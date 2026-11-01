@@ -132,6 +132,11 @@ std::string screenName()
     if (lv_screen_active() == Display::setPinScreen.getScreen()) return "set-pin";
     if (lv_screen_active() == Display::pendingApprovalScreen.getScreen()) return "pending-approval";
     if (lv_screen_active() == Display::connectionConfigurationScreen.getScreen()) return "settings";
+    if (lv_screen_active() == Display::statusScreen.getScreen()) return "status";
+    if (lv_screen_active() == Display::confirmScreen.getScreen()) return "confirm";
+    if (lv_screen_active() == Display::topUpScreen.getScreen()) return "top-up";
+    if (lv_screen_active() == Display::formsScreen.getScreen()) return "forms";
+    if (lv_screen_active() == Display::projectSelectScreen.getScreen()) return "project-select";
 #ifdef DEMO_MODE
     if (lv_screen_active() == Display::demoSettingsScreen.getScreen()) return "settings";
 #endif

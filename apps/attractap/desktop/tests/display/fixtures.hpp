@@ -2,6 +2,8 @@
 #include "sdl_display.hpp"
 #include "display/display.hpp"
 
+#include "../layout-check.hpp"
+
 #include <cassert>
 #include <cmath>
 #include <cstring>
@@ -63,6 +65,18 @@ inline void screenshot(const std::filesystem::path &directory, const char *name)
     SDL_DestroySurface(frame);
 }
 
+// The 480 x 480 panel only, without the device shell around it.
+inline void screenshotScreen(const std::filesystem::path &directory, const std::string &name)
+{
+    if (directory.empty()) return;
+    std::filesystem::create_directories(directory);
+    const SDL_Rect panel{10, 70, 480, 480};
+    SDL_Surface *frame = SDL_RenderReadPixels(renderer, &panel);
+    assert(frame);
+    assert(SDL_SavePNG(frame, (directory / name).c_str()));
+    SDL_DestroySurface(frame);
+}
+
 inline lv_obj_t *findLabel(lv_obj_t *root, const char *text)
 {
     if (lv_obj_check_type(root, &lv_label_class) && std::strcmp(lv_label_get_text(root), text) == 0)
@@ -80,6 +94,9 @@ inline void expectUmlaut(lv_obj_t *label)
     assert(!glyph.is_placeholder);
     assert(glyph.box_w > 0 && glyph.box_h > 0);
 }
+
+// The caption of a button in its error state: the warning sign, then the text.
+inline std::string warned(const char *text) { return std::string(LV_SYMBOL_WARNING " ") + text; }
 
 inline lv_obj_t *findWidget(lv_obj_t *root, const lv_obj_class_t *type)
 {
@@ -105,8 +122,30 @@ inline void expectReadableOption(lv_obj_t *label)
     assert(ratio >= 4.5);
 }
 
+inline lv_area_t coordsOf(lv_obj_t *object)
+{
+    lv_obj_update_layout(lv_obj_get_screen(object));
+    lv_area_t area;
+    lv_obj_get_coords(object, &area);
+    return area;
+}
+
+// Fails with a readable list when anything on the active screen overlaps, leaves the display
+// or touches the chrome on the top layer (see layout-check.hpp).
+inline void expectCleanLayout(const char *what)
+{
+    const auto problems = LayoutCheck::problems();
+    for (const auto &problem : problems) std::fprintf(stderr, "LAYOUT %s [%s]: %s\n", what, State::getActiveLanguage().c_str(), problem.c_str());
+    // LAYOUT_REPORT lists every problem of a run instead of stopping at the first screen.
+    assert(problems.empty() || std::getenv("LAYOUT_REPORT"));
+}
+
 void testSessionSummaryLifecycle();
-void testFormDrafts();
-void testPaymentPopup();
+void testFormScreens(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testScreenLayouts(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testStatusScreens(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testConfirmScreen(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testPendingApproval(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshots);

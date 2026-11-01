@@ -28,9 +28,13 @@ int main(int argc, char **argv)
     screenshot(screenshots, "device.png");
     testLockscreen(display, screenshots);
     testSessionSummaryLifecycle();
-    testFormDrafts();
-    testPaymentPopup();
+    testScreenLayouts(display, screenshots);
+    testStatusScreens(display, screenshots);
+    testConfirmScreen(display, screenshots);
+    testFormScreens(display, screenshots);
+    testTopUpScreen(display, screenshots);
     testPendingApproval(display, screenshots);
+    testGallery(display, screenshots);
 
     TouchPoint touch{};
     // The firmware still sees a 480 x 480 screen, offset inside the CAD face.

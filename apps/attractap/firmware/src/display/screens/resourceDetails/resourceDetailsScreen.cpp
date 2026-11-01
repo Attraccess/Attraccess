@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../shared/screenChrome.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
@@ -16,17 +17,15 @@ void ResourceDetailsScreen::init()
       return;
    }
    this->screen = lv_obj_create(NULL);
-   // Detail panels can exceed the display height, especially with many tutors.
-   lv_obj_add_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_scroll_dir(this->screen, LV_DIR_VER);
-   lv_obj_set_scrollbar_mode(this->screen, LV_SCROLLBAR_MODE_AUTO);
+   lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    DisplayTheme::applyScreen(this->screen);
    lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // The body scrolls above the device footer on the top layer, never under it.
+   lv_obj_set_style_pad_bottom(this->screen, ScreenChrome::Bottom, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    sessionHeader.create(this->screen, [this] {
       if (!this->actionInProgress && this->buttonClickCallback)
@@ -36,6 +35,19 @@ void ResourceDetailsScreen::init()
          this->buttonClickCallback({this, BUTTON_CLICK_TYPE_BACK, {}});
    });
    sessionHeader.setUser(this->loginUsernameCache);
+
+   // Detail panels can exceed the display height, especially with many tutors: they scroll in the body.
+   this->body = lv_obj_create(this->screen);
+   lv_obj_remove_style_all(this->body);
+   lv_obj_set_size(this->body, lv_pct(100), 0);
+   lv_obj_set_flex_grow(this->body, 1);
+   lv_obj_add_flag(this->body, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_scroll_dir(this->body, LV_DIR_VER);
+   lv_obj_set_scrollbar_mode(this->body, LV_SCROLLBAR_MODE_AUTO);
+   lv_obj_set_flex_flow(this->body, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(this->body, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+   // The sections keep the screen's row gap, as when they sat on the screen itself.
+   lv_obj_set_style_pad_row(this->body, lv_obj_get_style_pad_row(this->screen, LV_PART_MAIN), LV_PART_MAIN);
 
    this->createResourceHeader();
 
@@ -49,6 +61,12 @@ void ResourceDetailsScreen::init()
 
    this->applyCachedState();
    if (this->actionInProgress) this->showActionProgress(this->actionTitle);
+   // Back from a screen shown over the details (status, forms, ...) while a request is still
+   // pending: the input stays blocked, so the progress shows again.
+   lv_obj_add_event_cb(this->screen, [](lv_event_t *event) {
+      auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(event));
+      if (self->actionInProgress) self->showActionProgress(self->actionTitle);
+   }, LV_EVENT_SCREEN_LOAD_START, this);
 }
 void ResourceDetailsScreen::loop()
 {
@@ -73,30 +91,21 @@ void ResourceDetailsScreen::onButtonClick(lv_event_t *e)
    if (!evt->self->buttonClickCallback)
       return;
 
-   if (evt->buttonClickType != BUTTON_CLICK_TYPE_LOGOUT)
+   if (evt->buttonClickType != BUTTON_CLICK_TYPE_LOGOUT && evt->buttonClickType != BUTTON_CLICK_TYPE_BACK)
    {
-      evt->self->activeActionButton = static_cast<lv_obj_t *>(lv_event_get_current_target(e));
-      evt->self->activeActionLabel = lv_obj_get_child(evt->self->activeActionButton, 0);
-      evt->self->activeActionSpinner = lv_obj_get_child_count(evt->self->activeActionButton) > 1
-                                          ? lv_obj_get_child(evt->self->activeActionButton, 1)
-                                          : nullptr;
+      // Remember the button by role: a failure is shown on it even after a refresh rebuilt it.
+      // A tap on a button in its error state is a retry: ButtonError took the error away on
+      // LV_EVENT_PRESSED, which LVGL sends before this LV_EVENT_CLICKED.
+      evt->self->dropActionError();
+      evt->self->lastActionType = evt->buttonClickType;
+      evt->self->lastActionFlowId = evt->buttonClickType == BUTTON_CLICK_TYPE_FLOW_BUTTON ? evt->flowButtonId : "";
+      evt->self->lastActionRole = evt->self->roleOf(evt->buttonClickType);
    }
    evt->self->buttonClickCallback(*evt);
 }
 void ResourceDetailsScreen::onContainerDelete(lv_event_t *e)
 {
-   ButtonClickEventData *evt = static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
-   if (evt && evt->self && lv_event_get_target(e) == evt->self->activeActionButton)
-   {
-      // Flow buttons are rebuilt during resource refreshes while their request may still be pending.
-      evt->self->activeActionButton = nullptr;
-      evt->self->activeActionLabel = nullptr;
-      evt->self->activeActionSpinner = nullptr;
-   }
-   if (evt)
-   {
-      delete evt;
-   }
+   delete static_cast<ButtonClickEventData *>(lv_event_get_user_data(e));
 }
 std::string ResourceDetailsScreen::getName()
 {
@@ -117,18 +126,12 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
 void ResourceDetailsScreen::onScreenLeave()
 {
    this->hideActionProgressVisual();
-   if (this->successToast)
-   {
-      lv_obj_add_flag(this->successToast, LV_OBJ_FLAG_HIDDEN);
-   }
-   this->hideProjectsModal();
+   this->dropActionError();
 }
 
 void ResourceDetailsScreen::destroy()
 {
-   this->disposeProjectsModal();
-   this->disposeFormsModal();
-   this->disposeSuccessToast();
+   this->dropActionError();
 
    if (this->screen)
    {
@@ -136,6 +139,7 @@ void ResourceDetailsScreen::destroy()
    }
 
    this->screen = nullptr;
+   this->body = nullptr;
    sessionHeader.detach();
    actionOverlay.detach();
    this->sessionDetailsContainer = nullptr;
@@ -148,11 +152,6 @@ void ResourceDetailsScreen::destroy()
    this->projectsButton = nullptr;
    this->projectsButtonLabel = nullptr;
    this->clearProjectButton = nullptr;
-   this->projectsModalPanel = nullptr;
-   this->projectsListContainer = nullptr;
-   this->projectsPaginationLabel = nullptr;
-   this->projectsPrevButton = nullptr;
-   this->projectsNextButton = nullptr;
    this->startSessionButton = nullptr;
    this->startSessionButtonLabel = nullptr;
    this->stopSessionButton = nullptr;
@@ -160,20 +159,6 @@ void ResourceDetailsScreen::destroy()
    this->stopOtherUserNote = nullptr;
    this->doorControls = nullptr;
    this->flowButtonsContainer = nullptr;
-   this->formsModalPanel = nullptr;
-   this->formsModalContent = nullptr;
-   this->formsModalList = nullptr;
-   this->formsModalErrorLabel = nullptr;
-   this->formsModalProgressLabel = nullptr;
-   this->formsEditorOverlay = nullptr;
-   this->formsEditorTitleLabel = nullptr;
-   this->formsEditorTextarea = nullptr;
-   this->formsEditorSpacer = nullptr;
-   this->formsEditorKeyboard = nullptr;
-   this->formsBackButton = nullptr;
-   this->formsNextButton = nullptr;
-   this->formsNextLabel = nullptr;
-   this->formsNextSpinner = nullptr;
    this->elapsedTime = nullptr;
    this->usageStatsContainer = nullptr;
    this->meterValue = nullptr;
@@ -185,13 +170,10 @@ void ResourceDetailsScreen::destroy()
    this->maintenanceIntroducersLabel = nullptr;
    this->healthPanel = nullptr;
    this->healthReasonLabel = nullptr;
-   this->activeActionButton = nullptr;
-   this->activeActionLabel = nullptr;
-   this->activeActionSpinner = nullptr;
-   this->successToast = nullptr;
-   this->formsModalMeta = nullptr;
-   this->formsModalPage = nullptr;
-   this->formFieldWidgetCount = 0;
+   this->lockDoorButton = nullptr;
+   this->unlockDoorButton = nullptr;
+   this->unlatchDoorButton = nullptr;
+   this->flowButtons.clear();
 }
 void ResourceDetailsScreen::applyCachedState()
 {
@@ -298,6 +280,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
 
    // Rebuild flow buttons
    lv_obj_clean(this->flowButtonsContainer);
+   this->flowButtons.clear();
    for (uint8_t i = 0; i < resource.flowButtonCount; ++i)
    {
       const API::FlowButton &fb = resource.flowButtons[i];
@@ -311,6 +294,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
 
       ButtonClickEventData *evt = new ButtonClickEventData{this, BUTTON_CLICK_TYPE_FLOW_BUTTON, {}};
       strlcpy(evt->flowButtonId, fb.id, API::MAX_FLOW_BUTTON_ID_LEN);
+      this->flowButtons.emplace_back(fb.id, flowButton);
       lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onButtonClick, LV_EVENT_CLICKED, evt);
       lv_obj_add_event_cb(flowButton, &ResourceDetailsScreen::onContainerDelete, LV_EVENT_DELETE, evt);
 
@@ -439,6 +423,8 @@ void ResourceDetailsScreen::refreshAccessState()
          // - own session: solid danger red, full prominence, plain label, no note
          // - foreign session: soft danger surface, warning label + amber note
          bool isForeignStop = showStop && !ownsActiveUsage;
+         this->startIsTakeover = isTakeover;
+         this->stopIsForeign = isForeignStop;
          if (this->stopOtherUserNote)
          {
             lv_obj_set_flag(this->stopOtherUserNote, LV_OBJ_FLAG_HIDDEN, !isForeignStop);
@@ -468,4 +454,6 @@ void ResourceDetailsScreen::refreshAccessState()
    {
       lv_obj_set_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN, !ownsActiveUsage);
    }
+   // A failure waiting for this refresh goes back on its button, if it still means the same.
+   this->applyActionError();
 }

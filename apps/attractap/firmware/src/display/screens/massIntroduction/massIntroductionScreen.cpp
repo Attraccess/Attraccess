@@ -2,6 +2,8 @@
 #include "massIntroductionScreen.hpp"
 #include "../../theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
+#include "../../shared/resultLayout.hpp"
+#include "../../shared/screenChrome.hpp"
 #include <cstdio>
 #include <string>
 #include <functional>
@@ -10,16 +12,11 @@
 
 namespace
 {
-lv_obj_t *createWrappedLabel(lv_obj_t *parent, const lv_font_t *font, lv_color_t color)
+// Centred text that ends in dots after `maxLines` lines, so long names never push the layout
+// past the chrome.
+lv_obj_t *createWrappedLabel(lv_obj_t *parent, const lv_font_t *font, lv_color_t color, int32_t maxLines)
 {
-   lv_obj_t *label = lv_label_create(parent);
-   lv_obj_set_width(label, lv_pct(100));
-   lv_obj_set_height(label, LV_SIZE_CONTENT);
-   lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
-   lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(label, color, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(label, font, LV_PART_MAIN | LV_STATE_DEFAULT);
-   return label;
+   return ResultLayout::createText(parent, FirmwareI18n::Text(), font, color, maxLines);
 }
 }
 
@@ -35,11 +32,8 @@ void MassIntroductionScreen::init()
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
    DisplayTheme::applyScreen(this->screen);
-   lv_obj_set_style_pad_left(this->screen, 24, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(this->screen, 24, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_top(this->screen, 18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(this->screen, 18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_row(this->screen, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   ScreenChrome::applyInsets(this->screen);
+   lv_obj_set_style_pad_row(this->screen, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Countdown bar — full width, scaled to the whole session.
    this->timeoutBar = lv_bar_create(this->screen);
@@ -52,19 +46,19 @@ void MassIntroductionScreen::init()
    lv_obj_set_style_bg_opa(this->timeoutBar, 255, LV_PART_INDICATOR | LV_STATE_DEFAULT);
    lv_obj_set_style_radius(this->timeoutBar, 6, LV_PART_INDICATOR | LV_STATE_DEFAULT);
 
-   this->titleLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_28, DisplayTheme::muted());
+   this->titleLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_28, DisplayTheme::muted(), 1);
    FirmwareI18n::setLabel(this->titleLabel, FirmwareI18n::Message::MassIntroduction);
 
    // Target resource or group — what everyone gets introduced to. Most prominent line.
-   this->targetNameLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_36, DisplayTheme::text());
+   this->targetNameLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_36, DisplayTheme::text(), 2);
 
    // "N introduced · m:ss left"
-   this->progressLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
+   this->progressLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_18, DisplayTheme::muted(), 1);
 
    // Status line — colour + text reflect the current card.
-   this->statusLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_28, DisplayTheme::text());
+   this->statusLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_28, DisplayTheme::text(), 2);
 
-   this->hintLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_18, DisplayTheme::muted());
+   this->hintLabel = createWrappedLabel(this->screen, &attractap_font_montserrat_latin1_18, DisplayTheme::muted(), 2);
 
    // Cancel only takes this reader out of the session; the web QR code keeps working.
    this->cancelButton = lv_button_create(this->screen);
@@ -110,6 +104,8 @@ void MassIntroductionScreen::render(const View &view)
    lv_bar_set_range(this->timeoutBar, 0, durationSeconds > 0 ? (int32_t)durationSeconds : 1);
    this->updateCountdown(true);
    this->applyStatus();
+   // Size the texts now: their dot truncation needs the laid-out height.
+   if (this->screen) lv_obj_update_layout(this->screen);
 }
 
 void MassIntroductionScreen::setOnCancelCallback(std::function<void()> callback)

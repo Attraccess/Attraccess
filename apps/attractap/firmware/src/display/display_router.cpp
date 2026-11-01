@@ -10,6 +10,7 @@
 // retirement. Display::loop only asks this router to advance it.
 
 IScreen *Display::activeScreen = nullptr;
+IScreen *Display::parkedOrigin = nullptr;
 std::vector<IScreen *> Display::pendingDestroyScreens;
 uint32_t Display::transitionStartTime = 0;
 bool Display::transitionComplete = true;
@@ -71,6 +72,24 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
         previousScreen->onScreenLeave();
     }
 
+    // A transient screen parks the screen under it, state and all. Whatever
+    // else replaces the transient lets that origin unload as usual.
+    if (!screen->parksOrigin() && Display::parkedOrigin && Display::parkedOrigin != screen &&
+        Display::parkedOrigin->shouldAutoUnload() &&
+        std::find(Display::pendingDestroyScreens.begin(), Display::pendingDestroyScreens.end(), Display::parkedOrigin) ==
+            Display::pendingDestroyScreens.end())
+    {
+        Display::pendingDestroyScreens.push_back(Display::parkedOrigin);
+    }
+    if (!screen->parksOrigin())
+    {
+        Display::parkedOrigin = nullptr;
+    }
+    else if (previousScreen && !previousScreen->parksOrigin())
+    {
+        Display::parkedOrigin = previousScreen;
+    }
+
     Display::activeScreen = screen;
     if (Display::drawerGrabber) {
         if (screen == &Display::sessionSummaryScreen) lv_obj_add_flag(Display::drawerGrabber, LV_OBJ_FLAG_HIDDEN);
@@ -92,7 +111,7 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     // its callback is cancelled rather than being invoked for the wrong screen.
     Display::onTransitionComplete = onTransitionComplete;
 
-    if (previousScreen && previousScreen != screen && previousScreen->shouldAutoUnload())
+    if (previousScreen && previousScreen != screen && previousScreen != Display::parkedOrigin && previousScreen->shouldAutoUnload())
     {
         bool alreadyQueued =
             std::find(Display::pendingDestroyScreens.begin(),

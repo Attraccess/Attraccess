@@ -25,6 +25,11 @@
 #include "screens/supervision/supervisionScreen.hpp"
 #include "screens/massIntroduction/massIntroductionScreen.hpp"
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
+#include "screens/status/statusScreen.hpp"
+#include "screens/confirm/confirmScreen.hpp"
+#include "screens/topUp/topUpScreen.hpp"
+#include "screens/forms/formsScreen.hpp"
+#include "screens/projectSelect/projectSelectScreen.hpp"
 #ifdef DEMO_MODE
 #include "screens/demoSettings/demoSettingsScreen.hpp"
 #endif
@@ -64,6 +69,11 @@ public:
     static SupervisionScreen supervisionScreen;
     static MassIntroductionScreen massIntroductionScreen;
     static FirmwareUpdateScreen firmwareUpdateScreen;
+    static StatusScreen statusScreen;
+    static ConfirmScreen confirmScreen;
+    static TopUpScreen topUpScreen;
+    static FormsScreen formsScreen;
+    static ProjectSelectScreen projectSelectScreen;
 #ifdef DEMO_MODE
     static DemoSettingsScreen demoSettingsScreen;
 #endif
@@ -78,16 +88,30 @@ public:
     // The RGB565 frame on the panel (see IDisplayDriver::frameBuffer), or nullptr.
     // Callers hold lv_lock so no flush writes it meanwhile.
     static const uint8_t *frameBuffer();
+#ifdef ATTRACTAP_HOST
+    // Test access to the chrome on the top layer, which screens must keep clear of.
+    struct ChromePart
+    {
+        const char *name;
+        lv_obj_t *object;
+    };
+    static std::vector<ChromePart> chromeParts();
+#endif
 
     // Returns false if the display driver reported that touch hardware was not found at init.
     static bool hasTouchInput();
     static uint32_t touchPressSequence;
 
-    // Global error popup helpers
-    static void showErrorPopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message);
-    static void showBillingSummary(const std::string &total);
-    static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
-    static void hidePopup();
+    // Screens shown on top of the screen the user was on (see IScreen::parksOrigin).
+    // The router keeps that origin loaded until the user returns to it.
+    static bool isActive(const IScreen *screen);
+    static bool transientActive();
+    // Back to the origin; false when there is none (the caller resumes routing).
+    static bool returnFromTransient();
+    // The screen a transient screen was raised over, or nullptr.
+    static const IScreen *transientOrigin() { return transientActive() ? parkedOrigin : nullptr; }
+    static void showStatus(StatusScreen::Config config);
+    static void showConfirm(ConfirmScreen::Config config);
 
     // Hidden maintenance drawer: pulled down from the top edge, exposes
     // "Open Settings" and "Reboot" actions. The settings action is wired by the
@@ -105,8 +129,10 @@ public:
 
 private:
     static void setupFramebuffer();
-    static bool touchWarningPending;
-    static void showMessagePopup(const FirmwareI18n::Text &title, const FirmwareI18n::Text &message, bool error);
+    static constexpr uint32_t TouchWarningMs = 6000;
+    static uint32_t touchWarningRemainingMs;
+    static uint32_t touchWarningShownAt;
+    static void updateTouchWarning();
     // Dedicated LVGL task (ATT-554 item 7): runs lv_timer_handler (rendering +
     // indev/touch reads; self-locking via lv_lock) so UI refresh no longer
     // shares the main application loop with blocking work.
@@ -144,6 +170,7 @@ private:
     static uint32_t tick_cb();
 
     static void initDeviceOverlay();
+    static void refreshChromeLanguage(const std::string &language);
     static void updateNetworkQualityOverlay();
     static lv_obj_t *deviceNameLabel;
     static FirmwareI18n::Text deviceNameInitValue;
@@ -153,14 +180,14 @@ private:
     static State::NetworkQuality networkQualityOverlayValue;
     static bool networkQualityOverlayInitialized;
 
-    static lv_obj_t *activePopup;
-    static lv_timer_t *popupAutoCloseTimer;
+    // The screen a transient screen was raised over; see returnFromTransient.
+    static IScreen *parkedOrigin;
 
     // Maintenance drawer (display_drawer.cpp)
     static void initDrawer();
     static void openDrawer();
     static void closeDrawer();
-    static void showRebootConfirm();
+    static void requestReboot();
     static bool isDrawerAvailable();
     static void updateDrawerAvailability();
     // Fed every touch sample from touchpad_read to detect the top-edge pull-down
@@ -170,8 +197,8 @@ private:
     static lv_obj_t *drawerBackdrop;
     static lv_obj_t *drawerGrabber;
     static lv_obj_t *drawerPanel;
-    static lv_obj_t *rebootConfirmOverlay;
     static bool drawerOpen;
+    static bool rebootConfirmShown;
     static std::function<void()> onOpenSettingsCallback;
     static std::function<bool()> drawerAvailableCallback;
     static bool gestureCandidate;

@@ -96,7 +96,7 @@ void Application::setupApiCallbacks()
         this->currentProjectsUser = response.username;
         // Through the screen, so the refresh keeps the active search and stays the request it awaits.
         lv_lock();
-        Display::resourceDetailsScreen.refreshProjects();
+        Display::projectSelectScreen.refreshProjects();
         lv_unlock();
 #endif
 
@@ -141,13 +141,9 @@ void Application::setupErrorCallbacks()
           p->self->handleFormsCancel();
           Display::resourceDetailsScreen.hideActionProgress();
           if (p->enabled) {
-            Display::showInsufficientBalancePopup(
-                [self = p->self](uint32_t amountCents) {
-                  self->api.requestBillingTopup(amountCents);
-                },
-                []() {});
+            p->self->openTopUp();
           } else {
-            Display::showErrorPopup(FirmwareI18n::Message::Error, FirmwareI18n::readerError("INSUFFICIENT_BALANCE"));
+            p->self->showStatus(StatusScreen::warning(FirmwareI18n::Message::InsufficientBalance, FirmwareI18n::readerError("INSUFFICIENT_BALANCE")));
           }
           delete p;
         },
@@ -155,54 +151,30 @@ void Application::setupErrorCallbacks()
   });
 #endif
 
-  // Generic error fallback for all other errors
-  this->api.setErrorCallback([this](const char *title, const char *message) {
-    this->beeper.errorBeep();
-
+  // Errors the server reports for events that have no result callback of their own. `eventType`
+  // is the event that carried the error; only errors that belong to something on screen get UI.
+  this->api.setErrorCallback([this](const char *eventType, const char *code) {
 #ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_LOCKED)
-#else
-    if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
-#endif
-    {
-      this->nfc.enableCardDetection();
-    }
-
-#ifdef HAS_LVGL_DISPLAY
-    // Ensure UI operations on LVGL thread
+    this->logger.errorf("Reader error on %s: %s", eventType, code);
     struct ErrPayload {
       Application *self;
-      FirmwareI18n::Text t;
-      FirmwareI18n::Text m;
+      std::string eventType;
+      std::string code;
     };
-    ErrPayload *p = new ErrPayload();
-    if (!p)
-      return;
-    p->self = this;
-    p->t = FirmwareI18n::Message::Error;
-    this->logger.errorf("Reader error %s: %s", title, message);
-    p->m = FirmwareI18n::readerError(message);
+    auto *p = new ErrPayload{this, eventType, code};
     Display::asyncCall(
         [](void *u) {
-          auto *pl = (ErrPayload *)u;
-          if (!pl || !pl->self) {
-            if (pl)
-              delete pl;
-            return;
-          }
-          if (pl->self->cardAuthenticationPending) pl->self->finishCardAuthentication(false);
-          pl->self->finishReaderAction(false);
-          pl->self->handleFormsCancel();
-          Display::showErrorPopup(pl->t, pl->m);
-          if (pl && pl->self) {
-            pl->self->pendingActionType = PENDING_ACTION_NONE;
-            pl->self->hasPendingFormRequest = false;
-            pl->self->formFlowSubmitted = false;
-            Display::resourceDetailsScreen.hideFormsModal();
-          }
+          auto *pl = static_cast<ErrPayload *>(u);
+          pl->self->handleReaderError(pl->eventType, pl->code);
           delete pl;
         },
         p);
+#else
+    this->logger.errorf("Reader error on %s: %s", eventType, code);
+    this->beeper.errorBeep();
+    if (this->state == APPLICATION_STATE_WAIT_FOR_CARD) {
+      this->nfc.enableCardDetection();
+    }
 #endif
   });
 
@@ -221,7 +193,7 @@ void Application::setupErrorCallbacks()
 void Application::setupActionCallbacks()
 {
 #ifdef HAS_LVGL_DISPLAY
-  // Generic action result handling: stop overlay and show success toast
+  // Action results: the completion, billing or failure screen, or the error on the button.
   this->api.setActionResultCallback([this](const API::ActionResult &result) {
     struct Payload { Application *self; API::ActionResult result; };
     auto *payload = new Payload{this, result};
@@ -229,6 +201,14 @@ void Application::setupActionCallbacks()
       auto *payload = static_cast<Payload *>(data);
       auto *self = payload->self;
       const auto &result = payload->result;
+      // While a usage form is open the server refuses its fields or pages as a START error
+      // without a request id, also in stop flows: that is the form failing, not the action.
+      if (self->unlocked && self->hasPendingFormRequest && !result.success && self->api.isCurrentResourceAction(result.requestId) &&
+          (result.type == "START_RESOURCE_USAGE_SESSION" || result.type == "STOP_RESOURCE_USAGE_SESSION")) {
+        self->handleFormFlowError(result);
+        delete payload;
+        return;
+      }
       if (self->unlocked && self->pendingUiAction == result.type && self->api.isCurrentResourceAction(result.requestId)) {
         if (result.success && result.type == "STOP_RESOURCE_USAGE_SESSION" &&
             self->pendingActionType == PENDING_ACTION_STOP_SESSION && result.hasDuration &&
@@ -237,21 +217,24 @@ void Application::setupActionCallbacks()
           delete payload;
           return;
         }
+        const uint32_t resourceId = self->pendingUiResourceId;
+        const std::string resourceName = self->resourceNameOf(resourceId);
+        const bool returnToList = self->returnToListAfterAction;
         self->finishReaderAction(result.success);
         if (result.success) {
+          self->completedResourceName = resourceName;
           self->onActionResult(result.type);
           if (!result.billingTotal.empty()) {
             self->restartSessionTimeout();
-            Display::showBillingSummary(result.billingTotal);
+            self->billingSummaryShown = true;
+            self->showStatus(StatusScreen::billing(FirmwareI18n::Text::literal(result.billingTotal) /* i18n-data: Server-supplied formatted billing total; preserve exact amount and currency. */,
+                                                   FirmwareI18n::Text::literal(resourceName) /* i18n-data: Server-supplied resource name; preserve exact contents. */),
+                             returnToList);
           }
         }
         else {
           self->handleFormsCancel();
-          if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
-            Display::showInsufficientBalancePopup([self](uint32_t cents) { self->api.requestBillingTopup(cents); }, [] {});
-          } else {
-            Display::showErrorPopup(FirmwareI18n::Message::ActionFailed, result.error.empty() ? FirmwareI18n::Message::PleaseTryAgain : FirmwareI18n::readerError(result.error));
-          }
+          self->reportActionFailure(result, resourceId, returnToList);
         }
       }
       delete payload;
@@ -308,19 +291,26 @@ void Application::setupDisplayCallbacks()
         this->handleResourceDetailsButtonClick(evt);
       });
 
-  Display::resourceDetailsScreen.setProjectsPageRequestCallback(
-      [this](uint32_t page, const std::string &search) { return this->requestProjectsPage(page, search); });
   Display::resourceDetailsScreen.setProjectSelectionCallback(
       [this](uint32_t projectId, const std::string &projectName) {
         this->handleProjectSelection(projectId, projectName);
       });
-  Display::resourceDetailsScreen.setFormPageNextCallback(
+  Display::resourceDetailsScreen.setOpenProjectsCallback([this]() { this->openProjects(); });
+  Display::projectSelectScreen.setProjectsPageRequestCallback(
+      [this](uint32_t page, const std::string &search) { return this->requestProjectsPage(page, search); });
+  Display::projectSelectScreen.setCallbacks(
+      [this](uint32_t projectId, const std::string &projectName) {
+        this->handleProjectSelection(projectId, projectName);
+        Display::returnFromTransient();
+      },
+      []() { Display::returnFromTransient(); });
+  Display::formsScreen.setFormPageNextCallback(
       [this](const API::FormPageSubmission &page) {
         this->handleFormPageNext(page);
       });
-  Display::resourceDetailsScreen.setFormPageBackCallback(
+  Display::formsScreen.setFormPageBackCallback(
       [this]() { this->handleFormPageBack(); });
-  Display::resourceDetailsScreen.setFormsCancelCallback(
+  Display::formsScreen.setFormsCancelCallback(
       [this]() { this->handleFormsCancel(); });
 
   Display::setPinScreen.setOnPinConfirmedCallback(

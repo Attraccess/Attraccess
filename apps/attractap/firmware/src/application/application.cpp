@@ -140,7 +140,7 @@ void Application::loop() {
   this->api.loop();
 
 #ifdef HAS_LVGL_DISPLAY
-  // processState mutates LVGL (screen transitions, popups, screen setters);
+  // processState mutates LVGL (screen transitions, status screens, screen setters);
   // rendering runs on LvglTask, so serialize with lv_lock (recursive).
   lv_lock();
   this->processState();
@@ -167,8 +167,8 @@ void Application::finishReaderAction(bool success) {
   this->pendingUiAction.clear();
   this->waitingForResourceRefresh = true;
   this->pendingUiStartedAt = millis();
-  Display::resourceDetailsScreen.hideFormsModal();
   if (this->returnToListAfterAction) this->resourceIsSelected = false;
+  this->leaveForms();
   this->actionCompletionMessage = success
       ? FirmwareI18n::Text(type == "START_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageStarted
       : type == "STOP_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageEnded : FirmwareI18n::Message::ActionConfirmed)
@@ -181,7 +181,6 @@ void Application::finishReaderAction(bool success) {
 }
 
 void Application::beginSessionSummary(const API::ActionResult &result) {
-  Display::hidePopup();
   this->onActionResult(result.type);
   this->clearFormPageCache();
   this->pendingFormFieldsReady = false;
@@ -198,6 +197,7 @@ void Application::beginSessionSummary(const API::ActionResult &result) {
   this->waitingForResourceRefresh = false;
   this->returnToListAfterAction = false;
   this->actionCompletionMessage.clear();
+  this->billingSummaryShown = false;
   this->api.cancelResourceAction();
   this->resetPauseAccounting();
   Display::resourceListScreen.hideActionProgress();
@@ -228,7 +228,9 @@ void Application::logoutReader() {
   this->sessionSummaryVisible = false;
   this->sessionSummaryDismissRequested = false;
   Display::sessionSummaryScreen.clearSummary();
-  Display::hidePopup();
+  this->billingSummaryShown = false;
+  // A top-up answer that arrives later belongs to the user who just left.
+  this->topUpPending = false;
   this->handleFormsCancel();
   this->finishCardAuthentication(false);
   this->unlocked = false;
@@ -256,6 +258,8 @@ void Application::finishCardAuthentication(bool success) {
   if (success) {
     this->restartSessionTimeout();
     this->selectedResourceChanged = true;
+    this->topUpPending = false; // nothing of an earlier user's top-up reaches this one
+
   } else {
     State::setUserLanguage(false);
     this->externalState = EXTERNAL_STATE_NONE;

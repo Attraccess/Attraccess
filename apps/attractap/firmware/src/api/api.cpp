@@ -60,7 +60,7 @@ void API::loop()
     this->firmware.tick();
 }
 
-void API::setErrorCallback(std::function<void(const char *title, const char *message)> callback)
+void API::setErrorCallback(std::function<void(const char *eventType, const char *code)> callback)
 {
     this->errorCallback = callback;
 }
@@ -387,7 +387,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
                                    strcmp(eventType, "MASS_INTRODUCTION_END") == 0;
 
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    // Background stats failures must not interrupt start/stop controls with a popup.
+    // Background stats failures must not interrupt start/stop controls with an error.
     const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
     if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
         !isMassIntroductionEvent && inboundDoc["data"]["payload"].is<JsonObject>())
@@ -423,7 +423,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
                     if (this->errorCallback)
                     {
                         // The application owns localization; keep the code intact.
-                        this->errorCallback("Fehler", err.c_str());
+                        this->errorCallback(eventType, err.c_str());
                     }
                 }
                 // Do not process further

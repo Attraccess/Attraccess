@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "shared/powerOff/powerOffButton.hpp"
 #include "theme.hpp"
 #include "i18n.hpp"
 #include <vector>
@@ -26,7 +27,7 @@
 // collaborators live in sibling translation units:
 //   display_router.cpp  - screen routing (transitionToScreen)
 //   display_input.cpp   - flush + touch input dispatch
-//   display_popups.cpp  - global overlay popups
+//   display_transient.cpp - status/confirm screens shown over another screen
 //   display_overlay.cpp - persistent device-info overlay
 
 static std::string s_renderedLanguage;
@@ -37,12 +38,9 @@ void Display::refreshVisibleTextForLanguageChange()
     if (language == s_renderedLanguage) return;
     s_renderedLanguage = language;
     if (Display::activeScreen) FirmwareI18n::refreshTree(Display::activeScreen->getScreen(), language);
-    FirmwareI18n::refreshTree(Display::activePopup, language);
-    FirmwareI18n::refreshTree(Display::drawerPanel, language);
-    FirmwareI18n::refreshTree(Display::rebootConfirmOverlay, language);
-    // Project and form dialogs live on LVGL's top layer, outside the active
-    // screen tree. Refreshing the layer reaches those open dialogs as well.
-    FirmwareI18n::refreshTree(lv_layer_top(), language);
+    // The drawer, device footer and network badge live on LVGL's top layer,
+    // outside the active screen tree.
+    Display::refreshChromeLanguage(language);
 }
 
 // Static member definitions
@@ -74,28 +72,32 @@ ResetScreen Display::resetScreen;
 SupervisionScreen Display::supervisionScreen;
 MassIntroductionScreen Display::massIntroductionScreen;
 FirmwareUpdateScreen Display::firmwareUpdateScreen;
+StatusScreen Display::statusScreen;
+ConfirmScreen Display::confirmScreen;
+TopUpScreen Display::topUpScreen;
+FormsScreen Display::formsScreen;
+ProjectSelectScreen Display::projectSelectScreen;
 #ifdef DEMO_MODE
 DemoSettingsScreen Display::demoSettingsScreen;
 #endif
 
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
-lv_obj_t *Display::activePopup = nullptr;
-lv_timer_t *Display::popupAutoCloseTimer = nullptr;
 
 lv_obj_t *Display::drawerBackdrop = nullptr;
 lv_obj_t *Display::drawerGrabber = nullptr;
 lv_obj_t *Display::drawerPanel = nullptr;
 bool Display::drawerOpen = false;
-lv_obj_t *Display::rebootConfirmOverlay = nullptr;
+bool Display::rebootConfirmShown = false;
 std::function<void()> Display::onOpenSettingsCallback = nullptr;
 std::function<bool()> Display::drawerAvailableCallback = nullptr;
 bool Display::gestureCandidate = false;
 bool Display::gesturePrevPressed = false;
 int16_t Display::gestureStartY = 0;
 
-// Set during setup() if touch hardware was not found; popup is shown on the first loop() tick
-// to ensure LVGL is fully running before creating overlay objects.
-bool Display::touchWarningPending = false;
+// Set during setup() if touch hardware was not found: how long the warning still has to be
+// seen, and since when it is on screen (0: not shown right now).
+uint32_t Display::touchWarningRemainingMs = 0;
+uint32_t Display::touchWarningShownAt = 0;
 
 #if LV_USE_LOG != 0
 /* Serial debugging */
@@ -199,6 +201,41 @@ void Display::asyncCall(lv_async_cb_t cb, void *user_data)
 #endif
 }
 
+// Without touch nobody can dismiss anything: the warning shows over the first real screen
+// for its whole 6 s. Routing during start-up (init, then the list) can replace it early;
+// it then comes back over the next screen for the rest of its time.
+void Display::updateTouchWarning()
+{
+    if (Display::touchWarningRemainingMs == 0)
+        return;
+    if (Display::isActive(&Display::statusScreen) && Display::statusScreen.purpose() == StatusScreen::Purpose::TouchUnavailable)
+        return;
+    if (Display::touchWarningShownAt)
+    {
+        const uint32_t seen = millis() - Display::touchWarningShownAt;
+        Display::touchWarningShownAt = 0;
+        Display::touchWarningRemainingMs = seen >= Display::touchWarningRemainingMs ? 0 : Display::touchWarningRemainingMs - seen;
+        if (Display::touchWarningRemainingMs == 0)
+            return;
+    }
+    if (!Display::activeScreen || Display::activeScreen == &Display::bootScreen || Display::transientActive())
+        return;
+    StatusScreen::Config config = StatusScreen::warning(FirmwareI18n::Message::TouchUnavailable,
+                                                        FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot, false);
+    config.purpose = StatusScreen::Purpose::TouchUnavailable;
+    config.autoReturnMs = Display::touchWarningRemainingMs;
+    config.onDismiss = []
+    {
+        Display::touchWarningRemainingMs = 0;
+        Display::touchWarningShownAt = 0;
+        Display::returnFromTransient();
+    };
+    Display::showStatus(std::move(config));
+    Display::touchWarningShownAt = millis();
+    if (!Display::touchWarningShownAt)
+        Display::touchWarningShownAt = 1;
+}
+
 bool Display::hasTouchInput()
 {
     return Display::driver && Display::driver->touchAvailable();
@@ -207,6 +244,7 @@ bool Display::hasTouchInput()
 void Display::loop()
 {
 #ifdef ATTRACTAP_HOST
+    Display::updateTouchWarning();
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
     refreshVisibleTextForLanguageChange();
@@ -218,13 +256,7 @@ void Display::loop()
     // the duration (recursive FreeRTOS mutex, also taken by lv_timer_handler).
     lv_lock();
 
-    if (Display::touchWarningPending)
-    {
-        Display::touchWarningPending = false;
-        Display::showErrorPopup(FirmwareI18n::Message::TouchUnavailable,
-                                FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot);
-    }
-
+    Display::updateTouchWarning();
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
     refreshVisibleTextForLanguageChange();
@@ -257,6 +289,10 @@ void Display::setup()
 #endif
 {
     Display::logger.info("Initializing");
+#ifdef HAS_POWER_BUTTON
+    PowerOffButton::setConfirmPresenter([](ConfirmScreen::Config config) { Display::showConfirm(std::move(config)); },
+                                        [] { Display::returnFromTransient(); });
+#endif
 
 #ifdef ATTRACTAP_HOST
     Display::driver = &hostDriver;
@@ -282,6 +318,8 @@ void Display::setup()
     Display::initDeviceOverlay();
     Display::initDrawer();
     Display::transitionToScreen(&Display::bootScreen);
+    if (!Display::driver->touchAvailable())
+        Display::touchWarningRemainingMs = TouchWarningMs;
     Display::logger.info("Host display setup done");
 #else
 
@@ -436,7 +474,7 @@ void Display::setupFramebuffer()
     if (!Display::driver->touchAvailable())
     {
         Display::logger.warn("Touch panel not detected — warning will be shown after first render");
-        Display::touchWarningPending = true;
+        Display::touchWarningRemainingMs = TouchWarningMs;
     }
 
     // Rendering + touch sampling on a dedicated task (ATT-554 item 7), pinned to

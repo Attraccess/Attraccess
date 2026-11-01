@@ -22,6 +22,10 @@ void ReaderWorkflow::testSessionStart()
     list(true, false, false);
     assert(label(lv_screen_active(), "Status wird geladen"));
     active = true; list();
+    // The refresh confirms the start: a full-screen "usage started", then the list again.
+    assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Nutzung gestartet"));
+    display.capture(output, "03b-usage-started");
+    clearStatus();
     assert(label(lv_screen_active(), "Stop"));
     display.capture(output, "04-started-list");
     click("Lasercutter");

@@ -57,10 +57,13 @@ void Application::handleResourceListUpdate(
     this->endActionPause();
     Display::resourceListScreen.hideActionProgress();
     Display::resourceDetailsScreen.hideActionProgress();
-    if (!this->actionCompletionMessage.empty()) {
-      if (this->returnToListAfterAction) Display::resourceListScreen.showSuccessToast(this->actionCompletionMessage);
-      else Display::resourceDetailsScreen.showSuccessToast(this->actionCompletionMessage);
+    if (!this->actionCompletionMessage.empty() && !this->billingSummaryShown) {
+      // Back on the list when the action was started there; routing does that once the screen is done.
+      this->showStatus(StatusScreen::success(this->actionCompletionMessage,
+                                             FirmwareI18n::Text::literal(this->completedResourceName) /* i18n-data: Server-supplied resource name; preserve exact contents. */),
+                       this->returnToListAfterAction);
     }
+    this->billingSummaryShown = false;
     this->returnToListAfterAction = false;
     this->actionCompletionMessage.clear();
   }
@@ -88,7 +91,7 @@ bool Application::requestProjectsPage(uint32_t page, const std::string &search) 
 void Application::clearProjectSelection() {
   this->clearSelectedProject();
   lv_lock();
-  Display::resourceDetailsScreen.resetProjectsSearch();
+  Display::projectSelectScreen.resetProjectsSearch();
   lv_unlock();
   this->projectsCurrentPage = 1;
   this->projectsTotalCount = 0;
@@ -168,7 +171,6 @@ void Application::resetSessionOnDisconnect() {
   this->sessionSummaryDismissRequested = false;
   Display::sessionSummaryScreen.clearSummary();
   this->logger.info("Connectivity lost; resetting session state");
-  Display::hidePopup();
 
   // Ensure any in-progress UI overlays are dismissed
   Display::resourceDetailsScreen.hideActionProgress();
@@ -181,7 +183,11 @@ void Application::resetSessionOnDisconnect() {
   this->returnToListAfterAction = false;
   this->waitingForResourceRefresh = false;
   this->actionCompletionMessage.clear();
-  Display::resourceDetailsScreen.hideFormsModal();
+  Display::formsScreen.resetForm();
+  this->billingSummaryShown = false;
+  this->topUpPending = false;
+  this->formPageSubmitPending = false;
+  this->rerouteRequested = false;
   this->resetPauseAccounting();
 
   this->pendingActionType = PENDING_ACTION_NONE;
@@ -406,6 +412,58 @@ void Application::endActionPause() {
     Display::resourceDetailsScreen.setSessionTimeoutPaused(false);
   Display::resourceListScreen.setSessionTimeoutPaused(false);
   }
+}
+
+
+void Application::openTopUp(bool keepAmount) {
+  // A late balance error for a session that already ended has nobody to top up.
+  if (!this->unlocked || this->state == APPLICATION_STATE_TOP_UP) return;
+  if (!keepAmount) Display::topUpScreen.reset();
+  Display::topUpScreen.setCallbacks(
+      [this](uint32_t amountCents) {
+        if (this->state != APPLICATION_STATE_TOP_UP || !this->unlocked) return;
+        this->leaveTopUp();
+        this->api.requestBillingTopup(amountCents);
+        this->topUpPending = true;
+        this->showStatus(StatusScreen::info(FirmwareI18n::Message::TopUpStarted, FirmwareI18n::Message::PleaseContinueAtThePaymentTerminal));
+      },
+      [this]() { this->leaveTopUp(); });
+  this->state = APPLICATION_STATE_TOP_UP;
+  Display::transitionToScreen(&Display::topUpScreen);
+}
+
+void Application::leaveTopUp() {
+  if (this->state != APPLICATION_STATE_TOP_UP) return;
+  if (this->resourceIsSelected) {
+    this->state = APPLICATION_STATE_UNLOCKED;
+    Display::transitionToScreen(&Display::resourceDetailsScreen);
+  } else {
+    this->state = APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED;
+    Display::resourceListScreen.setAuthenticatedUser(this->cardAuthenticationData.username);
+    Display::transitionToScreen(&Display::resourceListScreen);
+  }
+}
+
+// Back from the form screen: to the details it was raised over, or to the list when the action
+// was started there (the selection is already cleared then).
+void Application::leaveForms() {
+  Display::formsScreen.resetForm();
+  this->formPageSubmitPending = false;
+  if (!Display::isActive(&Display::formsScreen)) return;
+  if (this->resourceIsSelected) {
+    Display::returnFromTransient();
+    return;
+  }
+  this->state = this->unlocked ? APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED : APPLICATION_STATE_RESOURCE_LIST;
+  Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "");
+  Display::transitionToScreen(&Display::resourceListScreen);
+}
+
+void Application::openProjects() {
+  Display::projectSelectScreen.setSelectedProject(this->selectedProjectId);
+  Display::projectSelectScreen.setResourceName(this->resourceNameOf(this->selectedResourceId));
+  Display::projectSelectScreen.begin();
+  Display::transitionToScreen(&Display::projectSelectScreen);
 }
 
 #endif

@@ -1,5 +1,6 @@
 #include "display/i18n.hpp"
 #include "resourceListScreen.hpp"
+#include "../../shared/screenChrome.hpp"
 #include "../../images/logo_40h.hpp"
 #include "../../images/lockscreen_background_image.hpp"
 #include "../../shared/wallClockText.hpp"
@@ -22,6 +23,8 @@ void ResourceListScreen::init() {
     DisplayTheme::applyScreen(screen);
     lv_obj_set_style_bg_image_src(screen, &lockscreen_background_image, 0);
     lv_obj_set_style_pad_all(screen, 20, 0);
+    // The hint line at the bottom stays above the device footer on the top layer.
+    lv_obj_set_style_pad_bottom(screen, ScreenChrome::Bottom, 0);
     lv_obj_set_style_pad_row(screen, 16, 0);
     lv_obj_remove_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_flex_flow(screen, LV_FLEX_FLOW_COLUMN);
@@ -46,11 +49,16 @@ void ResourceListScreen::init() {
     lv_obj_set_style_pad_row(resourceContainer, 10, 0);
     lv_obj_set_scroll_dir(resourceContainer, LV_DIR_VER);
     lv_obj_set_scrollbar_mode(resourceContainer, LV_SCROLLBAR_MODE_AUTO);
-    footerShowsSuccess = false;
     footer = text(screen, FirmwareI18n::Text(), &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
     lv_obj_set_height(footer, 18);
     renderRows();
     if (busy) overlay.show(screen, actionTitle, actionResource);
+    // Back from a screen shown over the list (status, forms, ...) while a request is still
+    // pending: the input stays blocked, so the progress shows again.
+    lv_obj_add_event_cb(screen, [](lv_event_t *event) {
+        auto *self = static_cast<ResourceListScreen *>(lv_event_get_user_data(event));
+        if (self->busy) self->overlay.show(self->screen, self->actionTitle, self->actionResource);
+    }, LV_EVENT_SCREEN_LOAD_START, this);
     loop();
 }
 
@@ -63,7 +71,6 @@ void ResourceListScreen::setAuthenticatedUser(const std::string &value) {
     if (username == value) return;
     username = value;
     sessionHeader.setUser(username);
-    successMessage.clear();
     renderRows();
     loop();
 }
@@ -75,9 +82,11 @@ void ResourceListScreen::renderRows() {
     updateClockHeader();
     const auto scroll = lv_obj_get_scroll_y(resourceContainer);
     lv_obj_clean(resourceContainer);
+    actionButtons.clear();
     for (uint16_t i = 0; i < cachedResourceList.count; ++i) addResourceListItem(cachedResourceList.items[i]);
     lv_obj_update_layout(resourceContainer);
     lv_obj_scroll_to_y(resourceContainer, scroll, LV_ANIM_OFF);
+    applyActionError();
 }
 
 void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource) {
@@ -142,6 +151,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
         break;
     }
     auto *primary = makeButton(true, color);
+    actionButtons[resource.id] = {primary, action};
     auto *actionLabel = text(primary, caption, &attractap_font_montserrat_latin1_20, DisplayTheme::onPrimary());
     lv_obj_set_style_text_align(actionLabel, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(actionLabel);
@@ -170,15 +180,39 @@ void ResourceListScreen::onClicked(lv_event_t *event) {
 
 void ResourceListScreen::showActionProgress(const FirmwareI18n::Text &title, const FirmwareI18n::Text &resource) {
     busy = true;
+    // A retry (or any other action) takes an earlier failure away for good.
+    errorResourceId = 0;
+    rowError.clear();
     actionTitle = title.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseWait) : title;
     actionResource = resource;
     overlay.show(screen, actionTitle, actionResource);
 }
-void ResourceListScreen::hideActionProgress() { busy = false; overlay.hide(); }
-void ResourceListScreen::showSuccessToast(const FirmwareI18n::Text &message) {
-    successMessage = message.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::Success) : message;
-    successUntil = millis() + 3000;
-    loop();
+void ResourceListScreen::hideActionProgress() { busy = false; overlay.hide(); applyActionError(); }
+bool ResourceListScreen::showActionError(uint32_t resourceId, const FirmwareI18n::Text &text) {
+    const auto row = actionButtons.find(resourceId);
+    if (row == actionButtons.end()) return false;
+    errorResourceId = resourceId;
+    errorAction = row->second.action;
+    errorText = text;
+    errorUntil = 0;
+    applyActionError();
+    return true;
+}
+// The error outlives a row rebuild: the refresh that follows a failed action replaces every
+// row, and the failure must stay on the button until it expires. It waits while the status
+// refresh covers the list, its 4 s start once it is visible, and it is dropped when the row's
+// action changed meanwhile (a retry must not start what the button no longer says).
+bool ResourceListScreen::applyActionError() {
+    if (!errorResourceId || !screen) return false;
+    const auto row = actionButtons.find(errorResourceId);
+    if (row == actionButtons.end() || row->second.action != errorAction) { errorResourceId = 0; rowError.clear(); return false; }
+    if (busy) return true;
+    if (!errorUntil) errorUntil = millis() + ButtonError::DurationMs;
+    const int32_t remaining = static_cast<int32_t>(errorUntil - millis());
+    if (remaining <= 0) { errorResourceId = 0; rowError.clear(); return false; }
+    if (rowError.target() != row->second.button)
+        rowError.show(row->second.button, errorText, static_cast<uint32_t>(remaining), [this] { errorResourceId = 0; });
+    return true;
 }
 // Signed out, the logo row becomes a wall clock once the time is known.
 void ResourceListScreen::createClockHeader() {
@@ -227,15 +261,12 @@ void ResourceListScreen::loop() {
     sessionHeader.update();
     updateClockHeader();
     if (!footer) return;
-    if (!successMessage.empty() && static_cast<int32_t>(successUntil - millis()) <= 0) successMessage.clear();
-    setLabelTextIfChanged(footer, !successMessage.empty() ? successMessage : username.empty() ? FirmwareI18n::Message::TapNfcCardOrOpenAResource : FirmwareI18n::Message::ResourceOnTheLeftDetailsActionOnTheRight);
-    if (footerShowsSuccess != !successMessage.empty()) {
-        footerShowsSuccess = !successMessage.empty();
-        lv_obj_set_style_text_color(footer, footerShowsSuccess ? DisplayTheme::success() : DisplayTheme::muted(), 0);
-    }
+    setLabelTextIfChanged(footer, username.empty() ? FirmwareI18n::Message::TapNfcCardOrOpenAResource : FirmwareI18n::Message::ResourceOnTheLeftDetailsActionOnTheRight);
 }
-void ResourceListScreen::onScreenLeave() { overlay.hide(); }
+void ResourceListScreen::onScreenLeave() { overlay.hide(); rowError.clear(); errorResourceId = 0; }
 void ResourceListScreen::destroy() {
+    rowError.clear();
+    actionButtons.clear();
     if (screen) lv_obj_delete(screen);
     screen = logo = loginContainer = resourceContainer = footer = nullptr;
     clockHeader = clockTime = clockWeekday = clockDate = nullptr;

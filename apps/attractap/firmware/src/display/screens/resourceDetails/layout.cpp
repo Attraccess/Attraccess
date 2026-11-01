@@ -23,6 +23,7 @@ void ResourceDetailsScreen::createDoorControls()
    lv_obj_add_flag(this->doorControls, LV_OBJ_FLAG_HIDDEN);
 
    lv_obj_t *lockDoorButton = lv_button_create(this->doorControls);
+   this->lockDoorButton = lockDoorButton;
    lv_obj_set_height(lockDoorButton, 50);
    lv_obj_set_width(lockDoorButton, lv_pct(30));
    lv_obj_set_align(lockDoorButton, LV_ALIGN_CENTER);
@@ -38,6 +39,7 @@ void ResourceDetailsScreen::createDoorControls()
    FirmwareI18n::setLabel(labelForLockDoorButton, FirmwareI18n::Message::Lock);
 
    lv_obj_t *unlockDoorButton = lv_button_create(this->doorControls);
+   this->unlockDoorButton = unlockDoorButton;
    lv_obj_set_height(unlockDoorButton, 50);
    lv_obj_set_width(unlockDoorButton, lv_pct(30));
    lv_obj_set_align(unlockDoorButton, LV_ALIGN_CENTER);
@@ -53,6 +55,7 @@ void ResourceDetailsScreen::createDoorControls()
    FirmwareI18n::setLabel(labelForUnlockDoorButton, FirmwareI18n::Message::Unlock);
 
    lv_obj_t *unlatchDoorButton = lv_button_create(this->doorControls);
+   this->unlatchDoorButton = unlatchDoorButton;
    lv_obj_set_height(unlatchDoorButton, 50);
    lv_obj_set_width(unlatchDoorButton, lv_pct(30));
    lv_obj_set_align(unlatchDoorButton, LV_ALIGN_CENTER);
@@ -84,7 +87,7 @@ void ResourceDetailsScreen::createDoorControls()
 
 void ResourceDetailsScreen::createResourceHeader()
 {
-   lv_obj_t *header = lv_obj_create(this->screen);
+   lv_obj_t *header = lv_obj_create(this->body);
    lv_obj_remove_style_all(header);
    lv_obj_set_width(header, lv_pct(100));
    lv_obj_set_height(header, LV_SIZE_CONTENT);
@@ -126,7 +129,7 @@ void ResourceDetailsScreen::createResourceHeader()
 
 void ResourceDetailsScreen::createSessionControls()
 {
-   this->sessionControls = lv_obj_create(this->screen);
+   this->sessionControls = lv_obj_create(this->body);
    lv_obj_remove_style_all(this->sessionControls);
    lv_obj_set_width(this->sessionControls, lv_pct(100));
    lv_obj_set_height(this->sessionControls, LV_SIZE_CONTENT);
@@ -225,7 +228,7 @@ void ResourceDetailsScreen::createSessionControls()
 
 void ResourceDetailsScreen::createSessionDetails()
 {
-   this->sessionDetailsContainer = lv_obj_create(this->screen);
+   this->sessionDetailsContainer = lv_obj_create(this->body);
    lv_obj_remove_style_all(this->sessionDetailsContainer);
    lv_obj_set_width(this->sessionDetailsContainer, lv_pct(100));
    lv_obj_set_height(this->sessionDetailsContainer, LV_SIZE_CONTENT);
@@ -329,7 +332,7 @@ void ResourceDetailsScreen::createSessionDetails()
 
 void ResourceDetailsScreen::createStatusPanels()
 {
-   this->usageStatsContainer = lv_obj_create(this->screen);
+   this->usageStatsContainer = lv_obj_create(this->body);
    DisplayTheme::applySurface(this->usageStatsContainer);
    lv_obj_set_width(this->usageStatsContainer, lv_pct(100));
    lv_obj_set_height(this->usageStatsContainer, LV_SIZE_CONTENT);
@@ -362,7 +365,7 @@ void ResourceDetailsScreen::createStatusPanels()
    this->operatingValue = createStat(FirmwareI18n::Message::OperatingTime);
    lv_obj_add_flag(this->usageStatsContainer, LV_OBJ_FLAG_HIDDEN);
 
-   this->noIntroductionPanel = lv_obj_create(this->screen);
+   this->noIntroductionPanel = lv_obj_create(this->body);
    lv_obj_set_width(this->noIntroductionPanel, lv_pct(100));
    lv_obj_set_height(this->noIntroductionPanel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->noIntroductionPanel, LV_ALIGN_CENTER);
@@ -391,7 +394,7 @@ void ResourceDetailsScreen::createStatusPanels()
     FirmwareI18n::setLabel(this->introducersListLabel, FirmwareI18n::Text::literal("???") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
     lv_obj_set_style_text_font(this->introducersListLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   this->maintenancePanel = lv_obj_create(this->screen);
+   this->maintenancePanel = lv_obj_create(this->body);
    lv_obj_set_width(this->maintenancePanel, lv_pct(100));
    lv_obj_set_height(this->maintenancePanel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->maintenancePanel, LV_ALIGN_CENTER);
@@ -420,7 +423,7 @@ void ResourceDetailsScreen::createStatusPanels()
     FirmwareI18n::setLabel(this->maintenanceIntroducersLabel, FirmwareI18n::Text::literal("???") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
     lv_obj_set_style_text_font(this->maintenanceIntroducersLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   this->healthPanel = lv_obj_create(this->screen);
+   this->healthPanel = lv_obj_create(this->body);
    lv_obj_set_width(this->healthPanel, lv_pct(100));
    lv_obj_set_height(this->healthPanel, LV_SIZE_CONTENT);
    lv_obj_set_align(this->healthPanel, LV_ALIGN_CENTER);

@@ -36,6 +36,37 @@ Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig n
 
 Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen der Maschine deren Details. Tippen Sie auf **Projekt wählen**, wählen Sie Ihr Projekt aus und starten Sie die Nutzung dort. Wenn Sie direkt aus der Liste starten, wird die Nutzung ohne Projekt erfasst.
 
+### Ergebnisse, Meldungen und niedriges Guthaben
+
+Der Leser zeigt Ergebnisse auf einem eigenen Vollbild und kehrt danach zu Ihrem Bildschirm zurück:
+
+- Ein grüner Haken mit **Nutzung gestartet** oder **Nutzung beendet** und dem Ressourcennamen, oder **Aktion bestätigt** nach einer Tür- oder Ablauf-Schaltfläche. Tippen Sie irgendwo, um fortzufahren, oder warten Sie einen Moment.
+- Der Bildschirm **Gesamtkosten dieser Sitzung** mit dem Betrag, wenn ein Stopp abgerechnet wird. Tippen Sie auf **OK** oder warten Sie.
+- Ein rotes Kreuz mit **Anmeldung fehlgeschlagen**, wenn die Karte nicht akzeptiert wird. Tippen Sie auf **OK** oder halten Sie Ihre Karte erneut an den Leser.
+- Eine Warnung mit Erklärung, zum Beispiel **Status nicht verfügbar**, wenn der Leser Sie abgemeldet hat, weil der Maschinenstatus nicht geladen wurde. Tippen Sie auf **OK**, warten Sie, oder halten Sie Ihre Karte an den Leser, um sich erneut anzumelden.
+
+![Nutzung gestartet: ein grüner Haken mit dem Ressourcennamen](../../_media/attractap/usage-started.png)
+
+![Gesamtkosten der Sitzung auf einem eigenen Bildschirm](../../_media/attractap/billing-total.png)
+
+![Anmeldung fehlgeschlagen: ein rotes Kreuz, der Grund und eine OK-Schaltfläche](../../_media/attractap/sign-in-failed.png)
+
+Schlägt die Aktion einer einzelnen Schaltfläche fehl, zum Beispiel **Start**, färbt sich die Schaltfläche selbst etwa vier Sekunden rot und zeigt **⚠ Fehlgeschlagen – erneut tippen** oder den Grund, zum Beispiel **⚠ Karte ist nicht aktiv**. Sie behält Größe und Platz, sonst bewegt sich nichts auf dem Bildschirm. Tippen Sie darauf, um es erneut zu versuchen. Lädt der Leser nach dem Fehler den Maschinenstatus neu, erscheint die Meldung erst, wenn der Status da ist. Bedeutet die Schaltfläche inzwischen etwas anderes, etwa weil jemand anderes die Maschine gestartet hat, entfällt die Meldung. Ist die Schaltfläche nicht mehr da, zeigt der Leser den Bildschirm **Etwas ist schiefgelaufen** mit dem Fehlercode und einer Schaltfläche **Zurück**.
+
+Dasselbe gilt für Nutzungsformulare: Kann der Server eine Seite nicht annehmen, erscheint der Grund auf **Weiter** oder **Absenden**; lässt sich das Formular gar nicht laden, schließt es sich und der Grund erscheint auf der Schaltfläche, die es geöffnet hat.
+
+![Eine fehlgeschlagene Start-Schaltfläche, rot und an Ort und Stelle](../../_media/attractap/button-error.png)
+
+![Etwas ist schiefgelaufen, mit Fehlercode und einer Zurück-Schaltfläche](../../_media/attractap/generic-error.png)
+
+Schlägt eine Aktion wegen zu geringen Guthabens fehl und hat der Leser ein Zahlungsterminal, öffnet der Leser den Bildschirm **Unzureichendes Guthaben**. Geben Sie den Betrag in ganzen Euro auf dem Ziffernblock ein, tippen Sie auf **Aufladen** und fahren Sie am Zahlungsterminal fort, sobald **Aufladung gestartet** erscheint. Ein fehlender Betrag oder eine vom Server abgelehnte Aufladung erscheint wie bei einer fehlgeschlagenen Schaltfläche auf **Aufladen**; der eingegebene Betrag bleibt erhalten. **Abbrechen** bringt Sie zurück. Auch Nutzungsformulare und die Projektauswahl sind eigene Bildschirme. Meldet der Leser Sie währenddessen ab, wird der geöffnete Bildschirm wie jeder andere ersetzt.
+
+![Der Bildschirm zum Aufladen mit Ziffernblock](../../_media/attractap/top-up.png)
+
+Der Neustart aus dem Wartungsmenü und das Ausschalten des Lesers (bei Geräten mit Ein/Aus-Taste) fragen auf einem eigenen Vollbild nach, mit **Abbrechen** und der Aktion nebeneinander.
+
+![Neustart-Rückfrage mit Abbrechen und Neustart nebeneinander](../../_media/attractap/reboot-confirm.png)
+
 ## Live-Statistiken ansehen
 
 Tippen Sie nach der Anmeldung auf den Namen der Maschine, die Sie gerade nutzen. Die Details zeigen die Sitzungsdauer sowie **Aktuelle Nutzung** mit dem Energieverbrauch in **kWh**, der Betriebszeit und dem Status „Läuft“ oder „Leerlauf“. Die Messwerte werden alle 10 Sekunden aktualisiert, solange Sie die Details ansehen.

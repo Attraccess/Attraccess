@@ -190,12 +190,43 @@ target_compile_options(attractap-demo-session-clock-tests PRIVATE -Wall -Wextra 
 target_link_libraries(attractap-demo-session-clock-tests PRIVATE attractap-production-host)
 add_test(NAME attractap-demo-session-clock-tests COMMAND attractap-demo-session-clock-tests)
 
-add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp tests/display/pending-approval.test.cpp)
+add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-screens.test.cpp tests/display/screens.test.cpp tests/display/pending-approval.test.cpp tests/display/layouts.test.cpp tests/display/gallery.test.cpp)
 target_link_libraries(attractap-desktop-display-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-desktop-display-tests COMMAND attractap-desktop-display-tests)
 set_tests_properties(attractap-desktop-display-tests PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_RENDER_DRIVER=software")
+
+# Hardware variants on the host: the power button exists on V4 hardware only, so the production
+# display is compiled with it (router, connection settings, the power-off confirmation and its
+# wiring); and a panel without touch. The application is left out: it powers off through the V4
+# IO expander.
+set(ATTRACTAP_HARDWARE_SOURCES ${ATTRACTAP_FIRMWARE_SOURCES})
+list(FILTER ATTRACTAP_HARDWARE_SOURCES EXCLUDE REGEX "/application/")
+add_executable(attractap-hardware-tests
+    tests/hardware/main.cpp
+    src/profile_store.cpp
+    ${ATTRACTAP_HARDWARE_SOURCES}
+    ${ATTRACTAP_LATIN1_FONTS}
+    src/host_beeper.cpp
+    src/host_utils.cpp
+    "${CMAKE_CURRENT_BINARY_DIR}/logos.S")
+target_include_directories(attractap-hardware-tests PRIVATE src/shims src "${FIRMWARE_DIR}/src")
+target_compile_definitions(attractap-hardware-tests PRIVATE
+    ATTRACTAP_HOST
+    HAS_LVGL_DISPLAY
+    HAS_POWER_BUTTON
+    DEMO_MODE
+    FIRMWARE_NAME="attractap-desktop"
+    FIRMWARE_VARIANT="desktop"
+    PIN_ETH_SPI_CS=-1
+    LOG_LEVEL_NUM=3
+    FIRMWARE_VERSION="desktop"
+    FIRMWARE_FRIENDLY_NAME="Attractap"
+    FIRMWARE_VARIANT_FRIENDLY_NAME="Desktop")
+target_compile_options(attractap-hardware-tests PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-UNDEBUG>")
+target_link_libraries(attractap-hardware-tests PRIVATE SDL3::SDL3 lvgl::lvgl ArduinoJson Threads::Threads ${ATTRACTAP_MBEDTLS_LIBRARIES})
+add_test(NAME attractap-hardware-tests COMMAND attractap-hardware-tests)
 
 # The API E2E suite launches this probe against a disposable Nest application.
 add_executable(attractap-desktop-real-api tests/real_api.cpp)
@@ -218,7 +249,8 @@ add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-
 add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
 add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
 set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)
-set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 120)
+# About 160 s on a developer machine; leave room for loaded CI runners.
+set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 300)
 
 # A reader without credentials: pairing channel, pending screen with and without QR, approval.
 add_executable(attractap-reader-pairing-tests tests/pairing/main.cpp)
@@ -228,8 +260,8 @@ add_test(NAME attractap-reader-pairing-tests COMMAND attractap-reader-pairing-te
 set_tests_properties(attractap-reader-pairing-tests PROPERTIES TIMEOUT 60)
 
 add_test(NAME attractap-reader-timeout-tests COMMAND attractap-reader-workflow-tests --timeouts)
-# Includes the bilingual reader journey plus four real 30-second expiry windows.
-set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 240)
+# Twelve real 30-second expiry windows without the journey (about 6.5 minutes).
+set_tests_properties(attractap-reader-timeout-tests PROPERTIES TIMEOUT 780)
 
 # Exercise the production beeper without playing sound on the developer's machine.
 set_property(TEST
@@ -241,4 +273,5 @@ set_property(TEST
     attractap-ota-interrupt-reset
     attractap-reader-timeout-tests
     attractap-reader-pairing-tests
+    attractap-hardware-tests
     APPEND PROPERTY ENVIRONMENT "SDL_AUDIO_DRIVER=dummy")

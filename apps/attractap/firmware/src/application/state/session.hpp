@@ -52,6 +52,30 @@ uint32_t resourceRefreshRequestId = 0;
 
 #if defined(HAS_LVGL_DISPLAY)
     FirmwareI18n::Text actionCompletionMessage;
+    std::string completedResourceName;
+    // The billing total screen already answers the action; the completion screen must not replace it.
+    bool billingSummaryShown = false;
+#endif
+
+#if defined(HAS_LVGL_DISPLAY)
+// What routing depends on. A status screen the application raised keeps routing
+// from replacing it for as long as this is unchanged.
+struct RoutingKey
+{
+    applicationState_t state;
+    bool unlocked;
+    bool resourceIsSelected;
+    uint32_t selectedResourceId;
+    bool operator==(const RoutingKey &) const = default;
+};
+bool statusHeld = false;
+RoutingKey statusHoldKey{};
+// Leaving a status screen without a screen to return to: route from the state again.
+bool rerouteRequested = false;
+// A top-up request was sent; only its refusal reopens the top-up screen.
+bool topUpPending = false;
+// A usage-form page was submitted and its result is outstanding.
+bool formPageSubmitPending = false;
 #endif
 
 #if defined(HAS_LVGL_DISPLAY)

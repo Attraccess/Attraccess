@@ -42,7 +42,8 @@ void Application::handleFormsRequest(
     Display::transitionToScreen(&Display::resourceDetailsScreen);
   }
   Display::resourceDetailsScreen.hideActionProgress();
-  Display::resourceDetailsScreen.showFormsModal(this->pendingFormRequest);
+  Display::formsScreen.showForm(this->pendingFormRequest);
+  Display::transitionToScreen(&Display::formsScreen);
   this->requestCurrentFormField();
 }
 
@@ -79,7 +80,7 @@ void Application::onActionResult(const std::string &eventType) {
     this->hasPendingFormRequest = false;
     this->hasPendingServerFormFlow = false;
     this->formFlowSubmitted = false;
-    Display::resourceDetailsScreen.hideFormsModal();
+    this->leaveForms();
   }
 }
 
@@ -144,7 +145,7 @@ void Application::clearFormPageCache() {
 void Application::renderFormFieldPage(
     const API::ResourceUsageFormFieldsPage &page) {
   bool canGoBack = this->globalFormFieldNumber() > 1;
-  Display::resourceDetailsScreen.renderFormField(
+  Display::formsScreen.renderFormField(
       page, canGoBack, this->isLastFormField(), this->globalFormFieldNumber(),
       this->totalFormFields());
 }
@@ -303,6 +304,7 @@ void Application::handleFormPageNext(const API::FormPageSubmission &page) {
   if (!this->hasPendingFormRequest) {
     return;
   }
+  this->formPageSubmitPending = true;
   this->api.submitFormPage(this->pendingFormRequest.resourceId,
                            this->pendingFormRequest.action, page);
 }
@@ -312,6 +314,7 @@ void Application::handleFormPageResult(
   if (!this->hasPendingFormRequest) {
     return;
   }
+  this->formPageSubmitPending = false;
   if (result.valid) {
     // The submitted field's draft value changed server-side; drop its cached copy
     // so navigating back re-fetches the persisted answer instead of a stale one.
@@ -319,7 +322,7 @@ void Application::handleFormPageResult(
     this->advanceFormCursor();
     this->requestCurrentFormField();
   } else {
-    Display::resourceDetailsScreen.showFormPageErrors(result);
+    Display::formsScreen.showFormPageErrors(result);
   }
 }
 
@@ -332,8 +335,9 @@ void Application::handleFormPageBack() {
 
 void Application::finishFormFlow() {
   this->hasPendingFormRequest = false;
+  this->formPageSubmitPending = false;
   this->formFlowSubmitted = true;
-  Display::resourceDetailsScreen.hideFormsModal();
+  this->leaveForms();
   this->pendingUiStartedAt = millis();
   this->showReaderActionProgress(FirmwareI18n::Message::SubmittingForm);
 
@@ -383,9 +387,12 @@ void Application::handleFormsCancel() {
   this->formCursorOffset = 0;
   this->clearFormPageCache();
   this->awaitingFieldRender = false;
-  Display::resourceDetailsScreen.hideFormsModal();
-  if (!this->waitingForResourceRefresh) Display::resourceDetailsScreen.hideActionProgress();
+  // Finishing first: an action started on the list goes back to the list, not the details.
   this->finishReaderAction(false);
-  if (!this->waitingForResourceRefresh) this->endActionPause();
+  this->leaveForms();
+  if (!this->waitingForResourceRefresh) {
+    Display::resourceDetailsScreen.hideActionProgress();
+    this->endActionPause();
+  }
 }
 #endif

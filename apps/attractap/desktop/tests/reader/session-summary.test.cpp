@@ -47,11 +47,12 @@ void ReaderWorkflow::testSessionSummary()
         R"("success":true)",
         R"("error":"Stop denied","durationSeconds":1,"endedOwnSession":true)"}) {
         login(); click("Stop"); stopReply(metadata); list();
+        if (std::string(metadata).find("billingSummary") != std::string::npos)
+            assert(label(lv_screen_active(), "12,50 EUR")); // The billing screen, not the summary.
+        clearStatus();
         assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         assert(label(lv_screen_active(), "Alex"));
-        if (std::string(metadata).find("billingSummary") != std::string::npos)
-            assert(label(lv_layer_top(), "12,50 EUR"));
-        Display::hidePopup(); click("Abmelden");
+        clearStatus(); click("Abmelden");
     }
     username = "abcdefghijklmnopqrstuvwxyz012345";
     login(); click("Stop");

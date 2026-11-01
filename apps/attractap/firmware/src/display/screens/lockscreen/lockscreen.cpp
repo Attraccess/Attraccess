@@ -74,7 +74,8 @@ void Lockscreen::init()
     lv_obj_set_width(this->resourceNameLabel, lv_pct(100));
     lv_obj_set_style_pad_right(this->resourceNameLabel, 76, 0);
     lv_label_set_long_mode(this->resourceNameLabel, LV_LABEL_LONG_DOT);
-    lv_obj_set_height(this->resourceNameLabel, LV_SIZE_CONTENT);
+    // One line each: a long name is cut with dots instead of wrapping into the usage line.
+    lv_obj_set_height(this->resourceNameLabel, lv_font_get_line_height(&attractap_font_montserrat_latin1_18));
     lv_obj_set_align(this->resourceNameLabel, LV_ALIGN_CENTER);
     FirmwareI18n::setLabel(this->resourceNameLabel, FirmwareI18n::Text::literal("???") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
     lv_obj_set_style_text_color(this->resourceNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -83,11 +84,13 @@ void Lockscreen::init()
 
     this->usageInfoLabel = lv_label_create(resourceInfo);
     lv_obj_set_width(this->usageInfoLabel, lv_pct(100));
+    // Clear of the network badge, like the name above.
+    lv_obj_set_style_pad_right(this->usageInfoLabel, 60, 0);
     lv_label_set_long_mode(this->usageInfoLabel, LV_LABEL_LONG_DOT);
-    lv_obj_set_height(this->usageInfoLabel, LV_SIZE_CONTENT);
+    lv_obj_set_height(this->usageInfoLabel, lv_font_get_line_height(&attractap_font_montserrat_latin1_14));
     lv_obj_set_align(this->usageInfoLabel, LV_ALIGN_CENTER);
     FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Text::literal("???") /* i18n-data: Language-neutral numeric placeholder or close-control mark. */);
-    lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(this->usageInfoLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     this->initWallClock();
     // Cached screens can return without resource updates or a loop tick.
