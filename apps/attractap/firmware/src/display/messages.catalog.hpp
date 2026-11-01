@@ -269,6 +269,14 @@ enum class Message {
     PairingRemovedAskingAgain,
     ServerCouldNotBeVerified,
     SecureConnectionFailed,
+    InUseCount,
+    ResourceFull,
+    ErrorResourceInUse,
+    ErrorResourceFull,
+    ErrorAlreadyHasActiveSession,
+    EndNamedSession,
+    EndOtherSessionsTitle,
+    ErrorNoOwnActiveSession,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -560,6 +568,14 @@ inline constexpr Entry catalog[] = {
     {Message::PairingRemovedAskingAgain, "Das Lesegerät fordert gleich eine neue Freigabe an", "The reader asks for a new approval shortly"},
     {Message::ServerCouldNotBeVerified, "Server konnte nicht überprüft werden", "Server could not be verified"},
     {Message::SecureConnectionFailed, "Sichere Verbindung fehlgeschlagen. Server oder Proxy prüfen.", "Secure connection failed. Check the server or proxy."},
+    {Message::InUseCount, "In Verwendung {0}/{1}", "In use {0}/{1}"},
+    {Message::ResourceFull, "Voll", "Full"},
+    {Message::ErrorResourceInUse, "Die Ressource wird gerade von jemand anderem verwendet.", "The resource is currently in use by someone else."},
+    {Message::ErrorResourceFull, "Diese Maschine ist voll. Bitte versuchen Sie es erneut, wenn jemand fertig ist.", "This machine is full. Try again when someone has finished."},
+    {Message::ErrorAlreadyHasActiveSession, "Sie haben bereits eine aktive Sitzung an dieser Maschine.", "You already have an active session on this machine."},
+    {Message::EndNamedSession, "Sitzung von {0} beenden", "End session of {0}"},
+    {Message::EndOtherSessionsTitle, "Andere Sitzung beenden:", "End another session:"},
+    {Message::ErrorNoOwnActiveSession, "Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.", "You have no session of your own here. Nothing was ended."},
 };
 
 } // namespace FirmwareI18n

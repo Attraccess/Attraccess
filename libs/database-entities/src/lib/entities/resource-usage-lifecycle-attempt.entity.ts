@@ -10,7 +10,9 @@ export type LifecycleBillingItem = Pick<
 
 /** A reservation, never a completed usage or bill. Interrupted attempts are aborted, not replayed. */
 @Entity()
-@Index('IDX_resource_usage_lifecycle_attempt_resource', ['resourceId'], { unique: true })
+@Index('IDX_resource_usage_lifecycle_attempt_resource', ['resourceId'])
+@Index('IDX_resource_usage_lifecycle_attempt_candidate', ['candidateUsageId'], { unique: true })
+@Index('IDX_resource_usage_lifecycle_attempt_previous', ['previousUsageId'], { unique: true })
 export class ResourceUsageLifecycleAttempt {
   @PrimaryColumn({ type: 'varchar' })
   id!: string;

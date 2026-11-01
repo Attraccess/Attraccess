@@ -3,6 +3,7 @@
 #include "../../images/logo_40h.hpp"
 #include "../../images/lockscreen_background_image.hpp"
 #include "../../shared/wallClockText.hpp"
+#include "../../shared/sessionOccupancy.hpp"
 
 namespace {
 lv_obj_t *text(lv_obj_t *parent, const FirmwareI18n::Text &value, const lv_font_t *font, lv_color_t color) {
@@ -109,7 +110,12 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     lv_obj_set_height(name, 26);
     lv_obj_align(name, LV_ALIGN_TOP_LEFT, 0, 0);
     FirmwareI18n::Text status = FirmwareI18n::Text::literal(resource.description) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
-    if (resource.hasActiveUsage) status = signedIn && username == resource.activeUser
+    const bool multi = resource.isMultiSession();
+    const bool accessMatches = username == cachedResourceList.authenticatedUsername;
+    const bool ownsUsage = signedIn && resource.isOwnedBy(username, accessMatches && resource.accessKnown);
+    const auto occupancy = multi ? SessionOccupancy::caption(resource, ownsUsage) : FirmwareI18n::Text();
+    if (!occupancy.empty()) status = occupancy;
+    else if (!multi && resource.hasActiveUsage) status = ownsUsage
         ? FirmwareI18n::Text(FirmwareI18n::Message::InUseByYou)
         : FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(resource.activeUser) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */});
     else if (resource.isUnderMaintenance) status = FirmwareI18n::Message::Maintenance;
@@ -122,10 +128,13 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     if (!signedIn) {
         lv_obj_set_style_border_side(details, LV_BORDER_SIDE_RIGHT, 0);
         lv_obj_set_style_border_width(details, 20, 0);
-        lv_obj_set_style_border_color(details, resource.hasActiveUsage ? DisplayTheme::danger() : resource.isUnderMaintenance || !resource.isHealthy ? DisplayTheme::warning() : DisplayTheme::success(), 0);
+        // A single-session machine in use reads like a full one.
+        using SessionOccupancy::Level;
+        const Level level = multi ? SessionOccupancy::level(resource) : resource.hasActiveUsage ? Level::Full : Level::Free;
+        const bool blocked = resource.isUnderMaintenance || !resource.isHealthy;
+        lv_obj_set_style_border_color(details, level == Level::Free && blocked ? DisplayTheme::warning() : SessionOccupancy::color(level), 0);
         return;
     }
-    const bool accessMatches = username == cachedResourceList.authenticatedUsername;
     const auto action = accessMatches ? resourceListAction(resource, username) : ResourceListAction::None;
     FirmwareI18n::Text caption = FirmwareI18n::Message::Introduction;
     auto color = DisplayTheme::warning();
@@ -137,6 +146,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     case ResourceListAction::Takeover: caption = FirmwareI18n::Message::TakeOver; break;
     default:
         if (!accessMatches || !resource.accessKnown) { caption = FirmwareI18n::Message::LoadingAlt; color = DisplayTheme::muted(); }
+        else if (multi && resource.isFull()) { caption = FirmwareI18n::Message::ResourceFull; color = DisplayTheme::muted(); }
         else if (resource.hasActiveUsage) { caption = FirmwareI18n::Message::InUseAlt; color = DisplayTheme::muted(); }
         else if (resource.isUnderMaintenance || !resource.isHealthy) caption = FirmwareI18n::Message::UnavailableLocked;
         break;

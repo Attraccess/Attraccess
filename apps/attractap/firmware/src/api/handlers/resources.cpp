@@ -65,12 +65,16 @@ void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, boo
     this->sendResourceAction("START_RESOURCE_USAGE_SESSION", payload);
 }
 
-void API::stopResourceUsageSession(uint32_t resourceId)
+void API::stopResourceUsageSession(uint32_t resourceId, uint32_t usageId)
 {
     this->logger.info("Stopping resource usage session");
     JsonDocument doc;
     JsonObject payload = doc.to<JsonObject>();
     payload["resourceId"] = resourceId;
+    if (usageId != 0)
+    {
+        payload["usageId"] = usageId;
+    }
     this->sendResourceAction("STOP_RESOURCE_USAGE_SESSION", payload);
 }
 
@@ -238,6 +242,7 @@ void API::onResourceList(JsonObject data)
         dst.hasIntroduction = resource["hasIntroduction"] | false;
         dst.isIntroducer = resource["isIntroducer"] | false;
         dst.canManageResource = resource["canManageResource"] | false;
+        dst.canEndOtherSessions = resource["canEndOtherSessions"] | false;
         dst.requiresSupervisor = resource["requiresSupervisor"] | false;
 
         const char *name = resource["name"].as<const char *>();
@@ -259,7 +264,11 @@ void API::onResourceList(JsonObject data)
         const char *healthReason = resource["healthReason"].as<const char *>();
         strlcpy(dst.healthReason, healthReason ? healthReason : "", sizeof(dst.healthReason));
 
-        JsonObject aus = resource["activeUsageSession"].as<JsonObject>();
+        // The card holder's own session wins, so the session panel and ownership always describe it.
+        JsonObject own = resource["ownUsageSession"].as<JsonObject>();
+        const bool hasOwn = !own.isNull() && own["id"].is<uint32_t>() &&
+                            own["user"]["username"].is<const char *>() && own["startTime"].is<const char *>();
+        JsonObject aus = hasOwn ? own : resource["activeUsageSession"].as<JsonObject>();
         if (!aus.isNull() && aus["user"]["username"].is<const char *>() && aus["startTime"].is<const char *>())
         {
             dst.hasActiveUsage = true;
@@ -274,9 +283,30 @@ void API::onResourceList(JsonObject data)
         else
         {
             dst.hasActiveUsage = false;
+            dst.activeUsageId = 0;
             dst.activeUser[0] = '\0';
             dst.activeStartEpoch = 0;
             dst.activeStartUtcOffsetMinutes = 0;
+        }
+
+        // Parallel sessions: absent fields describe a classic single-session machine
+        const int maxParallel = resource["maxParallelSessions"] | 1;
+        dst.maxParallelSessions = maxParallel < 1 ? 1 : (maxParallel > 1000 ? 1000 : maxParallel);
+        const int activeCount = resource["activeSessionCount"] | (dst.hasActiveUsage ? 1 : 0);
+        dst.activeSessionCount = activeCount < 0 ? 0 : (activeCount > 1000 ? 1000 : activeCount);
+        dst.canStart = resource["canStart"] | !dst.isFull();
+        dst.hasOwnUsage = hasOwn;
+        dst.ownUsageId = dst.hasOwnUsage ? own["id"].as<uint32_t>() : 0;
+        dst.activeSessions.clear();
+        for (JsonObject session : resource["activeUsageSessions"].as<JsonArray>())
+        {
+            if (dst.activeSessions.size() >= MAX_LISTED_SESSIONS) break;
+            const char *sessionUser = session["user"]["username"].as<const char *>();
+            if (!session["id"].is<uint32_t>() || !sessionUser) continue;
+            ActiveSession entry;
+            entry.id = session["id"].as<uint32_t>();
+            strlcpy(entry.username, sessionUser, sizeof(entry.username));
+            dst.activeSessions.push_back(entry);
         }
 
         // Parse introducers: array of strings (usernames)

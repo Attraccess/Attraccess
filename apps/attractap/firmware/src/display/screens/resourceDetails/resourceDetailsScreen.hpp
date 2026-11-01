@@ -7,6 +7,7 @@
 #include "resourceDetailsUsageState.hpp"
 
 #include <string>
+#include <vector>
 
 #include "../IScreen.hpp"
 #include "../../../logger/logger.hpp"
@@ -99,6 +100,15 @@ private:
     lv_obj_t *stopSessionButton = nullptr;
     lv_obj_t *stopSessionButtonLabel = nullptr;
     lv_obj_t *stopOtherUserNote = nullptr;
+    // Parallel sessions: occupancy caption in the header and a picker to end one chosen other session.
+    lv_obj_t *occupancyLabel = nullptr;
+    lv_obj_t *otherSessionsContainer = nullptr;
+    void rebuildOtherSessions(bool visible);
+    std::vector<uint32_t> otherSessionIds;
+    // Limit 1 force-stop: the usageId of the foreign session shown; 0 while the button stops one's own.
+    uint32_t stopSessionUsageId = 0;
+    bool ownsActiveUsage() const;
+    void updateOccupancy();
     lv_obj_t *doorControls = nullptr;
 
     lv_obj_t *flowButtonsContainer = nullptr;

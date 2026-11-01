@@ -40,6 +40,7 @@ export const schemas = [
       name: { type: String },
       type: { type: String },
       allowTakeOver: { type: Boolean, default: true },
+      maxParallelSessions: { type: Number, default: 1 },
       supervisionMode: { type: String },
     },
   }),
@@ -153,7 +154,7 @@ export const schemas = [
       billingItems: { type: 'simple-json' },
       createdAt: { type: 'datetime', createDate: true },
     },
-    indices: [{ columns: ['resourceId'], unique: true }],
+    indices: [{ columns: ['resourceId'] }],
   }),
   new EntitySchema<ResourceOperatingInterval>({
     name: 'ResourceOperatingInterval',

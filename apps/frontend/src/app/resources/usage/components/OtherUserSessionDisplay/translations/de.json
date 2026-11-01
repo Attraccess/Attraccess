@@ -25,7 +25,7 @@
     "errorDescription": "Die Übernahme der Ressource ist fehlgeschlagen. Bitte versuchen Sie es erneut oder wenden Sie sich an den Support."
   },
   "stopOtherUserSession": {
-    "available": "Als Einführer / Administrator können Sie die Sitzung des anderen Benutzers beenden.",
+    "available": "Sie dürfen die Sitzung des anderen Benutzers beenden.",
     "button": "Andere Benutzer-Sitzung beenden",
     "optionsMenu": {
       "label": "Alternative Beendigung-Optionen",

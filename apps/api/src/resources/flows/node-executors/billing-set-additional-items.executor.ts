@@ -10,6 +10,7 @@ import {
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { resolveTriggeringUsage, triggeringUsageId } from './triggering-usage';
 import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 
 export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
@@ -21,11 +22,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
   ) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
-    const candidateUsageId = 'id' in input ? input.id : undefined;
-    const usageId =
-      typeof candidateUsageId === 'number' && Number.isSafeInteger(candidateUsageId) && candidateUsageId > 0
-        ? candidateUsageId
-        : undefined;
+    const usageId = triggeringUsageId(input);
     const data = BillingTransactionItemCreateSchema.parse(node.data);
 
     this.logger.debug(
@@ -67,16 +64,16 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
     }
 
     const savePendingItem = async (manager: EntityManager): Promise<void> => {
-      const activeUsageSession = usageId
-        ? undefined
-        : await this.resourceUsageService.getActiveSession(node.resourceId, manager);
-      if (!usageId && !activeUsageSession) {
+      // The triggering session, else the newest; nothing when the triggering session ended on a shared machine.
+      const { session } = await resolveTriggeringUsage(this.resourceUsageService, node.resourceId, input, manager);
+      if (!session) {
         throw new NoUsageSessionError();
       }
 
       const billingTransaction = await manager.findOne(BillingTransaction, {
         where: {
-          resourceUsageId: usageId ?? activeUsageSession.id,
+          // A named session keeps its own pending transaction on a single-session machine, as before.
+          resourceUsageId: usageId ?? session.id,
           resourceUsage: { resourceId: node.resourceId },
           status: BillingTransactionStatus.Pending,
         },

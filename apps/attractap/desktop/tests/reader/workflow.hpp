@@ -115,6 +115,8 @@ struct ReaderWorkflow
                 const auto start = time(nullptr) - 1426;
                 std::strftime(startTime, sizeof(startTime), "%Y-%m-%dT%H:%M:%SZ", gmtime(&start));
                 r["activeUsageSession"]["startTime"] = startTime;
+                // The session belongs to the signed-in card, so a personalised list names it as theirs.
+                if (signedIn) r["ownUsageSession"] = r["activeUsageSession"];
             }
         }
         std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
@@ -145,6 +147,7 @@ struct ReaderWorkflow
     void testMassIntroduction();
     void testIdentityAndPendingAuthentication();
     void testSessionSummary();
+    void testParallelSessions();
     void testWallClock();
     void testTimeouts();
     void testFirmwareUpdate(bool reset);

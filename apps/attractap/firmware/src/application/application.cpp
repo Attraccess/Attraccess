@@ -192,6 +192,7 @@ void Application::beginSessionSummary(const API::ActionResult &result) {
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
   this->pendingActionIsTakeover = false;
+  this->pendingActionUsageId = 0;
   this->pendingFormRequestResourceId = 0;
   this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;
   this->pendingUiAction.clear();
@@ -271,7 +272,7 @@ void Application::pollUsageStats() {
       if (this->resourceList.items[i].id == this->selectedResourceId) resource = &this->resourceList.items[i];
   }
   if (!resource || !resource->hasActiveUsage || !resource->activeUsageId ||
-      this->cardAuthenticationData.username != resource->activeUser) {
+      !resource->isOwnedBy(this->cardAuthenticationData.username, resource->accessKnown)) {
     this->usageStatsResourceId = 0;
     this->usageStatsUsageId = 0;
     return;

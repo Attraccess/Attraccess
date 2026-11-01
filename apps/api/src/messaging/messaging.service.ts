@@ -237,8 +237,13 @@ export class MessagingService {
     return { referenceLabel: null, referenceUrl: null };
   }
 
-  public async resolveResourceHolder(resourceId: number): Promise<User | null> {
-    const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
-    return activeSession?.user ?? null;
+  /** With several parallel sessions the sender must pick whose session they mean (`userId`). */
+  public async resolveResourceHolder(resourceId: number, userId?: number): Promise<User | null> {
+    const sessions = await this.resourceUsageService.getActiveSessionsForResource(resourceId);
+    if (userId !== undefined) return sessions.find((session) => session.userId === userId)?.user ?? null;
+    if (sessions.length > 1) {
+      throw new BadRequestException('Several people are using this resource; choose whom to contact');
+    }
+    return sessions[0]?.user ?? null;
   }
 }

@@ -11,6 +11,7 @@ import { ResourceOperatingStateChangedEvent } from '../../operating-intervals/ev
 import {
   ResourceSessionStartedEvent,
   ResourceUsageLifecycleAbortedEvent,
+  ResourceUsageSessionEndedEvent,
 } from '../../usage/events/resource-usage.events';
 
 import { ResourceMaintenanceChangedEvent } from '../events/resource-maintenance-changed.event';
@@ -72,14 +73,19 @@ export abstract class MaintenanceResourceEvaluation {
    * evaluation, but evaluation is guaranteed to fire within usageEvalMaxWaitMs regardless of how
    * frequently events arrive (preventing indefinite starvation under sustained load).
    *
-   * Listens to ResourceSessionStartedEvent rather than ResourceUsageSessionEndedEvent: despite the
-   * name, ResourceUsageService.emitUsageEvent() fires it on every session start *and* end (with the
-   * usage re-read after commit, so endTime is set). ResourceUsageSessionEndedEvent only fires on
-   * takeover/flow-ended sessions, which would miss the common case of a user ending their own session.
+   * Starts (and door actions) arrive as ResourceSessionStartedEvent, every session end as
+   * ResourceUsageSessionEndedEvent; a take-over is followed by the new session's start event.
    */
   @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
   onResourceUsage(event: ResourceSessionStartedEvent): void {
     const resourceId = event.usage?.resource?.id;
+    if (resourceId == null) return;
+    this.queueEvaluation(resourceId);
+  }
+
+  @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
+  onResourceUsageEnded(event: ResourceUsageSessionEndedEvent): void {
+    const resourceId = event.usage?.resourceId ?? event.usage?.resource?.id;
     if (resourceId == null) return;
     this.queueEvaluation(resourceId);
   }
