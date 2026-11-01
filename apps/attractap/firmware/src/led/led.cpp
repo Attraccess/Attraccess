@@ -45,6 +45,10 @@ void LedController::setState(LedState state)
     {
         return;
     }
+    if (_state == LED_STATE_CONFIRM_WAIT && state == LED_STATE_WAIT_FOR_CARD)
+    {
+        return; // the confirm window ends it (endConfirmWait or expiry)
+    }
     _state = state;
     _firmwarePatternSet = false;
 }
@@ -68,6 +72,68 @@ void LedController::triggerIndicate()
     _stateBeforeTrigger = _state;
     _trigger = TRIGGER_INDICATE;
     _triggerStartMs = millis();
+}
+
+void LedController::triggerReserved()
+{
+    _stateBeforeTrigger = _state;
+    _trigger = TRIGGER_RESERVED;
+    _triggerStartMs = millis();
+}
+
+void LedController::triggerWarning()
+{
+    _stateBeforeTrigger = _state;
+    _trigger = TRIGGER_WARNING;
+    _triggerStartMs = millis();
+}
+
+void LedController::beginConfirmWait(uint32_t windowMs)
+{
+    _confirmWaitStartMs = millis();
+    _confirmWaitWindowMs = windowMs;
+    _state = LED_STATE_CONFIRM_WAIT;
+    _firmwarePatternSet = false;
+}
+
+void LedController::endConfirmWait()
+{
+    if (_state == LED_STATE_CONFIRM_WAIT)
+    {
+        _state = LED_STATE_WAIT_FOR_CARD;
+    }
+}
+
+void LedController::runConfirmWait()
+{
+    const LedFeedback::Action action = LedFeedback::actionFor(LedFeedback::Pattern::ConfirmWait, _confirmWaitWindowMs);
+    const uint32_t elapsed = millis() - _confirmWaitStartMs;
+    if (LedFeedback::finished(action, elapsed))
+    {
+        _state = LED_STATE_WAIT_FOR_CARD;
+        return;
+    }
+    LedFeedback::render(_strip, action, elapsed);
+}
+
+// Reserved / warning share the pure renderer; returns true while the trigger is still running.
+bool LedController::runFeedbackTrigger(uint32_t elapsed)
+{
+    const LedFeedback::Action action = LedFeedback::actionFor(
+        _trigger == TRIGGER_RESERVED ? LedFeedback::Pattern::Reserved : LedFeedback::Pattern::Warning);
+    if (LedFeedback::finished(action, elapsed))
+    {
+        _trigger = TRIGGER_NONE;
+        _state = _stateBeforeTrigger;
+        return false;
+    }
+    const uint16_t n = _strip.numPixels();
+    for (uint16_t i = 0; i < n; i++)
+    {
+        const uint32_t rgb = LedFeedback::pixelColor(action, elapsed, i, n);
+        _strip.setPixelColor(i, _strip.Color((uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb));
+    }
+    return true;
 }
 
 void LedController::loop()
@@ -136,6 +202,14 @@ void LedController::loop()
             }
             break;
 
+        case TRIGGER_RESERVED:
+        case TRIGGER_WARNING:
+            if (!runFeedbackTrigger(elapsed))
+            {
+                setAll(0);
+            }
+            break;
+
         default:
             break;
         }
@@ -159,6 +233,12 @@ void LedController::loop()
             _strip.show();
             _firmwarePatternSet = true;
         }
+        return;
+    }
+
+    if (_state == LED_STATE_CONFIRM_WAIT)
+    {
+        runConfirmWait();
         return;
     }
 

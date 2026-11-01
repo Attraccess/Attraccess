@@ -19,6 +19,8 @@ public:
         LED_STATE_NO_RESOURCES,
         LED_STATE_FIRMWARE_UPDATE,
         LED_STATE_ENROLLMENT_PENDING,
+        // Lite card-confirm: amber ring drains over the confirm window (LedFeedback::Pattern::ConfirmWait).
+        LED_STATE_CONFIRM_WAIT,
     };
 
     LedController() : _strip(WS2812_LED_COUNT, PIN_WS2812_DATA) {}
@@ -33,12 +35,21 @@ public:
     void triggerSuccess();
     void triggerError();
     void triggerIndicate();
+    // Steady amber half ring for 3 s: a plugin says the resource is reserved (Lite, no screen).
+    void triggerReserved();
+    // Amber blink for allow-with-warning.
+    void triggerWarning();
+    // Starts LED_STATE_CONFIRM_WAIT for `windowMs`; the state falls back to WAIT_FOR_CARD afterwards.
+    void beginConfirmWait(uint32_t windowMs);
+    void endConfirmWait();
 
 private:
     void runAnimation();
     void runCircularAnimation();
     void runLinearAnimation();
     void runEnrollmentPending();
+    void runConfirmWait();
+    bool runFeedbackTrigger(uint32_t elapsed);
     uint8_t idleBreathBrightness() const;
     void setAll(uint32_t color);
     bool isCircularRing() const;
@@ -56,9 +67,13 @@ private:
         TRIGGER_SUCCESS,
         TRIGGER_ERROR,
         TRIGGER_INDICATE,
+        TRIGGER_RESERVED,
+        TRIGGER_WARNING,
     };
     TriggerType _trigger = TRIGGER_NONE;
     uint32_t _triggerStartMs = 0;
+    uint32_t _confirmWaitStartMs = 0;
+    uint32_t _confirmWaitWindowMs = 0;
     LedState _stateBeforeTrigger = LED_STATE_WAIT_FOR_CARD;
 
     // Written by the application task, read by the LED task.
