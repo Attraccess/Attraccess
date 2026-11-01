@@ -1,14 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { ReaderUiRegistry } from '../reader-ui/reader-ui.registry';
 import type { ReaderUiContributions } from './reader-ui-load';
 
-/** Subset of ReaderUiRegistry (plugin-system/reader-ui) this wiring talks to. */
-interface ReaderUiRegistryPort {
-  register(pluginName: string, contributions: ReaderUiContributions): void;
-  unregister(pluginName: string): void;
-  invalidate(pluginName: string, scope: { resourceId?: number; readerId?: number }): void;
-  reportLoadFailure(pluginName: string, hasAccessHooks: boolean, error: Error): void;
-}
+type ReaderUiRegistryPort = ReaderUiRegistry;
 
 const pending = new Map<string, ReaderUiContributions>();
 const pendingFailures: Array<{ pluginName: string; hasAccessHooks: boolean; error: Error }> = [];
@@ -46,10 +41,6 @@ export class ReaderUiWiring implements OnModuleInit {
   constructor(private readonly moduleRef: ModuleRef) {}
 
   onModuleInit(): void {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { ReaderUiRegistry } = require('./../reader-ui/reader-ui.registry') as {
-      ReaderUiRegistry: new (...args: never[]) => ReaderUiRegistryPort;
-    };
     registryRef = this.moduleRef.get(ReaderUiRegistry, { strict: false });
     for (const [name, contributions] of pending) {
       registryRef.register(name, contributions);
