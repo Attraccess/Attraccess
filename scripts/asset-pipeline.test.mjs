@@ -18,10 +18,13 @@ for (const file of [
   'libs/companion-ws-client/project.json',
   'apps/attractap/firmware/project.json',
   'apps/plugins/wago/project.json',
+  'libs/plugins-frontend-sdk/project.json',
   'libs/react-query-client/project.json',
 ]) {
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
   data.root = path.dirname(file);
+  // Targets inferred by Nx plugins (the SDK's typecheck) only add dependsOn here; the graph needs an executor.
+  for (const target of Object.values(data.targets ?? {})) target.executor ??= 'nx:run-commands';
   nodes[data.name] = { name: data.name, type: data.projectType === 'library' ? 'lib' : 'app', data };
 }
 const graph = {
@@ -180,4 +183,10 @@ test('WAGO frontend typechecks generate the API client before compiling shared p
   for (const target of ['typecheck-frontend-tests', 'test-typecheck-frontend-gate']) {
     assert.ok(selected.dependencies[`plugin-wago:${target}`].includes('react-query-client:generate'));
   }
+});
+
+// The SDK drops its graph edge to plugins-frontend-ui (see its project.json), so nothing else orders this.
+test('plugin SDK typecheck generates the API client before compiling shared plugin UI', () => {
+  const selected = createTaskGraph(graph, {}, ['plugins-frontend-sdk'], ['typecheck'], undefined, {});
+  assert.ok(selected.dependencies['plugins-frontend-sdk:typecheck'].includes('react-query-client:generate'));
 });
