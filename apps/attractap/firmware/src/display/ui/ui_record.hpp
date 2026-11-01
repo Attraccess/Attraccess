@@ -83,11 +83,6 @@ namespace ui
     SlotId slotFromName(const char *name);
     int slotNodeBudget(SlotId slot);
 
-    // Rewrites UTF-8 `in` into `out` keeping only glyphs the Latin-1 fonts have (0x20-0x7E, 0xA0-0xFF);
-    // everything else becomes '?', control characters a space. Returns the number of code points written,
-    // or -1 when `out` is too small.
-    int sanitizeLatin1(const char *in, char *out, size_t outCap);
-
     // Validates a UI_SLOT_UPDATE payload against the schema and flattens it into `out`.
     // `payloadBytes` is the serialized size of the payload (the 3072 B limit applies to it).
     Verdict parseSlotUpdate(JsonObjectConst payload, size_t payloadBytes, SlotRecord &out);

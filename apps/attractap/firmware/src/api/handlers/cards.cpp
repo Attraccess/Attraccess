@@ -62,6 +62,8 @@ void API::onCardAuthenticationDetailsResponse(JsonObject data)
     response.keyLen = keyLen;
     response.error = error;
     response.username = username;
+    response.cardSessionId = payload["cardSessionId"].is<const char *>() ? payload["cardSessionId"].as<std::string>() : std::string("");
+    if (error.empty() && !response.cardSessionId.empty()) this->cardSessionId = response.cardSessionId;
     response.language = payload["language"].is<const char *>() ? payload["language"].as<std::string>() : "en";
     // The server supplies a canonical fallback for older readers. New readers
     // retain its fallback status so live default changes also affect this session.

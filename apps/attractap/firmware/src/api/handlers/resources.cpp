@@ -48,7 +48,8 @@ void API::setResourceListUpdateCallback(std::function<void(const ResourceList &)
     this->resourceListUpdateCallback = callback;
 }
 
-void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, bool forceTakeOver)
+void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, bool forceTakeOver,
+                                    const char *stepId, const char *choice)
 {
     this->logger.info("Starting resource usage session");
     JsonDocument doc;
@@ -62,6 +63,12 @@ void API::startResourceUsageSession(uint32_t resourceId, uint32_t projectId, boo
     {
         payload["forceTakeOver"] = true;
     }
+    if (stepId && *stepId)
+    {
+        payload["stepId"] = stepId;
+        if (choice && *choice) payload["choice"] = choice;
+    }
+    if (!cardSessionId.empty()) payload["cardSessionId"] = cardSessionId;
     this->sendResourceAction("START_RESOURCE_USAGE_SESSION", payload);
 }
 

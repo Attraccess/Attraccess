@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint>
 #include <cstddef>
+#include "../display/ui/ui_step.hpp"
 
 struct ApiResources
 {
@@ -119,6 +120,10 @@ struct ActionResult {
         uint32_t durationSeconds = 0;
         bool hasOwnership = false;
         bool endedOwnSession = false;
+        // START_BLOCKED: the plugin's literal reason (already sanitized to Latin-1 for the display).
+        std::string blockCode{};
+        std::string blockTitle{};
+        std::string blockBody{};
     };
 };
 
@@ -254,6 +259,8 @@ struct CardAuthenticationDetailsResponse
         std::string error;
         std::string username;
         std::string language;
+        // Issued per card authentication; sent back on START and on CARD_SESSION_ENDED.
+        std::string cardSessionId;
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;
@@ -319,6 +326,13 @@ protected:
     std::function<void(const MassIntroductionResult &)> massIntroductionResultCallback;
     std::function<void(const MassIntroductionEnd &)> massIntroductionEndCallback;
     std::function<void(std::string)> deviceNameCallback;
+    // Reader UI (ATT-1187). Step callbacks run on the inbound-dispatch task; the application hands over.
+    std::function<void(const ui::StepRequest &)> uiStepRequestCallback;
+    std::function<void(const std::string &stepId)> uiStepCancelCallback;
+    std::function<void()> uiSlotsChangedCallback;
+    std::string cardSessionId;
+    ui::StepRequest uiStepScratch;
+    void *uiSlotScratch = nullptr; // ui::SlotRecord in PSRAM, display readers only
     std::function<void(uint8_t)> ledBrightnessChangedCallback;
     // Written by the LVGL task's page requests, read when responses arrive.
     // Recursive: the response callback may issue the next request.
@@ -442,7 +456,21 @@ public:
     void sendResetNfcCard(bool success);
     void sendResetNfcCardCancel();
 
-    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false);
+    // `stepId`/`choice` answer a plugin confirmation (UI_STEP_REQUEST); the server matches them to the step.
+    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false,
+                                   const char *stepId = nullptr, const char *choice = nullptr);
+
+    // --- Reader UI (ATT-1187) ----------------------------------------------------------------
+    void setUiStepRequestCallback(std::function<void(const ui::StepRequest &)> callback) { uiStepRequestCallback = callback; }
+    void setUiStepCancelCallback(std::function<void(const std::string &)> callback) { uiStepCancelCallback = callback; }
+    void setUiSlotsChangedCallback(std::function<void()> callback) { uiSlotsChangedCallback = callback; }
+    void sendUiStepResult(const char *stepId, const char *action);
+    void sendUiRenderReport(uint32_t resourceId, const char *slot, const char *key, bool rendered, const char *reason);
+    // Drops all plugin slot content (disconnect, reconnect, sign-out of a card session).
+    void clearUiSlots();
+    const std::string &currentCardSessionId() const { return cardSessionId; }
+    // Tells the server the card session is over (sign-out or timeout) and forgets it.
+    void endCardSession();
     void stopResourceUsageSession(uint32_t resourceId);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
     void submitFormPage(uint32_t resourceId, ResourceUsageFormActionType action, const FormPageSubmission &page);
@@ -505,9 +533,13 @@ private:
 
     uint32_t authenticationCount = 0;
 
-    void sendAck(const char *type);
+    void sendAck(const char *type, uint32_t messageId = 0);
     void sendMessage(const char *type);
-    bool sendMessage(const char *type, JsonObject payload);
+    bool sendMessage(const char *type, JsonObject payload, uint32_t messageId = 0);
+    void readBlockReason(JsonVariantConst reason, ActionResult &out);
+    void onUiSlotUpdate(JsonObject data);
+    void onUiStepRequest(JsonObject data);
+    void onUiStepCancel(JsonObject data);
 
     void onUsageStats(JsonObject data);
 

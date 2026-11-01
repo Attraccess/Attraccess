@@ -176,6 +176,8 @@ void API::onReaderAuthenticated(JsonObject data)
     logger.info("READER_AUTHENTICATED");
     resourceListMessageCounter = resourceListRevision = 0;
     cancelResourceAction();
+    // Both sides restart UI revisions at 1 after (re)authentication.
+    clearUiSlots();
 
     std::string deviceName = data["payload"]["name"].as<std::string>();
     const char *language = data["payload"]["language"].as<const char *>();
