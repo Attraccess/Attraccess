@@ -138,6 +138,14 @@ struct ReaderWorkflow
         std::string payload; serializeJson(doc, payload); server.push("RESOURCE_LIST", payload);
         pump();
     }
+    // Past the boot screen onto the signed-out list.
+    void boot() {
+        list(false);
+        const auto deadline = millis() + 10000;
+        while (lv_screen_active() != Display::resourceListScreen.getScreen() && static_cast<int32_t>(deadline - millis()) > 0)
+            pump();
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+    }
     void login(bool refresh = true) {
         nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
         if (drawerSettingsBeforeLogin) {

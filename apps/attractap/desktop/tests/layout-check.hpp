@@ -216,7 +216,7 @@ namespace LayoutCheck
 
     // Walks up from `object`: the first ancestor that does not hold `box` either scrolls (the
     // rest is scrolled out of view, which is fine) or cuts the widget off.
-    inline void place(Item &item, std::vector<std::string> &out, bool cutAllowed)
+    inline void place(Item &item, std::vector<std::string> &out)
     {
         item.visible = item.box;
         item.onScreen = true;
@@ -232,7 +232,7 @@ namespace LayoutCheck
                 settled = true;
                 if (root)
                     out.push_back(item.name + at(item.box) + " leaves the display");
-                else if (!lv_obj_has_flag(parent, LV_OBJ_FLAG_SCROLLABLE) && !cutAllowed)
+                else if (!lv_obj_has_flag(parent, LV_OBJ_FLAG_SCROLLABLE))
                     out.push_back(item.name + at(item.box) + " is cut off by " + describe(parent) + at(area));
             }
             if (!clipTo(item.visible, area))
@@ -255,7 +255,7 @@ namespace LayoutCheck
             Item item{root, text.box, text.box, true, describe(root)};
             if (text.overflows) out.push_back(item.name + at(text.box) + " is cut off: its text is taller than the label");
             // Dots or a scrolling caption already shorten the text inside the label itself.
-            place(item, out, false);
+            place(item, out);
             if (item.onScreen) items.push_back(item);
             return;
         }
@@ -267,7 +267,7 @@ namespace LayoutCheck
             else
                 lv_obj_get_coords(root, &own);
             Item item{root, own, own, true, describe(root)};
-            place(item, out, false);
+            place(item, out);
             if (!item.onScreen) return;
             items.push_back(item);
             // A button in its error state wears a skin that covers its own caption.

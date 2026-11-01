@@ -99,6 +99,33 @@ void ReaderWorkflow::testTransientRouting()
     server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","language":"de","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})");
     pump(250); nfc.setPresent(0, false); list();
     assert(State::getApiState().userAuthenticated);
+    // A drawer that is open when a full-screen flow appears under it (a late top-up refusal)
+    // closes, and its reboot question is not asked from there.
+    click("Lasercutter");
+    click("Ressource verwenden");
+    refuseBalance(true);
+    click("7"); click("Aufladen");
+    assert(lv_screen_active() == Display::statusScreen.getScreen());
+    pump(6300); // "Continue at the payment terminal" returns by itself.
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    openDrawer();
+    assert(drawerOpen());
+    server.push("BILLING_REQUEST_TOPUP", R"({"error":"NO_SUMUP_TERMINALS_AVAILABLE"})"); pump();
+    assert(lv_screen_active() == Display::topUpScreen.getScreen() && !drawerOpen());
+    click("Neustart", true);
+    assert(lv_screen_active() == Display::topUpScreen.getScreen());
+    click("Abbrechen");
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    // A top-up refusal that arrives after its user signed out does not reach the next one.
+    click("Ressource verwenden");
+    refuseBalance(true);
+    click("7"); click("Aufladen");
+    pump(6300);
+    click("Abmelden");
+    list(false);
+    login();
+    server.push("BILLING_REQUEST_TOPUP", R"({"error":"NO_SUMUP_TERMINALS_AVAILABLE"})"); pump();
+    assert(lv_screen_active() == Display::resourceListScreen.getScreen() && !Display::transientActive());
     click("Abmelden");
     list(false);
     std::cout << "PASS screens over screens follow the application's routing; no drawer over them" << std::endl;
