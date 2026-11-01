@@ -41,7 +41,13 @@ export class ReaderUiWiring implements OnModuleInit {
   constructor(private readonly moduleRef: ModuleRef) {}
 
   onModuleInit(): void {
-    registryRef = this.moduleRef.get(ReaderUiRegistry, { strict: false });
+    try {
+      registryRef = this.moduleRef.get(ReaderUiRegistry, { strict: false });
+    } catch {
+      // Hosts without the Attractap/reader UI module (partial test hosts) have nothing to register with.
+      this.logger.debug('Reader UI registry is not part of this host');
+      return;
+    }
     for (const [name, contributions] of pending) {
       registryRef.register(name, contributions);
       this.logger.log(`Registered reader UI contributions from plugin ${name}`);

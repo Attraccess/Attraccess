@@ -228,7 +228,7 @@ const stepAction = z.object({
 const stepEnvelope = z.object({
   requestId: z.number().int().nonnegative(),
   stepId: z.string().regex(/^[A-Za-z0-9_-]{22}$/),
-  kind: z.enum(READER_UI_STEP_KINDS),
+  kind: z.enum([...READER_UI_STEP_KINDS, 'card-confirm']),
   resourceId: z.number().int().nonnegative(),
   serverNowMs: z.number().int().nonnegative(),
   expiresAtMs: z.number().int().nonnegative(),
@@ -314,4 +314,17 @@ export function validateReaderUiCapabilities(raw: unknown): ReaderUiCapabilities
     maxLiveNodes: Math.min(caps.maxLiveNodes, READER_UI_LIMITS.maxLiveNodes),
     schemaVersion: Math.min(caps.schemaVersion, READER_UI_SCHEMA_VERSION),
   };
+}
+
+/** Sanitizes and checks one plugin-supplied string (step title/body, block reason, label). */
+export function cleanPluginText(text: unknown, max: number): ReaderUiValidation<string> {
+  return run(() => checkText(text, max, 'text-too-long'));
+}
+
+/** Sanitizes and checks a button label (<= 31 bytes after transliteration). */
+export function cleanPluginLabel(label: unknown): ReaderUiValidation<string> {
+  return run(() => {
+    if (typeof label !== 'string') throw new Reject('invalid-shape');
+    return checkLabel(label);
+  });
 }

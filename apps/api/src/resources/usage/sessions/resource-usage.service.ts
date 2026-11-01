@@ -1,4 +1,12 @@
-import { Resource, ResourceUsage, User, ResourceType, ResourceUsageAction } from '@attraccess/database-entities';
+import {
+  Resource,
+  ResourceUsage,
+  User,
+  ResourceType,
+  ResourceUsageAction,
+  SupervisionMode,
+} from '@attraccess/database-entities';
+import { ResourceInUseError } from '../errors/resource-in-use.error';
 
 import {
   forwardRef,
@@ -430,5 +438,36 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
         }),
       );
     }
+  }
+
+  /**
+   * Read-only can-start precheck (ATT-1187): raises the refusals `prepareSessionStart` would raise, except
+   * balance, flows and form handling. Plugin pre-start hooks only run for users who pass it.
+   */
+  async precheckStart(
+    resourceId: number,
+    user: User,
+    dto: { forceTakeOver?: boolean },
+    supervisorUserId: number | null = null,
+  ): Promise<void> {
+    const resource = await this.getResource(resourceId, user, {
+      checkMaintenance: true,
+      checkControlPermission: false,
+    });
+    if (supervisorUserId === null) {
+      if (!(await this.canControllResource(resourceId, user))) {
+        throw new BadRequestException('You must complete the resource introduction before using it');
+      }
+      if (resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED) {
+        throw new BadRequestException('This resource requires a supervisor; request a supervised session instead');
+      }
+    } else {
+      await this.validateSupervisedStart(resourceId, user, supervisorUserId, undefined, resource);
+    }
+    if (resource.type !== ResourceType.Machine) throw new BadRequestException('Resource is not a machine');
+    const active = await this.getActiveSession(resourceId);
+    if (!active) return;
+    if (!dto.forceTakeOver) throw new ResourceInUseError();
+    if (!resource.allowTakeOver) throw new BadRequestException('This resource does not allow overtaking');
   }
 }

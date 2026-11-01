@@ -65,6 +65,10 @@ export function resetTestFixture(scope: AttractapSessionHandlerSessionFlowButton
   (scope.handler as any).resourceListService = scope.mockResourceListService;
   (scope.handler as any).formsHandler = scope.mockFormsHandler;
   (scope.handler as any).supervisionService = scope.mockSupervisionService;
+  (scope.handler as any).startGate = {
+    run: jest.fn().mockResolvedValue({ kind: 'proceed' }),
+    afterStop: jest.fn().mockResolvedValue(undefined),
+  };
   scope.mockBillingService = {
     getResourceUsageCharge: jest.fn().mockResolvedValue(null),
     getConfiguration: jest.fn().mockResolvedValue({ currency: 'EUR', minorUnit: 2 }),

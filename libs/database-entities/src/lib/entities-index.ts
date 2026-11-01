@@ -4,6 +4,13 @@ export { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity
 export { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 export { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
 export { AttractapInstallation } from './entities/attractap-installation.entity';
+export {
+  ReaderUiAlert,
+  ReaderUiPluginSettings,
+  ReaderUiReaderSettings,
+  ReaderUiResourceSettings,
+} from './entities/reader-ui-settings.entity';
+export type { ReaderUiAlertKind } from './entities/reader-ui-settings.entity';
 export { AuditLog } from './entities/audit-log.entity';
 export { AuthenticationDetail } from './entities/authenticationDetail.entity';
 export { BillingTransactionItem } from './entities/billing-transaction-item.entity';
@@ -127,6 +134,12 @@ import { Attractap } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 import { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
 import { AttractapInstallation } from './entities/attractap-installation.entity';
+import {
+  ReaderUiAlert,
+  ReaderUiPluginSettings,
+  ReaderUiReaderSettings,
+  ReaderUiResourceSettings,
+} from './entities/reader-ui-settings.entity';
 import { AuditLog } from './entities/audit-log.entity';
 import { AuthenticationDetail } from './entities/authenticationDetail.entity';
 import { BillingTransactionItem } from './entities/billing-transaction-item.entity';
@@ -201,6 +214,10 @@ export const entities = {
   AttractapCrashReport,
   AttractapCredentialEvent,
   AttractapInstallation,
+  ReaderUiAlert,
+  ReaderUiPluginSettings,
+  ReaderUiReaderSettings,
+  ReaderUiResourceSettings,
   EmailTemplate,
   EmailTemplateTranslation,
   ResourceFlowNode,

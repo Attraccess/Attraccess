@@ -28,6 +28,8 @@ import {
 
 import { AttractapFormsHandler } from '../forms/forms.handler';
 
+import { ReaderStartGate } from './reader-start-gate.service';
+
 import { ResourceActionGuard } from '../resource-action.guard';
 
 import { ResourceListService } from '../resource-list/resource-list.service';
@@ -67,6 +69,9 @@ export class AttractapSessionHandler {
 
   @Inject(AttractapFormsHandler)
   protected formsHandler: AttractapFormsHandler;
+
+  @Inject(ReaderStartGate)
+  protected startGate: ReaderStartGate;
 
   @Inject(SupervisionService)
   protected supervisionService: SupervisionService;
@@ -277,10 +282,11 @@ export class AttractapSessionHandler {
   }
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { resourceId, projectId, forceTakeOver } = data.payload as {
+    const { resourceId, projectId, forceTakeOver, stepId } = data.payload as {
       resourceId: number;
       projectId?: number;
       forceTakeOver?: boolean;
+      stepId?: string;
     };
 
     if (
@@ -317,6 +323,22 @@ export class AttractapSessionHandler {
     const supervisorUserId =
       flow && flow.resourceId === resourceId ? (flow.approvedSupervisorUserId ?? undefined) : undefined;
 
+    // Plugin pre-start hooks (ATT-1187): allow, ask for a confirmation step, or block. Never gates stop.
+    const gate = await this.startGate.run(socket, {
+      user,
+      resourceId,
+      projectId,
+      forceTakeOver,
+      requestId: data.payload?.requestId,
+      stepId,
+      supervisorUserId,
+    });
+    if (gate.kind === 'held') return;
+    if (gate.kind === 'reply') {
+      await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, gate.payload);
+      return;
+    }
+
     try {
       await this.resourceUsageService.startSession(
         resourceId,
@@ -333,7 +355,10 @@ export class AttractapSessionHandler {
         this.supervisionService.settleByCard(flow.requestId);
       }
       socket.state.supervisionFlow = null;
-      await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { success: true });
+      await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, {
+        success: true,
+        ...(gate.warning ? { warning: true } : {}),
+      });
     } catch (error) {
       if (error instanceof ResourceInUseError) {
         // Resolve the pending action before refreshing an occupied row.
@@ -424,6 +449,9 @@ export class AttractapSessionHandler {
         ...(durationSeconds !== undefined ? { durationSeconds } : {}),
         ...(billingSummary ? { billingSummary } : {}),
       } satisfies StopResourceUsageSessionPayload);
+      if (usage?.userId === user.id) {
+        void this.startGate.afterStop(socket, { resourceId, userId: user.id, sessionId: usage.id });
+      }
     } catch (error) {
       this.logger.error(`Failed to stop resource usage session: ${error.message}`);
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message });

@@ -1,4 +1,5 @@
 import { Attractap, ResourceFormAction } from '@attraccess/database-entities';
+import type { CardSessionState, UiSlotsState, UiStepState } from './handlers/ui/ui-socket-state';
 
 export interface AttractapMessageBaseData<TPayload = unknown> {
   auth?: {
@@ -253,5 +254,10 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
       lastLoggedPct?: number;
     } | null;
     formDrafts?: Record<string, Record<number, FormFieldAnswerValue>>;
+    /** Live card authentication (ATT-1187). Null once the reader reported sign-out or the server expired it. */
+    cardSession?: CardSessionState | null;
+    /** Open reader UI steps by stepId; discarded when the socket closes. */
+    uiSteps?: Map<string, UiStepState>;
+    uiSlots?: UiSlotsState;
   };
 }
