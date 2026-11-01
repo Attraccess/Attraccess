@@ -53,6 +53,12 @@ void ResourceListScreen::init() {
     lv_obj_set_height(footer, 18);
     renderRows();
     if (busy) overlay.show(screen, actionTitle, actionResource);
+    // Back from a screen shown over the list (status, forms, ...) while a request is still
+    // pending: the input stays blocked, so the progress shows again.
+    lv_obj_add_event_cb(screen, [](lv_event_t *event) {
+        auto *self = static_cast<ResourceListScreen *>(lv_event_get_user_data(event));
+        if (self->busy) self->overlay.show(self->screen, self->actionTitle, self->actionResource);
+    }, LV_EVENT_SCREEN_LOAD_START, this);
     loop();
 }
 
@@ -145,7 +151,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
         break;
     }
     auto *primary = makeButton(true, color);
-    actionButtons[resource.id] = primary;
+    actionButtons[resource.id] = {primary, action};
     auto *actionLabel = text(primary, caption, &attractap_font_montserrat_latin1_20, DisplayTheme::onPrimary());
     lv_obj_set_style_text_align(actionLabel, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(actionLabel);
@@ -174,26 +180,38 @@ void ResourceListScreen::onClicked(lv_event_t *event) {
 
 void ResourceListScreen::showActionProgress(const FirmwareI18n::Text &title, const FirmwareI18n::Text &resource) {
     busy = true;
+    // A retry (or any other action) takes an earlier failure away for good.
+    errorResourceId = 0;
+    rowError.clear();
     actionTitle = title.empty() ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseWait) : title;
     actionResource = resource;
     overlay.show(screen, actionTitle, actionResource);
 }
-void ResourceListScreen::hideActionProgress() { busy = false; overlay.hide(); }
+void ResourceListScreen::hideActionProgress() { busy = false; overlay.hide(); applyActionError(); }
 bool ResourceListScreen::showActionError(uint32_t resourceId, const FirmwareI18n::Text &text) {
+    const auto row = actionButtons.find(resourceId);
+    if (row == actionButtons.end()) return false;
     errorResourceId = resourceId;
+    errorAction = row->second.action;
     errorText = text;
-    errorUntil = millis() + ButtonError::DurationMs;
-    return applyActionError();
+    errorUntil = 0;
+    applyActionError();
+    return true;
 }
-// The error outlives a row rebuild: the refresh that follows a failed action
-// replaces every row, and the failure must stay on the button until it expires.
+// The error outlives a row rebuild: the refresh that follows a failed action replaces every
+// row, and the failure must stay on the button until it expires. It waits while the status
+// refresh covers the list, its 4 s start once it is visible, and it is dropped when the row's
+// action changed meanwhile (a retry must not start what the button no longer says).
 bool ResourceListScreen::applyActionError() {
-    if (!errorResourceId) return false;
+    if (!errorResourceId || !screen) return false;
+    const auto row = actionButtons.find(errorResourceId);
+    if (row == actionButtons.end() || row->second.action != errorAction) { errorResourceId = 0; rowError.clear(); return false; }
+    if (busy) return true;
+    if (!errorUntil) errorUntil = millis() + ButtonError::DurationMs;
     const int32_t remaining = static_cast<int32_t>(errorUntil - millis());
-    if (remaining <= 0) { errorResourceId = 0; return false; }
-    const auto button = actionButtons.find(errorResourceId);
-    if (button == actionButtons.end()) return false;
-    rowError.show(button->second, errorText, remaining);
+    if (remaining <= 0) { errorResourceId = 0; rowError.clear(); return false; }
+    if (rowError.target() != row->second.button)
+        rowError.show(row->second.button, errorText, static_cast<uint32_t>(remaining), [this] { errorResourceId = 0; });
     return true;
 }
 // Signed out, the logo row becomes a wall clock once the time is known.

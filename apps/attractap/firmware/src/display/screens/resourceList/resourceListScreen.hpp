@@ -39,8 +39,10 @@ private:
     std::string username;
     FirmwareI18n::Text actionTitle, actionResource;
     ButtonError rowError;
-    std::map<uint32_t, lv_obj_t *> actionButtons;
+    struct ActionButton { lv_obj_t *button; ResourceListAction action; };
+    std::map<uint32_t, ActionButton> actionButtons;
     uint32_t errorResourceId = 0;
+    ResourceListAction errorAction = ResourceListAction::None;
     FirmwareI18n::Text errorText;
     uint32_t errorUntil = 0;
     bool busy = false;
