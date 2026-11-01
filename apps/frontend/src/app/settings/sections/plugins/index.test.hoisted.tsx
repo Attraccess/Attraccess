@@ -73,6 +73,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   usePluginsServiceUploadPlugin: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+vi.mock('../../../readerUi/ReaderUiAlerts', () => ({ ReaderUiAlerts: () => null }));
 vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({
     success: hoisted.successToast,

@@ -28,6 +28,11 @@ export function invalidateReaderUi(pluginName: string, scope: { resourceId?: num
   registryRef.invalidate(pluginName, scope);
 }
 
+export function unregisterReaderUi(pluginName: string): void {
+  pending.delete(pluginName);
+  registryRef?.unregister(pluginName);
+}
+
 export function resetReaderUiWiring(): void {
   pending.clear();
   pendingFailures.length = 0;

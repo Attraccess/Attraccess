@@ -59,6 +59,7 @@ import {
   queueReaderUiContributions,
   queueReaderUiLoadFailure,
   ReaderUiWiring,
+  unregisterReaderUi,
 } from './runtime/reader-ui-wiring';
 import { loadPluginEntryExports } from './runtime/module-loader';
 
@@ -283,6 +284,7 @@ export class PluginModule {
             onModuleDestroy: () => {
               getImplementationClass().pluginMqtt().clearPlugin(manifest.id);
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);
+              unregisterReaderUi(manifest.name);
             },
           }),
         },

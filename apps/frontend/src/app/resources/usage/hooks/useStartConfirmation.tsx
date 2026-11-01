@@ -90,7 +90,9 @@ function useNow(active: boolean): number {
  * confirm calls `retry` with the collected `confirmedStepIds`. Several plugins chain: every new 409 of the
  * same attempt keeps the step ids confirmed so far.
  */
-export function useStartConfirmation<TBody extends object>(retry: (requestBody: TBody) => void) {
+export function useStartConfirmation<TBody extends { confirmedStepIds?: Array<string> }>(
+  retry: (requestBody: TBody) => void,
+) {
   const { t } = useTranslations({ en, de });
   const [pending, setPending] = useState<Pending<TBody> | null>(null);
   const now = useNow(pending !== null);
@@ -103,7 +105,7 @@ export function useStartConfirmation<TBody extends object>(retry: (requestBody: 
     if (!required) return false;
     setPending({
       confirmation: required.confirmation,
-      stepIds: [...((requestBody as { confirmedStepIds?: string[] }).confirmedStepIds ?? []), required.stepId],
+      stepIds: [...(requestBody.confirmedStepIds ?? []), required.stepId],
       requestBody,
     });
     return true;

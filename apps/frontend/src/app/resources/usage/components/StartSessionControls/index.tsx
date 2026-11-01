@@ -376,8 +376,6 @@ export function useStartSessionControlsStateInputs(
         tExists,
         baseTranslationKey: 'api',
       });
-
-      console.error('Failed to start session:', JSON.stringify(error));
     },
     [t, toast, resource, tExists],
   );

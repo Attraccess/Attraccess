@@ -18,7 +18,10 @@ describe('generateRowCells', () => {
       false,
     );
 
-    const rowCells = cells as Array<{ key: string; props: { children: { props: { variant: string } }; className: string } }>;
+    const rowCells = cells as Array<{
+      key: string;
+      props: { children: { props: { variant: string } }; className: string };
+    }>;
     const supervisorCell = rowCells.find((cell) => cell.key === 'supervisor-1');
     const endTimeCell = rowCells.find((cell) => cell.key === 'end-1');
 
