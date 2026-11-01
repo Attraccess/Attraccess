@@ -22,7 +22,8 @@ public:
     void destroy() override;
     bool parksOrigin() const override { return true; }
 
-    // Clears the amount and any error; call before each presentation.
+    // Clears the amount and any error; call before a new top-up. A refused request
+    // reopens the screen without it, so the typed amount is still there to retry.
     void reset();
     // `onTopUp` receives the validated amount in cents.
     void setCallbacks(std::function<void(uint32_t amountCents)> onTopUp, std::function<void()> onCancel);

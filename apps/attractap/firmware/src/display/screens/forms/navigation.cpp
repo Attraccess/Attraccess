@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include "text.hpp"
+#include "../../shared/headerButton.hpp"
 
 void FormsScreen::resetFormsState()
 {
@@ -16,8 +17,8 @@ void FormsScreen::resetFormsState()
    this->formsErrorLabel = nullptr;
    this->formsProgressLabel = nullptr;
    this->formsProgressBar = nullptr;
-   this->formsBreadcrumbLabel = nullptr;
-   this->formsCancelButton = nullptr;
+   this->formsTitleLabel = nullptr;
+   this->formsSubtitleLabel = nullptr;
    this->formsBackButton = nullptr;
    this->formsNextButton = nullptr;
    this->formsNextLabel = nullptr;
@@ -98,7 +99,7 @@ void FormsScreen::renderFormField(const API::ResourceUsageFormFieldsPage &page, 
    if (this->formsProgressBar && totalFields > 0)
    {
       int32_t pct = static_cast<int32_t>((static_cast<uint64_t>(fieldNumber) * 100) / totalFields);
-      lv_bar_set_value(this->formsProgressBar, pct, LV_ANIM_ON);
+      lv_bar_set_value(this->formsProgressBar, pct, LV_ANIM_OFF);
    }
 
    this->buildCurrentFormField();
@@ -174,31 +175,8 @@ void FormsScreen::buildFormsView()
    lv_obj_set_flex_grow(panel, 1);
 
    // Header: "‹ Cancel" left, page indicator right.
-   lv_obj_t *header = lv_obj_create(panel);
-   lv_obj_remove_style_all(header);
-   lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_width(header, lv_pct(100));
-   lv_obj_set_height(header, 36);
-   lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-   lv_obj_t *cancelBtn = lv_button_create(header);
-   this->formsCancelButton = cancelBtn;
-   DisplayTheme::secondaryButton(cancelBtn);
-   lv_obj_set_size(cancelBtn, 150, 36);
-   lv_obj_set_flex_flow(cancelBtn, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(cancelBtn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_pad_column(cancelBtn, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_t *cancelIcon = lv_label_create(cancelBtn);
-   FirmwareI18n::setDynamicLabel(cancelIcon, LV_SYMBOL_LEFT) /* i18n-data: Language-neutral LVGL icon glyph. */;
-   lv_obj_t *cancelLabel = lv_label_create(cancelBtn);
-   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Message::Cancel);
-   lv_obj_add_event_cb(cancelBtn, &FormsScreen::onFormsCancel, LV_EVENT_CLICKED, this);
-
-   this->formsProgressLabel = lv_label_create(header);
-   FirmwareI18n::setLabel(this->formsProgressLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
-   lv_obj_set_style_text_color(this->formsProgressLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->formsProgressLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_t *header = ReaderHeader::createFlowHeader(panel, &FormsScreen::onFormsCancel, this);
+   this->formsProgressLabel = ReaderHeader::createPageIndicator(header);
 
    // Slim progress bar tracking field N of total.
    this->formsProgressBar = lv_bar_create(panel);
@@ -215,7 +193,10 @@ void FormsScreen::buildFormsView()
    lv_bar_set_range(this->formsProgressBar, 0, 100);
    lv_bar_set_value(this->formsProgressBar, 0, LV_ANIM_OFF);
 
-   // Body: breadcrumb + the single focused field, filling the panel. Text
+   // What the form is for, then the resource and form it belongs to.
+   ReaderHeader::createFlowTitle(panel, &this->formsTitleLabel, &this->formsSubtitleLabel);
+
+   // Body: the single focused field, filling the panel. Text
    // fields are tap-to-edit previews (editing happens in the fullscreen editor
    // overlay), so a field normally fits; only the largest selects overflow, and
    // then the body scrolls vertically.
@@ -230,13 +211,6 @@ void FormsScreen::buildFormsView()
    lv_obj_set_scroll_dir(content, LV_DIR_VER);
    lv_obj_set_scrollbar_mode(content, LV_SCROLLBAR_MODE_AUTO);
    lv_obj_set_flex_grow(content, 1);
-
-   this->formsBreadcrumbLabel = lv_label_create(content);
-   FirmwareI18n::setLabel(this->formsBreadcrumbLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
-    lv_obj_set_style_text_color(this->formsBreadcrumbLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(this->formsBreadcrumbLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_width(this->formsBreadcrumbLabel, lv_pct(100), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_label_set_long_mode(this->formsBreadcrumbLabel, LV_LABEL_LONG_WRAP);
 
    this->formsErrorLabel = lv_label_create(content);
    FirmwareI18n::setLabel(this->formsErrorLabel, FirmwareI18n::Text::literal("") /* i18n-data: Empty control caption; no prose. */);
@@ -257,37 +231,11 @@ void FormsScreen::buildFormsView()
    lv_obj_set_style_pad_top(list, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Footer pinned below the body: secondary back + primary next/submit.
-   lv_obj_t *footer = lv_obj_create(panel);
-   lv_obj_remove_style_all(footer);
-   lv_obj_remove_flag(footer, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_width(footer, lv_pct(100));
-   lv_obj_set_height(footer, LV_SIZE_CONTENT);
-   lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_pad_top(footer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_column(footer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *backBtn = lv_button_create(footer);
-   this->formsBackButton = backBtn;
-   lv_obj_set_flex_grow(backBtn, 1);
-   lv_obj_set_height(backBtn, LV_SIZE_CONTENT);
-   lv_obj_set_style_pad_all(backBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   DisplayTheme::secondaryButton(backBtn);
-   lv_obj_t *backLabel = lv_label_create(backBtn);
-   FirmwareI18n::setLabel(backLabel, FirmwareI18n::Message::Back);
-   lv_obj_set_style_text_font(backLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
-   lv_obj_set_align(backLabel, LV_ALIGN_CENTER);
-   lv_obj_add_event_cb(backBtn, &FormsScreen::onFormsBack, LV_EVENT_CLICKED, this);
-
-   lv_obj_t *nextBtn = lv_button_create(footer);
-   this->formsNextButton = nextBtn;
-   lv_obj_set_flex_grow(nextBtn, 2);
-   lv_obj_set_height(nextBtn, LV_SIZE_CONTENT);
-   lv_obj_set_style_pad_all(nextBtn, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   DisplayTheme::button(nextBtn);
-   this->formsNextLabel = lv_label_create(nextBtn);
-   FirmwareI18n::setLabel(this->formsNextLabel, FirmwareI18n::Message::Next);
-   lv_obj_set_align(this->formsNextLabel, LV_ALIGN_CENTER);
+   const ReaderHeader::FlowFooter footer = ReaderHeader::createFlowFooter(panel, &FormsScreen::onFormsBack, &FormsScreen::onFormsNext, this);
+   this->formsBackButton = footer.back;
+   this->formsNextButton = footer.next;
+   this->formsNextLabel = footer.nextLabel;
+   lv_obj_t *nextBtn = footer.next;
    this->formsNextSpinner = lv_spinner_create(nextBtn);
    lv_obj_set_style_arc_color(this->formsNextSpinner, DisplayTheme::border(), LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_arc_color(this->formsNextSpinner, DisplayTheme::muted(), LV_PART_INDICATOR | LV_STATE_DEFAULT);
@@ -296,7 +244,6 @@ void FormsScreen::buildFormsView()
    lv_obj_set_size(this->formsNextSpinner, nextLabelHeight, nextLabelHeight);
    lv_obj_set_align(this->formsNextSpinner, LV_ALIGN_CENTER);
    lv_obj_add_flag(this->formsNextSpinner, LV_OBJ_FLAG_HIDDEN);
-   lv_obj_add_event_cb(nextBtn, &FormsScreen::onFormsNext, LV_EVENT_CLICKED, this);
 
    this->createFormsEditor(root);
 
@@ -304,7 +251,7 @@ void FormsScreen::buildFormsView()
 
 #include <string.h>
 
-void FormsScreen::updateFormBreadcrumb()
+void FormsScreen::updateFormTitle()
 {
 
    FirmwareI18n::Text pageTitle = FirmwareI18n::Message::PleaseCompleteTheForm;
@@ -345,27 +292,24 @@ void FormsScreen::updateFormBreadcrumb()
       }
    }
 
-   // Compact breadcrumb instead of three stacked headers: action context on the
-   // first line, resource + form scope on the second.
-   if (this->formsBreadcrumbLabel)
+   // The title says what the form is for; the line under it names the resource and the form.
+   if (this->formsTitleLabel)
    {
-
+      FirmwareI18n::setLabel(this->formsTitleLabel, pageTitle);
+   }
+   if (this->formsSubtitleLabel)
+   {
       std::string scope = resourceName;
       if (formName.length() > 0)
       {
          if (scope.length() > 0)
          {
-            scope += " - ";
+            scope += " \xE2\x80\x93 ";
          }
          scope += formName;
       }
-      if (scope.length() > 0)
-      {
-         pageTitle = FirmwareI18n::Text::format(FirmwareI18n::Message::Breadcrumb, {pageTitle, FirmwareI18n::Text::literal(scope) /* i18n-data: Supplied form/resource name, field caption, description, option, hint or entered value; preserve exact contents. */});
-      }
-      FirmwareI18n::setLabel(this->formsBreadcrumbLabel, pageTitle);
+      FirmwareI18n::setLabel(this->formsSubtitleLabel, FirmwareI18n::Text::literal(scope) /* i18n-data: Supplied resource and form names; preserve exact contents. */);
    }
-
 }
 
 void FormsScreen::onFormsNext(lv_event_t *e)
@@ -446,8 +390,9 @@ void FormsScreen::setFormsBusy(bool busy, const char *)
    {
       this->closeFormsEditor(false);
    }
-   // Disable controls while a request is in flight, without redrawing an overlay.
-   lv_obj_t *const buttons[] = {this->formsNextButton, this->formsBackButton, this->formsCancelButton};
+   // Disable controls while a request is in flight, without redrawing an overlay. Cancel stays:
+   // a form whose server never answers must not hold the reader (the session timeout is paused).
+   lv_obj_t *const buttons[] = {this->formsNextButton, this->formsBackButton};
    for (lv_obj_t *button : buttons)
    {
       if (!button)

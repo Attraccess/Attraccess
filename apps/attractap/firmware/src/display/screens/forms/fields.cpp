@@ -36,7 +36,7 @@ void FormsScreen::buildCurrentFormField()
       return;
    }
 
-   updateFormBreadcrumb();
+   updateFormTitle();
 
    {
       {

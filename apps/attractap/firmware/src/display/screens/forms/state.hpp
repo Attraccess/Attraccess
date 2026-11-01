@@ -12,8 +12,8 @@ protected:
     lv_obj_t *formsErrorLabel = nullptr;
     lv_obj_t *formsProgressLabel = nullptr;
     lv_obj_t *formsProgressBar = nullptr;
-    lv_obj_t *formsBreadcrumbLabel = nullptr;
-    lv_obj_t *formsCancelButton = nullptr;
+    lv_obj_t *formsTitleLabel = nullptr;
+    lv_obj_t *formsSubtitleLabel = nullptr;
     lv_obj_t *formsBackButton = nullptr;
     lv_obj_t *formsNextButton = nullptr;
     lv_obj_t *formsNextLabel = nullptr;

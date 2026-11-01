@@ -4,7 +4,7 @@
 #include <string>
 #include <lvgl.h>
 
-// Project name search inside the projects modal: a tap-to-edit search field
+// Project name search on the project picker: a tap-to-edit search field
 // opens a fullscreen keyboard editor; the committed query filters every page.
 
 static constexpr uint32_t PROJECT_SEARCH_MAX_LENGTH = 64;

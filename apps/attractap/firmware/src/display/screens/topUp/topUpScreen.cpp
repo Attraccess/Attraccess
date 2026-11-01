@@ -2,12 +2,18 @@
 #include "topUpScreen.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include "../../shared/screenChrome.hpp"
+#include "../../shared/headerButton.hpp"
 #include <cstdlib>
 
 namespace
 {
     constexpr size_t MaxDigits = 6; // up to 999999
-    constexpr int32_t KeyHeight = 48;
+    // Fixed rows inside the chrome insets: header, title, explanation, amount, keypad.
+    constexpr int32_t TitleY = 50;
+    constexpr int32_t ExplanationY = 88;
+    constexpr int32_t AmountY = 134;
+    constexpr int32_t KeypadY = 196;
+    constexpr int32_t KeyHeight = 44;
     constexpr int32_t KeyGap = 8;
 
     // Key identifiers: 0-9 digits, then these.
@@ -33,39 +39,28 @@ void TopUpScreen::init()
     screen = ScreenChrome::createScreen();
 
     // Header link back to where the user came from.
-    lv_obj_t *cancel = lv_button_create(screen);
-    DisplayTheme::secondaryButton(cancel);
-    lv_obj_set_size(cancel, 150, 36);
-    lv_obj_align(cancel, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_set_flex_flow(cancel, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(cancel, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(cancel, 8, LV_PART_MAIN);
-    lv_obj_t *backIcon = lv_label_create(cancel);
-    FirmwareI18n::setDynamicLabel(backIcon, LV_SYMBOL_LEFT) /* i18n-data: Language-neutral LVGL icon glyph. */;
-    lv_obj_t *cancelLabel = lv_label_create(cancel);
-    FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Message::Cancel);
-    lv_obj_add_event_cb(cancel, [](lv_event_t *e)
-                        {
+    ReaderHeader::createFlowHeader(screen, [](lv_event_t *e)
+                                   {
         auto *self = static_cast<TopUpScreen *>(lv_event_get_user_data(e));
-        if (self->onCancel) self->onCancel(); }, LV_EVENT_CLICKED, this);
+        if (self->onCancel) self->onCancel(); }, this);
 
     lv_obj_t *title = ScreenChrome::createOneLineLabel(screen, ScreenChrome::ContentWidth, &attractap_font_montserrat_latin1_24);
     FirmwareI18n::setLabel(title, FirmwareI18n::Message::InsufficientBalance);
     lv_obj_set_style_text_color(title, DisplayTheme::text(), LV_PART_MAIN);
-    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 0, 44);
+    lv_obj_align(title, LV_ALIGN_TOP_LEFT, 0, TitleY);
 
     lv_obj_t *explanation = makeLabel(screen, FirmwareI18n::Message::YourBalanceIsTooLowForThisActionPleaseTopUpYourBalance, &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
     lv_obj_set_width(explanation, lv_pct(100));
     lv_obj_set_height(explanation, 2 * lv_font_get_line_height(&attractap_font_montserrat_latin1_14));
     lv_label_set_long_mode(explanation, LV_LABEL_LONG_WRAP);
-    lv_obj_align(explanation, LV_ALIGN_TOP_LEFT, 0, 76);
+    lv_obj_align(explanation, LV_ALIGN_TOP_LEFT, 0, ExplanationY);
 
     // Amount and the button that submits it share one row.
     lv_obj_t *amountBox = lv_obj_create(screen);
     DisplayTheme::field(amountBox);
     lv_obj_remove_flag(amountBox, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(amountBox, 240, 48);
-    lv_obj_align(amountBox, LV_ALIGN_TOP_LEFT, 0, 114);
+    lv_obj_align(amountBox, LV_ALIGN_TOP_LEFT, 0, AmountY);
     amountLabel = ScreenChrome::createOneLineLabel(amountBox, 210, &attractap_font_montserrat_latin1_28);
     lv_obj_set_style_text_align(amountLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN);
     lv_obj_align(amountLabel, LV_ALIGN_RIGHT_MID, -10, 0);
@@ -73,7 +68,7 @@ void TopUpScreen::init()
     topUpButton = lv_button_create(screen);
     DisplayTheme::button(topUpButton);
     lv_obj_set_size(topUpButton, 200, 48);
-    lv_obj_align(topUpButton, LV_ALIGN_TOP_RIGHT, 0, 114);
+    lv_obj_align(topUpButton, LV_ALIGN_TOP_RIGHT, 0, AmountY);
     lv_obj_t *topUpLabel = lv_label_create(topUpButton);
     FirmwareI18n::setLabel(topUpLabel, FirmwareI18n::Message::TopUp);
     lv_obj_set_style_text_font(topUpLabel, &attractap_font_montserrat_latin1_20, LV_PART_MAIN);
@@ -93,7 +88,7 @@ void TopUpScreen::init()
         else
             DisplayTheme::secondaryButton(key);
         lv_obj_set_size(key, keyWidth, KeyHeight);
-        lv_obj_align(key, LV_ALIGN_TOP_LEFT, (i % 3) * (keyWidth + KeyGap), 172 + (i / 3) * (KeyHeight + KeyGap));
+        lv_obj_align(key, LV_ALIGN_TOP_LEFT, (i % 3) * (keyWidth + KeyGap), KeypadY + (i / 3) * (KeyHeight + KeyGap));
         lv_obj_t *caption = lv_label_create(key);
         FirmwareI18n::setDynamicLabel(caption, captions[i]) /* i18n-data: Language-neutral keypad glyph. */;
         lv_obj_set_style_text_font(caption, &lv_font_montserrat_24, LV_PART_MAIN);
@@ -134,8 +129,7 @@ void TopUpScreen::updateAmount()
     {
         return;
     }
-    // "EUR" instead of the euro sign: the display font is Latin-1.
-    FirmwareI18n::setDynamicLabel(amountLabel, digits.empty() ? "EUR" : (digits + " EUR").c_str()) /* i18n-data: Typed amount with the language-neutral currency code. */;
+    FirmwareI18n::setDynamicLabel(amountLabel, digits.empty() ? "\xE2\x82\xAC" : (digits + " \xE2\x82\xAC").c_str()) /* i18n-data: Typed amount with the language-neutral euro sign. */;
     lv_obj_set_style_text_color(amountLabel, digits.empty() ? DisplayTheme::muted() : DisplayTheme::text(), LV_PART_MAIN);
 }
 

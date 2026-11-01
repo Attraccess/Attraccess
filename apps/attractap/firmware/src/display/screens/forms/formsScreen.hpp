@@ -42,7 +42,7 @@ private:
     lv_obj_t *screen = nullptr;
     ButtonError submitError;
 
-    void updateFormBreadcrumb();
+    void updateFormTitle();
     void createFormsEditor(lv_obj_t *overlay);
     void createSelectField(lv_obj_t *fieldContainer, FormFieldWidget &widget, const API::ResourceUsageFormField &field);
     static void onFormsNext(lv_event_t *e);

@@ -2,6 +2,7 @@
 #include "projectSelectScreen.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include "../../shared/screenChrome.hpp"
+#include "../../shared/headerButton.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -49,79 +50,31 @@ void ProjectSelectScreen::buildProjectsView()
    lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-   lv_obj_t *header = lv_obj_create(panel);
-   lv_obj_remove_style_all(header);
-   lv_obj_remove_flag(header, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_width(header, lv_pct(100));
-   lv_obj_set_height(header, 36);
-   lv_obj_set_flex_flow(header, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(header, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_margin_bottom(header, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   lv_obj_t *cancelButton = lv_button_create(header);
-   DisplayTheme::secondaryButton(cancelButton);
-   lv_obj_set_size(cancelButton, 150, 36);
-   lv_obj_set_flex_flow(cancelButton, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(cancelButton, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-   lv_obj_set_style_pad_column(cancelButton, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(cancelButton, &ProjectSelectScreen::onProjectsCancel, LV_EVENT_CLICKED, this);
-   lv_obj_t *cancelIcon = lv_label_create(cancelButton);
-   FirmwareI18n::setDynamicLabel(cancelIcon, LV_SYMBOL_LEFT) /* i18n-data: Language-neutral LVGL icon glyph. */;
-   lv_obj_t *cancelLabel = lv_label_create(cancelButton);
-   FirmwareI18n::setLabel(cancelLabel, FirmwareI18n::Message::Cancel);
-
-   lv_obj_t *title = lv_label_create(header);
+   // Header: "‹ Cancel" left, page indicator right; then the title and the resource it is for.
+   lv_obj_t *header = ReaderHeader::createFlowHeader(panel, &ProjectSelectScreen::onProjectsCancel, this);
+   this->projectsPaginationLabel = ReaderHeader::createPageIndicator(header);
+   lv_obj_t *title = nullptr;
+   ReaderHeader::createFlowTitle(panel, &title, &this->resourceNameLabel);
    FirmwareI18n::setLabel(title, FirmwareI18n::Message::SelectProject);
-   lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(title, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
+   FirmwareI18n::setDynamicLabel(this->resourceNameLabel, this->resourceName.c_str()) /* i18n-data: Server-supplied resource name; preserve exact contents. */;
+   lv_obj_set_style_margin_bottom(this->resourceNameLabel, 8, LV_PART_MAIN);
 
    this->createProjectsSearchRow(panel);
 
    this->projectsListContainer = lv_obj_create(panel);
    lv_obj_remove_style_all(this->projectsListContainer);
    lv_obj_set_width(this->projectsListContainer, lv_pct(100));
-   lv_obj_set_height(this->projectsListContainer, 240);
-   lv_obj_set_style_max_height(this->projectsListContainer, 240, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_height(this->projectsListContainer, 0);
    lv_obj_set_flex_grow(this->projectsListContainer, 1);
    lv_obj_add_flag(this->projectsListContainer, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_scroll_dir(this->projectsListContainer, LV_DIR_VER);
    lv_obj_set_flex_flow(this->projectsListContainer, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->projectsListContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-   lv_obj_set_style_pad_row(this->projectsListContainer, 8, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_margin_bottom(this->projectsListContainer, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(this->projectsListContainer, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-   lv_obj_t *footer = lv_obj_create(panel);
-   lv_obj_remove_style_all(footer);
-   lv_obj_set_width(footer, lv_pct(100));
-   lv_obj_set_height(footer, LV_SIZE_CONTENT);
-   lv_obj_set_flex_flow(footer, LV_FLEX_FLOW_ROW);
-   lv_obj_set_flex_align(footer, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-
-   this->projectsPrevButton = lv_button_create(footer);
-   DisplayTheme::secondaryButton(this->projectsPrevButton);
-   lv_obj_set_height(this->projectsPrevButton, 36);
-   lv_obj_set_width(this->projectsPrevButton, LV_SIZE_CONTENT);
-   lv_obj_set_style_pad_left(this->projectsPrevButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(this->projectsPrevButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(this->projectsPrevButton, &ProjectSelectScreen::onProjectsPrevPage, LV_EVENT_CLICKED, this);
-   lv_obj_t *prevLabel = lv_label_create(this->projectsPrevButton);
-   FirmwareI18n::setLabel(prevLabel, FirmwareI18n::Message::Back);
-   lv_obj_set_style_text_font(prevLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN);
-
-   this->projectsPaginationLabel = lv_label_create(footer);
-   FirmwareI18n::setLabel(this->projectsPaginationLabel, FirmwareI18n::Message::Page1);
-   lv_obj_set_style_text_color(this->projectsPaginationLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-
-   this->projectsNextButton = lv_button_create(footer);
-   DisplayTheme::button(this->projectsNextButton);
-   lv_obj_set_height(this->projectsNextButton, 36);
-   lv_obj_set_width(this->projectsNextButton, LV_SIZE_CONTENT);
-   lv_obj_set_style_pad_left(this->projectsNextButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(this->projectsNextButton, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_add_event_cb(this->projectsNextButton, &ProjectSelectScreen::onProjectsNextPage, LV_EVENT_CLICKED, this);
-   lv_obj_t *nextLabel = lv_label_create(this->projectsNextButton);
-   FirmwareI18n::setLabel(nextLabel, FirmwareI18n::Message::Next);
-   lv_obj_set_style_text_align(nextLabel, LV_TEXT_ALIGN_RIGHT, LV_PART_MAIN | LV_STATE_DEFAULT);
+   const ReaderHeader::FlowFooter footer = ReaderHeader::createFlowFooter(panel, &ProjectSelectScreen::onProjectsPrevPage, &ProjectSelectScreen::onProjectsNextPage, this);
+   this->projectsPrevButton = footer.back;
+   this->projectsNextButton = footer.next;
 
    this->refreshProjectsSearchField();
 }
@@ -293,7 +246,8 @@ void ProjectSelectScreen::rebuildProjectsList()
       const API::Project &project = this->projectsCache.items[i];
       lv_obj_t *btn = lv_button_create(this->projectsListContainer);
       lv_obj_set_width(btn, lv_pct(100));
-      lv_obj_set_height(btn, 48);
+      // A full page (MAX_PROJECTS_PER_PAGE) fits the list area without scrolling.
+      lv_obj_set_height(btn, 40);
       lv_obj_add_flag(btn, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
       lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
       DisplayTheme::secondaryButton(btn);
@@ -307,7 +261,10 @@ void ProjectSelectScreen::rebuildProjectsList()
       lv_obj_add_event_cb(btn, &ProjectSelectScreen::onProjectListItemClick, LV_EVENT_CLICKED, evt);
       lv_obj_add_event_cb(btn, &ProjectSelectScreen::onProjectListItemDelete, LV_EVENT_DELETE, evt);
 
-      lv_obj_t *label = lv_label_create(btn);
+      lv_obj_set_style_pad_hor(btn, 12, LV_PART_MAIN);
+      // One line; a long project name ends in dots inside its button.
+      lv_obj_t *label = ScreenChrome::createOneLineLabel(btn, ScreenChrome::ContentWidth - 24, &attractap_font_montserrat_latin1_18);
+      lv_obj_center(label);
       if (project.name.length() > 0)
       {
       FirmwareI18n::setDynamicLabel(label, project.name.c_str()) /* i18n-data: Server-supplied project name; preserve exact contents. */;
@@ -395,6 +352,15 @@ void ProjectSelectScreen::setSelectedProject(uint32_t projectId)
    }
 }
 
+void ProjectSelectScreen::setResourceName(const std::string &name)
+{
+   this->resourceName = name;
+   if (this->resourceNameLabel)
+   {
+      FirmwareI18n::setDynamicLabel(this->resourceNameLabel, name.c_str()) /* i18n-data: Server-supplied resource name; preserve exact contents. */;
+   }
+}
+
 void ProjectSelectScreen::setCallbacks(std::function<void(uint32_t, const std::string &)> onSelect, std::function<void()> onCancel)
 {
    this->selectionCallback = std::move(onSelect);
@@ -434,6 +400,7 @@ void ProjectSelectScreen::destroy()
    this->screen = nullptr;
    this->projectsListContainer = nullptr;
    this->projectsPaginationLabel = nullptr;
+   this->resourceNameLabel = nullptr;
    this->projectsPrevButton = nullptr;
    this->projectsNextButton = nullptr;
    this->projectsSearchLabel = nullptr;
