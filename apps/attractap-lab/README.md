@@ -276,6 +276,13 @@ pytest. Logs, the emulator trace and camera photos land in
 `apps/attractap-lab/hil-artifacts/lab-artifacts/<session>`. These tests are
 not part of `pnpm nx run attractap-lab:test`, which runs without hardware.
 
+`test_power_cycle_stays_paired` switches the reader off with its power button,
+waits, switches it on again and expects it to open its secure session without
+a new approval. It runs only for the variants in `POWER_BUTTON_VARIANTS`
+(`hil/conftest.py`), currently the Touch V1 (`attractap-touch`). Other readers
+skip it: their emulator has no button to press. Add a variant there once its
+places have the emulator wired to its power button.
+
 ### In CI
 
 `.github/workflows/attractap-lab-hil.yml` runs these tests from the release
