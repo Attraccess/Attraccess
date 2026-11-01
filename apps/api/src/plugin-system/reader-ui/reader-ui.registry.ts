@@ -51,6 +51,11 @@ export class ReaderUiRegistry {
       .catch((e) => this.logger.error(`Could not raise load-failure alert: ${(e as Error).message}`));
   }
 
+  /** Every loaded plugin that contributes reader UI or hooks, in host order. */
+  pluginNames(): string[] {
+    return [...this.entries.keys()].sort((a, b) => a.localeCompare(b));
+  }
+
   providers(): { plugin: string; provider: ReaderUiProvider }[] {
     return [...this.entries]
       .filter(([, entry]) => entry.readerUi)

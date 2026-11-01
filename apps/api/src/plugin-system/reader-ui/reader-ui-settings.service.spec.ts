@@ -17,12 +17,19 @@ function repo<T extends Record<string, any>>(keys: string[]) {
   };
 }
 
-function setup() {
+function setup(loadedPlugins: string[] = []) {
   const resources = repo(['resourceId']);
   const plugins = repo(['resourceId', 'plugin']);
   const readers = repo(['readerId']);
   const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
-  const service = new ReaderUiSettingsService(resources as never, plugins as never, readers as never, audit as never);
+  const registry = { pluginNames: () => [...loadedPlugins].sort() };
+  const service = new ReaderUiSettingsService(
+    resources as never,
+    plugins as never,
+    readers as never,
+    audit as never,
+    registry as never,
+  );
   return { service, audit };
 }
 
@@ -36,8 +43,44 @@ describe('ReaderUiSettingsService', () => {
     expect(await service.getReader(2)).toEqual({ widgetsEnabled: true });
   });
 
+  it('lists loaded plugins with the defaults before any setting is stored', async () => {
+    const { service } = setup(['b-plugin', 'a-plugin']);
+    expect((await service.getResource(1)).plugins).toEqual([
+      { plugin: 'a-plugin', widgetsEnabled: true, hookFailurePolicy: 'fail-closed' },
+      { plugin: 'b-plugin', widgetsEnabled: true, hookFailurePolicy: 'fail-closed' },
+    ]);
+  });
+
+  it('rejects settings for a plugin that is not loaded and does not list stored rows of unloaded plugins', async () => {
+    const { service, audit } = setup(['res']);
+    await expect(
+      service.setResource(
+        1,
+        { noScreenPolicy: null, plugins: [{ plugin: 'gone', widgetsEnabled: false, hookFailurePolicy: 'fail-open' }] },
+        9,
+      ),
+    ).rejects.toThrow('Unknown plugin: gone');
+    expect(audit.recordAttractap).not.toHaveBeenCalled();
+    expect((await service.getResource(1)).plugins.map((p) => p.plugin)).toEqual(['res']);
+  });
+
+  it('audits a first change from the default, not from nothing', async () => {
+    const { service, audit } = setup(['res']);
+    await service.setResource(
+      1,
+      { noScreenPolicy: null, plugins: [{ plugin: 'res', widgetsEnabled: true, hookFailurePolicy: 'fail-open' }] },
+      9,
+    );
+    expect(audit.recordAttractap).toHaveBeenCalledTimes(1);
+    expect(audit.recordAttractap).toHaveBeenCalledWith(
+      expect.objectContaining({
+        details: expect.objectContaining({ setting: 'hookFailurePolicy', value: 'fail-open' }),
+      }),
+    );
+  });
+
   it('stores the override and per-plugin policy, and audits each change once', async () => {
-    const { service, audit } = setup();
+    const { service, audit } = setup(['res']);
     const next = {
       noScreenPolicy: 'card-confirm' as const,
       plugins: [{ plugin: 'res', widgetsEnabled: false, hookFailurePolicy: 'fail-open' as const }],
@@ -60,7 +103,7 @@ describe('ReaderUiSettingsService', () => {
   });
 
   it('shows widgets only when the resource and the reader toggle are both on', async () => {
-    const { service, audit } = setup();
+    const { service, audit } = setup(['res']);
     await service.setResource(
       1,
       { noScreenPolicy: null, plugins: [{ plugin: 'res', widgetsEnabled: true, hookFailurePolicy: 'fail-closed' }] },

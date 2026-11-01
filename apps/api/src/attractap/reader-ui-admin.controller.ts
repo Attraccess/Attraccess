@@ -3,6 +3,8 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
+import { ResourcesService } from '../resources/resources.service';
+import { AttractapService } from './attractap.service';
 import { ReaderUiAlertsService } from '../plugin-system/reader-ui/reader-ui-alerts.service';
 import { ReaderUiSettingsService } from '../plugin-system/reader-ui/reader-ui-settings.service';
 import {
@@ -22,13 +24,27 @@ export class ReaderUiAdminController {
     private readonly settings: ReaderUiSettingsService,
     private readonly alerts: ReaderUiAlertsService,
     private readonly slots: UiSlotService,
+    private readonly resources: ResourcesService,
+    private readonly readers: AttractapService,
   ) {}
+
+  private async requireResource(resourceId: number): Promise<void> {
+    // Throws ResourceNotFoundException (404) for an unknown id.
+    await this.resources.getResourceById(resourceId);
+  }
+
+  private async requireReader(readerId: number): Promise<void> {
+    if (!(await this.readers.findReaderById(readerId))) throw new NotFoundException(`Reader ${readerId} not found`);
+  }
 
   @Get('resources/:resourceId/reader-ui-settings')
   @Auth('resources.update')
   @ApiOperation({ summary: 'Reader UI settings of a resource', operationId: 'getResourceReaderUiSettings' })
   @ApiResponse({ status: 200, type: ResourceReaderUiSettingsDto })
-  getResourceSettings(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceReaderUiSettingsDto> {
+  async getResourceSettings(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+  ): Promise<ResourceReaderUiSettingsDto> {
+    await this.requireResource(resourceId);
     return this.settings.getResource(resourceId);
   }
 
@@ -41,6 +57,7 @@ export class ReaderUiAdminController {
     @Body() dto: ResourceReaderUiSettingsDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceReaderUiSettingsDto> {
+    await this.requireResource(resourceId);
     await this.settings.setResource(resourceId, dto, req.user.id);
     this.slots.syncReader(undefined);
     return this.settings.getResource(resourceId);
@@ -50,7 +67,8 @@ export class ReaderUiAdminController {
   @Auth('resources.update')
   @ApiOperation({ summary: 'Reader UI settings of a reader', operationId: 'getReaderReaderUiSettings' })
   @ApiResponse({ status: 200, type: ReaderReaderUiSettingsDto })
-  getReaderSettings(@Param('readerId', ParseIntPipe) readerId: number): Promise<ReaderReaderUiSettingsDto> {
+  async getReaderSettings(@Param('readerId', ParseIntPipe) readerId: number): Promise<ReaderReaderUiSettingsDto> {
+    await this.requireReader(readerId);
     return this.settings.getReader(readerId);
   }
 
@@ -63,6 +81,7 @@ export class ReaderUiAdminController {
     @Body() dto: ReaderReaderUiSettingsDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ReaderReaderUiSettingsDto> {
+    await this.requireReader(readerId);
     await this.settings.setReader(readerId, dto.widgetsEnabled, req.user.id);
     this.slots.syncReader(readerId);
     return this.settings.getReader(readerId);
@@ -75,7 +94,8 @@ export class ReaderUiAdminController {
     operationId: 'getReaderUiContributions',
   })
   @ApiResponse({ status: 200, type: [ReaderUiContributionStatusDto] })
-  getContributions(@Param('readerId', ParseIntPipe) readerId: number): ReaderUiContributionStatusDto[] {
+  async getContributions(@Param('readerId', ParseIntPipe) readerId: number): Promise<ReaderUiContributionStatusDto[]> {
+    await this.requireReader(readerId);
     return this.slots.contributionsOf(readerId);
   }
 

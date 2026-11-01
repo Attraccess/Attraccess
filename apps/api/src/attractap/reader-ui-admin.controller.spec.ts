@@ -11,9 +11,17 @@ function setup() {
   };
   const alerts = { listOpen: jest.fn().mockResolvedValue([{ id: 1 }]), clear: jest.fn() };
   const slots = { syncReader: jest.fn(), contributionsOf: jest.fn().mockReturnValue([{ plugin: 'p' }]) };
-  const controller = new ReaderUiAdminController(settings as never, alerts as never, slots as never);
+  const resources = { getResourceById: jest.fn().mockResolvedValue({ id: 3 }) };
+  const readers = { findReaderById: jest.fn().mockResolvedValue({ id: 8 }) };
+  const controller = new ReaderUiAdminController(
+    settings as never,
+    alerts as never,
+    slots as never,
+    resources as never,
+    readers as never,
+  );
   const req = { user: { id: 4 } } as any;
-  return { controller, settings, alerts, slots, req };
+  return { controller, settings, alerts, slots, resources, readers, req };
 }
 
 describe('ReaderUiAdminController', () => {
@@ -33,9 +41,24 @@ describe('ReaderUiAdminController', () => {
     expect(slots.syncReader).toHaveBeenCalledWith(8);
   });
 
+  it('answers 404 for settings of a resource or reader that does not exist', async () => {
+    const { controller, settings, resources, readers, req } = setup();
+    resources.getResourceById.mockRejectedValue(new NotFoundException('Resource 9 not found'));
+    readers.findReaderById.mockResolvedValue(undefined);
+    await expect(controller.getResourceSettings(9)).rejects.toThrow(NotFoundException);
+    await expect(controller.updateResourceSettings(9, { noScreenPolicy: null, plugins: [] }, req)).rejects.toThrow(
+      NotFoundException,
+    );
+    await expect(controller.getReaderSettings(9)).rejects.toThrow(NotFoundException);
+    await expect(controller.getContributions(9)).rejects.toThrow(NotFoundException);
+    await expect(controller.updateReaderSettings(9, { widgetsEnabled: false }, req)).rejects.toThrow(NotFoundException);
+    expect(settings.setResource).not.toHaveBeenCalled();
+    expect(settings.setReader).not.toHaveBeenCalled();
+  });
+
   it('lists contributions and open alerts', async () => {
     const { controller } = setup();
-    expect(controller.getContributions(8)).toEqual([{ plugin: 'p' }]);
+    expect(await controller.getContributions(8)).toEqual([{ plugin: 'p' }]);
     expect(await controller.getAlerts()).toEqual([{ id: 1 }]);
   });
 

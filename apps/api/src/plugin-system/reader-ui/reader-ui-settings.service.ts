@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -8,6 +8,7 @@ import {
 } from '@attraccess/database-entities';
 import type { HookFailurePolicy, NoScreenPolicy } from '@attraccess/plugins-backend-sdk';
 import { AuditService } from '../../audit/audit.service';
+import { ReaderUiRegistry } from './reader-ui.registry';
 
 export interface ResourceReaderUiSettings {
   noScreenPolicy: NoScreenPolicy | null;
@@ -22,6 +23,7 @@ export class ReaderUiSettingsService {
     @InjectRepository(ReaderUiPluginSettings) private readonly plugins: Repository<ReaderUiPluginSettings>,
     @InjectRepository(ReaderUiReaderSettings) private readonly readers: Repository<ReaderUiReaderSettings>,
     private readonly audit: AuditService,
+    private readonly registry: ReaderUiRegistry,
   ) {}
 
   async getResource(resourceId: number): Promise<ResourceReaderUiSettings> {
@@ -29,17 +31,23 @@ export class ReaderUiSettingsService {
       this.resources.findOne({ where: { resourceId } }),
       this.plugins.find({ where: { resourceId }, order: { plugin: 'ASC' } }),
     ]);
+    // A plugin has no row until an admin changes it, so loaded plugins are listed with the defaults.
+    // Rows of plugins that are not loaded stay stored but are not offered.
+    const stored = new Map(plugins.map((p) => [p.plugin, p]));
     return {
       noScreenPolicy: row?.noScreenPolicy ?? null,
-      plugins: plugins.map((p) => ({
-        plugin: p.plugin,
-        widgetsEnabled: p.widgetsEnabled,
-        hookFailurePolicy: p.hookFailurePolicy,
+      plugins: this.registry.pluginNames().map((plugin) => ({
+        plugin,
+        widgetsEnabled: stored.get(plugin)?.widgetsEnabled ?? true,
+        hookFailurePolicy: stored.get(plugin)?.hookFailurePolicy ?? 'fail-closed',
       })),
     };
   }
 
   async setResource(resourceId: number, next: ResourceReaderUiSettings, actorId: number): Promise<void> {
+    const loaded = new Set(this.registry.pluginNames());
+    const unknown = next.plugins.filter((entry) => !loaded.has(entry.plugin)).map((entry) => entry.plugin);
+    if (unknown.length) throw new BadRequestException(`Unknown plugin: ${unknown.join(', ')}`);
     const before = await this.getResource(resourceId);
     await this.resources.save({ resourceId, noScreenPolicy: next.noScreenPolicy });
     if (before.noScreenPolicy !== next.noScreenPolicy) {
