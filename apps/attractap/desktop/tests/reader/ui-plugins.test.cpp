@@ -195,4 +195,21 @@ void ReaderWorkflow::testUiPlugins()
     assert(lv_screen_active() != Display::sessionSummaryScreen.getScreen()); // dismissal resumes once answered
     assert(server.count("CARD_SESSION_ENDED") == 0 || !server.last("CARD_SESSION_ENDED")["data"]["payload"]["cardSessionId"].isNull());
     std::cout << "PASS post-stop question survives the summary auto-dismiss" << std::endl;
+    // --- A step outlives the watchdog, then the sign-in timeout resumes ----------------------------
+    hostAdvanceMillis(40000); pump(1100); // the old session times out normally
+    assert(!State::getApiState().userAuthenticated);
+    Display::hidePopup(); active = false; list(); login();
+    click("Lasercutter"); click("Ressource verwenden");
+    server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), "gggggggggggggggggggggg", "confirm", 1, 120000, "Lange Frage"));
+    pump();
+    assert(label(lv_layer_top(), "Lange Frage"));
+    hostAdvanceMillis(65000); pump(1100); // past the 60 s action watchdog and the 30 s sign-in timeout
+    assert(State::getApiState().userAuthenticated && label(lv_layer_top(), "Lange Frage"));
+    assert(!label(lv_layer_top(), "Aktion nicht bestätigt"));
+    click(LV_SYMBOL_CLOSE, true);
+    pump(300);
+    assert(State::getApiState().userAuthenticated); // closing the step does not sign out at once
+    hostAdvanceMillis(31000); pump(1100);
+    assert(!State::getApiState().userAuthenticated); // the sign-in timeout runs again
+    std::cout << "PASS a long step survives the watchdog and the sign-in timeout resumes" << std::endl;
 }
