@@ -121,7 +121,8 @@ inline void expectCleanLayout(const char *what)
 {
     const auto problems = LayoutCheck::problems();
     for (const auto &problem : problems) std::fprintf(stderr, "LAYOUT %s [%s]: %s\n", what, State::getActiveLanguage().c_str(), problem.c_str());
-    assert(problems.empty());
+    // LAYOUT_REPORT lists every problem of a run instead of stopping at the first screen.
+    assert(problems.empty() || std::getenv("LAYOUT_REPORT"));
 }
 
 void testSessionSummaryLifecycle();
