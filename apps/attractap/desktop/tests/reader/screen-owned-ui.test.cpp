@@ -149,8 +149,17 @@ void ReaderWorkflow::testScreenOwnedUi()
     pump(6300);
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
     // The server refuses the request: back to the amount, the reason in place on "Aufladen".
-    server.push("BILLING_TOPUP", R"({"error":"CARD_NOT_ACTIVE"})"); pump();
+    server.push("BILLING_REQUEST_TOPUP", R"({"error":"CARD_NOT_ACTIVE"})"); pump();
     assert(lv_screen_active() == Display::topUpScreen.getScreen() && label(lv_screen_active(), "Karte ist nicht aktiv"));
+    click("Abbrechen");
+    click(LV_SYMBOL_LEFT);
+    // The refusal usually arrives while "continue at the payment terminal" is still showing.
+    click("Lasercutter"); click("Ressource verwenden");
+    balanceFailure(true);
+    click("7"); click("Aufladen");
+    assert(lv_screen_active() == Display::statusScreen.getScreen());
+    server.push("BILLING_REQUEST_TOPUP", R"({"error":"SUMUP_TOPUP_FAILED"})"); pump();
+    assert(lv_screen_active() == Display::topUpScreen.getScreen() && label(lv_screen_active(), "Aufladen"));
     click("Abbrechen");
     click(LV_SYMBOL_LEFT);
 
