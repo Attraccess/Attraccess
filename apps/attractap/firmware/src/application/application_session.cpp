@@ -187,6 +187,7 @@ void Application::resetSessionOnDisconnect() {
   this->billingSummaryShown = false;
   this->topUpPending = false;
   this->formPageSubmitPending = false;
+  this->rerouteRequested = false;
   this->resetPauseAccounting();
 
   this->pendingActionType = PENDING_ACTION_NONE;

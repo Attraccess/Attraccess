@@ -229,6 +229,8 @@ void Application::logoutReader() {
   this->sessionSummaryDismissRequested = false;
   Display::sessionSummaryScreen.clearSummary();
   this->billingSummaryShown = false;
+  // A top-up answer that arrives later belongs to the user who just left.
+  this->topUpPending = false;
   this->handleFormsCancel();
   this->finishCardAuthentication(false);
   this->unlocked = false;
@@ -256,6 +258,8 @@ void Application::finishCardAuthentication(bool success) {
   if (success) {
     this->restartSessionTimeout();
     this->selectedResourceChanged = true;
+    this->topUpPending = false; // nothing of an earlier user's top-up reaches this one
+
   } else {
     State::setUserLanguage(false);
     this->externalState = EXTERNAL_STATE_NONE;

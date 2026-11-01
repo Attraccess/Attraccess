@@ -50,12 +50,14 @@ lv_obj_t *ResourceDetailsScreen::buttonFor(button_click_type_t type, const std::
 }
 
 // What the button means right now: a start that became a takeover, or a stop that now ends
-// another user's session, is not the button that failed.
-int ResourceDetailsScreen::roleOf(button_click_type_t type) const
+// another user's session (or a different session than before), is not the button that failed.
+std::string ResourceDetailsScreen::roleOf(button_click_type_t type) const
 {
-   if (type == BUTTON_CLICK_TYPE_START_SESSION) return this->startIsTakeover ? 1 : 0;
-   if (type == BUTTON_CLICK_TYPE_STOP_SESSION) return this->stopIsForeign ? 1 : 0;
-   return 0;
+   const bool takeOver = type == BUTTON_CLICK_TYPE_START_SESSION && this->startIsTakeover;
+   const bool foreignStop = type == BUTTON_CLICK_TYPE_STOP_SESSION && this->stopIsForeign;
+   if (!takeOver && !foreignStop) return type == BUTTON_CLICK_TYPE_STOP_SESSION ? "stop" : "";
+   return std::string(takeOver ? "take over " : "stop other ") + this->resourceCache.activeUser + " #" +
+          std::to_string(this->resourceCache.activeUsageId);
 }
 
 bool ResourceDetailsScreen::showActionError(const FirmwareI18n::Text &text)
