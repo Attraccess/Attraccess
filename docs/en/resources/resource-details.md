@@ -33,8 +33,8 @@ If the machine allows more than one [parallel session](resources/creating-resour
 
 - **Your own session** with an **End Session** button
 - **Other active sessions** as a list with user, start time and supervisor (if any). Resource managers, introducers, maintainers and the supervisor of a session see an **End Session** button for each entry to end that person's session
-- **In use k/N** while other people use the machine, with **Start controls** while slots are free and you do not have a session yet
-- **Full (N/N)** when all slots are in use
+- **In use k/N** while other people use the machine, with the **Start Using Resource** button while there is room for another person and you do not have a session yet
+- **Full (N/N)** when as many people as allowed are using the machine
 
 Everybody starts and stops their own session. Stopping without picking an entry from the list ends your own session and never someone else's. Maintenance and health state only block new starts; running sessions continue and can be stopped normally. The view updates live without reloading.
 

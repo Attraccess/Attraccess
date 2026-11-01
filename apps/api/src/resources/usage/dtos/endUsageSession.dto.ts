@@ -6,7 +6,7 @@ import { FormSubmissionRequestDto } from '../../forms/dto';
 export class EndUsageSessionDto {
   @ApiProperty({
     description:
-      "The usage session to end. Without it, the caller's own session is ended. Only on a machine limited to one session may the only active session be ended without naming it; otherwise NoOwnActiveSessionError is returned.",
+      'Id of the session to end. If omitted, your own session is ended. On a machine that allows only one session, the single running session may also be ended without an id (for example by a manager); on a machine with several sessions this fails with NoOwnActiveSessionError.',
     required: false,
     type: Number,
   })

@@ -73,14 +73,14 @@ The device currently uses German labels, including **Bis bald!**. Future English
 
 Some machines allow several people to work at the same time (see [Using Resources](end-user/using-resources.md#use-a-shared-machine)). On the touch reader:
 
-- The list and details show **In Verwendung k/N** (In use k/N) while some slots are taken. A **Start** action stays available in the list (**Ressource verwenden** in the details) as long as a slot is free and you have no session of your own. When all slots are taken, the machine shows **Voll** (Full).
+- The list and details show **In Verwendung k/N** (In use k/N) while other people are using it. A **Start** action stays available in the list (**Ressource verwenden** in the details) as long as there is room for another person and you have no session of your own. When as many people as allowed are using it, the machine shows **Voll** (Full).
 - If you have a session on the machine, it shows **Von dir verwendet** (In use by you) with **Stop** in the list and **Sitzung beenden** (End session) in the details. Live stats on the details screen are for your own session.
 - Resource managers, introducers and maintainers get a list **Andere Sitzung beenden:** (End another session:) on the details screen with one button per other session, to end that specific session. The reader lists at most 16 sessions; end further sessions on the [detail page](resources/resource-details.md) in the web interface.
 - The lock screen shows whether the machine is in use (**In Verwendung k/N**) or full (**Voll**).
 
-Machines with a limit of 1 behave as described above; takeover and force-stop are unchanged. If the limit was lowered to 1 while several sessions still run, the reader lists them like on a shared machine, so each one can be stopped.
+On machines with a limit of 1, the reader works as described in the sections above, including takeover and ending another person's session. If the limit was lowered to 1 while several sessions are running, the reader lists them like on a shared machine, so each one can be ended.
 
-On Attractap Lite readers (without a display), a short tap of your card starts your session. To stop your own session, hold the card against the reader until the reader signals the long tap (about 1.5 seconds, with a beep and an LED flash), then remove it. On a shared machine, a long tap never ends someone else's session. On a machine with a limit of 1, a long tap by a resource manager, introducer, maintainer or the session's supervisor who has no session there stops the running session, as before. If the machine is full or you already have a session, the reader plays the error beep.
+On Attractap Lite readers (without a display), a short tap of your card starts your session. To stop your own session, hold the card against the reader until the reader signals the long tap (about 1.5 seconds, with a beep and an LED flash), then remove it. On a shared machine, a long tap never ends someone else's session. On a machine with a limit of 1, a long tap also ends another person's running session if you are a resource manager, introducer, maintainer or that session's supervisor and have no session there yourself. If the machine is full or you already have a session, the reader plays the error beep.
 
 ## Complete a required form
 

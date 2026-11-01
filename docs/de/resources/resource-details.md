@@ -33,7 +33,7 @@ Erlaubt die Maschine mehr als eine [parallele Sitzung](resources/creating-resour
 
 - **Ihre eigene Sitzung** mit einer Schaltfläche **Sitzung beenden**
 - **Weitere aktive Sitzungen** als Liste mit Benutzer, Startzeit und gegebenenfalls Aufsicht. Ressourcenverwalter, Einweiser, Wartende und die Aufsicht einer Sitzung sehen bei jedem Eintrag eine Schaltfläche **Sitzung beenden**, um die Sitzung dieser Person zu beenden
-- **In Benutzung k/N**, solange andere Personen die Maschine nutzen, mit **Startelementen**, solange Plätze frei sind und Sie noch keine Sitzung haben
+- **In Benutzung k/N**, solange andere Personen die Maschine nutzen, mit der Schaltfläche **Ressource verwenden**, solange Plätze frei sind und Sie noch keine Sitzung haben
 - **Voll (N/N)**, wenn alle Plätze belegt sind
 
 Jede Person startet und beendet ihre eigene Sitzung. Beenden ohne Auswahl eines Eintrags aus der Liste beendet Ihre eigene Sitzung und nie die einer anderen Person. Wartung und Zustand blockieren nur neue Starts; laufende Sitzungen laufen weiter und können normal beendet werden. Die Ansicht aktualisiert sich live, ohne neu zu laden.

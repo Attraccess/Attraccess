@@ -116,7 +116,7 @@ void ReaderWorkflow::testParallelSessions()
     parallelList({3, false, false, {{7, "Robin"}, {10, "Kim"}, {11, "Lee"}}});
     click("Sitzung von Kim beenden");
     actionReply("STOP_RESOURCE_USAGE_SESSION", R"("error":"NoOwnActiveSessionError")");
-    assert(label(lv_layer_top(), "Sie haben keine aktive Sitzung an dieser Maschine."));
+    assert(label(lv_layer_top(), "Sie haben hier keine eigene Sitzung. Es wurde nichts beendet."));
     Display::hidePopup();
 
     // Ownership follows the own session the server names, even when another session is shown.

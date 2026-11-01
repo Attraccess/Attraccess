@@ -575,7 +575,7 @@ inline constexpr Entry catalog[] = {
     {Message::ErrorAlreadyHasActiveSession, "Sie haben bereits eine aktive Sitzung an dieser Maschine.", "You already have an active session on this machine."},
     {Message::EndNamedSession, "Sitzung von {0} beenden", "End session of {0}"},
     {Message::EndOtherSessionsTitle, "Andere Sitzung beenden:", "End another session:"},
-    {Message::ErrorNoOwnActiveSession, "Sie haben keine aktive Sitzung an dieser Maschine.", "You have no active session on this machine."},
+    {Message::ErrorNoOwnActiveSession, "Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.", "You have no session of your own here. Nothing was ended."},
 };
 
 } // namespace FirmwareI18n

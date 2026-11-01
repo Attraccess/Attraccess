@@ -45,7 +45,7 @@ Diese Seite listet häufig auftretende Probleme und deren Lösungen auf.
 | Ressource in Benutzung | Eine andere Person nutzt möglicherweise die Ressource. Warten Sie, bis deren Sitzung beendet ist. |
 | „Maschine ist voll“ | Die Maschine erlaubt mehrere parallele Sitzungen und alle Plätze sind belegt. Warten Sie, bis jemand fertig ist, oder bitten Sie einen Ressourcenverwalter, **Maximale parallele Sitzungen** zu erhöhen. Bei Maschinen mit mehr als einer parallelen Sitzung wird keine Übernahme angeboten. |
 | „Sitzung bereits aktiv“ | Sie haben bereits eine aktive Sitzung an dieser Maschine; pro Maschine ist nur eine aktive Sitzung möglich. Beenden Sie zuerst Ihre bestehende Sitzung (auf der Detailseite oder am Leser). |
-| „Keine eigene Sitzung“ | Sie haben an einer gemeinsam genutzten Maschine, an der Sie keine Sitzung haben, beendet, ohne eine Sitzung auszuwählen; das Beenden beendet dort nie die Sitzung einer anderen Person. Um die Sitzung einer anderen Person zu beenden (Ressourcenverwalter, Einweiser, Wartende und die Aufsicht der Sitzung), wählen Sie sie auf der Detailseite oder am Touchleser aus der Liste der aktiven Sitzungen aus. |
+| „Keine eigene Sitzung“ | Sie haben an einer gemeinsam genutzten Maschine auf Beenden getippt, ohne dort eine eigene Sitzung zu haben; es wurde nichts beendet. Um die Sitzung einer anderen Person zu beenden (als Ressourcenverwalter, Einweiser, Wartender oder Aufsicht dieser Sitzung), wählen Sie sie auf der Detailseite oder am Touchleser aus der Liste der aktiven Sitzungen aus. |
 
 ## Passwort vergessen
 

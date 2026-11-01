@@ -82,7 +82,7 @@ Resource managers can choose how introductions and supervision interact for each
 | **Supervision allowed** | Introduced users may start alone. Users without an introduction may start a supervised session while a supervisor is present. |
 | **Supervision required** | Every session requires a present supervisor, even for introduced users. |
 
-On a machine with [parallel sessions](resources/creating-resources.md#max-parallel-sessions), a supervised session is one session (the supervisee's) with a linked supervisor. The supervisor does not use a slot, can supervise any number of sessions on the same machine, and can run their own session alongside. The supervisee must not already have a session on that machine, and a reader can be armed for supervision while at least one slot is free.
+On a machine with [parallel sessions](resources/creating-resources.md#max-parallel-sessions), a supervised session is one session (the supervisee's) with a linked supervisor. The supervisor does not count towards the limit, can supervise any number of sessions on the same machine, and can run their own session alongside. The supervisee must not already have a session on that machine, and a reader can be prepared for a supervised session while there is room for one more session.
 
 Supervised sessions are recorded in the usage history with the supervisor. This makes it visible who supervised the session and helps distinguish supervised training or trial usage from regular solo usage.
 

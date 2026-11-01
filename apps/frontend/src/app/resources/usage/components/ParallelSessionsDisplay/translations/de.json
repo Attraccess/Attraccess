@@ -8,14 +8,14 @@
   "contact": {
     "button": "Kontaktieren",
     "error": "Kontaktaufnahme fehlgeschlagen",
-    "errorDescription": "Konnte keine Unterhaltung mit diesem Nutzer öffnen. Bitte versuchen Sie es erneut.",
+    "errorDescription": "Es konnte keine Unterhaltung mit diesem Benutzer geöffnet werden. Bitte versuchen Sie es erneut.",
     "ariaLabel": "{{name}} kontaktieren"
   },
   "endSession": {
     "button": "Sitzung beenden",
     "confirm": "Sie sind dabei, die Sitzung von {{name}} zu beenden.",
     "successful": "Sitzung beendet",
-    "successfulDescription": "Sie haben die Sitzung des anderen Nutzers beendet.",
+    "successfulDescription": "Sie haben die Sitzung des anderen Benutzers beendet.",
     "ariaLabel": "Sitzung von {{name}} beenden"
   }
 }

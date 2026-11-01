@@ -40,13 +40,13 @@
     "machine": {
       "allowTakeOver": {
         "label": "Allow Takeover",
-        "description": "If enabled, the resource can be taken over by other users without the current user having to release the resource. Has no effect when more than one parallel session is allowed."
+        "description": "If enabled, the resource can be taken over by other users without the current user having to release the resource. Has no effect when Max parallel sessions is greater than 1."
       },
       "maxParallelSessions": {
         "label": "Max parallel sessions",
-        "description": "How many people can have their own active session on this machine at the same time (1-1000). With 1, the machine works as before.",
-        "belowActiveHint": "{{count}} sessions are active right now. Running sessions keep running; new starts are blocked until fewer sessions are active.",
-        "flowsWarning": "Flows (for example powering off the machine when a session ends) still run per session. A power-off flow can cut the power while other people are still working."
+        "description": "How many people can use this machine at the same time, each with their own session (1–1000). With 1 (the default), only one person can use the machine at a time.",
+        "belowActiveHint": "{{count}} sessions are active right now, more than this limit. They keep running; new sessions can only be started once fewer sessions than the limit are active.",
+        "flowsWarning": "Flows (for example powering off the machine when a session ends) run on every session start and stop. A power-off flow can cut the power while other people are still working."
       }
     },
     "door": {

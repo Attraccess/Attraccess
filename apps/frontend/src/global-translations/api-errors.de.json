@@ -13,15 +13,15 @@
   },
   "ResourceFullError": {
     "title": "Maschine ist voll",
-    "description": "Alle parallelen Sitzungsplätze dieser Maschine sind belegt. Bitte versuchen Sie es erneut, sobald jemand fertig ist."
+    "description": "An dieser Maschine arbeiten bereits so viele Personen, wie erlaubt sind. Bitte versuchen Sie es erneut, sobald jemand fertig ist."
   },
   "AlreadyHasActiveSessionError": {
     "title": "Sitzung bereits aktiv",
-    "description": "Sie haben bereits eine aktive Sitzung auf dieser Maschine."
+    "description": "Sie haben an dieser Maschine bereits eine aktive Sitzung. Beenden Sie diese zuerst, wenn Sie neu starten möchten."
   },
   "NoOwnActiveSessionError": {
     "title": "Keine eigene Sitzung",
-    "description": "Sie haben keine aktive Sitzung an dieser Maschine."
+    "description": "Sie haben an dieser Maschine keine aktive Sitzung, daher wurde nichts beendet. Um die Sitzung einer anderen Person zu beenden, wählen Sie sie in der Liste der aktiven Sitzungen aus."
   },
   "ResourceUnhealthyException": {
     "title": "Ressource nicht betriebsbereit",

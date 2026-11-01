@@ -40,13 +40,13 @@
     "machine": {
       "allowTakeOver": {
         "label": "Übernahme erlauben",
-        "description": "Wenn aktiviert, kann die Ressource von anderen Benutzern übernommen werden ohne dass der aktuelle Nutzer die Ressource freigeben muss. Hat keine Wirkung, wenn mehr als eine parallele Sitzung erlaubt ist."
+        "description": "Wenn aktiviert, kann die Ressource von anderen Benutzern übernommen werden ohne dass der aktuelle Nutzer die Ressource freigeben muss. Hat keine Wirkung, wenn „Maximale parallele Sitzungen“ größer als 1 ist."
       },
       "maxParallelSessions": {
         "label": "Maximale parallele Sitzungen",
-        "description": "Wie viele Personen gleichzeitig eine eigene aktive Sitzung auf dieser Maschine haben können (1-1000). Mit 1 funktioniert die Maschine wie bisher.",
-        "belowActiveHint": "Aktuell sind {{count}} Sitzungen aktiv. Laufende Sitzungen laufen weiter; neue Starts sind blockiert, bis weniger Sitzungen aktiv sind.",
-        "flowsWarning": "Flows (z. B. Maschine ausschalten, wenn eine Sitzung endet) laufen weiterhin pro Sitzung. Ein Ausschalt-Flow kann den Strom abschalten, während andere noch arbeiten."
+        "description": "Wie viele Personen diese Maschine gleichzeitig nutzen können, jede mit eigener Sitzung (1–1000). Bei 1 (Standard) kann die Maschine nur von einer Person gleichzeitig genutzt werden.",
+        "belowActiveHint": "Aktuell sind {{count}} Sitzungen aktiv, mehr als dieses Limit. Sie laufen weiter; neue Sitzungen können erst gestartet werden, wenn weniger Sitzungen als das Limit aktiv sind.",
+        "flowsWarning": "Flows (z. B. Maschine ausschalten, wenn eine Sitzung endet) laufen bei jedem Sitzungsstart und -ende. Ein Ausschalt-Flow kann den Strom abschalten, während andere noch arbeiten."
       }
     },
 
