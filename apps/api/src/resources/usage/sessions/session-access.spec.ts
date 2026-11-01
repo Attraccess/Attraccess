@@ -73,6 +73,8 @@ describe('who reads other people’s sessions', () => {
     controller = new ResourceUsageController(
       scope.service,
       new ResourceActivityVisibilityService(settings as never, resources as unknown as never, scope.service),
+      {} as never,
+      {} as never,
     );
     scope.resourceUsageRepository.findOne.mockImplementation(async ({ where }) =>
       (where as { resourceId: number }).resourceId === SUPERVISED ? operatorSession(SUPERVISED) : operatorSession(),

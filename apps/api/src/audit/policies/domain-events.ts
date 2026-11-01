@@ -67,7 +67,20 @@ export interface AttractapAuditEvent {
     | 'reader.revoked'
     | 'reader.replaced'
     | 'reader.token_rejected'
-    | 'reader.handshake_rejected';
+    | 'reader.handshake_rejected'
+    | 'ui.hook_decision'
+    | 'ui.step_issued'
+    | 'ui.step_answered'
+    | 'ui.step_expired'
+    | 'ui.step_cancelled'
+    | 'ui.no_screen_policy_applied'
+    | 'ui.card_confirm_cancelled'
+    | 'ui.fail_open_used'
+    | 'ui.breaker_changed'
+    | 'ui.alert_changed'
+    | 'ui.setting_changed';
+  /** Defaults to attractap.reader. `ui.*` events may use the resource or an alert as subject. */
+  subjectType?: 'attractap.reader' | 'resource' | 'attractap.ui-alert';
   actorId: number | null;
   authenticationMethod: 'session' | 'api-token' | null;
   apiTokenId?: number;

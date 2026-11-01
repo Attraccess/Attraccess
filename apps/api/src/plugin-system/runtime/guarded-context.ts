@@ -6,6 +6,7 @@ import {
   PluginFlowsContext,
   PluginPermission,
   PluginPermissionError,
+  PluginReaderUiApi,
   PluginSecretsContext,
   SystemEvent,
   SystemEventHandler,
@@ -87,6 +88,11 @@ export function createGuardedContext(
     get flows(): PluginFlowsContext {
       require(PluginPermission.TRIGGER_FLOWS, 'flows.trigger()');
       return base.flows;
+    },
+    get readerUi(): PluginReaderUiApi {
+      require(PluginPermission.READER_UI, 'readerUi.invalidate()');
+      if (!base.readerUi) throw new Error('Reader UI is unavailable in this host');
+      return base.readerUi;
     },
     get secrets(): PluginSecretsContext {
       require(PluginPermission.MANAGE_SECRETS, 'secrets');

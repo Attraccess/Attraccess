@@ -1,0 +1,80 @@
+{
+  "resource": {
+    "title": "Reader-Anzeige",
+    "description": "Wie Plugin-Widgets und Startbestätigungen auf Attractap-Readern funktionieren",
+    "noScreenPolicy": {
+      "label": "Reader ohne Bildschirm",
+      "description": "Was passiert, wenn ein Plugin eine Bestätigung auf einem Reader verlangt, der sie nicht anzeigen kann: Lite-Reader, Reader mit älterer Firmware und Reader, die nach wiederholten Abstürzen pausiert sind. „Mit zweitem Auflegen der Karte bestätigen“ funktioniert nur auf Lite-Readern; andere Reader ohne Bildschirm blockieren den Start. „Mit Warnung starten“ startet ohne Bestätigung.",
+      "default": "Plugin-Standard",
+      "block": "Start blockieren",
+      "card-confirm": "Mit zweitem Auflegen der Karte bestätigen",
+      "allow-with-warning": "Mit Warnung starten"
+    },
+    "plugins": "Plugins",
+    "noPlugins": "Kein installiertes Plugin nutzt Reader-Widgets oder Startbestätigungen.",
+    "widgets": "Widgets auf Readern anzeigen",
+    "failurePolicy": {
+      "label": "Wenn die Prüfung des Plugins fehlschlägt",
+      "fail-closed": "Start blockieren (empfohlen)",
+      "fail-open": "Start erlauben"
+    },
+    "failOpenWarning": "„Start erlauben“ lässt Starts zu, während das Plugin den Start nicht prüfen kann. Jeder solche Start wird im Audit-Log festgehalten.",
+    "save": "Speichern",
+    "saved": "Einstellungen der Reader-Anzeige gespeichert",
+    "saveError": "Einstellungen der Reader-Anzeige konnten nicht gespeichert werden",
+    "loadError": "Die Einstellungen der Reader-Anzeige konnten nicht geladen werden",
+    "retry": "Erneut versuchen"
+  },
+  "reader": {
+    "widgets": "Plugin-Widgets auf diesem Reader anzeigen",
+    "widgetsDescription": "Widgets erscheinen nur, wenn diese und die Ressourceneinstellung aktiv sind.",
+    "contributions": "Was Plugins auf diesem Reader anzeigen",
+    "noContributions": "Zurzeit zeigt kein Plugin etwas auf diesem Reader an.",
+    "status": {
+      "rendered": "Angezeigt",
+      "degraded": "Als einfacher Text angezeigt",
+      "skipped": "Nicht angezeigt"
+    },
+    "reason": {
+      "old-firmware": "die Firmware des Readers ist zu alt für Plugin-Widgets",
+      "no-screen": "der Reader hat keinen Bildschirm",
+      "crash-loop-suspended": "nach wiederholten Abstürzen des Readers pausiert",
+      "widgets-disabled": "Widgets sind ausgeschaltet",
+      "unsupported": "dieser Reader kann es nicht anzeigen",
+      "expired": "nicht mehr aktuell",
+      "too-many-contributions": "das Plugin zeigt zu viele Widgets für diese Ressource",
+      "provider-error": "das Plugin hat nicht geantwortet",
+      "node-budget": "kein Platz mehr auf dem Bildschirm des Readers",
+      "invalid": "das Plugin hat ungültige Inhalte gesendet",
+      "reader": "der Reader hat es abgelehnt"
+    },
+    "savedImmediately": "Änderungen in diesem Tab werden sofort gespeichert.",
+    "saved": "Einstellung der Reader-Anzeige gespeichert",
+    "saveError": "Die Einstellung der Reader-Anzeige konnte nicht gespeichert werden",
+    "resourceFallback": "Ressource #{{id}}",
+    "slot": {
+      "listRow": "Ressourcenliste",
+      "detailsHeader": "Details-Kopf",
+      "detailsBody": "Details-Inhalt",
+      "detailsSession": "Aktive Sitzung",
+      "allWidgets": "Alle Widgets"
+    }
+  },
+  "alerts": {
+    "title": "Alarme der Reader-Anzeige",
+    "none": "Keine offenen Alarme.",
+    "clear": "Aufheben",
+    "kind": {
+      "breaker-open": "Plugin-Prüfung schlägt wiederholt fehl",
+      "load-failure": "Plugin konnte nicht geladen werden",
+      "crash-loop": "Reader stürzt wiederholt ab"
+    },
+    "clearError": "Der Alarm konnte nicht aufgehoben werden",
+    "readerFallback": "Reader #{{id}}",
+    "description": {
+      "breaker-open": "{{plugin}} konnte mehrere Starts hintereinander nicht prüfen und wird deshalb nicht mehr gefragt. Bis es wieder antwortet, folgen Starts der Einstellung „Wenn die Prüfung des Plugins fehlschlägt“ der jeweiligen Ressource. Nach 60 Sekunden wird das Plugin automatisch erneut gefragt; „Aufheben“ fragt es sofort. Passiert das wiederholt, prüfen Sie das Log des Plugins oder deaktivieren Sie das Plugin.",
+      "load-failure": "{{plugin}} konnte nicht geladen werden. Seine Startprüfungen und Bestätigungen werden daher nicht angewendet, Starts laufen ohne sie. Prüfen Sie den Fehler des Plugins auf dieser Seite und laden oder installieren Sie es neu. Der Alarm endet, sobald das Plugin wieder lädt.",
+      "crash-loop": "{{reader}} ist wiederholt abgestürzt. Plugin-Widgets sind auf ihm pausiert, Bestätigungen folgen dort der Einstellung „Reader ohne Bildschirm“ der Ressource. Die Widgets kehren nach 30 Minuten ohne weiteren Absturz zurück oder sofort mit „Aufheben“. Stürzt der Reader weiter ab, aktualisieren Sie seine Firmware oder melden Sie den Absturz."
+    }
+  }
+}

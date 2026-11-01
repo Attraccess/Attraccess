@@ -1,6 +1,16 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ToBoolean } from '../../../common/request-transformers';
-import { IsString, IsOptional, IsBoolean, IsInt, IsPositive, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsInt,
+  IsPositive,
+  IsArray,
+  ValidateNested,
+  ArrayMaxSize,
+  MaxLength,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { FormSubmissionRequestDto } from '../../forms/dto';
 
@@ -46,4 +56,17 @@ export class StartUsageSessionDto {
   @ValidateNested({ each: true })
   @Type(() => FormSubmissionRequestDto)
   formSubmissions?: FormSubmissionRequestDto[];
+
+  @ApiProperty({
+    description:
+      'Step ids of plugin confirmations the user accepted for this start attempt. Returned by a 409 CONFIRMATION_REQUIRED response; single-use.',
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(8)
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  confirmedStepIds?: string[];
 }

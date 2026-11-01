@@ -15,6 +15,7 @@
   "tabs": {
     "general": "General",
     "resources": "Resources",
+    "readerUi": "Reader display",
     "security": "Pairing"
   }
 }

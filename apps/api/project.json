@@ -150,6 +150,8 @@
         "{workspaceRoot}/monitoring/grafana/dashboards/**/*",
         "{workspaceRoot}/monitoring/prometheus/prometheus.yml",
         "{workspaceRoot}/apps/attractap/firmware/tests/pairing/vectors.json",
+        "{workspaceRoot}/apps/attractap/firmware/src/display/ui/ui_schema.hpp",
+        "{workspaceRoot}/apps/attractap/firmware/tests/ui-fixtures/*.json",
         {
           "externalDependencies": ["jest"]
         }

@@ -29,10 +29,14 @@ import { ResourceListService } from './handlers/resource-list/resource-list.serv
 import { AttractapSessionHandler } from './handlers/session/session.handler';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
+import { AttractapUiHandler } from './handlers/ui/ui.handler';
+import { isUiMessageSuperseded } from './handlers/ui/ui-slot.service';
+import { cleanupSocketState } from './websocket-disconnect-cleanup';
 
 import { CREDENTIAL_CHANGED_EVENT, PairingService } from '../security/pairing.service';
 import { ReaderSessionService } from '../security/reader-session.service';
 import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
+import { buildEventHandlers, type EventHandlerDeps } from './websocket-event-handlers';
 import { sanitizeForLVGL } from './websocket-lvgl';
 import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
@@ -41,7 +45,9 @@ import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, AttractapMe
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
 
-import { closeSync } from 'fs';
+import { READER_UI_LIMITS } from '@attraccess/plugins-backend-sdk';
+
+const isUiType = (type: string) => type.startsWith('UI_');
 
 @WebSocketGateway({
   path: '/api/attractap/websocket',
@@ -107,6 +113,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   @Inject(AttractapMassIntroductionHandler)
   protected massIntroductionHandler: AttractapMassIntroductionHandler;
 
+  @Inject(AttractapUiHandler)
+  protected uiHandler: AttractapUiHandler;
+
   @Inject(PairingService)
   protected pairingService: PairingService;
 
@@ -119,94 +128,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     id: string;
     clientId: string;
     type: AttractapEventType;
+    /** Set for UI_* types: their ACKs echo the message id and are matched on it. */
+    messageId?: number;
     resolve: () => void;
     timeoutId: NodeJS.Timeout;
   }> = [];
 
-  protected readonly eventHandlers: Record<
-    AttractapEventType,
-    (socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) => unknown
-  > = {
-    [AttractapEventType.READER_REGISTER]: (socket, eventData) =>
-      this.authHandler.handleReaderRegister(socket, eventData),
-    [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) =>
-      this.authHandler.handleAuthentication(socket, eventData),
-    [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) =>
-      this.firmwareHandler.handleFirmwareInfo(socket, eventData),
-    [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
-      this.crashReportHandler.handleCrashReport(socket, eventData),
-    [AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
-      this.cardHandler.handleCardAuthenticationRequest(socket, eventData),
-    [AttractapEventType.SUPERVISION_REQUEST]: (socket, eventData) =>
-      this.supervisionHandler.handleSupervisionRequest(socket, eventData),
-    [AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
-      this.supervisionHandler.handleSupervisorCardAuthRequest(socket, eventData),
-    [AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED]: (socket, eventData) =>
-      this.supervisionHandler.handleSupervisorCardAuthConfirmed(socket, eventData),
-    [AttractapEventType.SUPERVISION_CANCEL]: (socket) => this.supervisionHandler.handleSupervisionCancel(socket),
-    [AttractapEventType.REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
-      this.massIntroductionHandler.handleCardAuthRequest(socket, eventData),
-    [AttractapEventType.MASS_INTRODUCTION_CARD_AUTH_CONFIRMED]: (socket, eventData) =>
-      this.massIntroductionHandler.handleCardAuthConfirmed(socket, eventData),
-    [AttractapEventType.MASS_INTRODUCTION_CANCEL]: (socket, eventData) =>
-      this.massIntroductionHandler.handleCancel(socket, eventData),
-    [AttractapEventType.START_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
-      this.sessionHandler.handleStartResourceUsageSession(socket, eventData),
-    [AttractapEventType.STOP_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
-      this.sessionHandler.handleStopResourceUsageSession(socket, eventData),
-    [AttractapEventType.RESOURCE_USAGE_STATS]: (socket, eventData) =>
-      this.sessionHandler.handleResourceUsageStats(socket, eventData),
-    [AttractapEventType.LOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleLockDoor(socket, eventData),
-    [AttractapEventType.UNLOCK_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlockDoor(socket, eventData),
-    [AttractapEventType.UNLATCH_DOOR]: (socket, eventData) => this.sessionHandler.handleUnlatchDoor(socket, eventData),
-    [AttractapEventType.TRIGGER_FLOW_BUTTON]: (socket, eventData) =>
-      this.sessionHandler.handleTriggerFlowButton(socket, eventData),
-    [AttractapEventType.BILLING_REQUEST_TOPUP]: (socket, eventData) =>
-      this.billingHandler.handleBillingRequestTopup(socket, eventData),
-    [AttractapEventType.FIRMWARE_REQUEST_CHUNK]: (socket, eventData) =>
-      this.firmwareHandler.handleFirmwareChunkRequest(socket, eventData),
-    [AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY]: (socket, eventData) =>
-      this.cardHandler.onEnrollNewCardRequestNFCKey(socket, eventData),
-    [AttractapEventType.ENROLL_NEW_CARD]: (socket, eventData) => this.cardHandler.onEnrollNewCard(socket, eventData),
-    [AttractapEventType.ENROLL_NEW_CARD_CANCEL]: (socket) => this.cardHandler.onEnrollNewCardCancel(socket),
-    [AttractapEventType.RESET_NFC_CARD]: (socket, eventData) => this.cardHandler.onResetNfcCard(socket, eventData),
-    [AttractapEventType.RESET_NFC_CARD_CANCEL]: (socket) => this.cardHandler.onResetNfcCardCancel(socket),
-    [AttractapEventType.PROJECTS_OF_USER]: (socket, eventData) =>
-      this.projectsHandler.handleProjectsOfUserRequest(socket, eventData),
-    [AttractapEventType.RESOURCE_USAGE_FORM_GET_FIELDS]: (socket, eventData) =>
-      this.formsHandler.handleResourceUsageFormGetFields(socket, eventData),
-    [AttractapEventType.RESOURCE_USAGE_FORM_SUBMIT_PAGE]: (socket, eventData) =>
-      this.formsHandler.handleResourceUsageFormSubmitPage(socket, eventData),
-    [AttractapEventType.RESOURCE_USAGE_FORM_CANCEL]: (socket, eventData) => {
-      this.formsHandler.handleResourceUsageFormCancel(socket, eventData);
-    },
-    [AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED]: () => undefined,
-    [AttractapEventType.READER_START_PAIRING]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.REQUEST_RESOURCE_LIST]: (socket, eventData) =>
-      this.resourceListService.sendResourceListToSocket(socket, { requestId: eventData.payload?.requestId }),
-    [AttractapEventType.RESOURCE_LIST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.READER_UNAUTHORIZED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.READER_REQUEST_AUTHENTICATION]: (socket, eventData) =>
-      this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.READER_AUTHENTICATED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.READER_LANGUAGE]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.CARD_AUTHENTICATION_DATA]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
-      this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.SUPERVISION_RESOLVED]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.SUPERVISION_START]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.MASS_INTRODUCTION_START]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
-      this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.MASS_INTRODUCTION_RESULT]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.MASS_INTRODUCTION_END]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO]: (socket, eventData) =>
-      this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.RESOURCE_USAGE_FORM_REQUEST]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.RESOURCE_USAGE_FORM_FIELDS]: (socket, eventData) => this.rejectServerEvent(socket, eventData),
-    [AttractapEventType.RESOURCE_USAGE_FORM_PAGE_RESULT]: (socket, eventData) =>
-      this.rejectServerEvent(socket, eventData),
-  };
+  protected readonly eventHandlers = buildEventHandlers(this as unknown as EventHandlerDeps);
 
   public async sendResourceList(readerId: number) {
     return this.resourceListService.sendResourceList(readerId);
@@ -272,7 +200,12 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     return this.cardHandler.startResetOfNfcCard(data);
   }
 
-  protected async waitForClientResponse(client: AuthenticatedWebSocket, type: AttractapEventType, timeoutMs = 4000) {
+  protected async waitForClientResponse(
+    client: AuthenticatedWebSocket,
+    type: AttractapEventType,
+    timeoutMs = 4000,
+    messageId?: number,
+  ) {
     const id = randomBytes(4).toString('base64url').slice(0, 5);
 
     const removeAwaiter = async () => {
@@ -298,14 +231,21 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         removeAwaiter();
       };
 
-      this.clientResponseAwaiters.push({ id, clientId: client.id, type, resolve: onResolve, timeoutId });
+      this.clientResponseAwaiters.push({ id, clientId: client.id, type, messageId, resolve: onResolve, timeoutId });
     });
   }
 
-  protected async resolveClientResponseAwaiters(client: AuthenticatedWebSocket, type: AttractapEventType) {
+  protected async resolveClientResponseAwaiters(
+    client: AuthenticatedWebSocket,
+    type: AttractapEventType,
+    messageId?: number,
+  ) {
     await this.clientResponseAwaitersMutex.runExclusive(async () => {
       const matchingAwaiters = this.clientResponseAwaiters.filter(
-        (awaiter) => awaiter.clientId === client.id && awaiter.type === type,
+        (awaiter) =>
+          awaiter.clientId === client.id &&
+          awaiter.type === type &&
+          (awaiter.messageId === undefined || awaiter.messageId === messageId),
       );
 
       this.logger.debug(
@@ -360,7 +300,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     if (eventData.type.startsWith('ACK_')) {
       this.logger.debug(`Received ${eventData.type} from client ${socket.id}`);
 
-      this.resolveClientResponseAwaiters(socket, eventData.type.replace('ACK_', '') as AttractapEventType);
+      this.resolveClientResponseAwaiters(
+        socket,
+        eventData.type.replace('ACK_', '') as AttractapEventType,
+        eventData.messageId,
+      );
       return;
     }
 
@@ -392,7 +336,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       // Unlicensed installations take no pairing requests (the service closes the socket).
       const licensed = this.licenseService.verifyLicense({ modules: [LicenseModuleType.ATTRACTAP] });
       licensed.catch(() => this.logger.error('Closing pairing connection due to license error'));
-      this.pairingService.handleConnection(client, request as IncomingMessage, licensed.then(() => undefined));
+      this.pairingService.handleConnection(
+        client,
+        request as IncomingMessage,
+        licensed.then(() => undefined),
+      );
       return;
     }
     // Taken over before the first await: early TLS bytes must not be missed and a stray text
@@ -448,14 +396,30 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
         ) {
           message.data.payload.language = this.websocketService.readerLanguage;
         }
+        if (isUiMessageSuperseded(socket, message)) return false;
         const stringifiedMessage = JSON.stringify(sanitizeForLVGL(message));
+        // Legacy token readers cannot reassemble frames: a bigger UI frame would silently break parsing.
+        if (
+          isUiType(message.data.type) &&
+          Buffer.byteLength(stringifiedMessage, 'utf8') > READER_UI_LIMITS.maxFrameBytes
+        ) {
+          this.logger.error(
+            `Refusing to send ${message.data.type}: frame exceeds ${READER_UI_LIMITS.maxFrameBytes} bytes`,
+          );
+          return false;
+        }
         client.send(stringifiedMessage);
 
         this.logger.debug(
           `Waiting for response for ${message.event} of type ${message.data.type} (attempt ${i + 1}/${RETRY_COUNT})`,
         );
         try {
-          await this.waitForClientResponse(client as unknown as AuthenticatedWebSocket, message.data.type);
+          await this.waitForClientResponse(
+            client as unknown as AuthenticatedWebSocket,
+            message.data.type,
+            undefined,
+            isUiType(message.data.type) ? message.data.messageId : undefined,
+          );
           lastError = undefined;
           break;
         } catch (error) {
@@ -566,22 +530,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.logger.log('An unidentified client disconnected.');
     }
 
-    // Tear down any in-progress two-card supervision so the supervisor's web popup doesn't linger.
-    if (socket.state?.supervisionFlow) {
-      this.supervisionHandler.cancelForSocket(socket);
-    }
-    if (socket.state?.massIntroductionFlow) {
-      this.massIntroductionHandler.cancelForSocket(socket, readerId);
-    }
-
-    // Clean up OTA file descriptor if present
-    if (socket.state?.ota?.fd) {
-      try {
-        closeSync(socket.state.ota.fd);
-      } catch {
-        // nothing to do
-      }
-    }
+    cleanupSocketState(socket, readerId, {
+      supervisionHandler: this.supervisionHandler,
+      massIntroductionHandler: this.massIntroductionHandler,
+      uiHandler: this.uiHandler,
+    });
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }

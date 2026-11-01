@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint>
 #include <cstddef>
+#include "../display/ui/ui_step.hpp"
 
 struct ApiResources
 {
@@ -148,6 +149,12 @@ struct ActionResult {
         uint32_t durationSeconds = 0;
         bool hasOwnership = false;
         bool endedOwnSession = false;
+        // START_BLOCKED: the plugin's literal reason (already sanitized to Latin-1 for the display).
+        std::string blockCode{};
+        std::string blockTitle{};
+        std::string blockBody{};
+        // allow-with-warning: the start went through but the plugin asked for attention.
+        bool warning = false;
     };
 };
 
@@ -283,6 +290,8 @@ struct CardAuthenticationDetailsResponse
         std::string error;
         std::string username;
         std::string language;
+        // Issued per card authentication; sent back on START and on CARD_SESSION_ENDED.
+        std::string cardSessionId;
         bool canManageResource;
         bool hasIntroduction;
         bool isIntroducer;
@@ -331,8 +340,9 @@ struct SupervisionStartCommand
 #include <mutex>
 #include <ArduinoJson.h>
 #include "mass_introduction_types.hpp"
+#include "ui_state.hpp"
 
-struct ApiState : public ApiCards, public ApiMassIntroduction
+struct ApiState : public ApiCards, public ApiMassIntroduction, public ApiUiState
 {
 protected:
     bool loopIsEnabled = false;
@@ -471,7 +481,21 @@ public:
     void sendResetNfcCard(bool success);
     void sendResetNfcCardCancel();
 
-    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false);
+    // `stepId`/`choice` answer a plugin confirmation (UI_STEP_REQUEST); the server matches them to the step.
+    void startResourceUsageSession(uint32_t resourceId, uint32_t projectId = 0, bool forceTakeOver = false,
+                                   const char *stepId = nullptr, const char *choice = nullptr);
+
+    // Reader UI (ATT-1187)
+    void setUiStepRequestCallback(std::function<void(const ui::StepRequest &)> callback) { uiStepRequestCallback = callback; }
+    void setUiStepCancelCallback(std::function<void(const std::string &)> callback) { uiStepCancelCallback = callback; }
+    void setUiSlotsChangedCallback(std::function<void()> callback) { uiSlotsChangedCallback = callback; }
+    void sendUiStepResult(const char *stepId, const char *action);
+    void reportUiSkip(JsonObjectConst payload, const char *reason); // UI_SLOT_UPDATE contribution skipped, paced
+    void clearUiSlots(); // drops all plugin slot content (disconnect, reconnect)
+    void endCardSession(); // tells the server the card session is over (sign-out or timeout)
+#ifdef ATTRACTAP_UI_SELFTEST
+    void testInject(const char *json, size_t len); // self-test build: processed by API::loop()
+#endif
     // usageId 0 ends the card holder's own session; otherwise force-stops that session.
     void stopResourceUsageSession(uint32_t resourceId, uint32_t usageId = 0);
     void requestFormFields(uint32_t resourceId, ResourceUsageFormActionType action, uint32_t formId, uint32_t offset, uint32_t limit);
@@ -535,9 +559,14 @@ private:
 
     uint32_t authenticationCount = 0;
 
-    void sendAck(const char *type);
+    void sendAck(const char *type, uint32_t messageId = 0, bool paced = true); // UI_* acks are paced (ApiUiState)
+    void sendUiRenderReport(const UiRenderReport &report);
     void sendMessage(const char *type);
-    bool sendMessage(const char *type, JsonObject payload);
+    bool sendMessage(const char *type, JsonObject payload, uint32_t messageId = 0);
+    void readBlockReason(JsonVariantConst reason, ActionResult &out);
+    void onUiSlotUpdate(JsonObject data);
+    void onUiStepRequest(JsonObject data);
+    void onUiStepCancel(JsonObject data);
 
     void onUsageStats(JsonObject data);
 

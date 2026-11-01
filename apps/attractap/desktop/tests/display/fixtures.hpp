@@ -109,4 +109,6 @@ void testSessionSummaryLifecycle();
 void testFormDrafts();
 void testPaymentPopup();
 void testPendingApproval(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testReaderUiFixtures(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testReaderUiStepModal(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshots);

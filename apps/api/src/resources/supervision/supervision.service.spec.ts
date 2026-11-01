@@ -556,4 +556,27 @@ describe('SupervisionService', () => {
       expect(fixture.live.emitToSupervisor).not.toHaveBeenCalled();
     });
   });
+
+  describe('pre-start hooks (ATT-1187)', () => {
+    it('sends the approval start through the pre-start gate with the supervisor', async () => {
+      const gate = jest.fn().mockResolvedValue(undefined);
+      (fixture.service as unknown as { preStart: unknown }).preStart = { gateSupervision: gate };
+      const { requestId, pending } = await fixture.createRequest();
+      await fixture.service.approve(requestId, fixture.supervisor);
+      await pending;
+      expect(gate).toHaveBeenCalledWith(5, fixture.requester, fixture.dto, 2);
+    });
+
+    it('does not start the session when a hook blocks, and fails the requester with the plugin reason', async () => {
+      const blocked = new ForbiddenException({ code: 'START_BLOCKED' });
+      (fixture.service as unknown as { preStart: unknown }).preStart = {
+        gateSupervision: jest.fn().mockRejectedValue(blocked),
+      };
+      const { requestId, pending } = await fixture.createRequest();
+      const settled = pending.catch((error) => error);
+      await expect(fixture.service.approve(requestId, fixture.supervisor)).rejects.toBe(blocked);
+      await expect(settled).resolves.toBe(blocked);
+      expect(fixture.resourceUsageService.startSession).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -54,7 +54,7 @@ export function useResourceTabsLayoutInnerState({
 
   const { hasPermission } = useAuth();
   const { success, error: showError } = useToastMessage();
-  useQrCodeAction({ resourceId });
+  const { confirmationDialog } = useQrCodeAction({ resourceId });
 
   const { t } = useTranslations({ en, de });
 
@@ -117,6 +117,7 @@ export function useResourceTabsLayoutInnerState({
     handleDelete,
     resourceId,
     children,
+    confirmationDialog,
   };
 }
 
@@ -147,6 +148,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
     tabs,
     activeTabKey,
     handleDelete,
+    confirmationDialog,
   } = useResourceTabsLayoutInnerState({ resourceId, children });
 
   if (isLoadingResource) {
@@ -256,6 +258,7 @@ function ResourceTabsLayoutInner({ resourceId, children }: { resourceId: number;
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto">{children ?? <Outlet />}</div>
+      {confirmationDialog}
 
       {canDeleteResources && (
         <DeleteConfirmationModal

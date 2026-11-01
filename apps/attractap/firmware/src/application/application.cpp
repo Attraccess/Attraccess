@@ -7,6 +7,9 @@
 #include "../platform.hpp"
 #include <cstring>
 #include <string>
+#ifdef HAS_LVGL_DISPLAY
+#include "../display/ui/ui_slots.hpp"
+#endif
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
 #include "esp_task_wdt.h"
@@ -95,6 +98,7 @@ void Application::setup() {
   this->setupErrorCallbacks();
 
   this->setupActionCallbacks();
+  this->setupUiCallbacks();
 
   this->setupDisplayCallbacks();
   this->setupCardCallbacks();
@@ -224,6 +228,10 @@ void Application::dismissSessionSummary() {
 }
 
 void Application::logoutReader() {
+  this->closeUiStep();
+  // The card session is over: tell the server, and drop what only the signed-in user may see.
+  this->api.endCardSession();
+  ui::slotCache().clearSlot(ui::SlotId::DetailsSession);
   State::setUserLanguage(false);
   this->sessionSummaryActive = false;
   this->sessionSummaryVisible = false;

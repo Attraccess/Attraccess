@@ -5,8 +5,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@attraccess/react-query-client';
 import { StartSessionControls } from './index';
 
-const { startMutate, supervisionMode, requestForms } = vi.hoisted(() => ({
+const { startMutate, supervisionMode, requestForms, toastError, bothCallbacks } = vi.hoisted(() => ({
+  bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
+    // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
+    type Callbacks = {
+      onSuccess?: (data: unknown, v: unknown) => void;
+      onError?: (error: unknown, v: unknown) => void;
+    };
+    const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
+    return {
+      onSuccess: (data: unknown, _variables?: unknown) => {
+        hook?.onSuccess?.(data, variables);
+        call?.onSuccess?.(data, variables);
+      },
+      onError: (error: unknown) => {
+        hook?.onError?.(error, variables);
+        call?.onError?.(error, variables);
+      },
+    };
+  },
   startMutate: vi.fn(),
+  toastError: vi.fn(),
   requestForms: vi.fn().mockResolvedValue([]),
   supervisionMode: { value: 'introduction_required' },
 }));
@@ -19,7 +38,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 }));
 
 vi.mock('../../../../../components/toastProvider', () => ({
-  useToastMessage: () => ({ success: vi.fn(), apiError: vi.fn() }),
+  useToastMessage: () => ({ success: vi.fn(), apiError: vi.fn(), error: toastError }),
 }));
 
 vi.mock('../../../forms/hooks/useResourceFormsSubmission', () => ({
@@ -53,7 +72,12 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useResourcesServiceGetOneResourceById: () => ({
     data: { id: 1, type: 'machine', supervisionMode: supervisionMode.value },
   }),
-  useResourcesServiceResourceUsageStartSession: () => ({ mutate: startMutate, isPending: false }),
+  // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
+  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+    mutate: (variables: unknown, callbacks: unknown) =>
+      startMutate(variables, bothCallbacks(options, callbacks, variables)),
+    isPending: false,
+  }),
   useResourcesServiceUnlockDoor: () => ({ mutate: vi.fn(), isPending: false }),
   useResourcesServiceLockDoor: () => ({ mutate: vi.fn(), isPending: false }),
   useResourcesServiceUnlatchDoor: () => ({ mutate: vi.fn(), isPending: false }),
@@ -138,10 +162,10 @@ it.each([
   await act(() => callbacks.onError(error));
   expect(startMutate).toHaveBeenCalledTimes(retry ? 2 : 1);
   if (retry)
-    expect(startMutate).toHaveBeenLastCalledWith({
-      resourceId: 1,
-      requestBody: { projectId: undefined, formSubmissions: submissions },
-    });
+    expect(startMutate).toHaveBeenLastCalledWith(
+      { resourceId: 1, requestBody: { projectId: undefined, formSubmissions: submissions } },
+      expect.any(Object),
+    );
 });
 it('does not retry ordinary errors or a cancelled form resubmission', async () => {
   startMutate.mockClear();
@@ -162,5 +186,53 @@ it('does not retry ordinary errors or a cancelled form resubmission', async () =
       ),
     ),
   );
+  expect(startMutate).toHaveBeenCalledOnce();
+});
+
+it('asks for a plugin confirmation on 409 CONFIRMATION_REQUIRED and retries with the step id', async () => {
+  startMutate.mockClear();
+  requestForms.mockReset().mockResolvedValue([]);
+  supervisionMode.value = 'introduction_required';
+  render(<StartSessionControls resourceId={1} />);
+  await userEvent.click(screen.getByText('start'));
+  const callbacks = startMutate.mock.calls[0][1];
+  const error = new ApiError(
+    { method: 'POST', url: '/start' },
+    {
+      url: '/start',
+      ok: false,
+      status: 409,
+      statusText: 'Conflict',
+      body: {
+        code: 'CONFIRMATION_REQUIRED',
+        stepId: 'step-1',
+        confirmation: { title: 'Reserved from 14:00', body: 'Start anyway?' },
+      },
+    },
+    'Conflict',
+  );
+  await act(() => callbacks.onError(error));
+  expect(screen.getByText('Reserved from 14:00')).toBeInTheDocument();
+  expect(startMutate).toHaveBeenCalledOnce();
+
+  await userEvent.click(document.querySelector('[data-cy="start-confirmation-confirm"]') as HTMLElement);
+  expect(startMutate).toHaveBeenCalledTimes(2);
+  expect(startMutate.mock.calls[1][0].requestBody).toMatchObject({ confirmedStepIds: ['step-1'] });
+});
+
+it('shows the plugin reason on 403 START_BLOCKED instead of a generic error', async () => {
+  startMutate.mockClear();
+  toastError.mockClear();
+  render(<StartSessionControls resourceId={1} />);
+  await userEvent.click(screen.getByText('start'));
+  const callbacks = startMutate.mock.calls[0][1];
+  const reason = { code: 'RESERVED', title: 'Reserved', body: 'Booked until 14:00' };
+  const error = new ApiError(
+    { method: 'POST', url: '/start' },
+    { url: '/start', ok: false, status: 403, statusText: 'Forbidden', body: { code: 'START_BLOCKED', reason } },
+    'Forbidden',
+  );
+  await act(() => callbacks.onError(error));
+  expect(toastError).toHaveBeenCalledWith({ title: 'Reserved', description: 'Booked until 14:00' });
   expect(startMutate).toHaveBeenCalledOnce();
 });

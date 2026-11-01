@@ -23,9 +23,9 @@ CONFIG_PARTITION_TABLE_OFFSET=0x8000
 # --- Runtime parity with the Arduino core ---
 # Arduino ran FreeRTOS at 1 kHz; all ms-based timing in the firmware assumes it.
 CONFIG_FREERTOS_HZ=1000
-# app_main task = the old Arduino loopTask: 16 KB stack, pinned to core 1
-# (keeps the UI-driving loop off the WiFi core).
-CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+# app_main task = the old Arduino loopTask: 18 KB stack (16 KB + 2 KB for the plugin UI inbound path, ATT-1187),
+# pinned to core 1 (keeps the UI-driving loop off the WiFi core).
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=18432
 CONFIG_ESP_MAIN_TASK_AFFINITY_CPU1=y
 
 # --- Console over USB-Serial-JTAG (both boards route USB D+/D- to the S3) ---

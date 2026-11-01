@@ -255,6 +255,8 @@ jobs:
         run: pnpm nx run plugin-wago:reliability:short
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
+      - name: Test packed Reader UI fixture
+        run: pnpm --dir examples/plugin-reader-ui run pack-test
 
   fail2ban-smoke:
     runs-on: ubuntu-latest

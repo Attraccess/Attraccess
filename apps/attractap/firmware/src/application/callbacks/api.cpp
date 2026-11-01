@@ -249,6 +249,9 @@ void Application::setupActionCallbacks()
           self->handleFormsCancel();
           if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
             Display::showInsufficientBalancePopup([self](uint32_t cents) { self->api.requestBillingTopup(cents); }, [] {});
+          } else if (result.error == "START_BLOCKED" && !result.blockTitle.empty()) {
+            // The plugin's own words, and only that: no generic error popup on top.
+            Display::showReasonPopup(result.blockTitle, result.blockBody);
           } else {
             Display::showErrorPopup(FirmwareI18n::Message::ActionFailed, result.error.empty() ? FirmwareI18n::Message::PleaseTryAgain : FirmwareI18n::readerError(result.error));
           }
@@ -359,7 +362,7 @@ void Application::setupDisplayCallbacks()
   // Hidden maintenance drawer (pull down from the top edge)
   Display::setDrawerAvailableCallback([this]() {
     return !this->sessionSummaryActive && !this->cardAuthenticationPending && this->pendingUiAction.empty() &&
-           !this->waitingForResourceRefresh && !this->hasPendingFormRequest &&
+           !this->waitingForResourceRefresh && !this->hasPendingFormRequest && !this->uiStepOpen &&
            this->state != APPLICATION_STATE_SUPERVISION && this->state != APPLICATION_STATE_MASS_INTRODUCTION;
   });
   Display::setOnOpenSettingsCallback([this]() {

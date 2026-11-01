@@ -1,5 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import { z } from 'zod';
+import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
 import { logDestinationsSchema, logLevelsSchema } from '../logging/logging.config';
 import { join } from 'path';
 import { DEFAULT_STORAGE_ROOT } from './storage.config';
@@ -51,6 +52,10 @@ export const AppEnvSchema = z
     SSL_KEY_FILE: z.string().optional(),
     SSL_CERT_FILE: z.string().optional(),
     TRUST_PROXY: z.string().optional(),
+    /** Plugin pre-start / session-end hook timeout; the host caps it at 3 s. */
+    READER_UI_HOOK_TIMEOUT_MS: z.coerce.number().int().positive().default(READER_UI_TIMING.hookDefaultTimeoutMs),
+    /** Consecutive hook failures that open a plugin's circuit breaker. */
+    READER_UI_BREAKER_THRESHOLD: z.coerce.number().int().positive().default(READER_UI_TIMING.breakerThreshold),
   })
   .refine(
     (config) => {

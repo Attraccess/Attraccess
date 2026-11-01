@@ -172,7 +172,9 @@ export class AuditService
         authenticationMethod: snapshot.authenticationMethod,
         apiTokenId: snapshot.apiTokenId ?? null,
         outcome: 'succeeded',
-        subjectType: snapshot.action.startsWith('card.') ? 'attractap.card' : 'attractap.reader',
+        subjectType: snapshot.action.startsWith('card.')
+          ? 'attractap.card'
+          : (snapshot.subjectType ?? 'attractap.reader'),
         subjectId: snapshot.subjectId,
         ipAddress: null,
         userAgent: null,

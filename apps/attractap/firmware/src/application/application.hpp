@@ -18,6 +18,7 @@ private:
     void setupApiCallbacks();
     void setupErrorCallbacks();
     void setupActionCallbacks();
+    void setupUiCallbacks();
     void setupDisplayCallbacks();
     void setupCardCallbacks();
     void setupFormCallbacks();
@@ -128,6 +129,20 @@ private:
     uint32_t globalFormFieldNumber() const;
     bool isLastFormField() const;
     void onActionResult(const std::string &eventType);
+
+    // Plugin steps (ATT-1187), application_steps.cpp
+    void handleUiStepRequest(const ui::StepRequest &step);
+    void rejectUiStep(const ui::StepRequest &step);
+    void handleUiStepAction(const std::string &stepId, const std::string &action, bool isChoice);
+    void handleUiStepCancel(const std::string &stepId);
+    void closeUiStep();
+    void tickUiStep();
+    void clearPendingStartLocally();
+#endif
+#if defined(HAS_WS2812_LED) && !defined(HAS_LVGL_DISPLAY)
+    void handleLiteStepRequest(const ui::StepRequest &step);
+    void closeLiteStep();
+    void showLiteBlocked(const API::ActionResult &result);
 #endif
 
 #ifdef HAS_LVGL_DISPLAY

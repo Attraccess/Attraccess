@@ -1,0 +1,19 @@
+{
+  "name": "latin1-transliterated",
+  "kind": "slot-update",
+  "verdict": "accept",
+  "note": "",
+  "payload": {
+    "resourceId": 12,
+    "slot": "resource.details.header",
+    "revision": 1,
+    "owner": "reservations",
+    "key": "res-state",
+    "serverNowMs": 1790000000000,
+    "expiresAtMs": 1790003600000,
+    "tree": {
+      "t": "text",
+      "text": "Zlote \u2014 caf\u00e9"
+    }
+  }
+}

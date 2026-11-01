@@ -63,6 +63,14 @@ import { ResourceOperatingAttributionModule } from '../resources/operating-inter
 import { AuditModule } from '../audit/audit.module';
 import { DeviceEnrollmentModule } from '../device-enrollment/device-enrollment.module';
 import { SettingsModule } from '../settings/settings.module';
+import { ReaderUiModule } from '../plugin-system/reader-ui/reader-ui.module';
+import { AttractapUiHandler } from './websockets/handlers/ui/ui.handler';
+import { CardSessionService } from './websockets/handlers/ui/card-session.service';
+import { UiAuditService } from './websockets/handlers/ui/ui-audit.service';
+import { UiSlotService } from './websockets/handlers/ui/ui-slot.service';
+import { UiStepService } from './websockets/handlers/ui/ui-step.service';
+import { ReaderStartGate } from './websockets/handlers/session/reader-start-gate.service';
+import { ReaderUiAdminController } from './reader-ui-admin.controller';
 
 @Module({
   imports: [
@@ -97,6 +105,7 @@ import { SettingsModule } from '../settings/settings.module';
     SettingsModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,
+    ReaderUiModule,
   ],
   providers: [
     { provide: HandshakeLimiter, useFactory: () => new HandshakeLimiter() },
@@ -124,6 +133,12 @@ import { SettingsModule } from '../settings/settings.module';
     AttractapProjectsHandler,
     AttractapSupervisionHandler,
     AttractapMassIntroductionHandler,
+    CardSessionService,
+    UiAuditService,
+    UiStepService,
+    UiSlotService,
+    AttractapUiHandler,
+    ReaderStartGate,
   ],
   controllers: [
     AttractapController,
@@ -131,6 +146,7 @@ import { SettingsModule } from '../settings/settings.module';
     AttractapFirmwareController,
     ResourceAttractapsController,
     AttractapPairingController,
+    ReaderUiAdminController,
   ],
 })
 export class AttractapModule {}

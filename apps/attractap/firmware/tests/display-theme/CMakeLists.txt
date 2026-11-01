@@ -71,6 +71,10 @@ add_executable(display-theme-host
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/forms/navigation.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsActionFeedback.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/layout.cpp"
+    "${FIRMWARE_DIR}/src/display/screens/resourceDetails/resourceDetailsUiSlots.cpp"
+    "${FIRMWARE_DIR}/src/display/ui/ui_builder.cpp"
+    "${FIRMWARE_DIR}/src/display/ui/ui_slot_cache.cpp"
+    "${FIRMWARE_DIR}/src/display/ui/ui_slots.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/forms/fields.cpp"
     "${FIRMWARE_DIR}/src/display/screens/resourceDetails/forms/editor.cpp"
     ${ATTRACTAP_LATIN1_FONTS}

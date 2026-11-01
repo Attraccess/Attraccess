@@ -4,12 +4,21 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceUsageController } from './resource-usage.controller';
 import { ResourceUsageService } from './resource-usage.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
+import { PreStartService } from '../pre-start/pre-start.service';
+import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
+
+// Both are required: a wiring mistake must fail module compilation, not silently skip the gate.
+const gateProviders = [
+  { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
+  { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+];
 
 it('passes the authenticated user and both IDs to the usage details lookup', async () => {
   const getSessionDetails = jest.fn().mockResolvedValue({ id: 8 });
   const moduleRef = await Test.createTestingModule({
     controllers: [ResourceUsageController],
     providers: [
+      ...gateProviders,
       { provide: ResourceUsageService, useValue: { getSessionDetails } },
       {
         provide: ResourceActivityVisibilityService,
@@ -34,6 +43,7 @@ describe('usage history visibility', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        ...gateProviders,
         { provide: ResourceUsageService, useValue: { getResourceUsageHistory } },
         {
           provide: ResourceActivityVisibilityService,
@@ -90,6 +100,7 @@ describe('active sessions of a machine with parallel sessions', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
+        ...gateProviders,
         {
           provide: ResourceUsageService,
           useValue: { getActiveSessionOverview: jest.fn().mockResolvedValue(overview) },
@@ -125,4 +136,21 @@ describe('active sessions of a machine with parallel sessions', () => {
       ForbiddenException,
     );
   });
+});
+
+it("runs the session-end default for the ended session's owner when a manager ends it", async () => {
+  const applyDefault = jest.fn();
+  const endSession = jest.fn().mockResolvedValue({ id: 9, userId: 2 });
+  const moduleRef = await Test.createTestingModule({
+    controllers: [ResourceUsageController],
+    providers: [
+      { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
+      { provide: SessionEndNotifier, useValue: { applyDefault } },
+      { provide: ResourceUsageService, useValue: { endSession } },
+      { provide: ResourceActivityVisibilityService, useValue: {} },
+    ],
+  }).compile();
+  const request = { user: { id: 1, locale: 'en', authenticationMethod: 'session' } } as unknown as AuthenticatedRequest;
+  await moduleRef.get(ResourceUsageController).endSession(5, {} as never, request);
+  expect(applyDefault).toHaveBeenCalledWith({ resourceId: 5, userId: 2, sessionId: 9 }, 'web', 'en');
 });

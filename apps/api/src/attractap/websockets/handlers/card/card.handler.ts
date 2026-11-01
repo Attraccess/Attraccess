@@ -25,6 +25,7 @@ import { WebsocketService } from '../../websocket.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
 
 import { ResourceListService } from '../resource-list/resource-list.service';
+import { CardSessionService } from '../ui/card-session.service';
 
 @Injectable()
 export class AttractapCardHandler {
@@ -59,6 +60,9 @@ export class AttractapCardHandler {
 
   @Inject(AuditService)
   protected audit: AuditService;
+
+  @Inject(CardSessionService)
+  private cardSessions: CardSessionService;
 
   @Inject(ResourceListService)
   protected resourceListService: ResourceListService;
@@ -102,6 +106,9 @@ export class AttractapCardHandler {
     }
 
     socket.state.lastAuthenticatedUserId = nfcCard.user.id;
+    const language = await this.settingsService.resolveLanguage(nfcCard.user.locale);
+    // Steps and user-scoped slots are bound to this card session (ATT-1187); the reader carries the id.
+    const cardSession = this.cardSessions.issue(socket, nfcCard.user.id, language === 'de' ? 'de' : 'en');
 
     const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
     const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
@@ -123,7 +130,8 @@ export class AttractapCardHandler {
         keyNo: nfcCard.keyNo,
         key: nfcCard.key,
         username: nfcCard.user.username,
-        language: await this.settingsService.resolveLanguage(nfcCard.user.locale),
+        language,
+        cardSessionId: cardSession.id,
         languageFallback: !getSupportedDeviceLanguage(nfcCard.user.locale),
         canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
         hasIntroduction,

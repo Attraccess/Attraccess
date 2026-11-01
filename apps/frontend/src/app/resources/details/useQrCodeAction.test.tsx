@@ -2,8 +2,27 @@ import type { ReactNode } from 'react';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ApiError } from '@attraccess/react-query-client';
 import { useQrCodeAction } from './useQrCodeAction';
 const state = vi.hoisted(() => ({
+  bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
+    // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
+    type Callbacks = {
+      onSuccess?: (data: unknown, v: unknown) => void;
+      onError?: (error: unknown, v: unknown) => void;
+    };
+    const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
+    return {
+      onSuccess: (data: unknown, _variables?: unknown) => {
+        hook?.onSuccess?.(data, variables);
+        call?.onSuccess?.(data, variables);
+      },
+      onError: (error: unknown) => {
+        hook?.onError?.(error, variables);
+        call?.onError?.(error, variables);
+      },
+    };
+  },
   navigate: vi.fn(),
   start: vi.fn(),
   end: vi.fn(),
@@ -11,6 +30,7 @@ const state = vi.hoisted(() => ({
   reset: vi.fn(),
   success: vi.fn(),
   apiError: vi.fn(),
+  error: vi.fn(),
   callbacks: {} as Record<
     string,
     {
@@ -27,13 +47,18 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({ invalidateQueries: state.invalidate, resetQueries: state.reset }),
 }));
 vi.mock('../../../components/toastProvider', () => ({
-  useToastMessage: () => ({ success: state.success, apiError: state.apiError }),
+  useToastMessage: () => ({ success: state.success, apiError: state.apiError, error: state.error }),
 }));
-vi.mock('@attraccess/react-query-client', () => ({
-  useResourcesServiceResourceUsageStartSession: (callbacks: (typeof state.callbacks)[string]) => {
-    state.callbacks.start = callbacks;
-    return { mutate: state.start };
-  },
+vi.mock('@attraccess/react-query-client', async (original) => ({
+  ApiError: (await original<typeof import('@attraccess/react-query-client')>()).ApiError,
+  // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
+  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+    mutate: (variables: unknown, callbacks: unknown) => {
+      state.callbacks.start = state.bothCallbacks(options, callbacks, variables);
+      state.start(variables);
+    },
+    isPending: false,
+  }),
   useResourcesServiceResourceUsageEndSession: (callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.end = callbacks;
     return { mutate: state.end };
@@ -78,9 +103,8 @@ it('does nothing without an action', () => {
   expect(state.end).not.toHaveBeenCalled();
 });
 it('invalidates only resource-specific history after start and resets the active session after stop', () => {
-  setup();
-  for (const forceTakeOver of [false, true])
-    act(() => state.callbacks.start.onSuccess({}, { requestBody: { forceTakeOver } }));
+  setup('start');
+  act(() => state.callbacks.start.onSuccess({}, { requestBody: { forceTakeOver: false } }));
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', { resourceId: 7 }] });
   expect(state.success).toHaveBeenCalledWith({
     title: 'Session started',
@@ -101,10 +125,28 @@ it('invalidates only resource-specific history after start and resets the active
   }
 });
 it('reports failed start and stop requests without a success toast', () => {
-  setup();
+  setup('start');
+  setup('stop');
   const error = new Error('Forbidden');
   for (const action of ['start', 'end']) act(() => state.callbacks[action].onError(error));
   expect(state.apiError).toHaveBeenCalledTimes(2);
   expect(state.apiError).toHaveBeenLastCalledWith(expect.objectContaining({ error, baseTranslationKey: 'api' }));
   expect(state.success).not.toHaveBeenCalled();
+});
+
+const startError = (status: number, body: unknown) =>
+  new ApiError({ method: 'POST', url: '/start' }, { url: '/start', ok: false, status, statusText: 'x', body }, 'x');
+
+it('asks a plugin confirmation for a QR start and shows a block reason as written', () => {
+  const { result } = setup('start');
+  const confirmation = { title: 'Reserved from 14:00', body: 'Start anyway?' };
+  act(() =>
+    state.callbacks.start.onError(startError(409, { code: 'CONFIRMATION_REQUIRED', stepId: 's1', confirmation })),
+  );
+  expect(result.current.confirmationDialog).not.toBeNull();
+  expect(state.apiError).not.toHaveBeenCalled();
+  const reason = { code: 'RESERVED', title: 'Reserved', body: 'Booked until 14:00' };
+  act(() => state.callbacks.start.onError(startError(403, { code: 'START_BLOCKED', reason })));
+  expect(state.error).toHaveBeenCalledWith({ title: 'Reserved', description: 'Booked until 14:00' });
+  expect(state.apiError).not.toHaveBeenCalled();
 });

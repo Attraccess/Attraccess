@@ -20,6 +20,7 @@
 #include "screens/noResources/noResourcesScreen.hpp"
 #include "screens/resourceList/resourceListScreen.hpp"
 #include "screens/resourceDetails/resourceDetailsScreen.hpp"
+#include "ui/ui_step_modal.hpp"
 #include "screens/enrollment/enrollmentScreen.hpp"
 #include "screens/reset/resetScreen.hpp"
 #include "screens/supervision/supervisionScreen.hpp"
@@ -59,6 +60,8 @@ public:
     static SessionSummaryScreen sessionSummaryScreen;
     static ResourceListScreen resourceListScreen;
     static ResourceDetailsScreen resourceDetailsScreen;
+    // Plugin confirm / choose / info steps and the post-stop question (ATT-1187).
+    static ui::StepModal stepModal;
     static EnrollmentScreen enrollmentScreen;
     static ResetScreen resetScreen;
     static SupervisionScreen supervisionScreen;
@@ -88,6 +91,8 @@ public:
     static void showBillingSummary(const std::string &total);
     static void showInsufficientBalancePopup(std::function<void(uint32_t amountCents)> onStart, std::function<void()> onCancel);
     static void hidePopup();
+    // A plugin's literal block reason (title and body, already Latin-1). Replaces the generic error popup.
+    static void showReasonPopup(const std::string &title, const std::string &body);
 
     // Hidden maintenance drawer: pulled down from the top edge, exposes
     // "Open Settings" and "Reboot" actions. The settings action is wired by the

@@ -14,6 +14,8 @@ import { AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { SupervisionService } from '../../../../resources/supervision/supervision.service';
 import { ResourceMeteringService } from '../../../../resources/metering/resource-metering.service';
 import { ResourceOperatingAttributionService } from '../../../../resources/operating-intervals/resource-operating-attribution.service';
+import { ReaderStartGate } from './reader-start-gate.service';
+import { CardSessionService } from '../ui/card-session.service';
 import { NoOwnActiveSessionError } from '../../../../resources/usage/errors/no-own-active-session.error';
 
 // Lite long tap and the plain Stop button send no usageId: on a shared machine they may only end the card
@@ -42,6 +44,11 @@ describe('AttractapSessionHandler stop on a machine shared by several people', (
         { provide: BillingService, useValue: { getResourceUsageCharge } },
         { provide: ResourceListService, useValue: { sendResourceListToSocket: jest.fn() } },
         { provide: SupervisionService, useValue: {} },
+        {
+          provide: ReaderStartGate,
+          useValue: { run: jest.fn().mockResolvedValue({ kind: 'proceed' }), afterStop: jest.fn() },
+        },
+        { provide: CardSessionService, useValue: new CardSessionService() },
         { provide: ResourceMeteringService, useValue: {} },
         { provide: ResourceOperatingAttributionService, useValue: {} },
       ],

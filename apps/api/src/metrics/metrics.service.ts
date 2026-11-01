@@ -47,6 +47,7 @@ export class MetricsService implements OnModuleInit {
   public readonly resourceMaintenanceOverdue: Gauge;
 
   public readonly attractapDevicesConnected: Gauge;
+  public readonly readerUiOpenAlerts: Gauge;
   public readonly attractapReaderConnected: Gauge;
   public readonly attractapNfcTapsTotal: Counter;
   public readonly attractapFirmwareUpdatesTotal: Counter;
@@ -113,6 +114,7 @@ export class MetricsService implements OnModuleInit {
     this.resourceMaintenanceOverdue = resources.resourceMaintenanceOverdue;
     const devices = createDevicesMetrics(this.registry);
     this.attractapDevicesConnected = devices.attractapDevicesConnected;
+    this.readerUiOpenAlerts = devices.readerUiOpenAlerts;
     this.attractapReaderConnected = devices.attractapReaderConnected;
     this.attractapNfcTapsTotal = devices.attractapNfcTapsTotal;
     this.attractapFirmwareUpdatesTotal = devices.attractapFirmwareUpdatesTotal;
