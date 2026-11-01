@@ -40,10 +40,10 @@ To record machine usage against a project, tap the machine's name to open its de
 
 The reader reports results on a full screen of its own and returns to the screen you were on:
 
-- A green check with **Nutzung gestartet** (Usage started) or **Nutzung beendet** (Usage ended) and the resource name. Tap anywhere to continue, or wait a moment.
+- A green check with **Nutzung gestartet** (Usage started) or **Nutzung beendet** (Usage ended) and the resource name, or **Aktion bestätigt** (Action confirmed) after a door or flow button. Tap anywhere to continue, or wait a moment.
 - The **Gesamtkosten dieser Sitzung** (Total cost of this session) screen with the amount, when a stop is billed. Tap **OK** or wait.
 - A red cross with **Anmeldung fehlgeschlagen** (Sign-in failed) when the card is not accepted. Tap **OK** or hold your card against the reader again.
-- A warning with an explanation, for example **Status nicht verfügbar** (Status unavailable) after the reader signed you out because the machine status did not load. Tap **OK** to get to the sign-in screen.
+- A warning with an explanation, for example **Status nicht verfügbar** (Status unavailable) after the reader signed you out because the machine status did not load. Tap **OK**, wait, or hold your card against the reader to sign in again.
 
 ![Usage started: a green check with the resource name](../../_media/attractap/usage-started.png)
 
@@ -51,13 +51,15 @@ The reader reports results on a full screen of its own and returns to the screen
 
 ![Sign-in failed: a red cross, the reason and an OK button](../../_media/attractap/sign-in-failed.png)
 
-When a single button's action fails, for example **Start**, the button itself turns red for a few seconds and says that it failed, or why. Nothing else on the screen moves. Tap the button again to retry. If the button is no longer there, the reader shows a **Etwas ist schiefgelaufen** (Something went wrong) screen with the error code and a **Zurück** (Back) button.
+When a single button's action fails, for example **Start**, the button itself turns red for about four seconds and reads **⚠ Fehlgeschlagen – erneut tippen** (⚠ Failed – tap to retry), or the reason, for example **⚠ Karte ist nicht aktiv** (⚠ Card is inactive). It keeps its size and place, and nothing else on the screen moves. Tap the button to retry. While the reader reloads the machine status after the failure, the message waits until the status is back. If the button now means something else, for example because someone else started the machine meanwhile, the message is dropped. If the button is no longer there, the reader shows a **Etwas ist schiefgelaufen** (Something went wrong) screen with the error code and a **Zurück** (Back) button.
+
+The same applies to usage forms: if the server cannot take a page, the reason appears on **Weiter** (Next) or **Absenden** (Submit); if the form cannot be loaded at all, it closes and the reason appears on the button that opened it.
 
 ![A failed Start button, in red and in place](../../_media/attractap/button-error.png)
 
 ![Something went wrong, with the error code and a Back button](../../_media/attractap/generic-error.png)
 
-If an action fails because your balance is too low and the reader has a payment terminal, the reader opens the **Unzureichendes Guthaben** (Insufficient balance) screen. Type the amount in whole euros on the number pad, tap **Aufladen** (Top up) and continue at the payment terminal. **Abbrechen** (Cancel) returns you to where you were. Usage forms and the project selection are screens of their own as well. If the reader signs you out meanwhile, whichever screen is open is replaced like any other.
+If an action fails because your balance is too low and the reader has a payment terminal, the reader opens the **Unzureichendes Guthaben** (Insufficient balance) screen. Type the amount in whole euros on the number pad, tap **Aufladen** (Top up) and continue at the payment terminal when **Aufladung gestartet** (Top-up started) appears. A missing amount, or a top-up the server refuses, shows on **Aufladen** in the same way as a failed button; the amount you typed stays. **Abbrechen** (Cancel) returns you to where you were. Usage forms and the project selection are screens of their own as well. If the reader signs you out meanwhile, whichever screen is open is replaced like any other.
 
 ![The top-up screen with its number pad](../../_media/attractap/top-up.png)
 
