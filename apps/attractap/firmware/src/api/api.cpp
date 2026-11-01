@@ -281,6 +281,7 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
             JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
             result.hasDuration = payload["durationSeconds"].is<uint32_t>();
             if (result.hasDuration) result.durationSeconds = payload["durationSeconds"].as<uint32_t>();
+            result.warning = payload["warning"] | false;
             result.hasOwnership = payload["endedOwnSession"].is<bool>();
             if (result.hasOwnership) result.endedOwnSession = payload["endedOwnSession"].as<bool>();
             this->actionResultCallback(result);

@@ -36,7 +36,8 @@ public:
     void triggerError();
     void triggerIndicate();
     // Steady amber half ring for 3 s: a plugin says the resource is reserved (Lite, no screen).
-    void triggerReserved();
+    // With `thenBlocked` the error flash follows (a blocked start that names a reservation).
+    void triggerReserved(bool thenBlocked = false);
     // Amber blink for allow-with-warning.
     void triggerWarning();
     // Starts LED_STATE_CONFIRM_WAIT for `windowMs`; the state falls back to WAIT_FOR_CARD afterwards.
@@ -72,6 +73,7 @@ private:
     };
     TriggerType _trigger = TRIGGER_NONE;
     uint32_t _triggerStartMs = 0;
+    bool _blockedAfterReserved = false;
     uint32_t _confirmWaitStartMs = 0;
     uint32_t _confirmWaitWindowMs = 0;
     LedState _stateBeforeTrigger = LED_STATE_WAIT_FOR_CARD;

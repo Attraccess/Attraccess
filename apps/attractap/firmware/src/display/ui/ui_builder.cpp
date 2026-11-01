@@ -32,21 +32,27 @@ namespace ui
                 if (c.label == label) c.label = nullptr;
         }
 
-        void registerCountdown(lv_obj_t *label, const SlotRecord &rec, const Node &node, uint32_t nowMillis)
+        void registerCountdownScalars(lv_obj_t *label, int64_t toMs, int64_t serverNowMs, uint32_t receivedAtMillis,
+                                      uint32_t nowMillis)
         {
             for (Countdown &c : g_countdowns)
             {
                 if (c.label) continue;
-                c = Countdown{label, node.toMs, rec.serverNowMs, rec.receivedAtMillis, {}};
+                c = Countdown{label, toMs, serverNowMs, receivedAtMillis, {}};
                 lv_obj_add_event_cb(label, onCountdownDelete, LV_EVENT_DELETE, nullptr);
                 char text[12];
-                formatCountdown((node.toMs - rec.serverNowMs) - static_cast<int64_t>(nowMillis - rec.receivedAtMillis),
-                                text, sizeof text);
+                formatCountdown((toMs - serverNowMs) - static_cast<int64_t>(nowMillis - receivedAtMillis), text,
+                                sizeof text);
                 strncpy(c.last, text, sizeof c.last - 1);
                 FirmwareI18n::setDynamicLabel(label, text) /* i18n-data: Countdown digits; no prose. */;
                 return;
             }
             FirmwareI18n::setDynamicLabel(label, "--:--") /* i18n-data: Countdown placeholder; no prose. */;
+        }
+
+        void registerCountdown(lv_obj_t *label, const SlotRecord &rec, const Node &node, uint32_t nowMillis)
+        {
+            registerCountdownScalars(label, node.toMs, rec.serverNowMs, rec.receivedAtMillis, nowMillis);
         }
 
         const lv_font_t *fontFor(TextStyle style)
@@ -248,6 +254,12 @@ namespace ui
             }
         }
         return root;
+    }
+
+    void registerCountdownLabel(lv_obj_t *label, int64_t toMs, int64_t serverNowMs, uint32_t receivedAtMillis,
+                                uint32_t nowMillis)
+    {
+        registerCountdownScalars(label, toMs, serverNowMs, receivedAtMillis, nowMillis);
     }
 
     void tickCountdowns(uint32_t nowMillis)

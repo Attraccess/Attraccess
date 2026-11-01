@@ -26,6 +26,9 @@ namespace ui
     // when the text changes). Idempotent; runs under the LVGL timer handler.
     void startCountdownTimer();
     void tickCountdowns(uint32_t nowMillis);
+    // Registers an existing label (step modal body) with the shared countdown timer.
+    void registerCountdownLabel(lv_obj_t *label, int64_t toMs, int64_t serverNowMs, uint32_t receivedAtMillis,
+                                uint32_t nowMillis);
     size_t countdownLabelCount();
 
     // Colors by tone (Tone::None = neutral text color).

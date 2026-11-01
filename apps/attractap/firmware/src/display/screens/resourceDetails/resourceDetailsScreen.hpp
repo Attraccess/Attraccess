@@ -59,11 +59,18 @@ public:
     void showSuccessToast(const FirmwareI18n::Text &text, uint16_t ms = 1200);
 
     void setProjects(const API::ProjectsOfUserResponse &projects);
+    // Rebuilds the plugin slot containers (header, body, session) from the slot cache. Needs lv_lock().
+    void refreshUiSlots();
 
 private:
     void updateFormBreadcrumb();
     void createFormsEditor(lv_obj_t *overlay);
     void createSelectField(lv_obj_t *fieldContainer, FormFieldWidget &widget, const API::ResourceUsageFormField &field);
+    enum class UiSlotKind { Header, Body, Session };
+    void createUiSlotContainer(UiSlotKind kind);
+    lv_obj_t *uiSlotHeader = nullptr;
+    lv_obj_t *uiSlotBody = nullptr;
+    lv_obj_t *uiSlotSession = nullptr;
     void createResourceHeader();
     void createSessionDetails();
     void createSessionControls();

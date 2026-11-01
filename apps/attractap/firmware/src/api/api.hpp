@@ -124,6 +124,8 @@ struct ActionResult {
         std::string blockCode{};
         std::string blockTitle{};
         std::string blockBody{};
+        // allow-with-warning: the start went through but the plugin asked for attention.
+        bool warning = false;
     };
 };
 

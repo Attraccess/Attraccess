@@ -116,4 +116,21 @@ uint32_t usageStatsUsageId = 0;
 #if defined(HAS_LVGL_DISPLAY)
 uint32_t usageStatsRequestedAt = 0;
 #endif
+
+// Plugin steps (ATT-1187). A pre-start step keeps the START's pending action and sign-in-timeout pause;
+// the post-stop question (requestId 0) lives over the session summary.
+#if defined(HAS_LVGL_DISPLAY)
+bool uiStepOpen = false;
+bool uiStepPostStop = false;
+ui::StepRequest uiStep;
+// Last step this reader showed; a server retry of the same step must not reopen it.
+std::string lastUiStepId;
+#endif
+
+// Lite card-confirm: a second short tap by the same user confirms (no screen, LED ring drains).
+#if defined(HAS_WS2812_LED) && !defined(HAS_LVGL_DISPLAY)
+volatile bool liteStepOpen = false;
+ui::StepRequest liteStep;
+std::string liteStepUser;
+#endif
 };

@@ -13,7 +13,8 @@
 
 namespace ui
 {
-    enum class StepKind : uint8_t { Confirm, Choose, Info };
+    // CardConfirm: Lite readers confirm with a second short card tap (no screen).
+    enum class StepKind : uint8_t { Confirm, Choose, Info, CardConfirm };
     enum class StepRole : uint8_t { Cancel, Confirm, Ok };
 
     struct StepChoice
@@ -82,6 +83,7 @@ namespace ui
         if (!strcmp(kind, "confirm")) out.kind = StepKind::Confirm;
         else if (!strcmp(kind, "choose")) out.kind = StepKind::Choose;
         else if (!strcmp(kind, "info")) out.kind = StepKind::Info;
+        else if (!strcmp(kind, "card-confirm")) out.kind = StepKind::CardConfirm;
         else return false;
         if (!p["resourceId"].is<uint32_t>() || !p["serverNowMs"].is<int64_t>() || !p["expiresAtMs"].is<int64_t>())
             return false;

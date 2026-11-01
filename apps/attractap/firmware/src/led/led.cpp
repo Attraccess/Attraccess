@@ -74,8 +74,9 @@ void LedController::triggerIndicate()
     _triggerStartMs = millis();
 }
 
-void LedController::triggerReserved()
+void LedController::triggerReserved(bool thenBlocked)
 {
+    _blockedAfterReserved = thenBlocked;
     _stateBeforeTrigger = _state;
     _trigger = TRIGGER_RESERVED;
     _triggerStartMs = millis();
@@ -123,6 +124,13 @@ bool LedController::runFeedbackTrigger(uint32_t elapsed)
         _trigger == TRIGGER_RESERVED ? LedFeedback::Pattern::Reserved : LedFeedback::Pattern::Warning);
     if (LedFeedback::finished(action, elapsed))
     {
+        if (_trigger == TRIGGER_RESERVED && _blockedAfterReserved)
+        {
+            _blockedAfterReserved = false;
+            _trigger = TRIGGER_ERROR;
+            _triggerStartMs = millis();
+            return false;
+        }
         _trigger = TRIGGER_NONE;
         _state = _stateBeforeTrigger;
         return false;
