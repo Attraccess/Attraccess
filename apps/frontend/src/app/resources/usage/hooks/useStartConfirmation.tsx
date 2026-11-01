@@ -35,8 +35,18 @@ const TONE_STATUS: Record<NonNullable<StartConfirmation['tone']>, StatusDialogSt
   danger: 'warning',
 };
 
-const en = { start: 'Start', remaining: 'Time remaining: {{time}}' };
-const de = { start: 'Starten', remaining: 'Verbleibende Zeit: {{time}}' };
+const en = {
+  start: 'Start',
+  remaining: 'Time remaining: {{time}}',
+  expiredTitle: 'Confirmation expired',
+  expiredBody: 'The confirmation took too long. Nothing was started. Please start again.',
+};
+const de = {
+  start: 'Starten',
+  remaining: 'Verbleibende Zeit: {{time}}',
+  expiredTitle: 'Bestätigung abgelaufen',
+  expiredBody: 'Die Bestätigung hat zu lange gedauert. Es wurde nichts gestartet. Bitte starten Sie erneut.',
+};
 
 function errorBody(error: unknown): { status?: number; body?: Record<string, unknown> } {
   if (!(error instanceof ApiError)) return {};
@@ -96,14 +106,18 @@ export function useStartConfirmation<TBody extends { confirmedStepIds?: Array<st
 ) {
   const { t } = useTranslations({ en, de });
   const [pending, setPending] = useState<Pending<TBody> | null>(null);
+  // The confirmation ran out while the dialog was open; told instead of silently closed.
+  const [expiredNotice, setExpiredNotice] = useState(false);
   const now = useNow(pending !== null);
 
   const close = useCallback(() => setPending(null), []);
+  const closeExpiredNotice = useCallback(() => setExpiredNotice(false), []);
 
   /** Returns true when the error was a confirmation request (the caller must not show an error). */
   const handleStartError = useCallback((error: unknown, requestBody: TBody): boolean => {
     const required = getConfirmationRequired(error);
     if (!required) return false;
+    setExpiredNotice(false);
     setPending({
       confirmation: required.confirmation,
       stepId: required.stepId,
@@ -120,10 +134,25 @@ export function useStartConfirmation<TBody extends { confirmedStepIds?: Array<st
 
   const expired = pending?.confirmation.expiresAtMs !== undefined && now >= pending.confirmation.expiresAtMs;
   useEffect(() => {
-    if (expired) setPending(null);
+    if (!expired) return;
+    setPending(null);
+    setExpiredNotice(true);
   }, [expired]);
 
   const dialog: ReactNode = useMemo(() => {
+    if (expiredNotice && !pending) {
+      return (
+        <StatusDialog
+          isOpen
+          onClose={closeExpiredNotice}
+          status="warning"
+          title={t('expiredTitle')}
+          data-cy="start-confirmation-expired"
+        >
+          <p>{t('expiredBody')}</p>
+        </StatusDialog>
+      );
+    }
     if (!pending) return null;
     const { confirmation } = pending;
     const remaining = confirmation.countdownToMs === undefined ? null : confirmation.countdownToMs - now;
@@ -147,7 +176,7 @@ export function useStartConfirmation<TBody extends { confirmedStepIds?: Array<st
         )}
       </StatusDialog>
     );
-  }, [pending, now, close, confirm, t]);
+  }, [pending, expiredNotice, now, close, closeExpiredNotice, confirm, t]);
 
-  return { handleStartError, dialog, isOpen: pending !== null };
+  return { handleStartError, dialog, isOpen: pending !== null || expiredNotice };
 }

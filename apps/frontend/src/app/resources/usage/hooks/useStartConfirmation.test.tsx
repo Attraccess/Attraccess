@@ -90,4 +90,24 @@ describe('useStartConfirmation', () => {
     await userEvent.click(screen.getByText('Cancel'));
     expect(retry).not.toHaveBeenCalled();
   });
+
+  it('tells the user when the confirmation expired instead of closing silently', async () => {
+    const retry = vi.fn();
+    const { result } = renderHook(() => useStartConfirmation(retry));
+    const error = apiError(409, {
+      code: 'CONFIRMATION_REQUIRED',
+      stepId: 'a',
+      confirmation: { title: 'Reserved', body: 'Start anyway?', expiresAtMs: Date.now() - 1 },
+    });
+    act(() => void result.current.handleStartError(error, {}));
+    const { rerender } = render(<div>{result.current.dialog}</div>);
+    rerender(<div>{result.current.dialog}</div>);
+    expect(screen.queryByText('Reserved')).not.toBeInTheDocument();
+    expect(screen.getByText('Confirmation expired')).toBeInTheDocument();
+    expect(result.current.isOpen).toBe(true);
+    await userEvent.click(screen.getByText('Close'));
+    rerender(<div>{result.current.dialog}</div>);
+    expect(result.current.isOpen).toBe(false);
+    expect(retry).not.toHaveBeenCalled();
+  });
 });

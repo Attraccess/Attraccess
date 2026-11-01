@@ -17,7 +17,7 @@ const CONFIRM_STEP_KEY = 'tidy-up';
 
 const TEXT = {
   en: { badge: 'Tidy up after use', title: 'Before you start', body: 'Is the machine clean and ready?' },
-  de: { badge: 'Bitte aufraeumen', title: 'Bevor du startest', body: 'Ist die Maschine sauber und bereit?' },
+  de: { badge: 'Bitte aufraeumen', title: 'Bevor Sie starten', body: 'Ist die Maschine sauber und bereit?' },
 } as const;
 
 const readerUi: ReaderUiProvider = {

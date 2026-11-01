@@ -4,21 +4,21 @@
     "description": "How plugin widgets and start confirmations behave on Attractap readers",
     "noScreenPolicy": {
       "label": "Readers without a screen",
-      "description": "Applies to readers that can't show the confirmation: Lite readers, readers with older firmware and readers suspended after a crash. \"Start with a warning\" starts there without a confirmation.",
+      "description": "What happens when a plugin asks for a confirmation on a reader that cannot show it: Lite readers, readers with older firmware and readers paused after repeated crashes. \"Confirm with a second card tap\" works on Lite readers only; other readers without a screen block the start. \"Start with a warning\" starts without a confirmation.",
       "default": "Plugin default",
       "block": "Block the start",
       "card-confirm": "Confirm with a second card tap",
       "allow-with-warning": "Start with a warning"
     },
     "plugins": "Plugins",
-    "noPlugins": "No plugin contributes to readers yet.",
+    "noPlugins": "No installed plugin uses reader widgets or start confirmations.",
     "widgets": "Show widgets on readers",
     "failurePolicy": {
-      "label": "If the plugin fails",
+      "label": "If the plugin's check fails",
       "fail-closed": "Block the start (recommended)",
       "fail-open": "Allow the start"
     },
-    "failOpenWarning": "\"Allow the start\" lets people start while the plugin's check is unavailable. This choice is audited.",
+    "failOpenWarning": "\"Allow the start\" lets people start while the plugin cannot check the start. Every such start is recorded in the audit log.",
     "save": "Save",
     "saved": "Reader display settings saved",
     "saveError": "Could not save reader display settings",
@@ -28,25 +28,25 @@
   "reader": {
     "widgets": "Show plugin widgets on this reader",
     "widgetsDescription": "Widgets appear only when this and the resource setting are on.",
-    "contributions": "Plugin contributions",
-    "noContributions": "No plugin contributions for this reader.",
+    "contributions": "What plugins show on this reader",
+    "noContributions": "No plugin shows anything on this reader right now.",
     "status": {
-      "rendered": "Rendered",
-      "degraded": "Degraded",
-      "skipped": "Skipped"
+      "rendered": "Shown",
+      "degraded": "Shown as plain text",
+      "skipped": "Not shown"
     },
     "reason": {
-      "old-firmware": "reader firmware has no plugin UI",
-      "no-screen": "reader has no screen",
-      "crash-loop-suspended": "reader suspended after a crash",
+      "old-firmware": "the reader's firmware is too old for plugin widgets",
+      "no-screen": "the reader has no screen",
+      "crash-loop-suspended": "paused after repeated reader crashes",
       "widgets-disabled": "widgets are switched off",
-      "unsupported": "reader cannot show this",
-      "expired": "already expired",
-      "too-many-contributions": "too many contributions for this resource",
-      "provider-error": "plugin failed to answer",
-      "node-budget": "too many widget elements on this reader",
-      "invalid": "invalid content",
-      "reader": "dropped by the reader"
+      "unsupported": "this reader cannot show it",
+      "expired": "no longer current",
+      "too-many-contributions": "the plugin shows too many widgets for this resource",
+      "provider-error": "the plugin did not answer",
+      "node-budget": "no room left on the reader's screen",
+      "invalid": "the plugin sent invalid content",
+      "reader": "the reader rejected it"
     },
     "savedImmediately": "Changes on this tab are saved immediately.",
     "saved": "Reader display setting saved",
@@ -65,16 +65,16 @@
     "none": "No open alerts.",
     "clear": "Clear",
     "kind": {
-      "breaker-open": "Plugin hook disabled after repeated failures",
-      "load-failure": "Plugin with access hooks failed to load",
-      "crash-loop": "Reader suspended after a crash"
+      "breaker-open": "Plugin check keeps failing",
+      "load-failure": "Plugin failed to load",
+      "crash-loop": "Reader keeps crashing"
     },
     "clearError": "Could not clear the alert",
     "readerFallback": "Reader #{{id}}",
     "description": {
-      "breaker-open": "{{plugin}}: starts follow the plugin's failure policy. After 60 seconds the next start tries the hook again and the alert ends when it answers; Clear resets it now.",
-      "load-failure": "{{plugin}} did not load, so its start hooks are not applied.",
-      "crash-loop": "{{reader}}: plugin widgets are suspended. They return after 30 minutes without another crash, or now with Clear."
+      "breaker-open": "{{plugin}} failed to check several starts in a row, so it is no longer asked. Until it answers again, starts follow the \"If the plugin's check fails\" setting of each resource. The plugin is asked again automatically after 60 seconds; Clear asks it right away. If this keeps happening, check the plugin's log or disable the plugin.",
+      "load-failure": "{{plugin}} could not be loaded, so its start checks and confirmations are not applied and starts go ahead without them. Check the plugin's error on this page and reload or reinstall it. The alert ends when the plugin loads again.",
+      "crash-loop": "{{reader}} crashed repeatedly, so plugin widgets are paused on it and confirmations there follow the resource's \"Readers without a screen\" setting. Widgets return after 30 minutes without another crash, or right away with Clear. If it keeps crashing, update the reader's firmware or report the crash."
     }
   }
 }

@@ -21,26 +21,26 @@ const TEXTS: Record<HostReasonCode, Record<ReaderUiLanguage, { title: string; bo
   HOOK_UNAVAILABLE: {
     en: {
       title: 'Temporarily unavailable',
-      body: 'This resource cannot be started right now. Please try again later.',
+      body: 'This resource cannot be started right now. Please try again in a minute or ask the team.',
     },
     de: {
       title: 'Vorübergehend nicht startbar',
-      body: 'Diese Ressource kann gerade nicht gestartet werden. Bitte versuche es später erneut.',
+      body: 'Diese Ressource kann gerade nicht gestartet werden. Bitte versuchen Sie es gleich erneut oder fragen Sie das Team.',
     },
   },
   CONFIRMATION_UNAVAILABLE: {
     en: {
       title: 'Confirmation not possible',
-      body: 'This start needs a confirmation that cannot be shown right now. Tap your card and try again.',
+      body: 'This start needs a confirmation that cannot be shown right now. Please tap your card again.',
     },
     de: {
       title: 'Bestätigung nicht möglich',
-      body: 'Dieser Start braucht eine Bestätigung, die gerade nicht angezeigt werden kann. Halte deine Karte erneut an.',
+      body: 'Dieser Start braucht eine Bestätigung, die gerade nicht angezeigt werden kann. Bitte halten Sie Ihre Karte erneut an.',
     },
   },
   STEP_EXPIRED: {
     en: { title: 'Confirmation expired', body: 'The confirmation took too long. Please start again.' },
-    de: { title: 'Bestätigung abgelaufen', body: 'Die Bestätigung hat zu lange gedauert. Bitte starte erneut.' },
+    de: { title: 'Bestätigung abgelaufen', body: 'Die Bestätigung hat zu lange gedauert. Bitte starten Sie erneut.' },
   },
   STEP_UNKNOWN: {
     en: {
@@ -49,7 +49,7 @@ const TEXTS: Record<HostReasonCode, Record<ReaderUiLanguage, { title: string; bo
     },
     de: {
       title: 'Bestätigung nicht mehr gültig',
-      body: 'Diese Bestätigung wurde schon verwendet oder ersetzt. Bitte starte erneut.',
+      body: 'Diese Bestätigung wurde schon verwendet oder ersetzt. Bitte starten Sie erneut.',
     },
   },
 };
