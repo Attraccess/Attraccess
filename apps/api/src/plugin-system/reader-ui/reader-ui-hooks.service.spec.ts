@@ -193,3 +193,82 @@ describe('ReaderUiHooksService', () => {
     });
   });
 });
+
+describe('ReaderUiHooksService.runSessionEnd', () => {
+  const ctx = { resourceId: 3, userId: 7, sessionId: 11, origin: 'reader' as const };
+  const choice = (overrides: Record<string, unknown> = {}) => ({
+    decision: 'choose' as const,
+    choice: {
+      stepKey: 'free-rest',
+      title: 'Free the rest?',
+      body: 'Release your booking',
+      choices: [
+        { id: 'keep', label: 'Keep' },
+        { id: 'free', label: 'Free' },
+      ],
+      defaultOnTimeout: 'keep',
+      onAnswer: jest.fn(),
+      ...overrides,
+    },
+  });
+
+  function setupEnd(hooks: Record<string, () => unknown>) {
+    const registry = {
+      preStartHooks: () => [],
+      sessionEndHooks: () => Object.entries(hooks).map(([plugin, hook]) => ({ plugin, hook })),
+    };
+    const settings = { failurePolicy: jest.fn().mockResolvedValue('fail-closed') };
+    const alerts = {
+      onCleared: jest.fn(),
+      raise: jest.fn().mockResolvedValue({}),
+      clearWhere: jest.fn().mockResolvedValue(undefined),
+    };
+    const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+    return new ReaderUiHooksService(registry as never, settings as never, alerts as never, audit as never);
+  }
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('returns null when no hook asks a question', async () => {
+    const service = setupEnd({ a: () => ({ decision: 'none' }) });
+    await expect(service.runSessionEnd(ctx)).resolves.toBeNull();
+  });
+
+  it('returns null when there are no hooks', async () => {
+    await expect(setupEnd({}).runSessionEnd(ctx)).resolves.toBeNull();
+  });
+
+  it('returns the first valid choice with its plugin', async () => {
+    const service = setupEnd({ a: () => choice() });
+    await expect(service.runSessionEnd(ctx)).resolves.toMatchObject({ plugin: 'a', result: { decision: 'choose' } });
+  });
+
+  it.each([
+    ['no choices', { choices: [] }],
+    [
+      'too many choices',
+      { choices: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, label: id })), defaultOnTimeout: 'a' },
+    ],
+    ['default not among the choices', { defaultOnTimeout: 'nope' }],
+    ['choices not an array', { choices: undefined }],
+  ])('ignores an invalid choice (%s)', async (_name, overrides) => {
+    const service = setupEnd({ a: () => choice(overrides) });
+    await expect(service.runSessionEnd(ctx)).resolves.toBeNull();
+  });
+
+  it('skips a failing hook and falls through to the next plugin', async () => {
+    const service = setupEnd({
+      broken: () => {
+        throw new Error('down');
+      },
+      b: () => choice(),
+    });
+    await expect(service.runSessionEnd(ctx)).resolves.toMatchObject({ plugin: 'b' });
+  });
+
+  it('uses the second plugin when the first returns an invalid choice', async () => {
+    const service = setupEnd({ a: () => choice({ choices: [] }), b: () => choice() });
+    await expect(service.runSessionEnd(ctx)).resolves.toMatchObject({ plugin: 'b' });
+  });
+});
