@@ -2,6 +2,7 @@
 // FEATURE: api-ui
 
 #include "../api.hpp"
+#include "../../display/ui/ui_step_parse.hpp"
 #include "../../display/ui/ui_text.hpp"
 #include "../../platform.hpp"
 
