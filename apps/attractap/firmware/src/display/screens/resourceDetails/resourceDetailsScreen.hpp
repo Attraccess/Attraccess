@@ -64,6 +64,7 @@ public:
     // for long (measured: 8 nodes ~15 ms, a full set of slots > 25 ms).
     void refreshUiSlots(bool defer = false);
     uint32_t uiBuildMaxStepUs = 0;
+    void buildUiSlotStep(uint32_t generation, uint8_t slotIndex, uint16_t item); // async chain, see refreshUiSlots
 
 private:
     void updateFormBreadcrumb();
@@ -71,7 +72,6 @@ private:
     void createSelectField(lv_obj_t *fieldContainer, FormFieldWidget &widget, const API::ResourceUsageFormField &field);
     enum class UiSlotKind { Header, Body, Session };
     void createUiSlotContainer(UiSlotKind kind);
-    void buildUiSlotStep(uint32_t generation, uint8_t slotIndex, uint16_t item);
     uint32_t uiBuildGeneration = 0;
     lv_obj_t *uiSlotHeader = nullptr;
     lv_obj_t *uiSlotBody = nullptr;

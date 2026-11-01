@@ -7,7 +7,9 @@
 #include "../../ui/ui_builder.hpp"
 #include "../../ui/ui_slots.hpp"
 
+#ifdef ATTRACTAP_UI_SELFTEST
 #include <chrono>
+#endif
 
 namespace
 {
@@ -61,6 +63,18 @@ namespace
         uint8_t slotIndex;
         uint16_t item;
     };
+
+    void scheduleUiStep(ResourceDetailsScreen *screen, uint32_t generation, uint8_t slotIndex, uint16_t item)
+    {
+        auto *step = new DeferredStep{screen, generation, slotIndex, item};
+        lv_async_call(
+            [](void *data) {
+                auto *s = static_cast<DeferredStep *>(data);
+                s->screen->buildUiSlotStep(s->generation, s->slotIndex, s->item);
+                delete s;
+            },
+            step);
+    }
 }
 
 // Builds contribution `item` of slot `slotIndex`, then queues the next one. A newer refresh, or the screen being
@@ -76,7 +90,9 @@ void ResourceDetailsScreen::buildUiSlotStep(uint32_t generation, uint8_t slotInd
     if (!container) return;
 
     const uint32_t now = millis();
+#ifdef ATTRACTAP_UI_SELFTEST
     const auto started = std::chrono::steady_clock::now();
+#endif
     uint16_t seen = 0;
     bool more = false;
     if (visible[slotIndex])
@@ -88,8 +104,10 @@ void ResourceDetailsScreen::buildUiSlotStep(uint32_t generation, uint8_t slotInd
         });
     }
     lv_obj_set_flag(container, LV_OBJ_FLAG_HIDDEN, lv_obj_get_child_count(container) == 0);
+#ifdef ATTRACTAP_UI_SELFTEST
     const uint32_t took = (uint32_t)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started).count();
     if (took > this->uiBuildMaxStepUs) this->uiBuildMaxStepUs = took;
+#endif
 
     uint8_t nextSlot = slotIndex;
     uint16_t nextItem = item + 1;
@@ -99,14 +117,7 @@ void ResourceDetailsScreen::buildUiSlotStep(uint32_t generation, uint8_t slotInd
         nextItem = 0;
     }
     if (nextSlot >= 3) return;
-    auto *step = new DeferredStep{this, generation, nextSlot, nextItem};
-    lv_async_call(
-        [](void *data) {
-            auto *s = static_cast<DeferredStep *>(data);
-            s->screen->buildUiSlotStep(s->generation, s->slotIndex, s->item);
-            delete s;
-        },
-        step);
+    scheduleUiStep(this, generation, nextSlot, nextItem);
 }
 
 void ResourceDetailsScreen::refreshUiSlots(bool defer)
@@ -126,14 +137,7 @@ void ResourceDetailsScreen::refreshUiSlots(bool defer)
             lv_obj_clean(c);
             lv_obj_add_flag(c, LV_OBJ_FLAG_HIDDEN);
         }
-        auto *step = new DeferredStep{this, this->uiBuildGeneration, 0, 0};
-        lv_async_call(
-            [](void *data) {
-                auto *s = static_cast<DeferredStep *>(data);
-                s->screen->buildUiSlotStep(s->generation, s->slotIndex, s->item);
-                delete s;
-            },
-            step);
+        scheduleUiStep(this, this->uiBuildGeneration, 0, 0);
         return;
     }
     fillSlot(this->uiSlotHeader, id, ui::SlotId::DetailsHeader, true, now);

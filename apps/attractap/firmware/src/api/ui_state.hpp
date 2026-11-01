@@ -27,13 +27,20 @@ protected:
     // dropped record forces a reconnect (which clears every slot), so a burst of slot updates must not answer in a burst.
     struct DeferredUiReply
     {
-        std::string type;
-        std::string payloadJson;
+        bool isReport; // UI_RENDER_REPORT, otherwise ACK_<ackType>
+        bool rendered;
+        char ackType[24]; // type after "ACK_"
+        char slot[28];
+        char key[28];
+        char reason[16];
         uint32_t messageId;
+        uint32_t resourceId;
     };
     static constexpr uint32_t UI_REPLY_SPACING_MS = 25;
-    static constexpr size_t UI_REPLY_QUEUE_MAX = 64;
-    std::deque<DeferredUiReply> uiReplies;
+    static constexpr size_t UI_REPLY_QUEUE_MAX = 32;
+    DeferredUiReply uiReplies[UI_REPLY_QUEUE_MAX];
+    size_t uiReplyHead = 0;
+    size_t uiReplyCount = 0;
     static constexpr uint8_t UI_REPLY_BURST = 4;      // sent immediately per window, the rest paced
     static constexpr uint32_t UI_REPLY_WINDOW_MS = 100;
     uint32_t uiReplyLastMs = 0;

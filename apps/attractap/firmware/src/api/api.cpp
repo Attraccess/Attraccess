@@ -74,14 +74,16 @@ void API::loop()
         this->processIncomingMessage(next.c_str(), next.size());
     }
 #endif
-    if (!uiReplies.empty() && millis() - uiReplyLastMs >= UI_REPLY_SPACING_MS)
+    if (uiReplyCount > 0 && millis() - uiReplyLastMs >= UI_REPLY_SPACING_MS)
     {
-        DeferredUiReply reply = std::move(uiReplies.front());
-        uiReplies.pop_front();
-        JsonDocument payloadDoc;
-        if (deserializeJson(payloadDoc, reply.payloadJson) != DeserializationError::Ok) payloadDoc.to<JsonObject>();
+        const DeferredUiReply reply = uiReplies[uiReplyHead];
+        uiReplyHead = (uiReplyHead + 1) % UI_REPLY_QUEUE_MAX;
+        uiReplyCount--;
         uiReplyFlushing = true;
-        this->sendMessage(reply.type.c_str(), payloadDoc.as<JsonObject>(), reply.messageId);
+        if (reply.isReport)
+            this->sendUiRenderReport(reply.resourceId, reply.slot, reply.key, reply.rendered, reply.reason[0] ? reply.reason : nullptr);
+        else
+            this->sendAck(reply.ackType, reply.messageId);
         uiReplyFlushing = false;
         uiReplyLastMs = millis();
     }
@@ -136,12 +138,30 @@ bool API::sendMessage(const char *type, JsonObject payload, uint32_t messageId)
             uiReplyWindowStartMs = nowMs;
             uiReplyWindowCount = 0;
         }
-        if (!uiReplies.empty() || uiReplyWindowCount >= UI_REPLY_BURST)
+        if (uiReplyCount > 0 || uiReplyWindowCount >= UI_REPLY_BURST)
         {
-            if (uiReplies.size() >= UI_REPLY_QUEUE_MAX) uiReplies.pop_front();
-            std::string json;
-            serializeJson(payload, json);
-            uiReplies.push_back({type, std::move(json), messageId});
+            if (uiReplyCount >= UI_REPLY_QUEUE_MAX)
+            {
+                uiReplyHead = (uiReplyHead + 1) % UI_REPLY_QUEUE_MAX; // drop the oldest
+                uiReplyCount--;
+            }
+            DeferredUiReply reply{};
+            reply.messageId = messageId;
+            reply.isReport = strcmp(type, "UI_RENDER_REPORT") == 0;
+            if (reply.isReport)
+            {
+                reply.resourceId = payload["resourceId"] | 0u;
+                reply.rendered = strcmp(payload["status"] | "", "rendered") == 0;
+                snprintf(reply.slot, sizeof(reply.slot), "%s", payload["slot"] | "");
+                snprintf(reply.key, sizeof(reply.key), "%s", payload["key"] | "");
+                snprintf(reply.reason, sizeof(reply.reason), "%s", payload["reason"] | "");
+            }
+            else
+            {
+                snprintf(reply.ackType, sizeof(reply.ackType), "%s", type + 4);
+            }
+            uiReplies[(uiReplyHead + uiReplyCount) % UI_REPLY_QUEUE_MAX] = reply;
+            uiReplyCount++;
             return true;
         }
         uiReplyWindowCount++;
