@@ -4,6 +4,10 @@ import {
   AttractapCrashReport,
   AttractapCredentialEvent,
   AttractapInstallation,
+  ReaderUiAlert,
+  ReaderUiPluginSettings,
+  ReaderUiReaderSettings,
+  ReaderUiResourceSettings,
   Resource,
   ResourceBillingConfiguration,
 } from '@attraccess/database-entities';
@@ -41,6 +45,29 @@ export async function migrationReaderSeeds(dataSource: DataSource, seedTag: stri
     firmwareVersion: '1.0.0',
     coredumpSize: null,
     coredump: null,
+  }));
+
+  await ensureEntity(dataSource.getRepository(ReaderUiResourceSettings), () => ({
+    resourceId: resource.id,
+    noScreenPolicy: 'card-confirm' as const,
+  }));
+  await ensureEntity(dataSource.getRepository(ReaderUiPluginSettings), () => ({
+    resourceId: resource.id,
+    plugin: `seed-plugin-${seedTag}`,
+    widgetsEnabled: true,
+    hookFailurePolicy: 'fail-closed' as const,
+  }));
+  await ensureEntity(dataSource.getRepository(ReaderUiReaderSettings), () => ({
+    readerId: attractap.id,
+    widgetsEnabled: false,
+  }));
+  await ensureEntity(dataSource.getRepository(ReaderUiAlert), () => ({
+    kind: 'breaker-open' as const,
+    plugin: `seed-plugin-${seedTag}`,
+    readerId: null,
+    message: 'seed alert',
+    clearedAt: null,
+    clearedByUserId: null,
   }));
 
   await ensureEntity(dataSource.getRepository(AttractapCredentialEvent), () => ({
