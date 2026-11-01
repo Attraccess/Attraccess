@@ -77,6 +77,15 @@ void Display::initDeviceOverlay()
     lv_obj_set_style_text_font(Display::networkQualityLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
 }
 
+#ifdef ATTRACTAP_HOST
+std::vector<Display::ChromePart> Display::chromeParts()
+{
+    return {{"drawer grabber", Display::drawerGrabber},
+            {"network badge", Display::networkQualityContainer},
+            {"device footer", Display::deviceNameLabel ? lv_obj_get_parent(Display::deviceNameLabel) : nullptr}};
+}
+#endif
+
 void Display::refreshChromeLanguage(const std::string &language)
 {
     FirmwareI18n::refreshTree(lv_layer_top(), language);

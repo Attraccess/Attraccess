@@ -88,6 +88,15 @@ public:
     // The RGB565 frame on the panel (see IDisplayDriver::frameBuffer), or nullptr.
     // Callers hold lv_lock so no flush writes it meanwhile.
     static const uint8_t *frameBuffer();
+#ifdef ATTRACTAP_HOST
+    // Test access to the chrome on the top layer, which screens must keep clear of.
+    struct ChromePart
+    {
+        const char *name;
+        lv_obj_t *object;
+    };
+    static std::vector<ChromePart> chromeParts();
+#endif
 
     // Returns false if the display driver reported that touch hardware was not found at init.
     static bool hasTouchInput();
