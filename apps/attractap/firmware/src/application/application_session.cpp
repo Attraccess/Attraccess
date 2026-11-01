@@ -467,7 +467,7 @@ void Application::handleReaderError(const std::string &eventType, const std::str
     this->finishReaderAction(false);
     this->handleFormsCancel();
     this->showActionFailure(resourceId, code);
-  } else if (eventType == "BILLING_TOPUP") {
+  } else if (eventType == "BILLING_REQUEST_TOPUP") {
     // The top-up request was refused: back to the amount, with the reason on "Top up".
     if (this->unlocked) {
       this->beeper.errorBeep();
