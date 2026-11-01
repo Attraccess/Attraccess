@@ -76,7 +76,7 @@ describe('PreStartService', () => {
     const stepId = (await catchError(service.gateHttp(3, user, {}, web))).getResponse().stepId;
     hooks.runPreStart.mockResolvedValue({ decision: 'allow' });
     await expect(service.gateHttp(3, user, { confirmedStepIds: [stepId] }, web)).resolves.toBeUndefined();
-    const run = hooks.runPreStart.mock.calls.at(-1)![0];
+    const run = hooks.runPreStart.mock.calls.at(-1)?.[0];
     expect(run.satisfied.get('reservations')).toEqual(new Set(['k1']));
     expect(run.origin).toBe('web');
   });
@@ -93,7 +93,7 @@ describe('PreStartService', () => {
       .stepId;
     hooks.runPreStart.mockResolvedValue({ decision: 'allow' });
     await service.gateHttp(3, user, { confirmedStepIds: [second] }, web);
-    const run = hooks.runPreStart.mock.calls.at(-1)![0];
+    const run = hooks.runPreStart.mock.calls.at(-1)?.[0];
     expect(run.satisfied.get('reservations')).toEqual(new Set(['k1']));
     expect(run.satisfied.get('billing')).toEqual(new Set(['k2']));
   });
