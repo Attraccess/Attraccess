@@ -64,9 +64,19 @@ bool Display::isDrawerAvailable()
 
 void Display::updateDrawerAvailability()
 {
+    if (!Display::isActive(&Display::confirmScreen))
+        Display::rebootConfirmShown = false;
     if (Display::isDrawerAvailable())
         return;
     Display::closeDrawer();
+    // The reboot question belongs to the drawer: when the application takes the drawer
+    // away (a card is being signed in, an action started), the question goes with it.
+    if (Display::rebootConfirmShown)
+    {
+        Display::rebootConfirmShown = false;
+        Display::logger.info("Drawer became unavailable: dismissing the reboot confirmation");
+        Display::returnFromTransient();
+    }
 }
 
 void Display::initDrawer()
@@ -207,14 +217,16 @@ void Display::requestReboot()
 #endif
     };
     Display::showConfirm(std::move(config));
+    Display::rebootConfirmShown = true;
 }
 
 void Display::handleGestureSample(int16_t x, int16_t y, bool pressed)
 {
     (void)x;
 
-    // No second confirmation (or the drawer) on top of a confirmation.
-    if (Display::activeScreen == &Display::confirmScreen)
+    // No drawer over a full-screen flow (status, confirmation, top-up, forms, project picker):
+    // its reboot question would park that flow's origin while the application still waits on it.
+    if (Display::transientActive())
     {
         Display::gesturePrevPressed = pressed;
         Display::gestureCandidate = false;

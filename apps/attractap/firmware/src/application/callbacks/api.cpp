@@ -193,7 +193,7 @@ void Application::setupErrorCallbacks()
 void Application::setupActionCallbacks()
 {
 #ifdef HAS_LVGL_DISPLAY
-  // Generic action result handling: stop overlay and show success toast
+  // Action results: the completion, billing or failure screen, or the error on the button.
   this->api.setActionResultCallback([this](const API::ActionResult &result) {
     struct Payload { Application *self; API::ActionResult result; };
     auto *payload = new Payload{this, result};
@@ -201,6 +201,14 @@ void Application::setupActionCallbacks()
       auto *payload = static_cast<Payload *>(data);
       auto *self = payload->self;
       const auto &result = payload->result;
+      // While a usage form is open the server refuses its fields or pages as a START error
+      // without a request id, also in stop flows: that is the form failing, not the action.
+      if (self->unlocked && self->hasPendingFormRequest && !result.success &&
+          (result.type == "START_RESOURCE_USAGE_SESSION" || result.type == "STOP_RESOURCE_USAGE_SESSION")) {
+        self->handleFormFlowError(result);
+        delete payload;
+        return;
+      }
       if (self->unlocked && self->pendingUiAction == result.type && self->api.isCurrentResourceAction(result.requestId)) {
         if (result.success && result.type == "STOP_RESOURCE_USAGE_SESSION" &&
             self->pendingActionType == PENDING_ACTION_STOP_SESSION && result.hasDuration &&
@@ -226,14 +234,7 @@ void Application::setupActionCallbacks()
         }
         else {
           self->handleFormsCancel();
-          self->beeper.errorBeep();
-          if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
-            self->openTopUp();
-          } else if (result.error == "INSUFFICIENT_BALANCE") {
-            self->showStatus(StatusScreen::warning(FirmwareI18n::Message::InsufficientBalance, FirmwareI18n::readerError("INSUFFICIENT_BALANCE")), returnToList);
-          } else {
-            self->showActionFailure(resourceId, result.error);
-          }
+          self->reportActionFailure(result, resourceId, returnToList);
         }
       }
       delete payload;

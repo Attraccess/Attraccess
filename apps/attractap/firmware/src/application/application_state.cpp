@@ -356,7 +356,8 @@ bool Application::processAuthenticationState()
   // waiting for its key). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
     this->finishCardAuthentication(false);
-    this->showStatus(StatusScreen::error(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapTheNfcCardAgain));
+    this->beeper.errorBeep();
+    this->showSignInFailed(FirmwareI18n::Message::PleaseTapTheNfcCardAgain);
   }
 #endif
 
@@ -420,17 +421,21 @@ void Application::renderResourceState()
   if (!this->pendingUiAction.empty() && !this->hasPendingFormRequest &&
       now - this->pendingUiStartedAt > 60000) {
     const uint32_t resourceId = this->pendingUiResourceId;
+    const bool returnToList = this->returnToListAfterAction;
     this->finishReaderAction(false);
     this->handleFormsCancel();
-    this->showActionFailure(resourceId, "ACTION_NOT_CONFIRMED", FirmwareI18n::Message::ActionNotConfirmed);
+    this->showActionFailure(resourceId, "ACTION_NOT_CONFIRMED", FirmwareI18n::Message::ActionNotConfirmed, returnToList);
   }
   // Finishing an action starts a new refresh timer; do not subtract its newer
   // timestamp from the earlier sample and wrap the unsigned elapsed duration.
   now = millis();
   if (this->waitingForResourceRefresh && now - this->pendingUiStartedAt > 30000) {
     this->logoutReader();
-    // The message first; leaving it routes to the lockscreen.
-    this->showStatus(StatusScreen::warning(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus), true);
+    // The message first; leaving it (or tapping a card) routes to the signed-out screen.
+    this->beeper.errorBeep();
+    StatusScreen::Config config = StatusScreen::warning(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus);
+    config.purpose = StatusScreen::Purpose::StatusUnavailable;
+    this->showStatus(std::move(config), true);
   }
   if (this->unlocked) {
     uint32_t effectivePause = this->accumulatedPauseMs;
@@ -466,10 +471,13 @@ void Application::renderResourceState()
   if (this->statusHeld && this->routingKey() == this->statusHoldKey) return;
   // The top-up screen owns the reader while someone is signed in.
   if (this->state == APPLICATION_STATE_TOP_UP && this->unlocked) return;
+  // A status screen left without a screen to return to: show what the state dictates.
+  const bool reroute = this->rerouteRequested;
+  this->rerouteRequested = false;
   if (!this->resourceIsSelected) {
     Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "");
     const auto target = this->unlocked ? APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED : APPLICATION_STATE_RESOURCE_LIST;
-    if (this->state != target) {
+    if (this->state != target || reroute) {
       this->state = target;
       Display::transitionToScreen(&Display::resourceListScreen);
       if (!this->unlocked && !this->cardAuthenticationPending) this->nfc.enableCardDetection();
@@ -477,7 +485,7 @@ void Application::renderResourceState()
     return;
   }
   if (!this->unlocked) {
-    if (this->state == APPLICATION_STATE_LOCKED) {
+    if (this->state == APPLICATION_STATE_LOCKED && !reroute) {
       if (!this->cardAuthenticationPending && now - this->timeOfResourceSelectionMs > this->RESOURCE_SELECTION_TIMEOUT_MS) {
         this->resourceIsSelected = false;
         this->selectedResourceId = 0;
@@ -488,7 +496,7 @@ void Application::renderResourceState()
     Display::transitionToScreen(&Display::lockscreen, [this] { this->nfc.enableCardDetection(); });
     return;
   }
-  if (this->state != APPLICATION_STATE_UNLOCKED) {
+  if (this->state != APPLICATION_STATE_UNLOCKED || reroute) {
     this->state = APPLICATION_STATE_UNLOCKED;
     Display::transitionToScreen(&Display::resourceDetailsScreen);
   }

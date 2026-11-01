@@ -387,7 +387,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
                                    strcmp(eventType, "MASS_INTRODUCTION_END") == 0;
 
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
-    // Background stats failures must not interrupt start/stop controls with a popup.
+    // Background stats failures must not interrupt start/stop controls with an error.
     const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
     if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
         !isMassIntroductionEvent && inboundDoc["data"]["payload"].is<JsonObject>())

@@ -140,7 +140,7 @@ void Application::loop() {
   this->api.loop();
 
 #ifdef HAS_LVGL_DISPLAY
-  // processState mutates LVGL (screen transitions, popups, screen setters);
+  // processState mutates LVGL (screen transitions, status screens, screen setters);
   // rendering runs on LvglTask, so serialize with lv_lock (recursive).
   lv_lock();
   this->processState();
