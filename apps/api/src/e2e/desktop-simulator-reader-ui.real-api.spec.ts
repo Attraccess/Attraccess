@@ -344,7 +344,7 @@ describe('reader UI against an isolated real API and the desktop simulator', () 
       expiresAt = Date.now() + 6_000;
       useHook({
         readerUi: {
-          getSlotContributions: (ctx) =>
+          getSlotContributions: () =>
             Date.now() < expiresAt
               ? [
                   {
