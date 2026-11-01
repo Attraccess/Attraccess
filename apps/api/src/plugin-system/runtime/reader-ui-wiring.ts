@@ -5,17 +5,20 @@ import type { ReaderUiContributions } from './reader-ui-load';
 
 type ReaderUiRegistryPort = ReaderUiRegistry;
 
-const pending = new Map<string, ReaderUiContributions>();
+/** Every loaded plugin's contributions. Kept for the process: the bootstrap builds (and closes) a throwaway Nest app before the real one. */
+const queued = new Map<string, ReaderUiContributions>();
 const pendingFailures: Array<{ pluginName: string; hasAccessHooks: boolean; error: Error }> = [];
 let registryRef: ReaderUiRegistryPort | null = null;
 
 /**
  * Plugins load while the module graph is built, before the host registry exists. Contributions
- * and load failures are queued here and handed over by ReaderUiWiring on module init.
+ * and load failures are queued here and handed over by ReaderUiWiring on module init. Closing an
+ * app only unregisters from its own registry: a context that is created and closed before the
+ * real one must not drop the queued contributions.
  */
 export function queueReaderUiContributions(pluginName: string, contributions: ReaderUiContributions): void {
-  if (registryRef) registryRef.register(pluginName, contributions);
-  else pending.set(pluginName, contributions);
+  queued.set(pluginName, contributions);
+  registryRef?.register(pluginName, contributions);
 }
 
 export function queueReaderUiLoadFailure(pluginName: string, hasAccessHooks: boolean, error: Error): void {
@@ -29,12 +32,11 @@ export function invalidateReaderUi(pluginName: string, scope: { resourceId?: num
 }
 
 export function unregisterReaderUi(pluginName: string): void {
-  pending.delete(pluginName);
   registryRef?.unregister(pluginName);
 }
 
 export function resetReaderUiWiring(): void {
-  pending.clear();
+  queued.clear();
   pendingFailures.length = 0;
   registryRef = null;
 }
@@ -53,11 +55,10 @@ export class ReaderUiWiring implements OnModuleInit {
       this.logger.debug('Reader UI registry is not part of this host');
       return;
     }
-    for (const [name, contributions] of pending) {
+    for (const [name, contributions] of queued) {
       registryRef.register(name, contributions);
       this.logger.log(`Registered reader UI contributions from plugin ${name}`);
     }
-    pending.clear();
     for (const failure of pendingFailures) {
       registryRef.reportLoadFailure(failure.pluginName, failure.hasAccessHooks, failure.error);
     }

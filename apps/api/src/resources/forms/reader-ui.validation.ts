@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import {
-  READER_UI_COMPONENTS,
   READER_UI_ICONS,
   READER_UI_LIMITS,
   READER_UI_RESERVED_STATUS_STRINGS,
