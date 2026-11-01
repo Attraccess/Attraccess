@@ -26,7 +26,7 @@ void ReaderWorkflow::testTimeouts()
         assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         assert(label(lv_screen_active(), "Status wird geladen"));
         assert(label(lv_screen_active(), "Aktion nicht bestätigt"));
-        Display::clearNotice(); active = true; list();
+        clearStatus(); active = true; list();
         assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
         std::cout << "PASS action pauses the real 30-second login timeout" << std::endl;
         click("Abmelden");
@@ -41,9 +41,12 @@ void ReaderWorkflow::testTimeouts()
             pump();
         }
         pump(30500);
-        assert(lv_screen_active() == Display::resourceListScreen.getScreen() && !State::getApiState().userAuthenticated);
+        // The message first, on a screen of its own; leaving it lands on the signed-out list.
+        assert(lv_screen_active() == Display::statusScreen.getScreen() && !State::getApiState().userAuthenticated);
         assert(label(lv_screen_active(), "Status nicht verfügbar"));
-        Display::clearNotice();
+        display.capture(output, "status-unavailable");
+        clearStatus();
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         std::cout << "PASS status timeout on the details screen explains itself on the list" << std::endl;
         // The top-up screen is open while the status refresh never arrives. After the 30-second
         // window the reader signs out, the screen is replaced and the reason is shown on the
@@ -57,10 +60,11 @@ void ReaderWorkflow::testTimeouts()
         }
         assert(lv_screen_active() == Display::topUpScreen.getScreen());
         pump(30500);
-        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+        assert(lv_screen_active() == Display::statusScreen.getScreen());
         assert(label(lv_screen_active(), "Status nicht verfügbar"));
         assert(!label(lv_screen_active(), "Unzureichendes Guthaben") && !State::getApiState().userAuthenticated);
-        Display::clearNotice();
+        clearStatus();
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         std::cout << "PASS status timeout replaces the top-up screen and explains itself" << std::endl;
         // The ordinary session timeout keeps its semantics on the top-up screen: it signs out and replaces it.
         active = false; login(); click("Start");
@@ -75,7 +79,7 @@ void ReaderWorkflow::testTimeouts()
         pump(30500);
         assert(lv_screen_active() == Display::resourceListScreen.getScreen() && !State::getApiState().userAuthenticated);
         assert(!label(lv_screen_active(), "Unzureichendes Guthaben") && !label(lv_screen_active(), "Status nicht verfügbar"));
-        Display::clearNotice();
+        clearStatus();
         std::cout << "PASS session timeout replaces the top-up screen" << std::endl;
         nfc.setPresent(0, true); pump(); nfc.setPresent(0, false); pump();
         // The waiting card-key request also rejects a competing web approval.
@@ -83,8 +87,9 @@ void ReaderWorkflow::testTimeouts()
         assert(lv_screen_active() != Display::supervisionScreen.getScreen());
         server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})"); pump();
         pump(31050);
+        assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Anmeldung fehlgeschlagen"));
+        clearStatus();
         assert(lv_screen_active() == Display::resourceListScreen.getScreen());
         assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Abmelden")));
-        assert(label(lv_screen_active(), "Anmeldung fehlgeschlagen"));
         std::cout << "PASS lifted card authentication expires and recovers" << std::endl;
     }

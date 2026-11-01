@@ -19,3 +19,12 @@ void ResourceDetailsScreen::hideActionProgress()
    this->actionInProgress = false;
 }
 void ResourceDetailsScreen::hideActionProgressVisual() { actionOverlay.hide(); }
+bool ResourceDetailsScreen::showActionError(const FirmwareI18n::Text &text)
+{
+   if (!this->activeActionButton)
+   {
+      return false;
+   }
+   this->actionError.show(this->activeActionButton, text);
+   return true;
+}

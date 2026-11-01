@@ -3,6 +3,7 @@
 #include "clock/wall_clock.hpp"
 #include "profile_store.hpp"
 #include "virtual_rfid.hpp"
+#include "../layout-check.hpp"
 #include <cassert>
 #include <chrono>
 #include <cstring>
@@ -70,8 +71,17 @@ public:
         for (int y = area->y1; y <= area->y2; ++y)
             for (int x = area->x1; x <= area->x2; ++x) pixels[y * 480 + x] = *source++;
     }
+    // Every capture is also a layout check: nothing visible may overlap, touch the chrome or leave the display.
+    void expectCleanLayout(const char *name) {
+        lv_refr_now(nullptr);
+        const auto problems = LayoutCheck::problems();
+        for (const auto &problem : problems)
+            std::fprintf(stderr, "LAYOUT %s [%s]: %s\n", name, State::getActiveLanguage().c_str(), problem.c_str());
+        if (!problems.empty() && !std::getenv("LAYOUT_REPORT")) throw std::runtime_error(std::string("Layout problems on ") + name);
+    }
     void capture(const std::filesystem::path &directory, const char *name) {
         lv_obj_invalidate(lv_screen_active()); lv_refr_now(nullptr);
+        expectCleanLayout(name);
         if (directory.empty()) return;
         std::filesystem::create_directories(directory);
         std::ofstream file(directory / (std::string(name) + ".rgba"), std::ios::binary);

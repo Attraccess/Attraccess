@@ -73,8 +73,6 @@ enum class Message {
     YourBalanceIsTooLowForThisActionPleaseTopUpYourBalance,
     AmountEur,
     TopUp,
-    PleaseEnterAnAmount,
-    PleaseEnterAValidAmount,
     PleaseContinueAtThePaymentTerminal,
     TapNfcCardOrOpenAResource,
     IntroductionRequired,
@@ -188,6 +186,7 @@ enum class Message {
     NetworkPoor,
     NetworkOffline,
     Api,
+    Ok,
     ProjectName,
     InUseBy,
     Pagination,
@@ -268,6 +267,14 @@ enum class Message {
     PairingRemovedAskingAgain,
     ServerCouldNotBeVerified,
     SecureConnectionFailed,
+    SomethingWentWrong,
+    ErrorCode,
+    ActionFailedTapToRetry,
+    ProjectsCouldNotBeLoaded,
+    TryAgain,
+    TheReaderWillPowerOffNow,
+    AmountMissing,
+    AmountInvalid,
     Count
 };
 struct Entry { Message id; const char *de; const char *en; };
@@ -343,8 +350,6 @@ inline constexpr Entry catalog[] = {
     {Message::YourBalanceIsTooLowForThisActionPleaseTopUpYourBalance, "Ihr Guthaben reicht nicht aus, um die Aktion auszuführen. Bitte laden Sie Ihr Guthaben auf.", "Your balance is too low for this action. Please top up your balance."},
     {Message::AmountEur, "Betrag (EUR)", "Amount (EUR)"},
     {Message::TopUp, "Aufladen", "Top up"},
-    {Message::PleaseEnterAnAmount, "Bitte Betrag eingeben.", "Please enter an amount."},
-    {Message::PleaseEnterAValidAmount, "Bitte gültigen Betrag eingeben.", "Please enter a valid amount."},
     {Message::PleaseContinueAtThePaymentTerminal, "Bitte am Zahlungsterminal fortfahren ...", "Please continue at the payment terminal ..."},
     {Message::TapNfcCardOrOpenAResource, "RFID-Karte auflegen oder Ressource öffnen", "Tap RFID card or open a resource"},
     {Message::IntroductionRequired, "Einweisung fehlt", "Introduction required"},
@@ -459,6 +464,7 @@ inline constexpr Entry catalog[] = {
     {Message::NetworkPoor, "! NET", "! NET"},
     {Message::NetworkOffline, "x NET", "x NET"},
     {Message::Api, "API", "API"},
+    {Message::Ok, "OK", "OK"},
     {Message::ProjectName, "Projekt: {0}", "Project: {0}"},
     {Message::InUseBy, "In Verwendung: {0}", "In use: {0}"},
     {Message::Pagination, "Seite {0} von {1}", "Page {0} of {1}"},
@@ -558,6 +564,14 @@ inline constexpr Entry catalog[] = {
     {Message::PairingRemovedAskingAgain, "Das Lesegerät fordert gleich eine neue Freigabe an", "The reader asks for a new approval shortly"},
     {Message::ServerCouldNotBeVerified, "Server konnte nicht überprüft werden", "Server could not be verified"},
     {Message::SecureConnectionFailed, "Sichere Verbindung fehlgeschlagen. Server oder Proxy prüfen.", "Secure connection failed. Check the server or proxy."},
+    {Message::SomethingWentWrong, "Etwas ist schiefgelaufen", "Something went wrong"},
+    {Message::ErrorCode, "Code: {0}", "Code: {0}"},
+    {Message::ActionFailedTapToRetry, "! Fehler - erneut tippen", "! Failed - tap to retry"},
+    {Message::ProjectsCouldNotBeLoaded, "Projekte konnten nicht geladen werden", "Projects could not be loaded"},
+    {Message::TryAgain, "Erneut versuchen", "Try again"},
+    {Message::TheReaderWillPowerOffNow, "Das Lesegerät wird jetzt ausgeschaltet.", "The reader will power off now."},
+    {Message::AmountMissing, "Betrag fehlt", "Amount missing"},
+    {Message::AmountInvalid, "Betrag ungültig", "Invalid amount"},
 };
 
 } // namespace FirmwareI18n

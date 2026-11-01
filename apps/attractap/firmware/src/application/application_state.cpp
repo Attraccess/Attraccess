@@ -356,7 +356,7 @@ bool Application::processAuthenticationState()
   // waiting for its key). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
     this->finishCardAuthentication(false);
-    Display::showErrorNotice(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapTheNfcCardAgain);
+    this->showStatus(StatusScreen::error(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapTheNfcCardAgain));
   }
 #endif
 
@@ -419,16 +419,18 @@ void Application::renderResourceState()
   uint32_t now = millis();
   if (!this->pendingUiAction.empty() && !this->hasPendingFormRequest &&
       now - this->pendingUiStartedAt > 60000) {
+    const uint32_t resourceId = this->pendingUiResourceId;
     this->finishReaderAction(false);
     this->handleFormsCancel();
-    Display::showErrorNotice(FirmwareI18n::Message::ActionNotConfirmed, FirmwareI18n::Message::ResourceStatusIsBeingRefreshedCheckItBeforeTryingAgain);
+    this->showActionFailure(resourceId, "ACTION_NOT_CONFIRMED", FirmwareI18n::Message::ActionNotConfirmed);
   }
   // Finishing an action starts a new refresh timer; do not subtract its newer
   // timestamp from the earlier sample and wrap the unsigned elapsed duration.
   now = millis();
   if (this->waitingForResourceRefresh && now - this->pendingUiStartedAt > 30000) {
     this->logoutReader();
-    Display::showErrorNotice(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus);
+    // The message first; leaving it routes to the lockscreen.
+    this->showStatus(StatusScreen::warning(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus), true);
   }
   if (this->unlocked) {
     uint32_t effectivePause = this->accumulatedPauseMs;
@@ -442,7 +444,7 @@ void Application::renderResourceState()
     this->selectedResourceChanged = false;
   }
   if (this->projectsOfUserResponseUpdated && this->unlocked) {
-    Display::resourceDetailsScreen.setProjects(this->projectsOfUserResponse);
+    Display::projectSelectScreen.setProjects(this->projectsOfUserResponse);
     Display::resourceDetailsScreen.setSelectedProject(this->selectedProjectId, this->selectedProjectName.c_str());
     this->projectsOfUserResponseUpdated = false;
   }
@@ -458,8 +460,11 @@ void Application::renderResourceState()
     }
     return;
   }
-  // The top-up screen owns the reader while someone is signed in. The session timeout above still
-  // runs; once it logs out, state is no longer pinned here and routing below replaces the screen.
+  // A status screen the application raised holds its place until the state it was raised in
+  // changes (logout, timeout, ...). The session timeout above keeps running meanwhile.
+  if (this->statusHeld && !Display::transientActive()) this->statusHeld = false;
+  if (this->statusHeld && this->routingKey() == this->statusHoldKey) return;
+  // The top-up screen owns the reader while someone is signed in.
   if (this->state == APPLICATION_STATE_TOP_UP && this->unlocked) return;
   if (!this->resourceIsSelected) {
     Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "");

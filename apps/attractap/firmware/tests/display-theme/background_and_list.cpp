@@ -50,7 +50,7 @@ void testBackgroundScreens(Renderer &renderer)
         renderer.capture("lockscreen-english-available");
         lock.setUsageInfo(true, "Müller", false);
         auto *usage = requireObject(guard.root, &lv_label_class, "In use: Müller");
-        expect(lv_obj_get_style_text_font(usage, LV_PART_MAIN) == &attractap_font_montserrat_latin1_18,
+        expect(lv_obj_get_style_text_font(usage, LV_PART_MAIN) == &attractap_font_montserrat_latin1_14,
                "Lockscreen active username uses a Latin-1 font");
         lock.setUsageInfo(false, "", true);
         requireObject(guard.root, &lv_label_class, "Under maintenance");
@@ -167,7 +167,18 @@ void testAuthenticatedList(Renderer &renderer)
     resources.items[0].hasActiveUsage = true;
     std::strcpy(resources.items[0].activeUser, "Alex Example");
     list.setResourceList(resources);
-    list.showSuccessToast(FirmwareI18n::Message::UsageStarted);
+    // A failed action shows in place on the row's button; the row keeps its size.
+    lv_area_t buttonArea;
+    auto *startButton = lv_obj_get_parent(requireObject(guard.root, &lv_label_class, "Öffnen"));
+    lv_obj_update_layout(guard.root);
+    lv_obj_get_coords(startButton, &buttonArea);
+    expect(list.showActionError(3, FirmwareI18n::Message::ActionFailedTapToRetry), "The row's action button shows the error");
+    lv_area_t errorArea;
+    lv_obj_update_layout(guard.root);
+    lv_obj_get_coords(startButton, &errorArea);
+    expect(errorArea.x1 == buttonArea.x1 && errorArea.y1 == buttonArea.y1 && errorArea.x2 == buttonArea.x2 && errorArea.y2 == buttonArea.y2,
+           "The error state keeps the button's geometry");
+    requireObject(guard.root, &lv_label_class, "! Fehler - erneut tippen");
     renderer.capture("att-880-action-complete");
     resources.items[0].hasActiveUsage = false;
     resources.items[0].requiresSupervisor = true;

@@ -36,11 +36,34 @@ While the reader processes an action, the controls are temporarily unavailable. 
 
 To record machine usage against a project, tap the machine's name to open its details, tap **Projekt wählen** (Choose project), and select your project before starting there. Starting directly from the list records the usage without a project.
 
-### Messages and low balance
+### Results, messages and low balance
 
-Results and problems, such as a failed sign-in or an action that did not work, appear as a short notice at the top of the screen you are on. Tap the notice to dismiss it, or wait: it hides itself after a few seconds. A notice belongs to the screen it appears on, so it also disappears when the reader moves to another screen. If the reader signs you out, for example because the machine status could not be refreshed, the reason is shown on the signed-out screen it returns to instead. A notice covers part of the screen while it is shown, so tap it to reach what is underneath; everything outside the notice keeps working.
+The reader reports results on a full screen of its own and returns to the screen you were on:
 
-If an action fails because your balance is too low and the reader has a payment terminal, the reader opens the **Unzureichendes Guthaben** (Insufficient balance) screen. Enter the amount in whole euros, tap **Aufladen** (Top up) and continue at the payment terminal. **Abbrechen** (Cancel) returns you to where you were. If the reader signs you out meanwhile, the screen is replaced like any other.
+- A green check with **Nutzung gestartet** (Usage started) or **Nutzung beendet** (Usage ended) and the resource name. Tap anywhere to continue, or wait a moment.
+- The **Gesamtkosten dieser Sitzung** (Total cost of this session) screen with the amount, when a stop is billed. Tap **OK** or wait.
+- A red cross with **Anmeldung fehlgeschlagen** (Sign-in failed) when the card is not accepted. Tap **OK** or hold your card against the reader again.
+- A warning with an explanation, for example **Status nicht verfügbar** (Status unavailable) after the reader signed you out because the machine status did not load. Tap **OK** to get to the sign-in screen.
+
+![Usage started: a green check with the resource name](../../_media/attractap/usage-started.png)
+
+![Total cost of the session on its own screen](../../_media/attractap/billing-total.png)
+
+![Sign-in failed: a red cross, the reason and an OK button](../../_media/attractap/sign-in-failed.png)
+
+When a single button's action fails, for example **Start**, the button itself turns red for a few seconds and says that it failed, or why. Nothing else on the screen moves. Tap the button again to retry. If the button is no longer there, the reader shows a **Etwas ist schiefgelaufen** (Something went wrong) screen with the error code and a **Zurück** (Back) button.
+
+![A failed Start button, in red and in place](../../_media/attractap/button-error.png)
+
+![Something went wrong, with the error code and a Back button](../../_media/attractap/generic-error.png)
+
+If an action fails because your balance is too low and the reader has a payment terminal, the reader opens the **Unzureichendes Guthaben** (Insufficient balance) screen. Type the amount in whole euros on the number pad, tap **Aufladen** (Top up) and continue at the payment terminal. **Abbrechen** (Cancel) returns you to where you were. Usage forms and the project selection are screens of their own as well. If the reader signs you out meanwhile, whichever screen is open is replaced like any other.
+
+![The top-up screen with its number pad](../../_media/attractap/top-up.png)
+
+Rebooting from the maintenance drawer and powering the reader off (on devices with a power button) ask for confirmation on a full screen with **Abbrechen** and the action next to each other.
+
+![Reboot confirmation with Abbrechen and Neustart side by side](../../_media/attractap/reboot-confirm.png)
 
 ## View live usage stats
 

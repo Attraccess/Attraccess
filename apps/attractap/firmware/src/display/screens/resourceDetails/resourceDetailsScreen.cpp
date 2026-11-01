@@ -1,4 +1,5 @@
 #include "resourceDetailsScreen.hpp"
+#include "../../shared/screenChrome.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
@@ -16,17 +17,15 @@ void ResourceDetailsScreen::init()
       return;
    }
    this->screen = lv_obj_create(NULL);
-   // Detail panels can exceed the display height, especially with many tutors.
-   lv_obj_add_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
-   lv_obj_set_scroll_dir(this->screen, LV_DIR_VER);
-   lv_obj_set_scrollbar_mode(this->screen, LV_SCROLLBAR_MODE_AUTO);
+   lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
    DisplayTheme::applyScreen(this->screen);
    lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // The body scrolls above the device footer on the top layer, never under it.
+   lv_obj_set_style_pad_bottom(this->screen, ScreenChrome::Bottom, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    sessionHeader.create(this->screen, [this] {
       if (!this->actionInProgress && this->buttonClickCallback)
@@ -36,6 +35,17 @@ void ResourceDetailsScreen::init()
          this->buttonClickCallback({this, BUTTON_CLICK_TYPE_BACK, {}});
    });
    sessionHeader.setUser(this->loginUsernameCache);
+
+   // Detail panels can exceed the display height, especially with many tutors: they scroll in the body.
+   this->body = lv_obj_create(this->screen);
+   lv_obj_remove_style_all(this->body);
+   lv_obj_set_size(this->body, lv_pct(100), 0);
+   lv_obj_set_flex_grow(this->body, 1);
+   lv_obj_add_flag(this->body, LV_OBJ_FLAG_SCROLLABLE);
+   lv_obj_set_scroll_dir(this->body, LV_DIR_VER);
+   lv_obj_set_scrollbar_mode(this->body, LV_SCROLLBAR_MODE_AUTO);
+   lv_obj_set_flex_flow(this->body, LV_FLEX_FLOW_COLUMN);
+   lv_obj_set_flex_align(this->body, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
    this->createResourceHeader();
 
@@ -117,14 +127,12 @@ void ResourceDetailsScreen::setUserDetails(UserDetails userDetails)
 void ResourceDetailsScreen::onScreenLeave()
 {
    this->hideActionProgressVisual();
-   this->hideProjectsModal();
-   this->hideFormsModal();
+   this->actionError.clear();
 }
 
 void ResourceDetailsScreen::destroy()
 {
-   this->disposeProjectsModal();
-   this->disposeFormsModal();
+   this->actionError.clear();
 
    if (this->screen)
    {
@@ -132,6 +140,7 @@ void ResourceDetailsScreen::destroy()
    }
 
    this->screen = nullptr;
+   this->body = nullptr;
    sessionHeader.detach();
    actionOverlay.detach();
    this->sessionDetailsContainer = nullptr;
@@ -144,11 +153,6 @@ void ResourceDetailsScreen::destroy()
    this->projectsButton = nullptr;
    this->projectsButtonLabel = nullptr;
    this->clearProjectButton = nullptr;
-   this->projectsModalPanel = nullptr;
-   this->projectsListContainer = nullptr;
-   this->projectsPaginationLabel = nullptr;
-   this->projectsPrevButton = nullptr;
-   this->projectsNextButton = nullptr;
    this->startSessionButton = nullptr;
    this->startSessionButtonLabel = nullptr;
    this->stopSessionButton = nullptr;
@@ -156,20 +160,6 @@ void ResourceDetailsScreen::destroy()
    this->stopOtherUserNote = nullptr;
    this->doorControls = nullptr;
    this->flowButtonsContainer = nullptr;
-   this->formsModalPanel = nullptr;
-   this->formsModalContent = nullptr;
-   this->formsModalList = nullptr;
-   this->formsModalErrorLabel = nullptr;
-   this->formsModalProgressLabel = nullptr;
-   this->formsEditorOverlay = nullptr;
-   this->formsEditorTitleLabel = nullptr;
-   this->formsEditorTextarea = nullptr;
-   this->formsEditorSpacer = nullptr;
-   this->formsEditorKeyboard = nullptr;
-   this->formsBackButton = nullptr;
-   this->formsNextButton = nullptr;
-   this->formsNextLabel = nullptr;
-   this->formsNextSpinner = nullptr;
    this->elapsedTime = nullptr;
    this->usageStatsContainer = nullptr;
    this->meterValue = nullptr;
@@ -184,9 +174,6 @@ void ResourceDetailsScreen::destroy()
    this->activeActionButton = nullptr;
    this->activeActionLabel = nullptr;
    this->activeActionSpinner = nullptr;
-   this->formsModalMeta = nullptr;
-   this->formsModalPage = nullptr;
-   this->formFieldWidgetCount = 0;
 }
 void ResourceDetailsScreen::applyCachedState()
 {

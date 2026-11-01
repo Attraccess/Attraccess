@@ -2,6 +2,8 @@
 #include "sdl_display.hpp"
 #include "display/display.hpp"
 
+#include "../layout-check.hpp"
+
 #include <cassert>
 #include <cmath>
 #include <cstring>
@@ -113,27 +115,21 @@ inline lv_area_t coordsOf(lv_obj_t *object)
     return area;
 }
 
-inline bool overlaps(const lv_area_t &a, const lv_area_t &b)
+// Fails with a readable list when anything on the active screen overlaps, leaves the display
+// or touches the chrome on the top layer (see layout-check.hpp).
+inline void expectCleanLayout(const char *what)
 {
-    return a.x1 <= b.x2 && b.x1 <= a.x2 && a.y1 <= b.y2 && b.y1 <= a.y2;
-}
-
-// The chrome on the top layer: network badge (top right) and device footer (bottom).
-inline void expectClearOfChrome(lv_obj_t *object)
-{
-    assert(object);
-    auto *badge = findLabel(lv_layer_top(), "x NET");
-    auto *deviceName = findLabel(lv_layer_top(), "Attractap");
-    assert(badge && deviceName);
-    const lv_area_t area = coordsOf(object);
-    assert(!overlaps(area, coordsOf(lv_obj_get_parent(badge))));
-    assert(!overlaps(area, coordsOf(lv_obj_get_parent(deviceName))));
+    const auto problems = LayoutCheck::problems();
+    for (const auto &problem : problems) std::fprintf(stderr, "LAYOUT %s [%s]: %s\n", what, State::getActiveLanguage().c_str(), problem.c_str());
+    assert(problems.empty());
 }
 
 void testSessionSummaryLifecycle();
-void testFormDrafts(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testFormScreens(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testTopUpScreen(SdlDisplay &display, const std::filesystem::path &screenshots);
-void testScreenNotices(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testScreenLayouts();
+void testStatusScreens(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testConfirmScreen(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testPowerOffConfirm(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testPendingApproval(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshots);

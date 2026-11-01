@@ -4,6 +4,8 @@
 #include "../../../api/api.hpp"
 #include "../../shared/sessionHeader.hpp"
 #include "../../shared/actionOverlay.hpp"
+#include "../../shared/buttonError.hpp"
+#include <map>
 #include "resourceListAction.hpp"
 #include <functional>
 
@@ -25,7 +27,8 @@ public:
     void extendSessionTimeoutBy(uint32_t delta) { sessionHeader.extend(delta); }
     void showActionProgress(const FirmwareI18n::Text &title, const FirmwareI18n::Text &resource = {});
     void hideActionProgress();
-    void showSuccessToast(const FirmwareI18n::Text &message);
+    // Shows `text` in place on the action button of the resource's row; false when the row has none.
+    bool showActionError(uint32_t resourceId, const FirmwareI18n::Text &text);
 private:
     lv_obj_t *screen = nullptr, *logo = nullptr, *loginContainer = nullptr, *resourceContainer = nullptr, *footer = nullptr;
     lv_obj_t *clockHeader = nullptr, *clockTime = nullptr, *clockWeekday = nullptr, *clockDate = nullptr;
@@ -34,14 +37,18 @@ private:
     ActionOverlay overlay;
     API::ResourceList cachedResourceList{};
     std::string username;
-    FirmwareI18n::Text actionTitle, actionResource, successMessage;
-    uint32_t successUntil = 0;
+    FirmwareI18n::Text actionTitle, actionResource;
+    ButtonError rowError;
+    std::map<uint32_t, lv_obj_t *> actionButtons;
+    uint32_t errorResourceId = 0;
+    FirmwareI18n::Text errorText;
+    uint32_t errorUntil = 0;
     bool busy = false;
-    bool footerShowsSuccess = false;
     std::function<void(const API::ResourceBrief &)> selectionCallback;
     std::function<void(const API::ResourceBrief &, ResourceListAction)> actionCallback;
     std::function<void()> logoutCallback;
     void renderRows();
+    bool applyActionError();
     void createClockHeader();
     void updateClockHeader();
     void addResourceListItem(const API::ResourceBrief &resource);

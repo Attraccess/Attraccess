@@ -14,9 +14,10 @@ void ReaderWorkflow::testSupervisionAndCorrelation()
     assert(server.last("UNLOCK_DOOR")["data"]["payload"]["resourceId"].as<int>() == 3);
     server.push("UNLOCK_DOOR", R"({"error":"Denied by test"})"); pump(); list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
-    assert(label(lv_screen_active(), "Something went wrong. Please try again."));
+    // The failed door action shows in place on the "Öffnen" button, whose row stays as it was.
+    assert(label(lv_screen_active(), "! Fehler - erneut tippen"));
     display.capture(output, "10-action-error");
-    Display::clearNotice();
+    clearStatus();
     active = false; supervised = true; list(); click("Aufsicht");
     assert(lv_screen_active() == Display::supervisionScreen.getScreen());
     assert(server.last("SUPERVISION_REQUEST")["data"]["payload"]["resourceId"].as<int>() == 1);
@@ -41,6 +42,7 @@ void ReaderWorkflow::testSupervisionAndCorrelation()
     assert(label(lv_screen_active(), "Starte Sitzung"));
     server.push("START_RESOURCE_USAGE_SESSION", "{\"success\":true,\"requestId\":" + std::to_string(currentRequestId) + "}");
     pump(); active = true; list();
+    clearStatus(); // "Nutzung gestartet"
     // A delayed pre-action snapshot cannot overwrite the completed usage.
     server.push("RESOURCE_LIST", R"({"revision":1,"authenticatedUsername":"Alex","resources":[]})"); pump();
     assert(label(lv_screen_active(), "Stop"));
@@ -50,6 +52,7 @@ void ReaderWorkflow::testSupervisionAndCorrelation()
     active = false; list(true, false, false);
     const auto refreshId = server.last("REQUEST_RESOURCE_LIST")["data"]["payload"]["requestId"].as<uint32_t>();
     server.push("RESOURCE_LIST", "{\"revision\":" + std::to_string(listVersion - 1) + ",\"requestId\":" + std::to_string(refreshId) + ",\"resources\":[]}"); pump();
+    clearStatus(); // "Nutzung beendet"
     assert(label(lv_screen_active(), "Start"));
     assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Status wird geladen")));
     active = true; list();

@@ -249,59 +249,62 @@ void testPowerOffLocales(Renderer &renderer)
     auto *root = lv_obj_create(nullptr);
     ScreenGuard guard(root);
     unsigned confirmed = 0;
+    // The router is not part of this harness: present the confirmation the way Display does.
+    ConfirmScreen confirmScreen;
+    PowerOffButton::setConfirmPresenter(
+        [&](ConfirmScreen::Config config) {
+            confirmScreen.configure(std::move(config));
+            confirmScreen.init();
+            lv_screen_load(confirmScreen.getScreen());
+        },
+        [&] { lv_screen_load(root); });
     auto *button = PowerOffButton::create(root, [&] { ++confirmed; });
     lv_obj_send_event(button, LV_EVENT_CLICKED, nullptr);
-    expect(!lv_obj_is_visible(button) && lv_obj_get_screen(button) == root, "Production power-off confirm replaces the button in place");
-    FirmwareI18n::refreshTree(root, "en");
-    requireObject(root, &lv_label_class, "Power off");
+    expect(lv_screen_active() == confirmScreen.getScreen(), "Power-off asks on a full-screen confirmation");
+    FirmwareI18n::refreshTree(confirmScreen.getScreen(), "en");
+    requireObject(confirmScreen.getScreen(), &lv_label_class, "Power off");
     renderer.capture("power-off-english");
-    FirmwareI18n::refreshTree(root, "de");
-    requireObject(root, &lv_label_class, "Ausschalten");
+    FirmwareI18n::refreshTree(confirmScreen.getScreen(), "de");
+    requireObject(confirmScreen.getScreen(), &lv_label_class, "Ausschalten");
     renderer.capture("power-off-german");
-    auto *cancel = lv_obj_get_parent(requireObject(root, &lv_label_class, "Abbrechen"));
+    auto *cancel = lv_obj_get_parent(requireObject(confirmScreen.getScreen(), &lv_label_class, "Abbrechen"));
     lv_obj_send_event(cancel, LV_EVENT_CLICKED, nullptr);
-    expect(lv_obj_is_visible(button) && confirmed == 0, "Cancel does not power off");
+    // Cancel is the router's business (Display); here only the callback must not fire.
+    expect(confirmed == 0, "Cancel does not power off");
+    lv_screen_load(root);
     lv_obj_send_event(button, LV_EVENT_CLICKED, nullptr);
-    auto *confirm = lv_obj_get_parent(requireObject(root, &lv_label_class, "Ausschalten"));
+    auto *confirm = lv_obj_get_parent(requireObject(confirmScreen.getScreen(), &lv_label_class, "Ausschalten"));
     lv_obj_send_event(confirm, LV_EVENT_CLICKED, nullptr);
-    expect(lv_obj_is_visible(button) && confirmed == 1, "Production confirm callback fires once");
+    expect(confirmed == 1 && lv_screen_active() == root, "Production confirm callback fires once and hands the screen back");
+    confirmScreen.destroy();
 }
 
 void testFormAndProjectLocaleRefresh(Renderer &renderer)
 {
-    ResourceDetailsScreen details;
-    API::ResourceBrief resource{};
-    resource.id = 1; resource.isHealthy = true;
-    std::strcpy(resource.name, "Maintenance");
-    details.setResourceAndUsageDetails(resource);
-    details.setUserDetails({"Alex", true, true, true, false});
-    details.init();
-    ScreenGuard guard(details.getScreen(), &details);
-    const auto click = [](lv_obj_t *root, const char *caption) {
-        lv_obj_send_event(lv_obj_get_parent(requireObject(root, &lv_label_class, caption)), LV_EVENT_CLICKED, nullptr);
-    };
+    {
+    ProjectSelectScreen picker;
     API::ProjectsOfUserResponse projects{};
     projects.page = 2; projects.limit = 10; projects.total = 50; projects.count = 1;
     projects.items[0] = {42, "Maintenance %s"};
-    details.setProjects(projects);
-    click(guard.root, "Projekt wählen");
-    requireObject(guard.root, &lv_label_class, "Seite 2 von 5");
-    FirmwareI18n::refreshTree(guard.root, "en");
-    requireObject(guard.root, &lv_label_class, "Page 2 of 5");
-    requireObject(guard.root, &lv_label_class, "Maintenance %s");
+    picker.setProjects(projects);
+    picker.begin();
+    ScreenGuard pickerGuard(picker.getScreen(), &picker);
+    requireObject(pickerGuard.root, &lv_label_class, "Seite 2 von 5");
+    FirmwareI18n::refreshTree(pickerGuard.root, "en");
+    requireObject(pickerGuard.root, &lv_label_class, "Page 2 of 5");
+    requireObject(pickerGuard.root, &lv_label_class, "Maintenance %s");
     renderer.capture("projects-english-page-two");
-    FirmwareI18n::refreshTree(guard.root, "de");
-    requireObject(guard.root, &lv_label_class, "Seite 2 von 5");
+    FirmwareI18n::refreshTree(pickerGuard.root, "de");
+    requireObject(pickerGuard.root, &lv_label_class, "Seite 2 von 5");
     renderer.capture("projects-german-page-two");
-    click(guard.root, "Maintenance %s");
-    details.setSelectedProject(42, "Maintenance %s");
-    FirmwareI18n::refreshTree(guard.root, "en");
-    requireObject(guard.root, &lv_label_class, "Project: Maintenance %s");
+    } // The picker's guard goes before the forms' own: it restores the screen it found.
+
+    FormsScreen forms;
     API::ResourceUsageFormRequest request{};
     request.resourceId = 1; request.action = API::ResourceUsageFormActionType::START;
     request.resourceName = "Maintenance"; request.formCount = 1;
     request.forms[0] = {1, "Notes %s", 1};
-    details.showFormsModal(request);
+    forms.showForm(request);
     API::ResourceUsageFormFieldsPage page{};
     page.formId = 1; page.fieldCount = 1;
     page.fields[0].id = 5; page.fields[0].name = "Maintenance";
@@ -309,15 +312,11 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     page.fields[0].isRequired = true;
     page.fields[0].options.text.hasPlaceholder = true;
     page.fields[0].options.text.placeholder = "Maintenance";
-    details.renderFormField(page, false, true, 2, 3);
-    // The forms view is a floating page inside the screen. Look inside it, so the
-    // resource's own name behind it is not mistaken for the field.
-    lv_obj_t *forms = nullptr;
-    for (uint32_t i = 0; i < lv_obj_get_child_count(guard.root); ++i) {
-        auto *child = lv_obj_get_child(guard.root, i);
-        if (lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING) && findObject(child, &lv_label_class, "Absenden")) forms = child;
-    }
-    expect(forms != nullptr, "Forms view is a child of the details screen");
+    forms.renderFormField(page, false, true, 2, 3);
+    ScreenGuard guard(forms.getScreen(), &forms);
+    const auto click = [](lv_obj_t *root, const char *caption) {
+        lv_obj_send_event(lv_obj_get_parent(requireObject(root, &lv_label_class, caption)), LV_EVENT_CLICKED, nullptr);
+    };
     click(guard.root, "Absenden");
     requireObject(guard.root, &lv_label_class, "Pflichtfeld");
     FirmwareI18n::refreshTree(guard.root, "en");
@@ -328,7 +327,7 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     result.formId = 1; result.errorCount = 1;
     result.errors[0].fieldId = 5; result.errors[0].code = "INVALID_NUMBER";
     result.errors[0].message = "Raw diagnostic %s";
-    details.showFormPageErrors(result);
+    forms.showFormPageErrors(result);
     FirmwareI18n::refreshTree(guard.root, "en");
     requireObject(guard.root, &lv_label_class, "Please enter a valid number");
     renderer.capture("form-server-error-english");
@@ -336,7 +335,7 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     requireObject(guard.root, &lv_label_class, "Bitte eine gültige Zahl eingeben");
     renderer.capture("form-server-error-german");
     result.errors[0].code = "UNKNOWN_FIELD";
-    details.showFormPageErrors(result);
+    forms.showFormPageErrors(result);
     FirmwareI18n::refreshTree(guard.root, "de");
     auto *unknownFieldError = requireObject(guard.root, &lv_label_class, "Eingabe ungültig.");
     renderer.capture("form-unknown-field-german");
@@ -346,7 +345,7 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     renderer.capture("form-unknown-field-english");
     for (const auto *code : {"FUTURE_ERROR", ""}) {
         result.errors[0].code = code;
-        details.showFormPageErrors(result);
+        forms.showFormPageErrors(result);
         for (const auto *locale : {"de", "en"}) {
             FirmwareI18n::refreshTree(guard.root, locale);
             requireObject(guard.root, &lv_label_class, "Invalid input.");
@@ -355,7 +354,7 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     result.errors[0].fieldId = 999; // Not on the displayed page.
     for (const auto *code : {"FUTURE_ERROR", ""}) {
         result.errors[0].code = code;
-        details.showFormPageErrors(result);
+        forms.showFormPageErrors(result);
         for (const auto *locale : {"de", "en"}) {
             FirmwareI18n::refreshTree(guard.root, locale);
             requireObject(guard.root, &lv_label_class, "Invalid input.");
@@ -364,8 +363,7 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     }
     FirmwareI18n::refreshTree(guard.root, "de");
     renderer.capture("form-unmatched-error-english-fallback");
-    click(forms, "Maintenance");
-    // The project picker's search editor owns a keyboard too; the open editor's is the visible one.
+    click(guard.root, "Maintenance");
     const std::function<lv_obj_t *(lv_obj_t *)> visibleKeyboard = [&](lv_obj_t *object) -> lv_obj_t * {
         if (lv_obj_check_type(object, &lv_keyboard_class)) {
             bool shown = true; // Layout may not have run yet, so look at the flags rather than the area.
@@ -376,7 +374,7 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
             if (auto *found = visibleKeyboard(lv_obj_get_child(object, i))) return found;
         return nullptr;
     };
-    auto *keyboard = visibleKeyboard(forms);
+    auto *keyboard = visibleKeyboard(guard.root);
     expect(keyboard != nullptr, "Open form editor shows its keyboard");
     auto *field = lv_keyboard_get_textarea(keyboard);
     expect(field != nullptr, "Production editor connects its textarea");
@@ -392,7 +390,7 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     FirmwareI18n::refreshTree(guard.root, "de");
     requireObject(guard.root, &lv_label_class, "value %s\nMaintenance");
     renderer.capture("form-german-entered-preview");
-    details.hideFormsModal();
+    forms.resetForm();
 }
 
 void testFirmwareUpdateLocales(Renderer &renderer)

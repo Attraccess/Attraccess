@@ -36,11 +36,34 @@ Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig n
 
 Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen der Maschine deren Details. Tippen Sie auf **Projekt wählen**, wählen Sie Ihr Projekt aus und starten Sie die Nutzung dort. Wenn Sie direkt aus der Liste starten, wird die Nutzung ohne Projekt erfasst.
 
-### Meldungen und niedriges Guthaben
+### Ergebnisse, Meldungen und niedriges Guthaben
 
-Ergebnisse und Probleme, etwa eine fehlgeschlagene Anmeldung oder eine Aktion, die nicht geklappt hat, erscheinen als kurze Meldung am oberen Rand des aktuellen Bildschirms. Tippen Sie auf die Meldung, um sie zu schließen, oder warten Sie ab: Sie verschwindet nach einigen Sekunden von selbst. Eine Meldung gehört zu dem Bildschirm, auf dem sie erscheint, und verschwindet deshalb auch, wenn der Leser zu einem anderen Bildschirm wechselt. Meldet der Leser Sie ab, etwa weil der Status der Maschine nicht aktualisiert werden konnte, sehen Sie den Grund stattdessen auf dem Bildschirm, den der Leser nach der Abmeldung zeigt. Solange eine Meldung angezeigt wird, verdeckt sie einen Teil des Bildschirms. Tippen Sie darauf, um den verdeckten Bereich wieder zu bedienen; alles außerhalb der Meldung bleibt bedienbar.
+Der Leser zeigt Ergebnisse auf einem eigenen Vollbild und kehrt danach zu Ihrem Bildschirm zurück:
 
-Schlägt eine Aktion wegen zu geringen Guthabens fehl und hat der Leser ein Zahlungsterminal, öffnet der Leser den Bildschirm **Unzureichendes Guthaben**. Geben Sie den Betrag in ganzen Euro ein, tippen Sie auf **Aufladen** und fahren Sie am Zahlungsterminal fort. **Abbrechen** bringt Sie zurück. Meldet der Leser Sie währenddessen ab, wird der Bildschirm wie jeder andere ersetzt.
+- Ein grüner Haken mit **Nutzung gestartet** oder **Nutzung beendet** und dem Ressourcennamen. Tippen Sie irgendwo, um fortzufahren, oder warten Sie einen Moment.
+- Der Bildschirm **Gesamtkosten dieser Sitzung** mit dem Betrag, wenn ein Stopp abgerechnet wird. Tippen Sie auf **OK** oder warten Sie.
+- Ein rotes Kreuz mit **Anmeldung fehlgeschlagen**, wenn die Karte nicht akzeptiert wird. Tippen Sie auf **OK** oder halten Sie Ihre Karte erneut an den Leser.
+- Eine Warnung mit Erklärung, zum Beispiel **Status nicht verfügbar**, wenn der Leser Sie abgemeldet hat, weil der Maschinenstatus nicht geladen wurde. Tippen Sie auf **OK**, um zur Anmeldung zu gelangen.
+
+![Nutzung gestartet: ein grüner Haken mit dem Ressourcennamen](../../_media/attractap/usage-started.png)
+
+![Gesamtkosten der Sitzung auf einem eigenen Bildschirm](../../_media/attractap/billing-total.png)
+
+![Anmeldung fehlgeschlagen: ein rotes Kreuz, der Grund und eine OK-Schaltfläche](../../_media/attractap/sign-in-failed.png)
+
+Schlägt die Aktion einer einzelnen Schaltfläche fehl, zum Beispiel **Start**, färbt sich die Schaltfläche selbst einige Sekunden rot und nennt den Fehler oder den Grund. Sonst bewegt sich nichts auf dem Bildschirm. Tippen Sie erneut darauf, um es noch einmal zu versuchen. Ist die Schaltfläche nicht mehr da, zeigt der Leser den Bildschirm **Etwas ist schiefgelaufen** mit dem Fehlercode und einer Schaltfläche **Zurück**.
+
+![Eine fehlgeschlagene Start-Schaltfläche, rot und an Ort und Stelle](../../_media/attractap/button-error.png)
+
+![Etwas ist schiefgelaufen, mit Fehlercode und einer Zurück-Schaltfläche](../../_media/attractap/generic-error.png)
+
+Schlägt eine Aktion wegen zu geringen Guthabens fehl und hat der Leser ein Zahlungsterminal, öffnet der Leser den Bildschirm **Unzureichendes Guthaben**. Geben Sie den Betrag in ganzen Euro auf dem Ziffernblock ein, tippen Sie auf **Aufladen** und fahren Sie am Zahlungsterminal fort. **Abbrechen** bringt Sie zurück. Auch Nutzungsformulare und die Projektauswahl sind eigene Bildschirme. Meldet der Leser Sie währenddessen ab, wird der geöffnete Bildschirm wie jeder andere ersetzt.
+
+![Der Bildschirm zum Aufladen mit Ziffernblock](../../_media/attractap/top-up.png)
+
+Der Neustart aus dem Wartungsmenü und das Ausschalten des Lesers (bei Geräten mit Ein/Aus-Taste) fragen auf einem eigenen Vollbild nach, mit **Abbrechen** und der Aktion nebeneinander.
+
+![Neustart-Rückfrage mit Abbrechen und Neustart nebeneinander](../../_media/attractap/reboot-confirm.png)
 
 ## Live-Statistiken ansehen
 

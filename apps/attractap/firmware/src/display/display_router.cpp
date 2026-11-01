@@ -10,6 +10,7 @@
 // retirement. Display::loop only asks this router to advance it.
 
 IScreen *Display::activeScreen = nullptr;
+IScreen *Display::parkedOrigin = nullptr;
 std::vector<IScreen *> Display::pendingDestroyScreens;
 uint32_t Display::transitionStartTime = 0;
 bool Display::transitionComplete = true;
@@ -65,12 +66,28 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     // Reused screens may have been hidden when the locale last changed.
     FirmwareI18n::refreshTree(targetRoot, State::getActiveLanguage());
 
-    const bool sameScreen = screen == Display::activeScreen;
-
     IScreen *previousScreen = Display::activeScreen;
     if (previousScreen)
     {
         previousScreen->onScreenLeave();
+    }
+
+    // A transient screen parks the screen under it, state and all. Whatever
+    // else replaces the transient lets that origin unload as usual.
+    if (!screen->parksOrigin() && Display::parkedOrigin && Display::parkedOrigin != screen &&
+        Display::parkedOrigin->shouldAutoUnload() &&
+        std::find(Display::pendingDestroyScreens.begin(), Display::pendingDestroyScreens.end(), Display::parkedOrigin) ==
+            Display::pendingDestroyScreens.end())
+    {
+        Display::pendingDestroyScreens.push_back(Display::parkedOrigin);
+    }
+    if (!screen->parksOrigin())
+    {
+        Display::parkedOrigin = nullptr;
+    }
+    else if (previousScreen && !previousScreen->parksOrigin())
+    {
+        Display::parkedOrigin = previousScreen;
     }
 
     Display::activeScreen = screen;
@@ -85,8 +102,6 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     }
 
     Display::updateNetworkQualityOverlay();
-    // Keeps, carries or drops the notice; the rule lives in display_notice.cpp.
-    Display::routeNotice(sameScreen);
 
     lv_screen_load_anim(targetRoot, Display::TRANSITION_ANIMATION, Display::TRANSITION_DURATION, 0, false);
     Display::transitionStartTime = millis();
@@ -96,7 +111,7 @@ void Display::transitionToScreen(IScreen *screen, std::function<void()> onTransi
     // its callback is cancelled rather than being invoked for the wrong screen.
     Display::onTransitionComplete = onTransitionComplete;
 
-    if (previousScreen && previousScreen != screen && previousScreen->shouldAutoUnload())
+    if (previousScreen && previousScreen != screen && previousScreen != Display::parkedOrigin && previousScreen->shouldAutoUnload())
     {
         bool alreadyQueued =
             std::find(Display::pendingDestroyScreens.begin(),

@@ -42,6 +42,14 @@ public:
     /** Whether the LVGL tree exists; default infers via getScreen(). */
     virtual bool isLoaded() { return getScreen() != nullptr; }
 
+    /**
+     * Screens that are shown on top of the screen the user was on (status,
+     * confirm, top-up, forms, project picker). The router keeps that origin
+     * loaded, with its state, until the user returns to it; any other
+     * transition lets it unload as usual.
+     */
+    virtual bool parksOrigin() const { return false; }
+
     /** Screens may opt-out of auto-unload (e.g. lockscreen). */
     virtual bool shouldAutoUnload() const { return true; }
 };

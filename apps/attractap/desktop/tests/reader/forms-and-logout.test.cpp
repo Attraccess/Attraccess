@@ -13,18 +13,17 @@ void ReaderWorkflow::testFormsAndLogout()
     assert(server.last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["resourceId"].as<int>() == 1);
     server.push("RESOURCE_USAGE_FORM_REQUEST", R"({"resourceId":1,"action":"end","forms":[{"id":8,"name":"Check","fieldCount":1}]})");
     pump();
-    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    // The form is a screen of its own over the details.
+    assert(lv_screen_active() == Display::formsScreen.getScreen());
     assert(server.count("RESOURCE_USAGE_FORM_GET_FIELDS") > 0);
     display.capture(output, "06-required-end-form");
     server.push("RESOURCE_USAGE_FORM_FIELDS", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"totalFieldCount":1,"fields":[{"id":9,"name":"Sichtprüfung","type":"text","isRequired":true,"value":"OK"}]})");
     pump();
     display.capture(output, "06b-required-form-ready");
-    click(LV_SYMBOL_CLOSE);
+    click("Abbrechen");
     assert(server.count("RESOURCE_USAGE_FORM_CANCEL") > 0);
-    { // The X closed the form.
-        auto *field = label(Display::resourceDetailsScreen.getScreen(), "Sichtprüfung *");
-        assert(!field || !lv_obj_is_visible(field));
-    }
+    // Cancel left the form screen; the details it was raised over are shown again.
+    assert(lv_screen_active() != Display::formsScreen.getScreen() && !label(lv_screen_active(), "Sichtprüfung *"));
     list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Stop"));

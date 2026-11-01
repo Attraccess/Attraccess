@@ -89,8 +89,8 @@ void ReaderWorkflow::testProjectSearch()
 
     // Reopening while a search is pending asks again instead of showing the old results.
     search("laser", "werk");
-    click(LV_SYMBOL_CLOSE);
-    assert(!shown("Projekt auswählen")); // The X closed the picker.
+    click("Abbrechen");
+    assert(!shown("Projekt auswählen")); // Cancel closed the picker.
     const auto requestsBeforeReopen = server.count("PROJECTS_OF_USER");
     click("Projekt wählen");
     assert(server.count("PROJECTS_OF_USER") == requestsBeforeReopen + 1);
@@ -101,5 +101,6 @@ void ReaderWorkflow::testProjectSearch()
                                         R"(,"projects":[{"id":42,"name":"Werkstattprojekt"}]})"); pump();
     click("Werkstattprojekt");
     assert(label(lv_screen_active(), "Projekt: Werkstattprojekt"));
-    assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Werkstattprojekt")));
+    // Picking returns to the details; the picker is gone.
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen() && !label(lv_screen_active(), "Werkstattprojekt"));
 }

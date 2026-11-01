@@ -1,4 +1,5 @@
 #include "display.hpp"
+#include "shared/powerOff/powerOffButton.hpp"
 #include "theme.hpp"
 #include "i18n.hpp"
 #include <vector>
@@ -26,7 +27,7 @@
 // collaborators live in sibling translation units:
 //   display_router.cpp  - screen routing (transitionToScreen)
 //   display_input.cpp   - flush + touch input dispatch
-//   display_notice.cpp  - screen-owned notices
+//   display_transient.cpp - status/confirm screens shown over another screen
 //   display_overlay.cpp - persistent device-info overlay
 
 static std::string s_renderedLanguage;
@@ -37,6 +38,8 @@ void Display::refreshVisibleTextForLanguageChange()
     if (language == s_renderedLanguage) return;
     s_renderedLanguage = language;
     if (Display::activeScreen) FirmwareI18n::refreshTree(Display::activeScreen->getScreen(), language);
+    // The drawer, device footer and network badge live on LVGL's top layer,
+    // outside the active screen tree.
     Display::refreshChromeLanguage(language);
 }
 
@@ -69,31 +72,29 @@ ResetScreen Display::resetScreen;
 SupervisionScreen Display::supervisionScreen;
 MassIntroductionScreen Display::massIntroductionScreen;
 FirmwareUpdateScreen Display::firmwareUpdateScreen;
+StatusScreen Display::statusScreen;
+ConfirmScreen Display::confirmScreen;
 TopUpScreen Display::topUpScreen;
+FormsScreen Display::formsScreen;
+ProjectSelectScreen Display::projectSelectScreen;
 #ifdef DEMO_MODE
 DemoSettingsScreen Display::demoSettingsScreen;
 #endif
 
 std::function<void(int16_t, int16_t)> Display::touchCallback = nullptr;
-ScreenNotice Display::notice;
-Display::PendingNotice Display::lastNotice;
-bool Display::noticeRaisedThisPass = false;
-bool Display::noticeAwaitsScreen = false;
 
 lv_obj_t *Display::drawerBackdrop = nullptr;
 lv_obj_t *Display::drawerGrabber = nullptr;
 lv_obj_t *Display::drawerPanel = nullptr;
 bool Display::drawerOpen = false;
-lv_obj_t *Display::drawerActions = nullptr;
-lv_obj_t *Display::drawerRebootConfirm = nullptr;
 std::function<void()> Display::onOpenSettingsCallback = nullptr;
 std::function<bool()> Display::drawerAvailableCallback = nullptr;
 bool Display::gestureCandidate = false;
 bool Display::gesturePrevPressed = false;
 int16_t Display::gestureStartY = 0;
 
-// Set during setup() if touch hardware was not found; the notice is shown on the first loop() tick
-// to ensure LVGL is fully running before creating objects.
+// Set during setup() if touch hardware was not found; popup is shown on the first loop() tick
+// to ensure LVGL is fully running before creating overlay objects.
 bool Display::touchWarningPending = false;
 
 #if LV_USE_LOG != 0
@@ -217,16 +218,20 @@ void Display::loop()
     // the duration (recursive FreeRTOS mutex, also taken by lv_timer_handler).
     lv_lock();
 
-    if (Display::touchWarningPending)
+    // Shown over the first real screen: the boot screen is replaced within seconds.
+    if (Display::touchWarningPending && Display::activeScreen && Display::activeScreen != &Display::bootScreen &&
+        !Display::transientActive())
     {
         Display::touchWarningPending = false;
-        Display::showTouchUnavailableNotice();
+        Display::showStatus(StatusScreen::warning(FirmwareI18n::Message::TouchUnavailable,
+                                                  FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot, false));
     }
 
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
     refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
+
 
     lv_unlock();
 }
@@ -254,6 +259,10 @@ void Display::setup()
 #endif
 {
     Display::logger.info("Initializing");
+#ifdef HAS_POWER_BUTTON
+    PowerOffButton::setConfirmPresenter([](ConfirmScreen::Config config) { Display::showConfirm(std::move(config)); },
+                                        [] { Display::returnFromTransient(); });
+#endif
 
 #ifdef ATTRACTAP_HOST
     Display::driver = &hostDriver;

@@ -67,15 +67,12 @@ void DemoSettingsScreen::init()
 
 #ifdef HAS_POWER_BUTTON
     // Power-off button (V4 hardware with SYS_EN latch only).
-    _powerOffButton = PowerOffButton::create(actions, [this]() { if (_powerOffCb) _powerOffCb(); });
+    PowerOffButton::create(actions, [this]() { if (_powerOffCb) _powerOffCb(); });
     // Give the translated heading its own row when the additional power
     // control would make the title and action group overlap.
     lv_obj_set_height(titleBar, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(titleBar, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(titleBar, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-    // The inline power-off confirm wraps onto its own line below the buttons.
-    lv_obj_set_flex_flow(actions, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_style_pad_row(actions, 8, LV_PART_MAIN);
     lv_obj_set_width(title, lv_pct(100));
     lv_obj_set_width(actions, lv_pct(100));
 #endif
@@ -103,9 +100,6 @@ void DemoSettingsScreen::init()
 void DemoSettingsScreen::onScreenLeave()
 {
     hideScanOverlay();
-#ifdef HAS_POWER_BUTTON
-    PowerOffButton::hideConfirm(_powerOffButton);
-#endif
 }
 
 void DemoSettingsScreen::loop()
@@ -132,9 +126,6 @@ void DemoSettingsScreen::destroy()
     _cardList = nullptr;
     _scanOverlay = nullptr;
     _rolePicker = nullptr;
-#ifdef HAS_POWER_BUTTON
-    _powerOffButton = nullptr;
-#endif
 }
 
 #endif // DEMO_MODE

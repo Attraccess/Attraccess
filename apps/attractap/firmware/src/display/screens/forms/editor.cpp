@@ -1,5 +1,5 @@
-#include "../resourceDetailsScreen.hpp"
-#include "../../../fonts/attractap_fonts.hpp"
+#include "formsScreen.hpp"
+#include "../../fonts/attractap_fonts.hpp"
 #include <string>
 #include <functional>
 #include <lvgl.h>
@@ -8,7 +8,7 @@
 #include <cstdlib>
 #include "text.hpp"
 
-void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
+void FormsScreen::updateFieldPreview(FormFieldWidget &widget)
 {
    if (!widget.previewLabel)
    {
@@ -38,7 +38,7 @@ void ResourceDetailsScreen::updateFieldPreview(FormFieldWidget &widget)
       lv_obj_set_style_text_color(widget.previewLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
    }
 }
-void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
+void FormsScreen::openFormsEditor(uint16_t widgetIndex)
 {
    if (!this->formsEditorOverlay || !this->formsEditorTextarea || !this->formsEditorKeyboard)
    {
@@ -93,7 +93,7 @@ void ResourceDetailsScreen::openFormsEditor(uint16_t widgetIndex)
    lv_obj_clear_flag(this->formsEditorOverlay, LV_OBJ_FLAG_HIDDEN);
    lv_obj_move_foreground(this->formsEditorOverlay);
 }
-void ResourceDetailsScreen::closeFormsEditor(bool commit)
+void FormsScreen::closeFormsEditor(bool commit)
 {
    if (!this->formsEditorOverlay)
    {
@@ -123,7 +123,7 @@ void ResourceDetailsScreen::closeFormsEditor(bool commit)
    lv_obj_add_flag(this->formsEditorOverlay, LV_OBJ_FLAG_HIDDEN);
 }
 
-void ResourceDetailsScreen::createFormsEditor(lv_obj_t *overlay)
+void FormsScreen::createFormsEditor(lv_obj_t *overlay)
 {
    // Fullscreen text editor overlay: opened when a text/number preview box is
    // tapped. Solid background, textarea filling everything above the pinned
@@ -139,7 +139,7 @@ void ResourceDetailsScreen::createFormsEditor(lv_obj_t *overlay)
    lv_obj_set_size(editor, lv_pct(100), lv_pct(100));
    lv_obj_set_align(editor, LV_ALIGN_CENTER);
    DisplayTheme::applyScreen(editor);
-   // Fills the full-screen view's content area, which already leaves room for the chrome.
+   // Fills the screen's content area, which already leaves room for the chrome.
    lv_obj_set_style_pad_all(editor, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_row(editor, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_flex_flow(editor, LV_FLEX_FLOW_COLUMN);
@@ -169,7 +169,7 @@ void ResourceDetailsScreen::createFormsEditor(lv_obj_t *overlay)
    lv_obj_t *editorCancelLabel = lv_label_create(editorCancelBtn);
    FirmwareI18n::setLabel(editorCancelLabel, FirmwareI18n::Text::literal(LV_SYMBOL_CLOSE) /* i18n-data: Language-neutral LVGL icon glyph. */);
    lv_obj_center(editorCancelLabel);
-   lv_obj_add_event_cb(editorCancelBtn, &ResourceDetailsScreen::onFormsEditorCancel, LV_EVENT_CLICKED, this);
+   lv_obj_add_event_cb(editorCancelBtn, &FormsScreen::onFormsEditorCancel, LV_EVENT_CLICKED, this);
 
 
    // Textarea fills all space between header and keyboard.
@@ -194,17 +194,17 @@ void ResourceDetailsScreen::createFormsEditor(lv_obj_t *overlay)
    DisplayTheme::keyboard(this->formsEditorKeyboard);
    lv_obj_set_width(this->formsEditorKeyboard, lv_pct(100));
    lv_obj_set_height(this->formsEditorKeyboard, lv_pct(45));
-   lv_obj_add_event_cb(this->formsEditorKeyboard, &ResourceDetailsScreen::onFormsEditorKeyboardEvent, LV_EVENT_ALL, this);
+   lv_obj_add_event_cb(this->formsEditorKeyboard, &FormsScreen::onFormsEditorKeyboardEvent, LV_EVENT_ALL, this);
 
 }
 
-void ResourceDetailsScreen::onFieldPreviewClick(lv_event_t *e)
+void FormsScreen::onFieldPreviewClick(lv_event_t *e)
 {
    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
    {
       return;
    }
-   auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(e));
+   auto *self = static_cast<FormsScreen *>(lv_event_get_user_data(e));
    if (!self)
    {
       return;
@@ -225,14 +225,14 @@ void ResourceDetailsScreen::onFieldPreviewClick(lv_event_t *e)
    }
    self->openFormsEditor(widget->widgetIndex);
 }
-void ResourceDetailsScreen::onFormsEditorKeyboardEvent(lv_event_t *e)
+void FormsScreen::onFormsEditorKeyboardEvent(lv_event_t *e)
 {
    auto code = lv_event_get_code(e);
    if (code != LV_EVENT_READY && code != LV_EVENT_CANCEL)
    {
       return;
    }
-   auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(e));
+   auto *self = static_cast<FormsScreen *>(lv_event_get_user_data(e));
    if (!self)
    {
       return;
@@ -240,13 +240,13 @@ void ResourceDetailsScreen::onFormsEditorKeyboardEvent(lv_event_t *e)
    // Checkmark commits the text, keyboard-hide discards it.
    self->closeFormsEditor(code == LV_EVENT_READY);
 }
-void ResourceDetailsScreen::onFormsEditorCancel(lv_event_t *e)
+void FormsScreen::onFormsEditorCancel(lv_event_t *e)
 {
    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
    {
       return;
    }
-   auto *self = static_cast<ResourceDetailsScreen *>(lv_event_get_user_data(e));
+   auto *self = static_cast<FormsScreen *>(lv_event_get_user_data(e));
    if (!self)
    {
       return;
