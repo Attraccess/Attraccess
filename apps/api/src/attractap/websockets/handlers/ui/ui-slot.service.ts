@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
   READER_UI_LIMITS,
@@ -131,6 +132,7 @@ export class UiSlotService {
 
   private freshState(capabilities: ReaderUiCapabilities | null): UiSlotsState {
     return {
+      epoch: randomBytes(4).toString('hex'),
       capabilities,
       inflight: new Map(),
       contributions: new Map(),
@@ -160,7 +162,7 @@ export class UiSlotService {
         state.contributions.delete(ckey);
         continue;
       }
-      const wait = this.limiter.take(`${readerId}|${record.resourceId}|${record.slot}`, now);
+      const wait = this.limiter.take(`${state.epoch}|${record.resourceId}|${record.slot}`, now);
       if (wait > 0) {
         blockedFor = Math.max(blockedFor, wait);
         continue;
@@ -176,8 +178,9 @@ export class UiSlotService {
         state.contributions.set(ckey, { ...want.record, revision: have?.revision ?? 0 });
         continue;
       }
-      const wait = this.limiter.take(`${readerId}|${want.record.resourceId}|${want.record.slot}`, now);
-      if (wait > 0) {
+      // The first contribution of a slot is part of the initial sync; only updates to it are rate limited.
+      const wait = this.limiter.take(`${state.epoch}|${want.record.resourceId}|${want.record.slot}`, now);
+      if (wait > 0 && have) {
         blockedFor = Math.max(blockedFor, wait);
         continue;
       }

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 const sources = readdirSync(__dirname)
-  .filter((name) => name.endsWith('.ts') && !/\.spec\.ts$|test-helpers/.test(name))
+  .filter((name) => name.endsWith('.ts') && !/\.spec\.ts$|\.test-fixture\.ts$/.test(name))
   .map((name) => [name, readFileSync(join(__dirname, name), 'utf8')] as const);
 
 describe('handlers/ui boundaries', () => {

@@ -1,6 +1,6 @@
 import { ResourceFormAction } from '@attraccess/database-entities';
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { confirmation, lastSent, makeSocket, makeStepServices, sentTypes } from './ui-test-helpers';
+import { confirmation, lastSent, makeSocket, makeStepServices, sentTypes } from './ui-test-helpers.test-fixture';
 
 const BINDING = { resourceId: 12, action: 'start' as const, projectId: undefined, userId: 7 };
 
@@ -47,7 +47,10 @@ describe('UiStepService', () => {
     const step = issue(socket, services, { satisfied: { other: ['k0'] } });
     const result = services.steps.consumeStart(socket, step.stepId, BINDING);
     expect(result).toEqual({ ok: true, satisfied: { other: ['k0'], reservations: ['res-conflict'] } });
-    expect(services.audit.record).toHaveBeenCalledWith('ui.step_answered', expect.objectContaining({ plugin: 'reservations' }));
+    expect(services.audit.record).toHaveBeenCalledWith(
+      'ui.step_answered',
+      expect.objectContaining({ plugin: 'reservations' }),
+    );
   });
 
   it('rejects a replayed or unknown stepId', () => {
@@ -220,10 +223,16 @@ describe('UiStepService', () => {
     it('is sent with requestId 0 only to the holder of the live card session', () => {
       const services = makeStepServices();
       const socket = makeSocket();
-      expect(services.steps.offerPostStop(socket, { plugin: 'p', choice: choice(), userId: 7, resourceId: 12 })).toBe(false);
+      expect(services.steps.offerPostStop(socket, { plugin: 'p', choice: choice(), userId: 7, resourceId: 12 })).toBe(
+        false,
+      );
       services.cardSessions.issue(socket, 7, 'en');
-      expect(services.steps.offerPostStop(socket, { plugin: 'p', choice: choice(), userId: 9, resourceId: 12 })).toBe(false);
-      expect(services.steps.offerPostStop(socket, { plugin: 'p', choice: choice(), userId: 7, resourceId: 12 })).toBe(true);
+      expect(services.steps.offerPostStop(socket, { plugin: 'p', choice: choice(), userId: 9, resourceId: 12 })).toBe(
+        false,
+      );
+      expect(services.steps.offerPostStop(socket, { plugin: 'p', choice: choice(), userId: 7, resourceId: 12 })).toBe(
+        true,
+      );
       expect(lastSent(socket, 'UI_STEP_REQUEST')).toMatchObject({ requestId: 0, kind: 'choose' });
     });
 

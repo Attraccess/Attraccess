@@ -1,12 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { confirmation, lastSent, makeSocket, makeStepServices, sentTypes } from '../ui/ui-test-helpers';
+import { confirmation, lastSent, makeSocket, makeStepServices, sentTypes } from '../ui/ui-test-helpers.test-fixture';
 import { ReaderStartGate } from './reader-start-gate.service';
 
 const user = { id: 7 } as any;
 const TOUCH = { schemaVersion: 1, steps: ['confirm', 'choose', 'info'] };
 const LITE = { schemaVersion: 1, steps: ['card-confirm'] };
 
-function setup(ui: unknown, outcome: any, opts: { override?: string | null; suspended?: boolean; hooks?: boolean } = {}) {
+function setup(
+  ui: unknown,
+  outcome: any,
+  opts: { override?: string | null; suspended?: boolean; hooks?: boolean } = {},
+) {
   const services = makeStepServices();
   const preStart = {
     hasHooks: () => opts.hooks ?? true,
@@ -134,7 +138,9 @@ describe('ReaderStartGate', () => {
       jest.advanceTimersByTime(50);
       services.cardSessions.issue(socket, 7, 'en');
       preStart.evaluate.mockResolvedValue({ decision: 'allow' });
-      await expect(gate.run(socket, input({ requestId: 78, stepId: sent.stepId }))).resolves.toEqual({ kind: 'proceed' });
+      await expect(gate.run(socket, input({ requestId: 78, stepId: sent.stepId }))).resolves.toEqual({
+        kind: 'proceed',
+      });
     });
 
     it('card-confirm needs reader support, else it blocks', async () => {
@@ -144,7 +150,10 @@ describe('ReaderStartGate', () => {
 
     it('treats a crash-loop suspended reader like a reader without a screen', async () => {
       const { gate, socket } = setup(TOUCH, confirmOutcome(), { suspended: true });
-      await expect(gate.run(socket, input())).resolves.toMatchObject({ kind: 'reply', payload: { error: 'START_BLOCKED' } });
+      await expect(gate.run(socket, input())).resolves.toMatchObject({
+        kind: 'reply',
+        payload: { error: 'START_BLOCKED' },
+      });
     });
   });
 

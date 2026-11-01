@@ -47,6 +47,8 @@ export interface UiContributionRecord {
 }
 
 export interface UiSlotsState {
+  /** Fresh per authentication, so rate-limit windows of an earlier connection do not carry over. */
+  epoch: string;
   capabilities: ReaderUiCapabilities | null;
   /** Latest message id per contribution key, so a newer revision supersedes a pending retry. */
   inflight: Map<string, number>;

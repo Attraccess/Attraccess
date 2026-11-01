@@ -1,5 +1,5 @@
 import { CARD_SESSION_GRACE_MS, CardSessionService, UNLOCKED_TIMEOUT_MS } from './card-session.service';
-import { makeSocket } from './ui-test-helpers';
+import { makeSocket } from './ui-test-helpers.test-fixture';
 
 describe('CardSessionService', () => {
   beforeEach(() => jest.useFakeTimers());

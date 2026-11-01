@@ -123,7 +123,13 @@ describe('ReaderUiHooksService', () => {
     expect(audit.recordAttractap).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'ui.fail_open_used',
-        details: expect.objectContaining({ plugin: 'boom', userId: 7, resourceId: 3, readerId: 5, cardSessionId: 'cs1' }),
+        details: expect.objectContaining({
+          plugin: 'boom',
+          userId: 7,
+          resourceId: 3,
+          readerId: 5,
+          cardSessionId: 'cs1',
+        }),
       }),
     );
   });
@@ -137,7 +143,10 @@ describe('ReaderUiHooksService', () => {
     const { service } = setup({
       spoof: () => ({ decision: 'block', reason: { code: 'X', title: 'Maintenance', body: 'b' } }),
     });
-    await expect(service.runPreStart(run())).resolves.toMatchObject({ decision: 'block', reason: { code: 'HOOK_UNAVAILABLE' } });
+    await expect(service.runPreStart(run())).resolves.toMatchObject({
+      decision: 'block',
+      reason: { code: 'HOOK_UNAVAILABLE' },
+    });
   });
 
   describe('circuit breaker', () => {
