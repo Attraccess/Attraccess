@@ -15,7 +15,7 @@ void ReaderWorkflow::testSupervisionAndCorrelation()
     server.push("UNLOCK_DOOR", R"({"error":"Denied by test"})"); pump(); list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     // The failed door action shows in place on the "Öffnen" button, whose row stays as it was.
-    assert(label(lv_screen_active(), "! Fehler - erneut tippen"));
+    assert(label(lv_screen_active(), warned("Fehlgeschlagen – erneut tippen").c_str()));
     display.capture(output, "10-action-error");
     clearStatus();
     active = false; supervised = true; list(); click("Aufsicht");

@@ -81,7 +81,11 @@ void testStatusScreens(SdlDisplay &display, const std::filesystem::path &screens
             {"billing", StatusScreen::billing(FirmwareI18n::Text::literal("12.345.678.901,23 EUR") /* i18n-data: Test fixture. */, FirmwareI18n::Text::literal(longName) /* i18n-data: Test fixture. */)},
             {"warning", StatusScreen::warning(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus)},
             {"warning-no-button", StatusScreen::warning(FirmwareI18n::Message::TouchUnavailable, FirmwareI18n::Message::TouchPanelNotDetectedCheckHardwareAndReboot, false)},
-            {"generic", StatusScreen::generic(FirmwareI18n::Message::GenericError, "RESOURCE_LOCKED_BY_ANOTHER_ADMINISTRATOR_ACCOUNT")},
+            // What the application shows for an action error whose button is gone.
+            {"generic", StatusScreen::generic(FirmwareI18n::Message::PleaseTryAgain, "RESOURCE_LOCKED")},
+            {"generic-long-code", StatusScreen::generic(FirmwareI18n::Message::PleaseTryAgain, "RESOURCE_LOCKED_BY_ANOTHER_ADMINISTRATOR_ACCOUNT_FOR_MAINTENANCE_WORK")},
+            {"info", StatusScreen::info(FirmwareI18n::Message::TopUpStarted, FirmwareI18n::Message::PleaseContinueAtThePaymentTerminal)},
+            {"billing-chf", StatusScreen::billing(FirmwareI18n::Text::literal("2.90 CHF") /* i18n-data: Test fixture. */, FirmwareI18n::Text::literal("CNC") /* i18n-data: Test fixture. */)},
         };
         for (const auto &variant : variants)
         {
@@ -122,8 +126,16 @@ void testStatusScreens(SdlDisplay &display, const std::filesystem::path &screens
     Display::showStatus(std::move(timed));
     Display::loop();
     assert(lv_screen_active() == Display::statusScreen.getScreen());
-    SDL_Delay(160);
+    // Not before its time; then within a generous deadline (loaded CI runners).
+    SDL_Delay(60);
     Display::loop();
+    assert(lv_screen_active() == Display::statusScreen.getScreen());
+    const Uint64 deadline = SDL_GetTicks() + 2000;
+    while (lv_screen_active() != Display::resourceListScreen.getScreen() && SDL_GetTicks() < deadline)
+    {
+        SDL_Delay(10);
+        Display::loop();
+    }
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
 
     // Anything else that replaces it takes it away and lets the origin unload.

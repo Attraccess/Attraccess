@@ -102,6 +102,36 @@ inline lv_obj_t *label(lv_obj_t *root, const char *text) {
     return nullptr;
 }
 
+inline lv_area_t areaOf(lv_obj_t *object) {
+    lv_obj_update_layout(lv_obj_get_screen(object));
+    lv_area_t area;
+    lv_obj_get_coords(object, &area);
+    return area;
+}
+
+inline bool sameArea(const lv_area_t &a, const lv_area_t &b) {
+    return a.x1 == b.x1 && a.y1 == b.y1 && a.x2 == b.x2 && a.y2 == b.y2;
+}
+
+// The button that carries `text`: its own caption, or the error skin lying over it.
+inline lv_obj_t *buttonOf(lv_obj_t *root, const char *text) {
+    lv_obj_t *found = label(root, text);
+    while (found && !lv_obj_check_type(found, &lv_button_class)) found = lv_obj_get_parent(found);
+    return found;
+}
+
+// Whether `button` wears its in-place error skin.
+inline bool showsError(lv_obj_t *button) {
+    for (uint32_t i = 0; button && i < lv_obj_get_child_count(button); ++i) {
+        lv_obj_t *child = lv_obj_get_child(button, i);
+        if (lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING) && !lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN)) return true;
+    }
+    return false;
+}
+
+// The caption of a button in its error state: the warning sign, then the text.
+inline std::string warned(const char *text) { return std::string(LV_SYMBOL_WARNING " ") + text; }
+
 inline lv_obj_t *requireLabel(lv_obj_t *root, const char *text) {
     auto *found = label(root, text);
     if (!found)

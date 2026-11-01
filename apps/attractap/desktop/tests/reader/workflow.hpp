@@ -38,6 +38,11 @@ struct ReaderWorkflow
 
     bool active = false, supervised = false;
     uint32_t activeUsageId = 99;
+    // Who holds the Lasercutter's active session (empty: the signed-in user), whether others may
+    // take it over, and its flow buttons ({id, label}).
+    std::string activeUser;
+    bool allowTakeOver = false;
+    std::vector<std::pair<std::string, std::string>> flowButtons;
     std::string longDescription;
     lv_area_t fullDescriptionBounds{};
     lv_obj_t *drawerSettingsBeforeLogin = nullptr;
@@ -114,9 +119,16 @@ struct ReaderWorkflow
             r["type"] = id == 3 ? "door" : "machine";
             r["isHealthy"] = true;
             if (signedIn) { r["hasIntroduction"] = id != 2; r["requiresSupervisor"] = id == 1 && supervised; }
+            if (id == 1) r["allowTakeOver"] = allowTakeOver;
             if (id == 1 && active) {
                 r["activeUsageSession"]["id"] = activeUsageId;
-                r["activeUsageSession"]["user"]["username"] = username;
+                r["activeUsageSession"]["user"]["username"] = activeUser.empty() ? username : activeUser;
+                auto buttons = r["flowButtons"].to<JsonArray>();
+                for (const auto &flow : flowButtons) {
+                    auto button = buttons.add<JsonObject>();
+                    button["id"] = flow.first;
+                    button["label"] = flow.second;
+                }
                 char startTime[32];
                 const auto start = time(nullptr) - 1426;
                 std::strftime(startTime, sizeof(startTime), "%Y-%m-%dT%H:%M:%SZ", gmtime(&start));
@@ -141,7 +153,32 @@ struct ReaderWorkflow
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
         pump();
     }
+    // A real tap through the touch driver at the centre of `object`.
+    void touchCentre(lv_obj_t *object) {
+        const lv_area_t area = areaOf(object);
+        display.touch = {static_cast<int16_t>((area.x1 + area.x2) / 2), static_cast<int16_t>((area.y1 + area.y2) / 2), true};
+        pump();
+        display.touch.pressed = false;
+        pump();
+    }
+    uint32_t requestIdOf(const char *type) const { return server.last(type)["data"]["payload"]["requestId"].as<uint32_t>(); }
+    // The server's answer to a refused action: the request id and the error code.
+    void failAction(const char *type, const std::string &code) {
+        server.push(type, "{\"requestId\":" + std::to_string(requestIdOf(type)) + ",\"error\":\"" + code + "\"}");
+        pump();
+    }
+    // The pull-down gesture from the top edge.
+    void openDrawer() {
+        display.touch = {240, 10, true}; pump();
+        display.touch = {240, 150, true}; pump();
+        display.touch.pressed = false; pump();
+    }
+    bool drawerOpen() { return lv_obj_is_visible(requireLabel(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage()))); }
+    void tapCard() { nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump(); }
     void testLocalization();
+    void testButtonErrors();
+    void testFormErrors();
+    void testTransientRouting();
     void testListAndAuthentication();
     void testSessionStart();
     void testUsageStats();

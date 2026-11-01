@@ -22,7 +22,9 @@ void ReaderWorkflow::testLocalization()
         server.push("READER_LANGUAGE", std::string("{\"language\":\"") + language + "\"}");
         pump(0); // Exercise API-to-display settling without relying on elapsed time.
     };
-    // Exercise the API parser and application error callback, then refresh the status screen.
+    // Exercise the API parser and application error callback for a tapped card, then refresh
+    // the status screen.
+    tapCard();
     server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_NOT_ACTIVE"})");
     pump();
     assert(lv_screen_active() == Display::statusScreen.getScreen());
@@ -31,18 +33,21 @@ void ReaderWorkflow::testLocalization()
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte ist nicht aktiv")));
     display.capture(output, "i18n-status-german");
     clearStatus();
+    tapCard();
     server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_NOT_ACTIVE"})"); pump();
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte ist nicht aktiv")));
     defaultLanguage("en");
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Card is inactive")));
     display.capture(output, "i18n-status-english");
     clearStatus();
+    tapCard();
     server.push("CARD_AUTHENTICATION_DATA", R"({"error":"UNKNOWN_READER_ERROR"})"); pump();
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Something went wrong. Please try again.")));
     defaultLanguage("de");
     assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Something went wrong. Please try again.")));
     defaultLanguage("en");
     clearStatus();
+    nfc.setPresent(0, false); pump();
     // A real driver touch sequence opens the maintenance drawer.
     display.touch = {240, 10, true}; pump();
     display.touch = {240, 150, true}; pump();
@@ -121,7 +126,7 @@ void ReaderWorkflow::testLocalization()
         display.capture(output, "i18n-form-screen-german");
         refreshScreens("en");
         assert(label(lv_screen_active(), "Required field"));
-        assert(label(lv_screen_active(), "Please complete before starting\nMaintenance - Notes %s"));
+        assert(label(lv_screen_active(), "Please complete before starting") && label(lv_screen_active(), "Maintenance \xE2\x80\x93 Notes %s"));
         display.capture(output, "i18n-form-screen-english");
         Display::formsScreen.resetForm();
         Display::transitionToScreen(&Display::resourceListScreen);

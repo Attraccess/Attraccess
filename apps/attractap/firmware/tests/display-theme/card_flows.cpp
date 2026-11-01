@@ -321,7 +321,8 @@ void testFormAndProjectLocaleRefresh(Renderer &renderer)
     requireObject(guard.root, &lv_label_class, "Pflichtfeld");
     FirmwareI18n::refreshTree(guard.root, "en");
     requireObject(guard.root, &lv_label_class, "Required field");
-    requireObject(guard.root, &lv_label_class, "Please complete before starting\nMaintenance - Notes %s");
+    requireObject(guard.root, &lv_label_class, "Please complete before starting");
+    requireObject(guard.root, &lv_label_class, "Maintenance \xE2\x80\x93 Notes %s");
     renderer.capture("form-english-validation");
     API::ResourceUsageFormPageResult result{};
     result.formId = 1; result.errorCount = 1;
