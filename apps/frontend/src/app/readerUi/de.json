@@ -1,0 +1,43 @@
+{
+  "resource": {
+    "title": "Reader-Anzeige",
+    "description": "Wie Plugin-Widgets und Startbestätigungen auf Attractap-Readern funktionieren",
+    "noScreenPolicy": {
+      "label": "Reader ohne Bildschirm",
+      "description": "Was ein Reader ohne Display tut, wenn ein Plugin eine Bestätigung verlangt.",
+      "default": "Plugin-Standard (blockieren)",
+      "block": "Start blockieren",
+      "card-confirm": "Mit zweitem Auflegen der Karte bestätigen",
+      "allow-with-warning": "Mit Warnung starten"
+    },
+    "plugins": "Plugins",
+    "noPlugins": "Noch kein Plugin trägt zu Readern bei.",
+    "widgets": "Widgets auf Readern anzeigen",
+    "failurePolicy": {
+      "label": "Wenn das Plugin ausfällt",
+      "fail-closed": "Start blockieren (empfohlen)",
+      "fail-open": "Start erlauben"
+    },
+    "failOpenWarning": "Fail open erlaubt den Start, während die Prüfung des Plugins nicht verfügbar ist. Diese Auswahl wird protokolliert.",
+    "save": "Speichern",
+    "saved": "Einstellungen der Reader-Anzeige gespeichert",
+    "saveError": "Einstellungen der Reader-Anzeige konnten nicht gespeichert werden"
+  },
+  "reader": {
+    "widgets": "Plugin-Widgets auf diesem Reader anzeigen",
+    "widgetsDescription": "Widgets erscheinen nur, wenn diese und die Ressourceneinstellung aktiv sind.",
+    "contributions": "Plugin-Beiträge",
+    "noContributions": "Keine Plugin-Beiträge für diesen Reader.",
+    "status": { "rendered": "Angezeigt", "degraded": "Eingeschränkt", "skipped": "Übersprungen" }
+  },
+  "alerts": {
+    "title": "Reader-UI-Alarme",
+    "none": "Keine offenen Alarme.",
+    "clear": "Quittieren",
+    "kind": {
+      "breaker-open": "Plugin-Hook nach wiederholten Fehlern deaktiviert",
+      "load-failure": "Plugin mit Zugriffs-Hooks konnte nicht geladen werden",
+      "crash-loop": "Reader nach Absturz gesperrt"
+    }
+  }
+}

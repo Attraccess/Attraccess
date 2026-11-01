@@ -18,6 +18,7 @@ import { MachineTab } from '../editModal/tabs/machine';
 import { DoorTab } from '../editModal/tabs/door';
 import { RetrainingTab } from '../editModal/tabs/retraining';
 import { SupervisionTab } from '../editModal/tabs/supervision';
+import { ResourceReaderUiSettings } from '../../readerUi/ResourceReaderUiSettings';
 import { ResourceMetadataEditor } from '../editModal/resourceMetadataEditor';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -253,6 +254,12 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
               {saveButton}
             </>
           ),
+        },
+        {
+          key: 'readerUi',
+          title: model.t('topics.readerUi.title'),
+          description: model.t('topics.readerUi.description'),
+          content: <ResourceReaderUiSettings resourceId={resourceId} />,
         },
         {
           key: 'groups',

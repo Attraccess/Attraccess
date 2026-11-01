@@ -26,6 +26,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
 import { ReaderSecurity } from '../pairing/ReaderSecurity';
+import { ReaderUiReaderPanel } from '../../readerUi/ReaderUiReaderPanel';
 
 interface Props {
   readerId?: number;
@@ -51,7 +52,7 @@ export function AttractapEditor(props: Readonly<Props>) {
   const [name, setName] = useState('');
   const [ledBrightness, setLedBrightness] = useState<number>(255);
   const [connectedResourceIds, setConnectedResourceIds] = useState<number[]>([]);
-  const [selectedTab, setSelectedTab] = useState<'general' | 'resources' | 'security'>('general');
+  const [selectedTab, setSelectedTab] = useState<'general' | 'resources' | 'readerUi' | 'security'>('general');
   const updateReaderMutation = useAttractapServiceUpdateReader({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
@@ -107,8 +108,10 @@ export function AttractapEditor(props: Readonly<Props>) {
         <DrawerBody>
           <Form onSubmit={onSubmit} className="flex flex-col gap-4">
             <Tabs
-              selectedKey={!reader && selectedTab === 'security' ? 'general' : selectedTab}
-              onSelectionChange={(k) => setSelectedTab(k as 'general' | 'resources' | 'security')}
+              selectedKey={
+                !reader && (selectedTab === 'security' || selectedTab === 'readerUi') ? 'general' : selectedTab
+              }
+              onSelectionChange={(k) => setSelectedTab(k as 'general' | 'resources' | 'readerUi' | 'security')}
               className="w-full"
               data-cy="attractap-editor-tabs"
             >
@@ -122,6 +125,12 @@ export function AttractapEditor(props: Readonly<Props>) {
                     <Tabs.Indicator />
                     {t('tabs.resources')}
                   </Tab>
+                  {reader && (
+                    <Tab id="readerUi" data-cy="attractap-editor-reader-ui-tab">
+                      <Tabs.Indicator />
+                      {t('tabs.readerUi')}
+                    </Tab>
+                  )}
                   {reader && (
                     <Tab id="security" data-cy="attractap-editor-security-tab">
                       <Tabs.Indicator />
@@ -166,6 +175,11 @@ export function AttractapEditor(props: Readonly<Props>) {
                   />
                 </div>
               </TabPanel>
+              {reader && (
+                <TabPanel id="readerUi" className="pt-4">
+                  <ReaderUiReaderPanel readerId={reader.id} />
+                </TabPanel>
+              )}
               {reader && (
                 <TabPanel id="security" className="pt-4">
                   <ReaderSecurity reader={reader} onPairingRemoved={props.onCancel} />

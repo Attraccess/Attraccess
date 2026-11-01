@@ -1,0 +1,43 @@
+{
+  "resource": {
+    "title": "Reader display",
+    "description": "How plugin widgets and start confirmations behave on Attractap readers",
+    "noScreenPolicy": {
+      "label": "Readers without a screen",
+      "description": "What a reader without a display does when a plugin asks for confirmation.",
+      "default": "Plugin default (block)",
+      "block": "Block the start",
+      "card-confirm": "Confirm with a second card tap",
+      "allow-with-warning": "Start with a warning"
+    },
+    "plugins": "Plugins",
+    "noPlugins": "No plugin contributes to readers yet.",
+    "widgets": "Show widgets on readers",
+    "failurePolicy": {
+      "label": "If the plugin fails",
+      "fail-closed": "Block the start (recommended)",
+      "fail-open": "Allow the start"
+    },
+    "failOpenWarning": "Fail open lets people start while the plugin's check is unavailable. This choice is audited.",
+    "save": "Save",
+    "saved": "Reader display settings saved",
+    "saveError": "Could not save reader display settings"
+  },
+  "reader": {
+    "widgets": "Show plugin widgets on this reader",
+    "widgetsDescription": "Widgets appear only when this and the resource setting are on.",
+    "contributions": "Plugin contributions",
+    "noContributions": "No plugin contributions for this reader.",
+    "status": { "rendered": "Rendered", "degraded": "Degraded", "skipped": "Skipped" }
+  },
+  "alerts": {
+    "title": "Reader UI alerts",
+    "none": "No open alerts.",
+    "clear": "Clear",
+    "kind": {
+      "breaker-open": "Plugin hook disabled after repeated failures",
+      "load-failure": "Plugin with access hooks failed to load",
+      "crash-loop": "Reader suspended after a crash"
+    }
+  }
+}
