@@ -8,6 +8,7 @@ UI_STACK lvgl_free_min=4100 lvgl_size=12288 dispatch_free_min=9000 dispatch_size
 UI_HEAP int_min=161000
 UI_BUILD nodes=8 us=15000
 UI_DETAILS_INIT us=21000
+UI_DETAILS_STEP_MAX us=16000
 UI_SELFTEST done dropped=3 expected_dropped=3
 """
 
@@ -28,6 +29,7 @@ def test_accepts_a_healthy_run():
     ("lvgl_free_min=4100", "lvgl_free_min=2900", "lvgl stack"),
     ("dispatch_free_min=9000", "dispatch_free_min=3500", "dispatch stack"),
     ("done dropped=3", "done dropped=2", "dropped"),
+    ("STEP_MAX us=16000", "STEP_MAX us=31000", "LVGL lock"),
 ])
 def test_rejects_violations(old, new, message):
     with pytest.raises(AssertionError, match=message):

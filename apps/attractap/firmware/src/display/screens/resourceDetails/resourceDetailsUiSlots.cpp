@@ -7,6 +7,8 @@
 #include "../../ui/ui_builder.hpp"
 #include "../../ui/ui_slots.hpp"
 
+#include <chrono>
+
 namespace
 {
     lv_obj_t *makeSlotContainer(lv_obj_t *screen)
@@ -50,13 +52,90 @@ void ResourceDetailsScreen::createUiSlotContainer(UiSlotKind kind)
     }
 }
 
-void ResourceDetailsScreen::refreshUiSlots()
+namespace
+{
+    struct DeferredStep
+    {
+        ResourceDetailsScreen *screen;
+        uint32_t generation;
+        uint8_t slotIndex;
+        uint16_t item;
+    };
+}
+
+// Builds contribution `item` of slot `slotIndex`, then queues the next one. A newer refresh, or the screen being
+// destroyed, bumps the generation and ends the chain.
+void ResourceDetailsScreen::buildUiSlotStep(uint32_t generation, uint8_t slotIndex, uint16_t item)
+{
+    if (generation != this->uiBuildGeneration || !this->screen || !this->resourceCacheValid) return;
+    lv_obj_t *containers[3] = {this->uiSlotHeader, this->uiSlotBody, this->uiSlotSession};
+    const ui::SlotId slots[3] = {ui::SlotId::DetailsHeader, ui::SlotId::DetailsBody, ui::SlotId::DetailsSession};
+    const bool visible[3] = {true, true, this->resourceCache.hasActiveUsage};
+    if (slotIndex >= 3) return;
+    lv_obj_t *container = containers[slotIndex];
+    if (!container) return;
+
+    const uint32_t now = millis();
+    const auto started = std::chrono::steady_clock::now();
+    uint16_t seen = 0;
+    bool more = false;
+    if (visible[slotIndex])
+    {
+        ui::slotCache().forEach(this->resourceCache.id, slots[slotIndex], [&](const ui::SlotRecord &rec) {
+            if (seen == item) ui::buildRecord(container, rec, now, true);
+            else if (seen == item + 1) more = true;
+            seen++;
+        });
+    }
+    lv_obj_set_flag(container, LV_OBJ_FLAG_HIDDEN, lv_obj_get_child_count(container) == 0);
+    const uint32_t took = (uint32_t)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started).count();
+    if (took > this->uiBuildMaxStepUs) this->uiBuildMaxStepUs = took;
+
+    uint8_t nextSlot = slotIndex;
+    uint16_t nextItem = item + 1;
+    if (!more)
+    {
+        nextSlot = slotIndex + 1;
+        nextItem = 0;
+    }
+    if (nextSlot >= 3) return;
+    auto *step = new DeferredStep{this, generation, nextSlot, nextItem};
+    lv_async_call(
+        [](void *data) {
+            auto *s = static_cast<DeferredStep *>(data);
+            s->screen->buildUiSlotStep(s->generation, s->slotIndex, s->item);
+            delete s;
+        },
+        step);
+}
+
+void ResourceDetailsScreen::refreshUiSlots(bool defer)
 {
     if (!this->screen || !this->resourceCacheValid) return;
     const uint32_t now = millis();
     ui::slotCache().expire(now);
     ui::startCountdownTimer();
     const uint32_t id = this->resourceCache.id;
+    this->uiBuildGeneration++;
+    if (defer)
+    {
+        // Clear now, fill one contribution per tick.
+        for (lv_obj_t *c : {this->uiSlotHeader, this->uiSlotBody, this->uiSlotSession})
+        {
+            if (!c) continue;
+            lv_obj_clean(c);
+            lv_obj_add_flag(c, LV_OBJ_FLAG_HIDDEN);
+        }
+        auto *step = new DeferredStep{this, this->uiBuildGeneration, 0, 0};
+        lv_async_call(
+            [](void *data) {
+                auto *s = static_cast<DeferredStep *>(data);
+                s->screen->buildUiSlotStep(s->generation, s->slotIndex, s->item);
+                delete s;
+            },
+            step);
+        return;
+    }
     fillSlot(this->uiSlotHeader, id, ui::SlotId::DetailsHeader, true, now);
     fillSlot(this->uiSlotBody, id, ui::SlotId::DetailsBody, true, now);
     // The session block only exists while somebody is using the resource.

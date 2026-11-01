@@ -74,6 +74,17 @@ void API::loop()
         this->processIncomingMessage(next.c_str(), next.size());
     }
 #endif
+    if (!uiReplies.empty() && millis() - uiReplyLastMs >= UI_REPLY_SPACING_MS)
+    {
+        DeferredUiReply reply = std::move(uiReplies.front());
+        uiReplies.pop_front();
+        JsonDocument payloadDoc;
+        if (deserializeJson(payloadDoc, reply.payloadJson) != DeserializationError::Ok) payloadDoc.to<JsonObject>();
+        uiReplyFlushing = true;
+        this->sendMessage(reply.type.c_str(), payloadDoc.as<JsonObject>(), reply.messageId);
+        uiReplyFlushing = false;
+        uiReplyLastMs = millis();
+    }
     this->updateSateInfo();
 
     // Only send heartbeat when connection is usable
@@ -117,6 +128,25 @@ void API::sendMessage(const char *type)
 
 bool API::sendMessage(const char *type, JsonObject payload, uint32_t messageId)
 {
+    if (!uiReplyFlushing && (strncmp(type, "ACK_UI_", 7) == 0 || strcmp(type, "UI_RENDER_REPORT") == 0))
+    {
+        const uint32_t nowMs = millis();
+        if (nowMs - uiReplyWindowStartMs >= UI_REPLY_WINDOW_MS)
+        {
+            uiReplyWindowStartMs = nowMs;
+            uiReplyWindowCount = 0;
+        }
+        if (!uiReplies.empty() || uiReplyWindowCount >= UI_REPLY_BURST)
+        {
+            if (uiReplies.size() >= UI_REPLY_QUEUE_MAX) uiReplies.pop_front();
+            std::string json;
+            serializeJson(payload, json);
+            uiReplies.push_back({type, std::move(json), messageId});
+            return true;
+        }
+        uiReplyWindowCount++;
+        uiReplyLastMs = nowMs;
+    }
     JsonDocument event;
     event["event"] = "EVENT";
     event["data"]["type"] = type;

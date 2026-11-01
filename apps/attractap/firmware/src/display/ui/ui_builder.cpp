@@ -99,6 +99,27 @@ namespace ui
             }
         }
 
+        // A content-sized wrapping label collapses to its longest word, so text and containers take the width of
+        // their column (or share the rest of a row) instead of sizing to content.
+        bool parentIsRow(lv_obj_t *parent)
+        {
+            return lv_obj_get_style_layout(parent, LV_PART_MAIN) == LV_LAYOUT_FLEX &&
+                   lv_obj_get_style_flex_flow(parent, LV_PART_MAIN) == LV_FLEX_FLOW_ROW;
+        }
+
+        void spanParent(lv_obj_t *obj, lv_obj_t *parent)
+        {
+            if (parentIsRow(parent))
+            {
+                lv_obj_set_width(obj, LV_SIZE_CONTENT);
+                lv_obj_set_flex_grow(obj, 1);
+            }
+            else
+            {
+                lv_obj_set_width(obj, lv_pct(100));
+            }
+        }
+
         lv_obj_t *buildNode(lv_obj_t *parent, const SlotRecord &rec, const Node &node, uint32_t nowMillis)
         {
             switch (node.type)
@@ -108,6 +129,7 @@ namespace ui
             {
                 lv_obj_t *o = lv_obj_create(parent);
                 styleContainer(o, node);
+                spanParent(o, parent);
                 return o;
             }
             case NodeType::Text:
@@ -118,8 +140,7 @@ namespace ui
                 lv_obj_set_style_text_font(l, fontFor(node.style), LV_PART_MAIN);
                 lv_obj_set_style_text_color(l, node.style == TextStyle::Small ? DisplayTheme::muted() : DisplayTheme::text(),
                                             LV_PART_MAIN);
-                if (node.fill) lv_obj_set_width(l, lv_pct(100));
-                else lv_obj_set_style_max_width(l, lv_pct(100), LV_PART_MAIN);
+                spanParent(l, parent);
                 return l;
             }
             case NodeType::Badge:

@@ -69,8 +69,8 @@ namespace UiSelftest
 
         void printStack(const char *tag)
         {
-            logger.infof("%s lvgl_free_min=%u lvgl_size=12288 dispatch_free_min=%u dispatch_size=16384 tls_free_min=%u", tag,
-                         (unsigned)stackFree("LvglTask"), (unsigned)stackFree("main"), (unsigned)stackFree("rl_tls"));
+            logger.infof("%s lvgl_free_min=%u lvgl_size=12288 dispatch_free_min=%u dispatch_size=%u tls_free_min=%u", tag,
+                         (unsigned)stackFree("LvglTask"), (unsigned)stackFree("main"), (unsigned)CONFIG_ESP_MAIN_TASK_STACK_SIZE, (unsigned)stackFree("rl_tls"));
         }
 
         void printMem()
@@ -113,17 +113,21 @@ namespace UiSelftest
             strncpy(resource.name, "Selftest", sizeof(resource.name) - 1);
             lv_lock();
             Display::resourceDetailsScreen.setResourceAndUsageDetails(resource);
+            Display::resourceDetailsScreen.uiBuildMaxStepUs = 0;
             const int64_t t0 = esp_timer_get_time();
             Display::transitionToScreen(&Display::resourceDetailsScreen);
+            const int64_t t1 = esp_timer_get_time();
             lv_unlock();
+            logger.infof("UI_DETAILS_INIT us=%d", (int)(t1 - t0));
             vTaskDelay(pdMS_TO_TICKS(1500));
             lv_lock();
-            const int64_t t1 = esp_timer_get_time();
-            Display::resourceDetailsScreen.refreshUiSlots();
+            logger.infof("UI_DETAILS_STEP_MAX us=%u", (unsigned)Display::resourceDetailsScreen.uiBuildMaxStepUs);
             const int64_t t2 = esp_timer_get_time();
+            Display::resourceDetailsScreen.refreshUiSlots();
+            logger.infof("UI_DETAILS_REFRESH_SYNC us=%d", (int)(esp_timer_get_time() - t2));
             lv_unlock();
-            logger.infof("UI_DETAILS_INIT us=%d", (int)(t2 - t1));
-            (void)t0;
+            logger.info("UI_SHOT details-full-slots"); // the lab photographs the screen while it holds still
+            vTaskDelay(pdMS_TO_TICKS(6000));
 
             // One 8-node contribution built inside the lock.
             lv_lock();
@@ -158,6 +162,8 @@ namespace UiSelftest
             DisplayTheme::keyboard(keyboard);
             lv_unlock();
             vTaskDelay(pdMS_TO_TICKS(1500));
+            logger.info("UI_SHOT step-keyboard");
+            vTaskDelay(pdMS_TO_TICKS(6000));
             printMem();
             lv_lock();
             lv_obj_delete(keyboard);

@@ -51,7 +51,7 @@ void ResourceDetailsScreen::init()
    this->createUiSlotContainer(UiSlotKind::Body);
 
    this->applyCachedState();
-   this->refreshUiSlots();
+   this->refreshUiSlots(true);
    if (this->actionInProgress) this->showActionProgress(this->actionTitle);
 }
 void ResourceDetailsScreen::loop()
@@ -139,6 +139,7 @@ void ResourceDetailsScreen::destroy()
       lv_obj_del(this->screen);
    }
 
+   this->uiBuildGeneration++;
    this->screen = nullptr;
    sessionHeader.detach();
    actionOverlay.detach();

@@ -107,6 +107,7 @@ void API::sendUiRenderReport(uint32_t resourceId, const char *slot, const char *
 
 void API::clearUiSlots()
 {
+    uiReplies.clear(); // answers to the previous connection are pointless
 #ifdef HAS_LVGL_DISPLAY
     ui::slotCache().clear();
     if (uiSlotsChangedCallback) uiSlotsChangedCallback();

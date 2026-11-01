@@ -7,7 +7,9 @@ keyboard, then runs the hostile fixtures, and prints these lines on the UART:
     UI_STACK lvgl_free_min=<n> lvgl_size=<n> dispatch_free_min=<n> dispatch_size=<n> tls_free_min=<n>
     UI_HEAP int_min=<n>
     UI_BUILD nodes=<n> us=<n>
-    UI_DETAILS_INIT us=<n>
+    UI_DETAILS_INIT us=<n>            (resource details init with full slots: slots are built one per lv_async_call)
+    UI_DETAILS_STEP_MAX us=<n>        (longest single slot build inside the lock)
+    UI_DETAILS_REFRESH_SYNC us=<n>    (a synchronous full rebuild, for reference)
     UI_SELFTEST done dropped=<n> expected_dropped=<n>
 """
 
@@ -16,6 +18,7 @@ import re
 POOL_RESERVE = 32 * 1024
 MIN_STACK_FREE = 3 * 1024
 MIN_STACK_FREE_RATIO = 0.25
+MAX_STEP_US = 25_000
 LINE = re.compile(r"\b(UI_[A-Z_]+)((?: [a-z_]+=-?\d+)+|\s+done(?: [a-z_]+=-?\d+)*)")
 
 
@@ -53,6 +56,9 @@ def check(log):
         free, size = stack[f"{task}_free_min"], stack[size_key]
         if free < MIN_STACK_FREE or free < MIN_STACK_FREE_RATIO * size:
             problems.append(f"{task} stack keeps {free} of {size} B (needs >= 3 KiB and >= 25 %)")
+    step = values.get("UI_DETAILS_STEP_MAX")
+    if step is not None and step["us"] > MAX_STEP_US:
+        problems.append(f"a slot build holds the LVGL lock for {step['us']} us (limit {MAX_STEP_US})")
     if problems:
         raise AssertionError("; ".join(problems))
     return values
