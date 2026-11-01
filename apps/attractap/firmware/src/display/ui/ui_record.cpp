@@ -1,4 +1,5 @@
 #include "ui_record.hpp"
+#include "ui_json.hpp"
 #include "ui_text.hpp"
 
 #include <string.h>
@@ -89,45 +90,45 @@ namespace ui
         Verdict fillNode(Ctx &ctx, JsonObjectConst o, Node &node)
         {
             Verdict err = Verdict::InvalidShape;
-            const char *t = o["t"].is<const char *>() ? o["t"].as<const char *>() : nullptr;
+            const char *t = cstr(field(o, "t"), nullptr);
             memset(&node, 0, sizeof(node));
             node.parent = NO_PARENT;
             node.style = TextStyle::Body;
             if (!t) return Verdict::UnknownComponent;
-            if (!toneFrom(o["tone"], node.tone, err)) return err;
+            if (!toneFrom(field(o, "tone"), node.tone, err)) return err;
             SlotRecord &rec = ctx.rec;
             if (!strcmp(t, "col") || !strcmp(t, "row"))
             {
                 node.type = t[0] == 'c' ? NodeType::Col : NodeType::Row;
-                if (!o["c"].isNull() && !o["c"].is<JsonArrayConst>()) return Verdict::InvalidShape;
-                if (!smallInt(o["gap"], 32, node.gap, err) || !smallInt(o["pad"], 32, node.pad, err)) return err;
-                if (!o["fill"].isNull() && !o["fill"].is<bool>()) return Verdict::InvalidShape;
-                node.fill = o["fill"] | false;
+                if (!field(o, "c").isNull() && !field(o, "c").is<JsonArrayConst>()) return Verdict::InvalidShape;
+                if (!smallInt(field(o, "gap"), 32, node.gap, err) || !smallInt(field(o, "pad"), 32, node.pad, err)) return err;
+                if (!field(o, "fill").isNull() && !field(o, "fill").is<bool>()) return Verdict::InvalidShape;
+                node.fill = field(o, "fill") | false;
             }
             else if (!strcmp(t, "text"))
             {
                 node.type = NodeType::Text;
-                const char *st = o["style"].is<const char *>() ? o["style"].as<const char *>() : nullptr;
-                if (!o["style"].isNull() && !st) return Verdict::BadEnum;
+                const char *st = cstr(field(o, "style"), nullptr);
+                if (!field(o, "style").isNull() && !st) return Verdict::BadEnum;
                 if (st)
                 {
                     if (!strcmp(st, "title")) node.style = TextStyle::Title;
                     else if (!strcmp(st, "small")) node.style = TextStyle::Small;
                     else if (strcmp(st, "body")) return Verdict::BadEnum;
                 }
-                if (!o["fill"].isNull() && !o["fill"].is<bool>()) return Verdict::InvalidShape;
-                node.fill = o["fill"] | false;
-                if (!takeText(rec, o["text"], MAX_TEXT_CHARS, node, err)) return err;
+                if (!field(o, "fill").isNull() && !field(o, "fill").is<bool>()) return Verdict::InvalidShape;
+                node.fill = field(o, "fill") | false;
+                if (!takeText(rec, field(o, "text"), MAX_TEXT_CHARS, node, err)) return err;
             }
             else if (!strcmp(t, "badge"))
             {
                 node.type = NodeType::Badge;
-                if (!takeText(rec, o["text"], MAX_LIST_ROW_CHARS, node, err)) return err;
+                if (!takeText(rec, field(o, "text"), MAX_LIST_ROW_CHARS, node, err)) return err;
             }
             else if (!strcmp(t, "icon"))
             {
                 node.type = NodeType::Icon;
-                const char *n = o["name"].is<const char *>() ? o["name"].as<const char *>() : nullptr;
+                const char *n = cstr(field(o, "name"), nullptr);
                 if (!n) return Verdict::BadEnum;
                 if (!strcmp(n, "ok")) node.icon = Icon::Ok;
                 else if (!strcmp(n, "warning")) node.icon = Icon::Warning;
@@ -141,30 +142,30 @@ namespace ui
             {
                 if (!ctx.allowButtons) return Verdict::ButtonInSlot;
                 node.type = NodeType::Button;
-                if (!idValid(o["id"].is<const char *>() ? o["id"].as<const char *>() : nullptr, MAX_ID_CHARS))
+                if (!idValid(cstr(field(o, "id"), nullptr), MAX_ID_CHARS))
                     return Verdict::BadId;
-                const char *v = o["variant"].is<const char *>() ? o["variant"].as<const char *>() : nullptr;
+                const char *v = cstr(field(o, "variant"), nullptr);
                 node.secondary = v && !strcmp(v, "secondary");
-                if (!takeText(rec, o["text"], MAX_LABEL_BYTES, node, err)) return err;
+                if (!takeText(rec, field(o, "text"), MAX_LABEL_BYTES, node, err)) return err;
             }
             else if (!strcmp(t, "progress"))
             {
                 node.type = NodeType::Progress;
-                if (!o["value"].is<double>()) return Verdict::InvalidShape;
-                const double d = o["value"].as<double>();
+                if (!field(o, "value").is<double>()) return Verdict::InvalidShape;
+                const double d = field(o, "value").as<double>();
                 if (d < 0 || d > 100) return Verdict::InvalidShape;
                 node.value = static_cast<uint8_t>(d);
             }
             else if (!strcmp(t, "countdown"))
             {
                 node.type = NodeType::Countdown;
-                if (!o["toMs"].is<int64_t>() || o["toMs"].as<int64_t>() < 0) return Verdict::InvalidShape;
-                node.toMs = o["toMs"].as<int64_t>();
+                if (!field(o, "toMs").is<int64_t>() || field(o, "toMs").as<int64_t>() < 0) return Verdict::InvalidShape;
+                node.toMs = field(o, "toMs").as<int64_t>();
             }
             else if (!strcmp(t, "spacer"))
             {
                 node.type = NodeType::Spacer;
-                if (!smallInt(o["h"], 64, node.height, err)) return err;
+                if (!smallInt(field(o, "h"), 64, node.height, err)) return err;
             }
             else
             {
@@ -192,7 +193,7 @@ namespace ui
                 if (n.type == NodeType::Col || n.type == NodeType::Row)
                 {
                     stack[depth - 1] = {obj, idx};
-                    arrays[depth - 1] = obj["c"].as<JsonArrayConst>();
+                    arrays[depth - 1] = field(obj, "c").as<JsonArrayConst>();
                     cursor[depth - 1] = 0;
                 }
                 return Verdict::Accept;
@@ -290,23 +291,23 @@ namespace ui
         out.pool[0] = '\0';
         if (payloadBytes > MAX_PAYLOAD_BYTES) return Verdict::PayloadTooLarge;
         if (payload.isNull()) return Verdict::InvalidShape;
-        const char *slotName = payload["slot"].is<const char *>() ? payload["slot"].as<const char *>() : nullptr;
-        if (!payload["resourceId"].is<uint32_t>() || !payload["revision"].is<uint32_t>() ||
-            !payload["serverNowMs"].is<int64_t>() || !slotName)
+        const char *slotName = cstr(field(payload, "slot"), nullptr);
+        if (!field(payload, "resourceId").is<uint32_t>() || !field(payload, "revision").is<uint32_t>() ||
+            !field(payload, "serverNowMs").is<int64_t>() || !slotName)
             return Verdict::InvalidShape;
-        const char *owner = payload["owner"].is<const char *>() ? payload["owner"].as<const char *>() : nullptr;
-        const char *key = payload["key"].is<const char *>() ? payload["key"].as<const char *>() : nullptr;
+        const char *owner = cstr(field(payload, "owner"), nullptr);
+        const char *key = cstr(field(payload, "key"), nullptr);
         if (!owner || !*owner || strlen(owner) > 64 || !idValid(key, MAX_ID_CHARS)) return Verdict::InvalidShape;
         out.slot = slotFromName(slotName);
         if (out.slot == SlotId::Unknown) return Verdict::UnknownSlot;
-        out.resourceId = payload["resourceId"].as<uint32_t>();
-        out.revision = payload["revision"].as<uint32_t>();
-        out.serverNowMs = payload["serverNowMs"].as<int64_t>();
-        out.expiresAtMs = payload["expiresAtMs"].is<int64_t>() ? payload["expiresAtMs"].as<int64_t>() : 0;
+        out.resourceId = field(payload, "resourceId").as<uint32_t>();
+        out.revision = field(payload, "revision").as<uint32_t>();
+        out.serverNowMs = field(payload, "serverNowMs").as<int64_t>();
+        out.expiresAtMs = field(payload, "expiresAtMs").is<int64_t>() ? field(payload, "expiresAtMs").as<int64_t>() : 0;
         strncpy(out.key, key, MAX_ID_CHARS);
         out.key[MAX_ID_CHARS] = '\0';
 
-        JsonVariantConst tree = payload["tree"];
+        JsonVariantConst tree = field(payload, "tree");
         if (tree.isNull())
         {
             for (JsonPairConst kv : payload)

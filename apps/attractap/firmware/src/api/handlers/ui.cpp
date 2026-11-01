@@ -14,12 +14,12 @@ void API::readBlockReason(JsonVariantConst reason, ActionResult &out)
 {
     char buf[ui::MAX_TEXT_CHARS * 2 * 2 + 1];
     auto take = [&](JsonVariantConst v, std::string &dst) {
-        const char *s = v.is<const char *>() ? v.as<const char *>() : nullptr;
+        const char *s = ui::cstr(v, nullptr);
         if (s && strlen(s) < sizeof buf && ui::sanitizeLatin1(s, buf, sizeof buf) >= 0) dst = buf;
     };
-    take(reason["code"], out.blockCode);
-    take(reason["title"], out.blockTitle);
-    take(reason["body"], out.blockBody);
+    take(ui::field(reason, "code"), out.blockCode);
+    take(ui::field(reason, "title"), out.blockTitle);
+    take(ui::field(reason, "body"), out.blockBody);
 }
 
 void API::onUiSlotUpdate(JsonObject data)
@@ -34,8 +34,8 @@ void API::onUiSlotUpdate(JsonObject data)
     }
     ui::SlotRecord &rec = *static_cast<ui::SlotRecord *>(uiSlotScratch);
     const uint32_t resourceId = payload["resourceId"] | 0u;
-    const char *slot = payload["slot"].is<const char *>() ? payload["slot"].as<const char *>() : "";
-    const char *key = payload["key"].is<const char *>() ? payload["key"].as<const char *>() : "";
+    const char *slot = ui::cstr(ui::field(payload, "slot"), "");
+    const char *key = ui::cstr(ui::field(payload, "key"), "");
     const ui::Verdict verdict = ui::parseSlotUpdate(payload, measureJson(payload), rec);
     if (verdict != ui::Verdict::Accept)
     {
@@ -79,7 +79,7 @@ void API::onUiStepRequest(JsonObject data)
 
 void API::onUiStepCancel(JsonObject data)
 {
-    const char *stepId = data["payload"]["stepId"].is<const char *>() ? data["payload"]["stepId"].as<const char *>() : nullptr;
+    const char *stepId = ui::cstr(ui::field(ui::field(data, "payload"), "stepId"), nullptr);
     if (stepId && uiStepCancelCallback) uiStepCancelCallback(stepId);
 }
 
