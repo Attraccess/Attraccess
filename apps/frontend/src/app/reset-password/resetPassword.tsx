@@ -63,58 +63,54 @@ export function ResetPassword() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full" data-cy="reset-password-success-card">
-          <Card.Header className="text-center">{t('success.title')}</Card.Header>
-          <Card.Content>
-            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
-          </Card.Content>
-          <Card.Footer>
-            <Button
-              variant="primary"
-              className="w-full"
-              onPress={() => navigate('/')}
-              data-cy="reset-password-success-go-to-login-button"
-            >
-              {t('success.goToLogin')}
-            </Button>
-          </Card.Footer>
-        </Card>
-      </div>
+      <Card className="w-full" data-cy="reset-password-success-card">
+        <Card.Header className="text-center">{t('success.title')}</Card.Header>
+        <Card.Content>
+          <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
+        </Card.Content>
+        <Card.Footer>
+          <Button
+            variant="primary"
+            className="w-full"
+            onPress={() => navigate('/')}
+            data-cy="reset-password-success-go-to-login-button"
+          >
+            {t('success.goToLogin')}
+          </Button>
+        </Card.Footer>
+      </Card>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8">
-      <Form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onMainButtonPress();
+    <Form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onMainButtonPress();
+      }}
+      className="w-full gap-4"
+      data-cy="reset-password-form"
+    >
+      <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
+      <PasswordField
+        value={password}
+        onValueChange={(v) => {
+          setPassword(v);
+          setServerErrors([]);
         }}
-        className="max-w-md w-full gap-4"
-        data-cy="reset-password-form"
-      >
-        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
-        <PasswordField
-          value={password}
-          onValueChange={(v) => {
-            setPassword(v);
-            setServerErrors([]);
-          }}
-          serverErrors={serverErrors}
-          passwordLabel={t('inputs.password')}
-          confirmationLabel={t('inputs.confirmPassword')}
-          showConfirmation
-          confirmationValue={confirmPassword}
-          onConfirmationChange={setConfirmPassword}
-          isRequired
-          autoComplete="new-password"
-          dataCyPrefix="reset-password"
-        />
-        <Button variant="primary" className="w-full mt-2" type="submit" data-cy="reset-password-submit-button">
-          {t('submit')}
-        </Button>
-      </Form>
-    </div>
+        serverErrors={serverErrors}
+        passwordLabel={t('inputs.password')}
+        confirmationLabel={t('inputs.confirmPassword')}
+        showConfirmation
+        confirmationValue={confirmPassword}
+        onConfirmationChange={setConfirmPassword}
+        isRequired
+        autoComplete="new-password"
+        dataCyPrefix="reset-password"
+      />
+      <Button variant="primary" className="w-full mt-2" type="submit" data-cy="reset-password-submit-button">
+        {t('submit')}
+      </Button>
+    </Form>
   );
 }

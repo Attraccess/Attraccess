@@ -78,4 +78,22 @@ describe('ResetPassword completion labels', () => {
     expect(screen.getByLabelText(translations.inputs.confirmPassword)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: translations.submit })).toBeInTheDocument();
   });
+
+  it('renders the form without its own full-height centering wrapper', () => {
+    state.success = false;
+    const { container } = render(<ResetPassword />);
+
+    // Regression: the form must not reintroduce min-h-screen items-center centering,
+    // which pushed the CTA below the fold on small screens (it belongs to UnauthorizedLayout).
+    expect(screen.getByRole('button', { name: en.submit })).toBeInTheDocument();
+    expect(container.querySelector('.min-h-screen')).not.toBeInTheDocument();
+  });
+
+  it('renders the success card without its own full-height centering wrapper', () => {
+    state.success = true;
+    const { container } = render(<ResetPassword />);
+
+    expect(screen.getByText(en.success.title)).toBeInTheDocument();
+    expect(container.querySelector('.min-h-screen')).not.toBeInTheDocument();
+  });
 });
