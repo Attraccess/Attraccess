@@ -12,6 +12,7 @@
     "metadata": { "title": "Metadata", "description": "Values for integrations and flows" },
     "retraining": { "title": "Retraining", "description": "When introductions expire" },
     "supervision": { "title": "Supervision", "description": "Who may start a usage session" },
+    "readerUi": { "title": "Reader display", "description": "Plugin widgets and start confirmations on readers" },
     "groups": { "title": "Groups", "description": "Assign the resource to groups" },
     "forms": { "title": "Forms", "description": "Configure usage forms" },
     "flows": { "title": "Flows", "description": "Configure resource automation" },

@@ -23,6 +23,10 @@ import { ResourceRetrainingModule } from '../retraining/resourceRetraining.modul
 import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
 import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
 import { ResourceMeteringModule } from '../metering/resource-metering.module';
+import { ReaderUiModule } from '../../plugin-system/reader-ui/reader-ui.module';
+import { PreStartService } from './pre-start/pre-start.service';
+import { SessionEndNotifier } from './pre-start/session-end-notifier.service';
+import { WebStartStepStore } from './pre-start/web-start-step.store';
 
 @Module({
   imports: [
@@ -43,6 +47,7 @@ import { ResourceMeteringModule } from '../metering/resource-metering.module';
     ResourceFormsModule,
     ResourceHealthModule,
     ResourceOperatingIntervalModule,
+    ReaderUiModule,
   ],
   controllers: [ResourceUsageController],
   providers: [
@@ -51,7 +56,10 @@ import { ResourceMeteringModule } from '../metering/resource-metering.module';
     ResourceSessionNotificationListener,
     SupervisedUsageAutoPromotionListener,
     ResourceActivityVisibilityService,
+    PreStartService,
+    WebStartStepStore,
+    SessionEndNotifier,
   ],
-  exports: [ResourceUsageService, ResourceActivityVisibilityService],
+  exports: [ResourceUsageService, ResourceActivityVisibilityService, PreStartService, SessionEndNotifier],
 })
 export class ResourceUsageModule {}

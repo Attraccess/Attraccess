@@ -545,6 +545,56 @@ groups:
                     type: last
                     params: []
 
+      - uid: reader-ui-alerts-open
+        title: ReaderUiAlertsOpen
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Reader display alerts open"
+          description: "{{ $values.A }} reader display alerts are open. Open plugin circuit breaker: starts follow the plugin's hook failure policy (fail closed by default); after 60 s the next start probes the hook and the breaker closes by itself when it answers. ACCESS_HOOKS plugin that failed to load: its start hooks are not enforced until it loads again. Reader crash-loop suspension: plugin widgets are suspended on that reader and return after 30 min without another panic. Admins can clear an alert early in the plugin settings or the reader editor."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum(last_over_time(attraccess_reader_ui_open_alerts{job="attraccess"}[2m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
       - uid: cron-job-failing
         title: CronJobFailing
         condition: C

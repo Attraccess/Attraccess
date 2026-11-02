@@ -17,9 +17,7 @@ export const HistoryHeader = memo(
           <History className="w-5 h-5 mr-2" />
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
         </div>
-        {canUpdateResources && (
-          <ShowAllUsersToggle showAllUsers={showAllUsers} setShowAllUsers={setShowAllUsers} />
-        )}
+        {canUpdateResources && <ShowAllUsersToggle showAllUsers={showAllUsers} setShowAllUsers={setShowAllUsers} />}
       </div>
     );
   },

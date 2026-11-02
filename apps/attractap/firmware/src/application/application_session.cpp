@@ -159,6 +159,7 @@ void Application::resetSessionOnDisconnect() {
                        this->hasPendingServerFormFlow ||
                        this->currentProjectsUser.length() > 0;
 
+  this->closeUiStep();
   if (!sessionActive) {
     return;
   }

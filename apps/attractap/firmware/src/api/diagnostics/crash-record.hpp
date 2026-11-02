@@ -1,4 +1,5 @@
 #pragma once
+#include "reset-reason.hpp"
 // Must stay byte-compatible with Application::BootDiagnostics_t, persisted by
 // application_bootdiag.cpp. A layout/size mismatch fails the magic/size guard
 // below and simply skips the upload, so it can never crash the reader.
@@ -33,5 +34,4 @@ struct PendingCrashBootRecord
 #define CRASH_COREDUMP_MAX_BYTES (32 * 1024)
 
 
-const char *crashResetReasonToString(uint8_t reason);
 std::unique_ptr<char[]> readCoredumpBase64(Logger &logger, size_t &b64Len);

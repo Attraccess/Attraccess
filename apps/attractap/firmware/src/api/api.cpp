@@ -22,6 +22,10 @@ void API::updateSateInfo()
 
     if (!this->loopIsEnabled && apiState.authenticated)
     {
+        // Offline the init screen shows; no plugin content may linger or start anything.
+        this->clearUiSlots();
+        this->setCardSessionId(nullptr);
+        if (this->uiStepCancelCallback) this->uiStepCancelCallback("");
         State::setApiState(false, "");
     }
 }
@@ -46,9 +50,35 @@ void API::setFirmwareUpdateMetaCallback(std::function<bool(std::string available
     this->firmwareUpdateMetaCallback = callback;
 }
 
+#ifdef ATTRACTAP_UI_SELFTEST
+void API::testInject(const char *json, size_t len)
+{
+    std::lock_guard<std::mutex> guard(testInjectMutex);
+    testInjectQueue.emplace_back(json, len);
+}
+#endif
+
 void API::loop()
 {
     this->transport.loop();
+#ifdef ATTRACTAP_UI_SELFTEST
+    for (;;)
+    {
+        std::string next;
+        {
+            std::lock_guard<std::mutex> guard(testInjectMutex);
+            if (testInjectQueue.empty()) break;
+            next = std::move(testInjectQueue.front());
+            testInjectQueue.pop_front();
+        }
+        this->processIncomingMessage(next.c_str(), next.size());
+    }
+#endif
+    DeferredUiAck ack;
+    UiRenderReport report;
+    const int due = this->takeDueUiReply(ack, report);
+    if (due == 1) this->sendAck(ack.type, ack.messageId, false);
+    else if (due == 2) this->sendUiRenderReport(report);
     this->updateSateInfo();
 
     // Only send heartbeat when connection is usable
@@ -75,9 +105,13 @@ void API::setInsufficientBalanceCallback(std::function<void(bool sumUpEnabled)> 
     this->insufficientBalanceCallback = callback;
 }
 
-void API::sendAck(const char *type)
+void API::sendAck(const char *type, uint32_t messageId, bool paced)
 {
-    this->sendMessage(("ACK_" + std::string(type)).c_str());
+    if (paced && strncmp(type, "UI_", 3) == 0 && this->deferUiReply(type, messageId, nullptr)) return;
+    JsonDocument doc;
+    JsonObject payload = doc.to<JsonObject>();
+    // UI_* acks echo the server's messageId so it can match them per contribution.
+    this->sendMessage(("ACK_" + std::string(type)).c_str(), payload, messageId);
 }
 
 void API::sendMessage(const char *type)
@@ -87,11 +121,12 @@ void API::sendMessage(const char *type)
     this->sendMessage(type, payload);
 }
 
-bool API::sendMessage(const char *type, JsonObject payload)
+bool API::sendMessage(const char *type, JsonObject payload, uint32_t messageId)
 {
     JsonDocument event;
     event["event"] = "EVENT";
     event["data"]["type"] = type;
+    if (messageId != 0) event["data"]["messageId"] = messageId;
 
     // Create a copy of the payload in the destination document
     JsonObject eventPayload = event["data"]["payload"].to<JsonObject>();
@@ -273,6 +308,7 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
             JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
             result.hasDuration = payload["durationSeconds"].is<uint32_t>();
             if (result.hasDuration) result.durationSeconds = payload["durationSeconds"].as<uint32_t>();
+            result.warning = payload["warning"] | false;
             result.hasOwnership = payload["endedOwnSession"].is<bool>();
             if (result.hasOwnership) result.endedOwnSession = payload["endedOwnSession"].as<bool>();
             this->actionResultCallback(result);
@@ -316,6 +352,23 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     {
         this->onResourceUsageFormPageResult(inboundDoc["data"].as<JsonObject>());
     }
+    else if (strcmp(eventType, "UI_SLOT_UPDATE") == 0)
+    {
+        this->onUiSlotUpdate(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "UI_STEP_REQUEST") == 0)
+    {
+        this->onUiStepRequest(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strcmp(eventType, "UI_STEP_CANCEL") == 0)
+    {
+        this->onUiStepCancel(inboundDoc["data"].as<JsonObject>());
+    }
+    else if (strncmp(eventType, "UI_", 3) == 0)
+    {
+        // Reserved phase 7 types (custom screens) and anything newer: acked, otherwise ignored.
+        logger.debug("Ignoring unsupported UI event");
+    }
     else
     {
         logger.error((std::string("Unknown event type: ") + eventType).c_str());
@@ -326,7 +379,8 @@ void API::processIncomingMessage(const char *buf, size_t len)
 {
     // Parse into persistent inboundDoc to avoid deep stack usage in websocket task (no filter; server sends only needed fields)
     inboundDoc.clear();
-    auto err = deserializeJson(inboundDoc, buf, len);
+    // A depth-5 UI tree sits ~12 levels deep inside the event envelope (object + array per level).
+    auto err = deserializeJson(inboundDoc, buf, len, DeserializationOption::NestingLimit(16));
     if (err)
     {
         logger.error((std::string("JSON parse error: ") + err.c_str()).c_str());
@@ -351,12 +405,17 @@ void API::processIncomingMessage(const char *buf, size_t len)
         strcmp(eventType, "STOP_RESOURCE_USAGE_SESSION") == 0 || strcmp(eventType, "LOCK_DOOR") == 0 ||
         strcmp(eventType, "UNLOCK_DOOR") == 0 || strcmp(eventType, "UNLATCH_DOOR") == 0 ||
         strcmp(eventType, "TRIGGER_FLOW_BUTTON") == 0;
-    const bool isActionFormRequest = strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0;
+    // UI_* types carry the server's messageId back in their ACK; every path below that acks uses it.
+    const bool isUiEvent = strncmp(eventType, "UI_", 3) == 0;
+    const uint32_t ackMessageId = isUiEvent ? (inboundDoc["data"]["messageId"] | 0u) : 0u;
+    // A step answers one START; a stale step must not open over a newer action. requestId 0 (post-stop) passes.
+    const bool isActionFormRequest = strcmp(eventType, "RESOURCE_USAGE_FORM_REQUEST") == 0 ||
+        strcmp(eventType, "UI_STEP_REQUEST") == 0;
     const uint32_t requestId = inboundDoc["data"]["payload"]["requestId"] | 0u;
     // A cancelled/timed-out request must not complete a later action, even on
     // the same resource. Untagged replies remain compatible with older APIs.
     if ((isActionResponse || isActionFormRequest) && !isCurrentResourceAction(requestId)) {
-        this->sendAck(eventType);
+        this->sendAck(eventType, ackMessageId);
         return;
     }
 
@@ -389,7 +448,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
     // Background stats failures must not interrupt start/stop controls with a popup.
     const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
-    if (!isUsageStatsEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
+    if (!isUsageStatsEvent && !isUiEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
         !isMassIntroductionEvent && inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
@@ -402,7 +461,9 @@ void API::processIncomingMessage(const char *buf, size_t len)
                     // Keep the server's original error available in logs; the
                     // UI may replace it with a safe English fallback below.
                     this->logger.error((std::string("Reader action reported error: ") + err).c_str());
-                    this->actionResultCallback({eventType, false, requestId, err, payload["sumUpEnabled"] | false});
+                    ActionResult failed{eventType, false, requestId, err, payload["sumUpEnabled"] | false};
+                    if (err == "START_BLOCKED") this->readBlockReason(payload["reason"], failed);
+                    this->actionResultCallback(failed);
                     this->sendAck(eventType);
                     return;
                 }
@@ -433,7 +494,7 @@ void API::processIncomingMessage(const char *buf, size_t len)
         }
     }
 
-    this->sendAck(eventType);
+    this->sendAck(eventType, ackMessageId);
 
     dispatchIncomingEvent(eventType, requestId);
 }

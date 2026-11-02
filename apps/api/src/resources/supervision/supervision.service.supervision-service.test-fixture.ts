@@ -2,6 +2,7 @@ import { ResourceUsage, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditService } from '../../audit/audit.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
+import { PreStartService } from '../usage/pre-start/pre-start.service';
 import { ResourceUsageService } from '../usage/sessions/resource-usage.service';
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
 import { SupervisionLiveEventType } from './dtos/supervisionLiveEvent.dto';
@@ -59,6 +60,7 @@ export function registerSupervisionServiceFixture() {
         { provide: ResourceIntroducersService, useValue: introducers },
         { provide: SupervisionLiveService, useValue: live },
         { provide: AuditService, useValue: audit },
+        { provide: PreStartService, useValue: { gateSupervision: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 

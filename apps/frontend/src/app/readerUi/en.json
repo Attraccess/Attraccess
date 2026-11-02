@@ -1,0 +1,80 @@
+{
+  "resource": {
+    "title": "Reader display",
+    "description": "How plugin widgets and start confirmations behave on Attractap readers",
+    "noScreenPolicy": {
+      "label": "Readers without a screen",
+      "description": "What happens when a plugin asks for a confirmation on a reader that cannot show it: Lite readers, readers with older firmware and readers paused after repeated crashes. \"Confirm with a second card tap\" works on Lite readers only; other readers without a screen block the start. \"Start with a warning\" starts without a confirmation.",
+      "default": "Plugin default",
+      "block": "Block the start",
+      "card-confirm": "Confirm with a second card tap",
+      "allow-with-warning": "Start with a warning"
+    },
+    "plugins": "Plugins",
+    "noPlugins": "No installed plugin uses reader widgets or start confirmations.",
+    "widgets": "Show widgets on readers",
+    "failurePolicy": {
+      "label": "If the plugin's check fails",
+      "fail-closed": "Block the start (recommended)",
+      "fail-open": "Allow the start"
+    },
+    "failOpenWarning": "\"Allow the start\" lets people start while the plugin cannot check the start. Every such start is recorded in the audit log.",
+    "save": "Save",
+    "saved": "Reader display settings saved",
+    "saveError": "Could not save reader display settings",
+    "loadError": "Could not load the reader display settings",
+    "retry": "Try again"
+  },
+  "reader": {
+    "widgets": "Show plugin widgets on this reader",
+    "widgetsDescription": "Widgets appear only when this and the resource setting are on.",
+    "contributions": "What plugins show on this reader",
+    "noContributions": "No plugin shows anything on this reader right now.",
+    "status": {
+      "rendered": "Shown",
+      "degraded": "Shown as plain text",
+      "skipped": "Not shown"
+    },
+    "reason": {
+      "old-firmware": "the reader's firmware is too old for plugin widgets",
+      "no-screen": "the reader has no screen",
+      "crash-loop-suspended": "paused after repeated reader crashes",
+      "widgets-disabled": "widgets are switched off",
+      "unsupported": "this reader cannot show it",
+      "expired": "no longer current",
+      "too-many-contributions": "the plugin shows too many widgets for this resource",
+      "provider-error": "the plugin did not answer",
+      "node-budget": "no room left on the reader's screen",
+      "invalid": "the plugin sent invalid content",
+      "reader": "the reader rejected it"
+    },
+    "savedImmediately": "Changes on this tab are saved immediately.",
+    "saved": "Reader display setting saved",
+    "saveError": "Could not save the reader display setting",
+    "resourceFallback": "Resource #{{id}}",
+    "slot": {
+      "listRow": "Resource list",
+      "detailsHeader": "Details header",
+      "detailsBody": "Details body",
+      "detailsSession": "Active session",
+      "allWidgets": "All widgets"
+    }
+  },
+  "alerts": {
+    "title": "Reader display alerts",
+    "none": "No open alerts.",
+    "clear": "Clear",
+    "kind": {
+      "breaker-open": "Plugin check keeps failing",
+      "load-failure": "Plugin failed to load",
+      "crash-loop": "Reader keeps crashing"
+    },
+    "clearError": "Could not clear the alert",
+    "readerFallback": "Reader #{{id}}",
+    "description": {
+      "breaker-open": "{{plugin}} failed to check several starts in a row, so it is no longer asked. Until it answers again, starts follow the \"If the plugin's check fails\" setting of each resource. The plugin is asked again automatically after 60 seconds; Clear asks it right away. If this keeps happening, check the plugin's log or disable the plugin.",
+      "load-failure": "{{plugin}} could not be loaded, so its start checks and confirmations are not applied and starts go ahead without them. Check the plugin's error on this page and reload or reinstall it. The alert ends when the plugin loads again.",
+      "crash-loop": "{{reader}} crashed repeatedly, so plugin widgets are paused on it and confirmations there follow the resource's \"Readers without a screen\" setting. Widgets return after 30 minutes without another crash, or right away with Clear. If it keeps crashing, update the reader's firmware or report the crash."
+    }
+  }
+}

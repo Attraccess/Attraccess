@@ -195,11 +195,12 @@ def flash_reader(target, image, *, erase=False):
     power_on_after_reset(target)
 
 
-def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, expect=None):
+def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, expect=None, check_ui_selftest=False):
     """Flash/reset, collect a bounded UART log, and capture the reader screen.
 
-    Artifacts survive failures. ``expect`` is an optional literal UART marker;
-    screen PNGs are inspection evidence, not an assertion of UI correctness.
+    Artifacts survive failures. ``expect`` is an optional literal UART marker (or a list of them);
+    ``check_ui_selftest`` additionally checks the numeric UI_* lines of the UI self-test build against the
+    pass criteria in ``ui_selftest``. Screen PNGs are inspection evidence, not an assertion of UI correctness.
     """
     if not 0 < log_seconds <= 3600 or not 0 < max_log_bytes <= 100_000_000:
         raise ValueError("Use 0 < log_seconds <= 3600 and 0 < max_log_bytes <= 100000000")
@@ -214,8 +215,13 @@ def smoke(target, image, output, *, log_seconds=15.0, max_log_bytes=1_048_576, e
     target.deactivate(console)
     screen = target.get_driver(ScreenCaptureDriver)
     screen.capture(output / "screen.png")
-    if expect is not None and expect.encode() not in (output / "serial.log").read_bytes():
-        raise AssertionError(f"UART log did not contain expected marker: {expect!r}")
+    log = (output / "serial.log").read_bytes()
+    for marker in ([expect] if isinstance(expect, str) else expect or []):
+        if marker.encode() not in log:
+            raise AssertionError(f"UART log did not contain expected marker: {marker!r}")
+    if check_ui_selftest:
+        from .ui_selftest import check
+        check(log.decode("utf-8", "replace"))
     return output
 
 

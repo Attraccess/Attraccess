@@ -4,6 +4,7 @@
 #include "application.hpp"
 #include "../state/state.hpp"
 #include "../platform.hpp"
+#include "../api/diagnostics/reset-reason.hpp"
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
 #include "esp_system.h"
@@ -16,44 +17,6 @@
 #define BOOT_DIAG_SNAPSHOT_INTERVAL_MS 60000
 #define BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS 60000
 
-#ifdef ESP_PLATFORM
-static const char *resetReasonToString(esp_reset_reason_t reason) {
-  switch (reason) {
-  case ESP_RST_POWERON:
-    return "POWERON";
-  case ESP_RST_EXT:
-    return "EXT";
-  case ESP_RST_SW:
-    return "SW";
-  case ESP_RST_PANIC:
-    return "PANIC";
-  case ESP_RST_INT_WDT:
-    return "INT_WDT";
-  case ESP_RST_TASK_WDT:
-    return "TASK_WDT";
-  case ESP_RST_WDT:
-    return "WDT";
-  case ESP_RST_DEEPSLEEP:
-    return "DEEPSLEEP";
-  case ESP_RST_BROWNOUT:
-    return "BROWNOUT";
-  case ESP_RST_SDIO:
-    return "SDIO";
-  case ESP_RST_USB:
-    return "USB"; // USB-Serial-JTAG chip reset, e.g. a host DTR/RTS (esptool) reset
-  case ESP_RST_JTAG:
-    return "JTAG";
-  case ESP_RST_EFUSE:
-    return "EFUSE";
-  case ESP_RST_PWR_GLITCH:
-    return "PWR_GLITCH";
-  case ESP_RST_CPU_LOCKUP:
-    return "CPU_LOCKUP"; // double exception, e.g. a stack overflow
-  default:
-    return "UNKNOWN";
-  }
-}
-#endif
 
 void Application::setupBootDiagnostics() {
 #ifdef ESP_PLATFORM
@@ -84,7 +47,7 @@ void Application::setupBootDiagnostics() {
     this->logger.errorf(
         "Prior boot: reset=%s uptime=%ums freeHeap=%u largestBlock=%u ws=%d "
         "wifi=%d -> %s",
-        resetReasonToString(reason), prior.uptimeMs, prior.freeInternalHeap,
+        crashResetReasonToString((uint8_t)reason), prior.uptimeMs, prior.freeInternalHeap,
         prior.largestFreeBlock, prior.websocketConnected, prior.wifiConnected,
         failureClass);
 
@@ -112,7 +75,7 @@ void Application::setupBootDiagnostics() {
     this->bootDiagPreferences.end();
   } else {
     this->logger.infof("No prior boot record (reset=%s)",
-                       resetReasonToString(reason));
+                       crashResetReasonToString((uint8_t)reason));
   }
 
   BootDiagnostics_t current = {

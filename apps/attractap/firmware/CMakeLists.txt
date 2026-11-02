@@ -19,6 +19,11 @@ option(ATTRACTAP_TEST_HOOKS "Compile the ui.* serial test hooks (display variant
 
 # Beeper state of a reader that has no saved beeper setting yet (fresh or
 # erased). Lab builds set it OFF; the setting itself still works.
+# Reader UI self-test (ATT-1187): fills every plugin slot, opens a step and the keyboard, runs the hostile
+# fixtures and prints UI_MEM/UI_STACK/UI_HEAP/UI_BUILD lines for `attractap-lab --check-ui-selftest`.
+# Real display variants only (not the demo variants), lab builds only; build_firmwares.py never sets it.
+option(ATTRACTAP_UI_SELFTEST "Compile the reader UI self-test scenario (lab builds only)" OFF)
+
 option(ATTRACTAP_BEEPER_DEFAULT "Enable the beeper on readers without a saved beeper setting" ON)
 
 set(ATTRACTAP_VARIANT_FILE "${CMAKE_CURRENT_LIST_DIR}/variants/${ATTRACTAP_VARIANT}.cmake")

@@ -53,6 +53,14 @@ import { PluginEventsService } from './plugin-events.service';
 
 import { registerPluginFlowNodes } from './flows/node-registry';
 
+import { collectReaderUiContributions } from './runtime/reader-ui-load';
+import {
+  invalidateReaderUi,
+  queueReaderUiContributions,
+  queueReaderUiLoadFailure,
+  ReaderUiWiring,
+  unregisterReaderUi,
+} from './runtime/reader-ui-wiring';
 import { loadPluginEntryExports } from './runtime/module-loader';
 
 import { PluginMqttService } from './plugin-mqtt.service';
@@ -173,6 +181,11 @@ export class PluginModule {
       } catch (error) {
         this.logger.error(`Error loading plugin ${manifest.name}`, error);
         PluginService.quarantinePlugin(manifest, error as Error);
+        queueReaderUiLoadFailure(
+          manifest.name,
+          (manifest.permissions ?? []).includes(PluginPermission.ACCESS_HOOKS),
+          error as Error,
+        );
       }
     }
 
@@ -187,6 +200,7 @@ export class PluginModule {
         NpmPluginService,
         PluginClassificationService,
         PluginLiveUpdatesService,
+        ReaderUiWiring,
       ],
       exports: [PluginEventsService],
       controllers: [PluginController],
@@ -238,10 +252,24 @@ export class PluginModule {
       );
     }
 
+    // Reader UI provider and access hooks. A permission mismatch throws and quarantines the plugin.
+    const readerUiContributions = collectReaderUiContributions(
+      manifest.name,
+      manifest.permissions ?? [],
+      exported as PluginBackendModule,
+      context,
+    );
+    // Queued only once the module was built: a plugin quarantined by a throwing register() or credential
+    // provider must not keep its hooks and widgets.
+    const queueReaderUi = () => {
+      if (readerUiContributions) queueReaderUiContributions(manifest.name, readerUiContributions);
+    };
+
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(
         `Plugin ${manifest.name} does not export a register(context) factory; loading its default export as a static module.`,
       );
+      queueReaderUi();
       return exported as DynamicModule;
     }
 
@@ -251,6 +279,7 @@ export class PluginModule {
       MqttCredentialProvisioningService.register(credentialProvider(context));
       this.logger.log(`Registered MQTT credential provider from plugin ${manifest.name}.`);
     }
+    queueReaderUi();
     return {
       ...pluginModule,
       providers: [
@@ -261,6 +290,7 @@ export class PluginModule {
             onModuleDestroy: () => {
               getImplementationClass().pluginMqtt().clearPlugin(manifest.id);
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);
+              unregisterReaderUi(manifest.name);
             },
           }),
         },
@@ -323,6 +353,7 @@ export class PluginModule {
           .get<PluginAuditHostProvider>(PLUGIN_AUDIT_HOST_PROVIDER, { strict: false }),
       ),
       manifest: PluginService.toManifestInfo(manifest),
+      readerUi: { invalidate: (scope) => invalidateReaderUi(manifest.name, scope) },
       logger: new Logger(`Plugin:${manifest.name}`),
       mqtt: {
         subscribe(serverId, topicFilter, handler) {

@@ -190,7 +190,8 @@ target_compile_options(attractap-demo-session-clock-tests PRIVATE -Wall -Wextra 
 target_link_libraries(attractap-demo-session-clock-tests PRIVATE attractap-production-host)
 add_test(NAME attractap-demo-session-clock-tests COMMAND attractap-demo-session-clock-tests)
 
-add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp tests/display/pending-approval.test.cpp)
+add_executable(attractap-desktop-display-tests tests/display/main.cpp tests/display/form-drafts.test.cpp tests/display/screens.test.cpp tests/display/pending-approval.test.cpp tests/display/ui-slots.test.cpp)
+target_compile_definitions(attractap-desktop-display-tests PRIVATE ATTRACTAP_UI_FIXTURES="${FIRMWARE_DIR}/tests/ui-fixtures")
 target_link_libraries(attractap-desktop-display-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-desktop-display-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-desktop-display-tests COMMAND attractap-desktop-display-tests)
@@ -215,6 +216,7 @@ add_executable(attractap-reader-workflow-tests ${ATTRACTAP_READER_TEST_SOURCES} 
 target_link_libraries(attractap-reader-workflow-tests PRIVATE attractap-desktop-runtime)
 target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)
+add_test(NAME attractap-reader-ui-tests COMMAND attractap-reader-workflow-tests --ui)
 add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
 add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
 set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)

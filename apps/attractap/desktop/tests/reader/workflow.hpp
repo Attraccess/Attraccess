@@ -34,6 +34,7 @@ struct ReaderWorkflow
     unsigned listVersion = 0;
     std::string username = "Alex";
     std::string userLocale = "de";
+    std::string cardSessionId; // sent with CARD_AUTHENTICATION_DATA when set
     bool userLanguageFallback = false;
 
     bool active = false, supervised = false;
@@ -70,7 +71,8 @@ struct ReaderWorkflow
         // a loaded host consumed the entire wall-clock interval in one tick.
         do {
             application.loop(); lv_timer_handler();
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            if (hostMillisFrozen()) hostAdvanceMillis(5); // test clock: no real waits
+            else std::this_thread::sleep_for(std::chrono::milliseconds(5));
             ++iterations;
         } while (iterations < 4 || static_cast<int32_t>(end - millis()) > 0);
     }
@@ -131,7 +133,7 @@ struct ReaderWorkflow
             assert(lv_screen_active() == Display::resourceListScreen.getScreen());
             drawerSettingsBeforeLogin = nullptr;
         }
-        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + "\",\"language\":\"" + userLocale + "\",\"languageFallback\":" + (userLanguageFallback ? "true" : "false") + R"(,"keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
+        server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + "\",\"language\":\"" + userLocale + "\",\"languageFallback\":" + (userLanguageFallback ? "true" : "false") + (cardSessionId.empty() ? "" : ",\"cardSessionId\":\"" + cardSessionId + "\"") + R"(,"keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true,"requiresSupervisor":)" + (supervised ? "true}" : "false}"));
         pump(250); nfc.setPresent(0, false);
         if (refresh) list();
         server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":1,"projects":[{"id":42,"name":"Werkstattprojekt"}]})");
@@ -150,5 +152,6 @@ struct ReaderWorkflow
     void testParallelSessions();
     void testWallClock();
     void testTimeouts();
+    void testUiPlugins();
     void testFirmwareUpdate(bool reset);
 };
