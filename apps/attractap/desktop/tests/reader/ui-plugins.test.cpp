@@ -165,6 +165,7 @@ void ReaderWorkflow::testUiPlugins()
 
     // --- Cancel -------------------------------------------------------------------------------------
     active = false; list(); click("Lasercutter");
+    clearStatus(); // the start success screen
     starts = server.count("START_RESOURCE_USAGE_SESSION");
     click("Ressource verwenden");
     server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), STEP_B, "confirm", 1, 60000, "Zweite Frage"), 42);
@@ -197,6 +198,7 @@ void ReaderWorkflow::testUiPlugins()
     // --- Expiry starts nothing ---------------------------------------------------------------------
     server.push("START_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
     active = false; list(); click("Lasercutter");
+    clearStatus(); // the start success screen
     starts = server.count("START_RESOURCE_USAGE_SESSION");
     click("Ressource verwenden");
     server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), "dddddddddddddddddddddd", "confirm", 1, 10000, "Laeuft ab"));
