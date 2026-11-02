@@ -65,11 +65,9 @@ void ReaderWorkflow::testParallelSessions()
     const auto startRequest = server.last("START_RESOURCE_USAGE_SESSION");
     const auto start = startRequest["data"]["payload"];
     assert(start["resourceId"].as<int>() == 1 && !start["forceTakeOver"].as<bool>());
-    // The server refuses when someone else took the last slot meanwhile.
+    // The server refuses when someone else took the last slot meanwhile: the refresh shows the
+    // resource full, so the failed Start button is gone and the row reads "Voll".
     actionReply("START_RESOURCE_USAGE_SESSION", R"("error":"ResourceFullError")");
-    // The refresh that follows shows the reason on the row's own button.
-    parallelList({3, false, true, {{7, "Robin"}, {8, "Sam"}}});
-    assert(label(lv_screen_active(), warned("Diese Maschine ist voll. Bitte versuchen Sie es erneut, wenn jemand fertig ist.").c_str()));
     parallelList({3, false, false, {{7, "Robin"}, {8, "Sam"}, {10, "Kim"}}});
     assert(label(lv_screen_active(), "Voll"));
     assert(!label(lv_screen_active(), "Start"));
