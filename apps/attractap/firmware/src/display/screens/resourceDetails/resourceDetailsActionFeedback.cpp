@@ -36,7 +36,16 @@ lv_obj_t *ResourceDetailsScreen::buttonFor(button_click_type_t type, const std::
    switch (type)
    {
    case BUTTON_CLICK_TYPE_START_SESSION: button = this->startSessionButton; break;
-   case BUTTON_CLICK_TYPE_STOP_SESSION: button = this->stopSessionButton; break;
+   case BUTTON_CLICK_TYPE_STOP_SESSION:
+      button = this->stopSessionButton;
+      if (this->lastActionUsageId)
+      {
+         button = nullptr;
+         for (size_t i = 0; i < this->otherSessionIds.size() && this->otherSessionsContainer; ++i)
+            if (this->otherSessionIds[i] == this->lastActionUsageId)
+               button = lv_obj_get_child(this->otherSessionsContainer, static_cast<int32_t>(i) + 1); // child 0 is the title
+      }
+      break;
    case BUTTON_CLICK_TYPE_LOCK_DOOR: button = this->lockDoorButton; break;
    case BUTTON_CLICK_TYPE_UNLOCK_DOOR: button = this->unlockDoorButton; break;
    case BUTTON_CLICK_TYPE_UNLATCH_DOOR: button = this->unlatchDoorButton; break;
@@ -55,6 +64,8 @@ std::string ResourceDetailsScreen::roleOf(button_click_type_t type) const
 {
    const bool takeOver = type == BUTTON_CLICK_TYPE_START_SESSION && this->startIsTakeover;
    const bool foreignStop = type == BUTTON_CLICK_TYPE_STOP_SESSION && this->stopIsForeign;
+   if (type == BUTTON_CLICK_TYPE_STOP_SESSION && this->lastActionUsageId)
+      return "stop session #" + std::to_string(this->lastActionUsageId);
    if (!takeOver && !foreignStop) return type == BUTTON_CLICK_TYPE_STOP_SESSION ? "stop" : "";
    return std::string(takeOver ? "take over " : "stop other ") + this->resourceCache.activeUser + " #" +
           std::to_string(this->resourceCache.activeUsageId);

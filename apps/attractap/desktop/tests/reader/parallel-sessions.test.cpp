@@ -67,8 +67,9 @@ void ReaderWorkflow::testParallelSessions()
     assert(start["resourceId"].as<int>() == 1 && !start["forceTakeOver"].as<bool>());
     // The server refuses when someone else took the last slot meanwhile.
     actionReply("START_RESOURCE_USAGE_SESSION", R"("error":"ResourceFullError")");
-    assert(label(lv_layer_top(), "Diese Maschine ist voll. Bitte versuchen Sie es erneut, wenn jemand fertig ist."));
-    Display::hidePopup();
+    // The refresh that follows shows the reason on the row's own button.
+    parallelList({3, false, true, {{7, "Robin"}, {8, "Sam"}}});
+    assert(label(lv_screen_active(), warned("Diese Maschine ist voll. Bitte versuchen Sie es erneut, wenn jemand fertig ist.").c_str()));
     parallelList({3, false, false, {{7, "Robin"}, {8, "Sam"}, {10, "Kim"}}});
     assert(label(lv_screen_active(), "Voll"));
     assert(!label(lv_screen_active(), "Start"));
@@ -99,7 +100,6 @@ void ReaderWorkflow::testParallelSessions()
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stops + 2);
     assert(server.last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["usageId"].isNull());
     actionReply("STOP_RESOURCE_USAGE_SESSION", R"("error":"Stop denied")");
-    Display::hidePopup();
 
     // A crowded machine lists at most 16 sessions (reader memory bound); the rest stay unlisted.
     std::vector<std::string> crowdNames;
@@ -116,8 +116,10 @@ void ReaderWorkflow::testParallelSessions()
     parallelList({3, false, false, {{7, "Robin"}, {10, "Kim"}, {11, "Lee"}}});
     click("Sitzung von Kim beenden");
     actionReply("STOP_RESOURCE_USAGE_SESSION", R"("error":"NoOwnActiveSessionError")");
-    assert(label(lv_layer_top(), "Sie haben hier keine eigene Sitzung. Es wurde nichts beendet."));
-    Display::hidePopup();
+    // The picker button that was tapped shows the reason; the other picker buttons stay as they are.
+    parallelList({3, false, false, {{7, "Robin"}, {10, "Kim"}, {11, "Lee"}}});
+    assert(label(lv_screen_active(), warned("Sie haben hier keine eigene Sitzung. Es wurde nichts beendet.").c_str()));
+    assert(label(lv_screen_active(), "Sitzung von Lee beenden"));
 
     // Ownership follows the own session the server names, even when another session is shown.
     parallelList({3, true, false, {{7, "Robin"}, {10, "Kim"}}, true, false, false});
@@ -128,7 +130,6 @@ void ReaderWorkflow::testParallelSessions()
     click("Sitzung beenden");
     assert(server.last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["usageId"].isNull());
     actionReply("STOP_RESOURCE_USAGE_SESSION", R"("error":"Stop denied")");
-    Display::hidePopup();
 
     // A card that may only end other sessions (no introducer/manager role) still gets the picker.
     parallelList({3, false, false, {{7, "Robin"}, {10, "Kim"}, {11, "Lee"}}, false, true});
@@ -137,7 +138,6 @@ void ReaderWorkflow::testParallelSessions()
     click("Sitzung von Lee beenden");
     assert(server.last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["usageId"].as<int>() == 11);
     actionReply("STOP_RESOURCE_USAGE_SESSION", R"("error":"Stop denied")");
-    Display::hidePopup();
     parallelList({3, false, false, {{7, "Robin"}, {10, "Kim"}, {11, "Lee"}}, false, false});
     assert(!label(lv_screen_active(), "Sitzung von Lee beenden") ||
            !lv_obj_is_visible(requireLabel(lv_screen_active(), "Sitzung von Lee beenden")));
@@ -170,7 +170,6 @@ void ReaderWorkflow::testParallelSessions()
     click("Fremde Sitzung beenden");
     assert(server.last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["usageId"].as<int>() == 7);
     actionReply("STOP_RESOURCE_USAGE_SESSION", R"("error":"Stop denied")");
-    Display::hidePopup();
     parallelList({1, false, false, {{7, "Robin"}}});
     click(LV_SYMBOL_LEFT);
     assert(label(lv_screen_active(), "In Verwendung: Robin"));
