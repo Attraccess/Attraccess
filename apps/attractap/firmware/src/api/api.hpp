@@ -544,10 +544,6 @@ private:
 
     void sendResourceAction(const char *type, JsonObject payload);
 
-    // Persistent scratch buffer to avoid large stack allocations when parsing resource lists
-
-    // Persistent inbound JSON document to avoid large stack usage in websocket task
-
     void sendHeartbeat();
 
     void onUnauthorized(JsonObject data);
