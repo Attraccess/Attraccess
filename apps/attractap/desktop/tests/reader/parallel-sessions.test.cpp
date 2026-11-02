@@ -88,6 +88,7 @@ void ReaderWorkflow::testParallelSessions()
     assert(forceStop["resourceId"].as<int>() == 1 && forceStop["usageId"].as<int>() == 8);
     actionReply("STOP_RESOURCE_USAGE_SESSION", R"("success":true,"endedOwnSession":false)");
     parallelList({3, false, true, {{7, "Robin"}, {10, "Kim"}}});
+    clearStatus(); // the stop success screen
 
     // My own session: "In use by you" and Stop, which never names a usageId.
     parallelList({3, true, false, {{7, "Robin"}, {10, "Kim"}}});
@@ -153,6 +154,7 @@ void ReaderWorkflow::testParallelSessions()
     assert(server.last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["usageId"].as<int>() == 7);
     actionReply("STOP_RESOURCE_USAGE_SESSION", R"("success":true,"endedOwnSession":false)");
     parallelList({1, false, false, {{12, "Sam"}}});
+    clearStatus(); // the stop success screen
     click(LV_SYMBOL_LEFT);
     assert(label(lv_screen_active(), "In Verwendung: Sam"));
     parallelList({1, false, false, {{7, "Robin"}, {12, "Sam"}}});
