@@ -20,6 +20,7 @@
 #include "screens/noResources/noResourcesScreen.hpp"
 #include "screens/resourceList/resourceListScreen.hpp"
 #include "screens/resourceDetails/resourceDetailsScreen.hpp"
+#include "ui/ui_step_modal.hpp"
 #include "screens/enrollment/enrollmentScreen.hpp"
 #include "screens/reset/resetScreen.hpp"
 #include "screens/supervision/supervisionScreen.hpp"
@@ -64,6 +65,8 @@ public:
     static SessionSummaryScreen sessionSummaryScreen;
     static ResourceListScreen resourceListScreen;
     static ResourceDetailsScreen resourceDetailsScreen;
+    // Plugin confirm / choose / info steps and the post-stop question (ATT-1187).
+    static ui::StepModal stepModal;
     static EnrollmentScreen enrollmentScreen;
     static ResetScreen resetScreen;
     static SupervisionScreen supervisionScreen;

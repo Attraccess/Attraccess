@@ -189,3 +189,5 @@ export * from './1791700000000-attractap-crash-report-created-at-index';
 export * from './1791800000000-attractap-pairing';
 export * from './1791900000000-backfill-saml-auth-details';
 export * from './1792000000000-parallel-machine-sessions';
+export * from './1792100000000-attractap-reader-ui-capabilities';
+export * from './1792200000000-reader-ui-settings';

@@ -349,7 +349,7 @@ void Application::setupDisplayCallbacks()
   // Hidden maintenance drawer (pull down from the top edge)
   Display::setDrawerAvailableCallback([this]() {
     return !this->sessionSummaryActive && !this->cardAuthenticationPending && this->pendingUiAction.empty() &&
-           !this->waitingForResourceRefresh && !this->hasPendingFormRequest &&
+           !this->waitingForResourceRefresh && !this->hasPendingFormRequest && !this->uiStepOpen &&
            this->state != APPLICATION_STATE_SUPERVISION && this->state != APPLICATION_STATE_MASS_INTRODUCTION;
   });
   Display::setOnOpenSettingsCallback([this]() {

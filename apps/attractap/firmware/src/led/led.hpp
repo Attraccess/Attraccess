@@ -19,6 +19,8 @@ public:
         LED_STATE_NO_RESOURCES,
         LED_STATE_FIRMWARE_UPDATE,
         LED_STATE_ENROLLMENT_PENDING,
+        // Lite card-confirm: amber ring drains over the confirm window (LedFeedback::Pattern::ConfirmWait).
+        LED_STATE_CONFIRM_WAIT,
     };
 
     LedController() : _strip(WS2812_LED_COUNT, PIN_WS2812_DATA) {}
@@ -33,12 +35,22 @@ public:
     void triggerSuccess();
     void triggerError();
     void triggerIndicate();
+    // Steady amber half ring for 3 s: a plugin says the resource is reserved (Lite, no screen).
+    // With `thenBlocked` the error flash follows (a blocked start that names a reservation).
+    void triggerReserved(bool thenBlocked = false);
+    // Amber blink for allow-with-warning.
+    void triggerWarning();
+    // Starts LED_STATE_CONFIRM_WAIT for `windowMs`; the state falls back to WAIT_FOR_CARD afterwards.
+    void beginConfirmWait(uint32_t windowMs);
+    void endConfirmWait();
 
 private:
     void runAnimation();
     void runCircularAnimation();
     void runLinearAnimation();
     void runEnrollmentPending();
+    void runConfirmWait();
+    bool runFeedbackTrigger(uint32_t elapsed);
     uint8_t idleBreathBrightness() const;
     void setAll(uint32_t color);
     bool isCircularRing() const;
@@ -56,9 +68,14 @@ private:
         TRIGGER_SUCCESS,
         TRIGGER_ERROR,
         TRIGGER_INDICATE,
+        TRIGGER_RESERVED,
+        TRIGGER_WARNING,
     };
     TriggerType _trigger = TRIGGER_NONE;
     uint32_t _triggerStartMs = 0;
+    bool _blockedAfterReserved = false;
+    uint32_t _confirmWaitStartMs = 0;
+    uint32_t _confirmWaitWindowMs = 0;
     LedState _stateBeforeTrigger = LED_STATE_WAIT_FOR_CARD;
 
     // Written by the application task, read by the LED task.
@@ -71,7 +88,6 @@ private:
 
     static constexpr uint32_t ANIM_INTERVAL_MS = 50;
     static constexpr uint32_t TRIGGER_DURATION_MS = 400;
-    static constexpr uint32_t TRIGGER_ERROR_FLASH_MS = 100;
 
     static constexpr uint8_t IDLE_BRIGHTNESS_MIN = 8;
     static constexpr uint8_t IDLE_BRIGHTNESS_MAX = 38;

@@ -44,15 +44,15 @@ export function MaintenanceInProgressDisplay(props: Props) {
   return (
     <div className="flex flex-col gap-4">
       {(activeMaintenances?.data ?? []).map((maintenance) => (
-        <Alert status="warning"
-          key={maintenance.id}
-        >
+        <Alert status="warning" key={maintenance.id}>
           <AlertContent>
             <AlertTitle>{t('alert.title')}</AlertTitle>
-            <AlertDescription>{t('alert.description', {
-            start: formatDateTime(maintenance.startTime, t('alert.noDate')),
-            end: formatDateTime(maintenance.endTime, t('alert.noDate')),
-          })}</AlertDescription>
+            <AlertDescription>
+              {t('alert.description', {
+                start: formatDateTime(maintenance.startTime, t('alert.noDate')),
+                end: formatDateTime(maintenance.endTime, t('alert.noDate')),
+              })}
+            </AlertDescription>
             <div className="mt-4 flex flex-col">
               <small className="text-sm text-gray-500">{t('alert.reason.label')}</small>
               <p className="text-lg whitespace-pre-wrap">

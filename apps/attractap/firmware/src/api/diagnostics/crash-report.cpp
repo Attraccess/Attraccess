@@ -215,6 +215,16 @@ const char *crashResetReasonToString(uint8_t reason)
         return "BROWNOUT";
     case ESP_RST_SDIO:
         return "SDIO";
+    case ESP_RST_USB:
+        return "USB"; // USB-Serial-JTAG chip reset, e.g. a host DTR/RTS (esptool) reset
+    case ESP_RST_JTAG:
+        return "JTAG";
+    case ESP_RST_EFUSE:
+        return "EFUSE";
+    case ESP_RST_PWR_GLITCH:
+        return "PWR_GLITCH";
+    case ESP_RST_CPU_LOCKUP:
+        return "CPU_LOCKUP"; // double exception, e.g. a stack overflow
     default:
         return "UNKNOWN";
     }

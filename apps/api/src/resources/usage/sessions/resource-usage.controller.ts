@@ -2,7 +2,18 @@ import { ResourceUsage } from '@attraccess/database-entities';
 
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
-import { Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, Body, Put } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  Req,
+  Body,
+  Put,
+} from '@nestjs/common';
 
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
@@ -13,6 +24,8 @@ import { GetResourceHistoryQueryDto } from '../dtos/getResourceHistoryQuery.dto'
 import { GetResourceHistoryResponseDto } from '../dtos/GetResourceHistoryResponse.dto';
 
 import { ResourceUsageService } from './resource-usage.service';
+import { PreStartService } from '../pre-start/pre-start.service';
+import { SessionEndNotifier } from '../pre-start/session-end-notifier.service';
 import { ResourceActivityVisibilityService } from '../authorization/resource-activity-visibility.service';
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
@@ -28,6 +41,8 @@ export class ResourceUsageController {
   constructor(
     protected readonly resourceUsageService: ResourceUsageService,
     protected readonly activityVisibility: ResourceActivityVisibilityService,
+    protected readonly preStart: PreStartService,
+    protected readonly sessionEnd: SessionEndNotifier,
   ) {}
 
   @Post('lock')
@@ -208,6 +223,10 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
+    await this.preStart.gateHttp(resourceId, req.user, dto, {
+      origin: req.user.authenticationMethod === 'api-token' ? 'api' : 'web',
+      ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
+    });
     return this.resourceUsageService.startSession(resourceId, req.user, dto, {
       auditOrigin: {
         actorId: req.user.id,
@@ -243,13 +262,22 @@ export class ResourceUsageController {
     @Body() dto: EndUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    return this.resourceUsageService.endSession(resourceId, req.user, dto, {
+    const ended = await this.resourceUsageService.endSession(resourceId, req.user, dto, {
       auditOrigin: {
         actorId: req.user.id,
         authenticationMethod: req.user.authenticationMethod,
         ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
       },
     });
+    if (ended) {
+      // Nobody can answer an after-stop question on web/API, also when a manager ends someone else's session.
+      void this.sessionEnd.applyDefault(
+        { resourceId, userId: ended.userId, sessionId: ended.id },
+        req.user.authenticationMethod === 'api-token' ? 'api' : 'web',
+        req.user.locale,
+      );
+    }
+    return ended;
   }
 
   @Put('sessions/:usageId/project')

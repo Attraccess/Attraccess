@@ -51,15 +51,20 @@ void ResourceDetailsScreen::init()
    lv_obj_set_style_pad_row(this->body, lv_obj_get_style_pad_row(this->screen, LV_PART_MAIN), LV_PART_MAIN);
 
    this->createResourceHeader();
+   this->createUiSlotContainer(UiSlotKind::Header);
 
    this->createSessionDetails();
+   this->createUiSlotContainer(UiSlotKind::Session);
 
    this->createSessionControls();
 
    this->createDoorControls();
 
    this->createStatusPanels();
+   this->createUiSlotContainer(UiSlotKind::Body);
 
+   // Slots first, deferred: applyCachedState() then finds them current and does not build them a second time.
+   this->refreshUiSlots(true);
    this->applyCachedState();
    if (this->actionInProgress) this->showActionProgress(this->actionTitle);
    // Back from a screen shown over the details (status, forms, ...) while a request is still
@@ -150,11 +155,16 @@ void ResourceDetailsScreen::destroy()
       lv_obj_del(this->screen);
    }
 
+   this->uiBuildGeneration++;
+   this->uiBuilt = false;
    this->screen = nullptr;
    this->body = nullptr;
    sessionHeader.detach();
    actionOverlay.detach();
    this->sessionDetailsContainer = nullptr;
+   this->uiSlotHeader = nullptr;
+   this->uiSlotBody = nullptr;
+   this->uiSlotSession = nullptr;
    this->resourceName = nullptr;
    this->resourceDescription = nullptr;
    this->sessionStartTimeLabel = nullptr;
@@ -264,6 +274,7 @@ void ResourceDetailsScreen::setResourceAndUsageDetails(const API::ResourceBrief 
 
    const bool multi = resource.isMultiSession();
    this->updateOccupancy();
+   this->refreshUiSlots();
    // ponytail: always hide here; refreshAccessState() reveals it only to the session owner
    lv_obj_add_flag(this->flowButtonsContainer, LV_OBJ_FLAG_HIDDEN);
 

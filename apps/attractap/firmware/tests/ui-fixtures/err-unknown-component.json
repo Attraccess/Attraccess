@@ -1,0 +1,19 @@
+{
+  "name": "err-unknown-component",
+  "kind": "slot-update",
+  "verdict": "reject:unknown-component",
+  "note": "",
+  "payload": {
+    "resourceId": 12,
+    "slot": "resource.details.body",
+    "revision": 1,
+    "owner": "reservations",
+    "key": "res-state",
+    "serverNowMs": 1790000000000,
+    "expiresAtMs": 1790003600000,
+    "tree": {
+      "t": "image",
+      "src": "http://evil"
+    }
+  }
+}

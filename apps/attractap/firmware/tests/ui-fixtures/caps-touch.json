@@ -1,0 +1,51 @@
+{
+  "name": "caps-touch",
+  "kind": "capabilities",
+  "verdict": "accept",
+  "note": "",
+  "payload": {
+    "schemaVersion": 1,
+    "components": [
+      "col",
+      "row",
+      "text",
+      "badge",
+      "icon",
+      "button",
+      "progress",
+      "countdown",
+      "spacer"
+    ],
+    "slots": [
+      "resourceList.row.status",
+      "resource.details.header",
+      "resource.details.body",
+      "resource.details.session"
+    ],
+    "steps": [
+      "confirm",
+      "choose",
+      "info"
+    ],
+    "maxPayloadBytes": 3072,
+    "maxNodes": 32,
+    "maxDepth": 5,
+    "maxLiveNodes": 64,
+    "display": {
+      "w": 480,
+      "h": 480,
+      "touch": true
+    },
+    "input": {
+      "touch": true,
+      "buttons": 0,
+      "cardHold": true
+    },
+    "feedback": {
+      "leds": false,
+      "beeper": true
+    },
+    "charset": "latin1",
+    "images": false
+  }
+}

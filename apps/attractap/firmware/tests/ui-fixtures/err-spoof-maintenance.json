@@ -1,0 +1,19 @@
+{
+  "name": "err-spoof-maintenance",
+  "kind": "slot-update",
+  "verdict": "reject:core-string-spoof",
+  "note": "",
+  "payload": {
+    "resourceId": 12,
+    "slot": "resource.details.header",
+    "revision": 1,
+    "owner": "reservations",
+    "key": "res-state",
+    "serverNowMs": 1790000000000,
+    "expiresAtMs": 1790003600000,
+    "tree": {
+      "t": "text",
+      "text": "Maintenance"
+    }
+  }
+}

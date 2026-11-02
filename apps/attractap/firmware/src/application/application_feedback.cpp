@@ -71,6 +71,13 @@ void Application::reportActionFailure(const API::ActionResult &result, uint32_t 
   } else if (result.error == "INSUFFICIENT_BALANCE") {
     this->beeper.errorBeep();
     this->showStatus(StatusScreen::warning(FirmwareI18n::Message::InsufficientBalance, FirmwareI18n::readerError("INSUFFICIENT_BALANCE")), returnToList);
+  } else if (result.error == "START_BLOCKED" && !result.blockTitle.empty()) {
+    // A plugin refused the start: its own words, and only those, as a full-screen warning.
+    this->beeper.errorBeep();
+    this->showStatus(StatusScreen::warning(
+                         FirmwareI18n::Text::literal(result.blockTitle) /* i18n-data: Plugin block reason title, localized by the plugin. */,
+                         FirmwareI18n::Text::literal(result.blockBody) /* i18n-data: Plugin block reason body, localized by the plugin. */),
+                     returnToList);
   } else {
     this->showActionFailure(resourceId, result.error, FirmwareI18n::Text(), returnToList);
   }

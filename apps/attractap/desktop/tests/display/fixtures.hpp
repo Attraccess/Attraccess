@@ -148,4 +148,6 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testStatusScreens(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testConfirmScreen(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testPendingApproval(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testReaderUiFixtures(SdlDisplay &display, const std::filesystem::path &screenshots);
+void testReaderUiStepModal(SdlDisplay &display, const std::filesystem::path &screenshots);
 void testLockscreen(SdlDisplay &display, const std::filesystem::path &screenshots);

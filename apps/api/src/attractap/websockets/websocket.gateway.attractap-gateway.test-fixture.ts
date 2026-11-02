@@ -41,6 +41,17 @@ import { PairingService } from '../security/pairing.service';
 import { ReaderSessionService } from '../security/reader-session.service';
 import { AttractapSupervisionHandler } from './handlers/supervision/supervision.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
+import { AttractapUiHandler } from './handlers/ui/ui.handler';
+import { CardSessionService } from './handlers/ui/card-session.service';
+import { UiAuditService } from './handlers/ui/ui-audit.service';
+import { UiSlotService } from './handlers/ui/ui-slot.service';
+import { UiStepService } from './handlers/ui/ui-step.service';
+import { ReaderStartGate } from './handlers/session/reader-start-gate.service';
+import { PreStartService } from '../../resources/usage/pre-start/pre-start.service';
+import { SessionEndNotifier } from '../../resources/usage/pre-start/session-end-notifier.service';
+import { ReaderUiAlertsService } from '../../plugin-system/reader-ui/reader-ui-alerts.service';
+import { ReaderUiSettingsService } from '../../plugin-system/reader-ui/reader-ui-settings.service';
+import { ReaderUiRegistry } from '../../plugin-system/reader-ui/reader-ui.registry';
 import { MassIntroductionService } from '../../resources/mass-introductions/mass-introduction.service';
 import { AttractapGateway } from './websocket.gateway';
 import { WebsocketService } from './websocket.service';
@@ -129,6 +140,20 @@ export function gatewayProviders(
     AttractapProjectsHandler,
     AttractapSupervisionHandler,
     AttractapMassIntroductionHandler,
+    { provide: PreStartService, useValue: { hasHooks: () => false, evaluate: jest.fn() } },
+    { provide: SessionEndNotifier, useValue: { ask: jest.fn().mockResolvedValue(null) } },
+    { provide: ReaderUiRegistry, useValue: { providers: () => [] } },
+    { provide: ReaderUiSettingsService, useValue: { widgetsEnabled: jest.fn().mockResolvedValue(true) } },
+    {
+      provide: ReaderUiAlertsService,
+      useValue: { isReaderSuspended: () => false, onCleared: jest.fn(), touchCrash: jest.fn(), raise: jest.fn() },
+    },
+    CardSessionService,
+    UiAuditService,
+    UiStepService,
+    UiSlotService,
+    AttractapUiHandler,
+    ReaderStartGate,
     ...security,
   ];
 }

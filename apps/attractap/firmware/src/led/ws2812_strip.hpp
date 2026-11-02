@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include "led_strip.h"
+#include "led_feedback.hpp"
 
 /**
  * Minimal Adafruit_NeoPixel-compatible facade over the ESP-IDF led_strip
@@ -12,7 +13,7 @@
  * the global brightness is applied at show() time, which is the behavior the
  * animation code was written against.
  */
-class Ws2812Strip
+class Ws2812Strip : public LedFeedback::Strip
 {
 public:
     Ws2812Strip(uint16_t count, int gpio) : _count(count), _gpio(gpio) {}
@@ -40,11 +41,11 @@ public:
         return ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
     }
 
-    uint16_t numPixels() const { return _count; }
+    uint16_t numPixels() const override { return _count; }
 
     void setBrightness(uint8_t brightness) { _brightness = brightness; }
 
-    void setPixelColor(uint16_t index, uint32_t color)
+    void setPixelColor(uint16_t index, uint32_t color) override
     {
         if (_pixels && index < _count)
         {
@@ -52,7 +53,7 @@ public:
         }
     }
 
-    void show()
+    void show() override
     {
         if (!_strip || !_pixels)
         {

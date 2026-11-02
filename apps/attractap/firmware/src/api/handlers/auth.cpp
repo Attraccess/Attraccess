@@ -4,10 +4,17 @@
 
 #include "../api.hpp"
 #include "../../clock/wall_clock.hpp"
+#include "../../platform.hpp"
+#include "../../display/ui/ui_capabilities.hpp"
+#include "../diagnostics/reset-reason.hpp"
+#ifdef ESP_PLATFORM
+#include "esp_system.h"
+#endif
 #include <cmath>
 #include <functional>
 #include <limits>
 #include <string>
+
 
 void API::onUnauthorized(JsonObject data)
 {
@@ -82,34 +89,34 @@ void API::sendFirmwareInfo()
 {
     this->logger.info("Requested firmware info");
 
-    JsonDocument event;
-    event["event"] = "EVENT";
-    event["data"]["type"] = "READER_FIRMWARE_INFO";
-    event["data"]["payload"]["name"] = FIRMWARE_NAME;
-    event["data"]["payload"]["variant"] = FIRMWARE_VARIANT;
-    event["data"]["payload"]["version"] = FIRMWARE_VERSION;
-    event["data"]["payload"]["capabilities"]["resourceSelection"] =
+    ui::VariantTraits traits{};
 #ifdef HAS_LVGL_DISPLAY
-        true;
-#else
-        false;
+    traits.hasDisplay = true;
+    traits.touch = true;
+    traits.displayWidth = 480;
+    traits.displayHeight = 480;
 #endif
-    event["data"]["payload"]["capabilities"]["cardEnrollment"] =
-#ifdef HAS_LVGL_DISPLAY
-        true;
-#else
-        false;
-#endif
-    event["data"]["payload"]["capabilities"]["hasLeds"] =
 #ifdef HAS_WS2812_LED
-        true;
-#else
-        false;
+    traits.hasLeds = true;
+    traits.cardConfirm = true;
 #endif
+#if defined(BEEPER_PIN) || defined(HAS_IO_EXPANDER) // touch readers drive the beeper through the IO expander
+    traits.hasBeeper = true;
+#endif
+#ifdef ESP_PLATFORM
+    const char *resetReason = crashResetReasonToString((uint8_t)esp_reset_reason());
+#else
+    const char *resetReason = "POWERON"; // the simulator always starts cold
+#endif
+    JsonDocument event;
+    char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
+    ui::buildFirmwareInfo(event, {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION, resetReason, millis()}, traits,
+                          uiCaps, sizeof uiCaps);
 
-    char json[JSON_OUTBUF_SMALL];
+    // The ui block makes this message ~730 B; 256 B would be truncated silently.
+    char json[JSON_OUTBUF_AUTH];
     size_t n = serializeJson(event, json, sizeof(json));
-    if (n == 0)
+    if (n == 0 || n >= sizeof(json))
     {
         this->logger.error("Failed to serialize firmware info");
         return;
@@ -122,6 +129,8 @@ void API::onReaderAuthenticated(JsonObject data)
     logger.info("READER_AUTHENTICATED");
     resourceListMessageCounter = resourceListRevision = 0;
     cancelResourceAction();
+    // Both sides restart UI revisions at 1 after (re)authentication.
+    clearUiSlots();
 
     std::string deviceName = data["payload"]["name"].as<std::string>();
     const char *language = data["payload"]["language"].as<const char *>();
