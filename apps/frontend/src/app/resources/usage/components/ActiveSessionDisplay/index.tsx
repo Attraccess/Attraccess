@@ -100,10 +100,10 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
 
       endSession.mutate({
         resourceId,
-        requestBody: { ...body, formSubmissions },
+        requestBody: { ...body, usageId, formSubmissions },
       });
     },
-    [endSession, requestForms, resourceId],
+    [endSession, requestForms, resourceId, usageId],
   );
 
   const immediatelyEndSession = useCallback(() => {
@@ -118,7 +118,11 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
     setIsNotesModalOpen(true);
   };
 
-  const { data: activeSession } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
+  const { data: activeSessionResponse } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
+  // my own session by id: with parallel sessions `usage` may not be the one shown here
+  const myUsage =
+    activeSessionResponse?.usages?.find((usage) => usage.id === usageId) ??
+    (activeSessionResponse?.usage?.id === usageId ? activeSessionResponse.usage : undefined);
 
   return (
     <>
@@ -131,18 +135,18 @@ export function ActiveSessionDisplay({ resourceId, usageId, startTime }: ActiveS
       >
         <SessionTimer startTime={startTime} variant="hero" />
 
-        {(activeSession?.usage?.project || activeSession?.usage?.supervisorUser) && (
+        {(myUsage?.project || myUsage?.supervisorUser) && (
           <div className="border-t border-divider pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {activeSession?.usage?.project && (
+            {myUsage?.project && (
               <div className="min-w-0">
                 <p className="text-xs uppercase tracking-wide text-default-500">{t('project')}</p>
-                <p className="font-medium text-foreground truncate">{activeSession.usage.project.name}</p>
+                <p className="font-medium text-foreground truncate">{myUsage.project.name}</p>
               </div>
             )}
-            {activeSession?.usage?.supervisorUser && (
+            {myUsage?.supervisorUser && (
               <div className="min-w-0">
                 <p className="text-xs uppercase tracking-wide text-default-500 mb-1">{t('supervisedBy')}</p>
-                <AttraccessUser user={activeSession.usage.supervisorUser} />
+                <AttraccessUser user={myUsage.supervisorUser} />
               </div>
             )}
           </div>

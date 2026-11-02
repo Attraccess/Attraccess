@@ -38,6 +38,10 @@ All URL fields are filled in automatically.
 | **Client ID** | Client identifier | `attraccess` |
 | **Client Secret** | Client secret | (stored encrypted) |
 
+### Email Verification
+
+If the identity provider sends `email_verified=false` (boolean or string), the email address is not used to match or link an existing account. A new account is created with an unverified email address. If that email address already belongs to another account, the login is rejected with `SSO_EMAIL_NOT_VERIFIED`. If the claim is absent, the email is trusted as before.
+
 ### Scopes
 
 Optionally specify additional OIDC scopes (comma-separated). Default scopes are requested automatically.

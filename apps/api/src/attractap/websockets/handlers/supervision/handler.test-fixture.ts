@@ -10,7 +10,7 @@ export function registerAttractapSupervisionHandlerFixture() {
 
   let websocketService: { sockets: Map<string, AuthenticatedWebSocket> };
 
-  let resourceUsageService: { getActiveSession: jest.Mock; validateSupervisedStart: jest.Mock };
+  let resourceUsageService: { getActiveSessionsForResource: jest.Mock; validateSupervisedStart: jest.Mock };
 
   let supervisionService: {
     setReaderArmer: jest.Mock;
@@ -69,7 +69,7 @@ export function registerAttractapSupervisionHandlerFixture() {
     };
     websocketService = { sockets: new Map() };
     resourceUsageService = {
-      getActiveSession: jest.fn().mockResolvedValue(null),
+      getActiveSessionsForResource: jest.fn().mockResolvedValue([]),
       validateSupervisedStart: jest.fn().mockResolvedValue(undefined),
     };
     supervisionService = {

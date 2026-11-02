@@ -238,6 +238,7 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     resourceUsageService = {
       logger: new Logger(ResourceUsageService.name),
       getActiveSession: jest.fn().mockResolvedValue({ id: 'ru-1' }),
+      getActiveSessionsForResource: jest.fn().mockResolvedValue([{ id: 'ru-1' }]),
     } as unknown as ResourceUsageService;
     eventEmitter = new EventEmitter2();
 

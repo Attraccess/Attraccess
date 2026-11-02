@@ -26,6 +26,12 @@ from support import Api, ReaderConsole
 ENVIRONMENT = Path(__file__).parents[1] / "example-emulator-env.yaml"
 PIN = os.environ.get("READER_PIN", "4711")
 CARD_UIDS = ("08a11ce1", "08b0b001", "08ca0101")
+# The firmware variant under test; run.sh defaults it to the place name without its -<n>.
+READER_VARIANT = os.environ.get("READER_VARIANT", "")
+# Variants whose reader powers up only after a press of its power button, which
+# the place's NFC emulator presses (README "Readers with a power button"). Other
+# readers stay on while USB powers them; their emulator has nothing on GPIO4.
+POWER_BUTTON_VARIANTS = {"attractap-touch"}
 
 
 @pytest.fixture(scope="session")

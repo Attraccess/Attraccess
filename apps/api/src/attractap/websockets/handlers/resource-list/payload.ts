@@ -1,10 +1,12 @@
 import {
   ResourceFlowNodeType,
+  ResourceUsage,
   ResourceHealthStatus,
   ResourceIntroducerType,
   SupervisionMode,
 } from '@attraccess/database-entities';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
+import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
 import type { ResourceListService } from './resource-list.service';
 
 interface ResourceListServiceResourceListPayloadContext {
@@ -20,6 +22,32 @@ interface ResourceListServiceResourceListPayloadContext {
   rbacService: ResourceListService['rbacService'];
   logger: ResourceListService['logger'];
 }
+function toReaderSession(session: ResourceUsage) {
+  return {
+    id: session.id,
+    user: {
+      username: session.user.username,
+    },
+    startTime: session.startTime.toISOString(),
+    // Offset (minutes east of UTC) of the API's effective timezone for this
+    // specific instant, so the reader can render local wall-clock time without
+    // a tz database. Computed per-timestamp, so it stays DST-correct.
+    startTimeUtcOffsetMinutes: -session.startTime.getTimezoneOffset(),
+    ...(session.supervisorUser ? { supervisorUsername: session.supervisorUser.username } : {}),
+  };
+}
+
+type ReaderSession = ReturnType<typeof toReaderSession>;
+
+/** Readers list at most this many sessions (firmware MAX_LISTED_SESSIONS); activeSessionCount stays exact. */
+export const MAX_LISTED_READER_SESSIONS = 16;
+
+/** The card holder's own session first, then the others earliest first, capped for the reader's memory. */
+function listedReaderSessions(sessions: ResourceUsage[], own?: ResourceUsage): ReaderSession[] {
+  const ordered = own ? [own, ...sessions.filter((session) => session !== own)] : sessions;
+  return ordered.slice(0, MAX_LISTED_READER_SESSIONS).map(toReaderSession);
+}
+
 export async function sendResourceListToSockets(
   context: ResourceListServiceResourceListPayloadContext,
   sockets: AuthenticatedWebSocket[],
@@ -60,7 +88,10 @@ export async function sendResourceListToSockets(
     resources: resources.map((resource) => {
       const healthEntries = healthMap.get(resource.id) ?? [];
       const unhealthyEntries = healthEntries.filter((entry) => entry.status === ResourceHealthStatus.UNHEALTHY);
-      const activeUsageSession = activeSessionMap.get(resource.id) ?? null;
+      const activeSessions = activeSessionMap.get(resource.id) ?? [];
+      // Newest session; personalised below to the authenticated user's own session when they have one.
+      const activeUsageSession = activeSessions[activeSessions.length - 1] ?? null;
+      const capacity = getSessionCapacity(resource, activeSessions.length);
       const flowNodes = flowButtonMap.get(resource.id) ?? [];
 
       return {
@@ -76,19 +107,13 @@ export async function sendResourceListToSockets(
         isUnderMaintenance: activeMaintenanceIds.has(resource.id),
         isHealthy: unhealthyEntries.length === 0,
         healthReason: context.buildHealthReason(unhealthyEntries),
-        activeUsageSession: activeUsageSession
-          ? {
-              id: activeUsageSession.id,
-              user: {
-                username: activeUsageSession.user.username,
-              },
-              startTime: activeUsageSession.startTime.toISOString(),
-              // Offset (minutes east of UTC) of the API's effective timezone for this
-              // specific instant, so the reader can render local wall-clock time without
-              // a tz database. Computed per-timestamp, so it stays DST-correct.
-              startTimeUtcOffsetMinutes: -activeUsageSession.startTime.getTimezoneOffset(),
-            }
-          : null,
+        maxParallelSessions: capacity.maxParallelSessions,
+        activeSessionCount: capacity.activeSessionCount,
+        // Personalised per card: free slot and no session of one's own.
+        canStart: !capacity.isFull,
+        activeUsageSession: activeUsageSession ? toReaderSession(activeUsageSession) : null,
+        ownUsageSession: null as ReaderSession | null,
+        activeUsageSessions: listedReaderSessions(activeSessions),
         flowButtons: flowNodes.map((node) => ({ id: node.id, label: node.data.label || node.id })),
       };
     }),
@@ -108,12 +133,28 @@ export async function sendResourceListToSockets(
     const personalized = await Promise.all(
       resources.map(async (resource, index) => {
         const hasIntroduction = await context.resourceUsageService.canControllResource(resource.id, user);
+        const base = resourceListPayload.resources[index];
+        const activeSessions = activeSessionMap.get(resource.id) ?? [];
+        const own = activeSessions.find((session) => session.userId === userId);
+        const ownUsageSession = own ? toReaderSession(own) : null;
+        const canManageResource = permissions.has('resources.update');
         return {
-          ...resourceListPayload.resources[index],
+          ...base,
+          // At limit 1 this is today's single session; with several sessions the caller's own comes first.
+          activeUsageSession: ownUsageSession ?? base.activeUsageSession,
+          ownUsageSession,
+          activeUsageSessions: own ? listedReaderSessions(activeSessions, own) : base.activeUsageSessions,
+          canStart: base.canStart && !own,
           hasIntroduction,
           canManageMaintenance: maintenanceManagedResourceIds.has(resource.id),
           isIntroducer: (introducersByResourceId.get(resource.id) ?? []).some((role) => role.userId === userId),
-          canManageResource: permissions.has('resources.update'),
+          canManageResource,
+          // Same rule endSession applies to ending somebody else's chosen session. Only looked up while
+          // someone else's session runs, so idle resources cost no extra query per card.
+          canEndOtherSessions:
+            canManageResource ||
+            (activeSessions.some((session) => session.userId !== userId) &&
+              (await context.resourceIntroducersService.canMaintain(resource.id, userId, true))),
           requiresSupervisor:
             resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
             (resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction),

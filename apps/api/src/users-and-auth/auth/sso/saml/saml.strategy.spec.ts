@@ -1,16 +1,15 @@
-import { registerSsosamlStrategyFixture, type SamlProfile } from './saml.strategy.ssosaml-strategy.test-fixture';
+import {
+  buildSamlModuleRef,
+  registerSsosamlStrategyFixture,
+  type SamlProfile,
+} from './saml.strategy.ssosaml-strategy.test-fixture';
 import { ModuleRef } from '@nestjs/core';
 import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 import { SSOSamlStrategy } from './saml.strategy';
-import { RbacService } from './../../../rbac/rbac.service';
-import { UsersService } from './../../../users/users.service';
-import { SSOService } from './../sso.service';
-import { SsoAuditService } from './../../../../audit/sso-audit.service';
 import { EncryptionService } from './../../../../encryption/encryption.service';
 import { PassportSamlConfig } from '@node-saml/passport-saml';
 import { SSOSamlRequest } from './saml.types';
 import { AccountLinkingRequiredException } from './../oidc/exceptions/account-linking-required.exception';
-import { MetricsService } from './../../../../metrics/metrics.service';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 
 describe('SSOSamlStrategy', () => {
@@ -23,21 +22,14 @@ describe('SSOSamlStrategy', () => {
     { attributes: { custom: 'preferred@example.com' } },
     { attributes: { custom: ['preferred@example.com'] } },
   ])('resolves SAML email shapes without losing custom attribute precedence: %j', async (attributes) => {
-    const usersService = {
-      findOne: jest
-        .fn()
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce({ id: 9, authenticationDetails: [{}] }),
-    };
-    const strategy = new SSOSamlStrategy({ get: () => usersService } as unknown as ModuleRef);
+    const usersService = { findOne: jest.fn().mockResolvedValue({ id: 9, authenticationDetails: [{}] }) };
+    const strategy = new SSOSamlStrategy(buildSamlModuleRef({ users: usersService }));
     const request = fixture.buildRequest(10, 'custom');
     request.ssoSamlOptions.samlConfiguration.emailAttributeKeys = ['', 'custom'];
     await expect(strategy.validate(request, { nameID: 'subject', ...attributes } as SamlProfile)).rejects.toMatchObject(
       { email: 'preferred@example.com' },
     );
-    expect(usersService.findOne).toHaveBeenLastCalledWith({ email: 'preferred@example.com' }, [
-      'authenticationDetails',
-    ]);
+    expect(usersService.findOne).toHaveBeenLastCalledWith({ email: 'preferred@example.com' });
   });
 
   it('rejects assertions without any usable email before looking up an account', async () => {
@@ -103,9 +95,6 @@ describe('SSOSamlStrategy', () => {
       findOne: jest.fn(),
     };
     usersService.findOne.mockImplementation((query: Record<string, unknown>) => {
-      if ('externalIdentifier' in query) {
-        return Promise.resolve(null);
-      }
       if ('email' in query) {
         return Promise.resolve({
           id: 99,
@@ -115,11 +104,7 @@ describe('SSOSamlStrategy', () => {
       return Promise.resolve(null);
     });
 
-    const moduleRef = {
-      get: jest.fn().mockResolvedValue(usersService),
-    } as unknown as ModuleRef;
-
-    const strategy = new SSOSamlStrategy(moduleRef);
+    const strategy = new SSOSamlStrategy(buildSamlModuleRef({ users: usersService }));
 
     const requestA = fixture.buildRequest(10, 'emailA');
     const requestB = fixture.buildRequest(20, 'emailB');
@@ -196,11 +181,9 @@ describe('SSOSamlStrategy', () => {
           }) as unknown as { id: number; username: string; email: string; externalIdentifier: string },
       ),
     };
-    const moduleRef = {
-      get: jest.fn().mockImplementation((token: unknown) => (token === RbacService ? null : usersService)),
-    } as unknown as ModuleRef;
+    const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(null), addAuthenticationDetails: jest.fn() };
 
-    const strategy = new SSOSamlStrategy(moduleRef);
+    const strategy = new SSOSamlStrategy(buildSamlModuleRef({ users: usersService, auth }));
     const request = fixture.buildRequest(30, 'email');
     const profile = {
       nameID: 'user-1',
@@ -217,9 +200,15 @@ describe('SSOSamlStrategy', () => {
       expect.objectContaining({
         username: 'name.surname',
         email: 'user@example.com',
-        externalIdentifier: 'user-1',
+        externalIdentifier: null,
         isEmailVerified: true,
       }),
+      expect.anything(),
+    );
+    expect(auth.addAuthenticationDetails).toHaveBeenCalledWith(
+      101,
+      { type: 'sso', details: { providerId: 30, providerType: SSOProviderType.SAML, subject: 'user-1' } },
+      expect.anything(),
     );
     expect(user.username).toBe('name.surname');
   });
@@ -250,19 +239,12 @@ describe('SSOSamlStrategy', () => {
         roleMappings: { 'user-manager': ['admins'] },
       },
     } as unknown as SSOProvider;
-    const moduleRef = {
-      get: jest.fn((token: unknown) =>
-        token === UsersService
-          ? usersService
-          : token === RbacService
-            ? rbacService
-            : token === SSOService
-              ? { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) }
-              : token === SsoAuditService
-                ? audit
-                : undefined,
-      ),
-    } as unknown as ModuleRef;
+    const moduleRef = buildSamlModuleRef({
+      users: usersService,
+      rbac: rbacService,
+      sso: { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) },
+      audit,
+    });
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = fixture.buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
@@ -309,19 +291,12 @@ describe('SSOSamlStrategy', () => {
         roleMappings: { 'user-manager': ['admins'] },
       },
     } as unknown as SSOProvider;
-    const moduleRef = {
-      get: jest.fn((token: unknown) =>
-        token === UsersService
-          ? usersService
-          : token === RbacService
-            ? { syncSsoRoles: jest.fn().mockRejectedValue(new Error('role write failed')) }
-            : token === SSOService
-              ? { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) }
-              : token === SsoAuditService
-                ? audit
-                : undefined,
-      ),
-    } as unknown as ModuleRef;
+    const moduleRef = buildSamlModuleRef({
+      users: usersService,
+      rbac: { syncSsoRoles: jest.fn().mockRejectedValue(new Error('role write failed')) },
+      sso: { getProviderByTypeAndIdWithConfiguration: jest.fn().mockResolvedValue(provider) },
+      audit,
+    });
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = fixture.buildRequest(30, 'email');
     request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
@@ -338,16 +313,9 @@ describe('SSOSamlStrategy', () => {
 
   it('does not sync roles when profile has no role/group attributes (only email, name, etc.)', async () => {
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
-    const usersService = {
-      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
-        if ('externalIdentifier' in query) return Promise.resolve({ id: 44, externalIdentifier: 'saml-user' });
-        return Promise.resolve(null);
-      }),
-      updateOne: jest.fn(),
-    };
-    const moduleRef = {
-      get: jest.fn((token: unknown) => (token === RbacService ? rbacService : usersService)),
-    } as unknown as ModuleRef;
+    const usersService = { findOne: jest.fn().mockResolvedValue({ id: 44 }), updateOne: jest.fn() };
+    const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(44), addAuthenticationDetails: jest.fn() };
+    const moduleRef = buildSamlModuleRef({ users: usersService, auth, rbac: rbacService });
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = fixture.buildRequest(30, 'email');
@@ -367,18 +335,9 @@ describe('SSOSamlStrategy', () => {
 
   it('syncs RBAC roles from Azure AD URI-style group claims and memberOf', async () => {
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
-    const usersService = {
-      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
-        if ('externalIdentifier' in query) {
-          return Promise.resolve({ id: 55, externalIdentifier: 'ad-user' });
-        }
-        return Promise.resolve(null);
-      }),
-      updateOne: jest.fn(),
-    };
-    const moduleRef = {
-      get: jest.fn((token: unknown) => (token === RbacService ? rbacService : usersService)),
-    } as unknown as ModuleRef;
+    const usersService = { findOne: jest.fn().mockResolvedValue({ id: 55 }), updateOne: jest.fn() };
+    const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(55), addAuthenticationDetails: jest.fn() };
+    const moduleRef = buildSamlModuleRef({ users: usersService, auth, rbac: rbacService });
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = fixture.buildRequest(40, 'email');
@@ -408,22 +367,9 @@ describe('SSOSamlStrategy', () => {
   it('syncs RBAC roles from SAML role attributes', async () => {
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
-    const usersService = {
-      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
-        if ('externalIdentifier' in query) {
-          return Promise.resolve({ id: 44, externalIdentifier: 'saml-user' });
-        }
-        return Promise.resolve(null);
-      }),
-      updateOne: jest.fn(),
-    };
-
-    const moduleRef = {
-      get: jest.fn((token: unknown) => {
-        if (token === RbacService) return rbacService;
-        return usersService;
-      }),
-    } as unknown as ModuleRef;
+    const usersService = { findOne: jest.fn().mockResolvedValue({ id: 44 }), updateOne: jest.fn() };
+    const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(44), addAuthenticationDetails: jest.fn() };
+    const moduleRef = buildSamlModuleRef({ users: usersService, auth, rbac: rbacService });
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = fixture.buildRequest(30, 'email');
@@ -456,22 +402,9 @@ describe('SSOSamlStrategy', () => {
   it('revokes provider roles when a role attribute is present but empty', async () => {
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
-    const usersService = {
-      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
-        if ('externalIdentifier' in query) {
-          return Promise.resolve({ id: 44, externalIdentifier: 'saml-user' });
-        }
-        return Promise.resolve(null);
-      }),
-      updateOne: jest.fn(),
-    };
-
-    const moduleRef = {
-      get: jest.fn((token: unknown) => {
-        if (token === RbacService) return rbacService;
-        return usersService;
-      }),
-    } as unknown as ModuleRef;
+    const usersService = { findOne: jest.fn().mockResolvedValue({ id: 44 }), updateOne: jest.fn() };
+    const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(44), addAuthenticationDetails: jest.fn() };
+    const moduleRef = buildSamlModuleRef({ users: usersService, auth, rbac: rbacService });
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = fixture.buildRequest(30, 'email');
@@ -492,22 +425,9 @@ describe('SSOSamlStrategy', () => {
   it('revokes previously granted SSO roles after the mapping has been cleared', async () => {
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
-    const usersService = {
-      findOne: jest.fn().mockImplementation((query: Record<string, unknown>) => {
-        if ('externalIdentifier' in query) {
-          return Promise.resolve({ id: 45, externalIdentifier: 'saml-user' });
-        }
-        return Promise.resolve(null);
-      }),
-      updateOne: jest.fn(),
-    };
-
-    const moduleRef = {
-      get: jest.fn((token: unknown) => {
-        if (token === RbacService) return rbacService;
-        return usersService;
-      }),
-    } as unknown as ModuleRef;
+    const usersService = { findOne: jest.fn().mockResolvedValue({ id: 45 }), updateOne: jest.fn() };
+    const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(45), addAuthenticationDetails: jest.fn() };
+    const moduleRef = buildSamlModuleRef({ users: usersService, auth, rbac: rbacService });
 
     const strategy = new SSOSamlStrategy(moduleRef);
     const request = fixture.buildRequest(31, 'email');
@@ -528,15 +448,10 @@ describe('SSOSamlStrategy', () => {
   describe('validation failures', () => {
     const metricsFor = (usersService: unknown) => {
       const inc = jest.fn();
-      const moduleRef = {
-        get: jest.fn((token: unknown) =>
-          token === MetricsService
-            ? { authSsoLoginFailuresTotal: { inc } }
-            : token === RbacService
-              ? null
-              : usersService,
-        ),
-      } as unknown as ModuleRef;
+      const moduleRef = buildSamlModuleRef({
+        users: usersService,
+        metrics: { authSsoLoginFailuresTotal: { inc } },
+      });
       return { inc, strategy: new SSOSamlStrategy(moduleRef) };
     };
 
@@ -573,7 +488,7 @@ describe('SSOSamlStrategy', () => {
           email: 'user@example.com',
         } as SamlProfile),
       ).rejects.toBeInstanceOf(UnauthorizedException);
-      expect(usersService.findOne).toHaveBeenCalledTimes(2);
+      expect(usersService.findOne).toHaveBeenCalledTimes(1);
       expect(inc).toHaveBeenCalledWith({ provider_type: 'saml', reason: 'invalid_assertion' });
     });
 
@@ -587,28 +502,5 @@ describe('SSOSamlStrategy', () => {
         'Missing SAML configuration',
       );
     });
-  });
-
-  it('links an existing email account that has no local credentials to the SAML NameID', async () => {
-    const existing = { id: 7, email: 'user@example.com', authenticationDetails: [] };
-    const linked = { id: 7, email: 'user@example.com', externalIdentifier: 'subject' };
-    const usersService = {
-      findOne: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(existing),
-      updateOne: jest.fn().mockResolvedValue(linked),
-      createOne: jest.fn(),
-    };
-    const moduleRef = {
-      get: jest.fn((token: unknown) => (token === RbacService ? null : usersService)),
-    } as unknown as ModuleRef;
-    const strategy = new SSOSamlStrategy(moduleRef);
-
-    await expect(
-      strategy.validate(fixture.buildRequest(10, 'email'), {
-        nameID: 'subject',
-        email: 'user@example.com',
-      } as SamlProfile),
-    ).resolves.toBe(linked);
-    expect(usersService.updateOne).toHaveBeenCalledWith(7, { externalIdentifier: 'subject' });
-    expect(usersService.createOne).not.toHaveBeenCalled();
   });
 });

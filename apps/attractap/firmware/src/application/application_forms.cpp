@@ -345,7 +345,7 @@ void Application::finishFormFlow() {
     this->api.startResourceUsageSession(this->pendingActionResourceId,
                                         this->pendingActionProjectId, this->pendingActionIsTakeover);
   } else if (this->pendingActionType == PENDING_ACTION_STOP_SESSION) {
-    this->api.stopResourceUsageSession(this->pendingActionResourceId);
+    this->api.stopResourceUsageSession(this->pendingActionResourceId, this->pendingActionUsageId);
   } else {
     this->handleFormsCancel();
   }
@@ -378,6 +378,7 @@ void Application::handleFormsCancel() {
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
   this->pendingActionIsTakeover = false;
+  this->pendingActionUsageId = 0;
   this->hasPendingServerFormFlow = false;
   this->pendingFormRequestResourceId = 0;
   this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;

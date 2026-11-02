@@ -22,20 +22,20 @@ damit Attraccess sichere Anfragen erkennt. Über HTTP wird kein SAML-Status-Cook
 
 ## Konfiguration
 
-| Feld | Beschreibung |
-|------|-------------|
-| **Entry Point** | SSO-URL des Identity Providers |
-| **Issuer** | Service Provider Identifier (Ihre Attraccess-URL) |
-| **Zertifikat** | Signaturzertifikat des Identity Providers (X.509, PEM-Format) |
+| Feld            | Beschreibung                                                  |
+| --------------- | ------------------------------------------------------------- |
+| **Entry Point** | SSO-URL des Identity Providers                                |
+| **Issuer**      | Service Provider Identifier (Ihre Attraccess-URL)             |
+| **Zertifikat**  | Signaturzertifikat des Identity Providers (X.509, PEM-Format) |
 
 ### Signaturoptionen
 
-| Option | Standard | Beschreibung |
-|--------|----------|-------------|
-| **Request signieren** | Aus | AuthnRequest an den IdP signieren |
-| **Signierte Assertions erwarten** | Ein | IdP muss Assertions signieren |
-| **Signierte Responses erwarten** | Ein | IdP muss die gesamte Response signieren |
-| **Authentifizierung erzwingen** | Aus | Bei jedem Login erneut authentifizieren |
+| Option                            | Standard | Beschreibung                            |
+| --------------------------------- | -------- | --------------------------------------- |
+| **Request signieren**             | Aus      | AuthnRequest an den IdP signieren       |
+| **Signierte Assertions erwarten** | Ein      | IdP muss Assertions signieren           |
+| **Signierte Responses erwarten**  | Ein      | IdP muss die gesamte Response signieren |
+| **Authentifizierung erzwingen**   | Aus      | Bei jedem Login erneut authentifizieren |
 
 > [!NOTE]
 > Wenn **Request signieren** aktiviert ist, müssen Sie zusätzlich ein SP-Signaturzertifikat und einen privaten Schlüssel angeben.
@@ -45,6 +45,7 @@ damit Attraccess sichere Anfragen erkennt. Über HTTP wird kein SAML-Status-Cook
 Geben Sie die SAML-Attributnamen an, die die E-Mail-Adresse enthalten. Mehrere Werte sind möglich (einer pro Zeile).
 
 Häufige Attributnamen:
+
 - `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress`
 - `email`
 - `mail`
@@ -57,15 +58,27 @@ Optional können Sie ein Provisioning-Secret festlegen. Damit kann Ihr Identity 
 
 Wie bei [OIDC](user-management/sso-oidc.md) können Sie SAML-Rollen den Attraccess-Berechtigungen zuordnen.
 
+### Kontobindung
+
+SAML-Identitäten sind pro Anbieter gebunden: Ein Benutzer wird über die Kombination aus SAML-Anbieter und NameID erkannt. Dieselbe NameID eines anderen SAML-Anbieters führt daher nie zur Anmeldung an diesem Konto. Konfigurieren Sie Ihren Identity Provider so, dass er eine persistente NameID sendet: Eine transiente NameID ändert sich bei jeder Anmeldung, sodass der Benutzer nicht wiedererkannt würde.
+
+Gehört die E-Mail-Adresse einer SAML-Anmeldung zu einem bestehenden Konto, das nicht an diesen Anbieter gebunden ist, muss der Benutzer zuerst die [Kontoverknüpfung](user-management/sso-overview.md#kontoverknüpfung) mit dem lokalen Passwort des Kontos bestätigen. Das gilt auch für früher per SAML angelegte Konten, die beim Update nicht gebunden werden konnten. Die Verknüpfung entfernt das lokale Passwort; danach ist die Anmeldung nur noch über SSO möglich.
+
+- Ein Konto kann nur mit einem SSO-Anbieter verknüpft werden. Ist das Konto bereits an einen anderen Anbieter gebunden, wird die Aufforderung zur Verknüpfung angezeigt, die Bestätigung schlägt aber fehl (`SSO_ALREADY_LINKED`).
+- Konten ohne lokales Passwort (zum Beispiel früher per SAML angelegte Konten) können die Verknüpfung nicht bestätigen. Solange das Konto an keinen SSO-Anbieter gebunden ist, kann der Benutzer über „Passwort vergessen“ ein Passwort festlegen, oder ein Administrator legt eines fest.
+
+> [!WARNING]
+> **Hinweis zum Update:** Beim Update werden bestehende SAML-Benutzer automatisch an ihren Anbieter gebunden: anhand früherer SAML-Sitzungen oder, wenn es nur einen SAML-Anbieter gibt, an diesen. Benutzer, die sich nicht eindeutig zuordnen lassen (zum Beispiel mehrere SAML-Anbieter und keine Sitzungshistorie), werden nicht gebunden und sehen bei der nächsten SAML-Anmeldung die Aufforderung zur Kontoverknüpfung, die ein lokales Passwort voraussetzt (siehe oben). Konten, die eine frühere Version fälschlich an einen OIDC-Anbieter gebunden hat, werden nur umgestellt, wenn das nachweisbar ist; andernfalls sehen sie bei der SAML-Anmeldung die Aufforderung zur Verknüpfung, deren Bestätigung mit `SSO_ALREADY_LINKED` fehlschlägt. Ihre Bindung muss derzeit ein Administrator direkt in der Datenbank korrigieren.
+
 ## Service Provider Metadaten
 
 Konfigurieren Sie Ihren SAML-Identity-Provider mit diesen Werten:
 
-| Feld | Wert |
-|------|------|
+| Feld                   | Wert                                                           |
+| ---------------------- | -------------------------------------------------------------- |
 | **ACS URL (Callback)** | `https://ihre-url.de/api/auth/sso/SAML/{provider-id}/callback` |
-| **Entity ID / Issuer** | Ihre Attraccess-URL |
-| **Binding** | HTTP-POST |
+| **Entity ID / Issuer** | Ihre Attraccess-URL                                            |
+| **Binding**            | HTTP-POST                                                      |
 
 ## Testen
 

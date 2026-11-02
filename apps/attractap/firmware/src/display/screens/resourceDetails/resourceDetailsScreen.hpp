@@ -93,6 +93,15 @@ private:
     lv_obj_t *stopSessionButton = nullptr;
     lv_obj_t *stopSessionButtonLabel = nullptr;
     lv_obj_t *stopOtherUserNote = nullptr;
+    // Parallel sessions: occupancy caption in the header and a picker to end one chosen other session.
+    lv_obj_t *occupancyLabel = nullptr;
+    lv_obj_t *otherSessionsContainer = nullptr;
+    void rebuildOtherSessions(bool visible);
+    std::vector<uint32_t> otherSessionIds;
+    // Limit 1 force-stop: the usageId of the foreign session shown; 0 while the button stops one's own.
+    uint32_t stopSessionUsageId = 0;
+    bool ownsActiveUsage() const;
+    void updateOccupancy();
     lv_obj_t *doorControls = nullptr;
 
     lv_obj_t *flowButtonsContainer = nullptr;
@@ -125,6 +134,7 @@ private:
     // The button that started the last action, by role: it outlives refreshes that rebuild buttons.
     button_click_type_t lastActionType = BUTTON_CLICK_TYPE_BACK;
     std::string lastActionFlowId;
+    uint32_t lastActionUsageId = 0; // the other session chosen in the picker, else 0
     std::string lastActionRole;
     // The failure shown, or waiting to be shown, on that button.
     bool actionErrorPending = false;

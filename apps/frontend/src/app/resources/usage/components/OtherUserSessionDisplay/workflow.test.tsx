@@ -6,6 +6,7 @@ import { OtherUserSessionDisplay } from './index';
 import type { SessionNotesModal } from '../SessionNotesModal';
 const state = vi.hoisted(() => ({
   session: {
+    id: 40,
     userId: 2,
     startTime: '2026-09-01T12:00:00Z',
     user: { id: 2, username: 'Alex' },
@@ -38,6 +39,10 @@ vi.mock('@attraccess/react-query-client', () => ({
   useResourcesServiceResourceUsageGetActiveSession: () => ({ data: { usage: state.session } }),
   useResourcesServiceResourceUsageCanControl: () => ({ data: { canControl: state.canControl } }),
   useAccessControlServiceResourceIntroducersIsIntroducer: () => ({ data: { isIntroducer: state.introducer } }),
+  // Introducers and maintainers of the resource (the current user is id 1).
+  useAccessControlServiceResourceIntroducersGetNames: () => ({
+    data: state.introducer ? [{ userId: 1, username: 'me', role: 'introducer' }] : [],
+  }),
   useResourcesServiceGetOneResourceById: () => ({ data: { allowTakeOver: state.allowTakeover } }),
   useResourcesServiceResourceUsageStartSession: (options: (typeof state.callbacks)[string]) => {
     state.callbacks.start = options;
@@ -71,6 +76,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.callbacks = {};
   state.session = {
+    id: 40,
     userId: 2,
     startTime: '2026-09-01T12:00:00Z',
     user: { id: 2, username: 'Alex' },
@@ -113,7 +119,7 @@ it('shows the holder and supervisor and sends scoped takeover and stop submissio
   await waitFor(() =>
     expect(state.end).toHaveBeenCalledWith({
       resourceId: 7,
-      requestBody: { formSubmissions: [{ formId: 7, data: { ack: true } }] },
+      requestBody: { usageId: 40, formSubmissions: [{ formId: 7, data: { ack: true } }] },
     }),
   );
   expect(state.forms).toHaveBeenCalledWith('end');
@@ -154,7 +160,7 @@ it('collects optional notes and allows cancelling without a mutation', async () 
   fireEvent.click(screen.getByText('Confirm notes'));
   await waitFor(() =>
     expect(state.end).toHaveBeenCalledWith(
-      expect.objectContaining({ requestBody: expect.objectContaining({ notes: 'Operator note' }) }),
+      expect.objectContaining({ requestBody: expect.objectContaining({ notes: 'Operator note', usageId: 40 }) }),
     ),
   );
 });
@@ -171,7 +177,7 @@ it('keeps cancelled forms from starting or stopping sessions and reports failed 
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Takeover Failed' }));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Could not contact user' }));
   fireEvent.click(screen.getByRole('button', { name: 'Contact current user' }));
-  expect(state.contact).toHaveBeenCalledWith({ resourceId: 7 });
+  expect(state.contact).toHaveBeenCalledWith({ resourceId: 7, userId: 2 });
   act(() => state.callbacks.contact.onSuccess({ conversationId: 10 }));
   expect(screen.getByText('Conversation opened')).toBeTruthy();
 });
@@ -195,6 +201,22 @@ it('enforces distinct takeover and stop permissions and hides own or absent sess
   state.session = undefined;
   mount();
   expect(screen.queryByText('In use')).toBeNull();
+});
+it('lets maintainers and the supervisor stop the session, like the server does', () => {
+  state.update = false;
+  state.allowTakeover = false;
+  state.introducer = true;
+  let view = mount();
+  expect(screen.getByRole('button', { name: 'Stop Other User Session' })).toBeTruthy();
+  view.unmount();
+  state.introducer = false;
+  state.session = { id: 41, userId: 2, startTime: '2026-09-01T12:00:00Z', supervisorUserId: 1 };
+  view = mount();
+  expect(screen.getByRole('button', { name: 'Stop Other User Session' })).toBeTruthy();
+  view.unmount();
+  state.session = { id: 42, userId: 2, startTime: '2026-09-01T12:00:00Z', supervisorUserId: 3 };
+  mount();
+  expect(screen.queryByRole('button', { name: 'Stop Other User Session' })).toBeNull();
 });
 it('shows a redacted session as in use without a holder to contact', () => {
   state.update = false;

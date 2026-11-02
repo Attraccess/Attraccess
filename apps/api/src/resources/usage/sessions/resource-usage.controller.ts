@@ -227,7 +227,8 @@ export class ResourceUsageController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Bad Request - Invalid input data or no active session',
+    description:
+      'Bad Request - Invalid input data, no active session, or NoOwnActiveSessionError (no usageId and the caller has no own session on a shared machine)',
   })
   @ApiResponse({
     status: 401,
@@ -289,7 +290,10 @@ export class ResourceUsageController {
 
   @Get('active')
   @Auth()
-  @ApiOperation({ summary: 'Get active usage session for current user', operationId: 'resourceUsageGetActiveSession' })
+  @ApiOperation({
+    summary: "Get the active usage sessions of a resource (the caller's own session first)",
+    operationId: 'resourceUsageGetActiveSession',
+  })
   @ApiResponse({
     status: 200,
     description: 'Active session retrieved successfully.',
@@ -312,14 +316,18 @@ export class ResourceUsageController {
     @Req() req: AuthenticatedRequest,
   ): Promise<GetActiveUsageSessionDto> {
     const access = await this.activityVisibility.resolve(req.user, resourceId);
-    const activeSession = await this.resourceUsageService.getActiveSession(resourceId);
-    if (!activeSession) {
-      if (access === 'none') throw new ForbiddenException('You cannot view activity on this resource');
-      return { usage: null };
+    const overview = await this.resourceUsageService.getActiveSessionOverview(resourceId, req.user.id);
+    // Hidden activity: a viewer sees only what the visibility rule allows (own session in full, others redacted).
+    const view = (usage: ResourceUsage) => this.activityVisibility.viewUsage(usage, access, req.user.id);
+    const usages = overview.usages.flatMap((usage) => view(usage) ?? []);
+    if (overview.usages.length > 0 && usages.length === 0) {
+      throw new ForbiddenException('You cannot view activity on this resource');
     }
-    const usage = this.activityVisibility.viewUsage(activeSession, access, req.user.id);
-    if (!usage) throw new ForbiddenException('You cannot view activity on this resource');
-    return { usage };
+    if (overview.usages.length === 0 && access === 'none') {
+      throw new ForbiddenException('You cannot view activity on this resource');
+    }
+    const usage = overview.usage ? view(overview.usage) : null;
+    return { ...overview, usage: usage ?? usages[usages.length - 1] ?? null, usages };
   }
 
   @Get(':usageId')

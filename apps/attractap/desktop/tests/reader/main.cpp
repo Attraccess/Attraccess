@@ -32,6 +32,7 @@ int main(int argc, char **argv)
     workflow.testButtonErrors();
     workflow.testFormErrors();
     workflow.testTransientRouting();
+    workflow.testParallelSessions();
     workflow.testWallClock();
     std::filesystem::remove_all(workflow.storage);
     std::cout << "PASS ATT-880 production application journeys\n";

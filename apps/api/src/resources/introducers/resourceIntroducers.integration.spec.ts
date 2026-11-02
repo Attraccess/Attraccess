@@ -101,7 +101,7 @@ describe('persisted resource introducer aggregation', () => {
       resourceFlowsService: { getNodesForResources: async () => new Map() },
       resourceUsageService: {
         getActiveSessions: async () =>
-          new Map([[1, { user: { username: 'Occupant' }, startTime: new Date('2026-10-02T10:00:00Z') }]]),
+          new Map([[1, [{ user: { username: 'Occupant' }, startTime: new Date('2026-10-02T10:00:00Z') }]]]),
         canControllResource: async () => false,
       },
       usersService: { findOne: async () => source.getRepository(User).findOneByOrFail({ id: 99 }) },

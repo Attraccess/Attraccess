@@ -2,7 +2,12 @@ import { registerMaintenanceScheduleEvaluatorServiceFixture } from './maintenanc
 
 import { ResourceMaintenanceChangedEvent } from './events/resource-maintenance-changed.event';
 
-import { ResourceUsageLifecycleAbortedEvent } from './../usage/events/resource-usage.events';
+import {
+  ResourceUsageLifecycleAbortedEvent,
+  ResourceUsageSessionEndedEvent,
+} from './../usage/events/resource-usage.events';
+
+import { ResourceUsage } from '@attraccess/database-entities';
 
 import { ResourceOperatingStateChangedEvent } from './../operating-intervals/events/resource-operating-state-changed.event';
 
@@ -39,6 +44,20 @@ describe('MaintenanceScheduleEvaluatorService', () => {
       });
 
       fixture.service.onResourceUsage(event);
+      jest.runAllTimers();
+
+      expect(evalSpy).toHaveBeenCalledWith(fixture.resourceId);
+    });
+
+    it('reevaluates when a session ended event arrives', async () => {
+      const evalSpy = jest.spyOn(fixture.service, 'evaluateResource').mockResolvedValue();
+
+      fixture.service.onResourceUsageEnded(
+        new ResourceUsageSessionEndedEvent(
+          { id: 1, resourceId: fixture.resourceId, endTime: new Date() } as ResourceUsage,
+          null,
+        ),
+      );
       jest.runAllTimers();
 
       expect(evalSpy).toHaveBeenCalledWith(fixture.resourceId);

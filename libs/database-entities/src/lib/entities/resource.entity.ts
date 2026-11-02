@@ -56,6 +56,17 @@ export class Resource {
   })
   allowTakeOver!: boolean;
 
+  @Column({ type: 'integer', default: 1 })
+  @ApiProperty({
+    description:
+      'Maximum number of people who can have an active session on this machine at the same time (machines only, 1-1000)',
+    example: 1,
+    default: 1,
+    minimum: 1,
+    maximum: 1000,
+  })
+  maxParallelSessions!: number;
+
   @Column({ type: 'integer', nullable: true })
   @ApiProperty({
     description:

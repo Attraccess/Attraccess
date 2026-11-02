@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
     { id: 2, name: 'Saw' },
   ],
   end: vi.fn(),
+  getActive: vi.fn(),
   invalidate: vi.fn(),
   refetch: vi.fn(),
   success: vi.fn(),
@@ -22,12 +23,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
+vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ success: state.success }) }));
 vi.mock('../../../utils/apiError', () => ({
   getTranslationKeyForApiError: () => ({ key: 'api.denied', errorMessage: 'Denied' }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useResourcesServiceGetAllResourcesKey: 'resources',
+  ResourcesService: { resourceUsageGetActiveSession: state.getActive },
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn: ({ resourceId }: { resourceId: number }) => [
     'active',
     resourceId,
@@ -53,6 +56,13 @@ beforeEach(() => {
   state.end.mockImplementation(async ({ resourceId }: { resourceId: number }) => {
     state.onSuccess?.({ resourceId });
   });
+  // Each resource holds my session (user 1, usage id = resource id * 10) next to someone else's.
+  state.getActive.mockImplementation(async ({ resourceId }: { resourceId: number }) => ({
+    usages: [
+      { id: resourceId * 10 + 1, userId: 2 },
+      { id: resourceId * 10, userId: 1 },
+    ],
+  }));
 });
 afterEach(cleanup);
 it('shows loading, hides an empty banner and filters to the current user sessions', () => {
@@ -85,8 +95,8 @@ it('ends all sessions and invalidates both resource and active-session caches', 
   fireEvent.click(screen.getByRole('button', { name: 'endAll' }));
   fireEvent.click(await screen.findByRole('button', { name: 'modal.confirm' }));
   await screen.findByText('modal.completedTitle');
-  expect(state.end).toHaveBeenCalledWith({ resourceId: 1, requestBody: {} });
-  expect(state.end).toHaveBeenCalledWith({ resourceId: 2, requestBody: {} });
+  expect(state.end).toHaveBeenCalledWith({ resourceId: 1, requestBody: { usageId: 10 } });
+  expect(state.end).toHaveBeenCalledWith({ resourceId: 2, requestBody: { usageId: 20 } });
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', 1] });
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['resources'] });
   expect(state.refetch).toHaveBeenCalledOnce();
@@ -106,4 +116,16 @@ it('keeps partial failures visible alongside successful resources', async () => 
   expect(state.success).not.toHaveBeenCalled();
   await waitFor(() => expect(state.refetch).toHaveBeenCalledOnce());
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['resources'] });
+});
+it('treats a resource where I no longer have a session as done without ending anything', async () => {
+  state.getActive.mockImplementation(async ({ resourceId }: { resourceId: number }) => ({
+    usages: resourceId === 2 ? [{ id: 21, userId: 2 }] : [{ id: 10, userId: 1 }],
+  }));
+  render(<ActiveUsageSessionsBanner onShowMySessions={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'endAll' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'modal.confirm' }));
+  await screen.findByText('modal.completedTitle');
+  expect(state.end).toHaveBeenCalledExactlyOnceWith({ resourceId: 1, requestBody: { usageId: 10 } });
+  expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['active', 2] });
+  expect(state.success).toHaveBeenCalledWith({ title: 'endedAll.success' });
 });

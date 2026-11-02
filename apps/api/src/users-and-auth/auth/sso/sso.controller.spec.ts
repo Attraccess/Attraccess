@@ -695,19 +695,55 @@ describe('SsoController', () => {
       );
     });
 
-    it('requires an external identity for SAML email fallback', async () => {
+    it('scopes the SAML email fallback to a binding of the same provider', async () => {
       const users = fixture.module.get<UsersService>(UsersService);
       jest
         .spyOn(fixture.ssoService, 'getProviderByTypeAndIdWithConfiguration')
         .mockResolvedValue(fixture.mockSamlProvider);
       const request = { headers: { authorization: 'Bearer saml-secret' } } as unknown as Request;
-      (users.findOne as jest.Mock).mockResolvedValue({ id: 55, externalIdentifier: 'saml-subject' });
+      const bound = (providerId: number) => ({
+        id: 55,
+        externalIdentifier: 'saml-subject',
+        authenticationDetails: [{ type: 'sso', providerType: SSOProviderType.SAML, providerId }],
+      });
+      (users.findOneBySSO as jest.Mock).mockResolvedValue(null);
+      (users.findOne as jest.Mock).mockResolvedValue(bound(2));
       expect(await fixture.controller.samlLogout('2', request, { email: 'user@example.com' })).toEqual({ OK: true });
-      (users.findOne as jest.Mock).mockResolvedValue({ id: 55, externalIdentifier: null });
-      await expect(fixture.controller.samlLogout('2', request, { email: 'user@example.com' })).rejects.toThrow(
-        'SSO_USER_NOT_FOUND',
-      );
+      for (const user of [
+        bound(3),
+        { ...bound(2), authenticationDetails: [{ type: 'sso', providerType: SSOProviderType.OIDC, providerId: 2 }] },
+        { id: 55, externalIdentifier: 'saml-subject', authenticationDetails: [] },
+      ]) {
+        (users.findOne as jest.Mock).mockResolvedValue(user);
+        await expect(fixture.controller.samlLogout('2', request, { email: 'user@example.com' })).rejects.toThrow(
+          'SSO_USER_NOT_FOUND',
+        );
+      }
     });
+
+    it.each(['logout', 'delete', 'permissions'] as const)(
+      'does not resolve a SAML %s subject through externalIdentifier or another provider',
+      async (action) => {
+        const users = fixture.module.get<UsersService>(UsersService);
+        jest
+          .spyOn(fixture.ssoService, 'getProviderByTypeAndIdWithConfiguration')
+          .mockResolvedValue(fixture.mockSamlProvider);
+        const request = { headers: { authorization: 'Bearer saml-secret' } } as unknown as Request;
+        // Only a user whose externalIdentifier matches exists; nothing is bound to (SAML, 2, subject).
+        (users.findOneBySSO as jest.Mock).mockResolvedValue(null);
+        (users.findOne as jest.Mock).mockResolvedValue({ id: 55, externalIdentifier: 'saml-subject' });
+        const call =
+          action === 'logout'
+            ? fixture.controller.samlLogout('2', request, { subject: 'saml-subject' })
+            : action === 'delete'
+              ? fixture.controller.samlDeleteUser('2', request, { subject: 'saml-subject' })
+              : fixture.controller.samlUpdatePermissions('2', request, { subject: 'saml-subject', roles: [] });
+        await expect(call).rejects.toThrow('SSO_USER_NOT_FOUND');
+        expect(users.findOneBySSO).toHaveBeenCalledWith(SSOProviderType.SAML, 2, 'saml-subject');
+        expect(users.findOne).not.toHaveBeenCalledWith({ externalIdentifier: 'saml-subject' });
+        expect(users.deleteOne).not.toHaveBeenCalled();
+      },
+    );
 
     it('revokes sessions for oidc logout requests', async () => {
       const usersService = fixture.module.get<UsersService>(UsersService);
@@ -816,11 +852,7 @@ describe('SsoController', () => {
         .spyOn(fixture.ssoService, 'getProviderByTypeAndIdWithConfiguration')
         .mockResolvedValueOnce(fixture.mockSamlProvider);
 
-      (usersService.findOne as jest.Mock).mockResolvedValue({
-        id: 101,
-        externalIdentifier: 'saml-user',
-        authenticationDetails: [],
-      });
+      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 101 });
 
       const mockRequest = {
         headers: { authorization: 'Bearer saml-secret' },
@@ -847,11 +879,7 @@ describe('SsoController', () => {
         .spyOn(fixture.ssoService, 'getProviderByTypeAndIdWithConfiguration')
         .mockResolvedValueOnce(fixture.mockSamlProvider);
 
-      (usersService.findOne as jest.Mock).mockResolvedValue({
-        id: 102,
-        externalIdentifier: 'saml-user-2',
-        authenticationDetails: [],
-      });
+      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 102 });
 
       const mockRequest = {
         headers: { authorization: 'Bearer saml-secret' },
@@ -872,11 +900,7 @@ describe('SsoController', () => {
         .spyOn(fixture.ssoService, 'getProviderByTypeAndIdWithConfiguration')
         .mockResolvedValueOnce(fixture.mockSamlProvider);
 
-      (usersService.findOne as jest.Mock).mockResolvedValue({
-        id: 103,
-        externalIdentifier: 'saml-user-3',
-        authenticationDetails: [],
-      });
+      (usersService.findOneBySSO as jest.Mock).mockResolvedValue({ id: 103 });
 
       const mockRequest = {
         headers: { authorization: 'Bearer saml-secret' },

@@ -45,6 +45,7 @@ import { TokenHashService } from '../../../encryption/token-hash.service';
 import type { LicenseService } from '../../../license/license.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { AuthService } from '../../../users-and-auth/auth/auth.service';
+import { SsoAccountResolver } from '../../../users-and-auth/auth/sso/account-resolution/sso-account-resolver.service';
 import { SSOSamlStrategy } from '../../../users-and-auth/auth/sso/saml/saml.strategy';
 import type { SSOSamlRequest } from '../../../users-and-auth/auth/sso/saml/saml.types';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
@@ -190,8 +191,11 @@ beforeAll(async () => {
   );
   authService = new AuthService(mockEmailService, authDetailRepo, usersService, tokenHashService, mockMetricsService);
 
+  const resolver = new SsoAccountResolver(usersService, authService, dataSource);
+
   mockModuleRef = {
     get: (token: unknown): unknown => {
+      if (token === SsoAccountResolver) return resolver;
       if (token === UsersService) return usersService;
       if (token === AuthService) return authService;
       if (token === RbacService) return rbacService;

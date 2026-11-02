@@ -19,7 +19,7 @@ Click on a resource to open its detail page. Here you can see:
 
 - **Description** – What the resource is and how to use it
 - **Documentation** – Operating instructions or links to external documentation
-- **Status** – Whether the resource is available, in use, or under maintenance
+- **Status** – Whether the resource is available, in use (on shared machines **In use k/N**), full, or under maintenance
 - **Introduction status** – Whether you have been introduced to this resource
 
 <!-- TODO: Screenshot of resource detail page -->
@@ -79,6 +79,18 @@ When you are done using the resource:
 
 > [!WARNING]
 > Always end your usage session when you are finished. Leaving a session open may prevent other users from starting the resource.
+
+## Use a Shared Machine
+
+Some machines allow several people to work at the same time. On such a machine:
+
+- Everybody has their own session. You can have only one active session per machine; starting again shows **Session already active**.
+- The status shows **In use k/N** while other people are using it but there is still room (you can start), and **Full** when as many people as allowed are using it. Then a start is refused with **Machine is full**. Wait until someone finishes.
+- On the detail page you see your own session with **End Session**, and a list of the other active sessions. If you are a resource manager, introducer or maintainer, or the supervisor of a session, you can end someone else's session with **End Session** in that list.
+- Stopping without picking a session ends your own session. On a shared machine it never ends someone else's session; if you have no session there, nothing is ended and you see **No session of your own** (a Lite reader plays the error beep).
+- The view updates live without reloading.
+
+If a machine is under maintenance or reported as defective, you cannot start a new session, but running sessions continue and can be stopped normally.
 
 ## Link a Session to a Project
 

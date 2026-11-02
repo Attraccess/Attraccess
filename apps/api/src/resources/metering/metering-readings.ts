@@ -17,7 +17,7 @@ import { requireMeter } from './metering-catalog';
 
 import { toMeterValue, MeteringValueError, meterCharge } from './quantity';
 
-import { findActiveUsage } from '../usage/sessions/active-usage';
+import { findMeterHolder, isMeterLifecycleBusy } from './meter-holder';
 import { ConflictException } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
@@ -183,8 +183,9 @@ export class MeteringReadings {
     operation: ResourceMeteringOperation,
     meter: ResourceMeter,
   ): Promise<void> {
-    const attempt = await manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: operation.resourceId });
-    const activeUsage = await findActiveUsage(manager, operation.resourceId);
+    const holder = await findMeterHolder(manager, operation.resourceId, meter.id);
+    const attempt = await isMeterLifecycleBusy(manager, operation.resourceId, holder);
+    const activeUsage = holder.usage;
     // Free meters may skip initialization or lose their session after a failed start.
     // Their fresh lifetime polls are valid while usage stays unchanged, but a
     // reply must not cross a usage boundary or bypass an active meter session.
@@ -295,17 +296,7 @@ export class MeteringReadings {
   ): Promise<void> {
     const work = async (manager: EntityManager) => {
       const meter = await requireMeter(manager, resourceId, meterId);
-      const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } });
-      if (attempt && attempt.id !== lifecycleAttemptId) throw new ConflictException('METER_LIFECYCLE_BUSY');
-      const usageId = attempt
-        ? (attempt.candidateUsageId ?? attempt.previousUsageId)
-        : (await findActiveUsage(manager, resourceId))?.id;
-      const session =
-        usageId == null
-          ? null
-          : await manager.findOne(ResourceMeteringSession, {
-              where: { resourceId, meterId, usageId, status: ResourceMeteringSessionStatus.Active },
-            });
+      const session = await this.findReportSession(manager, resourceId, meterId, lifecycleAttemptId);
       const id = reportId ?? randomUUID();
       const existing = await manager.findOne(ResourceMeteringOperation, { where: { id } });
       if (existing) {
@@ -337,6 +328,46 @@ export class MeteringReadings {
     };
     if (transactionManager) await work(transactionManager);
     else await runSerializedTransaction(this.manager, work);
+  }
+
+  /**
+   * The meter session a pushed reading belongs to. Within a lifecycle flow that is its own usage's session;
+   * otherwise the meter holder's. A lifecycle that may change the meter's owner makes the reading ambiguous.
+   */
+  protected async findReportSession(
+    manager: EntityManager,
+    resourceId: number,
+    meterId: number,
+    lifecycleAttemptId?: string,
+  ): Promise<ResourceMeteringSession | null> {
+    const holder = await findMeterHolder(manager, resourceId, meterId);
+    if (!holder.shared) {
+      const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } });
+      if (attempt && attempt.id !== lifecycleAttemptId) throw new ConflictException('METER_LIFECYCLE_BUSY');
+      if (!attempt) return holder.session;
+      const usageId = attempt.candidateUsageId ?? attempt.previousUsageId;
+      return usageId == null
+        ? null
+        : manager.findOne(ResourceMeteringSession, {
+            where: { resourceId, meterId, usageId, status: ResourceMeteringSessionStatus.Active },
+          });
+    }
+    // Parallel sessions: several lifecycles may run at once. Each flow targets its own attempt, and only one
+    // touching the meter holder (or claiming a free meter) makes the reading ambiguous.
+    const own = lifecycleAttemptId
+      ? await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id: lifecycleAttemptId, resourceId } })
+      : null;
+    const ownUsageId = own ? (own.candidateUsageId ?? own.previousUsageId) : null;
+    const ownSession =
+      ownUsageId == null
+        ? null
+        : await manager.findOne(ResourceMeteringSession, {
+            where: { resourceId, meterId, usageId: ownUsageId, status: ResourceMeteringSessionStatus.Active },
+          });
+    if (ownSession) return ownSession;
+    if (await isMeterLifecycleBusy(manager, resourceId, holder, own?.id))
+      throw new ConflictException('METER_LIFECYCLE_BUSY');
+    return holder.session;
   }
 
   async assertMeterStillOwned(session: ResourceMeteringSession, manager = this.manager): Promise<void> {

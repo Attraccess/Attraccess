@@ -59,7 +59,7 @@ import { ResourceRetrainingService } from '../../retraining/resourceRetraining.s
 
 import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
 
-import { activeUsageWhere } from './active-usage';
+import { activeUsageWhere, getSessionCapacity } from './active-usage';
 
 import { UpdateUsageSessionProjectDto } from '../dtos/updateUsageSessionProject.dto';
 
@@ -143,37 +143,77 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     'formSubmissions.user',
   ];
 
+  /**
+   * The caller's own active session when `preferUserId` has one, otherwise the newest.
+   * Identical to the single-session behaviour at limit 1.
+   */
   public async getActiveSession(
     resourceId: number,
     transactionalEntityManager?: EntityManager,
+    preferUserId?: number,
   ): Promise<ResourceUsage | null> {
+    const sessions = await this.getActiveSessionsForResource(resourceId, transactionalEntityManager);
+    if (sessions.length === 0) return null;
+    return (
+      (preferUserId === undefined ? undefined : sessions.find((session) => session.userId === preferUserId)) ??
+      sessions[sessions.length - 1]
+    );
+  }
+
+  /** All active sessions of one resource, earliest started first. */
+  public async getActiveSessionsForResource(
+    resourceId: number,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<ResourceUsage[]> {
     const resourceUsageRepository = transactionalEntityManager
       ? transactionalEntityManager.getRepository(ResourceUsage)
       : this.resourceUsageRepository;
 
-    return await resourceUsageRepository.findOne({
-      where: {
-        resourceId,
-        ...activeUsageWhere(),
-      },
-      order: { startTime: 'DESC', id: 'DESC' },
+    return await resourceUsageRepository.find({
+      where: { resourceId, ...activeUsageWhere() },
+      order: { startTime: 'ASC', id: 'ASC' },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
   }
 
-  public async getActiveSessions(resourceIds: number[]): Promise<Map<number, ResourceUsage | null>> {
-    const map = new Map<number, ResourceUsage | null>(resourceIds.map((id) => [id, null]));
+  public async getActiveSessions(resourceIds: number[]): Promise<Map<number, ResourceUsage[]>> {
+    const map = new Map<number, ResourceUsage[]>(resourceIds.map((id) => [id, []]));
     if (resourceIds.length === 0) return map;
     const sessions = await this.resourceUsageRepository.find({
       where: { resourceId: In(resourceIds), ...activeUsageWhere() },
-      order: { startTime: 'DESC', id: 'DESC' },
+      order: { startTime: 'ASC', id: 'ASC' },
       relations: ['user', 'resource', 'billingTransaction', 'project', 'supervisorUser'],
     });
-    for (const session of sessions) {
-      // Legacy duplicates are retained for explicit resolution. Single and bulk reads agree.
-      if (!map.get(session.resourceId)) map.set(session.resourceId, session);
-    }
+    for (const session of sessions) map.get(session.resourceId)?.push(session);
     return map;
+  }
+
+  public async getActiveSessionOverview(
+    resourceId: number,
+    userId: number,
+  ): Promise<{
+    usage: ResourceUsage | null;
+    usages: ResourceUsage[];
+    activeSessionCount: number;
+    maxParallelSessions: number;
+    isFull: boolean;
+  }> {
+    const [usages, resource] = await Promise.all([
+      this.getActiveSessionsForResource(resourceId),
+      this.resourceRepository.findOne({
+        where: { id: resourceId },
+        select: { id: true, type: true, maxParallelSessions: true },
+      }),
+    ]);
+    const usage = usages.find((session) => session.userId === userId) ?? usages[usages.length - 1] ?? null;
+    return {
+      usage,
+      usages,
+      ...getSessionCapacity(
+        { type: resource?.type ?? ResourceType.Machine, maxParallelSessions: resource?.maxParallelSessions ?? 1 },
+        usages.length,
+      ),
+    };
   }
 
   /**
@@ -357,6 +397,9 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
       where: { id: usageId },
       relations: ['resource', 'user'],
     });
+    // An ended usage session is announced by ResourceUsageSessionEndedEvent (or the take-over event), never as a
+    // start. Door actions are stored already ended and still fire this event.
+    if (usage?.usageAction === ResourceUsageAction.Usage && usage.endTime) return;
     await this.eventEmitter.emitAsync(ResourceSessionStartedEvent.EVENT_NAME, new ResourceSessionStartedEvent(usage));
   }
 
@@ -379,25 +422,22 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
       })
       .catch(() => undefined);
 
-    // Emit event after the transaction committed to ensure readers can observe DB state
-    try {
-      if (endedUsageIdToEmit) {
-        await this.emitUsageEvent(endedUsageIdToEmit);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to emit usage event after endSession commit`, (error as Error).stack);
-    }
-
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
 
-    if (updatedUsage?.user?.id && (updatedUsage.user.id !== user.id || skipNoteNotification)) {
-      this.eventEmitter.emit(
-        ResourceUsageSessionEndedEvent.EVENT_NAME,
-        new ResourceUsageSessionEndedEvent(
-          updatedUsage,
-          skipNoteNotification ? null : { id: user.id, username: user.username },
-        ),
-      );
+    // Emitted after the transaction committed so listeners observe DB state. Every end fires it exactly once
+    // (live feed, reader resource lists, maintenance evaluation); the notification listener skips self-ends.
+    if (endedUsageIdToEmit && updatedUsage) {
+      try {
+        this.eventEmitter.emit(
+          ResourceUsageSessionEndedEvent.EVENT_NAME,
+          new ResourceUsageSessionEndedEvent(
+            updatedUsage,
+            skipNoteNotification ? null : { id: user.id, username: user.username },
+          ),
+        );
+      } catch (error) {
+        this.logger.error(`Failed to emit session ended event after endSession commit`, (error as Error).stack);
+      }
     }
 
     // Counter signal for supervised-usage auto-promotion (ATT-488): every completed supervised session

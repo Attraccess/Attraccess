@@ -1,6 +1,7 @@
 import { registerResourceOperatingAttributionServiceFixture } from './resource-operating-attribution.service.resource-operating-attribution-service.test-fixture';
 import { ResourceOperatingInterval, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
 import { MoreThan } from 'typeorm';
+import { TimeRange, UsageRange } from './resource-operating-attribution.service';
 
 describe('ResourceOperatingAttributionService', () => {
   const fixture = registerResourceOperatingAttributionServiceFixture();
@@ -27,6 +28,123 @@ describe('ResourceOperatingAttributionService', () => {
           isProvisional: false,
         },
       ],
+    });
+  });
+
+  describe('parallel sessions (interim rule)', () => {
+    it('attributes each operating moment to exactly one session, the earliest started', () => {
+      const result = fixture.service.derive(
+        [fixture.operating(1, '10:00:00', '11:00:00')],
+        [fixture.usage(2, '10:10:00', '10:40:00'), fixture.usage(3, '10:20:00', '10:50:00')],
+        fixture.asOf,
+      );
+
+      const byUsage = (usageId: number) =>
+        result.attributions.filter((entry) => entry.usageId === usageId).reduce((sum, e) => sum + e.durationMs, 0);
+      expect(byUsage(2)).toBe(30 * 60_000);
+      expect(byUsage(3)).toBe(10 * 60_000);
+      expect(result.attributedOperatingDurationMs).toBe(40 * 60_000);
+      expect(byUsage(2) + byUsage(3)).toBe(result.attributedOperatingDurationMs);
+    });
+
+    it('charges the persisted duration of a later session without the earlier overlapping one', async () => {
+      const earlier = fixture.usage(2, '10:00:00', null);
+      const later = fixture.usage(3, '10:20:00', '10:50:00');
+      fixture.intervalRepository.find.mockResolvedValue([fixture.operating(1, '10:00:00', '11:00:00')]);
+      const manager = {
+        getRepository: (entity: unknown) => ({
+          find: async () =>
+            entity === ResourceOperatingInterval
+              ? [fixture.operating(1, '10:00:00', '11:00:00')]
+              : entity === ResourceUsage
+                ? [earlier]
+                : [],
+        }),
+      };
+
+      await expect(fixture.service.getForUsage(later, manager as never)).resolves.toBe(0);
+    });
+
+    it('charges a later session from the requested end of an earlier session whose end is in progress', async () => {
+      // A started first; its end was requested at 10:30 but is not persisted yet when B ends at 10:50.
+      const earlier = fixture.usage(2, '10:00:00', null);
+      const later = fixture.usage(3, '10:20:00', '10:50:00');
+      const manager = {
+        getRepository: (entity: unknown) => ({
+          find: async () =>
+            entity === ResourceOperatingInterval
+              ? [fixture.operating(1, '10:00:00', '11:00:00')]
+              : entity === ResourceUsage
+                ? [earlier]
+                : [{ previousUsageId: earlier.id, transitionTime: fixture.at('10:30:00') }],
+        }),
+      };
+
+      await expect(fixture.service.getForUsage(later, manager as never)).resolves.toBe(20);
+    });
+
+    it('matches the pairwise subtraction it replaced for random overlapping sessions', () => {
+      type Service = { withoutOverlaps(ranges: UsageRange[]): UsageRange[] };
+      const subtract = (span: TimeRange, taken: TimeRange): TimeRange[] => {
+        if (span.endTime <= taken.startTime || taken.endTime <= span.startTime) return [span];
+        const remainder: TimeRange[] = [];
+        if (span.startTime < taken.startTime) remainder.push({ startTime: span.startTime, endTime: taken.startTime });
+        if (taken.endTime < span.endTime) remainder.push({ startTime: taken.endTime, endTime: span.endTime });
+        return remainder;
+      };
+      // The previous O(n²) implementation, kept verbatim as the reference.
+      const reference = (usageRanges: UsageRange[]): UsageRange[] => {
+        const ordered = [...usageRanges].sort(
+          (left, right) =>
+            left.usage.startTime.getTime() - right.usage.startTime.getTime() || left.usage.id - right.usage.id,
+        );
+        const result: UsageRange[] = [];
+        const earlier: TimeRange[] = [];
+        for (const entry of ordered) {
+          let spans: TimeRange[] = [entry.range];
+          for (const taken of earlier) {
+            spans = spans.flatMap((span) => subtract(span, taken));
+            if (spans.length === 0) break;
+          }
+          result.push(...spans.map((range) => (range === entry.range ? entry : { usage: entry.usage, range })));
+          earlier.push(entry.range);
+        }
+        return usageRanges.length < 2 ? usageRanges : result;
+      };
+      const plain = (ranges: UsageRange[]) =>
+        ranges.map(({ usage, range }) => [usage.id, range.startTime.getTime(), range.endTime.getTime()]);
+      let seed = 1189;
+      const random = (limit: number) => {
+        seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+        return seed % limit;
+      };
+      const base = fixture.at('10:00:00').getTime();
+      for (let run = 0; run < 500; run++) {
+        const ranges: UsageRange[] = Array.from({ length: random(12) }, (_, index) => {
+          // Coarse steps produce ties, touching ends and nested sessions; ids are shuffled against start order.
+          const start = base + random(20) * 60_000;
+          const range = { startTime: new Date(start), endTime: new Date(start + (1 + random(15)) * 60_000) };
+          const usage = { ...fixture.usage(100 - index, '10:00:00', null), startTime: range.startTime };
+          return { usage, range };
+        });
+        const actual = (fixture.service as unknown as Service).withoutOverlaps(ranges);
+        expect(plain(actual)).toEqual(plain(reference(ranges)));
+        // Untouched sessions keep their entry, so downstream identity checks behave as before.
+        reference(ranges).forEach((entry, index) => expect(actual[index] === entry).toBe(ranges.includes(entry)));
+      }
+    });
+
+    it('splits ten thousand overlapping sessions without quadratic work', () => {
+      const base = fixture.at('00:00:00').getTime();
+      const usages = Array.from({ length: 10_000 }, (_, index) => ({
+        ...fixture.usage(index + 1, '00:00:00', null),
+        startTime: new Date(base + index * 1_000),
+        endTime: new Date(base + index * 1_000 + 3_600_000),
+      }));
+      const started = performance.now();
+      const result = fixture.service.derive([fixture.operating(1, '00:00:00', '12:00:00')], usages, fixture.asOf);
+      expect(performance.now() - started).toBeLessThan(2_000);
+      expect(result.attributedOperatingDurationMs).toBe(result.sessionDurationMs);
     });
   });
 

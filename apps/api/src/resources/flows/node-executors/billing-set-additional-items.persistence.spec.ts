@@ -78,7 +78,7 @@ describe('Additional billing items around finalization', () => {
       .getRepository(BillingTransaction)
       .save({ id: 1, resourceUsageId: 1, status: BillingTransactionStatus.Pending, amount: 0 });
     executor = new BillingSetAdditionalItemsExecutor(
-      { getActiveSession: jest.fn().mockResolvedValue({ id: 1 }) } as unknown as ResourceUsageService,
+      { getActiveSessionsForResource: jest.fn().mockResolvedValue([{ id: 1 }]) } as unknown as ResourceUsageService,
       source.getRepository(BillingTransactionItem),
     );
   });

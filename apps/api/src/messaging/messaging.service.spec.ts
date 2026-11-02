@@ -32,7 +32,7 @@ describe('MessagingService', () => {
   let userRepository: { findOne: jest.Mock };
   let resourceRepository: { findOne: jest.Mock };
   let dataSource: { transaction: jest.Mock };
-  let resourceUsageService: { getActiveSession: jest.Mock };
+  let resourceUsageService: { getActiveSessionsForResource: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
   let messagingLiveService: { isOnline: jest.Mock };
   let messageRateLimitService: { assertWithinLimit: jest.Mock };
@@ -68,7 +68,7 @@ describe('MessagingService', () => {
     userRepository = { findOne: jest.fn() };
     resourceRepository = { findOne: jest.fn() };
     dataSource = { transaction: jest.fn() };
-    resourceUsageService = { getActiveSession: jest.fn() };
+    resourceUsageService = { getActiveSessionsForResource: jest.fn() };
     eventEmitter = { emit: jest.fn() };
     messagingLiveService = { isOnline: jest.fn().mockReturnValue(false) };
     messageRateLimitService = { assertWithinLimit: jest.fn() };
@@ -202,13 +202,23 @@ describe('MessagingService', () => {
 
   describe('resolveResourceHolder', () => {
     it('returns the active session user', async () => {
-      resourceUsageService.getActiveSession.mockResolvedValue({ user: { id: 8 } });
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ userId: 8, user: { id: 8 } }]);
       await expect(service.resolveResourceHolder(3)).resolves.toEqual({ id: 8 });
     });
 
     it('returns null when there is no active session', async () => {
-      resourceUsageService.getActiveSession.mockResolvedValue(null);
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([]);
       await expect(service.resolveResourceHolder(3)).resolves.toBeNull();
+    });
+
+    it('lets the sender pick one of several sessions and refuses to guess', async () => {
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([
+        { userId: 8, user: { id: 8 } },
+        { userId: 9, user: { id: 9 } },
+      ]);
+      await expect(service.resolveResourceHolder(3, 9)).resolves.toEqual({ id: 9 });
+      await expect(service.resolveResourceHolder(3, 77)).resolves.toBeNull();
+      await expect(service.resolveResourceHolder(3)).rejects.toThrow('choose whom to contact');
     });
   });
 
