@@ -67,9 +67,6 @@ public:
     void buildUiSlotStep(uint32_t generation, uint8_t slotIndex, uint16_t item); // async chain, see refreshUiSlots
 
 private:
-    void updateFormBreadcrumb();
-    void createFormsEditor(lv_obj_t *overlay);
-    void createSelectField(lv_obj_t *fieldContainer, FormFieldWidget &widget, const API::ResourceUsageFormField &field);
     enum class UiSlotKind { Header, Body, Session };
     void createUiSlotContainer(UiSlotKind kind);
     uint32_t uiBuildGeneration = 0;
