@@ -122,7 +122,9 @@ void testStatusScreens(SdlDisplay &display, const std::filesystem::path &screens
 
     // Auto-return.
     auto timed = StatusScreen::success(FirmwareI18n::Message::UsageEnded, FirmwareI18n::Text::literal("CNC") /* i18n-data: Test fixture. */);
-    timed.autoReturnMs = 120;
+    // Wide margin: the "not before its time" check below runs on loaded CI runners, whose loop
+    // iterations can each take tens of milliseconds, so a small window risks auto-returning early.
+    timed.autoReturnMs = 400;
     Display::showStatus(std::move(timed));
     Display::loop();
     assert(lv_screen_active() == Display::statusScreen.getScreen());
