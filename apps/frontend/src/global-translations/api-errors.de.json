@@ -15,6 +15,10 @@
     "title": "Maschine ist voll",
     "description": "An dieser Maschine arbeiten bereits so viele Personen, wie erlaubt sind. Bitte versuchen Sie es erneut, sobald jemand fertig ist."
   },
+  "MachineBusyError": {
+    "title": "Maschine ist beschäftigt",
+    "description": "An dieser Maschine startet oder beendet gerade eine andere Person. Bitte versuchen Sie es gleich noch einmal."
+  },
   "AlreadyHasActiveSessionError": {
     "title": "Sitzung bereits aktiv",
     "description": "Sie haben an dieser Maschine bereits eine aktive Sitzung. Beenden Sie diese zuerst, wenn Sie neu starten möchten."

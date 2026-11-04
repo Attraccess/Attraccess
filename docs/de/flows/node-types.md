@@ -22,19 +22,19 @@ Beispiel: Button `Relais testen` mit **MQTT-Nachricht senden** verbinden.
 
 Typ: `input.resource.usage.started` · Maschinen
 
-Läuft während eines Nutzungsstarts. Keine Einstellungen. Die Payload enthält Felder der neuen Sitzung an der Wurzel (`id`, `startTime`, `user`, `formSubmissions` usw.). `{{user.username}}` liest den Sitzungsbesitzer. Ein Flow-Fehler kann den Start verhindern; wählen Sie das Fehlerverhalten externer Aktionen entsprechend.
+Läuft während eines Nutzungsstarts. Keine Einstellungen. Die Payload enthält Felder der neuen Sitzung an der Wurzel (`id`, `startTime`, `user`, `formSubmissions` usw.) und [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). `{{user.username}}` liest den Sitzungsbesitzer. Ein Flow-Fehler kann den Start verhindern; wählen Sie das Fehlerverhalten externer Aktionen entsprechend.
 
 ### Nutzung beendet
 
 Typ: `input.resource.usage.stopped` · Maschinen
 
-Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes`. Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen.
+Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen.
 
 ### Nutzung übernommen
 
 Typ: `input.resource.usage.takeover` · Maschinen
 
-Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime`. `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**.
+Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime` und `activeSessions` (immer 1 zu 1). `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**.
 
 ### Tür entriegelt
 
@@ -133,13 +133,13 @@ Die Payload enthält `metering: { sessionId, meterId, operationId, resourceId, u
 
 Typ: `input.resource.metering.collect` · Maschinen
 
-| Einstellung | Bereich / Standard |
-| --- | --- |
-| **Zähler** | Vordefinierten Zähler auswählen oder einen erstellen |
-| **Zeitlimit (Sekunden)** | 1–600 / **30** |
-| **Zwischenintervall (Minuten)** | 0–1440 / **1**; `0` deaktiviert regelmäßige Abfragen |
-| **Versuche für den Endwert** | 1–10 / **3** |
-| **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5** |
+| Einstellung                                     | Bereich / Standard                                   |
+| ----------------------------------------------- | ---------------------------------------------------- |
+| **Zähler**                                      | Vordefinierten Zähler auswählen oder einen erstellen |
+| **Zeitlimit (Sekunden)**                        | 1–600 / **30**                                       |
+| **Zwischenintervall (Minuten)**                 | 0–1440 / **1**; `0` deaktiviert regelmäßige Abfragen |
+| **Versuche für den Endwert**                    | 1–10 / **3**                                         |
+| **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5**                                        |
 
 Läuft regelmäßig, auch außerhalb von Sitzungen, und für Endwerte beim Sitzungsende. Die Payload enthält dieselben Messfelder wie **Messung starten**, mit `kind: "interim"` oder `"final"`. Ohne Sitzung sind `sessionId` und `usageId` null. Mit **Zähler melden** für denselben Zähler verbinden. Regelmäßige Messungen aktualisieren Gesamtverbrauch und laufende Sitzung; nur Sitzungsverbrauch wird abgerechnet. Siehe [Zähler](flows/energy-metering.md) für Aktualität und ausstehende Gebühren.
 
@@ -287,7 +287,13 @@ Beispiel: Formularantwort mit **Payload setzen** nach `quantity` übertragen, da
 
 Typ: `output.resource.usage.end-session` · Maschinen · Editor: **Aktive Sitzung beenden**
 
-**Notizen** ist eine optionale Vorlage. **Bei Fehler** folgt dem gemeinsamen Verhalten. Beendet die aktuelle Sitzung dieser Ressource mit deren Besitzer; eine fehlende aktive Sitzung führt zum Fehler. Gibt bei Erfolg die unveränderte Payload weiter. Während eines ausstehenden Starts/einer Übernahme kann er die Kandidatensitzung dieser Lebenszyklusaktion beenden.
+**Notizen** ist eine optionale Vorlage. **Bei Fehler** folgt dem gemeinsamen Verhalten. **Welche Sitzung** legt fest, was beendet wird:
+
+- **Die auslösende Sitzung** (Standard, so verhalten sich auch ältere Knoten): die Sitzung, die diesen Lauf ausgelöst hat; eine fehlende aktive Sitzung führt zum Fehler.
+- **Die Sitzung eines Benutzers**: die Sitzung des Benutzers, dessen ID bei **Benutzer-ID** steht (Vorlage, z. B. `{{user.id}}`). Ein Benutzer ohne Sitzung führt zum Fehler.
+- **Alle Sitzungen**: jede laufende Sitzung der Maschine. Ohne Sitzungen passiert nichts.
+
+Sitzungen, die bereits beendet werden, werden übersprungen. Jede beendete Sitzung führt ihren eigenen Flow **Nutzung beendet** aus, daher meldet nur die letzte `activeSessions.after` = 0. Läuft dieser Knoten in einem Nutzungsstart oder -ende, werden die anderen Sitzungen direkt nach Abschluss dieses Starts oder Endes beendet, nie währenddessen. Die Sitzung wird mit ihrem Besitzer beendet. Gibt bei Erfolg die unveränderte Payload weiter. Während eines ausstehenden Starts/einer Übernahme kann er die Kandidatensitzung dieser Lebenszyklusaktion beenden.
 
 Beispielnotiz: `Wegen Inaktivität an {{resource.name}} automatisch beendet`. Die Aktion überspringt erforderliche Endformulare und Notizbenachrichtigungen.
 
@@ -357,11 +363,11 @@ Wählen Sie ein festes **Companion-Gerät**. Sendet einen Entsperrbefehl und spe
 
 Typ: `output.resource.metering.ready` · Maschinen
 
-| Einstellung | Beschreibung |
-| --- | --- |
-| **Zähler** | Den Zähler der Start-Anfrage auswählen |
+| Einstellung   | Beschreibung                                                              |
+| ------------- | ------------------------------------------------------------------------- |
+| **Zähler**    | Den Zähler der Start-Anfrage auswählen                                    |
 | **Basiswert** | Optionale Vorlage für den aktuellen Gesamtstand eines kumulierten Zählers |
-| **Quelle** | Optionale Vorlage mit dem Namen des physischen Zählers |
+| **Quelle**    | Optionale Vorlage mit dem Namen des physischen Zählers                    |
 
 Schließt eine **Messung starten**-Operation ab. Schlägt außerhalb eines Startzweigs fehl. Nach einem Reset auf null den Basiswert leer lassen; ein konfigurierter Basiswert, der leer gerendert wird, führt zum Fehler. Der Katalog bietet keinen ausgehenden Anschluss.
 
@@ -371,13 +377,13 @@ Beispiel nach HTTP-Antwort `{"counter":1500}`: Basiswert `{{counter}}`. Eine Ein
 
 Typ: `output.resource.metering.report`
 
-| Einstellung | Beschreibung |
-| --- | --- |
-| **Zähler** | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen |
-| **Modus** | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
-| **Wert** | Erforderlicher nichtnegativer Zahlenwert oder Vorlage |
-| **Messzeit** | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt |
-| **Quelle** | Optionale Vorlage mit dem Namen des Zählers |
+| Einstellung  | Beschreibung                                                           |
+| ------------ | ---------------------------------------------------------------------- |
+| **Zähler**   | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen   |
+| **Modus**    | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
+| **Wert**     | Erforderlicher nichtnegativer Zahlenwert oder Vorlage                  |
+| **Messzeit** | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt     |
+| **Quelle**   | Optionale Vorlage mit dem Namen des Zählers                            |
 
 Meldet Werte in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung. Eine Antwort im Abfragezweig muss zum angefragten Zähler passen. Eine Einheit ist nicht erforderlich. Der erste unaufgeforderte Gesamtstand legt einen Basiswert fest; spätere Zuwächse erhöhen den Gesamtverbrauch. Inkremente erhöhen den Verbrauch direkt. Während einer laufenden Sitzung aktualisieren akzeptierte Zuwächse auch deren Verbrauch. Eine konfigurierte Messzeit-Vorlage, die leer gerendert wird, führt zum Fehler; Endwerte müssen aktuell sein. Der Katalog bietet keinen ausgehenden Anschluss.
 

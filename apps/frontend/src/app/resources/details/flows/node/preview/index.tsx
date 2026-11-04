@@ -216,6 +216,10 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
   [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: (t, nodeData) => {
     return [
       {
+        label: t('nodes.output.resource.usage.end-session.preview.target'),
+        value: (nodeData?.data.target as string) ?? 'triggering',
+      },
+      {
         label: t('nodes.output.resource.usage.end-session.preview.notes'),
         value: nodeData?.data.notes as string,
       },

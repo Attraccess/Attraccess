@@ -667,6 +667,19 @@
             "inputs": { "input": "Input" },
             "outputs": { "output": "Output", "failure": "Failure" },
             "config": {
+              "target": {
+                "label": "Which session",
+                "helpText": "Triggering ends the session that started this flow. User ends one person's session, all ends every running session on this machine. Sessions that are already ending are skipped.",
+                "enum": {
+                  "triggering": "The triggering session",
+                  "user": "The session of a user",
+                  "all": "All sessions"
+                }
+              },
+              "userId": {
+                "label": "User id (templates allowed)",
+                "helpText": "Only for \"The session of a user\", for example {{user.id}}."
+              },
               "notes": { "label": "Notes (templates allowed)" },
               "failureBehavior": {
                 "label": "On failure",
@@ -679,6 +692,7 @@
               }
             },
             "preview": {
+              "target": "Which session",
               "notes": "Notes"
             }
           }

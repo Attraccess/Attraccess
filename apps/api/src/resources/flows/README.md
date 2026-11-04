@@ -35,6 +35,18 @@ DELETE /resources/:resourceId/flows
 
 Deletes the complete flow configuration for a resource, removing all nodes and edges.
 
+### Shared Machine Flow Warnings
+
+```
+GET /resources/:resourceId/flow/shared-machine-warnings
+```
+
+Lists the session start, stop and takeover triggers that lead to an external effect (HTTP, MQTT, PC lock/unlock, plugin outputs) without an IF node that checks `activeSessions`. The machine edit dialog shows it when the limit is raised above 1.
+
+## Session Counts
+
+Start, stop and takeover payloads carry `activeSessions: { before, after, limit }`, the published usage sessions around the event (supervisors do not count). On a machine with a limit above 1 these events run one at a time per machine, each from start through its flow to commit or abort; a waiter gets `MachineBusyError` after 30 s. The end-session node can end the triggering session, one user's session (`target: user`, `userId` template) or all sessions (`target: all`); inside a start or stop flow those other ends run once it has finished.
+
 ## Node Types
 
 ### Events

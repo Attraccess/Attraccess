@@ -44,6 +44,7 @@ import { InsufficientBalanceError } from '../../../../billing/errors/insufficien
 
 import { ResourceInUseError } from '../../../../resources/usage/errors/resource-in-use.error';
 import { ResourceFullError } from '../../../../resources/usage/errors/resource-full.error';
+import { MachineBusyError } from '../../../../resources/usage/errors/machine-busy.error';
 import { AlreadyHasActiveSessionError } from '../../../../resources/usage/errors/already-has-active-session.error';
 
 @Injectable()
@@ -376,6 +377,7 @@ export class AttractapSessionHandler {
       if (
         error instanceof ResourceInUseError ||
         error instanceof ResourceFullError ||
+        error instanceof MachineBusyError ||
         error instanceof AlreadyHasActiveSessionError
       ) {
         // Resolve the pending action before refreshing an occupied row.

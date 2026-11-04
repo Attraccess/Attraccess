@@ -13,6 +13,7 @@ import { rm } from 'node:fs/promises';
 import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
 import { ResourceUsageImpossibleMaintenanceInProgressException } from '../../../exceptions/resource.maintenance.inUse.exception';
 import { ResourceUnhealthyException } from '../../../exceptions/resource.unhealthy.exception';
+import { FlowExecutionError } from '../../flows/errors/flow-execution.error';
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { NoOwnActiveSessionError } from '../errors/no-own-active-session.error';
 import { ResourceFullError } from '../errors/resource-full.error';
@@ -58,6 +59,8 @@ describe('Parallel sessions on one machine', () => {
     }
     return { entered, release };
   };
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
 
   beforeEach(async () => {
     await resetTestFixture(scope);
@@ -174,7 +177,7 @@ describe('Parallel sessions on one machine', () => {
       expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(0);
     });
 
-    it('does not refuse a start because another person start is in progress while a slot is free', async () => {
+    it('queues a start behind another person start in progress while a slot is free', async () => {
       await setLimit(2);
       const parked = parkFlows();
       const first = scope.usage.startSession(1, scope.users[0], {});
@@ -182,76 +185,231 @@ describe('Parallel sessions on one machine', () => {
       // The first start is parked inside its flow, holding a pending reservation.
       expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(1);
       expect(await count('resource_usage_lifecycle_attempt')).toBe(1);
-      await scope.usage.startSession(1, scope.users[1], {});
+      const second = scope.usage.startSession(1, scope.users[1], {});
+      await settle();
+      expect(await count('resource_usage_lifecycle_attempt')).toBe(1);
       parked.release();
-      await first;
+      await Promise.all([first, second]);
       expect(await scope.usage.getActiveSessionsForResource(1)).toHaveLength(2);
     });
 
-    it('counts other people pending starts toward capacity', async () => {
+    it('refuses a queued start as full once the earlier starts took the last slot', async () => {
       await setLimit(2);
       const [third] = await addUsers(1);
       const parked = parkFlows();
       const first = scope.usage.startSession(1, scope.users[0], {});
       await parked.entered;
-      expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(1);
-      await scope.usage.startSession(1, scope.users[1], {});
-      await expect(scope.usage.startSession(1, third, {})).rejects.toBeInstanceOf(ResourceFullError);
+      const second = scope.usage.startSession(1, scope.users[1], {});
+      const queued = scope.usage.startSession(1, third, {});
       parked.release();
-      await first;
+      await Promise.all([first, second]);
+      await expect(queued).rejects.toBeInstanceOf(ResourceFullError);
     });
 
-    it('does not refuse a start while another person stop is in progress', async () => {
+    it('queues a start behind another person stop in progress', async () => {
       await setLimit(2);
       await scope.usage.startSession(1, scope.users[0], {});
-      const [third] = await addUsers(1);
       const parked = parkFlows();
       const stopping = scope.usage.endSession(1, scope.users[0], {});
       await parked.entered;
       expect(await scope.source.getRepository(ResourceUsageLifecycleAttempt).findOneByOrFail({})).toMatchObject({
         kind: 'end',
       });
-      // The stopping session still holds its slot until the stop completes.
-      await scope.usage.startSession(1, scope.users[1], {});
-      await expect(scope.usage.startSession(1, third, {})).rejects.toBeInstanceOf(ResourceFullError);
+      const starting = scope.usage.startSession(1, scope.users[1], {});
+      await settle();
+      expect(await count('resource_usage_lifecycle_attempt')).toBe(1);
       parked.release();
-      await stopping;
+      await Promise.all([stopping, starting]);
       expect((await scope.usage.getActiveSessionsForResource(1)).map((session) => session.userId)).toEqual([2]);
     });
 
-    it('refuses ending the same session twice at the same time', async () => {
+    it('ends the same session only once when two stops run at the same time', async () => {
       await setLimit(3);
       const own = await scope.usage.startSession(1, scope.users[0], {});
       await scope.usage.startSession(1, scope.users[1], {});
       const parked = parkFlows();
       const ending = scope.usage.endSession(1, scope.users[0], {});
       await parked.entered;
-      await expect(scope.usage.endSession(1, scope.users[1], { usageId: own.id })).rejects.toBeInstanceOf(
-        ConflictException,
-      );
-      await expect(scope.usage.endSession(1, scope.users[0], {})).rejects.toThrow(
-        'This session is already being ended',
-      );
+      const second = scope.usage.endSession(1, scope.users[1], { usageId: own.id });
       parked.release();
       expect((await ending).id).toBe(own.id);
+      await expect(second).rejects.toBeInstanceOf(BadRequestException);
       expect((await scope.usage.getActiveSessionsForResource(1)).map((session) => session.userId)).toEqual([2]);
     });
 
-    it('cleans up several interrupted lifecycles at once', async () => {
+    it('cleans up an interrupted lifecycle and lets the queued one go on', async () => {
       await setLimit(3);
       const users = await addUsers(2);
-      const parked = parkFlows(2);
+      const parked = parkFlows();
       const starts = Promise.allSettled(users.map((user) => scope.usage.startSession(1, user, {})));
       await parked.entered;
-      expect(await count('resource_usage_lifecycle_attempt')).toBe(2);
-      expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(2);
+      expect(await count('resource_usage_lifecycle_attempt')).toBe(1);
+      expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(1);
       await scope.usage.recoverInterruptedLifecycles();
       expect(await count('resource_usage_lifecycle_attempt')).toBe(0);
       expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(0);
-      // The parked flows resume after recovery; their starts fail because their reservations are gone.
+      // The parked flow resumes after recovery and fails because its reservation is gone; the queued start is unharmed.
       parked.release();
-      expect((await starts).map((result) => result.status)).toEqual(['rejected', 'rejected']);
+      expect((await starts).map((result) => result.status)).toEqual(['rejected', 'fulfilled']);
+      expect((await scope.usage.getActiveSessionsForResource(1)).map((session) => session.userId)).toEqual([
+        users[1].id,
+      ]);
+    });
+  });
+
+  describe('active session counts for flows', () => {
+    const payloadOf = (trigger: ResourceFlowNodeType, index = 0) =>
+      scope.flow.runFlow.mock.calls.filter((call) => call[1] === trigger)[index][2] as {
+        activeSessions: { before: number; after: number; limit: number };
+      };
+
+    it('reports before, after and limit around starts and stops', async () => {
+      await setLimit(3);
+      await scope.usage.startSession(1, scope.users[0], {});
+      await scope.usage.startSession(1, scope.users[1], {});
+      await scope.usage.endSession(1, scope.users[0], {});
+      await scope.usage.endSession(1, scope.users[1], {});
+      expect(payloadOf(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, 0).activeSessions).toEqual({
+        before: 0,
+        after: 1,
+        limit: 3,
+      });
+      expect(payloadOf(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, 1).activeSessions).toEqual({
+        before: 1,
+        after: 2,
+        limit: 3,
+      });
+      expect(payloadOf(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED, 0).activeSessions).toEqual({
+        before: 2,
+        after: 1,
+        limit: 3,
+      });
+      expect(payloadOf(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED, 1).activeSessions).toEqual({
+        before: 1,
+        after: 0,
+        limit: 3,
+      });
+    });
+
+    it('reports exactly one first start and one last stop for simultaneous starts and stops', async () => {
+      await setLimit(3);
+      const users = await addUsers(2);
+      await Promise.all(users.map((user) => scope.usage.startSession(1, user, {})));
+      await Promise.all(users.map((user) => scope.usage.endSession(1, user, {})));
+      const starts = [0, 1].map((index) => payloadOf(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, index));
+      const stops = [0, 1].map((index) => payloadOf(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED, index));
+      expect(starts.filter(({ activeSessions }) => activeSessions.before === 0)).toHaveLength(1);
+      expect(stops.filter(({ activeSessions }) => activeSessions.after === 0)).toHaveLength(1);
+    });
+
+    it('does not skew the next count after an aborted start or stop', async () => {
+      await setLimit(3);
+      scope.flow.runFlow.mockRejectedValueOnce(new FlowExecutionError('boom'));
+      await scope.usage.startSession(1, scope.users[0], {}).catch(() => undefined);
+      const aborted = await Promise.allSettled([scope.usage.startSession(1, scope.users[0], {})]);
+      expect(aborted[0].status).toBe('fulfilled');
+      expect(
+        scope.flow.runFlow.mock.calls.map((call) => (call[2] as { activeSessions: { before: number } }).activeSessions),
+      ).toEqual([
+        { before: 0, after: 1, limit: 3 },
+        { before: 0, after: 1, limit: 3 },
+      ]);
+    });
+
+    it('reports a takeover as 1 to 1 and keeps limit 1 working as before', async () => {
+      await setLimit(1, { allowTakeOver: true });
+      await scope.usage.startSession(1, scope.users[0], {});
+      await scope.usage.startSession(1, scope.users[1], { forceTakeOver: true });
+      expect(payloadOf(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER).activeSessions).toEqual({
+        before: 1,
+        after: 1,
+        limit: 1,
+      });
+    });
+
+    it('reports after 0 for the stop that follows a start flow cancelling its own session', async () => {
+      await setLimit(2);
+      const users = await addUsers(1);
+      scope.flow.runFlow.mockImplementationOnce(async (resourceId, _type, _payload, _manager, options) => {
+        await scope.usage.endLifecycleCandidate(options?.lifecycleAttemptId as string, resourceId as number, 'cancel');
+        throw new FlowExecutionError('cancelled');
+      });
+      await scope.usage.startSession(1, users[0], {}).catch(() => undefined);
+      expect(payloadOf(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED).activeSessions).toEqual({
+        before: 1,
+        after: 0,
+        limit: 2,
+      });
+    });
+  });
+
+  describe('ending sessions from flows', () => {
+    it('ends all sessions, each with its own stop and only the last reporting none left', async () => {
+      await setLimit(3);
+      const users = await addUsers(2);
+      await Promise.all(users.map((user) => scope.usage.startSession(1, user, {})));
+      scope.flow.runFlow.mockClear();
+      await scope.usage.endSessionsOfTarget(1, { kind: 'all' }, 'flow');
+      const afters = scope.flow.runFlow.mock.calls.map(
+        (call) => (call[2] as { activeSessions: { after: number } }).activeSessions.after,
+      );
+      expect(afters).toEqual([1, 0]);
       expect(await scope.usage.getActiveSessionsForResource(1)).toEqual([]);
+    });
+
+    it('does nothing for all without sessions and fails for a user without one', async () => {
+      await setLimit(3);
+      await expect(scope.usage.endSessionsOfTarget(1, { kind: 'all' }, '')).resolves.toBeUndefined();
+      await expect(scope.usage.endSessionsOfTarget(1, { kind: 'user', userId: 1 }, '')).rejects.toThrow();
+    });
+
+    it('ends one user session and skips sessions that are already being ended', async () => {
+      await setLimit(3);
+      await scope.usage.startSession(1, scope.users[0], {});
+      await scope.usage.startSession(1, scope.users[1], {});
+      const parked = parkFlows();
+      const ending = scope.usage.endSession(1, scope.users[0], {});
+      await parked.entered;
+      scope.flow.runFlow.mockClear();
+      const endingAll = scope.usage.endSessionsOfTarget(1, { kind: 'all' }, '');
+      parked.release();
+      await Promise.all([ending, endingAll]);
+      // The session that was already ending is not ended a second time.
+      expect(scope.flow.runFlow).toHaveBeenCalledTimes(1);
+      expect(await scope.usage.getActiveSessionsForResource(1)).toEqual([]);
+    });
+
+    it('runs ends requested inside a start flow after that start finished, without deadlock', async () => {
+      await setLimit(3);
+      const [other] = await addUsers(1);
+      await scope.usage.startSession(1, other, {});
+      scope.flow.runFlow.mockImplementationOnce(async (resourceId, _type, _payload, _manager, options) => {
+        await scope.usage.deferSessionEnds(
+          options?.lifecycleAttemptId as string,
+          resourceId as number,
+          { kind: 'user', userId: other.id },
+          'flow',
+        );
+      });
+      await scope.usage.startSession(1, scope.users[0], {});
+      expect((await scope.usage.getActiveSessionsForResource(1)).map((session) => session.userId)).toEqual([1]);
+    });
+
+    it('drops deferred ends when the start fails', async () => {
+      await setLimit(3);
+      const [other] = await addUsers(1);
+      await scope.usage.startSession(1, other, {});
+      scope.flow.runFlow.mockImplementationOnce(async (resourceId, _type, _payload, _manager, options) => {
+        await scope.usage.deferSessionEnds(
+          options?.lifecycleAttemptId as string,
+          resourceId as number,
+          { kind: 'all' },
+          'flow',
+        );
+        throw new FlowExecutionError('boom');
+      });
+      await scope.usage.startSession(1, scope.users[0], {}).catch(() => undefined);
+      expect(await scope.usage.getActiveSessionsForResource(1)).toHaveLength(1);
     });
   });
 

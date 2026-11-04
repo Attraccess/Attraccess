@@ -1,4 +1,5 @@
 import { ResourceFlowNode, ResourceUsageEndSessionNodeDataSchema } from '@attraccess/database-entities';
+import { SessionEndTarget } from '../../usage/sessions/usage-session-changes';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
@@ -9,12 +10,34 @@ export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
-    const { notes } = ResourceUsageEndSessionNodeDataSchema.parse(node.data ?? {});
+    const { notes, target, userId } = ResourceUsageEndSessionNodeDataSchema.parse(node.data ?? {}) ?? {};
 
     let finalNotes = '';
     if (typeof notes === 'string' && notes.length > 0) {
       const compiled = ctx.compileTemplate(notes, input);
       finalNotes = compiled && compiled.trim().length > 0 ? compiled : notes;
+    }
+
+    if (target === 'user' || target === 'all') {
+      const sessionTarget = this.resolveTarget(target, userId, input, ctx);
+      // Inside a start or stop, other sessions end once that start or stop has finished, never from within it.
+      if (ctx.lifecycleAttemptId) {
+        await this.resourceUsageService.deferSessionEnds(
+          ctx.lifecycleAttemptId,
+          node.resourceId,
+          sessionTarget,
+          finalNotes,
+          ctx.transactionManager,
+        );
+      } else {
+        await this.resourceUsageService.endSessionsOfTarget(
+          node.resourceId,
+          sessionTarget,
+          finalNotes,
+          ctx.transactionManager,
+        );
+      }
+      return { payload: input };
     }
 
     if (ctx.lifecycleAttemptId) {
@@ -52,5 +75,19 @@ export class EndUsageSessionExecutor implements NodeExecutor {
     );
 
     return { payload: input };
+  }
+
+  private resolveTarget(
+    target: 'user' | 'all',
+    userId: string | undefined,
+    input: object,
+    ctx: NodeExecutionContext,
+  ): SessionEndTarget {
+    if (target === 'all') return { kind: 'all' };
+    const compiled = userId ? ctx.compileTemplate(userId, input).trim() : '';
+    if (!/^\d+$/.test(compiled) || !Number.isSafeInteger(Number(compiled))) {
+      throw new FlowExecutionError('End session: the user id must be a number');
+    }
+    return { kind: 'user', userId: Number(compiled) };
   }
 }

@@ -4,12 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Resource } from '@attraccess/react-query-client';
 import { MachineTab } from './machine';
 
-const state = vi.hoisted(() => ({ activeSessionCount: 0 }));
+const state = vi.hoisted(() => ({
+  activeSessionCount: 0,
+  warnings: [] as { triggerNodeId: string; triggerType: string }[],
+}));
 
 vi.mock('@attraccess/react-query-client', () => ({
   useResourcesServiceResourceUsageGetActiveSession: () => ({
     data: { activeSessionCount: state.activeSessionCount },
   }),
+  useResourceFlowsServiceGetSharedMachineFlowWarnings: () => ({ data: state.warnings }),
 }));
 
 const t = (key: string, params?: { count: number }) => (params ? `${key} ${params.count}` : key);
@@ -30,6 +34,7 @@ function mount(maxParallelSessions: number) {
 describe('MachineTab max parallel sessions', () => {
   beforeEach(() => {
     state.activeSessionCount = 0;
+    state.warnings = [];
   });
 
   it('sets the clamped limit', () => {
@@ -55,13 +60,21 @@ describe('MachineTab max parallel sessions', () => {
 
   it('shows no hint for a sufficient limit and no flow warning at limit 1', () => {
     state.activeSessionCount = 1;
+    state.warnings = [{ triggerNodeId: 'a', triggerType: 'input.resource.usage.stopped' }];
     mount(1);
     expect(screen.queryByText(/belowActiveHint/)).not.toBeInTheDocument();
     expect(screen.queryByText(/flowsWarning/)).not.toBeInTheDocument();
   });
 
-  it('warns about per-session flows above limit 1', () => {
+  it('lists the affected flows above limit 1 with a link to the flows', () => {
+    state.warnings = [{ triggerNodeId: 'a', triggerType: 'input.resource.usage.stopped' }];
     mount(3);
-    expect(screen.getByText('inputs.machine.maxParallelSessions.flowsWarning')).toBeInTheDocument();
+    expect(screen.getByText('inputs.machine.maxParallelSessions.flowsWarningTriggers.stopped')).toBeInTheDocument();
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/resources/5/flows');
+  });
+
+  it('shows no flow warning when no flow is affected', () => {
+    mount(3);
+    expect(screen.queryByText(/flowsWarning/)).not.toBeInTheDocument();
   });
 });

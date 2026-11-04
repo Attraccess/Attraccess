@@ -19,8 +19,8 @@ The starting data depends on the trigger. For object payloads, Attraccess adds `
 | Trigger                                | Useful payload paths                                                                                                                                                                   |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Button**, **No Activity**            | Resource context only; no user or message data                                                                                                                                         |
-| **Usage Started / Stopped**            | Usage fields at the root: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `formSubmissions`                                                        |
-| **Usage Takeover**                     | Outgoing usage fields, plus `newUser`, `oldUser` and `takeOverTime`                                                                                                                    |
+| **Usage Started / Stopped**            | Usage fields at the root: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `formSubmissions`, `activeSessions`                                      |
+| **Usage Takeover**                     | Outgoing usage fields, plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions`                                                                                                  |
 | **Door Unlocked / Locked / Unlatched** | `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.externalIdentifier`                                                                                   |
 | **MQTT Message Received**              | `serverId`, `topic`, `payload`                                                                                                                                                         |
 | **Variable Changed**                   | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; watched values under `variables.resource` / `variables.global` |
@@ -51,6 +51,27 @@ For an MQTT message on `workshop/laser/status` containing `{"temperature":42,"ru
 ```
 
 MQTT content is parsed as JSON when possible, including numbers, booleans and arrays. Otherwise `payload` is the raw text, such as `ON`.
+
+### Active Sessions on Shared Machines
+
+Usage Started, Stopped and Takeover add `activeSessions` to the payload. It counts the published usage sessions of the machine (supervisors do not count):
+
+| Path                    | Meaning                                                          |
+| ----------------------- | ---------------------------------------------------------------- |
+| `activeSessions.before` | Sessions before this start, stop or takeover                     |
+| `activeSessions.after`  | Sessions after it. A stop has `before - 1`; a takeover is 1 to 1 |
+| `activeSessions.limit`  | The machine's **Max parallel sessions**                          |
+
+Use an [If](flows/node-types.md#if) node on `activeSessions.before` = `0` to detect the first start, and on `activeSessions.after` = `0` to detect the last stop. If a start flow ends its own new session, the stop that follows reports `after` as the number of sessions that were already running (0 for the first one).
+
+On a machine with a limit above 1, starts, stops and takeovers run one at a time, each from start through its flows to the end, so two simultaneous stops give exactly one `after` = 0. Someone who has to wait longer than 30 seconds gets a "machine busy, try again" error. A failed start or stop does not change the next count. With a limit of 1 nothing changes: a second start is refused immediately.
+
+#### Example: power on at the first start, off at the last stop
+
+1. **Usage Started** → **If** `activeSessions.before` `=` `0` → (true) **MQTT Send Message** with the power-on command.
+2. **Usage Stopped** → **If** `activeSessions.after` `=` `0` → (true) **MQTT Send Message** with the power-off command.
+
+Without the If nodes the machine would be switched on again at every start and switched off while others are still working. When an admin raises the limit above 1, the machine's edit dialog lists the flows that act on starts, stops or takeovers without such a check.
 
 ## Paths and Templates
 

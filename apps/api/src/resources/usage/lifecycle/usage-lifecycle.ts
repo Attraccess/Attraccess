@@ -72,6 +72,7 @@ import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
 import { ResourceUsageService } from '../sessions/resource-usage.service';
+import { activeUsageWhere } from '../sessions/active-usage';
 import { ResourceAuditOrigin } from '../../../audit/audit-policy';
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -88,6 +89,13 @@ export interface StartSessionOptions {
    */
   supervisorUserId?: number;
   auditOrigin?: ResourceAuditOrigin;
+}
+
+/** Published usage sessions on the machine around a start, stop or takeover, handed to flows as `activeSessions`. */
+export interface ActiveSessionCounts {
+  before: number;
+  after: number;
+  limit: number;
 }
 
 export type UsageFlowPayload = {
@@ -119,6 +127,10 @@ export type UsageFlowPayload = {
   meterRates: ResourceUsage['meterRates'];
   attributedOperatingDurationInMinutes: number | null;
 };
+
+export function sessionLimitOf(resource: Pick<Resource, 'type' | 'maxParallelSessions'> | null | undefined): number {
+  return resource?.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
+}
 
 export abstract class UsageLifecycle {
   protected async applyLifecycleDrafts(manager: EntityManager, attempt: ResourceUsageLifecycleAttempt): Promise<void> {
@@ -183,27 +195,37 @@ export abstract class UsageLifecycle {
 
   /** Claim and discard the candidate before dispatching stopped-flow effects. */
   async endLifecycleCandidate(attemptId: string, resourceId: number, endNotes: string): Promise<void> {
-    const candidate = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
-      if (attempt.candidateUsageId === null) {
-        throw new ConflictException('The usage lifecycle attempt has no candidate session');
-      }
-      const candidate = await manager.findOneOrFail(ResourceUsage, {
-        where: { id: attempt.candidateUsageId, lifecyclePending: true },
-        relations: ['resource', 'user', 'project'],
-      });
-      const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
-      if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
-      // Keep the reservation until the owning flow has settled all of its branches.
-      await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
-      return candidate;
-    });
+    const { candidate, activeSessions } = await runSerializedTransaction(
+      this.resourceUsageRepository.manager,
+      async (manager) => {
+        const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+        if (attempt.candidateUsageId === null) {
+          throw new ConflictException('The usage lifecycle attempt has no candidate session');
+        }
+        const candidate = await manager.findOneOrFail(ResourceUsage, {
+          where: { id: attempt.candidateUsageId, lifecyclePending: true },
+          relations: ['resource', 'user', 'project'],
+        });
+        const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+        if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
+        // Keep the reservation until the owning flow has settled all of its branches.
+        await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
+        // The start flow counted the candidate as a session; taking it back leaves the published sessions.
+        const published = await manager.count(ResourceUsage, { where: { resourceId, ...activeUsageWhere() } });
+        const activeSessions: ActiveSessionCounts = {
+          before: published + 1,
+          after: published,
+          limit: await this.getSessionLimit(manager, resourceId),
+        };
+        return { candidate, activeSessions };
+      },
+    );
 
     await this.runUsageFlow(
       undefined,
       resourceId,
       ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-      { ...this.getResourceUsageFlowPayload(candidate), endTime: new Date(), endNotes },
+      { ...this.getResourceUsageFlowPayload(candidate), endTime: new Date(), endNotes, activeSessions },
       'tentative end',
       attemptId,
       true,
@@ -276,7 +298,7 @@ export abstract class UsageLifecycle {
       where: { id: resourceId },
       select: { id: true, type: true, maxParallelSessions: true },
     });
-    return resource?.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
+    return sessionLimitOf(resource);
   }
 
   /**
@@ -481,6 +503,7 @@ export abstract class UsageLifecycle {
     existingActiveSession: ResourceUsage;
     attempt: import('typeorm').DeepPartial<ResourceUsageLifecycleAttempt> & ResourceUsageLifecycleAttempt;
     formSubmissions: FormSubmission[];
+    activeSessions: ActiveSessionCounts;
   }>;
 
   protected abstract notifySessionStarted(

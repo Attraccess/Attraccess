@@ -24,19 +24,19 @@ Example: connect a button labeled `Test relay` to **MQTT Send Message**.
 
 Type: `input.resource.usage.started` · Machines
 
-Runs during a usage start. No settings. Payload contains the new usage session's root fields (`id`, `startTime`, `user`, `formSubmissions`, etc.). Use `{{user.username}}` for the session owner. A flow failure can prevent the start; configure external actions' failure behavior accordingly.
+Runs during a usage start. No settings. Payload contains the new usage session's root fields (`id`, `startTime`, `user`, `formSubmissions`, etc.) and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Use `{{user.username}}` for the session owner. A flow failure can prevent the start; configure external actions' failure behavior accordingly.
 
 ### Resource Usage Stopped
 
 Type: `input.resource.usage.stopped` · Machines
 
-Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms and stop fields such as `endTime` and `endNotes`. Example: switch off a relay or add a billing item before settlement.
+Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms, stop fields such as `endTime` and `endNotes`, and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Example: switch off a relay or add a billing item before settlement.
 
 ### Resource Usage Takeover
 
 Type: `input.resource.usage.takeover` · Machines
 
-Runs when an active session is taken over. No settings. Payload contains the outgoing usage session plus `newUser`, `oldUser` and `takeOverTime`. Use `{{newUser.username}}` for the incoming owner. A takeover uses this trigger instead of the ordinary Usage Started trigger.
+Runs when an active session is taken over. No settings. Payload contains the outgoing usage session plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions` (always 1 to 1). Use `{{newUser.username}}` for the incoming owner. A takeover uses this trigger instead of the ordinary Usage Started trigger.
 
 ### Door Unlocked
 
@@ -135,13 +135,13 @@ Payload contains `metering: { sessionId, meterId, operationId, resourceId, usage
 
 Type: `input.resource.metering.collect` · Machines
 
-| Setting | Range / default |
-| --- | --- |
-| **Meter** | Select a predefined meter, or create one |
-| **Timeout (seconds)** | 1–600 / **30** |
-| **Interim interval (minutes)** | 0–1440 / **1**; `0` disables periodic readings |
-| **Final attempts** | 1–10 / **3** |
-| **Final retry delay (seconds)** | 0–120 / **5** |
+| Setting                         | Range / default                                |
+| ------------------------------- | ---------------------------------------------- |
+| **Meter**                       | Select a predefined meter, or create one       |
+| **Timeout (seconds)**           | 1–600 / **30**                                 |
+| **Interim interval (minutes)**  | 0–1440 / **1**; `0` disables periodic readings |
+| **Final attempts**              | 1–10 / **3**                                   |
+| **Final retry delay (seconds)** | 0–120 / **5**                                  |
 
 Runs for periodic readings, including while idle, and final readings at session end. Payload has the same metering fields as **Metering Start**, with `kind: "interim"` or `"final"`. While idle, `sessionId` and `usageId` are null. Connect the branch to **Report Meter** for the same meter. Periodic readings update lifetime and active-session totals; only session consumption is billed. See [Meters](flows/energy-metering.md) for freshness and pending charges.
 
@@ -289,7 +289,13 @@ Example: use **Set Payload** to map a form answer to `quantity`, then add a cons
 
 Type: `output.resource.usage.end-session` · Machines · Editor: **End active session**
 
-**Notes** is an optional template. **On failure** follows the shared policy. Ends this resource's current session using its owner; a missing active session fails. Forwards unchanged payload on success. During a pending usage start/takeover, it can end that lifecycle's candidate session.
+**Notes** is an optional template. **On failure** follows the shared policy. **Which session** chooses what is ended:
+
+- **The triggering session** (default, and what older nodes do): the session that started this run; a missing active session fails.
+- **The session of a user**: the session of the user whose id is in **User id** (template, e.g. `{{user.id}}`). A user without a session fails.
+- **All sessions**: every running session of the machine. Without sessions nothing happens.
+
+Sessions that are already being ended are skipped. Each ended session runs its own [Usage Stopped](flows/node-types.md#resource-usage-stopped) flow, so only the last one reports `activeSessions.after` = 0. When this node runs inside a usage start or stop, the other sessions are ended right after that start or stop has finished, never from within it. Ends the session using its owner. Forwards unchanged payload on success. During a pending usage start/takeover, it can end that lifecycle's candidate session.
 
 Example notes: `Automatically ended after inactivity on {{resource.name}}`. This action skips required end-form submissions and note notifications.
 
@@ -361,11 +367,11 @@ Select a literal **Companion device**. Sends an unlock-screen command and saves 
 
 Type: `output.resource.metering.ready` · Machines
 
-| Setting | Description |
-| --- | --- |
-| **Meter** | Select the meter matching the start request |
+| Setting            | Description                                                |
+| ------------------ | ---------------------------------------------------------- |
+| **Meter**          | Select the meter matching the start request                |
 | **Baseline value** | Optional template for a cumulative counter's current total |
-| **Source** | Optional template naming the physical meter |
+| **Source**         | Optional template naming the physical meter                |
 
 Completes a **Metering Start** operation. Fails outside a start branch. Leave the baseline empty after resetting the source to zero; a configured baseline that renders empty fails. The catalog exposes no outgoing connection.
 
@@ -375,13 +381,13 @@ Example after HTTP returning `{"counter":1500}`: baseline `{{counter}}`. No unit
 
 Type: `output.resource.metering.report`
 
-| Setting | Description |
-| --- | --- |
-| **Meter** | Select a predefined meter, or create one with a name |
-| **Mode** | **total** for a cumulative counter; **increment** for an increase |
-| **Value** | Required non-negative numeric value or template |
-| **Observed at** | Optional ISO timestamp template; defaults to reporting time |
-| **Source** | Optional template naming the meter |
+| Setting         | Description                                                       |
+| --------------- | ----------------------------------------------------------------- |
+| **Meter**       | Select a predefined meter, or create one with a name              |
+| **Mode**        | **total** for a cumulative counter; **increment** for an increase |
+| **Value**       | Required non-negative numeric value or template                   |
+| **Observed at** | Optional ISO timestamp template; defaults to reporting time       |
+| **Source**      | Optional template naming the meter                                |
 
 Reports values in collection branches and ordinary flows, including outside sessions. A reply in a collection branch must match the requested meter. No unit is required. The first unsolicited cumulative reading establishes a baseline; subsequent increases update lifetime consumption. Increments directly increase consumption. During an active session, accepted increases also update that session's total. A configured observed-at template that renders empty fails; final readings must be fresh. The catalog exposes no outgoing connection.
 

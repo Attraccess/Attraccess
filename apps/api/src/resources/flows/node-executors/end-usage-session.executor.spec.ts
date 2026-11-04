@@ -19,7 +19,14 @@ function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
 describe('EndUsageSessionExecutor', () => {
   let executor: EndUsageSessionExecutor;
   let resourceUsageService: jest.Mocked<
-    Pick<ResourceUsageService, 'endLifecycleCandidate' | 'getActiveSessionsForResource' | 'endSession'>
+    Pick<
+      ResourceUsageService,
+      | 'endLifecycleCandidate'
+      | 'getActiveSessionsForResource'
+      | 'endSession'
+      | 'endSessionsOfTarget'
+      | 'deferSessionEnds'
+    >
   >;
   let ctx: NodeExecutionContext;
   let compileTemplate: jest.Mock;
@@ -34,6 +41,8 @@ describe('EndUsageSessionExecutor', () => {
       endLifecycleCandidate: jest.fn(),
       getActiveSessionsForResource: jest.fn(),
       endSession: jest.fn(),
+      endSessionsOfTarget: jest.fn(),
+      deferSessionEnds: jest.fn(),
     };
 
     compileTemplate = jest.fn((tpl: string) => tpl);
@@ -195,6 +204,66 @@ describe('EndUsageSessionExecutor', () => {
       { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
     expect(result).toEqual({ payload: { foo: 'bar' } });
+  });
+
+  describe('target', () => {
+    it('ends all sessions of the machine', async () => {
+      const node = createNode({ resourceId: 42, data: { target: 'all', notes: 'Closing time' } as never });
+      await executor.execute(node, {}, ctx);
+      expect(resourceUsageService.endSessionsOfTarget).toHaveBeenCalledWith(
+        42,
+        { kind: 'all' },
+        'Closing time',
+        undefined,
+      );
+      expect(resourceUsageService.endSession).not.toHaveBeenCalled();
+    });
+
+    it('ends the session of the user named by a template', async () => {
+      compileTemplate.mockImplementation((tpl: string) => (tpl === '{{user.id}}' ? ' 7 ' : tpl));
+      const node = createNode({ data: { target: 'user', userId: '{{user.id}}' } as never });
+      await executor.execute(node, { user: { id: 7 } }, ctx);
+      expect(resourceUsageService.endSessionsOfTarget).toHaveBeenCalledWith(
+        1,
+        { kind: 'user', userId: 7 },
+        '',
+        undefined,
+      );
+    });
+
+    it('fails when the user id is not a number', async () => {
+      compileTemplate.mockReturnValue('abc');
+      const node = createNode({ data: { target: 'user', userId: '{{user.id}}' } as never });
+      await expect(executor.execute(node, {}, ctx)).rejects.toBeInstanceOf(FlowExecutionError);
+    });
+
+    it('defers the ends of other sessions while a start or stop is being processed', async () => {
+      ctx.lifecycleAttemptId = 'attempt-id';
+      const node = createNode({ data: { target: 'all' } as never });
+      await executor.execute(node, {}, ctx);
+      expect(resourceUsageService.deferSessionEnds).toHaveBeenCalledWith(
+        'attempt-id',
+        1,
+        { kind: 'all' },
+        '',
+        undefined,
+      );
+      expect(resourceUsageService.endSessionsOfTarget).not.toHaveBeenCalled();
+      expect(resourceUsageService.endLifecycleCandidate).not.toHaveBeenCalled();
+    });
+
+    it('keeps ending the triggering session for nodes saved before the setting existed', async () => {
+      const user = { id: 7 };
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ id: 3, user }] as never);
+      await executor.execute(createNode({ data: { notes: 'old' } as never }), {}, ctx);
+      expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+        1,
+        user,
+        expect.objectContaining({ usageId: 3 }),
+        expect.anything(),
+      );
+      expect(resourceUsageService.endSessionsOfTarget).not.toHaveBeenCalled();
+    });
   });
 
   describe('on a machine shared by several people', () => {

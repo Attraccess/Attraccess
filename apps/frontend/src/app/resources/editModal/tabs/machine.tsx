@@ -1,11 +1,20 @@
 import { useState } from 'react';
-import { Alert, AlertContent, AlertDescription, Description, Input, Label, TextField } from '@heroui/react';
-import { useResourcesServiceResourceUsageGetActiveSession } from '@attraccess/react-query-client';
+import { Alert, AlertContent, AlertDescription, Description, Input, Label, Link, TextField } from '@heroui/react';
+import {
+  useResourceFlowsServiceGetSharedMachineFlowWarnings,
+  useResourcesServiceResourceUsageGetActiveSession,
+} from '@attraccess/react-query-client';
 import { AlertStatusIcon, LabeledSwitch } from '@attraccess/plugins-frontend-ui';
 import { EditorTabProps } from './props';
 
 const MIN_PARALLEL_SESSIONS = 1;
 const MAX_PARALLEL_SESSIONS = 1000;
+
+const TRIGGER_KEYS: Record<string, string> = {
+  'input.resource.usage.started': 'started',
+  'input.resource.usage.stopped': 'stopped',
+  'input.resource.usage.takeover': 'takeover',
+};
 
 export function MachineTab(props: EditorTabProps) {
   const { t, formData, setField, resource } = props;
@@ -18,6 +27,11 @@ export function MachineTab(props: EditorTabProps) {
     { resourceId: resource?.id as number },
     undefined,
     { enabled: !!resource?.id },
+  );
+  const { data: flowWarnings } = useResourceFlowsServiceGetSharedMachineFlowWarnings(
+    { resourceId: resource?.id as number },
+    undefined,
+    { enabled: !!resource?.id && maxParallelSessions > 1 },
   );
   const activeSessionCount = activeSessions?.activeSessionCount ?? 0;
   const isBelowActiveCount = maxParallelSessions < activeSessionCount;
@@ -65,11 +79,23 @@ export function MachineTab(props: EditorTabProps) {
         </Description>
       </TextField>
 
-      {maxParallelSessions > 1 && (
+      {maxParallelSessions > 1 && !!flowWarnings?.length && (
         <Alert status="warning" data-cy="resource-edit-modal-max-parallel-sessions-flows-warning">
           <AlertStatusIcon status="warning" />
           <AlertContent>
-            <AlertDescription>{t('inputs.machine.maxParallelSessions.flowsWarning')}</AlertDescription>
+            <AlertDescription>
+              {t('inputs.machine.maxParallelSessions.flowsWarning')}
+              <ul className="list-disc pl-5">
+                {flowWarnings.map((warning) => (
+                  <li key={warning.triggerNodeId}>
+                    {t(`inputs.machine.maxParallelSessions.flowsWarningTriggers.${TRIGGER_KEYS[warning.triggerType]}`)}
+                  </li>
+                ))}
+              </ul>
+              <Link href={`/resources/${resource?.id}/flows`}>
+                {t('inputs.machine.maxParallelSessions.flowsWarningOpen')}
+              </Link>
+            </AlertDescription>
           </AlertContent>
         </Alert>
       )}
