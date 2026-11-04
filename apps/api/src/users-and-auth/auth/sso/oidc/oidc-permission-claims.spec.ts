@@ -50,4 +50,17 @@ describe('syncOidcRolesFromClaims', () => {
     await syncOidcRolesFromClaims(rbac, 7, { ...config, roleMappings: null }, [{ groups: ['fab-staff'] }]);
     expect(rbac.syncSsoRoles).toHaveBeenCalledWith(7, [], SSOProviderType.OIDC, 4);
   });
+
+  it('reads only the configured roleClaimPaths (shared by login and session re-sync)', async () => {
+    const custom = { ...config, roleClaimPaths: ['custom.roles'] };
+    await syncOidcRolesFromClaims(rbac, 7, custom, [{ groups: ['fab-staff'], custom: { roles: ['fab-staff'] } }]);
+    expect(rbac.syncSsoRoles).toHaveBeenLastCalledWith(
+      7,
+      [{ roleKey: 'resource-manager', externalValue: 'fab-staff' }],
+      SSOProviderType.OIDC,
+      4,
+    );
+
+    expect(await syncOidcRolesFromClaims(rbac, 7, custom, [{ groups: ['fab-staff'] }])).toBeUndefined();
+  });
 });

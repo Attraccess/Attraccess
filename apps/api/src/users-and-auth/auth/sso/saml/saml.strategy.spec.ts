@@ -425,17 +425,9 @@ describe('SSOSamlStrategy', () => {
   describe('configured roleAttributeKeys', () => {
     async function syncWith(roleAttributeKeys: string[] | null, attributes: Record<string, unknown>) {
       const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
-      const usersService = {
-        findOne: jest
-          .fn()
-          .mockImplementation((query: Record<string, unknown>) =>
-            Promise.resolve('externalIdentifier' in query ? { id: 44, externalIdentifier: 'saml-user' } : null),
-          ),
-        updateOne: jest.fn(),
-      };
-      const moduleRef = {
-        get: jest.fn((token: unknown) => (token === RbacService ? rbacService : usersService)),
-      } as unknown as ModuleRef;
+      const usersService = { findOne: jest.fn().mockResolvedValue({ id: 44 }), updateOne: jest.fn() };
+      const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(44), addAuthenticationDetails: jest.fn() };
+      const moduleRef = buildSamlModuleRef({ users: usersService, auth, rbac: rbacService });
       const strategy = new SSOSamlStrategy(moduleRef);
       const request = fixture.buildRequest(30, 'email');
       request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
