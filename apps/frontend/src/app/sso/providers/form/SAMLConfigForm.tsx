@@ -13,6 +13,8 @@ export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
     setSaml,
     emailAttributeKeysInput,
     setEmailAttributeKeysInput,
+    roleAttributeKeysInput,
+    setRoleAttributeKeysInput,
     showSamlProvisioningSecret,
     setShowSamlProvisioningSecret,
     samlRoleMappingEntries,
@@ -28,6 +30,8 @@ export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
     setSaml,
     emailAttributeKeysInput,
     setEmailAttributeKeysInput,
+    roleAttributeKeysInput,
+    setRoleAttributeKeysInput,
     showSamlProvisioningSecret,
     setShowSamlProvisioningSecret,
     samlRoleMappingEntries,
@@ -50,6 +54,8 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
     setSaml,
     emailAttributeKeysInput,
     setEmailAttributeKeysInput,
+    roleAttributeKeysInput,
+    setRoleAttributeKeysInput,
     showSamlProvisioningSecret,
     setShowSamlProvisioningSecret,
     samlRoleMappingEntries,
@@ -127,6 +133,14 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
             data-cy="sso-provider-form-saml-email-attribute-keys-input"
           />
           <Description>{t('emailAttributeKeysHint')}</Description>
+        </TextField>
+        <TextField value={roleAttributeKeysInput} onChange={setRoleAttributeKeysInput}>
+          <Label>{t('roleAttributeKeys')}</Label>
+          <Input
+            placeholder="roles, role, groups, group, memberof, http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+            data-cy="sso-provider-form-saml-role-attribute-keys-input"
+          />
+          <Description>{t('roleAttributeKeysHint')}</Description>
         </TextField>
       </section>
 

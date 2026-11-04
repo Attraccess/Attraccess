@@ -345,6 +345,8 @@
     "configuration.roleMappings": "Role mappings",
     "configuration.entryPoint": "Sign-in endpoint",
     "configuration.audience": "Audience",
+    "configuration.roleClaimPaths": "Role claims",
+    "configuration.roleAttributeKeys": "Role attributes",
     "configuration.emailAttributeKeys": "Email attributes",
     "configuration.usernameClaimPaths": "Username claims",
     "configuration.emailClaimPaths": "Email claims",

@@ -5,7 +5,7 @@ export function stringArray(value: unknown, max = 100): boolean {
   return (
     Array.isArray(value) &&
     value.length <= max &&
-    value.every((entry) => typeof entry === 'string' && entry.length <= 255)
+    value.every((entry) => typeof entry === 'string' && entry.length <= 256)
   );
 }
 
@@ -129,19 +129,21 @@ export function oidcProviderConfiguration(value: unknown): boolean {
     'scopes',
     'usernameClaimPaths',
     'emailClaimPaths',
+    'roleClaimPaths',
     'roleMappings',
     'omitted',
   ]);
   return (
     !!config &&
-    Reflect.ownKeys(config).length === 11 &&
+    // roleClaimPaths is absent from snapshots recorded before it existed
+    Reflect.ownKeys(config).length === ('roleClaimPaths' in config ? 12 : 11) &&
     ['issuer', 'authorizationURL', 'tokenURL', 'userInfoURL'].every(
       (key) => safeUrl(config[key]) || (config[key] === '' && omittedField(config.omitted, key)),
     ) &&
     typeof config.clientId === 'string' &&
     config.clientId.length <= 96 &&
     typeof config.clientSecretConfigured === 'boolean' &&
-    [config.scopes, config.usernameClaimPaths, config.emailClaimPaths].every(
+    [config.scopes, config.usernameClaimPaths, config.emailClaimPaths, config.roleClaimPaths ?? null].every(
       (field) => field === null || stringArray(field),
     ) &&
     (config.roleMappings === null || roleMappings(config.roleMappings)) &&
@@ -155,6 +157,7 @@ export function oidcProviderConfiguration(value: unknown): boolean {
       'scopes',
       'usernameClaimPaths',
       'emailClaimPaths',
+      'roleClaimPaths',
     ])
   );
 }
@@ -169,6 +172,7 @@ export function samlProviderConfiguration(value: unknown): boolean {
     'wantAuthnResponseSigned',
     'forceAuthn',
     'emailAttributeKeys',
+    'roleAttributeKeys',
     'roleMappings',
     'signingMaterial',
     'omitted',
@@ -183,7 +187,7 @@ export function samlProviderConfiguration(value: unknown): boolean {
     ]);
   return (
     !!config &&
-    Reflect.ownKeys(config).length === 11 &&
+    Reflect.ownKeys(config).length === ('roleAttributeKeys' in config ? 12 : 11) &&
     !!material &&
     Reflect.ownKeys(material).length === 4 &&
     (safeUrl(config.entryPoint) || (config.entryPoint === '' && omittedField(config.omitted, 'entryPoint'))) &&
@@ -195,8 +199,18 @@ export function samlProviderConfiguration(value: unknown): boolean {
       (key) => typeof config[key] === 'boolean',
     ) &&
     (config.emailAttributeKeys === null || stringArray(config.emailAttributeKeys)) &&
+    (config.roleAttributeKeys === undefined ||
+      config.roleAttributeKeys === null ||
+      stringArray(config.roleAttributeKeys)) &&
     (config.roleMappings === null || roleMappings(config.roleMappings)) &&
-    omissionMetadata(config.omitted, ['name', 'entryPoint', 'issuer', 'audience', 'emailAttributeKeys']) &&
+    omissionMetadata(config.omitted, [
+      'name',
+      'entryPoint',
+      'issuer',
+      'audience',
+      'emailAttributeKeys',
+      'roleAttributeKeys',
+    ]) &&
     [
       'identityProviderCertificateConfigured',
       'provisioningSecretConfigured',

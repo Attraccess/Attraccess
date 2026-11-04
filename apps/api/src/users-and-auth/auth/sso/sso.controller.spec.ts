@@ -120,6 +120,72 @@ describe('SsoController', () => {
       expect(fixture.ssoService.updateProvider).not.toHaveBeenCalled();
     });
 
+    it('gates changing role claim paths and attribute keys behind users.roles.manage', async () => {
+      const noPermission = {
+        user: { id: 1, effectivePermissions: new Set<string>() },
+      } as unknown as AuthenticatedRequest;
+
+      await expect(
+        fixture.controller.updateOne(
+          '1',
+          { oidcConfiguration: { roleClaimPaths: ['custom.roles'] } } as UpdateSSOProviderDto,
+          noPermission,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+
+      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce(fixture.mockSamlProvider);
+      await expect(
+        fixture.controller.updateOne(
+          '2',
+          { samlConfiguration: { roleAttributeKeys: ['custom-roles'] } } as UpdateSSOProviderDto,
+          noPermission,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        fixture.controller.createOne(
+          {
+            name: 'New',
+            type: SSOProviderType.OIDC,
+            oidcConfiguration: { roleClaimPaths: ['custom.roles'] },
+          } as CreateSSOProviderDto,
+          noPermission,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(fixture.ssoService.updateProvider).not.toHaveBeenCalled();
+    });
+
+    it('does not require users.roles.manage when role claim paths are unchanged or omitted', async () => {
+      const noPermission = {
+        user: { id: 1, effectivePermissions: new Set<string>() },
+      } as unknown as AuthenticatedRequest;
+      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValue({
+        ...fixture.mockSSOProvider,
+        oidcConfiguration: {
+          ...fixture.mockSSOProvider.oidcConfiguration,
+          roleClaimPaths: ['custom.roles'],
+        },
+      } as SSOProvider);
+
+      // re-sent unchanged
+      await expect(
+        fixture.controller.updateOne(
+          '1',
+          { oidcConfiguration: { roleClaimPaths: ['custom.roles'] } } as UpdateSSOProviderDto,
+          noPermission,
+        ),
+      ).resolves.toBeDefined();
+      // omitted
+      await expect(fixture.controller.updateOne('1', { name: 'Renamed' }, noPermission)).resolves.toBeDefined();
+      // clearing is a change
+      await expect(
+        fixture.controller.updateOne(
+          '1',
+          { oidcConfiguration: { roleClaimPaths: null } } as unknown as UpdateSSOProviderDto,
+          noPermission,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
     it('does not audit a provider update that fails before commit', async () => {
       jest.spyOn(fixture.ssoService, 'updateProvider').mockRejectedValueOnce(new Error('configuration write failed'));
       const request = {

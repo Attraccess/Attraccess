@@ -1,4 +1,5 @@
 import {
+  Description,
   Dropdown,
   DropdownItem,
   DropdownMenu,
@@ -35,6 +36,8 @@ export function useOIDCConfigFormState({ form }: OIDCConfigFormProps) {
     setUsernameClaimPathsInput,
     emailClaimPathsInput,
     setEmailClaimPathsInput,
+    roleClaimPathsInput,
+    setRoleClaimPathsInput,
     showClientSecret,
     setShowClientSecret,
     onAutoDiscovery,
@@ -55,6 +58,8 @@ export function useOIDCConfigFormState({ form }: OIDCConfigFormProps) {
     setUsernameClaimPathsInput,
     emailClaimPathsInput,
     setEmailClaimPathsInput,
+    roleClaimPathsInput,
+    setRoleClaimPathsInput,
     showClientSecret,
     setShowClientSecret,
     onAutoDiscovery,
@@ -244,6 +249,14 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
         <TextField value={model.emailClaimPathsInput} onChange={model.setEmailClaimPathsInput}>
           <Label>{model.t('emailClaimPaths')}</Label>
           <Input placeholder="email, emails[0].value, upn" data-cy="sso-provider-form-oidc-email-claims-input" />
+        </TextField>
+        <TextField value={model.roleClaimPathsInput} onChange={model.setRoleClaimPathsInput}>
+          <Label>{model.t('roleClaimPaths')}</Label>
+          <Input
+            placeholder="permissions, roles, groups, realm_access.roles, resource_access.<clientId>.roles"
+            data-cy="sso-provider-form-oidc-role-claims-input"
+          />
+          <Description>{model.t('roleClaimPathsHint')}</Description>
         </TextField>
       </section>
 

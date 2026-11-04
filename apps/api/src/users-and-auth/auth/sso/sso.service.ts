@@ -45,6 +45,7 @@ const SAML_UPDATE_PASSTHROUGH_FIELDS = [
   'wantAuthnResponseSigned',
   'forceAuthn',
   'emailAttributeKeys',
+  'roleAttributeKeys',
   'roleMappings',
 ] as const;
 
@@ -421,6 +422,10 @@ export class SSOService {
     }
     if (typeof updateConfig.emailClaimPaths !== 'undefined') {
       payload.emailClaimPaths = updateConfig.emailClaimPaths;
+    }
+    if (typeof updateConfig.roleClaimPaths !== 'undefined') {
+      // explicit null clears the column
+      payload.roleClaimPaths = updateConfig.roleClaimPaths;
     }
     if (typeof updateConfig.roleMappings !== 'undefined') {
       // explicit null clears the column

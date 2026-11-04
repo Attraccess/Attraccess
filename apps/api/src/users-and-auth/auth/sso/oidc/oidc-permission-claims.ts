@@ -8,9 +8,14 @@ import type { RoleDelta } from '../session-permission-sync';
 const logger = new Logger('OidcPermissionClaims');
 
 /** Claim values that may carry IdP roles/groups; shared by login and session-time re-sync. */
-export function getOidcPermissionClaimValues(claimSources: unknown[], clientId?: string | null): unknown[] {
-  const paths = ['permissions', 'roles', 'groups', 'realm_access.roles'];
-  if (clientId) {
+export function getOidcPermissionClaimValues(
+  claimSources: unknown[],
+  clientId?: string | null,
+  roleClaimPaths?: string[] | null,
+): unknown[] {
+  // Configured paths replace the defaults entirely.
+  const paths = roleClaimPaths?.length ? roleClaimPaths : ['permissions', 'roles', 'groups', 'realm_access.roles'];
+  if (!roleClaimPaths?.length && clientId) {
     paths.push(`resource_access.${clientId}.roles`);
   }
 
@@ -69,10 +74,10 @@ export function resolveOidcRoleNames(claimValues: unknown[]): string[] {
 export async function syncOidcRolesFromClaims(
   rbacService: Pick<RbacService, 'syncSsoRoles'>,
   userId: number,
-  config: Pick<SSOProviderOIDCConfiguration, 'ssoProviderId' | 'clientId' | 'roleMappings'>,
+  config: Pick<SSOProviderOIDCConfiguration, 'ssoProviderId' | 'clientId' | 'roleMappings' | 'roleClaimPaths'>,
   claimSources: unknown[],
 ): Promise<RoleDelta | undefined> {
-  const claimValues = getOidcPermissionClaimValues(claimSources, config.clientId);
+  const claimValues = getOidcPermissionClaimValues(claimSources, config.clientId, config.roleClaimPaths);
   logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
   if (claimValues.length === 0) {
     logger.debug(`No role/group claims for user ${userId}; roles kept`);

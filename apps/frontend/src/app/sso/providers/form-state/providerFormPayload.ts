@@ -23,6 +23,7 @@ export function buildOidcPayload({
   signingAlgorithmsInput,
   usernameClaimPathsInput,
   emailClaimPathsInput,
+  roleClaimPathsInput,
   oidcRoleMappingEntries,
   isEditing,
   providerDetails,
@@ -32,6 +33,7 @@ export function buildOidcPayload({
   signingAlgorithmsInput: string;
   usernameClaimPathsInput: string;
   emailClaimPathsInput: string;
+  roleClaimPathsInput: string;
   oidcRoleMappingEntries: RoleMappingEntry[];
   isEditing: boolean;
   providerDetails: SSOProvider | undefined;
@@ -55,6 +57,14 @@ export function buildOidcPayload({
   if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);
   if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
   if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
+  const roleClaimPaths = parseList(roleClaimPathsInput);
+  if (roleClaimPaths.length > 0) {
+    payload.roleClaimPaths = roleClaimPaths;
+  } else if (isEditing && providerDetails?.oidcConfiguration?.roleClaimPaths?.length) {
+    // emptied field must clear the stored paths (back to defaults); only sent when some were stored,
+    // so plain edits by users without users.roles.manage keep working
+    payload.roleClaimPaths = null;
+  }
   const roleMappings = buildRoleMappingsPayload(oidcRoleMappingEntries);
   if (roleMappings) {
     payload.roleMappings = roleMappings;
@@ -70,12 +80,14 @@ export function buildOidcPayload({
 export function buildSamlPayload({
   formValues,
   emailAttributeKeysInput,
+  roleAttributeKeysInput,
   samlRoleMappingEntries,
   isEditing,
   providerDetails,
 }: {
   formValues: CreateSSOProviderDto;
   emailAttributeKeysInput: string;
+  roleAttributeKeysInput: string;
   samlRoleMappingEntries: RoleMappingEntry[];
   isEditing: boolean;
   providerDetails: SSOProvider | undefined;
@@ -92,6 +104,16 @@ export function buildSamlPayload({
     payload.emailAttributeKeys = parsedEmailKeys;
   } else {
     delete payload.emailAttributeKeys;
+  }
+
+  const parsedRoleKeys = parseList(roleAttributeKeysInput);
+  if (parsedRoleKeys.length > 0) {
+    payload.roleAttributeKeys = parsedRoleKeys;
+  } else if (isEditing && providerDetails?.samlConfiguration?.roleAttributeKeys?.length) {
+    // emptied field must clear the stored keys (back to defaults); only sent when some were stored
+    payload.roleAttributeKeys = null;
+  } else {
+    delete payload.roleAttributeKeys;
   }
 
   const sanitizedSigningCertificate = sanitizeOptional(base.spSigningCertificate);

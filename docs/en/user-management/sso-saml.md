@@ -54,6 +54,12 @@ Common attribute names:
 
 Optionally set a provisioning secret. This allows your identity provider to manage users and permissions in Attraccess via the provisioning API.
 
+### Role Attribute Keys
+
+By default Attraccess reads roles from the attributes `roles`, `role`, `groups`, `group`, `memberof` and the Microsoft/ADFS group and role claim URIs. To read other attributes, enter a comma-separated list in **Role Attribute Keys** (at most 20, up to 256 characters each, no commas; matched case-insensitively). Changing this setting requires the `users.roles.manage` permission.
+
+> **Custom keys replace the defaults.** Once set, only the configured attributes are read. If one of them is present in the assertion, roles that came only from a default attribute (for example `groups`) are removed at the next login. If none is present, existing roles are kept; if one is present but empty, this provider's SSO roles are removed. Clear the field to return to the defaults.
+
 ### Permission Mapping
 
 As with [OIDC](user-management/sso-oidc.md), you can map SAML roles to Attraccess permissions.

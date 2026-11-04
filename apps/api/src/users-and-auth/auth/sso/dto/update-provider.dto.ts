@@ -13,7 +13,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { IsStringArrayRecord } from './validators';
+import { IsRolePathList, IsStringArrayRecord } from './validators';
 
 export class UpdateOIDCConfigurationDto {
   @ApiProperty({
@@ -146,6 +146,18 @@ export class UpdateOIDCConfigurationDto {
 
   @ApiProperty({
     description:
+      'Ordered list of claim paths (lodash-style, e.g. `realm_access.roles`) to read roles/groups/permissions from. When unset, the defaults are read: permissions, roles, groups, realm_access.roles and resource_access.<clientId>.roles. When set, ONLY these paths are read.',
+    required: false,
+    nullable: true,
+    type: [String],
+    example: ['realm_access.roles', 'groups'],
+  })
+  @IsOptional()
+  @IsRolePathList()
+  roleClaimPaths?: string[] | null;
+
+  @ApiProperty({
+    description:
       'Maps any Attraccess role key (system-provided or user-defined) to the IdP role/group claim values that should grant it.',
     required: false,
     type: Object,
@@ -264,6 +276,18 @@ export class UpdateSAMLConfigurationDto {
   @IsOptional()
   @IsString()
   provisioningSecret?: string;
+
+  @ApiProperty({
+    description:
+      'Attribute keys (matched case-insensitively) to read roles/groups from. When unset, the defaults are read: roles, role, groups, group, memberof and the Microsoft/ADFS group and role claim URIs. When set, ONLY these keys are read.',
+    required: false,
+    nullable: true,
+    type: [String],
+    example: ['roles', 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'],
+  })
+  @IsOptional()
+  @IsRolePathList()
+  roleAttributeKeys?: string[] | null;
 
   @ApiProperty({
     description:

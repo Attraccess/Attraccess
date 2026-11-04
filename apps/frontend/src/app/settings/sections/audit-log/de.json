@@ -345,6 +345,8 @@
     "configuration.roleMappings": "Rollenzuordnungen",
     "configuration.entryPoint": "Anmelde-Endpunkt",
     "configuration.audience": "Zielgruppe",
+    "configuration.roleClaimPaths": "Rollen-Claims",
+    "configuration.roleAttributeKeys": "Rollen-Attribute",
     "configuration.emailAttributeKeys": "E-Mail-Attribute",
     "configuration.usernameClaimPaths": "Benutzernamen-Claims",
     "configuration.emailClaimPaths": "E-Mail-Claims",

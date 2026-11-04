@@ -218,6 +218,19 @@ export abstract class SsoProviderRoutes {
     return withConfig;
   }
 
+  /** Null, undefined and an empty list all mean "defaults"; returns the list only when custom paths are set. */
+  private normalizedRolePaths(value: string[] | null | undefined): string[] | null {
+    return value && value.length > 0 ? value : null;
+  }
+
+  /** An omitted field means "unchanged"; otherwise compare against the stored value so re-sending it is not a change. */
+  private sameRolePaths(incoming: string[] | null | undefined, stored: string[] | null | undefined): boolean {
+    if (incoming === undefined) return true;
+    const next = this.normalizedRolePaths(incoming);
+    const current = this.normalizedRolePaths(stored);
+    return next?.join('\n') === current?.join('\n');
+  }
+
   @Post('providers')
   @Auth('system.sso.manage')
   @ApiOperation({ summary: 'Create a new SSO provider', operationId: 'createOneSsoProvider' })
@@ -240,6 +253,13 @@ export abstract class SsoProviderRoutes {
         throw new ForbiddenException('Configuring SSO role mappings requires users.roles.manage');
       }
       await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
+    }
+    if (
+      (this.normalizedRolePaths(createDto.oidcConfiguration?.roleClaimPaths) ||
+        this.normalizedRolePaths(createDto.samlConfiguration?.roleAttributeKeys)) &&
+      !(request.user as AuthenticatedUser).effectivePermissions?.has('users.roles.manage')
+    ) {
+      throw new ForbiddenException('Configuring SSO role claim paths requires users.roles.manage');
     }
     const provider = await this.ssoService.createProvider(createDto);
     await this.recordProviderAudit('created', request, provider);
@@ -285,6 +305,15 @@ export abstract class SsoProviderRoutes {
         throw new ForbiddenException('Configuring SSO role mappings requires users.roles.manage');
       }
       await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
+    }
+
+    if (
+      !this.sameRolePaths(updateDto.oidcConfiguration?.roleClaimPaths, before.oidcConfiguration?.roleClaimPaths) ||
+      !this.sameRolePaths(updateDto.samlConfiguration?.roleAttributeKeys, before.samlConfiguration?.roleAttributeKeys)
+    ) {
+      if (!(request.user as AuthenticatedUser).effectivePermissions?.has('users.roles.manage')) {
+        throw new ForbiddenException('Configuring SSO role claim paths requires users.roles.manage');
+      }
     }
 
     const provider = await this.ssoService.updateProvider(providerId, updateDto);

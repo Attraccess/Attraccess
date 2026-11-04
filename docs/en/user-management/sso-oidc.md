@@ -57,6 +57,12 @@ Attraccess needs to know which fields in the OIDC token contain the username and
 
 Attraccess checks the paths in the specified order and uses the first match.
 
+### Role Claim Paths
+
+By default Attraccess reads roles from `permissions`, `roles`, `groups`, `realm_access.roles` and `resource_access.<clientId>.roles`. If your provider puts roles elsewhere, enter a comma-separated list of claim paths (at most 20, up to 256 characters each, no commas) in **Role Claim Paths**. Changing this setting requires the `users.roles.manage` permission.
+
+> **Custom paths replace the defaults.** Once set, only the configured paths are read. If one of them is present in the token, roles that came only from a default location (for example `groups`) are removed at the next login. If none of the configured paths is present, existing roles are kept; if one is present but empty, this provider's SSO roles are removed. Clear the field to return to the defaults.
+
 ### Permission Mapping
 
 Map OIDC roles to Attraccess permissions. For each permission, enter a comma-separated list of role names.

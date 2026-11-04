@@ -67,6 +67,8 @@
   "copyUnsupported": "Clipboard access is not available in this browser.",
   "emailAttributeKeys": "Email attribute keys",
   "emailAttributeKeysHint": "Comma-separated attribute names or URNs to search when resolving user emails (first match wins).",
+  "roleAttributeKeys": "Role attribute keys",
+  "roleAttributeKeysHint": "Comma-separated attribute names to read roles or groups from (case-insensitive). Leave empty to use the defaults shown. Once set, ONLY these keys are read and the defaults are ignored: if one is present, roles that came only from a default attribute (e.g. groups) are removed at the next login. Requires the permission to manage user roles.",
   "signRequest": "Sign AuthnRequests",
   "wantAssertionsSigned": "Require signed assertions",
   "wantAuthnResponseSigned": "Require signed responses",
@@ -90,6 +92,8 @@
       "existingSessions": "Only sessions started on this Attraccess version or later can be re-synced. Users who signed in before the update must sign in once more."
     }
   },
+  "roleClaimPaths": "Role claim paths (comma-separated)",
+  "roleClaimPathsHint": "Claim paths to read roles, groups or permissions from. Leave empty to use the defaults shown. Once set, ONLY these paths are read and the defaults are ignored: if the claim is present, roles that came only from a default location (e.g. groups) are removed at the next login. Requires the permission to manage user roles.",
   "samlProvisioningSecret": "SAML provisioning secret",
   "samlProvisioningSecretHint": "Used to authorize SAML provisioning calls (logout, delete, permissions). Leave blank to keep existing secret.",
   "showSamlProvisioningSecret": "Show provisioning secret",

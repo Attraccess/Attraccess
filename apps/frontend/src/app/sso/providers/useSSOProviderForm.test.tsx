@@ -188,6 +188,58 @@ describe('SSO provider form', () => {
     expect(payload.requestBody.samlConfiguration).not.toHaveProperty('spSigningPrivateKey');
     expect(payload.requestBody).not.toHaveProperty('oidcConfiguration');
   });
+  it('sends role attribute keys, clears stored ones when emptied, and omits them when never set', async () => {
+    const saml = { entryPoint: 'https://idp.example/sso', issuer: 'urn:test' };
+    state.provider = {
+      id: 8,
+      name: 'SAML',
+      type: SSOProviderType.SAML,
+      samlConfiguration: { ...saml, roleAttributeKeys: ['custom-roles'] },
+    };
+    const { result, unmount } = renderHook(() => useSSOProviderForm(8));
+    expect(result.current.roleAttributeKeysInput).toBe('custom-roles');
+    act(() => result.current.setRoleAttributeKeysInput(' custom-roles, other '));
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[0][0].requestBody.samlConfiguration.roleAttributeKeys).toEqual([
+      'custom-roles',
+      'other',
+    ]);
+    act(() => result.current.setRoleAttributeKeysInput(''));
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[1][0].requestBody.samlConfiguration.roleAttributeKeys).toBeNull();
+    unmount();
+
+    state.provider = { id: 8, name: 'SAML', type: SSOProviderType.SAML, samlConfiguration: saml };
+    const untouched = renderHook(() => useSSOProviderForm(8));
+    await act(() => untouched.result.current.handleSubmit());
+    expect(state.update.mock.calls[2][0].requestBody.samlConfiguration).not.toHaveProperty('roleAttributeKeys');
+  });
+  it('sends role claim paths, clears stored ones when emptied, and omits them when never set', async () => {
+    const oidc = { issuer: 'https://idp.example', clientId: 'client' };
+    state.provider = {
+      id: 7,
+      name: 'OIDC',
+      type: SSOProviderType.OIDC,
+      oidcConfiguration: { ...oidc, roleClaimPaths: ['custom.roles'] },
+    };
+    const { result, unmount } = renderHook(() => useSSOProviderForm(7));
+    expect(result.current.roleClaimPathsInput).toBe('custom.roles');
+    act(() => result.current.setRoleClaimPathsInput('custom.roles, groups'));
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[0][0].requestBody.oidcConfiguration.roleClaimPaths).toEqual([
+      'custom.roles',
+      'groups',
+    ]);
+    act(() => result.current.setRoleClaimPathsInput(''));
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[1][0].requestBody.oidcConfiguration.roleClaimPaths).toBeNull();
+    unmount();
+
+    state.provider = { id: 7, name: 'OIDC', type: SSOProviderType.OIDC, oidcConfiguration: oidc };
+    const untouched = renderHook(() => useSSOProviderForm(7));
+    await act(() => untouched.result.current.handleSubmit());
+    expect(state.update.mock.calls[2][0].requestBody.oidcConfiguration).not.toHaveProperty('roleClaimPaths');
+  });
   it('blocks signing-enabled saves without a complete certificate and key', async () => {
     const { result } = renderHook(() => useSSOProviderForm());
     act(() => result.current.handleSelectChange(SSOProviderType.SAML));
