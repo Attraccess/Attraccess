@@ -169,12 +169,34 @@ it.each([
     ),
   );
 });
-it('does not submit the provider form when Enter adds a list entry', async () => {
+it('adds a list entry with Enter without saving the provider', async () => {
   mount();
   const user = userEvent.setup();
   await user.type(input('oidc-scopes'), 'email{Enter}');
   expect(state.create).not.toHaveBeenCalled();
   expect(screen.getByRole('button', { name: /Remove email/ })).toBeTruthy();
+});
+it('saves an entry that was typed but not added when Save is clicked right away', async () => {
+  state.provider = {
+    id: 8,
+    name: 'Existing',
+    type: 'OIDC',
+    oidcConfiguration: { issuer: 'https://idp.example', clientId: 'client', clientSecret: 'secret' },
+  };
+  mount('8');
+  expect(await screen.findByDisplayValue('Existing')).toBeTruthy();
+  const user = userEvent.setup();
+  await user.type(input('oidc-role-claims'), 'realm_access.roles');
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() =>
+    expect(state.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestBody: expect.objectContaining({
+          oidcConfiguration: expect.objectContaining({ roleClaimPaths: ['realm_access.roles'] }),
+        }),
+      }),
+    ),
+  );
 });
 it('applies the RS256 default on save when the signing algorithm list is emptied', async () => {
   mount();

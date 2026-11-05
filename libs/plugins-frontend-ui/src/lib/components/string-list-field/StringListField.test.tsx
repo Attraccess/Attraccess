@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -138,6 +138,82 @@ describe('StringListField', () => {
     expect(screen.getByText('Defaults used: roles')).toBeInTheDocument();
     await user.type(screen.getByRole('textbox', { name: 'Paths' }), 'x{Enter}');
     expect(screen.queryByText('Defaults used: roles')).not.toBeInTheDocument();
+  });
+
+  it('adds a typed entry when focus moves on without pressing Add, and adds it once via Add', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <Harness />
+        <button type="button">Save</button>
+      </>,
+    );
+    const field = screen.getByRole('textbox', { name: 'Paths' });
+
+    await user.type(field, 'groups');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(stored()).toEqual(['groups']);
+    expect(field).toHaveValue('');
+
+    await user.type(field, 'roles');
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+    expect(stored()).toEqual(['groups', 'roles']);
+    expect(screen.queryByText(/Enter a value/)).not.toBeInTheDocument();
+  });
+
+  it('keeps an invalid entry and shows why when focus moves on', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <Harness initial={['x']} />
+        <button type="button">Save</button>
+      </>,
+    );
+
+    await user.type(screen.getByRole('textbox', { name: 'Paths' }), 'a,b');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(stored()).toEqual(['x']);
+    expect(screen.getByRole('textbox', { name: 'Paths' })).toHaveValue('a,b');
+    expect(screen.getByText(/cannot contain commas/)).toBeInTheDocument();
+  });
+
+  it('does not add while an IME composition is confirmed with Enter', () => {
+    render(<Harness />);
+    const field = screen.getByRole('textbox', { name: 'Paths' });
+    fireEvent.change(field, { target: { value: 'ろーる' } });
+    fireEvent.keyDown(field, { key: 'Enter', isComposing: true });
+    expect(stored()).toEqual([]);
+  });
+
+  it('removes stored duplicates one at a time', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={['openid', 'openid', 'email']} />);
+
+    await user.click(screen.getAllByRole('button', { name: /Remove openid/ })[0]);
+
+    expect(stored()).toEqual(['openid', 'email']);
+  });
+
+  it('moves focus back to the input when the last entry is removed', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial={['only']} />);
+
+    await user.click(screen.getByRole('button', { name: /Remove only/ }));
+
+    expect(stored()).toEqual([]);
+    expect(screen.getByRole('textbox', { name: 'Paths' })).toHaveFocus();
+  });
+
+  it('exposes hints and errors to assistive technology', async () => {
+    const user = userEvent.setup();
+    render(<Harness emptyHint="Defaults used: roles" description="Where roles come from" />);
+    const field = screen.getByRole('textbox', { name: 'Paths' });
+
+    expect(field).toHaveAccessibleDescription(/Where roles come from.*Defaults used: roles/);
+    await user.type(field, 'a,b{Enter}');
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(field).toHaveAccessibleDescription(/cannot contain commas/);
   });
 
   it('shows angle brackets in entries unescaped', () => {

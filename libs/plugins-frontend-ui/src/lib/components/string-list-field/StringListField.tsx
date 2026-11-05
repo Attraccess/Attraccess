@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Button, Description, FieldError, Input, Label, Tag, TagGroup, TextField } from '@heroui/react';
 import type { Key } from '@heroui/react';
 import { useTranslations } from '../../i18n';
@@ -58,7 +58,17 @@ export const StringListField: React.FC<StringListFieldProps> = ({
   const { t } = useTranslations({ en, de });
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<StringListEntryError | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
   const isFull = maxEntries !== undefined && values.length >= maxEntries;
+  // Part of the field's description, so screen readers announce which defaults apply or why Add is disabled.
+  const hint = isFull
+    ? error
+      ? null
+      : t('limitReached', { max: maxEntries })
+    : values.length === 0
+      ? emptyHint
+      : null;
 
   const add = () => {
     const entry = draft.trim();
@@ -72,9 +82,13 @@ export const StringListField: React.FC<StringListFieldProps> = ({
     setError(null);
   };
 
+  // Tags are keyed by position, so stored duplicates stay distinct and can be removed one at a time.
   const remove = (keys: Set<Key>) => {
-    onChange(values.filter((value) => !keys.has(value)));
+    const remaining = values.filter((_, index) => !keys.has(String(index)));
+    onChange(remaining);
     setError(null);
+    // The tag list disappears with its last entry; keep keyboard focus in the field.
+    if (remaining.length === 0) inputRef.current?.focus();
   };
 
   return (
@@ -92,17 +106,24 @@ export const StringListField: React.FC<StringListFieldProps> = ({
         <Label>{label}</Label>
         <div className="flex gap-2">
           <Input
+            ref={inputRef}
             className="flex-1"
             placeholder={placeholder}
             data-cy={dataCy}
+            onBlur={(event) => {
+              // A typed entry must not get lost when the user moves on (e.g. straight to Save) without
+              // pressing Add; the Add button handles its own press.
+              if (draft.trim() && event.relatedTarget !== addButtonRef.current) add();
+            }}
             onKeyDown={(event) => {
-              if (event.key !== 'Enter') return;
+              if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
               // Enter adds the entry; it must never submit the surrounding form.
               event.preventDefault();
               add();
             }}
           />
           <Button
+            ref={addButtonRef}
             variant="secondary"
             onPress={add}
             isDisabled={isDisabled || isFull}
@@ -111,22 +132,26 @@ export const StringListField: React.FC<StringListFieldProps> = ({
             {t('add')}
           </Button>
         </div>
-        {description && <Description>{description}</Description>}
+        {(description || hint) && (
+          <Description>
+            {description}
+            {hint && <span className="block">{hint}</span>}
+          </Description>
+        )}
         {error && <FieldError>{t(error, { max: error === 'tooLong' ? maxLength : maxEntries })}</FieldError>}
       </TextField>
-      {isFull && !error && <p className="text-sm text-muted">{t('limitReached', { max: maxEntries })}</p>}
-      {values.length === 0 ? (
-        emptyHint && <p className="text-sm text-muted">{emptyHint}</p>
-      ) : (
+      {values.length > 0 && (
         <TagGroup size="sm" aria-label={label} onRemove={isDisabled ? undefined : remove}>
           <TagGroup.List>
-            {values.map((value) => (
-              <Tag key={value} id={value} textValue={value} className="max-w-full">
+            {values.map((value, index) => (
+              <Tag key={index} id={String(index)} textValue={value} className="max-w-full">
                 {(renderProps) => (
                   <>
                     {/* Entries such as URNs have no break opportunities; let them wrap instead of overflowing. */}
                     <span className="min-w-0 break-all">{value}</span>
-                    {renderProps.allowsRemoving ? <Tag.RemoveButton aria-label={t('remove')} className="shrink-0" /> : null}
+                    {renderProps.allowsRemoving ? (
+                      <Tag.RemoveButton aria-label={t('remove')} className="shrink-0" />
+                    ) : null}
                   </>
                 )}
               </Tag>
