@@ -1,12 +1,30 @@
 import { Logger } from '@nestjs/common';
 import { SSOProviderOIDCConfiguration, SSOProviderType } from '@attraccess/database-entities';
-import { get } from 'lodash-es';
+import { toPath } from 'lodash-es';
 import { DEFAULT_OIDC_ROLE_CLAIM_PATHS } from '@attraccess/shared';
 import type { RbacService } from '../../../rbac/rbac.service';
 import { resolveSsoRoleAssignments } from '../permission-mapping';
 import type { RoleDelta } from '../session-permission-sync';
 
 const logger = new Logger('OidcPermissionClaims');
+
+const hasOwn = (value: unknown, key: string): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && Object.prototype.hasOwnProperty.call(value, key);
+
+/**
+ * Like lodash `get`, but only follows the claims' own properties. An inherited name such as `toString`
+ * would otherwise resolve to a function, count as a present claim and revoke this provider's SSO roles.
+ * A key that exists as-is (e.g. a flat `"a.b"` claim) wins over the nested path, as with `get`.
+ */
+function getOwnClaim(source: unknown, path: string): unknown {
+  if (hasOwn(source, path)) return source[path];
+  let current = source;
+  for (const segment of toPath(path)) {
+    if (!hasOwn(current, segment)) return undefined;
+    current = current[segment];
+  }
+  return current;
+}
 
 /** Claim values that may carry IdP roles/groups; shared by login and session-time re-sync. */
 export function getOidcPermissionClaimValues(
@@ -22,7 +40,7 @@ export function getOidcPermissionClaimValues(
   const values: unknown[] = [];
   for (const path of paths) {
     for (const source of claimSources) {
-      const value = get(source, path);
+      const value = getOwnClaim(source, path);
       if (value !== undefined && value !== null) {
         values.push(value);
       }
