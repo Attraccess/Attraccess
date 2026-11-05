@@ -46,3 +46,7 @@ export const DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS: readonly string[] = [
   'http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
   'http://schemas.xmlsoap.org/claims/group',
 ];
+
+/** Limits for the role claim paths and role attribute keys lists, enforced by the API and the provider form. */
+export const ROLE_PATH_LIST_MAX_ENTRIES = 20;
+export const ROLE_PATH_MAX_LENGTH = 256;

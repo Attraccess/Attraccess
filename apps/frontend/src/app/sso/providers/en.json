@@ -143,7 +143,7 @@
   "logoutRegistrationHint": "Register these exact URLs at the provider. Enable signed back-channel notifications for reliable delivery. Front-channel notifications with session ID are supported; cookie-only notifications may be blocked by browser privacy settings.",
   "samlLogoutRegistrationHint": "Register this URL for HTTP-Redirect and HTTP-POST Single Logout. Attraccess sends signed Redirect messages. Configure the IdP signing certificate and trust the Attraccess signing certificate.",
   "defaultsUsed": "Defaults used: {{{defaults}}}",
-  "scopesEmptyHint": "Defaults used: openid, email, profile",
-  "signingAlgorithmsEmptyHint": "Saving an empty list uses RS256",
+  "scopesEmptyHint": "Defaults used: openid · email · profile",
+  "signingAlgorithmsEmptyHint": "An empty list is saved as RS256",
   "emailAttributeKeysEmptyHint": "Built-in names used: {{{defaults}}}"
 }

@@ -93,7 +93,7 @@
     }
   },
   "roleClaimPaths": "Rollen-Claim-Pfade",
-  "roleClaimPathsHint": "Claim-Pfade, aus denen Rollen, Gruppen oder Berechtigungen gelesen werden. Leer lassen, um die angezeigten Standardwerte zu verwenden. Sobald gesetzt, werden NUR diese Pfade gelesen und die Standardwerte ignoriert: Ist der Claim vorhanden, werden Rollen, die nur aus einem Standardpfad stammten (z. B. groups), bei der nächsten Anmeldung entfernt. Erfordert die Berechtigung zum Verwalten von Benutzerrollen.",
+  "roleClaimPathsHint": "Claim-Pfade, aus denen Rollen, Gruppen oder Berechtigungen gelesen werden. Die Liste leer lassen, um die angezeigten Standardwerte zu verwenden. Sobald gesetzt, werden NUR diese Pfade gelesen und die Standardwerte ignoriert: Ist der Claim vorhanden, werden Rollen, die nur aus einem Standardpfad stammten (z. B. groups), bei der nächsten Anmeldung entfernt. Erfordert die Berechtigung zum Verwalten von Benutzerrollen.",
   "samlProvisioningSecret": "SAML-Provisioning-Secret",
   "samlProvisioningSecretHint": "Wird für SAML-Provisioning-Aufrufe (Logout, Löschen, Berechtigungen) verwendet. Leer lassen, um das vorhandene Secret beizubehalten.",
   "showSamlProvisioningSecret": "Provisioning-Secret anzeigen",
@@ -143,7 +143,7 @@
   "logoutRegistrationHint": "Registrieren Sie diese exakten URLs beim Anbieter. Aktivieren Sie signierte Back-Channel-Nachrichten für zuverlässige Zustellung. Front-Channel-Nachrichten mit Sitzungs-ID werden unterstützt; Browser-Datenschutzeinstellungen können reine Cookie-Nachrichten blockieren.",
   "samlLogoutRegistrationHint": "Registrieren Sie diese URL für HTTP-Redirect und HTTP-POST Single Logout. Attraccess sendet signierte Redirect-Nachrichten. Hinterlegen Sie das Signaturzertifikat des Anbieters und vertrauen Sie dem Attraccess-Signaturzertifikat.",
   "defaultsUsed": "Standardwerte: {{{defaults}}}",
-  "scopesEmptyHint": "Standardwerte: openid, email, profile",
+  "scopesEmptyHint": "Standardwerte: openid · email · profile",
   "signingAlgorithmsEmptyHint": "Eine leere Liste wird als RS256 gespeichert",
   "emailAttributeKeysEmptyHint": "Integrierte Namen: {{{defaults}}}"
 }

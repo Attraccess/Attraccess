@@ -44,7 +44,7 @@ Sendet der Identity Provider `email_verified=false` (Boolean oder String), wird 
 
 ### Scopes
 
-Optional können Sie zusätzliche OIDC-Scopes angeben, jeweils einzeln. Standard-Scopes werden automatisch angefordert.
+Optional können Sie die anzufordernden OIDC-Scopes angeben, jeweils einzeln. Ist die Liste leer, werden `openid`, `email` und `profile` angefordert. Konfigurierte Scopes ersetzen diese Standardwerte; nehmen Sie `email` und `profile` also mit auf, wenn Sie sie weiterhin benötigen (z. B. `openid`, `email`, `profile`, `offline_access`). `openid` wird immer gesendet.
 
 ### Claim-Pfade
 

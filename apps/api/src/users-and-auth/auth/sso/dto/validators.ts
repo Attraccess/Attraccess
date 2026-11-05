@@ -1,4 +1,5 @@
 import { registerDecorator, ValidationOptions } from 'class-validator';
+import { ROLE_PATH_LIST_MAX_ENTRIES, ROLE_PATH_MAX_LENGTH } from '@attraccess/shared';
 
 export function IsStringArrayRecord(options?: ValidationOptions) {
   return function (object: object, propertyName: string) {
@@ -18,9 +19,6 @@ export function IsStringArrayRecord(options?: ValidationOptions) {
     });
   };
 }
-
-export const ROLE_PATH_LIST_MAX_ENTRIES = 20;
-export const ROLE_PATH_MAX_LENGTH = 256;
 
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;

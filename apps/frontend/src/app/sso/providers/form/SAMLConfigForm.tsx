@@ -3,12 +3,12 @@ import { Eye, EyeOff } from 'lucide-react';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
 import { Button, LabeledSwitch, StringListField, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS } from '@attraccess/shared';
+import { DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS, ROLE_PATH_LIST_MAX_ENTRIES, ROLE_PATH_MAX_LENGTH } from '@attraccess/shared';
 import en from '../en.json';
 import de from '../de.json';
 
 const EMAIL_ATTRIBUTE_KEYS_DEFAULT =
-  'email, mail, Email, http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress, urn:oid:1.2.840.113549.1.9.1';
+  'email · mail · Email · http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress · urn:oid:1.2.840.113549.1.9.1';
 
 export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
   const { t } = useTranslations({ en, de });
@@ -146,8 +146,8 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
           onChange={setRoleAttributeKeys}
           placeholder="roles"
           emptyHint={t('defaultsUsed', { defaults: DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS.join(' · ') })}
-          maxEntries={20}
-          maxLength={256}
+          maxEntries={ROLE_PATH_LIST_MAX_ENTRIES}
+          maxLength={ROLE_PATH_MAX_LENGTH}
           data-cy="sso-provider-form-saml-role-attribute-keys-input"
         />
       </section>

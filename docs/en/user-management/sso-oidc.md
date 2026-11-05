@@ -44,7 +44,7 @@ If the identity provider sends `email_verified=false` (boolean or string), the e
 
 ### Scopes
 
-Optionally specify additional OIDC scopes, one entry at a time. Default scopes are requested automatically.
+Optionally specify the OIDC scopes to request, one entry at a time. When the list is empty, `openid`, `email` and `profile` are requested. Configured scopes replace these defaults, so include `email` and `profile` if you still need them (e.g. `openid`, `email`, `profile`, `offline_access`); `openid` is always sent.
 
 ### Claim Paths
 

@@ -20,12 +20,12 @@ import { RoleMappingsSection } from './RoleMappingsSection';
 import { PermissionSyncSection } from './PermissionSyncSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
 import { Button, StringListField, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DEFAULT_OIDC_ROLE_CLAIM_PATHS } from '@attraccess/shared';
+import { DEFAULT_OIDC_ROLE_CLAIM_PATHS, ROLE_PATH_LIST_MAX_ENTRIES, ROLE_PATH_MAX_LENGTH } from '@attraccess/shared';
 import en from '../en.json';
 import de from '../de.json';
 
-const USERNAME_CLAIM_PATHS_DEFAULT = 'preferred_username, email, sub';
-const EMAIL_CLAIM_PATHS_DEFAULT = 'email, emails[0].value, upn';
+const USERNAME_CLAIM_PATHS_DEFAULT = 'preferred_username · email · sub';
+const EMAIL_CLAIM_PATHS_DEFAULT = 'email · emails[0].value · upn';
 const ROLE_CLAIM_PATHS_DEFAULT = [...DEFAULT_OIDC_ROLE_CLAIM_PATHS, 'resource_access.<clientId>.roles'].join(' · ');
 
 export function useOIDCConfigFormState({ form }: OIDCConfigFormProps) {
@@ -274,8 +274,8 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
           onChange={model.setRoleClaimPaths}
           placeholder="realm_access.roles"
           emptyHint={model.t('defaultsUsed', { defaults: ROLE_CLAIM_PATHS_DEFAULT })}
-          maxEntries={20}
-          maxLength={256}
+          maxEntries={ROLE_PATH_LIST_MAX_ENTRIES}
+          maxLength={ROLE_PATH_MAX_LENGTH}
           data-cy="sso-provider-form-oidc-role-claims-input"
         />
       </section>
