@@ -75,13 +75,13 @@ void testIntroducerDetails(Renderer &renderer)
         auto *list = requireObject(guard.root, &lv_label_class, expected.c_str());
         auto *panel = lv_obj_get_parent(list);
         expect(!lv_obj_has_flag(panel, LV_OBJ_FLAG_HIDDEN), "Introduction panel remains visible with occupancy");
-        expect(lv_obj_has_flag(guard.root, LV_OBJ_FLAG_SCROLLABLE), "Long list can be scrolled on reader");
+        expect(lv_obj_has_flag(lv_obj_get_parent(panel), LV_OBJ_FLAG_SCROLLABLE), "Long list can be scrolled on reader");
         renderer.capture(occupied ? "introducers-occupied-top" : "introducers-available-top");
-        lv_obj_scroll_to_y(guard.root, LV_COORD_MAX, LV_ANIM_OFF);
+        lv_obj_scroll_to_y(lv_obj_get_parent(panel), LV_COORD_MAX, LV_ANIM_OFF);
         settle();
         lv_area_t bounds;
         lv_obj_get_coords(list, &bounds);
-        expect(bounds.y2 < 480 && bounds.y2 > 0, "Last tutor is reachable by scrolling");
+        expect(bounds.y2 < 452 && bounds.y2 > 0, "Last tutor is reachable by scrolling, above the device footer");
         expect(lv_obj_get_width(list) <= lv_obj_get_content_width(panel), "Long names wrap inside the panel");
         renderer.capture(occupied ? "introducers-occupied-bottom" : "introducers-available-bottom");
         details.showActionProgress(FirmwareI18n::Message::PleaseWait);

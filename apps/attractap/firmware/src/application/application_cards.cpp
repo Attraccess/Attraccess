@@ -22,7 +22,7 @@ void Application::processCardAuthenticationData() {
     // LVGL calls racing the render task crash it (recursive lock).
     lv_lock();
     this->finishCardAuthentication(false);
-    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
+    this->showSignInFailed(FirmwareI18n::Message::PleaseTapAValidNfcCard);
     lv_unlock();
 #else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
@@ -46,7 +46,7 @@ void Application::processCardAuthenticationData() {
     // LVGL calls racing the render task crash it (recursive lock).
     lv_lock();
     this->finishCardAuthentication(false);
-    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapAValidNfcCard);
+    this->showSignInFailed(FirmwareI18n::Message::PleaseTapAValidNfcCard);
     lv_unlock();
 #else
     this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;

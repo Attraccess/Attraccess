@@ -63,7 +63,8 @@ protected:
     std::function<void(uint8_t keyNo, std::string key)> enrollNewCardCallback;
     std::function<void(std::string error)> enrollNewCardErrorCallback;
     std::function<void(std::string username, uint8_t keyNo, std::string key)> resetNfcCardCallback;
-    std::function<void(const char *title, const char *message)> errorCallback;
+    // (event type that carried the error, error code); OTA reports its own labels.
+    std::function<void(const char *eventType, const char *code)> errorCallback;
     std::function<void(const ActionResult &)> actionResultCallback;
     std::function<void(bool)> insufficientBalanceCallback;
     std::function<void(int)> firmwareUpdateProgressCallback;
@@ -193,7 +194,7 @@ public:
 
     // Error callback for server responses carrying an error field.
     // For server errors, message is the raw code; the application localizes it.
-    void setErrorCallback(std::function<void(const char *title, const char *message)> callback);
+    void setErrorCallback(std::function<void(const char *eventType, const char *code)> callback);
     // Generic action result callback for async operations (start/stop sessions, door controls, flow buttons)
     void setActionResultCallback(std::function<void(const ActionResult &)> callback);
 
@@ -244,10 +245,6 @@ private:
     void onUsageStats(JsonObject data);
 
     void sendResourceAction(const char *type, JsonObject payload);
-
-    // Persistent scratch buffer to avoid large stack allocations when parsing resource lists
-
-    // Persistent inbound JSON document to avoid large stack usage in websocket task
 
     void sendHeartbeat();
 

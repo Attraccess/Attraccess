@@ -8,6 +8,7 @@ void ReaderWorkflow::testIdentityAndPendingAuthentication()
     assert(label(lv_screen_active(), "Stop"));
     click("Stop"); server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
     active = false; list();
+    clearStatus(); // "Nutzung beendet"
     assert(label(lv_screen_active(), "Start"));
     assert(!lv_obj_is_visible(requireLabel(lv_screen_active(), "Status wird geladen")));
     click("Abmelden"); username = "Alex"; active = true; list(false);
