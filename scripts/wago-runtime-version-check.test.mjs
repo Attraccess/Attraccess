@@ -28,7 +28,6 @@ test('covers shared contracts, runtime dependencies, image construction and acti
     'apps/plugins/wago/backend/runtime/supervisor.ts',
     'apps/plugins/wago/backend/runtime/install.ts',
     'apps/plugins/wago/backend/runtime/update/shell.ts',
-    'pnpm-lock.yaml',
     '.github/actions/build-cc100-runtime/action.yml',
   ])
     assert.equal(isRuntimeSource(path), true, path);
@@ -40,6 +39,9 @@ test('covers shared contracts, runtime dependencies, image construction and acti
     'apps/plugins/wago/cc100-runtime/src/simulator.ts',
     'apps/plugins/wago/cc100-runtime/src/simulator/device.ts',
     'apps/plugins/wago/cc100-runtime/Dockerfile.simulator',
+    // Decided by content, see the fixture cases below.
+    'pnpm-lock.yaml',
+    'package.json',
   ])
     assert.equal(isRuntimeSource(path), false, path);
 });
@@ -87,6 +89,182 @@ for (const [name, path, next, pass] of [
           /increased|No WAGO/,
         );
       else assert.throws(() => execFileSync(process.execPath, [script, base], { cwd: directory, env, stdio: 'pipe' }));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
+const runtimePackage = 'apps/plugins/wago/cc100-runtime/package.json';
+
+const lockfile = ({
+  mqtt = '5.16.0',
+  packet = '9.0.2',
+  other = '1.0.0',
+  version = '9.0',
+} = {}) => `lockfileVersion: '${version}'
+
+settings:
+  autoInstallPeers: true
+
+importers:
+
+  .:
+    dependencies:
+      mqtt:
+        specifier: ^5.15.2
+        version: ${mqtt}
+      other:
+        specifier: ^1.0.0
+        version: ${other}
+    devDependencies:
+      '@scope/tool':
+        specifier: ^2.0.0
+        version: 2.0.0(other@${other})
+
+packages:
+
+  mqtt@5.16.0:
+    resolution: {integrity: sha512-aaa}
+
+snapshots:
+
+  '@scope/tool@2.0.0(other@${other})':
+    dependencies:
+      other: ${other}
+
+  mqtt-packet@${packet}:
+    dependencies:
+      debug: 4.4.3(supports-color@7.2.0)
+    transitivePeerDependencies:
+      - supports-color
+
+  mqtt@${mqtt}:
+    dependencies:
+      mqtt-packet: ${packet}
+    optionalDependencies:
+      bufferutil: 4.0.0
+
+  other@${other}: {}
+
+  debug@4.4.3(supports-color@7.2.0): {}
+
+  bufferutil@4.0.0: {}
+`;
+
+const rootPackage = ({
+  mqtt = '^5.15.2',
+  other = '^1.0.0',
+  overrides = {},
+  scripts = 'a',
+  manager = 'pnpm@10.0.0',
+} = {}) =>
+  JSON.stringify({
+    scripts: { build: scripts },
+    dependencies: { other },
+    devDependencies: { mqtt },
+    packageManager: manager,
+    pnpm: { overrides },
+  });
+
+for (const [name, files, pass, message] of [
+  ['allows an unrelated lockfile change', { 'pnpm-lock.yaml': lockfile({ other: '1.0.1' }) }, true],
+  [
+    'requires a bump for a changed mqtt version',
+    { 'pnpm-lock.yaml': lockfile({ mqtt: '5.16.1' }) },
+    false,
+    /mqtt 5\.16\.0 → 5\.16\.1/,
+  ],
+  [
+    'requires a bump for a changed transitive dependency of mqtt',
+    { 'pnpm-lock.yaml': lockfile({ packet: '9.0.3' }) },
+    false,
+    /mqtt-packet 9\.0\.2 → 9\.0\.3/,
+  ],
+  [
+    'allows an unrelated root package.json change',
+    { 'package.json': rootPackage({ other: '^1.1.0', scripts: 'b' }) },
+    true,
+  ],
+  [
+    'requires a bump for a changed mqtt specifier',
+    { 'package.json': rootPackage({ mqtt: '^5.16.0' }) },
+    false,
+    /devDependencies\.mqtt/,
+  ],
+  [
+    'requires a bump for changed pnpm overrides',
+    { 'package.json': rootPackage({ overrides: { debug: '4.4.4' } }) },
+    false,
+    /pnpm\.overrides/,
+  ],
+  [
+    'requires a bump for a changed packageManager',
+    { 'package.json': rootPackage({ manager: 'pnpm@10.1.0' }) },
+    false,
+    /packageManager/,
+  ],
+  [
+    'treats an unparseable lockfile as runtime source',
+    { 'pnpm-lock.yaml': 'not: [a lockfile' },
+    false,
+    /could not be analysed/,
+  ],
+  [
+    'treats an unknown lockfile version as runtime source',
+    { 'pnpm-lock.yaml': lockfile({ version: '10.0' }) },
+    false,
+    /lockfileVersion/,
+  ],
+  [
+    'treats an unparseable package.json as runtime source',
+    { 'package.json': '{ nope' },
+    false,
+    /could not be analysed/,
+  ],
+  [
+    'follows the dependencies declared by the runtime package',
+    {
+      [runtimePackage]: JSON.stringify({ dependencies: { mqtt: '^5.15.2', other: '^1.0.0' } }),
+      'pnpm-lock.yaml': lockfile({ other: '1.0.1' }),
+    },
+    false,
+    /other 1\.0\.0 → 1\.0\.1/,
+  ],
+]) {
+  test(name, () => {
+    const directory = mkdtempSync(join(tmpdir(), 'cc100-version-check-'));
+    const env = fixtureGitEnv();
+    const git = (...args) => execFileSync('git', args, { cwd: directory, env, encoding: 'utf8' }).trim();
+    const file = (path, content) => {
+      mkdirSync(join(directory, path, '..'), { recursive: true });
+      writeFileSync(join(directory, path), content);
+    };
+    try {
+      git('init', '--quiet');
+      git('config', 'user.email', 'test@example.com');
+      git('config', 'user.name', 'Test');
+      git('config', 'commit.gpgsign', 'false');
+      file(manifest, JSON.stringify({ runtimeVersion: '0.2.0' }));
+      file(runtimePackage, JSON.stringify({ dependencies: { mqtt: '^5.15.2' } }));
+      file('pnpm-lock.yaml', lockfile());
+      file('package.json', rootPackage());
+      git('add', '.');
+      git('commit', '--quiet', '-m', 'baseline');
+      const base = git('rev-parse', 'HEAD');
+      for (const [path, content] of Object.entries(files)) file(path, content);
+      git('add', '.');
+      git('commit', '--quiet', '-m', 'change');
+      const run = () =>
+        execFileSync(process.execPath, [script, base], { cwd: directory, env, encoding: 'utf8', stdio: 'pipe' });
+      if (pass) assert.match(run(), /No WAGO/);
+      else
+        assert.throws(run, (error) => {
+          assert.equal(error.status, 1);
+          assert.match(error.stderr, /source changed without increasing the version/);
+          assert.match(error.stderr, message);
+          return true;
+        });
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
