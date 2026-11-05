@@ -6,11 +6,15 @@ import {
   RoleMappingEntry,
 } from '../formDefaults';
 
-const parseList = (value: string) =>
-  value
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+/**
+ * Payload value for an edited list: the entries when there are any; `null` when the list was emptied
+ * and the provider had stored entries (clears them, so defaults apply); otherwise omitted. Only sent
+ * when stored values exist, so plain edits by users without `users.roles.manage` keep working.
+ */
+const listPayload = (values: string[], stored: string[] | null | undefined) => {
+  if (values.length > 0) return values;
+  return stored?.length ? null : undefined;
+};
 
 const sanitizeOptional = (value?: string) => (value && value.trim().length > 0 ? value.trim() : undefined);
 
@@ -19,32 +23,30 @@ const hasStoredMappings = (config?: { roleMappings?: Record<string, unknown> | n
 
 export function buildOidcPayload({
   formValues,
-  scopesInput,
-  signingAlgorithmsInput,
-  usernameClaimPathsInput,
-  emailClaimPathsInput,
-  roleClaimPathsInput,
+  scopes,
+  usernameClaimPaths,
+  emailClaimPaths,
+  roleClaimPaths,
   oidcRoleMappingEntries,
   isEditing,
   providerDetails,
 }: {
   formValues: CreateSSOProviderDto;
-  scopesInput: string;
-  signingAlgorithmsInput: string;
-  usernameClaimPathsInput: string;
-  emailClaimPathsInput: string;
-  roleClaimPathsInput: string;
+  scopes: string[];
+  usernameClaimPaths: string[];
+  emailClaimPaths: string[];
+  roleClaimPaths: string[];
   oidcRoleMappingEntries: RoleMappingEntry[];
   isEditing: boolean;
   providerDetails: SSOProvider | undefined;
 }) {
   const base = ensureOidcConfiguration(formValues.oidcConfiguration);
-  const signingAlgorithms = parseList(signingAlgorithmsInput);
   const payload: CreateOIDCConfigurationDto = {
     issuer: base.issuer,
     endSessionURL: base.endSessionURL?.trim() || null,
     jwksURL: base.jwksURL?.trim() || null,
-    signingAlgorithms: signingAlgorithms.length ? signingAlgorithms : ['RS256'],
+    // an emptied list falls back to the only algorithm every provider supports
+    signingAlgorithms: base.signingAlgorithms?.length ? base.signingAlgorithms : ['RS256'],
     authorizationURL: base.authorizationURL,
     tokenURL: base.tokenURL,
     userInfoURL: base.userInfoURL,
@@ -54,16 +56,15 @@ export function buildOidcPayload({
     permissionSyncTtlMinutes: base.permissionSyncTtlMinutes ?? null,
   };
 
-  if (scopesInput.trim().length > 0) payload.scopes = parseList(scopesInput);
-  if (usernameClaimPathsInput.trim().length > 0) payload.usernameClaimPaths = parseList(usernameClaimPathsInput);
-  if (emailClaimPathsInput.trim().length > 0) payload.emailClaimPaths = parseList(emailClaimPathsInput);
-  const roleClaimPaths = parseList(roleClaimPathsInput);
-  if (roleClaimPaths.length > 0) {
-    payload.roleClaimPaths = roleClaimPaths;
-  } else if (isEditing && providerDetails?.oidcConfiguration?.roleClaimPaths?.length) {
-    // emptied field must clear the stored paths (back to defaults); only sent when some were stored,
-    // so plain edits by users without users.roles.manage keep working
-    payload.roleClaimPaths = null;
+  const stored = providerDetails?.oidcConfiguration;
+  const lists = {
+    scopes: listPayload(scopes, stored?.scopes),
+    usernameClaimPaths: listPayload(usernameClaimPaths, stored?.usernameClaimPaths),
+    emailClaimPaths: listPayload(emailClaimPaths, stored?.emailClaimPaths),
+    roleClaimPaths: listPayload(roleClaimPaths, stored?.roleClaimPaths),
+  };
+  for (const [field, value] of Object.entries(lists)) {
+    if (value !== undefined) Object.assign(payload, { [field]: value });
   }
   const roleMappings = buildRoleMappingsPayload(oidcRoleMappingEntries);
   if (roleMappings) {
@@ -79,15 +80,15 @@ export function buildOidcPayload({
 
 export function buildSamlPayload({
   formValues,
-  emailAttributeKeysInput,
-  roleAttributeKeysInput,
+  emailAttributeKeys,
+  roleAttributeKeys,
   samlRoleMappingEntries,
   isEditing,
   providerDetails,
 }: {
   formValues: CreateSSOProviderDto;
-  emailAttributeKeysInput: string;
-  roleAttributeKeysInput: string;
+  emailAttributeKeys: string[];
+  roleAttributeKeys: string[];
   samlRoleMappingEntries: RoleMappingEntry[];
   isEditing: boolean;
   providerDetails: SSOProvider | undefined;
@@ -99,21 +100,13 @@ export function buildSamlPayload({
     logoutURL: base.logoutURL?.trim() || null,
     audience: sanitizeOptional(base.audience),
   };
-  const parsedEmailKeys = parseList(emailAttributeKeysInput);
-  if (parsedEmailKeys.length > 0) {
-    payload.emailAttributeKeys = parsedEmailKeys;
-  } else {
-    delete payload.emailAttributeKeys;
-  }
-
-  const parsedRoleKeys = parseList(roleAttributeKeysInput);
-  if (parsedRoleKeys.length > 0) {
-    payload.roleAttributeKeys = parsedRoleKeys;
-  } else if (isEditing && providerDetails?.samlConfiguration?.roleAttributeKeys?.length) {
-    // emptied field must clear the stored keys (back to defaults); only sent when some were stored
-    payload.roleAttributeKeys = null;
-  } else {
-    delete payload.roleAttributeKeys;
+  const stored = providerDetails?.samlConfiguration;
+  for (const [field, value] of [
+    ['emailAttributeKeys', listPayload(emailAttributeKeys, stored?.emailAttributeKeys)],
+    ['roleAttributeKeys', listPayload(roleAttributeKeys, stored?.roleAttributeKeys)],
+  ] as const) {
+    if (value !== undefined) Object.assign(payload, { [field]: value });
+    else delete payload[field];
   }
 
   const sanitizedSigningCertificate = sanitizeOptional(base.spSigningCertificate);

@@ -645,6 +645,15 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       expect(readOptions(strategy).scope).toEqual(['email', 'profile']);
     });
 
+    it('uses default scopes (without openid) when scopes was cleared to null', () => {
+      const strategy = fixture.createStrategy(
+        { scopes: null },
+        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
+        { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
+      );
+      expect(readOptions(strategy).scope).toEqual(['email', 'profile']);
+    });
+
     it('uses default scopes (without openid) when scopes is an empty array', () => {
       const strategy = fixture.createStrategy(
         { scopes: [] },

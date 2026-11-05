@@ -56,7 +56,7 @@ Optionally set a provisioning secret. This allows your identity provider to mana
 
 ### Role Attribute Keys
 
-By default Attraccess reads roles from the attributes `roles`, `role`, `groups`, `group`, `memberof` and the Microsoft/ADFS claim URIs `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups`, `http://schemas.microsoft.com/ws/2008/06/identity/claims/role` and `http://schemas.xmlsoap.org/claims/group`. To read other attributes, enter a comma-separated list in **Role Attribute Keys** (at most 20, up to 256 characters each, no commas; matched case-insensitively). Changing this setting requires the `users.roles.manage` permission.
+By default Attraccess reads roles from the attributes `roles`, `role`, `groups`, `group`, `memberof` and the Microsoft/ADFS claim URIs `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups`, `http://schemas.microsoft.com/ws/2008/06/identity/claims/role` and `http://schemas.xmlsoap.org/claims/group`. To read other attributes, add them one by one in **Role Attribute Keys** (at most 20, up to 256 characters each, no commas; matched case-insensitively). Changing this setting requires the `users.roles.manage` permission.
 
 > **Custom keys replace the defaults.** Once set, only the configured attributes are read. If one of them is present in the assertion, roles that came only from a default attribute (for example `groups`) are removed at the next login. If none is present, existing roles are kept; if one is present but empty, this provider's SSO roles are removed. Clear the field to return to the defaults.
 

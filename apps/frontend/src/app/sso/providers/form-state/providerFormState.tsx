@@ -29,7 +29,7 @@ import { hasRequiredSamlSigningMaterial } from '../signingMaterial';
 import en from '../en.json';
 import de from '../de.json';
 import { buildOidcPayload, buildSamlPayload } from './providerFormPayload';
-import { listInputValue, oidcFormValues, samlFormValues } from './providerFormValues';
+import { listValue, oidcFormValues, samlFormValues } from './providerFormValues';
 
 /**
  * Where the provider list lives — the Single sign-on settings section, and the target for cancel,
@@ -44,15 +44,12 @@ export function useSSOProviderFormInputs(providerId?: number) {
   const [formValues, setFormValues] = useState<CreateSSOProviderDto>(defaultProviderValues);
   const [showClientSecret, setShowClientSecret] = useState(false);
   const [showSamlProvisioningSecret, setShowSamlProvisioningSecret] = useState(false);
-  const [scopesInput, setScopesInput] = useState('');
-  const [signingAlgorithmsInput, setSigningAlgorithmsInput] = useState(() =>
-    getDefaultOidcConfiguration().signingAlgorithms.join(', '),
-  );
-  const [usernameClaimPathsInput, setUsernameClaimPathsInput] = useState('');
-  const [emailClaimPathsInput, setEmailClaimPathsInput] = useState('');
-  const [emailAttributeKeysInput, setEmailAttributeKeysInput] = useState('');
-  const [roleClaimPathsInput, setRoleClaimPathsInput] = useState('');
-  const [roleAttributeKeysInput, setRoleAttributeKeysInput] = useState('');
+  const [scopes, setScopes] = useState<string[]>([]);
+  const [usernameClaimPaths, setUsernameClaimPaths] = useState<string[]>([]);
+  const [emailClaimPaths, setEmailClaimPaths] = useState<string[]>([]);
+  const [emailAttributeKeys, setEmailAttributeKeys] = useState<string[]>([]);
+  const [roleClaimPaths, setRoleClaimPaths] = useState<string[]>([]);
+  const [roleAttributeKeys, setRoleAttributeKeys] = useState<string[]>([]);
   const [oidcRoleMappingEntries, setOidcRoleMappingEntries] = useState<RoleMappingEntry[]>([]);
   const [samlRoleMappingEntries, setSamlRoleMappingEntries] = useState<RoleMappingEntry[]>([]);
   const queryClient = useQueryClient();
@@ -129,20 +126,18 @@ export function useSSOProviderFormInputs(providerId?: number) {
     setShowClientSecret,
     showSamlProvisioningSecret,
     setShowSamlProvisioningSecret,
-    scopesInput,
-    setScopesInput,
-    signingAlgorithmsInput,
-    setSigningAlgorithmsInput,
-    usernameClaimPathsInput,
-    setUsernameClaimPathsInput,
-    emailClaimPathsInput,
-    setEmailClaimPathsInput,
-    emailAttributeKeysInput,
-    setEmailAttributeKeysInput,
-    roleClaimPathsInput,
-    setRoleClaimPathsInput,
-    roleAttributeKeysInput,
-    setRoleAttributeKeysInput,
+    scopes,
+    setScopes,
+    usernameClaimPaths,
+    setUsernameClaimPaths,
+    emailClaimPaths,
+    setEmailClaimPaths,
+    emailAttributeKeys,
+    setEmailAttributeKeys,
+    roleClaimPaths,
+    setRoleClaimPaths,
+    roleAttributeKeys,
+    setRoleAttributeKeys,
     oidcRoleMappingEntries,
     setOidcRoleMappingEntries,
     samlRoleMappingEntries,
@@ -169,14 +164,13 @@ export function useSSOProviderFormInputs(providerId?: number) {
 export function useSSOProviderFormEffects(model: ReturnType<typeof useSSOProviderFormInputs>) {
   const {
     providerDetails,
-    setScopesInput,
-    setSigningAlgorithmsInput,
-    setUsernameClaimPathsInput,
-    setEmailClaimPathsInput,
+    setScopes,
+    setUsernameClaimPaths,
+    setEmailClaimPaths,
     setOidcRoleMappingEntries,
-    setEmailAttributeKeysInput,
-    setRoleClaimPathsInput,
-    setRoleAttributeKeysInput,
+    setEmailAttributeKeys,
+    setRoleClaimPaths,
+    setRoleAttributeKeys,
     setSamlRoleMappingEntries,
     setFormValues,
   } = model;
@@ -197,62 +191,57 @@ export function useSSOProviderFormEffects(model: ReturnType<typeof useSSOProvide
     const oidcConfiguration = extendedProvider.type === SSOProviderType.OIDC && extendedProvider.oidcConfiguration;
     if (oidcConfiguration) {
       updatedFormValues.oidcConfiguration = oidcFormValues(oidcConfiguration);
-      setScopesInput(listInputValue(oidcConfiguration.scopes));
-      setUsernameClaimPathsInput(listInputValue(oidcConfiguration.usernameClaimPaths));
-      setEmailClaimPathsInput(listInputValue(oidcConfiguration.emailClaimPaths));
-      setRoleClaimPathsInput(listInputValue(oidcConfiguration.roleClaimPaths));
+      setScopes(listValue(oidcConfiguration.scopes));
+      setUsernameClaimPaths(listValue(oidcConfiguration.usernameClaimPaths));
+      setEmailClaimPaths(listValue(oidcConfiguration.emailClaimPaths));
+      setRoleClaimPaths(listValue(oidcConfiguration.roleClaimPaths));
       setOidcRoleMappingEntries(
         buildRoleMappingEntries((oidcConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined),
       );
     } else {
-      setScopesInput('');
-      setUsernameClaimPathsInput('');
-      setEmailClaimPathsInput('');
-      setRoleClaimPathsInput('');
+      setScopes([]);
+      setUsernameClaimPaths([]);
+      setEmailClaimPaths([]);
+      setRoleClaimPaths([]);
       setOidcRoleMappingEntries([]);
     }
 
     const samlConfiguration = extendedProvider.type === SSOProviderType.SAML && extendedProvider.samlConfiguration;
     if (samlConfiguration) {
       updatedFormValues.samlConfiguration = samlFormValues(samlConfiguration);
-      setEmailAttributeKeysInput(listInputValue(samlConfiguration.emailAttributeKeys));
-      setRoleAttributeKeysInput(listInputValue(samlConfiguration.roleAttributeKeys));
+      setEmailAttributeKeys(listValue(samlConfiguration.emailAttributeKeys));
+      setRoleAttributeKeys(listValue(samlConfiguration.roleAttributeKeys));
       setSamlRoleMappingEntries(
         buildRoleMappingEntries((samlConfiguration.roleMappings ?? undefined) as Record<string, string[]> | undefined),
       );
     } else {
-      setEmailAttributeKeysInput('');
-      setRoleAttributeKeysInput('');
+      setEmailAttributeKeys([]);
+      setRoleAttributeKeys([]);
       setSamlRoleMappingEntries([]);
     }
 
-    setSigningAlgorithmsInput((updatedFormValues.oidcConfiguration?.signingAlgorithms ?? ['RS256']).join(', '));
     setFormValues(updatedFormValues);
   }, [
     providerDetails,
     setFormValues,
-    setScopesInput,
-    setSigningAlgorithmsInput,
-    setUsernameClaimPathsInput,
-    setEmailClaimPathsInput,
+    setScopes,
+    setUsernameClaimPaths,
+    setEmailClaimPaths,
     setOidcRoleMappingEntries,
-    setEmailAttributeKeysInput,
-    setRoleClaimPathsInput,
-    setRoleAttributeKeysInput,
+    setEmailAttributeKeys,
+    setRoleClaimPaths,
+    setRoleAttributeKeys,
     setSamlRoleMappingEntries,
   ]);
 
   const setOidc = useCallback(
     (field: keyof NonNullable<CreateSSOProviderDto['oidcConfiguration']>, value: string | string[] | number | null) => {
-      if (field === 'signingAlgorithms') {
-        setSigningAlgorithmsInput(Array.isArray(value) ? value.join(', ') : String(value ?? ''));
-      }
       setFormValues((prev) => ({
         ...prev,
         oidcConfiguration: { ...ensureOidcConfiguration(prev.oidcConfiguration), [field]: value },
       }));
     },
-    [setFormValues, setSigningAlgorithmsInput],
+    [setFormValues],
   );
 
   const setSaml = useCallback(
@@ -339,15 +328,14 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
     isEditing,
     providerId,
     formValues,
-    scopesInput,
-    signingAlgorithmsInput,
-    usernameClaimPathsInput,
-    emailClaimPathsInput,
-    roleClaimPathsInput,
-    roleAttributeKeysInput,
+    scopes,
+    usernameClaimPaths,
+    emailClaimPaths,
+    roleClaimPaths,
+    roleAttributeKeys,
     oidcRoleMappingEntries,
     providerDetails,
-    emailAttributeKeysInput,
+    emailAttributeKeys,
     samlRoleMappingEntries,
     updateSSOProvider,
     success,
@@ -371,11 +359,10 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
         if (formValues.type === SSOProviderType.OIDC) {
           requestBody.oidcConfiguration = buildOidcPayload({
             formValues: formValues,
-            scopesInput: scopesInput,
-            signingAlgorithmsInput,
-            usernameClaimPathsInput: usernameClaimPathsInput,
-            emailClaimPathsInput: emailClaimPathsInput,
-            roleClaimPathsInput: roleClaimPathsInput,
+            scopes,
+            usernameClaimPaths,
+            emailClaimPaths,
+            roleClaimPaths,
             oidcRoleMappingEntries: oidcRoleMappingEntries,
             isEditing: isEditing,
             providerDetails: providerDetails,
@@ -385,8 +372,8 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
         if (formValues.type === SSOProviderType.SAML) {
           requestBody.samlConfiguration = buildSamlPayload({
             formValues: formValues,
-            emailAttributeKeysInput: emailAttributeKeysInput,
-            roleAttributeKeysInput: roleAttributeKeysInput,
+            emailAttributeKeys,
+            roleAttributeKeys,
             samlRoleMappingEntries: samlRoleMappingEntries,
             isEditing: isEditing,
             providerDetails: providerDetails,
@@ -410,11 +397,10 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
         if (formValues.type === SSOProviderType.OIDC) {
           requestBody.oidcConfiguration = buildOidcPayload({
             formValues: formValues,
-            scopesInput: scopesInput,
-            signingAlgorithmsInput,
-            usernameClaimPathsInput: usernameClaimPathsInput,
-            emailClaimPathsInput: emailClaimPathsInput,
-            roleClaimPathsInput: roleClaimPathsInput,
+            scopes,
+            usernameClaimPaths,
+            emailClaimPaths,
+            roleClaimPaths,
             oidcRoleMappingEntries: oidcRoleMappingEntries,
             isEditing: isEditing,
             providerDetails: providerDetails,
@@ -424,8 +410,8 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
         if (formValues.type === SSOProviderType.SAML) {
           requestBody.samlConfiguration = buildSamlPayload({
             formValues: formValues,
-            emailAttributeKeysInput: emailAttributeKeysInput,
-            roleAttributeKeysInput: roleAttributeKeysInput,
+            emailAttributeKeys,
+            roleAttributeKeys,
             samlRoleMappingEntries: samlRoleMappingEntries,
             isEditing: isEditing,
             providerDetails: providerDetails,
@@ -448,10 +434,10 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
     }
   }, [
     createSSOProvider,
-    emailAttributeKeysInput,
-    emailClaimPathsInput,
-    roleClaimPathsInput,
-    roleAttributeKeysInput,
+    emailAttributeKeys,
+    emailClaimPaths,
+    roleClaimPaths,
+    roleAttributeKeys,
     formValues,
     isEditing,
     navigate,
@@ -460,13 +446,12 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
     providerId,
     samlRoleMappingEntries,
     samlSigningMaterialsReady,
-    scopesInput,
-    signingAlgorithmsInput,
+    scopes,
     showError,
     success,
     t,
     updateSSOProvider,
-    usernameClaimPathsInput,
+    usernameClaimPaths,
   ]);
   return { ...model, handleSubmit } as const;
 }

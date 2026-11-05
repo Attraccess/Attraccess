@@ -1,0 +1,9 @@
+{
+  "add": "Hinzufügen",
+  "empty": "Bitte einen Wert eingeben.",
+  "duplicate": "Dieser Wert ist bereits in der Liste.",
+  "comma": "Werte dürfen keine Kommas enthalten. Jeden Wert einzeln hinzufügen.",
+  "control": "Werte dürfen keine Steuerzeichen enthalten.",
+  "tooLong": "Werte dürfen höchstens {{max}} Zeichen lang sein.",
+  "limitReached": "Die Liste darf höchstens {{max}} Einträge haben."
+}

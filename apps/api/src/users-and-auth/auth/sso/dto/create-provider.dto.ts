@@ -7,13 +7,12 @@ import {
   IsOptional,
   IsString,
   ValidateNested,
-  IsArray,
   IsBoolean,
   IsInt,
   Max,
   Min,
 } from 'class-validator';
-import { IsRolePathList, IsStringArrayRecord } from './validators';
+import { IsRolePathList, IsStoredStringList, IsStringArrayRecord } from './validators';
 
 export class CreateOIDCConfigurationDto {
   @ApiProperty({
@@ -40,8 +39,7 @@ export class CreateOIDCConfigurationDto {
     type: [String],
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
+  @IsStoredStringList()
   signingAlgorithms?: string[] | null;
 
   @ApiProperty({
@@ -112,31 +110,31 @@ export class CreateOIDCConfigurationDto {
     description: 'Optional list of OIDC scopes to request',
     example: ['openid', 'email', 'profile'],
     required: false,
+    nullable: true,
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  scopes?: string[];
+  @IsStoredStringList()
+  scopes?: string[] | null;
 
   @ApiProperty({
     description: 'Ordered list of claim paths to resolve the username',
     example: ['preferred_username', 'email', 'sub'],
     required: false,
+    nullable: true,
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  usernameClaimPaths?: string[];
+  @IsStoredStringList()
+  usernameClaimPaths?: string[] | null;
 
   @ApiProperty({
     description: 'Ordered list of claim paths to resolve the email',
     example: ['email', 'emails[0].value', 'upn'],
     required: false,
+    nullable: true,
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  emailClaimPaths?: string[];
+  @IsStoredStringList()
+  emailClaimPaths?: string[] | null;
 
   @ApiProperty({
     description:
@@ -244,14 +242,14 @@ export class CreateSAMLConfigurationDto {
   @ApiProperty({
     description: 'Ordered list of attribute keys to resolve email addresses from (first match wins)',
     required: false,
+    nullable: true,
     isArray: true,
     type: String,
     example: ['email', 'urn:oid:1.2.840.113549.1.9.1'],
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  emailAttributeKeys?: string[];
+  @IsStoredStringList()
+  emailAttributeKeys?: string[] | null;
 
   @ApiProperty({
     description: 'Shared secret used to authorize SAML provisioning requests',

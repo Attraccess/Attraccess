@@ -17,3 +17,4 @@ export * from './delete-confirmation-modal';
 export * from './page-header';
 export * from './password-input/PasswordInput';
 export * from './status-dialog';
+export * from './string-list-field/StringListField';

@@ -187,6 +187,26 @@ describe('SsoService', () => {
     });
   });
 
+  it('stores emptied OIDC lists as null so they never hydrate as [""]', async () => {
+    await fixture.service.updateProvider(1, {
+      oidcConfiguration: {
+        scopes: [],
+        usernameClaimPaths: [],
+        emailClaimPaths: [],
+        roleClaimPaths: [],
+      },
+    });
+    expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith(
+      { ssoProviderId: 1 },
+      { scopes: null, usernameClaimPaths: null, emailClaimPaths: null, roleClaimPaths: null },
+    );
+    await fixture.service.updateProvider(1, { oidcConfiguration: { scopes: ['email'], roleClaimPaths: null } });
+    expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith(
+      { ssoProviderId: 1 },
+      { scopes: ['email'], roleClaimPaths: null },
+    );
+  });
+
   it('updates, preserves omitted and clears nullable OIDC logout settings independently', async () => {
     const settings = {
       endSessionURL: 'https://idp.example/logout',

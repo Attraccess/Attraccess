@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SSOProviderType } from '@attraccess/react-query-client';
 import { SAMLConfigForm } from './form/SAMLConfigForm';
@@ -84,10 +85,10 @@ describe('SSO provider form', () => {
         permissionSyncTtlMinutes: 45,
       },
     });
-    expect(result.current.scopesInput).toBe('openid, email');
-    expect(result.current.signingAlgorithmsInput).toBe('ES256');
-    expect(result.current.usernameClaimPathsInput).toBe('preferred_username');
-    expect(result.current.emailClaimPathsInput).toBe('email');
+    expect(result.current.scopes).toEqual(['openid', 'email']);
+    expect(result.current.formValues.oidcConfiguration?.signingAlgorithms).toEqual(['ES256']);
+    expect(result.current.usernameClaimPaths).toEqual(['preferred_username']);
+    expect(result.current.emailClaimPaths).toEqual(['email']);
     expect(result.current.samlRoleMappingEntries).toEqual([]);
   });
   it('loads SAML settings while keeping stored secrets out of editable inputs', () => {
@@ -120,17 +121,17 @@ describe('SSO provider form', () => {
       provisioningSecret: '',
       wantAuthnResponseSigned: true,
     });
-    expect(result.current.emailAttributeKeysInput).toBe('mail, email');
+    expect(result.current.emailAttributeKeys).toEqual(['mail', 'email']);
     expect(result.current.oidcRoleMappingEntries).toEqual([]);
     expect(result.current.isSaveDisabled).toBe(false);
   });
-  it('creates an OIDC provider with parsed lists and preserved discovery credentials', async () => {
+  it('creates an OIDC provider with list entries and preserved discovery credentials', async () => {
     const { result } = renderHook(() => useSSOProviderForm());
     act(() => {
       result.current.setOidc('clientId', 'client');
       result.current.setOidc('clientSecret', 'secret');
-      result.current.setScopesInput(' openid, email, , ');
-      result.current.setSigningAlgorithmsInput(' ES256, PS256, , ');
+      result.current.setScopes(['openid', 'email']);
+      result.current.setOidc('signingAlgorithms', ['ES256', 'PS256']);
     });
     act(() =>
       result.current.onAutoDiscovery({
@@ -142,7 +143,7 @@ describe('SSO provider form', () => {
         userinfo_endpoint: 'https://idp.example/info',
       }),
     );
-    expect(result.current.signingAlgorithmsInput).toBe(' ES256, PS256, , ');
+    expect(result.current.formValues.oidcConfiguration?.signingAlgorithms).toEqual(['ES256', 'PS256']);
     await act(() => result.current.handleSubmit());
     expect(state.create).toHaveBeenCalledWith({
       requestBody: expect.objectContaining({
@@ -175,7 +176,7 @@ describe('SSO provider form', () => {
     const { result } = renderHook(() => useSSOProviderForm(8));
     act(() => {
       result.current.setSamlRoleMappingEntries([]);
-      result.current.setEmailAttributeKeysInput(' mail, email ');
+      result.current.setEmailAttributeKeys(['mail', 'email']);
     });
     await act(() => result.current.handleSubmit());
     const payload = state.update.mock.calls[0][0];
@@ -197,14 +198,14 @@ describe('SSO provider form', () => {
       samlConfiguration: { ...saml, roleAttributeKeys: ['custom-roles'] },
     };
     const { result, unmount } = renderHook(() => useSSOProviderForm(8));
-    expect(result.current.roleAttributeKeysInput).toBe('custom-roles');
-    act(() => result.current.setRoleAttributeKeysInput(' custom-roles, other '));
+    expect(result.current.roleAttributeKeys).toEqual(['custom-roles']);
+    act(() => result.current.setRoleAttributeKeys(['custom-roles', 'other']));
     await act(() => result.current.handleSubmit());
     expect(state.update.mock.calls[0][0].requestBody.samlConfiguration.roleAttributeKeys).toEqual([
       'custom-roles',
       'other',
     ]);
-    act(() => result.current.setRoleAttributeKeysInput(''));
+    act(() => result.current.setRoleAttributeKeys([]));
     await act(() => result.current.handleSubmit());
     expect(state.update.mock.calls[1][0].requestBody.samlConfiguration.roleAttributeKeys).toBeNull();
     unmount();
@@ -223,14 +224,14 @@ describe('SSO provider form', () => {
       oidcConfiguration: { ...oidc, roleClaimPaths: ['custom.roles'] },
     };
     const { result, unmount } = renderHook(() => useSSOProviderForm(7));
-    expect(result.current.roleClaimPathsInput).toBe('custom.roles');
-    act(() => result.current.setRoleClaimPathsInput('custom.roles, groups'));
+    expect(result.current.roleClaimPaths).toEqual(['custom.roles']);
+    act(() => result.current.setRoleClaimPaths(['custom.roles', 'groups']));
     await act(() => result.current.handleSubmit());
     expect(state.update.mock.calls[0][0].requestBody.oidcConfiguration.roleClaimPaths).toEqual([
       'custom.roles',
       'groups',
     ]);
-    act(() => result.current.setRoleClaimPathsInput(''));
+    act(() => result.current.setRoleClaimPaths([]));
     await act(() => result.current.handleSubmit());
     expect(state.update.mock.calls[1][0].requestBody.oidcConfiguration.roleClaimPaths).toBeNull();
     unmount();
@@ -239,6 +240,59 @@ describe('SSO provider form', () => {
     const untouched = renderHook(() => useSSOProviderForm(7));
     await act(() => untouched.result.current.handleSubmit());
     expect(state.update.mock.calls[2][0].requestBody.oidcConfiguration).not.toHaveProperty('roleClaimPaths');
+  });
+  it('keeps stored list entries in order and sends null for every emptied list', async () => {
+    state.provider = {
+      id: 7,
+      name: 'OIDC',
+      type: SSOProviderType.OIDC,
+      oidcConfiguration: {
+        issuer: 'https://idp.example',
+        clientId: 'client',
+        scopes: ['profile', 'openid', 'email'],
+        usernameClaimPaths: ['sub', 'preferred_username'],
+        emailClaimPaths: ['upn', 'email'],
+        roleClaimPaths: ['groups', 'roles'],
+      },
+    };
+    const { result } = renderHook(() => useSSOProviderForm(7));
+    expect(result.current.scopes).toEqual(['profile', 'openid', 'email']);
+    expect(result.current.usernameClaimPaths).toEqual(['sub', 'preferred_username']);
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[0][0].requestBody.oidcConfiguration).toMatchObject({
+      scopes: ['profile', 'openid', 'email'],
+      usernameClaimPaths: ['sub', 'preferred_username'],
+      emailClaimPaths: ['upn', 'email'],
+      roleClaimPaths: ['groups', 'roles'],
+    });
+    act(() => {
+      result.current.setScopes([]);
+      result.current.setUsernameClaimPaths([]);
+      result.current.setEmailClaimPaths([]);
+      result.current.setRoleClaimPaths([]);
+    });
+    await act(() => result.current.handleSubmit());
+    expect(state.update.mock.calls[1][0].requestBody.oidcConfiguration).toMatchObject({
+      scopes: null,
+      usernameClaimPaths: null,
+      emailClaimPaths: null,
+      roleClaimPaths: null,
+    });
+  });
+  it('clears a stored SAML email key list and omits lists that were never stored', async () => {
+    const saml = { entryPoint: 'https://idp.example/sso', issuer: 'urn:test' };
+    state.provider = {
+      id: 8,
+      name: 'SAML',
+      type: SSOProviderType.SAML,
+      samlConfiguration: { ...saml, emailAttributeKeys: ['mail'] },
+    };
+    const { result } = renderHook(() => useSSOProviderForm(8));
+    act(() => result.current.setEmailAttributeKeys([]));
+    await act(() => result.current.handleSubmit());
+    const body = state.update.mock.calls[0][0].requestBody.samlConfiguration;
+    expect(body.emailAttributeKeys).toBeNull();
+    expect(body).not.toHaveProperty('roleAttributeKeys');
   });
   it('shows the server message when a save is rejected', async () => {
     state.provider = {
@@ -252,7 +306,7 @@ describe('SSO provider form', () => {
     });
     state.update.mockRejectedValueOnce(rejection);
     const { result } = renderHook(() => useSSOProviderForm(7));
-    act(() => result.current.setRoleClaimPathsInput('custom.roles'));
+    act(() => result.current.setRoleClaimPaths(['custom.roles']));
     await act(() => result.current.handleSubmit());
     expect(state.error).toHaveBeenCalledWith(
       expect.objectContaining({ description: 'Configuring SSO role claim paths requires users.roles.manage' }),
@@ -371,7 +425,8 @@ it('edits SAML identity, signing and provisioning fields through the rendered co
   fireEvent.change(screen.getByLabelText('audience'), { target: { value: 'members' } });
   fireEvent.change(screen.getByLabelText('idpIssuer'), { target: { value: 'https://idp.test/entity' } });
   fireEvent.change(screen.getByLabelText('logoutURL'), { target: { value: 'https://idp.test/slo' } });
-  fireEvent.change(screen.getByLabelText('emailAttributeKeys'), { target: { value: 'mail, email' } });
+  const user = userEvent.setup();
+  await user.type(screen.getByRole('textbox', { name: 'emailAttributeKeys' }), 'mail{Enter}email{Enter}');
   fireEvent.change(screen.getByLabelText('samlProvisioningSecret'), { target: { value: 'new-secret' } });
   const toggle = container.querySelector('[data-cy="sso-provider-form-saml-provisioning-secret-toggle-button"]');
   if (!toggle) throw new Error('Missing secret visibility control');

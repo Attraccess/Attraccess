@@ -27,16 +27,39 @@ const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f]/;
 // lodash `get` walks inherited properties, so these segments would always resolve to "present"
 const PROTOTYPE_SEGMENT = /(^|[.[\]'"])(__proto__|constructor|prototype)($|[.[\]'"])/;
 
-export function isValidRolePath(entry: unknown): boolean {
+/** A list entry that survives the comma-joined `simple-array` storage: non-blank, trimmed, no commas or control characters. */
+export function isStoredStringEntry(entry: unknown): entry is string {
   return (
     typeof entry === 'string' &&
     entry.length > 0 &&
-    entry.length <= ROLE_PATH_MAX_LENGTH &&
     entry.trim() === entry &&
     !entry.includes(',') &&
-    !CONTROL_CHARACTERS.test(entry) &&
-    !PROTOTYPE_SEGMENT.test(entry)
+    !CONTROL_CHARACTERS.test(entry)
   );
+}
+
+export function isValidRolePath(entry: unknown): boolean {
+  return isStoredStringEntry(entry) && entry.length <= ROLE_PATH_MAX_LENGTH && !PROTOTYPE_SEGMENT.test(entry);
+}
+
+/** Any list stored as a `simple-array` column: every entry must be a safe, trimmed, non-empty string without commas. */
+export function IsStoredStringList(options?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      name: 'isStoredStringList',
+      target: object.constructor,
+      propertyName,
+      options: {
+        message: `${propertyName} must be an array of non-empty, trimmed strings without commas or control characters`,
+        ...options,
+      },
+      validator: {
+        validate(value: unknown) {
+          return Array.isArray(value) && value.every(isStoredStringEntry);
+        },
+      },
+    });
+  };
 }
 
 /**
