@@ -59,7 +59,7 @@ export const StringListField: React.FC<StringListFieldProps> = ({
   const [draft, setDraft] = useState('');
   const [error, setError] = useState<StringListEntryError | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
   const isFull = maxEntries !== undefined && values.length >= maxEntries;
   // Part of the field's description, so screen readers announce which defaults apply or why Add is disabled.
   const hint = isFull
@@ -104,17 +104,23 @@ export const StringListField: React.FC<StringListFieldProps> = ({
         validationBehavior="aria"
       >
         <Label>{label}</Label>
-        <div className="flex gap-2">
+        <div
+          ref={rowRef}
+          className="flex gap-2"
+          onBlur={(event) => {
+            // A typed entry must not get lost when the user moves on (e.g. straight to Save) without
+            // adding it. Moving between the input and Add, or away from the browser window, keeps the draft.
+            if (!draft.trim() || !document.hasFocus() || rowRef.current?.contains(event.relatedTarget as Node | null)) {
+              return;
+            }
+            add();
+          }}
+        >
           <Input
             ref={inputRef}
             className="flex-1"
             placeholder={placeholder}
             data-cy={dataCy}
-            onBlur={(event) => {
-              // A typed entry must not get lost when the user moves on (e.g. straight to Save) without
-              // pressing Add; the Add button handles its own press.
-              if (draft.trim() && event.relatedTarget !== addButtonRef.current) add();
-            }}
             onKeyDown={(event) => {
               if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
               // Enter adds the entry; it must never submit the surrounding form.
@@ -123,7 +129,6 @@ export const StringListField: React.FC<StringListFieldProps> = ({
             }}
           />
           <Button
-            ref={addButtonRef}
             variant="secondary"
             onPress={add}
             isDisabled={isDisabled || isFull}

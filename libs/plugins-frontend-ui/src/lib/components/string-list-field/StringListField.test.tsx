@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTranslationState } from '../../i18n';
 import { StringListField, StringListFieldProps, validateStringListEntry } from './StringListField';
 
@@ -41,6 +41,14 @@ function Harness({
 const stored = () => JSON.parse(screen.getByTestId('values').textContent ?? '[]') as string[];
 
 describe('StringListField', () => {
+  // jsdom reports the document as unfocused; browsers report true while the window is active.
+  beforeEach(() => {
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('adds an entry with Enter without submitting the surrounding form', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
@@ -159,6 +167,37 @@ describe('StringListField', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }));
     expect(stored()).toEqual(['groups', 'roles']);
     expect(screen.queryByText(/Enter a value/)).not.toBeInTheDocument();
+  });
+
+  it('adds a typed entry when the keyboard moves past the Add button', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <Harness />
+        <button type="button">Save</button>
+      </>,
+    );
+
+    await user.type(screen.getByRole('textbox', { name: 'Paths' }), 'groups');
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus();
+    expect(stored()).toEqual([]);
+    await user.tab();
+
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveFocus();
+    expect(stored()).toEqual(['groups']);
+  });
+
+  it('keeps a half-typed entry when the browser window loses focus', () => {
+    render(<Harness />);
+    const field = screen.getByRole('textbox', { name: 'Paths' });
+    field.focus();
+    fireEvent.change(field, { target: { value: 'realm_acc' } });
+    vi.mocked(document.hasFocus).mockReturnValue(false);
+    fireEvent.blur(field, { relatedTarget: null });
+
+    expect(stored()).toEqual([]);
+    expect(field).toHaveValue('realm_acc');
   });
 
   it('keeps an invalid entry and shows why when focus moves on', async () => {
