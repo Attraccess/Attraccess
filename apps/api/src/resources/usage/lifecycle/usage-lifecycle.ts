@@ -7,7 +7,6 @@ import {
   ResourceUsageLifecycleAttempt,
   LifecycleBillingItem,
   Resource,
-  ResourceType,
   ResourceUsageAction,
   User,
   Project,
@@ -72,7 +71,7 @@ import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
 import { ResourceUsageService } from '../sessions/resource-usage.service';
-import { activeUsageWhere } from '../sessions/active-usage';
+import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
 import { ResourceAuditOrigin } from '../../../audit/audit-policy';
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -80,6 +79,8 @@ export interface EndSessionOptions {
   /** Skip emitting ResourceUsageNoteAddedEvent (used when the note is auto-generated, e.g. flow-ended). */
   skipNoteNotification?: boolean;
   auditOrigin?: ResourceAuditOrigin;
+  /** Internal: the caller already holds this machine's turn in the session-change queue (deferred flow ends). */
+  withinSessionChange?: boolean;
 }
 
 export interface StartSessionOptions {
@@ -127,10 +128,6 @@ export type UsageFlowPayload = {
   meterRates: ResourceUsage['meterRates'];
   attributedOperatingDurationInMinutes: number | null;
 };
-
-export function sessionLimitOf(resource: Pick<Resource, 'type' | 'maxParallelSessions'> | null | undefined): number {
-  return resource?.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
-}
 
 export abstract class UsageLifecycle {
   protected async applyLifecycleDrafts(manager: EntityManager, attempt: ResourceUsageLifecycleAttempt): Promise<void> {
@@ -211,9 +208,10 @@ export abstract class UsageLifecycle {
         // Keep the reservation until the owning flow has settled all of its branches.
         await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
         // The start flow counted the candidate as a session; taking it back leaves the published sessions.
+        // A takeover counted it in place of the session it replaces, which keeps running now.
         const published = await manager.count(ResourceUsage, { where: { resourceId, ...activeUsageWhere() } });
         const activeSessions: ActiveSessionCounts = {
-          before: published + 1,
+          before: attempt.kind === 'takeover' ? published : published + 1,
           after: published,
           limit: await this.getSessionLimit(manager, resourceId),
         };

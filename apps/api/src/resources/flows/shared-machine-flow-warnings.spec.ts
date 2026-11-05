@@ -1,5 +1,31 @@
 import { ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import type { PluginFlowNodeDefinition } from '@attraccess/plugins-backend-sdk';
+import { registerPluginFlowNodes } from '../../plugin-system/flows/node-registry';
 import { findFlowsWithoutSessionCountCheck } from './shared-machine-flow-warnings';
+
+const pluginNode = (type: string, extra: Partial<PluginFlowNodeDefinition>) =>
+  ({
+    type,
+    label: type,
+    description: type,
+    configSchema: {},
+    inputs: ['input'],
+    outputs: ['output'],
+    execute: async () => ({ payload: {} }),
+    ...extra,
+  }) as PluginFlowNodeDefinition;
+
+registerPluginFlowNodes('warnings-spec', [
+  pluginNode('plugin.warnings-spec.switch', { isOutput: true }),
+  pluginNode('plugin.warnings-spec.command', { getFailureBehavior: () => undefined }),
+  pluginNode('plugin.warnings-spec.read', {}),
+  pluginNode('plugin.warnings-spec.trigger', {
+    isInput: true,
+    inputs: [],
+    outputs: ['output'],
+    execute: undefined,
+  } as Partial<PluginFlowNodeDefinition>),
+]);
 
 const node = (id: string, type: string, data: object = {}) => ({ id, type, data }) as unknown as ResourceFlowNode;
 const edges = (...pairs: [string, string][]) =>
@@ -23,7 +49,12 @@ describe('findFlowsWithoutSessionCountCheck', () => {
   });
 
   it('accepts a check that names activeSessions as the compared path', () => {
-    const data = { path: 'x', comparisonValueIsPath: true, comparisonValue: 'activeSessions.before' };
+    const data = {
+      path: 'x',
+      comparisonOperator: '=',
+      comparisonValueIsPath: true,
+      comparisonValue: 'activeSessions.before',
+    };
     const nodes = [node('t', STOPPED), node('i', IF, data), node('h', HTTP)];
     expect(findFlowsWithoutSessionCountCheck(nodes, edges(['t', 'i'], ['i', 'h']))).toEqual([]);
   });
@@ -51,5 +82,54 @@ describe('findFlowsWithoutSessionCountCheck', () => {
   it('terminates on cycles', () => {
     const nodes = [node('t', STOPPED), node('w', ResourceFlowNodeType.PROCESSING_WAIT), node('h', HTTP)];
     expect(findFlowsWithoutSessionCountCheck(nodes, edges(['t', 'w'], ['w', 'h'], ['h', 'w']))).toHaveLength(1);
+  });
+
+  it.each([
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+    ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
+  ])('flags the %s trigger', (trigger) => {
+    expect(findFlowsWithoutSessionCountCheck([node('t', trigger), node('h', HTTP)], edges(['t', 'h']))).toEqual([
+      { triggerNodeId: 't', triggerType: trigger, effectNodes: [{ nodeId: 'h', nodeType: HTTP }] },
+    ]);
+  });
+
+  it.each([
+    [HTTP, true],
+    [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE, true],
+    [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC, true],
+    [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC, true],
+    ['plugin.warnings-spec.switch', true],
+    ['plugin.warnings-spec.command', true],
+    [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, false],
+    [ResourceFlowNodeType.PROCESSING_SET_PAYLOAD, false],
+    ['plugin.warnings-spec.read', false],
+    ['plugin.warnings-spec.trigger', false],
+    ['plugin.unknown.node', false],
+  ])('treats %s as an external effect: %s', (type, flagged) => {
+    const warnings = findFlowsWithoutSessionCountCheck([node('t', STOPPED), node('x', type)], edges(['t', 'x']));
+    expect(warnings).toHaveLength(flagged ? 1 : 0);
+  });
+
+  it('flags an effect placed before the check', () => {
+    const nodes = [node('t', STOPPED), node('h', HTTP), node('i', IF, afterIsZero)];
+    expect(findFlowsWithoutSessionCountCheck(nodes, edges(['t', 'h'], ['h', 'i']))).toHaveLength(1);
+  });
+
+  it.each([
+    ['activeSessions.before', false],
+    [' activeSessions.after ', false],
+    ['activeSessions.limit', true],
+    ['activeSessions', true],
+    ['activeSessionsX.after', true],
+  ])('IF on %s still warns: %s', (path, flagged) => {
+    const nodes = [node('t', STOPPED), node('i', IF, { ...afterIsZero, path }), node('h', HTTP)];
+    expect(findFlowsWithoutSessionCountCheck(nodes, edges(['t', 'i'], ['i', 'h']))).toHaveLength(flagged ? 1 : 0);
+  });
+
+  it('does not count a literal comparison value that only looks like the count path', () => {
+    const data = { path: 'x', comparisonOperator: '=', comparisonValue: 'activeSessions.after' };
+    const nodes = [node('t', STOPPED), node('i', IF, data), node('h', HTTP)];
+    expect(findFlowsWithoutSessionCountCheck(nodes, edges(['t', 'i'], ['i', 'h']))).toHaveLength(1);
   });
 });

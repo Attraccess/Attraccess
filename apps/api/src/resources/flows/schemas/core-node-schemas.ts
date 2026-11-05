@@ -8,6 +8,8 @@ interface NodePresentation {
   isOutput?: boolean;
   isInput?: boolean;
   resourceType?: ResourceType;
+  /** Acts on the world outside Attraccess (power, PCs, other systems); see the shared-machine flow warning. */
+  hasExternalEffect?: boolean;
 }
 
 const presentations: Record<ResourceFlowNodeType, NodePresentation> = {
@@ -31,11 +33,13 @@ const presentations: Record<ResourceFlowNodeType, NodePresentation> = {
     inputs: ['input'],
     outputs: ['output', 'failure'],
     isOutput: true,
+    hasExternalEffect: true,
   },
   [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: {
     inputs: ['input'],
     outputs: ['output', 'failure'],
     isOutput: true,
+    hasExternalEffect: true,
   },
   [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: {
     inputs: ['input'],
@@ -70,8 +74,18 @@ const presentations: Record<ResourceFlowNodeType, NodePresentation> = {
   [ResourceFlowNodeType.INPUT_VARIABLE_CHANGED]: { outputs: ['output'] },
   [ResourceFlowNodeType.PROCESSING_SET_VARIABLES]: { inputs: ['input'], outputs: ['output'] },
   [ResourceFlowNodeType.PROCESSING_GET_VARIABLES]: { inputs: ['input'], outputs: ['output'] },
-  [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC]: { inputs: ['input'], outputs: ['output'], isOutput: true },
-  [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC]: { inputs: ['input'], outputs: ['output'], isOutput: true },
+  [ResourceFlowNodeType.OUTPUT_COMPANION_LOCK_PC]: {
+    inputs: ['input'],
+    outputs: ['output'],
+    isOutput: true,
+    hasExternalEffect: true,
+  },
+  [ResourceFlowNodeType.OUTPUT_COMPANION_UNLOCK_PC]: {
+    inputs: ['input'],
+    outputs: ['output'],
+    isOutput: true,
+    hasExternalEffect: true,
+  },
   [ResourceFlowNodeType.INPUT_COMPANION_IDLE]: { inputs: [], outputs: ['output'] },
   [ResourceFlowNodeType.INPUT_COMPANION_ACTIVE]: { inputs: [], outputs: ['output'] },
   [ResourceFlowNodeType.INPUT_COMPANION_FOREGROUND_APP_CHANGED]: { inputs: [], outputs: ['output'] },
@@ -82,6 +96,10 @@ const presentations: Record<ResourceFlowNodeType, NodePresentation> = {
   [ResourceFlowNodeType.OUTPUT_METERING_READY]: { inputs: ['input'], resourceType: ResourceType.Machine },
   [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: { inputs: ['input'] },
 };
+
+export function coreNodeHasExternalEffect(type: string): boolean {
+  return presentations[type as ResourceFlowNodeType]?.hasExternalEffect === true;
+}
 
 export function getCoreNodeSchemas(resourceType: ResourceType): ResourceFlowNodeSchemaDto[] {
   return Object.values(ResourceFlowNodeType).map((type) => {

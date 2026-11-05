@@ -33,9 +33,11 @@ import { ResourceInUseError } from '../errors/resource-in-use.error';
 
 import { ResourceFullError } from '../errors/resource-full.error';
 
+import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
+
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 
-import { countOccupiedSlots, pickSessionToEnd } from './active-usage';
+import { activeUsageWhere, countOccupiedSlots, pickSessionToEnd } from './active-usage';
 
 import { UsageSessionStartNotifications } from './usage-session-start-notifications';
 
@@ -47,8 +49,11 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
     options: EndSessionOptions = {},
   ): Promise<ResourceUsage> {
     const attemptId = randomUUID();
-    return this.runSessionChange(resourceId, attemptId, () =>
-      this.endSessionNow(resourceId, user, dto, options, attemptId),
+    return this.runSessionChange(
+      resourceId,
+      attemptId,
+      () => this.endSessionNow(resourceId, user, dto, options, attemptId),
+      options.withinSessionChange,
     );
   }
 
@@ -280,7 +285,7 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
       newSession = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
         const currentAttempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
         if (currentAttempt.candidateUsageId !== createdSession.id) {
-          throw new ConflictException('The tentative usage session was cancelled');
+          throw new TentativeSessionCancelledError();
         }
         // The flow may have independently triggered maintenance while this start was pending.
         // Recheck the gate before making the candidate session visible.
@@ -383,9 +388,11 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
       }
 
       let existingActiveSession: ResourceUsage | null = null;
-      const activeSessions = await this.getActiveSessionsForResource(resourceId, transactionalEntityManager);
-      const publishedSessions = activeSessions.length;
+      let publishedSessions: number;
       if (sharedMachine) {
+        publishedSessions = await transactionalEntityManager.count(ResourceUsage, {
+          where: { resourceId, ...activeUsageWhere() },
+        });
         // Capacity is decided inside this serialized transaction: published sessions and other
         // people's pending starts occupy a slot, so simultaneous starts can never exceed the limit.
         const ownSession = await transactionalEntityManager.findOne(ResourceUsage, {
@@ -395,6 +402,8 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
         const occupied = await countOccupiedSlots(transactionalEntityManager, resourceId);
         if (occupied >= sessionLimit) throw new ResourceFullError(occupied, sessionLimit);
       } else {
+        const activeSessions = await this.getActiveSessionsForResource(resourceId, transactionalEntityManager);
+        publishedSessions = activeSessions.length;
         // A limit lowered to 1 can leave several sessions running; takeover needs exactly one to replace.
         existingActiveSession = activeSessions.length === 1 ? activeSessions[0] : null;
         if (activeSessions.length > 1) throw new ResourceInUseError();

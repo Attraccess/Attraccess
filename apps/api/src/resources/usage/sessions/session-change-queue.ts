@@ -10,6 +10,7 @@ export const SESSION_CHANGE_WAIT_MS = 30_000;
 export class SessionChangeQueue {
   private readonly tails = new Map<number, Promise<void>>();
 
+  /** Waits for the changes before this one (at most `waitMs`, then `MachineBusyError`), then runs the task. */
   async run<T>(resourceId: number, task: () => Promise<T>, waitMs = SESSION_CHANGE_WAIT_MS): Promise<T> {
     const previous = this.tails.get(resourceId) ?? Promise.resolve();
     let release!: () => void;
@@ -36,6 +37,28 @@ export class SessionChangeQueue {
       clearTimeout(timer);
     }
 
+    return this.runHolding(resourceId, tail, release, task);
+  }
+
+  /**
+   * Runs the task right away, without waiting (a machine limited to one session keeps its immediate conflict),
+   * but changes queued after it still wait for it. That keeps counts consistent while the limit is being raised.
+   */
+  async runAlongside<T>(resourceId: number, task: () => Promise<T>): Promise<T> {
+    const previous = this.tails.get(resourceId) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => (release = resolve));
+    const tail = Promise.all([previous, current]).then(() => undefined);
+    this.tails.set(resourceId, tail);
+    return this.runHolding(resourceId, tail, release, task);
+  }
+
+  private async runHolding<T>(
+    resourceId: number,
+    tail: Promise<void>,
+    release: () => void,
+    task: () => Promise<T>,
+  ): Promise<T> {
     try {
       return await task();
     } finally {
