@@ -350,7 +350,8 @@ describe('desktop simulator against an isolated real API', () => {
   it('enrolls cards, rejects unknown and incorrect keys, and recovers from write failure and removal', async () => {
     await start('cards');
     await desktop().present(3);
-    await desktop().text('Karte nicht gefunden');
+    // Unknown, inactive and unverifiable cards all get the same notice (firmware rejectedCard).
+    await desktop().text('Anmeldung fehlgeschlagen');
     await desktop().snapshot('unknown-card');
     await desktop().click('OK');
     await desktop().screen('locked');

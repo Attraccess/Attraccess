@@ -138,7 +138,7 @@ int main(int argc, char **argv)
     assert(DemoStore::addCard("C3C3C3C3", DemoStore::UserRole::INTRODUCED, "Cid"));
     assert(DemoStore::addCard("D4D4D4D4", DemoStore::UserRole::ADMIN, "Dee"));
     const auto tap = [&](const char *uid) {
-        exchange((std::string(R"({"data":{"type":"REQUEST_CARD_AUTHENTICATION_DATA","payload":{"uid":")") + uid + R"(","resourceId":2}}})").c_str());
+        exchange((std::string(R"({"data":{"type":"CARD_DETECTED","payload":{"purpose":"tap","detectionId":1,"uid":")") + uid + R"(","resourceId":2}}})").c_str());
     };
     const auto printer = [&]() { return resourceList["data"]["payload"]["resources"][1]; };
     const auto startPrinter = [&]() {

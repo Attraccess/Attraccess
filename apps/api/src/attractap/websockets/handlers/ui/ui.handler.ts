@@ -65,7 +65,17 @@ export class AttractapUiHandler {
       this.logger.debug('CARD_SESSION_ENDED without cardSessionId ignored');
       return;
     }
-    this.cardSessions.end(socket, id, 'reader');
+    const session = socket.state?.cardSession;
+    if (this.cardSessions.end(socket, id, 'reader') && session && socket.state.verifiedUserId === session.userId) {
+      // The reader ended its card session itself (logout or timeout): nobody stays verified on this connection.
+      socket.state.verifiedUserId = null;
+      socket.state.verifiedCardUid = null;
+    }
+  }
+
+  /** The reader's login ended (READER_SESSION_ENDED): its card session ends with it. */
+  public endCardSession(socket: AuthenticatedWebSocket) {
+    if (socket.state?.cardSession) this.cardSessions.end(socket, socket.state.cardSession.id, 'reader');
   }
 
   /** Socket closed: steps are discarded and timers released. */
