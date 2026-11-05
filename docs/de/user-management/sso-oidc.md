@@ -59,7 +59,7 @@ Attraccess prüft die Pfade in der angegebenen Reihenfolge und verwendet den ers
 
 ### Rollen-Claim-Pfade
 
-Standardmäßig liest Attraccess Rollen aus `permissions`, `roles`, `groups`, `realm_access.roles` und `resource_access.<clientId>.roles`. Legt Ihr Anbieter die Rollen an anderer Stelle ab, geben Sie unter **Rollen-Claim-Pfade** eine kommagetrennte Liste von Claim-Pfaden an (höchstens 20, je bis zu 256 Zeichen, ohne Kommas). Das Ändern dieser Einstellung erfordert die Berechtigung `users.roles.manage`.
+Standardmäßig liest Attraccess Rollen aus `permissions`, `roles`, `groups`, `realm_access.roles` und `resource_access.<clientId>.roles`. Legt Ihr Anbieter die Rollen an anderer Stelle ab, geben Sie unter **Rollen-Claim-Pfade** eine kommagetrennte Liste von Claim-Pfaden an (höchstens 20, je bis zu 256 Zeichen, ohne Kommas). Das Ändern dieser Einstellung erfordert die Berechtigung `users.roles.manage`. Die Pfade werden beim Login in den Claims des ID-Tokens gesucht; ein Claim, den nur die UserInfo-Antwort enthält, wird beim Login nicht gesehen, sondern erst vom Berechtigungsabgleich während der Sitzung (siehe unten).
 
 > **Eigene Pfade ersetzen die Standardwerte.** Sobald Pfade gesetzt sind, werden nur diese gelesen. Ist einer davon im Token vorhanden, werden Rollen, die nur aus einem Standardpfad stammten (z. B. `groups`), beim nächsten Login entfernt. Ist keiner der konfigurierten Pfade vorhanden, bleiben vorhandene Rollen erhalten; ist einer vorhanden, aber leer, werden die SSO-Rollen dieses Anbieters entfernt. Leeren Sie das Feld, um zu den Standardwerten zurückzukehren.
 

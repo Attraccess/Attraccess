@@ -59,7 +59,7 @@ Attraccess checks the paths in the specified order and uses the first match.
 
 ### Role Claim Paths
 
-By default Attraccess reads roles from `permissions`, `roles`, `groups`, `realm_access.roles` and `resource_access.<clientId>.roles`. If your provider puts roles elsewhere, enter a comma-separated list of claim paths (at most 20, up to 256 characters each, no commas) in **Role Claim Paths**. Changing this setting requires the `users.roles.manage` permission.
+By default Attraccess reads roles from `permissions`, `roles`, `groups`, `realm_access.roles` and `resource_access.<clientId>.roles`. If your provider puts roles elsewhere, enter a comma-separated list of claim paths (at most 20, up to 256 characters each, no commas) in **Role Claim Paths**. Changing this setting requires the `users.roles.manage` permission. Paths are looked up in the ID token claims at login; a claim that only the UserInfo response carries is not seen at login, only by the permission re-sync during sessions (see below).
 
 > **Custom paths replace the defaults.** Once set, only the configured paths are read. If one of them is present in the token, roles that came only from a default location (for example `groups`) are removed at the next login. If none of the configured paths is present, existing roles are kept; if one is present but empty, this provider's SSO roles are removed. Clear the field to return to the defaults.
 

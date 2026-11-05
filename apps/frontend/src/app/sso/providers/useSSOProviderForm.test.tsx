@@ -240,6 +240,25 @@ describe('SSO provider form', () => {
     await act(() => untouched.result.current.handleSubmit());
     expect(state.update.mock.calls[2][0].requestBody.oidcConfiguration).not.toHaveProperty('roleClaimPaths');
   });
+  it('shows the server message when a save is rejected', async () => {
+    state.provider = {
+      id: 7,
+      name: 'OIDC',
+      type: SSOProviderType.OIDC,
+      oidcConfiguration: { issuer: 'https://idp.example', clientId: 'client' },
+    };
+    const rejection = Object.assign(new Error('Forbidden'), {
+      body: { message: 'Configuring SSO role claim paths requires users.roles.manage' },
+    });
+    state.update.mockRejectedValueOnce(rejection);
+    const { result } = renderHook(() => useSSOProviderForm(7));
+    act(() => result.current.setRoleClaimPathsInput('custom.roles'));
+    await act(() => result.current.handleSubmit());
+    expect(state.error).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Configuring SSO role claim paths requires users.roles.manage' }),
+    );
+    expect(state.navigate).not.toHaveBeenCalled();
+  });
   it('blocks signing-enabled saves without a complete certificate and key', async () => {
     const { result } = renderHook(() => useSSOProviderForm());
     act(() => result.current.handleSelectChange(SSOProviderType.SAML));

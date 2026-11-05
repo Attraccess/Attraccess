@@ -22,6 +22,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { getApiErrorMessage } from '../../../../utils/apiError';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { OpenIDConfiguration } from '../discovery/OpenIDC.data';
 import { hasRequiredSamlSigningMaterial } from '../signingMaterial';
@@ -442,7 +443,7 @@ export function useSSOProviderFormHandleSubmit(model: ReturnType<typeof useSSOPr
       const errorDescription = isEditing ? t('failedToUpdate') : t('failedToCreate');
       showError({
         title: t('errorGeneric'),
-        description: err instanceof Error ? err.message : errorDescription,
+        description: err instanceof Error ? getApiErrorMessage(err) : errorDescription,
       });
     }
   }, [
