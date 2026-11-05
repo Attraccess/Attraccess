@@ -121,11 +121,12 @@ export const StringListField: React.FC<StringListFieldProps> = ({
         <TagGroup size="sm" aria-label={label} onRemove={isDisabled ? undefined : remove}>
           <TagGroup.List>
             {values.map((value) => (
-              <Tag key={value} id={value} textValue={value}>
+              <Tag key={value} id={value} textValue={value} className="max-w-full">
                 {(renderProps) => (
                   <>
-                    {value}
-                    {renderProps.allowsRemoving ? <Tag.RemoveButton /> : null}
+                    {/* Entries such as URNs have no break opportunities; let them wrap instead of overflowing. */}
+                    <span className="min-w-0 break-all">{value}</span>
+                    {renderProps.allowsRemoving ? <Tag.RemoveButton aria-label={t('remove')} className="shrink-0" /> : null}
                   </>
                 )}
               </Tag>

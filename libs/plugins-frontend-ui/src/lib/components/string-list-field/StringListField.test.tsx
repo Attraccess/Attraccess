@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { useTranslationState } from '../../i18n';
 import { StringListField, StringListFieldProps, validateStringListEntry } from './StringListField';
 
 function Harness({
@@ -97,9 +98,27 @@ describe('StringListField', () => {
     const user = userEvent.setup();
     render(<Harness initial={['one', 'two', 'three']} />);
 
-    await user.click(screen.getByRole('button', { name: /Remove tag two/ }));
+    await user.click(screen.getByRole('button', { name: /Remove two/ }));
 
     expect(stored()).toEqual(['one', 'three']);
+  });
+
+  it('names the remove control in the active language', () => {
+    useTranslationState.setState({ language: 'de' });
+    try {
+      render(<Harness initial={['one']} />);
+      expect(screen.getByRole('button', { name: /Entfernen one/ })).toBeInTheDocument();
+    } finally {
+      useTranslationState.setState({ language: 'en' });
+    }
+  });
+
+  it('lets long unbreakable entries wrap inside the tag instead of overflowing', () => {
+    const urn = 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role';
+    render(<Harness initial={[urn]} />);
+    const text = screen.getByText(urn);
+    expect(text).toHaveClass('break-all', 'min-w-0');
+    expect(text.closest('[role="row"]')).toHaveClass('max-w-full');
   });
 
   it('stops at maxEntries', async () => {
@@ -124,7 +143,7 @@ describe('StringListField', () => {
   it('shows angle brackets in entries unescaped', () => {
     render(<Harness initial={['resource_access.<clientId>.roles']} />);
     expect(screen.getByText('resource_access.<clientId>.roles')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Remove tag resource_access\.<clientId>\.roles/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Remove resource_access\.<clientId>\.roles/ })).toBeInTheDocument();
   });
 });
 

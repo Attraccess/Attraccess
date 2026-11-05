@@ -174,13 +174,13 @@ it('does not submit the provider form when Enter adds a list entry', async () =>
   const user = userEvent.setup();
   await user.type(input('oidc-scopes'), 'email{Enter}');
   expect(state.create).not.toHaveBeenCalled();
-  expect(screen.getByRole('button', { name: /Remove tag email/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /Remove email/ })).toBeTruthy();
 });
 it('applies the RS256 default on save when the signing algorithm list is emptied', async () => {
   mount();
   const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: /Remove tag RS256/ }));
-  expect(screen.queryByRole('button', { name: /Remove tag RS256/ })).toBeNull();
+  await user.click(screen.getByRole('button', { name: /Remove RS256/ }));
+  expect(screen.queryByRole('button', { name: /Remove RS256/ })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() =>
     expect(state.create).toHaveBeenCalledWith({

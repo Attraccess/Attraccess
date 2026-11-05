@@ -1,5 +1,6 @@
 {
   "add": "Hinzufügen",
+  "remove": "Entfernen",
   "empty": "Bitte einen Wert eingeben.",
   "duplicate": "Dieser Wert ist bereits in der Liste.",
   "comma": "Werte dürfen keine Kommas enthalten. Jeden Wert einzeln hinzufügen.",
