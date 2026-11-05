@@ -265,14 +265,20 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     const start = jest
       .spyOn(scope.service as never as { startFlow: (...args: unknown[]) => Promise<void> }, 'startFlow')
       .mockResolvedValue(undefined);
-    scope.resourceUsageService.getActiveSession = jest.fn().mockResolvedValue({ userId: 7 });
+    scope.resourceUsageService.getActiveSessionsForResource = jest.fn().mockResolvedValue([
+      { id: 70, userId: 7 },
+      { id: 90, userId: 9 },
+    ]);
     await expect(scope.service.pressButton(1, 'button', 0)).rejects.toThrow('not allowed');
     await expect(scope.service.pressButton(1, 'button', 8)).rejects.toThrow('not allowed');
     await expect(scope.service.pressButton(1, 'button', 7)).rejects.toThrow('UNKNOWN_BUTTON_ID');
     const button = scope.createNode({ id: 'button' });
     scope.nodesById.button = button;
+    // Any active session owner may press; the pressing owner's session is the triggering one.
     await scope.service.pressButton(1, 'button', 7);
-    expect(start).toHaveBeenCalledWith(button, { payload: {} });
+    expect(start).toHaveBeenLastCalledWith(button, { payload: { usageId: 70 } });
+    await scope.service.pressButton(1, 'button', 9);
+    expect(start).toHaveBeenLastCalledWith(button, { payload: { usageId: 90 } });
   });
 
   it.each([

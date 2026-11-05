@@ -14,7 +14,7 @@ describe('SSO SAML strategy — validate() integration (e2e)', () => {
 
     const dbUser = await fixture.userRepo.findOne({ where: { id: user.id } });
     expect(dbUser).not.toBeNull();
-    expect(dbUser?.externalIdentifier).toBe('saml-user-123');
+    expect(dbUser?.externalIdentifier).toBeNull();
   });
 
   it('returns the same user on repeat SAML assertions (nameID deduplication)', async () => {

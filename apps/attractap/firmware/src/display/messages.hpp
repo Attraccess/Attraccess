@@ -78,6 +78,10 @@ inline Text readerError(const std::string &code) {
     if (code == "READER_NOT_FOUND") return Message::ErrorReaderNotFound;
     if (code == "RESOURCE_NOT_ASSOCIATED_WITH_READER") return Message::ErrorResourceNotAssociatedWithReader;
     if (code == "USER_NOT_AUTHENTICATED") return Message::ErrorUserNotAuthenticated;
+    if (code == "ResourceInUseError") return Message::ErrorResourceInUse;
+    if (code == "ResourceFullError") return Message::ErrorResourceFull;
+    if (code == "AlreadyHasActiveSessionError") return Message::ErrorAlreadyHasActiveSession;
+    if (code == "NoOwnActiveSessionError") return Message::ErrorNoOwnActiveSession;
     if (code == "INSUFFICIENT_BALANCE") return Message::InsufficientBalance;
     if (code == "SUMUP_NOT_ENABLED") return Message::ErrorSumupNotEnabled;
     if (code == "INVALID_AMOUNT") return Message::ErrorInvalidAmount;

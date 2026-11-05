@@ -232,8 +232,10 @@ bool Application::processCardFlowState()
       this->dismissSessionSummary();
       this->externalState = interrupt;
     } else {
-      if (this->sessionSummaryDismissRequested || (this->sessionSummaryVisible &&
-          millis() - this->sessionSummaryShownAt >= 3500)) this->dismissSessionSummary();
+      // The post-stop question holds the summary (auto-dismiss, touch, sign-out) until answered or expired.
+      this->tickUiStep();
+      if (!this->uiStepOpen && (this->sessionSummaryDismissRequested || (this->sessionSummaryVisible &&
+          millis() - this->sessionSummaryShownAt >= 3500))) this->dismissSessionSummary();
       else return true;
     }
   }
@@ -414,7 +416,9 @@ void Application::renderResourceState()
 {
 #ifdef HAS_LVGL_DISPLAY
   uint32_t now = millis();
-  if (!this->pendingUiAction.empty() && !this->hasPendingFormRequest &&
+  this->tickUiStep();
+  // An open plugin step is exempt from the watchdog like a pending form request: the user is deciding.
+  if (!this->pendingUiAction.empty() && !this->hasPendingFormRequest && !this->uiStepOpen &&
       now - this->pendingUiStartedAt > 60000) {
     this->finishReaderAction(false);
     this->handleFormsCancel();
@@ -488,6 +492,10 @@ void Application::renderResourceState()
     this->api.sendReaderSessionEnded();
   }
 
+#ifdef HAS_WS2812_LED
+  // Card-confirm window over: nothing starts (fail closed).
+  if (this->liteStep.expired(millis())) this->closeLiteStep();
+#endif
   // Process unlocked card actions for non-display mode
   if (this->state == APPLICATION_STATE_AUTHENTICATE_CARD) {
     if (!this->cardDetected) {
@@ -516,10 +524,25 @@ void Application::renderResourceState()
         this->api.unlockDoor(this->selectedResourceId);
       }
     } else {
+      // Parallel sessions (ATT-1189): a short tap starts the card holder's own session, a long tap
+      // ends only their own (no usageId, never someone else's). A full machine or an existing own
+      // session comes back as a server error, which the generic error callback signals with the
+      // error beep.
       if (this->cardPresentationWasLong) {
+#ifdef HAS_WS2812_LED
+        this->closeLiteStep(); // a long hold ends things, it never confirms
+#endif
         this->api.stopResourceUsageSession(this->selectedResourceId);
       } else {
+#ifdef HAS_WS2812_LED
+        // Second short tap of the same user while the confirm window runs: start with the step id.
+        // Another user's tap never confirms it; the step is dropped and that user starts normally.
+        const std::string stepId = this->liteStep.takeForTap(this->cardAuthenticationData.username, millis());
+        this->led.endConfirmWait();
+        this->api.startResourceUsageSession(this->selectedResourceId, 0, false, stepId.empty() ? nullptr : stepId.c_str());
+#else
         this->api.startResourceUsageSession(this->selectedResourceId);
+#endif
       }
     }
 

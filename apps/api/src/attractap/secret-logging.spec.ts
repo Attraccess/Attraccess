@@ -102,6 +102,11 @@ const GPIO_MACRO = /^PIN_[A-Z0-9_]+$/;
  */
 const SAFE_CALLS: Array<{ file: string; call: string; why: string }> = [
   {
+    file: 'apps/api/src/attractap/websockets/handlers/ui/ui-slot.service.ts',
+    call: '(message)',
+    why: 'a warning text from the reader UI slot collector (plugin contributions); it carries no card or reader data',
+  },
+  {
     file: 'apps/api/src/attractap/security/testing/load-test.ts',
     call: '(JSON.stringify(result, null, 2))',
     why: 'the developer load test prints its own aggregate counts and timings; it handles no real reader or card',

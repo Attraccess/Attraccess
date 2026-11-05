@@ -1,6 +1,7 @@
 #include "emulator.hpp"
 #include "nvs_store.hpp"
 #include "pn532_target.hpp"
+#include "reader_button.hpp"
 #include "serial_console.hpp"
 
 #include "esp_log.h"
@@ -190,6 +191,8 @@ void emulator_task(void *argument) {
 
 extern "C" void app_main() {
   using namespace nfc_emulator;
+  // Release the reader's button as early as possible after a reset.
+  ESP_ERROR_CHECK(reader_button_begin());
   esp_err_t nvs = nvs_flash_init();
   if (nvs == ESP_ERR_NVS_NO_FREE_PAGES || nvs == ESP_ERR_NVS_NEW_VERSION_FOUND) {
     nvs_flash_erase(); nvs = nvs_flash_init();

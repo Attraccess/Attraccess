@@ -36,6 +36,23 @@ Each session contains:
 2. Click **End Session**
 3. Depending on the resource configuration, you may need to fill in a form
 
+## Shared Machines (Parallel Sessions)
+
+A machine can allow several people to use it at the same time via **Max parallel sessions** (see [Creating Resources](resources/creating-resources.md#max-parallel-sessions)). Each person has their own session; a person can have only one active session per machine. Starting is refused with **Session already active** if you already have a session, or with **Machine is full** when as many people as allowed are already using it. A supervised session counts as one session (the supervisee's); the [supervisor](resources/introductions.md#supervision-mode) does not count towards the limit.
+
+Everybody ends their own session. Resource managers, introducers, maintainers and the supervisor of a session can end a chosen session of someone else by picking it from the list of active sessions on the [detail page](resources/resource-details.md) and clicking **End Session**.
+
+> [!WARNING]
+> **Flows and billing on shared machines (limit above 1).** Flows and billing do not take the number of running sessions into account. With a limit of 1, this section does not apply.
+>
+> - **Flows** run for every session start and stop. A flow that switches the power off when a session ends therefore cuts the power for everybody on the machine. Flow awareness of the session count is planned.
+> - **Per-use fees** are charged per session.
+> - **Session-time billing** is charged per session.
+> - **Meters (for example energy):** the earliest-started session that is still running owns the meter and is charged its consumption. Later overlapping sessions are not metered or charged for meters already in use. When that session ends while others continue, the meter is read as usual and the sessions still running are not charged any further meter consumption. The meter is then free again: the next session that starts while it is free gets the meter and is charged its consumption.
+> - **Running (operating) time** is attributed to exactly one session at any moment, the earliest-started active one, so the total charged never exceeds the machine's operating time.
+>
+> A fair split of meters and running time between simultaneous sessions is planned.
+
 ## Linking Sessions to Projects
 
 If you have active [projects](projects/overview.md), you can link a usage session to a project. This helps track which resources are used for which projects.

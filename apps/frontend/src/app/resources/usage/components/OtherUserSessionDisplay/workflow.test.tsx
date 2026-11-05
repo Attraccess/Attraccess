@@ -2,10 +2,30 @@ import type { ComponentProps } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ApiError } from '@attraccess/react-query-client';
 import { OtherUserSessionDisplay } from './index';
 import type { SessionNotesModal } from '../SessionNotesModal';
 const state = vi.hoisted(() => ({
+  bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
+    // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
+    type Callbacks = {
+      onSuccess?: (data: unknown, v: unknown) => void;
+      onError?: (error: unknown, v: unknown) => void;
+    };
+    const [hook, call] = [options as Callbacks | undefined, callbacks as Callbacks | undefined];
+    return {
+      onSuccess: (data: unknown, _variables?: unknown) => {
+        hook?.onSuccess?.(data, variables);
+        call?.onSuccess?.(data, variables);
+      },
+      onError: (error: unknown) => {
+        hook?.onError?.(error, variables);
+        call?.onError?.(error, variables);
+      },
+    };
+  },
   session: {
+    id: 40,
     userId: 2,
     startTime: '2026-09-01T12:00:00Z',
     user: { id: 2, username: 'Alex' },
@@ -34,15 +54,24 @@ vi.mock('../../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, error: state.error }),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
-vi.mock('@attraccess/react-query-client', () => ({
+vi.mock('@attraccess/react-query-client', async (original) => ({
+  ApiError: (await original<typeof import('@attraccess/react-query-client')>()).ApiError,
   useResourcesServiceResourceUsageGetActiveSession: () => ({ data: { usage: state.session } }),
   useResourcesServiceResourceUsageCanControl: () => ({ data: { canControl: state.canControl } }),
   useAccessControlServiceResourceIntroducersIsIntroducer: () => ({ data: { isIntroducer: state.introducer } }),
+  // Introducers and maintainers of the resource (the current user is id 1).
+  useAccessControlServiceResourceIntroducersGetNames: () => ({
+    data: state.introducer ? [{ userId: 1, username: 'me', role: 'introducer' }] : [],
+  }),
   useResourcesServiceGetOneResourceById: () => ({ data: { allowTakeOver: state.allowTakeover } }),
-  useResourcesServiceResourceUsageStartSession: (options: (typeof state.callbacks)[string]) => {
-    state.callbacks.start = options;
-    return { mutate: state.start, isPending: false };
-  },
+  // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
+  useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
+    mutate: (variables: unknown, callbacks: unknown) => {
+      state.callbacks.start = state.bothCallbacks(options, callbacks, variables);
+      state.start(variables);
+    },
+    isPending: false,
+  }),
   useResourcesServiceResourceUsageEndSession: (options: (typeof state.callbacks)[string]) => {
     state.callbacks.end = options;
     return { mutate: state.end, isPending: false };
@@ -71,6 +100,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.callbacks = {};
   state.session = {
+    id: 40,
     userId: 2,
     startTime: '2026-09-01T12:00:00Z',
     user: { id: 2, username: 'Alex' },
@@ -113,7 +143,7 @@ it('shows the holder and supervisor and sends scoped takeover and stop submissio
   await waitFor(() =>
     expect(state.end).toHaveBeenCalledWith({
       resourceId: 7,
-      requestBody: { formSubmissions: [{ formId: 7, data: { ack: true } }] },
+      requestBody: { usageId: 40, formSubmissions: [{ formId: 7, data: { ack: true } }] },
     }),
   );
   expect(state.forms).toHaveBeenCalledWith('end');
@@ -154,7 +184,7 @@ it('collects optional notes and allows cancelling without a mutation', async () 
   fireEvent.click(screen.getByText('Confirm notes'));
   await waitFor(() =>
     expect(state.end).toHaveBeenCalledWith(
-      expect.objectContaining({ requestBody: expect.objectContaining({ notes: 'Operator note' }) }),
+      expect.objectContaining({ requestBody: expect.objectContaining({ notes: 'Operator note', usageId: 40 }) }),
     ),
   );
 });
@@ -166,12 +196,15 @@ it('keeps cancelled forms from starting or stopping sessions and reports failed 
   await waitFor(() => expect(state.forms).toHaveBeenCalledTimes(2));
   expect(state.start).not.toHaveBeenCalled();
   expect(state.end).not.toHaveBeenCalled();
+  state.forms.mockResolvedValue([]);
+  fireEvent.click(screen.getByRole('button', { name: 'Takeover Resource' }));
+  await waitFor(() => expect(state.start).toHaveBeenCalledOnce());
   act(() => state.callbacks.start.onError?.(new Error('Forbidden')));
   act(() => state.callbacks.contact.onError?.(new Error('Unavailable')));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Takeover Failed' }));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ title: 'Could not contact user' }));
   fireEvent.click(screen.getByRole('button', { name: 'Contact current user' }));
-  expect(state.contact).toHaveBeenCalledWith({ resourceId: 7 });
+  expect(state.contact).toHaveBeenCalledWith({ resourceId: 7, userId: 2 });
   act(() => state.callbacks.contact.onSuccess({ conversationId: 10 }));
   expect(screen.getByText('Conversation opened')).toBeTruthy();
 });
@@ -196,6 +229,22 @@ it('enforces distinct takeover and stop permissions and hides own or absent sess
   mount();
   expect(screen.queryByText('In use')).toBeNull();
 });
+it('lets maintainers and the supervisor stop the session, like the server does', () => {
+  state.update = false;
+  state.allowTakeover = false;
+  state.introducer = true;
+  let view = mount();
+  expect(screen.getByRole('button', { name: 'Stop Other User Session' })).toBeTruthy();
+  view.unmount();
+  state.introducer = false;
+  state.session = { id: 41, userId: 2, startTime: '2026-09-01T12:00:00Z', supervisorUserId: 1 };
+  view = mount();
+  expect(screen.getByRole('button', { name: 'Stop Other User Session' })).toBeTruthy();
+  view.unmount();
+  state.session = { id: 42, userId: 2, startTime: '2026-09-01T12:00:00Z', supervisorUserId: 3 };
+  mount();
+  expect(screen.queryByRole('button', { name: 'Stop Other User Session' })).toBeNull();
+});
 it('shows a redacted session as in use without a holder to contact', () => {
   state.update = false;
   state.session = { startTime: '2026-09-01T12:00:00Z' };
@@ -203,4 +252,52 @@ it('shows a redacted session as in use without a holder to contact', () => {
   expect(screen.getByText('In use')).toBeTruthy();
   expect(screen.getByText('Unknown User')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Contact current user' })).toBeNull();
+});
+
+const startError = (status: number, body: unknown) =>
+  new ApiError({ method: 'POST', url: '/start' }, { url: '/start', ok: false, status, statusText: 'x', body }, 'x');
+
+it('asks a plugin confirmation on takeover and retries with the step id', async () => {
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Takeover Resource' }));
+  await waitFor(() => expect(state.start).toHaveBeenCalledOnce());
+  const confirmation = { title: 'Reserved from 14:00', body: 'Take over anyway?', confirmLabel: 'Take over' };
+  act(() =>
+    state.callbacks.start.onError?.(startError(409, { code: 'CONFIRMATION_REQUIRED', stepId: 's1', confirmation })),
+  );
+  expect(state.error).not.toHaveBeenCalled();
+  fireEvent.click(await screen.findByRole('button', { name: 'Take over' }));
+  expect(state.start).toHaveBeenLastCalledWith({
+    resourceId: 7,
+    requestBody: expect.objectContaining({ forceTakeOver: true, confirmedStepIds: ['s1'] }),
+  });
+});
+
+it('shows the plugin reason when a takeover is blocked', async () => {
+  mount();
+  fireEvent.click(screen.getByRole('button', { name: 'Takeover Resource' }));
+  await waitFor(() => expect(state.start).toHaveBeenCalledOnce());
+  const reason = { code: 'RESERVED', title: 'Reserved', body: 'Booked until 14:00' };
+  act(() => state.callbacks.start.onError?.(startError(403, { code: 'START_BLOCKED', reason })));
+  expect(state.error).toHaveBeenCalledExactlyOnceWith({ title: 'Reserved', description: 'Booked until 14:00' });
+});
+
+it('closes the takeover notes modal when the plugin confirmation or block notice appears', async () => {
+  mount();
+  const openNotes = async () => {
+    fireEvent.click(document.querySelectorAll('button[aria-haspopup="true"]')[0]);
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Takeover with Notes' }));
+    fireEvent.click(screen.getByText('Confirm notes'));
+    await waitFor(() => expect(state.start).toHaveBeenCalled());
+  };
+  await openNotes();
+  const reason = { code: 'RESERVED', title: 'Reserved', body: 'Booked until 14:00' };
+  act(() => state.callbacks.start.onError?.(startError(403, { code: 'START_BLOCKED', reason })));
+  expect(screen.queryByText('Confirm notes')).toBeNull();
+  await openNotes();
+  const confirmation = { title: 'Reserved from 14:00', body: 'Take over anyway?' };
+  act(() =>
+    state.callbacks.start.onError?.(startError(409, { code: 'CONFIRMATION_REQUIRED', stepId: 's1', confirmation })),
+  );
+  expect(screen.queryByText('Confirm notes')).toBeNull();
 });

@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
 import type { PluginAuditContext } from './plugin-audit';
+import type { PluginReaderUiApi } from './reader-ui';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 /**
@@ -132,6 +133,8 @@ export interface PluginContext {
   readonly liveUpdates?: PluginLiveUpdatesContext;
   /** Optional for compatibility with hosts predating generic plugin audit support. */
   readonly audit?: PluginAuditContext;
+  /** Reader UI helpers. Guarded getter: throws PluginPermissionError without READER_UI. */
+  readonly readerUi?: PluginReaderUiApi;
   /** This plugin's own manifest (name, version, directory, id). */
   readonly manifest: PluginManifestInfo;
 

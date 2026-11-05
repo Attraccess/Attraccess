@@ -26,6 +26,8 @@ import { SupervisionDecisionResponseDto } from './dtos/supervisionDecision.respo
 
 import { randomUUID } from 'crypto';
 
+import { PreStartService } from '../usage/pre-start/pre-start.service';
+
 import { StartUsageSessionDto } from '../usage/dtos/startUsageSession.dto';
 
 import { RequestSupervisedSessionDto } from './dtos/requestSupervisedSession.dto';
@@ -44,6 +46,7 @@ export class SupervisionService {
     protected readonly resourceIntroducersService: ResourceIntroducersService,
     protected readonly supervisionLive: SupervisionLiveService,
     protected readonly audit: AuditService,
+    protected readonly preStart: PreStartService,
   ) {}
 
   /** A pending request lapses this many milliseconds after creation. */
@@ -140,6 +143,8 @@ export class SupervisionService {
     this.clear(request);
 
     try {
+      // The approval is a start for the requester, so the pre-start hooks apply (a confirm blocks, see PreStartService).
+      await this.preStart.gateSupervision(request.resourceId, request.requester, request.dto, supervisor.id);
       const session = await this.resourceUsageService.startSession(request.resourceId, request.requester, request.dto, {
         supervisorUserId: supervisor.id,
         auditOrigin: {

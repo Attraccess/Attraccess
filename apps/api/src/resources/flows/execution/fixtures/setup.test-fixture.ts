@@ -79,6 +79,7 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
   scope.resourceUsageService = {
     logger: new Logger(ResourceUsageService.name),
     getActiveSession: jest.fn().mockResolvedValue({ id: 'ru-1' }),
+    getActiveSessionsForResource: jest.fn().mockResolvedValue([{ id: 'ru-1' }]),
     stageLifecycleBillingItem: jest.fn().mockResolvedValue(undefined),
   } as unknown as ResourceUsageService;
 

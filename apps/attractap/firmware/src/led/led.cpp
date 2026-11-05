@@ -45,6 +45,10 @@ void LedController::setState(LedState state)
     {
         return;
     }
+    if (_state == LED_STATE_CONFIRM_WAIT && state == LED_STATE_WAIT_FOR_CARD)
+    {
+        return; // the confirm window ends it (endConfirmWait or expiry)
+    }
     _state = state;
     _firmwarePatternSet = false;
 }
@@ -70,6 +74,79 @@ void LedController::triggerIndicate()
     _triggerStartMs = millis();
 }
 
+void LedController::triggerReserved(bool thenBlocked)
+{
+    _blockedAfterReserved = thenBlocked;
+    _stateBeforeTrigger = _state;
+    _trigger = TRIGGER_RESERVED;
+    _triggerStartMs = millis();
+}
+
+void LedController::triggerWarning()
+{
+    _stateBeforeTrigger = _state;
+    _trigger = TRIGGER_WARNING;
+    _triggerStartMs = millis();
+}
+
+void LedController::beginConfirmWait(uint32_t windowMs)
+{
+    _confirmWaitStartMs = millis();
+    _confirmWaitWindowMs = windowMs;
+    _state = LED_STATE_CONFIRM_WAIT;
+    _firmwarePatternSet = false;
+}
+
+void LedController::endConfirmWait()
+{
+    if (_state == LED_STATE_CONFIRM_WAIT)
+    {
+        _state = LED_STATE_WAIT_FOR_CARD;
+    }
+}
+
+void LedController::runConfirmWait()
+{
+    const LedFeedback::Action action = LedFeedback::actionFor(LedFeedback::Pattern::ConfirmWait, _confirmWaitWindowMs);
+    const uint32_t elapsed = millis() - _confirmWaitStartMs;
+    if (LedFeedback::finished(action, elapsed))
+    {
+        _state = LED_STATE_WAIT_FOR_CARD;
+        return;
+    }
+    LedFeedback::render(_strip, action, elapsed);
+}
+
+// Success, error, reserved and warning use the host-tested renderer; returns true while the trigger still runs.
+bool LedController::runFeedbackTrigger(uint32_t elapsed)
+{
+    const LedFeedback::Pattern pattern = _trigger == TRIGGER_SUCCESS ? LedFeedback::Pattern::Ok
+                                         : _trigger == TRIGGER_ERROR ? LedFeedback::Pattern::Blocked
+                                         : _trigger == TRIGGER_RESERVED ? LedFeedback::Pattern::Reserved
+                                                                        : LedFeedback::Pattern::Warning;
+    const LedFeedback::Action action = LedFeedback::actionFor(pattern);
+    if (LedFeedback::finished(action, elapsed))
+    {
+        if (_trigger == TRIGGER_RESERVED && _blockedAfterReserved)
+        {
+            _blockedAfterReserved = false;
+            _trigger = TRIGGER_ERROR;
+            _triggerStartMs = millis();
+            return false;
+        }
+        _trigger = TRIGGER_NONE;
+        _state = _stateBeforeTrigger;
+        return false;
+    }
+    const uint16_t n = _strip.numPixels();
+    for (uint16_t i = 0; i < n; i++)
+    {
+        const uint32_t rgb = LedFeedback::pixelColor(action, elapsed, i, n);
+        _strip.setPixelColor(i, _strip.Color((uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb));
+    }
+    return true;
+}
+
 void LedController::loop()
 {
     uint32_t now = millis();
@@ -85,37 +162,6 @@ void LedController::loop()
 
         switch (_trigger)
         {
-        case TRIGGER_SUCCESS:
-            if (elapsed < TRIGGER_DURATION_MS)
-            {
-                setAll(_strip.Color(0, 255, 0));
-            }
-            else
-            {
-                _trigger = TRIGGER_NONE;
-                _state = _stateBeforeTrigger;
-            }
-            break;
-
-        case TRIGGER_ERROR:
-        {
-            uint32_t flashPhase = elapsed / TRIGGER_ERROR_FLASH_MS;
-            if (flashPhase >= 6)
-            {
-                _trigger = TRIGGER_NONE;
-                _state = _stateBeforeTrigger;
-            }
-            else if (flashPhase % 2 == 0)
-            {
-                setAll(_strip.Color(255, 0, 0));
-            }
-            else
-            {
-                setAll(0);
-            }
-            break;
-        }
-
         case TRIGGER_INDICATE:
             if (elapsed < TRIGGER_DURATION_MS)
             {
@@ -133,6 +179,16 @@ void LedController::loop()
             {
                 _trigger = TRIGGER_NONE;
                 _state = _stateBeforeTrigger;
+            }
+            break;
+
+        case TRIGGER_SUCCESS:
+        case TRIGGER_ERROR:
+        case TRIGGER_RESERVED:
+        case TRIGGER_WARNING:
+            if (!runFeedbackTrigger(elapsed))
+            {
+                setAll(0);
             }
             break;
 
@@ -159,6 +215,12 @@ void LedController::loop()
             _strip.show();
             _firmwarePatternSet = true;
         }
+        return;
+    }
+
+    if (_state == LED_STATE_CONFIRM_WAIT)
+    {
+        runConfirmWait();
         return;
     }
 
@@ -329,6 +391,10 @@ void LedController::runCircularAnimation()
         runEnrollmentPending();
         break;
 
+    case LED_STATE_CONFIRM_WAIT:
+        runConfirmWait();
+        break;
+
     case LED_STATE_FIRMWARE_UPDATE:
         break;
     }
@@ -389,6 +455,10 @@ void LedController::runLinearAnimation()
 
     case LED_STATE_ENROLLMENT_PENDING:
         runEnrollmentPending();
+        break;
+
+    case LED_STATE_CONFIRM_WAIT:
+        runConfirmWait();
         break;
 
     case LED_STATE_FIRMWARE_UPDATE:

@@ -17,9 +17,18 @@ export type SessionNotesModalProps = {
   onConfirm: (notes: string) => void;
   mode: SessionModalMode;
   isSubmitting: boolean;
+  /** Extra context shown above the notes, e.g. whose session is being ended. */
+  description?: string;
 };
 
-export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitting }: SessionNotesModalProps) => {
+export const SessionNotesModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  mode,
+  isSubmitting,
+  description,
+}: SessionNotesModalProps) => {
   const { t } = useTranslations({ en, de });
   const [notes, setNotes] = useState('');
 
@@ -43,6 +52,7 @@ export const SessionNotesModal = ({ isOpen, onClose, onConfirm, mode, isSubmitti
           </ModalHeader>
 
           <ModalBody>
+            {description && <p className="text-sm mb-3">{description}</p>}
             <div className="space-y-2">
               <label htmlFor="notes" className="text-sm font-medium">
                 {t('notesLabel')}

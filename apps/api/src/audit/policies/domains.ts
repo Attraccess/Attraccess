@@ -21,6 +21,7 @@ export type CoreAuditDomain = (typeof CORE_AUDIT_DOMAINS)[number];
 export const CORE_SUBJECT_TYPES = [
   'attractap.reader',
   'attractap.card',
+  'attractap.ui-alert',
   'setting',
   'email-template',
   'email-layout',

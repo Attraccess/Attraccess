@@ -144,14 +144,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   protected readonly monitor: FlowResourceMonitor;
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
-    const activeResourceUsage = await this.resourceUsageService.getActiveSession(resourceId);
+    // With parallel sessions any active session owner may press the machine's buttons.
+    const activeSessions = await this.resourceUsageService.getActiveSessionsForResource(resourceId);
+    const pressingSession = activeSessions.find((session) => session.userId === executingUserId);
 
-    if (
-      !executingUserId ||
-      !activeResourceUsage ||
-      !activeResourceUsage.userId ||
-      activeResourceUsage.userId !== executingUserId
-    ) {
+    if (!executingUserId || !pressingSession) {
       throw new ForbiddenException('You are not allowed to press this button');
     }
 
@@ -167,7 +164,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       throw new NotFoundException('UNKNOWN_BUTTON_ID', { cause: { buttonId } });
     }
 
-    await this.startFlow(button, { payload: {} });
+    // The pressing owner's session is the triggering session for end-session and billing nodes.
+    await this.startFlow(button, { payload: { usageId: pressingSession.id } });
   }
 
   @OnEvent('companion.usb_disconnected')

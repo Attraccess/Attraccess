@@ -21,3 +21,6 @@ targets:
       NfcEmulatorFlashDriver:
         bindings:
           device: NfcEmulatorFlash
+      # Presses the reader's power button through the emulator, for readers
+      # that have one wired (Touch V1): labgrid-client power on/off/cycle/get.
+      ReaderPowerDriver: {}

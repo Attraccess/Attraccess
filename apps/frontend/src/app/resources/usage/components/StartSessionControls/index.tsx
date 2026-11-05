@@ -6,7 +6,6 @@ import { SupervisedStartModal } from '../SupervisedStartModal/index';
 import { useCallback, useState } from 'react';
 import {
   StartUsageSessionDto,
-  useResourcesServiceResourceUsageStartSession,
   useResourcesServiceUnlockDoor,
   useResourcesServiceUnlatchDoor,
   useResourcesServiceLockDoor,
@@ -18,6 +17,7 @@ import {
   ResourceType,
   SupervisionMode,
 } from '@attraccess/react-query-client';
+import { useStartSessionWithConfirmation } from '../../hooks/useStartSessionWithConfirmation';
 import { ResourceFormAction } from '../../../details/forms/types';
 import { useResourceFormsSubmission } from '../../../forms/hooks/useResourceFormsSubmission';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -111,6 +111,7 @@ export function useStartSessionControlsStateOutput(
     selectedProjectId: model.selectedProjectId,
     setSelectedProjectId: model.setSelectedProjectId,
     formsModal: model.formsModal,
+    confirmationDialog: model.confirmationDialog,
     handleStartSession,
     handleOpenStartSessionModal,
     handleLockDoor,
@@ -133,17 +134,16 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
   model: ReturnType<typeof useStartSessionControlsStateInputs>,
 ) {
   const { requestForms, modal: formsModal, clearFormsDraft } = useResourceFormsSubmission(model.resourceId);
+  const notifyStartSuccess = model.onStartSuccess;
   const onStartSuccess = useCallback(() => {
     clearFormsDraft();
-    model.onStartSuccess();
-  }, [clearFormsDraft, model.onStartSuccess]);
-  const { mutate: startUsageSessionMutate, isPending: startUsageSessionIsPending } =
-    useResourcesServiceResourceUsageStartSession({
-      onSuccess: onStartSuccess,
-      onError: (error) => {
-        model.onStartError(error as ApiError);
-      },
-    });
+    notifyStartSuccess();
+  }, [clearFormsDraft, notifyStartSuccess]);
+  const startSession = useStartSessionWithConfirmation(model.resourceId, {
+    onSuccess: onStartSuccess,
+    onError: (error) => model.onStartError(error),
+  });
+  const { start: startSessionWithConfirmation, isPending: startUsageSessionIsPending } = startSession;
 
   const { mutate: unlockDoorMutate, isPending: unlockDoorIsPending } = useResourcesServiceUnlockDoor({
     onSuccess: onStartSuccess,
@@ -201,36 +201,25 @@ export function useStartSessionControlsStateStartUsageSessionMutate(
 
   const submitStartSessionWithRetry = useCallback(
     (action: ResourceFormAction, requestBody: StartUsageSessionDto) => {
-      startUsageSessionMutate(
-        { resourceId: model.resourceId, requestBody },
-        {
-          onError: async (error) => {
-            if (!isFormsMissingError(error)) {
-              return;
-            }
+      startSessionWithConfirmation(requestBody, async (error) => {
+        if (!isFormsMissingError(error)) {
+          return;
+        }
 
-            const retrySubmissions = await gatherFormSubmissions(action);
-            if (!retrySubmissions) {
-              return;
-            }
+        const retrySubmissions = await gatherFormSubmissions(action);
+        if (!retrySubmissions) {
+          return;
+        }
 
-            startUsageSessionMutate({
-              resourceId: model.resourceId,
-              requestBody: {
-                ...requestBody,
-                formSubmissions: retrySubmissions,
-              },
-            });
-          },
-        },
-      );
+        startSessionWithConfirmation({ ...requestBody, formSubmissions: retrySubmissions });
+      });
     },
-    [gatherFormSubmissions, isFormsMissingError, model.resourceId, startUsageSessionMutate],
+    [gatherFormSubmissions, isFormsMissingError, startSessionWithConfirmation],
   );
   return {
+    confirmationDialog: startSession.dialog,
     ...model,
     onStartSuccess,
-    startUsageSessionMutate,
     startUsageSessionIsPending,
     unlockDoorMutate,
     unlockDoorIsPending,
@@ -346,8 +335,6 @@ export function useStartSessionControlsStateInputs(
         tExists,
         baseTranslationKey: 'api',
       });
-
-      console.error('Failed to start session:', JSON.stringify(error));
     },
     [t, toast, resource, tExists],
   );
@@ -410,6 +397,7 @@ export function StartSessionControls(
     selectedProjectId,
     setSelectedProjectId,
     formsModal,
+    confirmationDialog,
     handleStartSession,
     handleOpenStartSessionModal,
     handleLockDoor,
@@ -471,6 +459,7 @@ export function StartSessionControls(
         />
       )}
       {formsModal}
+      {confirmationDialog}
     </div>
   );
 }

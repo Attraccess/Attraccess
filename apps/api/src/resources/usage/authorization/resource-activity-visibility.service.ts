@@ -13,6 +13,8 @@ const LIVE_EVENT_ANONYMOUS_KEYS = new Set([
   'eventType',
   'resourceId',
   'inUse',
+  'activeSessionCount',
+  'maxParallelSessions',
   'timestamp',
   'identifier',
   'status',
@@ -111,7 +113,7 @@ export class ResourceActivityVisibilityService {
     resourceId: number,
   ): Promise<{ full: boolean; ownUsageId: number | null }> {
     if ((await this.resolve(user, resourceId)) === 'full') return { full: true, ownUsageId: null };
-    const active = await this.usage.getActiveSession(resourceId);
+    const active = await this.usage.getActiveSession(resourceId, undefined, user.id);
     return { full: false, ownUsageId: active?.userId === user.id ? active.id : null };
   }
 
@@ -121,7 +123,7 @@ export class ResourceActivityVisibilityService {
    */
   async canFollowLive(user: AuthenticatedUser, resourceId: number, access?: ResourceActivityAccess): Promise<boolean> {
     if ((access ?? (await this.resolve(user, resourceId))) !== 'none') return true;
-    return (await this.usage.getActiveSession(resourceId))?.userId === user.id;
+    return (await this.usage.getActiveSession(resourceId, undefined, user.id))?.userId === user.id;
   }
 
   /** The "free or in use" view for viewers who may not see who is using the machine. */

@@ -12,6 +12,7 @@
     "metadata": { "title": "Metadaten", "description": "Werte für Integrationen und Flows" },
     "retraining": { "title": "Nachschulung", "description": "Wann Einweisungen ablaufen" },
     "supervision": { "title": "Beaufsichtigung", "description": "Wer eine Nutzung starten darf" },
+    "readerUi": { "title": "Reader-Anzeige", "description": "Plugin-Widgets und Startbestätigungen auf Readern" },
     "groups": { "title": "Gruppen", "description": "Ressource Gruppen zuordnen" },
     "forms": { "title": "Formulare", "description": "Nutzungsformulare konfigurieren" },
     "flows": { "title": "Flows", "description": "Automatisierung konfigurieren" },

@@ -1,5 +1,5 @@
-"""Only the missing labgrid operations: ESP flashing/eFuse reads, screen snapshots
-and NFC card emulator commands.
+"""Only the missing labgrid operations: ESP flashing/eFuse reads, screen snapshots,
+NFC card emulator commands and a reader power button pressed by the emulator.
 
 Resources, USB discovery, SSH transport, locking and serial access use labgrid.
 """
@@ -19,9 +19,10 @@ from collections import deque
 import attr
 import serial
 from labgrid.driver import Driver, SerialDriver
+from labgrid.exceptions import NoResourceFoundError
 from labgrid.factory import target_factory
-from labgrid.protocol import ConsoleProtocol, ResetProtocol
-from labgrid.resource.common import NetworkResource
+from labgrid.protocol import ConsoleProtocol, PowerProtocol, ResetProtocol
+from labgrid.resource.common import NetworkResource, Resource
 from labgrid.util.managedfile import ManagedFile
 from labgrid.util.proxy import proxymanager
 from pexpect import TIMEOUT
@@ -217,6 +218,16 @@ class NfcEmulatorDriver(SerialDriver):
         """
         return self._exchange(name, arguments, self.command_timeout if timeout is None else timeout)
 
+    @Driver.check_active
+    def press_button(self, ms=200, *, count=1, gap_ms=300):
+        """Press the reader button wired to the emulator's GPIO4 ``count`` times.
+
+        Returns once the last press is released.
+        """
+        seconds = (count * ms + (count - 1) * gap_ms) / 1000
+        self.command("button.press", {"ms": ms, "count": count, "gapMs": gap_ms},
+                     timeout=self.command_timeout + seconds)
+
     def _exchange(self, name, arguments, timeout):
         # The leading newline ends any stray partial line the emulator buffered.
         line = b"\n" + name.encode()
@@ -270,3 +281,70 @@ class NfcEmulatorDriver(SerialDriver):
 class NfcEmulatorFlashDriver(ESPToolDriver):
     """ESPToolDriver for the emulator; plain ESPToolDriver lookups stay on the reader."""
     priorities = {ESPToolDriver: -10, ResetProtocol: -10}
+
+
+@target_factory.reg_driver
+@attr.s(eq=False)
+class ReaderPowerDriver(Driver, PowerProtocol):
+    """Switch a reader that has a power button, which its NFC emulator presses.
+
+    The Touch V1's power-bank chip turns the reader on after one short press
+    and off after two; an optocoupler on the emulator's GPIO4 presses the
+    button. The reader's serial port appearing or disappearing confirms each
+    switch. A reader that is already in the requested state is left alone.
+    The chip ignores presses for a moment after switching, so a switch that
+    did not happen is pressed again; repeating on or off presses is harmless.
+    """
+    bindings = {"emulator": "NfcEmulatorDriver"}
+    # The reader's serial resource, present only while the reader is on.
+    reader_port = attr.ib(default="USBSerialPort", validator=attr.validators.instance_of(str))
+    press_ms = attr.ib(default=200, converter=int)
+    gap_ms = attr.ib(default=300, converter=int)
+    # Time to wait for one press to take effect, and for the whole switch.
+    retry = attr.ib(default=6.0, converter=float)
+    timeout = attr.ib(default=20.0, converter=float)
+    # Off time for cycle(); `labgrid-client power cycle --delay` sets it.
+    delay = attr.ib(default=2.0, converter=float)
+
+    @Driver.check_active
+    def on(self):
+        if not self.get():
+            self._switch(True, presses=1)
+
+    @Driver.check_active
+    def off(self):
+        if self.get():
+            self._switch(False, presses=2)
+
+    @Driver.check_active
+    def cycle(self):
+        self.off()
+        time.sleep(self.delay)
+        self.on()
+
+    def get(self):
+        """Whether the reader is on. Needs no activation, so no emulator access."""
+        port = self._port()
+        port.poll()
+        return port.avail
+
+    def _port(self):
+        return self.target.get_resource(Resource, name=self.reader_port, wait_avail=False)
+
+    def _switch(self, on, presses):
+        deadline = time.monotonic() + self.timeout
+        while True:
+            attempt = time.monotonic()
+            self.emulator.press_button(self.press_ms, count=presses, gap_ms=self.gap_ms)
+            wait = max(0.0, min(self.retry, deadline - time.monotonic()))
+            try:
+                self.target.await_resources([self._port()], timeout=wait, avail=on)
+                return
+            except NoResourceFoundError:
+                pass
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"The reader did not turn {'on' if on else 'off'} within {self.timeout:g}s of "
+                    "pressing its power button; does this place have one?")
+            # Resources without a manager report unavailable at once.
+            time.sleep(max(0.0, min(attempt + wait, deadline) - time.monotonic()))

@@ -13,6 +13,13 @@ ApiValidationResult validate_removal(int64_t after_ms, int64_t after_exchanges,
   return {true, ""};
 }
 
+ApiValidationResult validate_button_press(int64_t press_ms, int64_t count, int64_t gap_ms) {
+  if (press_ms < 10 || press_ms > 5000) return {false, "ms must be from 10 to 5000"};
+  if (count < 1 || count > 5) return {false, "count must be from 1 to 5"};
+  if (gap_ms < 10 || gap_ms > 2000) return {false, "gapMs must be from 10 to 2000"};
+  return {true, ""};
+}
+
 bool parse_command_line(const std::string &line, std::string &command,
                         std::string &arguments) {
   const char *whitespace = " \t\r\n";

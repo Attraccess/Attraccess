@@ -34,6 +34,7 @@ import { WebsocketService } from '../../websocket.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
 
 import { ResourceListService } from '../resource-list/resource-list.service';
+import { CardSessionService } from '../ui/card-session.service';
 
 /**
  * How long an armed enrollment or reset waits for its card. The reader gives up after 30 s
@@ -96,6 +97,9 @@ export class AttractapCardHandler {
   @Inject(CardConversationService)
   protected cardConversations: CardConversationService;
 
+  @Inject(CardSessionService)
+  private cardSessions: CardSessionService;
+
   @Inject(ResourceListService)
   protected resourceListService: ResourceListService;
 
@@ -117,6 +121,9 @@ export class AttractapCardHandler {
 
     socket.state.verifiedUserId = nfcCard.user.id;
     socket.state.verifiedCardUid = detection.uid;
+    const language = await this.settingsService.resolveLanguage(nfcCard.user.locale);
+    // Steps and user-scoped slots are bound to this card session (ATT-1187); the reader carries the id.
+    const cardSession = this.cardSessions.issue(socket, nfcCard.user.id, language === 'de' ? 'de' : 'en');
 
     const hasIntroduction = await this.resourceUsageService.canControllResource(resourceId, nfcCard.user);
     const isIntroducer = await this.resourceIntroducersService.isIntroducer(resourceId, nfcCard.user.id, true);
@@ -135,7 +142,8 @@ export class AttractapCardHandler {
 
     await reply({
       username: nfcCard.user.username,
-      language: await this.settingsService.resolveLanguage(nfcCard.user.locale),
+      language,
+      cardSessionId: cardSession.id,
       languageFallback: !getSupportedDeviceLanguage(nfcCard.user.locale),
       canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
       hasIntroduction,

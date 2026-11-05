@@ -1,4 +1,4 @@
-"""Pairing on the real reader: pending approval, the encrypted session, reboot and revocation.
+"""Pairing on the real reader: pending approval, the encrypted session, reboot, power cycle and revocation.
 
 The session-scoped ``reader`` fixture has already approved the erased reader. Tests that
 need the pending-approval state revoke the pairing first and always give the reader its
@@ -10,12 +10,16 @@ import time
 import pytest
 
 from attractap_lab.enrollment import latest_code
+from attractap_lab.workflow import reader_power
 
-from conftest import approve_pairing, open_console
+from conftest import POWER_BUTTON_VARIANTS, READER_VARIANT, approve_pairing, open_console
 from test_nfc_cards import login, requires, sign_out
 
 REVOKE_DISCONNECT_SECONDS = 1.0
 ROTATION_SECONDS = 35  # codes rotate every 30 s
+# Long enough for the reader to lose all power, and for its power-bank chip to
+# take the next press: it ignores one right after switching.
+POWER_OFF_SECONDS = 5
 
 
 def status_of(hooks):
@@ -89,6 +93,29 @@ def repair(api, admin, reader, since):
     reader["console"].expect(r"Secure session established", since, 60)
 
 
+def close_console(target, reader):
+    """Stop reading the reader's port and release it: esptool needs it, and a reader that is off has none."""
+    reader["console"].stop()
+    target.deactivate(target.get_driver("SerialDriver", activate=False))
+
+
+def reopen_console(target, reader):
+    """Connect the reader's console again; return the log position it reads from."""
+    console = reader["console"]
+    open_console(target, target.get_driver("SerialDriver", activate=False))
+    mark = console.mark()
+    console.start()
+    return mark
+
+
+def expect_still_paired(reader, hooks, since):
+    """The reader opens its secure session again without asking for a new approval."""
+    console = reader["console"]
+    console.expect(r"Secure session established", since, 120)
+    assert b"Enrollment: code=" not in console.data[since:], "reader asked for a new approval"
+    wait_status(hooks, "authenticated", 30)
+
+
 def distinct_colours(shot, step=7):
     pixels = shot.rgb
     return len({tuple(pixels[i:i + 3]) for i in range(0, len(pixels) - 2, 3 * step)})
@@ -147,26 +174,31 @@ def test_pending_screen_shows_code_and_qr(api, admin, reader, hooks, unpaired, a
     assert differing_share(without_url, with_url) > 0.05
 
 
-def test_reboot_stays_paired(api, admin, target, reader, hooks):
+def test_reboot_stays_paired(target, reader, hooks):
     flash = target.get_driver("ESPToolDriver", activate=False)
-    console, driver = reader["console"], target.get_driver("SerialDriver", activate=False)
-    console.stop()
-    target.deactivate(driver)
+    close_console(target, reader)
     target.activate(flash)
     flash.reset()
     target.deactivate(flash)
-    open_console(target, driver)
-    mark = console.mark()
-    console.start()
-    console.expect(r"Secure session established", mark, 120)
-    assert b"Enrollment: code=" not in console.data[mark:], "reader asked for a new approval"
-    wait_status(hooks, "authenticated", 30)
+    expect_still_paired(reader, hooks, reopen_console(target, reader))
 
 
-@pytest.mark.skip(reason="the lab place has no power switch resource (labgrid PowerProtocol); "
-                         "only the esptool hard reset is available, covered by test_reboot_stays_paired")
-def test_power_cycle_stays_paired():
-    pass
+@pytest.mark.skipif(READER_VARIANT not in POWER_BUTTON_VARIANTS,
+                    reason=f"{READER_VARIANT or 'this reader'}: no power button for the NFC emulator to press")
+def test_power_cycle_stays_paired(target, reader, hooks):
+    """Cut the reader's power, unlike the esptool reset above, and switch it on again."""
+    power = reader_power(target)
+    close_console(target, reader)
+    target.activate(power)
+    try:
+        power.off()  # returns once the reader's port has disappeared
+        time.sleep(POWER_OFF_SECONDS)
+    finally:
+        # Also after a failed switch-off, so later tests find the reader on with its console open.
+        power.on()
+        target.deactivate(power)
+        mark = reopen_console(target, reader)
+    expect_still_paired(reader, hooks, mark)
 
 
 def test_login_inside_session(reader, resource, emulator, state, hooks):

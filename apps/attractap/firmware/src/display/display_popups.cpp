@@ -15,6 +15,13 @@ void Display::showErrorPopup(const FirmwareI18n::Text &title, const FirmwareI18n
     Display::showMessagePopup(title, message, true);
 }
 
+void Display::showReasonPopup(const std::string &title, const std::string &body)
+{
+    Display::showMessagePopup(
+        FirmwareI18n::Text::literal(title) /* i18n-data: Plugin block reason title, localized by the plugin. */,
+        FirmwareI18n::Text::literal(body) /* i18n-data: Plugin block reason body, localized by the plugin. */, true);
+}
+
 void Display::showBillingSummary(const std::string &total)
 {
     Display::showMessagePopup(FirmwareI18n::Message::SessionTotal, FirmwareI18n::Text::literal(total) /* i18n-data: Server-supplied formatted billing total; preserve exact amount and currency. */, false);

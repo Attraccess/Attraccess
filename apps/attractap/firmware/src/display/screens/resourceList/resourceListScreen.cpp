@@ -1,8 +1,11 @@
 #include "display/i18n.hpp"
 #include "resourceListScreen.hpp"
+#include "../../ui/ui_builder.hpp"
+#include "../../ui/ui_slots.hpp"
 #include "../../images/logo_40h.hpp"
 #include "../../images/lockscreen_background_image.hpp"
 #include "../../shared/wallClockText.hpp"
+#include "../../shared/sessionOccupancy.hpp"
 
 namespace {
 lv_obj_t *text(lv_obj_t *parent, const FirmwareI18n::Text &value, const lv_font_t *font, lv_color_t color) {
@@ -75,6 +78,7 @@ void ResourceListScreen::renderRows() {
     updateClockHeader();
     const auto scroll = lv_obj_get_scroll_y(resourceContainer);
     lv_obj_clean(resourceContainer);
+    rowStatusCount = 0;
     for (uint16_t i = 0; i < cachedResourceList.count; ++i) addResourceListItem(cachedResourceList.items[i]);
     lv_obj_update_layout(resourceContainer);
     lv_obj_scroll_to_y(resourceContainer, scroll, LV_ANIM_OFF);
@@ -109,7 +113,12 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     lv_obj_set_height(name, 26);
     lv_obj_align(name, LV_ALIGN_TOP_LEFT, 0, 0);
     FirmwareI18n::Text status = FirmwareI18n::Text::literal(resource.description) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */;
-    if (resource.hasActiveUsage) status = signedIn && username == resource.activeUser
+    const bool multi = resource.isMultiSession();
+    const bool accessMatches = username == cachedResourceList.authenticatedUsername;
+    const bool ownsUsage = signedIn && resource.isOwnedBy(username, accessMatches && resource.accessKnown);
+    const auto occupancy = multi ? SessionOccupancy::caption(resource, ownsUsage) : FirmwareI18n::Text();
+    if (!occupancy.empty()) status = occupancy;
+    else if (!multi && resource.hasActiveUsage) status = ownsUsage
         ? FirmwareI18n::Text(FirmwareI18n::Message::InUseByYou)
         : FirmwareI18n::Text::format(FirmwareI18n::Message::InUseBy, {FirmwareI18n::Text::literal(resource.activeUser) /* i18n-data: Server-supplied resource/user/introducer name, description, health reason or flow caption; preserve exact contents. */});
     else if (resource.isUnderMaintenance) status = FirmwareI18n::Message::Maintenance;
@@ -119,13 +128,24 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     auto *description = text(details, status, &attractap_font_montserrat_latin1_14, DisplayTheme::muted());
     lv_obj_set_height(description, 18);
     lv_obj_align(description, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+    if (rowStatusCount < API::MAX_RESOURCES) {
+        // Core status always wins; a plugin only gets the line that would show the description or "Available".
+        RowStatus &row = rowStatus[rowStatusCount++];
+        row = RowStatus{resource.id, details, description, nullptr,
+            resource.hasActiveUsage || resource.isUnderMaintenance || !resource.isHealthy ||
+            (signedIn && resource.accessKnown && !resource.hasIntroduction && !resource.requiresSupervisor && !resource.isIntroducer && !resource.canManageResource), 0};
+        patchRowStatus(row);
+    }
     if (!signedIn) {
         lv_obj_set_style_border_side(details, LV_BORDER_SIDE_RIGHT, 0);
         lv_obj_set_style_border_width(details, 20, 0);
-        lv_obj_set_style_border_color(details, resource.hasActiveUsage ? DisplayTheme::danger() : resource.isUnderMaintenance || !resource.isHealthy ? DisplayTheme::warning() : DisplayTheme::success(), 0);
+        // A single-session machine in use reads like a full one.
+        using SessionOccupancy::Level;
+        const Level level = multi ? SessionOccupancy::level(resource) : resource.hasActiveUsage ? Level::Full : Level::Free;
+        const bool blocked = resource.isUnderMaintenance || !resource.isHealthy;
+        lv_obj_set_style_border_color(details, level == Level::Free && blocked ? DisplayTheme::warning() : SessionOccupancy::color(level), 0);
         return;
     }
-    const bool accessMatches = username == cachedResourceList.authenticatedUsername;
     const auto action = accessMatches ? resourceListAction(resource, username) : ResourceListAction::None;
     FirmwareI18n::Text caption = FirmwareI18n::Message::Introduction;
     auto color = DisplayTheme::warning();
@@ -137,6 +157,7 @@ void ResourceListScreen::addResourceListItem(const API::ResourceBrief &resource)
     case ResourceListAction::Takeover: caption = FirmwareI18n::Message::TakeOver; break;
     default:
         if (!accessMatches || !resource.accessKnown) { caption = FirmwareI18n::Message::LoadingAlt; color = DisplayTheme::muted(); }
+        else if (multi && resource.isFull()) { caption = FirmwareI18n::Message::ResourceFull; color = DisplayTheme::muted(); }
         else if (resource.hasActiveUsage) { caption = FirmwareI18n::Message::InUseAlt; color = DisplayTheme::muted(); }
         else if (resource.isUnderMaintenance || !resource.isHealthy) caption = FirmwareI18n::Message::UnavailableLocked;
         break;
@@ -241,4 +262,29 @@ void ResourceListScreen::destroy() {
     clockHeader = clockTime = clockWeekday = clockDate = nullptr;
     sessionHeader.detach();
     overlay.detach();
+}
+
+void ResourceListScreen::patchRowStatus(RowStatus &row) {
+    if (row.core || !row.details) return;
+    uint32_t stamp = 0;
+    const uint32_t now = millis();
+    lv_obj_t *built = nullptr;
+    ui::slotCache().forEach(row.id, ui::SlotId::ListRowStatus, [&](const ui::SlotRecord &rec) {
+        if (built) return; // one text or badge per row
+        stamp = rec.stamp; // unique per applied update, also across owners, keys and reconnects
+        if (row.plugin && stamp == row.stamp) { built = row.plugin; return; }
+        built = ui::buildRecord(row.details, rec, now, false);
+    });
+    if (built && built == row.plugin) return; // unchanged: only the row that changed is touched
+    if (row.plugin) lv_obj_delete(row.plugin);
+    row.plugin = built;
+    row.stamp = stamp;
+    if (built) lv_obj_align(built, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+    lv_obj_set_flag(row.description, LV_OBJ_FLAG_HIDDEN, built != nullptr);
+}
+
+void ResourceListScreen::refreshUiSlots() {
+    if (!screen || !resourceContainer) return;
+    ui::slotCache().expire(millis());
+    for (uint16_t i = 0; i < rowStatusCount; ++i) patchRowStatus(rowStatus[i]);
 }

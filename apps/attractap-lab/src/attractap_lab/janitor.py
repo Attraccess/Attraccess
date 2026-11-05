@@ -76,6 +76,7 @@ class Janitor:
         self.marker_seconds = marker_seconds
         self.poll_seconds = poll_seconds
         self.dirty = set()
+        self.known = set()  # managed places seen by the last tick
         self.reservations = {}  # place -> [token, last poll]
         self.reserving = set()
         self.jobs = {}
@@ -87,8 +88,6 @@ class Janitor:
         self._watch_claims()
         await self._cancel_stale_reservations()
         places = self._managed()
-        # State is unknown after a (re)start: park every reader once.
-        self.dirty |= set(places)
         unmanaged = sorted(set(self.session.places) - set(places))
         log.info("Managing %s; no parking image for %s", sorted(places) or "nothing", unmanaged or "none")
         try:
@@ -108,7 +107,12 @@ class Janitor:
 
     async def tick(self):
         holds = quarantined(self.state_dir)
-        for name, place in self._managed().items():
+        managed = self._managed()
+        # A reader's state is unknown when the janitor first sees its place,
+        # after a (re)start or when a deployment adds the place: park it once.
+        self.dirty |= managed.keys() - self.known
+        self.known = set(managed)
+        for name, place in managed.items():
             if name in self.jobs or time.monotonic() < self.retry_after.get(name, 0):
                 continue
             if place.acquired == OWNER:

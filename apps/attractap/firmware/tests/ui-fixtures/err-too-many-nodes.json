@@ -1,0 +1,200 @@
+{
+  "name": "err-too-many-nodes",
+  "kind": "slot-update",
+  "verdict": "reject:too-many-nodes",
+  "note": "",
+  "payload": {
+    "resourceId": 12,
+    "slot": "resource.details.body",
+    "revision": 1,
+    "owner": "reservations",
+    "key": "res-state",
+    "serverNowMs": 1790000000000,
+    "expiresAtMs": 1790003600000,
+    "tree": {
+      "t": "col",
+      "c": [
+        {
+          "t": "col",
+          "c": [
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            }
+          ]
+        },
+        {
+          "t": "col",
+          "c": [
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            }
+          ]
+        },
+        {
+          "t": "col",
+          "c": [
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            }
+          ]
+        },
+        {
+          "t": "col",
+          "c": [
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            },
+            {
+              "t": "text",
+              "text": "x"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

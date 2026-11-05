@@ -69,6 +69,7 @@ NoResourcesScreen Display::noResourcesScreen;
 SessionSummaryScreen Display::sessionSummaryScreen;
 ResourceListScreen Display::resourceListScreen;
 ResourceDetailsScreen Display::resourceDetailsScreen;
+ui::StepModal Display::stepModal;
 EnrollmentScreen Display::enrollmentScreen;
 ResetScreen Display::resetScreen;
 SupervisionScreen Display::supervisionScreen;
@@ -443,7 +444,7 @@ void Display::setupFramebuffer()
     // core 1 (away from the WiFi/LwIP core) at priority 4: above the app loop,
     // NFC task (1) and websocket client (3), so input/refresh never wait behind
     // blocking application work.
-    xTaskCreatePinnedToCore(Display::renderTask, "LvglTask", 8192, nullptr, 4, nullptr, 1);
+    xTaskCreatePinnedToCore(Display::renderTask, "LvglTask", 12288, nullptr, 4, nullptr, 1);
 
     Display::logger.info("Setup done");
 #endif

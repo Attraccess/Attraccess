@@ -7,6 +7,9 @@
 #include "../platform.hpp"
 #include <cstring>
 #include <string>
+#ifdef HAS_LVGL_DISPLAY
+#include "../display/ui/ui_slots.hpp"
+#endif
 #ifdef ESP_PLATFORM
 #include "esp_heap_caps.h"
 #include "esp_task_wdt.h"
@@ -95,6 +98,7 @@ void Application::setup() {
   this->setupErrorCallbacks();
 
   this->setupActionCallbacks();
+  this->setupUiCallbacks();
 
   this->setupDisplayCallbacks();
   this->setupCardCallbacks();
@@ -195,6 +199,7 @@ void Application::beginSessionSummary(const API::ActionResult &result) {
   this->pendingActionResourceId = 0;
   this->pendingActionProjectId = 0;
   this->pendingActionIsTakeover = false;
+  this->pendingActionUsageId = 0;
   this->pendingFormRequestResourceId = 0;
   this->pendingFormRequestAction = API::ResourceUsageFormActionType::UNKNOWN;
   this->pendingUiAction.clear();
@@ -226,8 +231,12 @@ void Application::dismissSessionSummary() {
 }
 
 void Application::logoutReader() {
+  this->closeUiStep();
   // The server keeps the verified user for this connection until told otherwise.
   this->api.sendReaderSessionEnded();
+  // The card session is over: tell the server, and drop what only the signed-in user may see.
+  this->api.endCardSession();
+  ui::slotCache().clearSlot(ui::SlotId::DetailsSession);
   State::setUserLanguage(false);
   this->sessionSummaryActive = false;
   this->sessionSummaryVisible = false;
@@ -276,7 +285,7 @@ void Application::pollUsageStats() {
       if (this->resourceList.items[i].id == this->selectedResourceId) resource = &this->resourceList.items[i];
   }
   if (!resource || !resource->hasActiveUsage || !resource->activeUsageId ||
-      this->cardAuthenticationData.username != resource->activeUser) {
+      !resource->isOwnedBy(this->cardAuthenticationData.username, resource->accessKnown)) {
     this->usageStatsResourceId = 0;
     this->usageStatsUsageId = 0;
     return;

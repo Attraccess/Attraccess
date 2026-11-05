@@ -1,12 +1,12 @@
 import { DataSource } from 'typeorm';
-import { NfcCardPendingChange1791900000000 } from './1791900000000-nfc-card-pending-change';
+import { NfcCardPendingChange1792300000000 } from './1792300000000-nfc-card-pending-change';
 
 describe('NfcCardPendingChange migration', () => {
   it('creates the pending card change table with its UID index and can be reverted', async () => {
     const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
     const runner = database.createQueryRunner();
     try {
-      const migration = new NfcCardPendingChange1791900000000();
+      const migration = new NfcCardPendingChange1792300000000();
       await migration.up(runner);
 
       // An enrollment recovery record: the new key is stored encrypted, the card id is not known yet.

@@ -1,5 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { WebSocket } from 'ws';
+import { READER_UI_LIMITS } from '@attraccess/plugins-backend-sdk';
+import { isUiMessageSuperseded } from './handlers/ui/ui-slot.service';
 import { sanitizeForLVGL } from './websocket-lvgl';
 import { AttractapEventType, AttractapMessage, AuthenticatedWebSocket } from './websocket.types';
 
@@ -26,7 +28,8 @@ export interface ReaderSenderContext {
   client: WebSocket;
   id: string;
   logger: Logger;
-  waitForAck: (socket: AuthenticatedWebSocket, type: AttractapEventType) => Promise<void>;
+  /** UI_* ACKs echo the message id; it is passed so the right message is acknowledged. */
+  waitForAck: (socket: AuthenticatedWebSocket, type: AttractapEventType, messageId?: number) => Promise<void>;
   /** Whether this socket is an open, authenticated reader that may receive READER_LANGUAGE. */
   canReceiveReaderLanguage: (socket: AuthenticatedWebSocket) => boolean;
   /** The server-wide reader language, if an update superseded the one captured at send time. */
@@ -34,6 +37,8 @@ export interface ReaderSenderContext {
 }
 
 export type ReaderSenders = Pick<AuthenticatedWebSocket, 'sendMessage' | 'sendRaw' | 'sendBinaryData'>;
+
+const isUiType = (type: string) => type.startsWith('UI_');
 
 const isLanguageCarrier = (type: AttractapEventType) =>
   type === AttractapEventType.READER_LANGUAGE || type === AttractapEventType.READER_AUTHENTICATED;
@@ -85,7 +90,13 @@ export function createReaderSenders(context: ReaderSenderContext): ReaderSenders
         // An older auth/update retry must not restore a superseded default.
         const language = context.readerLanguage();
         if (isLanguageCarrier(type) && language !== undefined) message.data.payload.language = language;
+        if (isUiMessageSuperseded(socket, message)) return false;
         const stringifiedMessage = JSON.stringify(sanitizeForLVGL(message));
+        // Legacy token readers cannot reassemble frames: a bigger UI frame would silently break parsing.
+        if (isUiType(type) && Buffer.byteLength(stringifiedMessage, 'utf8') > READER_UI_LIMITS.maxFrameBytes) {
+          logger.error(`Refusing to send ${type}: frame exceeds ${READER_UI_LIMITS.maxFrameBytes} bytes`);
+          return false;
+        }
         if (!fitsQueue(Buffer.byteLength(stringifiedMessage), type)) return false;
         logger.debug(`Sending ${message.event} of type ${type} to client ${id} (attempt ${attempt})`);
         client.send(stringifiedMessage);
@@ -94,7 +105,7 @@ export function createReaderSenders(context: ReaderSenderContext): ReaderSenders
       }
 
       try {
-        await context.waitForAck(socket, type);
+        await context.waitForAck(socket, type, isUiType(type) ? message.data.messageId : undefined);
         return true;
       } catch (error) {
         logger.debug(`Attempt ${attempt} failed: ${(error as Error).message}`);

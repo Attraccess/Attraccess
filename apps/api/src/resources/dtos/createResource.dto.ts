@@ -16,6 +16,7 @@ import {
   MinLength,
   ValidateIf,
   IsUrl,
+  Max,
 } from 'class-validator';
 import { ToBoolean, ToJson, ToNumber } from '../../common/request-transformers';
 import { FileUpload } from '../../common/types/file-upload.types';
@@ -124,6 +125,22 @@ export class CreateResourceDto extends CreateResourceDtoDocumentation {
   @IsOptional()
   @ToBoolean()
   allowTakeOver?: boolean;
+
+  @ApiProperty({
+    description: 'Maximum number of people who can use this machine at the same time (machines only)',
+    required: false,
+    example: 1,
+    default: 1,
+    minimum: 1,
+    maximum: 1000,
+    type: Number,
+  })
+  @ToNumber()
+  @ValidateIf((o) => o.maxParallelSessions !== undefined)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  maxParallelSessions?: number;
 
   @ApiProperty({
     description: 'Days after a user was trained before retraining is required. Null disables the age-based trigger.',

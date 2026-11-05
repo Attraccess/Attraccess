@@ -70,6 +70,14 @@ import { CardOperationsService } from './websockets/card-operations.service';
 import { CardWriterPolicyService } from './websockets/card-writer-policy.service';
 import { CardWriterSettingsController } from './card-writer-settings.controller';
 import { EncryptionModule } from '../encryption/encryption.module';
+import { ReaderUiModule } from '../plugin-system/reader-ui/reader-ui.module';
+import { AttractapUiHandler } from './websockets/handlers/ui/ui.handler';
+import { CardSessionService } from './websockets/handlers/ui/card-session.service';
+import { UiAuditService } from './websockets/handlers/ui/ui-audit.service';
+import { UiSlotService } from './websockets/handlers/ui/ui-slot.service';
+import { UiStepService } from './websockets/handlers/ui/ui-step.service';
+import { ReaderStartGate } from './websockets/handlers/session/reader-start-gate.service';
+import { ReaderUiAdminController } from './reader-ui-admin.controller';
 
 @Module({
   imports: [
@@ -106,6 +114,7 @@ import { EncryptionModule } from '../encryption/encryption.module';
     EncryptionModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,
+    ReaderUiModule,
   ],
   providers: [
     { provide: HandshakeLimiter, useFactory: () => new HandshakeLimiter() },
@@ -137,6 +146,12 @@ import { EncryptionModule } from '../encryption/encryption.module';
     AttractapProjectsHandler,
     AttractapSupervisionHandler,
     AttractapMassIntroductionHandler,
+    CardSessionService,
+    UiAuditService,
+    UiStepService,
+    UiSlotService,
+    AttractapUiHandler,
+    ReaderStartGate,
   ],
   controllers: [
     AttractapController,
@@ -145,6 +160,7 @@ import { EncryptionModule } from '../encryption/encryption.module';
     AttractapFirmwareController,
     ResourceAttractapsController,
     AttractapPairingController,
+    ReaderUiAdminController,
   ],
 })
 export class AttractapModule {}

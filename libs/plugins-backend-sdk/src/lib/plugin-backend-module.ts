@@ -4,6 +4,7 @@ import type { PluginEntityClass } from './entity';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { PluginAuditDomainDeclaration } from './plugin-audit';
 import type { PluginFlowNodeDefinition } from './plugin-flow-node';
+import type { PreStartHook, ReaderUiProvider, SessionEndHook } from './reader-ui';
 
 /**
  * Shape every backend plugin's default export must satisfy. The host calls
@@ -43,4 +44,13 @@ export interface PluginBackendModule {
 
   /** Optional broker credential provider offered to other integrations by this plugin. */
   credentialProvisioningProvider?: MqttCredentialProvisioningProviderFactory;
+
+  /** Optional reader UI slot provider. Requires the READER_UI permission. */
+  readerUi?: ReaderUiProvider | ((context: PluginContext) => ReaderUiProvider);
+
+  /** Optional pre-start hook (allow / confirm / block). Requires ACCESS_HOOKS. */
+  preStartHook?: PreStartHook;
+
+  /** Optional advisory hook after a session ended. Requires ACCESS_HOOKS. */
+  sessionEndHook?: SessionEndHook;
 }

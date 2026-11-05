@@ -36,7 +36,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
   useAccessControlServiceResourceIntroducersIsIntroducer: () => ({ data: { isIntroducer: false } }),
   useResourceMaintenancesServiceCanManageMaintenance: () => ({ data: { canManage: state.update } }),
 }));
-vi.mock('../useQrCodeAction', () => ({ useQrCodeAction: vi.fn() }));
+vi.mock('../useQrCodeAction', () => ({ useQrCodeAction: () => ({ confirmationDialog: null }) }));
 vi.mock('../health-state', () => ({ ResourceHealthWarning: () => null }));
 vi.mock('../qrcode', () => ({
   ResourceQrCode: ({ renderTrigger }: ComponentProps<typeof ResourceQrCode>) => renderTrigger?.(state.qr),

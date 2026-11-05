@@ -27,7 +27,14 @@ export interface SupervisionLiveEvent {
 }
 
 export interface LivePayloads {
-  resource: { resourceId?: number; eventType?: string; inUse?: boolean; timestamp?: string };
+  resource: {
+    resourceId?: number;
+    eventType?: string;
+    inUse?: boolean;
+    activeSessionCount?: number;
+    maxParallelSessions?: number;
+    timestamp?: string;
+  };
   'flow-logs': ResourceFlowLog;
   billing: BillingTransaction;
   messaging: Message;

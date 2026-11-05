@@ -7,6 +7,7 @@ import {
   ResourceUsageLifecycleAttempt,
   LifecycleBillingItem,
   Resource,
+  ResourceType,
   ResourceUsageAction,
   User,
   Project,
@@ -225,7 +226,7 @@ export abstract class UsageLifecycle {
       }
       return attempts.map((attempt) => attempt.resourceId);
     });
-    for (const resourceId of resourceIds) {
+    for (const resourceId of new Set(resourceIds)) {
       this.eventEmitter.emit(
         ResourceUsageLifecycleAbortedEvent.EVENT_NAME,
         new ResourceUsageLifecycleAbortedEvent(resourceId),
@@ -269,7 +270,31 @@ export abstract class UsageLifecycle {
     usage.attributedOperatingDurationInMinutes = attributedOperatingDurationInMinutes;
   }
 
-  protected async assertLifecycleAvailable(manager: EntityManager, resourceId: number): Promise<void> {
+  /** Effective number of parallel sessions. Doors and unknown resources behave like a limit of 1. */
+  protected async getSessionLimit(manager: EntityManager, resourceId: number): Promise<number> {
+    const resource = await manager.findOne(Resource, {
+      where: { id: resourceId },
+      select: { id: true, type: true, maxParallelSessions: true },
+    });
+    return resource?.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
+  }
+
+  /**
+   * With a limit of 1 any lifecycle in progress blocks the resource, as before. With several parallel
+   * sessions only a takeover reservation (exclusive) blocks; capacity and one-session-per-person are
+   * enforced by the caller, and the same session cannot be ended twice (unique attempt index).
+   */
+  protected async assertLifecycleAvailable(
+    manager: EntityManager,
+    resourceId: number,
+    sharedMachine = false,
+  ): Promise<void> {
+    if (sharedMachine) {
+      if (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId, kind: 'takeover' } })) {
+        throw new ConflictException('A usage lifecycle operation is already in progress for this resource');
+      }
+      return;
+    }
     if (
       (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } })) ||
       (await manager.findOne(ResourceUsage, { where: { resourceId, endTime: IsNull(), lifecyclePending: true } }))
@@ -430,7 +455,13 @@ export abstract class UsageLifecycle {
   public abstract getActiveSession(
     resourceId: number,
     transactionalEntityManager?: EntityManager,
+    preferUserId?: number,
   ): Promise<ResourceUsage | null>;
+
+  public abstract getActiveSessionsForResource(
+    resourceId: number,
+    transactionalEntityManager?: EntityManager,
+  ): Promise<ResourceUsage[]>;
 
   protected abstract readonly billingService: BillingService;
 

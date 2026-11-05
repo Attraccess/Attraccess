@@ -17,6 +17,7 @@ import { MarketplaceBrowser } from './marketplace/MarketplaceBrowser';
 import { PluginToolbar } from './installed/PluginToolbar';
 import { RemovePluginModal } from './installed/RemovePluginModal';
 import { InstallPluginModal } from './marketplace/InstallPluginModal';
+import { ReaderUiAlerts } from '../../../readerUi/ReaderUiAlerts';
 import { PluginErrorModal } from './installed/PluginErrorModal';
 import { renderPluginRow } from './installed/PluginRow';
 import { usePluginsSectionState } from './state/usePluginSettings';
@@ -99,6 +100,8 @@ export function PluginsSection() {
             </TableContent>
           </TableScrollContainer>
         </Table>
+
+        <ReaderUiAlerts />
 
         <PluginErrorModal {...model} />
 

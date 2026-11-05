@@ -5,12 +5,17 @@ import { ResourceUsageSession } from './index';
 import { createMockResource } from '../../../../../test-utils/fixtures';
 import { SupervisionMode } from '@attraccess/react-query-client';
 
-const { canControl, hasPermission, activeSession, loading } = vi.hoisted(() => ({
-  canControl: { value: true },
-  hasPermission: { value: false },
-  activeSession: { value: null as { id: number; userId: number; startTime: string } | null },
-  loading: { activeSession: false, canControl: false, introducers: false },
-}));
+const { canControl, hasPermission, activeSession, parallel, liveUpdate, invalidateQueries, loading } = vi.hoisted(
+  () => ({
+    canControl: { value: true },
+    hasPermission: { value: false },
+    activeSession: { value: null as { id: number; userId: number; startTime: string } | null },
+    parallel: { value: null as Record<string, unknown> | null },
+    liveUpdate: { onUpdate: undefined as undefined | ((data: Record<string, unknown>) => void) },
+    invalidateQueries: vi.fn(),
+    loading: { activeSession: false, canControl: false, introducers: false },
+  }),
+);
 
 vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1, username: 'me' }, hasPermission: () => hasPermission.value }),
@@ -23,7 +28,11 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 
-vi.mock('../../../../../utils/live-updates', () => ({ useLiveUpdates: () => undefined }));
+vi.mock('../../../../../utils/live-updates', () => ({
+  useLiveUpdates: ({ onUpdate }: { onUpdate: (data: Record<string, unknown>) => void }) => {
+    liveUpdate.onUpdate = onUpdate;
+  },
+}));
 
 // The child components are irrelevant here — we only assert which branch renders.
 vi.mock('../StartSessionControls', () => ({
@@ -37,6 +46,16 @@ vi.mock('../IntroductionRequiredDisplay', () => ({
 vi.mock('../ActiveSessionDisplay', () => ({
   ActiveSessionDisplay: ({ usageId }: { usageId: number }) => (
     <div data-testid="active-session" data-usage-id={usageId} />
+  ),
+}));
+vi.mock('../ParallelSessionsDisplay', () => ({
+  ParallelSessionsDisplay: ({ usages, activeSessionCount, maxParallelSessions }: Record<string, unknown>) => (
+    <div
+      data-testid="parallel-sessions"
+      data-others={(usages as unknown[]).length}
+      data-count={String(activeSessionCount)}
+      data-max={String(maxParallelSessions)}
+    />
   ),
 }));
 vi.mock('../OtherUserSessionDisplay', () => ({
@@ -61,7 +80,7 @@ vi.mock('@attraccess/react-query-client', async () => ({
   useResourcesServiceResourceUsageCanControlKey: 'canControl',
   useAccessControlServiceResourceIntroducersGetNames: () => ({ data: [], isLoading: loading.introducers }),
   useResourcesServiceResourceUsageGetActiveSession: () => ({
-    data: { usage: activeSession.value },
+    data: parallel.value ?? { usage: activeSession.value },
     isLoading: loading.activeSession,
   }),
   useResourcesServiceResourceUsageGetActiveSessionKey: 'activeSession',
@@ -69,7 +88,7 @@ vi.mock('@attraccess/react-query-client', async () => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => ({ invalidateQueries }),
 }));
 
 function renderSession(supervisionMode: SupervisionMode) {
@@ -88,6 +107,8 @@ describe('ResourceUsageSession routing', () => {
     loading.canControl = false;
     loading.introducers = false;
     activeSession.value = null;
+    parallel.value = null;
+    invalidateQueries.mockClear();
   });
 
   it('lets an introduced user start solo on supervision_allowed', () => {
@@ -152,5 +173,87 @@ describe('ResourceUsageSession routing', () => {
 
     expect(screen.getByTestId('introduction-required')).toBeInTheDocument();
     expect(screen.getByTestId('active-session')).toHaveAttribute('data-usage-id', '8');
+  });
+
+  describe('with parallel sessions', () => {
+    const mine = { id: 8, userId: 1, startTime: '2026-08-20T10:00:00.000Z' };
+    const other = { id: 9, userId: 2, startTime: '2026-08-20T11:00:00.000Z' };
+    const response = (usages: unknown[], max = 3) => ({
+      usage: usages[0] ?? null,
+      usages,
+      activeSessionCount: usages.length,
+      maxParallelSessions: max,
+      isFull: usages.length >= max,
+    });
+
+    it('shows my session and the others and hides the start controls when I already have a session', () => {
+      parallel.value = response([other, mine]);
+
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      expect(screen.getByTestId('active-session')).toHaveAttribute('data-usage-id', '8');
+      expect(screen.getByTestId('parallel-sessions')).toHaveAttribute('data-others', '1');
+      expect(screen.queryByTestId('start-controls')).not.toBeInTheDocument();
+    });
+
+    it('keeps the start controls while slots are free and I have no session', () => {
+      parallel.value = response([other]);
+
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      expect(screen.getByTestId('parallel-sessions')).toHaveAttribute('data-count', '1');
+      expect(screen.getByTestId('start-controls')).toBeInTheDocument();
+      expect(screen.queryByTestId('other-user-session')).not.toBeInTheDocument();
+    });
+
+    it('shows the full state without start controls', () => {
+      parallel.value = response([other, { ...other, id: 10, userId: 3 }], 2);
+
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      expect(screen.getByTestId('parallel-sessions')).toHaveAttribute('data-max', '2');
+      expect(screen.queryByTestId('start-controls')).not.toBeInTheDocument();
+    });
+
+    it('refetches the sessions when the live update reports a session event', () => {
+      parallel.value = response([other]);
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      liveUpdate.onUpdate?.({ eventType: 'resource.usage.session_ended', inUse: true, activeSessionCount: 1 });
+      expect(invalidateQueries).toHaveBeenCalledTimes(2);
+
+      invalidateQueries.mockClear();
+      liveUpdate.onUpdate?.({ eventType: 'resource.health_changed', activeSessionCount: 1 });
+      expect(invalidateQueries).not.toHaveBeenCalled();
+    });
+
+    it('keeps the single-user display at limit 1', () => {
+      parallel.value = response([other], 1);
+
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      expect(screen.getByTestId('other-user-session')).toBeInTheDocument();
+      expect(screen.queryByTestId('parallel-sessions')).not.toBeInTheDocument();
+    });
+
+    it('lists every session when the limit was lowered to 1 while several still run', () => {
+      parallel.value = response([other, { ...other, id: 10, userId: 3 }], 1);
+
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      expect(screen.getByTestId('parallel-sessions')).toHaveAttribute('data-others', '2');
+      expect(screen.getByTestId('parallel-sessions')).toHaveAttribute('data-count', '2');
+      expect(screen.queryByTestId('other-user-session')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('start-controls')).not.toBeInTheDocument();
+    });
+
+    it('shows my own session next to the others after the limit was lowered to 1', () => {
+      parallel.value = response([other, mine], 1);
+
+      renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
+
+      expect(screen.getByTestId('active-session')).toHaveAttribute('data-usage-id', '8');
+      expect(screen.getByTestId('parallel-sessions')).toHaveAttribute('data-others', '1');
+    });
   });
 });

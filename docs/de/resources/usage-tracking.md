@@ -36,6 +36,23 @@ Jede Sitzung enthält:
 2. Klicken Sie auf **Sitzung beenden**
 3. Je nach Konfiguration der Ressource müssen Sie möglicherweise ein Formular ausfüllen
 
+## Gemeinsam genutzte Maschinen (parallele Sitzungen)
+
+Eine Maschine kann über **Maximale parallele Sitzungen** von mehreren Personen gleichzeitig genutzt werden (siehe [Ressourcen erstellen](resources/creating-resources.md#maximale-parallele-sitzungen)). Jede Person hat ihre eigene Sitzung; pro Maschine ist nur eine aktive Sitzung je Person möglich. Ein Start wird mit **Sitzung bereits aktiv** abgelehnt, wenn Sie bereits eine Sitzung haben, oder mit **Maschine ist voll**, wenn alle Plätze belegt sind. Eine beaufsichtigte Sitzung zählt als eine Sitzung (die der beaufsichtigten Person); die [Aufsicht](resources/introductions.md#beaufsichtigungsmodus) zählt nicht zum Limit.
+
+Jede Person beendet ihre eigene Sitzung. Ressourcenverwalter, Einweiser, Wartende und die Aufsicht einer Sitzung können die gewählte Sitzung einer anderen Person beenden, indem sie diese auf der [Detailseite](resources/resource-details.md) aus der Liste der aktiven Sitzungen auswählen und auf **Sitzung beenden** klicken.
+
+> [!WARNING]
+> **Flows und Abrechnung bei gemeinsam genutzten Maschinen (Limit über 1).** Flows und Abrechnung berücksichtigen nicht, wie viele Sitzungen laufen. Bei einem Limit von 1 gilt dieser Abschnitt nicht.
+>
+> - **Flows** laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab. Eine Berücksichtigung der Sitzungsanzahl in Flows ist geplant.
+> - **Nutzungsgebühren** pro Nutzung werden pro Sitzung berechnet.
+> - **Abrechnung nach Sitzungszeit** erfolgt pro Sitzung.
+> - **Zähler (zum Beispiel Energie):** Die am frühesten gestartete, noch laufende Sitzung besitzt den Zähler und wird mit ihrem Verbrauch belastet. Später überlappende Sitzungen werden für bereits belegte Zähler weder gemessen noch berechnet. Endet diese Sitzung, während andere weiterlaufen, wird der Zähler wie üblich abgelesen, und den noch laufenden Sitzungen wird kein weiterer Zählerverbrauch berechnet. Der Zähler ist dann wieder frei: Die nächste Sitzung, die startet, während er frei ist, erhält den Zähler und wird mit seinem Verbrauch belastet.
+> - **Laufzeit (Betriebszeit)** wird zu jedem Zeitpunkt genau einer Sitzung zugerechnet, der am frühesten gestarteten aktiven. Die insgesamt berechnete Zeit übersteigt daher nie die Betriebszeit der Maschine.
+>
+> Eine faire Aufteilung von Zählern und Laufzeit auf gleichzeitige Sitzungen ist geplant.
+
 ## Sitzungen mit Projekten verknüpfen
 
 Wenn Sie aktive [Projekte](projects/overview.md) haben, können Sie eine Nutzungssitzung mit einem Projekt verknüpfen. So lässt sich nachverfolgen, welche Ressourcen für welche Projekte verwendet werden.

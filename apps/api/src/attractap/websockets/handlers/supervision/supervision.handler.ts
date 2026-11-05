@@ -24,6 +24,7 @@ import { AttractapService } from '../../../attractap.service';
 
 import { CardOperationsService } from '../../card-operations.service';
 import { WebsocketService } from '../../websocket.service';
+import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
 
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
 
@@ -318,7 +319,9 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     // between the socket check and the assignment would let two concurrent arms of the same reader
     // both pass and the second silently overwrite the first.
     for (const linkedResource of reader.resources ?? []) {
-      if (await this.resourceUsageService.getActiveSession(linkedResource.id)) {
+      // Arming only needs a free slot; the supervisee takes it, the supervisor never does.
+      const sessions = await this.resourceUsageService.getActiveSessionsForResource(linkedResource.id);
+      if (getSessionCapacity(linkedResource, sessions.length).isFull) {
         throw new ConflictException('The selected reader has a session in progress');
       }
     }

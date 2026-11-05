@@ -24,6 +24,7 @@ import { SettingsModule } from './../settings/settings.module';
 import { LiveTopicsModule } from './../live-updates/live-topics.module';
 import { MqttModule } from './../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from './../mqtt/mqtt-credential-provisioning.service';
+import * as readerUiWiring from './runtime/reader-ui-wiring';
 
 describe('PluginModule', () => {
   const fixture = registerPluginModuleFixture();
@@ -141,6 +142,38 @@ describe('PluginModule', () => {
 
       expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
       expect(register).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a throwing register()', "register: () => { throw new Error('register failed'); }", false],
+      [
+        'a throwing credential provider',
+        "register: () => ({ module: class M {} }), credentialProvisioningProvider: () => { throw new Error('x'); }",
+        false,
+      ],
+      ['a module that builds', 'register: () => ({ module: class M {} })', true],
+      ['a static module', 'module: class StaticModule {}', true],
+    ])('queues reader UI hooks only once the module was built (%s)', (_name, body, queued) => {
+      mkdirSync(join(fixture.root, 'hooked', 'dist'), { recursive: true });
+      writeFileSync(
+        join(fixture.root, 'hooked', 'plugin.json'),
+        JSON.stringify({
+          name: 'hooked',
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          permissions: [PluginPermission.ACCESS_HOOKS],
+          attraccessVersion: { min: '1.0.0' },
+        }),
+      );
+      writeFileSync(
+        join(fixture.root, 'hooked', 'dist', 'index.js'),
+        `module.exports = { default: { preStartHook: () => ({ decision: 'allow' }), ${body} } };`,
+      );
+      const queue = jest.spyOn(readerUiWiring, 'queueReaderUiContributions').mockImplementation(() => undefined);
+      jest.spyOn(readerUiWiring, 'queueReaderUiLoadFailure').mockImplementation(() => undefined);
+      PluginModule.forRoot();
+      if (queued) expect(queue).toHaveBeenCalledWith('hooked', expect.objectContaining({ preStartHook: expect.any(Function) }));
+      else expect(queue).not.toHaveBeenCalled();
     });
 
     it('loads a plugin whose externalized host-shared requires resolve to the host copy', () => {

@@ -316,7 +316,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     );
     await expectLegacyFailure(
       scope.createNode({ id: 'end-1', type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, data: {} }),
-      () => (scope.resourceUsageService.getActiveSession as jest.Mock).mockResolvedValueOnce(null),
+      () => (scope.resourceUsageService.getActiveSessionsForResource as jest.Mock).mockResolvedValueOnce([]),
       'NO_USAGE_SESSION',
     );
     await expectLegacyFailure(
@@ -364,10 +364,12 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     scope.edgesBySourceAndHandle[`${endNode.id}|`] = [];
 
     // Mock active session and endSession
-    (scope.resourceUsageService.getActiveSession as jest.Mock).mockResolvedValue({
-      id: 'ru-1',
-      user: { id: 42, username: 'alice' },
-    });
+    (scope.resourceUsageService.getActiveSessionsForResource as jest.Mock).mockResolvedValue([
+      {
+        id: 'ru-1',
+        user: { id: 42, username: 'alice' },
+      },
+    ]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (scope.resourceUsageService as any).endSession = jest.fn().mockResolvedValue(undefined);
@@ -392,6 +394,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
       { id: 42, username: 'alice' },
       {
         notes: 'Ended by bob',
+        usageId: 'ru-1',
       },
       { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
     );
@@ -414,7 +417,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     scope.edgesBySourceAndHandle[`${inputNode.id}|`] = [{ source: inputNode.id, target: endNode.id }];
     scope.edgesBySourceAndHandle[`${endNode.id}|`] = [];
 
-    (scope.resourceUsageService.getActiveSession as jest.Mock).mockResolvedValue(null);
+    (scope.resourceUsageService.getActiveSessionsForResource as jest.Mock).mockResolvedValue([]);
 
     await expect(scope.service.runFlow(1, triggerNodeType, {})).rejects.toMatchObject({
       message: 'NO_USAGE_SESSION',

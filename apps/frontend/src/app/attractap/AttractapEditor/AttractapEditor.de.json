@@ -15,6 +15,7 @@
   "tabs": {
     "general": "Allgemein",
     "resources": "Ressourcen",
+    "readerUi": "Reader-Anzeige",
     "security": "Kopplung"
   }
 }

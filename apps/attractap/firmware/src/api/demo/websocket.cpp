@@ -114,18 +114,12 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
 
     if (strcmp(type, "CARD_DETECTED") == 0)
     {
-        // The demo has no card crypto: it ends the conversation at once (the reader's relay must not
-        // wait for commands) and answers like a server that verified the card.
+        // The demo has no card crypto: it ends the conversation at once and answers like a server that verified the card.
         const uint32_t detectionId = doc["data"]["payload"]["detectionId"] | 0u;
         enqueue(std::string(R"({"event":"EVENT","data":{"type":"CARD_CONVERSATION_END","payload":{"detectionId":)") +
                 std::to_string(detectionId) + R"(,"conversationId":"demo"}}})");
-        const char *purpose = doc["data"]["payload"]["purpose"] | "";
-        if (strcmp(purpose, "tap") == 0)
-        {
-            const char *uid = doc["data"]["payload"]["uid"] | "";
-            uint32_t resourceId = doc["data"]["payload"]["resourceId"] | 0u;
-            respondCardAuth(std::string(uid), resourceId);
-        }
+        if (strcmp(doc["data"]["payload"]["purpose"] | "", "tap") == 0)
+            respondCardAuth(std::string(doc["data"]["payload"]["uid"] | ""), doc["data"]["payload"]["resourceId"] | 0u);
         return;
     }
 
@@ -150,7 +144,7 @@ void DemoWebsocket::processOutbound(const char *data, size_t len)
 
     if (strcmp(type, "STOP_RESOURCE_USAGE_SESSION") == 0)
     {
-        handleStopSession(doc["data"]["payload"]["resourceId"] | 0u);
+        handleStopSession(doc["data"]["payload"]["resourceId"] | 0u, doc["data"]["payload"]["usageId"] | 0u);
         return;
     }
 
@@ -222,7 +216,7 @@ void DemoWebsocket::respondAuthenticated()
 void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language)
 {
     const bool english = language ? std::string(language) == "en" : State::getActiveLanguage() == "en";
-    StaticJsonDocument<3072> doc;
+    JsonDocument doc;
     doc["event"] = "EVENT";
     doc["data"]["type"] = "RESOURCE_LIST";
     doc["data"]["payload"]["messageId"] = ++_resourceListMsgId;
@@ -258,6 +252,8 @@ void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language
             obj["hasIntroduction"] = _currentHasIntroduction;
             obj["canManageResource"] = _currentCanManage;
             obj["isIntroducer"] = _currentCanManage;
+            // Mirrors handleStopSession: only managers may end another person's session.
+            obj["canEndOtherSessions"] = _currentCanManage;
             obj["canManageMaintenance"] = _currentCanManage;
             obj["requiresSupervisor"] = false;
         }
@@ -271,20 +267,30 @@ void DemoWebsocket::respondResourceList(uint32_t requestId, const char *language
         for (const std::string &name : introducers)
             intro.add(name);
 
-        const DemoSession &session = _sessions[i];
-        if (session.active)
-        {
-            JsonObject aus = obj["activeUsageSession"].to<JsonObject>();
-            aus["user"]["username"] = session.user;
-            aus["startTime"] = toIso8601(session.startEpoch);
-            aus["startTimeUtcOffsetMinutes"] = DemoClock::utcOffsetMinutes(session.startEpoch);
-        }
+        // Parallel sessions: capacity, per-card start permission and every session.
+        const std::vector<DemoSession> &sessions = _sessions[i];
+        const uint16_t limit = r.type == 1 ? 1 : maxParallelSessionsFor(r.id);
+        const DemoSession *own = nullptr;
+        for (const DemoSession &session : sessions)
+            if (!_currentUser.empty() && isOwnSession(session))
+                own = &session;
+        obj["maxParallelSessions"] = limit;
+        obj["activeSessionCount"] = sessions.size();
+        obj["canStart"] = sessions.size() < limit && own == nullptr;
+        // The card holder's own session wins; otherwise the newest one (limit 1: the only one).
+        const DemoSession *shown = own ? own : (sessions.empty() ? nullptr : &sessions.back());
+        if (shown)
+            addSessionJson(obj["activeUsageSession"].to<JsonObject>(), *shown);
+        if (own)
+            addSessionJson(obj["ownUsageSession"].to<JsonObject>(), *own);
+        JsonArray all = obj["activeUsageSessions"].to<JsonArray>();
+        for (const DemoSession &session : sessions)
+            addSessionJson(all.add<JsonObject>(), session);
     }
 
-    char buf[3072];
-    size_t n = serializeJson(doc, buf, sizeof(buf));
-    if (n > 0)
-        enqueue(std::string(buf, n));
+    std::string out;
+    serializeJson(doc, out);
+    enqueue(out);
 }
 
 void DemoWebsocket::respondCardAuth(const std::string &uidHex, uint32_t resourceId)

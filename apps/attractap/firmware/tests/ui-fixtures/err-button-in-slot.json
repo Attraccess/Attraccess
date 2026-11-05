@@ -1,0 +1,20 @@
+{
+  "name": "err-button-in-slot",
+  "kind": "slot-update",
+  "verdict": "reject:button-in-slot",
+  "note": "",
+  "payload": {
+    "resourceId": 12,
+    "slot": "resource.details.body",
+    "revision": 1,
+    "owner": "reservations",
+    "key": "res-state",
+    "serverNowMs": 1790000000000,
+    "expiresAtMs": 1790003600000,
+    "tree": {
+      "t": "button",
+      "id": "go",
+      "text": "Go"
+    }
+  }
+}

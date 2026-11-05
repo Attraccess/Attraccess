@@ -28,6 +28,8 @@ import { ResourceEventsService } from './sse/resource-events.service';
 import { ResourceUsageController } from './usage/sessions/resource-usage.controller';
 import { ResourceUsageService } from './usage/sessions/resource-usage.service';
 import { ResourceActivityVisibilityService } from './usage/authorization/resource-activity-visibility.service';
+import { PreStartService } from './usage/pre-start/pre-start.service';
+import { SessionEndNotifier } from './usage/pre-start/session-end-notifier.service';
 import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
 import { LiveTopicsService } from '../live-updates/live-topics.service';
 import { FlowLogRecorderService } from './flows/logs/flow-log-recorder.service';
@@ -118,6 +120,10 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
   const usageService = {
     canControllResource: jest.fn(async () => controllable),
     getActiveSession: jest.fn(async (resourceId: number) => ({ ...usage(), resourceId })),
+    getActiveSessionOverview: jest.fn(async (resourceId: number) => {
+      const session = { ...usage(), resourceId };
+      return { usage: session, usages: [session], activeSessionCount: 1, maxParallelSessions: 1, isFull: true };
+    }),
     // Mirrors the real service's gate: own or full access opens it, anonymous gets the redacted view, else 404.
     getSessionDetails: jest.fn(
       async (
@@ -203,6 +209,8 @@ describe('reads of equipment activity and access lists (ATT-1149)', () => {
         },
         { provide: LiveTopicsService, useValue: { register: jest.fn() } },
         { provide: FlowLogRecorderService, useValue: {} },
+        { provide: PreStartService, useValue: { gateHttp: jest.fn() } },
+        { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
       ],
     })
       .overrideGuard(DualAuthGuard)

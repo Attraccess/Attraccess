@@ -7,6 +7,10 @@
   "implicitDependencies": ["!plugins-frontend-ui"],
   "// targets": "to see all targets run: nx show project plugins-frontend-sdk --web",
   "targets": {
+    "typecheck": {
+      "// dependsOn": "tsc follows the StandardModal/StandardDrawer re-exports into plugins-frontend-ui source, which imports the generated react-query-client. The implicit-dependency exclusion above drops that edge (it would close a build cycle through api:swagger-build), so the generate step is listed here.",
+      "dependsOn": ["generate", "^generate", "react-query-client:generate"]
+    },
     "nx-release-publish": {
       "options": {
         "packageRoot": "dist/{projectRoot}",

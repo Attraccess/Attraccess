@@ -11,6 +11,18 @@
     "title": "Resource already in use",
     "description": "The resource is currently in use by another user and cannot be started by you until it is released."
   },
+  "ResourceFullError": {
+    "title": "Machine is full",
+    "description": "As many people as allowed are already using this machine. Please try again when someone has finished."
+  },
+  "AlreadyHasActiveSessionError": {
+    "title": "Session already active",
+    "description": "You already have an active session on this machine. End it first if you want to start again."
+  },
+  "NoOwnActiveSessionError": {
+    "title": "No session of your own",
+    "description": "You have no active session on this machine, so nothing was ended. To end someone else's session, pick it from the list of active sessions."
+  },
   "ResourceUnhealthyException": {
     "title": "Resource unhealthy",
     "description": "The resource is currently reporting an unhealthy state and cannot be used until it recovers."

@@ -10,7 +10,7 @@ import {
 } from '@attraccess/database-entities';
 import { meterDefinitionFromFlow } from './metering-definition';
 import { meterCharge, formatMeterValue } from './quantity';
-import { findActiveUsage } from '../usage/sessions/active-usage';
+import { findMeterHolders, type MeterHolder } from './meter-holder';
 
 export async function requireMeter(manager: EntityManager, resourceId: number, meterId: number) {
   const meter = await manager.findOne(ResourceMeter, { where: { id: meterId, resourceId } });
@@ -42,16 +42,16 @@ export class MeteringCatalog {
   }
 
   async listMeters(resourceId: number) {
-    const [meters, usage, active] = await Promise.all([
-      this.meters.find({ where: { resourceId }, order: { id: 'ASC' } }),
-      findActiveUsage(this.sessions.manager, resourceId),
-      this.findActiveSessions(resourceId),
-    ]);
+    const meters = await this.meters.find({ where: { resourceId }, order: { id: 'ASC' } });
+    const holders = await findMeterHolders(
+      this.sessions.manager,
+      resourceId,
+      meters.map((meter) => meter.id),
+    );
     return meters.map((meter) => {
+      const { usage, session: held } = holders.get(meter.id) as MeterHolder;
       const captured = usage?.meterRates?.find((rate) => rate.meterId === meter.id);
-      const session = active.find(
-        (s) => s.meterId === meter.id && s.usageId === usage?.id && (usage.meterRates == null || captured != null),
-      );
+      const session = held && (usage?.meterRates == null || captured != null) ? held : undefined;
       const sessionRate = captured?.creditsPerUnit ?? session?.creditsPerUnit ?? 0;
       return {
         id: meter.id,
@@ -126,14 +126,6 @@ export class MeteringCatalog {
 
   async getLive(resourceId: number) {
     return { meters: await this.listMeters(resourceId) };
-  }
-
-  async findActiveSessions(resourceId: number) {
-    const usage = await findActiveUsage(this.sessions.manager, resourceId);
-    if (!usage) return [];
-    return this.sessions.find({
-      where: { resourceId, usageId: usage.id, status: ResourceMeteringSessionStatus.Active },
-    });
   }
 
   async getStatus(resourceId: number) {

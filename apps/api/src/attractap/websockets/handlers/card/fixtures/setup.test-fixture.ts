@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the original handler test policy for partial protocol mocks. */
 import { SettingsService } from '../../../../../settings/settings.service';
 import { AttractapCardHandler } from '../card.handler';
+import { CardSessionService } from '../../ui/card-session.service';
 import { AttractapCardHandlerTestScope } from '../card.handler.spec';
 export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   scope.handler = Object.create(AttractapCardHandler.prototype);
@@ -65,4 +66,5 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
       { uid: data.payload.uid, detectionId: data.payload.detectionId ?? 1 },
       data.payload.resourceId,
     );
+  (scope.handler as any).cardSessions = new CardSessionService();
 }

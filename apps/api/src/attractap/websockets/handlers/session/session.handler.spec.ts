@@ -2,6 +2,8 @@
 
 import { ResourceFormAction } from '@attraccess/database-entities';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
+import { AlreadyHasActiveSessionError } from '../../../../resources/usage/errors/already-has-active-session.error';
+import { ResourceFullError } from '../../../../resources/usage/errors/resource-full.error';
 import { ResourceInUseError } from '../../../../resources/usage/errors/resource-in-use.error';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
@@ -267,30 +269,32 @@ describe('AttractapSessionHandler – session + flow button', () => {
         jest.useRealTimers();
       });
 
-      it('reports the occupied resource immediately and refreshes the list', async () => {
-        resourceInUseErrorHandlingScope.parentScope.mockResourceUsageService.startSession.mockRejectedValueOnce(
-          new ResourceInUseError(),
-        );
+      it.each([
+        ['ResourceInUseError', () => new ResourceInUseError()],
+        ['ResourceFullError', () => new ResourceFullError(2, 2)],
+        ['AlreadyHasActiveSessionError', () => new AlreadyHasActiveSessionError()],
+      ])('reports %s immediately and refreshes the list', async (name, createError) => {
+        const parentScope = resourceInUseErrorHandlingScope.parentScope;
+        parentScope.mockResourceUsageService.startSession.mockRejectedValueOnce(createError());
 
-        await (resourceInUseErrorHandlingScope.parentScope.handler as any).handleStartResourceUsageSession(
-          resourceInUseErrorHandlingScope.parentScope.mockSocket,
+        await (parentScope.handler as any).handleStartResourceUsageSession(
+          parentScope.mockSocket,
           resourceInUseErrorHandlingScope.eventData,
         );
 
-        expect(resourceInUseErrorHandlingScope.parentScope.mockSocket.sendMessage).toHaveBeenCalledWith(
+        expect(parentScope.mockSocket.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
               type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
-              payload: expect.objectContaining({ error: 'ResourceInUseError' }),
+              payload: expect.objectContaining({ error: name }),
             }),
           }),
         );
-        expect(resourceInUseErrorHandlingScope.parentScope.mockFormsHandler.clearFormDraft).not.toHaveBeenCalled();
-        expect(
-          resourceInUseErrorHandlingScope.parentScope.mockResourceListService.sendResourceListToSocket,
-        ).toHaveBeenCalledWith(resourceInUseErrorHandlingScope.parentScope.mockSocket, {
-          resourceIds: new Set([10]),
-        });
+        expect(parentScope.mockFormsHandler.clearFormDraft).not.toHaveBeenCalled();
+        expect(parentScope.mockResourceListService.sendResourceListToSocket).toHaveBeenCalledWith(
+          parentScope.mockSocket,
+          { resourceIds: new Set([10]) },
+        );
       });
     });
 
@@ -350,6 +354,26 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
   describe('handleStopResourceUsageSession', () => {
     const fixture = createHandleStopResourceUsageSessionFixture(scope);
+
+    it('passes the chosen usageId through to endSession, and none for the holder own session', async () => {
+      fixture.mockResourceUsageService.endSession.mockResolvedValue({ id: 99, userId: 2 });
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
+        { payload: { resourceId: 10, usageId: 55 } } as AttractapEvent['data'],
+      );
+      expect(fixture.mockResourceUsageService.endSession).toHaveBeenLastCalledWith(
+        10,
+        expect.anything(),
+        expect.objectContaining({ usageId: 55 }),
+        expect.anything(),
+      );
+      await fixture.handler.handleStopResourceUsageSession(
+        fixture.mockSocket as any,
+        { payload: { resourceId: 10 } } as AttractapEvent['data'],
+      );
+      const dto = fixture.mockResourceUsageService.endSession.mock.calls.at(-1)[2];
+      expect(dto).not.toHaveProperty('usageId');
+    });
 
     it('sends the final charge with configured precision and the action request ID', async () => {
       fixture.mockResourceUsageService.endSession.mockResolvedValue({

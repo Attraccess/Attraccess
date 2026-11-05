@@ -67,6 +67,7 @@ export function resourceAuditSnapshot(resource: Resource) {
     metadata: resource.metadata,
     imageFilename: resource.imageFilename,
     allowTakeOver: resource.allowTakeOver,
+    maxParallelSessions: resource.maxParallelSessions,
     retrainingMaxAgeDays: resource.retrainingMaxAgeDays,
     retrainingMaxInactivityDays: resource.retrainingMaxInactivityDays,
     retrainingBlocksAccess: resource.retrainingBlocksAccess,
@@ -92,6 +93,7 @@ export function applyResourceFields(resource: Resource, dto: UpdateResourceDto):
 
   // Handle allowTakeOver field
   if (dto.allowTakeOver !== undefined) resource.allowTakeOver = dto.allowTakeOver;
+  if (dto.maxParallelSessions !== undefined) resource.maxParallelSessions = dto.maxParallelSessions;
 
   if (dto.retrainingMaxAgeDays !== undefined) resource.retrainingMaxAgeDays = dto.retrainingMaxAgeDays;
   if (dto.retrainingMaxInactivityDays !== undefined)
@@ -125,6 +127,7 @@ export function resourceUpdateAuditDetails(
     ...(JSON.stringify(before.metadata ?? {}) !== JSON.stringify(updatedResource.metadata ?? {}) ? ['metadata'] : []),
     ...(before.imageFilename !== updatedResource.imageFilename ? ['image'] : []),
     ...(before.allowTakeOver !== updatedResource.allowTakeOver ? ['allowTakeOver'] : []),
+    ...(before.maxParallelSessions !== updatedResource.maxParallelSessions ? ['maxParallelSessions'] : []),
     ...(before.retrainingMaxAgeDays !== updatedResource.retrainingMaxAgeDays ? ['retrainingMaxAgeDays'] : []),
     ...(before.retrainingMaxInactivityDays !== updatedResource.retrainingMaxInactivityDays
       ? ['retrainingMaxInactivityDays']
@@ -377,6 +380,7 @@ export class ResourcesService {
       documentationMarkdown: dto.documentationMarkdown || null,
       documentationUrl: dto.documentationUrl || null,
       allowTakeOver: dto.allowTakeOver || false,
+      maxParallelSessions: dto.maxParallelSessions ?? 1,
       type: dto.type,
       separateUnlockAndUnlatch: dto.separateUnlockAndUnlatch || false,
       metadata: dto.metadata ?? null,
