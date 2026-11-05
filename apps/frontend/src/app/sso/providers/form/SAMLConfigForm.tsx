@@ -3,6 +3,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
 import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS } from '@attraccess/shared';
 import en from '../en.json';
 import de from '../de.json';
 
@@ -137,7 +138,7 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
         <TextField value={roleAttributeKeysInput} onChange={setRoleAttributeKeysInput}>
           <Label>{t('roleAttributeKeys')}</Label>
           <Input
-            placeholder="roles, role, groups, group, memberof, http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+            placeholder={DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS.join(', ')}
             data-cy="sso-provider-form-saml-role-attribute-keys-input"
           />
           <Description>{t('roleAttributeKeysHint')}</Description>

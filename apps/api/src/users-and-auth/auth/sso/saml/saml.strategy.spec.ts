@@ -456,6 +456,20 @@ describe('SSOSamlStrategy', () => {
       expect(sync).not.toHaveBeenCalled();
     });
 
+    it.each([
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups',
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
+      'http://schemas.xmlsoap.org/claims/group',
+    ])('reads the default ADFS attribute %s when no keys are configured', async (key) => {
+      const sync = await syncWith(null, { [key]: ['admins'] });
+      expect(sync).toHaveBeenCalledWith(
+        44,
+        [expect.objectContaining({ roleKey: 'user-manager' })],
+        SSOProviderType.SAML,
+        30,
+      );
+    });
+
     it.each([[null], [[]]])('falls back to the defaults when roleAttributeKeys is %j', async (keys) => {
       const sync = await syncWith(keys as string[] | null, { groups: ['admins'] });
       expect(sync).toHaveBeenCalledWith(

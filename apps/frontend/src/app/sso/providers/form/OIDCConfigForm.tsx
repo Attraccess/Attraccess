@@ -20,8 +20,11 @@ import { RoleMappingsSection } from './RoleMappingsSection';
 import { PermissionSyncSection } from './PermissionSyncSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
 import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DEFAULT_OIDC_ROLE_CLAIM_PATHS } from '@attraccess/shared';
 import en from '../en.json';
 import de from '../de.json';
+
+const ROLE_CLAIM_PATHS_PLACEHOLDER = [...DEFAULT_OIDC_ROLE_CLAIM_PATHS, 'resource_access.<clientId>.roles'].join(', ');
 
 export function useOIDCConfigFormState({ form }: OIDCConfigFormProps) {
   const { t } = useTranslations({ en, de });
@@ -252,10 +255,7 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
         </TextField>
         <TextField value={model.roleClaimPathsInput} onChange={model.setRoleClaimPathsInput}>
           <Label>{model.t('roleClaimPaths')}</Label>
-          <Input
-            placeholder="permissions, roles, groups, realm_access.roles, resource_access.<clientId>.roles"
-            data-cy="sso-provider-form-oidc-role-claims-input"
-          />
+          <Input placeholder={ROLE_CLAIM_PATHS_PLACEHOLDER} data-cy="sso-provider-form-oidc-role-claims-input" />
           <Description>{model.t('roleClaimPathsHint')}</Description>
         </TextField>
       </section>

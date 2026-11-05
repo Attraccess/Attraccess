@@ -68,7 +68,7 @@
   "emailAttributeKeys": "E-Mail-Attributschlüssel",
   "emailAttributeKeysHint": "Kommagetrennte Attributnamen oder URNs, die zur Ermittlung der Benutzer-E-Mail geprüft werden (erste Übereinstimmung gewinnt).",
   "roleAttributeKeys": "Rollen-Attributschlüssel",
-  "roleAttributeKeysHint": "Kommagetrennte Attributnamen, aus denen Rollen oder Gruppen gelesen werden (Groß-/Kleinschreibung egal). Leer lassen, um die angezeigten Standardwerte zu verwenden. Sobald gesetzt, werden NUR diese Schlüssel gelesen und die Standardwerte ignoriert: Ist einer vorhanden, werden Rollen, die nur aus einem Standardattribut stammten (z. B. groups), beim nächsten Login entfernt. Erfordert die Berechtigung zum Verwalten von Benutzerrollen.",
+  "roleAttributeKeysHint": "Kommagetrennte Attributnamen, aus denen Rollen oder Gruppen gelesen werden (Groß-/Kleinschreibung wird ignoriert). Leer lassen, um die angezeigten Standardwerte zu verwenden. Sobald gesetzt, werden NUR diese Schlüssel gelesen und die Standardwerte ignoriert: Ist einer vorhanden, werden Rollen, die nur aus einem Standardattribut stammten (z. B. groups), bei der nächsten Anmeldung entfernt. Erfordert die Berechtigung zum Verwalten von Benutzerrollen.",
   "signRequest": "AuthnRequests signieren",
   "wantAssertionsSigned": "Signierte Assertions erforderlich",
   "wantAuthnResponseSigned": "Signierte Antworten erforderlich",
@@ -93,7 +93,7 @@
     }
   },
   "roleClaimPaths": "Rollen-Claim-Pfade (durch Komma getrennt)",
-  "roleClaimPathsHint": "Claim-Pfade, aus denen Rollen, Gruppen oder Berechtigungen gelesen werden. Leer lassen, um die angezeigten Standardwerte zu verwenden. Sobald gesetzt, werden NUR diese Pfade gelesen und die Standardwerte ignoriert: Ist der Claim vorhanden, werden Rollen, die nur aus einem Standardpfad stammten (z. B. groups), beim nächsten Login entfernt. Erfordert die Berechtigung zum Verwalten von Benutzerrollen.",
+  "roleClaimPathsHint": "Claim-Pfade, aus denen Rollen, Gruppen oder Berechtigungen gelesen werden. Leer lassen, um die angezeigten Standardwerte zu verwenden. Sobald gesetzt, werden NUR diese Pfade gelesen und die Standardwerte ignoriert: Ist der Claim vorhanden, werden Rollen, die nur aus einem Standardpfad stammten (z. B. groups), bei der nächsten Anmeldung entfernt. Erfordert die Berechtigung zum Verwalten von Benutzerrollen.",
   "samlProvisioningSecret": "SAML-Provisioning-Secret",
   "samlProvisioningSecretHint": "Wird für SAML-Provisioning-Aufrufe (Logout, Löschen, Berechtigungen) verwendet. Leer lassen, um das vorhandene Secret beizubehalten.",
   "showSamlProvisioningSecret": "Provisioning-Secret anzeigen",

@@ -5,7 +5,7 @@ export function stringArray(value: unknown, max = 100): boolean {
   return (
     Array.isArray(value) &&
     value.length <= max &&
-    value.every((entry) => typeof entry === 'string' && entry.length <= 256)
+    value.every((entry) => typeof entry === 'string' && entry.length <= 255)
   );
 }
 
@@ -198,10 +198,10 @@ export function samlProviderConfiguration(value: unknown): boolean {
     ['signRequest', 'wantAssertionsSigned', 'wantAuthnResponseSigned', 'forceAuthn'].every(
       (key) => typeof config[key] === 'boolean',
     ) &&
-    (config.emailAttributeKeys === null || stringArray(config.emailAttributeKeys)) &&
-    (config.roleAttributeKeys === undefined ||
-      config.roleAttributeKeys === null ||
-      stringArray(config.roleAttributeKeys)) &&
+    // roleAttributeKeys is absent from snapshots recorded before it existed
+    [config.emailAttributeKeys, config.roleAttributeKeys ?? null].every(
+      (field) => field === null || stringArray(field),
+    ) &&
     (config.roleMappings === null || roleMappings(config.roleMappings)) &&
     omissionMetadata(config.omitted, [
       'name',

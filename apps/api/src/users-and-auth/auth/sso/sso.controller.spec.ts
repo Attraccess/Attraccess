@@ -186,6 +186,43 @@ describe('SsoController', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('compares role claim paths entry by entry so a merged list is a change', async () => {
+      const noPermission = {
+        user: { id: 1, effectivePermissions: new Set<string>() },
+      } as unknown as AuthenticatedRequest;
+      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValue({
+        ...fixture.mockSSOProvider,
+        oidcConfiguration: {
+          ...fixture.mockSSOProvider.oidcConfiguration,
+          roleClaimPaths: ['groups', 'realm_access.roles'],
+        },
+      } as SSOProvider);
+
+      await expect(
+        fixture.controller.updateOne(
+          '1',
+          { oidcConfiguration: { roleClaimPaths: ['groups\nrealm_access.roles'] } } as UpdateSSOProviderDto,
+          noPermission,
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(fixture.ssoService.updateProvider).not.toHaveBeenCalled();
+    });
+
+    it('names the SAML setting in the role attribute keys permission error', async () => {
+      const noPermission = {
+        user: { id: 1, effectivePermissions: new Set<string>() },
+      } as unknown as AuthenticatedRequest;
+      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce(fixture.mockSamlProvider);
+
+      await expect(
+        fixture.controller.updateOne(
+          '2',
+          { samlConfiguration: { roleAttributeKeys: ['custom-roles'] } } as UpdateSSOProviderDto,
+          noPermission,
+        ),
+      ).rejects.toThrow('Configuring SSO role attribute keys requires users.roles.manage');
+    });
+
     it('does not audit a provider update that fails before commit', async () => {
       jest.spyOn(fixture.ssoService, 'updateProvider').mockRejectedValueOnce(new Error('configuration write failed'));
       const request = {

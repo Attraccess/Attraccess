@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { SSOProviderOIDCConfiguration, SSOProviderType } from '@attraccess/database-entities';
 import { get } from 'lodash-es';
+import { DEFAULT_OIDC_ROLE_CLAIM_PATHS } from '@attraccess/shared';
 import type { RbacService } from '../../../rbac/rbac.service';
 import { resolveSsoRoleAssignments } from '../permission-mapping';
 import type { RoleDelta } from '../session-permission-sync';
@@ -14,10 +15,9 @@ export function getOidcPermissionClaimValues(
   roleClaimPaths?: string[] | null,
 ): unknown[] {
   // Configured paths replace the defaults entirely.
-  const paths = roleClaimPaths?.length ? roleClaimPaths : ['permissions', 'roles', 'groups', 'realm_access.roles'];
-  if (!roleClaimPaths?.length && clientId) {
-    paths.push(`resource_access.${clientId}.roles`);
-  }
+  const paths = roleClaimPaths?.length
+    ? roleClaimPaths
+    : [...DEFAULT_OIDC_ROLE_CLAIM_PATHS, ...(clientId ? [`resource_access.${clientId}.roles`] : [])];
 
   const values: unknown[] = [];
   for (const path of paths) {
