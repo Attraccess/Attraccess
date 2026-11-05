@@ -124,6 +124,12 @@ describe('ValkeySessionChangeCoordination', () => {
     valkey.failing = true;
     expect(await coordinationOn(valkey).isAlive('attempt-1')).toBe(false);
   });
+
+  it('returns the caller`s answer when Valkey cannot be asked and it was told what to assume', async () => {
+    const valkey = new FakeValkey();
+    valkey.failing = true;
+    expect(await coordinationOn(valkey).isAlive('attempt-1', true)).toBe(true);
+  });
 });
 
 describe('LocalSessionChangeCoordination', () => {

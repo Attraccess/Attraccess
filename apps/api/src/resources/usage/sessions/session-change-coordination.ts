@@ -4,7 +4,7 @@ import type { Redis } from 'ioredis';
 import { MachineBusyError } from '../errors/machine-busy.error';
 
 /** Another API instance may be running a change for the same machine, so Valkey holds the machine lock. */
-const LOCK_TTL_MS = 15_000;
+export const LOCK_TTL_MS = 15_000;
 const RENEW_EVERY_MS = 5_000;
 const RETRY_EVERY_MS = 50;
 
@@ -26,8 +26,11 @@ export interface SessionChangeCoordination {
   acquire(resourceId: number, timeoutMs: number): Promise<ReleaseLock>;
   /** Marks a lifecycle attempt as being worked on until the returned function is called. */
   keepAlive(attemptId: string): () => void;
-  /** False when no instance is working on the attempt any more (crashed or restarted). */
-  isAlive(attemptId: string): Promise<boolean>;
+  /**
+   * False when no instance is working on the attempt any more (crashed or restarted). When the answer cannot be
+   * found out, `ifUnknown` is returned: boot treats the attempt as gone, a periodic sweep must not.
+   */
+  isAlive(attemptId: string, ifUnknown?: boolean): Promise<boolean>;
 }
 
 /** One API instance: the in-process queue is the whole story and every attempt left at boot is an orphan. */
@@ -98,12 +101,12 @@ export class ValkeySessionChangeCoordination implements SessionChangeCoordinatio
     };
   }
 
-  async isAlive(attemptId: string): Promise<boolean> {
+  async isAlive(attemptId: string, ifUnknown = false): Promise<boolean> {
     if (await this.local.isAlive(attemptId)) return true;
     try {
       return (await this.client.exists(aliveKey(attemptId))) > 0;
     } catch {
-      return false;
+      return ifUnknown;
     }
   }
 }

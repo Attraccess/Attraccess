@@ -73,7 +73,7 @@ import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
 import { ResourceUsageService } from '../sessions/resource-usage.service';
-import type { SessionChangeCoordination } from '../sessions/session-change-coordination';
+import { LOCK_TTL_MS, type SessionChangeCoordination } from '../sessions/session-change-coordination';
 import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
 import { ResourceAuditOrigin } from '../../../audit/audit-policy';
 export interface EndSessionOptions {
@@ -239,19 +239,25 @@ export abstract class UsageLifecycle {
    * A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. An attempt that
    * another API instance is still working on (it keeps a heartbeat in Valkey) is left alone, so starting one
    * instance does not abort a start or stop in flight on another.
+   *
+   * The heartbeat outlives a crashed instance by up to its time to live, so an instance that restarts quickly
+   * cannot tell its own dead attempt from a live one. `sweep` repeats the check later, skipping attempts
+   * younger than the heartbeat's time to live and those whose heartbeat cannot be looked up.
    */
-  public async recoverInterruptedLifecycles(): Promise<void> {
-    const alive = new Set<string>();
-    for (const { id } of await this.resourceUsageRepository.manager.find(ResourceUsageLifecycleAttempt, {
-      select: { id: true },
+  public async recoverInterruptedLifecycles(sweep = false): Promise<void> {
+    const gone = new Set<string>();
+    const tooYoung = new Date(Date.now() - LOCK_TTL_MS);
+    for (const { id, createdAt } of await this.resourceUsageRepository.manager.find(ResourceUsageLifecycleAttempt, {
+      select: { id: true, createdAt: true },
     })) {
-      if (await this.sessionChangeCoordination.isAlive(id)) alive.add(id);
+      if (sweep && createdAt > tooYoung) continue;
+      if (!(await this.sessionChangeCoordination.isAlive(id, sweep))) gone.add(id);
     }
     const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const recovered = await recoverOrphanedUsages(manager);
+      const recovered = sweep ? 0 : await recoverOrphanedUsages(manager);
       if (recovered)
         this.logger.warn(`Cancelled ${recovered} orphan unfinalized usage sessions; see resource_usage_recovery`);
-      const attempts = (await manager.find(ResourceUsageLifecycleAttempt)).filter(({ id }) => !alive.has(id));
+      const attempts = (await manager.find(ResourceUsageLifecycleAttempt)).filter(({ id }) => gone.has(id));
       for (const attempt of attempts) {
         if (attempt.candidateUsageId !== null) {
           await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
@@ -387,6 +393,7 @@ export abstract class UsageLifecycle {
   ): UsageFlowPayload;
 
   protected abstract cacheCleanupInterval: ReturnType<typeof setInterval> | null;
+  protected abstract lifecycleSweepInterval: ReturnType<typeof setInterval> | null;
 
   protected abstract pruneAccessCache(): void;
 

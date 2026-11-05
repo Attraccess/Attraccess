@@ -33,6 +33,7 @@ import {
 } from '../../../users-and-auth/rbac/authorization-cache-invalidation';
 
 import { UsageLifecycle } from '../lifecycle/usage-lifecycle';
+import { LOCK_TTL_MS } from '../sessions/session-change-coordination';
 
 export abstract class UsageAuthorization extends UsageLifecycle {
   protected async getResource(
@@ -450,6 +451,13 @@ export abstract class UsageAuthorization extends UsageLifecycle {
     if (!this.valkeyClient) {
       return;
     }
+    // Other instances share the machines through Valkey, so a crashed one can leave an attempt no restart cleans up.
+    this.lifecycleSweepInterval = setInterval(() => {
+      this.recoverInterruptedLifecycles(true).catch((error: unknown) =>
+        this.logger.warn(`Sweeping interrupted usage lifecycles failed: ${(error as Error).message}`),
+      );
+    }, LOCK_TTL_MS);
+    this.lifecycleSweepInterval.unref?.();
     this.authorizationCacheSubscriber = this.valkeyClient.duplicate();
     this.authorizationCacheSubscriber.on('message', (channel, message) => {
       if (channel !== AUTHORIZATION_CACHE_INVALIDATION_CHANNEL) {
@@ -477,6 +485,10 @@ export abstract class UsageAuthorization extends UsageLifecycle {
     if (this.cacheCleanupInterval) {
       clearInterval(this.cacheCleanupInterval);
       this.cacheCleanupInterval = null;
+    }
+    if (this.lifecycleSweepInterval) {
+      clearInterval(this.lifecycleSweepInterval);
+      this.lifecycleSweepInterval = null;
     }
     this.authorizationCacheSubscriber?.disconnect();
     this.authorizationCacheSubscriber = null;

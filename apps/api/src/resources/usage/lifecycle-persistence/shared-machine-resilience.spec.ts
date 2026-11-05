@@ -11,7 +11,7 @@ import { closeResourceTransactionConnection } from '../../../database/run-serial
 import { MachineBusyError } from '../errors/machine-busy.error';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
-import { SessionChangeCoordination } from '../sessions/session-change-coordination';
+import { LOCK_TTL_MS, SessionChangeCoordination } from '../sessions/session-change-coordination';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';
 
@@ -158,6 +158,97 @@ describe('Shared machines: restart, waiting and audit', () => {
       expect(await attempts()).toHaveLength(0);
       parked.release();
       await expect(start).rejects.toBeInstanceOf(SessionChangeInterruptedError);
+    });
+
+    describe('sweeping attempts whose instance died without a restart cleaning them up', () => {
+      const ageAttempts = (seconds: number) =>
+        scope.source
+          .getRepository(ResourceUsageLifecycleAttempt)
+          .createQueryBuilder()
+          .update()
+          .set({ createdAt: new Date(Date.now() - seconds * 1000) })
+          .execute();
+
+      /** A start cut off when its API process died: the attempt and its tentative session stay in the database. */
+      const cutOffStart = async () => {
+        await setLimit(3);
+        const parked = parkFlows();
+        const start = scope.usage.startSession(1, scope.users[0], {});
+        start.catch(() => undefined);
+        await parked.entered;
+        return { parked, start };
+      };
+
+      it('is scheduled only when Valkey ties several instances to the same machines', async () => {
+        const interval = jest.spyOn(global, 'setInterval');
+        const sweeps = () => interval.mock.calls.filter(([, ms]) => ms === LOCK_TTL_MS);
+        try {
+          await scope.usage.onModuleInit();
+          expect(sweeps()).toHaveLength(0);
+          scope.usage.onModuleDestroy();
+
+          Reflect.set(scope.usage, 'valkeyClient', {
+            duplicate: () => ({ on: jest.fn(), subscribe: jest.fn(), disconnect: jest.fn() }),
+          });
+          await scope.usage.onModuleInit();
+          expect(sweeps()).toHaveLength(1);
+          scope.usage.onModuleDestroy();
+          expect(Reflect.get(scope.usage, 'lifecycleSweepInterval')).toBeNull();
+        } finally {
+          Reflect.set(scope.usage, 'valkeyClient', undefined);
+          interval.mockRestore();
+        }
+      });
+
+      it('removes it once its heartbeat has expired, so the user can start again', async () => {
+        const { parked, start } = await cutOffStart();
+        // The process restarted within the heartbeat's time to live: boot recovery still sees a heartbeat.
+        restartApi();
+        Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', otherInstance(true));
+        await scope.usage.recoverInterruptedLifecycles();
+        expect(await attempts()).toHaveLength(1);
+        await expect(scope.usage.startSession(1, scope.users[0], {})).rejects.toThrow();
+
+        await ageAttempts(60);
+        Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', otherInstance(false));
+        await scope.usage.recoverInterruptedLifecycles(true);
+        expect(await attempts()).toHaveLength(0);
+        expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(0);
+        await expect(scope.usage.startSession(1, scope.users[0], {})).resolves.toMatchObject({ userId: 1 });
+        parked.release();
+        await start.catch(() => undefined);
+      });
+
+      it('leaves an attempt alone while it is younger than the heartbeat lives, even without a heartbeat yet', async () => {
+        const { parked, start } = await cutOffStart();
+        Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', otherInstance(false));
+        await scope.usage.recoverInterruptedLifecycles(true);
+        expect(await attempts()).toHaveLength(1);
+        parked.release();
+        await expect(start).resolves.toMatchObject({ userId: 1 });
+      });
+
+      it('leaves an attempt alone when the heartbeat cannot be looked up', async () => {
+        const { parked, start } = await cutOffStart();
+        await ageAttempts(60);
+        Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', {
+          ...otherInstance(false),
+          isAlive: async (_id: string, ifUnknown = false) => ifUnknown,
+        });
+        await scope.usage.recoverInterruptedLifecycles(true);
+        expect(await attempts()).toHaveLength(1);
+        parked.release();
+        await start.catch(() => undefined);
+      });
+
+      it('never touches an attempt this instance is still working on', async () => {
+        const { parked, start } = await cutOffStart();
+        await ageAttempts(60);
+        await scope.usage.recoverInterruptedLifecycles(true);
+        expect(await attempts()).toHaveLength(1);
+        parked.release();
+        await expect(start).resolves.toMatchObject({ userId: 1 });
+      });
     });
 
     it('holds the machine through the other instance lock and refuses after the wait', async () => {

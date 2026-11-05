@@ -137,6 +137,7 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
   protected readonly ACCESS_CACHE_MAX_SIZE = 5_000;
 
   protected cacheCleanupInterval: ReturnType<typeof setInterval> | null = null;
+  protected lifecycleSweepInterval: ReturnType<typeof setInterval> | null = null;
 
   protected authorizationCacheSubscriber: Redis | null = null;
 
