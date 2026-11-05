@@ -64,14 +64,18 @@ Nutzung gestartet, beendet und übernommen ergänzen die Payload um `activeSessi
 
 Mit einem [Wenn](flows/node-types.md#wenn-if)-Knoten auf `activeSessions.before` = `0` erkennen Sie den ersten Start, mit `activeSessions.after` = `0` das letzte Ende. Beendet ein Start-Flow seine eigene neue Sitzung, meldet das folgende Ende bei `after` die Zahl der schon laufenden Sitzungen (0 bei der ersten).
 
-Bei einem Limit über 1 laufen Starts, Enden und Übernahmen einer Maschine nacheinander, jeweils vom Beginn über ihre Flows bis zum Abschluss. Zwei gleichzeitige Enden liefern daher genau einmal `after` = 0. Wer länger als 30 Sekunden warten muss, erhält die Meldung „Maschine ist beschäftigt, bitte erneut versuchen“. Ein fehlgeschlagener Start oder Ende verfälscht den nächsten Wert nicht. Bei einem Limit von 1 ändert sich nichts: Ein zweiter Start wird sofort abgelehnt.
+Bei einem Limit über 1 laufen Starts, Beendigungen und Übernahmen einer Maschine nacheinander, jeweils vom Beginn über ihre Flows bis zum Abschluss. Zwei gleichzeitige Enden liefern daher genau einmal `after` = 0. Ein Start oder Ende belegt die Maschine, bis sein gesamter Flow abgeschlossen ist. Wer länger als 30 Sekunden warten muss, erhält die Meldung **Maschine ist beschäftigt** und kann es erneut versuchen. Ein fehlgeschlagener Start oder ein fehlgeschlagenes Ende verfälscht den nächsten Wert nicht. Bei einem Limit von 1 ändert sich nichts: Ein zweiter Start wird sofort abgelehnt.
+
+Halten Sie Start- und Ende-Flows kurz: Ein Knoten [Warten](flows/node-types.md#warten), ein Knoten [Auf MQTT-Nachricht warten](flows/node-types.md#auf-mqtt-nachricht-warten) oder eine [HTTP-Anfrage](flows/node-types.md#http-anfrage) ohne Antwort-Timeout lässt alle anderen an der Maschine warten, und nach 30 Sekunden erhalten sie die Meldung **Maschine ist beschäftigt**.
+
+Ein Knoten [Nutzungssitzung beenden](flows/node-types.md#nutzungssitzung-beenden) mit **Die Sitzung eines Benutzers** oder **Alle Sitzungen** in einem Start- oder Ende-Flow wählt die Sitzungen aus, wenn er läuft, und beendet sie direkt nach Abschluss dieses Starts oder Endes, vor dem nächsten Start oder Ende an der Maschine. Die gerade startende Sitzung ist nie darunter. Schlägt der Start oder das Ende fehl, entfallen diese Beendigungen; beendet ein Start-Flow seine eigene neue Sitzung (mit **Die auslösende Sitzung**), laufen sie trotzdem.
 
 #### Beispiel: beim ersten Start einschalten, beim letzten Ende ausschalten
 
 1. **Nutzung gestartet** → **Wenn** `activeSessions.before` `=` `0` → (wahr) **MQTT-Nachricht senden** mit dem Einschaltbefehl.
 2. **Nutzung beendet** → **Wenn** `activeSessions.after` `=` `0` → (wahr) **MQTT-Nachricht senden** mit dem Ausschaltbefehl.
 
-Ohne die Wenn-Knoten würde die Maschine bei jedem Start erneut eingeschaltet und ausgeschaltet, während andere noch arbeiten. Wenn Admins das Limit über 1 erhöhen, listet der Bearbeiten-Dialog der Maschine die Flows auf, die Starts, Enden oder Übernahmen ohne eine solche Prüfung behandeln.
+Ohne die Wenn-Knoten würde die Maschine bei jedem Start erneut eingeschaltet und ausgeschaltet, während andere noch arbeiten. Wenn Admins das Limit über 1 erhöhen, listen die Ressourceneinstellungen im Abschnitt **Ressourcentyp und Verhalten** die Flows auf, die Starts, Beendigungen oder Übernahmen ohne eine solche Prüfung behandeln.
 
 ## Pfade und Vorlagen
 

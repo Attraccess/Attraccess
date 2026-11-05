@@ -17,7 +17,7 @@
   },
   "MachineBusyError": {
     "title": "Machine is busy",
-    "description": "Another person is just starting or stopping on this machine. Please try again in a moment."
+    "description": "Another session on this machine is being started or ended right now. Please try again in a moment."
   },
   "AlreadyHasActiveSessionError": {
     "title": "Session already active",

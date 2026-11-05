@@ -64,14 +64,18 @@ Usage Started, Stopped and Takeover add `activeSessions` to the payload. It coun
 
 Use an [If](flows/node-types.md#if) node on `activeSessions.before` = `0` to detect the first start, and on `activeSessions.after` = `0` to detect the last stop. If a start flow ends its own new session, the stop that follows reports `after` as the number of sessions that were already running (0 for the first one).
 
-On a machine with a limit above 1, starts, stops and takeovers run one at a time, each from start through its flows to the end, so two simultaneous stops give exactly one `after` = 0. Someone who has to wait longer than 30 seconds gets a "machine busy, try again" error. A failed start or stop does not change the next count. With a limit of 1 nothing changes: a second start is refused immediately.
+On a machine with a limit above 1, starts, stops and takeovers run one at a time, each from start through its flows to the end, so two simultaneous stops give exactly one `after` = 0. A start or stop holds the machine until its whole flow has finished. Someone who has to wait longer than 30 seconds gets the **Machine is busy** error and can try again. A failed start or stop does not change the next count. With a limit of 1 nothing changes: a second start is refused immediately.
+
+Keep start and stop flows short: a [Wait](flows/node-types.md#wait) node, a [Wait for MQTT Message](flows/node-types.md#wait-for-mqtt-message) node or an [HTTP Request](flows/node-types.md#http-request) without a response timeout makes everyone else on the machine wait, and after 30 seconds they get the **Machine is busy** error.
+
+An [End Usage Session](flows/node-types.md#end-usage-session) node set to **The session of a user** or **All sessions** inside a start or stop flow picks the sessions when it runs and ends them right after that start or stop has finished, before the next start or stop on the machine. The session being started is never among them. If the start or stop fails, these ends are dropped; if a start flow ends its own new session (End Usage Session with **The triggering session**), they still run.
 
 #### Example: power on at the first start, off at the last stop
 
 1. **Usage Started** → **If** `activeSessions.before` `=` `0` → (true) **MQTT Send Message** with the power-on command.
 2. **Usage Stopped** → **If** `activeSessions.after` `=` `0` → (true) **MQTT Send Message** with the power-off command.
 
-Without the If nodes the machine would be switched on again at every start and switched off while others are still working. When an admin raises the limit above 1, the machine's edit dialog lists the flows that act on starts, stops or takeovers without such a check.
+Without the If nodes the machine would be switched on again at every start and switched off while others are still working. When an admin raises the limit above 1, the resource settings list the flows that act on starts, stops or takeovers without such a check, in the **Resource type and behavior** section.
 
 ## Paths and Templates
 

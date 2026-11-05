@@ -45,7 +45,7 @@ Everybody ends their own session. Resource managers, introducers, maintainers an
 > [!WARNING]
 > **Flows and billing on shared machines (limit above 1).** Billing does not take the number of running sessions into account, and flows have to check it themselves. With a limit of 1, this section does not apply.
 >
-> - **Flows** run for every session start and stop. A flow that switches the power off when a session ends therefore cuts the power for everybody on the machine unless it checks `activeSessions` (see [Active sessions on shared machines](flows/payloads-variables-templates.md#active-sessions-on-shared-machines)). The edit dialog of the machine lists the flows that do not check it.
+> - **Flows** run for every session start and stop. A flow that switches the power off when a session ends therefore cuts the power for everybody on the machine unless it checks `activeSessions` (see [Active sessions on shared machines](flows/payloads-variables-templates.md#active-sessions-on-shared-machines)). The resource settings list the flows that do not check it in the **Resource type and behavior** section.
 > - **Per-use fees** are charged per session.
 > - **Session-time billing** is charged per session.
 > - **Meters (for example energy):** the earliest-started session that is still running owns the meter and is charged its consumption. Later overlapping sessions are not metered or charged for meters already in use. When that session ends while others continue, the meter is read as usual and the sessions still running are not charged any further meter consumption. The meter is then free again: the next session that starts while it is free gets the meter and is charged its consumption.

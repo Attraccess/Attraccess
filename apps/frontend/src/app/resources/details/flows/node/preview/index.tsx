@@ -214,11 +214,20 @@ const previewBuilders: Partial<Record<ResourceFlowNodeType, PreviewBuilder>> = {
   },
 
   [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: (t, nodeData) => {
+    const target = (nodeData?.data.target as string | undefined) ?? 'triggering';
     return [
       {
         label: t('nodes.output.resource.usage.end-session.preview.target'),
-        value: (nodeData?.data.target as string) ?? 'triggering',
+        value: t('nodes.output.resource.usage.end-session.config.target.enum.' + target),
       },
+      ...(target === 'user'
+        ? [
+            {
+              label: t('nodes.output.resource.usage.end-session.config.userId.label'),
+              value: nodeData?.data.userId ? String(nodeData.data.userId) : '-',
+            },
+          ]
+        : []),
       {
         label: t('nodes.output.resource.usage.end-session.preview.notes'),
         value: nodeData?.data.notes as string,
