@@ -226,7 +226,7 @@ describe('state-preserving update shell (isolated FW31 interfaces)', () => {
     rmSync(join(fixture.root, 'bin/dd'));
     fixture.file(
       'bin/dd',
-      '#!/bin/sh\ncase "$1" in bs=1) if test "$2" = count=8193 && test -e "$FIXTURE_ROOT/var/lib/attraccess-wago-update-transaction/bundle.tar"; then echo capture >> "$FIXTURE_ROOT/receiver-metadata-captures.log"; fi; exec /bin/dd "$@" ;; esac\nsize=${1#bs=}\nif test "$size" -gt 256 && test "$2" = count=1; then exec /bin/dd bs=256 count=1; fi\nexec /bin/dd "$@"\n',
+      '#!/bin/sh\ncase "$1" in bs=1) if test "$2" = count=8193 && test -e "$FIXTURE_ROOT/var/lib/attraccess-wago-update-transaction/bundle.tar"; then echo capture >> "$FIXTURE_ROOT/receiver-metadata-captures.log"; fi; exec "$FIXTURE_ROOT/host-tools/dd" "$@" ;; esac\nsize=${1#bs=}\nif test "$size" -gt 256 && test "$2" = count=1; then exec "$FIXTURE_ROOT/host-tools/dd" bs=256 count=1; fi\nexec "$FIXTURE_ROOT/host-tools/dd" "$@"\n',
       0o700,
     );
     success(stage());
