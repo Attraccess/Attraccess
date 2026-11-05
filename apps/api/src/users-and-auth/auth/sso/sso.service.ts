@@ -49,7 +49,7 @@ const SAML_UPDATE_PASSTHROUGH_FIELDS = [
   'roleMappings',
 ] as const;
 
-/** `simple-array` writes [] as '' and reads it back as [''], so an empty list is stored as null (= use the defaults). */
+/** An empty list means "use the defaults"; store it as null rather than the `simple-array` empty string. */
 const emptyListToNull = <T>(value: T[] | null | undefined) => (value?.length === 0 ? null : value);
 
 @Injectable()

@@ -41,7 +41,8 @@ export function getOidcPermissionClaimValues(
   for (const path of paths) {
     for (const source of claimSources) {
       const value = getOwnClaim(source, path);
-      if (value !== undefined && value !== null) {
+      // Only strings, lists and objects can carry role names; e.g. `groups.length` must not count as present.
+      if (typeof value === 'string' || (typeof value === 'object' && value !== null)) {
         values.push(value);
       }
     }

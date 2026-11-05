@@ -64,11 +64,11 @@ describe('syncOidcRolesFromClaims', () => {
     expect(await syncOidcRolesFromClaims(rbac, 7, custom, [{ groups: ['fab-staff'] }])).toBeUndefined();
   });
 
-  it.each(['toString', 'hasOwnProperty', 'groups.toString', 'custom.valueOf'])(
-    'treats the inherited property %s as absent so roles are kept',
+  it.each(['toString', 'hasOwnProperty', 'groups.toString', 'custom.valueOf', 'groups.length', 'flag'])(
+    'treats %s (inherited or not a list) as absent so roles are kept',
     async (path) => {
       const custom = { ...config, roleClaimPaths: [path] };
-      const sources = [{ groups: ['fab-staff'], custom: { roles: ['fab-staff'] } }];
+      const sources = [{ groups: ['fab-staff'], custom: { roles: ['fab-staff'] }, flag: true }];
       expect(await syncOidcRolesFromClaims(rbac, 7, custom, sources)).toBeUndefined();
       expect(rbac.syncSsoRoles).not.toHaveBeenCalled();
     },
