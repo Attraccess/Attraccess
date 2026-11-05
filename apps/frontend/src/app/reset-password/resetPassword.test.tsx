@@ -78,14 +78,22 @@ describe('ResetPassword completion labels', () => {
     expect(screen.getByLabelText(translations.inputs.confirmPassword)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: translations.submit })).toBeInTheDocument();
   });
+});
+
+describe('ResetPassword layout', () => {
+  beforeEach(() => {
+    navigateMock.mockReset();
+    state.locale = 'en';
+    state.pending = false;
+    state.success = true;
+  });
 
   it('renders the form without its own full-height centering wrapper', () => {
     state.success = false;
     const { container } = render(<ResetPassword />);
 
-    // Regression: the form must not reintroduce min-h-screen items-center centering,
-    // which pushed the CTA below the fold on small screens (it belongs to UnauthorizedLayout).
     expect(screen.getByRole('button', { name: en.submit })).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveAttribute('data-cy', 'reset-password-form');
     expect(container.querySelector('.min-h-screen')).not.toBeInTheDocument();
   });
 
@@ -94,6 +102,7 @@ describe('ResetPassword completion labels', () => {
     const { container } = render(<ResetPassword />);
 
     expect(screen.getByText(en.success.title)).toBeInTheDocument();
+    expect(container.firstElementChild).toHaveAttribute('data-cy', 'reset-password-success-card');
     expect(container.querySelector('.min-h-screen')).not.toBeInTheDocument();
   });
 });

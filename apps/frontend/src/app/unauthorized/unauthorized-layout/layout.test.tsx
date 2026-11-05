@@ -22,7 +22,7 @@ afterEach(() => {
 describe('UnauthorizedLayout', () => {
   it('renders its children', () => {
     renderLayout();
-    expect(screen.getByTestId('form-content')).toBeTruthy();
+    expect(screen.getByTestId('form-content')).toBeInTheDocument();
   });
 
   it('keeps the outer container scrollable at a dynamic viewport height', () => {
@@ -38,9 +38,10 @@ describe('UnauthorizedLayout', () => {
     expect(classesOf(content).has('min-h-full')).toBe(true);
   });
 
-  it('top-aligns the form column below lg and centers it at lg and above', () => {
-    const { getByTestId } = renderLayout();
-    const formColumn = getByTestId('form-content').parentElement?.parentElement ?? null;
+  it('applies top alignment to the form column with an lg-and-up centered override', () => {
+    renderLayout();
+    const formColumn = screen.getByTestId('unauthorized-form-column');
+    expect(formColumn).toContainElement(screen.getByTestId('form-content'));
     const classes = classesOf(formColumn);
     expect(classes.has('flex')).toBe(true);
     expect(classes.has('items-start')).toBe(true);
