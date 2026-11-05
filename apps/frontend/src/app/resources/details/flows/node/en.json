@@ -678,7 +678,7 @@
               },
               "userId": {
                 "label": "User id (templates allowed)",
-                "helpText": "Only for \"The session of a user\", for example {{user.id}}."
+                "helpText": "Only for \"The session of a user\". A user id, or a template that resolves to one, such as the path user.id of the payload."
               },
               "notes": { "label": "Notes (templates allowed)" },
               "failureBehavior": {

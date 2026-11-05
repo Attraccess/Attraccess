@@ -201,9 +201,11 @@ describe('Parallel sessions on one machine', () => {
       await parked.entered;
       const second = scope.usage.startSession(1, scope.users[1], {});
       const queued = scope.usage.startSession(1, third, {});
+      // Observe the refusal right away: it can settle while the earlier starts are still finishing.
+      const refused = expect(queued).rejects.toBeInstanceOf(ResourceFullError);
       parked.release();
       await Promise.all([first, second]);
-      await expect(queued).rejects.toBeInstanceOf(ResourceFullError);
+      await refused;
     });
 
     it('queues a start behind another person stop in progress', async () => {
@@ -231,9 +233,10 @@ describe('Parallel sessions on one machine', () => {
       const ending = scope.usage.endSession(1, scope.users[0], {});
       await parked.entered;
       const second = scope.usage.endSession(1, scope.users[1], { usageId: own.id });
+      const refused = expect(second).rejects.toBeInstanceOf(BadRequestException);
       parked.release();
       expect((await ending).id).toBe(own.id);
-      await expect(second).rejects.toBeInstanceOf(BadRequestException);
+      await refused;
       expect((await scope.usage.getActiveSessionsForResource(1)).map((session) => session.userId)).toEqual([2]);
     });
 
@@ -376,6 +379,21 @@ describe('Parallel sessions on one machine', () => {
       await Promise.all([ending, endingAll]);
       // The session that was already ending is not ended a second time.
       expect(scope.flow.runFlow).toHaveBeenCalledTimes(1);
+      expect(await scope.usage.getActiveSessionsForResource(1)).toEqual([]);
+    });
+
+    it('lets two simultaneous ends of all sessions both succeed and end every session once', async () => {
+      await setLimit(3);
+      const users = await addUsers(2);
+      await Promise.all(users.map((user) => scope.usage.startSession(1, user, {})));
+      scope.flow.runFlow.mockClear();
+      await expect(
+        Promise.all([
+          scope.usage.endSessionsOfTarget(1, { kind: 'all' }, ''),
+          scope.usage.endSessionsOfTarget(1, { kind: 'all' }, ''),
+        ]),
+      ).resolves.toBeDefined();
+      expect(scope.flow.runFlow).toHaveBeenCalledTimes(2);
       expect(await scope.usage.getActiveSessionsForResource(1)).toEqual([]);
     });
 

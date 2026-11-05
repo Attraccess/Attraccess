@@ -678,7 +678,7 @@
               },
               "userId": {
                 "label": "Benutzer-ID (Templates erlaubt)",
-                "helpText": "Nur für \"Die Sitzung eines Benutzers\", zum Beispiel {{user.id}}."
+                "helpText": "Nur für \"Die Sitzung eines Benutzers\". Eine Benutzer-ID oder ein Template, das eine ergibt, zum Beispiel der Payload-Pfad user.id."
               },
               "notes": { "label": "Notizen (Templates erlaubt)" },
               "failureBehavior": {

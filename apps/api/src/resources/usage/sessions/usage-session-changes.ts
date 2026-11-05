@@ -91,11 +91,18 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
         );
       } catch (error) {
         if (error instanceof ConflictException) continue;
+        // Another run ended it between listing and ending: nothing left to do for this session.
+        if (await this.isSessionGone(resourceId, session.id, manager)) continue;
         this.logger.warn(`Ending session ${session.id} of resource ${resourceId} from a flow failed`);
         firstError ??= error;
       }
     }
     if (firstError) throw firstError;
+  }
+
+  private async isSessionGone(resourceId: number, usageId: number, manager?: EntityManager): Promise<boolean> {
+    const stillActive = await this.getActiveSessionsForResource(resourceId, manager);
+    return !stillActive.some((session) => session.id === usageId);
   }
 
   private async findEndableSessions(
