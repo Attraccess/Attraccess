@@ -102,6 +102,7 @@ const lockfile = ({
   packet = '9.0.2',
   other = '1.0.0',
   version = '9.0',
+  filler = 0,
 } = {}) => `lockfileVersion: '${version}'
 
 settings:
@@ -150,7 +151,10 @@ snapshots:
   debug@4.4.3(supports-color@7.2.0): {}
 
   bufferutil@4.0.0: {}
-`;
+${Array.from({ length: filler }, (_, index) => `\n  filler-package-${index}@1.0.0: {}\n`).join('')}`;
+
+// Larger than the 1 MiB default of execFileSync, like the real root lockfile.
+const bigLockfile = (options = {}) => lockfile({ filler: 40000, ...options });
 
 const rootPackage = ({
   mqtt = '^5.15.2',
@@ -167,7 +171,7 @@ const rootPackage = ({
     pnpm: { overrides },
   });
 
-for (const [name, files, pass, message] of [
+for (const [name, files, pass, message, baseline] of [
   ['allows an unrelated lockfile change', { 'pnpm-lock.yaml': lockfile({ other: '1.0.1' }) }, true],
   [
     'requires a bump for a changed mqtt version',
@@ -231,6 +235,20 @@ for (const [name, files, pass, message] of [
     false,
     /other 1\.0\.0 → 1\.0\.1/,
   ],
+  [
+    'allows an unrelated change to a lockfile larger than 1 MiB',
+    { 'pnpm-lock.yaml': bigLockfile({ other: '1.0.1' }) },
+    true,
+    undefined,
+    { 'pnpm-lock.yaml': bigLockfile() },
+  ],
+  [
+    'requires a bump for a changed mqtt version in a lockfile larger than 1 MiB',
+    { 'pnpm-lock.yaml': bigLockfile({ mqtt: '5.16.1' }) },
+    false,
+    /mqtt 5\.16\.0 → 5\.16\.1/,
+    { 'pnpm-lock.yaml': bigLockfile() },
+  ],
 ]) {
   test(name, () => {
     const directory = mkdtempSync(join(tmpdir(), 'cc100-version-check-'));
@@ -249,6 +267,7 @@ for (const [name, files, pass, message] of [
       file(runtimePackage, JSON.stringify({ dependencies: { mqtt: '^5.15.2' } }));
       file('pnpm-lock.yaml', lockfile());
       file('package.json', rootPackage());
+      for (const [path, content] of Object.entries(baseline ?? {})) file(path, content);
       git('add', '.');
       git('commit', '--quiet', '-m', 'baseline');
       const base = git('rev-parse', 'HEAD');

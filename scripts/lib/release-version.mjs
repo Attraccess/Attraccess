@@ -12,18 +12,16 @@ export function stableVersion(value, description) {
  *
  * `contentSources` is optional: a map of path -> `({ ancestor, show }) => string | null`. Those paths count as
  * source only when the callback returns a description of what changed (`show(rev, path)` reads a file from git,
- * or null when it does not exist). They are evaluated in addition to `isSource`, which stays path-only.
+ * or null when it does not exist at that revision). They are evaluated in addition to `isSource`, which stays path-only.
  */
 export function checkReleaseVersion({ base, versionFile, isSource, readVersion, label, contentSources = {} }) {
-  const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  // Files such as pnpm-lock.yaml exceed execFileSync's 1 MiB default, which would make `git show` fail.
+  const git = (...args) =>
+    execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 });
   const ancestor = git('merge-base', base, 'HEAD').trim();
-  const show = (rev, path) => {
-    try {
-      return git('show', `${rev}:${path}`);
-    } catch {
-      return null;
-    }
-  };
+  // Only a file that does not exist at `rev` reads as null; any other git failure must surface, not look unchanged.
+  const show = (rev, path) =>
+    git('ls-tree', '--name-only', rev, '--', path).trim() ? git('show', `${rev}:${path}`) : null;
   const changed = git('diff', '--name-only', '-z', `${ancestor}...HEAD`, '--')
     .split('\0')
     .flatMap((path) => {
