@@ -14,7 +14,13 @@ import { EndSessionOptions } from '../lifecycle/usage-lifecycle';
 
 import { activeUsageWhere, sessionLimitOf } from './active-usage';
 
-import { SessionChangeQueue } from './session-change-queue';
+import {
+  LocalSessionChangeCoordination,
+  SessionChangeCoordination,
+  ValkeySessionChangeCoordination,
+} from './session-change-coordination';
+
+import { SESSION_CHANGE_WAIT_MS, SessionChangeQueue } from './session-change-queue';
 
 export type SessionEndTarget = { kind: 'user'; userId: number } | { kind: 'all' };
 
@@ -22,6 +28,7 @@ export type SessionEndTarget = { kind: 'user'; userId: number } | { kind: 'all' 
 interface DeferredSessionEnds {
   usageIds: number[];
   notes: string;
+  triggeredByUserId?: number;
 }
 
 /**
@@ -30,6 +37,19 @@ interface DeferredSessionEnds {
  */
 export abstract class UsageSessionChanges extends UsageAuthorization {
   private readonly sessionChangeQueue = new SessionChangeQueue();
+
+  /** How long a start, stop or takeover waits for the previous one on the same shared machine. */
+  protected sessionChangeWaitMs = SESSION_CHANGE_WAIT_MS;
+
+  private sessionChangeCoordinationInstance: SessionChangeCoordination | undefined;
+
+  /** Valkey makes the turn per machine hold across API instances; without it this instance's queue is enough. */
+  protected get sessionChangeCoordination(): SessionChangeCoordination {
+    this.sessionChangeCoordinationInstance ??= this.valkeyClient
+      ? new ValkeySessionChangeCoordination(this.valkeyClient)
+      : new LocalSessionChangeCoordination();
+    return this.sessionChangeCoordinationInstance;
+  }
 
   /** Ends of other sessions requested by a start or stop flow; they run once that start or stop has finished. */
   private readonly deferredSessionEnds = new Map<string, DeferredSessionEnds[]>();
@@ -54,30 +74,36 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
       }),
     );
     return limit > 1
-      ? this.sessionChangeQueue.run(resourceId, change)
+      ? this.sessionChangeQueue.run(resourceId, change, this.sessionChangeWaitMs, this.sessionChangeCoordination)
       : this.sessionChangeQueue.runAlongside(resourceId, change);
   }
 
   private async runChangeThenDeferredEnds<T>(resourceId: number, attemptId: string, task: () => Promise<T>) {
-    let result: T;
+    // Tells a restarting instance that this attempt is being worked on, so it leaves it alone.
+    const stopKeepAlive = this.sessionChangeCoordination.keepAlive(attemptId);
     try {
-      result = await task();
-    } catch (error) {
-      // A start flow that ended its own new session finished on purpose: the ends it asked for still apply.
-      if (error instanceof TentativeSessionCancelledError) await this.runDeferredSessionEnds(resourceId, attemptId);
-      else this.deferredSessionEnds.delete(attemptId);
-      throw error;
+      let result: T;
+      try {
+        result = await task();
+      } catch (error) {
+        // A start flow that ended its own new session finished on purpose: the ends it asked for still apply.
+        if (error instanceof TentativeSessionCancelledError) await this.runDeferredSessionEnds(resourceId, attemptId);
+        else this.deferredSessionEnds.delete(attemptId);
+        throw error;
+      }
+      await this.runDeferredSessionEnds(resourceId, attemptId);
+      return result;
+    } finally {
+      stopKeepAlive();
     }
-    await this.runDeferredSessionEnds(resourceId, attemptId);
-    return result;
   }
 
   private async runDeferredSessionEnds(resourceId: number, attemptId: string): Promise<void> {
     const deferred = this.deferredSessionEnds.get(attemptId) ?? [];
     this.deferredSessionEnds.delete(attemptId);
-    for (const { usageIds, notes } of deferred) {
-      await this.endSessionsById(resourceId, usageIds, notes, true).catch((error: unknown) =>
-        this.logger.error(`Deferred session end failed for resource ${resourceId}`, error),
+    for (const { usageIds, notes, triggeredByUserId } of deferred) {
+      await this.endSessionsById(resourceId, usageIds, notes, true, undefined, triggeredByUserId).catch(
+        (error: unknown) => this.logger.error(`Deferred session end failed for resource ${resourceId}`, error),
       );
     }
   }
@@ -92,12 +118,13 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
     target: SessionEndTarget,
     notes: string,
     manager?: EntityManager,
+    triggeredByUserId?: number,
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
     if (target.kind === 'user' && sessions.length === 0) throw new NoUsageSessionError();
     if (sessions.length === 0) return;
     const ends = this.deferredSessionEnds.get(attemptId) ?? [];
-    ends.push({ usageIds: sessions.map((session) => session.id), notes });
+    ends.push({ usageIds: sessions.map((session) => session.id), notes, triggeredByUserId });
     this.deferredSessionEnds.set(attemptId, ends);
   }
 
@@ -107,6 +134,7 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
     target: SessionEndTarget,
     notes: string,
     manager?: EntityManager,
+    triggeredByUserId?: number,
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
     if (target.kind === 'user' && sessions.length === 0) throw new NoUsageSessionError();
@@ -116,6 +144,7 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
       notes,
       false,
       manager,
+      triggeredByUserId,
     );
   }
 
@@ -125,6 +154,7 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
     notes: string,
     withinSessionChange: boolean,
     manager?: EntityManager,
+    triggeredByUserId?: number,
   ): Promise<void> {
     let firstError: unknown;
     for (const usageId of usageIds) {
@@ -140,6 +170,7 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
             skipFormSubmissions: true,
             skipNoteNotification: true,
             auditOrigin: { actorId: null },
+            triggeredByUserId,
             withinSessionChange,
           },
         );

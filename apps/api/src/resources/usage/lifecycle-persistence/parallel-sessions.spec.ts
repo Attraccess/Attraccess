@@ -249,6 +249,8 @@ describe('Parallel sessions on one machine', () => {
       await parked.entered;
       expect(await count('resource_usage_lifecycle_attempt')).toBe(1);
       expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(1);
+      // The API process restarts: nothing of the old process is running any more.
+      Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', undefined);
       await scope.usage.recoverInterruptedLifecycles();
       expect(await count('resource_usage_lifecycle_attempt')).toBe(0);
       expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(0);

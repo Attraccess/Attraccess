@@ -420,13 +420,18 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     endedUsageIdToEmit: number | null,
     activeSession: ResourceUsage | null,
     skipNoteNotification: boolean,
+    triggeredByUserId?: number,
   ): Promise<void> {
     await this.audit
       .recordResource({
         action: 'usage_session.ended',
         ...auditOrigin,
         subjectId: resourceId,
-        details: { usageId: updatedUsage.id, usageUserId: updatedUsage.userId },
+        details: {
+          usageId: updatedUsage.id,
+          usageUserId: updatedUsage.userId,
+          ...(triggeredByUserId === undefined ? {} : { triggeredByUserId }),
+        },
       })
       .catch(() => undefined);
 

@@ -111,6 +111,15 @@ describe('findFlowsWithoutSessionCountCheck', () => {
     expect(warnings).toHaveLength(flagged ? 1 : 0);
   });
 
+  it('warns for a plugin output node after a session trigger and accepts it behind a count check', () => {
+    const plugin = 'plugin.warnings-spec.switch';
+    expect(findFlowsWithoutSessionCountCheck([node('t', STOPPED), node('p', plugin)], edges(['t', 'p']))).toEqual([
+      { triggerNodeId: 't', triggerType: STOPPED, effectNodes: [{ nodeId: 'p', nodeType: plugin }] },
+    ]);
+    const guarded = [node('t', STOPPED), node('i', IF, afterIsZero), node('p', plugin)];
+    expect(findFlowsWithoutSessionCountCheck(guarded, edges(['t', 'i'], ['i', 'p']))).toEqual([]);
+  });
+
   it('flags an effect placed before the check', () => {
     const nodes = [node('t', STOPPED), node('h', HTTP), node('i', IF, afterIsZero)];
     expect(findFlowsWithoutSessionCountCheck(nodes, edges(['t', 'h'], ['h', 'i']))).toHaveLength(1);

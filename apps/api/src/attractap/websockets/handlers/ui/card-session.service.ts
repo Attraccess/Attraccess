@@ -28,6 +28,8 @@ export class CardSessionService {
   /** The last session the server timer expired, revivable by its own reader while nothing newer exists. */
   private readonly expired = new WeakMap<AuthenticatedWebSocket, CardSessionState>();
   private readonly deadlines = new WeakMap<CardSessionState, number>();
+  /** Start/stop requests still waiting for the machine or running their flows; the card session outlives them. */
+  private readonly holds = new WeakMap<CardSessionState, number>();
 
   onStarted(listener: StartedListener): void {
     this.started.push(listener);
@@ -84,6 +86,20 @@ export class CardSessionService {
     return true;
   }
 
+  /**
+   * A start or stop of this card session is in flight (it may wait up to 30 s for a shared machine, then run its
+   * flows): the server timer must not expire the card session meanwhile. Call the returned function when done.
+   */
+  hold(socket: AuthenticatedWebSocket): () => void {
+    const session = socket.state.cardSession;
+    if (!session) return () => undefined;
+    this.holds.set(session, (this.holds.get(session) ?? 0) + 1);
+    return () => {
+      this.holds.set(session, Math.max(0, (this.holds.get(session) ?? 1) - 1));
+      if (socket.state.cardSession?.id === session.id) this.rearm(socket);
+    };
+  }
+
   /** Reader reported "card session ended", the server timer fired, or the socket closed. */
   end(socket: AuthenticatedWebSocket, cardSessionId: string | null, reason: CardSessionEndReason): boolean {
     if (reason !== 'expired' && (cardSessionId === null || this.expired.get(socket)?.id === cardSessionId)) {
@@ -113,7 +129,7 @@ export class CardSessionService {
     this.deadlines.set(session, Date.now() + afterMs);
     session.expiryTimer = setTimeout(() => {
       if (socket.state.cardSession?.id !== session.id) return;
-      if (socket.state.uiSteps && socket.state.uiSteps.size > 0) {
+      if ((socket.state.uiSteps && socket.state.uiSteps.size > 0) || (this.holds.get(session) ?? 0) > 0) {
         this.arm(socket, session, CARD_SESSION_GRACE_MS * 2);
         return;
       }

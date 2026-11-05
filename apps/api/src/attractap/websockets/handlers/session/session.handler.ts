@@ -44,6 +44,7 @@ import { InsufficientBalanceError } from '../../../../billing/errors/insufficien
 
 import { ResourceInUseError } from '../../../../resources/usage/errors/resource-in-use.error';
 import { ResourceFullError } from '../../../../resources/usage/errors/resource-full.error';
+import { SessionChangeInterruptedError } from '../../../../resources/usage/errors/session-change-interrupted.error';
 import { MachineBusyError } from '../../../../resources/usage/errors/machine-busy.error';
 import { AlreadyHasActiveSessionError } from '../../../../resources/usage/errors/already-has-active-session.error';
 
@@ -354,15 +355,20 @@ export class AttractapSessionHandler {
         await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, gate.payload);
         return;
       }
-      await this.resourceUsageService.startSession(
-        resourceId,
-        user,
-        { projectId, formSubmissions, forceTakeOver },
-        {
-          ...(supervisorUserId ? { supervisorUserId } : {}),
-          auditOrigin: { actorId: user.id, authenticationMethod: null },
-        },
-      );
+      const releaseCardSession = this.cardSessions.hold(socket);
+      try {
+        await this.resourceUsageService.startSession(
+          resourceId,
+          user,
+          { projectId, formSubmissions, forceTakeOver },
+          {
+            ...(supervisorUserId ? { supervisorUserId } : {}),
+            auditOrigin: { actorId: user.id, authenticationMethod: null },
+          },
+        );
+      } finally {
+        releaseCardSession();
+      }
       this.formsHandler.clearFormDraft(socket, resourceId, formAction);
       // The card channel won — settle the still-open web request so any supervisor popups close.
       if (flow?.requestId) {
@@ -378,6 +384,7 @@ export class AttractapSessionHandler {
         error instanceof ResourceInUseError ||
         error instanceof ResourceFullError ||
         error instanceof MachineBusyError ||
+        error instanceof SessionChangeInterruptedError ||
         error instanceof AlreadyHasActiveSessionError
       ) {
         // Resolve the pending action before refreshing an occupied row.
@@ -434,14 +441,17 @@ export class AttractapSessionHandler {
     }
 
     try {
-      const usage = await this.resourceUsageService.endSession(
-        resourceId,
-        user,
-        { formSubmissions, ...(Number.isInteger(usageId) ? { usageId } : {}) },
-        {
-          auditOrigin: { actorId: user.id, authenticationMethod: null },
-        },
-      );
+      const releaseCardSession = this.cardSessions.hold(socket);
+      const usage = await this.resourceUsageService
+        .endSession(
+          resourceId,
+          user,
+          { formSubmissions, ...(Number.isInteger(usageId) ? { usageId } : {}) },
+          {
+            auditOrigin: { actorId: user.id, authenticationMethod: null },
+          },
+        )
+        .finally(releaseCardSession);
       this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.END);
       const start = usage?.startTime ? new Date(usage.startTime).getTime() : NaN;
       const end = usage?.endTime ? new Date(usage.endTime).getTime() : NaN;

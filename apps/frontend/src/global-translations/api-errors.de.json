@@ -19,6 +19,10 @@
     "title": "Maschine ist beschäftigt",
     "description": "An dieser Maschine wird gerade eine andere Sitzung gestartet oder beendet. Bitte versuchen Sie es gleich noch einmal."
   },
+  "SessionChangeInterruptedError": {
+    "title": "Anfrage unterbrochen",
+    "description": "Der Server wurde neu gestartet, während Ihre Anfrage bearbeitet wurde. Es wurde nichts geändert. Bitte versuchen Sie es erneut."
+  },
   "AlreadyHasActiveSessionError": {
     "title": "Sitzung bereits aktiv",
     "description": "Sie haben an dieser Maschine bereits eine aktive Sitzung. Beenden Sie diese zuerst, wenn Sie neu starten möchten."

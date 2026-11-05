@@ -41,6 +41,30 @@ describe('CardSessionService', () => {
     expect(service.current(socket)).toBeNull();
   });
 
+  it('does not expire while a start or stop is in flight, even past the 30 s wait for a shared machine', () => {
+    const service = new CardSessionService();
+    const socket = makeSocket();
+    service.issue(socket, 7, 'en');
+    const release = service.hold(socket);
+    jest.advanceTimersByTime(UNLOCKED_TIMEOUT_MS + CARD_SESSION_GRACE_MS * 4);
+    expect(service.current(socket)).not.toBeNull();
+    release();
+    jest.advanceTimersByTime(CARD_SESSION_GRACE_MS * 2 + 1);
+    expect(service.current(socket)).toBeNull();
+  });
+
+  it('keeps the card session while any of several holds is open', () => {
+    const service = new CardSessionService();
+    const socket = makeSocket();
+    service.issue(socket, 7, 'en');
+    const first = service.hold(socket);
+    const second = service.hold(socket);
+    first();
+    jest.advanceTimersByTime(UNLOCKED_TIMEOUT_MS + CARD_SESSION_GRACE_MS * 3);
+    expect(service.current(socket)).not.toBeNull();
+    second();
+  });
+
   describe('resume', () => {
     const LIFETIME = UNLOCKED_TIMEOUT_MS + CARD_SESSION_GRACE_MS;
 

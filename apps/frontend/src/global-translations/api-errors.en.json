@@ -19,6 +19,10 @@
     "title": "Machine is busy",
     "description": "Another session on this machine is being started or ended right now. Please try again in a moment."
   },
+  "SessionChangeInterruptedError": {
+    "title": "Request interrupted",
+    "description": "The server restarted while your request was being processed. Nothing was changed. Please try again."
+  },
   "AlreadyHasActiveSessionError": {
     "title": "Session already active",
     "description": "You already have an active session on this machine. End it first if you want to start again."

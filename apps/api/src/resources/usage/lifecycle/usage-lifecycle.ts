@@ -22,6 +22,8 @@ import { ResourceUsageLifecycleAbortedEvent } from '../events/resource-usage.eve
 
 import { recoverOrphanedUsages } from '../../../database/resource-usage-integrity';
 
+import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
+
 import { ExternalEffectFailureError } from '../../flows/errors/external-effect-failure.error';
 
 import { FlowExecutionError } from '../../flows/errors/flow-execution.error';
@@ -71,6 +73,7 @@ import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
 import { ResourceUsageService } from '../sessions/resource-usage.service';
+import type { SessionChangeCoordination } from '../sessions/session-change-coordination';
 import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
 import { ResourceAuditOrigin } from '../../../audit/audit-policy';
 export interface EndSessionOptions {
@@ -79,6 +82,8 @@ export interface EndSessionOptions {
   /** Skip emitting ResourceUsageNoteAddedEvent (used when the note is auto-generated, e.g. flow-ended). */
   skipNoteNotification?: boolean;
   auditOrigin?: ResourceAuditOrigin;
+  /** Flow ends: the user whose action triggered the flow, recorded in the audit entry of the ended session. */
+  triggeredByUserId?: number;
   /** Internal: the caller already holds this machine's turn in the session-change queue (deferred flow ends). */
   withinSessionChange?: boolean;
 }
@@ -230,13 +235,23 @@ export abstract class UsageLifecycle {
     );
   }
 
-  /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
+  /**
+   * A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. An attempt that
+   * another API instance is still working on (it keeps a heartbeat in Valkey) is left alone, so starting one
+   * instance does not abort a start or stop in flight on another.
+   */
   public async recoverInterruptedLifecycles(): Promise<void> {
+    const alive = new Set<string>();
+    for (const { id } of await this.resourceUsageRepository.manager.find(ResourceUsageLifecycleAttempt, {
+      select: { id: true },
+    })) {
+      if (await this.sessionChangeCoordination.isAlive(id)) alive.add(id);
+    }
     const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
       const recovered = await recoverOrphanedUsages(manager);
       if (recovered)
         this.logger.warn(`Cancelled ${recovered} orphan unfinalized usage sessions; see resource_usage_recovery`);
-      const attempts = await manager.find(ResourceUsageLifecycleAttempt);
+      const attempts = (await manager.find(ResourceUsageLifecycleAttempt)).filter(({ id }) => !alive.has(id));
       for (const attempt of attempts) {
         if (attempt.candidateUsageId !== null) {
           await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
@@ -329,7 +344,7 @@ export abstract class UsageLifecycle {
     resourceId: number,
   ): Promise<ResourceUsageLifecycleAttempt> {
     const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id, resourceId } });
-    if (!attempt) throw new ConflictException('The usage lifecycle attempt is no longer active');
+    if (!attempt) throw new SessionChangeInterruptedError();
     return attempt;
   }
 
@@ -355,6 +370,8 @@ export abstract class UsageLifecycle {
   protected abstract readonly flowExecutorService: ResourceFlowsExecutorService;
 
   protected abstract readonly logger: Logger;
+
+  protected abstract readonly sessionChangeCoordination: SessionChangeCoordination;
 
   protected abstract readonly operatingAttributionService: ResourceOperatingAttributionService | undefined;
 
@@ -536,6 +553,7 @@ export abstract class UsageLifecycle {
     endedUsageIdToEmit: number | null,
     activeSession: ResourceUsage | null,
     skipNoteNotification: boolean,
+    triggeredByUserId?: number,
   ): Promise<void>;
 
   protected abstract handleDoorAction(

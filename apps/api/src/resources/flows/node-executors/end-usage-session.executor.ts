@@ -4,7 +4,7 @@ import { ResourceUsageService } from '../../usage/sessions/resource-usage.servic
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
-import { resolveTriggeringUsage } from './triggering-usage';
+import { resolveTriggeringUsage, triggeringUsageId, triggeringUserIdFromPayload } from './triggering-usage';
 
 export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
@@ -20,6 +20,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
 
     if (target === 'user' || target === 'all') {
       const sessionTarget = this.resolveTarget(target, userId, input, ctx);
+      const triggeredByUserId = await this.triggeringUserId(node.resourceId, input, ctx);
       // Inside a start or stop, other sessions end once that start or stop has finished, never from within it.
       if (ctx.lifecycleAttemptId) {
         await this.resourceUsageService.deferSessionEnds(
@@ -28,6 +29,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
           sessionTarget,
           finalNotes,
           ctx.transactionManager,
+          triggeredByUserId,
         );
       } else {
         await this.resourceUsageService.endSessionsOfTarget(
@@ -35,6 +37,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
           sessionTarget,
           finalNotes,
           ctx.transactionManager,
+          triggeredByUserId,
         );
       }
       return { payload: input };
@@ -75,6 +78,16 @@ export class EndUsageSessionExecutor implements NodeExecutor {
     );
 
     return { payload: input };
+  }
+
+  /** Payload user first; button presses name only the pressing session, whose owner is the triggering user. */
+  private async triggeringUserId(resourceId: number, input: object, ctx: NodeExecutionContext) {
+    const fromPayload = triggeringUserIdFromPayload(input);
+    if (fromPayload !== undefined) return fromPayload;
+    const usageId = triggeringUsageId(input);
+    if (usageId === undefined) return undefined;
+    const sessions = await this.resourceUsageService.getActiveSessionsForResource(resourceId, ctx.transactionManager);
+    return sessions.find(({ id }) => id === usageId)?.userId ?? undefined;
   }
 
   private resolveTarget(

@@ -211,6 +211,7 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
       endedUsageIdToEmit,
       activeSession,
       skipNoteNotification,
+      options.triggeredByUserId,
     );
 
     return updatedUsage;

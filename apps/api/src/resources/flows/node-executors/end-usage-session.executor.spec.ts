@@ -215,6 +215,7 @@ describe('EndUsageSessionExecutor', () => {
         { kind: 'all' },
         'Closing time',
         undefined,
+        undefined,
       );
       expect(resourceUsageService.endSession).not.toHaveBeenCalled();
     });
@@ -228,6 +229,7 @@ describe('EndUsageSessionExecutor', () => {
         { kind: 'user', userId: 7 },
         '',
         undefined,
+        7,
       );
     });
 
@@ -247,9 +249,47 @@ describe('EndUsageSessionExecutor', () => {
         { kind: 'all' },
         '',
         undefined,
+        undefined,
       );
       expect(resourceUsageService.endSessionsOfTarget).not.toHaveBeenCalled();
       expect(resourceUsageService.endLifecycleCandidate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a start or stop', { user: { id: 5 } }, 5],
+      ['a takeover', { user: { id: 5 }, newUser: { id: 9 } }, 9],
+    ])('records the user who triggered %s with the ends', async (_name, payload, expected) => {
+      const node = createNode({ data: { target: 'all' } as never });
+      await executor.execute(node, payload, ctx);
+      expect(resourceUsageService.endSessionsOfTarget).toHaveBeenCalledWith(
+        1,
+        { kind: 'all' },
+        '',
+        undefined,
+        expected,
+      );
+    });
+
+    it('records the owner of the pressing session when a button triggered the flow', async () => {
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ id: 31, userId: 12 }] as never);
+      const node = createNode({ data: { target: 'all' } as never });
+      await executor.execute(node, { usageId: 31 }, ctx);
+      expect(resourceUsageService.endSessionsOfTarget).toHaveBeenCalledWith(1, { kind: 'all' }, '', undefined, 12);
+    });
+
+    it('passes the triggering user along when ends are deferred out of a start or stop', async () => {
+      ctx.lifecycleAttemptId = 'attempt-id';
+      const node = createNode({ data: { target: 'user', userId: '4' } as never });
+      compileTemplate.mockReturnValue('4');
+      await executor.execute(node, { user: { id: 5 } }, ctx);
+      expect(resourceUsageService.deferSessionEnds).toHaveBeenCalledWith(
+        'attempt-id',
+        1,
+        { kind: 'user', userId: 4 },
+        '',
+        undefined,
+        5,
+      );
     });
 
     it('keeps ending the triggering session for nodes saved before the setting existed', async () => {

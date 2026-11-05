@@ -1,24 +1,32 @@
 import { MachineBusyError } from '../errors/machine-busy.error';
+import { SessionChangeCoordination } from './session-change-coordination';
 
 export const SESSION_CHANGE_WAIT_MS = 30_000;
 
 /**
  * Runs the session changes (start, stop, takeover) of one machine one at a time, each from start through its
- * flow to commit or abort, so the session counts handed to flows stay consistent. The queue lives in the memory
- * of this API instance, which is the only one running against the database.
+ * flow to commit or abort, so the session counts handed to flows stay consistent. Changes of this API instance
+ * queue in memory; the optional coordination (Valkey) extends the same turn to other API instances.
  */
 export class SessionChangeQueue {
   private readonly tails = new Map<number, Promise<void>>();
 
   /** Waits for the changes before this one (at most `waitMs`, then `MachineBusyError`), then runs the task. */
-  async run<T>(resourceId: number, task: () => Promise<T>, waitMs = SESSION_CHANGE_WAIT_MS): Promise<T> {
+  async run<T>(
+    resourceId: number,
+    task: () => Promise<T>,
+    waitMs = SESSION_CHANGE_WAIT_MS,
+    coordination?: SessionChangeCoordination,
+  ): Promise<T> {
     const previous = this.tails.get(resourceId) ?? Promise.resolve();
     let release!: () => void;
     const current = new Promise<void>((resolve) => (release = resolve));
     const tail = previous.then(() => current);
     this.tails.set(resourceId, tail);
 
+    const startedAt = Date.now();
     let timer: NodeJS.Timeout | undefined;
+    let releaseMachine: (() => Promise<void>) | undefined;
     try {
       await Promise.race([
         previous,
@@ -28,6 +36,9 @@ export class SessionChangeQueue {
           }, waitMs);
         }),
       ]);
+      clearTimeout(timer);
+      // The whole wait, here and on other instances, stays within one `waitMs`.
+      releaseMachine = await coordination?.acquire(resourceId, Math.max(0, waitMs - (Date.now() - startedAt)));
     } catch (error) {
       // Keep the chain intact: the waiters behind this one still wait for the real holder.
       void previous.then(release);
@@ -37,7 +48,7 @@ export class SessionChangeQueue {
       clearTimeout(timer);
     }
 
-    return this.runHolding(resourceId, tail, release, task);
+    return this.runHolding(resourceId, tail, release, task, releaseMachine);
   }
 
   /**
@@ -58,10 +69,12 @@ export class SessionChangeQueue {
     tail: Promise<void>,
     release: () => void,
     task: () => Promise<T>,
+    releaseMachine?: () => Promise<void>,
   ): Promise<T> {
     try {
       return await task();
     } finally {
+      await releaseMachine?.();
       release();
       this.cleanup(resourceId, tail);
     }
