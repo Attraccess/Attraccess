@@ -533,6 +533,85 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     expect(rbacService.syncSsoRoles).not.toHaveBeenCalled();
   });
 
+  describe('configured roleClaimPaths', () => {
+    async function syncWith(config: Partial<SSOProviderOIDCConfiguration>, claims: Record<string, unknown>) {
+      const existingUser = { id: 337, username: 'existing', email: 'existing@example.com' } as User;
+      const usersService = { findOne: jest.fn(async () => existingUser), updateOne: jest.fn(), createOne: jest.fn() };
+      const authService = {
+        findUserIdBySSO: jest.fn(async () => existingUser.id),
+        addAuthenticationDetails: jest.fn(),
+      };
+      const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+      const strategy = fixture.createStrategy(
+        { roleMappings: { 'user-manager': ['admins'] }, ...config } as Partial<SSOProviderOIDCConfiguration>,
+        usersService,
+        authService,
+        rbacService,
+      );
+      const profile = {
+        id: 'ext-custom-paths',
+        emails: [{ value: 'existing@example.com' }],
+        _json: claims,
+      } as unknown as Profile;
+      await strategy.validateProfile('https://issuer', profile);
+      return rbacService.syncSsoRoles;
+    }
+
+    it('reads roles from a custom nested path', async () => {
+      const sync = await syncWith(
+        { roleClaimPaths: ['custom.access.roles'] },
+        { custom: { access: { roles: ['admins'] } } },
+      );
+      expect(sync).toHaveBeenCalledWith(
+        337,
+        [expect.objectContaining({ roleKey: 'user-manager' })],
+        SSOProviderType.OIDC,
+        1,
+      );
+    });
+
+    it('ignores the default locations once paths are configured and revokes roles that only came from them', async () => {
+      const sync = await syncWith(
+        { roleClaimPaths: ['custom.roles'] },
+        { groups: ['admins'], custom: { roles: ['other'] } },
+      );
+      expect(sync).toHaveBeenCalledWith(337, [], SSOProviderType.OIDC, 1);
+    });
+
+    it('keeps roles when none of the configured paths is present, even if default locations are', async () => {
+      const sync = await syncWith({ roleClaimPaths: ['custom.roles'] }, { groups: ['admins'] });
+      expect(sync).not.toHaveBeenCalled();
+    });
+
+    it('revokes when a configured path is present but empty', async () => {
+      const sync = await syncWith({ roleClaimPaths: ['custom.roles'] }, { custom: { roles: [] } });
+      expect(sync).toHaveBeenCalledWith(337, [], SSOProviderType.OIDC, 1);
+    });
+
+    it.each([[null], [[]]])('falls back to the defaults when roleClaimPaths is %j', async (roleClaimPaths) => {
+      const sync = await syncWith({ roleClaimPaths: roleClaimPaths as string[] | null }, { groups: ['admins'] });
+      expect(sync).toHaveBeenCalledWith(
+        337,
+        [expect.objectContaining({ roleKey: 'user-manager' })],
+        SSOProviderType.OIDC,
+        1,
+      );
+    });
+
+    it('still reads resource_access.<clientId>.roles by default but not when paths are configured', async () => {
+      const claims = { resource_access: { 'test-client': { roles: ['admins'] } } };
+      const byDefault = await syncWith({ clientId: 'test-client' }, claims);
+      expect(byDefault).toHaveBeenCalledWith(
+        337,
+        [expect.objectContaining({ roleKey: 'user-manager' })],
+        SSOProviderType.OIDC,
+        1,
+      );
+      const custom = await syncWith({ clientId: 'test-client', roleClaimPaths: ['custom.roles'] }, claims);
+      expect(custom).not.toHaveBeenCalled();
+    });
+  });
+
   describe('strategy options passed to passport-openidconnect', () => {
     function readOptions(strategy: SSOOIDCStrategy): { scope: unknown; skipUserProfile: unknown } {
       const internal = strategy as unknown as { _scope: unknown; _skipUserProfile: unknown };
@@ -560,6 +639,15 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     it('uses default scopes (without openid) when scopes is unset', () => {
       const strategy = fixture.createStrategy(
         {},
+        { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
+        { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
+      );
+      expect(readOptions(strategy).scope).toEqual(['email', 'profile']);
+    });
+
+    it('uses default scopes (without openid) when scopes was cleared to null', () => {
+      const strategy = fixture.createStrategy(
+        { scopes: null },
         { findOne: jest.fn(), updateOne: jest.fn(), buildUsernameFromSSOClaim: jest.fn(), createOne: jest.fn() },
         { findUserIdBySSO: jest.fn(), addAuthenticationDetails: jest.fn() },
       );

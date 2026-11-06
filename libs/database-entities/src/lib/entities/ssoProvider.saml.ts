@@ -97,6 +97,18 @@ export class SSOProviderSAMLConfiguration {
   })
   emailAttributeKeys?: string[] | null;
 
+  @Column({ type: 'simple-array', nullable: true })
+  @ApiProperty({
+    description:
+      'Attribute keys to read roles/groups from. When unset, the built-in defaults are read. When set, only these keys are read (matched case-insensitively).',
+    required: false,
+    nullable: true,
+    isArray: true,
+    type: String,
+    example: ['roles', 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'],
+  })
+  roleAttributeKeys?: string[] | null;
+
   @Column({ type: 'text', nullable: true })
   @ApiProperty({
     description: 'Shared secret used to authorize SAML provisioning requests',

@@ -66,7 +66,9 @@
   "copyFailedDesc": "Could not copy the URL to your clipboard.",
   "copyUnsupported": "Clipboard access is not available in this browser.",
   "emailAttributeKeys": "Email attribute keys",
-  "emailAttributeKeysHint": "Comma-separated attribute names or URNs to search when resolving user emails (first match wins).",
+  "emailAttributeKeysHint": "Attribute names or URNs to search when resolving user emails, in this order (first match wins). The built-in names are always checked after yours.",
+  "roleAttributeKeys": "Role attribute keys",
+  "roleAttributeKeysHint": "Attribute names to read roles or groups from (case-insensitive). Leave the list empty to use the defaults shown. Once set, ONLY these keys are read and the defaults are ignored: if one is present, roles that came only from a default attribute (e.g. groups) are removed at the next login. Requires the permission to manage user roles.",
   "signRequest": "Sign AuthnRequests",
   "wantAssertionsSigned": "Require signed assertions",
   "wantAuthnResponseSigned": "Require signed responses",
@@ -74,9 +76,9 @@
   "copy": "Copy",
   "showClientSecret": "Show client secret",
   "hideClientSecret": "Hide client secret",
-  "scopes": "Scopes (comma-separated)",
-  "usernameClaimPaths": "Username claim paths (comma-separated)",
-  "emailClaimPaths": "Email claim paths (comma-separated)",
+  "scopes": "Scopes",
+  "usernameClaimPaths": "Username claim paths",
+  "emailClaimPaths": "Email claim paths",
   "permissionSyncTtlMinutes": "Permission re-sync interval (minutes)",
   "permissionSyncTtlMinutesHint": "Roles are re-checked once this many minutes have passed since the last check, and when the session is refreshed (at most once per minute). Maximum 525600 (365 days).",
   "permissionSync": {
@@ -90,6 +92,8 @@
       "existingSessions": "Only sessions started on this Attraccess version or later can be re-synced. Users who signed in before the update must sign in once more."
     }
   },
+  "roleClaimPaths": "Role claim paths",
+  "roleClaimPathsHint": "Claim paths to read roles, groups or permissions from. Leave the list empty to use the defaults shown. Once set, ONLY these paths are read and the defaults are ignored: if the claim is present, roles that came only from a default location (e.g. groups) are removed at the next login. Requires the permission to manage user roles.",
   "samlProvisioningSecret": "SAML provisioning secret",
   "samlProvisioningSecretHint": "Used to authorize SAML provisioning calls (logout, delete, permissions). Leave blank to keep existing secret.",
   "showSamlProvisioningSecret": "Show provisioning secret",
@@ -137,5 +141,9 @@
   "frontchannelLogoutUrl": "Front-channel logout URI",
   "samlSloUrl": "Single Logout Service URL",
   "logoutRegistrationHint": "Register these exact URLs at the provider. Enable signed back-channel notifications for reliable delivery. Front-channel notifications with session ID are supported; cookie-only notifications may be blocked by browser privacy settings.",
-  "samlLogoutRegistrationHint": "Register this URL for HTTP-Redirect and HTTP-POST Single Logout. Attraccess sends signed Redirect messages. Configure the IdP signing certificate and trust the Attraccess signing certificate."
+  "samlLogoutRegistrationHint": "Register this URL for HTTP-Redirect and HTTP-POST Single Logout. Attraccess sends signed Redirect messages. Configure the IdP signing certificate and trust the Attraccess signing certificate.",
+  "defaultsUsed": "Defaults used: {{{defaults}}}",
+  "scopesEmptyHint": "Defaults used: openid · email · profile",
+  "signingAlgorithmsEmptyHint": "An empty list is saved as RS256",
+  "emailAttributeKeysEmptyHint": "Built-in names used: {{{defaults}}}"
 }

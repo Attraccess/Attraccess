@@ -44,7 +44,7 @@ Sendet der Identity Provider `email_verified=false` (Boolean oder String), wird 
 
 ### Scopes
 
-Optional können Sie zusätzliche OIDC-Scopes angeben (kommagetrennt). Standard-Scopes werden automatisch angefordert.
+Optional können Sie die anzufordernden OIDC-Scopes angeben, jeweils einzeln. Ist die Liste leer, werden `openid`, `email` und `profile` angefordert. Konfigurierte Scopes ersetzen diese Standardwerte; nehmen Sie `email` und `profile` also mit auf, wenn Sie sie weiterhin benötigen (z. B. `openid`, `email`, `profile`, `offline_access`). `openid` wird immer gesendet.
 
 ### Claim-Pfade
 
@@ -56,6 +56,12 @@ Attraccess muss wissen, welche Felder im OIDC-Token den Benutzernamen und die E-
 | **E-Mail-Claim-Pfade** | `email, emails[0].value, upn` | Geordnete Liste von Token-Feldern für die E-Mail |
 
 Attraccess prüft die Pfade in der angegebenen Reihenfolge und verwendet den ersten Treffer.
+
+### Rollen-Claim-Pfade
+
+Standardmäßig liest Attraccess Rollen aus `permissions`, `roles`, `groups`, `realm_access.roles` und `resource_access.<clientId>.roles`. Legt Ihr Anbieter die Rollen an anderer Stelle ab, fügen Sie unter **Rollen-Claim-Pfade** die Claim-Pfade einzeln hinzu (höchstens 20, je bis zu 256 Zeichen, ohne Kommas). Das Ändern dieser Einstellung erfordert die Berechtigung `users.roles.manage`. Die Pfade werden beim Login in den Claims des ID-Tokens gesucht; ein Claim, den nur die UserInfo-Antwort enthält, wird beim Login nicht gesehen, sondern erst vom Berechtigungsabgleich während der Sitzung (siehe unten).
+
+> **Eigene Pfade ersetzen die Standardwerte.** Sobald Pfade gesetzt sind, werden nur diese gelesen. Ist einer davon im Token vorhanden, werden Rollen, die nur aus einem Standardpfad stammten (z. B. `groups`), beim nächsten Login entfernt. Ist keiner der konfigurierten Pfade vorhanden, bleiben vorhandene Rollen erhalten; ist einer vorhanden, aber leer, werden die SSO-Rollen dieses Anbieters entfernt. Leeren Sie das Feld, um zu den Standardwerten zurückzukehren.
 
 ### Berechtigungszuordnung
 

@@ -1,0 +1,10 @@
+{
+  "add": "Add",
+  "remove": "Remove",
+  "empty": "Enter a value.",
+  "duplicate": "This value is already in the list.",
+  "comma": "Values cannot contain commas. Add each value separately.",
+  "control": "Values cannot contain control characters.",
+  "tooLong": "Values can be at most {{max}} characters long.",
+  "limitReached": "The list can have at most {{max}} entries."
+}

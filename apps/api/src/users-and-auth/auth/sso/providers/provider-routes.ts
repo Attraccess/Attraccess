@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from 'node:util';
+
 import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 
 import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
@@ -56,6 +58,16 @@ import { SSOLinkTokenService } from '../link-token.service';
 
 import { SSOService } from '../sso.service';
 import { discoveryPathSegment, discoveryUrl, requestDiscoveryJson } from './discovery-client';
+
+/** Null, undefined and an empty list all mean "defaults"; returns the list only when custom paths are set. */
+function customRolePaths(value: string[] | null | undefined): string[] | null {
+  return value && value.length > 0 ? value : null;
+}
+
+/** An omitted field means "unchanged"; otherwise compare entry by entry against the stored value. */
+function sameRolePaths(incoming: string[] | null | undefined, stored: string[] | null | undefined): boolean {
+  return incoming === undefined || isDeepStrictEqual(customRolePaths(incoming), customRolePaths(stored));
+}
 
 // Private and loopback IdPs are supported. Metadata services and non-unicast
 // destinations are not IdPs, including their IPv4-mapped IPv6 representations.
@@ -218,6 +230,12 @@ export abstract class SsoProviderRoutes {
     return withConfig;
   }
 
+  private assertCanManageSsoRoles(request: AuthenticatedRequest, setting: string): void {
+    if (!(request.user as AuthenticatedUser).effectivePermissions?.has('users.roles.manage')) {
+      throw new ForbiddenException(`Configuring ${setting} requires users.roles.manage`);
+    }
+  }
+
   @Post('providers')
   @Auth('system.sso.manage')
   @ApiOperation({ summary: 'Create a new SSO provider', operationId: 'createOneSsoProvider' })
@@ -235,11 +253,15 @@ export abstract class SsoProviderRoutes {
     const oidcMappings = createDto.oidcConfiguration?.roleMappings;
     const samlMappings = createDto.samlConfiguration?.roleMappings;
     if (oidcMappings !== undefined || samlMappings !== undefined) {
+      this.assertCanManageSsoRoles(request, 'SSO role mappings');
       const actor = request.user as AuthenticatedUser;
-      if (!actor.effectivePermissions?.has('users.roles.manage')) {
-        throw new ForbiddenException('Configuring SSO role mappings requires users.roles.manage');
-      }
       await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
+    }
+    if (customRolePaths(createDto.oidcConfiguration?.roleClaimPaths)) {
+      this.assertCanManageSsoRoles(request, 'SSO role claim paths');
+    }
+    if (customRolePaths(createDto.samlConfiguration?.roleAttributeKeys)) {
+      this.assertCanManageSsoRoles(request, 'SSO role attribute keys');
     }
     const provider = await this.ssoService.createProvider(createDto);
     await this.recordProviderAudit('created', request, provider);
@@ -280,11 +302,16 @@ export abstract class SsoProviderRoutes {
     const samlMappings = updateDto.samlConfiguration?.roleMappings;
 
     if (oidcMappings !== undefined || samlMappings !== undefined) {
+      this.assertCanManageSsoRoles(request, 'SSO role mappings');
       const actor = request.user as AuthenticatedUser;
-      if (!actor.effectivePermissions?.has('users.roles.manage')) {
-        throw new ForbiddenException('Configuring SSO role mappings requires users.roles.manage');
-      }
       await this.assertPermissionMappingCeiling([oidcMappings, samlMappings], actor.effectivePermissions);
+    }
+
+    if (!sameRolePaths(updateDto.oidcConfiguration?.roleClaimPaths, before.oidcConfiguration?.roleClaimPaths)) {
+      this.assertCanManageSsoRoles(request, 'SSO role claim paths');
+    }
+    if (!sameRolePaths(updateDto.samlConfiguration?.roleAttributeKeys, before.samlConfiguration?.roleAttributeKeys)) {
+      this.assertCanManageSsoRoles(request, 'SSO role attribute keys');
     }
 
     const provider = await this.ssoService.updateProvider(providerId, updateDto);
