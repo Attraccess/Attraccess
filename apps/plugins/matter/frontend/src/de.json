@@ -3,13 +3,13 @@
     "title": "Matter",
     "subtitle": "Verbindung zum Matter-Sidecar.",
     "insecure": "Unsichere Verbindung",
-    "insecureText": "Der Sidecar wird über unverschlüsseltes http an einer Nicht-Loopback-Adresse erreicht. Das Token wird unverschlüsselt übertragen. Verwenden Sie https oder betreiben Sie den Sidecar auf demselben Host."
+    "insecureText": "Der Sidecar wird über unverschlüsseltes http an einer Nicht-Loopback-Adresse erreicht. Das Token wird unverschlüsselt übertragen. Verwende https oder betreibe den Sidecar auf demselben Host."
   },
   "status": {
     "title": "Verbindungsstatus",
     "state": {
       "not_configured": "Nicht konfiguriert",
-      "connecting": "Verbindet",
+      "connecting": "Verbindung wird aufgebaut",
       "connected": "Verbunden",
       "degraded": "Eingeschränkt"
     },
@@ -29,31 +29,30 @@
     "received": "Empfangen",
     "supported": "Unterstützte Kombination",
     "combination": "Attraccess {{attraccess}}, Plugin {{plugin}}, Sidecar {{sidecar}}, matter.js {{matterJs}}",
-    "receivedCombination": "Attraccess {{attraccess}}, Plugin {{plugin}}, Sidecar {{sidecar}}, matter.js {{matterJs}}",
     "loadError": "Der Status konnte nicht geladen werden."
   },
   "hint": {
-    "not_configured": "Geben Sie unten die Sidecar-URL und das Token ein, um sich zu verbinden.",
+    "not_configured": "Gib unten die Sidecar-URL und das Token ein, um die Verbindung herzustellen.",
     "connecting": "Verbindung zum Matter-Sidecar wird aufgebaut…",
     "connected": "Das Plugin ist mit dem Matter-Sidecar verbunden.",
-    "unavailable": "Der Sidecar ist nicht erreichbar. Prüfen Sie, ob er läuft und ob URL, Port und Firewall stimmen. Attraccess versucht es automatisch erneut.",
-    "unauthorized": "Der Sidecar hat das Token abgelehnt. Prüfen Sie das Token (auch nach einer Rotation) und geben Sie es erneut ein.",
-    "incompatible": "Die Versionen passen nicht zusammen. Aktualisieren oder wechseln Sie den Sidecar auf eine unterstützte Kombination.",
-    "misconfigured": "URL, CA-Zertifikat oder TLS-Einrichtung sind ungültig. Prüfen Sie URL und Pfadpräfix sowie, ob die CA zum Sidecar-Zertifikat passt.",
-    "hostVersion": "Diese Attraccess-Version meldet ihre Version nicht. Aktualisieren Sie Attraccess auf 1.11.0 oder neuer."
+    "unavailable": "Der Sidecar ist nicht erreichbar. Prüfe, ob er läuft und ob URL, Port und Firewall stimmen. Attraccess versucht es automatisch erneut.",
+    "unauthorized": "Der Sidecar hat das Token abgelehnt. Prüfe das Token (auch nach einer Rotation) und gib es erneut ein.",
+    "incompatible": "Die Versionen passen nicht zusammen. Bringe Attraccess, das Matter-Plugin oder den Sidecar per Update oder Downgrade auf die unten gezeigte unterstützte Kombination.",
+    "misconfigured": "URL, CA-Zertifikat oder TLS-Einrichtung sind ungültig. Prüfe URL und Pfadpräfix sowie, ob die CA zum Sidecar-Zertifikat passt.",
+    "hostVersion": "Diese Attraccess-Version meldet ihre Version nicht. Aktualisiere Attraccess auf {{attraccess}} oder neuer."
   },
   "form": {
     "title": "Verbindungseinstellungen",
     "url": "Sidecar-URL",
     "urlPlaceholder": "http://127.0.0.1:8581",
-    "urlDescription": "Verwenden Sie https, außer der Sidecar läuft auf demselben Host. Ein Pfadpräfix für einen Reverse-Proxy ist erlaubt.",
+    "urlDescription": "Verwende https, außer der Sidecar läuft auf demselben Host. Ein Pfadpräfix für einen Reverse-Proxy ist erlaubt.",
     "credential": "Token",
     "credentialDescription": "Das gemeinsame Service-Token, das am Sidecar konfiguriert ist. Nach dem Speichern wird es nie wieder angezeigt.",
     "credentialConfigured": "Konfiguriert (zuletzt geändert {{time}})",
     "replace": "Ersetzen",
     "cancelReplace": "Aktuelles Token behalten",
     "ca": "CA-Zertifikat (optional)",
-    "caDescription": "PEM-Zertifikat(e), denen zusätzlich zu den System-Roots vertraut wird, für eine private CA.",
+    "caDescription": "PEM-Zertifikat(e) einer privaten CA. Node.js vertraut ihnen zusätzlich zu seinen Standard-Stammzertifikaten, nicht an deren Stelle.",
     "caClear": "CA-Zertifikat löschen",
     "caCleared": "Das CA-Zertifikat wird beim Speichern entfernt.",
     "save": "Speichern",
@@ -64,6 +63,7 @@
     "removeTitle": "Matter-Verbindung entfernen?",
     "removeText": "URL und Token werden gelöscht und das Plugin trennt die Verbindung zum Sidecar.",
     "removeConfirm": "Entfernen",
-    "removeError": "Entfernen fehlgeschlagen"
+    "removeError": "Entfernen fehlgeschlagen",
+    "loadError": "Die Verbindungseinstellungen konnten nicht geladen werden."
   }
 }

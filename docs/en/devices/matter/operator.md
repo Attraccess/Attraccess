@@ -48,17 +48,17 @@ Any 32–512 printable ASCII characters work (no spaces). Treat the token like a
 
 1. Install the Matter plugin (it needs Attraccess 1.11.0 or newer). It asks for the `DATABASE_ACCESS` and `MANAGE_SECRETS` permissions.
 2. Open **Devices → Matter** (visible to users with the `system.plugins.manage` permission).
-3. Enter the **sidecar URL** (for example `http://127.0.0.1:8581`) and the **token**, then **Save**. Add the **CA certificate** only if the sidecar uses a private CA.
+3. Enter the **sidecar URL** (for example `http://127.0.0.1:8581`) and the **token**, then **Save**. Add the **CA certificate** only if the sidecar uses a private CA. It is added to Node.js's default trust store (the bundled root certificates plus any `NODE_EXTRA_CA_CERTS`), not used instead of it.
 
 The page shows the connection state and polls it every five seconds. After saving, it should reach **Connected** within seconds and show the sidecar, matter.js and wire versions. The token is stored encrypted and is never shown again; use **Replace** to enter a new one. **Remove configuration** deletes the settings and disconnects.
 
-| State                    | What to do                                                                                                                                                                                                                                                 |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Not configured           | Enter URL and token.                                                                                                                                                                                                                                       |
-| Degraded – unavailable   | Check that the sidecar runs, and the URL, port and firewall. The page shows when the next attempt happens. It reconnects by itself once the sidecar is back.                                                                                               |
-| Degraded – unauthorized  | The sidecar rejected the token. Compare it with `MATTER_SIDECAR_AUTH_TOKEN` (or the previous token during a rotation) and enter it again.                                                                                                                  |
-| Degraded – incompatible  | The page shows the received and the supported combination. **Upgrade or downgrade** Attraccess, the plugin or the sidecar to a supported combination. "Host version unavailable" means Attraccess is older than 1.11.0.                                    |
-| Degraded – misconfigured | Check the URL (and path prefix), and that the CA certificate matches the sidecar certificate and host name. If the page says the Host name is not allowed, add that name to `MATTER_SIDECAR_ALLOWED_HOSTS`. Certificate verification cannot be turned off. |
+| State                    | What to do                                                                                                                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Not configured           | Enter URL and token.                                                                                                                                                                                                                                         |
+| Degraded – unavailable   | Check that the sidecar runs, and the URL, port and firewall. The page shows when the next attempt happens. It reconnects by itself once the sidecar is back.                                                                                                 |
+| Degraded – unauthorized  | The sidecar rejected the token. Compare it with `MATTER_SIDECAR_AUTH_TOKEN` (or the previous token during a rotation) and enter it again.                                                                                                                    |
+| Degraded – incompatible  | The page shows the received and the supported combination. **Upgrade or downgrade** Attraccess, the plugin or the sidecar to a supported combination. If the page says this Attraccess version does not report its version, Attraccess is older than 1.11.0. |
+| Degraded – misconfigured | Check the URL (and path prefix), and that the CA certificate matches the sidecar certificate and host name. If the page says the Host name is not allowed, add that name to `MATTER_SIDECAR_ALLOWED_HOSTS`. Certificate verification cannot be turned off.   |
 
 A warning appears when the URL is plain `http` to an address other than this machine: the token would cross the network unencrypted.
 
@@ -66,7 +66,7 @@ A warning appears when the URL is plain `http` to an address other than this mac
 
 - **Same host, loopback (recommended).** Run the sidecar next to Attraccess with the defaults. URL `http://127.0.0.1:8581`. No TLS needed: traffic never leaves the machine.
 - **Container network.** Put the sidecar and Attraccess on a private network that only they share:
-  `MATTER_SIDECAR_BIND_HOST=0.0.0.0`, `MATTER_SIDECAR_ALLOWED_HOSTS=matter-sidecar` (the name Attraccess uses), and either TLS (`MATTER_SIDECAR_TLS_CERT_FILE`/`…_KEY_FILE`, with the CA entered in the Matter page) or `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true`. Do not publish the port to the host network or the internet. URL `http://matter-sidecar:8581`.
+  `MATTER_SIDECAR_BIND_HOST=0.0.0.0`, `MATTER_SIDECAR_ALLOWED_HOSTS=matter-sidecar` (the name Attraccess uses), and either TLS (`MATTER_SIDECAR_TLS_CERT_FILE`/`…_KEY_FILE`, with the CA entered in the Matter page) or `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true`. Do not publish the port to the host network or the internet. URL `https://matter-sidecar:8581` with TLS, or `http://matter-sidecar:8581` with `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true`; in that case the Matter page shows the **Insecure connection** warning, which is expected.
 - **Reverse proxy with TLS and a path prefix.** The proxy terminates TLS and forwards `https://example.com/matter/…` to the sidecar. The proxy must strip the prefix, forward WebSocket upgrades and the `Authorization` header, and pass a `Host` name listed in `MATTER_SIDECAR_ALLOWED_HOSTS`. URL `https://example.com/matter` leads to `/matter/v1/...`.
 
 ## Credential rotation

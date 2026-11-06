@@ -142,7 +142,9 @@ describe('MatterPage', () => {
       },
       configured,
     );
-    expect(await screen.findByText(/Upgrade or downgrade the sidecar/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Upgrade or downgrade Attraccess, the Matter plugin or the sidecar/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/sidecar 9\.9\.9/)).toBeInTheDocument();
     expect(screen.getByText(/sidecar 0\.2\.0-alpha\.0, matter\.js 0\.18\.0/)).toBeInTheDocument();
   });
@@ -184,6 +186,41 @@ describe('MatterPage', () => {
         caCertificate: null,
       }),
     );
+  });
+
+  it('shows the saved settings after clearing the CA, so the next save does not upload it again', async () => {
+    const user = userEvent.setup();
+    const cleared = { ...configured, caCertificate: null, updatedAt: '2026-11-06T10:05:00.000Z' };
+    api.saveSettings.mockResolvedValue(cleared);
+    renderPage({ state: 'connected' }, configured);
+    await user.click(await screen.findByRole('button', { name: 'Clear CA certificate' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(await screen.findByRole('button', { name: 'Close' }));
+    const ca = screen.getByLabelText(/CA certificate/);
+    expect(ca).toHaveValue('');
+    expect(ca).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Clear CA certificate' })).not.toBeInTheDocument();
+
+    const url = screen.getByLabelText(/Sidecar URL/);
+    await user.clear(url);
+    await user.type(url, 'https://other.example.com');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(api.saveSettings).toHaveBeenCalledTimes(2));
+    expect(api.saveSettings).toHaveBeenLastCalledWith({ url: 'https://other.example.com' });
+  });
+
+  it('re-enables the CA field when the configuration is removed after clearing the CA', async () => {
+    const user = userEvent.setup();
+    api.removeSettings.mockResolvedValue(null);
+    renderPage({ state: 'connected' }, configured);
+    await user.click(await screen.findByRole('button', { name: 'Clear CA certificate' }));
+    expect(screen.getByLabelText(/CA certificate/)).toBeDisabled();
+    api.getSettings.mockResolvedValue(empty);
+    await user.click(screen.getByRole('button', { name: 'Remove configuration' }));
+    await user.click(await screen.findByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Remove configuration' })).not.toBeInTheDocument());
+    expect(screen.getByLabelText(/CA certificate/)).toBeEnabled();
+    expect(screen.getByLabelText(/CA certificate/)).toHaveValue('');
   });
 
   it('reports a failed save in an error dialog without echoing the token', async () => {
@@ -228,7 +265,59 @@ describe('MatterPage', () => {
   });
 });
 
+describe('MatterPage polling', () => {
+  it('skips a poll while the previous status request still hangs', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderPage({ state: 'connected' }, configured);
+    await screen.findByText('Connected');
+    const initial = api.getStatus.mock.calls.length;
+    api.getStatus.mockReturnValue(new Promise(() => undefined));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 3);
+    });
+    expect(api.getStatus.mock.calls.length).toBe(initial + 1);
+    // The hung request times out, so polling resumes instead of stopping for good.
+    api.getStatus.mockResolvedValue({ ...baseStatus, state: 'connected' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 2);
+    });
+    expect(api.getStatus.mock.calls.length).toBeGreaterThan(initial + 1);
+  });
+
+  it('ignores a late poll answer that arrives after a newer one', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    api.saveSettings.mockResolvedValue(configured);
+    renderPage({ state: 'connected' }, configured);
+    await screen.findByText('Connected');
+    let answerPoll: (status: ConnectionStatus) => void = () => undefined;
+    api.getStatus.mockImplementationOnce(() => new Promise((resolve) => (answerPoll = resolve)));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS);
+    });
+    api.getStatus.mockResolvedValue({ ...baseStatus, state: 'connecting' });
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Connecting')).toBeInTheDocument();
+    await act(async () => answerPoll({ ...baseStatus, state: 'degraded', reason: 'unavailable' }));
+    expect(screen.getByText('Connecting')).toBeInTheDocument();
+    expect(screen.queryByText('Degraded')).not.toBeInTheDocument();
+  });
+});
+
 describe('MatterPage recovery', () => {
+  it('reports a failed settings load even when the status loads', async () => {
+    api.getStatus.mockResolvedValue({ ...baseStatus, state: 'connected' });
+    api.getSettings.mockRejectedValue(new Error('Failed to fetch'));
+    render(
+      <MemoryRouter>
+        <MatterPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('The connection settings could not be loaded.')).toBeInTheDocument();
+    expect(screen.getByText('Connected')).toBeInTheDocument();
+    expect(screen.queryByText('The status could not be loaded.')).not.toBeInTheDocument();
+  });
+
   it('shows the settings form once the API is back after a failed first load', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     api.getStatus.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValue(baseStatus);
@@ -245,6 +334,7 @@ describe('MatterPage recovery', () => {
     });
     expect(await screen.findByLabelText(/Sidecar URL/)).toHaveValue('https://matter.example.com');
     expect(screen.queryByText('The status could not be loaded.')).not.toBeInTheDocument();
+    expect(screen.queryByText('The connection settings could not be loaded.')).not.toBeInTheDocument();
   });
 });
 

@@ -6,7 +6,8 @@ import { useMatterTranslations } from './i18n';
 
 type Props = Readonly<{
   settings: ConnectionSettings;
-  onSave: (input: SettingsInput) => Promise<void>;
+  /** Resolves with the settings as stored, which the form then shows. */
+  onSave: (input: SettingsInput) => Promise<ConnectionSettings>;
   onRemove: () => Promise<void>;
 }>;
 
@@ -39,10 +40,12 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
     if (caChanged) input.caCertificate = ca.trim() === '' || caCleared ? null : ca.trim();
     setBusy(true);
     try {
-      await onSave(input);
-      setCredential('');
-      setReplacing(false);
+      const saved = await onSave(input);
+      setUrl(saved.url ?? '');
+      setCa(saved.caCertificate ?? '');
       setCaCleared(false);
+      setCredential('');
+      setReplacing(!saved.credentialConfigured);
       setNotice({ kind: 'saved' });
     } catch (error) {
       setNotice({ kind: 'error', title: t('form.saveError'), message: messageOf(error) });
@@ -57,6 +60,7 @@ export function SettingsForm({ settings, onSave, onRemove }: Props) {
       await onRemove();
       setUrl('');
       setCa('');
+      setCaCleared(false);
       setCredential('');
       setReplacing(true);
       setNotice(null);

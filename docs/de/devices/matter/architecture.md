@@ -29,7 +29,7 @@ Eine passende Wire-Version genügt nicht. Attraccess, das Matter-Plugin und der 
 
 `attraccess.host` (`package.json`) und `attraccessVersion.min` (`plugin.json`) des Plugins werden aus derselben Tabelle abgeleitet; ein Test prüft, dass sie übereinstimmen. Jedes neue Plugin- oder Sidecar-Release braucht eine Tabellenaktualisierung, sonst lehnt der Sidecar es ab. Der Attraccess-Bereich ist bewusst ein Bereich: Ein neues Attraccess-1.x-Release erfordert nicht automatisch ein Sidecar-Release.
 
-Release-Header sind Kompatibilitätsinformationen, **keine Authentifizierung**; die Authentifizierung ist das Service-Token (siehe [Sicherheitsmodell](#sicherheitsmodell)). Ein nicht passender Sidecar muss aktualisiert oder zurückgesetzt werden.
+Release-Header sind Kompatibilitätsinformationen, **keine Authentifizierung**; die Authentifizierung ist das Service-Token (siehe [Sicherheitsmodell](#sicherheitsmodell)). Ein nicht passender Sidecar braucht ein Update oder Downgrade.
 
 ## Versionierter REST- und WebSocket-Vertrag
 
@@ -101,7 +101,7 @@ Der Sidecar steuert physische Anlagen und vertraut deshalb einem Aufrufer nie al
 
 ## Das Plugin verbindet sich mit dem Sidecar
 
-Ein Administrator richtet die Verbindung in der Weboberfläche ein (**Geräte → Matter**): Sidecar-URL, Service-Token und optional ein CA-Zertifikat. Die URL darf `http` oder `https` sein und ein Pfadpräfix für einen Reverse-Proxy tragen (`https://host/prefix` führt zu `/prefix/v1/...`). Das Token wird vom Host verschlüsselt gespeichert (`MANAGE_SECRETS`), in einer Plugin-Tabelle (`DATABASE_ACCESS`), nie wieder angezeigt und erscheint nie in Logs, Fehlern, Statusantworten oder Audit-Einträgen. Nur Benutzer mit der Berechtigung `system.plugins.manage` können die Einstellungen lesen oder ändern (eine eigene Matter-Berechtigung folgt mit [ATT-1003](https://linear.app/attraccess/issue/ATT-1003)). Jede Änderung wird ohne Geheimnisse im Audit-Log festgehalten.
+Ein Administrator richtet die Verbindung in der Weboberfläche ein (**Geräte → Matter**): Sidecar-URL, Service-Token und optional ein CA-Zertifikat. Diese CA wird dem Standard-Truststore von Node.js hinzugefügt (den mitgelieferten Stammzertifikaten plus etwaigen `NODE_EXTRA_CA_CERTS`) und ersetzt ihn nicht. Die URL darf `http` oder `https` sein und ein Pfadpräfix für einen Reverse-Proxy tragen (`https://host/prefix` führt zu `/prefix/v1/...`). Das Token wird vom Host verschlüsselt gespeichert (`MANAGE_SECRETS`), in einer Plugin-Tabelle (`DATABASE_ACCESS`), nie wieder angezeigt und erscheint nie in Logs, Fehlern, Statusantworten oder Audit-Einträgen. Nur Benutzer mit der Berechtigung `system.plugins.manage` können die Einstellungen lesen oder ändern (eine eigene Matter-Berechtigung folgt mit [ATT-1003](https://linear.app/attraccess/issue/ATT-1003)). Jede Änderung wird ohne Geheimnisse im Audit-Log festgehalten.
 
 Das Plugin startet die Verbindung, ohne auf den Sidecar zu warten. **Ein fehlender, neu startender, ablehnender oder inkompatibler Sidecar hindert weder Attraccess noch das Plugin am Laden**; stattdessen zeigt das Plugin einen eindeutigen Zustand:
 
@@ -121,7 +121,7 @@ Das Plugin startet die Verbindung, ohne auf den Sidecar zu warten. **Ein fehlend
 
 **Anfragen** tragen die Wire-Version, `X-Attraccess-Version`, `X-Matter-Plugin-Version`, `X-Matter-Sidecar-Version` (das Sidecar-Release, das die Tabelle dem Plugin zuordnet), `X-Correlation-Id` und `X-Request-Deadline-Ms`. Antworten werden gegen den Vertrag validiert. Eine Zeitüberschreitung bei einer physischen Operation wird als `uncertain` gemeldet.
 
-**Eine Wire-Version.** Es gibt keinen Fallback und keine Unterstützung früherer Versionen. Ein Sidecar mit anderer Version oder anderem Release **muss auf die unterstützte Kombination aktualisiert oder zurückgesetzt werden**.
+**Eine Wire-Version.** Es gibt keinen Fallback und keine Unterstützung früherer Versionen. Ein Sidecar mit anderer Version oder anderem Release **braucht ein Update oder Downgrade auf die unterstützte Kombination**.
 
 ## Erzeugte Vertragsdokumente
 

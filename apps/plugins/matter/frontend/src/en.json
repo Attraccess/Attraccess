@@ -29,7 +29,6 @@
     "received": "Received",
     "supported": "Supported combination",
     "combination": "Attraccess {{attraccess}}, plugin {{plugin}}, sidecar {{sidecar}}, matter.js {{matterJs}}",
-    "receivedCombination": "Attraccess {{attraccess}}, plugin {{plugin}}, sidecar {{sidecar}}, matter.js {{matterJs}}",
     "loadError": "The status could not be loaded."
   },
   "hint": {
@@ -38,9 +37,9 @@
     "connected": "The plugin is connected to the Matter sidecar.",
     "unavailable": "The sidecar cannot be reached. Check that it is running and that the URL, port and firewall are correct. Attraccess retries automatically.",
     "unauthorized": "The sidecar rejected the token. Check the token (also after a rotation) and enter it again.",
-    "incompatible": "The versions do not match. Upgrade or downgrade the sidecar to a supported combination.",
+    "incompatible": "The versions do not match. Upgrade or downgrade Attraccess, the Matter plugin or the sidecar to the supported combination shown below.",
     "misconfigured": "The URL, the CA certificate or the TLS setup is invalid. Check the URL and path prefix, and that the CA matches the sidecar certificate.",
-    "hostVersion": "This Attraccess version does not report its version. Upgrade Attraccess to 1.11.0 or newer."
+    "hostVersion": "This Attraccess version does not report its version. Upgrade Attraccess to {{attraccess}} or newer."
   },
   "form": {
     "title": "Connection settings",
@@ -53,7 +52,7 @@
     "replace": "Replace",
     "cancelReplace": "Keep current token",
     "ca": "CA certificate (optional)",
-    "caDescription": "PEM certificate(s) to trust in addition to the system roots, for a private CA.",
+    "caDescription": "PEM certificate(s) of a private CA. They are trusted in addition to Node.js's default root certificates, not instead of them.",
     "caClear": "Clear CA certificate",
     "caCleared": "The CA certificate will be removed when you save.",
     "save": "Save",
@@ -64,6 +63,7 @@
     "removeTitle": "Remove the Matter connection?",
     "removeText": "The URL and token are deleted and the plugin disconnects from the sidecar.",
     "removeConfirm": "Remove",
-    "removeError": "Removing failed"
+    "removeError": "Removing failed",
+    "loadError": "The connection settings could not be loaded."
   }
 }

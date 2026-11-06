@@ -10,6 +10,14 @@ const STATE_COLOR = {
   degraded: 'warning',
 } as const;
 
+/** `unavailable` usually heals by itself; the other reasons need the administrator. */
+const REASON_COLOR = {
+  unavailable: 'warning',
+  unauthorized: 'danger',
+  incompatible: 'danger',
+  misconfigured: 'danger',
+} as const;
+
 function Field({ label, children, dataCy }: Readonly<{ label: string; children: React.ReactNode; dataCy?: string }>) {
   return (
     <div className="mt:flex mt:flex-col" data-cy={dataCy}>
@@ -24,6 +32,12 @@ export function hintKey(status: ConnectionStatus): string {
   if (status.state !== 'degraded') return `hint.${status.state}`;
   if (status.reasonDetail === 'host version unavailable') return 'hint.hostVersion';
   return `hint.${status.reason ?? 'unavailable'}`;
+}
+
+/** The lowest Attraccess version of the first supported combination, e.g. `1.11.0` for `^1.11.0`. */
+function minimumAttraccess(status: ConnectionStatus): string {
+  const range = status.supported[0]?.attraccess ?? '';
+  return range.match(/\d+\.\d+\.\d+/)?.[0] ?? range;
 }
 
 function Combination({ entry }: Readonly<{ entry: SupportedCombination | Record<string, unknown> }>) {
@@ -57,12 +71,12 @@ export function StatusCard({ status }: Readonly<{ status: ConnectionStatus }>) {
             {t(`status.state.${status.state}`)}
           </Chip>
           {status.reason && (
-            <Chip color="danger" variant="soft" data-cy="matter-reason-chip">
+            <Chip color={REASON_COLOR[status.reason]} variant="soft" data-cy="matter-reason-chip">
               {t(`status.reason.${status.reason}`)}
             </Chip>
           )}
         </div>
-        <p data-cy="matter-hint">{t(hintKey(status))}</p>
+        <p data-cy="matter-hint">{t(hintKey(status), { attraccess: minimumAttraccess(status) })}</p>
         <dl className="mt:grid mt:grid-cols-1 mt:gap-3 mt:sm:grid-cols-2">
           <Field label={t('status.since')}>{formatDateTime(status.since)}</Field>
           {status.nextRetryAt && (
