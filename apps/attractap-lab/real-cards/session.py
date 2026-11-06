@@ -205,6 +205,49 @@ class Kit:
         self.user_seconds += time.monotonic() - began
         raise AssertionError(f"not completed after {attempts} tries: {text}")
 
+    def card_types(self, since):
+        """(uid, type) of cards whose GetVersion answer the server received after ``since`` (wall clock)."""
+        wire = [json.loads(line) for line in Path(os.environ["WIRETAP_FILE"]).read_text().splitlines() if line.startswith("{")]
+        found = []
+        for message in wire:
+            if message.get("type") != "CARD_APDU_RESPONSE" or message["dir"] != "r2s" or message["t"] < since:
+                continue
+            payload = message["payload"]
+            if payload.get("seq") != 1 or not str(payload.get("response", "")).endswith("91af"):
+                continue
+            raw = bytes.fromhex(payload["response"])
+            if len(raw) < 9:
+                continue
+            vendor, kind, major = raw[0], raw[1], raw[3]
+            if kind == 0x01:
+                name = {0x01: "DESFire EV1", 0x12: "DESFire EV2", 0x33: "DESFire EV3"}.get(major, f"DESFire (version 0x{major:02x})")
+            elif kind == 0x04:
+                name = "NTAG 424 DNA" if major == 0x30 else f"NTAG 4xx (version 0x{major:02x})"
+            else:
+                name = f"unknown (type 0x{kind:02x}, version 0x{major:02x})"
+            found.append(name)
+        return found
+
+    def identify(self, count):
+        """Ask for each card in turn and say what it is. The server only reads GetVersion; no card is changed."""
+        self.wait_idle()
+        for number in range(1, count + 1):
+            self.prompt(f"CARD {number} of {count}: HOLD IT FLAT ON THE READER (it is only read, nothing is written)")
+            began = time.time()
+            deadline = time.monotonic() + 40
+            kinds = []
+            while time.monotonic() < deadline and not kinds:
+                time.sleep(0.5)
+                kinds = self.card_types(began)
+            if kinds:
+                self.say(f"    -> card {number} is a {kinds[0]}")
+                self.log("identified", number=number, card=kinds[0])
+            else:
+                self.say(f"    -> card {number}: the reader did not read it (wrong side or not an NFC card?)")
+            self.say("    LIFT THE CARD NOW")
+            time.sleep(4)
+            self.wait_idle()
+
     def cards_of(self, user_id):
         status, cards = self.api.call("GET", f"/attractap/cards?userId={user_id}", token=self.admin)
         assert status == 200, cards
@@ -419,6 +462,8 @@ def main():
     parser.add_argument("--emulate", action="store_true", help="the NFC emulator answers instead of real cards")
     parser.add_argument("--cards", default="EV2,EV3,NTAG424")
     parser.add_argument("--speak", action="store_true", help="also say each prompt aloud (macOS)")
+    parser.add_argument("--identify", type=int, default=0, metavar="N",
+                        help="only tell what type each of N cards is (GetVersion, nothing is written to the cards)")
     args = parser.parse_args()
     run_dir = Path(os.environ["RUN_DIR"])
     began = time.time()
@@ -434,6 +479,10 @@ def main():
             for profile in kit.emulator.command("profiles.list"):
                 kit.emulator.command("profiles.delete", {"id": profile["id"]})
         kit.provision()
+        if args.identify:
+            kit.identify(args.identify)
+            kit.console.stop()
+            return
         interactive_began = time.time()
         results = []
         for name in args.cards.split(","):
