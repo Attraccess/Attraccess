@@ -7,15 +7,33 @@ import { wagoShellStat } from '../host/shell/stat';
  */
 export function wagoRuntimeSupervisorLaunchShell(): string {
   return `${wagoShellStat()}
+# A live supervisor publishes ready into every supervisor-start.* that lacks it.
+# Removing a request in place races that: rm unlinks ready, the supervisor
+# writes it again, and rmdir fails with "Directory not empty". Move the request
+# out of that name first. Writers address it by its old path, so they now fail
+# instead of refilling the directory that is being removed. The destination is
+# reserved before the request exists: a same-directory rename and removal need
+# no new inode, so a full configuration filesystem cannot strand the request.
+retire_runtime_supervisor_request() {
+  mv "$supervisor_launch" "$supervisor_retired/request" || return 1
+  rm -rf "$supervisor_retired"
+}
 launch_runtime_supervisor() {
   supervisor_failure_stage=prerequisites
   command -v nohup >/dev/null && command -v sleep >/dev/null || return 1
   test -f "$hook" && test ! -L "$hook" &&
     test "$(stat -c '%u:%g:%a:%h' "$hook")" = 0:0:700:1 || return 1
-  supervisor_launch=$(mktemp -d "$config/supervisor-start.XXXXXX") || return 1
+  supervisor_retired=$(mktemp -d "$config/supervisor-retired.XXXXXX") || return 1
+  if ! supervisor_launch=$(mktemp -d "$config/supervisor-start.XXXXXX"); then
+    rm -rf "$supervisor_retired"
+    return 1
+  fi
   # Caller rollback must never run without its transaction lock. Retain its
   # traps privately and restore them only after reacquiring that same lock.
-  trap > "$supervisor_launch/traps" || return 1
+  if ! trap > "$supervisor_launch/traps"; then
+    retire_runtime_supervisor_request
+    return 1
+  fi
   trap - EXIT
   supervisor_interrupted=0
   # Defer a catchable interruption until rollback can again own install.lock.
@@ -52,7 +70,7 @@ launch_runtime_supervisor() {
   supervisor_wait_remaining=300
   if ! { test -f "$config/install.lock" && test ! -L "$config/install.lock" &&
     test "$(stat -c '%u:%g:%a:%h' "$config/install.lock")" = 0:0:600:1; }; then
-    rm -rf "$supervisor_launch"
+    retire_runtime_supervisor_request
     trap - EXIT HUP INT TERM
     echo 'Runtime supervisor handoff lock unverified; recovery required' >&2
     exit 75
@@ -60,7 +78,7 @@ launch_runtime_supervisor() {
   exec 9<>"$config/install.lock"
   until flock -n 9; do
     if test "$supervisor_wait_remaining" -le 0 || ! sleep 2; then
-      rm -rf "$supervisor_launch"
+      retire_runtime_supervisor_request
       # Leave recovery ownership intact. Neither the caller nor its outer boot
       # wrapper may roll back a different transaction while this lock is held.
       trap - EXIT HUP INT TERM
@@ -88,7 +106,7 @@ launch_runtime_supervisor() {
           (exec 8<>"$config/supervisor.lock"; ! flock -n 8); then supervisor_live=1; fi ;;
     esac
   fi
-  rm -rf "$supervisor_launch" || return 1
+  retire_runtime_supervisor_request || return 1
   test "$supervisor_live" = 1
 }
 launch_runtime_supervisor || fail "Runtime supervisor launch unverified: $supervisor_failure_stage"`;

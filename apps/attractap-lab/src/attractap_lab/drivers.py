@@ -53,6 +53,21 @@ class ESPToolDriver(Driver, ResetProtocol):
         self._write(image, ["write-flash", "--erase-all", "0x0"])
 
     @Driver.check_active
+    def erase_and_flash_encrypted(self, image):
+        """Erase the whole chip, then write a lab-signed Intel HEX image encrypted.
+
+        For lab secure readers (ATT-1166): development-mode flash encryption lets
+        the ROM encrypt writes, and --force lets esptool write the bootloader
+        region while Secure Boot is on. HEX leaves the gaps between partitions
+        (e.g. NVS) erased instead of filling them with encrypted 0xFF.
+        """
+        with open(image, "rb") as file:
+            if file.read(1) != b":":
+                raise ValueError(f"{image} is not an Intel HEX image; lab secure readers take only "
+                                 "the signed .hex images of build_firmwares.py --lab")
+        self._write(image, ["write-flash", "--force", "--erase-all", "--encrypt", "0x0"], name="firmware.hex")
+
+    @Driver.check_active
     def reset(self):
         """Reboot existing firmware without flashing; SerialDriver must be inactive."""
         self._run([self.esptool, *self._connection(), "--after", "hard-reset", "--no-stub", "run"])
@@ -63,11 +78,11 @@ class ESPToolDriver(Driver, ResetProtocol):
         return self._run([self.espefuse, *self._connection(), "dump", "summary", "--format", "json"],
                          capture=True)
 
-    def _write(self, image, arguments):
+    def _write(self, image, arguments, name="firmware.bin"):
         if not self.device.devnode:
             raise RuntimeError("The flash resource has no serial device node")
         with tempfile.TemporaryDirectory(prefix="attractap-flash-") as directory:
-            staged = Path(directory) / "firmware.bin"
+            staged = Path(directory) / name
             shutil.copyfile(image, staged)
             managed = ManagedFile(str(staged), self.device, detect_nfs=False)
             managed.sync_to_resource()

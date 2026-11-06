@@ -91,6 +91,66 @@ if(fault==='stale-ack')fs.rmSync(root+'/supervisor-fixture-live');
     expect(fixture.read('launches').trim().split('\n').length).toBeLessThanOrEqual(15);
   });
 
+  it('removes its acknowledged request even when the supervisor acknowledges again during removal', () => {
+    // Pin the loaded-runner order: rm -rf has unlinked ready but not yet removed
+    // the directory when the still-running supervisor publishes ready again.
+    const result = fixture.run(
+      script(`
+rm() {
+  if test "$1" = -rf && test -d "$2"; then
+    command rm -rf "$2"/* "$2"/.[!.]*
+    for request in "$config"/supervisor-start.*; do
+      if test -d "$request" && test ! -e "$request/ready"; then printf '%s\\n' "$$" > "$request/ready"; fi
+    done
+    /bin/rmdir "$2"
+  else
+    command rm "$@"
+  fi
+}
+${wagoRuntimeSupervisorLaunchShell()}`),
+    );
+    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+    expect(requests()).toEqual([]);
+    expect(readdirSync(join(fixture.root, config)).filter((name) => name.startsWith('supervisor-retired.'))).toEqual(
+      [],
+    );
+  });
+
+  it('removes its request without a new inode when the configuration filesystem fills after the handoff starts', () => {
+    // Every mktemp after the request exists reports exhausted inodes.
+    const result = fixture.run(
+      script(`
+mktemp() {
+  for request in "$config"/supervisor-start.*; do
+    if test -d "$request"; then echo "mktemp: No space left on device" >&2; return 1; fi
+  done
+  command mktemp "$@"
+}
+${wagoRuntimeSupervisorLaunchShell()}`),
+    );
+    expect({ status: result.status, stderr: result.stderr }).toEqual({ status: 0, stderr: '' });
+    expect(requests()).toEqual([]);
+    expect(readdirSync(join(fixture.root, config)).filter((name) => name.startsWith('supervisor-retired.'))).toEqual(
+      [],
+    );
+  });
+
+  it('fails before the handoff and leaves nothing behind when no retirement directory can be reserved', () => {
+    const result = fixture.run(
+      script(`
+mktemp() { echo "mktemp: No space left on device" >&2; return 1; }
+${wagoRuntimeSupervisorLaunchShell()}`),
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Runtime supervisor launch unverified: prerequisites');
+    expect(existsSync(join(fixture.root, 'launches'))).toBe(false);
+    expect(
+      readdirSync(join(fixture.root, config)).filter(
+        (name) => name.startsWith('supervisor-start.') || name.startsWith('supervisor-retired.'),
+      ),
+    ).toEqual([]);
+  });
+
   it('fails after bounded launch attempts without an acknowledgement and removes its request', () => {
     // No existing owner in this case. Other tests exercise lock validation;
     // avoid 165 external metadata probes just to count replacement launches.
