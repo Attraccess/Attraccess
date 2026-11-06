@@ -53,7 +53,8 @@ export class SessionChangeQueue {
 
   /**
    * Runs the task right away, without waiting (a machine limited to one session keeps its immediate conflict),
-   * but changes queued after it still wait for it. That keeps counts consistent while the limit is being raised.
+   * but changes of this instance queued after it still wait for it. That keeps counts consistent while the limit
+   * is being raised; it takes no Valkey lock, so changes on other instances do not wait for it.
    */
   async runAlongside<T>(resourceId: number, task: () => Promise<T>): Promise<T> {
     const previous = this.tails.get(resourceId) ?? Promise.resolve();
