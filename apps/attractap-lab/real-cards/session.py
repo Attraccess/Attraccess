@@ -229,24 +229,40 @@ class Kit:
         return found
 
     def identify(self, count):
-        """Ask for each card in turn and say what it is. The server only reads GetVersion; no card is changed."""
+        """Ask for each card in turn and say what it is. The server only reads GetVersion; no card is changed.
+
+        Returns the card names (EV2, EV3, NTAG424) that were found, in the order they were identified.
+        """
         self.wait_idle()
+        found = []
         for number in range(1, count + 1):
-            self.prompt(f"CARD {number} of {count}: HOLD IT FLAT ON THE READER (it is only read, nothing is written)")
-            began = time.time()
-            deadline = time.monotonic() + 40
             kinds = []
-            while time.monotonic() < deadline and not kinds:
-                time.sleep(0.5)
-                kinds = self.card_types(began)
+            for attempt in range(2):
+                self.prompt(f"CARD {number} of {count}: HOLD IT FLAT ON THE READER (it is only read, nothing is written)"
+                            if attempt == 0 else f"AGAIN, CARD {number}: LIFT IT, WAIT 2 SECONDS, THEN HOLD IT FLAT ON THE READER")
+                began = time.time()
+                deadline = time.monotonic() + 45
+                while time.monotonic() < deadline and not kinds:
+                    time.sleep(0.5)
+                    kinds = self.card_types(began)
+                if kinds:
+                    break
+                self.say("    the reader did not read it; lift it for a moment")
+                time.sleep(3)
             if kinds:
-                self.say(f"    -> card {number} is a {kinds[0]}")
-                self.log("identified", number=number, card=kinds[0])
+                name = kinds[0]
+                key = {"DESFire EV2": "EV2", "DESFire EV3": "EV3", "NTAG 424 DNA": "NTAG424"}.get(name)
+                self.say(f"    -> card {number} is a {name}" + (f": PUT IT ON THE {key} PILE" if key else " (not used by this session)"))
+                self.log("identified", number=number, card=name)
+                if key and key not in found:
+                    found.append(key)
             else:
-                self.say(f"    -> card {number}: the reader did not read it (wrong side or not an NFC card?)")
+                self.say(f"    -> card {number}: the reader could not read it (wrong side or not an NFC card?)")
             self.say("    LIFT THE CARD NOW")
             time.sleep(4)
             self.wait_idle()
+        self.say(f"\nidentified for this session: {', '.join(found) or 'none'}")
+        return found
 
     def cards_of(self, user_id):
         status, cards = self.api.call("GET", f"/attractap/cards?userId={user_id}", token=self.admin)
@@ -487,10 +503,14 @@ def main():
                 kit.emulator.command("profiles.delete", {"id": profile["id"]})
         kit.provision()
         if args.identify:
-            kit.identify(args.identify)
+            identified = kit.identify(args.identify)
+            wanted = [c.strip() for c in (args.cards or "").split(",") if c.strip()]
+            args.cards = ",".join(c for c in wanted if c in identified)
             if not args.cards:
+                kit.say("no card of the wanted types was identified: nothing to run")
                 kit.console.stop()
                 return
+            kit.say(f"running the full script for: {args.cards}")
         interactive_began = time.time()
         results = []
         for name in (args.cards or "EV2,EV3,NTAG424").split(","):
