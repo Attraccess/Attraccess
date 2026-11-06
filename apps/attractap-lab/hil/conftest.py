@@ -180,8 +180,8 @@ def record_heap(console, artifacts, label):
 def reader(target, emulator, api, admin, artifacts):
     """A freshly flashed reader on the lab Wi-Fi, paired with the test API.
 
-    The janitor erases readers between sessions (this fixture wipes a secure-lab
-    reader itself), so the reader starts unpaired and is approved with the
+    The janitor erases readers between sessions (this fixture also wipes a
+    secure-lab reader itself), so the reader starts unpaired and is approved with the
     admin session of the API this run started.
     """
     secure = PROFILE == efuse.SECURE_LAB
@@ -234,8 +234,8 @@ def reader(target, emulator, api, admin, artifacts):
             except Exception:  # the wipe below must still run
                 pass
         if secure:
-            # The secure place has no janitor yet: also when setup failed, leave
-            # no Wi-Fi, PIN or pairing on the reader.
+            # Also when setup failed: no Wi-Fi, PIN or pairing may stay on the
+            # reader, even on a place without a janitor to park it.
             try:
                 target.deactivate(driver)
             except Exception:
