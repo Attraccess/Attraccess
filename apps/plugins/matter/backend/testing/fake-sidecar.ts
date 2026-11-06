@@ -38,6 +38,9 @@ export type FakeOptions = {
   port?: number;
 };
 
+/** The sidecar's real 401 hint, which names the header format and must reach the admin intact. */
+const UNAUTHORIZED_MESSAGE = 'A valid service token is required: send "Authorization: Bearer <token>".';
+
 const error = (res: ServerResponse, status: number, code: string, message: string, details?: unknown) => {
   const body = JSON.stringify({
     error: { code, message, correlationId: randomUUID(), retryable: status === 503, ...(details ? { details } : {}) },
@@ -119,7 +122,7 @@ export class FakeSidecar {
         body: JSON.stringify({
           error: {
             code: 'unauthorized',
-            message: 'A valid service token is required.',
+            message: UNAUTHORIZED_MESSAGE,
             correlationId: randomUUID(),
             retryable: false,
           },
@@ -149,7 +152,7 @@ export class FakeSidecar {
     this.requests.push({ method: req.method ?? '', path: path ?? req.url ?? '', headers: req.headers });
     if (path === null) return error(res, 404, 'not_found', 'Unknown path.');
     if (this.restOverride) return this.restOverride(req, res);
-    if (!this.authorized(req)) return error(res, 401, 'unauthorized', 'A valid service token is required.');
+    if (!this.authorized(req)) return error(res, 401, 'unauthorized', UNAUTHORIZED_MESSAGE);
     const json = (body: unknown) => {
       const text = JSON.stringify(body);
       res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(text) });

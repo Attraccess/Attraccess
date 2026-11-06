@@ -351,7 +351,8 @@ export class SidecarConnection {
   private scrub(text: string): string {
     const token = this.config?.token;
     const masked = token ? text.split(token).join('[redacted]') : text;
-    return masked.replace(/Bearer\s+\S+/gi, 'Bearer [redacted]');
+    // `<token>` is the placeholder in the sidecar's own 401 hint; masking it would eat the rest of that sentence.
+    return masked.replace(/Bearer\s+(?!<token>)[^\s"\\]+/gi, 'Bearer [redacted]');
   }
 
   private emit<T>(handlers: Set<(value: T) => void>, value: T): void {

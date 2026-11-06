@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { selfSignedCertificate } from '../testing/certs';
 import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
 import { SidecarConnection, type ConnectionStatus } from './connection';
@@ -149,6 +150,30 @@ describe('SidecarConnection', () => {
     expect(Date.parse(status.nextRetryAt as string) - Date.now()).toBeGreaterThan(BACKOFF_CAP_MS - 2_000);
   });
 
+  it('passes the sidecar 401 hint through intact and masks any real bearer value', async () => {
+    fake = await FakeSidecar.start({ tokens: ['another-token-0123456789abcdef0123456789'] });
+    create().configure({ url: fake.url, token: TOKEN });
+    await until(() => connection.status().reason === 'unauthorized');
+    expect(connection.status().lastError?.message).toBe(
+      'A valid service token is required: send "Authorization: Bearer <token>".',
+    );
+    fake.restOverride = (_req, res) => {
+      const body = JSON.stringify({
+        error: {
+          code: 'unauthorized',
+          message: 'rejected Bearer hunter2hunter2hunter2 here',
+          correlationId: randomUUID(),
+          retryable: false,
+        },
+      });
+      res.writeHead(401, { 'content-type': 'application/json' });
+      res.end(body);
+    };
+    connection.configure({ url: fake.url, token: `${TOKEN}-changed` });
+    await until(() => connection.status().lastError?.message.includes('here') === true);
+    expect(connection.status().lastError?.message).toBe('rejected Bearer [redacted] here');
+  });
+
   it('reconnects immediately when the settings change', async () => {
     fake = await FakeSidecar.start({ tokens: ['another-token-0123456789abcdef0123456789'] });
     create().configure({ url: fake.url, token: TOKEN });
@@ -254,6 +279,6 @@ describe('SidecarConnection', () => {
     connection.stop();
     const everything = JSON.stringify({ logs, states, status: connection.status() });
     expect(everything).not.toContain(TOKEN);
-    expect(everything.toLowerCase()).not.toContain('bearer');
+    expect(everything).not.toContain(`Bearer ${TOKEN}`);
   });
 });
