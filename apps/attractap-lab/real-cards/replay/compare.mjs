@@ -135,8 +135,9 @@ function withoutFactoryProbe(conversation, auths) {
   const ex = conversation.exchanges;
   const refused = first && first.keyNo !== 0 && ex[first.index + 1]?.rx?.endsWith('91ae') === true;
   const masterFollows = auths[1]?.keyNo === 0;
-  if (!refused || !masterFollows || !ex.some((e) => e.tx.startsWith('90c4'))) return { conversation, probe: 0 };
-  const from = ex[first.index - 1]?.tx.startsWith('00a4') ? first.index - 1 : first.index;
+  if (!refused || !masterFollows) return { conversation, probe: 0 };
+  const selectsApp = (tx) => tx?.startsWith('00a4') || tx?.startsWith('905a');
+  const from = selectsApp(ex[first.index - 1]?.tx) ? first.index - 1 : first.index;
   const exchanges = [...ex.slice(0, from), ...ex.slice(first.index + 2)];
   return { conversation: { ...conversation, exchanges }, probe: first.index + 2 - from };
 }
@@ -145,7 +146,8 @@ function compareOne(original) {
   const { conversation, probe } = withoutFactoryProbe(original, analyse(original));
   const ex = conversation.exchanges;
   const auths = analyse(conversation);
-  const operation = opOverrides[conversation.id] ?? guessOperation(conversation, auths);
+  const cutReset = probe > 0 && !conversation.exchanges.some((e) => e.tx.startsWith('90c4'));
+  const operation = opOverrides[conversation.id] ?? (cutReset ? 'reset' : guessOperation(conversation, auths));
   const kind = cardKind(conversation);
   const result = { conversation: conversation.id, operation, cardKind: kind, exchanges: ex.length, complete: ex.every((e) => e.rx !== null), ...(probe ? { factoryProbeExchangesIgnored: probe } : {}) };
   if (!result.complete) {

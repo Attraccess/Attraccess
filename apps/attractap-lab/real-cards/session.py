@@ -38,6 +38,8 @@ PN532_FAILURE = re.compile(r"PN532 InDataExchange status 0x[0-9A-Fa-f]+")
 CARDS = {
     "EV2": {"title": "DESFire EV2", "profile": {"id": "kit-ev2", "type": "desfire-ev2", "uid": "08ee2001"}},
     "EV3": {"title": "DESFire EV3", "profile": {"id": "kit-ev3", "type": "desfire-ev3", "uid": "08ee3001"}},
+    # A card of unknown type: the server detects it (GetVersion); the report names what the card answered.
+    "CARD": {"title": "NFC card", "profile": {"id": "kit-any", "type": "desfire-ev3", "uid": "08ee5001"}},
     "NTAG424": {"title": "NTAG 424 DNA", "profile": {"id": "kit-ntag", "type": "ntag424", "uid": "08ee4001"}},
 }
 LOGINS = 6
@@ -502,6 +504,19 @@ def main():
             for profile in kit.emulator.command("profiles.list"):
                 kit.emulator.command("profiles.delete", {"id": profile["id"]})
         kit.provision()
+        hold = os.environ.get("HOLD_FILE")
+        if hold:
+            # The reader is claimed, flashed and paired: wait here until the person says go.
+            kit.say(f"READY: reader paired. Waiting for {hold} (up to 15 minutes)")
+            kit.log("ready")
+            waited = time.monotonic()
+            while not Path(hold).exists():
+                if time.monotonic() - waited > 900:
+                    kit.say("nobody said go within 15 minutes: giving the reader back")
+                    kit.console.stop()
+                    return
+                time.sleep(1)
+            kit.say("GO received")
         if args.identify:
             identified = kit.identify(args.identify)
             wanted = [c.strip() for c in (args.cards or "").split(",") if c.strip()]
@@ -527,6 +542,10 @@ def main():
                                 "console_range": [kit.console.mark(), kit.console.mark()],
                                 "wall_start": time.time(), "wall_end": time.time()})
         summary = summarize(kit, results)
+        seen = sorted(set(kit.card_types(0)))
+        kit.say(f"card type(s) the cards answered with: {', '.join(seen) or 'none'}")
+        for entry in summary:
+            entry["card_types_seen"] = seen
         report = {
             "mode": "emulator" if args.emulate else "real cards",
             "setup_seconds": round(interactive_began - began),
