@@ -37,7 +37,11 @@ describe('production managed SSH transport', () => {
   const host = '10.77.0.7',
     token = 'a'.repeat(32);
 
-  function fixture(mode: 'ok' | 'host-change' | 'wait' | 'noisy' | 'storage', selectedHost = host) {
+  function fixture(
+    mode: 'ok' | 'host-change' | 'wait' | 'noisy' | 'storage',
+    selectedHost = host,
+    { scanInputBreaks = false } = {},
+  ) {
     const hostKey = generateManagementKey(),
       identity = generateManagementKey();
     const actualSpawn = jest.requireActual<typeof processes>('node:child_process').spawn;
@@ -65,6 +69,15 @@ describe('production managed SSH transport', () => {
           ],
           options,
         );
+        if (scanInputBreaks) {
+          // Loaded-runner order: the transport's stdin end() only runs after the
+          // scanner has finished, and closing the pipe it already left fails with EPIPE.
+          const stdin = child.stdin as NonNullable<typeof child.stdin>;
+          stdin.end = (() => {
+            child.stdout?.once('end', () => stdin.destroy(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' })));
+            return stdin;
+          }) as typeof stdin.end;
+        }
       } else if (command === 'ssh') {
         directory = dirname(args[args.indexOf('-i') + 1]);
         const script =
@@ -98,6 +111,15 @@ describe('production managed SSH transport', () => {
 
   it('rejects a changed pinned host before starting any authentication process', async () => {
     const test = fixture('host-change');
+    await expect(
+      managedSsh(test.target, test.identity.privateKey, `proof ${token}`, new AbortController().signal),
+    ).rejects.toMatchObject({ failure: 'host_identity' });
+    expect(test.calls.map((call) => call.command)).toEqual(['ssh-keyscan']);
+    expectReaped(test.children);
+  });
+
+  it('reports a changed host key even when ssh-keyscan closes its stdin first', async () => {
+    const test = fixture('host-change', host, { scanInputBreaks: true });
     await expect(
       managedSsh(test.target, test.identity.privateKey, `proof ${token}`, new AbortController().signal),
     ).rejects.toMatchObject({ failure: 'host_identity' });

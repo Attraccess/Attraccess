@@ -104,7 +104,11 @@ async function processOutput(
       if (errorBytes > 16_384) stop();
       else errors.push(chunk);
     });
-    child.stdin.on('error', () => stop());
+    // A stdin error (EPIPE) only means the child closed its end first. ssh-keyscan
+    // never reads stdin and can exit before end() shuts the pipe down, so killing
+    // here turned a host-key mismatch into "offline". The exit status decides:
+    // each consumer validates its own input (key, token, byte count, checksum).
+    child.stdin.on('error', () => undefined);
     let stream: Readable | undefined;
     child.stdin.write(input, () => {
       if (file && !failed) {
