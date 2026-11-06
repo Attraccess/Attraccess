@@ -97,7 +97,7 @@ require_idf() {
 
 # The second build of the reader's build directory: same sources, another version
 # string, so the reader can update from the base image to this one.
-READER_BASE_VERSION="${READER_BASE_VERSION:-$(head -n1 "$ROOT/apps/attractap/firmware/version.txt")}"
+READER_BASE_VERSION="${READER_BASE_VERSION:-$(head -n1 "$ROOT/apps/attractap/firmware/version.txt" 2>/dev/null || true)}"
 READER_OTA_VERSION="${READER_OTA_VERSION:-$READER_BASE_VERSION-hilota}"
 build_ota_image() { # build directory, extra CMake arguments...
   [[ "${NO_OTA_BUILD:-}" != 1 ]] || return 0

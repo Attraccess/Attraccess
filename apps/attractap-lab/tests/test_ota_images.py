@@ -53,5 +53,7 @@ def test_sign_command_uses_secure_boot_v2():
     assert command[-1] == "in.bin" and "key.pem" in command
 
 
+@pytest.mark.skipif(not ota_images.REPO.joinpath("apps/attractap/firmware").is_dir(),
+                    reason="the firmware sources are not part of this package build")
 def test_lab_signing_key_is_the_published_lab_key():
     assert ota_images.LAB_SIGNING_KEY.is_file()
