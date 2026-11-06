@@ -228,6 +228,26 @@ describe('MatterPage', () => {
   });
 });
 
+describe('MatterPage recovery', () => {
+  it('shows the settings form once the API is back after a failed first load', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    api.getStatus.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValue(baseStatus);
+    api.getSettings.mockRejectedValueOnce(new Error('Failed to fetch')).mockResolvedValue(configured);
+    render(
+      <MemoryRouter>
+        <MatterPage />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('The status could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Sidecar URL/)).not.toBeInTheDocument();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS);
+    });
+    expect(await screen.findByLabelText(/Sidecar URL/)).toHaveValue('https://matter.example.com');
+    expect(screen.queryByText('The status could not be loaded.')).not.toBeInTheDocument();
+  });
+});
+
 describe('plugin registration', () => {
   beforeEach(() => vi.resetModules());
 

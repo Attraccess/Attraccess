@@ -14,13 +14,17 @@ export const STATUS_POLL_MS = 5_000;
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** Loads the settings once and polls the status while the page is open. Saving and removing refresh both. */
+/**
+ * Loads the settings and polls the status while the page is open. Saving and removing refresh both. If the first
+ * settings load failed (API briefly down), the poll retries it so the form appears without a manual reload.
+ */
 export function useMatterPage() {
   const [settings, setSettings] = useState<ConnectionSettings | null>(null);
   const [status, setStatus] = useState<ConnectionStatus | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const mounted = useRef(true);
+  const settingsLoaded = useRef(false);
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -36,7 +40,9 @@ export function useMatterPage() {
   const refreshSettings = useCallback(async () => {
     try {
       const next = await getSettings();
-      if (mounted.current) setSettings(next);
+      if (!mounted.current) return;
+      settingsLoaded.current = true;
+      setSettings(next);
     } catch (error) {
       if (mounted.current) setStatusError(messageOf(error));
     }
@@ -45,7 +51,10 @@ export function useMatterPage() {
   useEffect(() => {
     mounted.current = true;
     void Promise.all([refreshSettings(), refreshStatus()]).finally(() => mounted.current && setLoading(false));
-    const timer = setInterval(() => void refreshStatus(), STATUS_POLL_MS);
+    const timer = setInterval(() => {
+      void refreshStatus();
+      if (!settingsLoaded.current) void refreshSettings();
+    }, STATUS_POLL_MS);
     return () => {
       mounted.current = false;
       clearInterval(timer);
