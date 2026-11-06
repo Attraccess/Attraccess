@@ -121,7 +121,6 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
     triggeredByUserId?: number,
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
-    if (target.kind === 'user' && sessions.length === 0) throw new NoUsageSessionError();
     if (sessions.length === 0) return;
     const ends = this.deferredSessionEnds.get(attemptId) ?? [];
     ends.push({ usageIds: sessions.map((session) => session.id), notes, triggeredByUserId });
@@ -137,7 +136,6 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
     triggeredByUserId?: number,
   ): Promise<void> {
     const sessions = await this.findEndableSessions(resourceId, target, manager);
-    if (target.kind === 'user' && sessions.length === 0) throw new NoUsageSessionError();
     await this.endSessionsById(
       resourceId,
       sessions.map((session) => session.id),
@@ -200,6 +198,7 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
     return beingEnded ? null : session;
   }
 
+  /** A named user without any active session fails (NO_USAGE_SESSION); one whose session is ending is skipped. */
   private async findEndableSessions(
     resourceId: number,
     target: SessionEndTarget,
@@ -208,6 +207,7 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
     const sessions = (await this.getActiveSessionsForResource(resourceId, manager)).filter(
       (session) => target.kind === 'all' || session.userId === target.userId,
     );
+    if (target.kind === 'user' && sessions.length === 0) throw new NoUsageSessionError();
     if (sessions.length === 0) return sessions;
     const beingEnded = await (manager ?? this.resourceUsageRepository.manager).find(ResourceUsageLifecycleAttempt, {
       where: { resourceId, kind: 'end' },

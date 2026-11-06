@@ -8,6 +8,7 @@ import {
   SupervisionMode,
   User,
 } from '@attraccess/database-entities';
+import { NoUsageSessionError } from '../../flows/errors/no-usage-session.error';
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { rm } from 'node:fs/promises';
 import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
@@ -400,7 +401,25 @@ describe('Parallel sessions on one machine', () => {
     it('does nothing for all without sessions and fails for a user without one', async () => {
       await setLimit(3);
       await expect(scope.usage.endSessionsOfTarget(1, { kind: 'all' }, '')).resolves.toBeUndefined();
-      await expect(scope.usage.endSessionsOfTarget(1, { kind: 'user', userId: 1 }, '')).rejects.toThrow();
+      await expect(scope.usage.endSessionsOfTarget(1, { kind: 'user', userId: 1 }, '')).rejects.toBeInstanceOf(
+        NoUsageSessionError,
+      );
+    });
+
+    it('skips a user whose session is already being ended instead of failing', async () => {
+      await setLimit(3);
+      await scope.usage.startSession(1, scope.users[0], {});
+      const parked = parkFlows();
+      const ending = scope.usage.endSession(1, scope.users[0], {});
+      await parked.entered;
+      scope.flow.runFlow.mockClear();
+      await expect(
+        scope.usage.endSessionsOfTarget(1, { kind: 'user', userId: scope.users[0].id }, ''),
+      ).resolves.toBeUndefined();
+      parked.release();
+      await ending;
+      expect(scope.flow.runFlow).not.toHaveBeenCalled();
+      expect(await scope.usage.getActiveSessionsForResource(1)).toEqual([]);
     });
 
     it('ends one user session and skips sessions that are already being ended', async () => {
