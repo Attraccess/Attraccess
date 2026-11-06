@@ -255,11 +255,15 @@ describe('SessionConnection', () => {
     await reader.connect();
     await outcomes[0];
     const connection = connections[0];
+    const terminate = jest.spyOn(WebSocket.prototype, 'terminate');
     const results: boolean[] = [];
     for (let i = 0; i < 64; i++) results.push(connection.sendFrame(FrameType.BINARY, Buffer.alloc(4096)));
     expect(results).toContain(false);
     expect(results.filter(Boolean).length).toBeLessThan(64);
     expect(connection.isOpen).toBe(false);
+    // A reader that does not read would not answer a closing handshake: the socket must not linger.
+    expect(terminate).toHaveBeenCalledTimes(1);
+    terminate.mockRestore();
     await reader.closed;
   });
 

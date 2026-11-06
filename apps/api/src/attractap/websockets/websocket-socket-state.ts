@@ -208,6 +208,11 @@ export interface CardDetection {
   detectionId: number;
 }
 
+/** What is still waiting to go out to this reader (session queue for paired readers, `bufferedAmount` otherwise). */
+export function queuedSendBytes(socket: Pick<AuthenticatedWebSocket, 'pendingSendBytes' | 'bufferedAmount'>): number {
+  return socket.pendingSendBytes?.() ?? socket.bufferedAmount ?? 0;
+}
+
 export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   messageCount: number;
   id: string;
@@ -217,6 +222,11 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   sessionViolation?: boolean;
   /** Drops the connection without a closing handshake. */
   terminate: () => void;
+  /**
+   * Bytes queued to the reader that have not left yet. Set by the session transport, whose queue lives in
+   * TLS rather than the WebSocket; read it through `queuedSendBytes`, which falls back to `bufferedAmount`.
+   */
+  pendingSendBytes?: () => number;
   readerId: Attractap['id'] | null;
   readerName: string | null;
   /**

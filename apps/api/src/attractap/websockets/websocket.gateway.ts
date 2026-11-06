@@ -45,6 +45,13 @@ import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './we
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
 
+/** Card relay events: a card conversation must not wait for the reader's lastConnection update. */
+const SKIPS_ACTIVITY_WRITE = new Set<AttractapEventType>([
+  AttractapEventType.CARD_DETECTED,
+  AttractapEventType.CARD_APDU_RESPONSE,
+  AttractapEventType.CARD_REMOVED,
+]);
+
 @WebSocketGateway({
   path: '/api/attractap/websocket',
   ...readerWebSocketOptions,
@@ -150,7 +157,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     await socket.sendMessage(new AttractapEvent(replyType, { ...extra, error: 'FIRMWARE_UPDATE_REQUIRED' }));
   }
 
-  /** The reader's login ended (logout or timeout): forget the verified user and stop what depended on them. */
+  /**
+   * The reader's login ended (READER_SESSION_ENDED, or CARD_SESSION_ENDED for the verified user): forget
+   * the verified user and stop what depended on them. The only place that does this.
+   */
   protected onReaderSessionEnded(
     socket: AuthenticatedWebSocket,
     reason: CardConversationFailure = 'READER_SESSION_ENDED',
@@ -212,12 +222,13 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   public async disconnectReader(readerId: number) {
     const sockets = Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);
-    if (sockets.length === 0) {
-      return;
+    for (const socket of sockets) {
+      // The old credential's login and armed flows end now, not when the close event arrives. The
+      // reader id stays until then: the disconnect handler needs it for metrics and mass introduction.
+      this.resetReaderConnectionState(socket, readerId, 'READER_UNREACHABLE');
+      // No closing handshake on either transport: a socket in CLOSING would still be found for this reader.
+      socket.terminate();
     }
-
-    // A session socket whose credential changed must not linger in a closing handshake.
-    await Promise.all(sockets.map((socket) => (socket.transport === 'session' ? socket.terminate() : socket.close())));
   }
 
   /** Revoked or re-paired credentials end live sessions immediately. */
@@ -362,8 +373,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    // Card answers arrive in bursts on the tap path; the activity write would only add latency.
-    if (eventData.type !== AttractapEventType.CARD_APDU_RESPONSE) await this.clientWasActive(socket);
+    // The tap path stays free of database writes (the BUSY check runs first); heartbeats keep lastConnection fresh.
+    if (!SKIPS_ACTIVITY_WRITE.has(eventData.type)) await this.clientWasActive(socket);
 
     this.logger.debug(`Received event ${eventData.type} from client ${socket.id}`);
 
@@ -383,7 +394,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       // Unlicensed installations take no pairing requests (the service closes the socket).
       const licensed = this.licenseService.verifyLicense({ modules: [LicenseModuleType.ATTRACTAP] });
       licensed.catch(() => this.logger.error('Closing pairing connection due to license error'));
-      this.pairingService.handleConnection(client, request as IncomingMessage, licensed.then(() => undefined));
+      this.pairingService.handleConnection(
+        client,
+        request as IncomingMessage,
+        licensed.then(() => undefined),
+      );
       return;
     }
     // Taken over before the first await: early TLS bytes must not be missed and a stray text
@@ -507,11 +522,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.resetReaderConnectionState(socket, readerId, 'READER_UNREACHABLE');
 
     // Open reader UI steps, timers and the OTA file descriptor.
-    cleanupSocketState(socket, readerId, {
-      supervisionHandler: this.supervisionHandler,
-      massIntroductionHandler: this.massIntroductionHandler,
-      uiHandler: this.uiHandler,
-    });
+    cleanupSocketState(socket, { uiHandler: this.uiHandler });
     this.websocketService.sockets.delete(socket.id);
     this.metricsService.attractapDevicesConnected.set(this.websocketService.sockets.size);
   }

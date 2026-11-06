@@ -138,7 +138,8 @@ export class ReaderSessionService implements OnModuleDestroy {
     connection: SessionConnection,
     onReady: (socket: AuthenticatedWebSocket) => void,
   ): void {
-    // Everything the handlers send leaves through the TLS session.
+    // Everything the handlers send leaves through the TLS session. The callback runs synchronously, so
+    // a sender learns right away that a frame was refused (see createReaderSenders).
     const send = (data: string | Buffer, callback?: (error?: Error) => void) => {
       const accepted = connection.sendFrame(
         typeof data === 'string' ? FrameType.JSON : FrameType.BINARY,
@@ -146,7 +147,9 @@ export class ReaderSessionService implements OnModuleDestroy {
       );
       callback?.(accepted ? undefined : new Error('session closed or send queue full'));
     };
-    Object.assign(socket, { send });
+    // Queued bytes wait inside the session, not in the WebSocket: the send limits must look there.
+    const pendingSendBytes = () => connection.queuedBytes;
+    Object.assign(socket, { send, pendingSendBytes });
 
     connection.on('message', (frame: Frame) => {
       let text: Buffer | null = null;

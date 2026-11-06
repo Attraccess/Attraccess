@@ -148,8 +148,10 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
     [AttractapEventType.UI_STEP_CANCEL]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.UI_STEP_RESULT]: (socket, eventData) => d.uiHandler.handleStepResult(socket, eventData),
     [AttractapEventType.UI_RENDER_REPORT]: (socket, eventData) => d.uiHandler.handleRenderReport(socket, eventData),
-    [AttractapEventType.CARD_SESSION_ENDED]: (socket, eventData) =>
-      d.uiHandler.handleCardSessionEnded(socket, eventData),
+    [AttractapEventType.CARD_SESSION_ENDED]: (socket, eventData) => {
+      // The reader signed the verified user out itself: the same as READER_SESSION_ENDED.
+      if (d.uiHandler.handleCardSessionEnded(socket, eventData)) d.onReaderSessionEnded(socket);
+    },
     // Phase 7 (custom screens) is not implemented: messages of these types are dropped.
     [AttractapEventType.UI_SCREEN_OPEN]: () => undefined,
     [AttractapEventType.UI_SCREEN_CLOSE]: () => undefined,

@@ -4,6 +4,8 @@ import { WebSocket } from 'ws';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
 import { createReaderSenders, READER_SEND_LIMITS } from './reader-socket-send';
 import { securelyHashToken } from './websocket.utils';
+import { CARD_CONVERSATION_LIMITS } from './card-conversation.service';
+import { CardSessionService } from './handlers/ui/card-session.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
 /** Gateway-level rules of the card relay (ATT-1145): what the server forgets, refuses and never queues. */
@@ -53,6 +55,13 @@ describe('AttractapGateway card relay rules', () => {
     fixture.websocketService.sockets.set(socket.id, socket);
     return socket;
   }
+
+  const cardSessions = () => fixture.gateway['uiHandler']['cardSessions'] as CardSessionService;
+  /** A card conversation waiting for the card's answer. */
+  const pendingConversation = (socket: AuthenticatedWebSocket) =>
+    fixture.gateway['cardConversations'].run(socket, 'tap', { uid: '04aabbccddee80', detectionId: 1 }, (channel) =>
+      channel.exchange(Buffer.from([0x90, 0x60, 0, 0, 0])),
+    );
 
   const send = (socket: AuthenticatedWebSocket, type: AttractapEventType, payload: unknown = {}) =>
     fixture.gateway.onClientEvent(new AttractapEvent(type, payload).data, socket);
@@ -184,6 +193,63 @@ describe('AttractapGateway card relay rules', () => {
       expectConnectionStateCleared(socket);
     });
 
+    it('READER_SESSION_ENDED ends the card session', async () => {
+      const socket = loggedInReader();
+      cardSessions().issue(socket, 5, 'en');
+
+      await send(socket, AttractapEventType.READER_SESSION_ENDED);
+
+      expect(socket.state.cardSession).toBeNull();
+    });
+
+    it('CARD_SESSION_ENDED for the verified user ends the login like READER_SESSION_ENDED', async () => {
+      const socket = loggedInReader({ sendRaw: jest.fn(() => true) });
+      socket.state.supervisionFlow.webInitiated = false;
+      const session = cardSessions().issue(socket, 5, 'en');
+      const conversation = pendingConversation(socket);
+      await new Promise(setImmediate);
+
+      await send(socket, AttractapEventType.CARD_SESSION_ENDED, { cardSessionId: session.id });
+
+      expect(await conversation).toEqual({ ok: false, reason: 'READER_SESSION_ENDED' });
+      expect(socket.state.cardSession).toBeNull();
+      expect(socket.state.verifiedUserId).toBeNull();
+      expect(socket.state.verifiedCardUid).toBeNull();
+      expect(socket.state.formDrafts).toBeUndefined();
+      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('web-request');
+    });
+
+    it('CARD_SESSION_ENDED for an older card session keeps the current login', async () => {
+      const socket = loggedInReader();
+      const old = cardSessions().issue(socket, 4, 'en');
+      cardSessions().issue(socket, 5, 'en');
+
+      await send(socket, AttractapEventType.CARD_SESSION_ENDED, { cardSessionId: old.id });
+
+      expect(abort).not.toHaveBeenCalled();
+      expect(socket.state.verifiedUserId).toBe(5);
+      expect(socket.state.formDrafts).toEqual({ '1:START': { 1: 'x' } });
+    });
+
+    it('a credential change ends the login and armed flows before the socket is gone', async () => {
+      const socket = loggedInReader({ sendRaw: jest.fn(() => true) });
+      const conversation = pendingConversation(socket);
+      await new Promise(setImmediate);
+
+      await fixture.gateway.disconnectReader(7);
+
+      expect(socket.terminate).toHaveBeenCalled();
+      expect(socket.close).not.toHaveBeenCalled();
+      // The close event has not arrived yet: nothing of the old login may still be usable.
+      expect(await conversation).toEqual({ ok: false, reason: 'READER_UNREACHABLE' });
+      expectConnectionStateCleared(socket);
+      expect(massIntroductionService.detachReader).toHaveBeenCalledWith('mass-1', 7);
+
+      await fixture.gateway.handleDisconnect(socket);
+      expect(massIntroductionService.detachReader).toHaveBeenCalledTimes(1);
+      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledTimes(1);
+    });
+
     function expectConnectionStateCleared(socket: AuthenticatedWebSocket) {
       expect(socket.state).toEqual(
         expect.objectContaining({
@@ -198,6 +264,100 @@ describe('AttractapGateway card relay rules', () => {
       );
       expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('web-request');
     }
+  });
+
+  describe('reader activity', () => {
+    it('keeps the card relay events free of the lastConnection write; heartbeats keep it fresh', async () => {
+      const socket = loggedInReader();
+      const route = jest.spyOn(fixture.gateway['cardDetectedRouter'], 'route').mockResolvedValue(undefined);
+
+      await send(socket, AttractapEventType.CARD_DETECTED, { uid: '04aabbccddee80', detectionId: 1 });
+      await send(socket, AttractapEventType.CARD_APDU_RESPONSE, { conversationId: 'c', seq: 1, response: '9100' });
+      await send(socket, AttractapEventType.CARD_REMOVED, { conversationId: 'c' });
+
+      expect(route).toHaveBeenCalled();
+      expect(fixture.attractapService.updateLastReaderConnection).not.toHaveBeenCalled();
+
+      await fixture.gateway.onHeartbeat(socket);
+      expect(fixture.attractapService.updateLastReaderConnection).toHaveBeenCalledWith(7);
+    });
+  });
+
+  describe('send limits of a paired reader (session transport)', () => {
+    /** A session socket as ReaderSessionService.attach leaves it: queued bytes live in the session. */
+    function sessionSenders(options: { queued?: () => number; refuse?: boolean } = {}) {
+      const client: any = {
+        readyState: WebSocket.OPEN,
+        bufferedAmount: 0,
+        transport: 'session',
+        readerId: 7,
+        state: { verifiedUserId: null },
+        pendingSendBytes: options.queued ?? (() => 0),
+        send: jest.fn((_data: unknown, callback?: (error?: Error) => void) =>
+          callback?.(options.refuse ? new Error('session closed or send queue full') : undefined),
+        ),
+        terminate: jest.fn(),
+      };
+      const waitForAck = jest.fn(async () => {
+        throw new Error('timeout');
+      });
+      const senders = createReaderSenders({
+        client,
+        id: 's1',
+        logger: new Logger('test'),
+        waitForAck,
+        canReceiveReaderLanguage: () => true,
+        readerLanguage: () => undefined,
+      });
+      Object.assign(client, senders);
+      return { client, socket: client as AuthenticatedWebSocket, waitForAck };
+    }
+    const apdu = () => new AttractapEvent(AttractapEventType.CARD_APDU, { apdu: '9060000000' });
+
+    it('reports a frame the session refused, so a card exchange ends with READER_UNREACHABLE', async () => {
+      const { socket } = sessionSenders({ refuse: true });
+
+      expect(socket.sendRaw(apdu())).toBe(false);
+      expect(await pendingConversation(socket)).toEqual({ ok: false, reason: 'READER_UNREACHABLE' });
+      await expect(socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_LIST, {}))).resolves.toBe(false);
+    });
+
+    it("cuts the reader off at the session's queue limit, not the WebSocket's", async () => {
+      const errors = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const { client, socket } = sessionSenders({ queued: () => READER_SEND_LIMITS.session.maxQueuedBytes + 1 });
+
+      expect(socket.sendRaw(apdu())).toBe(false);
+
+      expect(client.send).not.toHaveBeenCalled();
+      expect(client.terminate).toHaveBeenCalledTimes(1);
+      expect(errors).toHaveBeenCalled();
+    });
+
+    it('accepts a large message while the session queue is below its limit', () => {
+      const { client, socket } = sessionSenders({ queued: () => READER_SEND_LIMITS.session.maxQueuedBytes });
+      socket.sendBinaryData(Buffer.alloc(60 * 1024));
+      expect(client.send).toHaveBeenCalledTimes(1);
+      expect(client.terminate).not.toHaveBeenCalled();
+    });
+
+    it('does not resend an unACKed message while the session queue is backed up', async () => {
+      let queued = 0;
+      const { client, socket, waitForAck } = sessionSenders({ queued: () => queued });
+      waitForAck.mockImplementation(async () => {
+        queued = READER_SEND_LIMITS.session.retryMaxQueuedBytes + 1;
+        throw new Error('timeout');
+      });
+
+      await expect(socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_LIST, {}))).resolves.toBe(false);
+
+      expect(client.send).toHaveBeenCalledTimes(1);
+      expect(waitForAck).toHaveBeenCalledTimes(READER_SEND_LIMITS.ackRetryCount);
+    });
+
+    it('refuses a new card conversation with BUSY while the session queue is backed up', () => {
+      const { socket } = sessionSenders({ queued: () => CARD_CONVERSATION_LIMITS.maxBufferedBytes + 1 });
+      expect(fixture.gateway['cardConversations'].isBusy(socket)).toBe(true);
+    });
   });
 
   describe('bounded send queue', () => {
@@ -282,7 +442,7 @@ describe('AttractapGateway card relay rules', () => {
 
       socket.sendBinaryData(Buffer.alloc(4096));
 
-      expect(client.send).toHaveBeenLastCalledWith(expect.any(Buffer));
+      expect(client.send).toHaveBeenLastCalledWith(expect.any(Buffer), expect.any(Function));
       expect(client.terminate).not.toHaveBeenCalled();
     });
   });

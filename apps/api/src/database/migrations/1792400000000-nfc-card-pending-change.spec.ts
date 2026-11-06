@@ -50,4 +50,36 @@ describe('NfcCardPendingChange migration', () => {
       await database.destroy();
     }
   });
+
+  it('keeps an existing table and its rows when the migration ran before under an earlier name', async () => {
+    const database = await new DataSource({ type: 'sqlite', database: ':memory:' }).initialize();
+    const runner = database.createQueryRunner();
+    try {
+      const migration = new NfcCardPendingChange1792400000000();
+      await migration.up(runner);
+      await runner.query(
+        `INSERT INTO "nfc_card_pending_change" ("uid", "kind", "cardId", "keyNo") VALUES ('04aabbccddee80', 'reset', 3, 1)`,
+      );
+      // The earlier run left the table without its index.
+      await runner.query('DROP INDEX "IDX_nfc_card_pending_change_uid"');
+
+      await migration.up(runner);
+
+      expect(await runner.query(`SELECT "uid", "kind" FROM "nfc_card_pending_change"`)).toEqual([
+        { uid: '04aabbccddee80', kind: 'reset' },
+      ]);
+      expect(await runner.query(`PRAGMA index_list("nfc_card_pending_change")`)).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: 'IDX_nfc_card_pending_change_uid' })]),
+      );
+
+      await migration.down(runner);
+      await migration.down(runner); // nothing left to drop
+      expect(await runner.query(`SELECT name FROM sqlite_master WHERE name LIKE '%nfc_card_pending_change%'`)).toEqual(
+        [],
+      );
+    } finally {
+      await runner.release();
+      await database.destroy();
+    }
+  });
 });

@@ -54,17 +54,17 @@ describe('AttractapUiHandler crash-loop protection', () => {
     expect(cardSessions.current(socket)).toBeNull();
   });
 
-  it('forgets the verified user when the reader ends its own card session', () => {
+  it("reports the login as ended when the reader ends the verified user's card session", () => {
     const { handler, cardSessions } = setup();
     const socket = makeSocket();
     const session = cardSessions.issue(socket, 7, 'en');
     Object.assign(socket.state, { verifiedUserId: 7, verifiedCardUid: '04aabbccddee80' });
-    handler.handleCardSessionEnded(socket, {
-      type: 'CARD_SESSION_ENDED',
-      payload: { cardSessionId: session.id },
-    } as any);
-    expect(socket.state.verifiedUserId).toBeNull();
-    expect(socket.state.verifiedCardUid).toBeNull();
+    const ended = (cardSessionId: unknown) =>
+      handler.handleCardSessionEnded(socket, { type: 'CARD_SESSION_ENDED', payload: { cardSessionId } } as any);
+    expect(ended(5)).toBe(false);
+    expect(ended(session.id)).toBe(true);
+    // Already over: a repeated message ends nothing.
+    expect(ended(session.id)).toBe(false);
   });
 
   it('keeps a different verified user when an older card session ends', () => {
@@ -73,10 +73,12 @@ describe('AttractapUiHandler crash-loop protection', () => {
     const session = cardSessions.issue(socket, 7, 'en');
     // Someone else tapped since: the verified user is not the one of this card session.
     Object.assign(socket.state, { verifiedUserId: 9, verifiedCardUid: '04112233445566' });
-    handler.handleCardSessionEnded(socket, {
-      type: 'CARD_SESSION_ENDED',
-      payload: { cardSessionId: session.id },
-    } as any);
+    expect(
+      handler.handleCardSessionEnded(socket, {
+        type: 'CARD_SESSION_ENDED',
+        payload: { cardSessionId: session.id },
+      } as any),
+    ).toBe(false);
     expect(socket.state.verifiedUserId).toBe(9);
   });
 

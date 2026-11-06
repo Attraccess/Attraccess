@@ -2,7 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { MAX_RELAYED_COMMAND_LENGTH } from '../card-crypto';
 import type { CardChannel } from '../card-crypto/card-operations';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from './websocket.types';
+import {
+  AttractapEvent,
+  AttractapEventType,
+  AuthenticatedWebSocket,
+  CardDetection,
+  queuedSendBytes,
+} from './websocket.types';
 
 /**
  * Limits sized for 1,000 readers with 250 tapping at once (to be tuned by the load test).
@@ -13,7 +19,10 @@ export const CARD_CONVERSATION_LIMITS = {
   maxExchanges: 32,
   exchangeTimeoutMs: 3000,
   conversationTimeoutMs: 15000,
-  /** A reader that cannot drain its socket this fast is treated as busy. */
+  /**
+   * A reader that has this much still queued is treated as busy. Below the session's own 64 KiB queue
+   * limit (SEND_QUEUE_LIMIT_BYTES), so a paired reader gets BUSY before its session is cut off.
+   */
   maxBufferedBytes: 32 * 1024,
   /** The longest card answer worth reading (PN532 buffer). */
   maxResponseLength: 64,
@@ -192,7 +201,7 @@ export class CardConversationService {
   }
 
   private queueIsFull(socket: AuthenticatedWebSocket): boolean {
-    return (socket.bufferedAmount ?? 0) > CARD_CONVERSATION_LIMITS.maxBufferedBytes;
+    return queuedSendBytes(socket) > CARD_CONVERSATION_LIMITS.maxBufferedBytes;
   }
 
   private open(purpose: string, detectionId: number): CardConversation {

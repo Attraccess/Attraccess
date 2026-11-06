@@ -256,6 +256,26 @@ describe('conversation limits', () => {
     expect(await run(conversations, reader.socket)).toEqual({ ok: false, reason: 'BUSY' });
   });
 
+  it('says busy when a paired reader has its session queue full, although the WebSocket buffers nothing', async () => {
+    const conversations = new CardConversationService();
+    const reader = idle(conversations);
+    // A session keeps queued bytes in TLS; `bufferedAmount` stays near 0.
+    let queued = 0;
+    Object.assign(reader.socket, { transport: 'session', bufferedAmount: 0, pendingSendBytes: () => queued });
+
+    const first = run(conversations, reader.socket, async (channel) => {
+      await channel.exchange(GET_VERSION);
+      queued = CARD_CONVERSATION_LIMITS.maxBufferedBytes + 1;
+      return channel.exchange(GET_VERSION);
+    });
+    await new Promise(setImmediate);
+    answerLast(conversations, reader);
+    expect(await first).toEqual({ ok: false, reason: 'BUSY' });
+
+    expect(conversations.isBusy(reader.socket)).toBe(true);
+    expect(await run(conversations, reader.socket)).toEqual({ ok: false, reason: 'BUSY' });
+  });
+
   it('ends a conversation that needs more than the allowed number of exchanges', async () => {
     const conversations = new CardConversationService();
     const reader = createRelayReader(new EmulatedCard('ntag424'), conversations);

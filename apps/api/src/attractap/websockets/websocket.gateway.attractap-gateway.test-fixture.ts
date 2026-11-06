@@ -85,6 +85,7 @@ function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): Auth
     sendBinaryData: jest.fn(),
     send: jest.fn(),
     close: jest.fn(),
+    terminate: jest.fn(),
     state: {
       verifiedUserId: null,
       enrollment: null,

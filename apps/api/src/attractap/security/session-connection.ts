@@ -123,7 +123,8 @@ export class SessionConnection extends EventEmitter {
     super();
     this.firstByte = new Promise<void>((resolve) => (this.markFirstByte = resolve));
     this.stream = new WsByteStream(ws);
-    this.stream.on('error', () => this.close());
+    // The stream fails on a full send queue or a dead WebSocket; neither would finish a closing handshake.
+    this.stream.on('error', () => this.close({ terminate: true }));
     ws.on('message', this.onWsMessage);
     ws.on('close', () => this.close());
     ws.on('error', () => this.close());
@@ -195,6 +196,15 @@ export class SessionConnection extends EventEmitter {
   }
 
   /**
+   * Bytes of messages queued but not yet handed to the WebSocket. Covers the TLS write buffer and the
+   * byte stream behind it: a frame counts until TLS reports its write done, which happens only once
+   * the encrypted bytes left through the WebSocket. The socket's own `bufferedAmount` stays near 0.
+   */
+  public get queuedBytes(): number {
+    return this.pendingBytes;
+  }
+
+  /**
    * Queues one message. Returns false when the session is closed, or when more than the
    * per-reader limit is already waiting to leave (the reader is not reading; it is dropped).
    */
@@ -203,7 +213,9 @@ export class SessionConnection extends EventEmitter {
     if (!this.isOpen || !tls) return false;
     // Counted from tls.write() until its callback: the frame has then left through the WebSocket.
     if (this.pendingBytes > SEND_QUEUE_LIMIT_BYTES) {
-      this.close();
+      // A reader that does not read would not answer a closing handshake either: without terminate
+      // the socket would stay registered (and look signed in) until the close timeout.
+      this.close({ terminate: true });
       return false;
     }
     try {
@@ -230,14 +242,16 @@ export class SessionConnection extends EventEmitter {
     }
   }
 
-  public close(): void {
+  /** `terminate`: drop the TCP connection instead of waiting for the peer to answer a closing handshake. */
+  public close(options: { terminate?: boolean } = {}): void {
     if (this.closed) return;
     this.closed = true;
     this.aborted.abort();
     this.tls?.destroy();
     this.stream.destroy();
     try {
-      this.ws.close(1000);
+      if (options.terminate) this.ws.terminate();
+      else this.ws.close(1000);
     } catch {
       // already closed
     }
