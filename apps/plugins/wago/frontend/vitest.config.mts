@@ -26,7 +26,8 @@ export default defineConfig({
     // Running files concurrently allows user-event interactions in one file to target
     // another file's DOM, producing intermittent input corruption and timeouts.
     fileParallelism: false,
-    testTimeout: 15_000,
+    // The user-event editor flows take ~15 s on loaded hosts and CI runners.
+    testTimeout: 30_000,
     coverage: {
       // Unit coverage feeds the project's crap-score target.
       enabled: true,
