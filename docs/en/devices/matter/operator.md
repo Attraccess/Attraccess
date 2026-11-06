@@ -52,13 +52,13 @@ Any 32–512 printable ASCII characters work (no spaces). Treat the token like a
 
 The page shows the connection state and polls it every five seconds. After saving, it should reach **Connected** within seconds and show the sidecar, matter.js and wire versions. The token is stored encrypted and is never shown again; use **Replace** to enter a new one. **Remove configuration** deletes the settings and disconnects.
 
-| State                    | What to do                                                                                                                                                                                                              |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Not configured           | Enter URL and token.                                                                                                                                                                                                    |
-| Degraded – unavailable   | Check that the sidecar runs, and the URL, port and firewall. The page shows when the next attempt happens. It reconnects by itself once the sidecar is back.                                                            |
-| Degraded – unauthorized  | The sidecar rejected the token. Compare it with `MATTER_SIDECAR_AUTH_TOKEN` (or the previous token during a rotation) and enter it again.                                                                               |
-| Degraded – incompatible  | The page shows the received and the supported combination. **Upgrade or downgrade** Attraccess, the plugin or the sidecar to a supported combination. "Host version unavailable" means Attraccess is older than 1.11.0. |
-| Degraded – misconfigured | Check the URL (and path prefix), and that the CA certificate matches the sidecar certificate and host name. Certificate verification cannot be turned off.                                                              |
+| State                    | What to do                                                                                                                                                                                                                                                 |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Not configured           | Enter URL and token.                                                                                                                                                                                                                                       |
+| Degraded – unavailable   | Check that the sidecar runs, and the URL, port and firewall. The page shows when the next attempt happens. It reconnects by itself once the sidecar is back.                                                                                               |
+| Degraded – unauthorized  | The sidecar rejected the token. Compare it with `MATTER_SIDECAR_AUTH_TOKEN` (or the previous token during a rotation) and enter it again.                                                                                                                  |
+| Degraded – incompatible  | The page shows the received and the supported combination. **Upgrade or downgrade** Attraccess, the plugin or the sidecar to a supported combination. "Host version unavailable" means Attraccess is older than 1.11.0.                                    |
+| Degraded – misconfigured | Check the URL (and path prefix), and that the CA certificate matches the sidecar certificate and host name. If the page says the Host name is not allowed, add that name to `MATTER_SIDECAR_ALLOWED_HOSTS`. Certificate verification cannot be turned off. |
 
 A warning appears when the URL is plain `http` to an address other than this machine: the token would cross the network unencrypted.
 
@@ -71,9 +71,9 @@ A warning appears when the URL is plain `http` to an address other than this mac
 
 ## Credential rotation
 
-Rotate the token without rebuilding anything and without losing the connection:
+Rotate the token without rebuilding anything and without a lasting interruption:
 
-1. Set the **new** token as `MATTER_SIDECAR_AUTH_TOKEN` and the **old** one as `MATTER_SIDECAR_AUTH_TOKEN_PREVIOUS` (deployment secrets or files), then restart the sidecar. The plugin stays connected, because the old token is still accepted.
+1. Set the **new** token as `MATTER_SIDECAR_AUTH_TOKEN` and the **old** one as `MATTER_SIDECAR_AUTH_TOKEN_PREVIOUS` (deployment secrets or files), then restart the sidecar. The plugin may show _unavailable_ for a few seconds while the sidecar restarts, then reconnects by itself, because the old token is still accepted.
 2. Enter the **new** token in the Matter page (**Replace**, then **Save**). The plugin reconnects with it.
 3. Remove `MATTER_SIDECAR_AUTH_TOKEN_PREVIOUS` and restart the sidecar.
 

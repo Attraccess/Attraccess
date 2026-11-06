@@ -52,13 +52,13 @@ Jede Folge von 32–512 druckbaren ASCII-Zeichen (ohne Leerzeichen) funktioniert
 
 Die Seite zeigt den Verbindungszustand und aktualisiert ihn alle fünf Sekunden. Nach dem Speichern sollte sie innerhalb weniger Sekunden **Verbunden** erreichen und die Versionen von Sidecar, matter.js und Wire-Protokoll anzeigen. Das Token wird verschlüsselt gespeichert und nie wieder angezeigt; mit **Ersetzen** geben Sie ein neues ein. **Konfiguration entfernen** löscht die Einstellungen und trennt die Verbindung.
 
-| Zustand                             | Was zu tun ist                                                                                                                                                                                                                                                   |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Nicht konfiguriert                  | URL und Token eingeben.                                                                                                                                                                                                                                          |
-| Eingeschränkt – nicht erreichbar    | Prüfen Sie, ob der Sidecar läuft, sowie URL, Port und Firewall. Die Seite zeigt, wann der nächste Versuch stattfindet. Sobald der Sidecar wieder da ist, verbindet sie sich selbst.                                                                              |
-| Eingeschränkt – nicht autorisiert   | Der Sidecar hat das Token abgelehnt. Vergleichen Sie es mit `MATTER_SIDECAR_AUTH_TOKEN` (bei einer Rotation auch mit dem vorherigen Token) und geben Sie es erneut ein.                                                                                          |
-| Eingeschränkt – inkompatibel        | Die Seite zeigt die empfangene und die unterstützte Kombination. **Aktualisieren oder downgraden** Sie Attraccess, das Plugin oder den Sidecar auf eine unterstützte Kombination. „Host-Version nicht verfügbar“ bedeutet, dass Attraccess älter als 1.11.0 ist. |
-| Eingeschränkt – falsch konfiguriert | Prüfen Sie die URL (und das Pfadpräfix) und ob das CA-Zertifikat zu Sidecar-Zertifikat und Hostnamen passt. Die Zertifikatsprüfung lässt sich nicht abschalten.                                                                                                  |
+| Zustand                             | Was zu tun ist                                                                                                                                                                                                                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Nicht konfiguriert                  | URL und Token eingeben.                                                                                                                                                                                                                                                              |
+| Eingeschränkt – nicht erreichbar    | Prüfen Sie, ob der Sidecar läuft, sowie URL, Port und Firewall. Die Seite zeigt, wann der nächste Versuch stattfindet. Sobald der Sidecar wieder da ist, verbindet sie sich selbst.                                                                                                  |
+| Eingeschränkt – nicht autorisiert   | Der Sidecar hat das Token abgelehnt. Vergleichen Sie es mit `MATTER_SIDECAR_AUTH_TOKEN` (bei einer Rotation auch mit dem vorherigen Token) und geben Sie es erneut ein.                                                                                                              |
+| Eingeschränkt – inkompatibel        | Die Seite zeigt die empfangene und die unterstützte Kombination. **Aktualisieren Sie oder setzen Sie zurück:** Bringen Sie Attraccess, das Plugin oder den Sidecar auf eine unterstützte Kombination. „Host-Version nicht verfügbar“ bedeutet, dass Attraccess älter als 1.11.0 ist. |
+| Eingeschränkt – falsch konfiguriert | Prüfen Sie die URL (und das Pfadpräfix) und ob das CA-Zertifikat zu Sidecar-Zertifikat und Hostnamen passt. Meldet die Seite, dass der Host-Name nicht erlaubt ist, tragen Sie ihn in `MATTER_SIDECAR_ALLOWED_HOSTS` ein. Die Zertifikatsprüfung lässt sich nicht abschalten.        |
 
 Eine Warnung erscheint, wenn die URL unverschlüsseltes `http` zu einer anderen Adresse als diesem Rechner nutzt: Das Token würde unverschlüsselt durchs Netz gehen.
 
@@ -71,9 +71,9 @@ Eine Warnung erscheint, wenn die URL unverschlüsseltes `http` zu einer anderen 
 
 ## Token-Rotation
 
-Rotieren Sie das Token, ohne etwas neu zu bauen und ohne die Verbindung zu verlieren:
+Rotieren Sie das Token, ohne etwas neu zu bauen und ohne dauerhafte Unterbrechung:
 
-1. Setzen Sie das **neue** Token als `MATTER_SIDECAR_AUTH_TOKEN` und das **alte** als `MATTER_SIDECAR_AUTH_TOKEN_PREVIOUS` (Deployment-Secrets oder Dateien) und starten Sie den Sidecar neu. Das Plugin bleibt verbunden, weil das alte Token weiter akzeptiert wird.
+1. Setzen Sie das **neue** Token als `MATTER_SIDECAR_AUTH_TOKEN` und das **alte** als `MATTER_SIDECAR_AUTH_TOKEN_PREVIOUS` (Deployment-Secrets oder Dateien) und starten Sie den Sidecar neu. Das Plugin zeigt währenddessen kurz „nicht erreichbar“ und verbindet sich dann selbst wieder, weil das alte Token weiter akzeptiert wird.
 2. Geben Sie das **neue** Token auf der Matter-Seite ein (**Ersetzen**, dann **Speichern**). Das Plugin verbindet sich damit neu.
 3. Entfernen Sie `MATTER_SIDECAR_AUTH_TOKEN_PREVIOUS` und starten Sie den Sidecar neu.
 
@@ -88,7 +88,7 @@ curl -H "Authorization: Bearer $MATTER_SIDECAR_AUTH_TOKEN" http://127.0.0.1:8581
 ```
 
 - `/health/live` antwortet `{"status":"live"}`, solange der Prozess läuft.
-- `/health/ready` antwortet mit 200 und `"status":"ready"`, sobald Konfiguration, matter.js-Start und Transport erfolgreich waren. Während das Sidecar herunterfährt, antwortet es mit 503 und `"draining"`. Das Sidecar öffnet seinen Port erst nach dem Start, daher erreicht `"starting"` in diesem Release keinen Aufrufer. Das Feld `fabric` (in diesem Release `uninitialized`) wird getrennt gemeldet und beeinflusst die Bereitschaft nie.
+- `/health/ready` antwortet mit 200 und `"status":"ready"`, sobald Konfiguration, matter.js-Start und Transport erfolgreich waren. Während der Sidecar herunterfährt, antwortet es mit 503 und `"draining"`. Der Sidecar öffnet seinen Port erst nach dem Start, daher erreicht `"starting"` in diesem Release keinen Aufrufer. Das Feld `fabric` (in diesem Release `uninitialized`) wird getrennt gemeldet und beeinflusst die Bereitschaft nie.
 - `/version` braucht das Token. Es meldet `build.version` und `build.commit` (die Git-Revision, aus der gebaut wurde), `sidecar` (das Sidecar-Release), `matterJs` (das tatsächlich geladene matter.js-Release), `storageSchemaVersion` (`1`; die Meldung fügt keine Persistenz hinzu) und `wireVersion` (`1`).
 
 `/health/live` und `/health/ready` sind anonym, damit Container-Probes funktionieren, und verraten keine Versionen. `/version` braucht das Token, aber keine Kompatibilitäts-Header und bleibt daher nutzbar, während Sie ein Versionsproblem untersuchen. Ohne gültiges Token lautet die Antwort HTTP 401, und es wird nichts über Versionen verraten.
