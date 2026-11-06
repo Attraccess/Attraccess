@@ -454,13 +454,13 @@ again, and a previously paired reader needs a new approval of its pairing code
 eFuses cannot be erased. Before erasing, the janitor checks the security eFuses
 against the place's profile. A `plain` reader needs factory values for secure
 boot, flash encryption, key purposes, download mode and USB/JTAG disables. A
-`secure-lab` reader needs Secure Boot with the lab key digests in KEY0/KEY1,
-flash encryption in development mode (`DIS_DOWNLOAD_MANUAL_ENCRYPT` unburned)
-and download mode over USB. The janitor also compares the eFuses with the first
-dump recorded for the chip (`/var/lib/attractap-lab-janitor/efuse-baselines`):
-every raw block for plain readers; for secure-lab readers every field, where
-only `SECURE_VERSION` may grow (anti-rollback burns it when the reader boots an
-image with a higher secure version). A park image older than that version no
+`secure-lab` reader needs Secure Boot with the lab key digests in KEY0/KEY1 and
+the third digest slot revoked, JTAG off, flash encryption in development mode
+(`DIS_DOWNLOAD_MANUAL_ENCRYPT` unburned) and download mode over USB. The janitor
+also compares every raw eFuse block with the first dump recorded for the chip
+(`/var/lib/attractap-lab-janitor/efuse-baselines`). On secure-lab readers the
+`SECURE_VERSION` bits of BLOCK0 are left out and may only grow (anti-rollback
+burns them when the reader boots an image with a higher secure version). A park image older than that version no
 longer boots, so rebuild it from a branch with the new version. A mismatch
 quarantines the reader immediately; other failures retry, then quarantine after
 `janitor.attempts`. Quarantined readers stay claimed by the janitor without a

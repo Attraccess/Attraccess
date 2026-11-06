@@ -69,35 +69,55 @@ def test_efuse_missing_field_is_a_violation():
         efuse.check(output)
 
 
-SECURE_LAB = {**efuse.SECURE_LAB_VALUES, "SECURE_BOOT_KEY_REVOKE2": True, "DIS_PAD_JTAG": True,
-              "KEY_PURPOSE_2": "XTS_AES_128_KEY", "KEY_PURPOSE_4": "HMAC_UP", "SECURE_VERSION": 1}
+SECURE_LAB = {**efuse.SECURE_LAB_VALUES, "KEY_PURPOSE_2": "XTS_AES_128_KEY", "KEY_PURPOSE_4": "HMAC_UP",
+              **{name: " ".join(digest[i:i + 2] for i in range(0, 64, 2))
+                 for name, digest in efuse.LAB_KEY_DIGESTS.items()}}
+# BLOCK0 of the lab's secure Touch V2: SECURE_VERSION 1 in word 4, bits 14-29;
+# SPI_BOOT_CRYPT_CNT 1 in word 2, bits 18-20.
+SECURE_BLOCK0 = "0b801700 000f0c14 a984d1f5 00500804 00004102 00000000"
+
+
+def secure_output(overrides=None, block0=SECURE_BLOCK0, version=1):
+    output = espefuse_output({**SECURE_LAB, **(overrides or {})}, block0=block0)
+    layout = '"SECURE_VERSION": {"value": %d, "block": 0, "word": 4, "pos": 14, "bit_len": 16},\n    "MAC"' % version
+    return output.replace('"MAC"', layout, 1)
 
 
 def test_efuse_secure_lab_profile(tmp_path):
-    secure = espefuse_output(SECURE_LAB, block0="0b801700 000f0c14")
-    assert efuse.check(secure, tmp_path, profile="secure-lab") == "7c:df:a1:00:11:22"
+    assert efuse.check(secure_output(), tmp_path, profile="secure-lab") == "7c:df:a1:00:11:22"
     # A plain place must never take a Secure Boot reader, nor the other way round.
     with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_EN"):
-        efuse.check(secure)
+        efuse.check(secure_output())
     with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_EN"):
         efuse.check(espefuse_output(), profile="secure-lab")
     # Release-mode flash encryption leaves only signed OTA updates.
     with pytest.raises(efuse.EfuseViolation, match="DIS_DOWNLOAD_MANUAL_ENCRYPT"):
-        efuse.check(espefuse_output({**SECURE_LAB, "DIS_DOWNLOAD_MANUAL_ENCRYPT": True}), profile="secure-lab")
+        efuse.check(secure_output({"DIS_DOWNLOAD_MANUAL_ENCRYPT": True}), profile="secure-lab")
+    # Other Secure Boot keys would reject the lab-signed parking image.
+    other_key = "00 " * 31 + "01"
+    with pytest.raises(efuse.EfuseViolation, match="BLOCK_KEY0 does not hold the lab key digest"):
+        efuse.check(secure_output({"BLOCK_KEY0": other_key}), profile="secure-lab")
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_KEY_REVOKE2"):
+        efuse.check(secure_output({"SECURE_BOOT_KEY_REVOKE2": False}), profile="secure-lab")
+    with pytest.raises(efuse.EfuseViolation, match="DIS_USB_JTAG"):
+        efuse.check(secure_output({"DIS_USB_JTAG": False}), profile="secure-lab")
     with pytest.raises(ValueError, match="profile"):
-        efuse.check(secure, profile="release")
+        efuse.check(secure_output(), profile="release")
 
     # Anti-rollback raises SECURE_VERSION (in BLOCK0); that alone is fine.
-    newer = espefuse_output({**SECURE_LAB, "SECURE_VERSION": 2}, block0="0b801700 000f0c24")
+    newer = secure_output(block0=SECURE_BLOCK0.replace("00004102", "00008102"), version=2)
     assert efuse.check(newer, tmp_path, profile="secure-lab") == "7c:df:a1:00:11:22"
     with pytest.raises(efuse.EfuseViolation, match="SECURE_VERSION went from 1 to 0"):
-        efuse.check(espefuse_output({**SECURE_LAB, "SECURE_VERSION": 0}), tmp_path, profile="secure-lab")
-    # Any other burn is not.
-    with pytest.raises(efuse.EfuseViolation, match="fields changed since first seen: DIS_USB_JTAG"):
-        efuse.check(espefuse_output({**SECURE_LAB, "DIS_USB_JTAG": True}, block0="0b801700 000f0c14"),
+        efuse.check(secure_output(block0=SECURE_BLOCK0.replace("00004102", "00000102"), version=0),
+                    tmp_path, profile="secure-lab")
+    # Any other BLOCK0 burn is not, even one the summary hides: SPI_BOOT_CRYPT_CNT
+    # 1 -> 7 still reads "Enable".
+    with pytest.raises(efuse.EfuseViolation, match="BLOCK0 \\(besides SECURE_VERSION\\)"):
+        efuse.check(secure_output(block0=SECURE_BLOCK0.replace("a984d1f5", "a99cd1f5")),
                     tmp_path, profile="secure-lab")
     with pytest.raises(efuse.EfuseViolation, match="blocks changed since first seen: BLOCK_KEY0"):
-        efuse.check(secure.replace("BLOCK4          ) [4 ] dump: 00000000", "BLOCK4          ) [4 ] dump: 00000001"),
+        efuse.check(secure_output().replace("BLOCK4          ) [4 ] dump: 00000000",
+                                            "BLOCK4          ) [4 ] dump: 00000001"),
                     tmp_path, profile="secure-lab")
 
 
@@ -202,12 +222,12 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
         park(failing, tmp_path / "park.bin", tmp_path / "failing")
 
     secure = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
-                        FakeFlash(espefuse_output(SECURE_LAB), []))
+                        FakeFlash(secure_output(), []))
     assert park(secure, tmp_path / "park.hex", tmp_path / "secure", profile="secure-lab")
     assert ("erase-and-flash-encrypted", "park.hex") in secure.events
     assert not any(event[0] == "erase-and-flash" for event in secure.events if isinstance(event, tuple))
     with pytest.raises(efuse.EfuseViolation):
-        park(FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(SECURE_LAB), [])),
+        park(FakeTarget(FakeConsole([]), FakeFlash(secure_output(), [])),
              tmp_path / "park.bin", tmp_path / "unexpected-secure")
 
     silent = FakeTarget(FakeConsole([b"garbage\n"]), FakeFlash(espefuse_output(), []))
@@ -514,3 +534,27 @@ def test_flash_reader_keeps_a_reader_with_a_power_button_on(tmp_path, monkeypatc
     flash.flash = broken
     with pytest.raises(subprocess.CalledProcessError):
         flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
+
+
+def test_janitor_parks_again_when_variant_or_profile_changes(tmp_path):
+    from labgrid.remote.common import Place, ResourceMatch
+
+    def place(**tags):
+        return Place(name="reader", tags=tags, matches=[ResourceMatch.fromstr("test/reader/*")])
+
+    # No exporter resources: tick() only decides what is dirty, without reserving.
+    session = SimpleNamespace(stub=None, resources={}, places={"reader": place(variant="touch-v2")})
+    janitor = Janitor(session, config=None, images={"touch-v2": "park.bin", "touch-v2-secure": "park.hex"},
+                      state_dir=tmp_path, priority=1000, max_parallel=1, attempts=1, park_command=[],
+                      job_seconds=1, marker_seconds=1)
+    asyncio.run(janitor.tick())
+    assert janitor.dirty == {"reader"}
+    janitor.dirty.clear()
+    asyncio.run(janitor.tick())
+    assert not janitor.dirty
+    session.places["reader"] = place(variant="touch-v2", profile="plain")
+    asyncio.run(janitor.tick())
+    assert not janitor.dirty, "an explicit default profile is the same reader"
+    session.places["reader"] = place(variant="touch-v2-secure", profile="secure-lab")
+    asyncio.run(janitor.tick())
+    assert janitor.dirty == {"reader"}

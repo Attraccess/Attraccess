@@ -77,7 +77,7 @@ class Janitor:
         self.marker_seconds = marker_seconds
         self.poll_seconds = poll_seconds
         self.dirty = set()
-        self.known = set()  # managed places seen by the last tick
+        self.known = {}  # managed place -> (variant, profile) seen by the last tick
         self.reservations = {}  # place -> [token, last poll]
         self.reserving = set()
         self.jobs = {}
@@ -111,8 +111,11 @@ class Janitor:
         managed = self._managed()
         # A reader's state is unknown when the janitor first sees its place,
         # after a (re)start or when a deployment adds the place: park it once.
-        self.dirty |= managed.keys() - self.known
-        self.known = set(managed)
+        # A changed variant or profile tag needs another parking image.
+        seen = {name: (place.tags["variant"], place.tags.get("profile", efuse.PLAIN))
+                for name, place in managed.items()}
+        self.dirty |= {name for name, tags in seen.items() if self.known.get(name) != tags}
+        self.known = seen
         for name, place in managed.items():
             if name in self.jobs or time.monotonic() < self.retry_after.get(name, 0):
                 continue
