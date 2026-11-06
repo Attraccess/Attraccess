@@ -4,10 +4,16 @@ eFuses are one-time programmable: no erase undoes secure boot, flash
 encryption, key blocks or a disabled download/USB path. Two checks run on the
 output of ``ESPToolDriver.read_efuses()``:
 
-* ESP32-S3 security fields must hold their factory values.
-* Raw eFuse blocks must match the first dump recorded for the chip (by MAC),
-  which also catches burns the summary cannot show, e.g. SPI_BOOT_CRYPT_CNT
-  going from 0 to 3 still reads "Disable".
+* ESP32-S3 security fields must hold the values of the place's reader profile:
+  factory values for ``plain`` readers; for ``secure-lab`` readers (ATT-1166)
+  Secure Boot with the lab key digests in KEY0/KEY1 and flash encryption still
+  in development mode, so the reader stays re-flashable over USB.
+* eFuses must match the first dump recorded for the chip (by MAC). For plain
+  readers every raw block must match, which also catches burns the summary
+  cannot show, e.g. SPI_BOOT_CRYPT_CNT going from 0 to 3 still reads "Disable".
+  A secure-lab reader's firmware burns SECURE_VERSION when it boots an image
+  with a higher anti-rollback version, so for it BLOCK0 is compared field by
+  field and SECURE_VERSION may only grow.
 """
 
 import json
@@ -28,6 +34,31 @@ FACTORY_VALUES = {
     "SOFT_DIS_JTAG": 0,
     "RD_DIS": 0,
 }
+
+PLAIN = "plain"
+SECURE_LAB = "secure-lab"
+PROFILES = (PLAIN, SECURE_LAB)
+
+# Development-mode lab secure reader (apps/attractap/firmware/lab/secure-boot).
+# The first secure boot also burns fields not listed here (JTAG off, unused
+# digest slot revoked, the XTS and NVS HMAC keys); the baseline pins them.
+SECURE_LAB_VALUES = {
+    "SECURE_BOOT_EN": True,
+    "KEY_PURPOSE_0": "SECURE_BOOT_DIGEST0",
+    "KEY_PURPOSE_1": "SECURE_BOOT_DIGEST1",
+    "SECURE_BOOT_KEY_REVOKE0": False,
+    "SECURE_BOOT_KEY_REVOKE1": False,
+    "SPI_BOOT_CRYPT_CNT": "Enable",
+    # Release-mode flash encryption burns this: only signed OTA updates remain.
+    "DIS_DOWNLOAD_MANUAL_ENCRYPT": False,
+    **{name: False for name in (
+        "DIS_DOWNLOAD_MODE", "ENABLE_SECURITY_DOWNLOAD", "DIS_FORCE_DOWNLOAD",
+        "DIS_USB_SERIAL_JTAG", "DIS_USB_SERIAL_JTAG_DOWNLOAD_MODE",
+    )},
+}
+EXPECTED_VALUES = {PLAIN: FACTORY_VALUES, SECURE_LAB: SECURE_LAB_VALUES}
+# Raised by the firmware's anti-rollback; never lowered.
+GROWING_FIELDS = ("SECURE_VERSION",)
 
 _DUMP_LINE = re.compile(r"^(\S+)\s+\(.*?\)\s+\[\s*\d+\s*\]\s+dump:\s+([0-9a-fA-F ]+?)\s*$")
 
@@ -56,35 +87,57 @@ def parse(output):
     return summary, blocks
 
 
-def check(output, baseline_dir=None):
+def check(output, baseline_dir=None, profile=PLAIN):
     """Raise EfuseViolation unless the reader is safe to erase and reuse.
 
-    Returns the chip MAC. The first check of a chip records its raw blocks in
-    baseline_dir; later checks fail if any block differs.
+    Returns the chip MAC. The first check of a chip records its raw blocks and
+    summary fields in baseline_dir; later checks fail if they changed (see the
+    module docstring for secure-lab readers).
     """
+    if profile not in PROFILES:
+        raise ValueError(f"Unknown reader profile {profile!r}; expected one of {', '.join(PROFILES)}")
     summary, blocks = parse(output)
     problems = []
-    for name, factory in FACTORY_VALUES.items():
+    for name, expected in EXPECTED_VALUES[profile].items():
         if name not in summary:
             problems.append(f"{name} missing from espefuse summary (not an ESP32-S3?)")
-        elif summary[name].get("value") != factory:
-            problems.append(f"{name} = {summary[name].get('value')!r} (factory {factory!r})")
+        elif summary[name].get("value") != expected:
+            problems.append(f"{name} = {summary[name].get('value')!r} ({profile} reader needs {expected!r})")
     mac = str(summary.get("MAC", {}).get("value", "")).split(" ")[0].lower()
     if not re.fullmatch(r"([0-9a-f]{2}:){5}[0-9a-f]{2}", mac):
         problems.append(f"Unreadable chip MAC {mac!r}")
     if baseline_dir is not None and not problems:
         baseline = Path(baseline_dir) / f"{mac.replace(':', '')}.json"
+        fields = {name: entry.get("value") for name, entry in summary.items() if isinstance(entry, dict)}
         if baseline.exists():
-            recorded = json.loads(baseline.read_text())["blocks"]
-            changed = sorted(name for name in recorded.keys() | blocks.keys()
-                             if recorded.get(name) != blocks.get(name))
-            if changed:
-                problems.append(f"eFuse blocks changed since first seen: {', '.join(changed)}")
+            problems += _changes(json.loads(baseline.read_text()), blocks, fields, profile)
         else:
             baseline.parent.mkdir(parents=True, exist_ok=True)
             partial = baseline.with_suffix(".partial")
-            partial.write_text(json.dumps({"mac": mac, "blocks": blocks}, indent=2) + "\n")
+            partial.write_text(json.dumps({"mac": mac, "blocks": blocks, "fields": fields}, indent=2) + "\n")
             partial.replace(baseline)
     if problems:
         raise EfuseViolation("; ".join(problems))
     return mac
+
+
+def _changes(recorded, blocks, fields, profile):
+    """Differences from the chip's baseline that make it unsafe to reuse."""
+    ignored = set()
+    problems = []
+    if profile == SECURE_LAB and "fields" in recorded:
+        # BLOCK0 holds SECURE_VERSION; its other bits are all summary fields.
+        ignored.add("BLOCK0")
+        for name in GROWING_FIELDS:
+            before, now = recorded["fields"].get(name), fields.get(name)
+            if not (isinstance(before, int) and isinstance(now, int) and now >= before):
+                problems.append(f"{name} went from {before!r} to {now!r}")
+        changed = sorted(name for name in recorded["fields"].keys() | fields.keys()
+                         if name not in GROWING_FIELDS and recorded["fields"].get(name) != fields.get(name))
+        if changed:
+            problems.append(f"eFuse fields changed since first seen: {', '.join(changed)}")
+    changed = sorted(name for name in recorded["blocks"].keys() | blocks.keys()
+                     if name not in ignored and recorded["blocks"].get(name) != blocks.get(name))
+    if changed:
+        problems.append(f"eFuse blocks changed since first seen: {', '.join(changed)}")
+    return problems

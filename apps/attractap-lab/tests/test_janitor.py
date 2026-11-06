@@ -69,6 +69,38 @@ def test_efuse_missing_field_is_a_violation():
         efuse.check(output)
 
 
+SECURE_LAB = {**efuse.SECURE_LAB_VALUES, "SECURE_BOOT_KEY_REVOKE2": True, "DIS_PAD_JTAG": True,
+              "KEY_PURPOSE_2": "XTS_AES_128_KEY", "KEY_PURPOSE_4": "HMAC_UP", "SECURE_VERSION": 1}
+
+
+def test_efuse_secure_lab_profile(tmp_path):
+    secure = espefuse_output(SECURE_LAB, block0="0b801700 000f0c14")
+    assert efuse.check(secure, tmp_path, profile="secure-lab") == "7c:df:a1:00:11:22"
+    # A plain place must never take a Secure Boot reader, nor the other way round.
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_EN"):
+        efuse.check(secure)
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_EN"):
+        efuse.check(espefuse_output(), profile="secure-lab")
+    # Release-mode flash encryption leaves only signed OTA updates.
+    with pytest.raises(efuse.EfuseViolation, match="DIS_DOWNLOAD_MANUAL_ENCRYPT"):
+        efuse.check(espefuse_output({**SECURE_LAB, "DIS_DOWNLOAD_MANUAL_ENCRYPT": True}), profile="secure-lab")
+    with pytest.raises(ValueError, match="profile"):
+        efuse.check(secure, profile="release")
+
+    # Anti-rollback raises SECURE_VERSION (in BLOCK0); that alone is fine.
+    newer = espefuse_output({**SECURE_LAB, "SECURE_VERSION": 2}, block0="0b801700 000f0c24")
+    assert efuse.check(newer, tmp_path, profile="secure-lab") == "7c:df:a1:00:11:22"
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_VERSION went from 1 to 0"):
+        efuse.check(espefuse_output({**SECURE_LAB, "SECURE_VERSION": 0}), tmp_path, profile="secure-lab")
+    # Any other burn is not.
+    with pytest.raises(efuse.EfuseViolation, match="fields changed since first seen: DIS_USB_JTAG"):
+        efuse.check(espefuse_output({**SECURE_LAB, "DIS_USB_JTAG": True}, block0="0b801700 000f0c14"),
+                    tmp_path, profile="secure-lab")
+    with pytest.raises(efuse.EfuseViolation, match="blocks changed since first seen: BLOCK_KEY0"):
+        efuse.check(secure.replace("BLOCK4          ) [4 ] dump: 00000000", "BLOCK4          ) [4 ] dump: 00000001"),
+                    tmp_path, profile="secure-lab")
+
+
 class FakeConsole:
     def __init__(self, chunks):
         self.chunks = list(chunks)
@@ -94,6 +126,9 @@ class FakeFlash:
 
     def erase_and_flash(self, image):
         self.events.append(("erase-and-flash", Path(image).name))
+
+    def erase_and_flash_encrypted(self, image):
+        self.events.append(("erase-and-flash-encrypted", Path(image).name))
 
     def flash(self, image):
         self.events.append(("flash", Path(image).name))
@@ -166,6 +201,15 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="io-expander"):
         park(failing, tmp_path / "park.bin", tmp_path / "failing")
 
+    secure = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                        FakeFlash(espefuse_output(SECURE_LAB), []))
+    assert park(secure, tmp_path / "park.hex", tmp_path / "secure", profile="secure-lab")
+    assert ("erase-and-flash-encrypted", "park.hex") in secure.events
+    assert not any(event[0] == "erase-and-flash" for event in secure.events if isinstance(event, tuple))
+    with pytest.raises(efuse.EfuseViolation):
+        park(FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(SECURE_LAB), [])),
+             tmp_path / "park.bin", tmp_path / "unexpected-secure")
+
     silent = FakeTarget(FakeConsole([b"garbage\n"]), FakeFlash(espefuse_output(), []))
     with pytest.raises(TimeoutError):
         park(silent, tmp_path / "park.bin", tmp_path / "silent", marker_seconds=0.5)
@@ -187,7 +231,8 @@ FAKE_PARK = textwrap.dedent("""
     root = Path(os.environ["FAKE_PARK_ROOT"])
     with (root / "events.jsonl").open("a") as events:
         events.write(json.dumps({"place": place, "host": os.environ.get("LG_HOSTNAME"),
-                                 "image": Path(value("--image")).name}) + "\\n")
+                                 "image": Path(value("--image")).name,
+                                 "profile": value("--profile")}) + "\\n")
     time.sleep(float(os.environ.get("FAKE_PARK_SECONDS", "0")))
     while (root / f"hold-{place}").exists():
         time.sleep(0.05)
@@ -204,6 +249,7 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
     monkeypatch.setenv("LG_COORDINATOR", address)
     (tmp_path / "fake_park.py").write_text(FAKE_PARK)
     (tmp_path / "park.bin").write_bytes(b"park")
+    (tmp_path / "park.hex").write_bytes(b":park")
     (tmp_path / "outcome-reader-b").write_text("3")
     events = tmp_path / "events.jsonl"
     events.touch()
@@ -246,16 +292,18 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
         eventually(lambda: client("places", check=False).returncode == 0, coordinator)
         # reader-c has no exporter resources: acquiring it would leave nothing to
         # flash, and reserving it would hold off maintenance.
-        for place, variant in [("reader-a", "touch-v2"), ("reader-b", "touch-v2"),
-                               ("reader-c", "touch-v2"), ("other", None)]:
+        for place, tags in [("reader-a", ["variant=touch-v2"]),
+                            ("reader-b", ["variant=touch-v2-secure-lab", "profile=secure-lab"]),
+                            ("reader-c", ["variant=touch-v2"]), ("other", [])]:
             client("-p", place, "create")
             client("-p", place, "add-match", f"test/{place}/*")
-            if variant:
-                client("-p", place, "set-tags", f"variant={variant}")
+            if tags:
+                client("-p", place, "set-tags", *tags)
         janitor_command = [
             sys.executable, "-m", "attractap_lab.janitor", "--state-dir", str(state), "run",
             "--coordinator", address, "--config", str(tmp_path / "unused.yaml"),
-            "--image", f"touch-v2={tmp_path / 'park.bin'}", "--attempts", "2",
+            "--image", f"touch-v2={tmp_path / 'park.bin'}",
+            "--image", f"touch-v2-secure-lab={tmp_path / 'park.hex'}", "--attempts", "2",
             "--park-command", f"{sys.executable} {tmp_path / 'fake_park.py'}",
         ]
         monkeypatch.setenv("FAKE_PARK_ROOT", str(tmp_path))
@@ -271,7 +319,9 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
             assert holder("reader-b") == OWNER
             assert len(parked("reader-b")) == 1, "eFuse quarantine must not retry"
             assert parked("reader-a")[0] == {"place": "reader-a", "host": "attractap-lab-janitor",
-                                             "image": "park.bin"}
+                                             "image": "park.bin", "profile": "plain"}
+            assert parked("reader-b")[0]["image"] == "park.hex"
+            assert parked("reader-b")[0]["profile"] == "secure-lab"
             assert not parked("other") and holder("other") is None
             assert not parked("reader-c") and holder("reader-c") is None
             assert client("-p", "reader-b", "acquire", check=False).returncode != 0
@@ -377,7 +427,7 @@ def test_janitor_releases_a_claim_without_resources(tmp_path):
                       priority=1000, max_parallel=1, attempts=1, park_command=[], job_seconds=1,
                       marker_seconds=1)
 
-    async def fake_park(name, variant):
+    async def fake_park(name, variant, profile):
         parked.append(name)
 
     janitor._park = fake_park
