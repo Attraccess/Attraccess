@@ -102,6 +102,69 @@ function splitEntry(line) {
   return { key: m[1] !== undefined ? m[1].replaceAll("''", "'") : (m[2] ?? m[3]), value: scalar(m[4] ?? '', line) };
 }
 
+const add = (map, key, value) => {
+  if (map.has(key)) throw new Error(`duplicate lockfile entry: ${key}`);
+  map.set(key, value);
+};
+
+// `packages` entries are kept as raw text: any change to one is a resolution change.
+function readPackagesLine(state, line, indent) {
+  if (indent === 2) {
+    const { key, value } = splitEntry(line);
+    add(state.packages, (state.entry = key), value);
+  } else if (state.entry !== null)
+    state.packages.set(state.entry, `${state.packages.get(state.entry)}\n${line.trimEnd()}`);
+  else throw new Error(`unexpected indentation: ${line.trim()}`);
+}
+
+function readImporterLine(state, key, value, indent) {
+  if (indent === 2) {
+    state.inRoot = key === '.';
+    state.hasRoot ||= state.inRoot;
+  } else if (!state.inRoot) return;
+  else if (indent === 4) {
+    state.section = key;
+    state.entry = null;
+  } else if (!dependencySections.includes(state.section)) return;
+  else if (indent === 6) state.entry = key;
+  else if (indent === 8 && state.entry !== null && key === 'version') add(state.importer, state.entry, value);
+}
+
+function readSnapshotLine(state, key, value, indent) {
+  if (indent === 2) {
+    state.snapshot = key;
+    add(state.snapshots, key, []);
+    state.section = null;
+  } else if (indent === 4) state.section = key;
+  else if (indent === 6 && (state.section === 'dependencies' || state.section === 'optionalDependencies'))
+    state.snapshots.get(state.snapshot).push(`${key}=${value}`);
+}
+
+function readTopLevelLine(state, line) {
+  const { key, value } = splitEntry(line);
+  state.top = key;
+  if (!['importers', 'packages', 'snapshots'].includes(key)) add(state.sections, key, value);
+  else if (value) throw new Error(`unsupported value: ${line.trim()}`);
+  Object.assign(state, { inRoot: false, section: null, entry: null, snapshot: null, block: [0, ''] });
+}
+
+// Nesting must step in by two spaces below a key without a value; anything else (e.g. a multi-line scalar)
+// could be read differently by pnpm.
+function readNestedLine(state, line, indent) {
+  const [parentIndent, parentValue] = state.block;
+  if (indent > parentIndent && (indent !== parentIndent + 2 || parentValue !== ''))
+    throw new Error(`unexpected indentation: ${line.trim()}`);
+  if (line.trimStart().startsWith('- ')) {
+    scalar(line.trim().slice(1).trim(), line);
+    state.block = [indent, '-'];
+    return;
+  }
+  const { key, value } = splitEntry(line);
+  state.block = [indent, value];
+  if (state.top === 'importers') readImporterLine(state, key, value, indent);
+  else readSnapshotLine(state, key, value, indent);
+}
+
 /**
  * Minimal reader for the pnpm v9 lockfile: the root importer's direct dependencies, the `snapshots` graph, the raw
  * `packages` entries (resolution, integrity) and the raw text of every other top-level section.
@@ -110,78 +173,30 @@ function splitEntry(line) {
 export function parseLockfile(text) {
   if (!/^lockfileVersion: '?9\.0'?\s*$/m.test(text))
     throw new Error('unsupported or missing lockfileVersion (expected 9.0)');
-  const importer = new Map(); // name -> version, for the root importer
-  const snapshots = new Map(); // key -> "name=value" edges
-  const packages = new Map(); // key -> raw entry text
-  const sections = new Map(); // other top-level key -> raw text
-  const add = (map, key, value) => {
-    if (map.has(key)) throw new Error(`duplicate lockfile entry: ${key}`);
-    map.set(key, value);
+  const state = {
+    importer: new Map(), // name -> version, for the root importer
+    snapshots: new Map(), // key -> "name=value" edges
+    packages: new Map(), // key -> raw entry text
+    sections: new Map(), // other top-level key -> raw text
+    top: null,
+    hasRoot: false,
+    inRoot: false,
+    section: null,
+    entry: null,
+    snapshot: null,
+    block: null, // [indent, value] of the previous structural line, so nesting can be checked
   };
-  let top = null;
-  let hasRoot = false;
-  let inRoot = false;
-  let section = null;
-  let entry = null;
-  let snapshot = null;
-  let block = null; // [indent, value] of the previous structural line, so nesting can be checked
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim() || line.trimStart().startsWith('#')) continue;
     const indent = line.length - line.trimStart().length;
-    if (indent === 0) {
-      const { key, value } = splitEntry(line);
-      top = key;
-      if (!['importers', 'packages', 'snapshots'].includes(key)) add(sections, key, value);
-      else if (value) throw new Error(`unsupported value: ${line.trim()}`);
-      inRoot = false;
-      section = entry = snapshot = null;
-      block = [0, ''];
-      continue;
-    }
-    if (top === 'packages') {
-      if (indent === 2) {
-        const { key, value } = splitEntry(line);
-        add(packages, (entry = key), value);
-      } else if (entry !== null) packages.set(entry, `${packages.get(entry)}\n${line.trimEnd()}`);
-      else throw new Error(`unexpected indentation: ${line.trim()}`);
-      continue;
-    }
-    if (top !== 'importers' && top !== 'snapshots') {
-      sections.set(top, `${sections.get(top)}\n${line.trimEnd()}`);
-      continue;
-    }
-    // Nesting must step in by two spaces below a key without a value; anything else (e.g. a multi-line scalar)
-    // could be read differently by pnpm.
-    if (indent > block[0] && (indent !== block[0] + 2 || block[1] !== ''))
-      throw new Error(`unexpected indentation: ${line.trim()}`);
-    if (line.trimStart().startsWith('- ')) {
-      scalar(line.trim().slice(1).trim(), line);
-      block = [indent, '-'];
-      continue;
-    }
-    const { key, value } = splitEntry(line);
-    block = [indent, value];
-    if (top === 'importers') {
-      if (indent === 2) {
-        inRoot = key === '.';
-        hasRoot ||= inRoot;
-      } else if (inRoot && indent === 4) {
-        section = key;
-        entry = null;
-      } else if (inRoot && indent === 6 && dependencySections.includes(section)) entry = key;
-      else if (inRoot && indent === 8 && entry !== null && dependencySections.includes(section)) {
-        if (key === 'version') add(importer, entry, value);
-      }
-    } else if (indent === 2) {
-      snapshot = key;
-      add(snapshots, snapshot, []);
-      section = null;
-    } else if (indent === 4) section = key;
-    else if (indent === 6 && (section === 'dependencies' || section === 'optionalDependencies'))
-      snapshots.get(snapshot).push(`${key}=${value}`);
+    if (indent === 0) readTopLevelLine(state, line);
+    else if (state.top === 'packages') readPackagesLine(state, line, indent);
+    else if (state.top === 'importers' || state.top === 'snapshots') readNestedLine(state, line, indent);
+    else state.sections.set(state.top, `${state.sections.get(state.top)}\n${line.trimEnd()}`);
   }
-  if (!hasRoot) throw new Error('root importer not found');
-  if (!snapshots.size) throw new Error('no snapshots section found');
+  if (!state.hasRoot) throw new Error('root importer not found');
+  if (!state.snapshots.size) throw new Error('no snapshots section found');
+  const { importer, snapshots, packages, sections } = state;
   return { importer, snapshots, packages, sections };
 }
 
