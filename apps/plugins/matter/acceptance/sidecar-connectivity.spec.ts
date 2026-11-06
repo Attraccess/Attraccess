@@ -3,13 +3,15 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer, connect, type Server, type Socket } from 'node:net';
 import { join, resolve } from 'node:path';
+import { runInThisContext } from 'node:vm';
 import request from 'supertest';
-import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
-import { configWith } from '../../../matter-sidecar/src/config';
-import { createSidecar, type Sidecar } from '../../../matter-sidecar/src/sidecar';
-import { simulatedPlatform } from '../../../matter-sidecar/src/testing/harness';
+import { COMPATIBILITY_TABLE, HEADER_AUTHORIZATION } from '@attraccess/matter-contract';
+import { configWith } from '../../../matter-sidecar/src/testing/config';
+import { createSidecar, type Sidecar, type SidecarOptions } from '../../../matter-sidecar/src/sidecar';
+import { http as sidecarHttp, simulatedPlatform } from '../../../matter-sidecar/src/testing/harness';
+import { SidecarClientError } from '../backend/client/errors';
 import { selfSignedCertificate } from '../backend/testing/certs';
-import { ADMIN, bootHost, type Host } from './host';
+import { ADMIN, bootHost, type Host } from './host.test-utils';
 
 const NEW_TOKEN = 'new-rotation-token-0123456789abcdef0123456789';
 const OLD_TOKEN = 'old-rotation-token-0123456789abcdef0123456789';
@@ -32,10 +34,24 @@ async function freePort(): Promise<number> {
   });
 }
 
-/** Counts as the sidecar from the plugin's point of view; can be severed to simulate a dropped network link. */
+/** The typed error a promise rejects with, so a test can assert on its kind, code and outcome. */
+async function rejection(promise: Promise<unknown>): Promise<SidecarClientError> {
+  const error = await promise.then(
+    () => new Error('expected the request to fail'),
+    (reason: unknown) => reason,
+  );
+  if (!(error instanceof SidecarClientError)) throw error;
+  return error;
+}
+
+/**
+ * Counts as the sidecar from the plugin's point of view. It can be severed to simulate a dropped network link, or
+ * stalled: the TCP connections stay open but nothing the plugin sends reaches the sidecar any more.
+ */
 class TcpProxy {
   private readonly sockets = new Set<Socket>();
   private readonly server: Server;
+  private stalled = false;
   port = 0;
   constructor(private readonly targetPort: number) {
     this.server = createServer((client) => {
@@ -45,9 +61,13 @@ class TcpProxy {
         socket.on('error', () => undefined);
         socket.on('close', () => this.sockets.delete(socket));
       }
-      client.pipe(upstream);
+      client.on('data', (chunk) => this.stalled || upstream.write(chunk));
+      client.on('end', () => upstream.end());
       upstream.pipe(client);
     });
+  }
+  stall() {
+    this.stalled = true;
   }
   async start() {
     await new Promise<void>((resolveStart) => this.server.listen(0, '127.0.0.1', () => resolveStart()));
@@ -70,14 +90,20 @@ describe('Matter plugin against the real sidecar', () => {
   const status = async () => (await http().get('/api/matter/connection/status').set(ADMIN)).body;
   const put = (body: Record<string, unknown>) => http().put('/api/matter/connection').set(ADMIN).send(body);
 
-  async function startSidecar(overrides: Parameters<typeof configWith>[0]) {
+  async function startSidecar(overrides: Parameters<typeof configWith>[0], options: Partial<SidecarOptions> = {}) {
     sidecar = createSidecar({
       config: configWith(overrides),
       loadPlatform: simulatedPlatform,
       logger: () => undefined,
+      ...options,
     });
     return (await sidecar.start()).port;
   }
+  /** Resolves once the plugin itself has seen the link go down, so a later `connected` is a new connection. */
+  const disconnected = () => until(() => host.service.connection.status().state !== 'connected');
+  /** `/version` straight against the sidecar with one token: proves which tokens a (re)started sidecar accepts. */
+  const versionStatusWith = async (port: number, token: string) =>
+    (await sidecarHttp(port, 'GET', '/version', { headers: { [HEADER_AUTHORIZATION]: `Bearer ${token}` } })).status;
 
   beforeEach(async () => {
     host = await bootHost();
@@ -118,16 +144,27 @@ describe('Matter plugin against the real sidecar', () => {
     await until(async () => (await status()).state === 'connected');
     // 1. New token as current, old one as previous, restart the sidecar: the plugin keeps working with the old token.
     await sidecar?.stop();
+    await disconnected();
     await startSidecar({ authTokens: [NEW_TOKEN, OLD_TOKEN], port });
     await until(async () => (await status()).state === 'connected');
     // 2. Enter the new token in the Matter page.
+    const beforeChange = (await status()).since;
     await put({ url: `http://127.0.0.1:${port}`, credential: NEW_TOKEN }).expect(200);
-    await until(async () => (await status()).state === 'connected');
-    // 3. Drop the previous token and restart: still connected with the new one.
+    await until(async () => {
+      const current = await status();
+      return current.state === 'connected' && current.since !== beforeChange;
+    });
+    // 3. Drop the previous token and restart: the old token is refused now, and the plugin reconnects with the new one.
     await sidecar?.stop();
+    await disconnected();
+    const beforeRestart = (await status()).since;
     await startSidecar({ authTokens: [NEW_TOKEN], port });
+    expect(await versionStatusWith(port, OLD_TOKEN)).toBe(401);
+    expect(await versionStatusWith(port, NEW_TOKEN)).toBe(200);
     await until(async () => (await status()).state === 'connected');
-    expect((await status()).lastError).toBeNull();
+    const after = await status();
+    expect(after.since).not.toBe(beforeRestart);
+    expect(after.lastError).toBeNull();
   }, 30_000);
 
   it('connects over https/wss with an administrator-supplied CA and calls an untrusted certificate misconfigured', async () => {
@@ -143,6 +180,10 @@ describe('Matter plugin against the real sidecar', () => {
     await put({ url, caCertificate: certificate.cert }).expect(200);
     await until(async () => (await status()).state === 'connected');
     expect((await status()).insecureTransport).toBe(false);
+    // Clearing the CA must drop it from the client too: the same certificate is untrusted again.
+    await put({ url, caCertificate: null }).expect(200);
+    await until(async () => (await status()).reason === 'misconfigured');
+    expect(await status()).toMatchObject({ state: 'degraded', lastError: { code: 'tls' } });
   });
 
   it('resumes after a dropped link with no lost and no duplicate event', async () => {
@@ -175,8 +216,11 @@ describe('Matter plugin against the real sidecar', () => {
     await until(async () => (await status()).state === 'connected');
     const signals: string[] = [];
     host.service.connection.onReconciliationRequired((reason) => signals.push(reason));
-    sidecar?.stream.publish('device.state', {});
-    await until(() => host.service.connection.status().state === 'connected');
+    const delivered = new Set<string>();
+    host.service.connection.onEvent(({ event }) => delivered.add(event.eventId));
+    // The plugin holds a cursor of this run only once it has received an event from it.
+    const published = sidecar?.stream.publish('device.state', {});
+    await until(() => published !== undefined && delivered.has(published.eventId));
     await sidecar?.stop();
     await startSidecar({ authTokens: [NEW_TOKEN], port });
     await until(() => signals.length > 0, 15_000);
@@ -195,6 +239,92 @@ describe('Matter plugin against the real sidecar', () => {
     const everything = JSON.stringify({ logs: host.logs, status: await status() });
     for (const secret of [OLD_TOKEN, NEW_TOKEN]) expect(everything).not.toContain(secret);
     expect(everything.toLowerCase()).not.toContain('bearer ');
+  }, 30_000);
+
+  it('calls a sidecar running another matter.js release incompatible and names both sides', async () => {
+    const skewed = '0.17.99';
+    const port = await startSidecar(
+      { authTokens: [NEW_TOKEN] },
+      { loadPlatform: async () => ({ version: skewed, close: async () => undefined }) },
+    );
+    await put({ url: `http://127.0.0.1:${port}`, credential: NEW_TOKEN }).expect(200);
+    await until(async () => (await status()).reason === 'incompatible');
+    const current = await status();
+    expect(current).toMatchObject({
+      state: 'degraded',
+      sidecar: { matterJs: skewed },
+      capabilities: null,
+      lastError: {
+        code: 'incompatible_release',
+        details: {
+          received: { matterJs: skewed, sidecar: COMPATIBILITY_TABLE[0].sidecar },
+          supported: COMPATIBILITY_TABLE,
+        },
+      },
+    });
+    // No fallback: the plugin does not open the event stream or offer operations against it.
+    await expect(host.service.connection.request('fabric.get')).rejects.toMatchObject({ kind: 'unavailable' });
+  });
+
+  it('calls a real sidecar incompatible when the host release is outside the table', async () => {
+    await host.close();
+    host = await bootHost({ hostVersion: '1.10.0' });
+    const port = await startSidecar({ authTokens: [NEW_TOKEN] });
+    await put({ url: `http://127.0.0.1:${port}`, credential: NEW_TOKEN }).expect(200);
+    await until(async () => (await status()).reason === 'incompatible');
+    expect((await status()).lastError).toMatchObject({
+      code: 'incompatible_release',
+      details: { received: { attraccess: '1.10.0' }, supported: COMPATIBILITY_TABLE },
+    });
+  });
+
+  it('turns a stalled request into a typed timeout and never repeats a physical operation', async () => {
+    const calls: string[] = [];
+    // A handler that never answers; the sidecar gives up at the request deadline the plugin sent.
+    const stall = (id: string) => () => {
+      calls.push(id);
+      return new Promise<never>(() => undefined);
+    };
+    const port = await startSidecar(
+      { authTokens: [NEW_TOKEN] },
+      { features: { 'fabric.get': stall('fabric.get'), 'fabric.create': stall('fabric.create') } },
+    );
+    await put({ url: `http://127.0.0.1:${port}`, credential: NEW_TOKEN }).expect(200);
+    await until(async () => (await status()).state === 'connected');
+    const connection = host.service.connection;
+
+    const read = await rejection(connection.request('fabric.get', { timeoutMs: 200 }));
+    expect(read).toMatchObject({ kind: 'timeout', code: 'timeout' });
+    expect(read.outcome).toBeUndefined();
+
+    const physical = await rejection(
+      connection.request('fabric.create', { body: { label: 'Workshop' }, timeoutMs: 200 }),
+    );
+    expect(physical).toMatchObject({ kind: 'timeout', code: 'timeout', outcome: 'uncertain' });
+
+    const controller = new AbortController();
+    const cancelled = rejection(connection.request('fabric.get', { signal: controller.signal, timeoutMs: 10_000 }));
+    await until(() => calls.length === 3);
+    controller.abort();
+    expect(await cancelled).toMatchObject({ kind: 'aborted' });
+
+    // Give a retry every chance to happen: none does, and the failed requests do not degrade the connection.
+    await new Promise((resolveWait) => setTimeout(resolveWait, 500));
+    expect(calls).toEqual(['fabric.get', 'fabric.create', 'fabric.get']);
+    expect((await status()).state).toBe('connected');
+  }, 30_000);
+
+  it('gives up on its own when the link stalls and the sidecar cannot answer at all', async () => {
+    const port = await startSidecar({ authTokens: [NEW_TOKEN] });
+    proxy = new TcpProxy(port);
+    await proxy.start();
+    await put({ url: `http://127.0.0.1:${proxy.port}`, credential: NEW_TOKEN }).expect(200);
+    await until(async () => (await status()).state === 'connected');
+    proxy.stall();
+    const startedAt = Date.now();
+    const error = await rejection(host.service.connection.request('fabric.get', { timeoutMs: 200 }));
+    expect(error).toMatchObject({ kind: 'timeout', code: 'timeout', correlationId: expect.any(String) });
+    expect(Date.now() - startedAt).toBeLessThan(5_000);
   }, 30_000);
 });
 
@@ -230,7 +360,7 @@ describe('killing the sidecar process', () => {
   });
 
   it.each(['SIGTERM', 'SIGKILL'] as const)(
-    'keeps core running with the same PID after %s, reports unavailable and recovers on restart',
+    'keeps core running (no crash, no exit) after %s, reports unavailable and recovers on restart',
     async (signal) => {
       const port = await freePort();
       const first = launch(port);
@@ -238,23 +368,39 @@ describe('killing the sidecar process', () => {
       const url = `http://127.0.0.1:${port}`;
       await http().put('/api/matter/connection').set(ADMIN).send({ url, credential: NEW_TOKEN }).expect(200);
       await until(async () => (await status()).state === 'connected');
-      const pid = process.pid;
+      // Core runs in this process, so a crash would not change the PID; it shows up on these events instead. Jest's
+      // `process` is a sandboxed copy that never emits them, so the listeners go on the real process object.
+      const realProcess = runInThisContext('process') as NodeJS.Process;
+      const crashes: unknown[] = [];
+      const onCrash = (error: unknown) => crashes.push(error);
+      realProcess.on('unhandledRejection', onCrash);
+      realProcess.on('uncaughtException', onCrash);
+      const exit = jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+        crashes.push(new Error(`process.exit(${code})`));
+      }) as never);
 
-      first.kill(signal);
-      await exited(first);
-      await until(async () => (await status()).reason === 'unavailable', 15_000);
+      try {
+        first.kill(signal);
+        await exited(first);
+        await until(async () => (await status()).reason === 'unavailable', 15_000);
 
-      expect(process.pid).toBe(pid);
-      expect((await http().get('/api/unrelated').expect(200)).body).toEqual({ pid, ok: true });
-      await http().get('/api/other-plugin').expect(200);
-      expect(await status()).toMatchObject({ state: 'degraded', reason: 'unavailable' });
-      expect((await status()).nextRetryAt).not.toBeNull();
+        expect((await http().get('/api/unrelated').expect(200)).body).toEqual({ pid: process.pid, ok: true });
+        await http().get('/api/other-plugin').expect(200);
+        expect(await status()).toMatchObject({ state: 'degraded', reason: 'unavailable' });
+        expect((await status()).nextRetryAt).not.toBeNull();
 
-      const second = launch(port);
-      await listening(second);
-      await until(async () => (await status()).state === 'connected', 20_000);
-      second.kill('SIGTERM');
-      await exited(second);
+        const second = launch(port);
+        await listening(second);
+        await until(async () => (await status()).state === 'connected', 20_000);
+        second.kill('SIGTERM');
+        await exited(second);
+        expect(crashes).toEqual([]);
+        expect(exit).not.toHaveBeenCalled();
+      } finally {
+        realProcess.off('unhandledRejection', onCrash);
+        realProcess.off('uncaughtException', onCrash);
+        exit.mockRestore();
+      }
     },
     60_000,
   );

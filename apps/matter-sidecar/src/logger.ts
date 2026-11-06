@@ -10,11 +10,15 @@ export function createLogger(
   sink: LogSink = (line) => process.stdout.write(`${line}\n`),
   secrets: readonly string[] = [],
 ) {
-  const known = secrets.filter((secret) => secret !== '');
+  // A token may contain `"` or `\`, which JSON escapes: mask the escaped form as well, before the Bearer pattern
+  // could cut such a token in half.
+  const known = secrets
+    .filter((secret) => secret !== '')
+    .flatMap((secret) => [JSON.stringify(secret).slice(1, -1), secret]);
   const mask = (line: string) => {
-    let masked = line.replace(BEARER, 'Bearer [redacted]');
+    let masked = line;
     for (const secret of known) masked = masked.split(secret).join('[redacted]');
-    return masked;
+    return masked.replace(BEARER, 'Bearer [redacted]');
   };
   return (level: 'info' | 'warn' | 'error', message: string, fields: Record<string, unknown> = {}): void => {
     sink(mask(JSON.stringify({ level, message, ...fields })));

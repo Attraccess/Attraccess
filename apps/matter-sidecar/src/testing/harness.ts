@@ -9,7 +9,8 @@ import {
 } from '@attraccess/matter-contract';
 import { request as httpRequest } from 'node:http';
 import { WebSocket } from 'ws';
-import { TEST_TOKEN, configWith, type SidecarConfig } from '../config';
+import type { SidecarConfig } from '../config';
+import { TEST_TOKEN, configWith } from './config';
 import { createLogger } from '../logger';
 import { createSidecar, type Sidecar, type SidecarOptions } from '../sidecar';
 

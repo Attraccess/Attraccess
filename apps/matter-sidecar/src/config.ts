@@ -7,6 +7,7 @@ import {
   MAX_MESSAGE_BYTES,
 } from '@attraccess/matter-contract';
 import { readFileSync } from 'node:fs';
+import { isIPv6 } from 'node:net';
 import { z } from 'zod';
 
 export const LOOPBACK_HOST = '127.0.0.1';
@@ -17,6 +18,37 @@ const TOKEN_HINT = '32-512 printable ASCII characters, for example `openssl rand
 export function isLoopbackHost(host: string): boolean {
   const bare = host.replace(/^\[|\]$/g, '').toLowerCase();
   return bare === 'localhost' || bare === '::1' || /^127(\.\d{1,3}){3}$/.test(bare);
+}
+
+const HOST_NAME = /^[a-z0-9_-]+(\.[a-z0-9_-]+)*$/;
+
+/**
+ * One `MATTER_SIDECAR_ALLOWED_HOSTS` entry in the form a `Host` header carries it: lowercase, without a trailing dot, and
+ * an IPv6 literal in brackets. Null when the entry is not a bare host name or address, such as one with a port, a scheme
+ * or a path.
+ */
+export function normaliseAllowedHost(entry: string): string | null {
+  const host = entry.trim().toLowerCase().replace(/\.$/, '');
+  const literal = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  if (isIPv6(literal)) return `[${literal}]`;
+  return HOST_NAME.test(host) ? host : null;
+}
+
+function readAllowedHosts(value: string | undefined, problems: string[]): string[] {
+  const allowed: string[] = [];
+  for (const entry of (value ?? '').split(',').map((item) => item.trim())) {
+    if (entry === '') continue;
+    const host = normaliseAllowedHost(entry);
+    if (host === null) {
+      problems.push(
+        `MATTER_SIDECAR_ALLOWED_HOSTS: "${entry}" is not a host name; ` +
+          'list bare names or IP addresses without a scheme, port or path',
+      );
+    } else if (!allowed.includes(host)) {
+      allowed.push(host);
+    }
+  }
+  return allowed;
 }
 
 // An empty or blank variable (`MATTER_SIDECAR_PORT=` in an env file) means "not set". Without this, coercion turns it
@@ -57,7 +89,7 @@ export type SidecarConfig = {
   port: number;
   /** The current service token first, then the previous one while it is being rotated out. */
   authTokens: string[];
-  /** Extra `Host` names accepted besides loopback. */
+  /** Extra `Host` names accepted besides loopback, normalised by `normaliseAllowedHost`. */
   allowedHosts: string[];
   tls: { cert: Buffer; key: Buffer } | null;
   /** True when the sidecar serves plain HTTP on a non-loopback address (explicitly allowed by the operator). */
@@ -162,10 +194,7 @@ export function loadConfig(
   }
   const host = values.MATTER_SIDECAR_BIND_HOST ?? LOOPBACK_HOST;
   const remote = !isLoopbackHost(host);
-  const allowedHosts = (values.MATTER_SIDECAR_ALLOWED_HOSTS ?? '')
-    .split(',')
-    .map((entry) => entry.trim().toLowerCase())
-    .filter((entry) => entry !== '');
+  const allowedHosts = readAllowedHosts(values.MATTER_SIDECAR_ALLOWED_HOSTS, problems);
   const tls = readTls(values, readFile, problems);
   const allowInsecure = values.MATTER_SIDECAR_ALLOW_INSECURE_REMOTE === 'true';
   if (remote && allowedHosts.length === 0) {
@@ -197,12 +226,4 @@ export function loadConfig(
     maxClients: 64,
     firstMessageTimeoutMs: 30_000,
   };
-}
-
-/** The service token the test harness configures. Not a secret. */
-export const TEST_TOKEN = 'test-token-0123456789abcdef0123456789abcdef';
-
-/** Test helper friendly defaults without reading the environment. */
-export function configWith(overrides: Partial<SidecarConfig> = {}): SidecarConfig {
-  return { ...loadConfig({ MATTER_SIDECAR_AUTH_TOKEN: TEST_TOKEN }), port: 0, ...overrides };
 }

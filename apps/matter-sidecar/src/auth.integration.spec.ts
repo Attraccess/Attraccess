@@ -1,7 +1,7 @@
 import { COMPATIBILITY_TABLE, errorEnvelopeSchema } from '@attraccess/matter-contract';
 import { request as httpsRequest } from 'node:https';
 import { WebSocket } from 'ws';
-import { TEST_TOKEN } from './config';
+import { TEST_TOKEN } from './testing/config';
 import { selfSignedCertificate } from './testing/certs';
 import { WsClient, http, startSidecar, upgradeStatus, validHeaders, type Running } from './testing/harness';
 

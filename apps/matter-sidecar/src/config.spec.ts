@@ -1,4 +1,5 @@
-import { ConfigError, TEST_TOKEN, configWith, isLoopbackHost, loadConfig } from './config';
+import { ConfigError, isLoopbackHost, loadConfig, normaliseAllowedHost } from './config';
+import { TEST_TOKEN, configWith } from './testing/config';
 
 const TOKEN = TEST_TOKEN;
 const OTHER = 'other-token-0123456789abcdef0123456789abcdef';
@@ -173,6 +174,40 @@ describe('bind, allowed hosts and TLS', () => {
     expect(problemsOf({ ...base, MATTER_SIDECAR_ALLOW_INSECURE_REMOTE: 'yes' }).join()).toContain(
       'MATTER_SIDECAR_ALLOW_INSECURE_REMOTE',
     );
+  });
+
+  it('normalises allowed hosts to the form a Host header carries them', () => {
+    const config = loadConfig({
+      ...remote,
+      MATTER_SIDECAR_ALLOW_INSECURE_REMOTE: 'true',
+      MATTER_SIDECAR_ALLOWED_HOSTS: 'fd00::5, [FD00::6], Matter.LAN, matter.lan., 192.168.1.5,,',
+    });
+    expect(config.allowedHosts).toEqual(['[fd00::5]', '[fd00::6]', 'matter.lan', '192.168.1.5']);
+  });
+
+  it.each([
+    ['a port', 'host:8581'],
+    ['an IPv4 address with a port', '192.168.1.5:8581'],
+    ['a bracketed IPv6 address with a port', '[fd00::5]:8581'],
+    ['a scheme', 'https://matter.lan'],
+    ['a path', 'matter.lan/prefix'],
+    ['user info', 'user@matter.lan'],
+    ['an unbalanced bracket', '[fd00::5'],
+  ])('rejects an allowed host with %s and names the variable', (_name, entry) => {
+    const problems = problemsOf({
+      ...remote,
+      MATTER_SIDECAR_ALLOW_INSECURE_REMOTE: 'true',
+      MATTER_SIDECAR_ALLOWED_HOSTS: `ok, ${entry}`,
+    });
+    expect(problems.join()).toContain(`MATTER_SIDECAR_ALLOWED_HOSTS: "${entry}" is not a host name`);
+  });
+
+  it('normalises one allowed host entry', () => {
+    expect(normaliseAllowedHost(' FD00::5 ')).toBe('[fd00::5]');
+    expect(normaliseAllowedHost('[::1]')).toBe('[::1]');
+    expect(normaliseAllowedHost('Matter.LAN.')).toBe('matter.lan');
+    expect(normaliseAllowedHost('host:8581')).toBeNull();
+    expect(normaliseAllowedHost('[not-an-address]')).toBeNull();
   });
 
   it('keeps loopback binds free of any extra requirement', () => {
