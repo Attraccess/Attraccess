@@ -244,12 +244,15 @@ PARK_FAILED_MARKER = b"ATTRACTAP_PARK_FAILED"
 _PARK_REPORT = re.compile(rb"ATTRACTAP_PARK(?:ED|_FAILED)[^\n]*\n")
 
 
-def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resource_seconds=30.0):
+def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resource_seconds=30.0,
+         profile=efuse.PLAIN):
     """Check eFuses, erase the whole chip, flash a parking image and confirm it.
 
-    Raises efuse.EfuseViolation before erasing if security eFuses were burned;
-    such a reader must not be reused. Returns the chip MAC once the image
-    reports ATTRACTAP_PARKED on the UART. serial.log and efuse.txt stay in output.
+    Raises efuse.EfuseViolation before erasing if the eFuses do not match the
+    reader profile or changed since first seen; such a reader must not be
+    reused. A ``secure-lab`` reader takes a lab-signed Intel HEX image, written
+    encrypted. Returns the chip MAC once the image reports ATTRACTAP_PARKED on
+    the UART. serial.log and efuse.txt stay in output.
     """
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
@@ -262,8 +265,11 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
     target.activate(flash)
     report = flash.read_efuses()
     (output / "efuse.txt").write_text(report)
-    mac = efuse.check(report, baseline_dir)
-    flash.erase_and_flash(str(image))
+    mac = efuse.check(report, baseline_dir, profile=profile)
+    if profile == efuse.SECURE_LAB:
+        flash.erase_and_flash_encrypted(str(image))
+    else:
+        flash.erase_and_flash(str(image))
     target.deactivate(flash)
     power_on_after_reset(target)
     target.activate(console)

@@ -69,6 +69,58 @@ def test_efuse_missing_field_is_a_violation():
         efuse.check(output)
 
 
+SECURE_LAB = {**efuse.SECURE_LAB_VALUES, "KEY_PURPOSE_2": "XTS_AES_128_KEY", "KEY_PURPOSE_4": "HMAC_UP",
+              **{name: " ".join(digest[i:i + 2] for i in range(0, 64, 2))
+                 for name, digest in efuse.LAB_KEY_DIGESTS.items()}}
+# BLOCK0 of the lab's secure Touch V2: SECURE_VERSION 1 in word 4, bits 14-29;
+# SPI_BOOT_CRYPT_CNT 1 in word 2, bits 18-20.
+SECURE_BLOCK0 = "0b801700 000f0c14 a984d1f5 00500804 00004102 00000000"
+
+
+def secure_output(overrides=None, block0=SECURE_BLOCK0, version=1):
+    output = espefuse_output({**SECURE_LAB, **(overrides or {})}, block0=block0)
+    layout = '"SECURE_VERSION": {"value": %d, "block": 0, "word": 4, "pos": 14, "bit_len": 16},\n    "MAC"' % version
+    return output.replace('"MAC"', layout, 1)
+
+
+def test_efuse_secure_lab_profile(tmp_path):
+    assert efuse.check(secure_output(), tmp_path, profile="secure-lab") == "7c:df:a1:00:11:22"
+    # A plain place must never take a Secure Boot reader, nor the other way round.
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_EN"):
+        efuse.check(secure_output())
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_EN"):
+        efuse.check(espefuse_output(), profile="secure-lab")
+    # Release-mode flash encryption leaves only signed OTA updates.
+    with pytest.raises(efuse.EfuseViolation, match="DIS_DOWNLOAD_MANUAL_ENCRYPT"):
+        efuse.check(secure_output({"DIS_DOWNLOAD_MANUAL_ENCRYPT": True}), profile="secure-lab")
+    # Other Secure Boot keys would reject the lab-signed parking image.
+    other_key = "00 " * 31 + "01"
+    with pytest.raises(efuse.EfuseViolation, match="BLOCK_KEY0 does not hold the lab key digest"):
+        efuse.check(secure_output({"BLOCK_KEY0": other_key}), profile="secure-lab")
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_KEY_REVOKE2"):
+        efuse.check(secure_output({"SECURE_BOOT_KEY_REVOKE2": False}), profile="secure-lab")
+    with pytest.raises(efuse.EfuseViolation, match="DIS_USB_JTAG"):
+        efuse.check(secure_output({"DIS_USB_JTAG": False}), profile="secure-lab")
+    with pytest.raises(ValueError, match="profile"):
+        efuse.check(secure_output(), profile="release")
+
+    # Anti-rollback raises SECURE_VERSION (in BLOCK0); that alone is fine.
+    newer = secure_output(block0=SECURE_BLOCK0.replace("00004102", "00008102"), version=2)
+    assert efuse.check(newer, tmp_path, profile="secure-lab") == "7c:df:a1:00:11:22"
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_VERSION went from 1 to 0"):
+        efuse.check(secure_output(block0=SECURE_BLOCK0.replace("00004102", "00000102"), version=0),
+                    tmp_path, profile="secure-lab")
+    # Any other BLOCK0 burn is not, even one the summary hides: SPI_BOOT_CRYPT_CNT
+    # 1 -> 7 still reads "Enable".
+    with pytest.raises(efuse.EfuseViolation, match="BLOCK0 \\(besides SECURE_VERSION\\)"):
+        efuse.check(secure_output(block0=SECURE_BLOCK0.replace("a984d1f5", "a99cd1f5")),
+                    tmp_path, profile="secure-lab")
+    with pytest.raises(efuse.EfuseViolation, match="blocks changed since first seen: BLOCK_KEY0"):
+        efuse.check(secure_output().replace("BLOCK4          ) [4 ] dump: 00000000",
+                                            "BLOCK4          ) [4 ] dump: 00000001"),
+                    tmp_path, profile="secure-lab")
+
+
 class FakeConsole:
     def __init__(self, chunks):
         self.chunks = list(chunks)
@@ -94,6 +146,9 @@ class FakeFlash:
 
     def erase_and_flash(self, image):
         self.events.append(("erase-and-flash", Path(image).name))
+
+    def erase_and_flash_encrypted(self, image):
+        self.events.append(("erase-and-flash-encrypted", Path(image).name))
 
     def flash(self, image):
         self.events.append(("flash", Path(image).name))
@@ -166,6 +221,15 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="io-expander"):
         park(failing, tmp_path / "park.bin", tmp_path / "failing")
 
+    secure = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                        FakeFlash(secure_output(), []))
+    assert park(secure, tmp_path / "park.hex", tmp_path / "secure", profile="secure-lab")
+    assert ("erase-and-flash-encrypted", "park.hex") in secure.events
+    assert not any(event[0] == "erase-and-flash" for event in secure.events if isinstance(event, tuple))
+    with pytest.raises(efuse.EfuseViolation):
+        park(FakeTarget(FakeConsole([]), FakeFlash(secure_output(), [])),
+             tmp_path / "park.bin", tmp_path / "unexpected-secure")
+
     silent = FakeTarget(FakeConsole([b"garbage\n"]), FakeFlash(espefuse_output(), []))
     with pytest.raises(TimeoutError):
         park(silent, tmp_path / "park.bin", tmp_path / "silent", marker_seconds=0.5)
@@ -187,7 +251,8 @@ FAKE_PARK = textwrap.dedent("""
     root = Path(os.environ["FAKE_PARK_ROOT"])
     with (root / "events.jsonl").open("a") as events:
         events.write(json.dumps({"place": place, "host": os.environ.get("LG_HOSTNAME"),
-                                 "image": Path(value("--image")).name}) + "\\n")
+                                 "image": Path(value("--image")).name,
+                                 "profile": value("--profile")}) + "\\n")
     time.sleep(float(os.environ.get("FAKE_PARK_SECONDS", "0")))
     while (root / f"hold-{place}").exists():
         time.sleep(0.05)
@@ -204,6 +269,7 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
     monkeypatch.setenv("LG_COORDINATOR", address)
     (tmp_path / "fake_park.py").write_text(FAKE_PARK)
     (tmp_path / "park.bin").write_bytes(b"park")
+    (tmp_path / "park.hex").write_bytes(b":park")
     (tmp_path / "outcome-reader-b").write_text("3")
     events = tmp_path / "events.jsonl"
     events.touch()
@@ -246,16 +312,18 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
         eventually(lambda: client("places", check=False).returncode == 0, coordinator)
         # reader-c has no exporter resources: acquiring it would leave nothing to
         # flash, and reserving it would hold off maintenance.
-        for place, variant in [("reader-a", "touch-v2"), ("reader-b", "touch-v2"),
-                               ("reader-c", "touch-v2"), ("other", None)]:
+        for place, tags in [("reader-a", ["variant=touch-v2"]),
+                            ("reader-b", ["variant=touch-v2-secure-lab", "profile=secure-lab"]),
+                            ("reader-c", ["variant=touch-v2"]), ("other", [])]:
             client("-p", place, "create")
             client("-p", place, "add-match", f"test/{place}/*")
-            if variant:
-                client("-p", place, "set-tags", f"variant={variant}")
+            if tags:
+                client("-p", place, "set-tags", *tags)
         janitor_command = [
             sys.executable, "-m", "attractap_lab.janitor", "--state-dir", str(state), "run",
             "--coordinator", address, "--config", str(tmp_path / "unused.yaml"),
-            "--image", f"touch-v2={tmp_path / 'park.bin'}", "--attempts", "2",
+            "--image", f"touch-v2={tmp_path / 'park.bin'}",
+            "--image", f"touch-v2-secure-lab={tmp_path / 'park.hex'}", "--attempts", "2",
             "--park-command", f"{sys.executable} {tmp_path / 'fake_park.py'}",
         ]
         monkeypatch.setenv("FAKE_PARK_ROOT", str(tmp_path))
@@ -271,7 +339,9 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
             assert holder("reader-b") == OWNER
             assert len(parked("reader-b")) == 1, "eFuse quarantine must not retry"
             assert parked("reader-a")[0] == {"place": "reader-a", "host": "attractap-lab-janitor",
-                                             "image": "park.bin"}
+                                             "image": "park.bin", "profile": "plain"}
+            assert parked("reader-b")[0]["image"] == "park.hex"
+            assert parked("reader-b")[0]["profile"] == "secure-lab"
             assert not parked("other") and holder("other") is None
             assert not parked("reader-c") and holder("reader-c") is None
             assert client("-p", "reader-b", "acquire", check=False).returncode != 0
@@ -377,7 +447,7 @@ def test_janitor_releases_a_claim_without_resources(tmp_path):
                       priority=1000, max_parallel=1, attempts=1, park_command=[], job_seconds=1,
                       marker_seconds=1)
 
-    async def fake_park(name, variant):
+    async def fake_park(name, variant, profile):
         parked.append(name)
 
     janitor._park = fake_park
@@ -464,3 +534,27 @@ def test_flash_reader_keeps_a_reader_with_a_power_button_on(tmp_path, monkeypatc
     flash.flash = broken
     with pytest.raises(subprocess.CalledProcessError):
         flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
+
+
+def test_janitor_parks_again_when_variant_or_profile_changes(tmp_path):
+    from labgrid.remote.common import Place, ResourceMatch
+
+    def place(**tags):
+        return Place(name="reader", tags=tags, matches=[ResourceMatch.fromstr("test/reader/*")])
+
+    # No exporter resources: tick() only decides what is dirty, without reserving.
+    session = SimpleNamespace(stub=None, resources={}, places={"reader": place(variant="touch-v2")})
+    janitor = Janitor(session, config=None, images={"touch-v2": "park.bin", "touch-v2-secure": "park.hex"},
+                      state_dir=tmp_path, priority=1000, max_parallel=1, attempts=1, park_command=[],
+                      job_seconds=1, marker_seconds=1)
+    asyncio.run(janitor.tick())
+    assert janitor.dirty == {"reader"}
+    janitor.dirty.clear()
+    asyncio.run(janitor.tick())
+    assert not janitor.dirty
+    session.places["reader"] = place(variant="touch-v2", profile="plain")
+    asyncio.run(janitor.tick())
+    assert not janitor.dirty, "an explicit default profile is the same reader"
+    session.places["reader"] = place(variant="touch-v2-secure", profile="secure-lab")
+    asyncio.run(janitor.tick())
+    assert janitor.dirty == {"reader"}
