@@ -114,6 +114,11 @@ def enroll_card(api, admin, reader, emulator, hooks, user_id, profile, tries=6):
 
 
 def reset_card(api, admin, reader, emulator, hooks, user_id, card_id, profile, tries=6):
+    # The result of the previous reset stays up for a few seconds; a new reset starts from the list.
+    deadline = time.monotonic() + 30
+    while hooks.screen() == "ResetScreen" and time.monotonic() < deadline:
+        time.sleep(0.5)
+    time.sleep(2)  # a new request arriving as the result screen closes would be closed with it
     status, body, mark = start_reset(api, admin, reader, card_id)
     assert status in (200, 201), body
     reader["console"].expect(r"Transitioning to screen: ResetScreen", mark, 15)

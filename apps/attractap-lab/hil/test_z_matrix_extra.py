@@ -168,8 +168,8 @@ def test_disconnect_forgets_the_login(target, api, admin, reader, resource, lase
     flash.reset()
     target.deactivate(flash)
     expect_still_paired(reader, hooks, reopen_console(target, reader))
-    closes = [m for m in wire.since(mark) if m.get("ev") == "close"]
-    assert closes, "the API never saw the old connection close"
+    # A reset reader sends no FIN, so the API may keep the dead connection until its own timeout:
+    # what matters is that the new connection starts without the old login.
     first = wire.wait_for(mark, "RESOURCE_LIST", "s2r", timeout=40)
     assert authenticated_user(first["payload"]) is None
     time.sleep(1)
@@ -454,6 +454,10 @@ def test_ota_from_main_firmware_to_head(request, target, api, admin, reader, hoo
     update_mark = console.data.rfind(b"Starting OTA firmware update")
     console.expect(r"Secure session established", update_mark, 180)
     assert b"Enrollment: code=" not in console.data[update_mark:], "the updated reader asked for a new approval"
+    # The update rebooted the reader, which re-enumerated its USB port: the old serial connection
+    # still delivers log lines but no longer takes writes, so connect again before sending commands.
+    close_console(target, reader)
+    reopen_console(target, reader)
     hooks = ReaderTestHooks(console.stream(), PIN)
     for _ in range(40):
         try:
