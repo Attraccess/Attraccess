@@ -13,9 +13,16 @@ vi.mock('@attraccess/react-query-client', () => ({
   useAttractapServiceGetCardWriterSettings: vi.fn(),
 }));
 
-const reader = (id: number, name: string, capabilities: Record<string, boolean>, lastConnection = new Date()) => ({
+const reader = (
+  id: number,
+  name: string,
+  capabilities: Record<string, boolean>,
+  lastConnection = new Date(),
+  pairingState = 'paired',
+) => ({
   id,
   name,
+  pairingState,
   lastConnection: lastConnection.toISOString(),
   firmware: { capabilities: { cardEnrollment: true, cardRelay: true, ...capabilities } },
 });
@@ -118,7 +125,34 @@ describe('AttractapSelect for card writing', () => {
   it('points to the card enrollment setting when no reader is allowed', () => {
     settingsQuery({ mode: 'selected', readerIds: [] });
     render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
-    expect(screen.getByTestId('attractap-select-empty')).toHaveTextContent('Settings → Card enrollment');
+    expect(screen.getByTestId('attractap-select-empty')).toHaveTextContent('Settings → RFID card enrollment');
+  });
+
+  it('marks readers that are not paired in the list', async () => {
+    readersQuery([reader(1, 'Entrance', {}), reader(5, 'Legacy', {}, new Date(), 'unpaired')]);
+    settingsQuery({ mode: 'all', readerIds: [] });
+    render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
+    expect(await options()).toEqual(['Entrance', 'LegacyNot paired – the connection is not encrypted']);
+  });
+
+  it.each([
+    { pairingState: 'paired', hinted: false },
+    { pairingState: 'unpaired', hinted: true },
+    { pairingState: 'revoked', hinted: true },
+  ])('hints under the picker when the picked reader is $pairingState', ({ pairingState, hinted }) => {
+    readersQuery([reader(5, 'Front desk', {}, new Date(), pairingState)]);
+    settingsQuery({ mode: 'all', readerIds: [] });
+    render(<AttractapSelect selection={5} onSelectionChange={vi.fn()} forCardWriting />);
+    expect(screen.getByRole('button', { name: /Front desk/ })).toHaveTextContent(
+      hinted ? 'Front deskNot paired – the connection is not encrypted' : /^Front desk$/,
+    );
+  });
+
+  it('does not mark readers that are not paired in other pickers', async () => {
+    readersQuery([reader(5, 'Legacy', {}, new Date(), 'unpaired')]);
+    render(<AttractapSelect selection={5} onSelectionChange={vi.fn()} />);
+    expect(screen.queryByText('Not paired – the connection is not encrypted')).toBeNull();
+    expect(await options()).toEqual(['Legacy']);
   });
 
   it('does not explain an empty list for other pickers', () => {

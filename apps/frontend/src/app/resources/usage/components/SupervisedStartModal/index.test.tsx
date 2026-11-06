@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupervisedStartModal } from './index';
 
-const { requestMutate, ApiErrorMock, candidates } = vi.hoisted(() => {
+const { requestMutate, apiErrorToast, ApiErrorMock, candidates } = vi.hoisted(() => {
   class ApiErrorMock extends Error {
     status: number;
     constructor(status: number) {
@@ -14,6 +14,7 @@ const { requestMutate, ApiErrorMock, candidates } = vi.hoisted(() => {
   }
   return {
     requestMutate: vi.fn(),
+    apiErrorToast: vi.fn(),
     ApiErrorMock,
     candidates: {
       value: [
@@ -27,6 +28,10 @@ const { requestMutate, ApiErrorMock, candidates } = vi.hoisted(() => {
 
 vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1, username: 'me' } }),
+}));
+
+vi.mock('../../../../../components/toastProvider', () => ({
+  useToastMessage: () => ({ apiError: apiErrorToast }),
 }));
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -52,16 +57,28 @@ vi.mock('@attraccess/react-query-client', () => ({
         id: 5,
         name: 'Workshop reader',
         resources: [{ id: 42 }],
-        firmware: { capabilities: { cardEnrollment: true } },
+        firmware: { capabilities: { cardEnrollment: true, cardRelay: true } },
       },
       // Elsewhere in the building — offered behind the disclosure.
-      { id: 6, name: 'Lobby reader', resources: [{ id: 7 }], firmware: { capabilities: { cardEnrollment: true } } },
+      {
+        id: 6,
+        name: 'Lobby reader',
+        resources: [{ id: 7 }],
+        firmware: { capabilities: { cardEnrollment: true, cardRelay: true } },
+      },
       // No display, so it cannot run the supervision screen at all.
       {
         id: 7,
         name: 'Lite reader',
         resources: [{ id: 42 }],
-        firmware: { capabilities: { cardEnrollment: false } },
+        firmware: { capabilities: { cardEnrollment: false, cardRelay: true } },
+      },
+      // Firmware before 2.0.0 does not relay cards; the server refuses it.
+      {
+        id: 8,
+        name: 'Old firmware reader',
+        resources: [{ id: 42 }],
+        firmware: { capabilities: { cardEnrollment: true, cardRelay: false } },
       },
     ],
   }),
@@ -72,6 +89,7 @@ const getLastCallbacks = () => requestMutate.mock.calls[requestMutate.mock.calls
 describe('SupervisedStartModal', () => {
   beforeEach(() => {
     requestMutate.mockClear();
+    apiErrorToast.mockClear();
     candidates.value = [
       { userId: 2, username: 'alice', role: 'introducer' },
       { userId: 1, username: 'me', role: 'introducer' },
@@ -157,6 +175,11 @@ describe('SupervisedStartModal', () => {
       expect(screen.queryByText('Lite reader')).not.toBeInTheDocument();
     });
 
+    it('hides readers on firmware before 2.0.0, which the server refuses', () => {
+      renderModal();
+      expect(screen.queryByText('Old firmware reader')).not.toBeInTheDocument();
+    });
+
     it('puts readers belonging to other resources behind a disclosure', async () => {
       renderModal();
 
@@ -186,6 +209,23 @@ describe('SupervisedStartModal', () => {
       act(() => getLastCallbacks().onError(new ApiErrorMock(409)));
       expect(screen.getByText('error.description')).toBeInTheDocument();
       expect(screen.queryByText('rejected.description')).not.toBeInTheDocument();
+    });
+
+    it('says why the reader was refused', async () => {
+      renderModal();
+      await userEvent.click(screen.getByText('Workshop reader'));
+
+      const error = new ApiErrorMock(409);
+      act(() => getLastCallbacks().onError(error));
+      expect(apiErrorToast).toHaveBeenCalledWith(expect.objectContaining({ error, baseTranslationKey: 'api' }));
+    });
+
+    it('does not toast a declined or timed-out request', async () => {
+      renderModal();
+      await userEvent.click(screen.getByText('Workshop reader'));
+      act(() => getLastCallbacks().onError(new ApiErrorMock(403)));
+      act(() => getLastCallbacks().onError(new ApiErrorMock(408)));
+      expect(apiErrorToast).not.toHaveBeenCalled();
     });
   });
 });

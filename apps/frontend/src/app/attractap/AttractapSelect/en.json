@@ -1,5 +1,6 @@
 {
   "loading": "Loading readers...",
+  "notPaired": "Not paired – the connection is not encrypted",
   "empty": {
     "noConnectedReader": {
       "title": "No reader connected",
@@ -15,7 +16,7 @@
     },
     "notAllowed": {
       "title": "No reader allowed",
-      "description": "None of the connected Attractap readers is allowed to enroll or reset RFID cards. An administrator can allow readers under Settings → Card enrollment."
+      "description": "None of the connected Attractap readers is allowed to enroll or reset RFID cards. An administrator can allow readers under Settings → RFID card enrollment."
     }
   }
 }

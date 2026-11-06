@@ -153,8 +153,10 @@ Die Identität der Installation (eine Zertifizierungsstelle für Reader und das 
 liegt in der Datenbank. Der private Schlüssel der Zertifizierungsstelle und der Serverschlüssel
 sind dort **verschlüsselt** gespeichert, mit einem aus `AUTH_SESSION_SECRET` abgeleiteten
 Schlüssel; die Zertifikate selbst sind nicht geheim. **Sichere Datenbank und
-`AUTH_SESSION_SECRET` gemeinsam.** Geht das Geheimnis verloren oder wird es geändert, können die
-Schlüssel nicht mehr entschlüsselt werden und alle Reader müssen neu gekoppelt werden.
+`AUTH_SESSION_SECRET` gemeinsam.** Geht das Geheimnis verloren oder wird es geändert, ohne die
+gespeicherten Schlüssel umzuschlüsseln, können die Schlüssel nicht mehr entschlüsselt werden und
+alle Reader müssen neu gekoppelt werden. Um das Geheimnis zu wechseln, folgen Sie den Schritten in
+den [Sicherheitseinstellungen](../settings/security.md); sie schlüsseln diese Schlüssel mit um.
 
 ### Reverse-Proxys
 

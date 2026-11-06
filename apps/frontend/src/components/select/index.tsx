@@ -17,6 +17,8 @@ interface SelectItem {
   key: string;
   label: ReactNode;
   textValue?: string;
+  /** A hint shown under the item's label in the list. */
+  description?: ReactNode;
 }
 
 export interface Props {
@@ -93,7 +95,14 @@ export function Select({
               textValue={item.textValue ?? (typeof item.label === 'string' ? item.label : item.key)}
               data-cy={`select-item-${item.key}`}
             >
-              {item.label}
+              {item.description ? (
+                <div className="flex flex-col">
+                  <Label>{item.label}</Label>
+                  <Description>{item.description}</Description>
+                </div>
+              ) : (
+                item.label
+              )}
             </ListBoxItem>
           ))}
         </ListBox>

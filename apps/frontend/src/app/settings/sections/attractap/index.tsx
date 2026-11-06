@@ -14,7 +14,7 @@ import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
 import { useToastMessage } from '../../../../components/toastProvider';
-import { cardWritingBlocker } from '../../../attractap/cardWriting';
+import { cardWritingBlocker, connectsUnencrypted } from '../../../attractap/cardWriting';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
@@ -23,7 +23,7 @@ import de from './de.json';
 type Mode = CardWriterSettingsDto['mode'];
 
 /**
- * Card enrollment: which Attractap readers may enroll and reset RFID cards. Card keys are written
+ * RFID card enrollment: which Attractap readers may enroll and reset RFID cards. Card keys are written
  * through these readers, so an operator can limit the work to readers in a trusted place.
  */
 export function AttractapSection() {
@@ -120,6 +120,11 @@ export function AttractapSection() {
                     {blocker ? (
                       <Description data-testid={`card-writer-reader-${reader.id}-blocker`}>
                         {t(`readers.blockers.${blocker}`)}
+                      </Description>
+                    ) : null}
+                    {connectsUnencrypted(reader) ? (
+                      <Description data-testid={`card-writer-reader-${reader.id}-not-paired`}>
+                        {t('readers.notPaired')}
                       </Description>
                     ) : null}
                   </Checkbox>

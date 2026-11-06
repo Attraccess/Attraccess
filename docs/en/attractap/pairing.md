@@ -139,8 +139,10 @@ For the per-address limits to work behind a reverse proxy, set `TRUST_PROXY` (se
 The installation identity (a certificate authority for readers and the server certificate) is
 stored in the database. The CA private key and the server key are stored **encrypted** with a key
 derived from `AUTH_SESSION_SECRET`; the certificates themselves are not secret.
-**Back up the database and `AUTH_SESSION_SECRET` together.** If the secret is lost or changed, the
-keys cannot be decrypted and every reader has to be paired again.
+**Back up the database and `AUTH_SESSION_SECRET` together.** If the secret is lost, or changed
+without converting the stored keys, the keys cannot be decrypted and every reader has to be paired
+again. To change the secret, follow the rotation steps in
+[Security settings](../settings/security.md), which convert these keys too.
 
 ### Reverse proxies
 

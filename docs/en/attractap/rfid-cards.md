@@ -40,7 +40,7 @@ Use **Activate** or **Deactivate** next to a card and confirm the action. Activa
 2. Select a connected Attractap and confirm **Delete**
 3. Follow the instructions on the reader to reset the physical card
 
-The card is removed from the account after the reader confirms the reset succeeded. The physical card is required; use **Deactivate** if it is unavailable.
+The card is removed from the account after the server has checked that the card is back in its factory state. The physical card is required; use **Deactivate** if it is unavailable.
 
 ## Multiple Cards Per User
 
@@ -66,14 +66,15 @@ Attractap readers use AES-encrypted authentication, which requires cards with ha
 
 ## Which Readers May Enroll and Reset Cards
 
-By default every reader can enroll and reset cards. Administrators can limit this under **Settings -> Card enrollment**: choose **Selected readers** and tick the readers that may write cards. The enrollment and reset screens then list only those readers. All readers still let members sign in with their cards.
+By default every reader with a display and firmware 2.0.0 or later can enroll and reset cards. Administrators can limit this under **Settings -> RFID card enrollment**: choose **Selected readers** and tick the readers that may write cards. The enrollment and reset screens then list only those readers. All readers still let members sign in with their cards.
 
 > [!IMPORTANT]
-> **Only allow readers you trust to enroll and reset cards.** A new card still has the public factory key, so the server writes the new card key under that factory key. The reader that relays this write can work out the new key. A reader that was tampered with, or someone listening on an unencrypted connection to it, could therefore copy cards enrolled or reset on that reader. Use **Settings -> Card enrollment** to keep this to readers in a place you control, for example the front desk.
+> **Only allow paired readers you trust to enroll and reset cards.** A new card still has the public factory key, so the server writes the new card key under that factory key.
+>
+> - **The connection:** a [paired reader](attractap/pairing.md) talks to the server over an encrypted connection, so nobody listening on the network can read the key. A reader that is not paired yet still connects unencrypted. Pair a reader before you allow it to enroll or reset cards; the settings and the reader lists mark readers that are not paired.
+> - **The reader itself:** the reader that relays the write can still work out the new key. A reader that was tampered with could therefore copy cards enrolled or reset on it. Use **Settings -> RFID card enrollment** to keep this to readers in a place you control, for example the front desk. Secured reader firmware, planned for a later release, is meant to address tampered readers.
 >
 > Normal taps are not affected: when a card is used, the server checks it without the key ever passing through the reader.
->
-> Encrypted reader connections and secured reader firmware, planned for later releases, remove this limitation.
 
 ## Administrator Features
 

@@ -44,7 +44,7 @@
       "description": "Metrik-Endpunkt und Instrumentierung"
     },
     "attractap": {
-      "label": "Kartenregistrierung",
+      "label": "RFID-Kartenregistrierung",
       "description": "Welche Attractap-Reader RFID-Karten registrieren und zurücksetzen dürfen"
     },
     "auditLog": {

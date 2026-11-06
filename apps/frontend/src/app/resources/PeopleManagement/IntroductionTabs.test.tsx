@@ -30,6 +30,7 @@ const state = vi.hoisted(() => ({
   pendingStart: null as null | (() => void),
   serviceCancel: vi.fn((_data: unknown) => Promise.resolve()),
   eligibleReadersQuery: undefined as unknown,
+  apiError: vi.fn(),
 }));
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
@@ -83,6 +84,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   UserSearch: () => <p>User picker</p>,
 }));
+vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ apiError: state.apiError }) }));
 vi.mock('react-qrcode-logo', () => ({ QRCode: ({ value }: { value: string }) => <output>{value}</output> }));
 
 function makeSession(overrides: Partial<MassIntroductionSessionDto> = {}): MassIntroductionSessionDto {
@@ -200,7 +202,8 @@ describe('grant-introduction drawer', () => {
     mount({ type: 'group', id: 3 });
 
     fireEvent.click(screen.getByRole('switch', { name: /tap their NFC card/ }));
-    expect(state.readerCapabilities).toEqual({ cardEnrollment: true });
+    // Readers before firmware 2.0.0 (no card relay) are refused by the server, so they are not offered.
+    expect(state.readerCapabilities).toEqual({ cardEnrollment: true, cardRelay: true });
     expect(state.eligibleReadersQuery).toEqual({ groupId: 3 });
     expect(state.readerIds).toEqual([4]);
     expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled();
@@ -212,13 +215,18 @@ describe('grant-introduction drawer', () => {
     expect(screen.getByText('Lab reader is waiting for NFC cards')).toBeInTheDocument();
   });
 
-  it('shows the API message when starting fails', () => {
-    state.startError = { status: 409, message: 'Conflict', body: { message: 'The selected reader is busy' } };
+  it('shows the translated API error when starting fails', () => {
+    state.startError = { status: 409, message: 'Conflict', body: { message: 'READER_FIRMWARE_UPDATE_REQUIRED' } };
     mount();
 
     startSession();
 
-    expect(screen.getByText('The selected reader is busy')).toBeInTheDocument();
+    expect(state.apiError).toHaveBeenCalledWith(
+      expect.objectContaining({ error: state.startError, baseTranslationKey: 'api' }),
+    );
+    const { t, tExists } = state.apiError.mock.calls[0][0];
+    expect(tExists('api.READER_FIRMWARE_UPDATE_REQUIRED', { succeedIfKeyIsObject: true })).toBe(true);
+    expect(t('api.READER_FIRMWARE_UPDATE_REQUIRED.title')).toBe('Firmware update required');
     expect(screen.getByRole('button', { name: 'Start' })).toBeInTheDocument();
   });
 

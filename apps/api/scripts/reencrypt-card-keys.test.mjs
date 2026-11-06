@@ -42,6 +42,66 @@ test('moves card keys to the new secret', async () => {
   assert.throws(() => decrypt(deriveKey('old-secret'), card.key));
 });
 
+test('moves the reader pairing keys too', async () => {
+  const db = await database();
+  await run(
+    db,
+    'CREATE TABLE attractap_installation (id integer primary key, caPrivateKeyEncrypted text NOT NULL, serverPrivateKeyEncrypted text NOT NULL)',
+  );
+  const oldKey = deriveKey('old-secret');
+  await run(db, 'INSERT INTO attractap_installation VALUES (1, ?, ?)', [
+    encrypt(oldKey, 'ca private key pem'),
+    encrypt(oldKey, 'server private key pem'),
+  ]);
+
+  assert.deepEqual(await reencryptCardKeys(db, 'old-secret', 'new-secret'), {
+    nfc_card: 0,
+    nfc_card_pending_change: 0,
+    'attractap_installation.caPrivateKeyEncrypted': 1,
+    'attractap_installation.serverPrivateKeyEncrypted': 1,
+  });
+
+  const [row] = await all(db, 'SELECT * FROM attractap_installation');
+  const newKey = deriveKey('new-secret');
+  assert.equal(decrypt(newKey, row.caPrivateKeyEncrypted), 'ca private key pem');
+  assert.equal(decrypt(newKey, row.serverPrivateKeyEncrypted), 'server private key pem');
+});
+
+test('counts an empty installation table and skips one an older database does not have', async () => {
+  const db = await database();
+  assert.deepEqual(await reencryptCardKeys(db, 'old-secret', 'new-secret'), {
+    nfc_card: 0,
+    nfc_card_pending_change: 0,
+  });
+  await run(
+    db,
+    'CREATE TABLE attractap_installation (id integer primary key, caPrivateKeyEncrypted text, serverPrivateKeyEncrypted text)',
+  );
+  assert.equal(
+    (await reencryptCardKeys(db, 'old-secret', 'new-secret'))['attractap_installation.caPrivateKeyEncrypted'],
+    0,
+  );
+});
+
+test('names the column of a pairing key that does not decrypt', async () => {
+  const db = await database();
+  await run(
+    db,
+    'CREATE TABLE attractap_installation (id integer primary key, caPrivateKeyEncrypted text, serverPrivateKeyEncrypted text)',
+  );
+  const oldKey = deriveKey('old-secret');
+  const ca = encrypt(oldKey, 'ca');
+  await run(db, 'INSERT INTO attractap_installation VALUES (1, ?, ?)', [ca, encrypt(deriveKey('other'), 'server')]);
+  await assert.rejects(
+    () => reencryptCardKeys(db, 'old-secret', 'new-secret'),
+    /attractap_installation\.serverPrivateKeyEncrypted row 1 cannot be read/,
+  );
+  assert.equal(
+    (await all(db, 'SELECT caPrivateKeyEncrypted FROM attractap_installation'))[0].caPrivateKeyEncrypted,
+    ca,
+  );
+});
+
 test('writes nothing for a dry run or when a value does not decrypt', async () => {
   const db = await database();
   const stored = encrypt(deriveKey('old-secret'), 'aa');
@@ -52,7 +112,7 @@ test('writes nothing for a dry run or when a value does not decrypt', async () =
   await run(db, 'INSERT INTO nfc_card (id, key) VALUES (2, ?)', [encrypt(deriveKey('somebody-else'), 'bb')]);
   await assert.rejects(
     () => reencryptCardKeys(db, 'old-secret', 'new-secret'),
-    /nfc_card row 2 cannot be read with OLD_AUTH_SESSION_SECRET/,
+    /nfc_card\.key row 2 cannot be read with OLD_AUTH_SESSION_SECRET/,
   );
   assert.equal((await all(db, 'SELECT key FROM nfc_card WHERE id = 1'))[0].key, stored);
 });

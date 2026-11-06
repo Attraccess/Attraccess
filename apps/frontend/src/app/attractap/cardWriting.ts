@@ -13,3 +13,11 @@ export function cardWritingBlocker(reader: Pick<Attractap, 'firmware'>): CardWri
   if (!capabilities.cardEnrollment) return 'noCardEnrollment';
   return null;
 }
+
+/**
+ * A reader that is not paired yet still talks to the server unencrypted, so a card key written
+ * through it could be read by anyone on the network. Card writing is not blocked, only flagged.
+ */
+export function connectsUnencrypted(reader: Pick<Attractap, 'pairingState'>): boolean {
+  return reader.pairingState !== 'paired';
+}

@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 /* eslint-disable no-console -- CLI output. */
-// Re-encrypts stored NFC card keys from one AUTH_SESSION_SECRET to another, in one transaction.
+// Re-encrypts everything the API encrypts with AUTH_SESSION_SECRET that a new secret must still read:
+// the NFC card keys and the reader pairing keys (the installation CA and server private keys). It
+// moves them from one AUTH_SESSION_SECRET to another, in one transaction. The name stays
+// reencrypt-card-keys for the nx target and the path in the Docker image.
 //
 // Usage: OLD_AUTH_SESSION_SECRET=... NEW_AUTH_SESSION_SECRET=... node reencrypt-card-keys.mjs [--dry-run] [--db <path>]
 //   Source checkout: pnpm nx run api:reencrypt-card-keys -- --dry-run
@@ -20,9 +23,21 @@ const SALT = Buffer.from('attraccess.encryption.salt', 'utf8');
 const INFO = Buffer.from('attraccess|aes-256-gcm|content-encryption', 'utf8');
 const VERSION = 'v1';
 // Same format as EncryptionService: v1.<base64url(iv | ciphertext | tag)>.
-const TABLES = [
-  { table: 'nfc_card', column: 'key' },
-  { table: 'nfc_card_pending_change', column: 'key' },
+// `name` is the key in the printed counts. Tables a database does not have yet are skipped.
+export const TABLES = [
+  { name: 'nfc_card', table: 'nfc_card', column: 'key' },
+  { name: 'nfc_card_pending_change', table: 'nfc_card_pending_change', column: 'key' },
+  // Reader pairing keys (since the reader pairing migration). Without them paired readers cannot connect.
+  {
+    name: 'attractap_installation.caPrivateKeyEncrypted',
+    table: 'attractap_installation',
+    column: 'caPrivateKeyEncrypted',
+  },
+  {
+    name: 'attractap_installation.serverPrivateKeyEncrypted',
+    table: 'attractap_installation',
+    column: 'serverPrivateKeyEncrypted',
+  },
 ];
 
 export function deriveKey(secret) {
@@ -70,7 +85,7 @@ const call = (db, method, sql, params = []) =>
     db[method](sql, params, (error, result) => (error ? reject(error) : resolve(result))),
   );
 
-/** Returns how many values were re-encrypted per table. Throws (and rolls back) when any value does not decrypt with the old secret. */
+/** Returns how many values were re-encrypted per table (column). Throws (and rolls back) when any value does not decrypt with the old secret. */
 export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = false } = {}) {
   if (!oldSecret || !newSecret) throw new Error('OLD_AUTH_SESSION_SECRET and NEW_AUTH_SESSION_SECRET are required');
   if (oldSecret.trim() === newSecret.trim()) throw new Error('the old and the new secret are the same');
@@ -79,7 +94,7 @@ export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = fal
   const counts = {};
   await call(db, 'run', 'BEGIN IMMEDIATE');
   try {
-    for (const { table, column } of TABLES) {
+    for (const { name, table, column } of TABLES) {
       const exists = await call(db, 'get', "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [table]);
       if (!exists) continue;
       const rows = await call(
@@ -87,7 +102,7 @@ export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = fal
         'all',
         `SELECT id, "${column}" AS value FROM "${table}" WHERE "${column}" IS NOT NULL AND "${column}" != ''`,
       );
-      counts[table] = 0;
+      counts[name] = 0;
       for (const row of rows) {
         // Unencrypted legacy values are encrypted with the new secret as they are.
         let plain = row.value;
@@ -96,12 +111,12 @@ export async function reencryptCardKeys(db, oldSecret, newSecret, { dryRun = fal
             plain = decrypt(oldKey, row.value);
           } catch {
             throw new Error(
-              `${table} row ${row.id} cannot be read with OLD_AUTH_SESSION_SECRET. Is it the secret the data was written with? Nothing was changed.`,
+              `${table}.${column} row ${row.id} cannot be read with OLD_AUTH_SESSION_SECRET. Is it the secret the data was written with? Nothing was changed.`,
             );
           }
         }
         await call(db, 'run', `UPDATE "${table}" SET "${column}" = ? WHERE id = ?`, [encrypt(newKey, plain), row.id]);
-        counts[table]++;
+        counts[name]++;
       }
     }
     await call(db, 'run', dryRun ? 'ROLLBACK' : 'COMMIT');
@@ -124,7 +139,7 @@ async function main() {
       { dryRun },
     );
     console.log(
-      `${dryRun ? 'Checked (nothing written)' : 'Re-encrypted'} in ${databasePath}: ${JSON.stringify(counts)}`,
+      `${dryRun ? 'Checked (nothing written)' : 'Re-encrypted'} card keys and reader pairing keys in ${databasePath}: ${JSON.stringify(counts)}`,
     );
     if (!dryRun) console.log('Now set AUTH_SESSION_SECRET to the new secret and start the API.');
   } finally {

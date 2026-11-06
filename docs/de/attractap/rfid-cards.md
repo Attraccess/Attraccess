@@ -4,16 +4,16 @@ RFID-Karten sind die physischen Schluessel, mit denen Benutzer ueber Attractap-L
 
 ## Wie RFID-Karten funktionieren
 
-Wenn ein Benutzer eine RFID-Karte an einen Attractap-Leser haelt, sendet der Leser die eindeutige ID der Karte an das Attraccess-Backend. Das Backend spricht dann **ueber den Leser** mit der Karte und prueft:
+Wenn ein Benutzer eine RFID-Karte an einen Attractap-Reader hält, sendet der Reader die eindeutige ID der Karte an das Attraccess-Backend. Das Backend spricht dann **über den Reader** mit der Karte und prüft:
 
 1. Ist diese Karte im System registriert?
-2. Beweist die Karte, dass sie den dafuer gespeicherten geheimen Schluessel kennt? (Eine kopierte Karten-ID genuegt nicht.)
-3. Mit welchem Benutzerkonto ist die Karte verknuepft?
+2. Beweist die Karte, dass sie den dafür gespeicherten geheimen Schlüssel kennt? (Eine kopierte Karten-ID genügt nicht.)
+3. Mit welchem Benutzerkonto ist die Karte verknüpft?
 4. Hat dieser Benutzer die Berechtigung, die zugewiesene Ressource zu nutzen?
 
-Wenn alle Pruefungen bestanden sind, wird der Zugang gewaehrt. Der Leser reicht nur Nachrichten zwischen Backend und Karte durch: **Kartenschluessel werden vom Server erzeugt und geprueft; beim Vorhalten einer Karte erfaehrt der Leser keinen Kartenschluessel**. Ein Leser ohne Verbindung gewaehrt nichts.
+Wenn alle Prüfungen bestanden sind, wird der Zugang gewährt. Der Reader reicht nur Nachrichten zwischen Backend und Karte durch: **Kartenschlüssel werden vom Server erzeugt und geprüft; beim Vorhalten einer Karte erfährt der Reader keinen Kartenschlüssel**. Ein Reader ohne Verbindung gewährt nichts.
 
-Kartenschluessel sind zufaellig, je 16 Byte lang, und werden verschluesselt gespeichert. Wie Sie das Secret sichern, das sie schuetzt, steht unter [Sicherheitseinstellungen](settings/security.md).
+Kartenschlüssel sind zufällig, je 16 Byte lang, und werden verschlüsselt gespeichert. Wie Sie das Secret sichern, das sie schützt, steht unter [Sicherheitseinstellungen](settings/security.md).
 
 ## RFID-Karten verwalten
 
@@ -25,10 +25,10 @@ Kartenschluessel sind zufaellig, je 16 Byte lang, und werden verschluesselt gesp
 2. Wählen Sie einen verbundenen Attractap, der die Registrierung von Karten unterstützt
 3. Klicken Sie auf **Registrieren** und folgen Sie den Anweisungen auf dem Leser
 
-Eine Karte wird erst registriert, nachdem der Server geprueft hat, dass die Karte ihren neuen Schluessel angenommen hat. Wird die Karte weggezogen oder schlaegt das Schreiben fehl, wird nichts gespeichert; halten Sie dieselbe Karte erneut an den Leser, dann wird die Registrierung abgeschlossen.
+Eine Karte wird erst registriert, nachdem der Server geprüft hat, dass die Karte ihren neuen Schlüssel angenommen hat. Wird die Karte weggezogen oder schlägt das Schreiben fehl, wird nichts gespeichert; halten Sie dieselbe Karte erneut an den Reader, dann wird die Registrierung abgeschlossen.
 
 > [!NOTE]
-> Fuer alle Kartenfunktionen brauchen Leser Firmware 2.0.0 oder neuer. Lesern mit aelterer Firmware wird das Update auf 2.0.0 beim Verbindungsaufbau automatisch angeboten (siehe [Firmware-Updates](attractap/firmware-updates.md)). Bis sie es installiert haben, lehnt der Server ihre Kartenanmeldungen ab, und sie koennen keine Karten registrieren oder zuruecksetzen. Bereits registrierte Karten funktionieren weiter, sobald der Leser aktualisiert ist.
+> Für alle Kartenfunktionen brauchen Reader Firmware 2.0.0 oder neuer. Readern mit älterer Firmware wird das Update auf 2.0.0 beim Verbindungsaufbau automatisch angeboten (siehe [Firmware-Updates](attractap/firmware-updates.md)). Bis sie es installiert haben, lehnt der Server ihre Kartenanmeldungen ab, und sie können keine Karten registrieren oder zurücksetzen. Bereits registrierte Karten funktionieren weiter, sobald der Reader aktualisiert ist.
 
 ### Karten aktivieren und deaktivieren
 
@@ -40,7 +40,7 @@ Klicken Sie neben einer Karte auf **Aktivieren** oder **Deaktivieren** und best�
 2. Wählen Sie einen verbundenen Attractap und bestätigen Sie **Löschen**
 3. Folgen Sie den Anweisungen auf dem Leser, um die physische Karte zurückzusetzen
 
-Die Karte wird aus dem Konto entfernt, sobald der Leser das erfolgreiche Zurücksetzen bestätigt. Die physische Karte wird benötigt; nutzen Sie **Deaktivieren**, falls die Karte nicht verfügbar ist.
+Die Karte wird aus dem Konto entfernt, nachdem der Server geprüft hat, dass die Karte wieder im Werkszustand ist. Die physische Karte wird benötigt; nutzen Sie **Deaktivieren**, falls die Karte nicht verfügbar ist.
 
 ## Mehrere Karten pro Benutzer
 
@@ -64,16 +64,17 @@ Attractap-Leser verwenden AES-verschluesselte Authentifizierung, die Karten mit 
 > [!NOTE]
 > Auf MIFARE-DESFire-Karten speichert Attractap seine Schluessel in einer eigenen DESFire-Applikation (AID `0xACCE55`), die bei der Registrierung automatisch angelegt wird. Andere Applikationen auf der Karte (z.B. bestehende Zugangssysteme) bleiben unberuehrt.
 
-## Welche Leser Karten registrieren und zuruecksetzen duerfen
+## Welche Reader Karten registrieren und zurücksetzen dürfen
 
-Standardmaessig kann jeder Leser Karten registrieren und zuruecksetzen. Administratoren koennen das unter **Einstellungen -> Kartenregistrierung** begrenzen: **Ausgewaehlten Readern** waehlen und die Leser ankreuzen, die Karten beschreiben duerfen. Die Bildschirme zum Registrieren und Zuruecksetzen zeigen dann nur diese Leser. Alle Leser lassen Mitglieder sich weiterhin mit ihrer Karte anmelden.
+Standardmäßig kann jeder Reader mit Display und Firmware 2.0.0 oder neuer Karten registrieren und zurücksetzen. Administratoren können das unter **Einstellungen -> RFID-Kartenregistrierung** begrenzen: Wählen Sie **Ausgewählten Readern** und kreuzen Sie die Reader an, die Karten beschreiben dürfen. Die Bildschirme zum Registrieren und Zurücksetzen zeigen dann nur diese Reader. Alle Reader lassen Mitglieder sich weiterhin mit ihrer Karte anmelden.
 
 > [!IMPORTANT]
-> **Erlauben Sie nur vertrauenswuerdigen Lesern, Karten zu registrieren und zurueckzusetzen.** Eine neue Karte hat noch den oeffentlich bekannten Werksschluessel, deshalb schreibt der Server den neuen Kartenschluessel unter diesem Werksschluessel. Der Leser, der diesen Schreibvorgang weiterreicht, kann den neuen Schluessel ermitteln. Ein manipulierter Leser oder jemand, der eine unverschluesselte Verbindung zu ihm mitliest, koennte so Karten kopieren, die an diesem Leser registriert oder zurueckgesetzt wurden. Beschraenken Sie das unter **Einstellungen -> Kartenregistrierung** auf Leser an einem Ort, den Sie kontrollieren, zum Beispiel am Empfang.
+> **Erlauben Sie nur gekoppelten, vertrauenswürdigen Readern, Karten zu registrieren und zurückzusetzen.** Eine neue Karte hat noch den öffentlich bekannten Werksschlüssel, deshalb schreibt der Server den neuen Kartenschlüssel unter diesem Werksschlüssel.
 >
-> Das normale Vorhalten einer Karte ist nicht betroffen: Der Server prueft die Karte, ohne dass der Schluessel ueber den Leser laeuft.
+> - **Die Verbindung:** Ein [gekoppelter Reader](attractap/pairing.md) spricht über eine verschlüsselte Verbindung mit dem Server, niemand im Netzwerk kann den Schlüssel mitlesen. Ein noch nicht gekoppelter Reader verbindet sich weiterhin unverschlüsselt. Koppeln Sie einen Reader, bevor Sie ihm das Registrieren und Zurücksetzen von Karten erlauben; die Einstellungen und die Reader-Auswahl kennzeichnen nicht gekoppelte Reader.
+> - **Der Reader selbst:** Der Reader, der den Schreibvorgang weiterreicht, kann den neuen Schlüssel weiterhin ermitteln. Ein manipulierter Reader könnte so Karten kopieren, die an ihm registriert oder zurückgesetzt wurden. Beschränken Sie das unter **Einstellungen -> RFID-Kartenregistrierung** auf Reader an einem Ort, den Sie kontrollieren, zum Beispiel am Empfang. Gegen manipulierte Reader soll abgesicherte Reader-Firmware helfen, die für eine spätere Version geplant ist.
 >
-> Verschluesselte Verbindungen zu den Lesern und abgesicherte Leser-Firmware, die fuer spaetere Versionen geplant sind, heben diese Einschraenkung auf.
+> Das normale Vorhalten einer Karte ist nicht betroffen: Der Server prüft die Karte, ohne dass der Schlüssel über den Reader läuft.
 
 ## Administratorfunktionen
 

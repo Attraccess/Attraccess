@@ -38,6 +38,10 @@ import {
   ResourceIntroducerNameDto,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
+import { useToastMessage } from '../../../../../components/toastProvider';
+import { cardWritingBlocker } from '../../../../attractap/cardWriting';
+import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import en from './translations/en.json';
 import de from './translations/de.json';
 
@@ -172,7 +176,11 @@ export function useSupervisedStartModalState({
   requestBody,
   onApproved,
 }: Readonly<SupervisedStartModalProps>) {
-  const { t } = useTranslations({ en, de });
+  const { t, tExists } = useTranslations({
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+  });
+  const toast = useToastMessage();
   const { user } = useAuth();
 
   const [phase, setPhase] = useState<Phase>('select');
@@ -195,7 +203,9 @@ export function useSupervisedStartModalState({
   const { data: allReaders } = useAttractapServiceGetReaders();
 
   const { resourceReaders, otherReaders } = useMemo(() => {
-    const capable = (allReaders ?? []).filter((reader) => reader.firmware?.capabilities?.cardEnrollment);
+    // Supervision runs on the reader's screen and relays the introducer's card, like card writing:
+    // the server refuses readers without a display or on firmware before 2.0.0.
+    const capable = (allReaders ?? []).filter((reader) => cardWritingBlocker(reader) === null);
     return {
       resourceReaders: capable.filter((reader) => reader.resources?.some((r) => r.id === resourceId)),
       otherReaders: capable.filter((reader) => !reader.resources?.some((r) => r.id === resourceId)),
@@ -246,12 +256,18 @@ export function useSupervisedStartModalState({
             // 403 covers both an explicit rejection and an unauthorized supervisor. Everything else
             // — offline, busy or unsupported reader, and anything unexpected — is the request
             // failing to land, which is a different story from a supervisor saying no.
-            setPhase(status === 403 ? 'rejected' : 'error');
+            if (status === 403) {
+              setPhase('rejected');
+              return;
+            }
+            setPhase('error');
+            // Say why, e.g. READER_FIRMWARE_UPDATE_REQUIRED, READER_BUSY or READER_OFFLINE.
+            toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
           },
         },
       );
     },
-    [onApproved, requestBody, requestSupervisedSession, resourceId],
+    [onApproved, requestBody, requestSupervisedSession, resourceId, t, tExists, toast],
   );
 
   const handleSelectSupervisor = useCallback(

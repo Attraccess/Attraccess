@@ -1,4 +1,5 @@
 import {
+  Attractap,
   AttractapCapabilities,
   useAttractapServiceGetCardWriterSettings,
   useAttractapServiceGetReaders,
@@ -7,7 +8,7 @@ import { Alert } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useEffect, useMemo, useState } from 'react';
 import { Select } from '../../../components/select';
-import { cardWritingBlocker } from '../cardWriting';
+import { cardWritingBlocker, connectsUnencrypted } from '../cardWriting';
 import de from './de.json';
 import en from './en.json';
 
@@ -83,15 +84,21 @@ export function AttractapSelect(props: Props) {
     return { offered, emptyReason };
   }, [readers, now, props.requiredCapabilities, props.readerIds, props.forCardWriting, cardWriterSettings]);
 
+  // A card key written through a reader that is not paired could be read on the network. The hint
+  // also shows in the trigger once the reader is picked.
+  const notPairedHint = (reader: Attractap) =>
+    props.forCardWriting && connectsUnencrypted(reader) ? t('notPaired') : undefined;
+  const selected = readers?.find((r) => r.id === props.selection);
+
   return (
     <>
       <Select
-        items={isLoading ? [] : offered.map((r) => ({ key: r.id.toString(), label: r.name }))}
+        items={
+          isLoading ? [] : offered.map((r) => ({ key: r.id.toString(), label: r.name, description: notPairedHint(r) }))
+        }
         label={props.label}
         aria-label={props.ariaLabel}
-        placeholder={
-          isLoading ? t('loading') : (readers?.find((r) => r.id === props.selection)?.name ?? props.placeholder)
-        }
+        placeholder={isLoading ? t('loading') : (selected?.name ?? props.placeholder)}
         value={props.selection ? props.selection.toString() : ''}
         onChange={(key) => props.onSelectionChange(Number(key))}
         isDisabled={isLoading || emptyReason !== null}

@@ -1,5 +1,5 @@
 {
-  "title": "Card enrollment",
+  "title": "RFID card enrollment",
   "description": "Which Attractap readers may enroll and reset RFID cards. A new card key is written through the reader, so allow only readers in a place you trust.",
   "loading": "Loading settings...",
   "mode": {
@@ -25,7 +25,8 @@
     "blockers": {
       "firmwareUpdateRequired": "Cannot write cards until it runs firmware 2.0.0 or later.",
       "noCardEnrollment": "This reader model cannot enroll or reset cards."
-    }
+    },
+    "notPaired": "Not paired – the connection is not encrypted"
   },
   "success": {
     "title": "Settings saved",

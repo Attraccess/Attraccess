@@ -19,13 +19,20 @@ const NEW_SECRET = 'new-secret-fedcba9876543210fedcba9876543210';
 const encryptionFor = (secret: string) =>
   new EncryptionService({ get: () => ({ AUTH_SESSION_SECRET: secret }) } as unknown as ConfigService);
 
+type Row = { id: number; key: string | null; caPrivateKeyEncrypted?: string; serverPrivateKeyEncrypted?: string };
+
 const sql = (db: Database, method: 'run' | 'all', query: string, params: unknown[] = []) =>
-  new Promise<Array<{ id: number; key: string | null }>>((done, fail) =>
+  new Promise<Row[]>((done, fail) =>
     db[method](query, params, function (this: unknown, error: Error | null, rows?: unknown) {
       if (error) fail(error);
-      else done((rows as Array<{ id: number; key: string | null }>) ?? []);
+      else done((rows as Row[]) ?? []);
     }),
   );
+
+const runScript = (path: string) =>
+  promisify(execFile)(process.execPath, [SCRIPT, '--db', path], {
+    env: { PATH: process.env.PATH, OLD_AUTH_SESSION_SECRET: OLD_SECRET, NEW_AUTH_SESSION_SECRET: NEW_SECRET },
+  });
 
 describe('reencrypt-card-keys command', () => {
   let dir: string;
@@ -53,9 +60,7 @@ describe('reencrypt-card-keys command', () => {
     ]);
     await new Promise((done) => db.close(done));
 
-    const { stdout } = await promisify(execFile)(process.execPath, [SCRIPT, '--db', path], {
-      env: { PATH: process.env.PATH, OLD_AUTH_SESSION_SECRET: OLD_SECRET, NEW_AUTH_SESSION_SECRET: NEW_SECRET },
-    });
+    const { stdout } = await runScript(path);
     expect(stdout).toContain('{"nfc_card":2,"nfc_card_pending_change":1}');
 
     const after = encryptionFor(NEW_SECRET);
@@ -71,5 +76,48 @@ describe('reencrypt-card-keys command', () => {
     ]);
     expect(after.decrypt(pending[0].key as string)).toBe('0f0e0d0c0b0a09080706050403020100');
     expect(() => before.decrypt(cards[0].key as string)).toThrow();
+  });
+
+  it('moves the reader pairing keys so paired readers still connect under the new secret', async () => {
+    const before = encryptionFor(OLD_SECRET);
+    const db = new Database(path);
+    await sql(db, 'run', 'CREATE TABLE nfc_card (id integer primary key, key text)');
+    await sql(db, 'run', 'CREATE TABLE nfc_card_pending_change (id integer primary key, key text)');
+    // Same columns as the attractap pairing migration.
+    await sql(
+      db,
+      'run',
+      `CREATE TABLE "attractap_installation" (
+        "id" integer PRIMARY KEY NOT NULL,
+        "installationId" text NOT NULL,
+        "caCertificatePem" text NOT NULL,
+        "caPrivateKeyEncrypted" text NOT NULL,
+        "serverCertificatePem" text NOT NULL,
+        "serverPrivateKeyEncrypted" text NOT NULL,
+        "serverCertificateNotAfter" datetime NOT NULL
+      )`,
+    );
+    const caKey = '-----BEGIN PRIVATE KEY-----\nca\n-----END PRIVATE KEY-----\n';
+    const serverKey = '-----BEGIN PRIVATE KEY-----\nserver\n-----END PRIVATE KEY-----\n';
+    await sql(
+      db,
+      'run',
+      `INSERT INTO "attractap_installation" VALUES (1, 'installation', 'ca cert', ?, 'server cert', ?, datetime('now'))`,
+      [before.encrypt(caKey), before.encrypt(serverKey)],
+    );
+    await new Promise((done) => db.close(done));
+
+    const { stdout } = await runScript(path);
+    expect(stdout).toContain('"attractap_installation.caPrivateKeyEncrypted":1');
+    expect(stdout).toContain('"attractap_installation.serverPrivateKeyEncrypted":1');
+
+    const after = encryptionFor(NEW_SECRET);
+    const check = new Database(path);
+    const [row] = await sql(check, 'all', 'SELECT * FROM attractap_installation');
+    await new Promise((done) => check.close(done));
+
+    expect(after.decrypt(row.caPrivateKeyEncrypted as string)).toBe(caKey);
+    expect(after.decrypt(row.serverPrivateKeyEncrypted as string)).toBe(serverKey);
+    expect(() => before.decrypt(row.caPrivateKeyEncrypted as string)).toThrow();
   });
 });

@@ -1,5 +1,6 @@
 {
   "loading": "Reader werden geladen...",
+  "notPaired": "Nicht gekoppelt – die Verbindung ist nicht verschlüsselt",
   "empty": {
     "noConnectedReader": {
       "title": "Kein Reader verbunden",
@@ -15,7 +16,7 @@
     },
     "notAllowed": {
       "title": "Kein Reader erlaubt",
-      "description": "Keiner der verbundenen Attractap-Reader darf RFID-Karten registrieren oder zurücksetzen. Eine Administratorin oder ein Administrator kann Reader unter Einstellungen → Kartenregistrierung erlauben."
+      "description": "Keiner der verbundenen Attractap-Reader darf RFID-Karten registrieren oder zurücksetzen. Eine Administratorin oder ein Administrator kann Reader unter Einstellungen → RFID-Kartenregistrierung erlauben."
     }
   }
 }

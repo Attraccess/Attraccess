@@ -28,9 +28,15 @@ vi.mock('../../../../components/toastProvider', () => ({
 
 const save = vi.fn();
 
-const reader = (id: number, name: string, capabilities: Record<string, boolean> = {}) => ({
+const reader = (
+  id: number,
+  name: string,
+  capabilities: Record<string, boolean> = {},
+  pairingState: 'unpaired' | 'paired' | 'revoked' = 'paired',
+) => ({
   id,
   name,
+  pairingState,
   firmware: { capabilities: { cardEnrollment: true, cardRelay: true, ...capabilities } },
 });
 
@@ -124,5 +130,24 @@ describe('AttractapSection (which readers may write cards)', () => {
       'readers.blockers.firmwareUpdateRequired',
     );
     expect(screen.getByTestId('card-writer-reader-3-blocker')).toHaveTextContent('readers.blockers.noCardEnrollment');
+  });
+
+  it('marks readers that are not paired, because their connection is not encrypted', () => {
+    selectedMode([1]);
+    readersQuery([
+      reader(1, 'Front desk'),
+      reader(2, 'Legacy', {}, 'unpaired'),
+      reader(3, 'Removed', {}, 'revoked'),
+      reader(4, 'Legacy old firmware', { cardRelay: false }, 'unpaired'),
+    ]);
+    render(<AttractapSection />);
+    expect(screen.queryByTestId('card-writer-reader-1-not-paired')).toBeNull();
+    expect(screen.getByTestId('card-writer-reader-2-not-paired')).toHaveTextContent('readers.notPaired');
+    expect(screen.getByTestId('card-writer-reader-3-not-paired')).toHaveTextContent('readers.notPaired');
+    // Both reasons show; pairing does not hide the firmware blocker.
+    expect(screen.getByTestId('card-writer-reader-4-blocker')).toBeInTheDocument();
+    expect(screen.getByTestId('card-writer-reader-4-not-paired')).toBeInTheDocument();
+    // Not paired is a warning, not a blocker: the reader can still be picked.
+    expect(screen.getByRole('checkbox', { name: 'Legacy' })).toBeEnabled();
   });
 });

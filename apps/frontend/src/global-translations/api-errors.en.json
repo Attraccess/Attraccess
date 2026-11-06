@@ -169,7 +169,7 @@
   },
   "READER_NOT_ALLOWED_TO_WRITE_CARDS": {
     "title": "Reader not allowed",
-    "description": "This Attractap is not allowed to enroll or reset RFID cards. Choose another reader, or ask an administrator to allow it under Settings → Card enrollment."
+    "description": "This Attractap is not allowed to enroll or reset RFID cards. Choose another reader, or ask an administrator to allow it under Settings → RFID card enrollment."
   },
   "READER_NOT_FOUND": {
     "title": "Reader not found",
