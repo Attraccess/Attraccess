@@ -14,8 +14,8 @@ else {
   out.push(`# Real-card session (${report.mode})\n`);
   out.push(`- setup (flash, pair): ${report.setup_seconds} s; card session: ${report.card_session_seconds} s; prompts: ${report.prompts}; time spent waiting for cards: ${report.seconds_waiting_for_cards} s\n`);
   out.push('## PN532 exchange failures per card type\n');
-  out.push('| card | exchanges | answered | PN532 failures | failure rate | statuses |\n|---|---|---|---|---|---|');
-  for (const c of report.cards) out.push(`| ${c.card} | ${c.rf.exchanges} | ${c.rf.answered} | ${c.rf.pn532_failures} | ${c.rf.failure_rate === null ? '-' : (c.rf.failure_rate * 100).toFixed(1) + ' %'} | ${c.rf.statuses.join(' ') || '-'} |`);
+  out.push('| card | exchanges | answered | PN532 status lines | lost inside a conversation | statuses |\n|---|---|---|---|---|---|');
+  for (const c of report.cards) out.push(`| ${c.card} | ${c.rf.exchanges} | ${c.rf.answered} | ${c.rf.pn532_failures} (also every lifted card) | ${c.rf.exchanges_lost_in_conversation ?? '-'} (${c.rf.lost_in_conversation_rate == null ? '-' : (c.rf.lost_in_conversation_rate * 100).toFixed(1) + ' %'}) | ${c.rf.statuses.join(' ') || '-'} |`);
   out.push('\n## Steps\n');
   for (const c of report.cards) {
     out.push(`### ${c.card}\n`);

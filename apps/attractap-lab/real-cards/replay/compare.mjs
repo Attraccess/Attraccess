@@ -99,7 +99,13 @@ function guessOperation(conversation, auths) {
   const firstAuthKeyNo = auths[0]?.keyNo;
   // Enroll looks for a free slot first (DESFire: GetKeyVersion, NTAG424: authenticates slots 1..5 with
   // the factory key); reset authenticates the master key and goes straight to ChangeKey.
-  if (probesKeyVersions || (firstAuthKeyNo !== undefined && firstAuthKeyNo !== 0)) return 'enroll';
+  if (probesKeyVersions) return 'enroll';
+  // Enroll looks for a free slot: the factory key is accepted there (9100 after the second auth frame).
+  // Reset first tries the factory key on the card's slot to see whether it is already factory; the card
+  // refuses it (91ae) and the master key login follows.
+  const first = auths[0];
+  const firstAccepted = first ? ex[first.index + 1]?.rx?.endsWith('9100') === true : false;
+  if (first && firstAuthKeyNo !== 0 && firstAccepted) return 'enroll';
   return 'reset';
 }
 
@@ -121,12 +127,27 @@ function runReplay(spec) {
   };
 }
 
-function compareOne(conversation) {
+// The server's reset first tries the factory key on the card's slot (select, AuthenticateEV2First and its
+// second frame) so a reset that already got through is recognised on the next tap. The 1.7.x firmware has
+// no such step; it is the one intended difference, so it is cut out before the byte comparison.
+function withoutFactoryProbe(conversation, auths) {
+  const first = auths[0];
+  const ex = conversation.exchanges;
+  const refused = first && first.keyNo !== 0 && ex[first.index + 1]?.rx?.endsWith('91ae') === true;
+  const masterFollows = auths[1]?.keyNo === 0;
+  if (!refused || !masterFollows || !ex.some((e) => e.tx.startsWith('90c4'))) return { conversation, probe: 0 };
+  const from = ex[first.index - 1]?.tx.startsWith('00a4') ? first.index - 1 : first.index;
+  const exchanges = [...ex.slice(0, from), ...ex.slice(first.index + 2)];
+  return { conversation: { ...conversation, exchanges }, probe: first.index + 2 - from };
+}
+
+function compareOne(original) {
+  const { conversation, probe } = withoutFactoryProbe(original, analyse(original));
   const ex = conversation.exchanges;
   const auths = analyse(conversation);
   const operation = opOverrides[conversation.id] ?? guessOperation(conversation, auths);
   const kind = cardKind(conversation);
-  const result = { conversation: conversation.id, operation, cardKind: kind, exchanges: ex.length, complete: ex.every((e) => e.rx !== null) };
+  const result = { conversation: conversation.id, operation, cardKind: kind, exchanges: ex.length, complete: ex.every((e) => e.rx !== null), ...(probe ? { factoryProbeExchangesIgnored: probe } : {}) };
   if (!result.complete) {
     // A card that went away mid-conversation: compare what was answered, mark it partial.
     result.partial = true;
@@ -163,6 +184,12 @@ function compareOne(conversation) {
   result.replayOutcome = best.replayed.ok ? 'ok' : best.replayed.exhausted ? 'ran out of captured answers' : 'refused';
   if (best.firstDiff === -1) {
     result.verdict = 'MATCH';
+  } else if (best.firstDiff === ex.length) {
+    // The server sent every command identically and then stopped: the link was cut on purpose after
+    // ChangeKey (interrupted-write test), so what the 1.7.x code would send next never went out.
+    result.verdict = 'MATCH';
+    result.partial = true;
+    result.note = 'identical up to the cut link';
   } else {
     result.verdict = 'MISMATCH';
     result.firstDifference = {

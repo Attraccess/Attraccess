@@ -451,8 +451,15 @@ def summarize(kit, results):
         answered = sum(1 for m in wire if m.get("type") == "CARD_APDU_RESPONSE" and m["dir"] == "r2s"
                        and result["wall_start"] <= m["t"] <= result["wall_end"])
         statuses = sorted(set(re.findall(r"status (0x[0-9A-Fa-f]+)", " ".join(failures))))
+        # A failed InDataExchange is also how the reader notices a lifted card (its presence probe), so the
+        # log lines overcount. What matters is a card that vanished inside a conversation: the reader
+        # then reports CARD_REMOVED to the server instead of an answer.
+        dropped = sum(1 for m in wire if m.get("type") == "CARD_REMOVED" and m["dir"] == "r2s"
+                      and result["wall_start"] <= m["t"] <= result["wall_end"])
         result["rf"] = {"exchanges": exchanges, "answered": answered, "pn532_failures": len(failures),
-                        "failure_rate": round(len(failures) / exchanges, 4) if exchanges else None, "statuses": statuses}
+                        "failure_rate": round(len(failures) / exchanges, 4) if exchanges else None, "statuses": statuses,
+                        "exchanges_lost_in_conversation": dropped,
+                        "lost_in_conversation_rate": round(dropped / exchanges, 4) if exchanges else None}
         summary.append(result)
     return summary
 
