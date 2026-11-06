@@ -3,7 +3,6 @@
 import os
 from pathlib import Path
 import subprocess
-import sys
 
 import pytest
 
@@ -22,9 +21,14 @@ def run(tmp_path, env, place_output=None):
         (tmp_path / "place.txt").write_text(place_output)
         client.write_text(f"#!/bin/sh\ncat '{tmp_path / 'place.txt'}'\n")
     client.chmod(0o755)
+    # run.sh only checks that LAB_PYTHON imports labgrid and pytest; the test's own
+    # interpreter may not (Nix check phase), so a stand-in answers yes.
+    lab_python = bin_dir / "lab-python"
+    lab_python.write_text("#!/bin/sh\nexit 0\n")
+    lab_python.chmod(0o755)
     result = subprocess.run(
         ["bash", str(RUN_SH)], cwd=RUN_SH.parents[1], capture_output=True, text=True, timeout=30,
-        env={"PATH": f"{bin_dir}:{os.environ['PATH']}", "LAB_PYTHON": sys.executable, "TMPDIR": str(tmp_path), **env})
+        env={"PATH": f"{bin_dir}:{os.environ['PATH']}", "LAB_PYTHON": str(lab_python), "TMPDIR": str(tmp_path), **env})
     return result.returncode, result.stderr
 
 
