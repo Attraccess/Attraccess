@@ -19,7 +19,7 @@ export class MatterConnectionService implements OnModuleInit, OnModuleDestroy, O
 
   constructor(
     @Inject(PLUGIN_CONTEXT) context: PluginContext,
-    private readonly settings: MatterSettingsService,
+    @Inject(MatterSettingsService) private readonly settings: MatterSettingsService,
   ) {
     const logger = context.logger;
     this.connection = new SidecarConnection({

@@ -1,5 +1,5 @@
 import { Auth, type AuthenticatedRequest, type PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Put, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Inject, Put, Req } from '@nestjs/common';
 import { MatterConnectionService } from './connection.service';
 import { MissingCredentialError, MatterSettingsService, type PublicSettings } from './settings.service';
 import { settingsSchema, validationMessages } from './validation';
@@ -19,8 +19,8 @@ function principalOf(request: AuthenticatedRequest): PluginAuditPrincipal {
 @Controller('matter/connection')
 export class MatterConnectionController {
   constructor(
-    private readonly settings: MatterSettingsService,
-    private readonly service: MatterConnectionService,
+    @Inject(MatterSettingsService) private readonly settings: MatterSettingsService,
+    @Inject(MatterConnectionService) private readonly service: MatterConnectionService,
   ) {}
 
   /** The saved settings. The credential is never part of the answer. */

@@ -21,9 +21,9 @@ import {
 import { createPluginAuditContext } from '../../../api/src/plugin-system/runtime/audit-context';
 import { SettingsStoreService } from '../../../api/src/settings/settings-store.service';
 import { Setting } from '@attraccess/database-entities';
-import * as matterMigrations from '../backend/migrations';
+import * as sourceMigrations from '../backend/migrations';
 import { MatterConnectionService } from '../backend/connection/connection.service';
-import plugin from '../backend/plugin';
+import sourcePlugin from '../backend/plugin';
 
 export const PLUGIN_ID = 'MatterAcceptance21chr';
 export const HOST_VERSION = '1.11.0';
@@ -53,7 +53,25 @@ export type Host = {
   close(): Promise<void>;
 };
 
-export async function bootHost(options: { hostVersion?: string | undefined } = {}): Promise<Host> {
+/**
+ * `source` runs the plugin through ts-jest, which emits decorator metadata. `bundle` loads the packed esbuild output
+ * the real host loads: it has no `design:paramtypes`, so every constructor parameter needs an explicit `@Inject`.
+ */
+export type PluginSource = 'source' | 'bundle';
+
+function loadPlugin(source: PluginSource) {
+  if (source === 'source') return { plugin: sourcePlugin, migrations: sourceMigrations };
+  const dist = join(__dirname, '../package/dist');
+  return {
+    plugin: require(join(dist, 'index.js')).default as typeof sourcePlugin,
+    migrations: require(join(dist, 'migrations.js')),
+  };
+}
+
+export async function bootHost(
+  options: { hostVersion?: string | undefined; source?: PluginSource } = {},
+): Promise<Host> {
+  const { plugin, migrations: matterMigrations } = loadPlugin(options.source ?? 'source');
   resetPluginAuditRegistry(); // the registry is process-wide: a second boot in one test starts clean
   registerPluginAuditDomains(
     { name: '@attraccess/plugin-matter', id: PLUGIN_ID },
@@ -65,7 +83,7 @@ export async function bootHost(options: { hostVersion?: string | undefined } = {
     type: 'sqlite',
     database: join(directory, 'host.sqlite'),
     entities: [...Object.values(entities), ...(plugin.entities ?? [])],
-    migrations: [...Object.values(coreMigrations), ...Object.values(matterMigrations)],
+    migrations: [...Object.values(coreMigrations), ...(Object.values(matterMigrations) as (new () => never)[])],
     synchronize: false,
   }).initialize();
   await db.runMigrations();
@@ -108,7 +126,10 @@ export async function bootHost(options: { hostVersion?: string | undefined } = {
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');
   await app.init();
-  const service = moduleRef.get(MatterConnectionService);
+  const provided = (plugin.register(context) as { providers?: unknown[] }).providers ?? [];
+  const serviceClass = (provided.find((p) => typeof p === 'function' && p.name === 'MatterConnectionService') ??
+    MatterConnectionService) as typeof MatterConnectionService;
+  const service = moduleRef.get(serviceClass);
   return {
     app,
     db,
