@@ -14,7 +14,7 @@ import {
 
 import { ConflictException, Logger } from '@nestjs/common';
 
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 
 import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 
@@ -46,6 +46,7 @@ import { ProjectsService } from '../../../projects/projects.service';
 
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 
+import { FlowExecutionOptions } from '../../flows/execution/flow-execution.types';
 import { ResourceFlowsExecutorService } from '../../flows/execution/resource-flows-executor.service';
 
 import { ResourceFormsService } from '../../forms/forms.service';
@@ -195,8 +196,16 @@ export abstract class UsageLifecycle {
     });
   }
 
-  /** Claim and discard the candidate before dispatching stopped-flow effects. */
-  async endLifecycleCandidate(attemptId: string, resourceId: number, endNotes: string): Promise<void> {
+  /**
+   * Claim and discard the candidate before dispatching stopped-flow effects. `actorUserId` is the user whose start
+   * or takeover this was; its stop flow runs on their behalf.
+   */
+  async endLifecycleCandidate(
+    attemptId: string,
+    resourceId: number,
+    endNotes: string,
+    actorUserId?: number,
+  ): Promise<void> {
     const { candidate, activeSessions } = await runSerializedTransaction(
       this.resourceUsageRepository.manager,
       async (manager) => {
@@ -230,8 +239,7 @@ export abstract class UsageLifecycle {
       ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
       { ...this.getResourceUsageFlowPayload(candidate), endTime: new Date(), endNotes, activeSessions },
       'tentative end',
-      attemptId,
-      true,
+      { lifecycleAttemptId: attemptId, lifecycleCandidateCancellation: true, actorUserId },
     );
   }
 
@@ -240,24 +248,27 @@ export abstract class UsageLifecycle {
    * another API instance is still working on (it keeps a heartbeat in Valkey) is left alone, so starting one
    * instance does not abort a start or stop in flight on another.
    *
-   * The heartbeat outlives a crashed instance by up to its time to live, so an instance that restarts quickly
-   * cannot tell its own dead attempt from a live one. `sweep` repeats the check later, skipping attempts
-   * younger than the heartbeat's time to live and those whose heartbeat cannot be looked up.
+   * With Valkey, every instance repeats this as a `sweep` for attempts left by an instance that crashed while
+   * others keep running. A sweep skips attempts younger than the heartbeat's time to live, and one with
+   * nothing to clean up does not touch the database.
    */
   public async recoverInterruptedLifecycles(sweep = false): Promise<void> {
-    const gone = new Set<string>();
-    const tooYoung = new Date(Date.now() - LOCK_TTL_MS);
-    for (const { id, createdAt } of await this.resourceUsageRepository.manager.find(ResourceUsageLifecycleAttempt, {
+    const oldEnough = new Date(Date.now() - LOCK_TTL_MS);
+    const attempts = await this.resourceUsageRepository.manager.find(ResourceUsageLifecycleAttempt, {
       select: { id: true, createdAt: true },
-    })) {
-      if (sweep && createdAt > tooYoung) continue;
-      if (!(await this.sessionChangeCoordination.isAlive(id, sweep))) gone.add(id);
-    }
+    });
+    const gone = await this.sessionChangeCoordination.findGone(
+      attempts.filter(({ createdAt }) => !sweep || createdAt <= oldEnough).map(({ id }) => id),
+      !sweep,
+    );
+    if (sweep && gone.size === 0) return;
     const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
       const recovered = sweep ? 0 : await recoverOrphanedUsages(manager);
       if (recovered)
         this.logger.warn(`Cancelled ${recovered} orphan unfinalized usage sessions; see resource_usage_recovery`);
-      const attempts = (await manager.find(ResourceUsageLifecycleAttempt)).filter(({ id }) => gone.has(id));
+      const attempts = gone.size
+        ? await manager.find(ResourceUsageLifecycleAttempt, { where: { id: In([...gone]) } })
+        : [];
       for (const attempt of attempts) {
         if (attempt.candidateUsageId !== null) {
           await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
@@ -281,19 +292,10 @@ export abstract class UsageLifecycle {
     triggerNodeType: ResourceFlowNodeType,
     payload: object,
     description: string,
-    lifecycleAttemptId?: string,
-    lifecycleCandidateCancellation = false,
+    options: Pick<FlowExecutionOptions, 'lifecycleAttemptId' | 'lifecycleCandidateCancellation' | 'actorUserId'>,
   ): Promise<void> {
     try {
-      await this.flowExecutorService.runFlow(
-        resourceId,
-        triggerNodeType,
-        payload,
-        manager,
-        lifecycleCandidateCancellation
-          ? { lifecycleAttemptId, lifecycleCandidateCancellation: true }
-          : { lifecycleAttemptId },
-      );
+      await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, manager, options);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);

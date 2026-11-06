@@ -2,6 +2,8 @@ import { Resource } from '@attraccess/database-entities';
 import { MeteringRunContext } from '../node-executors';
 
 export interface FlowExecutionOptions {
+  /** The user whose action started this run (start, stop, takeover, button press); none for MQTT, webhooks etc. */
+  actorUserId?: number;
   lifecycleAttemptId?: string;
   lifecycleCandidateCancellation?: boolean;
   metering?: MeteringRunContext;

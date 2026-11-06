@@ -4,7 +4,7 @@ import { ResourceUsageService } from '../../usage/sessions/resource-usage.servic
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
-import { resolveTriggeringUsage, triggeringUsageId, triggeringUserIdFromPayload } from './triggering-usage';
+import { resolveTriggeringUsage } from './triggering-usage';
 
 export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
@@ -20,7 +20,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
 
     if (target === 'user' || target === 'all') {
       const sessionTarget = this.resolveTarget(target, userId, input, ctx);
-      const triggeredByUserId = await this.triggeringUserId(node.resourceId, input, ctx);
+      // Attributed to the user whose action started this run, never to the payload, which nodes can replace.
       // Inside a start or stop, other sessions end once that start or stop has finished, never from within it.
       if (ctx.lifecycleAttemptId) {
         await this.resourceUsageService.deferSessionEnds(
@@ -29,7 +29,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
           sessionTarget,
           finalNotes,
           ctx.transactionManager,
-          triggeredByUserId,
+          ctx.actorUserId,
         );
       } else {
         await this.resourceUsageService.endSessionsOfTarget(
@@ -37,7 +37,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
           sessionTarget,
           finalNotes,
           ctx.transactionManager,
-          triggeredByUserId,
+          ctx.actorUserId,
         );
       }
       return { payload: input };
@@ -46,7 +46,12 @@ export class EndUsageSessionExecutor implements NodeExecutor {
     if (ctx.lifecycleAttemptId) {
       // The stopped flow may include an end-session node; it has already claimed the candidate.
       if (ctx.lifecycleCandidateCancellation) return { payload: input };
-      await this.resourceUsageService.endLifecycleCandidate(ctx.lifecycleAttemptId, node.resourceId, finalNotes);
+      await this.resourceUsageService.endLifecycleCandidate(
+        ctx.lifecycleAttemptId,
+        node.resourceId,
+        finalNotes,
+        ctx.actorUserId,
+      );
       return { payload: input };
     }
 
@@ -74,20 +79,12 @@ export class EndUsageSessionExecutor implements NodeExecutor {
         skipFormSubmissions: true,
         skipNoteNotification: true,
         auditOrigin: { actorId: null },
+        // Its stop flow runs on behalf of the user who caused this run.
+        triggeredByUserId: ctx.actorUserId,
       },
     );
 
     return { payload: input };
-  }
-
-  /** Payload user first; button presses name only the pressing session, whose owner is the triggering user. */
-  private async triggeringUserId(resourceId: number, input: object, ctx: NodeExecutionContext) {
-    const fromPayload = triggeringUserIdFromPayload(input);
-    if (fromPayload !== undefined) return fromPayload;
-    const usageId = triggeringUsageId(input);
-    if (usageId === undefined) return undefined;
-    const sessions = await this.resourceUsageService.getActiveSessionsForResource(resourceId, ctx.transactionManager);
-    return sessions.find(({ id }) => id === usageId)?.userId ?? undefined;
   }
 
   private resolveTarget(

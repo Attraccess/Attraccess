@@ -8,10 +8,17 @@ import {
 } from '@attraccess/database-entities';
 import { rm } from 'node:fs/promises';
 import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
+import { EndUsageSessionExecutor } from '../../flows/node-executors/end-usage-session.executor';
+import { NodeExecutionContext } from '../../flows/node-executors/node-executor.interface';
 import { MachineBusyError } from '../errors/machine-busy.error';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
-import { LOCK_TTL_MS, SessionChangeCoordination } from '../sessions/session-change-coordination';
+import { FakeValkey } from '../sessions/fake-valkey.test-fixture';
+import {
+  SessionChangeCoordination,
+  SWEEP_EVERY_MS,
+  ValkeySessionChangeCoordination,
+} from '../sessions/session-change-coordination';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';
 
@@ -127,25 +134,57 @@ describe('Shared machines: restart, waiting and audit', () => {
     const otherInstance = (alive: boolean): SessionChangeCoordination => ({
       acquire: async () => async () => undefined,
       keepAlive: () => () => undefined,
-      isAlive: async () => alive,
+      findGone: async (ids) => new Set(alive ? [] : ids),
     });
+    /** This API instance with Valkey; `host` names the instance (host and port), each call is a new boot. */
+    const bootOnValkey = (valkey: FakeValkey, host: string, bootWaitMs = 0) =>
+      Reflect.set(
+        scope.usage,
+        'sessionChangeCoordinationInstance',
+        new ValkeySessionChangeCoordination(valkey as never, host, bootWaitMs),
+      );
 
     it('does not abort a start another instance is still working on when this one boots', async () => {
       await setLimit(3);
+      const valkey = new FakeValkey();
+      bootOnValkey(valkey, 'host-a:3000');
       const parked = parkFlows();
       const start = scope.usage.startSession(1, scope.users[0], {});
       await parked.entered;
       const [attempt] = await attempts();
 
-      // A second instance boots; the heartbeat of the first one is visible in Valkey.
-      Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', otherInstance(true));
+      // A second instance (another host) boots; the first one's heartbeat is visible in Valkey.
+      const first = Reflect.get(scope.usage, 'sessionChangeCoordinationInstance');
+      bootOnValkey(valkey, 'host-b:3000');
       await scope.usage.recoverInterruptedLifecycles();
       expect((await attempts()).map((a) => a.id)).toEqual([attempt.id]);
 
+      Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', first);
       parked.release();
       await expect(start).resolves.toMatchObject({ userId: 1 });
       expect(await sessionOwners()).toEqual([1]);
     });
+
+    it.each([1, 3])(
+      'cleans up its own cut-off start at limit %i when Valkey stays unreachable at boot, after waiting for it',
+      async (limit) => {
+        await setLimit(limit);
+        const parked = parkFlows();
+        const start = scope.usage.startSession(1, scope.users[0], {});
+        start.catch(() => undefined);
+        await parked.entered;
+        restartApi();
+        const valkey = new FakeValkey();
+        valkey.failing = true;
+        bootOnValkey(valkey, 'host-a:3000', 50);
+        await scope.usage.recoverInterruptedLifecycles();
+        expect(await attempts()).toHaveLength(0);
+        valkey.failing = false;
+        await expect(scope.usage.startSession(1, scope.users[0], {})).resolves.toMatchObject({ userId: 1 });
+        parked.release();
+        await expect(start).rejects.toBeInstanceOf(SessionChangeInterruptedError);
+      },
+    );
 
     it('cleans up an attempt whose instance is gone', async () => {
       await setLimit(3);
@@ -160,6 +199,29 @@ describe('Shared machines: restart, waiting and audit', () => {
       await expect(start).rejects.toBeInstanceOf(SessionChangeInterruptedError);
     });
 
+    it.each([1, 3])(
+      'cleans up its own cut-off start at once when it restarts quickly at limit %i, although the heartbeat lives on',
+      async (limit) => {
+        await setLimit(limit);
+        const valkey = new FakeValkey();
+        bootOnValkey(valkey, 'host-a:3000');
+        const parked = parkFlows();
+        const start = scope.usage.startSession(1, scope.users[0], {});
+        start.catch(() => undefined);
+        await parked.entered;
+        expect(valkey.data.size).toBeGreaterThan(0);
+
+        restartApi();
+        bootOnValkey(valkey, 'host-a:3000');
+        await scope.usage.recoverInterruptedLifecycles();
+        expect(await attempts()).toHaveLength(0);
+        // No 409 and no "you already have a session": the retry works right away.
+        await expect(scope.usage.startSession(1, scope.users[0], {})).resolves.toMatchObject({ userId: 1 });
+        parked.release();
+        await expect(start).rejects.toBeInstanceOf(SessionChangeInterruptedError);
+      },
+    );
+
     describe('sweeping attempts whose instance died without a restart cleaning them up', () => {
       const ageAttempts = (seconds: number) =>
         scope.source
@@ -169,19 +231,28 @@ describe('Shared machines: restart, waiting and audit', () => {
           .set({ createdAt: new Date(Date.now() - seconds * 1000) })
           .execute();
 
-      /** A start cut off when its API process died: the attempt and its tentative session stay in the database. */
-      const cutOffStart = async () => {
+      /** A start cut off when its API process (host-a) died: the attempt and its tentative session stay. */
+      const cutOffStart = async (valkey = new FakeValkey()) => {
         await setLimit(3);
+        bootOnValkey(valkey, 'host-a:3000');
+        const timers = jest.spyOn(global, 'setInterval');
         const parked = parkFlows();
         const start = scope.usage.startSession(1, scope.users[0], {});
         start.catch(() => undefined);
         await parked.entered;
-        return { parked, start };
+        const hostATimers = timers.mock.results.map(({ value }) => value as NodeJS.Timeout);
+        timers.mockRestore();
+        /** host-a dies: it renews nothing any more and its machine lock expires (its heartbeat lives a bit longer). */
+        const crash = () => {
+          hostATimers.forEach((timer) => clearInterval(timer));
+          valkey.data.delete('attraccess:session-change:lock:1');
+        };
+        return { parked, start, valkey, crash };
       };
 
-      it('is scheduled only when Valkey ties several instances to the same machines', async () => {
+      it('is scheduled only when Valkey ties several instances to the same machines, never overlapping itself', async () => {
         const interval = jest.spyOn(global, 'setInterval');
-        const sweeps = () => interval.mock.calls.filter(([, ms]) => ms === LOCK_TTL_MS);
+        const sweeps = () => interval.mock.calls.filter(([, ms]) => ms === SWEEP_EVERY_MS);
         try {
           await scope.usage.onModuleInit();
           expect(sweeps()).toHaveLength(0);
@@ -192,6 +263,20 @@ describe('Shared machines: restart, waiting and audit', () => {
           });
           await scope.usage.onModuleInit();
           expect(sweeps()).toHaveLength(1);
+          let finish!: () => void;
+          const sweep = jest
+            .spyOn(scope.usage, 'recoverInterruptedLifecycles')
+            .mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+          const [tick] = sweeps()[0] as unknown as [() => void];
+          tick();
+          tick();
+          expect(sweep).toHaveBeenCalledTimes(1);
+          expect(sweep).toHaveBeenCalledWith(true);
+          finish();
+          await new Promise((resolve) => setImmediate(resolve));
+          tick();
+          expect(sweep).toHaveBeenCalledTimes(2);
+          finish();
           scope.usage.onModuleDestroy();
           expect(Reflect.get(scope.usage, 'lifecycleSweepInterval')).toBeNull();
         } finally {
@@ -200,18 +285,26 @@ describe('Shared machines: restart, waiting and audit', () => {
         }
       });
 
-      it('removes it once its heartbeat has expired, so the user can start again', async () => {
-        const { parked, start } = await cutOffStart();
-        // The process restarted within the heartbeat's time to live: boot recovery still sees a heartbeat.
+      it('removes it once its heartbeat has stayed missing over two sweeps, so the user can start again', async () => {
+        const { parked, start, valkey, crash } = await cutOffStart();
+        crash();
+        // host-b (its own process and queue) keeps running; its boot saw the heartbeat that has not expired yet.
         restartApi();
-        Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', otherInstance(true));
+        bootOnValkey(valkey, 'host-b:3000');
         await scope.usage.recoverInterruptedLifecycles();
         expect(await attempts()).toHaveLength(1);
-        await expect(scope.usage.startSession(1, scope.users[0], {})).rejects.toThrow();
+        // Meanwhile the user sees "machine busy, try again", not "end your session first".
+        await expect(scope.usage.startSession(1, scope.users[0], {})).rejects.toBeInstanceOf(MachineBusyError);
 
         await ageAttempts(60);
-        Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', otherInstance(false));
+        valkey.data.clear(); // the heartbeat expired
         await scope.usage.recoverInterruptedLifecycles(true);
+        expect(await attempts()).toHaveLength(1);
+        // The next sweep, 7.5 s later: the heartbeat has stayed missing past a renewal.
+        const later = Date.now() + SWEEP_EVERY_MS;
+        jest.spyOn(Date, 'now').mockReturnValue(later);
+        await scope.usage.recoverInterruptedLifecycles(true);
+        jest.mocked(Date.now).mockRestore();
         expect(await attempts()).toHaveLength(0);
         expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(0);
         await expect(scope.usage.startSession(1, scope.users[0], {})).resolves.toMatchObject({ userId: 1 });
@@ -220,23 +313,25 @@ describe('Shared machines: restart, waiting and audit', () => {
       });
 
       it('leaves an attempt alone while it is younger than the heartbeat lives, even without a heartbeat yet', async () => {
-        const { parked, start } = await cutOffStart();
-        Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', otherInstance(false));
+        const { parked, start, valkey } = await cutOffStart();
+        bootOnValkey(valkey, 'host-b:3000');
+        valkey.data.clear();
+        await scope.usage.recoverInterruptedLifecycles(true);
         await scope.usage.recoverInterruptedLifecycles(true);
         expect(await attempts()).toHaveLength(1);
         parked.release();
-        await expect(start).resolves.toMatchObject({ userId: 1 });
+        await start.catch(() => undefined);
       });
 
       it('leaves an attempt alone when the heartbeat cannot be looked up', async () => {
-        const { parked, start } = await cutOffStart();
+        const { parked, start, valkey } = await cutOffStart();
+        bootOnValkey(valkey, 'host-b:3000');
         await ageAttempts(60);
-        Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', {
-          ...otherInstance(false),
-          isAlive: async (_id: string, ifUnknown = false) => ifUnknown,
-        });
+        valkey.failing = true;
+        await scope.usage.recoverInterruptedLifecycles(true);
         await scope.usage.recoverInterruptedLifecycles(true);
         expect(await attempts()).toHaveLength(1);
+        valkey.failing = false;
         parked.release();
         await start.catch(() => undefined);
       });
@@ -245,9 +340,68 @@ describe('Shared machines: restart, waiting and audit', () => {
         const { parked, start } = await cutOffStart();
         await ageAttempts(60);
         await scope.usage.recoverInterruptedLifecycles(true);
+        await scope.usage.recoverInterruptedLifecycles(true);
         expect(await attempts()).toHaveLength(1);
         parked.release();
         await expect(start).resolves.toMatchObject({ userId: 1 });
+      });
+    });
+
+    describe('two instances sharing the database and Valkey', () => {
+      /** A second API process: same database, its own queue, both coordinated through one Valkey. */
+      const twoInstances = () => {
+        const valkey = new FakeValkey();
+        bootOnValkey(valkey, 'host-a:3000');
+        const instanceB = Object.create(scope.usage) as typeof scope.usage;
+        Reflect.set(
+          instanceB,
+          'sessionChangeQueue',
+          new (Reflect.get(scope.usage, 'sessionChangeQueue').constructor)(),
+        );
+        Reflect.set(
+          instanceB,
+          'sessionChangeCoordinationInstance',
+          new ValkeySessionChangeCoordination(valkey as never, 'host-b:3000'),
+        );
+        return { a: scope.usage, b: instanceB };
+      };
+
+      it('gives exactly one first start when both start at once', async () => {
+        await setLimit(3);
+        const [second] = await addUsers(1);
+        const { a, b } = twoInstances();
+        const parked = parkFlows();
+        const first = a.startSession(1, scope.users[0], {});
+        await parked.entered;
+        const other = b.startSession(1, second, {});
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        // B waits for A's turn although it runs in another process.
+        expect(scope.flow.runFlow).toHaveBeenCalledTimes(1);
+        parked.release();
+        await Promise.all([first, other]);
+        expect(payloads(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED)).toEqual([
+          { before: 0, after: 1, limit: 3 },
+          { before: 1, after: 2, limit: 3 },
+        ]);
+      });
+
+      it('gives exactly one last stop when both stop at once', async () => {
+        await setLimit(3);
+        const [second] = await addUsers(1);
+        const { a, b } = twoInstances();
+        await a.startSession(1, scope.users[0], {});
+        await b.startSession(1, second, {});
+        const parked = parkFlows();
+        const first = a.endSession(1, scope.users[0], {});
+        await parked.entered;
+        const other = b.endSession(1, second, {});
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        parked.release();
+        await Promise.all([first, other]);
+        expect(payloads(ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED)).toEqual([
+          { before: 2, after: 1, limit: 3 },
+          { before: 1, after: 0, limit: 3 },
+        ]);
       });
     });
 
@@ -328,7 +482,9 @@ describe('Shared machines: restart, waiting and audit', () => {
       await parked.entered;
       const [second] = await addUsers(1);
       const startedAt = Date.now();
-      await expect(scope.usage.startSession(1, second, {})).rejects.toThrow();
+      await expect(scope.usage.startSession(1, second, {})).rejects.toThrow(
+        'A usage lifecycle operation is already in progress',
+      );
       expect(Date.now() - startedAt).toBeLessThan(2000);
       parked.release();
       await first;
@@ -414,6 +570,46 @@ describe('Shared machines: restart, waiting and audit', () => {
           details: expect.objectContaining({ usageUserId: other.id, triggeredByUserId: 1 }),
         }),
       ]);
+    });
+
+    /** Stop flows that end other sessions, run by the real end-session node with the options the API passes. */
+    const stopFlowsEnding = (targets: Map<number, { target: 'all' } | { target: 'user'; userId: string }>) => {
+      const executor = new EndUsageSessionExecutor(scope.usage);
+      scope.flow.runFlow.mockImplementation(async (resourceId, type, payload, _manager, options) => {
+        const data = targets.get((payload as { user: { id: number } }).user.id);
+        if (type !== ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED || !data) return [];
+        const ctx = { ...options, compileTemplate: (template: string) => template } as NodeExecutionContext;
+        const node = { id: 'end', type: ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION, resourceId, data };
+        await executor.execute(node as never, payload as object, ctx);
+        return [];
+      });
+    };
+    const triggeredBy = () =>
+      Object.fromEntries(auditCalls().map(({ details }) => [details.usageUserId, details.triggeredByUserId]));
+
+    it('records the manager who stopped a session, not its owner, for the sessions its stop flow ends', async () => {
+      await setLimit(4);
+      const [manager, owner, ...others] = await addUsers(4);
+      for (const user of [owner, ...others]) await scope.usage.startSession(1, user, {});
+      stopFlowsEnding(new Map([[owner.id, { target: 'all' }]]));
+      const ownersSession = (await scope.usage.getActiveSessionsForResource(1)).find((s) => s.userId === owner.id);
+      await scope.usage.endSession(1, manager, { usageId: ownersSession?.id });
+      expect(await sessionOwners()).toEqual([]);
+      expect(triggeredBy()).toEqual({ [owner.id]: undefined, [others[0].id]: manager.id, [others[1].id]: manager.id });
+    });
+
+    it('records the user who started a chain of flow ends for every session in it', async () => {
+      await setLimit(4);
+      const [starter, first, second, third] = await addUsers(4);
+      for (const user of [first, second, third]) await scope.usage.startSession(1, user, {});
+      stopFlowsEnding(
+        new Map([
+          [first.id, { target: 'user', userId: String(second.id) }],
+          [second.id, { target: 'user', userId: String(third.id) }],
+        ]),
+      );
+      await scope.usage.endSession(1, starter, { usageId: (await scope.usage.getActiveSessionsForResource(1))[0].id });
+      expect(triggeredBy()).toEqual({ [first.id]: undefined, [second.id]: starter.id, [third.id]: starter.id });
     });
 
     it('leaves ordinary ends without it', async () => {

@@ -74,7 +74,8 @@ export class SessionChangeQueue {
     try {
       return await task();
     } finally {
-      await releaseMachine?.();
+      // Sent before the next local change asks for the lock; the answer is not awaited (the lock also expires).
+      void releaseMachine?.();
       release();
       this.cleanup(resourceId, tail);
     }

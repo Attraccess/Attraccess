@@ -36,6 +36,7 @@ import { ResourceFullError } from '../errors/resource-full.error';
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
+import { MachineBusyError } from '../errors/machine-busy.error';
 
 import { activeUsageWhere, countOccupiedSlots, pickSessionToEnd } from './active-usage';
 
@@ -94,7 +95,8 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
             where: { previousUsageId: activeSession.id },
           }))
         ) {
-          throw new ConflictException('This session is already being ended');
+          // Changes of this machine take turns, so this is a stop cut off by a crash that is not cleaned up yet.
+          throw new MachineBusyError();
         }
 
         // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
@@ -170,7 +172,8 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
           activeSessions: activeSessionCounts,
         },
         'end',
-        attemptId,
+        // The requester stops it (maybe someone else's session); a flow end passes on the user who caused it.
+        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.actorId ?? options.triggeredByUserId },
       );
       // Stop effects have run; only now read the final total. Failure leaves energy billing pending, not the stop undone.
       const final: FinalCollection = (await this.metering?.collectFinal(
@@ -281,7 +284,8 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
             }
           : { ...this.getResourceUsageFlowPayload(createdSession, formSubmissions), activeSessions },
         existingActiveSession ? 'takeover' : 'start',
-        attemptId,
+        // The starter, or the supervisor who started it for them.
+        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.actorId ?? user.id },
       );
       newSession = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
         const currentAttempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
@@ -399,7 +403,8 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
         const ownSession = await transactionalEntityManager.findOne(ResourceUsage, {
           where: { resourceId, userId: user.id, usageAction: ResourceUsageAction.Usage, endTime: IsNull() },
         });
-        if (ownSession) throw new AlreadyHasActiveSessionError();
+        // A pending own session within this turn is a start cut off by a crash that is not cleaned up yet.
+        if (ownSession) throw ownSession.lifecyclePending ? new MachineBusyError() : new AlreadyHasActiveSessionError();
         const occupied = await countOccupiedSlots(transactionalEntityManager, resourceId);
         if (occupied >= sessionLimit) throw new ResourceFullError(occupied, sessionLimit);
       } else {

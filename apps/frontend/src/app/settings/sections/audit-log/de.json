@@ -279,7 +279,7 @@
     "requestId": "Anfrage-ID",
     "usageId": "Nutzungs-ID",
     "usageUserId": "Nutzende Benutzer-ID",
-    "triggeredByUserId": "Ausgelöst von Benutzer-ID",
+    "triggeredByUserId": "Auslösende Benutzer-ID",
     "waivedCredits": "Erlassene Credits",
     "previousStatus": "Vorheriger Zustand",
     "status": "Zustand",

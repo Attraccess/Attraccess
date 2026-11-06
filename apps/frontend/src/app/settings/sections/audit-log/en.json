@@ -279,7 +279,7 @@
     "requestId": "Request ID",
     "usageId": "Usage ID",
     "usageUserId": "Using user ID",
-    "triggeredByUserId": "Triggered by user ID",
+    "triggeredByUserId": "Triggering user ID",
     "waivedCredits": "Waived credits",
     "previousStatus": "Previous status",
     "status": "Status",

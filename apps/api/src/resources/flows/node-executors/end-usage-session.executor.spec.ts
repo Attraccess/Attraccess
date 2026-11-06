@@ -86,9 +86,23 @@ describe('EndUsageSessionExecutor', () => {
       payload: { source: 'start' },
     });
 
-    expect(resourceUsageService.endLifecycleCandidate).toHaveBeenCalledWith('attempt-id', 42, 'Stopped by {{source}}');
+    expect(resourceUsageService.endLifecycleCandidate).toHaveBeenCalledWith(
+      'attempt-id',
+      42,
+      'Stopped by {{source}}',
+      undefined,
+    );
     expect(resourceUsageService.getActiveSessionsForResource).not.toHaveBeenCalled();
     expect(resourceUsageService.endSession).not.toHaveBeenCalled();
+  });
+
+  it('runs the stopped flow of a cancelled start on behalf of its starter', async () => {
+    ctx.lifecycleAttemptId = 'attempt-id';
+    ctx.actorUserId = 8;
+
+    await executor.execute(createNode({ resourceId: 42 }), { user: { id: 3 } }, ctx);
+
+    expect(resourceUsageService.endLifecycleCandidate).toHaveBeenCalledWith('attempt-id', 42, '', 8);
   });
 
   it('does not recursively cancel the candidate from its stopped flow', async () => {
@@ -229,7 +243,7 @@ describe('EndUsageSessionExecutor', () => {
         { kind: 'user', userId: 7 },
         '',
         undefined,
-        7,
+        undefined,
       );
     });
 
@@ -255,33 +269,40 @@ describe('EndUsageSessionExecutor', () => {
       expect(resourceUsageService.endLifecycleCandidate).not.toHaveBeenCalled();
     });
 
+    it('records the user who started the run with the ends', async () => {
+      ctx.actorUserId = 5;
+      const node = createNode({ data: { target: 'all' } as never });
+      await executor.execute(node, {}, ctx);
+      expect(resourceUsageService.endSessionsOfTarget).toHaveBeenCalledWith(1, { kind: 'all' }, '', undefined, 5);
+    });
+
     it.each([
-      ['a start or stop', { user: { id: 5 } }, 5],
-      ['a takeover', { user: { id: 5 }, newUser: { id: 9 } }, 9],
-    ])('records the user who triggered %s with the ends', async (_name, payload, expected) => {
+      ['a session owner', { user: { id: 5 } }],
+      ['a takeover user', { user: { id: 5 }, newUser: { id: 9 } }],
+      ['a session', { usageId: 31 }],
+    ])('never takes the recorded user from %s in the payload', async (_name, payload) => {
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ id: 31, userId: 12 }] as never);
       const node = createNode({ data: { target: 'all' } as never });
       await executor.execute(node, payload, ctx);
-      expect(resourceUsageService.endSessionsOfTarget).toHaveBeenCalledWith(
+      ctx.actorUserId = 3;
+      await executor.execute(node, payload, ctx);
+      expect(resourceUsageService.endSessionsOfTarget).toHaveBeenNthCalledWith(
+        1,
         1,
         { kind: 'all' },
         '',
         undefined,
-        expected,
+        undefined,
       );
+      expect(resourceUsageService.endSessionsOfTarget).toHaveBeenNthCalledWith(2, 1, { kind: 'all' }, '', undefined, 3);
     });
 
-    it('records the owner of the pressing session when a button triggered the flow', async () => {
-      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ id: 31, userId: 12 }] as never);
-      const node = createNode({ data: { target: 'all' } as never });
-      await executor.execute(node, { usageId: 31 }, ctx);
-      expect(resourceUsageService.endSessionsOfTarget).toHaveBeenCalledWith(1, { kind: 'all' }, '', undefined, 12);
-    });
-
-    it('passes the triggering user along when ends are deferred out of a start or stop', async () => {
+    it('passes the acting user along when ends are deferred out of a start or stop', async () => {
       ctx.lifecycleAttemptId = 'attempt-id';
+      ctx.actorUserId = 5;
       const node = createNode({ data: { target: 'user', userId: '4' } as never });
       compileTemplate.mockReturnValue('4');
-      await executor.execute(node, { user: { id: 5 } }, ctx);
+      await executor.execute(node, { user: { id: 9 }, newUser: { id: 10 } }, ctx);
       expect(resourceUsageService.deferSessionEnds).toHaveBeenCalledWith(
         'attempt-id',
         1,
@@ -303,6 +324,18 @@ describe('EndUsageSessionExecutor', () => {
         expect.anything(),
       );
       expect(resourceUsageService.endSessionsOfTarget).not.toHaveBeenCalled();
+    });
+
+    it('lets the stop flow of the ended triggering session run on behalf of the acting user', async () => {
+      ctx.actorUserId = 12;
+      resourceUsageService.getActiveSessionsForResource.mockResolvedValue([{ id: 3, user: { id: 7 } }] as never);
+      await executor.execute(createNode({ data: { notes: '' } as never }), { usageId: 3 }, ctx);
+      expect(resourceUsageService.endSession).toHaveBeenCalledWith(
+        1,
+        { id: 7 },
+        { notes: '', usageId: 3 },
+        expect.objectContaining({ auditOrigin: { actorId: null }, triggeredByUserId: 12 }),
+      );
     });
   });
 

@@ -12,16 +12,6 @@ export function triggeringUsageId(input: object): number | undefined {
   return isUsageId(record.id) ? record.id : undefined;
 }
 
-/** The user whose action triggered a flow run: the new owner of a takeover, else the session owner (`user`). */
-export function triggeringUserIdFromPayload(input: object): number | undefined {
-  const idOf = (value: unknown) => {
-    const id = (value as { id?: unknown } | null | undefined)?.id;
-    return typeof id === 'number' && Number.isSafeInteger(id) && id > 0 ? id : undefined;
-  };
-  const record = input as { newUser?: unknown; user?: unknown };
-  return idOf(record.newUser) ?? idOf(record.user);
-}
-
 export interface TriggeringUsage {
   /** The usage id named by the payload, whether or not it is still active. */
   triggeringId: number | undefined;

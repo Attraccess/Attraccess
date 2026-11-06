@@ -485,6 +485,13 @@ export class AttractapSessionHandler {
         void this.startGate.afterStop(socket, { resourceId, userId: user.id, sessionId: usage.id });
       }
     } catch (error) {
+      if (error instanceof MachineBusyError || error instanceof SessionChangeInterruptedError) {
+        // Retryable: the reader shows its error, and the refreshed row shows whether the session still runs.
+        this.logger.warn(`Stopping a session on resource ${resourceId} was refused: ${error.message}`);
+        await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message });
+        await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
+        return;
+      }
       this.logger.error(`Failed to stop resource usage session: ${error.message}`);
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message });
     }

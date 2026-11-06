@@ -16,6 +16,7 @@ import { PreStartService } from '../pre-start/pre-start.service';
 import { SESSION_CHANGE_WAIT_MS, SessionChangeQueue } from './session-change-queue';
 import {
   CARD_SESSION_GRACE_MS,
+  CARD_SESSION_MAX_HOLD_MS,
   UNLOCKED_TIMEOUT_MS,
 } from '../../../attractap/websockets/handlers/ui/card-session.service';
 
@@ -42,7 +43,10 @@ describe('waiting for a shared machine over the web API', () => {
     const holder = new Promise<void>((resolve) => (releaseHolder = resolve));
     void queue.run(5, () => holder);
     // The web path waits the same way a real service does, here with a short limit instead of 30 s.
-    const waitForMachine = () => queue.run(5, async () => ({ id: 1, userId: 7 }), 100);
+    const waitForMachine = (resourceId: number) =>
+      resourceId === 6
+        ? Promise.reject(new SessionChangeInterruptedError())
+        : queue.run(5, async () => ({ id: 1, userId: 7 }), 100);
     const moduleRef = await Test.createTestingModule({
       controllers: [ResourceUsageController],
       providers: [
@@ -77,11 +81,13 @@ describe('waiting for a shared machine over the web API', () => {
     expect(Date.now() - startedAt).toBeGreaterThanOrEqual(90);
   });
 
-  it('answers a start interrupted by a restart with the same kind of retryable 503', () => {
-    const error = new SessionChangeInterruptedError();
-    expect(error.getStatus()).toBe(503);
-    expect(error.getResponse()).toMatchObject({ message: 'SessionChangeInterruptedError' });
-    expect(new MachineBusyError().getStatus()).toBe(503);
+  it.each([
+    ['start', 'post', 'start'],
+    ['stop', 'put', 'end'],
+  ] as const)('answers a %s interrupted by a restart with a retryable 503 as well', async (_name, method, path) => {
+    const response = await request(app.getHttpServer())[method](`/resources/6/usage/${path}`).send({});
+    expect(response.status).toBe(503);
+    expect(response.body).toMatchObject({ message: 'SessionChangeInterruptedError', statusCode: 503 });
   });
 });
 
@@ -115,6 +121,12 @@ describe('the 30 s wait for a shared machine', () => {
  */
 describe('client and transport timeouts versus the 30 s wait', () => {
   const root = join(__dirname, '../../../../../..');
+  const readerActionWatchdogMs = () => {
+    const source = readFileSync(join(root, 'apps/attractap/firmware/src/application/application_state.cpp'), 'utf8');
+    const match = /now - this->pendingUiStartedAt > (\d+)/.exec(source);
+    expect(match).not.toBeNull();
+    return Number(match?.[1]);
+  };
 
   it('lets Node keep HTTP requests open longer than the wait', () => {
     const server = createServer();
@@ -128,10 +140,15 @@ describe('client and transport timeouts versus the 30 s wait', () => {
     expect(bootstrap).not.toMatch(/requestTimeout|headersTimeout|server\.setTimeout|\.timeout\s*=/);
   });
 
-  it('keeps the reader signed in on the server for longer than a start can wait and run', () => {
-    // Held while a start/stop is in flight (CardSessionService.hold); without a hold the lifetime is this long.
-    expect(UNLOCKED_TIMEOUT_MS).toBe(30_000);
-    expect(CARD_SESSION_GRACE_MS).toBeGreaterThan(0);
+  it('keeps the reader signed in on the server while a start waits and runs, at least as long as the reader waits', () => {
+    // Without a hold a card session lives this long; a start or stop in flight holds it (CardSessionService.hold).
+    expect(UNLOCKED_TIMEOUT_MS + CARD_SESSION_GRACE_MS).toBeGreaterThan(SESSION_CHANGE_WAIT_MS);
+    expect(CARD_SESSION_MAX_HOLD_MS).toBeGreaterThanOrEqual(readerActionWatchdogMs());
+  });
+
+  it('lets the reader wait for a start or stop longer than the server waits for the machine', () => {
+    // The reader gives up on an unconfirmed action after this long ("Action not confirmed").
+    expect(readerActionWatchdogMs()).toBeGreaterThan(SESSION_CHANGE_WAIT_MS);
   });
 
   it('keeps the reader socket alive while it waits: probes arrive well within the liveness timeout', () => {
