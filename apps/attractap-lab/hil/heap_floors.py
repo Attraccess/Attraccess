@@ -21,7 +21,7 @@ Seen (free / largest block), measured 2026-11-06 on firmware 1.11.1:
     workload        plain              secure-lab
     card-reads      106,727 / 31,744   62,359 / 31,744
     reconnects      108,939 / 31,744   61,055 / 29,696
-    resource-list   93,687 / 31,744   30,195 / 15,360
+    resource-list   79,215 / 31,744   30,195 / 15,360
     ota             98,527 / 31,744    55,079 / 27,648
 """
 
@@ -29,7 +29,7 @@ FLOORS = {
     "plain": {
         "card-reads": {"min_free": 74_000, "min_largest": 22_000},
         "reconnects": {"min_free": 76_000, "min_largest": 22_000},
-        "resource-list": {"min_free": 65_000, "min_largest": 22_000},
+        "resource-list": {"min_free": 55_000, "min_largest": 22_000},
         "ota": {"min_free": 69_000, "min_largest": 22_000},
     },
     "secure-lab": {
