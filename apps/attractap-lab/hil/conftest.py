@@ -18,7 +18,7 @@ import urllib.error
 
 import pytest
 
-from attractap_lab import efuse
+from attractap_lab import efuse, ota_images
 from attractap_lab.drivers import (
     ESPToolDriver, NfcEmulatorDriver, NfcEmulatorFlashDriver, ScreenCaptureDriver,
 )
@@ -166,14 +166,35 @@ def write_secure_image(target):
         target.deactivate(flash)
 
 
-def record_heap(console, artifacts, label):
-    """Append the reader's internal heap (system.heap.get test hook) to reader-heap.jsonl."""
+def read_heap(console, reset=False):
+    """The reader's internal heap (system.heap.get/reset test hook); ``reset`` also restarts its high-water window."""
+    topic = "system.heap.reset" if reset else "system.heap.get"
+    return ReaderTestHooks(console.stream(), PIN).command(topic, timeout=15)
+
+
+def record_heap(console, artifacts, label, reset=False):
+    """Append the reader's internal heap to reader-heap.jsonl and return it (None if unreadable)."""
     try:
-        heap = ReaderTestHooks(console.stream(), PIN).command("system.heap.get")
+        heap = read_heap(console, reset)
     except Exception as error:  # diagnostics only: never fail a run over it
         heap = {"error": str(error)}
     with (artifacts / "reader-heap.jsonl").open("a") as log:
         log.write(json.dumps({"label": label, "profile": PROFILE, **heap}) + "\n")
+    return heap if "error" not in heap else None
+
+
+def reboot_reader(target, reader):
+    """Hardware-reset the reader and reopen its console (the capture thread keeps the log)."""
+    flash = target.get_driver(ESPToolDriver, activate=False)
+    driver = target.get_driver("SerialDriver", activate=False)
+    console = reader["console"]
+    console.stop()
+    target.deactivate(driver)
+    target.activate(flash)
+    flash.reset()
+    target.deactivate(flash)
+    open_console(target, driver)
+    console.start()
 
 
 @pytest.fixture(scope="session")
@@ -294,3 +315,24 @@ def laser(api, admin, reader, resource, users):
 def state():
     """Results later tests build on, e.g. enrolled card ids."""
     return {}
+
+
+@pytest.fixture(scope="session")
+def ota(reader, api, admin):
+    """The firmware update test bench: images the API can offer the reader, and the versions involved.
+
+    Skips when the run has no second image (run.sh builds it with another version string).
+    """
+    image = os.environ.get("READER_OTA_IMAGE")
+    directory = os.environ.get("OTA_ASSETS_DIR")
+    if not image or not directory:
+        pytest.skip("run.sh built no update image (NO_OTA_BUILD, or a prebuilt READER_IMAGE without READER_OTA_IMAGE)")
+    status, record = api.call("GET", f"/attractap/readers/{reader['id']}", token=admin)
+    assert status == 200, record
+    firmware = record["firmware"]
+    base = os.environ["READER_BASE_VERSION"]
+    assert firmware["version"] == base, f"reader reports {firmware['version']}, built as {base}"
+    definition = ota_images.firmware_definition(firmware["name"], firmware["variant"], os.environ["READER_OTA_VERSION"])
+    yield {"directory": directory, "image": image, "definition": definition, "base": base,
+           "version": os.environ["READER_OTA_VERSION"], "secure": PROFILE == efuse.SECURE_LAB}
+    ota_images.offer(directory)  # nothing on offer for any later test

@@ -326,12 +326,75 @@ release; on a place without one, run the suite again. A branch that raises
 `CONFIG_BOOTLOADER_APP_SECURE_VERSION` burns the new version into the reader
 (anti-rollback), so lab images from older branches stop booting on it.
 
+### Updates over Wi-Fi, RAM stress and the QA runs
+
+One command per profile; each saves its artifacts in
+`apps/attractap-lab/hil-artifacts/lab-artifacts/<session>/`:
+
+```sh
+. .tools/esp-idf/export.sh
+pnpm nx run attractap-lab:hil                              # plain Touch V2, place attractap-touch-v2-1
+READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil    # Secure Boot lab reader, place attractap-touch-v2-secure-1
+pnpm nx run attractap-lab:hil -- -k "ota or ram"           # only the update and RAM tests
+```
+
+A QA run of a firmware change runs the full suite on the secure-lab place and at
+least the update (`test_ota.py`) and RAM (`test_ram.py`) tests on the plain one.
+Off the readers' LAN, add the relay variables from "In CI".
+
+**Update tests (`test_ota.py`).** The API under test offers a lab image through
+the real path (firmware info, `READER_FIRMWARE_UPDATE_REQUIRED`, chunked
+download over the websocket, `esp_ota_*`). `run.sh` builds the reader image
+twice from the same directory, the second time with
+`-DATTRACTAP_VERSION_OVERRIDE=<version>-hilota`, and starts the API with
+`ATTRACTAP_FIRMWARE_ASSETS_DIR` pointing at a scratch directory whose
+`firmwares.json` the tests rewrite (the API re-reads it when it changes; unset in
+deployments). With a prebuilt `READER_IMAGE` the tests skip unless
+`READER_OTA_IMAGE`, `READER_OTA_VERSION` and `READER_BASE_VERSION` are set;
+`NO_OTA_BUILD=1` skips the second build.
+
+- Rejected images: a wrong first byte (refused at the first chunk), a flipped
+  byte in the middle (refused at the end of the download), and on a secure lab
+  reader an unsigned image and one signed with a foreign key. Each time the reader
+  keeps its version, restarts and pairs without a new approval.
+- The good image installs; the reader boots the new version, reports it to the
+  API and stays paired. The test leaves the reader on the new version.
+- During the download the test asks the screen for its widget list every few
+  seconds (it must answer and show the `FirmwareUpdate` screen), takes camera
+  photos (`ota-flash-<seconds>s.png`) and fails on any `LCD underrun` line in the
+  reader's log. `ota-update.json` has the duration, the heap high-water marks,
+  the response times and the photo names.
+- Secure lab images are signed in the test harness with the public lab key
+  (`attractap_lab.ota_images`, espsecure). The API's signer refuses lab keys on
+  purpose and takes no part.
+- Not covered: rollback (the application confirms its image right after boot, so
+  there is nothing to roll back to without a crashing image) and anti-rollback
+  (rejecting a lower `secure_version` needs the SECURE_VERSION eFuse raised
+  first, and the tests never burn eFuses).
+
+**RAM tests (`test_ram.py`).** Each workload resets the reader's heap high-water
+window (`system.heap.reset`), runs, and checks the lowest free internal heap and
+the smallest largest free block (`windowMinFree`, `windowMinLargest`) against
+`hil/heap_floors.py`, plus that the free heap comes back afterwards. Workloads:
+cards the server does not know in a loop (NFC read, API round trip, error
+screen), Wi-Fi reconnects that re-open the websocket and the encrypted session,
+and a resource list of dozens of long names. The OTA download measures the
+same marks in `ota-update.json`. `HIL_RAM_ITERATIONS` scales the loops (default
+20). Results of every run are in `ram-<workload>.json` and `reader-heap.jsonl`.
+
+`test_touch_controller_answers` (`test_hardware.py`) checks that the GT911 answers
+its polling (register reads grow, none fail).
+
 ### In CI
 
 `.github/workflows/attractap-lab-hil.yml` runs these tests from the release
 workflow and on every push to `main`, on every reader type at once: one job
 each for the Touch V2 (`attractap-touch-v2-1`) and the Touch V1
-(`attractap-touch-1`), in parallel. It is off until the repository variable
+(`attractap-touch-1`), in parallel, and, once the repository variable
+`ATTRACTAP_LAB_HIL_SECURE_ENABLED` is `true`, one with `READER_PROFILE=secure-lab`
+on the Secure Boot lab reader (`attractap-touch-v2-secure-1`). The secure job is
+a separate switch because it relays on a third host port (below): enable it after
+the lab host runs with three `readerApiRelay.ports`. It is off until the repository variable
 `ATTRACTAP_LAB_HIL_ENABLED` is `true` (a repository variable, because the job's
 `if:` runs before the `attractap-lab` environment loads); the
 workflow file lists all variables (lab host, coordinator port, Tailscale tags,
@@ -347,10 +410,10 @@ GitHub concurrency group, which would cancel queued runs.
 
 A runner joins the tailnet, but readers only reach the lab's LAN. The runner
 therefore relays its API through the lab host: enable
-`services.attractap-lab.readerApiRelay` (default ports 20480 and 20481), which
+`services.attractap-lab.readerApiRelay` (default ports 20480 to 20482), which
 lets the `labgrid` account open exactly those remote forwards, and allow the
 ports from the readers' LAN in the host firewall. The Touch V2 job relays on
-the first port, the Touch V1 job on the next one. Set
+the first port, the Touch V1 job on the next one, the secure lab job on the third. Set
 `ATTRACTAP_LAB_API_RELAY_HOST` to the lab host's address on that LAN.
 
 ## Reader touchscreen and screenshots
