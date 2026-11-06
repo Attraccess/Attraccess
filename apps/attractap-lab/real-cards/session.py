@@ -460,7 +460,7 @@ def summarize(kit, results):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--emulate", action="store_true", help="the NFC emulator answers instead of real cards")
-    parser.add_argument("--cards", default="EV2,EV3,NTAG424")
+    parser.add_argument("--cards", default=None, help="comma separated: EV2,EV3,NTAG424 (default all; none with --identify)")
     parser.add_argument("--speak", action="store_true", help="also say each prompt aloud (macOS)")
     parser.add_argument("--identify", type=int, default=0, metavar="N",
                         help="only tell what type each of N cards is (GetVersion, nothing is written to the cards)")
@@ -481,11 +481,12 @@ def main():
         kit.provision()
         if args.identify:
             kit.identify(args.identify)
-            kit.console.stop()
-            return
+            if not args.cards:
+                kit.console.stop()
+                return
         interactive_began = time.time()
         results = []
-        for name in args.cards.split(","):
+        for name in (args.cards or "EV2,EV3,NTAG424").split(","):
             try:
                 results.append(kit.run_card(name.strip()))
             except NoCardSeen as error:
