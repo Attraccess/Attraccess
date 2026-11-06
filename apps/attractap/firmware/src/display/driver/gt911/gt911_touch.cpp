@@ -2,7 +2,20 @@
 
 #ifdef DISPLAY_DRIVER_GT911
 
+#include <atomic>
+
 #include "../../../utils.hpp"
+
+namespace
+{
+    std::atomic<uint32_t> readsOk{0};
+    std::atomic<uint32_t> readsFailed{0};
+}
+
+Gt911Touch::Stats Gt911Touch::stats()
+{
+    return {readsOk.load(), readsFailed.load()};
+}
 
 bool Gt911Touch::probeAt(uint8_t address)
 {
@@ -39,8 +52,10 @@ bool Gt911Touch::readRegs(uint16_t reg, uint8_t *buf, size_t len)
         return false;
     }
     uint8_t regBytes[2] = {(uint8_t)(reg >> 8), (uint8_t)(reg & 0xFF)};
-    return i2c_master_transmit_receive(dev, regBytes, sizeof(regBytes), buf, len,
-                                       ATTRACTAP_I2C_XFER_TIMEOUT_MS) == ESP_OK;
+    const bool ok = i2c_master_transmit_receive(dev, regBytes, sizeof(regBytes), buf, len,
+                                                ATTRACTAP_I2C_XFER_TIMEOUT_MS) == ESP_OK;
+    (ok ? readsOk : readsFailed)++;
+    return ok;
 }
 
 bool Gt911Touch::writeReg8(uint16_t reg, uint8_t value)

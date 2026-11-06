@@ -419,6 +419,22 @@ pixels (480 x 480, origin top left as shown on screen).
 | `ui.touch.release`  | —                                                                                                     | `{"success":true}`                                          |
 | `ui.touch.swipe`    | `x1`, `y1`, `x2`, `y2`, optional `durationMs` (1-10000, default 300)                                  | `{"success":true}`                                          |
 | `ui.screenshot.get` | —                                                                                                     | header, data lines and end line (below)                     |
+| `system.heap.get`   | —                                                                                                     | `{"internalFree","internalLargest","internalMinFree","windowMinFree","windowMinLargest","psramFree"}` |
+| `system.heap.reset` | —                                                                                                     | same as `system.heap.get`, then restarts the `window*` high-water marks |
+| `ui.touch.controller.get` | — (GT911 displays only)                                                                         | `{"reads","failures"}`: GT911 register reads since boot       |
+
+`system.heap.*` report the internal (8-bit capable) heap in bytes.
+`internalMinFree` is ESP-IDF's lowest free size since boot. ESP-IDF keeps no
+minimum for the largest free block, so a 50 ms sampler task (started by the
+first `system.heap.*` command) tracks `windowMinFree` and `windowMinLargest`
+since the last `system.heap.reset`; the HIL RAM tests reset the window, run a
+workload and compare the window minima with their floors
+(`apps/attractap-lab/hil/heap_floors.py`). `ui.touch.controller.get` counts the
+GT911 register reads that succeeded and failed: LVGL polls the controller
+continuously, so `reads` grows while it answers.
+
+`-DATTRACTAP_VERSION_OVERRIDE=<string>` replaces `version.txt` in a lab build:
+the HIL update test builds its second image with it. Release builds never set it.
 
 `ui.widgets.get` lists the visible touchable widgets front to back, in the
 order LVGL hit-tests them: system layer, top layer (popups, dialogs), then the

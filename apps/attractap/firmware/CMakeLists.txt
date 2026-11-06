@@ -71,6 +71,12 @@ endif()
 # Single source of truth for the firmware version (also read by
 # scripts/check-attractap-firmware-version.sh and build_firmwares.py).
 file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/version.txt" ATTRACTAP_VERSION LIMIT_COUNT 1)
+# Lab builds only: the HIL OTA test builds a second image that must report a
+# different version. Release builds never set it (build_firmwares.py).
+set(ATTRACTAP_VERSION_OVERRIDE "" CACHE STRING "Firmware version string replacing version.txt (HIL OTA test images)")
+if(NOT "${ATTRACTAP_VERSION_OVERRIDE}" STREQUAL "")
+    set(ATTRACTAP_VERSION "${ATTRACTAP_VERSION_OVERRIDE}")
+endif()
 
 # The lvgl managed component compiles against our lv_conf.h instead of its
 # Kconfig (defining LV_CONF_PATH overrides lvgl's CONFIG_LV_CONF_SKIP default;
