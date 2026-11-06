@@ -174,6 +174,20 @@ describe('CardDetectedRouter', () => {
     ]);
   });
 
+  it.each([
+    ['keeps', 5, { '10:start': { 1: 'a' } }],
+    ['drops', 9, undefined],
+  ])('%s form answers when the logged in user (%s) taps the card of user 5', async (_verb, before, after) => {
+    const { reader, tap } = await setup();
+    const r = reader();
+    Object.assign(r.socket.state, { verifiedUserId: before, formDrafts: { '10:start': { 1: 'a' } } });
+
+    await tap(r.socket);
+
+    expect(r.socket.state.verifiedUserId).toBe(5);
+    expect(r.socket.state.formDrafts).toEqual(after);
+  });
+
   it('ties a verified card to the connection it was verified on', async () => {
     const { reader, tap } = await setup();
     const a = reader({ socketId: 'a', readerId: 7 });

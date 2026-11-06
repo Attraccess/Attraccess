@@ -48,7 +48,10 @@ export class CardDetectedRouter {
       sessionId?: unknown;
       detectionId?: unknown;
     };
-    // A login tap replaces whoever was logged in, whether or not the new card checks out.
+    // A login tap replaces whoever was logged in, whether or not the new card checks out. What the
+    // previous login left behind (form answers, a reader-started supervision) is dropped once the
+    // card shows whose it is: the same user tapping again to confirm keeps it.
+    const previousUserId = socket.state.verifiedUserId ?? null;
     if (purpose === 'tap') this.cardHandler.clearVerifiedUser(socket);
 
     const replyType = Object.hasOwn(REPLY_TYPES, purpose ?? '') ? REPLY_TYPES[purpose as string] : undefined;
@@ -75,7 +78,7 @@ export class CardDetectedRouter {
       const detection: CardDetection = { uid, detectionId };
       switch (purpose) {
         case 'tap':
-          return await this.cardHandler.handleCardTap(socket, detection, resourceId as number);
+          return await this.cardHandler.handleCardTap(socket, detection, resourceId as number, previousUserId);
         case 'enroll':
           return await this.cardHandler.handleEnrollCard(socket, detection);
         case 'reset':

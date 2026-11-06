@@ -60,7 +60,7 @@ describe('AttractapMassIntroductionHandler', () => {
         resources: [{ id: 42 }],
       }),
     };
-    // The card proof is covered by card-operations.service.spec.ts.
+    // The card proof is covered by card-relay.spec.ts and card-pending-records.spec.ts.
     cardOperations = {
       verifyCard: jest
         .fn()
@@ -125,10 +125,12 @@ describe('AttractapMassIntroductionHandler', () => {
       await expect(arm()).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('rejects readers on firmware that cannot relay card commands', async () => {
-      websocketService.sockets.set('a', makeSocket({ cardRelay: false }));
+    it('rejects readers on firmware that cannot relay card commands, also when only one socket lacks it', async () => {
+      websocketService.sockets.set('a', makeSocket());
+      websocketService.sockets.set('b', makeSocket({ cardRelay: false }));
 
-      await expect(arm()).rejects.toBeInstanceOf(BadRequestException);
+      await expect(arm()).rejects.toThrow(new BadRequestException('READER_FIRMWARE_UPDATE_REQUIRED'));
+      expect(websocketService.sockets.get('a').state.massIntroductionFlow).toBeFalsy();
     });
 
     it('rejects unknown and offline readers', async () => {

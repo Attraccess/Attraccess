@@ -145,6 +145,23 @@ describe.each<CardKind>(['desfire', 'ntag424'])('recovery records (%s)', (kind) 
     expect(services.pending).toHaveLength(0);
   });
 
+  it('drops only the enrolling user’s own stale records of the card, never another user’s', async () => {
+    const services = createServices();
+    const card = new EmulatedCard(kind);
+    const notOnCard = `encrypted:${Buffer.alloc(16, 0x21).toString('hex')}`;
+    services.pending.push(
+      { id: 80, uid: UID, kind: 'enroll', userId: 5, cardId: null, keyNo: 1, key: notOnCard, actorId: 1 },
+      { id: 81, uid: UID, kind: 'enroll', userId: 9, cardId: null, keyNo: 2, key: notOnCard, actorId: 1 },
+      { id: 82, uid: OTHER_UID, kind: 'enroll', userId: 5, cardId: null, keyNo: 1, key: notOnCard, actorId: 1 },
+    );
+    const reader = createRelayReader(card, services.conversations);
+
+    expect(await services.operations.enroll(reader.socket, detect(), enrollmentFor(5))).toEqual({ ok: true });
+
+    // 80 was this user's and its key is not on the card; 81 belongs to someone else, 82 to another card.
+    expect(services.pending.map((change) => change.id)).toEqual([81, 82]);
+  });
+
   it('keeps the user’s other enrollment records when one enrollment is recovered', async () => {
     const services = createServices();
     const card = new EmulatedCard(kind);

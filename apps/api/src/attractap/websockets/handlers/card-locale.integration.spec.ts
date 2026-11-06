@@ -68,7 +68,7 @@ describe('persisted web UI locale at card authentication', () => {
       resourceIntroducersService: { isIntroducer: async () => false },
       rbacService: { getEffectivePermissions: async () => new Set<string>() },
       resourceListService: { sendResourceListToSocket: async () => undefined },
-      // The card proof itself is covered by card-operations.service.spec.ts.
+      // The card proof itself is covered by card-relay.spec.ts and card-pending-records.spec.ts.
       cardOperations: {
         verifyCard: async (_socket: unknown, _purpose: string, detection: { uid: string }) => ({
           ok: true,
@@ -78,7 +78,7 @@ describe('persisted web UI locale at card authentication', () => {
       cardSessions: new CardSessionService(),
     });
     const sendMessage = jest.fn().mockResolvedValue(true);
-    const socket = { readerId: 42, state: {}, sendMessage } as unknown as AuthenticatedWebSocket;
+    const socket = { readerId: 42, readyState: 1, state: {}, sendMessage } as unknown as AuthenticatedWebSocket;
     const tap = () => handler.handleCardTap(socket, { uid: card.uid, detectionId: 1 }, resource.id);
     const expectLanguage = (language: string, languageFallback = false) =>
       expect(sendMessage).toHaveBeenLastCalledWith(

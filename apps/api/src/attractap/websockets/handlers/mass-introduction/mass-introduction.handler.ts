@@ -13,6 +13,7 @@ import { MassIntroductionEndReason } from '../../../../resources/mass-introducti
 import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
 import { AttractapService } from '../../../attractap.service';
 import { CardOperationsService } from '../../card-operations.service';
+import { assertReaderRelaysCards } from '../card/card-write-errors';
 import { WebsocketService } from '../../websocket.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
 
@@ -155,9 +156,7 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
     }
 
     // Readers on firmware before 2.0.0 cannot relay card commands, so they cannot check a card.
-    if (sockets.some((socket) => !socket.state.cardRelay)) {
-      throw new BadRequestException('This reader needs a firmware update before it can check cards');
-    }
+    assertReaderRelaysCards(sockets);
 
     // Checked before the socket state below: an await between the busy check and the claim would
     // let two concurrent arms both pass (see the supervision handler).

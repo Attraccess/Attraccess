@@ -145,6 +145,31 @@ describe('AttractapCardHandler', () => {
       expect(socket.state.enrollment).toBeFalsy();
     });
 
+    it('refuses to arm a reset when any connection of the reader lacks relay firmware', async () => {
+      const relaying = scope.createMockSocket();
+      const legacy = scope.createMockSocket({ id: 'socket-2', state: { cardRelay: false } });
+      scope.websocketService.sockets.set(relaying.id, relaying);
+      scope.websocketService.sockets.set(legacy.id, legacy);
+
+      await expect(scope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 })).rejects.toThrow(
+        'READER_FIRMWARE_UPDATE_REQUIRED',
+      );
+      expect(relaying.state.resetNfcCardData).toBeFalsy();
+      expect(relaying.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('refuses to arm a reset while another connection of the reader is busy', async () => {
+      const idle = scope.createMockSocket();
+      const busy = scope.createMockSocket({ id: 'socket-2', state: { cardRelay: true, enrollment: { userId: 3 } } });
+      scope.websocketService.sockets.set(idle.id, idle);
+      scope.websocketService.sockets.set(busy.id, busy);
+
+      await expect(scope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 })).rejects.toThrow(
+        new ConflictException('READER_BUSY'),
+      );
+      expect(idle.state.resetNfcCardData).toBeFalsy();
+    });
+
     it('refuses to arm enrollment on a reader the admin policy excludes', async () => {
       const socket = scope.createMockSocket();
       scope.websocketService.sockets.set(socket.id, socket);

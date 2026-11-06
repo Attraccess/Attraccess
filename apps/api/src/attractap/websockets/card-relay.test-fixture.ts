@@ -29,6 +29,7 @@ export function createRelayReader(
   const socket: any = {
     id: options.socketId ?? 'reader-socket',
     readerId: options.readerId ?? 7,
+    readyState: 1, // WebSocket.OPEN
     bufferedAmount: 0,
     state: { verifiedUserId: null, verifiedCardUid: null, cardConversation: null, cardRelay: true },
     sendRaw: (message: any) => {

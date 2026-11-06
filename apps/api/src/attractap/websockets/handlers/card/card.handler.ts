@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { WebSocket } from 'ws';
 
 import { MetricsService } from '../../../../metrics/metrics.service';
 
@@ -34,25 +35,17 @@ import { WebsocketService } from '../../websocket.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
 
 import { ResourceListService } from '../resource-list/resource-list.service';
+import { AttractapSupervisionHandler } from '../supervision/supervision.handler';
 import { CardSessionService } from '../ui/card-session.service';
+import { CARD_WRITE_START_ERRORS, assertReaderRelaysCards } from './card-write-errors';
+
+export { CARD_WRITE_START_ERRORS } from './card-write-errors';
 
 /**
  * How long an armed enrollment or reset waits for its card. The reader gives up after 30 s
  * (firmware ENROLLMENT_TIMEOUT_MS / RESET_TIMEOUT_MS); the margin covers delivery and clock drift.
  */
 export const ARMED_CARD_OPERATION_TTL_MS = 30_000 + 30_000;
-
-/** Error codes (HTTP exception messages) for starting an enrollment or reset; the frontend translates them. */
-export const CARD_WRITE_START_ERRORS = {
-  READER_NOT_FOUND: 'READER_NOT_FOUND',
-  READER_OFFLINE: 'READER_OFFLINE',
-  READER_BUSY: 'READER_BUSY',
-  READER_FIRMWARE_UPDATE_REQUIRED: 'READER_FIRMWARE_UPDATE_REQUIRED',
-  READER_NOT_ALLOWED_TO_WRITE_CARDS: 'READER_NOT_ALLOWED_TO_WRITE_CARDS',
-  READER_CARD_ENROLLMENT_NOT_SUPPORTED: 'READER_CARD_ENROLLMENT_NOT_SUPPORTED',
-  USER_NOT_FOUND: 'USER_NOT_FOUND',
-  CARD_NOT_FOUND: 'CARD_NOT_FOUND',
-} as const;
 
 const armedTooLongAgo = (armedAt: number | undefined) =>
   armedAt == null || Date.now() - armedAt > ARMED_CARD_OPERATION_TTL_MS;
@@ -103,25 +96,38 @@ export class AttractapCardHandler {
   @Inject(ResourceListService)
   protected resourceListService: ResourceListService;
 
+  @Inject(AttractapSupervisionHandler)
+  protected supervisionHandler: AttractapSupervisionHandler;
+
   /**
    * A card was tapped for a login. The user becomes the connection's verified user only after the
    * server authenticated the card with the stored key; a UID alone gets nothing.
+   * `previousUserId` is who was logged in before this tap (the router already logged them out).
    */
-  public async handleCardTap(socket: AuthenticatedWebSocket, detection: CardDetection, resourceId: number) {
+  public async handleCardTap(
+    socket: AuthenticatedWebSocket,
+    detection: CardDetection,
+    resourceId: number,
+    previousUserId: number | null = null,
+  ) {
     this.metricsService.attractapNfcTapsTotal.inc({ reader_id: String(socket.readerId) });
     const reply = (payload: Record<string, unknown>) =>
       socket.sendMessage(new AttractapEvent(AttractapEventType.CARD_AUTHENTICATION_DATA, payload));
 
     const verified = await this.cardOperations.verifyCard(socket, 'tap', detection);
     if (!verified.ok) {
+      this.forgetLoginState(socket, null, previousUserId);
       await reply({ error: verified.error });
       return;
     }
     const nfcCard = verified.card;
+    const language = await this.settingsService.resolveLanguage(nfcCard.user.locale);
 
+    // No await from here to the card session: a logout, re-authentication or disconnect handled in
+    // between would find a verified user without a card session to end.
+    this.forgetLoginState(socket, nfcCard.user.id, previousUserId);
     socket.state.verifiedUserId = nfcCard.user.id;
     socket.state.verifiedCardUid = detection.uid;
-    const language = await this.settingsService.resolveLanguage(nfcCard.user.locale);
     // Steps and user-scoped slots are bound to this card session (ATT-1187); the reader carries the id.
     const cardSession = this.cardSessions.issue(socket, nfcCard.user.id, language === 'de' ? 'de' : 'en');
 
@@ -139,13 +145,25 @@ export class AttractapCardHandler {
     const requiresSupervisor =
       supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
       (supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !hasIntroduction);
+    const canManageResource = (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update');
+
+    // The login may have ended (logout, re-authentication, new tap) or the connection closed during
+    // the lookups above: then this tap logs nobody in.
+    if (
+      socket.readyState !== WebSocket.OPEN ||
+      socket.state.verifiedUserId !== nfcCard.user.id ||
+      !this.cardSessions.isLive(socket, cardSession.id)
+    ) {
+      this.cardSessions.end(socket, cardSession.id, socket.readyState === WebSocket.OPEN ? 'reader' : 'disconnect');
+      return;
+    }
 
     await reply({
       username: nfcCard.user.username,
       language,
       cardSessionId: cardSession.id,
       languageFallback: !getSupportedDeviceLanguage(nfcCard.user.locale),
-      canManageResource: (await this.rbacService.getEffectivePermissions(nfcCard.user.id)).has('resources.update'),
+      canManageResource,
       hasIntroduction,
       isIntroducer,
       supervisionMode,
@@ -156,6 +174,19 @@ export class AttractapCardHandler {
     void this.resourceListService.sendResourceListToSocket(socket).catch((error) => {
       this.logger.error(`Failed to refresh resources after card authentication for reader ${socket.readerId}`, error);
     });
+  }
+
+  /**
+   * A tap by someone else ends what the previous login left on the connection: form answers and a
+   * supervision the reader started for them. The same user tapping again (a card confirmation)
+   * keeps both. A web-started supervision belongs to the reader, not to a login, and stays.
+   */
+  private forgetLoginState(socket: AuthenticatedWebSocket, userId: number | null, previousUserId: number | null) {
+    if (userId === null || userId !== previousUserId) socket.state.formDrafts = undefined;
+    const flow = socket.state.supervisionFlow;
+    if (flow && !flow.webInitiated && flow.requesterUserId !== userId) {
+      this.supervisionHandler.cancelForSocket(socket);
+    }
   }
 
   /** Forget who is logged in on this connection (logout, timeout, disconnect, new tap). */
@@ -184,24 +215,21 @@ export class AttractapCardHandler {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.USER_NOT_FOUND);
     }
 
-    const socket = Array.from(this.websocketService.sockets.values()).find(
-      (socket) => socket.readerId === data.readerId,
-    );
-
-    if (!socket) {
+    const sockets = this.readerSockets(data.readerId);
+    if (sockets.length === 0) {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.READER_OFFLINE);
     }
-    if (!socket.state.cardRelay) {
-      throw new BadRequestException(CARD_WRITE_START_ERRORS.READER_FIRMWARE_UPDATE_REQUIRED);
-    }
+    assertReaderRelaysCards(sockets);
     const nfcCard = await this.attractapService.getNFCCardByID(data.cardId);
 
     if (!nfcCard) {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.CARD_NOT_FOUND);
     }
-    if (socket.state.enrollment || socket.state.resetNfcCardData || socket.state.massIntroductionFlow) {
+    if (sockets.some((socket) => this.isBusyWithCardFlow(socket))) {
       throw new ConflictException(CARD_WRITE_START_ERRORS.READER_BUSY);
     }
+    // The reset is armed on one connection; the server resets the card that arrives there.
+    const socket = sockets[0];
 
     // The reader only learns who the card belongs to. The key stays on the server: the next card
     // presented here is reset by the server, and the record is dropped once the card confirmed it.
@@ -286,21 +314,12 @@ export class AttractapCardHandler {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.USER_NOT_FOUND);
     }
 
-    const sockets = Array.from(this.websocketService.sockets.values()).filter(
-      (socket) => socket.readerId === data.readerId,
-    );
-
+    const sockets = this.readerSockets(data.readerId);
     if (sockets.length === 0) {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.READER_OFFLINE);
     }
-    if (sockets.some((socket) => !socket.state.cardRelay)) {
-      throw new BadRequestException(CARD_WRITE_START_ERRORS.READER_FIRMWARE_UPDATE_REQUIRED);
-    }
-    if (
-      sockets.some(
-        (socket) => socket.state.enrollment || socket.state.resetNfcCardData || socket.state.massIntroductionFlow,
-      )
-    ) {
+    assertReaderRelaysCards(sockets);
+    if (sockets.some((socket) => this.isBusyWithCardFlow(socket))) {
       throw new ConflictException(CARD_WRITE_START_ERRORS.READER_BUSY);
     }
 
@@ -369,6 +388,14 @@ export class AttractapCardHandler {
     this.logger.log('Enroll new card cancelled by reader');
     socket.state.enrollment = null;
     this.cardConversations.abort(socket, 'CARD_REMOVED', 'enroll');
+  }
+
+  private readerSockets(readerId: number): AuthenticatedWebSocket[] {
+    return Array.from(this.websocketService.sockets.values()).filter((socket) => socket.readerId === readerId);
+  }
+
+  private isBusyWithCardFlow(socket: AuthenticatedWebSocket): boolean {
+    return !!(socket.state.enrollment || socket.state.resetNfcCardData || socket.state.massIntroductionFlow);
   }
 
   /** The admin policy as an error code the frontend translates; other failures pass through. */

@@ -46,7 +46,7 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   (scope.handler as any).resourceRepository = scope.resourceRepository;
   (scope.handler as any).rbacService = scope.rbacService;
   (scope.handler as any).cardOperations = {
-    // Card verification itself is covered by card-operations.service.spec.ts; here the card is
+    // Card verification itself is covered by card-relay.spec.ts and card-pending-records.spec.ts; here the card is
     // verified exactly when the stored card exists and is active.
     verifyCard: jest.fn(async (_socket: unknown, _purpose: string, detection: { uid: string }) => {
       const card = await scope.attractapService.getNFCCardByUID(detection.uid);
@@ -67,4 +67,9 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
       data.payload.resourceId,
     );
   (scope.handler as any).cardSessions = new CardSessionService();
+  (scope.handler as any).supervisionHandler = {
+    cancelForSocket: jest.fn((socket: any) => {
+      socket.state.supervisionFlow = null;
+    }),
+  };
 }

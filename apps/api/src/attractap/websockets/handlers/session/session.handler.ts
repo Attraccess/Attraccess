@@ -351,10 +351,15 @@ export class AttractapSessionHandler {
     }
 
     // Two-card supervision (ATT-493): if a supervisor card was validated for this socket, attribute
-    // the session to that supervisor. The requester stays as `user` (verifiedUserId).
-    const flow = socket.state.supervisionFlow;
-    const supervisorUserId =
-      flow && flow.resourceId === resourceId ? (flow.approvedSupervisorUserId ?? undefined) : undefined;
+    // the session to that supervisor. The requester stays as `user` (verifiedUserId). Only a flow the
+    // reader started for this very user counts: a web-started flow is approved on the server, and an
+    // approval for someone else must not carry over to whoever is logged in now.
+    const current = socket.state.supervisionFlow;
+    const flow =
+      current && !current.webInitiated && current.resourceId === resourceId && current.requesterUserId === userId
+        ? current
+        : null;
+    const supervisorUserId = flow?.approvedSupervisorUserId ?? undefined;
 
     try {
       // Plugin pre-start hooks (ATT-1187): allow, ask for a confirmation step, or block. Never gates stop.
@@ -387,7 +392,7 @@ export class AttractapSessionHandler {
       if (flow?.requestId) {
         this.supervisionService.settleByCard(flow.requestId);
       }
-      socket.state.supervisionFlow = null;
+      if (flow && socket.state.supervisionFlow === flow) socket.state.supervisionFlow = null;
       await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, {
         success: true,
         ...(gate.warning ? { warning: true } : {}),

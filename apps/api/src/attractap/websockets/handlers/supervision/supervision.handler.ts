@@ -23,6 +23,7 @@ import { UsersService } from '../../../../users-and-auth/users/users.service';
 import { AttractapService } from '../../../attractap.service';
 
 import { CardOperationsService } from '../../card-operations.service';
+import { assertReaderRelaysCards } from '../card/card-write-errors';
 import { WebsocketService } from '../../websocket.service';
 import { getSessionCapacity } from '../../../../resources/usage/sessions/active-usage';
 
@@ -308,9 +309,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     }
 
     // Readers on firmware before 2.0.0 cannot relay card commands, so they cannot check a card.
-    if (sockets.some((socket) => !socket.state.cardRelay)) {
-      throw new BadRequestException('This reader needs a firmware update before it can check cards');
-    }
+    assertReaderRelaysCards(sockets);
 
     // A live session is something a user would notice losing. Asked of the source of truth rather
     // than mirrored into socket state, so it cannot go stale.

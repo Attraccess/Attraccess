@@ -78,15 +78,19 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card checks on the server (%s)'
     expect(reader.socket.state.verifiedUserId).toBeNull();
   });
 
-  it('refuses a card that cannot prove the key (no proof, wrong rotation)', async () => {
-    for (const misbehaviour of ['no-proof', 'wrong-rotation'] as const) {
+  it.each(['no-proof', 'wrong-rotation'] as const)(
+    'refuses a card that cannot prove the key (%s)',
+    async (misbehaviour) => {
       const { operations, card, conversations } = await enrolled();
       card.misbehaviour = misbehaviour;
       const reader = createRelayReader(card, conversations);
 
-      expect((await operations.verifyCard(reader.socket, 'tap', detect())).ok).toBe(false);
-    }
-  });
+      const verified = await operations.verifyCard(reader.socket, 'tap', detect());
+
+      expect(verified).toEqual({ ok: false, error: 'CARD_AUTHENTICATION_FAILED' });
+      expect(reader.socket.state.verifiedUserId).toBeNull();
+    },
+  );
 
   it('refuses a reader that makes up the card answers after the card was detected', async () => {
     const { operations, conversations, card } = await enrolled();

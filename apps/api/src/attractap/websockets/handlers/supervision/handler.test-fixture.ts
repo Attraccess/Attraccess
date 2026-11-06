@@ -78,7 +78,8 @@ export function registerAttractapSupervisionHandlerFixture() {
       createReaderRequest: jest.fn().mockReturnValue({ requestId: 'req-1', expiresAt: new Date(0) }),
     };
     usersService = { findOne: jest.fn().mockResolvedValue({ id: 2, username: 'supervisor' }) };
-    // The card proof is covered by card-operations.service.spec.ts; here it either passes or fails.
+    // The card proof is covered by card-relay.spec.ts and card-pending-records.spec.ts; here it either
+    // passes or fails.
     cardOperations = {
       verifyCard: jest.fn().mockResolvedValue({
         ok: true,

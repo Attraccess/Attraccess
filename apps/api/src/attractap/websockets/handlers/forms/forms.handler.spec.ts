@@ -414,6 +414,19 @@ describe('AttractapFormsHandler', () => {
       );
     });
 
+    it('does not keep answers when another user logged in while they were checked', async () => {
+      fixture.mockResourceActionGuard.validateResourceAction.mockResolvedValue(true);
+      const socket = fixture.createMockSocket();
+      fixture.mockResourceFormsService.validatePageAnswers.mockImplementation(async () => {
+        socket.state.verifiedUserId = 2;
+        return { valid: true, errors: {} };
+      });
+
+      await fixture.handler.handleResourceUsageFormSubmitPage(socket, eventData);
+
+      expect(socket.state.formDrafts).toBeUndefined();
+    });
+
     it('merges into an existing draft for the same key when valid', async () => {
       fixture.mockResourceActionGuard.validateResourceAction.mockResolvedValue(true);
       fixture.mockResourceFormsService.validatePageAnswers.mockResolvedValue({ valid: true, errors: {} });

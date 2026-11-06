@@ -39,6 +39,7 @@ export function createAttractapCardHandlerFixture() {
     return {
       id: 'socket-1',
       readerId: 42,
+      readyState: 1, // WebSocket.OPEN
       state: {
         verifiedUserId: null,
         cardRelay: true,

@@ -92,10 +92,12 @@ describe('AttractapSupervisionHandler', () => {
       await expect(fixture.arm()).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('refuses a reader on firmware that cannot relay card commands', async () => {
-      fixture.websocketService.sockets.set('a', fixture.makeSocket({ cardRelay: false }));
+    it('refuses a reader on firmware that cannot relay card commands, also when only one socket lacks it', async () => {
+      fixture.websocketService.sockets.set('a', fixture.makeSocket());
+      fixture.websocketService.sockets.set('b', fixture.makeSocket({ cardRelay: false }));
 
-      await expect(fixture.arm()).rejects.toBeInstanceOf(BadRequestException);
+      await expect(fixture.arm()).rejects.toThrow(new BadRequestException('READER_FIRMWARE_UPDATE_REQUIRED'));
+      expect(fixture.websocketService.sockets.get('a').state.supervisionFlow).toBeFalsy();
     });
 
     it('refuses a reader with no display', async () => {

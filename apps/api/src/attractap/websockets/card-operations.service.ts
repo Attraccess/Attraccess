@@ -214,7 +214,10 @@ export class CardOperationsService {
           return { ok: true };
         }
       }
-      if (stale.length) await this.pendingRepository.delete(stale.map((change) => change.id));
+      // This user's records were not for this card. Other users' records stay: their key may be on
+      // this card (an interrupted enrollment for them), and only their record can recover it.
+      const ownStale = stale.filter((change) => change.userId === user.id);
+      if (ownStale.length) await this.pendingRepository.delete(ownStale.map((change) => change.id));
 
       const keyNo = await findFreeKeyNo(channel, kind);
       if (keyNo == null) return { ok: false, error: 'NO_FREE_KEY_SLOT' };

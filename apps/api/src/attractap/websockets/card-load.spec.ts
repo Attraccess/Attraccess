@@ -10,9 +10,14 @@ import { createRelayReader, createServices, detect } from './card-relay.test-fix
  */
 const READERS = 1000;
 const LATENCY_MS = 15;
-/** Heap the server side of 1,000 connected readers and 250 simultaneous taps may grow by (measured about 7 MB). */
-const HEAP_BUDGET_BYTES = 32 * 1024 * 1024;
 const MB = 1024 * 1024;
+/**
+ * Heap the server side of 1,000 connected readers and 250 simultaneous taps may grow by. With a
+ * collection before the measurement (`node --expose-gc`) it is about 7 MB, so 32 MB catches a leak
+ * of per-tap state. Plain jest cannot collect first: the growth then also holds garbage of earlier
+ * tests and of the emulated cards (measured 9–30 MB), so only a gross regression is caught (96 MB).
+ */
+const HEAP_BUDGET_BYTES = (global.gc ? 32 : 96) * MB;
 
 function percentile(sorted: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, Math.floor((sorted.length * p) / 100))];

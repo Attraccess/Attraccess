@@ -152,6 +152,8 @@ export class AttractapFormsHandler {
 
   public async handleResourceUsageFormSubmitPage(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId, action, formId, offset, answers } = data.payload as ResourceUsageFormSubmitPagePayload;
+    // Answers belong to the user who gave them: a new login while they are checked must not inherit them.
+    const userId = socket.state.verifiedUserId;
 
     if (
       !(await this.resourceActionGuard.validateResourceAction(
@@ -165,7 +167,7 @@ export class AttractapFormsHandler {
 
     const { valid, errors } = await this.resourceFormsService.validatePageAnswers(resourceId, formId, answers);
 
-    if (valid) {
+    if (valid && userId != null && socket.state.verifiedUserId === userId) {
       const key = this.formDraftKey(resourceId, action);
       socket.state.formDrafts ??= {};
       socket.state.formDrafts[key] ??= {};
