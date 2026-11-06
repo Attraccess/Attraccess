@@ -189,7 +189,15 @@ void Application::setupNfcCallbacks()
       if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
       else Display::resourceListScreen.showActionProgress(FirmwareI18n::Message::CheckingCard, FirmwareI18n::Message::OneMoment);
       lv_unlock();
-      this->api.sendCardDetected("tap", uid, uidLength, this->authenticationResourceId);
+      if (!this->api.sendCardDetected("tap", uid, uidLength, this->authenticationResourceId)) {
+        // Nothing reached the server: don't leave "checking card" up until the 30 s timeout.
+        Display::asyncCall(
+            [](void *data) {
+              auto *self = static_cast<Application *>(data);
+              if (self->cardAuthenticationPending && !self->unlocked) self->finishCardAuthentication(false);
+            },
+            this);
+      }
 #else
       this->api.sendCardDetected("tap", uid, uidLength, this->selectedResourceId);
 #endif
