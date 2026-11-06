@@ -12,7 +12,7 @@ to 1000 bytes ("seen" column below). A run that goes under a floor lost a third
 of the headroom the workload had: a larger TLS or websocket buffer, a new
 always-on task, a bigger bounce buffer. The floors are a regression alarm, not a
 proof the reader never runs out; ``resource-list`` is the workload closest to
-exhaustion (secure-lab: 30 KB free and a 15 KB block left of ~64 KB idle).
+exhaustion (secure-lab: 30 KB free and a 15 KB block left of ~64 KB idle; 19.7 KB free since boot).
 Raise a floor when a change gives the headroom back; lower one only with a
 measured reason, in the same commit.
 
@@ -21,14 +21,15 @@ Seen (free / largest block), measured 2026-11-06 on firmware 1.11.1:
     workload        plain              secure-lab
     card-reads      106,727 / 31,744   62,359 / 31,744
     reconnects      108,939 / 31,744   61,055 / 29,696
-    resource-list   see below          30,195 / 15,360
-    ota             99,007 / 31,744    55,079 / 27,648
+    resource-list   93,687 / 31,744   30,195 / 15,360
+    ota             98,527 / 31,744    55,079 / 27,648
 """
 
 FLOORS = {
     "plain": {
         "card-reads": {"min_free": 74_000, "min_largest": 22_000},
         "reconnects": {"min_free": 76_000, "min_largest": 22_000},
+        "resource-list": {"min_free": 65_000, "min_largest": 22_000},
         "ota": {"min_free": 69_000, "min_largest": 22_000},
     },
     "secure-lab": {
