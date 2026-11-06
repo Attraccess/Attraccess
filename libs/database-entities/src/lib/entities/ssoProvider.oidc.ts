@@ -99,6 +99,16 @@ export class SSOProviderOIDCConfiguration {
   })
   emailClaimPaths!: string[] | null;
 
+  @Column({ type: 'simple-array', nullable: true })
+  @ApiProperty({
+    description:
+      'Ordered list of claim paths to read roles/groups/permissions from. When unset, the built-in defaults are read. When set, only these paths are read.',
+    example: ['realm_access.roles', 'groups'],
+    required: false,
+    nullable: true,
+  })
+  roleClaimPaths?: string[] | null;
+
   // ponytail: keeps the legacy 'permissionMappings' DB column — renaming it would need a migration for zero gain
   @Column({ type: 'json', nullable: true, name: 'permissionMappings' })
   @ApiProperty({

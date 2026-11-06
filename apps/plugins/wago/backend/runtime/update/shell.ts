@@ -21,7 +21,11 @@ received=0
 while test "$received" -lt "$limit"; do
   chunk=$((limit - received))
   if test "$chunk" -gt 65536; then chunk=65536; fi
-  dd bs="$chunk" count=1 >> "$file" 2>/dev/null || exit 1
+  # dd writes into a pipe, never into the file: some dd builds (uutils on newer
+  # Ubuntu) truncate a regular-file stdout, which would undo an append redirect.
+  # dd's own status comes back on fd 3 because there is no pipefail.
+  dd_status=$( { { dd bs="$chunk" count=1 2>/dev/null; echo "$?" >&3; } | cat >> "$file"; } 3>&1 ) || exit 1
+  test "$dd_status" = 0 || exit 1
   # The outer filesystem guard already positively identified this stat ABI.
   # One metadata process per input block avoids the guarded capture pipeline
   # (and its byte-at-a-time dd) on every short SSH pipe read. This is our own

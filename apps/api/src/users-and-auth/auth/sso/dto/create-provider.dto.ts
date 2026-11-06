@@ -7,13 +7,12 @@ import {
   IsOptional,
   IsString,
   ValidateNested,
-  IsArray,
   IsBoolean,
   IsInt,
   Max,
   Min,
 } from 'class-validator';
-import { IsStringArrayRecord } from './validators';
+import { IsRolePathList, IsStoredStringList, IsStringArrayRecord } from './validators';
 
 export class CreateOIDCConfigurationDto {
   @ApiProperty({
@@ -40,8 +39,7 @@ export class CreateOIDCConfigurationDto {
     type: [String],
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
+  @IsStoredStringList()
   signingAlgorithms?: string[] | null;
 
   @ApiProperty({
@@ -112,31 +110,43 @@ export class CreateOIDCConfigurationDto {
     description: 'Optional list of OIDC scopes to request',
     example: ['openid', 'email', 'profile'],
     required: false,
+    nullable: true,
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  scopes?: string[];
+  @IsStoredStringList()
+  scopes?: string[] | null;
 
   @ApiProperty({
     description: 'Ordered list of claim paths to resolve the username',
     example: ['preferred_username', 'email', 'sub'],
     required: false,
+    nullable: true,
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  usernameClaimPaths?: string[];
+  @IsStoredStringList()
+  usernameClaimPaths?: string[] | null;
 
   @ApiProperty({
     description: 'Ordered list of claim paths to resolve the email',
     example: ['email', 'emails[0].value', 'upn'],
     required: false,
+    nullable: true,
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  emailClaimPaths?: string[];
+  @IsStoredStringList()
+  emailClaimPaths?: string[] | null;
+
+  @ApiProperty({
+    description:
+      'Ordered list of claim paths (lodash-style, e.g. `realm_access.roles`) to read roles/groups/permissions from. When unset, the defaults are read: permissions, roles, groups, realm_access.roles and resource_access.<clientId>.roles. When set, ONLY these paths are read.',
+    required: false,
+    nullable: true,
+    type: [String],
+    example: ['realm_access.roles', 'groups'],
+  })
+  @IsOptional()
+  @IsRolePathList()
+  roleClaimPaths?: string[] | null;
 
   @ApiProperty({
     description:
@@ -232,14 +242,14 @@ export class CreateSAMLConfigurationDto {
   @ApiProperty({
     description: 'Ordered list of attribute keys to resolve email addresses from (first match wins)',
     required: false,
+    nullable: true,
     isArray: true,
     type: String,
     example: ['email', 'urn:oid:1.2.840.113549.1.9.1'],
   })
   @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  emailAttributeKeys?: string[];
+  @IsStoredStringList()
+  emailAttributeKeys?: string[] | null;
 
   @ApiProperty({
     description: 'Shared secret used to authorize SAML provisioning requests',
@@ -249,6 +259,18 @@ export class CreateSAMLConfigurationDto {
   @IsOptional()
   @IsString()
   provisioningSecret?: string;
+
+  @ApiProperty({
+    description:
+      'Attribute keys (matched case-insensitively) to read roles/groups from. When unset, the defaults are read: roles, role, groups, group, memberof and the Microsoft/ADFS group and role claim URIs. When set, ONLY these keys are read.',
+    required: false,
+    nullable: true,
+    type: [String],
+    example: ['roles', 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role'],
+  })
+  @IsOptional()
+  @IsRolePathList()
+  roleAttributeKeys?: string[] | null;
 
   @ApiProperty({
     description:

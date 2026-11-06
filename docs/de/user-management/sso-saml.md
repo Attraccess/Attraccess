@@ -54,6 +54,12 @@ Häufige Attributnamen:
 
 Optional können Sie ein Provisioning-Secret festlegen. Damit kann Ihr Identity Provider über die Provisioning-API Benutzer und Berechtigungen in Attraccess verwalten.
 
+### Rollen-Attributschlüssel
+
+Standardmäßig liest Attraccess Rollen aus den Attributen `roles`, `role`, `groups`, `group`, `memberof` sowie den Microsoft/ADFS-Claim-URIs `http://schemas.microsoft.com/ws/2008/06/identity/claims/groups`, `http://schemas.microsoft.com/ws/2008/06/identity/claims/role` und `http://schemas.xmlsoap.org/claims/group`. Um andere Attribute zu lesen, fügen Sie sie unter **Rollen-Attributschlüssel** einzeln hinzu (höchstens 20, je bis zu 256 Zeichen, ohne Kommas; Groß-/Kleinschreibung wird ignoriert). Das Ändern dieser Einstellung erfordert die Berechtigung `users.roles.manage`.
+
+> **Eigene Schlüssel ersetzen die Standardwerte.** Sobald Schlüssel gesetzt sind, werden nur diese Attribute gelesen. Ist eines davon in der Assertion vorhanden, werden Rollen, die nur aus einem Standardattribut stammten (z. B. `groups`), beim nächsten Login entfernt. Ist keines vorhanden, bleiben vorhandene Rollen erhalten; ist eines vorhanden, aber leer, werden die SSO-Rollen dieses Anbieters entfernt. Leeren Sie das Feld, um zu den Standardwerten zurückzukehren.
+
 ### Berechtigungszuordnung
 
 Wie bei [OIDC](user-management/sso-oidc.md) können Sie SAML-Rollen den Attraccess-Berechtigungen zuordnen.

@@ -135,7 +135,7 @@ in {
         type = types.attrsOf types.path;
         default = { };
         example = lib.literalExpression ''{ "attractap-touch-v2" = ./attractap_touch_v2_park.bin; }'';
-        description = "Parking images keyed by place `variant` tag, built with `pnpm nx run attractap-firmware:build-lab`. Places whose variant has no image are not managed.";
+        description = "Parking images keyed by place `variant` tag, built with `pnpm nx run attractap-firmware:build-lab`. Places whose variant has no image are not managed. Places tagged `profile=secure-lab` (Secure Boot lab readers) need the lab-signed `.hex` image of a secure-lab park variant; the janitor writes it encrypted.";
       };
       priority = mkOption {
         type = types.ints.positive;

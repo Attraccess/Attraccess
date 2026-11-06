@@ -165,6 +165,7 @@ void ReaderWorkflow::testUiPlugins()
 
     // --- Cancel -------------------------------------------------------------------------------------
     active = false; list(); click("Lasercutter");
+    clearStatus(); // the start success screen
     starts = server.count("START_RESOURCE_USAGE_SESSION");
     click("Ressource verwenden");
     server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), STEP_B, "confirm", 1, 60000, "Zweite Frage"), 42);
@@ -197,6 +198,7 @@ void ReaderWorkflow::testUiPlugins()
     // --- Expiry starts nothing ---------------------------------------------------------------------
     server.push("START_RESOURCE_USAGE_SESSION", R"({"success":true})"); pump();
     active = false; list(); click("Lasercutter");
+    clearStatus(); // the start success screen
     starts = server.count("START_RESOURCE_USAGE_SESSION");
     click("Ressource verwenden");
     server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), "dddddddddddddddddddddd", "confirm", 1, 10000, "Laeuft ab"));
@@ -223,9 +225,9 @@ void ReaderWorkflow::testUiPlugins()
     server.push("START_RESOURCE_USAGE_SESSION", "{\"error\":\"START_BLOCKED\",\"requestId\":" + std::to_string(startRequestId()) +
         R"(,"reason":{"code":"RESERVED","title":"Reserviert","body":"Bis 16:00 von Anna M."}})");
     pump();
-    assert(label(lv_layer_top(), "Reserviert") && label(lv_layer_top(), "Bis 16:00 von Anna M."));
-    assert(!label(lv_layer_top(), "Aktion fehlgeschlagen") && !label(lv_layer_top(), "Action failed"));
-    Display::hidePopup();
+    assert(label(lv_screen_active(), "Reserviert") && label(lv_screen_active(), "Bis 16:00 von Anna M."));
+    assert(!label(lv_screen_active(), "Aktion fehlgeschlagen") && !label(lv_screen_active(), "Action failed"));
+    clearStatus();
     std::cout << "PASS blocked start shows exactly the plugin reason" << std::endl;
 
     // --- Post-stop question holds the session summary ---------------------------------------------
@@ -254,7 +256,7 @@ void ReaderWorkflow::testUiPlugins()
     assert(server.last("CARD_SESSION_ENDED")["data"]["payload"]["cardSessionId"] == "cs-1");
     std::cout << "PASS post-stop question survives the summary auto-dismiss" << std::endl;
     // --- A step outlives the watchdog, then the sign-in timeout resumes ----------------------------
-    Display::hidePopup(); active = false; cardSessionId = "cs-2"; list(); login();
+    clearStatus(); active = false; cardSessionId = "cs-2"; list(); login();
     click("Lasercutter"); click("Ressource verwenden");
     server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), "gggggggggggggggggggggg", "confirm", 1, 120000, "Lange Frage"));
     pump();
@@ -271,7 +273,7 @@ void ReaderWorkflow::testUiPlugins()
     std::cout << "PASS a long step survives the watchdog and the sign-in timeout resumes" << std::endl;
 
     // --- A post-stop question expires on the reader too ------------------------------------------
-    Display::hidePopup(); active = true; cardSessionId = "cs-3"; list(); login();
+    clearStatus(); active = true; cardSessionId = "cs-3"; list(); login();
     click("Lasercutter"); click("Sitzung beenden");
     server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true,"durationSeconds":60,"endedOwnSession":true})"); pump();
     assert(lv_screen_active() == Display::sessionSummaryScreen.getScreen());
@@ -315,8 +317,8 @@ void ReaderWorkflow::testUiPlugins()
     assert(!label(lv_layer_top(), "Falsche Ressource"));
     resultDoc = server.last("UI_STEP_RESULT");
     assert(resultDoc["data"]["payload"]["stepId"] == "jjjjjjjjjjjjjjjjjjjjjj" && resultDoc["data"]["payload"]["action"] == "cancel");
-    assert(label(lv_layer_top(), "Aktion fehlgeschlagen")); // the pending start ends now, not after the watchdog
-    Display::hidePopup(); list(); // the reader refreshes the resource after a failed start
+    assert(label(lv_screen_active(), "Aktion fehlgeschlagen")); // the pending start ends now, not after the watchdog
+    clearStatus(); list(); // the reader refreshes the resource after a failed start
     starts = server.count("START_RESOURCE_USAGE_SESSION");
     click("Ressource verwenden");
     assert(server.count("START_RESOURCE_USAGE_SESSION") == starts + 1);
@@ -325,6 +327,6 @@ void ReaderWorkflow::testUiPlugins()
     pump();
     resultDoc = server.last("UI_STEP_RESULT");
     assert(resultDoc["data"]["payload"]["stepId"] == "kkkkkkkkkkkkkkkkkkkkkk" && resultDoc["data"]["payload"]["action"] == "cancel");
-    Display::hidePopup(); pump();
+    clearStatus(); pump();
     std::cout << "PASS an unusable step is cancelled at once" << std::endl;
 }

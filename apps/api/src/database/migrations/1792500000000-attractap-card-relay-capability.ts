@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AttractapCardRelayCapability1792400000000 implements MigrationInterface {
+export class AttractapCardRelayCapability1792500000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
       'ALTER TABLE "attractap" ADD COLUMN "firmwareCapabilitiesCardrelay" boolean NOT NULL DEFAULT (0)',

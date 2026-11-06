@@ -3,9 +3,10 @@
 While someone holds a reader, the janitor keeps a high-priority reservation
 for it. When the holder releases, the coordinator's scheduler allocates the
 reader to that reservation in the same locked step, ahead of any waiting
-session. The janitor then claims it, checks the security eFuses, erases the
-whole chip, flashes the parking image for the place's `variant` tag and
-releases the reader once the image reports it is parked.
+session. The janitor then claims it, checks the security eFuses against the
+place's `profile` tag (`plain`, the default, or `secure-lab`), erases the whole
+chip, flashes the parking image for the place's `variant` tag (encrypted on a
+`secure-lab` reader) and releases the reader once the image reports it is parked.
 
 A reader whose eFuses were burned, or that fails to park repeatedly, stays
 claimed by the janitor (quarantine) until an operator runs `clear`.
@@ -76,7 +77,7 @@ class Janitor:
         self.marker_seconds = marker_seconds
         self.poll_seconds = poll_seconds
         self.dirty = set()
-        self.known = set()  # managed places seen by the last tick
+        self.known = {}  # managed place -> (variant, profile) seen by the last tick
         self.reservations = {}  # place -> [token, last poll]
         self.reserving = set()
         self.jobs = {}
@@ -110,8 +111,11 @@ class Janitor:
         managed = self._managed()
         # A reader's state is unknown when the janitor first sees its place,
         # after a (re)start or when a deployment adds the place: park it once.
-        self.dirty |= managed.keys() - self.known
-        self.known = set(managed)
+        # A changed variant or profile tag needs another parking image.
+        seen = {name: (place.tags["variant"], place.tags.get("profile", efuse.PLAIN))
+                for name, place in managed.items()}
+        self.dirty |= {name for name, tags in seen.items() if self.known.get(name) != tags}
+        self.known = seen
         for name, place in managed.items():
             if name in self.jobs or time.monotonic() < self.retry_after.get(name, 0):
                 continue
@@ -121,7 +125,8 @@ class Janitor:
                 elif not place.acquired_resources:
                     await self._release_empty_claim(name)
                 else:
-                    self.jobs[name] = asyncio.create_task(self._park(name, place.tags["variant"]))
+                    self.jobs[name] = asyncio.create_task(self._park(
+                        name, place.tags["variant"], place.tags.get("profile", efuse.PLAIN)))
                 continue
             if name not in self.dirty and name not in holds:
                 await self._drop_reservation(name)
@@ -270,10 +275,10 @@ class Janitor:
         except grpc.aio.AioRpcError as error:
             log.warning("%s: could not check for a half-finished acquire: %s", name, error.details())
 
-    async def _park(self, name, variant):
+    async def _park(self, name, variant, profile):
         try:
             async with self.slots:
-                code, run = await self._run_child(name, self.images[variant])
+                code, run = await self._run_child(name, self.images[variant], profile)
             if code == 0:
                 self.failures.pop(name, None)
                 self.dirty.discard(name)
@@ -303,17 +308,17 @@ class Janitor:
         finally:
             self.jobs.pop(name, None)
 
-    async def _run_child(self, name, image):
+    async def _run_child(self, name, image, profile):
         runs = self.state_dir / "runs" / name
         run = runs / time.strftime("%Y%m%dT%H%M%S")
         run.mkdir(parents=True, exist_ok=True)
         for old in sorted(runs.iterdir())[:-RUNS_KEPT_PER_PLACE]:
             shutil.rmtree(old, ignore_errors=True)
         command = [*self.park_command, "park", "--config", str(self.config), "--place", name,
-                   "--image", str(image), "--output", str(run),
+                   "--image", str(image), "--profile", profile, "--output", str(run),
                    "--baseline-dir", str(self.state_dir / "efuse-baselines"),
                    "--marker-seconds", str(self.marker_seconds)]
-        log.info("%s: parking with %s", name, image)
+        log.info("%s: parking with %s (%s reader)", name, image, profile)
         # Own process group: labgrid drivers and SSH children stop with it.
         process = await asyncio.create_subprocess_exec(*command, start_new_session=True)
         try:
@@ -385,9 +390,10 @@ def run_park(args):
     try:
         with attached(args.config, args.place) as target:
             mac = park(target, args.image, output, baseline_dir=args.baseline_dir,
-                       marker_seconds=args.marker_seconds)
+                       marker_seconds=args.marker_seconds, profile=args.profile)
     except efuse.EfuseViolation as violation:
-        (output / "reason.txt").write_text(f"eFuses burned, reader must not be reused: {violation}\n")
+        (output / "reason.txt").write_text(
+            f"eFuses do not match the {args.profile} reader profile, reader must not be reused: {violation}\n")
         print(f"{args.place}: {violation}", file=sys.stderr)
         return QUARANTINE_EXIT
     except Exception:
@@ -423,7 +429,8 @@ def main(argv=None):
     daemon.add_argument("--coordinator", default=os.environ.get("LG_COORDINATOR", "127.0.0.1:20408"))
     daemon.add_argument("--config", required=True, help="Labgrid environment YAML (ESPToolDriver, SerialDriver)")
     daemon.add_argument("--image", action="append", default=[], metavar="VARIANT=FILE",
-                        help="parking image for places tagged variant=VARIANT (repeatable)")
+                        help="parking image for places tagged variant=VARIANT (repeatable); places tagged "
+                             "profile=secure-lab need a lab-signed .hex image")
     daemon.add_argument("--priority", type=float, default=1000.0, help="reservation priority (sessions use 0)")
     daemon.add_argument("--max-parallel", type=int, default=2)
     daemon.add_argument("--attempts", type=int, default=3, help="failed attempts before quarantine")
@@ -436,6 +443,8 @@ def main(argv=None):
     single.add_argument("--config", required=True)
     single.add_argument("--place", required=True)
     single.add_argument("--image", required=True)
+    single.add_argument("--profile", choices=efuse.PROFILES, default=efuse.PLAIN,
+                        help="reader profile from the place's `profile` tag (secure-lab: lab-signed HEX, encrypted)")
     single.add_argument("--output", required=True)
     single.add_argument("--baseline-dir")
     single.add_argument("--marker-seconds", type=float, default=30.0)

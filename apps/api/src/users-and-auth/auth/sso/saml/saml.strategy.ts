@@ -1,5 +1,6 @@
 import { SsoSessionRequest } from '../sso-session-request';
 import { SSOProviderType, User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import { DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS } from '@attraccess/shared';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 
@@ -136,20 +137,15 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     return await this.syncPermissionsFromClaims(user, profile, config);
   }
 
-  protected getPermissionClaimValues(profile: SamlProfile): unknown[] {
+  protected getPermissionClaimValues(
+    profile: SamlProfile,
+    config: Pick<SSOProviderSAMLConfiguration, 'roleAttributeKeys'>,
+  ): unknown[] {
     const values: unknown[] = [];
     const profileRecord = profile as Record<string, unknown>;
-    const candidateKeys = [
-      'roles',
-      'role',
-      'groups',
-      'group',
-      'memberof',
-      // Azure AD / ADFS URI-style claim names
-      'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups',
-      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
-      'http://schemas.xmlsoap.org/claims/group',
-    ];
+    // Configured keys replace the defaults entirely.
+    const configuredKeys = config.roleAttributeKeys?.map((key) => key.toLowerCase());
+    const candidateKeys = configuredKeys?.length ? configuredKeys : DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS;
 
     // Check candidateKeys inside the SAML attributes bag (not all attributes — that would
     // include email/displayName and make the empty-claims guard always true)
@@ -191,7 +187,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     profile: SamlProfile,
     config: SSOProviderSAMLConfiguration,
   ): Promise<User> {
-    const claimValues = this.getPermissionClaimValues(profile);
+    const claimValues = this.getPermissionClaimValues(profile, config);
     const roleNames = this.resolveRoleNamesFromClaims(claimValues);
     const roleAssignments = resolveSsoRoleAssignments(roleNames, config.roleMappings);
     this.logger.debug(`RBAC role keys from SAML: ${JSON.stringify(roleAssignments.map((r) => r.roleKey))}`);

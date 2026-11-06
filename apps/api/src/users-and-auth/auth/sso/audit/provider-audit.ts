@@ -90,6 +90,7 @@ export function ssoAuditSnapshot(provider: SSOProvider): string {
             omitted,
           ),
           emailClaimPaths: boundedArray(provider.oidcConfiguration?.emailClaimPaths, 'emailClaimPaths', omitted),
+          roleClaimPaths: boundedArray(provider.oidcConfiguration?.roleClaimPaths, 'roleClaimPaths', omitted),
           roleMappings: auditRoleMappings(provider.oidcConfiguration?.roleMappings),
           omitted,
         }
@@ -108,6 +109,7 @@ export function ssoAuditSnapshot(provider: SSOProvider): string {
             'emailAttributeKeys',
             omitted,
           ),
+          roleAttributeKeys: boundedArray(provider.samlConfiguration?.roleAttributeKeys, 'roleAttributeKeys', omitted),
           roleMappings: auditRoleMappings(provider.samlConfiguration?.roleMappings),
           signingMaterial: {
             identityProviderCertificateConfigured: Boolean(provider.samlConfiguration?.certificate),

@@ -4,6 +4,7 @@
   "private": true,
   "description": "Data-driven WAGO CC100 runtime for Attraccess.",
   "dependencies": {
+    "ipaddr.js": "^2.4.0",
     "mqtt": "^5.15.2"
   }
 }

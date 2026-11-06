@@ -3,8 +3,9 @@ import type { CreateSSOProviderDto, SSOProvider } from '@attraccess/react-query-
 type StoredOidcConfiguration = NonNullable<SSOProvider['oidcConfiguration']>;
 type StoredSamlConfiguration = NonNullable<SSOProvider['samlConfiguration']>;
 
-/** Text-input representation of a stored list; anything other than an array becomes empty. */
-export const listInputValue = (value: unknown) => (Array.isArray(value) ? value.join(', ') : '');
+/** Editable entries of a stored list, in stored order; anything other than an array becomes empty. */
+export const listValue = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
 /** Editable OIDC form values for a stored provider configuration. */
 export function oidcFormValues(

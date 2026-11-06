@@ -7,20 +7,23 @@ void ReaderWorkflow::testFormsAndLogout()
     assert(label(lv_screen_active(), "Alex"));
     // Going back must keep the fetched project catalogue.
     click("Lasercutter"); click("Projekt wählen");
-    assert(label(lv_layer_top(), "Werkstattprojekt"));
-    click("Werkstattprojekt", true); click(LV_SYMBOL_LEFT);
+    assert(label(lv_screen_active(), "Werkstattprojekt"));
+    click("Werkstattprojekt"); click(LV_SYMBOL_LEFT);
     click("Stop");
     assert(server.last("STOP_RESOURCE_USAGE_SESSION")["data"]["payload"]["resourceId"].as<int>() == 1);
     server.push("RESOURCE_USAGE_FORM_REQUEST", R"({"resourceId":1,"action":"end","forms":[{"id":8,"name":"Check","fieldCount":1}]})");
     pump();
-    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    // The form is a screen of its own over the details.
+    assert(lv_screen_active() == Display::formsScreen.getScreen());
     assert(server.count("RESOURCE_USAGE_FORM_GET_FIELDS") > 0);
     display.capture(output, "06-required-end-form");
     server.push("RESOURCE_USAGE_FORM_FIELDS", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"totalFieldCount":1,"fields":[{"id":9,"name":"Sichtprüfung","type":"text","isRequired":true,"value":"OK"}]})");
     pump();
     display.capture(output, "06b-required-form-ready");
-    click(LV_SYMBOL_CLOSE, true);
+    click("Abbrechen");
     assert(server.count("RESOURCE_USAGE_FORM_CANCEL") > 0);
+    // Cancel left the form screen; the details it was raised over are shown again.
+    assert(lv_screen_active() != Display::formsScreen.getScreen() && !label(lv_screen_active(), "Sichtprüfung *"));
     list();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(label(lv_screen_active(), "Stop"));
@@ -29,35 +32,35 @@ void ReaderWorkflow::testFormsAndLogout()
     click("Stop");
     server.push("RESOURCE_USAGE_FORM_REQUEST", R"({"resourceId":1,"action":"end","forms":[{"id":8,"name":"Check","fieldCount":1}]})"); pump();
     server.push("RESOURCE_USAGE_FORM_FIELDS", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"totalFieldCount":1,"fields":[{"id":9,"name":"Sichtprüfung","type":"text","isRequired":true,"value":"OK"}]})"); pump();
-    click("Absenden", true);
+    click("Absenden");
     assert(server.count("RESOURCE_USAGE_FORM_SUBMIT_PAGE") == 1);
     server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":false,"errors":[{"fieldId":9,"code":"REQUIRED_FIELD","message":"Server diagnostic %s"}]})"); pump();
-    auto *serverError = requireLabel(lv_layer_top(), "Pflichtfeld");
-    assert(!label(lv_layer_top(), "Server diagnostic %s"));
+    auto *serverError = requireLabel(lv_screen_active(), "Pflichtfeld");
+    assert(!label(lv_screen_active(), "Server diagnostic %s"));
     State::setUserLanguage(true, "en"); pump();
-    assert(label(lv_layer_top(), "Required field") == serverError);
-    assert(label(lv_layer_top(), "Sichtprüfung *") && label(lv_layer_top(), "OK"));
+    assert(label(lv_screen_active(), "Required field") == serverError);
+    assert(label(lv_screen_active(), "Sichtprüfung *") && label(lv_screen_active(), "OK"));
     display.capture(output, "form-server-error-english");
     State::setUserLanguage(true, "de"); pump();
-    assert(label(lv_layer_top(), "Pflichtfeld") == serverError);
+    assert(label(lv_screen_active(), "Pflichtfeld") == serverError);
     display.capture(output, "form-server-error-german");
     // Known unknown-field validation errors still use the localized catalog.
     server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":false,"errors":[{"fieldId":9,"code":"UNKNOWN_FIELD","message":"Unknown field #9."}]})"); pump();
-    assert(label(lv_layer_top(), "Eingabe ungültig.") == serverError);
-    assert(!label(lv_layer_top(), "Unknown field #9."));
+    assert(label(lv_screen_active(), "Eingabe ungültig.") == serverError);
+    assert(!label(lv_screen_active(), "Unknown field #9."));
     display.capture(output, "form-unknown-field-german");
     State::setUserLanguage(true, "en"); pump();
-    assert(label(lv_layer_top(), "Invalid input.") == serverError);
+    assert(label(lv_screen_active(), "Invalid input.") == serverError);
     display.capture(output, "form-unknown-field-english");
     State::setUserLanguage(true, "de"); pump();
-    assert(label(lv_layer_top(), "Eingabe ungültig.") == serverError);
+    assert(label(lv_screen_active(), "Eingabe ungültig.") == serverError);
     // Unknown identifiers and old servers without a code use English fallback.
     for (const auto *error : {R"({"fieldId":9,"code":"FUTURE_ERROR","message":"Unbekannter Fehler"})", R"({"fieldId":9,"message":"Alte Diagnose"})"}) {
         server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", std::string(R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":false,"errors":[)") + error + "]}"); pump();
-        assert(label(lv_layer_top(), "Invalid input.") == serverError);
-        assert(!label(lv_layer_top(), "Unbekannter Fehler") && !label(lv_layer_top(), "Alte Diagnose"));
+        assert(label(lv_screen_active(), "Invalid input.") == serverError);
+        assert(!label(lv_screen_active(), "Unbekannter Fehler") && !label(lv_screen_active(), "Alte Diagnose"));
     }
-    click("Absenden", true);
+    click("Absenden");
     server.push("RESOURCE_USAGE_FORM_PAGE_RESULT", R"({"resourceId":1,"action":"end","formId":8,"offset":0,"valid":true})"); pump();
     assert(server.count("STOP_RESOURCE_USAGE_SESSION") == stopsBeforeForm + 2);
     // Holding the original touch/card must not dismiss the new summary.
@@ -69,7 +72,7 @@ void ReaderWorkflow::testFormsAndLogout()
     assert(label(lv_screen_active(), "Danke, Alex!"));
     assert(label(lv_screen_active(), "00:23:46"));
     assert(label(lv_screen_active(), "12,50 EUR"));
-    assert(!label(lv_layer_top(), "Gesamtkosten dieser Sitzung"));
+    assert(!label(lv_screen_active(), "Gesamtkosten dieser Sitzung"));
     assert(!label(lv_screen_active(), "Nutzung beendet"));
     active = false; list();
     server.push("PROJECTS_OF_USER", R"({"page":1,"limit":10,"total":0,"projects":[]})"); pump();

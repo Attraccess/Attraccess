@@ -66,14 +66,18 @@ it('edits and saves an OIDC provider with credentials and claim lists through th
     ['user-info-url', 'https://idp.example/userinfo'],
     ['client-id', 'client'],
     ['client-secret', 'secret'],
-    ['scopes', 'openid, email'],
-    ['username-claims', 'preferred_username, sub'],
-    ['email-claims', 'email'],
   ])
     fireEvent.change(input(`oidc-${field}`), { target: { value } });
   fireEvent.change(screen.getByLabelText(/End-session URL/), { target: { value: 'https://idp.example/logout' } });
   fireEvent.change(screen.getByLabelText(/JWKS URL/), { target: { value: 'https://idp.example/jwks' } });
-  fireEvent.change(screen.getByLabelText('Allowed signing algorithms'), { target: { value: ' ES256, RS256, ' } });
+  const user = userEvent.setup();
+  for (const [field, values] of [
+    ['scopes', ['openid', 'email']],
+    ['username-claims', ['preferred_username', 'sub']],
+    ['email-claims', ['email']],
+    ['signing-algorithms', ['ES256']],
+  ] as const)
+    for (const value of values) await user.type(input(`oidc-${field}`), `${value}{Enter}`);
   expect(input('oidc-client-secret')).toHaveAttribute('type', 'password');
   fireEvent.click(document.querySelector('[data-cy="sso-provider-form-oidc-toggle-client-secret-button"]')!);
   expect(input('oidc-client-secret')).toHaveAttribute('type', 'text');
@@ -89,7 +93,7 @@ it('edits and saves an OIDC provider with credentials and claim lists through th
           issuer: 'https://idp.example',
           endSessionURL: 'https://idp.example/logout',
           jwksURL: 'https://idp.example/jwks',
-          signingAlgorithms: ['ES256', 'RS256'],
+          signingAlgorithms: ['RS256', 'ES256'],
           clientId: 'client',
           clientSecret: 'secret',
           scopes: ['openid', 'email'],
@@ -132,7 +136,7 @@ it('loads existing providers with a fixed protocol and saves updates', async () 
 it.each([
   { mode: 'create', id: 'new', initial: ['RS256'], added: 'ES256' },
   { mode: 'update', id: '8', initial: ['ES256', 'PS256'], added: 'RS256' },
-])('preserves delimiters when typing multiple signing algorithms on $mode', async ({ mode, id, initial, added }) => {
+])('appends signing algorithms in order and never splits on commas on $mode', async ({ mode, id, initial, added }) => {
   if (mode === 'update') {
     state.provider = {
       id: 8,
@@ -148,13 +152,11 @@ it.each([
   }
   mount(id);
   const user = userEvent.setup();
-  const algorithms = screen.getByLabelText('Allowed signing algorithms');
-  const initialText = initial.join(', ');
-  expect(algorithms).toHaveValue(initialText);
-  await user.type(algorithms, ',');
-  expect(algorithms).toHaveValue(`${initialText},`);
-  await user.type(algorithms, ` ${added}, `);
-  expect(algorithms).toHaveValue(`${initialText}, ${added}, `);
+  const algorithms = input('oidc-signing-algorithms');
+  await user.type(algorithms, 'A,B{Enter}');
+  expect(screen.getByText(/cannot contain commas/)).toBeTruthy();
+  await user.clear(algorithms);
+  await user.type(algorithms, `${added}{Enter}`);
   await user.click(screen.getByRole('button', { name: 'Save' }));
   const mutation = mode === 'update' ? state.update : state.create;
   await waitFor(() =>
@@ -167,13 +169,40 @@ it.each([
     ),
   );
 });
-it('keeps the signing-algorithm input empty while editing and applies the default on save', async () => {
+it('adds a list entry with Enter without saving the provider', async () => {
   mount();
   const user = userEvent.setup();
-  const algorithms = screen.getByLabelText('Allowed signing algorithms');
-  await user.clear(algorithms);
-  expect(algorithms).toHaveValue('');
-  // Invoke Save while the input is still focused, without depending on blur to parse it.
+  await user.type(input('oidc-scopes'), 'email{Enter}');
+  expect(state.create).not.toHaveBeenCalled();
+  expect(screen.getByRole('button', { name: /Remove email/ })).toBeTruthy();
+});
+it('saves an entry that was typed but not added when Save is clicked right away', async () => {
+  state.provider = {
+    id: 8,
+    name: 'Existing',
+    type: 'OIDC',
+    oidcConfiguration: { issuer: 'https://idp.example', clientId: 'client', clientSecret: 'secret' },
+  };
+  mount('8');
+  expect(await screen.findByDisplayValue('Existing')).toBeTruthy();
+  const user = userEvent.setup();
+  await user.type(input('oidc-role-claims'), 'realm_access.roles');
+  await user.click(screen.getByRole('button', { name: 'Save' }));
+  await waitFor(() =>
+    expect(state.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestBody: expect.objectContaining({
+          oidcConfiguration: expect.objectContaining({ roleClaimPaths: ['realm_access.roles'] }),
+        }),
+      }),
+    ),
+  );
+});
+it('applies the RS256 default on save when the signing algorithm list is emptied', async () => {
+  mount();
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('button', { name: /Remove RS256/ }));
+  expect(screen.queryByRole('button', { name: /Remove RS256/ })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Save' }));
   await waitFor(() =>
     expect(state.create).toHaveBeenCalledWith({

@@ -49,6 +49,9 @@ importers:
 
   .:
     dependencies:
+      ipaddr.js:
+        specifier: ^2.4.0
+        version: 2.4.0
       mqtt:
         specifier: ^5.15.2
         version: 5.15.2
@@ -131,6 +134,10 @@ packages:
   ip-address@10.2.0:
     resolution: {integrity: sha512-/+S6j4E9AHvW9SWMSEY9Xfy66O5PWvVEJ08O0y5JGyEKQpojb0K0GKpz/v5HJ/G0vi3D2sjGK78119oXZeE0qA==}
     engines: {node: '>= 12'}
+
+  ipaddr.js@2.4.0:
+    resolution: {integrity: sha512-9VGk3HGanVE6JoZXHiCpnGy5X0jYDnN4EA4lntFPj+1vIWlFhIylq2CrrCOJH9EAhc5CYhq18F2Av2tgoAPsYQ==}
+    engines: {node: '>= 10'}
 
   js-sdsl@4.3.0:
     resolution: {integrity: sha512-mifzlm2+5nZ+lEcLJMoBK0/IH/bDg8XnJfd/Wq6IP+xoCjLZsTOnV2QpxlVbX9bMnkl5PdEjNtBJ9Cj1NjifhQ==}
@@ -307,6 +314,8 @@ snapshots:
   inherits@2.0.4: {}
 
   ip-address@10.2.0: {}
+
+  ipaddr.js@2.4.0: {}
 
   js-sdsl@4.3.0: {}
 

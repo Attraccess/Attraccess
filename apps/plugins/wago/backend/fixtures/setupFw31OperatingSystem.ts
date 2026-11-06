@@ -3,6 +3,9 @@ import { join } from 'node:path';
 import { WAGO_DIN, WAGO_DOUT, wagoRuntimeBootScript } from '../host/hardware-deployment';
 import { fw31Model, fw31OsRelease, fw31Revisions } from './fw31-identity';
 import { fw31MinimalOd } from './fw31-minimal-od';
+
+// Fixture-root path of the host dd with FW31 stdout semantics.
+const FW31_HOST_DD = 'host-tools/dd';
 export function setupFw31OperatingSystem({
   root,
   file,
@@ -23,7 +26,6 @@ export function setupFw31OperatingSystem({
     cp: '/bin/cp',
     cmp: '/usr/bin/cmp',
     awk: '/usr/bin/awk',
-    dd: '/bin/dd',
     mkdir: '/bin/mkdir',
     mktemp: '/usr/bin/mktemp',
     mkfifo: '/usr/bin/mkfifo',
@@ -44,6 +46,18 @@ export function setupFw31OperatingSystem({
     symlinkSync(path, join(root, 'bin', name));
 
   file('bin/od', fw31MinimalOd, 0o700);
+
+  // FW31 BusyBox dd, like GNU dd, never truncates standard output. uutils dd
+  // (/bin/dd on Ubuntu 26.04) truncates a regular-file stdout when it copies
+  // zero bytes, which empties an appended upload at end of input. conv=notrunc
+  // restores the FW31 behavior on any host; device scripts must not use it,
+  // since FW31 may lack BusyBox's optional conv/iflag support.
+  file(
+    FW31_HOST_DD,
+    '#!/bin/sh\nfor arg; do case "$arg" in of=*|conv=*) exec /bin/dd "$@" ;; esac; done\nexec /bin/dd "$@" conv=notrunc\n',
+    0o700,
+  );
+  symlinkSync(join(root, FW31_HOST_DD), join(root, 'bin/dd'));
 
   for (const path of ['tmp', 'var/lib', 'home', 'etc/attraccess-wago', 'etc/rc.d/disabled'])
     mkdirSync(join(root, path), { recursive: true, mode: 0o700 });

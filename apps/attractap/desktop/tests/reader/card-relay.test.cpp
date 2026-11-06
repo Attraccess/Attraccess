@@ -58,10 +58,9 @@ void ReaderWorkflow::testCardRelay()
 
     // The server rejects the card; the reader shows it and is ready for the next presentation.
     server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_AUTHENTICATION_FAILED"})"); pump();
-    assert(label(lv_layer_top(), "Anmeldung fehlgeschlagen") || label(lv_layer_top(), "Sign-in failed"));
-    assert(label(lv_layer_top(), "Bitte eine gültige RFID-Karte auflegen.") ||
-           label(lv_layer_top(), "Please tap a valid RFID card."));
-    Display::hidePopup();
+    assert(label(lv_screen_active(), "Anmeldung fehlgeschlagen") || label(lv_screen_active(), "Sign-in failed"));
+    assert(label(lv_screen_active(), "Bitte eine gültige RFID-Karte auflegen.") ||
+           label(lv_screen_active(), "Please tap a valid RFID card."));
 
     // A command too long for the PN532 is dropped before it gets near the card.
     nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
@@ -85,8 +84,7 @@ void ReaderWorkflow::testCardRelay()
     // The server names the reason, so the member knows to hold the card longer.
     server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_REMOVED"})");
     server.push("CARD_CONVERSATION_END", end(second, "c-2")); pump();
-    assert(label(lv_layer_top(), "Karte zu früh entfernt") || label(lv_layer_top(), "Card removed too early"));
-    Display::hidePopup();
+    assert(label(lv_screen_active(), "Karte zu früh entfernt") || label(lv_screen_active(), "Card removed too early"));
 
     // The server turns a card away before any command (here: busy) and ends the detection at once:
     // the reader does not wait 20 s for commands that never come.
@@ -95,11 +93,11 @@ void ReaderWorkflow::testCardRelay()
     const uint32_t third = server.last("CARD_DETECTED")["data"]["payload"]["detectionId"];
     server.push("CARD_AUTHENTICATION_DATA", R"({"error":"BUSY"})");
     server.push("CARD_CONVERSATION_END", end(third)); pump();
-    assert(label(lv_layer_top(), "Server ausgelastet, bitte erneut versuchen") ||
-           label(lv_layer_top(), "Server busy, please try again"));
+    assert(label(lv_screen_active(), "Server ausgelastet, bitte erneut versuchen") ||
+           label(lv_screen_active(), "Server busy, please try again"));
     server.push("CARD_APDU", apdu(third, "c-3", 1, "9060000000")); pump();
     assert(server.count("CARD_APDU_RESPONSE") == responsesBefore + 3);
-    Display::hidePopup(); nfc.setPresent(0, false); pump();
+    nfc.setPresent(0, false); pump();
 
     // Whatever the card did, no key or session state is in anything the reader sent.
     for (const auto &message : server.sent) {

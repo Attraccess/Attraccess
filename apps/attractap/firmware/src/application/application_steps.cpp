@@ -98,7 +98,7 @@ void Application::rejectUiStep(const ui::StepRequest &step)
     return;
   // That START will never be answered now: end its pause and progress instead of waiting for the watchdog.
   this->clearPendingStartLocally();
-  Display::showErrorPopup(FirmwareI18n::Message::ActionFailed, FirmwareI18n::Message::PleaseTryAgain);
+  this->showStatus(StatusScreen::error(FirmwareI18n::Message::ActionFailed, FirmwareI18n::Message::PleaseTryAgain));
 }
 
 void Application::closeUiStep()

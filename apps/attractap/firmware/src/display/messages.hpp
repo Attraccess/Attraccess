@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "../state/language.hpp"
-#include "messages.catalog.hpp"
+#include "messages.catalog.card-relay.hpp"
 
 // Firmware-owned text is identified independently of its displayed wording.
 namespace FirmwareI18n {
@@ -15,7 +15,8 @@ inline const char *messageText(Message id, const std::string &locale) {
         std::fprintf(stderr, "Unknown firmware message identifier: %zu\n", index);
         return "Something went wrong. Please try again.";
     }
-    const auto &entry = catalog[index];
+    constexpr size_t mainEntries = sizeof(catalog) / sizeof(catalog[0]);
+    const auto &entry = index < mainEntries ? catalog[index] : cardRelayCatalog[index - mainEntries];
     return Language::text(entry.en, entry.de, locale);
 }
 
@@ -63,7 +64,8 @@ inline Text formError(const std::string &code) {
     // in the API log and display the English fallback.
     return Text::literal(messageText(Message::InvalidInput, "en"));
 }
-inline Text readerError(const std::string &code) {
+// The localized text for a reader error code, or an empty Text for codes the reader does not know.
+inline Text knownReaderError(const std::string &code) {
     if (code == "USER_NOT_SET") return Message::NoUserSelected;
     if (code == "INVALID_PARAMS") return Message::ErrorInvalidParams;
     if (code == "CARD_ALREADY_ENROLLED") return Message::ErrorCardAlreadyEnrolled;
@@ -105,6 +107,11 @@ inline Text readerError(const std::string &code) {
     if (code == "FIRMWARE_UPDATE_REQUIRED") return Message::ErrorFirmwareUpdateRequired;
     if (code == "READER_NOT_ALLOWED_TO_WRITE_CARDS") return Message::ErrorReaderNotAllowedToWriteCards;
     if (code == "ENROLLMENT_EXPIRED" || code == "RESET_EXPIRED") return Message::ErrorCardOperationExpired;
+    return Text();
+}
+inline Text readerError(const std::string &code) {
+    const Text known = knownReaderError(code);
+    if (!known.empty()) return known;
     std::fprintf(stderr, "Unknown reader error: %s\n", code.c_str());
     // Unknown server errors have no reliable language; preserve English fallback.
     return Text::literal("Something went wrong. Please try again.");

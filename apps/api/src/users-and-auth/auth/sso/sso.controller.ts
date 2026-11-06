@@ -187,6 +187,7 @@ export class SSOController extends SsoUserProvisioning {
             'scopes',
             'usernameClaimPaths',
             'emailClaimPaths',
+            'roleClaimPaths',
             'roleMappings',
             'permissionSyncTtlMinutes',
           ]
@@ -199,6 +200,7 @@ export class SSOController extends SsoUserProvisioning {
             'wantAuthnResponseSigned',
             'forceAuthn',
             'emailAttributeKeys',
+            'roleAttributeKeys',
             'roleMappings',
           ];
     const changed = [

@@ -45,8 +45,12 @@ const SAML_UPDATE_PASSTHROUGH_FIELDS = [
   'wantAuthnResponseSigned',
   'forceAuthn',
   'emailAttributeKeys',
+  'roleAttributeKeys',
   'roleMappings',
 ] as const;
+
+/** An empty list means "use the defaults"; store it as null rather than the `simple-array` empty string. */
+const emptyListToNull = <T>(value: T[] | null | undefined) => (value?.length === 0 ? null : value);
 
 @Injectable()
 export class SSOService {
@@ -215,6 +219,8 @@ export class SSOService {
 
     const newConfig = repository.create({
       ...persistableConfig,
+      emailAttributeKeys: emptyListToNull(persistableConfig.emailAttributeKeys),
+      roleAttributeKeys: emptyListToNull(persistableConfig.roleAttributeKeys),
       certificate: normalizedCertificate,
       provisioningSecret: encryptedProvisioningSecret,
       spSigningCertificate: normalizedSpSigningCertificate,
@@ -252,6 +258,9 @@ export class SSOService {
     const payload: Partial<SAMLConfigEntity> = {};
     for (const key of SAML_UPDATE_PASSTHROUGH_FIELDS) {
       if (config[key] !== undefined) Object.assign(payload, { [key]: config[key] });
+    }
+    for (const key of ['emailAttributeKeys', 'roleAttributeKeys'] as const) {
+      if (config[key] !== undefined) Object.assign(payload, { [key]: emptyListToNull(config[key]) });
     }
     if (typeof config.certificate !== 'undefined') {
       payload.certificate = this.normalizeCertificate(config.certificate);
@@ -373,6 +382,10 @@ export class SSOService {
     const encryptedSecret = this.encryptionService.encrypt(config.clientSecret);
     const newConfig = repository.create({
       ...config,
+      scopes: emptyListToNull(config.scopes),
+      usernameClaimPaths: emptyListToNull(config.usernameClaimPaths),
+      emailClaimPaths: emptyListToNull(config.emailClaimPaths),
+      roleClaimPaths: emptyListToNull(config.roleClaimPaths),
       clientSecret: encryptedSecret,
       ssoProviderId: providerId,
     });
@@ -414,13 +427,17 @@ export class SSOService {
       // empty string means "unchanged" — the frontend never receives the real secret back
     }
     if (typeof updateConfig.scopes !== 'undefined') {
-      payload.scopes = updateConfig.scopes;
+      payload.scopes = emptyListToNull(updateConfig.scopes);
     }
     if (typeof updateConfig.usernameClaimPaths !== 'undefined') {
-      payload.usernameClaimPaths = updateConfig.usernameClaimPaths;
+      payload.usernameClaimPaths = emptyListToNull(updateConfig.usernameClaimPaths);
     }
     if (typeof updateConfig.emailClaimPaths !== 'undefined') {
-      payload.emailClaimPaths = updateConfig.emailClaimPaths;
+      payload.emailClaimPaths = emptyListToNull(updateConfig.emailClaimPaths);
+    }
+    if (typeof updateConfig.roleClaimPaths !== 'undefined') {
+      // explicit null clears the column
+      payload.roleClaimPaths = emptyListToNull(updateConfig.roleClaimPaths);
     }
     if (typeof updateConfig.roleMappings !== 'undefined') {
       // explicit null clears the column
