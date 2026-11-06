@@ -419,11 +419,22 @@ services.attractap-lab.janitor = {
   enable = true;
   # Keyed by place `variant` tag; places without an image are left alone.
   images.attractap-touch-v2 = ./attractap_touch_v2_park.bin;
+  # A place tagged variant=attractap-touch-v2-secure-lab profile=secure-lab.
+  images.attractap-touch-v2-secure-lab = ./attractap_touch_v2_secure_lab_park.hex;
 };
 ```
 
 Build the images with `pnpm nx run attractap-firmware:build-lab`
 (`firmware_output_lab/`). They are never part of an Attraccess release.
+
+A place's `profile` tag says which reader it holds: `plain` (the default) or
+`secure-lab`, a Secure Boot reader provisioned with the public lab keys and
+development-mode flash encryption (ATT-1166). A secure-lab reader boots only
+images signed with the lab key, so its parking image is the
+`attractap-touch-v2-secure-lab-park` firmware variant: `build-lab` signs it with
+the lab key and writes it as Intel HEX (`.hex`), which keeps the gaps between
+partitions unwritten. The janitor writes it with `esptool write-flash --force
+--erase-all --encrypt`.
 
 While anyone holds a reader, the janitor keeps a reservation for it at priority
 1000 (sessions use 0). Labgrid allocates a released reader inside the release
@@ -440,10 +451,17 @@ Full erase also wipes NVS: each session must provision Wi-Fi/API settings
 again, and a previously paired reader needs a new approval of its pairing code
 (see Hardware-in-the-loop tests and Agent and CI workflow).
 
-eFuses cannot be erased. Before erasing, the janitor requires factory values
-for secure boot, flash encryption, key purposes, download mode and USB/JTAG
-disables, and compares raw eFuse blocks with the first dump recorded for the
-chip (`/var/lib/attractap-lab-janitor/efuse-baselines`). A changed eFuse
+eFuses cannot be erased. Before erasing, the janitor checks the security eFuses
+against the place's profile. A `plain` reader needs factory values for secure
+boot, flash encryption, key purposes, download mode and USB/JTAG disables. A
+`secure-lab` reader needs Secure Boot with the lab key digests in KEY0/KEY1 and
+the third digest slot revoked, JTAG off, flash encryption in development mode
+(`DIS_DOWNLOAD_MANUAL_ENCRYPT` unburned) and download mode over USB. The janitor
+also compares every raw eFuse block with the first dump recorded for the chip
+(`/var/lib/attractap-lab-janitor/efuse-baselines`). On secure-lab readers the
+`SECURE_VERSION` bits of BLOCK0 are left out and may only grow (anti-rollback
+burns them when the reader boots an image with a higher secure version). A park image older than that version no
+longer boots, so rebuild it from a branch with the new version. A mismatch
 quarantines the reader immediately; other failures retry, then quarantine after
 `janitor.attempts`. Quarantined readers stay claimed by the janitor without a
 reservation, so sessions skip them and maintenance does not wait for them:
