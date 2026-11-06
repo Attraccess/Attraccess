@@ -96,7 +96,8 @@ function scalar(raw, line) {
 }
 
 function splitEntry(line) {
-  const m = /^\s*(?:'((?:[^']|'')*)'|"([^"]*)"|([^\s'"][^:]*?)):(?:\s+(.*?))?\s*$/.exec(line);
+  // Plain keys may contain `:` (e.g. `pkg@file:../pkg`, tarball URLs); only `:` before a space or the end ends them.
+  const m = /^\s*(?:'((?:[^']|'')*)'|"([^"]*)"|([^\s'"].*?)):(?:\s+(.*?))?\s*$/.exec(line);
   if (!m) throw new Error(`unexpected lockfile line: ${line.trim()}`);
   return { key: m[1] !== undefined ? m[1].replaceAll("''", "'") : (m[2] ?? m[3]), value: scalar(m[4] ?? '', line) };
 }

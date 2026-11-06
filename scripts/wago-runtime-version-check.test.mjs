@@ -203,6 +203,8 @@ const rootPackage = ({
   });
 
 const malformed = (from, to) => lockfile().replace(from, to);
+const local = (version) =>
+  `  other@1.0.0: {}\n\n  local@file:../local-${version}: {}\n\n  xlsx@https://cdn.example/xlsx-${version}.tgz: {}`;
 
 for (const { name, files, pass, message, baseline, cwd } of [
   {
@@ -213,6 +215,12 @@ for (const { name, files, pass, message, baseline, cwd } of [
   {
     name: 'allows a type-only change in the mqtt closure',
     files: { 'pnpm-lock.yaml': lockfile({ types: '8.18.2' }) },
+    pass: true,
+  },
+  {
+    name: 'reads unrelated file: and tarball dependencies',
+    baseline: { 'pnpm-lock.yaml': lockfile().replace('  other@1.0.0: {}', local('1')) },
+    files: { 'pnpm-lock.yaml': lockfile().replace('  other@1.0.0: {}', local('2')) },
     pass: true,
   },
   {
