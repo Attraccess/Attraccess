@@ -1,7 +1,8 @@
-import { PLUGIN_CONTEXT, type PluginAuditPrincipal, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { SidecarClientConfig } from '../client/rest-client';
+import { PLUGIN_CONTEXT } from '../plugin-context';
 import { CONNECTION_ROW_ID, MatterConnection } from './entity';
 import { normalizeUrl, type SettingsInput } from './validation';
 

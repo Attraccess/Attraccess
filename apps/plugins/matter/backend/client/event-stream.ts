@@ -11,7 +11,15 @@ import {
 } from '@attraccess/matter-contract';
 import { randomUUID } from 'node:crypto';
 import { WebSocket } from 'ws';
-import { SidecarClientError, classifyHttpFailure, classifyNetworkError } from './errors';
+import {
+  SidecarClientError,
+  classifyHttpFailure,
+  classifyNetworkError,
+  closedUnexpectedly,
+  fromErrorEnvelope,
+  protocolError,
+  streamSilent,
+} from './errors';
 import type { SidecarHttpClient } from './rest-client';
 import { eventsUrl, parseEndpoint } from './url';
 
@@ -61,6 +69,9 @@ export class SeenEventIds {
   }
 }
 
+/** One connection attempt: its socket, the handlers it reports to, and how it reports its end exactly once. */
+type Link = { socket: WebSocket; handlers: StreamHandlers; finish: (close: StreamClose) => void };
+
 /**
  * Resumable subscriber for `/v1/events`. It keeps the last cursor and the seen event IDs across reconnects, so a new
  * connection resumes without losing or repeating events. Reconnect scheduling belongs to the caller.
@@ -72,14 +83,13 @@ export class SidecarEventStream {
   private streamInstanceId: string | null = null;
   /** Sequence the next event must have, once known. Per stream instance: a new instance never counts as a gap. */
   private expectedSequence: number | null = null;
-  private lastMessageAt = 0;
   private pingTimer: NodeJS.Timeout | undefined;
+  private watchdog: NodeJS.Timeout | undefined;
 
   constructor(
     private readonly client: () => SidecarHttpClient,
     private readonly handlers: StreamHandlers,
     private readonly pingIntervalMs = PING_INTERVAL_MS,
-    private readonly now: () => number = Date.now,
   ) {}
 
   get cursor(): string | null {
@@ -98,12 +108,17 @@ export class SidecarEventStream {
     this.seen.clear();
   }
 
-  connect(url: string): void {
+  /**
+   * Opens a new connection that resumes from the last cursor. `handlers` hears only about this connection, so a
+   * caller can tell one connection attempt from the next.
+   */
+  connect(url: string, handlers: StreamHandlers = this.handlers): void {
     this.disconnect();
     const correlationId = randomUUID();
+    const client = this.client();
     const socket = new WebSocket(eventsUrl(parseEndpoint(url), EVENTS_PATH), {
-      headers: this.client().headers(correlationId),
-      ...this.client().tlsOptions,
+      headers: client.headers(correlationId, HANDSHAKE_TIMEOUT_MS),
+      ...client.tlsOptions,
       handshakeTimeout: HANDSHAKE_TIMEOUT_MS,
       maxPayload: MAX_MESSAGE_BYTES,
       followRedirects: false,
@@ -111,23 +126,27 @@ export class SidecarEventStream {
     this.socket = socket;
     let opened = false;
     let finished = false;
-    const finish = (close: StreamClose) => {
-      if (finished || this.socket !== socket) return;
-      finished = true;
-      this.stopPing();
-      this.socket = null;
-      this.handlers.onClose(close);
+    const link: Link = {
+      socket,
+      handlers,
+      finish: (close) => {
+        if (finished || this.socket !== socket) return;
+        finished = true;
+        this.stopPing();
+        this.socket = null;
+        handlers.onClose(close);
+      },
     };
     socket.on('open', () => {
       opened = true;
-      this.lastMessageAt = this.now();
+      this.watch(link);
     });
     socket.on('message', (data, isBinary) => {
-      this.lastMessageAt = this.now();
-      if (isBinary) return this.protocolError(socket, finish);
+      this.watchdog?.refresh();
+      if (isBinary) return this.protocolError(link);
       const parsed = serverMessageSchema.safeParse(safeJson(String(data)));
-      if (!parsed.success) return this.protocolError(socket, finish);
-      this.handle(socket, parsed.data, finish);
+      if (!parsed.success) return this.protocolError(link);
+      this.handle(link, parsed.data);
     });
     socket.on('unexpected-response', (_request, response) => {
       const chunks: Buffer[] = [];
@@ -139,18 +158,22 @@ export class SidecarEventStream {
           Buffer.concat(chunks).toString('utf8'),
           typeof header === 'string' ? header : null,
         );
-        finish({ code: response.statusCode ?? 0, error, reconcile: false });
+        link.finish({ code: response.statusCode ?? 0, error, reconcile: false });
       });
-      response.on('error', () =>
-        finish({ code: 0, error: classifyNetworkError(new Error('response')), reconcile: false }),
+      response.on('error', (error) =>
+        link.finish({ code: 0, error: classifyNetworkError(error, correlationId), reconcile: false }),
       );
     });
     socket.on('error', (error) => {
-      if (!opened) finish({ code: 0, error: classifyNetworkError(error), reconcile: false });
+      if (!opened) link.finish({ code: 0, error: classifyNetworkError(error, correlationId), reconcile: false });
     });
     socket.on('close', (code) => {
-      const error = code === CLOSE_CODES.normal || code === CLOSE_CODES.tryAgainLater ? null : classifyClose(code);
-      finish({ code, error: opened ? error : (error ?? classifyNetworkError(new Error('closed'))), reconcile: false });
+      const error = code === CLOSE_CODES.normal || code === CLOSE_CODES.tryAgainLater ? null : closedUnexpectedly(code);
+      link.finish({
+        code,
+        error: opened ? error : (error ?? classifyNetworkError(new Error('closed'), correlationId)),
+        reconcile: false,
+      });
     });
   }
 
@@ -162,85 +185,78 @@ export class SidecarEventStream {
     if (!socket) return;
     socket.removeAllListeners('message');
     socket.on('error', () => undefined);
-    if (socket.readyState === WebSocket.OPEN) socket.close(CLOSE_CODES.normal, 'client closing');
-    else if (socket.readyState === WebSocket.CONNECTING) socket.terminate();
+    if (socket.readyState === WebSocket.CONNECTING) socket.terminate();
+    else closeSocket(socket, CLOSE_CODES.normal, 'client closing');
   }
 
-  private handle(socket: WebSocket, message: ServerMessage, finish: (close: StreamClose) => void): void {
+  private handle(link: Link, message: ServerMessage): void {
     switch (message.type) {
       case 'hello':
-        return this.onHello(socket, message);
+        return this.onHello(link, message);
       case 'event':
-        return this.onEvent(socket, message, finish);
+        return this.onEvent(link, message);
       case 'reconciliation-required':
-        return this.reconcile(socket, message.reason, finish);
+        return this.reconcile(link, message.reason);
       case 'error':
-        socket.removeAllListeners('message');
-        socket.close(CLOSE_CODES.normal, 'sidecar reported an error');
-        finish({
-          code: CLOSE_CODES.policyViolation,
-          error: classifyHttpFailure(400, JSON.stringify({ error: message.error })),
-          reconcile: false,
-        });
+        link.socket.removeAllListeners('message');
+        closeSocket(link.socket, CLOSE_CODES.normal, 'sidecar reported an error');
+        link.finish({ code: CLOSE_CODES.policyViolation, error: fromErrorEnvelope(message.error), reconcile: false });
         return;
       case 'pong':
         return;
     }
   }
 
-  private onHello(socket: WebSocket, hello: Extract<ServerMessage, { type: 'hello' }>): void {
+  private onHello(link: Link, hello: Extract<ServerMessage, { type: 'hello' }>): void {
     this.streamInstanceId = hello.streamInstanceId;
     const cursor = this.lastCursor;
     // The expected sequence only exists when resuming a known cursor. Without one this is a fresh start.
     this.expectedSequence = cursor ? (parseCursor(cursor)?.sequence ?? 0) + 1 : null;
-    socket.send(JSON.stringify({ type: 'resume', wireVersion: WIRE_VERSION, ...(cursor ? { cursor } : {}) }));
-    this.startPing(socket);
-    this.handlers.onHello();
+    link.socket.send(JSON.stringify({ type: 'resume', wireVersion: WIRE_VERSION, ...(cursor ? { cursor } : {}) }));
+    this.startPing(link.socket);
+    link.handlers.onHello();
   }
 
-  private onEvent(
-    socket: WebSocket,
-    message: Extract<ServerMessage, { type: 'event' }>,
-    finish: (close: StreamClose) => void,
-  ): void {
+  private onEvent(link: Link, message: Extract<ServerMessage, { type: 'event' }>): void {
     const { event } = message;
     if (!this.seen.add(event.eventId)) return; // a duplicate: consumers see it once
     const wrongStream = this.streamInstanceId !== null && event.streamInstanceId !== this.streamInstanceId;
     const gap = this.expectedSequence !== null && event.sequence !== this.expectedSequence;
-    if (wrongStream || gap) return this.reconcile(socket, wrongStream ? 'foreign-stream' : 'sequence-gap', finish);
+    if (wrongStream || gap) return this.reconcile(link, wrongStream ? 'foreign-stream' : 'sequence-gap');
     this.expectedSequence = event.sequence + 1;
     this.lastCursor = message.cursor;
-    this.handlers.onEvent({ cursor: message.cursor, event });
+    link.handlers.onEvent({ cursor: message.cursor, event });
   }
 
   /** Nothing is skipped silently: the consumer is told, state is dropped, and the next connection starts fresh. */
-  private reconcile(socket: WebSocket, reason: ReconciliationReason, finish: (close: StreamClose) => void): void {
+  private reconcile(link: Link, reason: ReconciliationReason): void {
     this.reset();
-    this.handlers.onReconciliationRequired(reason);
+    link.handlers.onReconciliationRequired(reason);
     this.stopPing();
-    socket.removeAllListeners('message');
-    if (socket.readyState === WebSocket.OPEN) socket.close(CLOSE_CODES.normal, 'reconciliation required');
-    finish({ code: CLOSE_CODES.normal, error: null, reconcile: true });
+    link.socket.removeAllListeners('message');
+    closeSocket(link.socket, CLOSE_CODES.normal, 'reconciliation required');
+    link.finish({ code: CLOSE_CODES.normal, error: null, reconcile: true });
   }
 
-  private protocolError(socket: WebSocket, finish: (close: StreamClose) => void): void {
-    socket.removeAllListeners('message');
-    socket.close(CLOSE_CODES.policyViolation, 'invalid message');
-    finish({
-      code: CLOSE_CODES.policyViolation,
-      error: classifyHttpFailure(502, 'invalid message from the sidecar'),
-      reconcile: false,
-    });
+  private protocolError(link: Link): void {
+    link.socket.removeAllListeners('message');
+    closeSocket(link.socket, CLOSE_CODES.policyViolation, 'invalid message');
+    link.finish({ code: CLOSE_CODES.policyViolation, error: protocolError(), reconcile: false });
   }
 
   /** Detects half-open connections: no message (not even a pong) within two intervals means the link is dead. */
+  private watch(link: Link): void {
+    clearTimeout(this.watchdog);
+    this.watchdog = setTimeout(() => {
+      link.finish({ code: 0, error: streamSilent(), reconcile: false });
+      link.socket.terminate();
+    }, this.pingIntervalMs * 2);
+    this.watchdog.unref();
+  }
+
   private startPing(socket: WebSocket): void {
-    this.stopPing();
+    clearInterval(this.pingTimer);
     this.pingTimer = setInterval(() => {
-      if (this.now() - this.lastMessageAt > this.pingIntervalMs * 2) {
-        socket.terminate();
-        return;
-      }
       if (socket.readyState === WebSocket.OPEN)
         socket.send(JSON.stringify({ type: 'ping', wireVersion: WIRE_VERSION }));
     }, this.pingIntervalMs);
@@ -249,8 +265,21 @@ export class SidecarEventStream {
 
   private stopPing(): void {
     clearInterval(this.pingTimer);
-    this.pingTimer = undefined;
+    clearTimeout(this.watchdog);
+    this.pingTimer = this.watchdog = undefined;
   }
+}
+
+/** A close frame the other side never answers would keep the socket for ws's 30 s close timeout. */
+const CLOSE_GRACE_MS = 1_000;
+
+/** Sends a close frame and, should the other side never answer it, drops the socket shortly after. */
+function closeSocket(socket: WebSocket, code: number, reason: string): void {
+  if (socket.readyState === WebSocket.OPEN) socket.close(code, reason);
+  if (socket.readyState === WebSocket.CLOSED) return;
+  const timer = setTimeout(() => socket.terminate(), CLOSE_GRACE_MS);
+  timer.unref();
+  socket.once('close', () => clearTimeout(timer));
 }
 
 function safeJson(text: string): unknown {
@@ -259,8 +288,4 @@ function safeJson(text: string): unknown {
   } catch {
     return undefined;
   }
-}
-
-function classifyClose(code: number): SidecarClientError {
-  return classifyNetworkError(Object.assign(new Error(`WebSocket closed with ${code}`), { code: 'ECONNRESET' }));
 }

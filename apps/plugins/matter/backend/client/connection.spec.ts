@@ -1,9 +1,11 @@
+import { CLOSE_CODES, UNAUTHORIZED_MESSAGE, type CapabilityReport } from '@attraccess/matter-contract';
 import { randomUUID } from 'node:crypto';
 import { selfSignedCertificate } from '../testing/certs';
 import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
 import { SidecarConnection, type ConnectionStatus } from './connection';
-import { SidecarUnavailableError } from './errors';
+import { SidecarAbortedError, SidecarUnavailableError } from './errors';
 import { BACKOFF_CAP_MS } from './backoff';
+import { SidecarHttpClient } from './rest-client';
 
 async function until(predicate: () => boolean, timeoutMs = 4_000) {
   const deadline = Date.now() + timeoutMs;
@@ -73,7 +75,9 @@ describe('SidecarConnection', () => {
     fake = await FakeSidecar.start({ prefix: '/matter' });
     create().configure({ url: fake.url, token: TOKEN });
     await until(() => connection.status().state === 'connected');
-    expect(fake.requests.every((request) => request.path.startsWith('/'))).toBe(true);
+    expect(fake.requests.map((request) => request.path)).toEqual(['/version', '/v1/capabilities']);
+    expect(fake.requests.every((request) => request.prefixed)).toBe(true);
+    expect(fake.upgrades).toMatchObject([{ path: '/v1/events', prefixed: true }]);
     expect(fake.sockets.size).toBe(1);
   });
 
@@ -114,16 +118,81 @@ describe('SidecarConnection', () => {
     fake = await FakeSidecar.start();
     create().configure({ url: fake.url, token: TOKEN });
     await until(() => connection.status().state === 'connected');
-    const received: number[] = [];
-    connection.onEvent(({ event }) => received.push(event.sequence));
+    const received: string[] = [];
+    connection.onEvent(({ cursor }) => received.push(cursor));
     fake.broadcast(fake.nextEvent());
-    await until(() => received.length === 1);
+    fake.broadcast(fake.nextEvent());
+    await until(() => received.length === 2);
     fake.killSockets();
     await until(() => connection.status().state === 'degraded');
     expect(connection.status().reason).toBe('unavailable');
     await until(() => connection.status().state === 'connected');
     await until(() => fake?.resumes.length === 2);
-    expect(fake.resumes[1].cursor).toMatch(/.+/);
+    expect(fake.resumes[1].cursor).toBe(received[1]);
+  });
+
+  it('keeps the cursor across a settings change, so events published meanwhile are replayed', async () => {
+    fake = await FakeSidecar.start();
+    create().configure({ url: fake.url, token: TOKEN });
+    await until(() => connection.status().state === 'connected');
+    const received: string[] = [];
+    const signals: string[] = [];
+    connection.onEvent(({ cursor }) => received.push(cursor));
+    connection.onReconciliationRequired((reason) => signals.push(reason));
+    fake.broadcast(fake.nextEvent());
+    await until(() => received.length === 1);
+    connection.configure({ url: `${fake.url}/`, token: TOKEN, caCertificate: null });
+    await until(() => fake?.resumes.length === 2);
+    expect(fake.resumes[1].cursor).toBe(received[0]);
+    await until(() => connection.status().state === 'connected');
+    expect(signals).toEqual([]);
+  });
+
+  it('backs off on repeated slow-client closes (1013) without cutting off requests in flight', async () => {
+    fake = await FakeSidecar.start();
+    create({ random: () => 0.5 }).configure({ url: fake.url, token: TOKEN });
+    await until(() => connection.status().state === 'connected');
+    fake.restOverride = (req) => (req.url === '/v1/fabric' ? undefined : 'pass'); // fabric.get never answers
+    let settled = false;
+    const inFlight = connection.request('fabric.get');
+    void inFlight.catch(() => undefined).finally(() => (settled = true));
+    for (const socket of fake.sockets) socket.close(CLOSE_CODES.tryAgainLater, 'slow');
+    await until(() => logs.some((line) => line.includes('reconnecting in 500 ms')));
+    await until(() => connection.status().state === 'connected' && fake?.sockets.size === 1);
+    for (const socket of fake.sockets) socket.close(CLOSE_CODES.tryAgainLater, 'slow');
+    await until(() => logs.some((line) => line.includes('reconnecting in 1000 ms')));
+    await until(() => connection.status().state === 'connected');
+    expect(fake.resumes.at(-1)?.cursor).toBeUndefined(); // no events yet, so nothing to resume from
+    // Only the event stream reconnected: the REST request is still waiting, and stop() still aborts it.
+    expect(settled).toBe(false);
+    connection.stop();
+    await expect(inFlight).rejects.toBeInstanceOf(SidecarAbortedError);
+  });
+
+  it('reports a physical request that may have reached the sidecar as uncertain', async () => {
+    fake = await FakeSidecar.start();
+    create().configure({ url: fake.url, token: TOKEN });
+    await until(() => connection.status().state === 'connected');
+    fake.restOverride = (req) => void req.socket.destroy();
+    const before = fake.requests.length;
+    const failure = await connection
+      .request('fabric.create', { body: { label: 'Makerspace' } })
+      .catch((error) => error);
+    expect(failure).toMatchObject({ kind: 'unavailable', retryable: false, outcome: 'uncertain' });
+    expect(fake.requests.length).toBe(before + 1);
+  });
+
+  it('types requests from the contract', async () => {
+    fake = await FakeSidecar.start();
+    create().configure({ url: fake.url, token: TOKEN });
+    await until(() => connection.status().state === 'connected');
+    const report: CapabilityReport = await connection.request('health.capabilities');
+    expect(report.capabilities).toHaveLength(8);
+    // @ts-expect-error /version does not answer with a capability report
+    const wrong: () => Promise<CapabilityReport> = () => connection.request('health.version');
+    // @ts-expect-error fabric.create needs a body
+    const missing = () => connection.request('fabric.create', {});
+    expect([typeof wrong, typeof missing]).toEqual(['function', 'function']);
   });
 
   it('raises the reconciliation signal to subscribers on a sequence gap and reconnects fresh', async () => {
@@ -154,14 +223,12 @@ describe('SidecarConnection', () => {
     fake = await FakeSidecar.start({ tokens: ['another-token-0123456789abcdef0123456789'] });
     create().configure({ url: fake.url, token: TOKEN });
     await until(() => connection.status().reason === 'unauthorized');
-    expect(connection.status().lastError?.message).toBe(
-      'A valid service token is required: send "Authorization: Bearer <token>".',
-    );
+    expect(connection.status().lastError?.message).toBe(UNAUTHORIZED_MESSAGE);
     fake.restOverride = (_req, res) => {
       const body = JSON.stringify({
         error: {
           code: 'unauthorized',
-          message: 'rejected Bearer hunter2hunter2hunter2 here',
+          message: `${UNAUTHORIZED_MESSAGE} rejected Bearer hunter2hunter2hunter2 here`,
           correlationId: randomUUID(),
           retryable: false,
         },
@@ -171,7 +238,7 @@ describe('SidecarConnection', () => {
     };
     connection.configure({ url: fake.url, token: `${TOKEN}-changed` });
     await until(() => connection.status().lastError?.message.includes('here') === true);
-    expect(connection.status().lastError?.message).toBe('rejected Bearer [redacted] here');
+    expect(connection.status().lastError?.message).toBe(`${UNAUTHORIZED_MESSAGE} rejected Bearer [redacted] here`);
   });
 
   it('reconnects immediately when the settings change', async () => {
@@ -258,16 +325,56 @@ describe('SidecarConnection', () => {
     expect(logs.join('\n')).toMatch(/next attempt in 900 ms/); // not 1800: the attempt counter was reset
   });
 
-  it('closes the socket, aborts requests and starts nothing after stop', async () => {
+  it('closes the socket with 1000, aborts requests and starts nothing after stop', async () => {
     fake = await FakeSidecar.start();
     create().configure({ url: fake.url, token: TOKEN });
     await until(() => connection.status().state === 'connected');
+    fake.restOverride = () => undefined; // never answers
+    const inFlight = connection.request('fabric.get');
+    await until(() => fake?.requests.at(-1)?.path === '/v1/fabric');
     connection.stop();
+    await expect(inFlight).rejects.toBeInstanceOf(SidecarAbortedError);
     await until(() => fake?.sockets.size === 0);
+    expect(fake.closeCodes).toEqual([CLOSE_CODES.normal]);
     const count = fake.requests.length;
     connection.configure({ url: fake.url, token: TOKEN }); // ignored once stopped
     await new Promise((resolve) => setTimeout(resolve, 150));
     expect(fake.requests.length).toBe(count);
+  });
+
+  it('logs an unexpected error at warn, scrubbed, as internal_error rather than a URL problem', async () => {
+    fake = await FakeSidecar.start();
+    const version = jest
+      .spyOn(SidecarHttpClient.prototype, 'version')
+      .mockRejectedValueOnce(new TypeError(`boom Bearer ${TOKEN}`));
+    create().configure({ url: fake.url, token: TOKEN });
+    await until(() => connection.status().state === 'degraded');
+    version.mockRestore();
+    expect(connection.status()).toMatchObject({ reason: 'misconfigured', lastError: { code: 'internal_error' } });
+    expect(logs.find((line) => line.startsWith('warn:'))).toMatch(/TypeError: boom Bearer \[redacted\]/);
+    expect(logs.join('\n')).not.toContain(TOKEN);
+  });
+
+  it('masks a token the sidecar echoes in a REST 401, a WebSocket-upgrade 401 or a stream error message', async () => {
+    fake = await FakeSidecar.start({ tokens: ['another-token-0123456789abcdef0123456789'] });
+    fake.unauthorizedMessage = `rejected ${TOKEN}, sent as Bearer ${TOKEN}`;
+    create().configure({ url: fake.url, token: TOKEN });
+    await until(() => connection.status().reason === 'unauthorized');
+    const whileUnauthorized = JSON.stringify(connection.status());
+    expect(connection.status().lastError?.message).toBe('rejected [redacted], sent as Bearer [redacted]');
+    fake.tokens = [TOKEN];
+    fake.rejectUpgrades = true;
+    connection.configure({ url: fake.url, token: TOKEN });
+    await until(() => fake?.upgrades.length === 1 && connection.status().reason === 'unauthorized');
+    const afterUpgrade = JSON.stringify(connection.status());
+    fake.rejectUpgrades = false;
+    fake.onResume = (socket) => fake?.sendError(socket, 'unauthorized', `revoked Bearer ${TOKEN} and ${TOKEN}`);
+    connection.configure({ url: fake.url, token: TOKEN });
+    await until(() => connection.status().lastError?.message.startsWith('revoked') === true);
+    expect(connection.status().lastError?.message).toBe('revoked Bearer [redacted] and [redacted]');
+    const everything = JSON.stringify({ logs, states, whileUnauthorized, afterUpgrade, status: connection.status() });
+    expect(everything).not.toContain(TOKEN);
+    expect(everything).toContain('[redacted]');
   });
 
   it('never writes the token or an Authorization header into logs, errors or status', async () => {

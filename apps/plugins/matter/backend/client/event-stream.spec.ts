@@ -1,8 +1,16 @@
-import { CLOSE_CODES, parseCursor } from '@attraccess/matter-contract';
+import { CLOSE_CODES, DEFAULT_REPLAY_MAX_EVENTS, parseCursor } from '@attraccess/matter-contract';
+import type { WebSocket } from 'ws';
 import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
-import { SeenEventIds, SidecarEventStream, type StreamClose, type StreamEvent } from './event-stream';
+import {
+  PING_INTERVAL_MS,
+  SEEN_EVENT_IDS,
+  SeenEventIds,
+  SidecarEventStream,
+  type StreamClose,
+  type StreamEvent,
+} from './event-stream';
 import { SidecarHttpClient } from './rest-client';
-import { SidecarUnauthorizedError } from './errors';
+import { SidecarUnauthorizedError, SidecarUnavailableError } from './errors';
 
 const identity = { attraccessVersion: HOST_VERSION, pluginVersion: entry.plugin, sidecarVersion: entry.sidecar };
 
@@ -13,6 +21,14 @@ async function until(predicate: () => boolean, timeoutMs = 3_000) {
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
+
+describe('event-stream limits', () => {
+  it('remembers at least the 1000 event IDs a replay can repeat, and pings every 30 s', () => {
+    expect(SEEN_EVENT_IDS).toBeGreaterThanOrEqual(1000);
+    expect(SEEN_EVENT_IDS).toBeGreaterThanOrEqual(DEFAULT_REPLAY_MAX_EVENTS);
+    expect(PING_INTERVAL_MS).toBe(30_000);
+  });
+});
 
 describe('SeenEventIds', () => {
   it('is bounded and forgets the oldest ID first', () => {
@@ -170,17 +186,22 @@ describe('SidecarEventStream', () => {
     expect(closes[0].error).toBeInstanceOf(SidecarUnauthorizedError);
   });
 
-  it('sends a ping every interval and reconnects when nothing arrives for two intervals', async () => {
+  it('sends a ping every interval and gives up when nothing arrives for two intervals', async () => {
     fake.answerPings = false;
-    open(40);
+    open(100);
     await until(() => hellos === 1);
+    const helloAt = Date.now();
     await until(() => closes.length === 1, 3_000); // no pong: the half-open link is detected
+    // The watchdog fires two intervals after the last message (the hello), not on a later interval tick.
+    expect(Date.now() - helloAt).toBeLessThan(290);
     expect(fake.pings.length).toBeGreaterThanOrEqual(1);
-    expect(closes[0].error).not.toBeNull();
+    expect(closes[0].error).toBeInstanceOf(SidecarUnavailableError);
+    expect(closes[0].error?.message).toMatch(/stopped answering pings/);
   });
 
   it('stays connected while the sidecar answers pings', async () => {
-    open(30);
+    // Pongs arrive within milliseconds; an interval this long keeps the two-interval watchdog far away.
+    open(200);
     await until(() => fake.pings.length >= 3);
     expect(closes).toHaveLength(0);
   });
@@ -201,6 +222,72 @@ describe('SidecarEventStream', () => {
     await until(() => hellos === 1);
     stream.disconnect();
     await until(() => fake.sockets.size === 0);
+    expect(closes).toHaveLength(0);
+    expect(fake.closeCodes).toEqual([CLOSE_CODES.normal]);
+  });
+
+  it('drops a socket whose peer never answers the close frame instead of waiting 30 s', async () => {
+    open();
+    await until(() => hellos === 1);
+    for (const socket of fake.sockets) (socket as unknown as { _socket: { pause(): void } })._socket.pause();
+    const client = (stream as unknown as { socket: WebSocket }).socket;
+    stream.disconnect();
+    await until(() => client.readyState === client.CLOSED, 2_500);
+  });
+
+  it('sends every request header on the upgrade, including the deadline and the credential', async () => {
+    open();
+    await until(() => hellos === 1);
+    expect(fake.upgrades).toHaveLength(1);
+    expect(fake.upgrades[0].headers).toMatchObject({
+      'x-matter-wire-version': '1',
+      'x-attraccess-version': HOST_VERSION,
+      'x-matter-plugin-version': entry.plugin,
+      'x-matter-sidecar-version': entry.sidecar,
+      'x-correlation-id': expect.stringMatching(/^[0-9a-f-]{36}$/),
+      'x-request-deadline-ms': expect.stringMatching(/^\d+$/),
+      authorization: `Bearer ${TOKEN}`,
+    });
+  });
+
+  it('reports a sidecar error message by its contract code, and an invalid message as a protocol error', async () => {
+    fake.onResume = (socket) => fake.sendError(socket, 'unauthorized', 'The token was revoked.');
+    open();
+    await until(() => closes.length === 1);
+    expect(closes[0].error).toBeInstanceOf(SidecarUnauthorizedError);
+    expect(closes[0].error).toMatchObject({ message: 'The token was revoked.', status: undefined });
+    fake.onResume = (socket) => socket.send('{"type":"nonsense"}');
+    stream.connect(fake.url);
+    await until(() => closes.length === 2);
+    expect(closes[1].error).toMatchObject({ kind: 'unavailable', code: 'invalid_response' });
+    expect(closes[1].error?.message).not.toMatch(/HTTP/);
+  });
+
+  it('reports an unexpected close code as such, not as a made-up network error', async () => {
+    open();
+    await until(() => hellos === 1);
+    for (const socket of fake.sockets) socket.close(1011, 'internal');
+    await until(() => closes.length === 1);
+    expect(closes[0]).toMatchObject({ code: 1011, reconcile: false });
+    expect(closes[0].error?.message).toContain('1011');
+    expect(closes[0].error?.message).not.toMatch(/ECONNRESET/);
+  });
+
+  it('reports each connection only to the handlers it was opened with', async () => {
+    open();
+    await until(() => hellos === 1);
+    const second: StreamClose[] = [];
+    let secondHellos = 0;
+    stream.connect(fake.url, {
+      onHello: () => (secondHellos += 1),
+      onEvent: () => undefined,
+      onReconciliationRequired: () => undefined,
+      onClose: (close) => second.push(close),
+    });
+    await until(() => secondHellos === 1);
+    fake.killSockets();
+    await until(() => second.length === 1);
+    expect(hellos).toBe(1);
     expect(closes).toHaveLength(0);
   });
 });

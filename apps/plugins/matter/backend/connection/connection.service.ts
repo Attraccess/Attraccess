@@ -1,4 +1,4 @@
-import { PLUGIN_CONTEXT, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import {
   Inject,
   Injectable,
@@ -7,6 +7,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import { SidecarConnection } from '../client/connection';
+import { PLUGIN_CONTEXT } from '../plugin-context';
 import { CredentialUnreadableError, MatterSettingsService } from './settings.service';
 
 /**

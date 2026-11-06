@@ -175,6 +175,18 @@ describe('Matter connection settings API', () => {
     old.service.onModuleDestroy();
   });
 
+  it('audits a saved or removed configuration even when reconnecting fails', async () => {
+    const harness = await setup();
+    service = harness.service;
+    jest.spyOn(harness.service, 'reload').mockRejectedValue(new Error('reload failed'));
+    await expect(harness.controller.put({ url: 'http://127.0.0.1:1', credential: TOKEN }, request())).rejects.toThrow(
+      'reload failed',
+    );
+    await expect(harness.controller.remove(request())).rejects.toThrow('reload failed');
+    expect(harness.audit).toHaveBeenNthCalledWith(1, expect.objectContaining({ action: 'matter.connection_saved' }));
+    expect(harness.audit).toHaveBeenNthCalledWith(2, expect.objectContaining({ action: 'matter.connection_removed' }));
+  });
+
   it('survives a failing audit sink', async () => {
     const harness = await setup();
     service = harness.service;

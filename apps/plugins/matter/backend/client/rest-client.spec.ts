@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { getCACertificates } from 'node:tls';
 import { selfSignedCertificate } from '../testing/certs';
 import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
 import {
@@ -11,9 +12,11 @@ import {
   SidecarUnauthorizedError,
   SidecarUnavailableError,
 } from './errors';
-import { SidecarHttpClient } from './rest-client';
+import { SidecarHttpClient, trustedAuthorities } from './rest-client';
 
 const identity = { attraccessVersion: HOST_VERSION, pluginVersion: entry.plugin, sidecarVersion: entry.sidecar };
+const CORRELATION_ID = '11111111-1111-4111-8111-111111111111';
+const fabric = { body: { label: 'Makerspace' } };
 
 describe('SidecarHttpClient', () => {
   let fake: FakeSidecar;
@@ -145,8 +148,94 @@ describe('SidecarHttpClient', () => {
     await expect(client().call('inventory.get', { params: { nodeId: 'not-a-node' } })).rejects.toBeInstanceOf(
       SidecarRequestError,
     );
+    // @ts-expect-error the body is typed from the contract, so this does not even compile
     await expect(client().call('fabric.create', { body: { bogus: true } })).rejects.toBeInstanceOf(SidecarRequestError);
     expect(fake.requests).toHaveLength(0);
+  });
+
+  it('reports a physical operation that timed out as uncertain, and sends it exactly once', async () => {
+    fake = await FakeSidecar.start();
+    fake.restOverride = () => undefined; // never answers
+    const failure = await client({}, 100)
+      .call('fabric.create', { ...fabric, correlationId: CORRELATION_ID })
+      .catch((error) => error);
+    expect(failure).toBeInstanceOf(SidecarTimeoutError);
+    expect(failure).toMatchObject({ outcome: 'uncertain', retryable: false, correlationId: CORRELATION_ID });
+    expect(fake.requests).toHaveLength(1);
+  });
+
+  it('reports a physical operation whose connection reset after it was sent as uncertain', async () => {
+    fake = await FakeSidecar.start();
+    fake.restOverride = (req) => void req.socket.destroy();
+    const failure = await client()
+      .call('fabric.create', { ...fabric, correlationId: CORRELATION_ID })
+      .catch((error) => error);
+    expect(failure).toBeInstanceOf(SidecarUnavailableError);
+    expect(failure).toMatchObject({ outcome: 'uncertain', retryable: false, correlationId: CORRELATION_ID });
+    expect(fake.requests).toHaveLength(1);
+    // The same failure on a read is an ordinary, retryable network error.
+    const read = await client()
+      .call('fabric.get')
+      .catch((error) => error);
+    expect(read).toMatchObject({ kind: 'unavailable', retryable: true, outcome: undefined });
+  });
+
+  it('reports a physical operation cancelled after it was sent as uncertain', async () => {
+    fake = await FakeSidecar.start();
+    fake.restOverride = () => undefined;
+    const controller = new AbortController();
+    const pending = client().call('fabric.create', { ...fabric, signal: controller.signal });
+    setTimeout(() => controller.abort(), 50);
+    await expect(pending).rejects.toMatchObject({ kind: 'aborted', outcome: 'uncertain', retryable: false });
+  });
+
+  it('reports a proxy gateway error on a physical operation as uncertain, but not on a read', async () => {
+    fake = await FakeSidecar.start();
+    fake.restOverride = (_req, res) =>
+      void res.writeHead(502, { 'content-type': 'text/html' }).end('<h1>Bad Gateway</h1>');
+    const failure = await client()
+      .call('fabric.create', fabric)
+      .catch((error) => error);
+    expect(failure).toBeInstanceOf(SidecarUnavailableError);
+    expect(failure).toMatchObject({ status: 502, outcome: 'uncertain', retryable: false });
+    const read = await client()
+      .call('fabric.get')
+      .catch((error) => error);
+    expect(read).toMatchObject({ status: 502, retryable: true, outcome: undefined });
+  });
+
+  it('keeps a physical operation that never reached the sidecar retryable, with its correlation ID', async () => {
+    fake = await FakeSidecar.start();
+    const url = fake.url;
+    await fake.stop();
+    const failure = await new SidecarHttpClient({ url, token: TOKEN }, identity)
+      .call('fabric.create', { ...fabric, correlationId: CORRELATION_ID })
+      .catch((error) => error);
+    expect(failure).toBeInstanceOf(SidecarUnavailableError);
+    expect(failure).toMatchObject({ retryable: true, outcome: undefined, correlationId: CORRELATION_ID });
+  });
+
+  it('answers an unsupported wire version (426) with an incompatible error that carries the details', async () => {
+    fake = await FakeSidecar.start();
+    fake.restOverride = (_req, res) => {
+      res.writeHead(426, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          error: {
+            code: 'unsupported_wire_version',
+            message: 'Missing, malformed or unsupported wire version. Supported wire version: 1.',
+            correlationId: CORRELATION_ID,
+            retryable: false,
+            details: { supportedWireVersion: 1 },
+          },
+        }),
+      );
+    };
+    const failure = await client()
+      .capabilities()
+      .catch((error) => error);
+    expect(failure).toBeInstanceOf(SidecarIncompatibleError);
+    expect(failure).toMatchObject({ status: 426, details: { supportedWireVersion: 1 }, correlationId: CORRELATION_ID });
   });
 
   it('never puts the token into an error message', async () => {
@@ -174,6 +263,16 @@ describe('SidecarHttpClient over TLS', () => {
     const failure = await new SidecarHttpClient({ url: fake.url, token: TOKEN }, identity).version().catch((e) => e);
     expect(failure).toBeInstanceOf(SidecarMisconfiguredError);
     expect(failure.code).toBe('tls');
+  });
+
+  it('trusts the default store (with NODE_EXTRA_CA_CERTS) plus the CA, built once per client', async () => {
+    const { cert } = await selfSignedCertificate();
+    expect(trustedAuthorities(cert)).toEqual([...getCACertificates('default'), cert]);
+    expect(trustedAuthorities(null)).toEqual([]);
+    const client = new SidecarHttpClient({ url: 'https://127.0.0.1:1', token: TOKEN, caCertificate: cert }, identity);
+    expect(client.tlsOptions.secureContext).toBeDefined();
+    expect(client.tlsOptions.secureContext).toBe(client.tlsOptions.secureContext);
+    expect(new SidecarHttpClient({ url: 'https://127.0.0.1:1', token: TOKEN }, identity).tlsOptions).toEqual({});
   });
 
   it('has no way to skip certificate verification', () => {

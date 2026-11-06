@@ -5,6 +5,7 @@ import {
   HEADER_PLUGIN_VERSION,
   HEADER_SIDECAR_VERSION,
   HEADER_WIRE_VERSION,
+  UNAUTHORIZED_MESSAGE,
   formatCursor,
   type EventEnvelope,
 } from '@attraccess/matter-contract';
@@ -38,9 +39,6 @@ export type FakeOptions = {
   port?: number;
 };
 
-/** The sidecar's real 401 hint, which names the header format and must reach the admin intact. */
-const UNAUTHORIZED_MESSAGE = 'A valid service token is required: send "Authorization: Bearer <token>".';
-
 const error = (res: ServerResponse, status: number, code: string, message: string, details?: unknown) => {
   const body = JSON.stringify({
     error: { code, message, correlationId: randomUUID(), retryable: status === 503, ...(details ? { details } : {}) },
@@ -51,18 +49,26 @@ const error = (res: ServerResponse, status: number, code: string, message: strin
 
 /** A stand-in for the Matter sidecar that speaks just enough of the wire contract for the client under test. */
 export class FakeSidecar {
-  readonly requests: { method: string; path: string; headers: IncomingMessage['headers'] }[] = [];
+  /** `prefixed`: the request carried the configured reverse-proxy prefix (always true without one). */
+  readonly requests: { method: string; path: string; prefixed: boolean; headers: IncomingMessage['headers'] }[] = [];
+  readonly upgrades: { path: string; prefixed: boolean; headers: IncomingMessage['headers'] }[] = [];
+  /** The close code of every event-stream socket, as this side saw it. */
+  readonly closeCodes: number[] = [];
   readonly resumes: { cursor?: string }[] = [];
   readonly pings: number[] = [];
   readonly sockets = new Set<WebSocket>();
   streamInstanceId: string = randomUUID();
   tokens: string[];
   sidecarVersion: string;
-  /** Answer REST requests with this instead of the normal behaviour. */
-  restOverride: ((req: IncomingMessage, res: ServerResponse) => void) | null = null;
+  /** Answer REST requests with this instead of the normal behaviour; returning `'pass'` falls through to it. */
+  restOverride: ((req: IncomingMessage, res: ServerResponse) => void | 'pass') | null = null;
+  /** Refuse every event-stream upgrade with 401, while REST requests are still served. */
+  rejectUpgrades = false;
   /** Called after each resume message, so a test can replay or refuse. */
   onResume: ((socket: WebSocket, message: { cursor?: string }) => void) | null = null;
   answerPings = true;
+  /** Replaces the sidecar's 401 message, such as with one that echoes a credential. */
+  unauthorizedMessage = UNAUTHORIZED_MESSAGE;
   private readonly server: Server;
   private readonly wss = new WebSocketServer({ noServer: true });
   port = 0;
@@ -76,11 +82,18 @@ export class FakeSidecar {
       ? createHttpsServer({ cert: options.tls.cert, key: options.tls.key }, listener)
       : createHttpServer(listener);
     this.server.on('upgrade', (req, socket, head) => {
-      if (req.url !== `${options.prefix ?? ''}/v1/events`) {
+      const prefix = options.prefix ?? '';
+      const prefixed = (req.url ?? '').startsWith(prefix);
+      this.upgrades.push({
+        path: prefixed ? (req.url ?? '').slice(prefix.length) : (req.url ?? ''),
+        prefixed,
+        headers: req.headers,
+      });
+      if (req.url !== `${prefix}/v1/events`) {
         socket.end('HTTP/1.1 404 not_found\r\nconnection: close\r\n\r\n');
         return;
       }
-      const refusal = this.refusal(req);
+      const refusal = this.refusal(req, true);
       if (refusal) {
         socket.end(
           `HTTP/1.1 ${refusal.status} refused\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n${refusal.body}`,
@@ -115,14 +128,14 @@ export class FakeSidecar {
     );
   }
 
-  private refusal(req: IncomingMessage): { status: number; body: string } | null {
-    if (!this.authorized(req)) {
+  private refusal(req: IncomingMessage, upgrade = false): { status: number; body: string } | null {
+    if (!this.authorized(req) || (upgrade && this.rejectUpgrades)) {
       return {
         status: 401,
         body: JSON.stringify({
           error: {
             code: 'unauthorized',
-            message: UNAUTHORIZED_MESSAGE,
+            message: this.unauthorizedMessage,
             correlationId: randomUUID(),
             retryable: false,
           },
@@ -149,10 +162,15 @@ export class FakeSidecar {
   private handle(req: IncomingMessage, res: ServerResponse): void {
     const prefix = this.options.prefix ?? '';
     const path = (req.url ?? '').slice(0, prefix.length) === prefix ? (req.url ?? '').slice(prefix.length) : null;
-    this.requests.push({ method: req.method ?? '', path: path ?? req.url ?? '', headers: req.headers });
+    this.requests.push({
+      method: req.method ?? '',
+      path: path ?? req.url ?? '',
+      prefixed: path !== null,
+      headers: req.headers,
+    });
     if (path === null) return error(res, 404, 'not_found', 'Unknown path.');
-    if (this.restOverride) return this.restOverride(req, res);
-    if (!this.authorized(req)) return error(res, 401, 'unauthorized', UNAUTHORIZED_MESSAGE);
+    if (this.restOverride && this.restOverride(req, res) !== 'pass') return;
+    if (!this.authorized(req)) return error(res, 401, 'unauthorized', this.unauthorizedMessage);
     const json = (body: unknown) => {
       const text = JSON.stringify(body);
       res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(text) });
@@ -178,7 +196,10 @@ export class FakeSidecar {
 
   private accept(ws: WebSocket): void {
     this.sockets.add(ws);
-    ws.on('close', () => this.sockets.delete(ws));
+    ws.on('close', (code) => {
+      this.closeCodes.push(code);
+      this.sockets.delete(ws);
+    });
     ws.on('error', () => undefined);
     ws.send(
       JSON.stringify({ type: 'hello', wireVersion: 1, streamInstanceId: this.streamInstanceId, headCursor: null }),
@@ -217,6 +238,13 @@ export class FakeSidecar {
 
   send(socket: WebSocket, event: EventEnvelope): void {
     socket.send(JSON.stringify({ type: 'event', cursor: formatCursor(event.streamInstanceId, event.sequence), event }));
+  }
+
+  /** An event-stream `error` message, as the sidecar sends before it closes the stream. */
+  sendError(socket: WebSocket, code: string, message: string): void {
+    socket.send(
+      JSON.stringify({ type: 'error', error: { code, message, correlationId: randomUUID(), retryable: false } }),
+    );
   }
 
   broadcast(event: EventEnvelope): void {

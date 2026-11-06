@@ -1,20 +1,30 @@
 import {
   COMPATIBILITY_TABLE,
+  UNAUTHORIZED_MESSAGE,
   WIRE_VERSION,
+  combinationForPlugin,
   expectedSidecarVersion,
   isHostSupported,
   type CapabilityReport,
   type ErrorCode,
   type OperationId,
+  type OperationResponse,
 } from '@attraccess/matter-contract';
 import { BACKOFF_CAP_MS, STABLE_AFTER_MS, backoffDelay } from './backoff';
 import {
   SidecarClientError,
   SidecarIncompatibleError,
+  type ClientErrorKind,
   SidecarMisconfiguredError,
   SidecarUnavailableError,
 } from './errors';
-import { SidecarEventStream, type ReconciliationReason, type StreamClose, type StreamEvent } from './event-stream';
+import {
+  SidecarEventStream,
+  type ReconciliationReason,
+  type StreamClose,
+  type StreamEvent,
+  type StreamHandlers,
+} from './event-stream';
 import { SidecarHttpClient, type CallOptions, type SidecarClientConfig } from './rest-client';
 import { isInsecureTransport } from './url';
 
@@ -59,13 +69,15 @@ export type ConnectionOptions = {
   random?: () => number;
 };
 
-const REASON_BY_KIND: Record<string, DegradedReason> = {
+/** `null`: not a failure of the connection, such as a request this client cancelled itself. */
+const REASON_BY_KIND: Record<ClientErrorKind, DegradedReason | null> = {
   unavailable: 'unavailable',
   timeout: 'unavailable',
   request: 'unavailable',
   unauthorized: 'unauthorized',
   incompatible: 'incompatible',
   misconfigured: 'misconfigured',
+  aborted: null,
 };
 
 /**
@@ -120,7 +132,10 @@ export class SidecarConnection {
   }
 
   /** Performs one contract operation. Never retried here: a failed physical operation must not be repeated blindly. */
-  async request(operation: OperationId, options: CallOptions = {}): Promise<unknown> {
+  async request<Id extends OperationId>(
+    operation: Id,
+    options: CallOptions<Id> = {} as CallOptions<Id>,
+  ): Promise<OperationResponse<Id>> {
     const client = this.client;
     if (!client || this.state !== 'connected') {
       throw new SidecarUnavailableError('The Matter sidecar is not connected.');
@@ -146,11 +161,14 @@ export class SidecarConnection {
 
   // --- lifecycle ----------------------------------------------------------------------------------------------
 
-  /** Applies new settings and reconnects immediately. `null` clears the configuration and stops. */
+  /**
+   * Applies new settings and reconnects immediately. `null` clears the configuration and stops. The event stream
+   * keeps its cursor, so events published meanwhile are replayed; a different sidecar answers the foreign cursor
+   * with reconciliation-required.
+   */
   configure(config: SidecarClientConfig | null): void {
     if (this.stopped) return;
     this.teardown();
-    this.stream = null;
     this.generation += 1;
     this.attempt = 0;
     this.config = config;
@@ -167,7 +185,6 @@ export class SidecarConnection {
   misconfigure(message: string): void {
     if (this.stopped) return;
     this.teardown();
-    this.stream = null;
     this.generation += 1;
     this.config = null;
     this.sidecar = null;
@@ -207,11 +224,15 @@ export class SidecarConnection {
         });
       }
       const expectedSidecar = expectedSidecarVersion(pluginVersion);
-      const client = new SidecarHttpClient(
-        config,
-        { attraccessVersion: hostVersion, pluginVersion, sidecarVersion: expectedSidecar ?? pluginVersion },
-        this.options.requestTimeoutMs,
-      );
+      // configure(), fail() and stop() drop the client, so one that is still here belongs to this configuration: the
+      // event stream closed cleanly and only it reconnects. Requests in flight on the client must not be cut off.
+      const client =
+        this.client ??
+        new SidecarHttpClient(
+          config,
+          { attraccessVersion: hostVersion, pluginVersion, sidecarVersion: expectedSidecar ?? pluginVersion },
+          this.options.requestTimeoutMs,
+        );
       this.client = client;
       const version = await client.version();
       if (generation !== this.generation) return;
@@ -228,7 +249,7 @@ export class SidecarConnection {
 
   /** The local half of the compatibility check; the sidecar enforces the same table on every versioned request. */
   private assertCompatible(hostVersion: string, pluginVersion: string, version: SidecarVersionInfo): void {
-    const expected = COMPATIBILITY_TABLE.find((entry) => entry.plugin === pluginVersion);
+    const expected = combinationForPlugin(pluginVersion);
     const received = {
       attraccess: hostVersion,
       plugin: pluginVersion,
@@ -250,26 +271,34 @@ export class SidecarConnection {
   }
 
   private openStream(generation: number, url: string): void {
-    // One stream per configuration: it keeps the cursor and the seen event IDs across reconnects.
+    // One stream for the connection's lifetime: it keeps the cursor and the seen event IDs across reconnects and
+    // settings changes. Each connection attempt reports to handlers bound to its own generation.
+    const handlers = this.streamHandlers(generation);
     this.stream ??= new SidecarEventStream(
       () => this.client as SidecarHttpClient,
-      {
-        onHello: () => this.onHello(this.generation),
-        onEvent: (event) => this.emit(this.eventHandlers, event),
-        onReconciliationRequired: (reason) => {
-          this.options.logger.debug(`event stream needs reconciliation (${reason})`);
-          this.emit(this.reconcileHandlers, reason);
-        },
-        onClose: (close) => this.onStreamClose(this.generation, close),
-      },
+      handlers,
       this.options.pingIntervalMs,
-      this.now,
     );
     try {
-      this.stream.connect(url);
+      this.stream.connect(url, handlers);
     } catch (error) {
       this.fail(generation, error);
     }
+  }
+
+  private streamHandlers(generation: number): StreamHandlers {
+    return {
+      onHello: () => this.onHello(generation),
+      onEvent: (event) => {
+        if (generation === this.generation) this.emit(this.eventHandlers, event);
+      },
+      onReconciliationRequired: (reason) => {
+        if (generation !== this.generation) return;
+        this.options.logger.debug(`event stream needs reconciliation (${reason})`);
+        this.emit(this.reconcileHandlers, reason);
+      },
+      onClose: (close) => this.onStreamClose(generation, close),
+    };
   }
 
   private onHello(generation: number): void {
@@ -289,21 +318,20 @@ export class SidecarConnection {
     if (generation !== this.generation) return;
     clearTimeout(this.stableTimer);
     if (close.error) return this.fail(generation, close.error);
-    // A reconciliation, a slow-client close (1013) or a clean close: reconnect right away, with the cursor unless the
-    // stream was reset.
-    this.options.logger.debug(`event stream closed (${close.code}); reconnecting`);
+    // A reconciliation reconnects at once and fresh. A slow-client close (1013) or a clean close resumes with the
+    // cursor after the backoff, so a sidecar that keeps closing is not hammered; a stable connection resets it.
+    const delay = close.reconcile ? 0 : backoffDelay(this.attempt, this.random);
+    if (!close.reconcile) this.attempt += 1;
+    this.options.logger.debug(`event stream closed (${close.code}); reconnecting in ${delay} ms`);
     this.setState('connecting', null, null);
-    this.scheduleRetry(generation, close.reconcile ? 0 : backoffDelay(0, this.random));
+    this.scheduleRetry(generation, delay);
   }
 
   private fail(generation: number, error: unknown): void {
     if (generation !== this.generation) return;
-    if (error instanceof SidecarClientError && error.kind === 'aborted') return;
-    const failure =
-      error instanceof SidecarClientError
-        ? error
-        : new SidecarMisconfiguredError('The Matter connection could not be set up.', { code: 'invalid_url' });
-    const reason = REASON_BY_KIND[failure.kind] ?? 'unavailable';
+    const failure = error instanceof SidecarClientError ? error : this.unexpected(error);
+    const reason = REASON_BY_KIND[failure.kind];
+    if (reason === null) return;
     this.stream?.disconnect();
     this.client?.close();
     this.client = null;
@@ -347,12 +375,24 @@ export class SidecarConnection {
     this.emit(this.stateHandlers, this.status());
   }
 
+  /** A bug rather than a sidecar answer. Logged by name and message only, scrubbed, never with a stack. */
+  private unexpected(error: unknown): SidecarClientError {
+    const text = error instanceof Error ? `${error.name}: ${error.message}` : 'a non-error value was thrown';
+    this.options.logger.warn(`unexpected error in the Matter connection: ${this.scrub(text)}`);
+    return new SidecarMisconfiguredError('The Matter connection could not be set up because of an unexpected error.', {
+      code: 'internal_error',
+    });
+  }
+
   /** The token never reaches a message; this is the last line of defence should one ever echo it. */
   private scrub(text: string): string {
     const token = this.config?.token;
     const masked = token ? text.split(token).join('[redacted]') : text;
-    // `<token>` is the placeholder in the sidecar's own 401 hint; masking it would eat the rest of that sentence.
-    return masked.replace(/Bearer\s+(?!<token>)[^\s"\\]+/gi, 'Bearer [redacted]');
+    // The sidecar's own 401 hint names the header format (`Bearer <token>`) and must reach the admin unchanged.
+    return masked
+      .split(UNAUTHORIZED_MESSAGE)
+      .map((part) => part.replace(/Bearer\s+[^\s"\\]+/gi, 'Bearer [redacted]'))
+      .join(UNAUTHORIZED_MESSAGE);
   }
 
   private emit<T>(handlers: Set<(value: T) => void>, value: T): void {

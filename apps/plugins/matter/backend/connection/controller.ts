@@ -41,12 +41,13 @@ export class MatterConnectionController {
       if (error instanceof MissingCredentialError) throw new BadRequestException([error.message]);
       throw error;
     }
-    await this.service.reload();
+    // Audited right after the save: the change is made even if reconnecting fails.
     await this.settings.audit('matter.connection_saved', principal, {
       credentialChanged: changed.credentialChanged,
       caChanged: changed.caChanged,
       scheme: parsed.data.url.trim().toLowerCase().startsWith('https:') ? 'https' : 'http',
     });
+    await this.service.reload();
     return this.settings.publicView();
   }
 
@@ -55,8 +56,8 @@ export class MatterConnectionController {
   @HttpCode(204)
   async remove(@Req() request: AuthenticatedRequest): Promise<void> {
     const removed = await this.settings.remove();
-    await this.service.reload();
     if (removed) await this.settings.audit('matter.connection_removed', principalOf(request));
+    await this.service.reload();
   }
 
   @Get('status')
