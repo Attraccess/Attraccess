@@ -11,9 +11,10 @@ export function wagoRuntimeSupervisorLaunchShell(): string {
 # Removing a request in place races that: rm unlinks ready, the supervisor
 # writes it again, and rmdir fails with "Directory not empty". Move the request
 # out of that name first. Writers address it by its old path, so they now fail
-# instead of refilling the directory that is being removed.
+# instead of refilling the directory that is being removed. The destination is
+# reserved before the request exists: a same-directory rename and removal need
+# no new inode, so a full configuration filesystem cannot strand the request.
 retire_runtime_supervisor_request() {
-  supervisor_retired=$(mktemp -d "$config/supervisor-retired.XXXXXX") || return 1
   mv "$supervisor_launch" "$supervisor_retired/request" || return 1
   rm -rf "$supervisor_retired"
 }
@@ -22,10 +23,17 @@ launch_runtime_supervisor() {
   command -v nohup >/dev/null && command -v sleep >/dev/null || return 1
   test -f "$hook" && test ! -L "$hook" &&
     test "$(stat -c '%u:%g:%a:%h' "$hook")" = 0:0:700:1 || return 1
-  supervisor_launch=$(mktemp -d "$config/supervisor-start.XXXXXX") || return 1
+  supervisor_retired=$(mktemp -d "$config/supervisor-retired.XXXXXX") || return 1
+  if ! supervisor_launch=$(mktemp -d "$config/supervisor-start.XXXXXX"); then
+    rm -rf "$supervisor_retired"
+    return 1
+  fi
   # Caller rollback must never run without its transaction lock. Retain its
   # traps privately and restore them only after reacquiring that same lock.
-  trap > "$supervisor_launch/traps" || return 1
+  if ! trap > "$supervisor_launch/traps"; then
+    retire_runtime_supervisor_request
+    return 1
+  fi
   trap - EXIT
   supervisor_interrupted=0
   # Defer a catchable interruption until rollback can again own install.lock.
