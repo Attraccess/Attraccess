@@ -301,14 +301,15 @@ describe('SessionChangeQueue across API instances', () => {
     const queue = new SessionChangeQueue();
     // Another instance holds the machine in Valkey the whole time.
     const heldElsewhere = await coordinationOn(valkey, 'host-b:3000').acquire(1, 100);
-    // A change of this instance holds its queue for 150 ms (it needs no lock for this test).
-    void queue.run(1, () => new Promise<void>((resolve) => setTimeout(resolve, 150)), 1000);
+    // A change of this instance holds its queue for 400 ms (it needs no lock for this test).
+    void queue.run(1, () => new Promise<void>((resolve) => setTimeout(resolve, 400)), 2000);
     const startedAt = Date.now();
-    await expect(queue.run(1, async () => 'x', 250, coordinationOn(valkey))).rejects.toBeInstanceOf(MachineBusyError);
-    // 150 ms in the queue plus the remaining 100 ms for the lock, not another full 250 ms.
+    await expect(queue.run(1, async () => 'x', 600, coordinationOn(valkey))).rejects.toBeInstanceOf(MachineBusyError);
+    // 400 ms in the queue plus the remaining 200 ms for the lock, not another full 600 ms (1000 ms). The upper bound
+    // leaves room for a slow CI runner and still sits well below the 1000 ms a second full wait would take.
     const waited = Date.now() - startedAt;
-    expect(waited).toBeGreaterThanOrEqual(240);
-    expect(waited).toBeLessThan(350);
+    expect(waited).toBeGreaterThanOrEqual(590);
+    expect(waited).toBeLessThan(850);
     await heldElsewhere();
   });
 });

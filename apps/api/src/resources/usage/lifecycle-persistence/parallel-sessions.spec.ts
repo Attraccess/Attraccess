@@ -202,12 +202,17 @@ describe('Parallel sessions on one machine', () => {
       const first = scope.usage.startSession(1, scope.users[0], {});
       await parked.entered;
       const second = scope.usage.startSession(1, scope.users[1], {});
-      const queued = scope.usage.startSession(1, third, {});
-      // Observe the refusal right away: it can settle while the earlier starts are still finishing.
-      const refused = expect(queued).rejects.toBeInstanceOf(ResourceFullError);
+      const thirdStart = scope.usage.startSession(1, third, {});
+      // Observe every outcome right away: a refusal can settle while the earlier starts are still finishing.
+      // Which of the two queued starts reaches the machine first is up to the scheduler, so only one of them gets the slot.
+      const outcomes = Promise.allSettled([first, second, thirdStart]);
       parked.release();
-      await Promise.all([first, second]);
-      await refused;
+      const results = await outcomes;
+      expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(2);
+      const rejections = rejectionsOf(results);
+      expect(rejections).toHaveLength(1);
+      expect(rejections[0]).toBeInstanceOf(ResourceFullError);
+      expect(await scope.usage.getActiveSessionsForResource(1)).toHaveLength(2);
     });
 
     it('queues a start behind another person stop in progress', async () => {
