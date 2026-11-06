@@ -1,5 +1,6 @@
 #include "test_hooks.hpp"
 
+#include <atomic>
 #include <cstdio>
 #include <functional>
 
@@ -12,6 +13,9 @@
 #include "touch_injector.hpp"
 #include "widget_finder.hpp"
 #include "../display/display.hpp"
+#ifdef DISPLAY_DRIVER_GT911
+#include "../display/driver/gt911/gt911_touch.hpp"
+#endif
 #include "../logger/logger.hpp"
 #include "../platform.hpp"
 #include "../serial/serialCommandHandler.hpp"
@@ -23,6 +27,45 @@ namespace TestHooks
         Logger logger("TestHooks");
         // Guarded by lv_lock: the LVGL task samples it in the touch read callback.
         TouchInjector injector;
+
+        // Heap high-water marks since the last system.heap.reset (or the first
+        // system.heap.* command): a task samples the internal heap, because
+        // ESP-IDF only keeps a since-boot minimum of the free size and none of
+        // the largest block.
+        constexpr uint32_t HEAP_SAMPLE_MS = 50;
+        constexpr uint32_t INTERNAL_HEAP_CAPS = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+        std::atomic<uint32_t> windowMinFree{UINT32_MAX};
+        std::atomic<uint32_t> windowMinLargest{UINT32_MAX};
+        bool heapSamplerStarted = false;
+
+        void sampleHeap()
+        {
+            const uint32_t free = heap_caps_get_free_size(INTERNAL_HEAP_CAPS);
+            const uint32_t largest = heap_caps_get_largest_free_block(INTERNAL_HEAP_CAPS);
+            if (free < windowMinFree)
+                windowMinFree = free;
+            if (largest < windowMinLargest)
+                windowMinLargest = largest;
+        }
+
+        void heapSamplerTask(void *)
+        {
+            while (true)
+            {
+                sampleHeap();
+                vTaskDelay(pdMS_TO_TICKS(HEAP_SAMPLE_MS));
+            }
+        }
+
+        void ensureHeapSampler()
+        {
+            if (heapSamplerStarted)
+                return;
+            heapSamplerStarted = true;
+            windowMinFree = UINT32_MAX;
+            windowMinLargest = UINT32_MAX;
+            xTaskCreate(heapSamplerTask, "heapSampler", 3072, nullptr, 1, nullptr);
+        }
 
         constexpr uint32_t DEFAULT_TAP_HOLD_MS = 60;
         constexpr uint32_t DEFAULT_SWIPE_MS = 300;
@@ -383,16 +426,38 @@ namespace TestHooks
             return true;
         }
 
-        if (topic == "system.heap.get")
+        if (topic == "system.heap.get" || topic == "system.heap.reset")
         {
+            ensureHeapSampler();
+            sampleHeap();
             JsonDocument doc;
-            doc["internalFree"] = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-            doc["internalLargest"] = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-            doc["internalMinFree"] = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            doc["internalFree"] = heap_caps_get_free_size(INTERNAL_HEAP_CAPS);
+            doc["internalLargest"] = heap_caps_get_largest_free_block(INTERNAL_HEAP_CAPS);
+            doc["internalMinFree"] = heap_caps_get_minimum_free_size(INTERNAL_HEAP_CAPS);
+            doc["windowMinFree"] = windowMinFree.load();
+            doc["windowMinLargest"] = windowMinLargest.load();
             doc["psramFree"] = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+            if (topic == "system.heap.reset")
+            {
+                windowMinFree = UINT32_MAX;
+                windowMinLargest = UINT32_MAX;
+                sampleHeap();
+            }
             reply(topic, doc);
             return true;
         }
+
+#ifdef DISPLAY_DRIVER_GT911
+        if (topic == "ui.touch.controller.get")
+        {
+            const Gt911Touch::Stats stats = Gt911Touch::stats();
+            JsonDocument doc;
+            doc["reads"] = stats.ok;
+            doc["failures"] = stats.failed;
+            reply(topic, doc);
+            return true;
+        }
+#endif
 
         if (topic == "ui.screenshot.get")
         {
