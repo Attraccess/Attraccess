@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { fixtureGitEnv } from './test-utils/git-env.mjs';
-import { isRuntimeSource } from './check-wago-runtime-version.mjs';
+import { isRuntimeSource, parseLockfile, runtimeClosure } from './check-wago-runtime-version.mjs';
 
 const script = fileURLToPath(new URL('./check-wago-runtime-version.mjs', import.meta.url));
 const manifest = 'apps/plugins/wago/cc100-runtime/manifest.json';
@@ -29,6 +29,7 @@ test('covers shared contracts, runtime dependencies, image construction and acti
     'apps/plugins/wago/backend/runtime/install.ts',
     'apps/plugins/wago/backend/runtime/update/shell.ts',
     '.github/actions/build-cc100-runtime/action.yml',
+    '.pnpmfile.cjs',
   ])
     assert.equal(isRuntimeSource(path), true, path);
   for (const path of [
@@ -100,14 +101,30 @@ const runtimePackage = 'apps/plugins/wago/cc100-runtime/package.json';
 const lockfile = ({
   mqtt = '5.16.0',
   packet = '9.0.2',
+  packetIntegrity = 'sha512-packet',
+  babel = '7.29.7',
+  types = '8.18.1',
+  bufferutil = '4.0.0',
   other = '1.0.0',
+  workspaceMqtt = '4.0.0',
   version = '9.0',
+  top = '',
   filler = 0,
-} = {}) => `lockfileVersion: '${version}'
+} = {}) => {
+  const packages = [
+    `'@babel/runtime@${babel}'`,
+    "'@scope/tool@2.0.0'",
+    `'@types/ws@${types}'`,
+    `bufferutil@${bufferutil}`,
+    'debug@4.4.3',
+    `mqtt@${mqtt}`,
+    `other@${other}`,
+  ];
+  return `lockfileVersion: '${version}'
 
 settings:
   autoInstallPeers: true
-
+${top}
 importers:
 
   .:
@@ -123,16 +140,30 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0(other@${other})
 
-packages:
+  apps/other:
+    dependencies:
+      mqtt:
+        specifier: ^4.0.0
+        version: ${workspaceMqtt}
 
-  mqtt@5.16.0:
-    resolution: {integrity: sha512-aaa}
+packages:
+${packages.map((key) => `\n  ${key}:\n    resolution: {integrity: sha512-${key.replace(/'/g, '')}}\n`).join('')}
+  mqtt-packet@${packet}:
+    resolution: {integrity: ${packetIntegrity}}
 
 snapshots:
+
+  '@babel/runtime@${babel}': {}
 
   '@scope/tool@2.0.0(other@${other})':
     dependencies:
       other: ${other}
+
+  '@types/ws@${types}': {}
+
+  bufferutil@${bufferutil}: {}
+
+  debug@4.4.3(supports-color@7.2.0): {}
 
   mqtt-packet@${packet}:
     dependencies:
@@ -142,119 +173,217 @@ snapshots:
 
   mqtt@${mqtt}:
     dependencies:
+      '@babel/runtime': ${babel}
+      '@types/ws': ${types}
       mqtt-packet: ${packet}
     optionalDependencies:
-      bufferutil: 4.0.0
+      bufferutil: ${bufferutil}
 
   other@${other}: {}
-
-  debug@4.4.3(supports-color@7.2.0): {}
-
-  bufferutil@4.0.0: {}
 ${Array.from({ length: filler }, (_, index) => `\n  filler-package-${index}@1.0.0: {}\n`).join('')}`;
+};
 
 // Larger than the 1 MiB default of execFileSync, like the real root lockfile.
 const bigLockfile = (options = {}) => lockfile({ filler: 40000, ...options });
 
 const rootPackage = ({
   mqtt = '^5.15.2',
+  section = 'dependencies',
   other = '^1.0.0',
-  overrides = {},
+  pnpm = {},
   scripts = 'a',
-  manager = 'pnpm@10.0.0',
+  manager = 'pnpm@10.0.0+sha512.abc',
 } = {}) =>
   JSON.stringify({
     scripts: { build: scripts },
     dependencies: { other },
-    devDependencies: { mqtt },
+    [section]: { ...(section === 'dependencies' ? { other } : {}), mqtt },
     packageManager: manager,
-    pnpm: { overrides },
+    pnpm: { overrides: { a: '1', b: '2' }, ...pnpm },
   });
 
-for (const [name, files, pass, message, baseline] of [
-  ['allows an unrelated lockfile change', { 'pnpm-lock.yaml': lockfile({ other: '1.0.1' }) }, true],
-  [
-    'requires a bump for a changed mqtt version',
-    { 'pnpm-lock.yaml': lockfile({ mqtt: '5.16.1' }) },
-    false,
-    /mqtt 5\.16\.0 → 5\.16\.1/,
-  ],
-  [
-    'requires a bump for a changed transitive dependency of mqtt',
-    { 'pnpm-lock.yaml': lockfile({ packet: '9.0.3' }) },
-    false,
-    /mqtt-packet 9\.0\.2 → 9\.0\.3/,
-  ],
-  [
-    'allows an unrelated root package.json change',
-    { 'package.json': rootPackage({ other: '^1.1.0', scripts: 'b' }) },
-    true,
-  ],
-  [
-    'requires a bump for a changed mqtt specifier',
-    { 'package.json': rootPackage({ mqtt: '^5.16.0' }) },
-    false,
-    /devDependencies\.mqtt/,
-  ],
-  [
-    'requires a bump for changed pnpm overrides',
-    { 'package.json': rootPackage({ overrides: { debug: '4.4.4' } }) },
-    false,
-    /pnpm\.overrides/,
-  ],
-  [
-    'requires a bump for a changed packageManager',
-    { 'package.json': rootPackage({ manager: 'pnpm@10.1.0' }) },
-    false,
-    /packageManager/,
-  ],
-  [
-    'treats an unparseable lockfile as runtime source',
-    { 'pnpm-lock.yaml': 'not: [a lockfile' },
-    false,
-    /could not be analysed/,
-  ],
-  [
-    'treats an unknown lockfile version as runtime source',
-    { 'pnpm-lock.yaml': lockfile({ version: '10.0' }) },
-    false,
-    /lockfileVersion/,
-  ],
-  [
-    'treats an unparseable package.json as runtime source',
-    { 'package.json': '{ nope' },
-    false,
-    /could not be analysed/,
-  ],
-  [
-    'follows the dependencies declared by the runtime package',
-    {
-      [runtimePackage]: JSON.stringify({ dependencies: { mqtt: '^5.15.2', other: '^1.0.0' } }),
-      'pnpm-lock.yaml': lockfile({ other: '1.0.1' }),
+const malformed = (from, to) => lockfile().replace(from, to);
+
+for (const { name, files, pass, message, baseline, cwd } of [
+  {
+    name: 'allows an unrelated lockfile change',
+    files: { 'pnpm-lock.yaml': lockfile({ other: '1.0.1' }) },
+    pass: true,
+  },
+  {
+    name: 'allows a type-only change in the mqtt closure',
+    files: { 'pnpm-lock.yaml': lockfile({ types: '8.18.2' }) },
+    pass: true,
+  },
+  {
+    name: 'allows an mqtt change in another workspace importer',
+    files: { 'pnpm-lock.yaml': lockfile({ workspaceMqtt: '4.0.1' }) },
+    pass: true,
+  },
+  {
+    name: 'requires a bump for a changed mqtt version',
+    files: { 'pnpm-lock.yaml': lockfile({ mqtt: '5.16.1' }) },
+    message: /closure changed: mqtt 5\.16\.0 → 5\.16\.1\)$/m,
+  },
+  {
+    name: 'requires a bump for a changed transitive dependency of mqtt',
+    files: { 'pnpm-lock.yaml': lockfile({ packet: '9.0.3' }) },
+    message: /\(runtime dependency closure changed: mqtt-packet 9\.0\.2 → 9\.0\.3\)$/m,
+  },
+  {
+    name: 'requires a bump for a changed scoped dependency of mqtt',
+    files: { 'pnpm-lock.yaml': lockfile({ babel: '7.29.8' }) },
+    message: /@babel\/runtime 7\.29\.7 → 7\.29\.8/,
+  },
+  {
+    name: 'requires a bump for a changed optional dependency of mqtt',
+    files: { 'pnpm-lock.yaml': lockfile({ bufferutil: '4.0.1' }) },
+    message: /bufferutil 4\.0\.0 → 4\.0\.1/,
+  },
+  {
+    name: 'requires a bump for a changed resolution of an mqtt dependency',
+    files: { 'pnpm-lock.yaml': lockfile({ packetIntegrity: 'sha512-tampered' }) },
+    message: /mqtt-packet 9\.0\.2 \(resolution changed\)/,
+  },
+  {
+    name: 'requires a bump for changed lockfile settings',
+    files: { 'pnpm-lock.yaml': lockfile({ top: '\npnpmfileChecksum: sha256-abc\n' }) },
+    message: /lockfile pnpmfileChecksum changed/,
+  },
+  {
+    name: 'requires a bump when the lockfile is removed',
+    files: { 'pnpm-lock.yaml': null },
+    message: /pnpm-lock\.yaml \(added or removed\)/,
+  },
+  {
+    name: 'allows an unrelated root package.json change',
+    files: { 'package.json': rootPackage({ other: '^1.1.0', scripts: 'b', pnpm: { overrides: { b: '2', a: '1' } } }) },
+    pass: true,
+  },
+  {
+    name: 'requires a bump for a changed mqtt specifier',
+    files: { 'package.json': rootPackage({ mqtt: '^5.16.0' }) },
+    message: /dependencies\.mqtt \^5\.15\.2 → \^5\.16\.0/,
+  },
+  ...['devDependencies', 'optionalDependencies'].map((section) => ({
+    name: `requires a bump for mqtt moving to ${section}`,
+    files: { 'package.json': rootPackage({ section }) },
+    message: new RegExp(`${section}\\.mqtt \\(none\\) → \\^5\\.15\\.2`),
+  })),
+  {
+    name: 'requires a bump for changed pnpm overrides',
+    files: { 'package.json': rootPackage({ pnpm: { overrides: { a: '1', b: '3' } } }) },
+    message: /pnpm\.overrides \(b\)/,
+  },
+  {
+    name: 'requires a bump for changed pnpm patched dependencies',
+    files: {
+      'package.json': rootPackage({ pnpm: { patchedDependencies: { 'mqtt-packet@9.0.2': 'patches/x.patch' } } }),
     },
-    false,
-    /other 1\.0\.0 → 1\.0\.1/,
-  ],
-  [
-    'allows an unrelated change to a lockfile larger than 1 MiB',
-    { 'pnpm-lock.yaml': bigLockfile({ other: '1.0.1' }) },
-    true,
-    undefined,
-    { 'pnpm-lock.yaml': bigLockfile() },
-  ],
-  [
-    'requires a bump for a changed mqtt version in a lockfile larger than 1 MiB',
-    { 'pnpm-lock.yaml': bigLockfile({ mqtt: '5.16.1' }) },
-    false,
-    /mqtt 5\.16\.0 → 5\.16\.1/,
-    { 'pnpm-lock.yaml': bigLockfile() },
-  ],
+    message: /pnpm\.patchedDependencies \(mqtt-packet@9\.0\.2\)/,
+  },
+  {
+    name: 'requires a bump for changed pnpm package extensions',
+    files: { 'package.json': rootPackage({ pnpm: { packageExtensions: { 'mqtt@*': { dependencies: { x: '1' } } } } }) },
+    message: /pnpm\.packageExtensions \(mqtt@\*\)/,
+  },
+  {
+    name: 'requires a bump for a changed packageManager',
+    files: { 'package.json': rootPackage({ manager: 'pnpm@10.1.0+sha512.def' }) },
+    message: /packageManager pnpm@10\.0\.0 → pnpm@10\.1\.0/,
+  },
+  {
+    name: 'treats an unparseable lockfile as runtime source',
+    files: { 'pnpm-lock.yaml': 'not: [a lockfile' },
+    message: /could not be analysed/,
+  },
+  {
+    name: 'treats an unknown lockfile version as runtime source',
+    files: { 'pnpm-lock.yaml': lockfile({ version: '10.0' }) },
+    message: /lockfileVersion/,
+  },
+  ...[
+    [
+      'a missing snapshot',
+      'mqtt-packet: 9.0.2',
+      'mqtt-packet: 9.0.3',
+      /no snapshot for mqtt-packet@9\.0\.3 \(at HEAD\)/,
+    ],
+    [
+      'a missing packages entry',
+      'mqtt-packet@9.0.2:\n    resolution',
+      'mqtt-packet@9.0.9:\n    resolution',
+      /no packages entry/,
+    ],
+    ['a missing snapshots section', /\nsnapshots:[^]*$/, '\n', /no snapshots section/],
+    ['a missing root importer', '\n  .:\n', "\n  'apps/root':\n", /root importer not found/],
+    ['a line it cannot read', '  other@1.0.0: {}', '  other@1.0.0', /unexpected lockfile line/],
+    ['a duplicate entry', '  other@1.0.0: {}', '  other@1.0.0: {}\n  other@1.0.0: {}', /duplicate lockfile entry/],
+    [
+      'unexpected indentation',
+      '      mqtt-packet: 9.0.2',
+      '          mqtt-packet: 9.0.3\n      mqtt-packet: 9.0.2',
+      /unexpected indentation/,
+    ],
+    [
+      'a multi-line string',
+      '    optionalDependencies:',
+      '    x: "\n    optionalDependencies:',
+      /unsupported quoted value/,
+    ],
+    [
+      'a flow-style importer entry',
+      '      mqtt:\n        specifier: ^5.15.2\n        version: 5.16.0',
+      '      mqtt: {specifier: ^5.15.2, version: 5.16.1}',
+      /unsupported value/,
+    ],
+    [
+      'a missing runtime dependency',
+      '      mqtt:\n        specifier: ^5.15.2\n        version: 5.16.0\n',
+      '',
+      /mqtt is not a dependency/,
+    ],
+  ].map(([what, from, to, message]) => ({
+    name: `treats a lockfile with ${what} as runtime source`,
+    files: { 'pnpm-lock.yaml': malformed(from, to) },
+    message,
+  })),
+  {
+    name: 'treats an unparseable package.json as runtime source',
+    files: { 'package.json': '{ nope' },
+    message: /package\.json \(could not be analysed/,
+  },
+  {
+    name: 'follows the dependencies declared by the runtime package',
+    baseline: { [runtimePackage]: JSON.stringify({ dependencies: { mqtt: '^5.15.2', other: '^1.0.0' } }) },
+    files: { 'pnpm-lock.yaml': lockfile({ other: '1.0.1' }) },
+    message: /other 1\.0\.0 → 1\.0\.1/,
+  },
+  {
+    name: 'detects a runtime dependency change when run from a subdirectory',
+    files: { 'pnpm-lock.yaml': lockfile({ mqtt: '5.16.1' }) },
+    message: /mqtt 5\.16\.0 → 5\.16\.1/,
+    cwd: 'apps',
+  },
+  {
+    name: 'allows an unrelated change to a lockfile larger than 1 MiB',
+    baseline: { 'pnpm-lock.yaml': bigLockfile() },
+    files: { 'pnpm-lock.yaml': bigLockfile({ other: '1.0.1' }) },
+    pass: true,
+  },
+  {
+    name: 'requires a bump for a changed mqtt version in a lockfile larger than 1 MiB',
+    baseline: { 'pnpm-lock.yaml': bigLockfile() },
+    files: { 'pnpm-lock.yaml': bigLockfile({ mqtt: '5.16.1' }) },
+    message: /mqtt 5\.16\.0 → 5\.16\.1/,
+  },
 ]) {
   test(name, () => {
     const directory = mkdtempSync(join(tmpdir(), 'cc100-version-check-'));
     const env = fixtureGitEnv();
     const git = (...args) => execFileSync('git', args, { cwd: directory, env, encoding: 'utf8' }).trim();
     const file = (path, content) => {
+      if (content === null) return rmSync(join(directory, path));
       mkdirSync(join(directory, path, '..'), { recursive: true });
       writeFileSync(join(directory, path), content);
     };
@@ -272,10 +401,15 @@ for (const [name, files, pass, message, baseline] of [
       git('commit', '--quiet', '-m', 'baseline');
       const base = git('rev-parse', 'HEAD');
       for (const [path, content] of Object.entries(files)) file(path, content);
-      git('add', '.');
+      git('add', '-A');
       git('commit', '--quiet', '-m', 'change');
       const run = () =>
-        execFileSync(process.execPath, [script, base], { cwd: directory, env, encoding: 'utf8', stdio: 'pipe' });
+        execFileSync(process.execPath, [script, base], {
+          cwd: join(directory, cwd ?? ''),
+          env,
+          encoding: 'utf8',
+          stdio: 'pipe',
+        });
       if (pass) assert.match(run(), /No WAGO/);
       else
         assert.throws(run, (error) => {
@@ -289,3 +423,16 @@ for (const [name, files, pass, message, baseline] of [
     }
   });
 }
+
+test('reads the real root lockfile: the runtime closure covers mqtt and ipaddr.js without type-only packages', () => {
+  const read = (path) => readFileSync(fileURLToPath(new URL(`../${path}`, import.meta.url)), 'utf8');
+  const declared = new Set(Object.keys(JSON.parse(read(runtimePackage)).dependencies));
+  const { roots, packages } = runtimeClosure(parseLockfile(read('pnpm-lock.yaml')), declared);
+  assert.deepEqual([...roots.keys()].sort(), [...declared].sort());
+  for (const name of declared)
+    assert.ok(
+      [...packages.keys()].some((key) => key.startsWith(`${name}@`)),
+      name,
+    );
+  assert.ok(![...packages.keys()].some((key) => key.startsWith('@types/')));
+});

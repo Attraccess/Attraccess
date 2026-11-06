@@ -20,8 +20,9 @@ export function checkReleaseVersion({ base, versionFile, isSource, readVersion, 
     execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 });
   const ancestor = git('merge-base', base, 'HEAD').trim();
   // Only a file that does not exist at `rev` reads as null; any other git failure must surface, not look unchanged.
+  // `--full-tree` keeps paths relative to the repository root, like `rev:path`, even when run from a subdirectory.
   const show = (rev, path) =>
-    git('ls-tree', '--name-only', rev, '--', path).trim() ? git('show', `${rev}:${path}`) : null;
+    git('ls-tree', '--full-tree', '--name-only', rev, '--', path).trim() ? git('show', `${rev}:${path}`) : null;
   const changed = git('diff', '--name-only', '-z', `${ancestor}...HEAD`, '--')
     .split('\0')
     .flatMap((path) => {
@@ -32,9 +33,9 @@ export function checkReleaseVersion({ base, versionFile, isSource, readVersion, 
     });
   const current = stableVersion(readVersion(git('show', `HEAD:${versionFile}`)), versionFile);
   if (!changed.length) return `No ${label} source changes detected.`;
-  if (!git('ls-tree', '--name-only', ancestor, '--', versionFile).trim())
-    return `Initial ${label} version established.`;
-  const previous = stableVersion(readVersion(git('show', `${ancestor}:${versionFile}`)), versionFile);
+  const previousText = show(ancestor, versionFile);
+  if (previousText === null) return `Initial ${label} version established.`;
+  const previous = stableVersion(readVersion(previousText), versionFile);
   const firstDifference = current.findIndex((part, index) => part !== previous[index]);
   if (firstDifference < 0 || current[firstDifference] < previous[firstDifference]) {
     throw new Error(`${label} source changed without increasing the version in ${versionFile}.\n${changed.join('\n')}`);
