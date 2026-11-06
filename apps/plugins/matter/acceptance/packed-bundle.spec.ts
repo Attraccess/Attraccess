@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { ADMIN, bootHost, type Host } from './host';
+import { ADMIN, bootHost, type Host } from './host.test-utils';
 
 // Needs `build-backend` first (the e2e target depends on it). Regression for the packed plugin: with no
 // design:paramtypes in the bundle, constructor parameters without @Inject resolve to undefined and the routes 500.

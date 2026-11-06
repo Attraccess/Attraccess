@@ -5,7 +5,7 @@ import request from 'supertest';
 import { MatterConnectionService } from '../backend/connection/connection.service';
 import plugin from '../backend/plugin';
 import { FakeSidecar, TOKEN } from '../backend/testing/fake-sidecar';
-import { ADMIN, auditRows, bootHost, type Host } from './host';
+import { ADMIN, auditRows, bootHost, type Host } from './host.test-utils';
 
 async function until(predicate: () => boolean | Promise<boolean>, timeoutMs = 5_000) {
   const deadline = Date.now() + timeoutMs;

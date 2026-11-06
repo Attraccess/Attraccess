@@ -50,12 +50,50 @@ describe('Matter plugin bundle', () => {
     expect(bundle).not.toMatch(/rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED/);
   });
 
-  it('loads as a plugin module, with and without the optional native modules available', () => {
-    const loaded = require(join(__dirname, '../package/dist/index.js'));
-    const module = loaded.default.register({});
-    expect(module.controllers).toHaveLength(1);
-    expect(loaded.default.entities).toHaveLength(1);
-    expect(loaded.default.auditDomains[0].domain).toBe('matter');
+  describe('loads as a plugin module', () => {
+    const bundlePath = join(__dirname, '../package/dist/index.js');
+    /** Loads a fresh copy of the bundle; `nativeModule` answers its `require("bufferutil")`/`("utf-8-validate")`. */
+    function loadWith(nativeModule: (name: string) => unknown) {
+      const requested: string[] = [];
+      let loaded: { default: { register(context: unknown): { controllers: unknown[] } } } | undefined;
+      jest.isolateModules(() => {
+        for (const name of optionalNative) {
+          jest.doMock(
+            name,
+            () => {
+              requested.push(name);
+              return nativeModule(name);
+            },
+            { virtual: true },
+          );
+        }
+        loaded = require(bundlePath);
+      });
+      for (const name of optionalNative) jest.dontMock(name);
+      return { plugin: (loaded as NonNullable<typeof loaded>).default, requested };
+    }
+    const expectUsable = (plugin: ReturnType<typeof loadWith>['plugin']) => {
+      expect(plugin.register({}).controllers).toHaveLength(1);
+      expect((plugin as unknown as { entities: unknown[] }).entities).toHaveLength(1);
+      expect((plugin as unknown as { auditDomains: { domain: string }[] }).auditDomains[0].domain).toBe('matter');
+    };
+
+    // ws only asks for utf-8-validate when Node lacks buffer.isUtf8 (before 18.14), so on supported Node versions
+    // bufferutil is the accelerator that is actually looked up.
+    it('without the optional native modules installed', () => {
+      const { plugin, requested } = loadWith((name) => {
+        throw Object.assign(new Error(`Cannot find module '${name}'`), { code: 'MODULE_NOT_FOUND' });
+      });
+      expect(requested).toContain('bufferutil');
+      expectUsable(plugin);
+    });
+
+    it('with the optional native modules installed', () => {
+      const accelerator = { mask: jest.fn(), unmask: jest.fn(), isValidUTF8: jest.fn(() => true) };
+      const { plugin, requested } = loadWith(() => accelerator);
+      expect(requested).toContain('bufferutil');
+      expectUsable(plugin);
+    });
   });
 
   it('ships the migration as a separate entry', () => {
