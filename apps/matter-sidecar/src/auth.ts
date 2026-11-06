@@ -63,4 +63,4 @@ export class TokenAuthenticator {
   }
 }
 
-export const UNAUTHORIZED_MESSAGE = 'A valid service token is required: send "Authorization: Bearer <token>".';
+export { UNAUTHORIZED_MESSAGE } from '@attraccess/matter-contract';

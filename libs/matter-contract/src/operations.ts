@@ -17,6 +17,8 @@ export type OperationDefinition = {
   response: z.ZodType;
   /** Physical effects: a timeout is reported as `uncertain` and is never retried automatically. */
   physical?: boolean;
+  /** Served without the service token: the container probes, which reveal no versions. */
+  anonymous?: true;
 };
 
 /** `const T` keeps each `id` a string literal so `OperationId` is a union of the real operation IDs. */
@@ -29,6 +31,7 @@ const DEFINITIONS = [
     method: 'GET',
     path: '/health/live',
     versioned: false,
+    anonymous: true,
     summary: 'Liveness',
     response: f.liveResponseSchema,
   }),
@@ -38,6 +41,7 @@ const DEFINITIONS = [
     method: 'GET',
     path: '/health/ready',
     versioned: false,
+    anonymous: true,
     summary: 'Readiness',
     response: f.readyResponseSchema,
   }),
@@ -195,6 +199,16 @@ const DEFINITIONS = [
 ];
 
 export type OperationId = (typeof DEFINITIONS)[number]['id'];
+/** The definition of one operation, with its exact schemas. */
+export type OperationById<Id extends OperationId> = Extract<(typeof DEFINITIONS)[number], { id: Id }>;
+/** What a successful call returns, after validation. */
+export type OperationResponse<Id extends OperationId> = z.infer<OperationById<Id>['response']>;
+/** The path parameters, or `undefined` for an operation without any. */
+export type OperationParams<Id extends OperationId> =
+  OperationById<Id> extends { params: infer Schema extends z.ZodType } ? z.input<Schema> : undefined;
+/** The request body before validation, or `undefined` for an operation without one. */
+export type OperationBody<Id extends OperationId> =
+  OperationById<Id> extends { body: infer Schema extends z.ZodType } ? z.input<Schema> : undefined;
 export type TypedOperation = OperationDefinition & { id: OperationId };
 export const OPERATIONS: readonly TypedOperation[] = DEFINITIONS;
 

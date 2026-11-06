@@ -1,6 +1,7 @@
 import {
   HEADER_REQUEST_DEADLINE,
   MAX_REQUEST_DEADLINE_MS,
+  OPERATIONS,
   findOperation,
   type OperationId,
   type TypedOperation,
@@ -45,7 +46,9 @@ export type PipelineDeps = {
 };
 
 /** The probes container platforms call without credentials. They reveal no versions. */
-const ANONYMOUS_OPERATIONS: ReadonlySet<string> = new Set(['health.live', 'health.ready']);
+const ANONYMOUS_OPERATIONS: ReadonlySet<string> = new Set(
+  OPERATIONS.filter((operation) => operation.anonymous).map((operation) => operation.id),
+);
 
 class DeadlineError extends Error {}
 

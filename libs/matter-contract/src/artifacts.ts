@@ -59,14 +59,16 @@ export function buildSchemaDefinitions(refPrefix: string): Record<string, JsonOb
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
 const errorBody = { description: 'Error', content: { 'application/json': { schema: ref('ErrorEnvelope') } } };
 
-type ResponseShape = Pick<OperationDefinition, 'family' | 'versioned' | 'params' | 'body'> & { id: string };
+type ResponseShape = Pick<OperationDefinition, 'family' | 'versioned' | 'params' | 'body' | 'anonymous'> & {
+  id: string;
+};
 
 /** The error statuses a route can actually answer with, so generated clients do not expect impossible ones. */
 function errorStatuses(operation: ResponseShape): number[] {
   // Any route can refuse a browser origin, miss the path, get the wrong method or fail internally.
   const codes = [403, 404, 405, 500];
   // Everything except the container probes needs the service token.
-  if (operation.id !== 'health.live' && operation.id !== 'health.ready') codes.push(401);
+  if (!operation.anonymous) codes.push(401);
   // Release headers are checked, and draining refused, only on versioned routes.
   if (operation.versioned) codes.push(409, 426, 503);
   if (operation.params || operation.body) codes.push(400);
@@ -97,8 +99,6 @@ const COMPAT_PARAMETERS = [
   ['x-matter-sidecar-version', 'Expected Matter sidecar release version.'],
 ].map(([name, description]) => ({ name, in: 'header', required: true, description, schema: { type: 'string' } }));
 
-const isAnonymous = (operation: { id: string }) => operation.id === 'health.live' || operation.id === 'health.ready';
-
 function buildPathItem(operation: OperationDefinition): JsonObject {
   const pathParams = Object.keys(operation.params ? pathParamNames(operation.path) : {}).map((name) => ({
     name,
@@ -110,7 +110,7 @@ function buildPathItem(operation: OperationDefinition): JsonObject {
     operationId: operation.id,
     summary: operation.summary,
     tags: [operation.family],
-    ...(isAnonymous(operation) ? { security: [] } : {}),
+    ...(operation.anonymous ? { security: [] } : {}),
     parameters: [...(operation.versioned ? COMPAT_PARAMETERS : []), ...pathParams],
     ...(operation.body
       ? {
