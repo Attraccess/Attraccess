@@ -151,4 +151,9 @@ static constexpr uint32_t RESET_SUCCESS_DWELL_MS = 1500;
 #if defined(HAS_LVGL_DISPLAY)
 static constexpr uint32_t RESET_ERROR_DWELL_MS = 1800;
 #endif
+
+#ifdef HAS_WS2812_LED
+// The server rejected a card. Set on the websocket task, flashed by the main loop (updateLedState).
+volatile bool cardRejectedLedPending = false;
+#endif
 };

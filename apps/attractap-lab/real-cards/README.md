@@ -13,7 +13,9 @@ cd apps/attractap-lab/real-cards
 Needs ESP-IDF (found in `.tools/esp-idf` or already sourced), the labgrid client with the lab place
 (`LG_PLACE_NAME`, default `attractap-touch-v2-1`), Node 24 and a C++17 compiler. Options: `--cards
 EV3,NTAG424` (subset), `--speak` (macOS `say` for each prompt). `READER_IMAGE` / `EMULATOR_IMAGE` skip
-the builds. Cards must be factory fresh (the server records slot 1 for the reference format).
+the builds. `KEEP_API=1` leaves the API and the wire proxy running afterwards (the script prints how to
+stop them); `API_START_TIMEOUT` (default 120 s) bounds the wait for the API. Cards must be factory
+fresh (the server records slot 1 for the reference format).
 
 ## What the person does
 
@@ -33,19 +35,19 @@ Each step also checks the server side (card record and key slot 1-5, pending rec
 
 ## What it records (`runs/<timestamp>/`)
 
-| file | content |
-|---|---|
-| `summary.md` | steps per card, PN532 failure rate per card type, replay verdicts, time needed |
-| `wiretap.jsonl` | plaintext of every reader/API message, with full APDUs and card answers (`wiretap.cjs`, preloaded into the API; the websocket itself is TLS, so a proxy only sees ciphertext) |
-| `wire.jsonl` | raw TCP bytes between reader and API (`wireproxy.py`), proves the wire is opaque |
-| `reader-serial.log` | reader UART; `PN532 InDataExchange status 0x..` lines are the failed exchanges |
-| `keys.json` | card keys from the API database, decrypted with `AUTH_SESSION_SECRET` (`dump-keys.mjs`); lab secret, never commit |
-| `recordings/*.json` | every conversation in the reference-recordings format, plus `comparison.json` |
-| `session-report.json`, `events.jsonl` | machine readable report and the prompt/step timeline |
+| file                                  | content                                                                                                                                                                       |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `summary.md`                          | steps per card, PN532 failure rate per card type, replay verdicts, time needed                                                                                                |
+| `wiretap.jsonl`                       | plaintext of every reader/API message, with full APDUs and card answers (`wiretap.cjs`, preloaded into the API; the websocket itself is TLS, so a proxy only sees ciphertext) |
+| `wire.jsonl`                          | raw TCP bytes between reader and API (`wireproxy.py`), proves the wire is opaque                                                                                              |
+| `reader-serial.log`                   | reader UART; `PN532 InDataExchange status 0x..` lines are the failed exchanges                                                                                                |
+| `keys.json`                           | card keys from the API database, decrypted with `AUTH_SESSION_SECRET` (`dump-keys.mjs`); lab secret, never commit                                                             |
+| `recordings/*.json`                   | every conversation in the reference-recordings format, plus `comparison.json`                                                                                                 |
+| `session-report.json`, `events.jsonl` | machine readable report and the prompt/step timeline                                                                                                                          |
 
 The failure rate per card type is `PN532 failures / CARD_APDU the server sent` during that card's part.
 
-## Checking a recording against the 1.7.x code (task 55)
+## Checking a recording against the 1.7.x code
 
 `replay/compare.mjs` runs automatically. For each conversation it recovers the key and the server's
 random value RndA of every `AuthenticateEV2First` (decrypt the card's RndB with the key, then the

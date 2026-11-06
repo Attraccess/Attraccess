@@ -20,9 +20,10 @@ void ReaderWorkflow::testFirmwareUpdate(bool reset)
 
     // Old replies and new card requests cannot steal OTA's screen or restart
     // either sticky card workflow, even when the network subsequently drops.
-    server.push("ENROLL_NEW_CARD", R"({"keyNo":1,"key":"00000000000000000000000000000000"})");
+    server.push("ENROLL_NEW_CARD", R"({"success":true})");
     server.push("ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO", R"({"username":"Alex"})");
-    server.push("RESET_NFC_CARD", R"({"username":"Alex","keyNo":1,"key":"00000000000000000000000000000000"})");
+    server.push("RESET_NFC_CARD", R"({"success":true})");
+    server.push("RESET_NFC_CARD", R"({"username":"Alex"})");
     pump();
     State::setWebsocketState(false, "reader.test", 80, false);
     pump();

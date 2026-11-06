@@ -99,6 +99,35 @@ void ReaderWorkflow::testCardRelay()
     assert(server.count("CARD_APDU_RESPONSE") == responsesBefore + 3);
     nfc.setPresent(0, false); pump();
 
+    const auto reconnect = [&] {
+        State::setWebsocketState(false, "reader.test", 80, false); pump();
+        State::setWebsocketState(true, "reader.test", 80, false);
+        State::setApiState(true, "Test reader"); list(false); pump();
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+    };
+
+    // The connection drops mid-conversation: the reader closes it, so a command arriving after the
+    // reconnect (for a session the server already dropped) never reaches the card.
+    nfc.setPresent(0, true); pump();
+    assert(server.count("CARD_DETECTED") == detectedBefore + 4);
+    const uint32_t fourth = server.last("CARD_DETECTED")["data"]["payload"]["detectionId"];
+    server.push("CARD_APDU", apdu(fourth, "c-4", 1, "9060000000")); pump();
+    assert(server.count("CARD_APDU_RESPONSE") == responsesBefore + 4);
+    reconnect();
+    server.push("CARD_APDU", apdu(fourth, "c-4", 2, "90af000000")); pump();
+    assert(server.count("CARD_APDU_RESPONSE") == responsesBefore + 4);
+    nfc.setPresent(0, false); pump();
+
+    // CARD_DETECTED could not be sent: the conversation opened for it is closed at once.
+    server.failSends = true;
+    nfc.setPresent(0, true); pump();
+    server.failSends = false;
+    assert(server.count("CARD_DETECTED") == detectedBefore + 4);
+    server.push("CARD_APDU", apdu(fourth + 1, "c-5", 1, "9060000000")); pump();
+    assert(server.count("CARD_APDU_RESPONSE") == responsesBefore + 4);
+    nfc.setPresent(0, false); pump();
+    reconnect();
+
     // Whatever the card did, no key or session state is in anything the reader sent.
     for (const auto &message : server.sent) {
         assert(message.find("\"key\"") == std::string::npos);

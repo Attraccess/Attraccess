@@ -1,7 +1,7 @@
 """Real Attractap reader firmware against emulated NTAG424 / DESFire cards.
 
 Tests run in file order and build on each other (enrolled cards); a test
-whose prerequisite failed is skipped.
+whose prerequisite failed fails too, naming the missing prerequisite.
 """
 
 import re
@@ -37,7 +37,7 @@ def present(emulator, profile):
 def requires(state, *keys):
     missing = [key for key in keys if key not in state]
     if missing:
-        pytest.skip(f"needs {', '.join(missing)} from an earlier test")
+        pytest.fail(f"needs {', '.join(missing)} from an earlier test, which failed")
 
 
 def card_record(api, admin, user_id, uid):

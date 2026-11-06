@@ -145,7 +145,7 @@ bool API::sendMessage(const char *type, JsonObject payload, uint32_t messageId)
             this->logger.error("Failed to serialize event to buffer (small)");
             return false;
         }
-        this->logger.info((std::string("Sending reader event: ") + type).c_str());
+        this->logSendingEvent(type);
         return this->transport.sendMessage(json, n);
     }
 
@@ -161,8 +161,20 @@ bool API::sendMessage(const char *type, JsonObject payload, uint32_t messageId)
         this->logger.error("Failed to serialize event to dynamically allocated buffer");
         return false;
     }
-    this->logger.info((std::string("Sending reader event: ") + type).c_str());
+    this->logSendingEvent(type);
     return this->transport.sendMessage(json.get(), n);
+}
+
+void API::logSendingEvent(const char *type)
+{
+    // A tap relays 6 to 32 card answers; an INFO line each would hold up the main loop on the
+    // USB serial in the middle of the card conversation.
+    if (strcmp(type, "CARD_APDU_RESPONSE") == 0)
+    {
+        this->logger.debugf("Sending reader event: %s", type);
+        return;
+    }
+    this->logger.info((std::string("Sending reader event: ") + type).c_str());
 }
 
 void API::disableConnectionAttempts()

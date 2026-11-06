@@ -79,9 +79,9 @@ private:
     static const uint32_t hardwareCheckIntervalMs = 10000;
 
     // Serializes every PN532 conversation (poll loop on the NFC task vs.
-    // enrollment/reset card operations on the main loop). Recursive because
-    // e.g. getAvailableKeyNo() -> authenticate() and the detection callback
-    // (fired while loop() holds the lock) may call back into NFC methods.
+    // relayed card commands on the main loop). Recursive because the detection
+    // callback (fired while loop() holds the lock) may call back into NFC
+    // methods such as enableCardDetection().
     SemaphoreHandle_t opMutex = nullptr;
     void lock();
     void unlock();

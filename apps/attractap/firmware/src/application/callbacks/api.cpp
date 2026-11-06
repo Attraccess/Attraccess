@@ -67,6 +67,9 @@ void Application::setupApiCallbacks()
           // Same line as the generic error path: lab tests read the server's verdict from it.
           this->logger.error((std::string("Reader reported error: ") + response.error).c_str());
           this->beeper.errorBeep();
+#ifdef HAS_WS2812_LED
+          this->cardRejectedLedPending = true;
+#endif
           this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
           struct Payload {

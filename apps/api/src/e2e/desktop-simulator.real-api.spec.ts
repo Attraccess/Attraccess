@@ -161,6 +161,21 @@ describe('desktop simulator against an isolated real API', () => {
     return observed;
   }
 
+  /**
+   * Waits until a full-screen notice (#2044) is gone. The reader may leave it on its own (the state
+   * it was raised in changed), so OK is clicked only while the notice is still up, as the desktop
+   * tests' clearStatus() does.
+   */
+  async function dismissNotice(text: string) {
+    await waitFor(async () => {
+      const { labels } = await desktop().command('inspect');
+      if (!labels.includes(text)) return true;
+      // Not requireSuccess: the notice may close between the inspect and the click.
+      if (labels.includes('OK')) await desktop().exchange(JSON.stringify({ action: 'click', text: 'OK' }), 'click OK');
+      return false;
+    }, `the "${text}" notice to close`);
+  }
+
   function socket(): AuthenticatedWebSocket {
     const connections = [...api().get(WebsocketService).sockets.values()].filter((item) => item.readerId === reader.id);
     if (connections.length !== 1)
@@ -328,7 +343,9 @@ describe('desktop simulator against an isolated real API', () => {
 
     // And a new key: the credential history (as the admin API reports it) names different keys.
     const history = async (readerId: number) => {
-      const token = await api().get(SessionService).createSession(pairingAdmin as User);
+      const token = await api()
+        .get(SessionService)
+        .createSession(pairingAdmin as User);
       desktop().diagnostics.remember(token);
       const response = await fetch(`${endpoint}${prefix}/attractap/readers/${readerId}/credentials`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -353,7 +370,7 @@ describe('desktop simulator against an isolated real API', () => {
     // Unknown, inactive and unverifiable cards all get the same notice (firmware rejectedCard).
     await desktop().text('Anmeldung fehlgeschlagen');
     await desktop().snapshot('unknown-card');
-    await desktop().click('OK');
+    await dismissNotice('Anmeldung fehlgeschlagen');
     await desktop().screen('locked');
     expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
     await desktop().remove(3);
@@ -364,7 +381,7 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().authenticationFailure();
     expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
     await desktop().snapshot('incorrect-key');
-    await desktop().click('OK');
+    await dismissNotice('Anmeldung fehlgeschlagen');
     await desktop().remove();
     await desktop().command('corrupt-key', { card: 0, slot: card.keyNo });
     await authenticate();

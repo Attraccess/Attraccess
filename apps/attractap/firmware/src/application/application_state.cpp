@@ -75,6 +75,11 @@ void Application::updateLedState() {
   if (State::consumeSessionProblemNotice()) {
     this->led.triggerError();
   }
+  // A card the server did not verify: the error flash, as for a wrong-key card on firmware 1.x.
+  if (this->cardRejectedLedPending) {
+    this->cardRejectedLedPending = false;
+    this->led.triggerError();
+  }
 }
 #endif
 
@@ -160,6 +165,10 @@ bool Application::processConnectionState()
   if (!apiState.authenticated ||
       (!networkState.ethernet_connected && !networkState.wifi_connected) ||
       !websocketState.connected) {
+    // The server's commands for an open card conversation can no longer arrive, and a late one
+    // after the reconnect belongs to a session the server already dropped: close it now instead of
+    // keeping the card (and presence probing) blocked until the relay's own timeout.
+    this->cardRelay.cancel();
 #ifdef HAS_LVGL_DISPLAY
     this->resetSessionOnDisconnect();
     // Drop any pending/active enrollment. The trigger is set asynchronously by
@@ -397,16 +406,12 @@ bool Application::processAuthenticationState()
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
 
-#ifndef HAS_LVGL_DISPLAY
-    // For non-display mode, process authentication immediately since the card
-    // is still present and won't trigger another detection event
-    this->processCardAuthenticationData();
-#else
+#ifdef HAS_LVGL_DISPLAY
     this->nfc.enableCardDetection();
+#endif
     // The server already verified the card through the relay, so there is nothing left to do with
     // the card itself: show the outcome right away.
     this->processCardAuthenticationData();
-#endif
     return true;
   }
 

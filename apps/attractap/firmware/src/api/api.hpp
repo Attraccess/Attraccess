@@ -117,7 +117,8 @@ public:
     // APDU at a time: CARD_APDU in, CARD_APDU_RESPONSE out, until CARD_CONVERSATION_END. CARD_DETECTED
     // carries the card relay's detectionId; the server echoes it in CARD_APDU and CARD_CONVERSATION_END.
     // purpose: "tap", "enroll", "reset", "supervisor" or "mass-introduction".
-    void sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidLength, uint32_t resourceId = 0,
+    // false: not sent; the conversation opened for this card is closed again.
+    bool sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidLength, uint32_t resourceId = 0,
                           const char *sessionId = nullptr);
     void sendCardApduResponse(const char *conversationId, uint32_t seq, const uint8_t *response, uint8_t length);
     void sendCardRemoved(const char *conversationId);
@@ -251,6 +252,7 @@ private:
     void sendUiRenderReport(const UiRenderReport &report);
     void sendMessage(const char *type);
     bool sendMessage(const char *type, JsonObject payload, uint32_t messageId = 0);
+    void logSendingEvent(const char *type);
     void readBlockReason(JsonVariantConst reason, ActionResult &out);
     void onUiSlotUpdate(JsonObject data);
     void onUiStepRequest(JsonObject data);

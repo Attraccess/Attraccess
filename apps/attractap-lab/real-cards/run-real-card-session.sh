@@ -10,7 +10,9 @@
 # the 1.7.x firmware card code and compared with what the server sent.
 #
 # Environment: LG_PLACE_NAME (default attractap-touch-v2-1), READER_IMAGE / EMULATOR_IMAGE (skip the
-# builds), API_HOST, KEEP_API=1 (leave nothing running regardless), RUN_ROOT (default ./runs).
+# builds), API_HOST, API_START_TIMEOUT (seconds to wait for the API, default 120), KEEP_API=1 (leave
+# the API and the wire proxy running after the session, to look at the database; the script prints
+# how to stop them), RUN_ROOT (default ./runs).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -64,13 +66,36 @@ export WIRETAP_FILE="$RUN_DIR/wiretap.jsonl" WIRETAP_DROP="$RUN_DIR/drop.arm"
   echo $! >"$RUN_DIR/api.pid")
 python3 "$HERE/wireproxy.py" --target-port "$API_PORT" --capture "$RUN_DIR/wire.jsonl" --ready "$RUN_DIR/proxy.json" >"$RUN_DIR/proxy.log" 2>&1 &
 echo $! >"$RUN_DIR/proxy.pid"
-cleanup() { kill "$(cat "$RUN_DIR/proxy.pid")" "$(cat "$RUN_DIR/api.pid")" 2>/dev/null || true; }
+stop_api() { kill "$(cat "$RUN_DIR/proxy.pid")" "$(cat "$RUN_DIR/api.pid")" 2>/dev/null || true; }
+cleanup() {
+  if [[ "${KEEP_API:-}" == 1 && "${api_ready:-0}" == 1 ]]; then
+    echo "KEEP_API=1: the API (http://127.0.0.1:$API_PORT, database $STORAGE/attraccess.sqlite) and the wire proxy keep running."
+    echo "Stop them with: kill $(cat "$RUN_DIR/proxy.pid") $(cat "$RUN_DIR/api.pid")"
+    return
+  fi
+  stop_api
+}
 trap cleanup EXIT
+api_deadline=$((SECONDS + ${API_START_TIMEOUT:-120}))
 until curl -sf -o /dev/null "http://127.0.0.1:$API_PORT/api/info"; do
   kill -0 "$(cat "$RUN_DIR/api.pid")" 2>/dev/null || { tail -30 "$RUN_DIR/api.log" >&2; exit 1; }
+  if ((SECONDS > api_deadline)); then
+    tail -30 "$RUN_DIR/api.log" >&2
+    echo "API did not start within ${API_START_TIMEOUT:-120}s (set API_START_TIMEOUT)" >&2
+    exit 1
+  fi
   sleep 1
 done
-until [[ -s "$RUN_DIR/proxy.json" ]]; do sleep 0.3; done
+proxy_deadline=$((SECONDS + 30))
+until [[ -s "$RUN_DIR/proxy.json" ]]; do
+  if ! kill -0 "$(cat "$RUN_DIR/proxy.pid")" 2>/dev/null || ((SECONDS > proxy_deadline)); then
+    tail -30 "$RUN_DIR/proxy.log" >&2
+    echo "The wire proxy did not start" >&2
+    exit 1
+  fi
+  sleep 0.3
+done
+api_ready=1
 PROXY_PORT="$(python3 -c "import json; print(json.load(open('$RUN_DIR/proxy.json'))['port'])")"
 (cd "$ROOT" && STORAGE_ROOT="$STORAGE" node --env-file="$ROOT/.env" --experimental-strip-types apps/api/scripts/seed-dev-user.mjs \
   --username admin --password password --allow-external-db >"$RUN_DIR/seed.log" 2>&1)

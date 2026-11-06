@@ -476,7 +476,14 @@ def test_tampered_card_answers_never_log_in(case, api, admin, reader, resource, 
     tries, window = (3, 5) if case.startswith("oversized") else (5, 9)
     verdict = try_to_log_in(emulator, console, "alice", HOSTILE[case](enrolled_alice["answers"]), tries, window)
     assert verdict != VERIFIED and "Card verified by the server" not in console.since(mark)
-    assert verdict is None or verdict in DENIED, verdict
+    if case.startswith("oversized"):
+        # An answer longer than the PN532 buffer never reaches the server: the reader reports the
+        # card as gone (CARD_REMOVED) instead, so no verdict is the expected outcome here.
+        assert verdict in DENIED or (verdict is None and RADIO_DROP in console.since(mark)), verdict
+    else:
+        # Every other tampered answer reaches the server, which must say no (no verdict at all
+        # means the test never saw the server decide).
+        assert verdict in DENIED, verdict
     assert not signed_in(hooks)
     assert stored_card(api, "08a11ce1") == record_before and key_versions(emulator, "alice") == keys_before
     # The reader is still fine: the genuine card logs in afterwards.

@@ -1,8 +1,8 @@
 """Reader session lifetime, tap latency, presence probe and captured secrets (ATT-1145 / ATT-1187).
 
 Runs after the other files. Needs the lab API started with the wiretap preload
-(``real-cards/wiretap.cjs``, ``WIRETAP_FILE``) for the plaintext of the conversation; without it
-the wire tests skip. With ``WIRE_CAPTURE`` (raw TCP proxy capture) the secrets tests also check
+(``real-cards/wiretap.cjs``, ``WIRETAP_FILE``) for the plaintext of the conversation; ``hil/run.sh``
+starts it that way, and without it (a hand-started API) the wire tests skip. With ``WIRE_CAPTURE`` (raw TCP proxy capture) the secrets tests also check
 that the ciphertext on the wire holds nothing readable.
 
 The server keeps a verified user per connection. The only thing a test can read about it is the

@@ -7,9 +7,10 @@
 #include <cstring>
 #include <string>
 
-void API::sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidLength, uint32_t resourceId,
+bool API::sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidLength, uint32_t resourceId,
                            const char *sessionId)
 {
+    // The relay opens before the message goes out, so the server's first command cannot beat it.
     const uint32_t detectionId =
         this->cardConversationStartCallback != nullptr ? this->cardConversationStartCallback() : 0;
     JsonDocument doc;
@@ -25,7 +26,18 @@ void API::sendCardDetected(const char *purpose, const uint8_t *uid, uint8_t uidL
     {
         payload["sessionId"] = sessionId;
     }
-    this->sendMessage("CARD_DETECTED", payload);
+    if (this->sendMessage("CARD_DETECTED", payload))
+    {
+        return true;
+    }
+    // Not sent (no connection, or the secure session is not ready): the server will never talk to
+    // this card, so close the conversation that was just opened for it.
+    this->logger.warn("Could not announce the card to the server");
+    if (this->cardConversationEndCallback != nullptr)
+    {
+        this->cardConversationEndCallback(detectionId, nullptr);
+    }
+    return false;
 }
 
 void API::sendCardApduResponse(const char *conversationId, uint32_t seq, const uint8_t *response, uint8_t length)

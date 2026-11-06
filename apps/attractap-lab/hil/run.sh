@@ -16,6 +16,10 @@
 # session on LG_PLACE_NAME. Needs ESP-IDF (source export.sh) for the builds,
 # the labgrid client environment (LAB_PYTHON: labgrid fork + pytest) and a lab
 # host with readerWifi enabled. Artifacts land in apps/attractap-lab/hil-artifacts.
+#
+# The API runs with the real-cards/wiretap.cjs preload (NODE_OPTIONS); WIRETAP_FILE
+# (hil-artifacts/wiretap.jsonl, started fresh per run) holds the plaintext reader conversation
+# the wire fixture reads. It records card APDUs in full: lab evidence only, never commit it.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,9 +83,16 @@ fi
 
 API_PORT="${API_PORT:-$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')}"
 export STORAGE_ROOT="$WORK/storage"
-# Own process group, so the trap stops pnpm and the API it spawned.
+ARTIFACTS="$(cd "$HERE/.." && pwd)/hil-artifacts"
+mkdir -p "$ARTIFACTS"
+export WIRETAP_FILE="$ARTIFACTS/wiretap.jsonl"
+: >"$WIRETAP_FILE"
+WIRETAP_PRELOAD="$(cd "$HERE/../real-cards" && pwd)/wiretap.cjs"
+# Own process group, so the trap stops pnpm and the API it spawned. NODE_OPTIONS reaches the API
+# process through pnpm serve and nx (the preload also loads, harmlessly, into those tools).
 set -m
-(cd "$ROOT" && PORT="$API_PORT" exec pnpm serve --only=api >"$WORK/api.log" 2>&1) &
+(cd "$ROOT" && PORT="$API_PORT" NODE_OPTIONS="--require $WIRETAP_PRELOAD" \
+  exec pnpm serve --only=api >"$WORK/api.log" 2>&1) &
 api_pid=$!
 set +m
 trap 'kill -- "-$api_pid" 2>/dev/null || true' EXIT
@@ -103,13 +114,12 @@ if [[ -n "${API_RELAY_SSH:-}" ]]; then
 fi
 (cd "$ROOT" && pnpm seed:dev -- --username admin --password password --allow-external-db >"$WORK/seed.log" 2>&1)
 
-mkdir -p "$HERE/../hil-artifacts"
-cd "$HERE/../hil-artifacts"
+cd "$ARTIFACTS"
 GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTHON" \
   READER_IMAGE="$READER_IMAGE" READER_VARIANT="$VARIANT" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
   API_URL="http://127.0.0.1:$API_PORT" API_DB="$STORAGE_ROOT/attraccess.sqlite" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \
-  API_RELAY_SSH="${API_RELAY_SSH:-}" \
+  API_RELAY_SSH="${API_RELAY_SSH:-}" WIRETAP_FILE="$WIRETAP_FILE" \
   labgrid-client -x "$COORDINATOR" -p "$PLACE" session \
     --purpose "${HIL_PURPOSE:-Attractap HIL: NFC emulator tests}" --wait-timeout "${HIL_WAIT_TIMEOUT:-1800}" -- \
     bash "$HERE/run.sh" --in-session "$@"
