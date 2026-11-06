@@ -49,7 +49,7 @@ def efuses(secure_boot=False, crypt_raw="0x0", crypt_writeable=True, digests_bur
     return fuses
 
 
-def write_build(root, lab=True):
+def write_build(root, lab=True, plain_parts=()):
     os.makedirs(os.path.join(root, "config"))
     os.makedirs(os.path.join(root, "bootloader"))
     os.makedirs(os.path.join(root, "partition_table"))
@@ -59,9 +59,10 @@ def write_build(root, lab=True):
         json.dump(config, f)
     with open(os.path.join(root, "flasher_args.json"), "w") as f:
         json.dump({
-            "partition-table": {"offset": "0x8000", "file": "partition_table/partition-table.bin", "encrypted": "true"},
-            "otadata": {"offset": "0xe000", "file": "ota_data_initial.bin", "encrypted": "true"},
-            "app": {"offset": "0x10000", "file": "attractap.bin", "encrypted": "true"},
+            name: {"offset": offset, "file": path, "encrypted": "false" if name in plain_parts else "true"}
+            for name, offset, path in (("partition-table", "0x8000", "partition_table/partition-table.bin"),
+                                       ("otadata", "0xe000", "ota_data_initial.bin"),
+                                       ("app", "0x10000", "attractap.bin"))
         }, f)
     for rel in ("bootloader/bootloader.bin", "partition_table/partition-table.bin", "ota_data_initial.bin",
                 "attractap.bin"):
@@ -199,6 +200,36 @@ class Flash(unittest.TestCase):
     def test_non_lab_reader_is_refused(self):
         with self.assertRaisesRegex(r.LabReaderError, "Not a provisioned lab reader"):
             self.flash(efuses(secure_boot=True, crypt_raw="0x1"))
+
+
+class Hex(unittest.TestCase):
+    def write(self, **build):
+        commands = []
+        with tempfile.TemporaryDirectory() as root:
+            write_build(root, **build)
+            with mock.patch.object(r, "signed_images", side_effect=lambda images, tmp: [
+                        (o, p.replace(".bin", "-lab-signed.bin") if sign else p, enc) for o, p, enc, sign in images]), \
+                    mock.patch.object(r, "run", side_effect=lambda cmd, capture=False: commands.append(cmd)), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                r.write_hex_image(root, "/out/reader.hex")
+        return commands
+
+    def test_signed_parts_are_merged_into_intel_hex(self):
+        (cmd,) = self.write()
+        self.assertEqual(cmd[cmd.index("merge-bin"):cmd.index("-o")], ["merge-bin", "--format", "hex"])
+        self.assertEqual(cmd[cmd.index("-o") + 1], "/out/reader.hex")
+        parts = cmd[cmd.index("-o") + 2:]
+        self.assertEqual(parts[0::2], ["0x0", "0x8000", "0xe000", "0x10000"])
+        self.assertTrue(parts[1].endswith("bootloader-lab-signed.bin"))
+        self.assertTrue(parts[7].endswith("attractap-lab-signed.bin"))
+
+    def test_a_part_written_in_plaintext_is_refused(self):
+        with self.assertRaisesRegex(r.LabReaderError, "not written encrypted at 0xe000"):
+            self.write(plain_parts=("otadata",))
+
+    def test_a_release_build_is_refused(self):
+        with self.assertRaisesRegex(r.LabReaderError, "not a lab secure build"):
+            self.write(lab=False)
 
 
 if __name__ == "__main__":
