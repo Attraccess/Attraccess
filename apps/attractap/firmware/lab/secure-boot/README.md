@@ -31,6 +31,11 @@ Then use `tools/secure_lab_reader.py` (inside an ESP-IDF environment):
 - `flash --port … --build-dir …`: signs with the lab key and writes encrypted
   images. Also recovers a lab reader whose flash was erased. Add `--erase-all`
   to drop its settings.
+- `hex --build-dir … --output reader.hex`: signs with the lab key and merges
+  everything into one Intel HEX image for `esptool write-flash --force
+  --erase-all --encrypt 0x0`. That is the write a lab place makes
+  (`ESPToolDriver.erase_and_flash_encrypted` in `apps/attractap-lab`), e.g. in
+  the HIL suite's `READER_PROFILE=secure-lab` mode.
 - `provision --port … --build-dir … --expect-mac … --burn-efuses`: first time only,
   on a fresh reader. Refuses any chip whose MAC (shown by `status`) differs from
   `--expect-mac`. Burns the lab key digests, erases the whole flash, then writes
@@ -44,6 +49,6 @@ only accepts signed OTA updates.
 
 Known lab secure readers:
 
-| Reader | USB serial | Provisioned |
-| ------ | ---------- | ----------- |
-| Touch V2 (cracked display glass) | `DC:B4:D9:21:71:C8` | 2026-10-30 |
+| Reader | USB serial | Provisioned | Lab place |
+| ------ | ---------- | ----------- | --------- |
+| Touch V2 (cracked display glass) | `DC:B4:D9:21:71:C8` | 2026-10-30 | `attractap-touch-v2-secure-1` |

@@ -16,6 +16,12 @@
 # session on LG_PLACE_NAME. Needs ESP-IDF (source export.sh) for the builds,
 # the labgrid client environment (LAB_PYTHON: labgrid fork + pytest) and a lab
 # host with readerWifi enabled. Artifacts land in apps/attractap-lab/hil-artifacts.
+#
+# READER_PROFILE=secure-lab runs on the Secure Boot lab reader (default place
+# attractap-touch-v2-secure-1; README "Secure lab reader"): the reader image is
+# built with -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON, signed with
+# the lab key into Intel HEX, and written encrypted. READER_SECURE_BUILD=<dir>
+# reuses a lab secure build directory. The place's `profile` tag must match.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -39,9 +45,25 @@ if [[ "${1:-}" == --in-session ]]; then
 fi
 
 ROOT="$(cd "$HERE/../../.." && pwd)"
-PLACE="${LG_PLACE_NAME:-attractap-touch-v2-1}"
-# Places are named <firmware variant>-<n>.
-VARIANT="${READER_VARIANT:-${PLACE%-*}}"
+fail() { echo "$*" >&2; exit 1; }
+READER_PROFILE="${READER_PROFILE:-plain}"
+case "$READER_PROFILE" in
+  plain)
+    PLACE="${LG_PLACE_NAME:-attractap-touch-v2-1}"
+    # Places are named <firmware variant>-<n>.
+    VARIANT="${READER_VARIANT:-${PLACE%-*}}"
+    ;;
+  secure-lab)
+    PLACE="${LG_PLACE_NAME:-attractap-touch-v2-secure-1}"
+    VARIANT="${READER_VARIANT:-attractap-touch-v2}"
+    [[ -z "${READER_IMAGE:-}" ]] ||
+      fail "READER_PROFILE=secure-lab builds its own signed image; set READER_SECURE_BUILD to reuse a lab secure build directory"
+    if [[ -n "${READER_SECURE_BUILD:-}" && "$READER_SECURE_BUILD" != /* ]]; then
+      READER_SECURE_BUILD="$PWD/$READER_SECURE_BUILD"
+    fi
+    ;;
+  *) fail "READER_PROFILE must be plain or secure-lab" ;;
+esac
 COORDINATOR="${LG_COORDINATOR:-attractap-lab:20408}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/attractap-hil.XXXXXX")"
 
@@ -54,11 +76,32 @@ fi
 "$LAB_PYTHON" -c 'import labgrid, pytest' || {
   echo "LAB_PYTHON=$LAB_PYTHON needs labgrid and pytest" >&2; exit 1; }
 
+# A plain image leaves a Secure Boot reader unbootable, and the secure-lab write
+# needs a lab reader: the place's `profile` tag (plain if it has none) must match.
+place="$(labgrid-client -x "$COORDINATOR" -p "$PLACE" show)" || fail "Cannot read place $PLACE from $COORDINATOR"
+place_profile="$(sed -n 's/^ *tags:.*[ ,]profile=\([a-z-]*\).*/\1/p' <<<"$place" | head -1)"
+[[ "${place_profile:-plain}" == "$READER_PROFILE" ]] ||
+  fail "$PLACE is a ${place_profile:-plain} reader, but READER_PROFILE=$READER_PROFILE"
+
 require_idf() {
   command -v idf.py >/dev/null || { echo "Source ESP-IDF export.sh first (or set READER_IMAGE/EMULATOR_IMAGE)" >&2; exit 1; }
 }
 
-if [[ -z "${READER_IMAGE:-}" ]]; then
+if [[ "$READER_PROFILE" == secure-lab ]]; then
+  require_idf
+  firmware="$ROOT/apps/attractap/firmware"
+  if [[ -z "${READER_SECURE_BUILD:-}" ]]; then
+    READER_SECURE_BUILD="$firmware/build/hil-$VARIANT-secure-lab"
+    (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
+      idf.py -B "$READER_SECURE_BUILD" -DSDKCONFIG="$READER_SECURE_BUILD/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
+        -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
+        -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON ${READER_CMAKE_ARGS:-} build >"$WORK/reader-build.log")
+  fi
+  # Refuses anything but a lab secure build (a release-mode image would switch the reader to release mode for good).
+  python3 "$firmware/tools/secure_lab_reader.py" hex --build-dir "$READER_SECURE_BUILD" --output "$WORK/reader.hex" \
+    >"$WORK/reader-sign.log"
+  READER_IMAGE="$WORK/reader.hex"
+elif [[ -z "${READER_IMAGE:-}" ]]; then
   require_idf
   firmware="$ROOT/apps/attractap/firmware"
   build="$firmware/build/hil-$VARIANT"
@@ -106,7 +149,7 @@ fi
 mkdir -p "$HERE/../hil-artifacts"
 cd "$HERE/../hil-artifacts"
 GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTHON" \
-  READER_IMAGE="$READER_IMAGE" READER_VARIANT="$VARIANT" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
+  READER_IMAGE="$READER_IMAGE" READER_VARIANT="$VARIANT" READER_PROFILE="$READER_PROFILE" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
   API_URL="http://127.0.0.1:$API_PORT" API_DB="$STORAGE_ROOT/attraccess.sqlite" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \
   API_RELAY_SSH="${API_RELAY_SSH:-}" \

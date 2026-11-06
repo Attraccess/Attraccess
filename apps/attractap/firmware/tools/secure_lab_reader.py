@@ -13,6 +13,9 @@ encryption, so it stays re-flashable over USB with encrypted writes.
              --expect-mac with the reader's MAC, and --burn-efuses.
   flash      re-flash a provisioned lab reader with signed, encrypted images
              (also recovers a reader whose flash was erased)
+  hex        sign a lab secure build and merge it into one Intel HEX image for
+             `esptool write-flash --force --erase-all --encrypt 0x0`, the write
+             a lab place does (attractap_lab ESPToolDriver.erase_and_flash_encrypted)
 
 Run inside an ESP-IDF environment (espefuse, esptool and espsecure on PATH).
 """
@@ -159,6 +162,22 @@ def signed_images(images, tmp):
     return out
 
 
+def write_hex_image(build_dir, output):
+    """Sign a lab secure build and merge every part into one Intel HEX file.
+
+    One encrypted write takes the whole file, so every part (the bootloader too)
+    must be one that is written encrypted. HEX leaves the gaps between parts
+    unwritten: an encrypted write of a raw merged image would also fill them
+    (NVS included) with encrypted 0xFF."""
+    images = flash_layout(build_dir)
+    plain = [offset for offset, _, encrypted, _ in images if not encrypted]
+    if plain:
+        raise LabReaderError(f"{build_dir} has parts that are not written encrypted at {', '.join(plain)}")
+    with tempfile.TemporaryDirectory() as tmp:
+        flat = [item for offset, path, _ in signed_images(images, tmp) for item in (offset, path)]
+        run(["esptool", "--chip", CHIP, "merge-bin", "--format", "hex", "-o", output, *flat])
+
+
 def cmd_status(args):
     efuses = read_efuses(args.port)
     describe(efuses)
@@ -229,14 +248,20 @@ def cmd_flash(args):
         run(cmd)
 
 
+def cmd_hex(args):
+    write_hex_image(args.build_dir, args.output)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("status", "provision", "flash"):
+    for name in ("status", "provision", "flash", "hex"):
         p = sub.add_parser(name)
-        p.add_argument("--port", required=True)
+        if name != "hex":
+            p.add_argument("--port", required=True)
         if name != "status":
             p.add_argument("--build-dir", required=True, help="lab secure build directory")
+    sub.choices["hex"].add_argument("--output", required=True, help="Intel HEX file to write")
     sub.choices["provision"].add_argument("--expect-mac", required=True,
                                           help="MAC of the reader to provision (see `status`); any other chip is refused")
     sub.choices["provision"].add_argument("--burn-efuses", action="store_true",
@@ -245,7 +270,7 @@ def main():
                                       help="erase the whole flash first (drops the reader's settings)")
     args = parser.parse_args()
     try:
-        {"status": cmd_status, "provision": cmd_provision, "flash": cmd_flash}[args.command](args)
+        {"status": cmd_status, "provision": cmd_provision, "flash": cmd_flash, "hex": cmd_hex}[args.command](args)
     except LabReaderError as error:
         print(f"Error: {error}", file=sys.stderr)
         sys.exit(1)

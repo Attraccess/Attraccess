@@ -3,6 +3,10 @@
 Run through `pnpm nx run attractap-lab:hil`, which builds the firmware, starts
 an API with a throwaway database and runs pytest inside a labgrid session.
 The reader is erased on release, so every run flashes and provisions it.
+
+READER_PROFILE=secure-lab runs on a Secure Boot lab reader (README "Secure lab
+reader"): its image is lab-signed Intel HEX, written encrypted after an eFuse
+check, and the reader is wiped the same way when the run ends.
 """
 
 import json
@@ -14,6 +18,7 @@ import urllib.error
 
 import pytest
 
+from attractap_lab import efuse
 from attractap_lab.drivers import (
     ESPToolDriver, NfcEmulatorDriver, NfcEmulatorFlashDriver, ScreenCaptureDriver,
 )
@@ -24,6 +29,9 @@ from attractap_lab.workflow import claim, flash_reader, send_reader_wifi
 from support import Api, ReaderConsole
 
 ENVIRONMENT = Path(__file__).parents[1] / "example-emulator-env.yaml"
+PROFILE = os.environ.get("READER_PROFILE") or efuse.PLAIN
+if PROFILE not in efuse.PROFILES:
+    raise RuntimeError(f"READER_PROFILE must be one of {', '.join(efuse.PROFILES)}, not {PROFILE!r}")
 PIN = os.environ.get("READER_PIN", "4711")
 CARD_UIDS = ("08a11ce1", "08b0b001", "08ca0101")
 # The firmware variant under test; run.sh defaults it to the place name without its -<n>.
@@ -143,48 +151,96 @@ def approve_pairing(console, url, token, timeout=180, since=0, **options):
     raise AssertionError("reader never showed a pairing code the API accepted")
 
 
+def write_secure_image(target):
+    """Erase a secure lab reader and write the lab-signed HEX image encrypted.
+
+    The eFuse check runs first: only a development-mode reader with the lab key
+    digests takes the write, so a plain reader is never erased this way.
+    """
+    flash = target.get_driver(ESPToolDriver, activate=False)
+    target.activate(flash)
+    try:
+        efuse.check(flash.read_efuses(), profile=efuse.SECURE_LAB)
+        flash.erase_and_flash_encrypted(os.environ["READER_IMAGE"])
+    finally:
+        target.deactivate(flash)
+
+
+def record_heap(console, artifacts, label):
+    """Append the reader's internal heap (system.heap.get test hook) to reader-heap.jsonl."""
+    try:
+        heap = ReaderTestHooks(console.stream(), PIN).command("system.heap.get")
+    except Exception as error:  # diagnostics only: never fail a run over it
+        heap = {"error": str(error)}
+    with (artifacts / "reader-heap.jsonl").open("a") as log:
+        log.write(json.dumps({"label": label, "profile": PROFILE, **heap}) + "\n")
+
+
 @pytest.fixture(scope="session")
 def reader(target, emulator, api, admin, artifacts):
     """A freshly flashed reader on the lab Wi-Fi, paired with the test API.
 
-    The janitor erases readers between sessions, so the reader starts unpaired
-    and is approved with the admin session of the API this run started.
+    The janitor erases readers between sessions (this fixture wipes a secure-lab
+    reader itself), so the reader starts unpaired and is approved with the
+    admin session of the API this run started.
     """
-    # An idle Touch V1 is off: flash_reader turns it on with its power button,
-    # which the emulator presses now that it runs this run's firmware, and keeps
-    # it on through the flash. Readers that are on, like a Touch V2, are left alone.
-    flash_reader(target, os.environ["READER_IMAGE"])
+    secure = PROFILE == efuse.SECURE_LAB
+    if secure:
+        write_secure_image(target)
+    else:
+        # An idle Touch V1 is off: flash_reader turns it on with its power button,
+        # which the emulator presses now that it runs this run's firmware, and keeps
+        # it on through the flash. Readers that are on, like a Touch V2, are left alone.
+        flash_reader(target, os.environ["READER_IMAGE"])
     flash = target.get_driver(ESPToolDriver, activate=False)
     driver = target.get_driver("SerialDriver", activate=False)
-    open_console(target, driver)
-    console = ReaderConsole(driver, artifacts / "reader-serial.log")
-    console.start()
-    time.sleep(3)
-    assert "error" not in console.command("auth.code.set", {"newCode": PIN}).lower()
-    mark = console.mark()
-    send_reader_wifi(target, PIN)
-    response = console.expect(r"RESP network\.wifi\.credentials\.set ([^\r\n]*)", mark, 30).group(1)
-    assert b"error" not in response.lower(), response
-    reader_ip = console.expect(r"Got IP (\d+\.\d+\.\d+\.\d+)", mark, 60).group(1).decode()
-    configuration = console.command("api.configuration.set", {
-        "authCode": PIN, "hostname": api_host(reader_ip),
-        "port": int(os.environ.get("READER_API_PORT") or os.environ["API_PORT"]), "useSSL": False,
-    })
-    assert "error" not in configuration.lower(), configuration
-    # Leave the configuration-required state with a reboot.
-    console.stop()
-    target.deactivate(driver)
-    target.activate(flash)
-    flash.reset()
-    target.deactivate(flash)
-    open_console(target, driver)
-    console.start()
-    # The erased reader shows a rotating code; approve it as admin on the API
-    # this run started (a code that rotated away is retried with the next one).
-    reader_id = approve_pairing(console, api.base[:-len("/api")], admin)
-    console.expect(r"Reader Authentication successful", 0, 120)
-    yield {"id": reader_id, "console": console}
-    console.stop()
+    console = None
+    try:
+        open_console(target, driver)
+        console = ReaderConsole(driver, artifacts / "reader-serial.log")
+        console.start()
+        time.sleep(3)
+        assert "error" not in console.command("auth.code.set", {"newCode": PIN}).lower()
+        mark = console.mark()
+        send_reader_wifi(target, PIN)
+        response = console.expect(r"RESP network\.wifi\.credentials\.set ([^\r\n]*)", mark, 30).group(1)
+        assert b"error" not in response.lower(), response
+        reader_ip = console.expect(r"Got IP (\d+\.\d+\.\d+\.\d+)", mark, 60).group(1).decode()
+        configuration = console.command("api.configuration.set", {
+            "authCode": PIN, "hostname": api_host(reader_ip),
+            "port": int(os.environ.get("READER_API_PORT") or os.environ["API_PORT"]), "useSSL": False,
+        })
+        assert "error" not in configuration.lower(), configuration
+        # Leave the configuration-required state with a reboot.
+        console.stop()
+        target.deactivate(driver)
+        target.activate(flash)
+        flash.reset()
+        target.deactivate(flash)
+        open_console(target, driver)
+        console.start()
+        record_heap(console, artifacts, "before pairing")
+        # The erased reader shows a rotating code; approve it as admin on the API
+        # this run started (a code that rotated away is retried with the next one).
+        reader_id = approve_pairing(console, api.base[:-len("/api")], admin)
+        console.expect(r"Reader Authentication successful", 0, 120)
+        record_heap(console, artifacts, "after the TLS session opened")
+        yield {"id": reader_id, "console": console}
+        record_heap(console, artifacts, "end of session")
+    finally:
+        if console is not None:
+            try:
+                console.stop()
+            except Exception:  # the wipe below must still run
+                pass
+        if secure:
+            # The secure place has no janitor yet: also when setup failed, leave
+            # no Wi-Fi, PIN or pairing on the reader.
+            try:
+                target.deactivate(driver)
+            except Exception:
+                pass
+            write_secure_image(target)
 
 
 @pytest.fixture

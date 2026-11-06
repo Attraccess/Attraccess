@@ -283,6 +283,49 @@ a new approval. It runs only for the variants in `POWER_BUTTON_VARIANTS`
 skip it: their emulator has no button to press. Add a variant there once its
 places have the emulator wired to its power button.
 
+### Secure lab reader
+
+> **Never write a release (non-lab) secure image to a secure lab reader**: its
+> first boot switches flash encryption to release mode for good. The suite never
+> burns eFuses itself (only the firmware's anti-rollback version, see below).
+
+`READER_PROFILE=secure-lab` runs the same tests on the place
+`attractap-touch-v2-secure-1`: a Touch V2 with Secure Boot v2 bound to the
+public lab keys and development-mode flash encryption (ATT-1166; see
+`apps/attractap/firmware/lab/secure-boot/README.md`).
+
+```sh
+. .tools/esp-idf/export.sh
+READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil
+```
+
+- The runner builds the reader with `-DATTRACTAP_SECURE_PROFILE=ON
+  -DATTRACTAP_SECURE_LAB=ON -DATTRACTAP_TEST_HOOKS=ON`. The lab profile keeps
+  the USB console and serial command handler that the release profile compiles
+  out.
+- `tools/secure_lab_reader.py hex` signs the bootloader and app with the lab key
+  and merges them into Intel HEX. It refuses anything but a lab secure build.
+  `READER_SECURE_BUILD=<dir>` reuses an existing build directory; `READER_IMAGE`
+  is refused for this profile.
+- Before writing, the tests check the reader's eFuses against the `secure-lab`
+  profile (`efuse.check`). Then they erase the chip and write the image
+  encrypted (`ESPToolDriver.erase_and_flash_encrypted`), the same write the
+  janitor uses to park this reader.
+- The place has no janitor yet (`janitor=none`). When the run ends, also after
+  a failed setup, the tests write the image again, so no Wi-Fi, PIN or pairing
+  stays on the reader.
+- `run.sh` refuses to start when `READER_PROFILE` does not match the place's
+  `profile` tag (`plain` when it has none). A plain image leaves this reader
+  unbootable, and the secure write would not fit a plain reader.
+- The reader's internal heap (before pairing, after the TLS session opened, at
+  the end) is written to `reader-heap.jsonl` in the run's artifacts.
+
+If a run is killed before its own wipe, run it again, or write any lab image
+by hand inside a session on the place, for example with
+`ESPToolDriver.erase_and_flash_encrypted`. A branch that raises
+`CONFIG_BOOTLOADER_APP_SECURE_VERSION` burns the new version into the reader
+(anti-rollback), so lab images from older branches stop booting on it.
+
 ### In CI
 
 `.github/workflows/attractap-lab-hil.yml` runs these tests from the release
