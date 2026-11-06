@@ -166,7 +166,7 @@ export function jestSuite(config) {
   return {
     runner: 'jest',
     cwd: workspace,
-    args: ['--config', config, '--runInBand', '--passWithNoTests', '--testPathIgnorePatterns=\\.e2e\\.spec\\.ts$'],
+    args: ['--config', config, '--maxWorkers=2', '--passWithNoTests', '--testPathIgnorePatterns=\\.e2e\\.spec\\.ts$'],
   };
 }
 

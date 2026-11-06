@@ -1,7 +1,3 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { SignedXml } from 'xml-crypto';
 import { inflateRawSync } from 'node:zlib';
@@ -16,6 +12,7 @@ import { SessionStore } from '../../session-store/session-store';
 import { SettingsService } from '../../../../settings/settings.service';
 import { EncryptionService } from '../../../../encryption/encryption.service';
 import { OidcTokenVerifier } from '../oidc/oidc-token-verifier.service';
+import { selfSignedCertificate } from '../../../../test/self-signed-certificate.test-fixture';
 
 jest.setTimeout(30000);
 const destination = 'https://app.example/api/auth/sso/SAML/2/slo';
@@ -37,7 +34,6 @@ const decodeRedirect = (url: string) => {
 };
 
 describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () => {
-  let directory: string;
   let cert: string;
   let privateKey: string;
   let spCert: string;
@@ -67,34 +63,10 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
       return true;
     },
   });
-  beforeAll(() => {
-    directory = mkdtempSync(join(tmpdir(), 'attraccess-slo-'));
-    for (const name of ['idp', 'sp'])
-      execFileSync(
-        'openssl',
-        [
-          'req',
-          '-x509',
-          '-newkey',
-          'rsa:2048',
-          '-nodes',
-          '-subj',
-          `/CN=${name}-logout-test`,
-          '-keyout',
-          join(directory, `${name}.key`),
-          '-out',
-          join(directory, `${name}.pem`),
-          '-days',
-          '1',
-        ],
-        { stdio: 'ignore' },
-      );
-    cert = readFileSync(join(directory, 'idp.pem'), 'utf8');
-    privateKey = readFileSync(join(directory, 'idp.key'), 'utf8');
-    spCert = readFileSync(join(directory, 'sp.pem'), 'utf8');
-    spKey = readFileSync(join(directory, 'sp.key'), 'utf8');
+  beforeAll(async () => {
+    ({ cert, key: privateKey } = await selfSignedCertificate('idp-logout-test'));
+    ({ cert: spCert, key: spKey } = await selfSignedCertificate('sp-logout-test'));
   });
-  afterAll(() => rmSync(directory, { recursive: true, force: true }));
   beforeEach(() => {
     jest.clearAllMocks();
     states.clear();

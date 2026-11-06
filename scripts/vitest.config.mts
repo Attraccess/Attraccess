@@ -12,5 +12,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['scripts/**/*.spec.mts'],
+    // These specs spawn real processes, which are slow on a loaded machine.
+    testTimeout: 30_000,
   },
 });

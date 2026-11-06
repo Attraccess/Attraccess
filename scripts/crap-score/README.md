@@ -89,8 +89,16 @@ fixes or configuration from validating a different staged snapshot and leaves
 the index and worktree untouched. Stage or discard those changes and retry. CI
 uses the PR or merge-queue base and applies the same project check. Shared-change
 detection diffs exactly the revisions Nx uses for affected selection (`--base`
-and `--head`, or the uncommitted worktree), so a shared configuration change
-always expands to every target.
+and `--head`, or the uncommitted worktree), so in CI a shared configuration change
+always expands to every target. The hook passes `--nx-affected`, which skips that
+expansion and scores only the projects Nx reports as affected; CI still covers the rest.
+Projects tagged `host:fhs` (the WAGO plugin, whose tests run device shell scripts
+against `/bin` and `/usr/bin` tools) are skipped by the hook on hosts without that
+layout, such as NixOS, with a notice; CI scores them.
+
+The hook runs lint and typecheck for affected projects, and runs their unit tests
+only through the CRAP coverage run, so each suite runs once. Builds, e2e and
+the other suites run in CI.
 `pnpm crap-score` always runs the full workspace.
 
 Run the adapter's regression checks with:

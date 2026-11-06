@@ -197,15 +197,35 @@ export function supportedProjects(nodes, tracked) {
     .map((node) => node.name);
 }
 
+// The pre-commit hook passes --nx-affected to trust Nx's affected graph instead of
+// widening shared changes to every project; CI keeps the full widening.
+export const scoresEveryProject = (args, selection, files) =>
+  selection === null || (!args.includes('--nx-affected') && isSharedChange(files));
+
+// Projects tagged host:fhs run device shell scripts against /bin and /usr/bin tools.
+// Hosts without that layout (NixOS) cannot run them, so the hook leaves them to CI.
+export const hasFhsLayout = () => ['/bin/bash', '/usr/bin/tr', '/usr/bin/awk'].every((tool) => existsSync(tool));
+
+export function skipHostBound(projects, nodes, args, fhs = hasFhsLayout()) {
+  if (fhs || !args.includes('--nx-affected')) return projects;
+  const skipped = projects.filter((project) => nodes[project]?.data.tags?.includes('host:fhs'));
+  if (skipped.length) console.warn(`Skipping ${skipped.join(', ')}: this host lacks /bin and /usr/bin tools; CI scores them.`);
+  return projects.filter((project) => !skipped.includes(project));
+}
+
 export async function selectProjects(args) {
   const { nodes } = await createProjectGraphAsync({ exitOnError: true });
+  return skipHostBound(affectedProjects(args, nodes), nodes, args);
+}
+
+function affectedProjects(args, nodes) {
   const targetProjects = Object.values(nodes)
     .filter((node) => node.data.targets?.['crap-score'])
     .map((node) => node.name);
   validateSupportedTargets(supportedProjects(nodes, trackedFiles()), targetProjects);
   const selection = affectedSelection(args);
   const files = selection && changedFiles(selection);
-  if (selection === null || isSharedChange(files)) return targetProjects.sort();
+  if (scoresEveryProject(args, selection, files)) return targetProjects.sort();
   const { args: nxArgs, input } = affectedProjectsQuery(selection, files);
   return JSON.parse(exec(nx, nxArgs, { encoding: 'utf8', input })).sort();
 }

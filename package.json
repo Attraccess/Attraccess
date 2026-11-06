@@ -8,7 +8,7 @@
     "lint:strict": "nx affected -t lint -- --max-warnings=0",
     "lint:files": "nx run @attraccess/source:lint-files",
     "prepare": "husky",
-    "precommit": "pnpm lint:files && pnpm lint:files --staged && node scripts/crap-score/check-staged.mjs && pnpm nx affected --uncommitted --nxBail --target=lint,typecheck,build,test,e2e --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin && pnpm nx affected --uncommitted --nxBail --target=lint --exclude='*,!tag:type:plugin' && node scripts/crap-score/affected.mjs --uncommitted",
+    "precommit": "pnpm lint:files && pnpm lint:files --staged && node scripts/crap-score/check-staged.mjs && pnpm nx affected --uncommitted --nxBail --target=lint,typecheck --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin && pnpm nx affected --uncommitted --nxBail --target=lint --exclude='*,!tag:type:plugin' && node scripts/crap-score/affected.mjs --uncommitted --nx-affected",
     "precommit:all": "pnpm lint:files && pnpm lint:files --staged && pnpm nx run-many -t lint,typecheck,build,test,e2e && pnpm crap-score",
     "services": "node --experimental-strip-types scripts/services-compose.mts",
     "crap-score": "node scripts/crap-score/affected.mjs --all",

@@ -11,7 +11,9 @@ import {
   changedFiles,
   isSharedChange,
   projectSourceManifest,
+  scoresEveryProject,
   selectProjects,
+  skipHostBound,
   supportedProjects,
   trackedFiles,
   validateSupportedTargets,
@@ -50,6 +52,22 @@ test('affected selection uses Nx base or worktree selectors', () => {
   assert.deepEqual(affectedSelection(['--base=origin/main', '--head=feature']), ['--base=origin/main', '--head=feature']);
   assert.deepEqual(affectedSelection(['--uncommitted']), ['--uncommitted']);
   assert.deepEqual(affectedSelection([]), ['--uncommitted']);
+});
+
+test('shared changes score every project unless the hook trusts Nx affected selection', () => {
+  const uncommitted = affectedSelection(['--uncommitted']);
+  assert.ok(scoresEveryProject(['--all'], affectedSelection(['--all']), []));
+  assert.ok(scoresEveryProject(['--all', '--nx-affected'], affectedSelection(['--all']), []));
+  assert.ok(scoresEveryProject(['--uncommitted'], uncommitted, ['package.json']));
+  assert.ok(!scoresEveryProject(['--uncommitted', '--nx-affected'], uncommitted, ['package.json']));
+  assert.ok(!scoresEveryProject(['--uncommitted'], uncommitted, ['libs/a/src/changed.ts']));
+});
+
+test('the hook leaves host:fhs projects to CI only on hosts without /bin and /usr/bin tools', () => {
+  const nodes = { device: { data: { tags: ['host:fhs'] } }, web: { data: { tags: [] } } };
+  assert.deepEqual(skipHostBound(['device', 'web'], nodes, ['--nx-affected'], false), ['web']);
+  assert.deepEqual(skipHostBound(['device', 'web'], nodes, ['--nx-affected'], true), ['device', 'web']);
+  assert.deepEqual(skipHostBound(['device', 'web'], nodes, ['--base=origin/main'], false), ['device', 'web']);
 });
 
 test('working-tree selections pass changed and untracked files to Nx', () => {
