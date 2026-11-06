@@ -19,7 +19,8 @@ import { NotificationDispatchService } from '../../notifications/notification-di
 describe('persisted resource introducer aggregation', () => {
   let source: DataSource;
   let service: ResourceIntroducersService;
-  beforeEach(async () => {
+  // Migrating is the slow part (every migration, on a busy coverage run): do it once per file.
+  beforeAll(async () => {
     source = await new DataSource({
       type: 'sqlite',
       database: ':memory:',
@@ -27,6 +28,23 @@ describe('persisted resource introducer aggregation', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
+  }, 120_000);
+  afterAll(async () => {
+    if (source?.isInitialized) await source.destroy();
+  });
+  beforeEach(async () => {
+    // Each test starts from the same rows; children before the rows they reference.
+    const groups = source.getMetadata(Resource).findRelationWithPropertyPath('groups')?.junctionEntityMetadata;
+    if (!groups) throw new Error('Resource.groups has no junction table');
+    for (const metadata of [
+      source.getMetadata(ResourceIntroducer),
+      groups,
+      source.getMetadata(ResourceGroup),
+      source.getMetadata(Resource),
+      source.getMetadata(User),
+    ]) {
+      await source.query(`DELETE FROM "${metadata.tableName}"`);
+    }
     service = new ResourceIntroducersService(
       source.getRepository(ResourceIntroducer),
       source.getRepository(User),
@@ -63,9 +81,6 @@ describe('persisted resource introducer aggregation', () => {
       { resourceId: 1, userId: 5, type: ResourceIntroducerType.MAINTAINER },
     ]);
     await source.getRepository(User).softDelete(6);
-  }, 60_000);
-  afterEach(async () => {
-    if (source?.isInitialized) await source.destroy();
   });
 
   it('returns the complete unique tutor union for web and reader queries without maintainer-only users', async () => {
