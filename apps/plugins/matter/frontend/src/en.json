@@ -1,0 +1,69 @@
+{
+  "page": {
+    "title": "Matter",
+    "subtitle": "Connection to the Matter sidecar.",
+    "insecure": "Insecure connection",
+    "insecureText": "The sidecar is reached over plain http on a non-loopback address. The token travels unencrypted. Use https, or keep the sidecar on the same host."
+  },
+  "status": {
+    "title": "Connection status",
+    "state": {
+      "not_configured": "Not configured",
+      "connecting": "Connecting",
+      "connected": "Connected",
+      "degraded": "Degraded"
+    },
+    "reason": {
+      "unavailable": "Unavailable",
+      "unauthorized": "Unauthorized",
+      "incompatible": "Incompatible",
+      "misconfigured": "Misconfigured"
+    },
+    "since": "Since",
+    "lastError": "Last error",
+    "correlationId": "Correlation ID",
+    "nextRetry": "Next attempt",
+    "sidecarVersion": "Sidecar",
+    "matterJsVersion": "matter.js",
+    "wireVersion": "Wire version",
+    "received": "Received",
+    "supported": "Supported combination",
+    "combination": "Attraccess {{attraccess}}, plugin {{plugin}}, sidecar {{sidecar}}, matter.js {{matterJs}}",
+    "receivedCombination": "Attraccess {{attraccess}}, plugin {{plugin}}, sidecar {{sidecar}}, matter.js {{matterJs}}",
+    "loadError": "The status could not be loaded."
+  },
+  "hint": {
+    "not_configured": "Enter the sidecar URL and token below to connect.",
+    "connecting": "Connecting to the Matter sidecar…",
+    "connected": "The plugin is connected to the Matter sidecar.",
+    "unavailable": "The sidecar cannot be reached. Check that it is running and that the URL, port and firewall are correct. Attraccess retries automatically.",
+    "unauthorized": "The sidecar rejected the token. Check the token (also after a rotation) and enter it again.",
+    "incompatible": "The versions do not match. Upgrade or downgrade the sidecar to a supported combination.",
+    "misconfigured": "The URL, the CA certificate or the TLS setup is invalid. Check the URL and path prefix, and that the CA matches the sidecar certificate.",
+    "hostVersion": "This Attraccess version does not report its version. Upgrade Attraccess to 1.11.0 or newer."
+  },
+  "form": {
+    "title": "Connection settings",
+    "url": "Sidecar URL",
+    "urlPlaceholder": "http://127.0.0.1:8581",
+    "urlDescription": "Use https for anything but the same host. A path prefix for a reverse proxy is allowed.",
+    "credential": "Token",
+    "credentialDescription": "The shared service token configured on the sidecar. It is never shown again after saving.",
+    "credentialConfigured": "Configured (last changed {{time}})",
+    "replace": "Replace",
+    "cancelReplace": "Keep current token",
+    "ca": "CA certificate (optional)",
+    "caDescription": "PEM certificate(s) to trust in addition to the system roots, for a private CA.",
+    "caClear": "Clear CA certificate",
+    "caCleared": "The CA certificate will be removed when you save.",
+    "save": "Save",
+    "remove": "Remove configuration",
+    "saved": "Saved",
+    "savedText": "The connection settings were saved. The plugin reconnects now.",
+    "saveError": "Saving failed",
+    "removeTitle": "Remove the Matter connection?",
+    "removeText": "The URL and token are deleted and the plugin disconnects from the sidecar.",
+    "removeConfirm": "Remove",
+    "removeError": "Removing failed"
+  }
+}

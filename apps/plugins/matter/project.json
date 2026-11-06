@@ -6,20 +6,31 @@
   "tags": ["type:plugin", "scope:plugin"],
   "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
   "targets": {
+    "install-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node apps/plugins/scripts/install-dev-plugin.mjs --src apps/plugins/matter/package"
+      }
+    },
     "lint": {
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
         "{projectRoot}/backend/**/*",
+        "{projectRoot}/frontend/src/**/*",
         "{projectRoot}/acceptance/**/*",
         "{workspaceRoot}/eslint.config.cjs",
         "{workspaceRoot}/tools/eslint-rules/**/*",
         "{workspaceRoot}/libs/matter-contract/project.json",
-        { "externalDependencies": ["eslint", "prettier"] }
+        {
+          "externalDependencies": ["eslint", "prettier"]
+        }
       ],
       "outputs": [],
       "options": {
-        "command": "eslint apps/plugins/matter --max-warnings=0 && prettier --check apps/plugins/matter"
+        "command": "eslint apps/plugins/matter/backend apps/plugins/matter/frontend/src apps/plugins/matter/acceptance --max-warnings=0 && prettier --check apps/plugins/matter/backend apps/plugins/matter/frontend/src apps/plugins/matter/acceptance apps/plugins/matter/package.json apps/plugins/matter/plugin.json apps/plugins/matter/project.json"
       }
     },
     "typecheck": {
@@ -30,10 +41,26 @@
         "{workspaceRoot}/tsconfig.base.json",
         "{workspaceRoot}/libs/plugins-backend-sdk/src/**/*",
         "{workspaceRoot}/libs/matter-contract/src/**/*",
-        { "externalDependencies": ["typescript"] }
+        {
+          "externalDependencies": ["typescript"]
+        }
       ],
       "options": {
-        "command": "tsc --noEmit -p apps/plugins/matter/backend/tsconfig.json && tsc --noEmit -p apps/plugins/matter/tsconfig.spec.json"
+        "command": "tsc --noEmit -p apps/plugins/matter/backend/tsconfig.json && tsc --noEmit -p apps/plugins/matter/frontend/tsconfig.json && tsc --noEmit -p apps/plugins/matter/tsconfig.spec.json"
+      }
+    },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"
+      ],
+      "outputs": [],
+      "options": {
+        "cwd": "apps/plugins/matter",
+        "command": "pnpm exec vitest run --root frontend"
       }
     },
     "test": {
@@ -44,24 +71,30 @@
         "^production",
         "{workspaceRoot}/jest.preset.js",
         "{workspaceRoot}/libs/matter-contract/src/**/*",
-        { "externalDependencies": ["jest"] }
+        {
+          "externalDependencies": ["jest"]
+        }
       ],
       "outputs": ["{workspaceRoot}/coverage/apps/plugins/matter"],
       "options": {
         "jestConfig": "apps/plugins/matter/jest.config.ts"
-      }
+      },
+      "dependsOn": ["test-frontend"]
     },
     "e2e": {
       "executor": "@nx/jest:jest",
       "cache": true,
-      "dependsOn": ["build-backend"],
+      "dependsOn": ["build-backend", "matter-sidecar:build"],
       "inputs": [
         "default",
         "^production",
         "{workspaceRoot}/jest.preset.js",
         "{workspaceRoot}/apps/api/src/plugin-system/**/*",
         "{workspaceRoot}/libs/matter-contract/src/**/*",
-        { "externalDependencies": ["jest"] }
+        {
+          "externalDependencies": ["jest"]
+        },
+        "{workspaceRoot}/apps/matter-sidecar/src/**/*"
       ],
       "outputs": [],
       "options": {
@@ -80,15 +113,30 @@
       "outputs": ["{projectRoot}/package/dist"],
       "options": {
         "cwd": "apps/plugins/matter",
-        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js"
+        "command": "node ../scripts/esbuild-backend.mjs --tsconfig backend/tsconfig.json --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+      }
+    },
+    "build-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
+      ],
+      "outputs": ["{projectRoot}/package/frontend"],
+      "options": {
+        "cwd": "apps/plugins/matter",
+        "command": "pnpm exec vite build --config frontend/vite.config.ts"
       }
     },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
-      "dependsOn": ["build-backend"],
+      "dependsOn": ["build-backend", "build-frontend"],
       "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
-      "outputs": ["{projectRoot}/package"],
+      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
       "options": {
         "cwd": "apps/plugins/matter",
         "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
@@ -116,8 +164,10 @@
       ],
       "options": {
         "cwd": "apps/plugins/matter",
-        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js",
-        "env": { "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0" }
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "env": {
+          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0"
+        }
       }
     },
     "crap-score": {

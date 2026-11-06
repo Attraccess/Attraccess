@@ -154,6 +154,7 @@ export const vitestSuites = {
   'apps/plugins/wago': [{ cwd: workspace, args: ['--config', 'apps/plugins/wago/frontend/vitest.config.mts'] }],
   'apps/plugins/rabbitmq': [{ cwd: workspace, args: ['--config', 'apps/plugins/rabbitmq/frontend/vitest.config.ts'] }],
   'apps/plugins/shelly': [{ cwd: path.join(workspace, 'apps/plugins/shelly'), args: ['--root', 'frontend'] }],
+  'apps/plugins/matter': [{ cwd: path.join(workspace, 'apps/plugins/matter'), args: ['--root', 'frontend'] }],
   ...Object.fromEntries(
     ['libs/plugins-frontend-sdk', 'libs/plugins-frontend-ui', 'libs/companion-ws-client'].map((root) => [
       root,

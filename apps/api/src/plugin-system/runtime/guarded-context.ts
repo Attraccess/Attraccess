@@ -38,6 +38,7 @@ export function createGuardedContext(
 
   return {
     manifest: base.manifest,
+    hostVersion: base.hostVersion,
     audit: base.audit,
     liveUpdates: base.liveUpdates,
     logger: base.logger,

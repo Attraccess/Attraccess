@@ -4,6 +4,7 @@ import { uuidSchema } from './primitives';
 
 export const ERROR_STATUS = {
   validation_failed: 400,
+  unauthorized: 401,
   forbidden_origin: 403,
   not_found: 404,
   method_not_allowed: 405,

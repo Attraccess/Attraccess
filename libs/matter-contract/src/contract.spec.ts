@@ -3,8 +3,12 @@ import {
   ERROR_STATUS,
   FEATURE_FAMILIES,
   OPERATIONS,
+  SERVICE_TOKEN_PATTERN,
   WIRE_VERSION,
   buildError,
+  buildRequestHeaders,
+  expectedSidecarVersion,
+  isHostSupported,
   capabilityReportSchema,
   clientMessageSchema,
   commandRequestSchema,
@@ -61,6 +65,7 @@ describe('errors', () => {
   it('maps every code to a documented status', () => {
     expect(ERROR_STATUS).toMatchObject({
       validation_failed: 400,
+      unauthorized: 401,
       payload_too_large: 413,
       incompatible_release: 409,
       unsupported_wire_version: 426,
@@ -223,5 +228,44 @@ describe('compatibility table', () => {
     expect(isWellFormedVersion('1.11.0\nX: y')).toBe(false);
     expect(isWellFormedVersion(undefined)).toBe(false);
     expect(isWellFormedVersion(`1.0.0-${'a'.repeat(80)}`)).toBe(false);
+  });
+});
+
+describe('client helpers', () => {
+  it('pairs a plugin release with its sidecar release and checks the host range', () => {
+    const entry = COMPATIBILITY_TABLE[0];
+    expect(expectedSidecarVersion(entry.plugin)).toBe(entry.sidecar);
+    expect(expectedSidecarVersion('9.9.9')).toBeUndefined();
+    expect(isHostSupported(entry.plugin, '1.11.0')).toBe(true);
+    expect(isHostSupported(entry.plugin, '1.10.0')).toBe(false);
+    expect(isHostSupported('9.9.9', '1.11.0')).toBe(false);
+  });
+
+  it('builds the full header set with a bearer token only when given', () => {
+    const base = {
+      attraccessVersion: '1.11.0',
+      pluginVersion: '0.2.0-alpha.0',
+      sidecarVersion: '0.2.0-alpha.0',
+      correlationId: id,
+    };
+    expect(buildRequestHeaders({ ...base, deadlineMs: 1500.2, token: 'x'.repeat(32) })).toEqual({
+      'x-matter-wire-version': '1',
+      'x-attraccess-version': '1.11.0',
+      'x-matter-plugin-version': '0.2.0-alpha.0',
+      'x-matter-sidecar-version': '0.2.0-alpha.0',
+      'x-correlation-id': id,
+      'x-request-deadline-ms': '1501',
+      authorization: `Bearer ${'x'.repeat(32)}`,
+    });
+    expect(buildRequestHeaders(base).authorization).toBeUndefined();
+  });
+
+  it('accepts only 32-512 printable ASCII characters as a service token', () => {
+    expect(SERVICE_TOKEN_PATTERN.test('a'.repeat(32))).toBe(true);
+    expect(SERVICE_TOKEN_PATTERN.test('a'.repeat(512))).toBe(true);
+    expect(SERVICE_TOKEN_PATTERN.test('a'.repeat(31))).toBe(false);
+    expect(SERVICE_TOKEN_PATTERN.test('a'.repeat(513))).toBe(false);
+    expect(SERVICE_TOKEN_PATTERN.test(`${'a'.repeat(31)} `)).toBe(false);
+    expect(SERVICE_TOKEN_PATTERN.test(`${'a'.repeat(31)}é`)).toBe(false);
   });
 });

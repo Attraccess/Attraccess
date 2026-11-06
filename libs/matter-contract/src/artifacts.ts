@@ -65,6 +65,8 @@ type ResponseShape = Pick<OperationDefinition, 'family' | 'versioned' | 'params'
 function errorStatuses(operation: ResponseShape): number[] {
   // Any route can refuse a browser origin, miss the path, get the wrong method or fail internally.
   const codes = [403, 404, 405, 500];
+  // Everything except the container probes needs the service token.
+  if (operation.id !== 'health.live' && operation.id !== 'health.ready') codes.push(401);
   // Release headers are checked, and draining refused, only on versioned routes.
   if (operation.versioned) codes.push(409, 426, 503);
   if (operation.params || operation.body) codes.push(400);
@@ -95,6 +97,8 @@ const COMPAT_PARAMETERS = [
   ['x-matter-sidecar-version', 'Expected Matter sidecar release version.'],
 ].map(([name, description]) => ({ name, in: 'header', required: true, description, schema: { type: 'string' } }));
 
+const isAnonymous = (operation: { id: string }) => operation.id === 'health.live' || operation.id === 'health.ready';
+
 function buildPathItem(operation: OperationDefinition): JsonObject {
   const pathParams = Object.keys(operation.params ? pathParamNames(operation.path) : {}).map((name) => ({
     name,
@@ -106,6 +110,7 @@ function buildPathItem(operation: OperationDefinition): JsonObject {
     operationId: operation.id,
     summary: operation.summary,
     tags: [operation.family],
+    ...(isAnonymous(operation) ? { security: [] } : {}),
     parameters: [...(operation.versioned ? COMPAT_PARAMETERS : []), ...pathParams],
     ...(operation.body
       ? {
@@ -152,8 +157,19 @@ export function buildOpenApiDocument(): JsonObject {
     openapi: '3.1.0',
     info: { title: 'Attraccess Matter sidecar', version: String(WIRE_VERSION) },
     'x-compatibility': COMPATIBILITY_TABLE,
+    security: [{ serviceToken: [] }],
     paths,
-    components: { schemas: buildSchemaDefinitions('#/components/schemas/') },
+    components: {
+      securitySchemes: {
+        serviceToken: {
+          type: 'http',
+          scheme: 'bearer',
+          description:
+            'Shared service token (32-512 printable ASCII characters). Required on every route except /health/live and /health/ready.',
+        },
+      },
+      schemas: buildSchemaDefinitions('#/components/schemas/'),
+    },
   };
 }
 

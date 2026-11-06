@@ -182,6 +182,7 @@ export default plugin;
 | Member                                                    | Purpose                                                                        | Permission               |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
 | `context.manifest`                                        | Your plugin's name, version, id, directory.                                    | none                     |
+| `context.hostVersion`                                     | Version of the running Attraccess host (the one plugin compatibility is checked against). Optional: hosts older than 1.11.0 do not set it, so handle `undefined`. | none                     |
 | `context.logger`                                          | Logger prefixed with your plugin name.                                         | none                     |
 | `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                 | per-entity (see below)   |
 | `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                           | `DATABASE_ACCESS`        |

@@ -14,6 +14,7 @@ describe('OpenAPI error responses', () => {
     expect(Object.keys(responses('/health/live'))).toEqual(['200', '403', '404', '405', '500']);
     expect(Object.keys(responses('/v1/capabilities'))).toEqual([
       '200',
+      '401',
       '403',
       '404',
       '405',
@@ -22,9 +23,33 @@ describe('OpenAPI error responses', () => {
       '500',
       '503',
     ]);
-    expect(Object.keys(responses('/v1/events'))).toEqual(['101', '403', '404', '405', '409', '426', '500', '503']);
+    expect(Object.keys(responses('/v1/events'))).toEqual([
+      '101',
+      '401',
+      '403',
+      '404',
+      '405',
+      '409',
+      '426',
+      '500',
+      '503',
+    ]);
     expect(responses('/v1/fabric', 'post')).toEqual(
       expect.objectContaining({ '400': expect.anything(), '413': expect.anything(), '501': expect.anything() }),
     );
+  });
+});
+
+describe('OpenAPI security', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const document = buildOpenApiDocument() as any;
+
+  it('requires the bearer service token by default and leaves the container probes anonymous', () => {
+    expect(document.components.securitySchemes.serviceToken).toMatchObject({ type: 'http', scheme: 'bearer' });
+    expect(document.security).toEqual([{ serviceToken: [] }]);
+    expect(document.paths['/health/live'].get.security).toEqual([]);
+    expect(document.paths['/health/ready'].get.security).toEqual([]);
+    expect(document.paths['/version'].get.security).toBeUndefined();
+    expect(document.paths['/version'].get.responses['401']).toBeDefined();
   });
 });

@@ -1,6 +1,7 @@
 import {
   COMPATIBILITY_TABLE,
   HEADER_ATTRACCESS_VERSION,
+  HEADER_AUTHORIZATION,
   HEADER_PLUGIN_VERSION,
   HEADER_SIDECAR_VERSION,
   HEADER_WIRE_VERSION,
@@ -8,7 +9,7 @@ import {
 } from '@attraccess/matter-contract';
 import { request as httpRequest } from 'node:http';
 import { WebSocket } from 'ws';
-import { configWith, type SidecarConfig } from '../config';
+import { TEST_TOKEN, configWith, type SidecarConfig } from '../config';
 import { createLogger } from '../logger';
 import { createSidecar, type Sidecar, type SidecarOptions } from '../sidecar';
 
@@ -24,6 +25,7 @@ export function validHeaders(overrides: Record<string, string | undefined> = {})
     [HEADER_ATTRACCESS_VERSION]: '1.11.0',
     [HEADER_PLUGIN_VERSION]: entry.plugin,
     [HEADER_SIDECAR_VERSION]: entry.sidecar,
+    [HEADER_AUTHORIZATION]: `Bearer ${TEST_TOKEN}`,
     ...overrides,
   };
   return Object.fromEntries(Object.entries(headers).filter(([, value]) => value !== undefined)) as Record<

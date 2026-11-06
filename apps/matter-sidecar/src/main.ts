@@ -5,7 +5,7 @@ import { isOperational, startupFailure } from './startup-failure';
 
 // A supervisor that closes our stdout must not crash the sidecar with EPIPE; the log lines are simply lost.
 process.stdout.on('error', () => undefined);
-const logger = createLogger();
+let logger = createLogger();
 
 function fatal(message: string, error?: unknown): never {
   process.stderr.write(`matter-sidecar: ${message}\n`);
@@ -15,6 +15,8 @@ function fatal(message: string, error?: unknown): never {
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  // From here on the configured tokens are masked in every log line, as a safety net.
+  logger = createLogger(undefined, config.authTokens);
   const sidecar = createSidecar({ config, logger });
   let signalled = false;
   const onSignal = (signal: NodeJS.Signals) => {

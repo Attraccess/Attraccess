@@ -6,6 +6,8 @@ import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
 import { http } from './testing/harness';
 
 const root = resolve(__dirname, '../../..');
+const TOKEN = 'built-test-token-0123456789abcdef0123456789';
+const authorized = { authorization: `Bearer ${TOKEN}` };
 const entry = join(root, 'dist/apps/matter-sidecar/main.js');
 const rootPackage = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
@@ -50,7 +52,7 @@ describe('built sidecar process', () => {
   });
 
   const launch = (env: Record<string, string> = { MATTER_SIDECAR_PORT: '0' }, nodeArgs: string[] = []) => {
-    const started = start(env, cwd, nodeArgs);
+    const started = start({ MATTER_SIDECAR_AUTH_TOKEN: TOKEN, ...env }, cwd, nodeArgs);
     children.push(started.child);
     return started;
   };
@@ -58,7 +60,7 @@ describe('built sidecar process', () => {
   it('starts on its own, loads the pinned matter.js and reports exact versions and Git revision', async () => {
     const started = launch();
     const port = await ready(started);
-    const version = (await http(port, 'GET', '/version')).body;
+    const version = (await http(port, 'GET', '/version', { headers: authorized })).body;
     const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
     expect(version.build.commit).toBe(head);
     expect(version.build.version).toBe(`${version.sidecar}+${head.slice(0, 12)}`);
@@ -106,6 +108,28 @@ describe('built sidecar process', () => {
     expect(started.stderr.join('')).toMatch(/MATTER_SIDECAR_PORT.*Fix the MATTER_SIDECAR_\* environment variables/s);
     expect(started.stderr.join('')).not.toMatch(/\n\s+at /);
     expect(started.stdout.join('')).not.toContain('listening');
+  });
+
+  it('refuses to start without a service token, naming the variable, and ends only itself', async () => {
+    const started = start({ MATTER_SIDECAR_PORT: '0' }, cwd);
+    children.push(started.child);
+    expect(await started.exited).toBe(1);
+    expect(started.stderr.join('')).toMatch(/MATTER_SIDECAR_AUTH_TOKEN: a service token is required/);
+    expect(started.stdout.join('')).not.toContain('listening');
+  });
+
+  it('refuses a remote bind that has neither TLS nor the explicit insecure flag', async () => {
+    const started = launch({ MATTER_SIDECAR_PORT: '0', MATTER_SIDECAR_BIND_HOST: '0.0.0.0' });
+    expect(await started.exited).toBe(1);
+    expect(started.stderr.join('')).toMatch(/MATTER_SIDECAR_ALLOWED_HOSTS.*MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true/s);
+  });
+
+  it('answers 401 without the token and keeps the probes anonymous', async () => {
+    const started = launch();
+    const port = await ready(started);
+    expect((await http(port, 'GET', '/version')).status).toBe(401);
+    expect((await http(port, 'GET', '/health/live')).status).toBe(200);
+    expect(started.stdout.join('') + started.stderr.join('')).not.toContain(TOKEN);
   });
 
   it('ends only itself when the port is already taken', async () => {

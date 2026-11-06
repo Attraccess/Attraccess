@@ -17,11 +17,17 @@ function hostnameOf(host: string | undefined): string | null {
   return (end > 0 ? host.slice(0, end) : host).toLowerCase();
 }
 
-/** The sidecar is not a browser API: any Origin, and any Host that is not loopback, is refused. */
-export function checkLocalAccess(headers: IncomingHttpHeaders): string | null {
+/**
+ * The sidecar is not a browser API: any Origin is refused, and so is any Host that is neither loopback nor on the
+ * operator's allow-list.
+ */
+export function checkLocalAccess(headers: IncomingHttpHeaders, allowedHosts: readonly string[] = []): string | null {
   if (headers.origin !== undefined) return 'Browser-origin requests are not accepted by the Matter sidecar.';
   const hostname = hostnameOf(headers.host);
-  if (hostname === null || !ALLOWED_HOSTNAMES.has(hostname)) return 'The Matter sidecar only answers on loopback.';
+  if (hostname === null) return 'The Matter sidecar needs a Host header.';
+  if (!ALLOWED_HOSTNAMES.has(hostname) && !allowedHosts.some((allowed) => hostnameOf(allowed) === hostname)) {
+    return 'This Host name is not allowed. The operator must list it in MATTER_SIDECAR_ALLOWED_HOSTS.';
+  }
   return null;
 }
 
