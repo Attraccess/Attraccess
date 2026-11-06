@@ -3,9 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/attractap-lab/src",
   "projectType": "application",
-  "tags": [
-    "scope:hardware"
-  ],
+  "tags": ["scope:hardware"],
   "targets": {
     "check": {
       "executor": "nx:run-commands",
@@ -26,7 +24,23 @@
       "options": {
         "command": "nix flake check path:./apps/attractap-lab --print-build-logs --no-write-lock-file"
       },
-      "cache": false
+      "cache": false,
+      "dependsOn": ["test-scripts"]
+    },
+    "test-scripts": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/apps/attractap/firmware/tests/reference-recordings/recordings/**/*",
+        {
+          "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
+        }
+      ],
+      "outputs": [],
+      "options": {
+        "command": "node --test apps/attractap-lab/real-cards/*.test.mjs apps/attractap-lab/real-cards/replay/*.test.mjs"
+      }
     },
     "smoke": {
       "executor": "nx:run-commands",
@@ -42,6 +56,12 @@
         "cwd": "apps/attractap-lab"
       },
       "cache": false
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/attractap-lab"
+      }
     }
   }
 }
