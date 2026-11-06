@@ -166,8 +166,10 @@ export class CardOperationsService {
       { key: keyHex, keyNo: pending.keyNo, uid },
       { activate },
     );
-    // Other records stay: their key may already be on another card, and only they can recover it.
+    // This UID now belongs to this card record: no other enrollment may be recovered onto it later
+    // (e.g. after a reset). Records for other UIDs stay; their key may be on another card.
     await this.pendingRepository.delete(pending.id);
+    await this.pendingRepository.delete({ uid, kind: 'enroll' });
     await this.audit
       .recordAttractap({
         action: 'card.linked',
@@ -323,6 +325,8 @@ export class CardOperationsService {
   ): Promise<void> {
     const deleted = await this.attractapService.deleteNFCCard(cardId);
     await this.pendingRepository.delete({ uid, kind: 'reset' });
+    // A reset card must not come back as someone's card from an older interrupted enrollment.
+    await this.pendingRepository.delete({ uid, kind: 'enroll' });
     if (deleted.affected && auditPrincipal) {
       await this.audit
         .recordAttractap({

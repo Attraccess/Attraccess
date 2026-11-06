@@ -373,8 +373,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
       return;
     }
 
-    // The tap path stays free of database writes (the BUSY check runs first); heartbeats keep lastConnection fresh.
-    if (!SKIPS_ACTIVITY_WRITE.has(eventData.type)) await this.clientWasActive(socket);
+    // Not awaited: the WS adapter runs a socket's handlers concurrently, so an await here would let a
+    // later event (a tap) overtake an earlier one (READER_SESSION_ENDED). Card events skip the write
+    // entirely (the BUSY check comes first); heartbeats keep lastConnection fresh.
+    if (!SKIPS_ACTIVITY_WRITE.has(eventData.type)) {
+      void this.clientWasActive(socket).catch((error: Error) =>
+        this.logger.warn(`Could not record reader activity for client ${socket.id}: ${error.message}`),
+      );
+    }
 
     this.logger.debug(`Received event ${eventData.type} from client ${socket.id}`);
 

@@ -281,6 +281,29 @@ describe('AttractapGateway card relay rules', () => {
       await fixture.gateway.onHeartbeat(socket);
       expect(fixture.attractapService.updateLastReaderConnection).toHaveBeenCalledWith(7);
     });
+
+    it('handles a logout before a later tap even while the activity write is slow', async () => {
+      const socket = loggedInReader();
+      socket.state.verifiedUserId = 11;
+      // A write that never finishes must not hold READER_SESSION_ENDED behind the next tap.
+      fixture.attractapService.updateLastReaderConnection.mockReturnValue(new Promise(() => undefined));
+      const order: string[] = [];
+      jest.spyOn(fixture.gateway, 'onReaderSessionEnded').mockImplementation(async () => {
+        order.push('logout');
+      });
+      jest.spyOn(fixture.gateway['cardDetectedRouter'], 'route').mockImplementation(async () => {
+        order.push('tap');
+      });
+
+      void fixture.gateway.onClientEvent(new AttractapEvent(AttractapEventType.READER_SESSION_ENDED, {}).data, socket);
+      void fixture.gateway.onClientEvent(
+        new AttractapEvent(AttractapEventType.CARD_DETECTED, { uid: '04aabbccddee80', detectionId: 2 }).data,
+        socket,
+      );
+      await new Promise(setImmediate);
+
+      expect(order).toEqual(['logout', 'tap']);
+    });
   });
 
   describe('send limits of a paired reader (session transport)', () => {

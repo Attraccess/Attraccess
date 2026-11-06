@@ -165,9 +165,14 @@ export class AttractapFormsHandler {
       return;
     }
 
-    const { valid, errors } = await this.resourceFormsService.validatePageAnswers(resourceId, formId, answers);
+    const checked = await this.resourceFormsService.validatePageAnswers(resourceId, formId, answers);
+    // Saved only for the user who answered; if the login changed meanwhile, the reader must not be
+    // told the page was accepted (START would then miss the answers).
+    const stillSameUser = userId != null && socket.state.verifiedUserId === userId;
+    const valid = checked.valid && stillSameUser;
+    const errors = checked.errors;
 
-    if (valid && userId != null && socket.state.verifiedUserId === userId) {
+    if (valid) {
       const key = this.formDraftKey(resourceId, action);
       socket.state.formDrafts ??= {};
       socket.state.formDrafts[key] ??= {};

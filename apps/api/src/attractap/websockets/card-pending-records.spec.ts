@@ -145,7 +145,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('recovery records (%s)', (kind) 
     expect(services.pending).toHaveLength(0);
   });
 
-  it('drops only the enrolling user’s own stale records of the card, never another user’s', async () => {
+  it('keeps another user’s record of the card while the enrollment fails, drops it once the card is enrolled', async () => {
     const services = createServices();
     const card = new EmulatedCard(kind);
     const notOnCard = `encrypted:${Buffer.alloc(16, 0x21).toString('hex')}`;
@@ -154,12 +154,38 @@ describe.each<CardKind>(['desfire', 'ntag424'])('recovery records (%s)', (kind) 
       { id: 81, uid: UID, kind: 'enroll', userId: 9, cardId: null, keyNo: 2, key: notOnCard, actorId: 1 },
       { id: 82, uid: OTHER_UID, kind: 'enroll', userId: 5, cardId: null, keyNo: 1, key: notOnCard, actorId: 1 },
     );
+
+    // A failed write: this user's stale record (key not on the card) goes, someone else's stays.
+    const failing = createRelayReader(card, services.conversations);
+    card.failWritesAfter = 0;
+    expect((await services.operations.enroll(failing.socket, detect(), enrollmentFor(5))).ok).toBe(false);
+    expect(services.pending.map((change) => change.id)).toEqual(expect.arrayContaining([81, 82]));
+    expect(services.pending.map((change) => change.id)).not.toContain(80);
+
+    // Enrolled: the UID belongs to this card record now, so nothing else may be recovered onto it.
+    card.failWritesAfter = Infinity;
     const reader = createRelayReader(card, services.conversations);
-
     expect(await services.operations.enroll(reader.socket, detect(), enrollmentFor(5))).toEqual({ ok: true });
+    expect(services.pending.map((change) => change.id)).toEqual([82]);
+  });
 
-    // 80 was this user's and its key is not on the card; 81 belongs to someone else, 82 to another card.
-    expect(services.pending.map((change) => change.id)).toEqual([81, 82]);
+  it('a reset card never comes back as another user’s card from an older interrupted enrollment', async () => {
+    const { operations, cards, card, conversations, pending } = await enrolled();
+    pending.push({
+      id: 90,
+      uid: UID,
+      kind: 'enroll',
+      userId: 9,
+      cardId: null,
+      keyNo: 2,
+      key: 'encrypted:x',
+      actorId: 1,
+    });
+
+    const reader = createRelayReader(card, conversations);
+    expect((await operations.reset(reader.socket, detect(), resetBy(cards[0].id))).ok).toBe(true);
+
+    expect(pending.filter((change) => change.uid === UID)).toHaveLength(0);
   });
 
   it('keeps the user’s other enrollment records when one enrollment is recovered', async () => {
