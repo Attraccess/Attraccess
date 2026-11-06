@@ -10,6 +10,8 @@ from unittest import mock
 
 FIRMWARE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, FIRMWARE_DIR)
+sys.path.insert(0, os.path.join(FIRMWARE_DIR, "tools"))
+import secure_lab_reader  # noqa: E402,F401  (patched below)
 import build_firmwares as b  # noqa: E402
 
 FLAG = 'set(ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED "%s")\n'
@@ -144,6 +146,46 @@ class ReleaseBuildRunsTheSecureGate(unittest.TestCase):
         with self.assertRaises(SystemExit) as exit_:
             self.run_main(gate_returncode=1)
         self.assertEqual(exit_.exception.code, 1)
+
+
+class SecureLabVariant(unittest.TestCase):
+    LAB = 'set(ATTRACTAP_RELEASE OFF)\n'
+    SECURE = 'set(ATTRACTAP_SECURE_PROFILE "true")\nset(ATTRACTAP_SECURE_LAB "true")\n'
+
+    def test_only_the_secure_lab_park_variant_is_secure_lab(self):
+        cwd = os.getcwd()
+        os.chdir(FIRMWARE_DIR)
+        self.addCleanup(os.chdir, cwd)
+        secure = [name for name in b.lab_variants() if b.secure_lab_variant(name, b.read_variant(name)[1])]
+        self.assertEqual(secure, ["attractap-touch-v2-secure-lab-park"])
+        for name in b.RELEASE_VARIANTS:
+            self.assertIs(b.secure_lab_variant(name, b.read_variant(name)[1]), False, name)
+
+    def test_release_variant_is_rejected(self):
+        with self.assertRaises(ValueError):
+            b.secure_lab_variant("x", self.SECURE)
+
+    def test_needs_the_secure_profile(self):
+        with self.assertRaises(ValueError):
+            b.secure_lab_variant("x", self.LAB + 'set(ATTRACTAP_SECURE_LAB "true")\n')
+
+    def test_is_packaged_as_signed_encrypted_hex(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images = [("0x0", "boot.bin", True, True), ("0x8000", "pt.bin", True, False),
+                      ("0x10000", "app.bin", True, True)]
+            merges = []
+            with mock.patch("secure_lab_reader.flash_layout", return_value=images), \
+                    mock.patch("secure_lab_reader.signed_images",
+                               side_effect=lambda images, tmp, espsecure: [(o, "signed-" + p, e)
+                                                                           for o, p, e, _ in images]), \
+                    mock.patch.object(b, "run_merge_bin", side_effect=lambda *a: merges.append(a)):
+                b.package_secure_lab(tmp, os.path.join(tmp, "park.hex"), ["esptool"])
+            self.assertEqual(merges, [(["esptool"], os.path.join(tmp, "park.hex"),
+                                       [("0x0", "signed-boot.bin"), ("0x8000", "signed-pt.bin"),
+                                        ("0x10000", "signed-app.bin")], "hex")])
+            with mock.patch("secure_lab_reader.flash_layout", return_value=[("0x9000", "nvs.bin", False, False)]), \
+                    contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+                b.package_secure_lab(tmp, os.path.join(tmp, "park.hex"), ["esptool"])
 
 
 if __name__ == "__main__":

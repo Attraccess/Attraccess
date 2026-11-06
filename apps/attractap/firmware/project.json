@@ -54,7 +54,10 @@
         "{projectRoot}/tools/**/*",
         "{projectRoot}/src/**/*",
         "{projectRoot}/esp-idf-version.txt",
-        "{projectRoot}/park/**/*"
+        "{projectRoot}/park/**/*",
+        "{projectRoot}/sdkconfig.secure",
+        "{projectRoot}/sdkconfig.secure-lab",
+        "{projectRoot}/lab/secure-boot/*.pem"
       ],
       "cache": true
     },
