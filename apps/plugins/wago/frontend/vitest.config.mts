@@ -28,6 +28,11 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 15_000,
     coverage: {
+      // Unit coverage feeds the project's crap-score target.
+      enabled: true,
+      provider: 'istanbul',
+      reporter: ['json'],
+      reportsDirectory: fileURLToPath(new URL('../../../../coverage/apps/plugins/wago/test-frontend', import.meta.url)),
       // Test helpers contain hoisted mocks that Istanbul's instrumentation breaks.
       exclude: [...coverageConfigDefaults.exclude, 'apps/plugins/wago/frontend/tests/**', '**/*.test-fixture.{ts,tsx}'],
     },

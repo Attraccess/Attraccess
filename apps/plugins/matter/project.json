@@ -46,7 +46,7 @@
         "{workspaceRoot}/libs/matter-contract/src/**/*",
         { "externalDependencies": ["jest"] }
       ],
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/matter"],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/matter/test"],
       "options": {
         "jestConfig": "apps/plugins/matter/jest.config.ts"
       }
@@ -121,6 +121,7 @@
       }
     },
     "crap-score": {
+      "dependsOn": ["test"],
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/matter"

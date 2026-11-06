@@ -14,5 +14,12 @@ export default defineConfig({
     include: ['scripts/**/*.spec.mts'],
     // These specs spawn real processes, which are slow on a loaded machine.
     testTimeout: 30_000,
+    coverage: {
+      // Unit coverage feeds the project's crap-score target.
+      enabled: true,
+      provider: 'istanbul',
+      reporter: ['json'],
+      reportsDirectory: fileURLToPath(new URL('../coverage/root/test/vitest', import.meta.url)),
+    },
   },
 });

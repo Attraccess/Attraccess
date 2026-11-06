@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 /// <reference types='vitest' />
 import { defineConfig } from 'vitest/config';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
@@ -63,8 +64,11 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
     coverage: {
-      reportsDirectory: '../../coverage/libs/plugins-frontend-sdk',
-      provider: 'v8',
+      // Unit coverage feeds the project's crap-score target.
+      enabled: true,
+      provider: 'istanbul',
+      reporter: ['json'],
+      reportsDirectory: fileURLToPath(new URL('../../coverage/libs/plugins-frontend-sdk/test', import.meta.url)),
     },
     passWithNoTests: true,
   },
