@@ -311,18 +311,18 @@ READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil
   profile (`efuse.check`). Then they erase the chip and write the image
   encrypted (`ESPToolDriver.erase_and_flash_encrypted`), the same write the
   janitor uses to park this reader.
-- The place has no janitor yet (`janitor=none`). When the run ends, also after
-  a failed setup, the tests write the image again, so no Wi-Fi, PIN or pairing
-  stays on the reader.
+- When the run ends, also after a failed setup, the tests write the image
+  again, so no Wi-Fi, PIN or pairing stays on the reader even where the place
+  has no janitor. With `janitor=park`, the janitor then parks it with the
+  lab-signed parking image.
 - `run.sh` refuses to start when `READER_PROFILE` does not match the place's
   `profile` tag (`plain` when it has none). A plain image leaves this reader
   unbootable, and the secure write would not fit a plain reader.
 - The reader's internal heap (before pairing, after the TLS session opened, at
   the end) is written to `reader-heap.jsonl` in the run's artifacts.
 
-If a run is killed before its own wipe, run it again, or write any lab image
-by hand inside a session on the place, for example with
-`ESPToolDriver.erase_and_flash_encrypted`. A branch that raises
+If a run is killed before its own wipe, the janitor parks the reader on
+release; on a place without one, run the suite again. A branch that raises
 `CONFIG_BOOTLOADER_APP_SECURE_VERSION` burns the new version into the reader
 (anti-rollback), so lab images from older branches stop booting on it.
 
