@@ -123,6 +123,72 @@ reserviert.“). Der Hinweis aktualisiert sich von selbst, wenn eine Buchung beg
 Seite veraltet und Sie drücken trotzdem auf Start, wird der Start weiterhin mit derselben Meldung abgelehnt.
 Verwaltende und Wartende sehen den Hinweis nicht; sie starten über die oben beschriebene Override-Bestätigung.
 
+### Attractap-Reader
+
+Auf einem Attractap-Touch-Reader (Firmware 1.9.0 oder neuer) zeigt das Plugin Reservierungsinformationen auf dem
+Bildschirm an, fragt vor einem Start nach, der mit einer Buchung kollidiert, und wertet einen Start am Reader als
+Check-in. Für die Reader-Widgets braucht das Plugin die Berechtigung, Widgets auf Attractap-Reader-Bildschirmen anzuzeigen, die eine
+administrierende Person bei Installation oder Update freigibt (siehe [Reader-Anzeige](attractap/reader-ui.md)).
+Alle Zeiten stehen in der [Zeitzone](#zeitzone) des Plugins als `HH:MM`; eine Zeit an einem anderen Tag bekommt einen
+kurzen Wochentag („Di 09:00“). Gezeigt werden nur bestätigte Buchungen. Der Status des Readers selbst („In
+Benutzung“, Wartung und so weiter) hat immer Vorrang vor dem Hinweis des Plugins.
+
+**Vor dem Auflegen einer Karte.** Ein Reader, an dem niemand angemeldet ist, zeigt nur Zeiten und Zustände, nie Namen
+oder andere personenbezogene Daten, egal bei welcher Einstellung:
+
+| Situation                                                                                | Ressourcenliste        | Ressourcendetails                             |
+| ---------------------------------------------------------------------------------------- | ---------------------- | --------------------------------------------- |
+| Nichts läuft, nichts beginnt innerhalb von 24 Stunden                                    | nichts                 | nichts                                        |
+| Die nächste Buchung beginnt innerhalb von 24 Stunden, keine läuft                        | „Frei bis 14:00“       | „Frei bis 14:00“, „Reserviert 14:00-16:00“    |
+| Eine Buchung läuft, Check-in ist verlangt, aber noch nicht erfolgt, vor Ablauf der Frist | „Check-in bis 14:15“   | „Reserviert 14:00-16:00 - Check-in bis 14:15“ |
+| Eine Buchung läuft und ist eingecheckt (oder Check-in ist ausgeschaltet)                 | „Reserviert bis 16:00“ | „Reserviert 14:00-16:00“                      |
+
+Die Zeiten sind Beginn und Ende der Buchung ohne Puffer. Die Texte folgen der Standardsprache der Installation.
+
+**Nach dem Auflegen einer Karte.** Die Texte folgen der Sprache der Person, die die Karte aufgelegt hat. Endet die
+Kartensitzung, kehrt der Reader zu den Texten oben zurück.
+
+- **Die eigene Buchung** (laufend oder beginnt im Fenster für frühes Einchecken): Die Liste zeigt „Deine Buchung bis
+  16:00“, die Details „Deine Buchung 14:00-16:00“, solange der Check-in noch offen ist mit „Check-in bis 14:15“.
+- **Verwaltende der Ressource** sehen in den Details auch, wer eine Buchung hat („Reserviert von Alex
+  14:00-16:00“).
+- **Alle anderen** sehen die Texte oben, es sei denn, die Ressource schaltet **Namen auf Readern anzeigen** ein; dann
+  nennen auch für sie die Details die buchende Person.
+- **Während du die Ressource nutzt** und die Buchung einer anderen Person im Bestätigungsfenster beginnt, zeigt der
+  Sitzungsbereich „Reserviert ab 14:00“ mit einem Countdown (mit Namen nach den Regeln oben).
+- Die **Liste zeigt nie Namen**, weder angemeldet noch abgemeldet. Lange Namen werden gekürzt.
+
+**Am Reader starten.**
+
+| Situation                                                                      | Was der Reader tut                                                                                                                                                                        |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Die Buchung einer anderen Person beginnt im Bestätigungsfenster                | Fragt „Reserviert ab 14:00, du hast 40 Min. Trotzdem starten?“ mit Countdown. Abbrechen oder keine Antwort startet nichts. Der Name steht nur dabei, wenn du Namen sehen darfst.          |
+| Die Buchung einer anderen Person läuft                                         | Lehnt ab: „Von einer anderen Person bis 16:00 reserviert“ (mit Namen, wenn du Namen sehen darfst). Verwaltende bekommen stattdessen die Override-Frage, die buchende Person wird genannt. |
+| Du startest innerhalb deiner Buchung oder ihres Fensters für frühes Einchecken | Keine Frage. Der Start checkt die Buchung ein und der Bildschirm aktualisiert sich.                                                                                                       |
+| Du beendest eine Sitzung innerhalb deiner eigenen laufenden Buchung            | Fragt „Behalten oder den Rest freigeben?“. **Rest freigeben** beendet die Buchung vorzeitig. Ohne Antwort innerhalb von 15 Sekunden bleibt die Buchung bestehen.                          |
+
+Eine Buchung ohne Sitzung freizugeben ist nur in der Weboberfläche möglich. Buchen selbst ist am Reader nicht möglich.
+
+**Namen auf Readern anzeigen** (Ressourceneinstellung, standardmäßig aus). Sie ändert nur, was eine Person sieht,
+die **nach dem Auflegen einer Karte** weder buchende Person noch verwaltend ist: Namen in den Ressourcendetails und in
+den Bestätigungs- und Ablehnungstexten des Readers. Ein abgemeldeter Reader ist nie betroffen. Der Hilfetext des
+Schalters lautet: „Namen werden erst angezeigt, nachdem jemand die Karte angetippt hat.“ Beim Speichern aktualisieren
+sich die Reader sofort.
+
+**Reader ohne Bildschirm.** Attractap-Lite-Reader, Touch-Reader mit älterer Firmware und Reader, deren
+Plugin-Hinweise nach Abstürzen pausiert sind, können nichts davon anzeigen:
+
+| Reader                   | Reservierungstexte | Buchung beginnt bald                                                                                              | Andere Buchung läuft                                       | Frage nach dem Beenden             |
+| ------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------- |
+| Lite                     | keine              | Das Plugin schlägt Blockieren vor; die Ressourceneinstellung **Reader ohne Bildschirm** entscheidet.              | Abgelehnt (bernsteinfarbener Halbring, dann rotes Blinken) | keine, die Buchung bleibt bestehen |
+| Touch, ältere Firmware   | keine              | Dieselbe Einstellung; Blockieren zeigt einen allgemeinen Fehler. Zweites Auflegen der Karte gibt es nur für Lite. | Allgemeiner Fehler                                         | keine, die Buchung bleibt bestehen |
+| Plugin-Hinweise pausiert | keine              | Dieselbe Einstellung.                                                                                             | Abgelehnt                                                  | keine, die Buchung bleibt bestehen |
+
+**Reader ohne Bildschirm** ist unter [Reader-Anzeige](attractap/reader-ui.md#reader-ohne-bildschirm) beschrieben:
+**Start blockieren** (Standard), **Mit zweitem Auflegen der Karte bestätigen** (nur Lite) oder **Mit Warnung
+starten**. Das Übergehen einer laufenden Buchung durch Verwaltende braucht immer einen Bildschirm und wird ohne
+Bildschirm blockiert. Der Check-in funktioniert auf jedem Readertyp, sofern die buchende Person den Start macht.
+
 ### Erinnerungen und Benachrichtigungen
 
 Sie erhalten Benachrichtigungen in der App, per Push und per E-Mail, je nach Ihren Benachrichtigungseinstellungen
@@ -209,24 +275,25 @@ Benachrichtigungen in der App und per Push weiterhin.
 **Ressourcen verwalten** angezeigt (die API erlaubt es auch den Wartenden der Ressource). Reservierungen sind
 standardmäßig **deaktiviert**.
 
-| Einstellung                       | Standard    | Erlaubte Werte / Bedeutung                                                                                                              |
-| --------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Reservierungen aktiviert          | aus         | Schaltet die Funktion für diese Ressource ein.                                                                                          |
-| Genehmigung erforderlich          | aus         | Neue Buchungen sind ausstehend, bis eine verwaltende Person entscheidet. Gilt auch für Buchungen von Verwaltenden.                      |
-| Zeitraster (Minuten)              | 15          | 5 bis 240, muss 1440 teilen. Beginn und Dauer rasten auf dieses Raster ein.                                                             |
-| Mindestdauer (Minuten)            | 15          | 1 bis 1440, ein Vielfaches des Zeitrasters.                                                                                             |
-| Höchstdauer (Minuten)             | 240         | 1 bis 10080, ein Vielfaches des Zeitrasters, nicht unter der Mindestdauer.                                                              |
-| Maximaler Vorlauf (Tage)          | 30          | 1 bis 730. Wie weit im Voraus gebucht werden kann.                                                                                      |
-| Mindestvorlauf (Minuten)          | 0           | 0 bis 10080. Der späteste Zeitpunkt vor dem Beginn, zu dem noch gebucht werden kann. 0 heißt bis zum Beginn (nie in der Vergangenheit). |
-| Puffer vorher / nachher (Minuten) | 0 / 0       | je 0 bis 1440. Bleibt um eine Buchung frei und zählt bei Überschneidungen.                                                              |
-| Aktive Buchungen pro Person       | 3           | 0 bis 100 (ausstehend und bestätigt mit künftigem Ende). 0 heißt unbegrenzt.                                                            |
-| Wer buchen darf                   | `can-start` | `can-start`, `managers-only` oder `any-user`.                                                                                           |
-| Bestätigungsfenster (Minuten)     | 60          | 0 bis 1440. Ein Start so kurz vor der Buchung einer anderen Person verlangt eine Bestätigung. 0 heißt nie fragen.                       |
-| Check-in aktiviert                | an          | Buchungen brauchen einen Sitzungsstart, um nicht als „Nicht erschienen“ zu enden.                                                       |
-| Check-in-Karenz (Minuten)         | 15          | 1 bis 240. Zeit nach dem Beginn, bis eine Buchung ohne Check-in zu „Nicht erschienen“ wird.                                             |
-| Frühes Einchecken (Minuten)       | 15          | 0 bis 240. Wie lange vor dem Beginn ein Check-in zählt.                                                                                 |
-| Übergabe-Erinnerung (Minuten)     | 15          | 0 bis 1440. Benachrichtigt Personen mit laufender Sitzung so lange vor Beginn einer Reservierung.                                       |
-| Buchbare Zeiten                   | leer (24/7) | Pro Wochentag null oder mehr Bereiche `HH:mm-HH:mm`.                                                                                    |
+| Einstellung                       | Standard    | Erlaubte Werte / Bedeutung                                                                                                                                   |
+| --------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Reservierungen aktiviert          | aus         | Schaltet die Funktion für diese Ressource ein.                                                                                                               |
+| Genehmigung erforderlich          | aus         | Neue Buchungen sind ausstehend, bis eine verwaltende Person entscheidet. Gilt auch für Buchungen von Verwaltenden.                                           |
+| Zeitraster (Minuten)              | 15          | 5 bis 240, muss 1440 teilen. Beginn und Dauer rasten auf dieses Raster ein.                                                                                  |
+| Mindestdauer (Minuten)            | 15          | 1 bis 1440, ein Vielfaches des Zeitrasters.                                                                                                                  |
+| Höchstdauer (Minuten)             | 240         | 1 bis 10080, ein Vielfaches des Zeitrasters, nicht unter der Mindestdauer.                                                                                   |
+| Maximaler Vorlauf (Tage)          | 30          | 1 bis 730. Wie weit im Voraus gebucht werden kann.                                                                                                           |
+| Mindestvorlauf (Minuten)          | 0           | 0 bis 10080. Der späteste Zeitpunkt vor dem Beginn, zu dem noch gebucht werden kann. 0 heißt bis zum Beginn (nie in der Vergangenheit).                      |
+| Puffer vorher / nachher (Minuten) | 0 / 0       | je 0 bis 1440. Bleibt um eine Buchung frei und zählt bei Überschneidungen.                                                                                   |
+| Aktive Buchungen pro Person       | 3           | 0 bis 100 (ausstehend und bestätigt mit künftigem Ende). 0 heißt unbegrenzt.                                                                                 |
+| Wer buchen darf                   | `can-start` | `can-start`, `managers-only` oder `any-user`.                                                                                                                |
+| Bestätigungsfenster (Minuten)     | 60          | 0 bis 1440. Ein Start so kurz vor der Buchung einer anderen Person verlangt eine Bestätigung. 0 heißt nie fragen.                                            |
+| Check-in aktiviert                | an          | Buchungen brauchen einen Sitzungsstart, um nicht als „Nicht erschienen“ zu enden.                                                                            |
+| Check-in-Karenz (Minuten)         | 15          | 1 bis 240. Zeit nach dem Beginn, bis eine Buchung ohne Check-in zu „Nicht erschienen“ wird.                                                                  |
+| Frühes Einchecken (Minuten)       | 15          | 0 bis 240. Wie lange vor dem Beginn ein Check-in zählt.                                                                                                      |
+| Übergabe-Erinnerung (Minuten)     | 15          | 0 bis 1440. Benachrichtigt Personen mit laufender Sitzung so lange vor Beginn einer Reservierung.                                                            |
+| Namen auf Readern anzeigen        | aus         | Angemeldete Kartennutzende, die weder buchende noch verwaltende Person sind, sehen Namen auf Attractap-Readern, siehe [Attractap-Reader](#attractap-reader). |
+| Buchbare Zeiten                   | leer (24/7) | Pro Wochentag null oder mehr Bereiche `HH:mm-HH:mm`.                                                                                                         |
 
 Änderungen betreffen nur **neue** Buchungen; bestehende bleiben erhalten. Bestätigungsfenster und Check-in-Regeln
 verwenden immer die aktuellen Werte.
@@ -281,17 +348,17 @@ Jede E-Mail des Plugins ist eine **E-Mail-Vorlage**, die Sie wie die E-Mails des
 **Einstellungen → E-Mail → Vorlagen**. Die Vorlagen des Plugins stehen nach den Systemvorlagen und sind mit „Plugin:
 reservations“ gekennzeichnet:
 
-| Vorlage                                                                                                      | Gesendet, wenn                                                                     |
-| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| Reservierungsanfrage wartet auf Genehmigung                                                                  | Eine Buchung wartet auf Genehmigung (an die Verwaltenden).                         |
-| Reservierung bestätigt                                                                                       | Eine Buchung bestätigt oder genehmigt wurde, mit den Check-in-Regeln.              |
-| Reservierung abgelehnt / Reservierungsanfrage abgelaufen                                                     | Eine Anfrage abgelehnt wurde oder bis zu ihrem Beginn niemand entschied.           |
-| Reservierung von Verwaltung storniert / Laufende Reservierung vorzeitig beendet / Reservierung entfernt      | Verwaltende eine Buchung geändert oder entfernt haben oder Reservierungen deaktiviert wurden. |
-| Nicht eingecheckt, Reservierung verfallen                                                                    | Eine Buchung als Nichterscheinen freigegeben wurde.                                |
-| Erinnerung 48 Std. vorher: noch benötigt? / Erinnerung 24 Std. vorher                                        | Die Erinnerungen vor einer Buchung.                                                |
-| Wartung betrifft eine Reservierung / Ressource hat ein Problem / Ressource funktioniert wieder               | Wartung oder der Zustand der Ressource eine Buchung betrifft.                      |
-| Bald reserviert (an die aktuelle Person) / Reservierung begonnen, Ressource noch belegt / Reservierung begonnen, bitte beenden | Übergabe- und Überschreitungshinweise.                          |
-| Start trotz Reservierung (an die Buchenden / an die Verwaltung)                                              | Verwaltende während einer Buchung gestartet haben.                                 |
+| Vorlage                                                                                                                        | Gesendet, wenn                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Reservierungsanfrage wartet auf Genehmigung                                                                                    | Eine Buchung wartet auf Genehmigung (an die Verwaltenden).                                    |
+| Reservierung bestätigt                                                                                                         | Eine Buchung bestätigt oder genehmigt wurde, mit den Check-in-Regeln.                         |
+| Reservierung abgelehnt / Reservierungsanfrage abgelaufen                                                                       | Eine Anfrage abgelehnt wurde oder bis zu ihrem Beginn niemand entschied.                      |
+| Reservierung von Verwaltung storniert / Laufende Reservierung vorzeitig beendet / Reservierung entfernt                        | Verwaltende eine Buchung geändert oder entfernt haben oder Reservierungen deaktiviert wurden. |
+| Nicht eingecheckt, Reservierung verfallen                                                                                      | Eine Buchung als Nichterscheinen freigegeben wurde.                                           |
+| Erinnerung 48 Std. vorher: noch benötigt? / Erinnerung 24 Std. vorher                                                          | Die Erinnerungen vor einer Buchung.                                                           |
+| Wartung betrifft eine Reservierung / Ressource hat ein Problem / Ressource funktioniert wieder                                 | Wartung oder der Zustand der Ressource eine Buchung betrifft.                                 |
+| Bald reserviert (an die aktuelle Person) / Reservierung begonnen, Ressource noch belegt / Reservierung begonnen, bitte beenden | Übergabe- und Überschreitungshinweise.                                                        |
+| Start trotz Reservierung (an die Buchenden / an die Verwaltung)                                                                | Verwaltende während einer Buchung gestartet haben.                                            |
 
 - Bearbeiten Sie Betreff und Text im visuellen Editor und die deutschen und englischen Texte im Dialog
   **Übersetzungen**. **Variablen** zeigt, was Sie verwenden können, etwa `{{reservation.when}}` oder
