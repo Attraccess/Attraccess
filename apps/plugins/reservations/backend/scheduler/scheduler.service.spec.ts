@@ -417,9 +417,11 @@ describe('ReservationScheduler', () => {
       h.setNow('2026-06-01T11:00:00Z'); // 25 h before
       await p.scheduler.tick();
       expect(h.invalidateReaderUi).not.toHaveBeenCalled();
+      h.invalidateStartBlocked.mockClear();
       h.setNow('2026-06-01T12:00:00Z'); // exactly 24 h before
       await p.scheduler.tick();
       expect(h.invalidateReaderUi.mock.calls).toEqual([[{ resourceId: 1 }]]);
+      expect(h.invalidateStartBlocked).not.toHaveBeenCalled(); // a booking 24 h away decides no start
       h.setNow('2026-06-01T12:01:00Z');
       await p.scheduler.tick();
       expect(h.invalidateReaderUi).toHaveBeenCalledTimes(1);

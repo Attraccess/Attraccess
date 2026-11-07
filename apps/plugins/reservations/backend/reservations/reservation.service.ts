@@ -66,9 +66,10 @@ export class ReservationService implements OnModuleDestroy {
    * Open resource pages ask the host again whether a start is blocked, and Attractap readers re-read the
    * reservation slots. Called after every change that can decide either answer; never throws (the page
    * also refreshes on its own and the slots expire at their next state boundary). `readers: false` is for
-   * changes readers cannot see (an unconfirmed booking).
+   * changes readers cannot see (an unconfirmed booking), `startBlocked: false` for changes that cannot
+   * decide a start (keeping a booking, a booking entering the reader horizon).
    */
-  invalidateViews(resourceId: number, readers = true): void {
+  invalidateViews(resourceId: number, { startBlocked = true, readers = true } = {}): void {
     const attempt = (what: string, invalidate: () => void) => {
       try {
         invalidate();
@@ -76,7 +77,7 @@ export class ReservationService implements OnModuleDestroy {
         this.logger.debug(`${what} invalidation failed: ${error instanceof Error ? error.message : String(error)}`);
       }
     };
-    attempt('start-blocked', () => this.context.startBlocked.invalidate({ resourceId }));
+    if (startBlocked) attempt('start-blocked', () => this.context.startBlocked.invalidate({ resourceId }));
     if (readers) attempt('reader-ui', () => this.context.readerUi?.invalidate({ resourceId }));
   }
 
@@ -223,7 +224,7 @@ export class ReservationService implements OnModuleDestroy {
     );
     if (created.status === 'pending') this.notify('onPending', () => this.notifier.onPending(created));
     else this.notify('onConfirmed', () => this.notifier.onConfirmed(created, { viaApproval: false }));
-    this.invalidateViews(created.resourceId, created.status === 'confirmed');
+    this.invalidateViews(created.resourceId, { readers: created.status === 'confirmed' });
     return created;
   }
 
@@ -324,7 +325,7 @@ export class ReservationService implements OnModuleDestroy {
       throw new ReservationError('ALREADY_FINISHED', 'This reservation is no longer active');
     }
     if (!reservation.keptAt) await this.store.transition(id, [reservation.status], { keptAt: this.clock() });
-    this.invalidateViews(reservation.resourceId);
+    this.invalidateViews(reservation.resourceId, { startBlocked: false });
     return this.load(id);
   }
 

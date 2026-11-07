@@ -584,7 +584,9 @@ describe('ReservationService', () => {
     it('stays quiet when the holder keeps a booking (keeping does not decide a start)', async () => {
       await h.enable(2);
       const booking = await book(alice, [8, 9], 2);
+      h.invalidateReaderUi.mockClear();
       expect(await invalidatedBy(() => h.reservations.keep(alice, booking.id))).toEqual([]);
+      expect(h.invalidateReaderUi).toHaveBeenCalledWith({ resourceId: 2 }); // readers still refresh
     });
 
     it('tells the host when the scheduler moves a booking (no-show)', async () => {

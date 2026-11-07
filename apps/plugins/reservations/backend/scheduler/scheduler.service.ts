@@ -156,7 +156,9 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     const entering = await this.store.findUpcomingConfirmed(from, horizon);
     this.readerHorizonAnnouncedUntil = horizon;
     for (const resourceId of new Set(entering.map((r) => r.resourceId))) {
-      if (this.settings.getCachedSettings(resourceId).enabled) this.reservations.invalidateViews(resourceId);
+      if (this.settings.getCachedSettings(resourceId).enabled) {
+        this.reservations.invalidateViews(resourceId, { startBlocked: false });
+      }
     }
   }
 
