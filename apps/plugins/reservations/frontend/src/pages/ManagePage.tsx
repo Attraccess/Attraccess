@@ -1,16 +1,18 @@
-import { Button, PageHeader, StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { PageHeader, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Card } from '@heroui/react';
-import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { ReservationsApiError, searchHostResources, type ManageFilter } from '../api';
+import { ReservationsApiError, type ManageFilter } from '../api';
 import { useReservationsTranslations } from '../i18n';
 import { useManagedReservations, usePluginTimezone } from '../lib/queries';
 import { addLocalDays, browserTimeZone, fromDateKey, startOfLocalDay } from '../lib/time';
-import type { ReservationStatus } from '../lib/types';
+import type { NamedEntity, ReservationStatus } from '../lib/types';
 import { SelectField, TextInput } from '../shared/fields';
+import { PagePagination } from '../shared/PagePagination';
 import { listState } from '../shared/queryState';
 import { ReservationsTable } from '../shared/ReservationsTable';
+import { TimezoneHint } from '../shared/TimezoneHint';
 import { useReservationActions } from '../shared/useReservationActions';
+import { ResourceFilter } from './ResourceFilter';
 
 const STATUSES: ReservationStatus[] = [
   'pending',
@@ -29,30 +31,24 @@ export function ManagePage() {
   const zone = timezone ?? browserTimeZone();
   const actions = useReservationActions({ timezone });
 
-  const [resourceId, setResourceId] = useState(ALL);
+  const [resource, setResource] = useState<NamedEntity | null>(null);
   const [status, setStatus] = useState(ALL);
   const [fromKey, setFromKey] = useState('');
   const [toKey, setToKey] = useState('');
   const [page, setPage] = useState(1);
-
-  const resources = useQuery({
-    queryKey: ['reservations', 'host-resources', ''],
-    queryFn: () => searchHostResources(''),
-    staleTime: 60_000,
-  });
 
   const filter = useMemo<ManageFilter>(() => {
     const from = fromDateKey(fromKey);
     const to = fromDateKey(toKey);
     return {
       page,
-      resourceId: resourceId === ALL ? undefined : Number(resourceId),
+      resourceId: resource?.id,
       status: status === ALL ? undefined : (status as ReservationStatus),
       from: from ? startOfLocalDay(from, zone).toISOString() : undefined,
       // The end date is inclusive: the range runs to the start of the next day.
       to: to ? startOfLocalDay(addLocalDays(to, 1), zone).toISOString() : undefined,
     };
-  }, [page, resourceId, status, fromKey, toKey, zone]);
+  }, [page, resource, status, fromKey, toKey, zone]);
 
   const pending = useManagedReservations({ page: 1, status: 'pending' });
   const list = useManagedReservations(filter);
@@ -77,6 +73,7 @@ export function ManagePage() {
   return (
     <div className="rv:flex rv:flex-col rv:gap-6" data-cy="reservations-manage-page">
       <PageHeader title={t('manage.title')} subtitle={t('manage.subtitle')} backTo="/reservations" noMargin />
+      {timezone && <TimezoneHint timezone={timezone} />}
       <Card>
         <Card.Header>
           <Card.Title>{t('manage.pending')}</Card.Title>
@@ -87,7 +84,7 @@ export function ManagePage() {
             items={pending.data?.items ?? []}
             timezone={timezone}
             ariaLabel={t('manage.pending')}
-            {...listState(pending)}
+            {...listState(pending, timezone)}
             showUser
             onAction={actions.ask}
           />
@@ -99,15 +96,7 @@ export function ManagePage() {
           {t('manage.all')}
         </h2>
         <div className="rv:grid rv:gap-3 rv:sm:grid-cols-2 rv:lg:grid-cols-4">
-          <SelectField
-            label={t('manage.filters.resource')}
-            value={resourceId}
-            onChange={resetPage(setResourceId)}
-            options={[
-              { key: ALL, label: t('manage.filters.allResources') },
-              ...(resources.data ?? []).map((resource) => ({ key: String(resource.id), label: resource.name })),
-            ]}
-          />
+          <ResourceFilter value={resource} onChange={resetPage(setResource)} />
           <SelectField
             label={t('manage.filters.status')}
             value={status}
@@ -124,21 +113,11 @@ export function ManagePage() {
           items={list.data?.items ?? []}
           timezone={timezone}
           ariaLabel={t('manage.all')}
-          {...listState(list)}
+          {...listState(list, timezone)}
           showUser
           onAction={actions.ask}
         />
-        <div className="rv:flex rv:items-center rv:justify-between rv:gap-2" data-cy="reservations-manage-pagination">
-          <span className="rv:text-sm rv:text-muted">{t('manage.page', { page, total: totalPages })}</span>
-          <div className="rv:flex rv:gap-2">
-            <Button size="sm" variant="tertiary" isDisabled={page <= 1} onPress={() => setPage(page - 1)}>
-              {t('manage.previous')}
-            </Button>
-            <Button size="sm" variant="tertiary" isDisabled={page >= totalPages} onPress={() => setPage(page + 1)}>
-              {t('manage.next')}
-            </Button>
-          </div>
-        </div>
+        <PagePagination page={page} total={totalPages} onChange={setPage} />
       </section>
       {actions.dialogs}
     </div>

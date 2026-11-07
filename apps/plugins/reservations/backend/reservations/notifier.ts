@@ -1,10 +1,9 @@
-import { Injectable } from '@nestjs/common';
 import type { ReservationEntity } from '../entities/reservation.entity';
 
 /**
- * Event sink for reservation state changes. Called by the services AFTER the change committed;
- * failures are logged and never fail the request. Part 2 provides the real implementation (in-app /
- * email notifications) by replacing the `RESERVATION_NOTIFIER` provider in plugin.ts.
+ * Event sink for reservation state changes. Called by ReservationService in the background AFTER the
+ * change committed; failures are logged and never fail the request. Provided as `RESERVATION_NOTIFIER`
+ * (ReservationNotifications in plugin.ts; a mock in the tests).
  */
 export interface ReservationNotifier {
   /** A booking now waits for approval: notify the managers of the resource. */
@@ -18,26 +17,4 @@ export interface ReservationNotifier {
   onEndedEarly(reservation: ReservationEntity, context: { byUserId: number }): Promise<void> | void;
   /** Cancelled because the plugin was disabled for the resource (reason `reservations disabled`). */
   onRemoved(reservation: ReservationEntity, context: { byUserId: number; reason: string }): Promise<void> | void;
-}
-
-@Injectable()
-export class NoopReservationNotifier implements ReservationNotifier {
-  onPending(): void {
-    /* no-op */
-  }
-  onConfirmed(): void {
-    /* no-op */
-  }
-  onRejected(): void {
-    /* no-op */
-  }
-  onCancelled(): void {
-    /* no-op */
-  }
-  onEndedEarly(): void {
-    /* no-op */
-  }
-  onRemoved(): void {
-    /* no-op */
-  }
 }

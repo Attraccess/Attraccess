@@ -118,4 +118,13 @@ describe('plugin settings slots', () => {
       });
     }
   });
+
+  it('hides admin.settings from users who only see other settings sections', () => {
+    auth.permissions = new Set(['system.audit.read']);
+    const renderContribution = vi.fn(() => <div>Contribution body</div>);
+    install([{ slotId: ADMIN_SETTINGS_SLOT, render: renderContribution }]);
+    const { container } = render(<AdminSettingsPluginSlot />);
+    expect(container).toBeEmptyDOMElement();
+    expect(renderContribution).not.toHaveBeenCalled();
+  });
 });

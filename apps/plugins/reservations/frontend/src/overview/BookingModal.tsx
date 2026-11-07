@@ -22,6 +22,8 @@ import { useFormatters } from '../lib/useFormatters';
 import { SelectField, TextInput } from '../shared/fields';
 import { CheckInRules } from './CheckInRules';
 
+const DAY_MS = 86_400_000;
+
 interface Props {
   resourceId: number;
   resourceName?: string;
@@ -39,6 +41,8 @@ export function BookingModal(props: Readonly<Props>) {
   const zone = availability.timezone;
 
   const today = () => toDateKey(localDateOf(new Date(), zone));
+  // The picker offers only days that can hold a booking: today up to the advance limit, in the plugin zone.
+  const lastDay = toDateKey(localDateOf(new Date(Date.now() + availability.rules.maxAdvanceDays * DAY_MS), zone));
   const [dateKey, setDateKey] = useState(today);
   const [startIso, setStartIso] = useState('');
   const [duration, setDuration] = useState('');
@@ -123,6 +127,8 @@ export function BookingModal(props: Readonly<Props>) {
             label={t('booking.date')}
             type="date"
             value={dateKey}
+            min={today()}
+            max={lastDay}
             onChange={(value) => {
               setDateKey(value);
               setStartIso('');

@@ -1,7 +1,7 @@
 import plugin from '../plugin';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
-import { Part2, createPart2 } from '../testing/part2.test-utils';
+import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
 import { NOTIFICATION_CATEGORIES } from './notifier.service';
 
 type Request = {
@@ -17,13 +17,13 @@ type Request = {
 
 describe('ReservationNotifications', () => {
   let h: Harness;
-  let p: Part2;
+  let p: BackgroundServices;
   const calls = (): Request[] => h.dispatch.mock.calls.map(([request]) => request as Request);
   const load = (id: number) => h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ id });
 
   beforeEach(async () => {
     h = await createHarness();
-    p = createPart2(h);
+    p = createBackgroundServices(h);
     await h.enable(1);
     await h.settings.warmUp();
     p.info.managers.set(1, [10, 98, 99]);
@@ -105,7 +105,7 @@ describe('ReservationNotifications', () => {
     await p.notifications.onRejected(fresh);
     await p.notifications.onCancelled(fresh, { byUserId: 99, byHolder: false });
     await p.notifications.onEndedEarly(fresh, { byUserId: 99 });
-    await p.notifications.onRemoved(fresh, { byUserId: 99, reason: 'reservations disabled' });
+    await p.notifications.onRemoved(fresh, { byUserId: 99 });
     const requests = calls();
     expect(requests.map((r) => r.dedupeKey)).toEqual([
       `reservations:rejected:${booking.id}`,
@@ -122,7 +122,7 @@ describe('ReservationNotifications', () => {
     const booking = await load((await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T13:00:00')).id);
     await p.notifications.onCancelled(booking, { byUserId: 10, byHolder: true });
     await p.notifications.onEndedEarly(booking, { byUserId: 10 });
-    await p.notifications.onRemoved(booking, { byUserId: 10, reason: 'x' });
+    await p.notifications.onRemoved(booking, { byUserId: 10 });
     expect(calls()).toHaveLength(0);
   });
 
@@ -154,7 +154,22 @@ describe('ReservationNotifications', () => {
     await p.notifications.notifyNoShow(booking);
     await p.notifications.notifyExpired(booking);
     expect(calls()[0].body).toContain('nicht innerhalb von 15 Minuten');
+    // "freigegeben" alone reads like "approved": the title says what happened
+    expect(calls()[0].title).toBe('Nicht eingecheckt – Reservierung verfallen: Resource 1');
+    expect(calls()[0].body).toContain('ist deshalb verfallen und der Zeitraum wurde für andere freigegeben');
     expect(calls()[1].title).toBe('Reservierungsanfrage abgelaufen: Resource 1');
+    expect(calls()[1].body).toContain('weder genehmigt noch abgelehnt');
+  });
+
+  it('tells a lingering user since when and until when the resource is reserved', async () => {
+    p.info.languages.set(13, 'de');
+    const booking = await load((await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T13:00:00')).id);
+    await p.notifications.notifyOverrun(booking, [12, 13]);
+    const toUsers = calls().filter((r) => r.dedupeKey.startsWith('reservations:overrun-user'));
+    expect(toUsers.map((r) => r.body)).toEqual([
+      expect.stringContaining('Resource 1 has been reserved since 14:00 (until 15:00).'),
+      expect.stringContaining('Resource 1 ist seit 14:00 reserviert (bis 15:00).'),
+    ]);
   });
 
   it('override notices go to the holder and to the other managers, never to the starter', async () => {

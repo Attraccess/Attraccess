@@ -104,6 +104,24 @@ export interface ManageFilter {
 export const listManaged = (filter: ManageFilter) =>
   request<ManagedReservationList>('/manage', { query: { ...filter } });
 
+let manageAccessInFlight: Promise<{ isManager: boolean }> | null = null;
+
+/**
+ * Whether the caller manages any resource. Concurrent callers (the sidebar probe on an auth change
+ * and the pages' query) share one request; {@link resetManageAccess} drops it when the user changes.
+ */
+export function getManageAccess(): Promise<{ isManager: boolean }> {
+  manageAccessInFlight ??= request<{ isManager: boolean }>('/manage/access').finally(() => {
+    manageAccessInFlight = null;
+  });
+  return manageAccessInFlight;
+}
+
+/** Forget a probe still in flight, so a new user never receives the previous user's answer. */
+export function resetManageAccess(): void {
+  manageAccessInFlight = null;
+}
+
 export const getReservation = (id: number) => request<Reservation>(`/${id}`);
 
 export interface CreateReservationInput {

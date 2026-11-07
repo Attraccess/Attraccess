@@ -1,5 +1,5 @@
 import { Button, StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
-import { Chip, Spinner } from '@heroui/react';
+import { Chip, ToggleButton, ToggleButtonGroup } from '@heroui/react';
 import { CalendarCheckIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useReservationsTranslations } from '../i18n';
@@ -8,6 +8,7 @@ import { useAvailability, useResourceName } from '../lib/queries';
 import { addLocalDays, localDateOf, startOfLocalDay, type LocalDate } from '../lib/time';
 import type { Availability, Reservation } from '../lib/types';
 import { useFormatters } from '../lib/useFormatters';
+import { TimezoneHint } from '../shared/TimezoneHint';
 import { useReservationActions } from '../shared/useReservationActions';
 import { AvailabilityTimeline } from './AvailabilityTimeline';
 import { BookingModal } from './BookingModal';
@@ -33,7 +34,10 @@ function Section({ actions, children }: Readonly<{ actions?: ReactNode; children
   );
 }
 
-/** `resource.overview` slot: renders nothing only when reservations are disabled for the resource. */
+/**
+ * `resource.overview` slot. Renders nothing until the first answer says reservations are enabled
+ * (so the card never flashes on resources without them), and nothing while they are disabled.
+ */
 export function ReservationsCard({ resourceId }: Readonly<{ resourceId: number }>) {
   const { t } = useReservationsTranslations();
   const [view, setView] = useState<View>('week');
@@ -85,15 +89,8 @@ export function ReservationsCard({ resourceId }: Readonly<{ resourceId: number }
   ) : null;
 
   if (!availability) {
-    return (
-      <Section>
-        {failure ?? (
-          <div className="rv:flex rv:justify-center rv:py-4" data-cy="reservations-loading">
-            <Spinner size="sm" aria-label={t('common.loading')} />
-          </div>
-        )}
-      </Section>
-    );
+    // A failed first load still shows the card with Retry; a pending one shows nothing yet.
+    return failure ? <Section>{failure}</Section> : null;
   }
 
   return (
@@ -111,30 +108,25 @@ export function ReservationsCard({ resourceId }: Readonly<{ resourceId: number }
       }
     >
       <div className="rv:flex rv:flex-col rv:gap-4">
-        <p className="rv:text-xs rv:text-muted">{t('card.timezone', { timezone: availability.timezone })}</p>
+        <TimezoneHint timezone={availability.timezone} />
         {availability.isManager && <p className="rv:text-xs rv:text-muted">{t('card.managerHint')}</p>}
         <NextBooking resourceId={resourceId} timezone={availability.timezone} onAsk={actions.ask} />
         <div className="rv:flex rv:flex-wrap rv:items-center rv:gap-2">
-          <Button
+          <ToggleButtonGroup
+            aria-label={t('card.view')}
             size="sm"
-            variant={view === 'day' ? 'primary' : 'tertiary'}
-            onPress={() => {
-              setView('day');
+            selectionMode="single"
+            disallowEmptySelection
+            selectedKeys={[view]}
+            onSelectionChange={(keys) => {
+              setView(keys.has('day') ? 'day' : 'week');
               setOffset(0);
             }}
+            data-cy="reservations-view"
           >
-            {t('card.day')}
-          </Button>
-          <Button
-            size="sm"
-            variant={view === 'week' ? 'primary' : 'tertiary'}
-            onPress={() => {
-              setView('week');
-              setOffset(0);
-            }}
-          >
-            {t('card.week')}
-          </Button>
+            <ToggleButton id="day">{t('card.day')}</ToggleButton>
+            <ToggleButton id="week">{t('card.week')}</ToggleButton>
+          </ToggleButtonGroup>
           <Button
             size="sm"
             variant="tertiary"
@@ -185,7 +177,11 @@ export function ReservationsCard({ resourceId }: Readonly<{ resourceId: number }
             })
           : ''}
       </StatusDialog>
-      <KeepFreeDialog resourceId={resourceId} timezone={availability.timezone} />
+      <KeepFreeDialog
+        resourceId={resourceId}
+        timezone={availability.timezone}
+        reservations={availability.reservations}
+      />
       {actions.dialogs}
     </Section>
   );

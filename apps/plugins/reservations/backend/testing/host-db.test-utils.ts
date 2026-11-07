@@ -7,7 +7,8 @@ export async function createHostDb() {
   const dataSource = await new DataSource({
     type: 'sqlite',
     database: ':memory:',
-    entities: Object.values(entities),
+    // The SDK's entity barrel also re-exports enums and schemas, which TypeORM's entity list type does not accept.
+    entities: Object.values(entities) as never,
     synchronize: true,
   }).initialize();
   const context = {

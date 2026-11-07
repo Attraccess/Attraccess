@@ -136,7 +136,7 @@ export function expired(m: MessageContext, r: ReservationEntity): NoticeText {
       pick(
         lang,
         `Your request for ${resourceName} (${when(m, r)}) was not decided before it started and has expired.`,
-        `Deine Anfrage für ${resourceName} (${when(m, r)}) wurde nicht vor dem Beginn entschieden und ist abgelaufen.`,
+        `Deine Anfrage für ${resourceName} (${when(m, r)}) wurde vor dem Beginn weder genehmigt noch abgelehnt und ist abgelaufen.`,
       ),
     ],
     path: ROUTES.reservation(r.id),
@@ -147,12 +147,16 @@ export function expired(m: MessageContext, r: ReservationEntity): NoticeText {
 export function noShow(m: MessageContext, r: ReservationEntity, settings: ResourceSettings): NoticeText {
   const { lang, resourceName } = m;
   return {
-    title: pick(lang, `Booking released: ${resourceName}`, `Reservierung freigegeben: ${resourceName}`),
+    title: pick(
+      lang,
+      `Not checked in – booking released: ${resourceName}`,
+      `Nicht eingecheckt – Reservierung verfallen: ${resourceName}`,
+    ),
     lines: [
       pick(
         lang,
         `You did not check in within ${minutesText(lang, settings.checkInGraceMinutes)} after the start of your booking of ${resourceName} (${when(m, r)}). The booking was released as a no-show.`,
-        `Du hast dich nicht innerhalb von ${minutesText(lang, settings.checkInGraceMinutes)} nach dem Beginn deiner Reservierung von ${resourceName} (${when(m, r)}) eingecheckt. Die Reservierung wurde als Nichterscheinen freigegeben.`,
+        `Du hast dich nicht innerhalb von ${minutesText(lang, settings.checkInGraceMinutes)} nach dem Beginn deiner Reservierung von ${resourceName} (${when(m, r)}) eingecheckt. Die Reservierung ist deshalb verfallen und der Zeitraum wurde für andere freigegeben.`,
       ),
     ],
     path: ROUTES.reservation(r.id),

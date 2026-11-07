@@ -1,3 +1,4 @@
+/** `updated` is reserved for a future edit path; core currently emits only `created` and `finished`. */
 export type ResourceMaintenanceChangeAction = 'created' | 'updated' | 'finished';
 
 export class ResourceMaintenanceChangedEvent {
@@ -6,6 +7,6 @@ export class ResourceMaintenanceChangedEvent {
   constructor(
     public readonly resourceId: number,
     public readonly maintenanceId: number,
-    public readonly action: ResourceMaintenanceChangeAction = 'updated',
+    public readonly action: ResourceMaintenanceChangeAction,
   ) {}
 }

@@ -20,6 +20,10 @@ const DAY_MS = 86_400_000;
 export const PAST_DAYS = 30;
 export const MAX_FEEDS_PER_USER = 20;
 const TOKEN_PREFIX_LENGTH = 6;
+/** Parallel `canStart` lookups for the "all introduced" selector. */
+const INTRODUCED_LOOKUP_CONCURRENCY = 8;
+/** Shape of every token this service issues (base64url); anything else is answered 404 without a lookup. */
+export const FEED_TOKEN_PATTERN = /^[A-Za-z0-9_-]{20,128}$/;
 
 export const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex');
 
@@ -170,11 +174,15 @@ export class IcalService {
 
   // ------------------------------------------------------------- rendering
 
-  /** The calendar for a token, or null for an unknown/revoked token. Resources are resolved NOW. */
+  /**
+   * The calendar for a token, or null for an unknown/revoked token or when the owner's account is deleted or
+   * disabled (their roles would otherwise keep exposing data). Resources are resolved NOW.
+   */
   async renderForToken(token: string): Promise<string | null> {
-    if (!/^[A-Za-z0-9_-]{20,128}$/.test(token)) return null;
+    if (!FEED_TOKEN_PATTERN.test(token)) return null;
     const feed = await this.repo.findOneBy({ tokenHash: hashToken(token) });
     if (!feed || feed.revokedAt) return null;
+    if (!(await this.visibility.isActiveAccount(feed.userId))) return null;
     const now = this.clock();
     if (!feed.lastUsedAt || now.getTime() - feed.lastUsedAt.getTime() > 60_000) {
       await this.context
@@ -185,19 +193,50 @@ export class IcalService {
   }
 
   private async candidateResourceIds(feed: IcalFeedEntity, selection: IcalSelectionDto): Promise<number[]> {
-    const enabled = new Set(this.settings.getEnabledResourceIds());
-    const selected = new Set<number>(selection.resourceIds);
+    const enabledIds = this.settings.getEnabledResourceIds();
+    const enabled = new Set(enabledIds);
     const hasSelectors =
       selection.resourceIds.length > 0 || selection.groupIds.length > 0 || selection.introduced || selection.maintained;
-    if (!hasSelectors) return [...enabled]; // "only my own bookings" alone: every resource
-    for (const id of await this.visibility.resourceIdsOfGroups(selection.groupIds)) selected.add(id);
-    if (selection.introduced) {
-      for (const id of await this.context.resourceAccess.listResourceIdsIntroduced(feed.userId)) selected.add(id);
+    if (!hasSelectors) return enabledIds; // "only my own bookings" alone: every resource
+    const selected = new Set<number>();
+    const add = (ids: number[]) => ids.filter((id) => enabled.has(id)).forEach((id) => selected.add(id));
+    add(selection.resourceIds);
+    add(await this.visibility.resourceIdsOfGroups(selection.groupIds));
+    if (selection.maintained) add(await this.context.resourceAccess.listResourceIdsMaintained(feed.userId));
+    // Only enabled resources that are not selected anyway need the (per-resource) introduction check.
+    if (selection.introduced)
+      add(
+        await this.introducedAmong(
+          feed.userId,
+          enabledIds.filter((id) => !selected.has(id)),
+        ),
+      );
+    return [...selected];
+  }
+
+  /**
+   * The subset of `resourceIds` the user is introduced to, in the sense of `listResourceIdsIntroduced`
+   * (core's `canControllResource`), checked per resource instead of across every resource of the host.
+   * `canStart.allowed` is exactly that rule except on supervision-required resources, where it is always
+   * false; only those fall back to the host-wide list.
+   */
+  private async introducedAmong(userId: number, resourceIds: number[]): Promise<number[]> {
+    const results = await mapWithConcurrency(resourceIds, INTRODUCED_LOOKUP_CONCURRENCY, (id) =>
+      this.context.resourceAccess.canStart(userId, id).catch(() => null),
+    );
+    const introduced: number[] = [];
+    const undecided: number[] = [];
+    resourceIds.forEach((id, index) => {
+      const result = results[index];
+      if (result?.allowed) introduced.push(id);
+      else if (result?.supervisionAllowed) undecided.push(id);
+    });
+    const required = await this.visibility.resourceIdsRequiringSupervision(undecided);
+    if (required.length > 0) {
+      const all = new Set(await this.context.resourceAccess.listResourceIdsIntroduced(userId));
+      introduced.push(...required.filter((id) => all.has(id)));
     }
-    if (selection.maintained) {
-      for (const id of await this.context.resourceAccess.listResourceIdsMaintained(feed.userId)) selected.add(id);
-    }
-    return [...selected].filter((id) => enabled.has(id));
+    return introduced;
   }
 
   async render(feed: IcalFeedEntity, now: Date): Promise<string> {
@@ -222,12 +261,13 @@ export class IcalService {
       (r) =>
         r.startTime.getTime() <= now.getTime() + this.settings.getCachedSettings(r.resourceId).maxAdvanceDays * DAY_MS,
     );
-    const managed = new Map<number, boolean>();
-    for (const id of new Set(inRange.map((r) => r.resourceId))) {
-      managed.set(id, await this.access.isManager(feed.userId, id));
-    }
+    // One lookup for all resources (null = manages everything); skipped when every row is the owner's own.
+    const managed = inRange.some((r) => r.userId !== feed.userId)
+      ? await this.access.managedResourceIds(feed.userId)
+      : [];
+    const managedIds = new Set(managed ?? []);
     const seesHolder = (r: { userId: number; resourceId: number }) =>
-      r.userId === feed.userId || managed.get(r.resourceId) === true;
+      r.userId === feed.userId || managed === null || managedIds.has(r.resourceId);
     const [resourceNames, userNames] = await Promise.all([
       this.directory.getResourceNames(inRange.map((r) => r.resourceId)),
       this.directory.getUserNames(inRange.filter(seesHolder).map((r) => r.userId)),
@@ -252,4 +292,18 @@ export class IcalService {
     });
     return buildCalendar({ name: feed.name, timeZone, events });
   }
+}
+
+/** Like `Promise.all(items.map(fn))`, with at most `limit` calls in flight. Results keep the input order. */
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }

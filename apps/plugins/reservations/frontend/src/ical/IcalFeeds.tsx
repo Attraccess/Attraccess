@@ -1,4 +1,10 @@
-import { Button, EmptyState, StatusDialog } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  EmptyState,
+  StatusAlert,
+  StatusDialog,
+  TableDataLoadingIndicator,
+} from '@attraccess/plugins-frontend-ui';
 import { Chip } from '@heroui/react';
 import { useMutation } from '@tanstack/react-query';
 import { PlusIcon } from 'lucide-react';
@@ -6,19 +12,25 @@ import { useState } from 'react';
 import { regenerateFeed, revokeFeed } from '../api';
 import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
-import { useFeeds, useInvalidateReservations } from '../lib/queries';
+import { useFeeds, useInvalidateReservations, usePluginTimezone } from '../lib/queries';
 import type { IcalFeed, IcalFeedSecret } from '../lib/types';
 import { useFormatters } from '../lib/useFormatters';
+import { listState } from '../shared/queryState';
 import { FeedFormModal } from './FeedFormModal';
 import { FeedSecretDialog } from './FeedSecretDialog';
 
 type Confirm = { kind: 'regenerate' | 'revoke'; feed: IcalFeed } | null;
 
-/** iCal feed management: list, create, rename/re-scope, regenerate and revoke. Used by the account slot and page. */
+/**
+ * iCal feed management: list, create, rename/re-scope, regenerate and revoke. Used by the account
+ * slot and page. Dates are shown in the plugin timezone, like every other reservation time.
+ */
 export function IcalFeeds() {
   const { t } = useReservationsTranslations();
-  const format = useFormatters();
+  const timezone = usePluginTimezone();
+  const format = useFormatters(timezone);
   const feeds = useFeeds();
+  const state = listState(feeds, timezone);
   const invalidate = useInvalidateReservations();
   const [formFeed, setFormFeed] = useState<IcalFeed | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -67,10 +79,20 @@ export function IcalFeeds() {
           <PlusIcon size={16} /> {t('feeds.create')}
         </Button>
       </div>
-      {feeds.isError && <p className="rv:text-sm rv:text-danger">{describeError(feeds.error, t)}</p>}
-      {feeds.data?.length === 0 && <EmptyState message={t('feeds.empty')} />}
+      {state.error ? (
+        <div className="rv:flex rv:flex-col rv:items-start rv:gap-3" data-cy="reservations-feeds-error">
+          <StatusAlert status="danger" title={t('feeds.loadFailed')}>
+            {describeError(state.error, t)}
+          </StatusAlert>
+          <Button size="sm" variant="secondary" onPress={state.onRetry}>
+            {t('common.retry')}
+          </Button>
+        </div>
+      ) : null}
+      {state.isPending && <TableDataLoadingIndicator label={t('common.loading')} />}
+      {!state.isPending && feeds.data?.length === 0 && <EmptyState message={t('feeds.empty')} />}
       <ul className="rv:flex rv:flex-col rv:gap-3">
-        {(feeds.data ?? []).map((feed) => (
+        {(state.isPending ? [] : (feeds.data ?? [])).map((feed) => (
           <li
             key={feed.id}
             className="rv:flex rv:flex-wrap rv:items-center rv:justify-between rv:gap-3"

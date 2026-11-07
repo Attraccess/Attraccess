@@ -76,9 +76,15 @@ Ist der Check-in für die Ressource aktiviert, checken Sie einfach ein, indem Si
 eine Sitzung auf dieser Ressource starten**: ab einigen Minuten vor Beginn (frühes Einchecken) bis zum Ende der
 Buchung. Mehr müssen Sie nicht tun; auch ein beaufsichtigter Start zählt, wenn Sie ihn angefragt haben.
 
+Auch eine Sitzung von Ihnen, die bei Beginn der Buchung **bereits läuft**, zählt, etwa wenn Sie vor dem frühen
+Check-in-Fenster gestartet haben oder Ihre Sitzung aus Ihrer direkt vorangehenden Buchung weiterläuft. Eine solche
+Sitzung wird am Ende der Karenzzeit erkannt und checkt Sie dann ein.
+
 Haben Sie bis zum Beginn plus Karenzzeit nicht eingecheckt, wird die Buchung zu **Nicht erschienen**, das
-Zeitfenster wird für andere frei und Sie erhalten eine E-Mail. Ist der Check-in deaktiviert, bleibt die Buchung
-einfach bis zu ihrem Ende bestehen. Bestätigungs- und Erinnerungs-E-Mails nennen die Check-in-Regeln der Ressource.
+Zeitfenster wird für andere frei und Sie erhalten eine E-Mail. Ist die Karenzzeit so lang wie die Buchung oder
+länger, wird eine ungenutzte Buchung an ihrem Ende zu **Nicht erschienen**. Es gelten die aktuellen
+Check-in-Einstellungen der Ressource, auch für Buchungen von vor einer Änderung. Ist der Check-in deaktiviert, bleibt
+die Buchung einfach bis zu ihrem Ende bestehen. Bestätigungs- und Erinnerungs-E-Mails nennen die Check-in-Regeln der Ressource.
 
 ### Vorzeitig beenden: behalten oder Rest freigeben
 
@@ -100,7 +106,8 @@ Beim Start einer Ressource prüft das Plugin die Buchungen **anderer** Personen.
   Name der buchenden Person wird nie Personen gezeigt, die ihn nicht sehen dürfen.
 - **Eine fremde Buchung beginnt bald:** Beginnt sie innerhalb des Bestätigungsfensters der Ressource
   (standardmäßig 60 Minuten), werden Sie um Bestätigung gebeten: „Reserviert ab 14:00, du hast 40 Min. Trotzdem
-  starten?“. Auf einem Reader ohne Bildschirm wird der Start standardmäßig abgelehnt.
+  starten?“. Auf einem Reader ohne Bildschirm wird der Start standardmäßig abgelehnt. Beginnen mehrere Buchungen
+  innerhalb des Fensters, bestätigen Sie jede einzeln.
 - **Ihre eigene Buchung:** Während oder kurz vor Ihrer eigenen Buchung starten Sie ohne Rückfrage.
 - **Wartende und Verwaltende** können eine laufende Buchung nach ausdrücklicher Bestätigung übersteuern. Die buchende
   Person und die Verwaltenden werden benachrichtigt; die Übersteuerung steht im [Audit-Log](settings/audit-log.md).
@@ -115,17 +122,20 @@ Sie erhalten Benachrichtigungen in der App, per Push und per E-Mail, je nach Ihr
 (siehe [Benachrichtigungskategorien](#benachrichtigungskategorien)). Jede Mitteilung wird höchstens einmal
 gesendet. Die Texte nutzen Ihre Sprache, sofern bekannt, sonst die Standardsprache der Installation.
 
-| Wann                                                       | Was                                                                                                                                                                  |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Buchung bestätigt oder genehmigt                           | Bestätigung inklusive Check-in-Regeln.                                                                                                                               |
-| 48 Stunden vor Beginn                                      | „Brauchen Sie die Buchung noch?“ mit **Behalten** und **Stornieren**. Nur, wenn Sie mindestens 48 Stunden im Voraus gebucht haben. Keine Antwort behält die Buchung. |
-| 24 Stunden vor Beginn                                      | Erinnerung inklusive Check-in-Regeln.                                                                                                                                |
-| Buchung abgelehnt, abgelaufen, storniert, nicht erschienen | Information, was passiert ist und warum.                                                                                                                             |
-| Wartung überschneidet Ihre Buchung                         | Nur Information. Buchungen werden nicht automatisch storniert.                                                                                                       |
-| Ressource wird gestört / erholt sich                       | Für Buchungen, die laufen oder innerhalb von 24 Stunden beginnen.                                                                                                    |
-| Vor dem Beginn einer fremden Buchung                       | Bei laufender Sitzung: „Die Ressource ist ab 14:00 reserviert. Bitte rechtzeitig fertig werden und abmelden.“                                                        |
-| Fremde Sitzung läuft bei Ihrem Beginn noch                 | Sie und die andere Person werden informiert. Die Sitzung wird nicht beendet.                                                                                         |
-| Jemand hat Ihre Buchung übersteuert                        | Sie erfahren, wer trotzdem gestartet hat.                                                                                                                            |
+| Wann                                                       | Was                                                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Buchung bestätigt oder genehmigt                           | Bestätigung inklusive Check-in-Regeln.                                                                                                                                                                                                                                           |
+| 48 Stunden vor Beginn                                      | „Brauchen Sie die Buchung noch?“ mit **Behalten** und **Stornieren**. Nur, wenn die Buchung mindestens 48 Stunden im Voraus bestätigt wurde (bei genehmigungspflichtigen Buchungen: genehmigt) und Sie nicht schon **Behalten** gewählt haben. Keine Antwort behält die Buchung. |
+| 24 Stunden vor Beginn                                      | Erinnerung inklusive Check-in-Regeln. Entfällt für Buchungen, die weniger als 24 Stunden im Voraus bestätigt (gebucht oder genehmigt) wurden: Ihre Bestätigungs-E-Mail enthält die Regeln bereits.                                                                               |
+| Buchung abgelehnt, abgelaufen, storniert, nicht erschienen | Information, was passiert ist und warum.                                                                                                                                                                                                                                         |
+| Wartung überschneidet Ihre Buchung                         | Nur Information. Buchungen werden nicht automatisch storniert.                                                                                                                                                                                                                   |
+| Ressource wird gestört / erholt sich                       | Für Buchungen, die laufen oder innerhalb von 24 Stunden beginnen.                                                                                                                                                                                                                |
+| Vor dem Beginn einer fremden Buchung                       | Bei laufender Sitzung: „Die Ressource ist ab 14:00 reserviert. Bitte rechtzeitig fertig werden und abmelden.“                                                                                                                                                                    |
+| Fremde Sitzung läuft bei Ihrem Beginn noch                 | Sie und die andere Person werden informiert (geprüft in den ersten fünf Minuten Ihrer Buchung). Die Sitzung wird nicht beendet.                                                                                                                                                  |
+| Jemand hat Ihre Buchung übersteuert                        | Sie erfahren, wer trotzdem gestartet hat.                                                                                                                                                                                                                                        |
+
+Ressourcen, deren Reservierungen deaktiviert sind, senden für beim Deaktivieren behaltene Buchungen keine
+Erinnerungen, Übergabe- oder Überziehungs-Mitteilungen.
 
 ### Links in E-Mails
 
@@ -224,15 +234,17 @@ Seite unter Umständen einmal neu laden, bis der Eintrag erscheint.
 
 Buchbare Zeiten gelten **nur für Buchungen**, nicht für spontane Starts. Die Regel: Sobald **irgendein** Wochentag
 einen Bereich hat, sind Wochentage ohne Bereich **geschlossen**. Ohne jeden Bereich ist die Ressource rund um die
-Uhr buchbar. Eine Buchung samt Puffern muss vollständig in einem Bereich an einem Tag liegen. Ein Bereich bis 24:00
-kann sich mit dem Bereich ab 00:00 des Folgetags verbinden.
+Uhr buchbar. Eine Buchung samt Puffern muss vollständig in einem Bereich an einem Tag liegen. Bereiche, die am selben
+Tag aneinandergrenzen, bleiben getrennt: Bei 08:00-12:00 und 12:00-16:00 wird eine Buchung von 11:00 bis 13:00
+abgelehnt. Nur ein Bereich bis 24:00 verbindet sich mit dem Bereich ab 00:00 des Folgetags.
 
 #### Reservierungen deaktivieren
 
 Deaktivieren Sie Reservierungen, während es ausstehende oder bestätigte künftige Buchungen gibt, warnt die
 Einstellungsseite mit der Anzahl der betroffenen Buchungen. Bestätigen Sie, werden diese Buchungen mit der Begründung
-„Reservierungen deaktiviert“ storniert und die Buchenden benachrichtigt. Nach dem Deaktivieren sind alle Starts
-wieder erlaubt.
+„Reservierungen deaktiviert“ storniert und die Buchenden benachrichtigt (im Hintergrund, das Speichern wartet nicht
+darauf). Eine Buchung, die genau in diesem Moment angelegt wird, wird entweder mit storniert oder abgelehnt. Nach dem
+Deaktivieren sind alle Starts wieder erlaubt.
 
 ### Zeitzone
 
@@ -246,14 +258,14 @@ werden in UTC gespeichert, die Sommerzeit wird berücksichtigt.
 Benachrichtigungen nutzen diese Kategorien, die jede Person pro Kanal (App, Push, E-Mail) in ihren
 Benachrichtigungseinstellungen unter dem Namen des Plugins einstellen kann:
 
-| Kategorie                       | Enthält                                                                         |
-| ------------------------------- | ------------------------------------------------------------------------------- |
-| Reservierungen: meine Buchungen | Bestätigungen, Stornierungen, vorzeitige Enden, Nichterscheinen.                |
-| Reservierungen: Genehmigungen   | Neue ausstehende Buchungen (Verwaltende), Entscheidungen und Ablauf (Buchende). |
-| Reservierungen: Erinnerungen    | Die 48-Stunden-Frage und die 24-Stunden-Erinnerung.                             |
-| Reservierungen: Verfügbarkeit   | Wartung überschneidet eine Buchung, Ressource gestört oder erholt.              |
-| Reservierungen: Übergabe        | Übergabe-Erinnerungen und Hinweise bei Überschreitung.                          |
-| Reservierungen: Übersteuerungen | Wartende oder Verwaltende haben während einer Buchung gestartet.                |
+| Kategorie                                 | Enthält                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------- |
+| Reservierungen: meine Buchungen           | Bestätigungen, Stornierungen, vorzeitige Enden, Nichterscheinen.                |
+| Reservierungen: Genehmigungen             | Neue ausstehende Buchungen (Verwaltende), Entscheidungen und Ablauf (Buchende). |
+| Reservierungen: Erinnerungen              | Die 48-Stunden-Frage und die 24-Stunden-Erinnerung.                             |
+| Reservierungen: Verfügbarkeit             | Wartung überschneidet eine Buchung, Ressource gestört oder erholt.              |
+| Reservierungen: Übergabe                  | Übergabe-Erinnerungen und Hinweise bei Überschreitung.                          |
+| Reservierungen: Starts trotz Reservierung | Wartende oder Verwaltende haben während einer Buchung gestartet.                |
 
 ### Startprüfung und Hook-Ausfälle
 
@@ -297,10 +309,14 @@ Das Plugin schreibt die Audit-Domäne **reservations**: `created`, `approved`, `
 
 Gut zu wissen:
 
-- Der Scheduler läuft einmal pro Minute (Ablauf, Nichterscheinen, Abschluss, Erinnerungen, Übergabe). Jede Mitteilung
-  wird vor dem Senden in der Datenbank beansprucht, sodass Neustarts und doppelte Läufe nie eine Mitteilung doppelt
-  senden. Mitteilungen werden **höchstens einmal** gesendet: Schlägt das Senden nach dem Beanspruchen fehl, wird es
-  nicht wiederholt.
+- Der Scheduler läuft einmal pro Minute (Ablauf, Nichterscheinen, Abschluss, Erinnerungen, Übergabe, Überziehen).
+  Jede Mitteilung wird vor dem Senden in der Datenbank beansprucht, sodass Neustarts und doppelte Läufe nie eine
+  Mitteilung doppelt senden. Mitteilungen werden **höchstens einmal** gesendet: Schlägt das Senden nach dem
+  Beanspruchen fehl, wird es nicht wiederholt.
+- Die Prüfung auf eine noch laufende fremde Sitzung erfolgt nur in den ersten fünf Minuten einer Buchung. Ist die API
+  rund um den Beginn länger ausgefallen, entfällt diese Mitteilung.
+- Benachrichtigungen zu einer Aktion (Buchen, Genehmigen, Stornieren, vorzeitig Beenden, Deaktivieren) werden nach
+  dem Speichern im Hintergrund gesendet; die Aktion wartet nicht auf den Mailserver.
 - Offene Entscheidungen „Behalten oder Rest freigeben?“ von Web-Nutzenden liegen im Arbeitsspeicher. Nach einem
   Neustart der API ist die Frage weg, und die Buchung bleibt bestehen.
 
@@ -308,6 +324,15 @@ Gut zu wissen:
 
 Alle Endpunkte liegen unter `/api/reservations` und akzeptieren ein Sitzungs-Cookie **oder** ein API-Token
 (`Authorization: Bearer <token>`, siehe [API-Referenz](developer/api-reference.md)). Zeiten sind ISO 8601.
+Ein API-Token handelt mit den Berechtigungen des Tokens: Verwalteraktionen (fremde Buchungen genehmigen, stornieren
+oder vorzeitig beenden, die Verwalterliste, Ressourceneinstellungen, Buchen bei „nur Verwalter“) brauchen
+`resources.update` oder `resources.maintenance.manage` am Token selbst. Wartungs- und Einweiserrechte aus Ihren Rollen
+gelten weiterhin.
+Einen Kalender-Feed anlegen und seine URL neu erzeugen geht nur mit einer Browser-Sitzung (403 mit einem API-Token),
+denn eine Feed-URL zeigt Ihre Buchungen mit allen Ihren Rechten, wie ein API-Token.
+Ein Start mit einem API-Token läuft durch die Startprüfung des Kerns, die die Berechtigungen des Tokens anwendet; die
+eigene Übersteuerungsprüfung des Plugins (Bestätigung statt Sperre während einer fremden Buchung) nutzt weiterhin die
+Berechtigungen Ihrer Rollen, weil der Start-Hook den Umfang des Tokens nicht erhält.
 
 | Methode und Pfad                                            | Zweck                                                                                      |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ |

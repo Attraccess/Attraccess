@@ -5,14 +5,33 @@ import type {
   SessionEndResult,
 } from '@attraccess/plugins-backend-sdk';
 
-/** The two services the host-called hooks delegate to. */
+/** The two services the host-called hooks delegate to; `deadline` is an epoch-ms bound for their waits. */
 export interface HookServices {
-  preStart: { evaluate(ctx: PreStartContext): Promise<PreStartResult> };
-  sessionEnd: { evaluate(ctx: SessionEndContext): Promise<SessionEndResult> };
+  preStart: { evaluate(ctx: PreStartContext, deadline?: number): Promise<PreStartResult> };
+  sessionEnd: { evaluate(ctx: SessionEndContext, deadline?: number): Promise<SessionEndResult> };
 }
 
-/** How long a hook waits for the plugin module to finish booting (the host allows 1.5 s per hook). */
-export const READY_BUDGET_MS = 900;
+/**
+ * Total time a hook call may spend WAITING (module boot, then settings cache warm-up). One budget for
+ * both, well under the host's 1.5 s hook timeout, so the remaining work (one indexed query) still fits.
+ */
+export const HOOK_BUDGET_MS = 1200;
+
+/** Epoch-ms deadline for a hook call starting now. */
+export const hookDeadline = (): number => Date.now() + HOOK_BUDGET_MS;
+
+/** Awaits `work`, rejecting with `message` once `deadline` (epoch ms) has passed. */
+export async function waitUntil<T>(work: Promise<T>, deadline: number, message: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), Math.max(0, deadline - Date.now()));
+  });
+  try {
+    return await Promise.race([work, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * The host calls `preStartHook` / `sessionEndHook` as plain functions of the plugin object, with a
@@ -43,27 +62,27 @@ export function publishHookServices(services: HookServices | null): void {
   }
 }
 
-/** Resolves the services, waiting up to `budgetMs` for a module that is still booting. */
-export async function resolveHookServices(budgetMs = READY_BUDGET_MS): Promise<HookServices> {
+const NOT_READY = 'The reservations plugin is not ready yet';
+
+/** Resolves the services, waiting until `deadline` (epoch ms) for a module that is still booting. */
+export async function resolveHookServices(deadline = hookDeadline()): Promise<HookServices> {
   if (current) return current;
-  let timer: NodeJS.Timeout | undefined;
-  await Promise.race([
-    readyPromise(),
-    new Promise<void>((resolve) => {
-      timer = setTimeout(resolve, budgetMs);
-    }),
-  ]);
-  clearTimeout(timer);
-  if (!current) throw new Error('The reservations plugin is not ready yet');
+  await waitUntil(readyPromise(), deadline, NOT_READY).catch(() => undefined);
+  if (!current) throw new Error(NOT_READY);
   return current;
 }
 
-/** `PluginBackendModule.preStartHook`. Throws while not ready: the host applies its failure policy. */
+/**
+ * `PluginBackendModule.preStartHook`. Waiting for the module and for the settings cache share one
+ * HOOK_BUDGET_MS deadline; past it the hook throws and the host applies its failure policy.
+ */
 export async function preStartHook(ctx: PreStartContext): Promise<PreStartResult> {
-  return (await resolveHookServices()).preStart.evaluate(ctx);
+  const deadline = hookDeadline();
+  return (await resolveHookServices(deadline)).preStart.evaluate(ctx, deadline);
 }
 
-/** `PluginBackendModule.sessionEndHook`. */
+/** `PluginBackendModule.sessionEndHook` (same shared deadline). */
 export async function sessionEndHook(ctx: SessionEndContext): Promise<SessionEndResult> {
-  return (await resolveHookServices()).sessionEnd.evaluate(ctx);
+  const deadline = hookDeadline();
+  return (await resolveHookServices(deadline)).sessionEnd.evaluate(ctx, deadline);
 }

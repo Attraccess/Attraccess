@@ -8,7 +8,6 @@ import {
 } from '@attraccess/plugins-frontend-sdk';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAuth } from '../../hooks/useAuth';
-import { useSettingsSections } from '../settings/layout/useSettingsSections';
 import { PluginSlot } from './PluginSlot';
 import en from './PluginSettingsSlots.en.json';
 import de from './PluginSettingsSlots.de.json';
@@ -38,8 +37,8 @@ export function UserAccountPluginSlot({ userId }: { userId: number }) {
 
 export function AdminSettingsPluginSlot() {
   const { t } = useTranslations({ en, de });
-  const { sections } = useSettingsSections();
-  if (sections.length === 0) return null;
+  const { hasPermission } = useAuth();
+  if (!hasPermission('system.settings.manage')) return null;
   return (
     <PluginSlot<AdminSettingsSlotContext> slotId={ADMIN_SETTINGS_SLOT} context={{}} sectionTitle={t('adminSettings')} />
   );

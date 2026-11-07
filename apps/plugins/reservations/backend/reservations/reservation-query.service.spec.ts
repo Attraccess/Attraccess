@@ -149,4 +149,117 @@ describe('ReservationQueryService', () => {
     expect((await h.queries.listManaged(principal(50), { page: 1, resourceId: 2, status: 'confirmed' })).total).toBe(1);
     expect((await h.queries.listManaged(principal(50), { page: 1, status: 'cancelled' })).total).toBe(0);
   });
+
+  it('answers 404 for resources the caller cannot see, like unknown ones', async () => {
+    h.state.hidden.add(1);
+    await expect(h.queries.availability(bob, 1, ...range)).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND' });
+    h.state.hidden.delete(1);
+    expect((await h.queries.availability(bob, 1, ...range)).enabled).toBe(true);
+  });
+
+  it('answers disabled resources from the settings cache without permission lookups', async () => {
+    await h.admin.update(manager, 1, { enabled: false });
+    const isManager = jest.spyOn(h.access, 'isManager');
+    const canBook = jest.spyOn(h.access, 'canBook');
+    const read = jest.spyOn(h.settings, 'get');
+    expect(await h.queries.availability(manager, 1, ...range)).toMatchObject({
+      enabled: false,
+      isManager: false,
+      canBook: { allowed: false, reason: 'RESERVATIONS_DISABLED' },
+    });
+    expect(isManager).not.toHaveBeenCalled();
+    expect(canBook).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('looks up manager rights once (canBook reuses the resolved flag)', async () => {
+    await h.reservations.create(alice, { resourceId: 1, ...slot(8, 9) });
+    await h.settings.update(1, { whoCanBook: 'managers-only' });
+    const isManager = jest.spyOn(h.access, 'isManager');
+    const canBook = jest.spyOn(h.access, 'canBook');
+    const managed = jest.spyOn(h.access, 'managedResourceIds');
+    expect((await h.queries.availability(manager, 1, ...range)).canBook).toEqual({ allowed: true, reason: null });
+    expect((await h.queries.availability(bob, 1, ...range)).canBook).toEqual({
+      allowed: false,
+      reason: 'NOT_ALLOWED_TO_BOOK',
+    });
+    expect(isManager).toHaveBeenCalledTimes(2);
+    expect(canBook).toHaveBeenCalledWith(manager, 1, expect.anything(), true);
+    expect(canBook).toHaveBeenCalledWith(bob, 1, expect.anything(), false);
+    expect(managed).not.toHaveBeenCalled();
+  });
+
+  it('reports USER_BOOKING_LIMIT in canBook once the caller holds the maximum', async () => {
+    await h.enable(1, { maxActiveBookingsPerUser: 2 });
+    await h.reservations.create(alice, { resourceId: 1, ...slot(8, 9) });
+    expect((await h.queries.availability(alice, 1, ...range)).canBook).toEqual({ allowed: true, reason: null });
+    const second = await h.reservations.create(alice, { resourceId: 1, ...slot(10, 11) });
+    expect((await h.queries.availability(alice, 1, ...range)).canBook).toEqual({
+      allowed: false,
+      reason: 'USER_BOOKING_LIMIT',
+    });
+    expect((await h.queries.availability(bob, 1, ...range)).canBook.allowed).toBe(true);
+    await h.reservations.cancel(alice, second.id);
+    expect((await h.queries.availability(alice, 1, ...range)).canBook.allowed).toBe(true);
+    // 0 = unlimited; the creation path agrees with the advertised limit.
+    await h.enable(1, { maxActiveBookingsPerUser: 0 });
+    expect((await h.queries.availability(alice, 1, ...range)).canBook.allowed).toBe(true);
+    await h.enable(1, { maxActiveBookingsPerUser: 1 });
+    await expect(h.reservations.create(alice, { resourceId: 1, ...slot(12, 13) })).rejects.toMatchObject({
+      code: 'USER_BOOKING_LIMIT',
+    });
+  });
+
+  it('includes neighbours whose buffers reach into the range, and maintenance within this resource’s buffers', async () => {
+    // A booking 10:00-11:00 created with 60 min buffer after blocks until 12:00.
+    await h.enable(1, { bufferAfterMinutes: 60 });
+    const neighbour = await h.reservations.create(bob, { resourceId: 1, ...slot(10, 11) });
+    await h.enable(1, { bufferBeforeMinutes: 30, bufferAfterMinutes: 0 });
+    const day = [at('2026-06-02T11:30:00'), at('2026-06-02T18:00:00')] as const;
+    // Its buffered span [10:00, 12:00) overlaps [11:00, 18:00) (the range widened by bufferBefore 30).
+    expect((await h.queries.availability(alice, 1, ...day)).reservations.map((r) => r.id)).toEqual([neighbour.id]);
+    // A range starting 12:30 widens to 12:00: the neighbour's span ends exactly there and is left out.
+    const later = [at('2026-06-02T12:30:00'), at('2026-06-02T18:00:00')] as const;
+    expect((await h.queries.availability(alice, 1, ...later)).reservations).toEqual([]);
+
+    h.state.maintenance.push({
+      maintenanceId: 1,
+      resourceId: 1,
+      startTime: at('2026-06-02T09:00:00'),
+      endTime: at('2026-06-02T11:15:00'),
+      reason: null,
+    });
+    // Maintenance ending 11:15 is before the range (11:30) but inside its 30 min buffer.
+    expect((await h.queries.availability(alice, 1, ...day)).maintenance).toEqual([
+      { startTime: '2026-06-02T09:00:00.000Z', endTime: '2026-06-02T11:15:00.000Z' },
+    ]);
+    expect((await h.queries.availability(alice, 1, ...later)).maintenance).toEqual([]);
+  });
+
+  it('presents mixed resources with a single managed-resources lookup', async () => {
+    await h.enable(2);
+    await h.reservations.create(alice, { resourceId: 1, ...slot(8, 9) });
+    await h.reservations.create(alice, { resourceId: 2, ...slot(8, 9) });
+    const isManager = jest.spyOn(h.access, 'isManager');
+    const managed = jest.spyOn(h.access, 'managedResourceIds');
+    const rows = await h.store.listForUser(10, 'upcoming', h.clock());
+    const asManager = await h.queries.present(manager, rows);
+    expect(asManager.map((r) => [r.resourceId, r.userName]).sort()).toEqual([
+      [1, 'user10'],
+      [2, null],
+    ]);
+    expect(managed).toHaveBeenCalledTimes(1);
+    expect(isManager).not.toHaveBeenCalled();
+    h.grant(50, 'resources.update');
+    expect((await h.queries.present(principal(50), rows)).map((r) => r.userName)).toEqual(['user10', 'user10']);
+  });
+
+  it('tells whether the caller manages anything', async () => {
+    expect(await h.queries.managerAccess(manager)).toEqual({ isManager: true });
+    expect(await h.queries.managerAccess(bob)).toEqual({ isManager: false });
+    h.grant(50, 'resources.update');
+    expect(await h.queries.managerAccess(principal(50))).toEqual({ isManager: true });
+    h.grant(51, 'resources.maintenance.manage');
+    expect(await h.queries.managerAccess(principal(51))).toEqual({ isManager: true });
+  });
 });

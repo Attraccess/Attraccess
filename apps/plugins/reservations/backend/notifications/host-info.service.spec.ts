@@ -72,6 +72,11 @@ describe('HostInfoService (real host entities)', () => {
     );
     expect((await info.managerIdsOf(1)).sort()).toEqual([1, 2, 3, 4]);
     expect((await info.managerIdsOf(2)).sort()).toEqual([1, 2, 5]);
+
+    // soft-deleted users keep their role and introducer rows but are no managers anymore
+    await db.sql(`UPDATE "user" SET deletedAt = datetime('now') WHERE id IN (1, 3, 5)`);
+    expect((await info.managerIdsOf(1)).sort()).toEqual([2, 4]);
+    expect((await info.managerIdsOf(2)).sort()).toEqual([2]);
   });
 
   it('counts unhealthy health entries', async () => {

@@ -207,6 +207,12 @@ export interface PluginContext {
    * Run `fn` in a serialized database transaction. Concurrent callers (core lifecycle writes included)
    * run one at a time on SQLite, so check-then-write sequences such as overlap checks are race-free.
    * The transaction commits when `fn` resolves and rolls back when it throws. Requires DATABASE_ACCESS.
+   *
+   * The queue is shared with every core session start and end, so keep `fn` short and limited to database
+   * work through the given manager: no HTTP, MQTT, email or other I/O inside. Do not nest calls: a
+   * runSerialized started inside `fn` would wait for `fn` itself, so the host rejects it with an error;
+   * pass the manager down instead. Core services that write through the same queue (session start/end)
+   * must not be awaited inside `fn` either.
    */
   runSerialized<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T>;
 }

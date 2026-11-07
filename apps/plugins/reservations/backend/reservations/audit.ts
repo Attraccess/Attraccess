@@ -5,6 +5,7 @@ import type {
   PluginAuditPrincipal,
 } from '@attraccess/plugins-backend-sdk';
 import { randomUUID } from 'node:crypto';
+import { auditPrincipal } from './actor';
 
 export type ReservationAuditAction =
   | 'created'
@@ -107,7 +108,8 @@ export class ReservationAudit {
         receipt = await this.audit.record({
           action: `reservations.${action}`,
           operationId,
-          principal,
+          // Only the audit fields: request actors also carry their permissions, which do not belong in the log.
+          principal: auditPrincipal(principal),
           outcome: 'succeeded',
           subject: { type: `reservations.${subject.type}`, id: subject.id },
           details: present,

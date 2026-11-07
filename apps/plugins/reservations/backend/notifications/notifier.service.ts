@@ -21,7 +21,7 @@ export const NOTIFICATION_CATEGORIES = [
   { id: 'reminders', label: { en: 'Reservations: reminders', de: 'Reservierungen: Erinnerungen' } },
   { id: 'availability', label: { en: 'Reservations: availability', de: 'Reservierungen: Verfügbarkeit' } },
   { id: 'handover', label: { en: 'Reservations: handover', de: 'Reservierungen: Übergabe' } },
-  { id: 'overrides', label: { en: 'Reservations: overrides', de: 'Reservierungen: Übersteuerungen' } },
+  { id: 'overrides', label: { en: 'Reservations: overrides', de: 'Reservierungen: Starts trotz Reservierung' } },
 ] as const;
 export type NotificationCategoryId = (typeof NOTIFICATION_CATEGORIES)[number]['id'];
 

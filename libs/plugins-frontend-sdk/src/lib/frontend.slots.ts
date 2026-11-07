@@ -38,7 +38,7 @@ export const RESOURCE_SETTINGS_SLOT = 'resource.settings';
 // The host wraps each contribution in a titled section.
 export const USER_ACCOUNT_SLOT = 'user.account';
 
-// System settings area, for users with system administration permission. Context: AdminSettingsSlotContext.
+// System settings index, only for users with the `system.settings.manage` permission. Context: AdminSettingsSlotContext.
 // The host wraps each contribution in a titled section.
 export const ADMIN_SETTINGS_SLOT = 'admin.settings';
 

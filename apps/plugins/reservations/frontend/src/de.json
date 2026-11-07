@@ -10,7 +10,11 @@
     "edit": "Bearbeiten",
     "done": "Fertig",
     "retry": "Erneut versuchen",
-    "loading": "Wird geladen"
+    "loading": "Wird geladen",
+    "timesIn": "Zeiten in {{timezone}}",
+    "pagination": "Seiten",
+    "previousPage": "Vorherige Seite",
+    "nextPage": "Nächste Seite"
   },
   "weekdays": {
     "mon": "Montag",
@@ -22,7 +26,7 @@
     "sun": "Sonntag"
   },
   "status": {
-    "pending": "Wartet auf Freigabe",
+    "pending": "Wartet auf Genehmigung",
     "confirmed": "Bestätigt",
     "rejected": "Abgelehnt",
     "cancelled": "Storniert",
@@ -45,7 +49,7 @@
     "USER_BOOKING_LIMIT": "Du hast die maximale Anzahl aktiver Buchungen für diese Ressource erreicht.",
     "OVERLAP": "Der Zeitraum überschneidet sich mit einer anderen Buchung. Bitte wähle eine andere Zeit.",
     "MAINTENANCE": "Die Ressource ist in dieser Zeit in Wartung.",
-    "NOT_PENDING": "Diese Buchung wartet nicht mehr auf Freigabe.",
+    "NOT_PENDING": "Diese Buchung wartet nicht mehr auf Genehmigung.",
     "NOT_ACTIVE": "Diese Buchung ist nicht aktiv.",
     "NOT_CANCELLABLE": "Diese Buchung kann nicht mehr storniert werden.",
     "ALREADY_STARTED": "Diese Buchung hat bereits begonnen.",
@@ -67,10 +71,10 @@
   },
   "card": {
     "title": "Reservierungen",
-    "timezone": "Zeiten in {{timezone}}",
     "reserve": "Reservieren",
     "cannotBook": "Buchen ist nicht möglich",
-    "managerHint": "Als Verwalter siehst du, wer welche Buchung hält.",
+    "view": "Ansicht",
+    "managerHint": "Als verwaltende Person siehst du, wer welche Buchung hält.",
     "next": "Deine nächste Buchung",
     "current": "Aktuelle Buchung",
     "loadFailed": "Reservierungen konnten nicht geladen werden",
@@ -81,7 +85,7 @@
     "dayBarLabel": "Gebuchte Zeiten des Tages",
     "free": "Keine Buchungen",
     "reserved": "Reserviert",
-    "reservedPending": "Reserviert (wartet auf Freigabe)",
+    "reservedPending": "Reserviert (wartet auf Genehmigung)",
     "yours": "Deine Buchung",
     "maintenance": "Wartung",
     "openEnd": "offenes Ende"
@@ -96,7 +100,7 @@
     "durationHint": "In Schritten von {{step}} Min., von {{min}} bis {{max}}",
     "note": "Notiz (optional)",
     "noSlots": "An diesem Tag gibt es keine freien Startzeiten.",
-    "approvalNeeded": "Ein Verwalter muss diese Buchung freigeben, bevor sie gültig wird.",
+    "approvalNeeded": "Eine verwaltende Person muss diese Buchung genehmigen, bevor sie gültig wird.",
     "instantNote": "Deine Buchung wird sofort bestätigt.",
     "submit": "Reservieren",
     "requestSubmit": "Reservierung anfragen",
@@ -104,10 +108,11 @@
     "bookedTitle": "Reservierung bestätigt",
     "bookedBody": "Deine Buchung für {{range}} ist bestätigt.",
     "requestedTitle": "Reservierung angefragt",
-    "requestedBody": "Deine Anfrage für {{range}} wartet auf Freigabe."
+    "requestedBody": "Deine Anfrage für {{range}} wartet auf Genehmigung."
   },
   "checkIn": {
     "required": "Einchecken durch Starten der Ressource: ab {{early}} Min. vor Beginn bis {{grace}} Min. nach Beginn. Ohne Check-in wird die Buchung freigegeben.",
+    "requiredFromStart": "Einchecken durch Starten der Ressource: ab Beginn bis {{grace}} Min. nach Beginn. Ohne Check-in wird die Buchung freigegeben.",
     "notRequired": "Ein Check-in ist nicht nötig; die Buchung bleibt bis zum Ende bestehen."
   },
   "keepFree": {
@@ -118,6 +123,7 @@
   },
   "actions": {
     "reasonLabel": "Grund (optional)",
+    "commentLabel": "Kommentar (optional)",
     "failedTitle": "Aktion fehlgeschlagen",
     "cancel": {
       "label": "Stornieren",
@@ -138,10 +144,10 @@
       "confirm": "Buchung behalten"
     },
     "approve": {
-      "label": "Freigeben",
-      "title": "Diese Buchung freigeben?",
+      "label": "Genehmigen",
+      "title": "Diese Buchung genehmigen?",
       "body": "Die Buchung {{range}} für {{resource}} wird bestätigt.",
-      "confirm": "Freigeben"
+      "confirm": "Genehmigen"
     },
     "reject": {
       "label": "Ablehnen",
@@ -165,21 +171,19 @@
   "manage": {
     "denied": "Du verwaltest keine Ressource, deshalb gibt es hier nichts anzuzeigen.",
     "title": "Reservierungen verwalten",
-    "subtitle": "Anfragen freigeben und alle Buchungen deiner Ressourcen im Blick behalten",
-    "pending": "Wartet auf Freigabe",
-    "pendingHint": "Anfragen freigeben oder ablehnen; der Inhaber wird benachrichtigt.",
+    "subtitle": "Anfragen genehmigen und alle Buchungen deiner Ressourcen im Blick behalten",
+    "pending": "Wartet auf Genehmigung",
+    "pendingHint": "Anfragen genehmigen oder ablehnen; die buchende Person wird benachrichtigt.",
     "all": "Alle Buchungen",
     "filters": {
       "resource": "Ressource",
       "allResources": "Alle Ressourcen",
+      "searchResources": "Ressourcen suchen",
       "status": "Status",
       "allStatuses": "Alle Status",
       "from": "Von",
       "to": "Bis"
-    },
-    "page": "Seite {{page}} von {{total}}",
-    "previous": "Zurück",
-    "next": "Weiter"
+    }
   },
   "detail": {
     "title": "Reservierung",
@@ -191,13 +195,13 @@
   "settings": {
     "loadFailed": "Die Reservierungs-Einstellungen konnten nicht geladen werden",
     "enabled": "Reservierungen für diese Ressource aktivieren",
-    "approvalRequired": "Buchungen müssen von einem Verwalter freigegeben werden",
+    "approvalRequired": "Buchungen müssen von einer verwaltenden Person genehmigt werden",
     "checkInEnabled": "Check-in verlangen (Ressource innerhalb der Karenzzeit starten)",
     "failed": "Die Einstellungen konnten nicht gespeichert werden",
     "whoCanBook": {
       "label": "Wer darf buchen",
       "can-start": "Alle, die die Ressource starten dürfen",
-      "managers-only": "Nur Verwalter",
+      "managers-only": "Nur verwaltende Personen",
       "any-user": "Jeder angemeldete Nutzer"
     },
     "groups": {
@@ -248,9 +252,12 @@
       "description": "Buchungen müssen vollständig in diesen Zeiten liegen. Ein Tag ohne Zeitraum ist geschlossen, sobald ein anderer Tag Zeiträume hat; ganz ohne Zeiträume ist die Ressource rund um die Uhr buchbar.",
       "allDay": "Kein Zeitraum festgelegt",
       "addRange": "Zeitraum hinzufügen",
-      "removeRange": "Zeitraum entfernen",
+      "addRangeTo": "Zeitraum für {{day}} hinzufügen",
+      "removeRange": "Zeitraum {{index}} am {{day}} entfernen",
       "from": "Von",
-      "to": "Bis"
+      "to": "Bis",
+      "fromLabel": "Von ({{day}}, Zeitraum {{index}})",
+      "toLabel": "Bis ({{day}}, Zeitraum {{index}})"
     },
     "disableWarning": {
       "title": "Reservierungen deaktivieren?",
@@ -274,6 +281,7 @@
   },
   "admin": {
     "description": "Die Zeitzone für buchbare Zeiten, das Buchungsraster, Benachrichtigungen und Kalender-Feeds.",
+    "loadFailed": "Die Zeitzonen-Einstellung konnte nicht geladen werden",
     "current": "Zeitzone",
     "default": "Server-Standard: {{timezone}}",
     "search": "Zeitzonen suchen",
@@ -295,6 +303,7 @@
     "lastUsed": "Zuletzt genutzt {{date}}",
     "neverUsed": "Nie genutzt",
     "failed": "Aktion fehlgeschlagen",
+    "loadFailed": "Kalender-Feeds konnten nicht geladen werden",
     "selection": {
       "ownOnly": "Nur meine eigenen Buchungen",
       "introduced": "Ressourcen, in die ich eingewiesen bin",

@@ -5,7 +5,6 @@ import {
   useLicenseServiceGetLicenseInformation,
   useNotificationsServiceNotificationsGetPreferences,
   useNotificationsServiceNotificationsUpdatePreferences,
-  NotificationCategoryPreferenceDto,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -31,13 +30,6 @@ export interface PreferenceGroup {
   label: string;
   description?: string;
   rows: PreferenceRow[];
-}
-
-export function getCategoryPreference(
-  preferences: NotificationCategoryPreferenceDto[] | undefined,
-  category: NotificationCategory,
-): NotificationCategoryPreferenceDto | undefined {
-  return preferences?.find((preference) => preference.category === category);
 }
 
 export function useNotificationPreferencesFormState() {

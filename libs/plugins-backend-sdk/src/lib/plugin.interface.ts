@@ -19,6 +19,10 @@ export enum SystemEvent {
 export interface MaintenanceChangedPayload {
   resourceId: number;
   maintenanceId: number;
+  /**
+   * Core currently emits only `created` and `finished`; maintenance windows have no edit path yet.
+   * `updated` is reserved for forward compatibility, so handle it like `created` (re-read the window).
+   */
   action: 'created' | 'updated' | 'finished';
   startTime: Date;
   /** Null while the maintenance is open-ended (no end set, not finished). */

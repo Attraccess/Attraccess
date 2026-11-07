@@ -4,10 +4,14 @@ import { IcalFeedEntity } from '../entities/ical-feed.entity';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { ReservationError } from '../reservations/errors';
 import { Harness, createHarness, principal } from '../testing/harness.test-utils';
-import { Part2, createPart2 } from '../testing/part2.test-utils';
-import { IcalFeedsController, IcalPublicController } from './ical.controller';
+import {
+  BackgroundServices as Part2,
+  createBackgroundServices as createPart2,
+} from '../testing/background-services.test-utils';
+import { ICAL_RATE_LIMIT, IcalFeedsController, IcalPublicController } from './ical.controller';
 import type { IcalSelectionDto } from './ical.dto';
-import { IcalService } from './ical.service';
+import { IcalService, hashToken } from './ical.service';
+import { RateLimiter } from './rate-limiter';
 import { ParsedCalendar, parseIcalDate, validateIcal } from './ical-validator.test-utils';
 import type { VisibilityService } from './visibility.service';
 
@@ -26,6 +30,8 @@ describe('IcalService', () => {
   let ical: IcalService;
   const hidden = new Set<number>();
   const groups = new Map<number, number[]>();
+  const inactive = new Set<number>();
+  const supervisionRequired = new Set<number>();
 
   const events = (calendar: ParsedCalendar) => calendar.events.map((event) => event.summary).sort();
   const render = async (token: string): Promise<ParsedCalendar> => {
@@ -49,6 +55,8 @@ describe('IcalService', () => {
   beforeEach(async () => {
     hidden.clear();
     groups.clear();
+    inactive.clear();
+    supervisionRequired.clear();
     h = await createHarness();
     p = createPart2(h);
     for (const id of [1, 2, 3]) await h.enable(id);
@@ -56,6 +64,8 @@ describe('IcalService', () => {
     const visibility = {
       filterVisible: async (_userId: number, ids: number[]) => ids.filter((id) => !hidden.has(id)),
       resourceIdsOfGroups: async (groupIds: number[]) => groupIds.flatMap((id) => groups.get(id) ?? []),
+      isActiveAccount: async (userId: number) => !inactive.has(userId),
+      resourceIdsRequiringSupervision: async (ids: number[]) => ids.filter((id) => supervisionRequired.has(id)),
     } as unknown as VisibilityService;
     ical = new IcalService(
       h.context,
@@ -252,6 +262,34 @@ describe('IcalService', () => {
       expect(events(await render(manager.token))).toEqual(['Resource 1 – user10', 'Resource 1 – user11']);
     });
 
+    it('resolves manager rights with one lookup (resources.update sees every holder)', async () => {
+      await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
+      await p.book(11, 2, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
+      const managed = jest.spyOn(h.access, 'managedResourceIds');
+      const isManager = jest.spyOn(h.access, 'isManager');
+      h.grant(50, 'resources.update');
+      const feed = await ical.create(principal(50), { name: 'm', selection: selection({ resourceIds: [1, 2] }) });
+      expect(events(await render(feed.token))).toEqual(['Resource 1 – user11', 'Resource 2 – user11']);
+      expect(managed).toHaveBeenCalledTimes(1);
+      expect(isManager).not.toHaveBeenCalled();
+
+      managed.mockClear();
+      const own = await ical.create(principal(11), { name: 'o', selection: selection({ ownOnly: true }) });
+      expect(events(await render(own.token))).toHaveLength(2);
+      expect(managed).not.toHaveBeenCalled();
+    });
+
+    it('stops serving feeds of deleted or disabled owners', async () => {
+      const feed = await ical.create(principal(10), { name: 'u', selection: selection({ resourceIds: [1] }) });
+      expect(await ical.renderForToken(feed.token)).not.toBeNull();
+      inactive.add(10);
+      expect(await ical.renderForToken(feed.token)).toBeNull();
+      const controller = new IcalPublicController(ical, h.clock);
+      await expect(
+        controller.feed(`${feed.token}.ics`, { ip: '203.0.113.1' }, { setHeader: () => undefined }),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
     it('speaks German in the owner’s language', async () => {
       p.info.languages.set(10, 'de');
       await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
@@ -288,9 +326,36 @@ describe('IcalService', () => {
       groups.set(7, [2, 3]);
       expect((await feedFor({ groupIds: [7] })).events).toHaveLength(3);
     });
-    it('introduced', async () => {
-      h.state.introduced.set(10, [3]);
+    it('introduced: canStart per enabled resource, host-wide list only for supervision-required ones', async () => {
+      const canStart = jest.fn(async (_userId: number, resourceId: number) => {
+        if (resourceId === 1) throw new Error('resource deleted');
+        return {
+          allowed: resourceId === 3,
+          requiresSupervision: resourceId === 2,
+          supervisionAllowed: resourceId === 2,
+        };
+      });
+      const listResourceIdsIntroduced = jest.fn(async () => [2, 3, 42]);
+      Object.assign(h.context.resourceAccess, { canStart, listResourceIdsIntroduced });
+      // Resource 2 only allows supervised starts for this user: not introduced (same as canControllResource).
       expect((await feedFor({ introduced: true })).events).toHaveLength(2);
+      expect(listResourceIdsIntroduced).not.toHaveBeenCalled();
+      expect(canStart.mock.calls.map(([, id]) => id).sort()).toEqual([1, 2, 3]);
+      // On supervision-required resources canStart never says "allowed": ask the host-wide list.
+      supervisionRequired.add(2);
+      expect((await feedFor({ introduced: true })).events).toHaveLength(3);
+      expect(listResourceIdsIntroduced).toHaveBeenCalledTimes(1);
+    });
+    it('introduced: skips disabled and already selected resources', async () => {
+      const canStart = jest.fn(async (_userId: number, _resourceId: number) => ({
+        allowed: true,
+        requiresSupervision: false,
+        supervisionAllowed: false,
+      }));
+      Object.assign(h.context.resourceAccess, { canStart });
+      await h.settings.update(1, { enabled: false });
+      expect((await feedFor({ introduced: true, resourceIds: [3] })).events).toHaveLength(3);
+      expect(canStart.mock.calls.map(([, id]) => id)).toEqual([2]);
     });
     it('maintained', async () => {
       h.makeManager(10, 2);
@@ -340,6 +405,50 @@ describe('IcalService', () => {
       }
       expect(limited).toMatchObject({ status: 429 });
       expect(Number(headers['Retry-After'])).toBeGreaterThan(0);
+    });
+
+    describe('rate limiting', () => {
+      const response = { setHeader: () => undefined };
+      const status = (promise: Promise<unknown>) =>
+        promise.then(
+          () => 200,
+          (error) => error.status as number,
+        );
+      let hit: jest.SpyInstance;
+      beforeEach(() => {
+        hit = jest.spyOn(RateLimiter.prototype, 'hit');
+      });
+      afterEach(() => hit.mockRestore());
+
+      it('answers malformed tokens 404 without touching any limiter', async () => {
+        const controller = new IcalPublicController(ical, h.clock);
+        const request = { ip: '203.0.113.7' };
+        for (const file of ['x.ics', `${'a'.repeat(10_000)}.ics`, '../../etc/passwd.ics', 'nope']) {
+          expect(await status(controller.feed(file, request, response))).toBe(404);
+        }
+        for (let i = 0; i < ICAL_RATE_LIMIT.perIpPerMinute + 10; i += 1) {
+          expect(await status(controller.feed('short.ics', request, response))).toBe(404);
+        }
+        expect(hit).not.toHaveBeenCalled();
+      });
+
+      it('keys the per-feed window on the token hash and skips it once the IP is refused', async () => {
+        const controller = new IcalPublicController(ical, h.clock);
+        const request = { ip: '203.0.113.8' };
+        const token = 'A'.repeat(43);
+        await controller.feed(`${token}.ics`, request, response).catch(() => undefined);
+        expect(hit.mock.calls.map(([key]) => key)).toEqual(['203.0.113.8', `203.0.113.8|${hashToken(token)}`]);
+
+        // Distinct (unknown) tokens exhaust the per-IP budget; from then on only the IP limiter is asked.
+        for (let i = 1; i < ICAL_RATE_LIMIT.perIpPerMinute; i += 1) {
+          expect(await status(controller.feed(`${String(i).padStart(43, 'B')}.ics`, request, response))).toBe(404);
+        }
+        hit.mockClear();
+        expect(await status(controller.feed(`${token}.ics`, request, response))).toBe(429);
+        expect(hit.mock.calls.map(([key]) => key)).toEqual(['203.0.113.8']);
+        // Another IP is unaffected.
+        expect(await status(controller.feed(`${token}.ics`, { ip: '203.0.113.9' }, response))).toBe(404);
+      });
     });
   });
 });

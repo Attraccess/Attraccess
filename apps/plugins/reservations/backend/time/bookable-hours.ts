@@ -89,45 +89,52 @@ export function normalizeBookableHours(hours: BookableHours): BookableHours {
 }
 
 /**
- * Bookable UTC intervals touching [from, to], with adjacent ranges merged: a range ending at 24:00
- * joins the next local day's range starting at 00:00. DST days simply have a 23 or 25 hour span.
+ * Bookable UTC intervals touching [from, to]: one interval per configured range and day. Ranges are
+ * never merged, not even when they touch on the same day (08:00-12:00 and 12:00-16:00 stay two ranges),
+ * with one exception: a range ending at 24:00 joins the next local day's range starting at 00:00.
+ * DST days simply have a 23 or 25 hour span.
  */
 export function bookableIntervals(hours: BookableHours, timeZone: string, from: Date, to: Date): Interval[] {
   const first = addLocalDays(localDateOf(from, timeZone), -1);
   const last = addLocalDays(localDateOf(to, timeZone), 1);
-  const raw: Interval[] = [];
+  const raw: (Interval & { fromMidnight: boolean; toMidnight: boolean })[] = [];
   const key = (d: LocalDate) => d.year * 10000 + d.month * 100 + d.day;
   for (let day = first; key(day) <= key(last); day = addLocalDays(day, 1)) {
     for (const range of hours[WEEKDAYS[weekdayOf(day)]] ?? []) {
-      const endsAtMidnight = range.end === '24:00';
+      const toMidnight = range.end === '24:00';
       raw.push({
         start: wallClockToDate(
           { ...day, hour: Math.floor(parseHm(range.start) / 60), minute: parseHm(range.start) % 60 },
           timeZone,
         ),
-        end: endsAtMidnight
+        end: toMidnight
           ? wallClockToDate(addLocalDays(day, 1), timeZone)
           : wallClockToDate(
               { ...day, hour: Math.floor(parseHm(range.end) / 60), minute: parseHm(range.end) % 60 },
               timeZone,
             ),
+        fromMidnight: parseHm(range.start) === 0,
+        toMidnight,
       });
     }
   }
   raw.sort((a, b) => a.start.getTime() - b.start.getTime());
-  const merged: Interval[] = [];
+  const joined: typeof raw = [];
   for (const interval of raw) {
-    const previous = merged[merged.length - 1];
-    if (previous && interval.start.getTime() <= previous.end.getTime()) {
-      if (interval.end.getTime() > previous.end.getTime()) previous.end = interval.end;
+    const previous = joined[joined.length - 1];
+    const crossesMidnight =
+      previous?.toMidnight && interval.fromMidnight && interval.start.getTime() === previous.end.getTime();
+    if (previous && crossesMidnight) {
+      previous.end = interval.end;
+      previous.toMidnight = interval.toMidnight;
     } else {
-      merged.push({ ...interval });
+      joined.push({ ...interval });
     }
   }
-  return merged;
+  return joined.map(({ start, end }) => ({ start, end }));
 }
 
-/** Whether [start, end] lies fully inside one (merged) bookable interval. Unrestricted hours accept everything. */
+/** Whether [start, end] lies fully inside one bookable range (or a 24:00/00:00 chain of them). Unrestricted hours accept everything. */
 export function isWithinBookableHours(hours: BookableHours, timeZone: string, start: Date, end: Date): boolean {
   if (!hasRestrictions(hours)) return true;
   return bookableIntervals(hours, timeZone, start, end).some(

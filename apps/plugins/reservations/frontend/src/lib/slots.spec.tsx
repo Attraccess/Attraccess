@@ -87,6 +87,45 @@ describe('checkWindow', () => {
     expect(checkWindow(ctx, at(1, 23, 0, 7), at(2, 1, 0, 7))).toBeNull();
   });
 
+  it('does not join ranges that touch on the same day, like the server', () => {
+    const ctx = context({
+      rules: {
+        ...rules,
+        bookableHours: {
+          mon: [
+            { start: '08:00', end: '12:00' },
+            { start: '12:00', end: '16:00' },
+          ],
+        },
+      },
+      now: at(1, 0, 0, 7),
+    });
+    expect(checkWindow(ctx, at(1, 10, 0, 7), at(1, 12, 0, 7))).toBeNull();
+    expect(checkWindow(ctx, at(1, 12, 0, 7), at(1, 13, 0, 7))).toBeNull();
+    expect(checkWindow(ctx, at(1, 11, 0, 7), at(1, 13, 0, 7))).toBe('OUTSIDE_BOOKABLE_HOURS');
+  });
+
+  it('does not join a range ending 24:00 with a next-day range that starts later than 00:00', () => {
+    const ctx = context({
+      rules: {
+        ...rules,
+        bookableHours: { mon: [{ start: '20:00', end: '24:00' }], tue: [{ start: '00:30', end: '06:00' }] },
+      },
+      now: at(1, 0, 0, 7),
+    });
+    expect(checkWindow(ctx, at(1, 23, 0, 7), at(2, 1, 0, 7))).toBe('OUTSIDE_BOOKABLE_HOURS');
+  });
+
+  it('keeps the buffers clear of maintenance, like the server', () => {
+    const maintenance = [{ startTime: at(2, 12).toISOString(), endTime: at(2, 13).toISOString() }];
+    const buffered = context({ rules: { ...rules, bufferBeforeMinutes: 30, bufferAfterMinutes: 30 }, maintenance });
+    expect(checkWindow(buffered, at(2, 11), at(2, 11, 45))).toBe('MAINTENANCE');
+    expect(checkWindow(buffered, at(2, 13, 15), at(2, 14))).toBe('MAINTENANCE');
+    expect(checkWindow(buffered, at(2, 10), at(2, 11, 30))).toBeNull();
+    expect(checkWindow(buffered, at(2, 13, 30), at(2, 14, 30))).toBeNull();
+    expect(checkWindow(context({ maintenance }), at(2, 11), at(2, 12))).toBeNull();
+  });
+
   it('detects overlaps with buffers of both bookings, and maintenance', () => {
     const other = reservation(at(2, 12), at(2, 13), { bufferAfterMinutes: 30 });
     const ctx = context({ reservations: [other] });

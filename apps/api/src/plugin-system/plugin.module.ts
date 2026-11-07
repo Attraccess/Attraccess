@@ -4,7 +4,7 @@ import { ModuleRef } from '@nestjs/core';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { DataSource as HostDataSource, EntityManager, In } from 'typeorm';
+import { DataSource as HostDataSource } from 'typeorm';
 
 import {
   PluginBackendModule,
@@ -21,9 +21,6 @@ import {
   PluginEntityClass,
   PluginFlowsContext,
   PluginPermission,
-  PluginPermissionError,
-  PluginNotificationsContext,
-  PluginResourceAccessContext,
   PluginSecretsContext,
   Repository,
   SystemEvent,
@@ -87,30 +84,15 @@ import { ResourceFlowsExecutorService } from '../resources/flows/execution/resou
 
 import { createPluginAuditContext } from './runtime/audit-context';
 
-import { createPluginNotificationsContext } from './runtime/plugin-notifications';
-
-import { createResourceAccessContext } from './runtime/resource-access';
-
-import { runSerializedTransaction } from '../database/run-serialized-transaction';
-
-import { PluginEmailService } from '../email/plugin-email.service';
+import { preparePluginNotificationCategories } from './runtime/plugin-notifications';
 
 import {
-  registerPluginNotificationCategories,
-  unregisterPluginNotificationCategories,
-} from '../notifications/plugin-notification-categories';
+  createHostNotificationsContext,
+  createHostResourceAccessContext,
+  PluginHostRefs,
+} from './runtime/host-contexts';
 
-import { NotificationDispatchService } from '../notifications/notification-dispatch.service';
-
-import { ResourceIntroducersService } from '../resources/introducers/resourceIntroducers.service';
-
-import { ResourceMaintenanceService } from '../resources/maintenances/maintenance.service';
-
-import { ResourceUsageService } from '../resources/usage/sessions/resource-usage.service';
-
-import { RbacService } from '../users-and-auth/rbac/rbac.service';
-
-import { Resource, User } from '@attraccess/database-entities';
+import { createPluginRunSerialized } from './runtime/plugin-serialized';
 
 function getImplementationClass(): typeof PluginModule {
   return require('./plugin.module').PluginModule;
@@ -300,17 +282,12 @@ export class PluginModule {
 
     // Notification categories need SEND_NOTIFICATIONS. They are registered once the module was built, so a
     // quarantined plugin leaves no category behind.
-    const notificationCategories = (exported as PluginBackendModule)?.notificationCategories ?? [];
-    if (notificationCategories.length && !(manifest.permissions ?? []).includes(PluginPermission.SEND_NOTIFICATIONS)) {
-      throw new PluginPermissionError(
-        manifest.name,
-        'notificationCategories',
-        PluginPermission.SEND_NOTIFICATIONS,
-      );
-    }
-    const registerCategories = () => {
-      if (notificationCategories.length) registerPluginNotificationCategories(manifest.name, notificationCategories);
-    };
+    const categories = preparePluginNotificationCategories(
+      manifest.name,
+      manifest.permissions ?? [],
+      (exported as PluginBackendModule)?.notificationCategories,
+    );
+    const registerCategories = () => categories.register();
 
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(
@@ -342,7 +319,7 @@ export class PluginModule {
               getImplementationClass().pluginMqtt().clearPlugin(manifest.id);
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);
               unregisterReaderUi(manifest.name);
-              unregisterPluginNotificationCategories(manifest.name);
+              categories.unregister();
             },
           }),
         },
@@ -506,54 +483,26 @@ export class PluginModule {
           decrypt: (ciphertext) => encryption.decryptForPlugin(manifest.id, ciphertext),
         };
       },
-      notifications: getImplementationClass().createNotificationsContext(manifest.name),
-      resourceAccess: getImplementationClass().createResourceAccess(),
-      runSerialized<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T> {
-        return runSerializedTransaction(
-          getImplementationClass().requireRef(getImplementationClass().dataSourceRef, 'DataSource').manager,
-          fn,
-        );
-      },
+      notifications: createHostNotificationsContext(manifest.name, getImplementationClass().hostRefs()),
+      resourceAccess: createHostResourceAccessContext(getImplementationClass().hostRefs()),
+      runSerialized: createPluginRunSerialized(
+        manifest.name,
+        () => getImplementationClass().hostRefs().dataSource().manager,
+      ),
     };
 
     return PluginSandboxService.createGuardedContext(base, manifest.permissions ?? []);
   }
 
-  protected static createNotificationsContext(pluginName: string): PluginNotificationsContext {
-    const get = <T>(token: Type<T>): T =>
-      getImplementationClass()
-        .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
-        .get(token, { strict: false });
-    return createPluginNotificationsContext(pluginName, () => ({
-      dispatcher: get(NotificationDispatchService),
-      email: get(PluginEmailService),
-      findUsers: (userIds) =>
+  /** Lazy host accessors for the runtime context factories; each call throws until bootstrap completed. */
+  protected static hostRefs(): PluginHostRefs {
+    return {
+      get: (token) =>
         getImplementationClass()
-          .requireRef(getImplementationClass().dataSourceRef, 'DataSource')
-          .getRepository(User)
-          .find({ where: { id: In(userIds) } }),
-    }));
-  }
-
-  protected static createResourceAccess(): PluginResourceAccessContext {
-    const get = <T>(token: Type<T>): T =>
-      getImplementationClass()
-        .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
-        .get(token, { strict: false });
-    const dataSource = () => getImplementationClass().requireRef(getImplementationClass().dataSourceRef, 'DataSource');
-    return createResourceAccessContext(() => ({
-      usage: get(ResourceUsageService),
-      introducers: get(ResourceIntroducersService),
-      maintenance: get(ResourceMaintenanceService),
-      rbac: get(RbacService),
-      findUser: (userId) => dataSource().getRepository(User).findOne({ where: { id: userId } }),
-      findResource: (resourceId) =>
-        dataSource()
-          .getRepository(Resource)
-          .findOne({ where: { id: resourceId }, select: { id: true, supervisionMode: true } }),
-      listResourceIds: async () =>
-        (await dataSource().getRepository(Resource).find({ select: { id: true } })).map((resource) => resource.id),
-    }));
+          .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
+          .get(token, { strict: false }),
+      dataSource: () => getImplementationClass().requireRef(getImplementationClass().dataSourceRef, 'DataSource'),
+    };
   }
 
   /** Discard host instances when the temporary configuration app is closed. */

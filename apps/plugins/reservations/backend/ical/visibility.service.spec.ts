@@ -62,6 +62,22 @@ describe('VisibilityService (real host entities)', () => {
     expect(await visible(4)).toEqual([1, 2, 3, 4]);
   });
 
+  it('treats soft-deleted and disabled accounts as inactive', async () => {
+    expect(await service.isActiveAccount(1)).toBe(true);
+    expect(await service.isActiveAccount(99)).toBe(false);
+    await db.sql(`UPDATE "user" SET isDisabled = 1 WHERE id = 2`);
+    await db.sql(`UPDATE "user" SET deletedAt = datetime('now') WHERE id = 3`);
+    expect(await service.isActiveAccount(2)).toBe(false);
+    expect(await service.isActiveAccount(3)).toBe(false);
+  });
+
+  it('finds supervision-required resources', async () => {
+    await db.sql(`UPDATE resource SET supervisionMode = 'supervision_required' WHERE id IN (2, 4)`);
+    await db.sql(`UPDATE resource SET supervisionMode = 'supervision_allowed' WHERE id = 3`);
+    expect((await service.resourceIdsRequiringSupervision([1, 2, 3, 4, 99])).sort()).toEqual([2, 4]);
+    expect(await service.resourceIdsRequiringSupervision([])).toEqual([]);
+  });
+
   it('lists the resources of groups', async () => {
     expect((await service.resourceIdsOfGroups([10, 11])).sort()).toEqual([1, 2, 3]);
     expect(await service.resourceIdsOfGroups([])).toEqual([]);

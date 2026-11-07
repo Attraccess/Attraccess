@@ -1,8 +1,8 @@
-import { Button, LabeledSwitch, StandardModal, StatusDialog } from '@attraccess/plugins-frontend-ui';
-import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
+import { Button, LabeledSwitch, ResourceSelector, StandardModal, StatusDialog } from '@attraccess/plugins-frontend-ui';
+import { Description, Fieldset, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { createFeed, listHostGroups, searchHostResources, updateFeed } from '../api';
+import { createFeed, listHostGroups, updateFeed } from '../api';
 import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
 import type { IcalFeed, IcalFeedSecret, IcalSelection } from '../lib/types';
@@ -25,22 +25,14 @@ export function FeedFormModal({ isOpen, feed, onOpenChange, onSaved }: Readonly<
   const { t } = useReservationsTranslations();
   const [name, setName] = useState('');
   const [selection, setSelection] = useState<IcalSelection>(EMPTY);
-  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     setName(feed?.name ?? '');
     setSelection(feed?.selection ?? EMPTY);
-    setSearch('');
   }, [isOpen, feed]);
 
-  const resources = useQuery({
-    queryKey: ['reservations', 'host-resources', search],
-    queryFn: () => searchHostResources(search),
-    enabled: isOpen && !selection.ownOnly,
-    staleTime: 30_000,
-  });
   const groups = useQuery({
     queryKey: ['reservations', 'host-groups'],
     queryFn: listHostGroups,
@@ -97,8 +89,8 @@ export function FeedFormModal({ isOpen, feed, onOpenChange, onSaved }: Readonly<
               >
                 {t('feeds.form.maintained')}
               </LabeledSwitch>
-              <fieldset className="rv:flex rv:flex-col rv:gap-2">
-                <legend className="rv:mb-1 rv:text-sm rv:font-semibold">{t('feeds.form.groups')}</legend>
+              <Fieldset>
+                <Fieldset.Legend>{t('feeds.form.groups')}</Fieldset.Legend>
                 {(groups.data ?? []).map((group) => (
                   <LabeledSwitch
                     key={group.id}
@@ -109,27 +101,16 @@ export function FeedFormModal({ isOpen, feed, onOpenChange, onSaved }: Readonly<
                   </LabeledSwitch>
                 ))}
                 {groups.data?.length === 0 && <p className="rv:text-sm rv:text-muted">{t('feeds.form.noGroups')}</p>}
-              </fieldset>
-              <fieldset className="rv:flex rv:flex-col rv:gap-2">
-                <legend className="rv:mb-1 rv:text-sm rv:font-semibold">{t('feeds.form.resources')}</legend>
-                <TextInput
-                  label={t('feeds.form.searchResources')}
-                  value={search}
-                  onChange={setSearch}
-                  description={t('feeds.form.selectedCount', { count: selection.resourceIds.length })}
+              </Fieldset>
+              <Fieldset>
+                <Fieldset.Legend>{t('feeds.form.resources')}</Fieldset.Legend>
+                {/* Selected resources stay selected while a search no longer lists them. */}
+                <ResourceSelector
+                  selection={selection.resourceIds}
+                  onSelectionChange={(resourceIds) => setSelection({ ...selection, resourceIds })}
                 />
-                {(resources.data ?? []).map((resource) => (
-                  <LabeledSwitch
-                    key={resource.id}
-                    isSelected={selection.resourceIds.includes(resource.id)}
-                    onChange={() =>
-                      setSelection({ ...selection, resourceIds: toggle(selection.resourceIds, resource.id) })
-                    }
-                  >
-                    {resource.name}
-                  </LabeledSwitch>
-                ))}
-              </fieldset>
+                <Description>{t('feeds.form.selectedCount', { count: selection.resourceIds.length })}</Description>
+              </Fieldset>
             </>
           )}
           {!hasSelection && <p className="rv:text-sm rv:text-muted">{t('feeds.form.needSelection')}</p>}

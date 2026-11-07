@@ -1,18 +1,21 @@
 import { ResourceMaintenance, ResourceUsage, SupervisionMode, User } from '@attraccess/database-entities';
-import { NotFoundException } from '@nestjs/common';
+import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { createResourceUsageServiceFixture } from '../../resources/usage/sessions/fixtures/service.test-fixture';
 import { resetTestFixture } from '../../resources/usage/sessions/fixtures/setup.test-fixture';
 import { createResourceAccessContext, ResourceAccessDeps } from './resource-access';
 
 /**
- * The usage service is the real ResourceUsageService (only its collaborators are mocked), so the
- * introduction, group introduction and retraining rules exercised here are core's, not a copy.
+ * The usage service is the real ResourceUsageService and canMaintain runs the real
+ * ResourceMaintenanceService.canManageMaintenance (only their collaborators are mocked), so the
+ * introduction, group introduction, retraining and maintainer rules exercised here are core's, not a copy.
  */
 describe('plugin resourceAccess', () => {
   const scope = createResourceUsageServiceFixture();
   const user = { id: 5 } as User;
   const resources = new Map<number, { id: number; supervisionMode: SupervisionMode }>();
   let permissions: Set<string>;
+  let maintainerOf: Set<number>;
+  let groupMaintainer: boolean;
   let maintenance: jest.Mocked<ResourceAccessDeps['maintenance']>;
   let access: ReturnType<typeof createResourceAccessContext>;
 
@@ -32,13 +35,28 @@ describe('plugin resourceAccess', () => {
       blocksAccess: false,
       dueAt: null,
     });
+    maintainerOf = new Set();
+    groupMaintainer = false;
+    const maintenanceService = new ResourceMaintenanceService(
+      null as never,
+      { findOne: async ({ where }) => ({ id: where.id, groups: [{ id: 9 }] }) } as never,
+      {
+        findOne: async ({ where }) =>
+          (where.resource ? maintainerOf.has(where.resource.id) : groupMaintainer) ? { id: 1 } : null,
+      } as never,
+      null as never,
+      null as never,
+      scope.mockRbacService as never,
+    );
     maintenance = {
+      canManageMaintenance: jest.fn((target, resourceId) =>
+        maintenanceService.canManageMaintenance(target, resourceId),
+      ),
       getMaintenanceManagedResourceIds: jest.fn(),
       findOverlappingMaintenances: jest.fn(),
     };
     access = createResourceAccessContext(() => ({
       usage: scope.service,
-      introducers: scope.mockResourceIntroducersService as never,
       maintenance,
       rbac: scope.mockRbacService as never,
       findUser: async (id) => (id === user.id ? user : null),
@@ -121,13 +139,11 @@ describe('plugin resourceAccess', () => {
       });
     });
 
-    it('reports unknown users as unable to start and unknown resources as not found', async () => {
-      await expect(access.canStart(404, 1)).resolves.toEqual({
-        allowed: false,
-        requiresSupervision: false,
-        supervisionAllowed: false,
-      });
-      await expect(access.canStart(user.id, 99)).rejects.toBeInstanceOf(NotFoundException);
+    it('reports unknown users and unknown resources as unable to start', async () => {
+      const none = { allowed: false, requiresSupervision: false, supervisionAllowed: false };
+      await expect(access.canStart(404, 1)).resolves.toEqual(none);
+      await expect(access.canStart(user.id, 99)).resolves.toEqual(none);
+      await expect(access.canStart({ id: user.id, effectivePermissions: [] }, 99)).resolves.toEqual(none);
     });
   });
 
@@ -143,10 +159,84 @@ describe('plugin resourceAccess', () => {
       permissions = new Set(['resources.maintenance.manage']);
       await expect(access.canMaintain(user.id, 1)).resolves.toBe(true);
       permissions = new Set();
-      scope.mockResourceIntroducersService.canMaintain.mockResolvedValue(true);
+      maintainerOf.add(1);
       await expect(access.canMaintain(user.id, 1)).resolves.toBe(true);
-      expect(scope.mockResourceIntroducersService.canMaintain).toHaveBeenCalledWith(1, user.id, true);
+      maintainerOf.clear();
+      groupMaintainer = true;
+      await expect(access.canMaintain(user.id, 1)).resolves.toBe(true);
+      await expect(access.canMaintain(404, 1)).resolves.toBe(false);
     });
+  });
+
+  describe('request principals (API-token scopes)', () => {
+    const tokenWith = (...scope: string[]) => ({ id: user.id, effectivePermissions: new Set(scope) });
+
+    beforeEach(() => {
+      permissions = new Set(['resources.update', 'resources.maintenance.manage']);
+    });
+
+    it('keeps the full RBAC permissions for a plain user id', async () => {
+      await expect(access.hasPermission(user.id, 'resources.update')).resolves.toBe(true);
+      await expect(access.canMaintain(user.id, 1)).resolves.toBe(true);
+      await expect(access.canStart(user.id, 1)).resolves.toMatchObject({ allowed: true });
+    });
+
+    it('limits permission grants to the token scope', async () => {
+      const token = tokenWith('resources.read');
+      await expect(access.hasPermission(token, 'resources.update')).resolves.toBe(false);
+      await expect(access.hasPermission(token, 'resources.maintenance.manage')).resolves.toBe(false);
+      await expect(access.canMaintain(token, 1)).resolves.toBe(false);
+      await expect(access.canStart(token, 1)).resolves.toMatchObject({ allowed: false });
+      await expect(access.listResourceIdsIntroduced(token)).resolves.toEqual([]);
+    });
+
+    it('hands core services the scoped user, as core does for API-token requests', async () => {
+      maintenance.getMaintenanceManagedResourceIds.mockResolvedValue(new Set());
+      await access.listResourceIdsMaintained(tokenWith('resources.read', 'resources.update'));
+      const [scopedUser] = maintenance.getMaintenanceManagedResourceIds.mock.calls[0];
+      expect(scopedUser).toMatchObject({ id: user.id });
+      // Intersected with the owner's current permissions, like the session strategy does for tokens.
+      expect([...(scopedUser as { effectivePermissions: Set<string> }).effectivePermissions]).toEqual([
+        'resources.update',
+      ]);
+    });
+
+    it('grants scoped permissions only while the user still holds them', async () => {
+      const token = tokenWith('resources.update', 'resources.maintenance.manage');
+      await expect(access.hasPermission(token, 'resources.update')).resolves.toBe(true);
+      await expect(access.canMaintain(token, 1)).resolves.toBe(true);
+      permissions = new Set();
+      await expect(access.hasPermission(token, 'resources.update')).resolves.toBe(false);
+      await expect(access.canMaintain(token, 1)).resolves.toBe(false);
+    });
+
+    it('still honours maintainer roles and introductions under a narrow scope', async () => {
+      const token = tokenWith();
+      maintainerOf.add(1);
+      await expect(access.canMaintain(token, 1)).resolves.toBe(true);
+      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      await expect(access.canStart(token, 1)).resolves.toMatchObject({ allowed: true });
+    });
+
+    it('accepts any iterable of permissions', async () => {
+      await expect(
+        access.hasPermission({ id: user.id, effectivePermissions: ['resources.update'] }, 'resources.update'),
+      ).resolves.toBe(true);
+    });
+  });
+
+  it('exposes exactly the read-only queries and nothing that could end or change sessions', () => {
+    expect(Object.keys(access).sort()).toEqual(
+      [
+        'canMaintain',
+        'canStart',
+        'getActiveSessions',
+        'getMaintenanceWindows',
+        'hasPermission',
+        'listResourceIdsIntroduced',
+        'listResourceIdsMaintained',
+      ].sort(),
+    );
   });
 
   describe('resource lists', () => {

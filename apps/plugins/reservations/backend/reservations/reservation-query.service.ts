@@ -1,17 +1,22 @@
-import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import type { AvailabilityDto, ManagedReservationListDto, ReservationDto } from '../api/dto.response';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
 import { ReservationEntity, ReservationStatus } from '../entities/reservation.entity';
+import { VisibilityService } from '../ical/visibility.service';
 import { GlobalSettingsService } from '../settings/global-settings.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
-import { AccessService } from './access.service';
+import type { ResourceSettings } from '../settings/settings.model';
+import { AccessService, type CanBookResult } from './access.service';
+import type { ReservationActor } from './actor';
 import { DirectoryService } from './directory.service';
 import { ReservationError } from './errors';
 import { Viewer, presentReservation } from './presenter';
-import { ReservationStore } from './reservation.store';
+import { MAX_BUFFER_MINUTES, ReservationStore } from './reservation.store';
 import { ReservationService } from './reservation.service';
+import { blockedSpan, spansOverlap } from './rules';
 
+const MINUTE_MS = 60_000;
 const DAY_MS = 86_400_000;
 export const MAX_AVAILABILITY_RANGE_DAYS = 62;
 export const MANAGE_PAGE_SIZE = 25;
@@ -28,19 +33,23 @@ export class ReservationQueryService {
     @Inject(DirectoryService) private readonly directory: DirectoryService,
     @Inject(ReservationService) private readonly reservations: ReservationService,
     @Inject(RESERVATION_CLOCK) private readonly clock: Clock,
+    @Inject(VisibilityService) private readonly visibility: VisibilityService,
   ) {}
 
-  /** Maps entities to DTOs with names and manager flags resolved in bulk (2 name queries). */
+  /**
+   * Maps entities to DTOs with names and manager flags resolved in bulk: one managed-resources lookup (only
+   * when `knownManaged` does not cover every resource) and 2 name queries.
+   */
   async present(
-    actor: PluginAuditPrincipal,
+    actor: ReservationActor,
     rows: ReservationEntity[],
     knownManaged?: Map<number, boolean>,
   ): Promise<ReservationDto[]> {
-    const managed = knownManaged ?? new Map<number, boolean>();
-    for (const resourceId of new Set(rows.map((row) => row.resourceId))) {
-      if (!managed.has(resourceId)) managed.set(resourceId, await this.access.isManager(actor.userId, resourceId));
-    }
-    const viewer: Viewer = { userId: actor.userId, isManager: (resourceId) => managed.get(resourceId) === true };
+    const known = knownManaged ?? new Map<number, boolean>();
+    const managed = rows.every((row) => known.has(row.resourceId)) ? [] : await this.access.managedResourceIds(actor);
+    const managedIds = new Set(managed ?? []);
+    const isManager = (resourceId: number) => known.get(resourceId) ?? (managed === null || managedIds.has(resourceId));
+    const viewer: Viewer = { userId: actor.userId, isManager };
     const visibleUserIds = rows
       .filter((row) => row.userId === actor.userId || viewer.isManager(row.resourceId))
       .map((row) => row.userId);
@@ -58,13 +67,13 @@ export class ReservationQueryService {
     );
   }
 
-  async get(actor: PluginAuditPrincipal, id: number): Promise<ReservationDto> {
+  async get(actor: ReservationActor, id: number): Promise<ReservationDto> {
     const { reservation, isManager } = await this.reservations.getForActor(actor, id);
     return (await this.present(actor, [reservation], new Map([[reservation.resourceId, isManager]])))[0];
   }
 
   async listMine(
-    actor: PluginAuditPrincipal,
+    actor: ReservationActor,
     scope: 'upcoming' | 'past',
     status?: ReservationStatus,
   ): Promise<ReservationDto[]> {
@@ -73,10 +82,10 @@ export class ReservationQueryService {
   }
 
   async listManaged(
-    actor: PluginAuditPrincipal,
+    actor: ReservationActor,
     filter: { resourceId?: number; status?: ReservationStatus; from?: Date; to?: Date; page: number },
   ): Promise<ManagedReservationListDto> {
-    const managedIds = await this.access.managedResourceIds(actor.userId);
+    const managedIds = await this.access.managedResourceIds(actor);
     // The manager pages and the frontend's "do I manage anything" probe rely on this being a 403, not an empty list.
     if (managedIds !== null && managedIds.length === 0) {
       throw new ReservationError('FORBIDDEN', 'You do not manage any resource');
@@ -101,22 +110,32 @@ export class ReservationQueryService {
     return { items: await this.present(actor, items, managedMap), total, page, pageSize: MANAGE_PAGE_SIZE };
   }
 
-  /** Booking view of a resource over [from, to): occupying bookings (redacted), rules, caller permissions. */
-  async availability(actor: PluginAuditPrincipal, resourceId: number, from: Date, to: Date): Promise<AvailabilityDto> {
+  /** Whether the caller manages at least one resource (drives the manager pages' visibility). */
+  async managerAccess(actor: ReservationActor): Promise<{ isManager: boolean }> {
+    const managedIds = await this.access.managedResourceIds(actor);
+    return { isManager: managedIds === null || managedIds.length > 0 };
+  }
+
+  /**
+   * Booking view of a resource over [from, to): occupying bookings (redacted), maintenance, rules and the
+   * caller's permissions. Resources the caller may not see answer 404 like unknown ones. Bookings and
+   * maintenance are fetched for the range widened by this resource's buffers, so everything that can
+   * conflict with a booking starting and ending inside [from, to) is included (see `AvailabilityDto`).
+   */
+  async availability(actor: ReservationActor, resourceId: number, from: Date, to: Date): Promise<AvailabilityDto> {
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to.getTime() <= from.getTime()) {
       throw new ReservationError('INVALID_RANGE', 'to must be after from');
     }
     if (to.getTime() - from.getTime() > MAX_AVAILABILITY_RANGE_DAYS * DAY_MS) {
       throw new ReservationError('RANGE_TOO_LARGE', `The range may span at most ${MAX_AVAILABILITY_RANGE_DAYS} days`);
     }
-    if (!(await this.directory.getResource(resourceId)))
+    // Existence and visibility in one query (filterVisible only returns existing resources).
+    if ((await this.visibility.filterVisible(actor, [resourceId])).length === 0) {
       throw new ReservationError('RESOURCE_NOT_FOUND', 'Resource not found');
-    const settings = await this.settings.get(resourceId);
-    const [timezone, isManager, canBook] = await Promise.all([
-      this.globalSettings.getTimezone(),
-      this.access.isManager(actor.userId, resourceId),
-      this.access.canBook(actor.userId, resourceId, settings),
-    ]);
+    }
+    await this.settings.whenReady();
+    const settings = this.settings.getCachedSettings(resourceId);
+    const timezone = await this.globalSettings.getTimezone();
     const rules: AvailabilityDto['rules'] = {
       approvalRequired: settings.approvalRequired,
       timeStepMinutes: settings.timeStepMinutes,
@@ -133,19 +152,67 @@ export class ReservationQueryService {
       earlyCheckInMinutes: settings.earlyCheckInMinutes,
       bookableHours: settings.bookableHours as Record<string, { start: string; end: string }[]>,
     };
-    const base = { resourceId, enabled: settings.enabled, timezone, isManager, canBook, rules };
-    if (!settings.enabled) return { ...base, reservations: [], maintenance: [] };
-    const [rows, windows] = await Promise.all([
-      this.store.findOccupying(resourceId, from, to),
-      this.context.resourceAccess.getMaintenanceWindows(resourceId, from, to),
+    if (!settings.enabled) {
+      // No permission lookups for disabled resources (the booking card is hidden for them anyway).
+      const canBook: CanBookResult = { allowed: false, reason: 'RESERVATIONS_DISABLED' };
+      return {
+        resourceId,
+        enabled: false,
+        timezone,
+        isManager: false,
+        canBook,
+        rules,
+        reservations: [],
+        maintenance: [],
+      };
+    }
+    const isManager = await this.access.isManager(actor, resourceId);
+    const canBook = await this.canBook(actor, resourceId, settings, isManager);
+    // A booking inside [from, to) blocks [start - bufferBefore, end + bufferAfter); stored bookings carry their
+    // own buffers (at most MAX_BUFFER_MINUTES each), so the query is widened by that and filtered exactly.
+    const span = {
+      start: new Date(from.getTime() - settings.bufferBeforeMinutes * MINUTE_MS),
+      end: new Date(to.getTime() + settings.bufferAfterMinutes * MINUTE_MS),
+    };
+    const margin = MAX_BUFFER_MINUTES * MINUTE_MS;
+    const [candidates, windows] = await Promise.all([
+      this.store.findOccupying(
+        resourceId,
+        new Date(span.start.getTime() - margin),
+        new Date(span.end.getTime() + margin),
+      ),
+      this.context.resourceAccess.getMaintenanceWindows(resourceId, span.start, span.end),
     ]);
+    const rows = candidates.filter((row) => spansOverlap(blockedSpan(row), span));
     return {
-      ...base,
+      resourceId,
+      enabled: true,
+      timezone,
+      isManager,
+      canBook,
+      rules,
       reservations: await this.present(actor, rows, new Map([[resourceId, isManager]])),
       maintenance: windows.map((window) => ({
         startTime: window.startTime.toISOString(),
         endTime: window.endTime ? window.endTime.toISOString() : null,
       })),
     };
+  }
+
+  /**
+   * `AccessService.canBook` with the already resolved manager flag (managers may always book), plus the per-user
+   * cap a booking attempt would hit (`USER_BOOKING_LIMIT`), counted like the create path does.
+   */
+  private async canBook(
+    actor: ReservationActor,
+    resourceId: number,
+    settings: ResourceSettings,
+    isManager: boolean,
+  ): Promise<CanBookResult> {
+    const result = await this.access.canBook(actor, resourceId, settings, isManager);
+    if (!result.allowed || settings.maxActiveBookingsPerUser === 0) return result;
+    const manager = this.context.getRepository(ReservationEntity).manager;
+    const live = await this.store.countLiveForUser(manager, actor.userId, resourceId, this.clock());
+    return live >= settings.maxActiveBookingsPerUser ? { allowed: false, reason: 'USER_BOOKING_LIMIT' } : result;
   }
 }

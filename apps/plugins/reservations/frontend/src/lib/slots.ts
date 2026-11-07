@@ -51,10 +51,11 @@ export function checkWindow(context: SlotContext, start: Date, end: Date): SlotV
     return spanStart.getTime() < otherEnd && otherStart < spanEnd.getTime();
   });
   if (overlapping) return 'OVERLAP';
+  // Like the server: the booking including its buffers must stay clear of maintenance.
   const inMaintenance = context.maintenance.some(
     (span) =>
-      start.getTime() < (span.endTime ? new Date(span.endTime).getTime() : Infinity) &&
-      new Date(span.startTime).getTime() < end.getTime(),
+      spanStart.getTime() < (span.endTime ? new Date(span.endTime).getTime() : Infinity) &&
+      new Date(span.startTime).getTime() < spanEnd.getTime(),
   );
   return inMaintenance ? 'MAINTENANCE' : null;
 }

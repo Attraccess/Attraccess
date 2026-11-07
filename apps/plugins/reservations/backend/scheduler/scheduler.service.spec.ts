@@ -1,12 +1,12 @@
 import { Logger } from '@nestjs/common';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
-import { Part2, createPart2 } from '../testing/part2.test-utils';
-import { TICK_INTERVAL_MS } from './scheduler.service';
+import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
+import { OVERRUN_CHECK_WINDOW_MS, TICK_INTERVAL_MS } from './scheduler.service';
 
 describe('ReservationScheduler', () => {
   let h: Harness;
-  let p: Part2;
+  let p: BackgroundServices;
 
   type Dispatched = {
     category: string;
@@ -20,12 +20,14 @@ describe('ReservationScheduler', () => {
     h.dispatch.mock.calls
       .map(([request]) => request as Dispatched)
       .filter((r) => r.dedupeKey.startsWith(`reservations:${prefix}`));
-  const status = async (id: number) =>
-    (await h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ id })).status;
+  const row = (id: number) => h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ id });
+  const status = async (id: number) => (await row(id)).status;
+  const manager = { userId: 99, authenticationMethod: 'session' as const };
+  const holder = { userId: 10, authenticationMethod: 'session' as const };
 
   beforeEach(async () => {
     h = await createHarness();
-    p = createPart2(h);
+    p = createBackgroundServices(h);
     await h.enable(1);
     await h.settings.warmUp();
   });
@@ -47,7 +49,22 @@ describe('ReservationScheduler', () => {
       expect(jest.getTimerCount()).toBe(0);
     });
 
-    it('does not start a second interval and skips overlapping ticks', async () => {
+    it('does not start a second interval and unref()s the one it starts', () => {
+      jest.useFakeTimers();
+      jest.spyOn(p.scheduler, 'tick').mockResolvedValue();
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
+      p.scheduler.start();
+      p.scheduler.start();
+      expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+      expect(jest.getTimerCount()).toBe(1);
+      const timer = setIntervalSpy.mock.results[0].value as NodeJS.Timeout;
+      expect(timer.hasRef()).toBe(false);
+      p.scheduler.stop();
+      expect(jest.getTimerCount()).toBe(0);
+      setIntervalSpy.mockRestore();
+    });
+
+    it('skips overlapping ticks', async () => {
       const query = jest.spyOn(h.store, 'findPendingStarted');
       await Promise.all([p.scheduler.tick(), p.scheduler.tick()]);
       expect(query).toHaveBeenCalledTimes(1);
@@ -72,6 +89,7 @@ describe('ReservationScheduler', () => {
     h.setNow('2026-06-01T12:00:00Z');
     await p.scheduler.tick();
     await p.scheduler.tick();
+    await p.newScheduler().tick(); // a restarted instance over the same database
     expect(await status(booking.id)).toBe('expired');
     expect(sent('expired')).toHaveLength(1);
     expect(sent('expired')[0].recipients).toEqual([10]);
@@ -87,6 +105,7 @@ describe('ReservationScheduler', () => {
       h.setNow('2026-06-01T12:15:00Z');
       await p.scheduler.tick();
       await p.scheduler.tick();
+      await p.newScheduler().tick();
       expect(await status(booking.id)).toBe('no_show');
       expect(sent('no-show')).toHaveLength(1);
       expect(sent('no-show')[0].email.text).toContain('no-show');
@@ -103,6 +122,87 @@ describe('ReservationScheduler', () => {
       await p.scheduler.tick();
       expect(await status(checkedIn.id)).toBe('confirmed');
       expect(await status(noCheckIn.id)).toBe('confirmed');
+    });
+
+    it('uses the current grace period after a settings change', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      await h.settings.update(1, { checkInGraceMinutes: 30 });
+      h.setNow('2026-06-01T12:15:00Z');
+      await p.scheduler.tick();
+      expect(await status(booking.id)).toBe('confirmed');
+      h.setNow('2026-06-01T12:30:00Z');
+      await p.scheduler.tick();
+      expect(await status(booking.id)).toBe('no_show');
+    });
+
+    it('is skipped while reservations are disabled for the resource', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      await h.settings.update(1, { enabled: false });
+      h.setNow('2026-06-01T12:30:00Z');
+      await p.scheduler.tick();
+      expect(await status(booking.id)).toBe('confirmed');
+      expect(sent('no-show')).toHaveLength(0);
+      h.setNow('2026-06-01T14:00:00Z');
+      await p.scheduler.tick();
+      expect(await status(booking.id)).toBe('completed');
+    });
+
+    it('counts a holder session that was already running before the check-in window as check-in', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      h.state.sessions.push({ usageId: 41, resourceId: 1, userId: 10, startTime: new Date('2026-06-01T10:00:00Z') });
+      h.setNow('2026-06-01T12:15:00Z');
+      await p.scheduler.tick();
+      expect(await row(booking.id)).toMatchObject({
+        status: 'confirmed',
+        checkedInUsageId: 41,
+        checkedInAt: new Date('2026-06-01T12:15:00Z'),
+      });
+      expect(sent('no-show')).toHaveLength(0);
+    });
+
+    it('checks in a back-to-back booking whose holder kept the session running from the first one', async () => {
+      const first = await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      const second = await p.book(10, 1, '2026-06-01T14:00:00', '2026-06-01T16:00:00');
+      h.setNow('2026-06-01T11:55:00Z');
+      const session = { usageId: 42, resourceId: 1, userId: 10, startTime: h.clock() };
+      h.state.sessions.push(session);
+      await p.events.onSessionStart(session); // the host event checks in the first booking only
+      expect((await row(first.id)).checkedInUsageId).toBe(42);
+      expect((await row(second.id)).checkedInAt).toBeNull();
+      for (const at of ['2026-06-01T14:00:00Z', '2026-06-01T14:15:00Z']) {
+        h.setNow(at);
+        await p.scheduler.tick();
+      }
+      expect(await status(first.id)).toBe('completed');
+      expect(await row(second.id)).toMatchObject({ status: 'confirmed', checkedInUsageId: 42 });
+    });
+
+    it('ignores running sessions of other users', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      h.state.sessions.push({ usageId: 43, resourceId: 1, userId: 12, startTime: new Date('2026-06-01T10:00:00Z') });
+      h.setNow('2026-06-01T12:15:00Z');
+      await p.scheduler.tick();
+      expect(await status(booking.id)).toBe('no_show');
+    });
+
+    it('releases a booking whose grace period reaches its end as no-show, not as completed', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T12:15:00');
+      h.setNow('2026-06-01T12:14:00Z');
+      await p.scheduler.tick();
+      expect(await status(booking.id)).toBe('confirmed');
+      h.setNow('2026-06-01T12:15:00Z');
+      await p.scheduler.tick();
+      expect(await status(booking.id)).toBe('no_show');
+      expect(sent('no-show')).toHaveLength(1);
+    });
+
+    it('records a no-show found long after its deadline (downtime) without mailing the holder', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T13:00:00');
+      h.setNow('2026-06-01T16:00:00Z');
+      await p.scheduler.tick();
+      await p.newScheduler().tick();
+      expect(await status(booking.id)).toBe('no_show');
+      expect(sent('no-show')).toHaveLength(0);
     });
   });
 
@@ -123,6 +223,7 @@ describe('ReservationScheduler', () => {
       h.setNow('2026-06-02T10:00:00Z');
       await p.scheduler.tick();
       await p.scheduler.tick();
+      await p.newScheduler().tick();
       const mails = sent('still-needed');
       expect(mails).toHaveLength(1);
       expect(mails[0].dedupeKey).toBe(`reservations:still-needed:${early.id}`);
@@ -135,6 +236,51 @@ describe('ReservationScheduler', () => {
       await p.scheduler.tick();
       expect(sent('still-needed').map((m) => m.dedupeKey)).not.toContain(`reservations:still-needed:${late.id}`);
     });
+
+    it('is skipped when the holder already kept the booking', async () => {
+      const booking = await p.book(10, 1, '2026-06-04T10:00:00', '2026-06-04T11:00:00');
+      await h.reservations.keep(holder, booking.id);
+      h.setNow('2026-06-02T10:00:00Z');
+      await p.scheduler.tick();
+      expect(sent('still-needed')).toHaveLength(0);
+    });
+
+    it('is skipped once the start is 24h away or closer (e.g. the first tick after a downtime)', async () => {
+      await p.book(10, 1, '2026-06-04T10:00:00', '2026-06-04T11:00:00');
+      h.setNow('2026-06-03T10:00:00Z');
+      await p.scheduler.tick();
+      expect(sent('still-needed')).toHaveLength(0);
+      expect(sent('reminder-24h')).toHaveLength(1);
+    });
+  });
+
+  it('times the 48h and 24h eligibility from the approval of a request, not from its creation', async () => {
+    h.makeManager(99, 1);
+    await h.settings.update(1, { approvalRequired: true });
+    const lateApproved = await p.book(10, 1, '2026-06-04T10:00:00', '2026-06-04T11:00:00'); // requested 74h ahead
+    const lastMinute = await p.book(11, 1, '2026-06-04T12:00:00', '2026-06-04T13:00:00');
+    h.setNow('2026-06-02T12:00:00Z'); // 46h before: approval right after the 48h mark
+    await h.reservations.approve(manager, lateApproved.id);
+    await p.scheduler.tick();
+    expect(sent('still-needed')).toHaveLength(0);
+    h.setNow('2026-06-03T14:00:00Z'); // 22h before
+    await h.reservations.approve(manager, lastMinute.id);
+    await p.scheduler.tick();
+    expect(sent('reminder-24h').map((m) => m.dedupeKey)).toEqual([`reservations:reminder-24h:${lateApproved.id}`]);
+  });
+
+  it('sends no reminders, handover or overrun notices for resources with reservations disabled', async () => {
+    await p.book(10, 1, '2026-06-04T10:00:00', '2026-06-04T11:00:00'); // 48h question due 06-02 10:00
+    await p.book(10, 1, '2026-06-02T10:00:00', '2026-06-02T11:00:00'); // 24h reminder due 06-01 10:00
+    const running = await p.book(11, 1, '2026-06-02T12:00:00', '2026-06-02T13:00:00');
+    await h.settings.update(1, { enabled: false });
+    h.state.sessions.push({ usageId: 44, resourceId: 1, userId: 12, startTime: new Date('2026-06-01T08:00:00Z') });
+    for (const at of ['2026-06-01T10:00:00Z', '2026-06-02T10:00:00Z', '2026-06-02T11:50:00Z', '2026-06-02T12:01:00Z']) {
+      h.setNow(at);
+      await p.scheduler.tick();
+    }
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(await status(running.id)).toBe('confirmed');
   });
 
   describe('24h reminder', () => {
@@ -144,6 +290,7 @@ describe('ReservationScheduler', () => {
       const fresh = await p.book(11, 1, '2026-06-02T09:00:00', '2026-06-02T10:00:00');
       await p.scheduler.tick();
       await p.scheduler.tick();
+      await p.newScheduler().tick();
       const mails = sent('reminder-24h');
       expect(mails.map((m) => m.dedupeKey)).toEqual([`reservations:reminder-24h:${early.id}`]);
       expect(mails[0].email.text).toContain('Check-in is required');
@@ -173,8 +320,7 @@ describe('ReservationScheduler', () => {
       h.setNow('2026-06-01T11:45:00Z');
       await p.scheduler.tick();
       await p.scheduler.tick();
-      p.newScheduler(); // another instance over the same database, like a restart
-      await p.newScheduler().tick();
+      await p.newScheduler().tick(); // another instance over the same database, like a restart
       const mails = sent('handover:');
       expect(mails).toHaveLength(1);
       expect(mails[0].recipients).toEqual([12]);
@@ -218,12 +364,27 @@ describe('ReservationScheduler', () => {
     it('ignores sessions that started during the booking (manager overrides) and the holder own session', async () => {
       await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
       h.state.sessions.push(
-        { usageId: 6, resourceId: 1, userId: 99, startTime: new Date('2026-06-01T12:30:00Z') },
+        { usageId: 6, resourceId: 1, userId: 99, startTime: new Date('2026-06-01T12:01:00Z') },
         { usageId: 7, resourceId: 1, userId: 10, startTime: new Date('2026-06-01T11:00:00Z') },
       );
-      h.setNow('2026-06-01T12:31:00Z');
+      h.setNow('2026-06-01T12:02:00Z');
       await p.scheduler.tick();
       expect(sent('overrun')).toHaveLength(0);
+    });
+
+    it('only looks at bookings that started within the last few ticks', async () => {
+      await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      h.state.sessions.push(lingering);
+      const sessions = jest.spyOn(h.context.resourceAccess, 'getActiveSessions');
+      h.setNow(new Date(new Date('2026-06-01T12:00:00Z').getTime() + OVERRUN_CHECK_WINDOW_MS));
+      await p.scheduler.tick();
+      expect(sessions).not.toHaveBeenCalled();
+      expect(sent('overrun')).toHaveLength(0);
+      // a delayed tick inside the window still notifies
+      h.setNow(new Date(new Date('2026-06-01T12:00:00Z').getTime() + OVERRUN_CHECK_WINDOW_MS - 1));
+      await p.scheduler.tick();
+      expect(sessions).toHaveBeenCalledTimes(1);
+      expect(sent('overrun')).toHaveLength(2);
     });
   });
 });

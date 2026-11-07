@@ -1,14 +1,37 @@
-import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
+import { DualAuthGuard, EffectivePermissionsGuard, SessionOnlyGuard } from '@attraccess/plugins-backend-sdk';
+import type { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { PendingDecisionService } from '../hooks/pending-decision.service';
 import { PendingDecisionStore } from '../hooks/pending-decisions';
 import { ReservationQueryService } from '../reservations/reservation-query.service';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { CreateReservationBody, UpdateGlobalSettingsBody } from './dto.request';
 import { validated } from './pipes';
+import { IcalFeedsController } from '../ical/ical.controller';
 import { ReservationsController } from './reservations.controller';
 import { ReservationSettingsController } from './settings.controller';
 
 const request = (userId: number) => ({ user: { id: userId, authenticationMethod: 'session' } }) as never;
+
+/** Permission lists the SDK's @Auth/@AuthAny stored on a handler (its metadata key is private to the SDK). */
+const permissionMetadata = (handler: object): string[][] =>
+  Reflect.getMetadataKeys(handler)
+    .map((key) => Reflect.getMetadata(key, handler) as unknown)
+    .filter((value): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string'));
+
+/** Runs the SDK permission guard for a route as a user holding `permissions`. */
+const passesGuard = (controller: object, handler: object, permissions: string[]) => {
+  const context = {
+    getHandler: () => handler,
+    getClass: () => controller,
+    switchToHttp: () => ({ getRequest: () => ({ user: { id: 1, effectivePermissions: new Set(permissions) } }) }),
+  } as unknown as ExecutionContext;
+  try {
+    return new EffectivePermissionsGuard(new Reflector()).canActivate(context) === true;
+  } catch {
+    return false;
+  }
+};
 
 describe('controllers', () => {
   let h: Harness;
@@ -111,7 +134,47 @@ describe('controllers', () => {
     expect(await settings.getGlobal()).toMatchObject({ timezone: 'Europe/Berlin' });
     expect(await settings.updateGlobal({ timezone: 'UTC' }, request(1))).toMatchObject({ timezone: 'UTC' });
     await expect(settings.updateGlobal({ timezone: 'bad' }, request(1))).rejects.toMatchObject({ status: 400 });
-    expect(Reflect.getMetadata('__guards__', ReservationSettingsController.prototype.updateGlobal)).toBeDefined();
+  });
+
+  it('requires exactly system.settings.manage to change the global settings', () => {
+    const handler = ReservationSettingsController.prototype.updateGlobal;
+    expect(Reflect.getMetadata('__guards__', handler)).toEqual(
+      expect.arrayContaining([DualAuthGuard, EffectivePermissionsGuard]),
+    );
+    expect(permissionMetadata(handler)).toEqual([['system.settings.manage']]);
+    expect(passesGuard(ReservationSettingsController, handler, ['system.settings.manage'])).toBe(true);
+    expect(passesGuard(ReservationSettingsController, handler, ['resources.update', 'system.settings.read'])).toBe(
+      false,
+    );
+    // Reading stays open to every signed-in user.
+    expect(passesGuard(ReservationSettingsController, ReservationSettingsController.prototype.getGlobal, [])).toBe(
+      true,
+    );
+  });
+
+  it('serves GET manage/access to any signed-in user, declared before the :id route', async () => {
+    expect(await reservations.managerAccess(request(99))).toEqual({ isManager: true });
+    expect(await reservations.managerAccess(request(10))).toEqual({ isManager: false });
+    const handler = ReservationsController.prototype.managerAccess;
+    expect(Reflect.getMetadata('path', handler)).toBe('manage/access');
+    expect(Reflect.getMetadata('method', handler)).toBe(0); // RequestMethod.GET
+    expect(permissionMetadata(handler)).toEqual([]);
+    expect(passesGuard(ReservationsController, handler, [])).toBe(true);
+    const routes = Object.getOwnPropertyNames(ReservationsController.prototype);
+    expect(routes.indexOf('managerAccess')).toBeLessThan(routes.indexOf('get'));
+  });
+
+  it('issues feed URLs only to browser sessions, like core issues API tokens', () => {
+    const guardsOf = (name: keyof IcalFeedsController) =>
+      (Reflect.getMetadata('__guards__', IcalFeedsController.prototype[name]) as unknown[] | undefined) ?? [];
+    expect(guardsOf('create')).toContain(SessionOnlyGuard);
+    expect(guardsOf('regenerate')).toContain(SessionOnlyGuard);
+    for (const name of ['list', 'update', 'revoke'] as const) expect(guardsOf(name)).not.toContain(SessionOnlyGuard);
+    const guard = new SessionOnlyGuard();
+    const as = (authenticationMethod: string) =>
+      ({ switchToHttp: () => ({ getRequest: () => ({ user: { id: 1, authenticationMethod } }) }) }) as never;
+    expect(() => guard.canActivate(as('api-token'))).toThrow('Session authentication required');
+    expect(guard.canActivate(as('session'))).toBe(true);
   });
 
   describe('validation pipes', () => {

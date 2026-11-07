@@ -1,11 +1,11 @@
 import { PageHeader } from '@attraccess/plugins-frontend-ui';
-import { Card } from '@heroui/react';
-import { Link } from 'react-router-dom';
+import { Card, Link } from '@heroui/react';
 import { useReservationsTranslations } from '../i18n';
 import { useIsManagerAnywhere, useMyReservations, usePluginTimezone } from '../lib/queries';
 import { IcalFeeds } from '../ical/IcalFeeds';
 import { listState } from '../shared/queryState';
 import { ReservationsTable } from '../shared/ReservationsTable';
+import { TimezoneHint } from '../shared/TimezoneHint';
 import { useReservationActions } from '../shared/useReservationActions';
 
 export function MyReservationsPage() {
@@ -19,10 +19,13 @@ export function MyReservationsPage() {
   return (
     <div className="rv:flex rv:flex-col rv:gap-6" data-cy="reservations-my-page">
       <PageHeader title={t('my.title')} subtitle={t('my.subtitle')} noMargin />
+      {timezone && <TimezoneHint timezone={timezone} />}
       {manager && (
-        <Link to="/reservations/manage" className="rv:text-sm rv:underline">
-          {t('my.manageLink')}
-        </Link>
+        <div>
+          <Link href="/reservations/manage" data-cy="reservations-manage-link">
+            {t('my.manageLink')}
+          </Link>
+        </div>
       )}
       <Card>
         <Card.Header>
@@ -33,7 +36,7 @@ export function MyReservationsPage() {
             items={upcoming.data ?? []}
             timezone={timezone}
             ariaLabel={t('my.upcoming')}
-            {...listState(upcoming)}
+            {...listState(upcoming, timezone)}
             onAction={actions.ask}
           />
         </Card.Content>
@@ -47,7 +50,7 @@ export function MyReservationsPage() {
             items={past.data ?? []}
             timezone={timezone}
             ariaLabel={t('my.past')}
-            {...listState(past)}
+            {...listState(past, timezone)}
             onAction={actions.ask}
           />
         </Card.Content>
