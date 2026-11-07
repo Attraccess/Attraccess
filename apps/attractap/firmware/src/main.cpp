@@ -121,7 +121,10 @@ extern "C" void app_main(void)
     mainLogger.info("Console initialized");
 
     mainLogger.infof("I2C init: SDA=%d, SCL=%d", PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);
-    recoverI2CBus(PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL);
+    if (!recoverI2CBus(PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL))
+    {
+        mainLogger.error("I2C bus still held low after recovery; a stuck slave releases it only on a power cycle");
+    }
     if (!initSharedI2CBus(PIN_NFC_I2C_SDA, PIN_NFC_I2C_SCL))
     {
         mainLogger.error("Shared I2C bus init failed");

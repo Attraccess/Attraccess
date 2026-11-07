@@ -579,7 +579,17 @@ ssh root@lab-host attractap-lab-janitor clear attractap-touch-v2-1  # after repa
 
 Each attempt keeps `efuse.txt` and `serial.log` under
 `/var/lib/attractap-lab-janitor/runs/PLACE/`; `journalctl -u attractap-lab-janitor`
-shows decisions. The janitor reaches the local exporter over SSH like any
+shows decisions.
+
+A parking image that cannot park prints `ATTRACTAP_PARK_FAILED`, clears the
+I2C bus and retries every 2 s; the attempt fails only if `markerSeconds` pass
+without `ATTRACTAP_PARKED`. The failure line names the line that failed, the
+I2C error, the idle SDA/SCL levels and whether the I/O expander and the PN532
+answer, for example `line=io-expander err=ESP_ERR_TIMEOUT sda=1 scl=0
+expander=ESP_ERR_TIMEOUT pn532=ESP_ERR_TIMEOUT`. An idle bus reads `sda=1
+scl=1`. A line still low after the bus clear is held by a slave (on the Touch
+V2 most likely the CH32 I/O expander MCU), which only lets go when the reader
+loses power: unplug its USB cable for at least 10 s, then `clear` the place. The janitor reaches the local exporter over SSH like any
 client, with a host-local key authorized only for the `labgrid` account.
 
 The parking image never deep-sleeps: that would power down USB-Serial-JTAG and
