@@ -85,8 +85,7 @@ export default defineConfig(({ command }) => {
       normalizeFederationFsUrlsPlugin(),
       VitePWA({
         workbox: {
-          clientsClaim: true,
-          skipWaiting: true,
+          // Inert under `injectManifest`; kept in sync with `injectManifest` below.
           // Deliberately excludes `wasm`: apps/frontend/public/openscad/openscad.wasm
           // is 10.3 MB and is fetched on demand by the /printables page only.
           globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
@@ -94,7 +93,8 @@ export default defineConfig(({ command }) => {
         },
         includeAssets: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,bin,json}'],
         manifest: siteWebManifest,
-        registerType: 'autoUpdate',
+        // 'prompt': nothing reloads the page on its own; src/pwa-update drives the update flow.
+        registerType: 'prompt',
         srcDir: 'src',
         filename: 'service-worker.ts',
         strategies: 'injectManifest',

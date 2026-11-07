@@ -4,10 +4,12 @@ import { CacheFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { setupPrecaching } from './service-worker/caching';
 import { clientsClaim } from 'workbox-core';
+import { setupUpdateProgress } from './service-worker/progress';
 
 declare let self: ServiceWorkerGlobalScope;
 
-self.skipWaiting();
+// An updated worker waits until a client sends SKIP_WAITING (see the message handler below),
+// so the page can tell the user about the update instead of reloading under them.
 clientsClaim();
 cleanupOutdatedCaches();
 
@@ -33,6 +35,7 @@ const ensurePrecached = (url: string) => {
 };
 
 ensurePrecached('index.html');
+setupUpdateProgress(precacheManifest.map((entry) => (typeof entry === 'string' ? entry : entry.url)));
 setupPrecaching(precacheManifest);
 
 // Cache-first strategy for CDN assets under /cdn/
