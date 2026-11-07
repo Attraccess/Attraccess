@@ -12,6 +12,8 @@ import {
   ResourceUsageSessionTakenOverEvent,
 } from '../events/resource-usage.events';
 
+import { emitPluginSessionStart } from '../events/plugin-usage-events';
+
 import { type ResourceUsageService } from './resource-usage.service';
 
 import { UsageSessionChanges } from './usage-session-changes';
@@ -83,6 +85,14 @@ export abstract class UsageSessionStartNotifications extends UsageSessionChanges
       this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, newSession?.resource, takeoverEndedUser);
     }
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_STARTED, newSession?.resource, newSession?.user);
+    if (newSession) {
+      emitPluginSessionStart(this.pluginEvents, this.logger, {
+        newSession,
+        replacedSession: prepared.existingActiveSession ?? null,
+        transitionTime: prepared.attempt.transitionTime,
+        supervisorUserId,
+      });
+    }
 
     // Counter signal for the supervised-usage auto-promotion follow-up (ATT-486): every supervised
     // session start is counted there to decide when to auto-create an introduction for the user.
