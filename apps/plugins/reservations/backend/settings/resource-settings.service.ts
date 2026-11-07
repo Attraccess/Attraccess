@@ -64,9 +64,16 @@ export class ResourceSettingsService implements OnModuleInit {
 
   /** Loads every settings row into the cache (idempotent; concurrent calls share one load). */
   warmUp(): Promise<void> {
-    this.warmed ??= this.loadAll().then(() => {
-      this.warm = true;
-    });
+    // A failed load is not cached: the next caller (e.g. the pre-start hook) retries.
+    this.warmed ??= this.loadAll().then(
+      () => {
+        this.warm = true;
+      },
+      (error) => {
+        this.warmed = null;
+        throw error;
+      },
+    );
     return this.warmed;
   }
 

@@ -1,4 +1,6 @@
 import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
+import { PendingDecisionService } from '../hooks/pending-decision.service';
+import { PendingDecisionStore } from '../hooks/pending-decisions';
 import { ReservationQueryService } from '../reservations/reservation-query.service';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { CreateReservationBody, UpdateGlobalSettingsBody } from './dto.request';
@@ -17,7 +19,11 @@ describe('controllers', () => {
     h = await createHarness();
     h.makeManager(99, 1);
     await h.enable(1);
-    reservations = new ReservationsController(h.reservations, h.queries as ReservationQueryService);
+    reservations = new ReservationsController(
+      h.reservations,
+      h.queries as ReservationQueryService,
+      new PendingDecisionService(new PendingDecisionStore(), h.store, h.queries, () => new Date()),
+    );
     settings = new ReservationSettingsController(h.admin, h.access, h.directory);
   });
   afterEach(() => h.close());

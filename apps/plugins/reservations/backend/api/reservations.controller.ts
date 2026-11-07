@@ -1,6 +1,7 @@
 import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { Body, Controller, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Param, ParseIntPipe, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { PendingDecisionService } from '../hooks/pending-decision.service';
 import { BOOKING_CONFLICT_CODES, STATE_CONFLICT_CODES, ReservationError } from '../reservations/errors';
 import { ReservationQueryService } from '../reservations/reservation-query.service';
 import { ReservationService } from '../reservations/reservation.service';
@@ -23,7 +24,24 @@ export class ReservationsController {
   constructor(
     @Inject(ReservationService) private readonly reservations: ReservationService,
     @Inject(ReservationQueryService) private readonly queries: ReservationQueryService,
+    @Inject(PendingDecisionService) private readonly pendingDecisions: PendingDecisionService,
   ) {}
+
+  @Get('resources/:resourceId/pending-decision')
+  @ApiOperation({
+    summary: 'The caller’s running booking that still awaits a "keep or free the rest?" answer on this resource',
+    description:
+      'Set when the holder stopped a session inside their own running booking (kept for 15 minutes in memory). The body is the booking, or the JSON value null when nothing is pending. Cleared by keep, end-early, expiry and the holder’s next session start.',
+  })
+  @ApiParam({ name: 'resourceId', type: Number })
+  @ApiOkResponse({ type: ReservationDto, description: 'The booking, or null' })
+  async pendingDecision(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() request: AuthenticatedRequest,
+    @Res() response: { json(body: unknown): void },
+  ): Promise<void> {
+    response.json(await this.pendingDecisions.get(principalOf(request), resourceId));
+  }
 
   @Get('resources/:resourceId/availability')
   @ApiOperation({
@@ -165,7 +183,9 @@ export class ReservationsController {
   @ApiReservationErrors({ notFound: true, conflict: ['NOT_ACTIVE'] })
   async endEarly(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest): Promise<ReservationDto> {
     const actor = principalOf(request);
-    return (await this.queries.present(actor, [await this.reservations.endEarly(actor, id)]))[0];
+    const ended = await this.reservations.endEarly(actor, id);
+    this.pendingDecisions.clear(ended.userId, ended.resourceId);
+    return (await this.queries.present(actor, [ended]))[0];
   }
 
   @Post(':id/keep')
@@ -176,7 +196,9 @@ export class ReservationsController {
   @ApiReservationErrors({ notFound: true, conflict: ['ALREADY_FINISHED'] })
   async keep(@Param('id', ParseIntPipe) id: number, @Req() request: AuthenticatedRequest): Promise<ReservationDto> {
     const actor = principalOf(request);
-    return (await this.queries.present(actor, [await this.reservations.keep(actor, id)]))[0];
+    const kept = await this.reservations.keep(actor, id);
+    this.pendingDecisions.clear(kept.userId, kept.resourceId);
+    return (await this.queries.present(actor, [kept]))[0];
   }
 
   @Post(':id/approve')

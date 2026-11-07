@@ -41,6 +41,7 @@
       "LISTEN_EVENTS",
       "ACCESS_RESOURCES",
       "READ_USERS",
+      "READ_SETTINGS",
       "SEND_NOTIFICATIONS"
     ],
     "sdk": {
