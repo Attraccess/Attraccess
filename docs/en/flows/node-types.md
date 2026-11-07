@@ -89,6 +89,9 @@ Type: `input.resource.maintenance-request.created` · All resources · Resource 
 
 Runs when a maintenance request is submitted for a resource. No settings. Payload contains the resource context and `maintenanceRequest: { id, reason, status, createdAt, createdByUser }`, where `createdByUser` is `{ id, username }` or `null`. Only user-visible fields are included.
 
+> [!WARNING]
+> Any signed-in user can create a maintenance request for a resource, so any authenticated user can fire this trigger. Do not connect it to actions you would not let any user cause.
+
 ### MQTT Message Received
 
 Type: `input.mqtt.message.received`
@@ -106,7 +109,7 @@ Type: `input.resource.activity.no-activity` · Machines · Editor: **Inactivity 
 
 **Minimum inactivity (minutes)** (`minInactivityMinutes`) is a positive integer. Runs only while a finalized usage session is active. Checks happen once per minute, so this is not a precise timer. Payload starts with resource context only.
 
-**Track Activity** resets the timer. After firing, the timer resets and can fire again if the session remains active. Activity timestamps are kept in memory and initialized again after a server restart. Example: connect to **End Usage Session** for automatic shutdown.
+**Track Activity** resets the timer of every no-activity node on the machine. Each no-activity node keeps its own schedule per machine and fires again while the session stays inactive: with a 5-minute and a 10-minute node, the first fires at 5, 10, 15 … minutes and the second at 10, 20 … minutes. Firing one node does not reset the others, and nodes in [global flows](flows/global-flows.md) and in the resource's own flow do not affect each other. Earlier versions reset the machine's timer for all its no-activity nodes whenever any of them fired, so in this example the 10-minute node never fired. Activity timestamps are kept in memory and initialized again after a server restart. Example: connect to **End Usage Session** for automatic shutdown.
 
 ### Variable Changed
 

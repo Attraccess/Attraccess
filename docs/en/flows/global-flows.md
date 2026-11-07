@@ -23,7 +23,7 @@ Each flow opens in its own editor at `/devices/flows/:flowId`. The editor shows 
 
 You can create as many global flows as you need.
 
-A disabled flow never runs: none of its triggers match, its no-activity nodes are skipped, and its MQTT topics are not subscribed. Turning a flow off while a run is in progress lets that run finish.
+A disabled flow never runs: none of its triggers match and its no-activity nodes are skipped. Its MQTT topics are not subscribed when the server starts. Subscriptions that already exist stay until the next restart when you disable or delete the flow, but incoming messages do not start it. Turning a flow off while a run is in progress lets that run finish.
 
 ## Available Nodes
 
@@ -55,7 +55,8 @@ A trigger in a global flow fires **once per matching event**, for any resource o
 
 Details worth knowing:
 
-- **No activity:** a global node and a resource node keep independent schedules for each combination of node and resource.
+- **No activity:** every no-activity node keeps its own schedule per machine. A 5-minute node fires after 5, 10, 15 … minutes of inactivity, a 10-minute node after 10, 20 … minutes. Global nodes and nodes in the resource's own flow do not affect each other. See [No Activity](flows/node-types.md#no-activity).
+- **Maintenance request created:** any signed-in user can create a maintenance request for a resource, and so fire this trigger. Only connect it to actions you would let any user cause.
 - **Variable changed:** with the `global` scope the flow fires when that global variable changes. With the `resource` scope it fires when that key changes on **any** resource, and that resource becomes the triggering resource.
 
 ## The Triggering Resource
@@ -72,7 +73,9 @@ Use this to find out which resource fired. To react only to some resources, add 
 
 Triggers that are not resource events have **no triggering resource**, and the payload has no `resource` key at all. This applies to MQTT messages, Companion inputs, global-scope variable changes and plugin triggers.
 
-Nodes that act on a resource -- End Usage Session, billing items, Record activity, Operating/Idle, health heartbeat and health set, and `resource`-scope variable get and set -- fail as a normal node error when the run has no triggering resource, or when the triggering resource has the wrong type (for example End Usage Session for a door). The node's usual failure behavior applies. **End Usage Session** with the target **The triggering session** ends the triggering session.
+Nodes that act on a resource -- End active session, Add billing item, Record activity, Record operation started/stopped, Send health heartbeat, Set health state, and `resource`-scope Get variables and Set variables -- fail as a normal node error when the run has no triggering resource, or when the triggering resource has the wrong type (for example End active session for a door). The node's usual failure behavior applies. **End active session** with the target **The triggering session** ends the triggering session.
+
+**Send health heartbeat** in a global flow only watches resources that have sent at least one heartbeat through that node since the server started. After a restart, a resource that never sends another heartbeat is not marked unhealthy. Heartbeat nodes in global flows and in resource flows are tracked separately; a heartbeat from one does not reset the timeout of the other.
 
 ## Execution and Blocking
 
@@ -87,7 +90,7 @@ For usage started, stopped and takeover, and for door events, the matching trigg
 This has the same consequences as a node in the machine's own flow:
 
 - A global node with failure behavior **Fail flow**, or an error without a failure output, aborts and rolls back the start, stop or takeover.
-- A slow global flow (Wait, HTTP request without a timeout, wait for MQTT) delays the start or stop on every machine.
+- A slow global flow (Wait, Send HTTP request without a timeout, Wait for MQTT message) delays the start or stop on every machine.
 
 Set the failure behavior of external actions in global flows deliberately, for example **Log and continue** for notifications. See [Failure behavior](flows/node-types.md#failure-behavior).
 
@@ -108,9 +111,9 @@ Send an HTTP webhook whenever anybody starts using any machine.
 
 1. Open **Devices** → **Flows** and click **New flow**.
 2. Enter the name `Notify on starts`, add a description if you like, and confirm. The editor opens.
-3. Add a **Resource Usage Started** trigger from the palette.
-4. Add an **HTTP Request** node, set the URL and use templates such as `{{resource.name}}` and `{{user.username}}` in the body. Set its failure behavior to **Log and continue**, so an unreachable webhook does not block starts.
-5. Connect **Output** of the trigger to the HTTP Request.
+3. Add a **Usage started** trigger from the palette.
+4. Add a **Send HTTP request** node, set the URL and use templates such as `{{resource.name}}` and `{{user.username}}` in the body. Set its failure behavior to **Log and continue**, so an unreachable webhook does not block starts.
+5. Connect **Output** of the trigger to **Send HTTP request**.
 6. Optional: put an **If** node in between with path `resource.id` to notify for one machine only.
 7. Click **Save**. The flow is enabled by default and runs at the next start.
 

@@ -87,6 +87,9 @@ Typ: `input.resource.maintenance-request.created` · Alle Ressourcen · Ressourc
 
 Läuft, wenn eine Wartungsanfrage für eine Ressource gestellt wird. Keine Einstellungen. Die Payload enthält den Ressourcenkontext und `maintenanceRequest: { id, reason, status, createdAt, createdByUser }`; `createdByUser` ist `{ id, username }` oder `null`. Es sind nur für Benutzer sichtbare Felder enthalten.
 
+> [!WARNING]
+> Jeder angemeldete Benutzer kann für eine Ressource eine Wartungsanfrage stellen. Dieser Trigger kann also von jedem angemeldeten Benutzer ausgelöst werden. Verbinden Sie ihn nicht mit Aktionen, die nicht jeder Benutzer auslösen dürfte.
+
 ### MQTT-Nachricht empfangen
 
 Typ: `input.mqtt.message.received`
@@ -104,7 +107,7 @@ Typ: `input.resource.activity.no-activity` · Maschinen · Editor: **Inaktivitä
 
 **Minimale Inaktivität (Minuten)** (`minInactivityMinutes`) ist eine positive ganze Zahl. Läuft nur bei einer aktiven, finalisierten Nutzungssitzung. Die Prüfung erfolgt einmal pro Minute und ist kein präziser Timer. Die Payload beginnt nur mit Ressourcenkontext.
 
-**Aktivität verfolgen** setzt den Timer zurück. Nach dem Auslösen wird er ebenfalls zurückgesetzt und kann bei weiterhin aktiver Sitzung erneut auslösen. Aktivitätszeiten liegen im Arbeitsspeicher und werden nach Serverneustart neu initialisiert. Beispiel: mit **Nutzungssitzung beenden** für automatische Abschaltung verbinden.
+**Aktivität verfolgen** setzt den Timer aller Keine-Aktivität-Knoten der Maschine zurück. Jeder Keine-Aktivität-Knoten hat pro Maschine seinen eigenen Zeitplan und löst erneut aus, solange die Sitzung inaktiv bleibt: Bei einem Knoten mit 5 und einem mit 10 Minuten löst der erste nach 5, 10, 15 … Minuten aus, der zweite nach 10, 20 … Minuten. Das Auslösen eines Knotens setzt die anderen nicht zurück, und Knoten in [globalen Flows](flows/global-flows.md) und im Flow der Ressource beeinflussen sich nicht gegenseitig. Frühere Versionen setzten den Timer der Maschine für alle Keine-Aktivität-Knoten zurück, sobald einer davon auslöste; im Beispiel löste der 10-Minuten-Knoten deshalb nie aus. Aktivitätszeiten liegen im Arbeitsspeicher und werden nach Serverneustart neu initialisiert. Beispiel: mit **Nutzungssitzung beenden** für automatische Abschaltung verbinden.
 
 ### Variable geändert
 
