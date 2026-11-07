@@ -6,6 +6,7 @@ import { AttractapFirmwareService } from '../../../firmware.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AttractapFirmware } from '../../../dtos/firmware.dto';
 import { validateReaderUiCapabilities } from '../../../../resources/forms/reader-ui.validation';
+import { PAIRING_REQUIRED } from '../../../reader-pairing';
 import { AttractapUiHandler } from '../ui/ui.handler';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 
@@ -83,11 +84,21 @@ export class AttractapFirmwareHandler {
     socket.state.cardRelay = data.payload?.capabilities?.cardRelay === true;
     await this.attractapService.updateReaderFirmware(socket.readerId, this.withValidatedUi(data.payload));
     // Initial full slot sync and crash-loop protection, in the background: it must not stop or delay the OTA check.
-    void this.uiHandler.onFirmwareInfo(socket, data.payload).catch((error) => {
-      this.logger.warn(`Reader UI sync after firmware info failed: ${(error as Error).message}`);
-    });
+    // A reader that is not paired shows nothing from the server.
+    if (!socket.state.pairingRequired)
+      void this.uiHandler.onFirmwareInfo(socket, data.payload).catch((error) => {
+        this.logger.warn(`Reader UI sync after firmware info failed: ${(error as Error).message}`);
+      });
 
     const firmwareIsUpToDate = await this.isFirmwareLatest(data.payload);
+    // Current firmware but not paired: after the firmware gate comes the pairing gate. The reader
+    // starts pairing; one that needs the update gets it first and meets this check once it runs 2.0.0.
+    if (firmwareIsUpToDate && socket.state.pairingRequired) {
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, { message: PAIRING_REQUIRED }),
+      );
+      return;
+    }
     if (!firmwareIsUpToDate) {
       this.logger.debug('Firmware is not up to date, notifying client to start OTA');
 

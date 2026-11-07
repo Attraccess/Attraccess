@@ -104,6 +104,9 @@ export class ResourceListService {
     sockets: AuthenticatedWebSocket[],
     onlyIfResourceMatches?: { resourceIds?: Set<number>; requestId?: number },
   ) {
+    // A reader that is not paired gets no resources, whatever triggered the push.
+    sockets = sockets.filter((socket) => !socket.state?.pairingRequired);
+    if (sockets.length === 0) return;
     const getContextOwner = () => this;
     return sendResourceListToSocketsImplementation(
       {

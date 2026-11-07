@@ -64,6 +64,7 @@ describe('CardDetectedRouter', () => {
 
   it.each([
     ['FIRMWARE_UPDATE_REQUIRED', { cardRelay: false }, {}],
+    ['PAIRING_REQUIRED', { pairingRequired: true }, {}],
     ['INVALID_PARAMS', {}, { detectionId: undefined }],
     ['INVALID_PARAMS', {}, { detectionId: -1 }],
     ['INVALID_PARAMS', {}, { detectionId: 0x1_0000_0000 }],

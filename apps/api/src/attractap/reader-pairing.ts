@@ -12,6 +12,9 @@ export const READER_NOT_PAIRED = 'READER_NOT_PAIRED';
 export const isPaired = (reader: Pick<Attractap, 'pairingState'> | null | undefined): boolean =>
   reader?.pairingState === 'paired';
 
+/** What a connected reader that is not paired gets instead of any function; the reader starts pairing. */
+export const PAIRING_REQUIRED = 'PAIRING_REQUIRED';
+
 export function assertReaderPaired(reader: Pick<Attractap, 'pairingState'>): void {
   if (!isPaired(reader)) throw new BadRequestException(READER_NOT_PAIRED);
 }

@@ -275,6 +275,52 @@ describe('AttractapFirmwareHandler', () => {
       expect(fixture.socket.state.cardRelay).toBe(expected);
     });
 
+    describe('a reader that is not paired', () => {
+      const info = { name: 'attractap', variant: 'touch', version: '2.0.0', capabilities: { cardRelay: true } };
+
+      beforeEach(() => {
+        fixture.socket.state.pairingRequired = true;
+      });
+
+      it('is told to pair once its firmware is current, and gets no reader UI', async () => {
+        fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({ version: '2.0.0' });
+
+        await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
+
+        expect(fixture.socket.sendMessage).toHaveBeenCalledTimes(1);
+        expect(fixture.socket.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              type: AttractapEventType.READER_UNAUTHORIZED,
+              payload: { message: 'PAIRING_REQUIRED' },
+            }),
+          }),
+        );
+        expect((fixture.handler as any).uiHandler.onFirmwareInfo).not.toHaveBeenCalled();
+      });
+
+      it('still gets the firmware update first', async () => {
+        fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({
+          name: 'attractap',
+          variant: 'touch',
+          version: '2.1.0',
+          filename: 'fw.bin',
+          filenameOTA: 'fw-ota.bin',
+        });
+        fixture.mockExistsSync.mockReturnValue(true);
+        fixture.mockStatSync.mockReturnValue({ size: 4096 } as any);
+
+        await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
+
+        expect(fixture.socket.sendMessage).toHaveBeenCalledTimes(1);
+        expect(fixture.socket.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ type: AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED }),
+          }),
+        );
+      });
+    });
+
     it('always calls updateReaderFirmware with readerId and payload', async () => {
       fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({ version: '1.0.0' });
 

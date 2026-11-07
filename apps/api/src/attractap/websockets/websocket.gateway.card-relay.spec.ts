@@ -513,6 +513,10 @@ describe('AttractapGateway card relay rules', () => {
     await fixture.gateway.onClientEvent({ type: 'ACK_READER_AUTHENTICATED' } as any, socket);
     await authentication;
     expect(socket.readerId).toBe(7);
+    // A token sign-in is an unpaired reader and gets no card functions; this test logs the card
+    // traffic of a paired one, so lift the gate that the pairing flow would have lifted.
+    expect(socket.state.pairingRequired).toBe(true);
+    socket.state.pairingRequired = false;
 
     // Card traffic both ways, including answers to a conversation that does not exist (logged as ignored).
     socket.sendRaw(new AttractapEvent(AttractapEventType.CARD_APDU, { conversationId: 'c', seq: 1, apdu: cardBytes }));

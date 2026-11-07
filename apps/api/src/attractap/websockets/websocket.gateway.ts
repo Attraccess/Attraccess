@@ -18,6 +18,7 @@ import { WsMetricsInterceptor } from '../../metrics/instrumentation/ws/ws.interc
 import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { AttractapService } from '../attractap.service';
+import { PAIRING_REQUIRED } from '../reader-pairing';
 import { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import { AttractapBillingHandler } from './handlers/billing/billing.handler';
 import { AttractapCardHandler } from './handlers/card/card.handler';
@@ -46,6 +47,19 @@ import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
 
 /** Card relay events: a card conversation must not wait for the reader's lastConnection update. */
+/**
+ * The only events a reader that is not paired may send: signing in again, the firmware update (readers
+ * before 2.0.0 cannot pair) and its crash report. Everything else is answered with PAIRING_REQUIRED.
+ */
+const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
+  AttractapEventType.READER_AUTHENTICATE,
+  AttractapEventType.READER_REGISTER,
+  AttractapEventType.READER_FIRMWARE_INFO,
+  AttractapEventType.FIRMWARE_REQUEST_CHUNK,
+  AttractapEventType.READER_CRASH_REPORT,
+  AttractapEventType.READER_SESSION_ENDED,
+]);
+
 const SKIPS_ACTIVITY_WRITE = new Set<AttractapEventType>([
   AttractapEventType.CARD_DETECTED,
   AttractapEventType.CARD_APDU_RESPONSE,
@@ -155,6 +169,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     extra: Record<string, unknown> = {},
   ) {
     await socket.sendMessage(new AttractapEvent(replyType, { ...extra, error: 'FIRMWARE_UPDATE_REQUIRED' }));
+  }
+
+  /**
+   * Tells a connected reader that is not paired to pair first. Shaped like the unauthorized answer to
+   * its sign-in: the reader forgets its token and shows the pairing screen.
+   */
+  protected async requirePairing(socket: AuthenticatedWebSocket) {
+    await socket.sendMessage(new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, { message: PAIRING_REQUIRED }));
   }
 
   /**
@@ -383,6 +405,11 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     }
 
     this.logger.debug(`Received event ${eventData.type} from client ${socket.id}`);
+
+    // The same gate as old firmware, ahead of every handler: no tap, flow, resource or door action.
+    if (socket.state.pairingRequired && !ALLOWED_WHILE_PAIRING_REQUIRED.has(eventData.type)) {
+      return await this.requirePairing(socket);
+    }
 
     if (!Object.hasOwn(this.eventHandlers, eventData.type)) throw new Error(`Unknown event type: ${eventData.type}`);
     await this.eventHandlers[eventData.type](socket, eventData);

@@ -247,6 +247,11 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     /** The reader runs firmware that relays card APDUs (capabilities.cardRelay, 2.0.0+). Older readers get no card functions. */
     cardRelay?: boolean;
     /**
+     * The reader signed in with its legacy token but is not paired. Like firmware before 2.0.0 it gets
+     * no functions (answered with PAIRING_REQUIRED) and only the firmware update and pairing flows.
+     */
+    pairingRequired?: boolean;
+    /**
      * The user whose card this connection verified with the server (EV2 authentication with the
      * stored key). Never set from a UID alone or from anything the reader claims. Cleared on
      * logout, timeout, disconnect and when a new card is tapped.

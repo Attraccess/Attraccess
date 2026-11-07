@@ -40,6 +40,20 @@ describe('ResourceListService', () => {
       expect(matchA.sendMessage.mock.calls[0][0]).not.toBe(matchB.sendMessage.mock.calls[0][0]);
       expect(matchA.sendMessage.mock.calls[0][0].data.payload).toBe(matchB.sendMessage.mock.calls[0][0].data.payload);
     });
+
+    it('sends nothing to a connection of a reader that is not paired', async () => {
+      const unpaired = fixture.createMockSocket({ id: 'u', readerId: 42, state: { pairingRequired: true } });
+      const paired = fixture.createMockSocket({ id: 'p', readerId: 42 });
+      fixture.websocketService.sockets.set('u', unpaired);
+      fixture.websocketService.sockets.set('p', paired);
+      fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
+
+      await fixture.service.sendResourceList(42);
+      await fixture.service.sendResourceListToSocket(unpaired);
+
+      expect(unpaired.sendMessage).not.toHaveBeenCalled();
+      expect(paired.sendMessage).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('per-resource card access', () => {

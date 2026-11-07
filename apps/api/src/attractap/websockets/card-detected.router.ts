@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { PAIRING_REQUIRED } from '../reader-pairing';
 import { CardConversationService } from './card-conversation.service';
 import { AttractapCardHandler } from './handlers/card/card.handler';
 import { AttractapMassIntroductionHandler } from './handlers/mass-introduction/mass-introduction.handler';
@@ -66,6 +67,7 @@ export class CardDetectedRouter {
       };
 
       if (!socket.state.cardRelay) return await fail('FIRMWARE_UPDATE_REQUIRED');
+      if (socket.state.pairingRequired) return await fail(PAIRING_REQUIRED);
       if (!validDetectionId) return await fail('INVALID_PARAMS');
       this.conversations.noteDetection(socket, detectionId);
       if (typeof uid !== 'string' || !/^[0-9a-fA-F]{4,32}$/.test(uid)) return await fail('INVALID_UID');
