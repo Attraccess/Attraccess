@@ -270,6 +270,24 @@ describe('ReservationEventHandlers', () => {
       expect(sent('maintenance')).toHaveLength(4);
     });
 
+    it('sends one mail per holder however many of their bookings are affected, naming the earliest', async () => {
+      const first = await p.book(10, 1, '2026-06-02T08:00:00', '2026-06-02T09:00:00');
+      await p.book(10, 1, '2026-06-02T10:00:00', '2026-06-02T11:00:00');
+      await p.book(10, 1, '2026-06-03T10:00:00', '2026-06-03T11:00:00');
+      await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
+      const event = maintenance(5, '2026-06-02T00:00:00', '2026-06-04T00:00:00');
+      await h.emit(SystemEvent.MAINTENANCE_CHANGED, event);
+      await p.newEvents().onMaintenance(event); // a restarted instance does not tell them again
+      expect(
+        sent('maintenance')
+          .map((m) => m.recipients)
+          .sort(),
+      ).toEqual([[10], [11]]);
+      expect(sent('maintenance').find((m) => m.recipients[0] === 10)?.dedupeKey).toBe(
+        `reservations:maintenance:${first.id}:5`,
+      );
+    });
+
     it('covers open-ended maintenance and ignores finished events', async () => {
       await p.book(10, 1, '2026-06-20T08:00:00', '2026-06-20T09:00:00');
       await h.emit(SystemEvent.MAINTENANCE_CHANGED, maintenance(7, '2026-06-02T00:00:00', null, 'finished'));

@@ -6,6 +6,7 @@ import { START_BLOCKED_POLL_MS, StartBlockedGate } from './index';
 const { query, refetch } = vi.hoisted(() => ({
   query: {
     data: undefined as undefined | Record<string, unknown>,
+    pending: false,
     options: undefined as undefined | Record<string, unknown>,
   },
   refetch: vi.fn(),
@@ -20,7 +21,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
 vi.mock('@attraccess/react-query-client', () => ({
   useResourcesServiceResourceUsageStartBlocked: (_params: unknown, _key: unknown, options: Record<string, unknown>) => {
     query.options = options;
-    return { data: query.data, refetch };
+    return { data: query.data, isPending: query.pending, refetch };
   },
 }));
 
@@ -37,17 +38,24 @@ describe('StartBlockedGate', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
     query.data = undefined;
+    query.pending = false;
     refetch.mockClear();
   });
   afterEach(() => vi.useRealTimers());
 
-  it('shows the start controls while nothing blocks, and while the answer is not there yet', () => {
+  it('shows the start controls while nothing blocks, and when the question failed', () => {
     renderGate();
     expect(screen.getByTestId('start')).toBeInTheDocument();
     query.data = { blocked: false };
     renderGate();
     expect(screen.getAllByTestId('start')).toHaveLength(2);
     expect(screen.queryByTestId('start-blocked-notice')).not.toBeInTheDocument();
+  });
+
+  it('holds the start controls back until the first answer, so they do not flash before a notice', () => {
+    query.pending = true;
+    renderGate();
+    expect(screen.queryByTestId('start')).not.toBeInTheDocument();
   });
 
   it('replaces the start controls with the reason and the end time', () => {

@@ -75,5 +75,5 @@
     "resetSuccess": "Template reset to default.",
     "resetError": "Failed to reset template."
   },
-  "pluginChip": "Plugin: {plugin}"
+  "pluginChip": "Plugin: {{plugin}}"
 }

@@ -199,6 +199,33 @@ describe('EmailTemplateService — translation CRUD', () => {
       );
     });
 
+    it.each([
+      ['an empty subject', { subject: ' ', body: FRAGMENT }],
+      ['an empty body', { subject: 'S', body: '' }],
+      ['a body without MJML elements', { subject: 'S', body: 'just text' }],
+      ['a subject with an unclosed block', { subject: '{{#if a}}broken', body: FRAGMENT }],
+      ['a body calling an unknown helper', { subject: 'S', body: FRAGMENT.replace('Hi', '{{shout "x"}}') }],
+    ])('rejects %s before anything is stored', async (_name, edit) => {
+      const { service, emailTemplateRepo } = setup();
+      emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
+
+      await expect(service.update(EmailTemplateType.VERIFY_EMAIL, edit)).rejects.toThrow(BadRequestException);
+      expect(emailTemplateRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('accepts the t helper and block helpers in subject and body', async () => {
+      const { service, emailTemplateRepo } = setup();
+      emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
+      emailTemplateRepo.update.mockResolvedValue({});
+
+      await expect(
+        service.update(EmailTemplateType.VERIFY_EMAIL, {
+          subject: '{{#if a}}{{t "s" "Hi {x}" x=a}}{{else}}no{{/if}}',
+          body: '<mj-raw>{{#if a}}</mj-raw><mj-section><mj-column><mj-text>{{t "k" "Hi"}}</mj-text></mj-column></mj-section><mj-raw>{{/if}}</mj-raw>',
+        }),
+      ).resolves.toBeDefined();
+    });
+
     it('rejects full <mjml> documents — the send pipeline expects fragments', async () => {
       const { service, emailTemplateRepo, mjmlService } = setup();
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });

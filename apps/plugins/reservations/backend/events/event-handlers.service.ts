@@ -135,17 +135,23 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
 
   // ------------------------------------------------------------- maintenance
 
-  /** Notifies holders of bookings overlapping the maintenance window, once per (booking, maintenance). */
+  /**
+   * Notifies each holder of bookings overlapping the maintenance window once per maintenance: every affected booking
+   * is marked as told, but the notice names only the first newly marked one so a holder with many bookings gets one mail.
+   */
   async onMaintenance(event: SystemEventPayload[SystemEvent.MAINTENANCE_CHANGED]): Promise<void> {
     if (event.action === 'finished') return;
     const overlapping = await this.store.findLiveOverlapping(event.resourceId, event.startTime, event.endTime);
+    const refKey = String(event.maintenanceId);
+    const told = new Set<number>();
     for (const reservation of overlapping) {
-      await this.once(reservation, 'maintenance', String(event.maintenanceId), () =>
-        this.notifications.notifyMaintenance(
-          reservation,
-          { startTime: event.startTime, endTime: event.endTime, reason: null },
-          event.maintenanceId,
-        ),
+      if (!(await this.store.claimNotice(reservation.id, 'maintenance', refKey, this.clock()))) continue;
+      if (told.has(reservation.userId)) continue;
+      told.add(reservation.userId);
+      await this.notifications.notifyMaintenance(
+        reservation,
+        { startTime: event.startTime, endTime: event.endTime, reason: null },
+        event.maintenanceId,
       );
     }
   }

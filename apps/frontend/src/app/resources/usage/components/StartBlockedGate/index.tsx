@@ -1,5 +1,5 @@
 import { ReactNode, useEffect } from 'react';
-import { Alert, AlertContent, AlertDescription, AlertTitle } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Skeleton } from '@heroui/react';
 import { AlertStatusIcon, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useResourcesServiceResourceUsageStartBlocked } from '@attraccess/react-query-client';
 import en from './translations/en.json';
@@ -24,7 +24,7 @@ interface StartBlockedGateProps {
 export function StartBlockedGate({ resourceId, children }: Readonly<StartBlockedGateProps>) {
   const { t } = useTranslations({ en, de });
   const formatDateTime = useDateTimeFormatter({ showDate: true, showTime: true });
-  const { data, refetch } = useResourcesServiceResourceUsageStartBlocked({ resourceId }, undefined, {
+  const { data, isPending, refetch } = useResourcesServiceResourceUsageStartBlocked({ resourceId }, undefined, {
     refetchInterval: START_BLOCKED_POLL_MS,
   });
 
@@ -36,6 +36,8 @@ export function StartBlockedGate({ resourceId, children }: Readonly<StartBlocked
     return () => clearTimeout(timer);
   }, [untilMs, refetch]);
 
+  // Until the first answer is there, the start controls would flash up and vanish again when the notice follows.
+  if (isPending) return <Skeleton className="h-10 w-full rounded-lg" />;
   if (!data?.blocked || !data.reason) return <>{children}</>;
 
   return (

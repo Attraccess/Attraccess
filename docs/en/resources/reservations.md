@@ -309,8 +309,8 @@ normally ask for a confirmation is therefore refused on that path.
 
 - A booking cannot be made across a maintenance window, including open-ended maintenance (it counts from its start
   until it is finished).
-- When maintenance is created or changed and overlaps existing bookings, holders get **one** notice per booking
-  and maintenance. Bookings are **not** cancelled automatically; managers decide.
+- When maintenance is created or changed and overlaps existing bookings, holders get **one** notice per
+  maintenance, however many of their bookings it affects (it names the earliest). Bookings are **not** cancelled automatically; managers decide.
 - When a resource becomes unhealthy, holders of bookings running or starting within 24 hours are told, and again
   once it recovers.
 

@@ -34,7 +34,8 @@ function tCall(key: string, en: string, extra: Record<string, string> = {}): str
 function wrap(condition: Condition | undefined, inner: string): string {
   if (!condition) return inner;
   const [kind, path] = condition.split(':') as ['if' | 'unless', string];
-  return `{{#${kind} ${path}}}${inner}{{/${kind}}}`;
+  // mj-raw: MJML drops loose text between its elements, which would silently remove the block helpers.
+  return `<mj-raw>{{#${kind} ${path}}}</mj-raw>${inner}<mj-raw>{{/${kind}}}</mj-raw>`;
 }
 
 const paragraph = ([key, en, , condition]: Paragraph): string =>

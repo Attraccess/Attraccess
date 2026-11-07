@@ -51,6 +51,7 @@ vi.mock('../../../components/toastProvider', () => ({
 }));
 vi.mock('@attraccess/react-query-client', async (original) => ({
   ApiError: (await original<typeof import('@attraccess/react-query-client')>()).ApiError,
+  useResourcesServiceResourceUsageStartBlockedKey: 'start-blocked',
   // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
   useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
     mutate: (variables: unknown, callbacks: unknown) => {

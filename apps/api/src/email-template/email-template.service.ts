@@ -4,6 +4,7 @@ import { EmailTemplate, EmailTemplateTranslation, EmailTemplateType } from '@att
 import { EntityManager, Repository } from 'typeorm';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { MjmlService } from './mjml.service';
+import { assertRenderableTemplate } from './template-syntax';
 import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from './email-defaults';
 import { extractTranslationKeys, isFullMjmlDocument, TranslationKey } from '@attraccess/shared';
 import {
@@ -78,6 +79,7 @@ export class EmailTemplateService implements OnApplicationBootstrap {
 
   async update(type: EmailTemplateKey, updateEmailTemplateDto: UpdateEmailTemplateDto): Promise<EmailTemplate> {
     await this.findOne(type);
+    assertRenderableTemplate(updateEmailTemplateDto);
 
     if (updateEmailTemplateDto.body) {
       // Bodies are MJML fragments injected into the global layout at send time;

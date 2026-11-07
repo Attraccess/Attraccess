@@ -75,5 +75,5 @@
     "resetSuccess": "Vorlage auf Standard zurückgesetzt.",
     "resetError": "Vorlage konnte nicht zurückgesetzt werden."
   },
-  "pluginChip": "Plugin: {plugin}"
+  "pluginChip": "Plugin: {{plugin}}"
 }

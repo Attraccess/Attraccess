@@ -32,5 +32,5 @@
     "access-change": "Zugriffsänderung",
     "resource-session-ended": "Ressourcen-Sitzung beendet"
   },
-  "pluginChip": "Plugin: {plugin}"
+  "pluginChip": "Plugin: {{plugin}}"
 }

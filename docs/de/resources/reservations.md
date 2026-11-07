@@ -326,7 +326,7 @@ Start, der normalerweise eine Bestätigung verlangt, wird auf diesem Weg daher a
 - Über ein Wartungsfenster hinweg kann nicht gebucht werden, auch nicht über offene Wartung (sie zählt ab ihrem
   Beginn bis zum Abschluss).
 - Wird eine Wartung angelegt oder geändert und überschneidet bestehende Buchungen, erhalten die Buchenden **einen**
-  Hinweis pro Buchung und Wartung. Buchungen werden **nicht** automatisch storniert; die Verwaltenden entscheiden.
+  Hinweis pro Wartung, egal wie viele ihrer Buchungen betroffen sind (er nennt die früheste). Buchungen werden **nicht** automatisch storniert; die Verwaltenden entscheiden.
 - Wird eine Ressource gestört, werden Buchende von Buchungen informiert, die laufen oder innerhalb von 24 Stunden
   beginnen, und noch einmal bei Erholung.
 
