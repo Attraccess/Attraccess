@@ -4,7 +4,11 @@
   },
   "preview": {
     "title": "Preview (first {{n}})",
-    "rowCount": "{{count}} total rows"
+    "rowCount": {
+      "one": "{{count}} total row",
+      "many": "{{count}} total rows"
+    },
+    "error": "The data could not be loaded. You may be missing the permission for this export."
   },
   "actions": {
     "refetch": "Refresh",
@@ -28,7 +32,8 @@
     "remove": "Remove column {{n}}",
     "addField": "Add field column",
     "addConstant": "Add constant column",
-    "unavailable": "Not available in current data"
+    "unavailable": "Not available in current data",
+    "limit": "A template can hold at most {{max}} columns."
   },
   "templates": {
     "title": "Template",

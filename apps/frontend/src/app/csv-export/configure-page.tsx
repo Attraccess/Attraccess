@@ -48,7 +48,7 @@ export function CsvExportConfigurePage({ exportKey }: Props) {
         <SelectedRangePill
           range={range}
           emptyLabel={t('range.empty')}
-          summaryLabel={({ start, end, days }) => t('range.summary', { start, end, days })}
+          summaryLabel={({ start, end, days }) => t('range.summary', { start, end, count: days })}
           dataCy="csv-export-page-range-pill"
         />
       </header>

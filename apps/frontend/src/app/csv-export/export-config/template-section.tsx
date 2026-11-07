@@ -118,9 +118,15 @@ export function TemplateSection(props: Props) {
       setDeleteOpen(false);
       toast.success({ title: t('templates.toasts.deleted') });
     },
-    onError: () => {
+    onError: (error) => {
       setDeleteOpen(false);
       toast.error({ title: t('templates.errors.deleteFailed') });
+      // somebody else may have deleted it already: stop offering a template that no longer exists
+      void invalidateTemplates();
+      if (error instanceof ApiError && error.status === 404) {
+        setActiveTemplateId(null);
+        setNameDraft('');
+      }
     },
   });
 
@@ -298,7 +304,9 @@ export function TemplateSection(props: Props) {
         }}
         data-cy="csv-export-template-delete-dialog"
       >
-        {t('templates.deleteMessage', { name: activeTemplate?.name ?? '' })}
+        <span className="[overflow-wrap:anywhere]">
+          {t('templates.deleteMessage', { name: activeTemplate?.name ?? '' })}
+        </span>
       </StatusDialog>
     </section>
   );

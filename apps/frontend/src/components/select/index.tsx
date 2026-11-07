@@ -81,7 +81,8 @@ export function Select({
       {label && <Label>{label}</Label>}
       {description && <Description>{description}</Description>}
       <SelectTrigger>
-        <SelectValue />
+        {/* an unbreakable value (e.g. a long key or name) must wrap inside the trigger instead of spilling out of it */}
+        <SelectValue className="min-w-0 [overflow-wrap:anywhere]" />
         <SelectIndicator />
       </SelectTrigger>
       <SelectPopover {...popoverProps}>

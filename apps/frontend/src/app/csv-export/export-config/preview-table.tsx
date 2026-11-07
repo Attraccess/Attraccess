@@ -1,4 +1,4 @@
-// Preview table for CSV export drawer — first N rows with selected columns
+// Preview table for the CSV export page — first N rows with selected columns
 // FEATURE: CSV export — data sample shown before download
 import { EmptyState } from '@attraccess/plugins-frontend-ui';
 import {
@@ -34,12 +34,26 @@ interface Props {
   ariaLabel: string;
   titleLabel: (vars: { n: number }) => string;
   rowCountLabel: (vars: { count: number }) => string;
+  errorLabel: string;
+  refreshLabel: string;
   refetch?: () => unknown;
   queryStatus: QueryStatus;
 }
 
 export function PreviewTable(props: Props) {
-  const { columns, rows, totalCount, previewLimit, ariaLabel, titleLabel, rowCountLabel, refetch, queryStatus } = props;
+  const {
+    columns,
+    rows,
+    totalCount,
+    previewLimit,
+    ariaLabel,
+    titleLabel,
+    rowCountLabel,
+    errorLabel,
+    refreshLabel,
+    refetch,
+    queryStatus,
+  } = props;
 
   const limited = rows.slice(0, previewLimit);
 
@@ -56,7 +70,7 @@ export function PreviewTable(props: Props) {
               isIconOnly
               onPress={() => refetch()}
               data-cy="resource-usage-export-refresh-button"
-              aria-label="refresh"
+              aria-label={refreshLabel}
             >
               <RotateCwIcon className={'size-4 ' + (queryStatus === 'pending' ? 'animate-spin' : '')} />
             </Button>
@@ -69,6 +83,10 @@ export function PreviewTable(props: Props) {
           <div className="flex items-center justify-center py-12">
             <Spinner />
           </div>
+        ) : queryStatus === 'error' ? (
+          <p className="px-4 py-12 text-center text-sm" role="alert" data-cy="resource-usage-export-error">
+            {errorLabel}
+          </p>
         ) : (
           <Table data-cy="resource-usage-export-table">
             <TableScrollContainer>

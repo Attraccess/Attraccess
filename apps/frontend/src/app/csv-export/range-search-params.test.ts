@@ -16,6 +16,9 @@ describe('range search params', () => {
     ['missing', ''],
     ['unparsable', 'start=nope&end=2026-09-10T00:00:00Z'],
     ['only start', 'start=2026-09-01T00:00:00Z'],
+    ['loosely parsable numbers', 'start=1&end=2'],
+    ['date without time', 'start=2026-09-01&end=2026-09-10'],
+    ['impossible calendar date', 'start=2026-13-45T00:00:00Z&end=2026-99-99T00:00:00Z'],
     ['reversed', 'start=2026-09-10T00:00:00Z&end=2026-09-01T00:00:00Z'],
   ])('falls back to the last 30 days when params are %s', (_label, search) => {
     const parsed = parseRangeSearchParams(new URLSearchParams(search), NOW);

@@ -58,6 +58,10 @@ export function CsvExportConfigContent<TData extends Row>(props: Props<TData>) {
   const [edited, setEdited] = useState<ConfiguredColumn[] | null>(null);
   const defaults = useMemo(() => defaultColumns(fields), [fields]);
   const configured = edited ?? defaults;
+  const updateColumns = useCallback(
+    (update: (columns: ConfiguredColumn[]) => ConfiguredColumn[]) => setEdited((current) => update(current ?? defaults)),
+    [defaults],
+  );
 
   const resolved = useMemo(() => resolveColumns(configured, fields), [configured, fields]);
   const fieldOptions = useMemo(() => fields.map(({ key, label }) => ({ key, label })), [fields]);
@@ -111,7 +115,8 @@ export function CsvExportConfigContent<TData extends Row>(props: Props<TData>) {
       <ColumnConfigList
         columns={configured}
         fields={fieldOptions}
-        onChange={setEdited}
+        onChange={updateColumns}
+        checkAvailability={queryStatus === 'success'}
         options={options}
         onOptionChange={setOption}
         t={t}
@@ -125,6 +130,8 @@ export function CsvExportConfigContent<TData extends Row>(props: Props<TData>) {
         ariaLabel={t('table.ariaLabel')}
         titleLabel={(vars) => t('preview.title', vars)}
         rowCountLabel={(vars) => t('preview.rowCount', vars)}
+        errorLabel={t('preview.error')}
+        refreshLabel={t('actions.refetch')}
         refetch={refetch}
         queryStatus={queryStatus}
       />

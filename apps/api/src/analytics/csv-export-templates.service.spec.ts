@@ -60,6 +60,18 @@ describe('CsvExportTemplatesService', () => {
       expect(result).toEqual([template]);
     });
 
+    it('sorts names case-insensitively', async () => {
+      mockRepository.find.mockResolvedValue([
+        { ...template, id: 1, name: 'Zeta' },
+        { ...template, id: 2, name: 'alpha' },
+        { ...template, id: 3, name: 'Beta' },
+      ]);
+
+      const result = await service.findAll();
+
+      expect(result.map((entry) => entry.name)).toEqual(['alpha', 'Beta', 'Zeta']);
+    });
+
     it('filters by export type when given', async () => {
       mockRepository.find.mockResolvedValue([]);
 

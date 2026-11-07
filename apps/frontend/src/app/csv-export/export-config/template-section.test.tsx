@@ -6,6 +6,11 @@ import { TemplateSection } from './template-section';
 import { ConfiguredColumn } from './csv';
 
 const state = vi.hoisted(() => ({
+  ApiError: class ApiError extends Error {
+    constructor(public status: number) {
+      super('api error');
+    }
+  },
   templates: [] as unknown[],
   listArgs: vi.fn(),
   create: vi.fn(),
@@ -14,11 +19,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('@attraccess/react-query-client', () => ({
-  ApiError: class ApiError extends Error {
-    constructor(public status: number) {
-      super('api error');
-    }
-  },
+  ApiError: state.ApiError,
   useAnalyticsServiceGetCsvExportTemplatesKey: 'templates',
   useAnalyticsServiceGetCsvExportTemplates: (...args: unknown[]) => {
     state.listArgs(...args);
@@ -95,9 +96,8 @@ it('saves the editor state as a new template and trims nothing but sends the typ
 });
 
 it('shows a clear message when the name already exists (409)', async () => {
-  const { ApiError } = await import('@attraccess/react-query-client');
   state.create.mockImplementation((_vars, options: { onError: (error: unknown) => void }) =>
-    options.onError(new (ApiError as unknown as new (status: number) => Error)(409)),
+    options.onError(new state.ApiError(409)),
   );
   renderSection();
   press('csv-export-template-save-as');
@@ -164,4 +164,17 @@ it('asks for confirmation before deleting and only deletes from the dialog', asy
   press('csv-export-template-delete');
   press('csv-export-template-delete-confirm');
   expect(state.remove).toHaveBeenCalledWith({ id: 5 }, expect.anything());
+});
+
+it('stops offering a template that is already gone when the delete fails with 404', async () => {
+  state.remove.mockImplementation((_vars, options: { onError: (error: unknown) => void }) =>
+    options.onError(new state.ApiError(404)),
+  );
+  renderSection();
+  await selectTemplate('Accounting');
+  press('csv-export-template-delete');
+  press('csv-export-template-delete-confirm');
+  // selection is cleared, so there is nothing to update or delete any more
+  await waitFor(() => expect(document.querySelector('[data-cy="csv-export-template-update"]')).toBeNull());
+  expect(document.querySelector('[data-cy="csv-export-template-delete"]')).toBeNull();
 });

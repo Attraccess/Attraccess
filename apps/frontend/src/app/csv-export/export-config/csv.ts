@@ -3,6 +3,9 @@
 
 export const CSV_SEPARATOR = ';';
 
+/** Mirrors the API's template limit; a template with more columns is rejected. */
+export const MAX_COLUMNS = 200;
+
 /**
  * A column as configured in the editor. Field columns reference a data field by `fieldKey`,
  * constant columns emit `value` on every row.
@@ -48,6 +51,13 @@ export function stringifyCell(value: unknown): string {
   return value === null || value === undefined ? '' : String(value);
 }
 
+const emptyCell = () => '';
+
+// named (instead of an inline arrow in the column object) so the CRAP tooling can match it to its complexity data
+function cellGetter<TItem>(field: FieldDefinition<TItem>) {
+  return (item: TItem) => stringifyCell(field.getter(item));
+}
+
 export function resolveColumns<TItem>(
   configured: ConfiguredColumn[],
   fields: FieldDefinition<TItem>[],
@@ -66,7 +76,7 @@ export function resolveColumns<TItem>(
       // a stale field has no label, its key is the best hint left for the header
       header: column.header === '' ? (field?.label ?? column.fieldKey ?? '') : column.header,
       isAvailable: field !== undefined,
-      getValue: field ? (item) => stringifyCell(field.getter(item)) : () => '',
+      getValue: field ? cellGetter(field) : emptyCell,
     };
   });
 }

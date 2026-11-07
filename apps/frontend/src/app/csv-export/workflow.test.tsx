@@ -91,7 +91,7 @@ it('starts with the default columns and previews and exports the same values', a
   expect(screen.getByText('Alice')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('checkbox', { name: 'Group rows' }));
   expect(option).toHaveBeenCalledWith('group', true);
-  fireEvent.click(screen.getByRole('button', { name: 'refresh' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
   expect(refresh).toHaveBeenCalledOnce();
   fireEvent.click(download());
   expect(await blob?.text()).toBe('Name\nAlice\nBob');

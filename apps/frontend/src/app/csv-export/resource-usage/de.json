@@ -22,7 +22,7 @@
     "supervisorUsername": "Aufsicht-Name",
     "userEmail": "Benutzer-E-Mail",
     "userExternalIdentifier": "Externe Benutzerkennung",
-    "supervisorEmail": "Betreuer-E-Mail"
+    "supervisorEmail": "Aufsicht-E-Mail"
   },
   "status": {
     "provisional": "Vorläufig",

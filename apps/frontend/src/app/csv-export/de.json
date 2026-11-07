@@ -22,7 +22,10 @@
     "custom": "Benutzerdefiniert"
   },
   "range": {
-    "summary": "{{start}} – {{end}} · {{days}} Tage",
+    "summary": {
+      "one": "{{start}} – {{end}} · {{count}} Tag",
+      "many": "{{start}} – {{end}} · {{count}} Tage"
+    },
     "empty": "Kein Zeitraum gewählt"
   },
   "rangeCalendar": {
@@ -38,7 +41,10 @@
       "subtitle": "vom {{start}} bis zum {{end}}"
     },
     "card": {
-      "estimatedRows": "Voraussichtlich {{count}} Zeilen",
+      "estimatedRows": {
+        "one": "Voraussichtlich {{count}} Zeile",
+        "many": "Voraussichtlich {{count}} Zeilen"
+      },
       "estimatedRowsLoading": "Lade …",
       "requireRange": "Wähle zuerst Zeitraum",
       "cta": "Konfigurieren & Exportieren"

@@ -22,7 +22,10 @@
     "custom": "Custom"
   },
   "range": {
-    "summary": "{{start}} – {{end}} · {{days}} days",
+    "summary": {
+      "one": "{{start}} – {{end}} · {{count}} day",
+      "many": "{{start}} – {{end}} · {{count}} days"
+    },
     "empty": "No range selected"
   },
   "rangeCalendar": {
@@ -38,7 +41,10 @@
       "subtitle": "from {{start}} to {{end}}"
     },
     "card": {
-      "estimatedRows": "~{{count}} rows",
+      "estimatedRows": {
+        "one": "~{{count}} row",
+        "many": "~{{count}} rows"
+      },
       "estimatedRowsLoading": "Loading…",
       "requireRange": "Pick a date range first",
       "cta": "Configure & Export"

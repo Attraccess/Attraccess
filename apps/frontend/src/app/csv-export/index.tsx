@@ -33,13 +33,16 @@ export function CsvExport() {
     initial.isFallback ? computeRange(DEFAULT_PRESET) : boundsToRange(initial),
   );
 
-  const handleRangeChange = useCallback(
-    (next: RangeValue<DateValue>) => {
-      setDateRange(next);
-      if (preset !== 'custom') setPreset('custom');
-    },
-    [preset],
-  );
+  // Picking a preset sets its range; only a hand-picked calendar range switches the chip to "custom".
+  const handlePresetChange = useCallback((next: Preset) => {
+    setPreset(next);
+    if (next !== 'custom') setDateRange(computeRange(next));
+  }, []);
+
+  const handleRangeChange = useCallback((next: RangeValue<DateValue>) => {
+    setDateRange(next);
+    setPreset('custom');
+  }, []);
 
   const now = useRef(new Date());
 
@@ -61,7 +64,7 @@ export function CsvExport() {
       <DateRangeSection
         preset={preset}
         range={dateRange}
-        onPresetChange={setPreset}
+        onPresetChange={handlePresetChange}
         onRangeChange={handleRangeChange}
         t={t}
       />

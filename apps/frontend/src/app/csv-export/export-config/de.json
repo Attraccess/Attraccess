@@ -4,7 +4,11 @@
   },
   "preview": {
     "title": "Vorschau (erste {{n}})",
-    "rowCount": "{{count}} Zeilen insgesamt"
+    "rowCount": {
+      "one": "{{count}} Zeile insgesamt",
+      "many": "{{count}} Zeilen insgesamt"
+    },
+    "error": "Die Daten konnten nicht geladen werden. Möglicherweise fehlt dir die Berechtigung für diesen Export."
   },
   "actions": {
     "refetch": "Aktualisieren",
@@ -28,7 +32,8 @@
     "remove": "Spalte {{n}} entfernen",
     "addField": "Feldspalte hinzufügen",
     "addConstant": "Konstantenspalte hinzufügen",
-    "unavailable": "In den aktuellen Daten nicht verfügbar"
+    "unavailable": "In den aktuellen Daten nicht verfügbar",
+    "limit": "Eine Vorlage kann höchstens {{max}} Spalten enthalten."
   },
   "templates": {
     "title": "Vorlage",

@@ -12,10 +12,14 @@ export class CsvExportTemplatesService {
   ) {}
 
   public async findAll(exportType?: CsvExportType): Promise<CsvExportTemplate[]> {
-    return await this.templateRepository.find({
+    const templates = await this.templateRepository.find({
       where: exportType ? { exportType } : {},
       order: { name: 'ASC' },
     });
+    // The database orders by binary collation ("Z" before "a"); users expect "a, B, c". The list is small.
+    return templates.sort(
+      (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || (a.name < b.name ? -1 : 1),
+    );
   }
 
   public async findOne(id: number): Promise<CsvExportTemplate> {
