@@ -225,16 +225,7 @@ describe('Flow-defined metering with parallel sessions', () => {
 
       it('lets exactly one of several simultaneous starts claim the meter', async () => {
         await setUpSharedMachine(3);
-        // Hold every start right before its meter check, then release them together.
-        const metering = genericMetersScope.metering;
-        const getDefinition = metering.getDefinition.bind(metering);
-        const waiting: (() => void)[] = [];
-        jest.spyOn(metering, 'getDefinition').mockImplementation(async (resourceId, meterId) => {
-          const definition = await getDefinition(resourceId, meterId);
-          if (waiting.length < 2) await new Promise<void>((resolve) => waiting.push(resolve));
-          else waiting.splice(0).forEach((release) => release());
-          return definition;
-        });
+        // Starts of one shared machine are queued, so the meter is claimed by exactly the first of them.
         const started = await Promise.all([start(0), start(1), start(2)]);
 
         const active = await meterSessions().findBy({ meterId: 1, status: ResourceMeteringSessionStatus.Active });

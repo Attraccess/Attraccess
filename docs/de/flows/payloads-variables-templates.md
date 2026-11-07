@@ -19,8 +19,8 @@ Die Anfangsdaten hängen vom Trigger ab. Bei Objekt-Payloads ergänzt Attraccess
 | Trigger                                          | Nützliche Payload-Pfade                                                                                                                                                                  |
 | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Button**, **Keine Aktivität**                  | Nur Ressourcenkontext; keine Benutzer- oder Nachrichtendaten                                                                                                                             |
-| **Nutzung gestartet / beendet**                  | Nutzungsfelder an der Wurzel: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `formSubmissions`                                                      |
-| **Nutzung übernommen**                           | Felder der bisherigen Sitzung sowie `newUser`, `oldUser`, `takeOverTime`                                                                                                                 |
+| **Nutzung gestartet / beendet**                  | Nutzungsfelder an der Wurzel: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `formSubmissions`, `activeSessions`                                    |
+| **Nutzung übernommen**                           | Felder der bisherigen Sitzung sowie `newUser`, `oldUser`, `takeOverTime`, `activeSessions`                                                                                               |
 | **Tür entriegelt / verriegelt / Falle geöffnet** | `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.externalIdentifier`                                                                                     |
 | **MQTT-Nachricht empfangen**                     | `serverId`, `topic`, `payload`                                                                                                                                                           |
 | **Variable geändert**                            | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; überwachte Werte unter `variables.resource` / `variables.global` |
@@ -51,6 +51,31 @@ Eine MQTT-Nachricht auf `workshop/laser/status` mit dem Inhalt `{"temperature":4
 ```
 
 MQTT-Inhalte werden nach Möglichkeit als JSON gelesen, auch Zahlen, boolesche Werte und Arrays. Andernfalls enthält `payload` den unveränderten Text, etwa `ON`.
+
+### Aktive Sitzungen auf gemeinsam genutzten Maschinen
+
+Nutzung gestartet, beendet und übernommen ergänzen die Payload um `activeSessions`. Gezählt werden die veröffentlichten Nutzungssitzungen der Maschine (Aufsichtspersonen zählen nicht):
+
+| Pfad                    | Bedeutung                                                              |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `activeSessions.before` | Sitzungen vor diesem Start, Ende oder dieser Übernahme                 |
+| `activeSessions.after`  | Sitzungen danach. Ein Ende hat `before - 1`; eine Übernahme ist 1 zu 1 |
+| `activeSessions.limit`  | **Maximale parallele Sitzungen** der Maschine                          |
+
+Mit einem [Wenn](flows/node-types.md#wenn-if)-Knoten auf `activeSessions.before` = `0` erkennen Sie den ersten Start, mit `activeSessions.after` = `0` das letzte Ende. Beendet ein Start-Flow seine eigene neue Sitzung, meldet das folgende Ende bei `after` die Zahl der schon laufenden Sitzungen (0 bei der ersten).
+
+Bei einem Limit über 1 laufen Starts, Beendigungen und Übernahmen einer Maschine nacheinander, jeweils vom Beginn über ihre Flows bis zum Abschluss. Zwei gleichzeitige Enden liefern daher genau einmal `after` = 0. Ein Start oder Ende belegt die Maschine, bis sein gesamter Flow abgeschlossen ist. Wer länger als 30 Sekunden warten muss, erhält die Meldung **Maschine ist beschäftigt** und kann es erneut versuchen. Das gilt auch bei mehreren API-Instanzen: Ist `VALKEY_URL` gesetzt, ist der Zug pro Maschine eine Sperre in Valkey (wird erneuert, solange die Änderung läuft, bei Ende freigegeben und läuft etwa 15 Sekunden nach dem Absturz einer Instanz ab), sodass die 30 Sekunden über Instanzen hinweg gelten. Ohne Valkey darf nur eine API-Instanz laufen. Ist Valkey nicht erreichbar, reiht jede Instanz nur ihre eigenen Änderungen ein, und eine startende Instanz wartet bis zu 10 Sekunden auf Valkey und bricht dann unfertige Starts und Enden ab, als wäre sie die einzige Instanz. Gleichzeitig laufende Instanzen brauchen unterschiedliche Hostnamen oder Ports. Ein Start oder Ende, das ein Neustart des Servers abschneidet, wird abgebrochen und nicht gespeichert: Ein wartender Browser erhält **Start oder Ende unterbrochen**, und seine Flows können schon gelaufen sein; prüfen Sie daher die Maschine, bevor Sie es erneut versuchen. Eine neu startende Instanz (gleicher Hostname und Port) bricht ihre eigenen unfertigen Starts und Enden sofort ab, sodass ein erneuter Versuch gleich funktioniert. Mit Valkey lässt eine startende Instanz unfertige Starts und Enden anderer laufender Instanzen in Ruhe; ohne Valkey bricht eine neu gestartete Instanz ab, was die alte noch bearbeitet hat. Stürzt eine von mehreren Instanzen ab und kommt nicht zurück, brechen die anderen ihren unfertigen Start oder ihr unfertiges Ende nach etwa 30 Sekunden ab; bis dahin meldet ein erneuter Start oder ein Beenden dieser Sitzung **Maschine ist beschäftigt**. Browser warten ohne kürzeres Timeout auf die Antwort; ein Leser wartet bis zu 60 Sekunden, bleibt angemeldet, während sein Start oder Ende wartet, und zeigt bei einer beschäftigten Maschine oder einem unterbrochenen Start oder Ende seinen allgemeinen Fehler an. Ein fehlgeschlagener Start oder ein fehlgeschlagenes Ende verfälscht den nächsten Wert nicht. Bei einem Limit von 1 ändert sich nichts: Ein zweiter Start wird sofort abgelehnt.
+
+Halten Sie Start- und Ende-Flows kurz: Ein Knoten [Warten](flows/node-types.md#warten), ein Knoten [Auf MQTT-Nachricht warten](flows/node-types.md#auf-mqtt-nachricht-warten) oder eine [HTTP-Anfrage](flows/node-types.md#http-anfrage) ohne Antwort-Timeout lässt alle anderen an der Maschine warten, und nach 30 Sekunden erhalten sie die Meldung **Maschine ist beschäftigt**.
+
+Ein Knoten [Nutzungssitzung beenden](flows/node-types.md#nutzungssitzung-beenden) mit **Die Sitzung eines Benutzers** oder **Alle Sitzungen** in einem Start- oder Ende-Flow wählt die Sitzungen aus, wenn er läuft, und beendet sie direkt nach Abschluss dieses Starts oder Endes, vor dem nächsten Start oder Ende an der Maschine. Die gerade startende Sitzung ist nie darunter. Schlägt der Start oder das Ende fehl, entfallen diese Beendigungen; beendet ein Start-Flow seine eigene neue Sitzung (mit **Die auslösende Sitzung**), laufen sie trotzdem.
+
+#### Beispiel: beim ersten Start einschalten, beim letzten Ende ausschalten
+
+1. **Nutzung gestartet** → **Wenn** `activeSessions.before` `=` `0` → (wahr) **MQTT-Nachricht senden** mit dem Einschaltbefehl.
+2. **Nutzung beendet** → **Wenn** `activeSessions.after` `=` `0` → (wahr) **MQTT-Nachricht senden** mit dem Ausschaltbefehl.
+
+Ohne die Wenn-Knoten würde die Maschine bei jedem Start erneut eingeschaltet und ausgeschaltet, während andere noch arbeiten. Wenn Admins das Limit über 1 erhöhen, listen die Ressourceneinstellungen im Abschnitt **Ressourcentyp und Verhalten** die Flows auf, die Starts, Beendigungen oder Übernahmen ohne eine solche Prüfung behandeln.
 
 ## Pfade und Vorlagen
 

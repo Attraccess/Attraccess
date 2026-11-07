@@ -11,5 +11,8 @@ module.exports = {
   moduleNameMapper: {
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
-  coverageDirectory: '../../../coverage/apps/plugins/rabbitmq',
+  // Unit coverage feeds the project's crap-score target.
+  collectCoverage: true,
+  coverageReporters: ['json'],
+  coverageDirectory: '../../../coverage/apps/plugins/rabbitmq/test',
 };

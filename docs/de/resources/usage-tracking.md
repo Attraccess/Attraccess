@@ -43,9 +43,9 @@ Eine Maschine kann über **Maximale parallele Sitzungen** von mehreren Personen 
 Jede Person beendet ihre eigene Sitzung. Ressourcenverwalter, Einweiser, Wartende und die Aufsicht einer Sitzung können die gewählte Sitzung einer anderen Person beenden, indem sie diese auf der [Detailseite](resources/resource-details.md) aus der Liste der aktiven Sitzungen auswählen und auf **Sitzung beenden** klicken.
 
 > [!WARNING]
-> **Flows und Abrechnung bei gemeinsam genutzten Maschinen (Limit über 1).** Flows und Abrechnung berücksichtigen nicht, wie viele Sitzungen laufen. Bei einem Limit von 1 gilt dieser Abschnitt nicht.
+> **Flows und Abrechnung bei gemeinsam genutzten Maschinen (Limit über 1).** Die Abrechnung berücksichtigt nicht, wie viele Sitzungen laufen; Flows müssen die Anzahl selbst prüfen. Bei einem Limit von 1 gilt dieser Abschnitt nicht.
 >
-> - **Flows** laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab. Eine Berücksichtigung der Sitzungsanzahl in Flows ist geplant.
+> - **Flows** laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab, sofern er nicht `activeSessions` prüft (siehe [Aktive Sitzungen auf gemeinsam genutzten Maschinen](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen)). Die Ressourceneinstellungen listen im Abschnitt **Ressourcentyp und Verhalten** die Flows auf, die das nicht prüfen.
 > - **Nutzungsgebühren** pro Nutzung werden pro Sitzung berechnet.
 > - **Abrechnung nach Sitzungszeit** erfolgt pro Sitzung.
 > - **Zähler (zum Beispiel Energie):** Die am frühesten gestartete, noch laufende Sitzung besitzt den Zähler und wird mit ihrem Verbrauch belastet. Später überlappende Sitzungen werden für bereits belegte Zähler weder gemessen noch berechnet. Endet diese Sitzung, während andere weiterlaufen, wird der Zähler wie üblich abgelesen, und den noch laufenden Sitzungen wird kein weiterer Zählerverbrauch berechnet. Der Zähler ist dann wieder frei: Die nächste Sitzung, die startet, während er frei ist, erhält den Zähler und wird mit seinem Verbrauch belastet.

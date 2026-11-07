@@ -35,6 +35,18 @@ DELETE /resources/:resourceId/flows
 
 Deletes the complete flow configuration for a resource, removing all nodes and edges.
 
+### Shared Machine Flow Warnings
+
+```
+GET /resources/:resourceId/flow/shared-machine-warnings
+```
+
+Lists the session start, stop and takeover triggers that lead to an external effect (HTTP, MQTT, PC lock/unlock, plugin outputs) without an IF node that checks `activeSessions`. The resource settings page shows it in the "Resource type and behavior" section when the limit is raised above 1.
+
+## Session Counts
+
+Start, stop and takeover payloads carry `activeSessions: { before, after, limit }`, the published usage sessions around the event (supervisors do not count). On a machine with a limit above 1 these events run one at a time per machine, each from start through its flow to commit or abort; a waiter gets `MachineBusyError` after 30 s (the turn is a Valkey lock when `VALKEY_URL` is set, so it holds across API instances; a start or stop interrupted by a restart gets `SessionChangeInterruptedError`, 503; heartbeats and lock tokens carry `<host>:<port>|<boot id>`, so a restarted instance cancels its own previous run's attempts and lock at once, and the attempts of an instance that stays down are swept by the others after about 30 s; with Valkey unreachable a booting instance waits 10 s, then cleans up as the only instance; concurrent instances need distinct host:port), so a slow start or stop flow (Wait, MQTT wait, HTTP without timeout) blocks the machine. The end-session node can end the triggering session, one user's session (`target: user`, `userId` template) or all sessions (`target: all`); inside a start or stop flow those other ends are picked when the node runs and run once that start or stop has finished, before the next one, and their audit entry records the user who caused the flow run (`triggeredByUserId`, from the run's `actorUserId` option, never from the payload; none for runs without a user such as MQTT); they are dropped if it fails, unless a start flow ended its own new session.
+
 ## Node Types
 
 ### Events

@@ -1,12 +1,12 @@
 /* eslint-disable no-console -- CLI progress and diagnostics are intentional. */
 import { getCrapReport } from 'crap-score';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import istanbulCoverage from 'istanbul-lib-coverage';
 import { createInstrumenter } from 'istanbul-lib-instrument';
+import { isSource, ownedFiles, workspace } from './sources.mjs';
 
 // Source-map remapping may leave end columns null (end of line). Restore exact
 // boundaries from the original source, without changing any execution counts.
@@ -88,103 +88,11 @@ export function fillMissingFunctions(measured, original) {
   }
 }
 
-export const workspace = fileURLToPath(new URL('../../', import.meta.url));
+export { isSource, ownedFiles, workspace };
 export const CRAP_SCORE_LIMIT = 30;
-
-export function isSource(file) {
-  return (
-    /\.[cm]?[jt]sx?$/.test(file) &&
-    // Upstream OpenSCAD WebAssembly runtime, distributed unchanged with the app.
-    file !== 'apps/frontend/public/openscad/openscad.wasm.js' &&
-    !/(^|\/)(__tests__|__mocks__|test|tests|test-utils|fixtures|generated|node_modules|dist|package|\.nx-cache|\.nx-workspace-data|\.electron-cache|\.npm-cache)(\/|$)/.test(
-      file,
-    ) &&
-    !/\.(spec|test|test-utils|test-fixture|d)\.[cm]?[jt]sx?$/.test(file) &&
-    !/(^|\/)(test-setup|jest\.setup)\.[jt]s$/.test(file) &&
-    !/^libs\/(react-query-client|companion-ws-client)\/src\/lib\//.test(file)
-  );
-}
-
-export function ownedFiles(root, tracked) {
-  const projects = tracked
-    .filter((file) => /(^|\/)project\.json$/.test(file))
-    .map((file) => path.dirname(file))
-    .filter((directory) => directory !== '.')
-    .sort((a, b) => b.length - a.length);
-  return tracked.filter((file) => (projects.find((directory) => file.startsWith(`${directory}/`)) ?? '.') === root);
-}
 
 // Use complete source ranges, not names or just line numbers: anonymous
 
-export function nodeCoverage(files, tests, output) {
-  if (!tests.length) return [];
-  mkdirSync(output, { recursive: true });
-  const manifest = path.join(output, 'manifest.json');
-  const sourceCopies = {};
-  for (const file of files) {
-    const absolute = path.resolve(workspace, file);
-    const hash = createHash('sha256').update(readFileSync(absolute)).digest('hex');
-    (sourceCopies[hash] ??= []).push(absolute);
-  }
-  writeFileSync(
-    manifest,
-    JSON.stringify({ files: files.map((file) => path.resolve(workspace, file)), sourceCopies, output }),
-  );
-  const loader = path.join(workspace, 'scripts/crap-score/node-coverage.mjs');
-  const env = {
-    ...process.env,
-    CRAP_NODE_MANIFEST: manifest,
-    NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import=${loader}`,
-  };
-  delete env.NODE_TEST_CONTEXT;
-  execFileSync(process.execPath, ['--test', ...tests], {
-    cwd: workspace,
-    stdio: 'inherit',
-    env,
-  });
-  const reports = readdirSync(output).filter((file) => file !== 'manifest.json' && file.endsWith('.json'));
-  if (!reports.length) throw new Error('Node test runner did not produce coverage');
-  return reports.map((file) => JSON.parse(readFileSync(path.join(output, file), 'utf8')));
-}
-
-export const vitestSuites = {
-  '.': [{ cwd: workspace, args: ['--config', 'scripts/vitest.config.mts'] }],
-  'apps/companion': [{ cwd: workspace, args: ['--config', 'apps/companion/renderer/vitest.config.mts'] }],
-  'apps/frontend': [{ cwd: workspace, args: ['--config', 'apps/frontend/vitest.config.ts'] }],
-  'apps/plugins/wago': [{ cwd: workspace, args: ['--config', 'apps/plugins/wago/frontend/vitest.config.mts'] }],
-  'apps/plugins/rabbitmq': [{ cwd: workspace, args: ['--config', 'apps/plugins/rabbitmq/frontend/vitest.config.ts'] }],
-  'apps/plugins/shelly': [{ cwd: path.join(workspace, 'apps/plugins/shelly'), args: ['--root', 'frontend'] }],
-  'apps/plugins/matter': [{ cwd: path.join(workspace, 'apps/plugins/matter'), args: ['--root', 'frontend'] }],
-  ...Object.fromEntries(
-    ['libs/plugins-frontend-sdk', 'libs/plugins-frontend-ui', 'libs/companion-ws-client'].map((root) => [
-      root,
-      [{ cwd: path.join(workspace, root), args: [] }],
-    ]),
-  ),
-};
-
-export function jestSuite(config) {
-  return {
-    runner: 'jest',
-    cwd: workspace,
-    args: ['--config', config, '--runInBand', '--passWithNoTests', '--testPathIgnorePatterns=\\.e2e\\.spec\\.ts$'],
-  };
-}
-
-export function suites(root) {
-  const result = (vitestSuites[root] ?? []).map((suite) => ({ runner: 'vitest', ...suite }));
-  const config = ['jest.config.ts', 'jest.config.js'].find((file) => existsSync(path.join(root, file)));
-  if (root !== '.' && config) result.unshift(jestSuite(path.join(root, config)));
-  if (root === 'apps/plugins/wago') {
-    result.push(
-      jestSuite(`${root}/cc100-runtime/jest.config.ts`),
-      ...['audit-hooks', 'commissioning', 'reliability-plan'].map((name) =>
-        jestSuite(`${root}/scripts/jest.${name}.config.cjs`),
-      ),
-    );
-  }
-  return result;
-}
 // callbacks and same-named methods can share a line and still be distinct.
 export function deduplicateFunctions(file) {
   const locations = new Map();
@@ -423,6 +331,23 @@ export function validateFunctionCompleteness(project, files, report, coverage) {
 // Source-map remapping may leave end columns null (end of line). Restore exact
 // boundaries from the original source, without changing any execution counts.
 
+// Unit test targets write Istanbul JSON to coverage/<project root>/<target>/; the
+// crap-score target depends on those targets and reads exactly their directories.
+export const coverageDirectory = (root, target) =>
+  path.join(workspace, 'coverage', root === '.' ? 'root' : root, target);
+
+const dependencyTargets = (project) =>
+  (project.targets?.['crap-score']?.dependsOn ?? []).map((dependency) =>
+    typeof dependency === 'string' ? dependency : dependency.target,
+  );
+
+function coverageReports(directory) {
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory, { recursive: true })
+    .filter((file) => path.basename(file) === 'coverage-final.json')
+    .map((file) => JSON.parse(readFileSync(path.join(directory, file), 'utf8')));
+}
+
 export async function run(root, outputDirectory) {
   process.chdir(workspace);
   const project = JSON.parse(readFileSync(path.join(root, 'project.json'), 'utf8'));
@@ -434,39 +359,16 @@ export async function run(root, outputDirectory) {
   })
     .split('\0')
     .filter((file) => file && existsSync(path.resolve(workspace, file)));
-  const owned = ownedFiles(root, tracked);
-  const files = owned.filter(isSource);
+  const files = ownedFiles(root, tracked).filter(isSource);
   if (!files.length) throw new Error(`No JS/TS source files found for ${project.name}`);
-  const nodeTests = owned.filter(
-    (file) => /\.(spec|test)\.mjs$/.test(file) && readFileSync(file, 'utf8').includes('node:test'),
-  );
-  const reports = nodeCoverage(
-    files.filter((file) => /\.[cm]?js$/.test(file)),
-    nodeTests,
-    path.join(output, 'node'),
-  );
-  for (const [index, suite] of suites(root).entries()) {
-    const dir = path.join(output, `coverage-${index}`);
-    const args =
-      suite.runner === 'jest'
-        ? ['exec', 'jest', ...suite.args, '--coverage', '--coverageReporters=json', `--coverageDirectory=${dir}`]
-        : [
-            'exec',
-            'vitest',
-            'run',
-            ...suite.args,
-            '--coverage',
-            '--coverage.provider=istanbul',
-            '--coverage.reporter=json',
-            `--coverage.reportsDirectory=${dir}`,
-            '--maxWorkers=2',
-            '--passWithNoTests',
-          ];
-    execFileSync('pnpm', args, { cwd: suite.cwd, stdio: 'inherit', env: { ...process.env, CRAP_SCORE_COVERAGE: '1' } });
-    const reportFile = path.join(dir, 'coverage-final.json');
-    if (!existsSync(reportFile)) throw new Error(`Coverage runner did not write ${reportFile}`);
-    reports.push(JSON.parse(readFileSync(reportFile, 'utf8')));
-  }
+  const reports = dependencyTargets(project).flatMap((target) => {
+    const found = coverageReports(coverageDirectory(root, target));
+    if (!found.length)
+      throw new Error(
+        `${project.name}:${target} wrote no coverage to ${path.relative(workspace, coverageDirectory(root, target))}`,
+      );
+    return found;
+  });
   const testCoverage = completeCoverage(files, reports);
   writeFileSync(path.join(output, 'coverage-final.json'), JSON.stringify(testCoverage));
   const errors = [];

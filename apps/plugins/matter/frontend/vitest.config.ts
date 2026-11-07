@@ -16,5 +16,18 @@ export default defineConfig({
       ),
     },
   },
-  test: { environment: 'jsdom', include: ['src/**/*.spec.tsx'], testTimeout: 20_000 },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.spec.tsx'],
+    testTimeout: 20_000,
+    coverage: {
+      // Unit coverage feeds the project's crap-score target.
+      enabled: true,
+      provider: 'istanbul',
+      reporter: ['json'],
+      reportsDirectory: fileURLToPath(
+        new URL('../../../../coverage/apps/plugins/matter/test-frontend', import.meta.url),
+      ),
+    },
+  },
 });

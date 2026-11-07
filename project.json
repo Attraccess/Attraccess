@@ -21,7 +21,8 @@
       "options": {
         "command": "node scripts/crap-score/run.mjs ."
       },
-      "outputs": ["{workspaceRoot}/coverage/crap/@attraccess__source"]
+      "outputs": ["{workspaceRoot}/coverage/crap/@attraccess__source"],
+      "dependsOn": ["test"]
     },
     "test": {
       "executor": "nx:run-commands",
@@ -35,10 +36,10 @@
           "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
         }
       ],
-      "outputs": [],
+      "outputs": ["{workspaceRoot}/coverage/root/test"],
       "options": {
         "commands": [
-          "node --test scripts/*.test.mjs scripts/crap-score/*.test.mjs tools/eslint-rules/*.test.mjs",
+          "node scripts/crap-score/node-test.mjs . coverage/root/test/node scripts/*.test.mjs scripts/crap-score/*.test.mjs tools/eslint-rules/*.test.mjs apps/plugins/scripts/*.test.mjs tools/hetzner-dns-updater/*.test.mjs",
           "vitest run --config scripts/vitest.config.mts"
         ],
         "parallel": false

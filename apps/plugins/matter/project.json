@@ -57,7 +57,7 @@
         "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
         "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"
       ],
-      "outputs": [],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/matter/test-frontend"],
       "options": {
         "cwd": "apps/plugins/matter",
         "command": "pnpm exec vitest run --root frontend"
@@ -75,7 +75,7 @@
           "externalDependencies": ["jest"]
         }
       ],
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/matter"],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/matter/test"],
       "options": {
         "jestConfig": "apps/plugins/matter/jest.config.ts"
       },
@@ -171,6 +171,7 @@
       }
     },
     "crap-score": {
+      "dependsOn": ["test", "test-frontend"],
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/matter"

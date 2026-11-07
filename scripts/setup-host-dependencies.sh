@@ -159,7 +159,9 @@ setup_host_dependencies() {
         echo "⚠ Docker Compose v2 is unavailable. Install the plugin so 'docker compose' works."
     fi
     if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
-        . "$HOME/.nvm/nvm.sh"
+        # nvm.sh returns non-zero when no default version is installed yet,
+        # which would end this `set -e` script silently.
+        . "$HOME/.nvm/nvm.sh" || true
     fi
     if ! check_node; then install_node; fi
     check_node || { echo "Node.js $NODE_VERSION is required." >&2; return 1; }

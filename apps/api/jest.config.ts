@@ -12,7 +12,10 @@ module.exports = {
   // ESM-only packages: JOSE, and otplib's @scure/@noble dependencies (mass-introduction QR codes).
   transformIgnorePatterns: ['node_modules/(?!jose/|\\.pnpm/jose@|@scure/|\\.pnpm/@scure\\+|@noble/|\\.pnpm/@noble\\+)'],
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/apps/api',
+  // Unit coverage feeds the project's crap-score target.
+  collectCoverage: true,
+  coverageReporters: ['json'],
+  coverageDirectory: '../../coverage/apps/api/test',
   // SQLite integration tests and bcrypt exceed their per-test timeouts under the default worker count.
   maxWorkers: 3,
   moduleNameMapper: {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -7,6 +7,13 @@ import { test } from 'node:test';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
+const toolDirectories = [
+  ...new Set(
+    ['sh', 'sed', 'dirname', 'uname'].map((tool) =>
+      dirname(execFileSync('sh', ['-c', `command -v ${tool}`], { encoding: 'utf8' }).trim()),
+    ),
+  ),
+];
 // Both runners own a labelled RabbitMQ container and share the same cleanup contract.
 const runners = [
   {
@@ -28,8 +35,9 @@ const runners = [
     label: 'reliability',
     script: resolve(import.meta.dirname, 'test-reliability.mjs'),
     contextVariable: 'WAGO_RELIABILITY_DOCKER_CONTEXT',
-    // The reliability runner bundles its controller farm with esbuild first, which needs node and a shell.
-    path: (directory) => [directory, dirname(process.execPath), '/usr/bin', '/bin'].join(':'),
+    // The reliability runner bundles its controller farm with esbuild first, which needs node, a shell
+    // and esbuild's launcher tools. Nix keeps those outside /usr/bin, so resolve them from PATH.
+    path: (directory) => [directory, dirname(process.execPath), ...toolDirectories].join(':'),
     // A successful `docker run` would make it wait for broker readiness, so only startup failures apply.
     scenarios: [
       'startup-fails',

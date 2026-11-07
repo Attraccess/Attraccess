@@ -7,7 +7,6 @@ import {
   ResourceUsageLifecycleAttempt,
   LifecycleBillingItem,
   Resource,
-  ResourceType,
   ResourceUsageAction,
   User,
   Project,
@@ -15,13 +14,15 @@ import {
 
 import { ConflictException, Logger } from '@nestjs/common';
 
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 
 import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 
 import { ResourceUsageLifecycleAbortedEvent } from '../events/resource-usage.events';
 
 import { recoverOrphanedUsages } from '../../../database/resource-usage-integrity';
+
+import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
 
 import { ExternalEffectFailureError } from '../../flows/errors/external-effect-failure.error';
 
@@ -45,6 +46,7 @@ import { ProjectsService } from '../../../projects/projects.service';
 
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 
+import { FlowExecutionOptions } from '../../flows/execution/flow-execution.types';
 import { ResourceFlowsExecutorService } from '../../flows/execution/resource-flows-executor.service';
 
 import { ResourceFormsService } from '../../forms/forms.service';
@@ -72,6 +74,8 @@ import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
 import { ResourceUsageService } from '../sessions/resource-usage.service';
+import { LOCK_TTL_MS, type SessionChangeCoordination } from '../sessions/session-change-coordination';
+import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
 import { ResourceAuditOrigin } from '../../../audit/audit-policy';
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
@@ -79,6 +83,10 @@ export interface EndSessionOptions {
   /** Skip emitting ResourceUsageNoteAddedEvent (used when the note is auto-generated, e.g. flow-ended). */
   skipNoteNotification?: boolean;
   auditOrigin?: ResourceAuditOrigin;
+  /** Flow ends: the user whose action triggered the flow, recorded in the audit entry of the ended session. */
+  triggeredByUserId?: number;
+  /** Internal: the caller already holds this machine's turn in the session-change queue (deferred flow ends). */
+  withinSessionChange?: boolean;
 }
 
 export interface StartSessionOptions {
@@ -88,6 +96,13 @@ export interface StartSessionOptions {
    */
   supervisorUserId?: number;
   auditOrigin?: ResourceAuditOrigin;
+}
+
+/** Published usage sessions on the machine around a start, stop or takeover, handed to flows as `activeSessions`. */
+export interface ActiveSessionCounts {
+  before: number;
+  after: number;
+  limit: number;
 }
 
 export type UsageFlowPayload = {
@@ -181,42 +196,79 @@ export abstract class UsageLifecycle {
     });
   }
 
-  /** Claim and discard the candidate before dispatching stopped-flow effects. */
-  async endLifecycleCandidate(attemptId: string, resourceId: number, endNotes: string): Promise<void> {
-    const candidate = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
-      if (attempt.candidateUsageId === null) {
-        throw new ConflictException('The usage lifecycle attempt has no candidate session');
-      }
-      const candidate = await manager.findOneOrFail(ResourceUsage, {
-        where: { id: attempt.candidateUsageId, lifecyclePending: true },
-        relations: ['resource', 'user', 'project'],
-      });
-      const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
-      if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
-      // Keep the reservation until the owning flow has settled all of its branches.
-      await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
-      return candidate;
-    });
+  /**
+   * Claim and discard the candidate before dispatching stopped-flow effects. `actorUserId` is the user whose start
+   * or takeover this was; its stop flow runs on their behalf.
+   */
+  async endLifecycleCandidate(
+    attemptId: string,
+    resourceId: number,
+    endNotes: string,
+    actorUserId?: number,
+  ): Promise<void> {
+    const { candidate, activeSessions } = await runSerializedTransaction(
+      this.resourceUsageRepository.manager,
+      async (manager) => {
+        const attempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
+        if (attempt.candidateUsageId === null) {
+          throw new ConflictException('The usage lifecycle attempt has no candidate session');
+        }
+        const candidate = await manager.findOneOrFail(ResourceUsage, {
+          where: { id: attempt.candidateUsageId, lifecyclePending: true },
+          relations: ['resource', 'user', 'project'],
+        });
+        const result = await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
+        if (result.affected === 0) throw new ConflictException('The tentative usage session no longer exists');
+        // Keep the reservation until the owning flow has settled all of its branches.
+        await manager.update(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId }, { candidateUsageId: null });
+        // The start flow counted the candidate as a session; taking it back leaves the published sessions.
+        // A takeover counted it in place of the session it replaces, which keeps running now.
+        const published = await manager.count(ResourceUsage, { where: { resourceId, ...activeUsageWhere() } });
+        const activeSessions: ActiveSessionCounts = {
+          before: attempt.kind === 'takeover' ? published : published + 1,
+          after: published,
+          limit: await this.getSessionLimit(manager, resourceId),
+        };
+        return { candidate, activeSessions };
+      },
+    );
 
     await this.runUsageFlow(
       undefined,
       resourceId,
       ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-      { ...this.getResourceUsageFlowPayload(candidate), endTime: new Date(), endNotes },
+      { ...this.getResourceUsageFlowPayload(candidate), endTime: new Date(), endNotes, activeSessions },
       'tentative end',
-      attemptId,
-      true,
+      { lifecycleAttemptId: attemptId, lifecycleCandidateCancellation: true, actorUserId },
     );
   }
 
-  /** A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. */
-  public async recoverInterruptedLifecycles(): Promise<void> {
+  /**
+   * A restart has the same outcome as a rolled-back lifecycle: never replay physical effects. An attempt that
+   * another API instance is still working on (it keeps a heartbeat in Valkey) is left alone, so starting one
+   * instance does not abort a start or stop in flight on another.
+   *
+   * With Valkey, every instance repeats this as a `sweep` for attempts left by an instance that crashed while
+   * others keep running. A sweep skips attempts younger than the heartbeat's time to live, and one with
+   * nothing to clean up does not touch the database.
+   */
+  public async recoverInterruptedLifecycles(sweep = false): Promise<void> {
+    const oldEnough = new Date(Date.now() - LOCK_TTL_MS);
+    const attempts = await this.resourceUsageRepository.manager.find(ResourceUsageLifecycleAttempt, {
+      select: { id: true, createdAt: true },
+    });
+    const gone = await this.sessionChangeCoordination.findGone(
+      attempts.filter(({ createdAt }) => !sweep || createdAt <= oldEnough).map(({ id }) => id),
+      !sweep,
+    );
+    if (sweep && gone.size === 0) return;
     const resourceIds = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
-      const recovered = await recoverOrphanedUsages(manager);
+      const recovered = sweep ? 0 : await recoverOrphanedUsages(manager);
       if (recovered)
         this.logger.warn(`Cancelled ${recovered} orphan unfinalized usage sessions; see resource_usage_recovery`);
-      const attempts = await manager.find(ResourceUsageLifecycleAttempt);
+      const attempts = gone.size
+        ? await manager.find(ResourceUsageLifecycleAttempt, { where: { id: In([...gone]) } })
+        : [];
       for (const attempt of attempts) {
         if (attempt.candidateUsageId !== null) {
           await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
@@ -240,19 +292,10 @@ export abstract class UsageLifecycle {
     triggerNodeType: ResourceFlowNodeType,
     payload: object,
     description: string,
-    lifecycleAttemptId?: string,
-    lifecycleCandidateCancellation = false,
+    options: Pick<FlowExecutionOptions, 'lifecycleAttemptId' | 'lifecycleCandidateCancellation' | 'actorUserId'>,
   ): Promise<void> {
     try {
-      await this.flowExecutorService.runFlow(
-        resourceId,
-        triggerNodeType,
-        payload,
-        manager,
-        lifecycleCandidateCancellation
-          ? { lifecycleAttemptId, lifecycleCandidateCancellation: true }
-          : { lifecycleAttemptId },
-      );
+      await this.flowExecutorService.runFlow(resourceId, triggerNodeType, payload, manager, options);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Usage ${description} flow failed for resource ${resourceId}: ${message}`, error);
@@ -276,7 +319,7 @@ export abstract class UsageLifecycle {
       where: { id: resourceId },
       select: { id: true, type: true, maxParallelSessions: true },
     });
-    return resource?.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
+    return sessionLimitOf(resource);
   }
 
   /**
@@ -309,7 +352,7 @@ export abstract class UsageLifecycle {
     resourceId: number,
   ): Promise<ResourceUsageLifecycleAttempt> {
     const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id, resourceId } });
-    if (!attempt) throw new ConflictException('The usage lifecycle attempt is no longer active');
+    if (!attempt) throw new SessionChangeInterruptedError();
     return attempt;
   }
 
@@ -336,6 +379,8 @@ export abstract class UsageLifecycle {
 
   protected abstract readonly logger: Logger;
 
+  protected abstract readonly sessionChangeCoordination: SessionChangeCoordination;
+
   protected abstract readonly operatingAttributionService: ResourceOperatingAttributionService | undefined;
 
   protected abstract readonly resourceUsageRepository: Repository<ResourceUsage>;
@@ -350,6 +395,7 @@ export abstract class UsageLifecycle {
   ): UsageFlowPayload;
 
   protected abstract cacheCleanupInterval: ReturnType<typeof setInterval> | null;
+  protected abstract lifecycleSweepInterval: ReturnType<typeof setInterval> | null;
 
   protected abstract pruneAccessCache(): void;
 
@@ -481,6 +527,7 @@ export abstract class UsageLifecycle {
     existingActiveSession: ResourceUsage;
     attempt: import('typeorm').DeepPartial<ResourceUsageLifecycleAttempt> & ResourceUsageLifecycleAttempt;
     formSubmissions: FormSubmission[];
+    activeSessions: ActiveSessionCounts;
   }>;
 
   protected abstract notifySessionStarted(
@@ -515,6 +562,7 @@ export abstract class UsageLifecycle {
     endedUsageIdToEmit: number | null,
     activeSession: ResourceUsage | null,
     skipNoteNotification: boolean,
+    triggeredByUserId?: number,
   ): Promise<void>;
 
   protected abstract handleDoorAction(

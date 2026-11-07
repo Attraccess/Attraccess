@@ -39,6 +39,8 @@ export interface TemplateVariables {
  */
 export interface NodeExecutionContext {
   flowRunId?: string;
+  /** The user whose action started this run; never taken from the payload, which nodes can replace. */
+  actorUserId?: number;
   lifecycleAttemptId?: string;
   lifecycleCandidateCancellation?: boolean;
   metering?: MeteringRunContext;

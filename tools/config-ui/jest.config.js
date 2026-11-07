@@ -3,5 +3,8 @@ module.exports = {
   testEnvironment: 'node',
   rootDir: '.',
   testMatch: ['<rootDir>/modules/*.spec.js', '<rootDir>/server.spec.js'],
-  coverageDirectory: '../../coverage/tools/config-ui',
+  // Unit coverage feeds the project's crap-score target.
+  collectCoverage: true,
+  coverageReporters: ['json'],
+  coverageDirectory: '../../coverage/tools/config-ui/test',
 };

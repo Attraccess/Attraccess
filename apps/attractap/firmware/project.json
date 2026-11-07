@@ -86,13 +86,15 @@
           "ctest --test-dir apps/attractap/firmware/tests/ota/build --output-on-failure",
           "cmake -S apps/attractap/firmware/tests/test-hooks -B apps/attractap/firmware/tests/test-hooks/build",
           "cmake --build apps/attractap/firmware/tests/test-hooks/build --parallel 2",
-          "ctest --test-dir apps/attractap/firmware/tests/test-hooks/build --output-on-failure",
-          "node --test apps/attractap/firmware/tests/ota/hardware-soak.test.mjs"
+          "ctest --test-dir apps/attractap/firmware/tests/test-hooks/build --output-on-failure"
         ],
         "parallel": false,
         "cwd": "."
       },
-      "cache": false
+      "cache": false,
+      "dependsOn": [
+        "test-node"
+      ]
     },
     "flash": {
       "executor": "nx:run-commands",
@@ -120,6 +122,22 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/attractap/firmware"
+      },
+      "dependsOn": [
+        "test-node"
+      ]
+    },
+    "test-node": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default"
+      ],
+      "outputs": [
+        "{workspaceRoot}/coverage/apps/attractap/firmware/test-node"
+      ],
+      "options": {
+        "command": "node scripts/crap-score/node-test.mjs apps/attractap/firmware coverage/apps/attractap/firmware/test-node apps/attractap/firmware/tests/ota/hardware-soak.test.mjs"
       }
     }
   }

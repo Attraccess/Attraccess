@@ -4,13 +4,39 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Resource } from '@attraccess/react-query-client';
 import { MachineTab } from './machine';
 
-const state = vi.hoisted(() => ({ activeSessionCount: 0 }));
+type Warning = { triggerNodeId: string; triggerType: string; effectNodes: { nodeId: string; nodeType: string }[] };
+
+const state = vi.hoisted(() => ({
+  activeSessionCount: 0,
+  warnings: [] as Warning[],
+  warningsFailed: false,
+  warningsEnabled: [] as boolean[],
+}));
 
 vi.mock('@attraccess/react-query-client', () => ({
   useResourcesServiceResourceUsageGetActiveSession: () => ({
     data: { activeSessionCount: state.activeSessionCount },
   }),
+  // Behaves like react-query: a disabled query has no data.
+  useResourceFlowsServiceGetSharedMachineFlowWarnings: (_: unknown, __: unknown, options: { enabled: boolean }) => {
+    state.warningsEnabled.push(options.enabled);
+    if (!options.enabled) return { data: undefined, isError: false };
+    return state.warningsFailed ? { data: undefined, isError: true } : { data: state.warnings, isError: false };
+  },
+  useResourceFlowsServiceGetNodeSchemas: () => ({
+    data: [{ type: 'plugin.lights.switch', label: 'Switch lights' }],
+  }),
 }));
+
+const stopWarning: Warning = {
+  triggerNodeId: 'a',
+  triggerType: 'input.resource.usage.stopped',
+  effectNodes: [
+    { nodeId: 'b', nodeType: 'output.http.sendRequest' },
+    { nodeId: 'c', nodeType: 'plugin.lights.switch' },
+    { nodeId: 'd', nodeType: 'plugin.unknown.node' },
+  ],
+};
 
 const t = (key: string, params?: { count: number }) => (params ? `${key} ${params.count}` : key);
 
@@ -30,6 +56,9 @@ function mount(maxParallelSessions: number) {
 describe('MachineTab max parallel sessions', () => {
   beforeEach(() => {
     state.activeSessionCount = 0;
+    state.warnings = [];
+    state.warningsFailed = false;
+    state.warningsEnabled = [];
   });
 
   it('sets the clamped limit', () => {
@@ -53,15 +82,38 @@ describe('MachineTab max parallel sessions', () => {
     );
   });
 
-  it('shows no hint for a sufficient limit and no flow warning at limit 1', () => {
+  it('shows no hint for a sufficient limit and does not check the flows at limit 1', () => {
     state.activeSessionCount = 1;
+    state.warnings = [stopWarning];
     mount(1);
     expect(screen.queryByText(/belowActiveHint/)).not.toBeInTheDocument();
     expect(screen.queryByText(/flowsWarning/)).not.toBeInTheDocument();
+    expect(state.warningsEnabled).not.toContain(true);
   });
 
-  it('warns about per-session flows above limit 1', () => {
+  it('lists each trigger with its effects, titled like the flow editor, and opens the flows in a new tab', () => {
+    state.warnings = [stopWarning];
+    mount(3);
+    expect(screen.getByText('inputs.machine.maxParallelSessions.flowsWarningTitle')).toBeInTheDocument();
+    // Core titles from the flow editor translations, plugin titles from the schema label, else the raw type.
+    expect(
+      screen.getByText('Usage stopped → Send HTTP request, Switch lights, plugin.unknown.node'),
+    ).toBeInTheDocument();
+    const link = screen.getByRole('link');
+    expect(link).toHaveAttribute('href', '/resources/5/flows');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('shows the generic flow warning without a list when the check fails', () => {
+    state.warningsFailed = true;
     mount(3);
     expect(screen.getByText('inputs.machine.maxParallelSessions.flowsWarning')).toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+  });
+
+  it('shows no flow warning when no flow is affected', () => {
+    mount(3);
+    expect(screen.queryByText(/flowsWarning/)).not.toBeInTheDocument();
   });
 });
