@@ -7,7 +7,7 @@ import {
   getExternalEffectFailureBehavior,
 } from '@attraccess/database-entities';
 
-import { Repository, EntityManager } from 'typeorm';
+import { Repository, EntityManager, FindOperator, IsNull } from 'typeorm';
 
 import { FlowLogRecorderService } from '../logs/flow-log-recorder.service';
 
@@ -21,22 +21,27 @@ import { FlowExecutionOptions, FlowResourceContext } from './flow-execution.type
 import { ResourceFlowLogType } from '../dto/flow-log.dto';
 
 import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
+import { FlowExecutionError } from '../errors/flow-execution.error';
 
 import { getPluginFlowNode } from '../../../plugin-system/flows/node-registry';
 
 import { randomBytes } from 'crypto';
 
+/** Lifecycle-fatal errors outrank ordinary ones, so a branch failing first cannot mask them. */
+function flowErrorRank(error: unknown): number {
+  if (error instanceof ExternalEffectFailureError) return 2;
+  if (error instanceof FlowExecutionError) return 1;
+  return 0;
+}
+
 export async function settleFlowBranches(branches: Promise<NodeProcessingResult[]>[]): Promise<NodeProcessingResult[]> {
   // A failed branch cannot release a lifecycle reservation while sibling effects are still running.
-  // Wait for work already started, then preserve lifecycle-fatal failures over ordinary node errors.
+  // Wait for work already started, then keep the highest-ranked failure (first seen within a rank).
   let failure: { error: unknown } | undefined;
   const results = await Promise.allSettled(
     branches.map((branch) =>
       branch.catch((error) => {
-        if (
-          !failure ||
-          (error instanceof ExternalEffectFailureError && !(failure.error instanceof ExternalEffectFailureError))
-        ) {
+        if (!failure || flowErrorRank(error) > flowErrorRank(failure.error)) {
           failure = { error };
         }
         throw error;
@@ -45,6 +50,13 @@ export async function settleFlowBranches(branches: Promise<NodeProcessingResult[
   );
   if (failure) throw failure.error;
   return results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
+}
+
+/** Edges and nodes of the canvas a node belongs to: its global flow, or its resource's own flow. */
+function sameOwnerWhere(
+  node: ResourceFlowNode,
+): { flowId: number } | { resourceId: number; flowId: FindOperator<null> } {
+  return node.flowId != null ? { flowId: node.flowId } : { resourceId: node.resourceId as number, flowId: IsNull() };
 }
 
 export class FlowExecutionEngine {
@@ -70,10 +82,13 @@ export class FlowExecutionEngine {
 
     const edgesRepository = getFlowRepository(ResourceFlowEdge, this.flowEdgeRepository, transactionManager);
 
+    // Edges and targets must belong to the same canvas; another owner's nodes (e.g. a disabled flow) never run.
+    const owner = sameOwnerWhere(node);
     const edgesFromThisNode = await edgesRepository.find({
       where: {
         source: node.id,
         sourceHandle: resultOfPreviousNode.outputHandle,
+        ...owner,
       },
     });
 
@@ -93,7 +108,7 @@ export class FlowExecutionEngine {
     // Execute each edge individually instead of deduplicating target nodes
     const edgePromises = edgesFromThisNode.map(async (edge) => {
       const targetNode = await flowNodeRepository.findOne({
-        where: { id: edge.target },
+        where: { id: edge.target, ...owner },
       });
 
       if (!targetNode) {

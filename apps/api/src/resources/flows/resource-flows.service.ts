@@ -15,7 +15,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 
@@ -112,15 +112,57 @@ export class ResourceFlowsService {
     const warnings = findFlowsWithoutSessionCountCheck(nodes, edges);
 
     // Enabled global flows run for this machine's starts and stops too.
-    const globalFlows = await this.flowRepository.find({ where: { enabled: true }, order: { id: 'ASC' } });
+    const globalFlows = await this.flowRepository.find({
+      where: { enabled: true, scope: 'global' },
+      order: { id: 'ASC' },
+    });
+    if (globalFlows.length === 0) return warnings;
+    const flowIds = globalFlows.map((flow) => flow.id);
+    const [flowNodes, flowEdges] = await Promise.all([
+      this.flowNodeRepository.find({ where: { flowId: In(flowIds) } }),
+      this.flowEdgeRepository.find({ where: { flowId: In(flowIds) } }),
+    ]);
     for (const flow of globalFlows) {
-      const [flowNodes, flowEdges] = await Promise.all([
-        this.flowNodeRepository.find({ where: { flowId: flow.id } }),
-        this.flowEdgeRepository.find({ where: { flowId: flow.id } }),
-      ]);
-      warnings.push(...findFlowsWithoutSessionCountCheck(flowNodes, flowEdges, flow));
+      warnings.push(
+        ...findFlowsWithoutSessionCountCheck(
+          flowNodes.filter((node) => node.flowId === flow.id),
+          flowEdges.filter((edge) => edge.flowId === flow.id),
+          flow,
+        ),
+      );
     }
     return warnings;
+  }
+
+  /**
+   * Node and edge ids are global. Call after deleting the saving flow's own rows: any id still present belongs to
+   * another resource or global flow, and saving it would move it out of its owner.
+   */
+  public async assertCanvasIdsNotOwnedElsewhere(
+    manager: EntityManager,
+    canvas: { nodes: { id: string }[]; edges: { id: string }[] },
+  ): Promise<void> {
+    const nodeIds = canvas.nodes.map((node) => node.id);
+    const edgeIds = canvas.edges.map((edge) => edge.id);
+    const [nodes, edges] = await Promise.all([
+      nodeIds.length > 0
+        ? manager.find(ResourceFlowNode, { where: { id: In(nodeIds) }, select: { id: true } })
+        : Promise.resolve([]),
+      edgeIds.length > 0
+        ? manager.find(ResourceFlowEdge, { where: { id: In(edgeIds) }, select: { id: true } })
+        : Promise.resolve([]),
+    ]);
+    if (nodes.length === 0 && edges.length === 0) return;
+    throw new BadRequestException({
+      message: [
+        ...nodes.map((node) => `Node id ${node.id} is already used by another flow`),
+        ...edges.map((edge) => `Edge id ${edge.id} is already used by another flow`),
+      ],
+      error: 'Bad Request',
+      statusCode: 400,
+      nodeIds: nodes.map((node) => node.id),
+      edgeIds: edges.map((edge) => edge.id),
+    });
   }
 
   /** Rejects a canvas that contains a node the flow's scope cannot use; the error names every such node. */
@@ -260,6 +302,7 @@ export class ResourceFlowsService {
       // Delete existing nodes and edges (cascading will handle relationships)
       await transactionalEntityManager.delete(ResourceFlowNode, { resource: { id: resourceId } });
       await transactionalEntityManager.delete(ResourceFlowEdge, { resource: { id: resourceId } });
+      await this.assertCanvasIdsNotOwnedElsewhere(transactionalEntityManager, flowData);
 
       // Create new nodes
       const newNodes = flowData.nodes.map((nodeData) => {

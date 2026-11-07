@@ -1,7 +1,7 @@
 import { ResourceFlowsExecutorService } from '../resource-flows-executor.service';
 import { FlowLogRecorderService } from '../../logs/flow-log-recorder.service';
 import { Logger } from '@nestjs/common';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { FindOperator, Repository, SelectQueryBuilder } from 'typeorm';
 import {
   Resource,
   ResourceFlowNode,
@@ -18,6 +18,20 @@ import { CronTimer } from '../../../../metrics/instrumentation/cron/cron.helper'
 import { FlowTimer } from '../../../../metrics/instrumentation/flow/flow.helper';
 import { CompanionGatewayService } from '../../../../companion/companion-gateway.service';
 import { ResourceFlowsExecutorServiceRunFlowTestScope } from '../resource-flows-executor.service.spec';
+// Mirrors `flowId: IsNull()` / `flowId: <id>` / `resourceId: <id>` where clauses on in-memory rows.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function matchesFlowId(row: { flowId?: number | null }, flowId: any): boolean {
+  if (flowId === undefined || row.flowId === undefined) return true;
+  if (flowId instanceof FindOperator) return flowId.type === 'isNull' ? row.flowId === null : true;
+  return row.flowId === flowId;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function matchesOwner(row: { flowId?: number | null; resourceId?: number | null }, where: any): boolean {
+  if (!matchesFlowId(row, where.flowId)) return false;
+  return where.resourceId === undefined || row.resourceId === undefined || row.resourceId === where.resourceId;
+}
+
 export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestScope) {
   jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
   jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
@@ -28,12 +42,43 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
   scope.initialNodes = [];
   scope.edgesBySourceAndHandle = {};
 
-  const defaultQueryBuilder = {
-    innerJoin: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    distinct: jest.fn().mockReturnThis(),
-    getMany: jest.fn().mockResolvedValue([]),
-  } as unknown as SelectQueryBuilder<ResourceFlowNode>;
+  // Answers the plugin trigger page query (left join on the flow) from `initialNodes`; other queries find nothing.
+  const createQueryBuilder = () => {
+    const params: Record<string, unknown> = {};
+    let joinsFlow = false;
+    let limit: number | undefined;
+    const builder = {
+      innerJoin: jest.fn(() => builder),
+      leftJoin: jest.fn(() => {
+        joinsFlow = true;
+        return builder;
+      }),
+      where: jest.fn((_sql: string, values?: Record<string, unknown>) => {
+        Object.assign(params, values);
+        return builder;
+      }),
+      andWhere: jest.fn((_sql: string, values?: Record<string, unknown>) => {
+        Object.assign(params, values);
+        return builder;
+      }),
+      orderBy: jest.fn(() => builder),
+      limit: jest.fn((value: number) => {
+        limit = value;
+        return builder;
+      }),
+      distinct: jest.fn(() => builder),
+      getMany: jest.fn(async () => {
+        if (!joinsFlow) return [];
+        return scope.initialNodes
+          .filter((node) => node.type === params.type)
+          .filter((node) => params.lastId === undefined || node.id > (params.lastId as string))
+          .filter((node) => (node.flowId ?? null) === null || (node.flow?.enabled ?? true) === params.enabled)
+          .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+          .slice(0, limit);
+      }),
+    };
+    return builder as unknown as SelectQueryBuilder<ResourceFlowNode>;
+  };
 
   scope.flowNodeRepository = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,7 +90,7 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
         if (type !== undefined && node.type !== type) return false;
         if (resourceId !== undefined && node.resourceId !== resourceId) return false;
         if (id !== undefined && !(node.id > id._value)) return false;
-        if (flowId !== undefined && (node.flowId ?? null) !== null) return false;
+        if (!matchesFlowId(node, flowId)) return false;
         if (flow !== undefined && ((node.flowId ?? null) === null || (node.flow?.enabled ?? true) !== flow.enabled)) {
           return false;
         }
@@ -56,16 +101,18 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     findOne: jest.fn(async ({ where }: any) => {
-      return scope.nodesById[where.id] ?? null;
+      const node = scope.nodesById[where.id];
+      return node && matchesOwner(node, where) ? node : null;
     }),
-    createQueryBuilder: jest.fn(() => defaultQueryBuilder),
+    createQueryBuilder: jest.fn(createQueryBuilder),
   };
 
   scope.flowEdgeRepository = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     find: jest.fn(async ({ where }: any) => {
       const key = `${where.source}|${where.sourceHandle ?? ''}`;
-      return scope.edgesBySourceAndHandle[key] ?? [];
+      // Edges without owner fields belong to whatever canvas asks for them.
+      return (scope.edgesBySourceAndHandle[key] ?? []).filter((edge) => matchesOwner(edge, where));
     }),
   } as unknown as Repository<ResourceFlowEdge>;
 

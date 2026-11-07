@@ -144,10 +144,12 @@ Every node declares `flowScopes` (`'resource'`, `'global'` or both). The resourc
 
 ### Execution Semantics
 
-- A disabled flow never runs: no trigger matches, no-activity is skipped and MQTT topics are not needed. Disabling during a run lets that run finish.
+- A disabled flow never runs: no trigger matches and no-activity is skipped. Its MQTT topics are not subscribed at startup, but disabling or deleting a flow never unsubscribes; dispatch ignores disabled flows, so messages on those topics run nothing. Disabling during a run lets that run finish.
 - A trigger in a global flow fires once per matching event for any resource of the right type. The new triggers `input.resource.health.changed`, `input.resource.maintenance.created`, `input.resource.maintenance.finished` and `input.resource.maintenance-request.created` exist in both flow types. Health fires only on a real status change.
 - For usage start/stop/takeover and door events the matching trigger nodes of enabled global flows run in the **same run** as the resource's own flow: same transaction, same per-machine session-change turn, concurrent with the resource flow and awaited together. A failing global node (failure behavior `fail-flow`, or an error) therefore aborts and rolls back the start, stop or takeover, and a slow global flow delays it. All other triggers (health, maintenance, MQTT, Companion, variables, plugin, no activity) run as in resource flows.
-- No activity checks every minute with each node's `minInactivityMinutes`; global and resource nodes keep independent schedules per (node, resource).
+- No activity checks every minute with each node's `minInactivityMinutes`. Every no-activity node keeps its own schedule per (node, resource), measured from the later of the last activity and its own last firing, so a 5-min and a 10-min node fire at 5, 10, 15… and 10, 20…; firing one node does not reset the others, and global and resource nodes do not affect each other.
+- A global heartbeat node only watches resources that have beaten through it since startup; after a restart a resource that never beats again is not marked unhealthy. Global and resource heartbeat nodes are tracked separately.
+- `input.resource.maintenance-request.created` can be fired by any authenticated user, since any signed-in user can create a maintenance request.
 - Variable changed: `global` scope fires on that global variable; `resource` scope fires when the key changes on any resource, which becomes the triggering resource. A flow that sets the variable it watches can loop, as in resource flows.
 - `context.flows.trigger(...)` from plugins also matches the plugin's trigger nodes in enabled global flows with the same `matches` callback.
 

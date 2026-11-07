@@ -4,6 +4,8 @@ import { GlobalFlowsService } from './global-flows.service';
 import { ResourceFlowsService } from './resource-flows.service';
 import { getCoreNodeFlowScopes } from './schemas/core-node-schemas';
 import { getNodeFlowScopes } from './schemas/node-flow-scopes';
+import { registerPluginFlowNodes } from '../../plugin-system/flows/node-registry';
+import { openFlowCanvasDatabase, startToHttpCanvas } from './flow-canvas-database.test-fixture';
 
 const T = ResourceFlowNodeType;
 
@@ -78,7 +80,10 @@ describe('GlobalFlowsService', () => {
 
     expect(manager.delete).toHaveBeenCalledWith(ResourceFlowNode, { flowId: 5 });
     expect(manager.delete).toHaveBeenCalledWith(ResourceFlowEdge, { flowId: 5 });
-    expect(result.nodes.every((node) => node.flowId === 5 && node.resourceId === null)).toBe(true);
+    expect(result.nodes).toEqual([
+      expect.objectContaining({ flowId: 5, resourceId: null }),
+      expect.objectContaining({ flowId: 5, resourceId: null }),
+    ]);
     expect(result.edges[0]).toMatchObject({ flowId: 5, resourceId: null });
   });
 
@@ -116,6 +121,62 @@ describe('GlobalFlowsService', () => {
     expect(subscribe).toHaveBeenCalledWith(2, 'a/b');
   });
 
+  it('only looks up flows of the global scope', async () => {
+    await service.get(5);
+    expect(flowRepository.findOne).toHaveBeenCalledWith({ where: { id: 5, scope: 'global' } });
+  });
+
+  describe('name, description and enabled', () => {
+    it('rejects a null or blank name and a null enabled with 400 and saves nothing', async () => {
+      for (const dto of [{ name: null }, { name: '   ' }, { enabled: null }]) {
+        await expect(service.update(5, dto as never)).rejects.toBeInstanceOf(BadRequestException);
+      }
+      await expect(service.create({ name: '  ' })).rejects.toBeInstanceOf(BadRequestException);
+      expect(flowRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('trims the name and clears the description with null', async () => {
+      flowRepository.findOne.mockResolvedValue({ ...flow, description: 'old' });
+      await expect(service.update(5, { name: '  Renamed ', description: null })).resolves.toMatchObject({
+        name: 'Renamed',
+        description: null,
+        enabled: true,
+      });
+      await expect(service.create({ name: ' New ', description: '  ' })).resolves.toMatchObject({
+        name: 'New',
+        description: null,
+        enabled: true,
+        scope: 'global',
+      });
+    });
+  });
+
+  it('passes the global flow context to resolveConfigSchema, with purpose for previews', async () => {
+    const schema = { type: 'object', properties: { channelId: { type: 'string' } } };
+    const resolve = jest.fn().mockResolvedValue(schema);
+    registerPluginFlowNodes('context-test', [
+      {
+        type: 'plugin.context-test.dynamic',
+        label: 'Dynamic',
+        inputs: ['input'],
+        outputs: [],
+        isOutput: true,
+        flowScopes: ['resource', 'global'],
+        resolveConfigSchema: resolve,
+        execute: jest.fn(),
+      },
+    ]);
+    await expect(service.resolveNodeSchema(5, 'plugin.context-test.dynamic', { a: 1 })).resolves.toMatchObject({
+      configSchema: schema,
+    });
+    expect(resolve).toHaveBeenLastCalledWith({ a: 1 }, { flowScope: 'global', resourceId: null, flowId: 5 });
+    await service.resolveNodeSchema(5, 'plugin.context-test.dynamic', { a: 2 }, 'preview');
+    expect(resolve).toHaveBeenLastCalledWith(
+      { a: 2 },
+      { flowScope: 'global', resourceId: null, flowId: 5, purpose: 'preview' },
+    );
+  });
+
   it('reports a missing flow', async () => {
     flowRepository.findOne.mockResolvedValue(null);
     await expect(service.getCanvas(99)).rejects.toThrow(NotFoundException);
@@ -128,7 +189,6 @@ describe('GlobalFlowsService', () => {
   });
 
   it('refuses to resolve a resource-only plugin node for a global flow', async () => {
-    const { registerPluginFlowNodes } = await import('../../plugin-system/flows/node-registry');
     registerPluginFlowNodes('scope-test', [
       {
         type: 'plugin.scope-test.default',
@@ -154,5 +214,89 @@ describe('GlobalFlowsService', () => {
     });
     const schemas = await service.getNodeSchemas();
     expect(schemas.find((s) => s.type === 'plugin.scope-test.default')?.supportedFlowScopes).toEqual(['resource']);
+  });
+});
+
+// Several real SQLite schema syncs; coverage runs on loaded CI machines exceed Jest's 5 s default.
+describe('GlobalFlowsService with a database', () => {
+  jest.setTimeout(30_000);
+  let db: Awaited<ReturnType<typeof openFlowCanvasDatabase>>;
+  beforeEach(async () => {
+    db = await openFlowCanvasDatabase();
+  });
+  afterEach(() => db.source.destroy());
+
+  const owners = async () =>
+    (await db.nodes.find({ order: { id: 'ASC' } })).map(({ id, resourceId, flowId }) => ({ id, resourceId, flowId }));
+
+  it('rejects ids of a resource flow with 400 naming them and leaves both flows untouched', async () => {
+    await db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'));
+    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'));
+
+    const saving = db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('r'));
+    await expect(saving).rejects.toBeInstanceOf(BadRequestException);
+    await expect(saving).rejects.toMatchObject({
+      response: { nodeIds: expect.arrayContaining(['r-start', 'r-http']), edgeIds: ['r-edge'] },
+    });
+    expect(await owners()).toEqual([
+      // The failed save rolled back: the global flow keeps its nodes.
+      { id: 'g-http', resourceId: null, flowId: db.flow.id },
+      { id: 'g-start', resourceId: null, flowId: db.flow.id },
+      { id: 'r-http', resourceId: db.resource.id, flowId: null },
+      { id: 'r-start', resourceId: db.resource.id, flowId: null },
+    ]);
+    expect(await db.edges.findOneByOrFail({ id: 'r-edge' })).toMatchObject({
+      resourceId: db.resource.id,
+      flowId: null,
+    });
+  });
+
+  it('rejects ids of another global flow and saves its own ids again', async () => {
+    const other = await db.flows.save(db.flows.create({ name: 'Other', enabled: true, scope: 'global' }));
+    await db.globalFlows.saveCanvas(other.id, startToHttpCanvas('o'));
+    await expect(db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('o'))).rejects.toMatchObject({
+      response: { edgeIds: ['o-edge'] },
+    });
+    expect(await db.nodes.count({ where: { flowId: other.id } })).toBe(2);
+
+    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'));
+    await expect(db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'))).resolves.toMatchObject({
+      nodes: [{ id: 'g-start' }, { id: 'g-http' }],
+    });
+  });
+
+  it('enforces exactly one owner per node and edge in the schema', async () => {
+    const base = { type: T.INPUT_RESOURCE_USAGE_STARTED, position: { x: 0, y: 0 }, data: {} };
+    await expect(db.nodes.insert({ ...base, id: 'none', resourceId: null, flowId: null })).rejects.toThrow(
+      /CHECK constraint failed/,
+    );
+    await expect(
+      db.nodes.insert({ ...base, id: 'both', resourceId: db.resource.id, flowId: db.flow.id }),
+    ).rejects.toThrow(/CHECK constraint failed/);
+    await expect(
+      db.edges.insert({ id: 'none', source: 'a', target: 'b', resourceId: null, flowId: null }),
+    ).rejects.toThrow(/CHECK constraint failed/);
+  });
+
+  it('does not list, count or open flows of another scope', async () => {
+    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'));
+    // A future flow scope (ATT-1204) sharing the table.
+    const foreign = await db.flows.save(db.flows.create({ name: 'Resource scoped', scope: 'resource' }));
+    await db.nodes.insert({
+      id: 'foreign-node',
+      type: T.INPUT_RESOURCE_USAGE_STARTED,
+      position: { x: 0, y: 0 },
+      data: {},
+      flowId: foreign.id,
+      resourceId: null,
+    });
+
+    await expect(db.globalFlows.list()).resolves.toEqual([
+      expect.objectContaining({ id: db.flow.id, nodeCount: 2, scope: 'global' }),
+    ]);
+    await expect(db.globalFlows.get(foreign.id)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(db.globalFlows.getCanvas(foreign.id)).rejects.toBeInstanceOf(NotFoundException);
+    await expect(db.globalFlows.update(foreign.id, { enabled: false })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(db.globalFlows.delete(foreign.id)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

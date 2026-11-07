@@ -6,8 +6,6 @@ import { ResourceFlowEdge } from './resourceFlowEdge';
 /** Which kind of flow an owner is: bound to one resource, or reacting to events of every resource. */
 export type FlowScope = 'resource' | 'global';
 
-export const FLOW_SCOPES = ['resource', 'global'] as const satisfies readonly FlowScope[];
-
 /**
  * A named flow that is not tied to one resource. Its nodes and edges point here through `flowId`
  * (with `resourceId` NULL); resource flows keep using `resourceId` alone.
@@ -31,8 +29,8 @@ export class Flow {
   enabled!: boolean;
 
   @Column({ type: 'varchar', default: 'global' })
-  @ApiProperty({ description: 'The kind of flow', enum: ['global'], example: 'global' })
-  scope!: 'global';
+  @ApiProperty({ description: 'The kind of flow', enum: ['resource', 'global'], example: 'global' })
+  scope!: FlowScope;
 
   @CreateDateColumn()
   @ApiProperty({ type: String, format: 'date-time' })

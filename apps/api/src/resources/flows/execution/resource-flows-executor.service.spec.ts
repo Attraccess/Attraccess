@@ -532,32 +532,51 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     await scope.service.triggerPluginFlows('pagination-test', 'plugin.pagination-test.trigger', () => true, {});
 
-    expect(scope.flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(1, {
-      where: [
-        { type: 'plugin.pagination-test.trigger', flowId: expect.anything() },
-        { type: 'plugin.pagination-test.trigger', flow: { enabled: true } },
-      ],
-      order: { id: 'ASC' },
-      take: 100,
-    });
-    expect(scope.flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(2, {
-      where: [
-        {
-          type: 'plugin.pagination-test.trigger',
-          flowId: expect.anything(),
-          id: expect.objectContaining({ _value: 'node-099' }),
-        },
-        {
-          type: 'plugin.pagination-test.trigger',
-          flow: { enabled: true },
-          id: expect.objectContaining({ _value: 'node-099' }),
-        },
-      ],
-      order: { id: 'ASC' },
-      take: 100,
-    });
+    // One query per page with a plain LIMIT, never TypeORM's two-query pagination.
+    const builders = (scope.flowNodeRepository.createQueryBuilder as jest.Mock).mock.results.map(
+      (result) => result.value,
+    );
+    expect(builders).toHaveLength(2);
+    for (const builder of builders) {
+      expect(builder.leftJoin).toHaveBeenCalledWith('node.flow', 'flow');
+      expect(builder.where).toHaveBeenCalledWith('node.type = :type', { type: 'plugin.pagination-test.trigger' });
+      expect(builder.andWhere).toHaveBeenCalledWith(
+        '(node.flowId IS NULL OR (flow.enabled = :enabled AND flow.scope = :scope))',
+        { enabled: true, scope: 'global' },
+      );
+      expect(builder.orderBy).toHaveBeenCalledWith('node.id', 'ASC');
+      expect(builder.limit).toHaveBeenCalledWith(100);
+    }
+    expect(builders[0].andWhere).not.toHaveBeenCalledWith('node.id > :lastId', expect.anything());
+    expect(builders[1].andWhere).toHaveBeenCalledWith('node.id > :lastId', { lastId: 'node-099' });
+    expect(scope.flowNodeRepository.find).not.toHaveBeenCalled();
     expect(maxInFlight).toBeLessThanOrEqual(10);
     expect(scope.service.startFlow).toHaveBeenCalledTimes(101);
+  });
+
+  it('starts plugin triggers of resource flows and enabled global flows only', async () => {
+    registerPluginFlowNodes('global-plugin-test', [
+      {
+        type: 'plugin.global-plugin-test.trigger',
+        label: 'Global plugin trigger',
+        configSchema: {},
+        inputs: [],
+        outputs: ['output'],
+        isInput: true,
+      },
+    ]);
+    const type = 'plugin.global-plugin-test.trigger' as ResourceFlowNodeType;
+    scope.initialNodes = [
+      scope.createNode({ id: 'a-resource', type }),
+      scope.createNode({ id: 'b-enabled', type, resourceId: null, flowId: 1, flow: { enabled: true } } as never),
+      scope.createNode({ id: 'c-disabled', type, resourceId: null, flowId: 2, flow: { enabled: false } } as never),
+    ];
+    jest.spyOn(scope.service, 'startFlow').mockResolvedValue([]);
+
+    await scope.service.triggerPluginFlows('global-plugin-test', type, () => true, {});
+
+    const started = (scope.service.startFlow as jest.Mock).mock.calls.map(([node]) => node.id);
+    expect(started).toEqual(['a-resource', 'b-enabled']);
   });
 
   it('evaluates concurrent plugin triggers in order without waiting for earlier flow runs', async () => {
@@ -576,7 +595,19 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     const firstLookup = new Promise<ResourceFlowNode[]>((resolve) => {
       resolveFirstLookup = resolve;
     });
-    (scope.flowNodeRepository.find as jest.Mock).mockImplementationOnce(() => firstLookup).mockResolvedValue([node]);
+    const createQueryBuilder = scope.flowNodeRepository.createQueryBuilder as jest.Mock;
+    const realCreateQueryBuilder = createQueryBuilder.getMockImplementation() as () => { getMany: jest.Mock };
+    createQueryBuilder
+      .mockImplementationOnce(() => {
+        const builder = realCreateQueryBuilder();
+        builder.getMany.mockImplementation(() => firstLookup);
+        return builder;
+      })
+      .mockImplementation(() => {
+        const builder = realCreateQueryBuilder();
+        builder.getMany.mockResolvedValue([node]);
+        return builder;
+      });
     let releaseFirstFlow!: () => void;
     const firstFlow = new Promise<NodeProcessingResult[]>((resolve) => {
       releaseFirstFlow = () => resolve([]);
@@ -607,7 +638,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     );
 
     await Promise.resolve();
-    expect(scope.flowNodeRepository.find).toHaveBeenCalledTimes(1);
+    expect(createQueryBuilder).toHaveBeenCalledTimes(1);
     resolveFirstLookup([node]);
     await new Promise((resolve) => setImmediate(resolve));
 

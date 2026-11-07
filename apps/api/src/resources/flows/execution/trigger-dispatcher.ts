@@ -6,7 +6,7 @@ import {
   MqttWaitForMessageNodeDataSchema,
   CompanionUsbDeviceNodeDataSchema,
 } from '@attraccess/database-entities';
-import { MoreThan, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import z from 'zod';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../../mqtt/mqtt-message.event';
@@ -107,16 +107,7 @@ export class FlowTriggerDispatcher {
     const concurrency = 10;
     let lastId: string | undefined;
     for (;;) {
-      const nodes = await this.queuedPluginFlowLookup(() =>
-        this.flowNodeRepository.find({
-          where: resourceAndGlobalNodesWhere(nodeType).map((where) => ({
-            ...where,
-            ...(lastId ? { id: MoreThan(lastId) } : {}),
-          })),
-          order: { id: 'ASC' },
-          take: pageSize,
-        }),
-      );
+      const nodes = await this.queuedPluginFlowLookup(() => this.pluginTriggerPage(nodeType, lastId, pageSize));
 
       if (nodes.length === 0) return;
       lastId = nodes[nodes.length - 1].id;
@@ -144,6 +135,29 @@ export class FlowTriggerDispatcher {
 
       if (nodes.length < pageSize) return;
     }
+  }
+
+  /**
+   * One page of plugin trigger nodes: resource flows and enabled global flows. A single query with a plain
+   * LIMIT, since a relation filter plus `take` makes TypeORM paginate in two queries.
+   */
+  private pluginTriggerPage(
+    nodeType: string,
+    lastId: string | undefined,
+    pageSize: number,
+  ): Promise<ResourceFlowNode[]> {
+    const query = this.flowNodeRepository
+      .createQueryBuilder('node')
+      .leftJoin('node.flow', 'flow')
+      .where('node.type = :type', { type: nodeType })
+      .andWhere('(node.flowId IS NULL OR (flow.enabled = :enabled AND flow.scope = :scope))', {
+        enabled: true,
+        scope: 'global',
+      });
+    if (lastId) {
+      query.andWhere('node.id > :lastId', { lastId });
+    }
+    return query.orderBy('node.id', 'ASC').limit(pageSize).getMany();
   }
 
   private queuedPluginFlowLookup(lookup: () => Promise<ResourceFlowNode[]>): Promise<ResourceFlowNode[]> {

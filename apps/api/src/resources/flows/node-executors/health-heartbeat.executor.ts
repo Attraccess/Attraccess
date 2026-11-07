@@ -7,7 +7,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
-import { heartbeatKey, requireRunResourceId } from './flow.utils';
+import { globalHeartbeatKey, heartbeatKey, requireRunResourceId } from './flow.utils';
 
 /**
  * Records a heartbeat from an output node: stamps the shared last-seen map and
@@ -32,7 +32,12 @@ export class HealthHeartbeatExecutor implements NodeExecutor {
     const resourceId = requireRunResourceId(node, ctx);
     const now = new Date();
 
-    this.heartbeatLastSeen.set(heartbeatKey(resourceId, normalizedIdentifier), now);
+    // Global-flow beats are kept per node, apart from the resource's own heartbeat nodes.
+    const key =
+      node.flowId != null
+        ? globalHeartbeatKey(node.id, resourceId, normalizedIdentifier)
+        : heartbeatKey(resourceId, normalizedIdentifier);
+    this.heartbeatLastSeen.set(key, now);
 
     await this.resourceHealthService.reportHealth({
       resourceId: resourceId,

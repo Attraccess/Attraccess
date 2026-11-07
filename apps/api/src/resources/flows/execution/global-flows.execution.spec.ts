@@ -1,5 +1,16 @@
-import { ResourceFlowNode, ResourceFlowNodeType, ResourceType } from '@attraccess/database-entities';
+import {
+  ResourceFlowNode,
+  ResourceFlowNodeType,
+  ResourceHealthSource,
+  ResourceHealthStatus,
+  ResourceType,
+} from '@attraccess/database-entities';
+import { ResourceHealthChangedEvent } from '../../health/events/resource-health-changed.event';
+import { registerResourceHealthServiceFixture } from '../../health/resource-health.service.resource-health-service.test-fixture';
+import { FlowEventTriggersService } from './flow-event-triggers.service';
 import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
+import { FlowExecutionError } from '../errors/flow-execution.error';
+import { settleFlowBranches } from './flow-execution-engine';
 import { Edge } from './fixtures/edge.test-fixture';
 import { createNode } from './fixtures/node.test-fixture';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
@@ -188,5 +199,162 @@ describe('global flows', () => {
     await expect(
       scope.service.startFlow(activity, { payload: {} }, undefined, new Map(), { triggeringResourceId: 3 }),
     ).rejects.toThrow(/only works for machines/);
+  });
+
+  it('does not follow an edge into a node of another owner, e.g. a disabled global flow', async () => {
+    const own = scope.createNode({
+      id: 'x-own',
+      type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+      resourceId: 3,
+    });
+    const foreign = globalNode({
+      id: 'x-foreign',
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+      data: { status: 'unhealthy', identifier: 'x', reason: 'r' },
+      flow: { enabled: false },
+    } as never);
+    wire(own, foreign);
+    // An edge stored on the resource canvas that points into the global flow's node.
+    scope.edgesBySourceAndHandle['x-own|'] = [{ source: 'x-own', target: 'x-foreign', resourceId: 3, flowId: null }];
+
+    await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
+
+    expect(scope.resourceHealthService.reportHealth).not.toHaveBeenCalled();
+    expect(scope.flowNodeRepository.findOne).toHaveBeenCalledWith({
+      where: { id: 'x-foreign', resourceId: 3, flowId: expect.objectContaining({ _type: 'isNull' }) },
+    });
+  });
+
+  it("does not follow another owner's edge from a global node", async () => {
+    const trigger = globalNode({ id: 'y-trigger', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const set = globalNode({
+      id: 'y-set',
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+      data: { status: 'unhealthy', identifier: 'x', reason: 'r' },
+    });
+    wire(trigger, set);
+    scope.edgesBySourceAndHandle['y-trigger|'] = [
+      { source: 'y-trigger', target: 'y-set', resourceId: 3, flowId: null },
+    ];
+
+    await scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {});
+
+    expect(scope.resourceHealthService.reportHealth).not.toHaveBeenCalled();
+    expect(scope.flowEdgeRepository.find).toHaveBeenCalledWith({
+      where: { source: 'y-trigger', sourceHandle: undefined, flowId: 5 },
+    });
+  });
+
+  it("lets a resource flow's Error node abort the run even when a global flow fails first with a plain error", async () => {
+    const own = scope.createNode({
+      id: 'e-own',
+      type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+      resourceId: 3,
+    });
+    const error = scope.createNode({
+      id: 'e-error',
+      type: ResourceFlowNodeType.PROCESSING_ERROR,
+      resourceId: 3,
+      data: { message: 'resource says no' },
+    });
+    const global = globalNode({ id: 'e-global', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED });
+    const broken = globalNode({ id: 'e-broken', type: 'not-a-node-type' as ResourceFlowNodeType });
+    wire(own, error, global, broken);
+    scope.edgesBySourceAndHandle['e-own|'] = [{ source: 'e-own', target: 'e-error' }];
+    scope.edgesBySourceAndHandle['e-global|'] = [{ source: 'e-global', target: 'e-broken' }];
+    // The resource flow reaches its Error node only after the global flow has failed.
+    const findOne = scope.flowNodeRepository.findOne as jest.Mock;
+    const original = findOne.getMockImplementation() as (args: { where: { id: string } }) => Promise<unknown>;
+    const reachedOrder: string[] = [];
+    findOne.mockImplementation(async (args: { where: { id: string } }) => {
+      if (args.where.id === 'e-error') await new Promise((resolve) => setTimeout(resolve, 20));
+      reachedOrder.push(args.where.id);
+      return original(args);
+    });
+
+    await expect(
+      scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {}),
+    ).rejects.toBeInstanceOf(FlowExecutionError);
+    expect(reachedOrder).toEqual(['e-broken', 'e-error']);
+  });
+});
+
+describe('settleFlowBranches', () => {
+  const reject = (ms: number, error: unknown) =>
+    new Promise<never>((_resolve, rejectWith) => setTimeout(() => rejectWith(error), ms));
+
+  it('prefers a FlowExecutionError over an ordinary error that came first', async () => {
+    const flowError = new FlowExecutionError('stop');
+    await expect(settleFlowBranches([reject(20, flowError), reject(1, new Error('plain'))])).rejects.toBe(flowError);
+  });
+
+  it('prefers an ExternalEffectFailureError over a FlowExecutionError that came first', async () => {
+    const external = new ExternalEffectFailureError('down', undefined);
+    await expect(
+      settleFlowBranches([reject(20, external), reject(1, new FlowExecutionError('stop')), reject(5, new Error('x'))]),
+    ).rejects.toBe(external);
+  });
+
+  it('keeps the first error of the same rank', async () => {
+    const first = new Error('first');
+    await expect(settleFlowBranches([reject(20, new Error('second')), reject(1, first)])).rejects.toBe(first);
+  });
+});
+
+describe('global flow health feedback', () => {
+  // The real ResourceHealthService, so its "emit only on status change" guard is what stops the loop.
+  const health = registerResourceHealthServiceFixture();
+
+  it('does not loop when a global health-changed flow sets the same health again', async () => {
+    const trigger = scope.createNode({
+      id: 'loop-trigger',
+      type: ResourceFlowNodeType.INPUT_RESOURCE_HEALTH_CHANGED,
+      resourceId: null,
+      flowId: 5,
+    });
+    // Same identifier and status: the health-changed payload overrides both.
+    const set = scope.createNode({
+      id: 'loop-set',
+      type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET,
+      resourceId: null,
+      flowId: 5,
+      data: { status: 'healthy', identifier: 'ignored' },
+    });
+    scope.initialNodes = [trigger, set];
+    scope.nodesById[trigger.id] = trigger;
+    scope.nodesById[set.id] = set;
+    scope.edgesBySourceAndHandle['loop-trigger|'] = [{ source: 'loop-trigger', target: 'loop-set' }];
+
+    const report = jest.spyOn(health.service, 'reportHealth');
+    scope.resourceHealthService.reportHealth = ((input) =>
+      health.service.reportHealth(input)) as typeof scope.resourceHealthService.reportHealth;
+    const triggers = new FlowEventTriggersService(scope.service, {} as never, {} as never);
+    const runFlow = jest.spyOn(scope.service, 'runFlow');
+    const events: ResourceHealthChangedEvent[] = [];
+    const runs: Promise<void>[] = [];
+    health.eventEmitter.on(ResourceHealthChangedEvent.EVENT_NAME, (event: ResourceHealthChangedEvent) => {
+      events.push(event);
+      runs.push(triggers.onHealthChanged(event));
+    });
+
+    await health.service.reportHealth({
+      resourceId: 3,
+      identifier: 'bridge',
+      status: ResourceHealthStatus.UNHEALTHY,
+      reason: 'lost',
+      source: ResourceHealthSource.HEARTBEAT,
+    });
+    for (let index = 0; index < runs.length; index++) await runs[index];
+
+    // The flow ran once and reported the same state again, which emitted no second change.
+    expect(runFlow).toHaveBeenCalledTimes(1);
+    expect(report).toHaveBeenCalledTimes(2);
+    expect(report).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resourceId: 3, identifier: 'bridge', status: ResourceHealthStatus.UNHEALTHY }),
+    );
+    expect(events).toHaveLength(1);
+    expect(health.records).toEqual([
+      expect.objectContaining({ resourceId: 3, identifier: 'bridge', status: ResourceHealthStatus.UNHEALTHY }),
+    ]);
   });
 });

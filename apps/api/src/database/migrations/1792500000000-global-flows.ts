@@ -50,9 +50,12 @@ export class GlobalFlows1792500000000 implements MigrationInterface {
     );
     await queryRunner.query(`CREATE INDEX "IDX_resource_flow_node_flow" ON "resource_flow_node" ("flowId")`);
     await queryRunner.query(`CREATE INDEX "IDX_resource_flow_edge_flow" ON "resource_flow_edge" ("flowId")`);
+    // Every node step looks up the edges leaving it.
+    await queryRunner.query(`CREATE INDEX "IDX_resource_flow_edge_source" ON "resource_flow_edge" ("source")`);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_resource_flow_edge_source"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_resource_flow_edge_flow"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_resource_flow_node_flow"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_resource_flow_node_type_flow"`);

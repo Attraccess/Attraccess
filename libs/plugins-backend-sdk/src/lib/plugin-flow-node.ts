@@ -137,9 +137,10 @@ interface PluginFlowNodeDefinitionBase {
    * The flow scopes this node can be used in. Defaults to `['resource']`, so a node only appears in global
    * flows once it opts in with `['resource', 'global']` (or `['global']`).
    *
-   * In a global flow there is no fixed resource: `resourceId` is `null` in `resolveConfigSchema` and
-   * `validateConfig`, and a run has a triggering resource only when a resource event started it. Opt in only
-   * when the node copes with that. `supportedByAllResources` filters resource flows only.
+   * In a global flow there is no fixed resource: the `resolveConfigSchema` context
+   * (`{ flowScope, resourceId, flowId, purpose? }`) has `resourceId: null`, and a run has a triggering
+   * resource only when a resource event started it. Opt in only when the node copes with that.
+   * `supportedByAllResources` filters resource flows only.
    */
   readonly flowScopes?: readonly PluginFlowScope[];
 

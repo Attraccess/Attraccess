@@ -1,4 +1,5 @@
 import {
+  Check,
   Entity,
   Index,
   Column,
@@ -83,6 +84,9 @@ export class ResourceFlowNodePosition {
 
 @Entity()
 @Index('IDX_resource_flow_node_type_flow', ['type', 'flowId'])
+@Index('IDX_resource_flow_node_flow', ['flowId'])
+// Exactly one owner: a resource flow or a global flow.
+@Check('CHK_resource_flow_node_owner', '("resourceId" IS NULL) <> ("flowId" IS NULL)')
 export class ResourceFlowNode {
   @PrimaryColumn({ type: 'text' })
   @ApiProperty({
@@ -156,7 +160,7 @@ export class ResourceFlowNode {
   flowId!: number | null;
 
   @ManyToOne(() => Flow, (flow) => flow.nodes, { onDelete: 'CASCADE', nullable: true })
-  @JoinColumn({ name: 'flowId' })
+  @JoinColumn({ name: 'flowId', foreignKeyConstraintName: 'FK_resource_flow_node_flow' })
   flow!: Flow | null;
 
   @ManyToOne(() => Resource, (resource) => resource.flowNodes, { onDelete: 'CASCADE' })

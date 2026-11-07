@@ -1,9 +1,24 @@
-import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Check,
+  Entity,
+  Index,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
 import { Flow } from './flow.entity';
 
 @Entity()
+@Index('IDX_resource_flow_edge_flow', ['flowId'])
+// Every node step looks up the edges leaving it.
+@Index('IDX_resource_flow_edge_source', ['source'])
+// Exactly one owner: a resource flow or a global flow.
+@Check('CHK_resource_flow_edge_owner', '("resourceId" IS NULL) <> ("flowId" IS NULL)')
 export class ResourceFlowEdge {
   @PrimaryColumn({ type: 'text' })
   @ApiProperty({
@@ -71,7 +86,7 @@ export class ResourceFlowEdge {
   flowId!: number | null;
 
   @ManyToOne(() => Flow, (flow) => flow.edges, { onDelete: 'CASCADE', nullable: true })
-  @JoinColumn({ name: 'flowId' })
+  @JoinColumn({ name: 'flowId', foreignKeyConstraintName: 'FK_resource_flow_edge_flow' })
   flow!: Flow | null;
 
   @ManyToOne(() => Resource, (resource) => resource.flowEdges, { onDelete: 'CASCADE' })

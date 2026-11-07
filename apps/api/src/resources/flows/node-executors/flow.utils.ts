@@ -33,6 +33,27 @@ export function heartbeatKey(resourceId: number, identifier: string): string {
   return `${resourceId}::${identifier}`;
 }
 
+/**
+ * Heartbeat key for a beat through a global-flow node. It carries the node id so each global node
+ * judges only its own beats, never those of resource flows or other global nodes.
+ */
+export function globalHeartbeatKey(nodeId: string, resourceId: number, identifier: string): string {
+  return `${globalHeartbeatKeyPrefix(nodeId)}${heartbeatKey(resourceId, identifier)}`;
+}
+
+export function globalHeartbeatKeyPrefix(nodeId: string): string {
+  return `global:${encodeURIComponent(nodeId)}:`;
+}
+
+/** Splits a global heartbeat key; undefined for resource-flow keys. */
+export function parseGlobalHeartbeatKey(
+  key: string,
+): { encodedNodeId: string; resourceId: number; identifier: string } | undefined {
+  const match = /^global:([^:]*):(\d+)::/.exec(key);
+  if (!match) return undefined;
+  return { encodedNodeId: match[1], resourceId: Number(match[2]), identifier: key.slice(match[0].length) };
+}
+
 interface RunResourceContext {
   resourceId?: number | null;
   getResourceType?(): Promise<ResourceType | undefined>;

@@ -1,8 +1,14 @@
-import { ApiProperty, ApiPropertyOptional, PartialType, PickType } from '@nestjs/swagger';
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional, PickType } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+/** Skips validation only when the field is left out; an explicit null is still validated (and rejected). */
+const unlessOmitted = ValidateIf((_object: object, value: unknown) => value !== undefined);
 
 export class CreateGlobalFlowDto {
   @ApiProperty({ description: 'The name of the flow', example: 'Notify on starts' })
+  @Transform(trim)
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
@@ -20,7 +26,26 @@ export class CreateGlobalFlowDto {
   enabled?: boolean;
 }
 
-export class UpdateGlobalFlowDto extends PartialType(CreateGlobalFlowDto) {}
+export class UpdateGlobalFlowDto {
+  @ApiPropertyOptional({ description: 'The name of the flow', example: 'Notify on starts' })
+  @Transform(trim)
+  @unlessOmitted
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'What the flow does; null clears it', nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string | null;
+
+  @ApiPropertyOptional({ description: 'Disabled flows never run', example: true })
+  @unlessOmitted
+  @IsBoolean()
+  enabled?: boolean;
+}
 
 export class GlobalFlowDto extends PickType(CreateGlobalFlowDto, ['name'] as const) {
   @ApiProperty({ example: 1 })

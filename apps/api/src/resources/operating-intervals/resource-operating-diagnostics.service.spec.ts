@@ -1,5 +1,7 @@
 import { registerResourceOperatingDiagnosticsServiceFixture } from './resource-operating-diagnostics.service.resource-operating-diagnostics-service.test-fixture';
-import { unionDurationMs } from './resource-operating-diagnostics.service';
+import { ResourceType } from '@attraccess/database-entities';
+import { In } from 'typeorm';
+import { TRACKING_NODE_TYPES, unionDurationMs } from './resource-operating-diagnostics.service';
 
 describe('ResourceOperatingDiagnosticsService', () => {
   const fixture = registerResourceOperatingDiagnosticsServiceFixture();
@@ -163,6 +165,31 @@ describe('ResourceOperatingDiagnosticsService', () => {
       const report = await fixture.service.getDataQualityReport(1, fixture.at(20, '00:00:00'));
 
       expect(report.issues).toEqual([expect.objectContaining({ kind: 'multiple-open-intervals', count: 2 })]);
+    });
+
+    it('counts operating and idle nodes of enabled global flows for a machine', async () => {
+      fixture.flowNodeRepository.count.mockResolvedValue(1);
+
+      const report = await fixture.service.getDataQualityReport(1, fixture.at(20, '00:00:00'));
+
+      expect(report.trackingConfigured).toBe(true);
+      expect(fixture.flowNodeRepository.count).toHaveBeenCalledWith({
+        where: [
+          { resourceId: 1, type: In(TRACKING_NODE_TYPES) },
+          { type: In(TRACKING_NODE_TYPES), flow: { enabled: true, scope: 'global' } },
+        ],
+      });
+    });
+
+    it('ignores global tracking nodes for a door: they only act on machines', async () => {
+      fixture.flowNodeRepository.manager.findOne.mockResolvedValue({ id: 1, type: ResourceType.Door });
+
+      const report = await fixture.service.getDataQualityReport(1, fixture.at(20, '00:00:00'));
+
+      expect(report.trackingConfigured).toBe(false);
+      expect(fixture.flowNodeRepository.count).toHaveBeenCalledWith({
+        where: { resourceId: 1, type: In(TRACKING_NODE_TYPES) },
+      });
     });
   });
 

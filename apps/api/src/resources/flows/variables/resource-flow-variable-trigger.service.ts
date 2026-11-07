@@ -10,7 +10,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 import { ResourceFlowsExecutorService } from '../execution/resource-flows-executor.service';
-import { enabledGlobalNodesWhere } from '../execution/flow-node-queries';
+import { enabledGlobalNodesWhere, isGlobalFlowNode } from '../execution/flow-node-queries';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 
 @Injectable()
@@ -51,24 +51,20 @@ export class ResourceFlowVariableTriggerService {
       const matchesWatch = watches.some((w) => w.scope === event.scope && w.key === event.key);
       if (!matchesWatch) continue;
 
-      const isGlobalFlowNode = node.flowId != null;
+      const isGlobal = isGlobalFlowNode(node);
       // The resource a run acts on: the node's own, or the resource whose variable changed in a global flow.
-      const triggeringResourceId = isGlobalFlowNode
+      const triggeringResourceId = isGlobal
         ? event.scope === ResourceFlowVariableScope.RESOURCE
           ? event.resourceId
           : null
         : node.resourceId;
 
-      if (
-        !isGlobalFlowNode &&
-        event.scope === ResourceFlowVariableScope.RESOURCE &&
-        event.resourceId !== node.resourceId
-      ) {
+      if (!isGlobal && event.scope === ResourceFlowVariableScope.RESOURCE && event.resourceId !== node.resourceId) {
         continue;
       }
 
       if (source === 'exclude-self') {
-        const changedBySelf = isGlobalFlowNode
+        const changedBySelf = isGlobal
           ? event.sourceFlowId === node.flowId
           : event.sourceResourceId === node.resourceId && event.sourceFlowId == null;
         if (changedBySelf) continue;

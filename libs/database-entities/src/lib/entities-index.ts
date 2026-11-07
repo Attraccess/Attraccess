@@ -72,7 +72,7 @@ export { ResourceMaintenance } from './entities/resource.maintenance';
 export { AutoIntroductionTarget, SupervisionMode } from './entities/resource.supervision';
 export { ResourceType } from './entities/resource.type';
 export { ResourceFlowEdge } from './entities/resourceFlowEdge';
-export { Flow, FLOW_SCOPES, type FlowScope } from './entities/flow.entity';
+export { Flow, type FlowScope } from './entities/flow.entity';
 export {
   BillingTransactionItemCreateSchema,
   ButtonNodeDataSchema,

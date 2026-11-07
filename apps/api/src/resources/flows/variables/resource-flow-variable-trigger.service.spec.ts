@@ -133,4 +133,22 @@ describe('ResourceFlowVariableTriggerService', () => {
       expect(executor.startFlow.mock.calls.map(([n]) => (n as ResourceFlowNode).id)).toEqual(['other']);
     });
   });
+
+  it('only loads variable triggers of resource flows and enabled global flows', async () => {
+    nodeRepo.find.mockResolvedValueOnce([]);
+
+    await triggerService.handle(
+      new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.RESOURCE, 7, 'a', 0, 1, new Date(), 7),
+    );
+
+    expect(nodeRepo.find).toHaveBeenCalledWith({
+      where: [
+        expect.objectContaining({ type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED, resourceId: 7 }),
+        {
+          type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED,
+          flow: { enabled: true, scope: 'global' },
+        },
+      ],
+    });
+  });
 });

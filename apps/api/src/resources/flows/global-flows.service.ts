@@ -1,5 +1,5 @@
 import { Flow, ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -17,6 +17,18 @@ const MQTT_TYPES = [
   ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
 ];
 
+/** A flow row known to be a global flow. */
+export type GlobalFlow = Flow & { scope: 'global' };
+
+const GLOBAL_SCOPE = { scope: 'global' } as const;
+
+/** Trims a flow name and rejects null or blank names. */
+function requireName(name: unknown): string {
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  if (!trimmed) throw new BadRequestException('name must be a non-empty string');
+  return trimmed;
+}
+
 /** Global flows: named flows that are not bound to one resource. Canvas rules are shared with resource flows. */
 @Injectable()
 export class GlobalFlowsService {
@@ -30,42 +42,50 @@ export class GlobalFlowsService {
   ) {}
 
   public async list(): Promise<GlobalFlowSummaryDto[]> {
-    const flows = await this.flowRepository.find({ order: { name: 'ASC', id: 'ASC' } });
+    const flows = (await this.flowRepository.find({
+      where: GLOBAL_SCOPE,
+      order: { name: 'ASC', id: 'ASC' },
+    })) as GlobalFlow[];
     const counts: Array<{ flowId: number; count: string | number }> = await this.nodeRepository
       .createQueryBuilder('node')
+      .innerJoin('node.flow', 'flow', 'flow.scope = :scope', GLOBAL_SCOPE)
       .select('node.flowId', 'flowId')
       .addSelect('COUNT(*)', 'count')
-      .where('node.flowId IS NOT NULL')
       .groupBy('node.flowId')
       .getRawMany();
     const countByFlow = new Map(counts.map((row) => [Number(row.flowId), Number(row.count)]));
     return flows.map((flow) => ({ ...flow, nodeCount: countByFlow.get(flow.id) ?? 0 }));
   }
 
-  public async get(flowId: number): Promise<Flow> {
-    const flow = await this.flowRepository.findOne({ where: { id: flowId } });
+  /** Only flows of the global scope; other scopes (ATT-1204) are not reachable here. */
+  public async get(flowId: number): Promise<GlobalFlow> {
+    const flow = await this.flowRepository.findOne({ where: { id: flowId, ...GLOBAL_SCOPE } });
     if (!flow) throw new NotFoundException(`Flow with ID ${flowId} not found`);
-    return flow;
+    return flow as GlobalFlow;
   }
 
-  public async create(dto: CreateGlobalFlowDto): Promise<Flow> {
+  public async create(dto: CreateGlobalFlowDto): Promise<GlobalFlow> {
     return this.flowRepository.save(
       this.flowRepository.create({
-        name: dto.name.trim(),
+        name: requireName(dto.name),
         description: dto.description?.trim() || null,
         enabled: dto.enabled ?? true,
         scope: 'global',
       }),
-    );
+    ) as Promise<GlobalFlow>;
   }
 
-  public async update(flowId: number, dto: UpdateGlobalFlowDto): Promise<Flow> {
+  public async update(flowId: number, dto: UpdateGlobalFlowDto): Promise<GlobalFlow> {
+    if (dto.enabled !== undefined && typeof dto.enabled !== 'boolean') {
+      throw new BadRequestException('enabled must be a boolean');
+    }
+    const name = dto.name !== undefined ? requireName(dto.name) : undefined;
     const flow = await this.get(flowId);
     const wasEnabled = flow.enabled;
-    if (dto.name !== undefined) flow.name = dto.name.trim();
+    if (name !== undefined) flow.name = name;
     if (dto.description !== undefined) flow.description = dto.description?.trim() || null;
     if (dto.enabled !== undefined) flow.enabled = dto.enabled;
-    const saved = await this.flowRepository.save(flow);
+    const saved = (await this.flowRepository.save(flow)) as GlobalFlow;
     if (!wasEnabled && saved.enabled) {
       // Topics of a flow that was off may not be subscribed yet.
       const nodes = await this.nodeRepository.find({ where: { flowId } });
@@ -116,6 +136,7 @@ export class GlobalFlowsService {
       const oldNodes = await manager.find(ResourceFlowNode, { where: { flowId } });
       await manager.delete(ResourceFlowNode, { flowId });
       await manager.delete(ResourceFlowEdge, { flowId });
+      await this.resourceFlows.assertCanvasIdsNotOwnedElsewhere(manager, flowData);
 
       const newNodes = flowData.nodes.map((nodeData) => {
         const node = new ResourceFlowNode();

@@ -1,10 +1,10 @@
-import { FlowScope, ResourceFlowNode, ResourceType } from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceType } from '@attraccess/database-entities';
 import { FindOptionsWhere, IsNull } from 'typeorm';
 import { getCoreNodeResourceType } from '../schemas/core-node-schemas';
 
-/** Trigger nodes of enabled global flows. Disabled flows never match. */
+/** Trigger nodes of enabled global flows. Disabled flows and flows of any other scope never match. */
 export function enabledGlobalNodesWhere(type: string): FindOptionsWhere<ResourceFlowNode> {
-  return { type: type as ResourceFlowNode['type'], flow: { enabled: true } };
+  return { type: type as ResourceFlowNode['type'], flow: { enabled: true, scope: 'global' } };
 }
 
 /** Trigger nodes of every resource flow plus those of enabled global flows, in one query. */
@@ -25,8 +25,4 @@ export function isGlobalFlowNode(node: Pick<ResourceFlowNode, 'flowId'>): boolea
 export function triggerAppliesToResourceType(triggerType: string, resourceType: ResourceType | undefined): boolean {
   const restriction = getCoreNodeResourceType(triggerType);
   return restriction === undefined || resourceType === undefined || restriction === resourceType;
-}
-
-export function flowScopeOfNode(node: Pick<ResourceFlowNode, 'flowId'>): FlowScope {
-  return isGlobalFlowNode(node) ? 'global' : 'resource';
 }

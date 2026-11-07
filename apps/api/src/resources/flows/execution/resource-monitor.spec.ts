@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import { globalHeartbeatKey, heartbeatKey } from '../node-executors';
 import { FlowResourceMonitor } from './resource-monitor';
 
 const noActivityNode = (id: string, minInactivityMinutes: number, extra: Partial<ResourceFlowNode> = {}) =>
@@ -32,7 +33,7 @@ function build(resourceNodes: ResourceFlowNode[], globalNodes: ResourceFlowNode[
   };
   const activity = new Map<number, Date>();
   const heartbeats = new Map<string, Date>();
-  const startFlow = jest.fn(async () => []);
+  const startFlow = jest.fn(async (..._args: unknown[]): Promise<never[]> => []);
   const health = { reportHealth: jest.fn(async () => undefined) };
   const monitor = new FlowResourceMonitor(
     repository as never,
@@ -43,7 +44,7 @@ function build(resourceNodes: ResourceFlowNode[], globalNodes: ResourceFlowNode[
     startFlow,
     new Logger('test'),
   );
-  return { monitor, activity, heartbeats, startFlow, health };
+  return { monitor, activity, heartbeats, startFlow, health, repository };
 }
 
 describe('FlowResourceMonitor no-activity schedules', () => {
@@ -95,21 +96,68 @@ describe('FlowResourceMonitor no-activity schedules', () => {
     await monitor.checkResourceActivity();
     expect(startFlow).toHaveBeenCalledTimes(1);
   });
+
+  it('starts at most ten runs at once and still fires every due pair', async () => {
+    const global = noActivityNode('g', 5, { flowId: 1 });
+    const machines = Array.from({ length: 25 }, (_, index) => 100 + index);
+    const { monitor, activity, startFlow } = build([], [global], machines);
+    for (const id of machines) activity.set(id, minutes(6));
+    let running = 0;
+    let peak = 0;
+    startFlow.mockImplementation(async () => {
+      running++;
+      peak = Math.max(peak, running);
+      await Promise.resolve();
+      running--;
+      return [] as never[];
+    });
+
+    await monitor.checkResourceActivity();
+
+    expect(startFlow).toHaveBeenCalledTimes(25);
+    expect(peak).toBe(10);
+  });
+
+  it('keeps firing later pairs when one run fails', async () => {
+    const global = noActivityNode('g', 5, { flowId: 1 });
+    const machines = Array.from({ length: 12 }, (_, index) => 100 + index);
+    const { monitor, activity, startFlow } = build([], [global], machines);
+    for (const id of machines) activity.set(id, minutes(6));
+    jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    startFlow.mockRejectedValueOnce(new Error('boom'));
+
+    await monitor.checkResourceActivity();
+
+    expect(startFlow).toHaveBeenCalledTimes(12);
+  });
+
+  it('only loads no-activity nodes of enabled global flows', async () => {
+    const { monitor, repository } = build([], [], [10]);
+    await monitor.checkResourceActivity();
+    expect(repository.find).toHaveBeenCalledWith({
+      where: expect.objectContaining({ flow: { enabled: true, scope: 'global' } }),
+    });
+  });
 });
 
-describe('FlowResourceMonitor global heartbeats', () => {
-  it('marks every resource that beat through a global node unhealthy after the timeout', async () => {
-    const node = {
-      id: 'hb',
+describe('FlowResourceMonitor heartbeats', () => {
+  const heartbeatNode = (id: string, timeoutSeconds: number, extra: Partial<ResourceFlowNode>) =>
+    ({
+      id,
       type: ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT,
-      data: { identifier: 'bridge', timeoutSeconds: 60, unhealthyReason: 'gone' },
+      data: { identifier: 'bridge', timeoutSeconds, unhealthyReason: 'gone' },
       resourceId: null,
-      flowId: 1,
-    } as unknown as ResourceFlowNode;
-    const { monitor, heartbeats, health } = build([], [node], []);
+      flowId: null,
+      ...extra,
+    }) as unknown as ResourceFlowNode;
+  const secondsAgo = (n: number) => new Date(Date.now() - n * 1000);
+
+  it('marks every resource that beat through a global node unhealthy after the timeout', async () => {
+    const node = heartbeatNode('hb', 60, { flowId: 1 });
     // The heartbeat query shares the repository mock's find().
-    heartbeats.set('7::bridge', new Date(Date.now() - 120_000));
-    heartbeats.set('8::bridge', new Date());
+    const { monitor, heartbeats, health } = build([], [node], []);
+    heartbeats.set(globalHeartbeatKey('hb', 7, 'bridge'), secondsAgo(120));
+    heartbeats.set(globalHeartbeatKey('hb', 8, 'bridge'), new Date());
 
     await monitor.checkHealthHeartbeats();
 
@@ -117,6 +165,59 @@ describe('FlowResourceMonitor global heartbeats', () => {
     expect(health.reportHealth).toHaveBeenCalledWith(
       expect.objectContaining({ resourceId: 7, identifier: 'bridge', reason: 'gone' }),
     );
-    expect(heartbeats.has('7::bridge')).toBe(true);
+    expect(heartbeats.has(globalHeartbeatKey('hb', 7, 'bridge'))).toBe(true);
+  });
+
+  it("does not judge a resource flow's beats with a global node of the same identifier", async () => {
+    const own = heartbeatNode('own', 600, { resourceId: 7 });
+    const global = heartbeatNode('hb', 60, { flowId: 1 });
+    const { monitor, heartbeats, health } = build([], [own, global], []);
+    heartbeats.set(heartbeatKey(7, 'bridge'), secondsAgo(120));
+
+    await monitor.checkHealthHeartbeats();
+
+    expect(health.reportHealth).not.toHaveBeenCalled();
+    expect(heartbeats.has(heartbeatKey(7, 'bridge'))).toBe(true);
+  });
+
+  it("judges a resource node only by its own beats, not a global node's", async () => {
+    const own = heartbeatNode('own', 60, { resourceId: 7 });
+    const global = heartbeatNode('hb', 600, { flowId: 1 });
+    const { monitor, heartbeats, health } = build([], [own, global], []);
+    heartbeats.set(heartbeatKey(7, 'bridge'), secondsAgo(10));
+    heartbeats.set(globalHeartbeatKey('hb', 7, 'bridge'), secondsAgo(120));
+
+    await monitor.checkHealthHeartbeats();
+    expect(health.reportHealth).not.toHaveBeenCalled();
+
+    heartbeats.set(heartbeatKey(7, 'bridge'), secondsAgo(120));
+    heartbeats.set(globalHeartbeatKey('hb', 7, 'bridge'), new Date());
+    await monitor.checkHealthHeartbeats();
+    expect(health.reportHealth).toHaveBeenCalledTimes(1);
+    expect(health.reportHealth).toHaveBeenCalledWith(expect.objectContaining({ resourceId: 7, identifier: 'bridge' }));
+  });
+
+  it('keeps beats of current global nodes and drops those of removed nodes or old identifiers', async () => {
+    const global = heartbeatNode('hb', 600, { flowId: 1 });
+    const { monitor, heartbeats } = build([], [global], []);
+    heartbeats.set(globalHeartbeatKey('hb', 7, 'bridge'), new Date());
+    heartbeats.set(globalHeartbeatKey('hb', 7, 'old-name'), new Date());
+    heartbeats.set(globalHeartbeatKey('removed', 7, 'bridge'), new Date());
+    heartbeats.set(heartbeatKey(7, 'bridge'), new Date());
+
+    await monitor.checkHealthHeartbeats();
+
+    expect([...heartbeats.keys()]).toEqual([globalHeartbeatKey('hb', 7, 'bridge')]);
+  });
+
+  it('only loads heartbeat nodes of resource flows and enabled global flows', async () => {
+    const { monitor, repository } = build([], [], []);
+    await monitor.checkHealthHeartbeats();
+    expect(repository.find).toHaveBeenCalledWith({
+      where: [
+        expect.objectContaining({ flowId: expect.anything() }),
+        expect.objectContaining({ flow: { enabled: true, scope: 'global' } }),
+      ],
+    });
   });
 });
