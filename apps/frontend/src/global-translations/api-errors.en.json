@@ -15,6 +15,14 @@
     "title": "Machine is full",
     "description": "As many people as allowed are already using this machine. Please try again when someone has finished."
   },
+  "MachineBusyError": {
+    "title": "Machine is busy",
+    "description": "Another session on this machine is being started or ended right now. Please try again in a moment."
+  },
+  "SessionChangeInterruptedError": {
+    "title": "Start or stop interrupted",
+    "description": "The server was restarted while your request was being processed, so your start or stop was not recorded. Please check the machine and try again."
+  },
   "AlreadyHasActiveSessionError": {
     "title": "Session already active",
     "description": "You already have an active session on this machine. End it first if you want to start again."

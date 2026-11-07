@@ -15,6 +15,14 @@
     "title": "Maschine ist voll",
     "description": "An dieser Maschine arbeiten bereits so viele Personen, wie erlaubt sind. Bitte versuchen Sie es erneut, sobald jemand fertig ist."
   },
+  "MachineBusyError": {
+    "title": "Maschine ist beschäftigt",
+    "description": "An dieser Maschine wird gerade eine andere Sitzung gestartet oder beendet. Bitte versuchen Sie es gleich noch einmal."
+  },
+  "SessionChangeInterruptedError": {
+    "title": "Start oder Ende unterbrochen",
+    "description": "Der Server wurde neu gestartet, während Ihre Anfrage bearbeitet wurde. Ihr Start bzw. Ende wurde daher nicht gespeichert. Bitte prüfen Sie die Maschine und versuchen Sie es erneut."
+  },
   "AlreadyHasActiveSessionError": {
     "title": "Sitzung bereits aktiv",
     "description": "Sie haben an dieser Maschine bereits eine aktive Sitzung. Beenden Sie diese zuerst, wenn Sie neu starten möchten."

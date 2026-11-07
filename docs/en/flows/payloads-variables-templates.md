@@ -19,8 +19,8 @@ The starting data depends on the trigger. For object payloads, Attraccess adds `
 | Trigger                                | Useful payload paths                                                                                                                                                                   |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Button**, **No Activity**            | Resource context only; no user or message data                                                                                                                                         |
-| **Usage Started / Stopped**            | Usage fields at the root: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `formSubmissions`                                                        |
-| **Usage Takeover**                     | Outgoing usage fields, plus `newUser`, `oldUser` and `takeOverTime`                                                                                                                    |
+| **Usage Started / Stopped**            | Usage fields at the root: `id`, `startTime`, `endTime`, `startNotes`, `endNotes`, `user.id`, `user.username`, `formSubmissions`, `activeSessions`                                      |
+| **Usage Takeover**                     | Outgoing usage fields, plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions`                                                                                                  |
 | **Door Unlocked / Locked / Unlatched** | `event.timestamp`, `usage.start`, `usage.end`, `user.id`, `user.username`, `user.externalIdentifier`                                                                                   |
 | **MQTT Message Received**              | `serverId`, `topic`, `payload`                                                                                                                                                         |
 | **Variable Changed**                   | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; watched values under `variables.resource` / `variables.global` |
@@ -51,6 +51,31 @@ For an MQTT message on `workshop/laser/status` containing `{"temperature":42,"ru
 ```
 
 MQTT content is parsed as JSON when possible, including numbers, booleans and arrays. Otherwise `payload` is the raw text, such as `ON`.
+
+### Active Sessions on Shared Machines
+
+Usage Started, Stopped and Takeover add `activeSessions` to the payload. It counts the published usage sessions of the machine (supervisors do not count):
+
+| Path                    | Meaning                                                          |
+| ----------------------- | ---------------------------------------------------------------- |
+| `activeSessions.before` | Sessions before this start, stop or takeover                     |
+| `activeSessions.after`  | Sessions after it. A stop has `before - 1`; a takeover is 1 to 1 |
+| `activeSessions.limit`  | The machine's **Max parallel sessions**                          |
+
+Use an [If](flows/node-types.md#if) node on `activeSessions.before` = `0` to detect the first start, and on `activeSessions.after` = `0` to detect the last stop. If a start flow ends its own new session, the stop that follows reports `after` as the number of sessions that were already running (0 for the first one).
+
+On a machine with a limit above 1, starts, stops and takeovers run one at a time, each from start through its flows to the end, so two simultaneous stops give exactly one `after` = 0. A start or stop holds the machine until its whole flow has finished. Someone who has to wait longer than 30 seconds gets the **Machine is busy** error and can try again. This also holds with several API instances: when `VALKEY_URL` is set, the turn per machine is a lock in Valkey (renewed while the change runs, released when it ends, and expiring about 15 seconds after an instance crashes), so the 30 seconds count across instances. Without Valkey only one API instance may run. If Valkey cannot be reached, each instance queues only its own changes, and a booting instance waits up to 10 seconds for Valkey, then cancels unfinished starts and stops as if it were the only instance. Instances running at the same time need different host names or ports. A start or stop cut off by a server restart is cancelled and was not recorded: a waiting browser gets **Start or stop interrupted**, and its flows may already have run, so check the machine before trying again. An instance that restarts (same host name and port) cancels its own unfinished starts and stops right away, so a retry works at once. With Valkey, a booting instance leaves the unfinished starts and stops of other running instances alone; without Valkey, a newly started instance cancels whatever the old one was still doing. If one of several instances crashes and does not come back, the others cancel its unfinished start or stop after about 30 seconds; until then starting or stopping that session again reports **Machine is busy**. Browsers wait for the answer without a shorter timeout; a reader waits up to 60 seconds, stays signed in while its start or stop waits, and shows its generic error ("Something went wrong") for a busy machine or an interrupted start or stop. A failed start or stop does not change the next count. With a limit of 1 nothing changes: a second start is refused immediately.
+
+Keep start and stop flows short: a [Wait](flows/node-types.md#wait) node, a [Wait for MQTT Message](flows/node-types.md#wait-for-mqtt-message) node or an [HTTP Request](flows/node-types.md#http-request) without a response timeout makes everyone else on the machine wait, and after 30 seconds they get the **Machine is busy** error.
+
+An [End Usage Session](flows/node-types.md#end-usage-session) node set to **The session of a user** or **All sessions** inside a start or stop flow picks the sessions when it runs and ends them right after that start or stop has finished, before the next start or stop on the machine. The session being started is never among them. If the start or stop fails, these ends are dropped; if a start flow ends its own new session (End Usage Session with **The triggering session**), they still run.
+
+#### Example: power on at the first start, off at the last stop
+
+1. **Usage Started** → **If** `activeSessions.before` `=` `0` → (true) **MQTT Send Message** with the power-on command.
+2. **Usage Stopped** → **If** `activeSessions.after` `=` `0` → (true) **MQTT Send Message** with the power-off command.
+
+Without the If nodes the machine would be switched on again at every start and switched off while others are still working. When an admin raises the limit above 1, the resource settings list the flows that act on starts, stops or takeovers without such a check, in the **Resource type and behavior** section.
 
 ## Paths and Templates
 

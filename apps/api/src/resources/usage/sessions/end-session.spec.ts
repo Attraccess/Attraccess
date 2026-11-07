@@ -208,7 +208,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: 'Auto-ended' }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 1 },
       );
     });
 
@@ -277,7 +277,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.any(Object),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 1 },
       );
     });
 
@@ -556,7 +556,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 88 },
       );
     });
 
@@ -602,7 +602,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 44 },
       );
     });
 
@@ -653,7 +653,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 91 },
       );
     });
 
@@ -692,7 +692,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 61 },
       );
     });
 

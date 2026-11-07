@@ -663,10 +663,23 @@
         "usage": {
           "end-session": {
             "title": "Aktive Sitzung beenden",
-            "description": "Beendet die aktuelle Nutzungssitzung, optional mit einer Notiz.",
+            "description": "Beendet die auslösende Sitzung, die Sitzung eines Benutzers oder alle Sitzungen dieser Maschine, optional mit einer Notiz.",
             "inputs": { "input": "Eingabe" },
             "outputs": { "output": "Ausgabe", "failure": "Fehler" },
             "config": {
+              "target": {
+                "label": "Welche Sitzung",
+                "helpText": "„Die auslösende Sitzung“ beendet die Sitzung, deren Start, Ende oder Übernahme diesen Flow ausgelöst hat. „Die Sitzung eines Benutzers“ beendet die Sitzung dieses Benutzers. „Alle Sitzungen“ beendet jede laufende Sitzung an dieser Maschine. Sitzungen, die bereits beendet werden, werden übersprungen.",
+                "enum": {
+                  "triggering": "Die auslösende Sitzung",
+                  "user": "Die Sitzung eines Benutzers",
+                  "all": "Alle Sitzungen"
+                }
+              },
+              "userId": {
+                "label": "Benutzer-ID (Templates erlaubt)",
+                "helpText": "Nur für „Die Sitzung eines Benutzers“. Eine Benutzer-ID oder ein Template, das eine ergibt, zum Beispiel \\{{user.id}}."
+              },
               "notes": { "label": "Notizen (Templates erlaubt)" },
               "failureBehavior": {
                 "label": "Bei Fehler",
@@ -679,6 +692,7 @@
               }
             },
             "preview": {
+              "target": "Welche Sitzung",
               "notes": "Notizen"
             }
           }

@@ -276,9 +276,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     scope.nodesById.button = button;
     // Any active session owner may press; the pressing owner's session is the triggering one.
     await scope.service.pressButton(1, 'button', 7);
-    expect(start).toHaveBeenLastCalledWith(button, { payload: { usageId: 70 } });
+    expect(start).toHaveBeenLastCalledWith(button, { payload: { usageId: 70 } }, undefined, new Map(), {
+      actorUserId: 7,
+    });
     await scope.service.pressButton(1, 'button', 9);
-    expect(start).toHaveBeenLastCalledWith(button, { payload: { usageId: 90 } });
+    expect(start).toHaveBeenLastCalledWith(button, { payload: { usageId: 90 } }, undefined, new Map(), {
+      actorUserId: 9,
+    });
   });
 
   it.each([

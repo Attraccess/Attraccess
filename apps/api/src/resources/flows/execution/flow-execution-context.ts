@@ -97,6 +97,7 @@ export class FlowExecutionContext {
   ): NodeExecutionContext {
     return {
       flowRunId,
+      actorUserId: options.actorUserId,
       lifecycleAttemptId: options.lifecycleAttemptId,
       lifecycleCandidateCancellation: options.lifecycleCandidateCancellation,
       metering: options.metering,

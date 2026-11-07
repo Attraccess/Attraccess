@@ -131,7 +131,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     } as never,
     scope.health as never,
     { emit: jest.fn() } as never,
-    {} as never,
+    { getEffectivePermissions: jest.fn(async () => new Set<string>()) } as never,
     { recordResource: jest.fn().mockResolvedValue(undefined) } as never,
     null,
   );

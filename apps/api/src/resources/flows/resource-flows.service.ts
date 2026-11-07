@@ -25,6 +25,8 @@ import { ResourceFlowChangedEvent } from './events/resource-flow-changed.event';
 
 import { getPluginFlowNode, getRegisteredPluginFlowNodes } from '../../plugin-system/flows/node-registry';
 
+import { findFlowsWithoutSessionCountCheck, SharedMachineFlowWarning } from './shared-machine-flow-warnings';
+
 import { getCoreNodeSchemas } from './schemas/core-node-schemas';
 
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
@@ -89,6 +91,19 @@ export class ResourceFlowsService {
       );
     }
     return { nodes, edges, ...(validationErrors.length ? { validationErrors } : {}) };
+  }
+
+  /** Flows that switch something on every start or stop without looking at how many people are using the machine. */
+  public async getSharedMachineFlowWarnings(resourceId: number): Promise<SharedMachineFlowWarning[]> {
+    const resource = await this.resourceRepository.findOne({ where: { id: resourceId } });
+    if (!resource) {
+      throw new ResourceNotFoundException(resourceId);
+    }
+    const [nodes, edges] = await Promise.all([
+      this.flowNodeRepository.find({ where: { resourceId } }),
+      this.flowEdgeRepository.find({ where: { resource: { id: resourceId } } }),
+    ]);
+    return findFlowsWithoutSessionCountCheck(nodes, edges);
   }
 
   public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<ResourceFlowNode[]> {

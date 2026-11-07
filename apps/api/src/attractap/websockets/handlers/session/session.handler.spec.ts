@@ -4,6 +4,8 @@ import { ResourceFormAction } from '@attraccess/database-entities';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 import { AlreadyHasActiveSessionError } from '../../../../resources/usage/errors/already-has-active-session.error';
 import { ResourceFullError } from '../../../../resources/usage/errors/resource-full.error';
+import { SessionChangeInterruptedError } from '../../../../resources/usage/errors/session-change-interrupted.error';
+import { MachineBusyError } from '../../../../resources/usage/errors/machine-busy.error';
 import { ResourceInUseError } from '../../../../resources/usage/errors/resource-in-use.error';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
@@ -273,6 +275,8 @@ describe('AttractapSessionHandler – session + flow button', () => {
       it.each([
         ['ResourceInUseError', () => new ResourceInUseError()],
         ['ResourceFullError', () => new ResourceFullError(2, 2)],
+        ['MachineBusyError', () => new MachineBusyError()],
+        ['SessionChangeInterruptedError', () => new SessionChangeInterruptedError()],
         ['AlreadyHasActiveSessionError', () => new AlreadyHasActiveSessionError()],
       ])('reports %s immediately and refreshes the list', async (name, createError) => {
         const parentScope = resourceInUseErrorHandlingScope.parentScope;

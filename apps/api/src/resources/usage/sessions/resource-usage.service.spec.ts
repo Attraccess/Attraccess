@@ -276,7 +276,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
         expect.any(Object),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 1 },
       );
     });
 
@@ -447,7 +447,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
         expect.any(Object),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 1 },
       );
     });
 

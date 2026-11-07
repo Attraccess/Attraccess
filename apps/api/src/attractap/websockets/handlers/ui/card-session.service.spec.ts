@@ -1,4 +1,9 @@
-import { CARD_SESSION_GRACE_MS, CardSessionService, UNLOCKED_TIMEOUT_MS } from './card-session.service';
+import {
+  CARD_SESSION_GRACE_MS,
+  CARD_SESSION_MAX_HOLD_MS,
+  CardSessionService,
+  UNLOCKED_TIMEOUT_MS,
+} from './card-session.service';
 import { makeSocket } from './ui-test-helpers.test-fixture';
 
 describe('CardSessionService', () => {
@@ -39,6 +44,53 @@ describe('CardSessionService', () => {
     socket.state.uiSteps.clear();
     jest.advanceTimersByTime(CARD_SESSION_GRACE_MS * 2 + 1);
     expect(service.current(socket)).toBeNull();
+  });
+
+  it('does not expire while a start or stop is in flight, even past the 30 s wait for a shared machine', () => {
+    const service = new CardSessionService();
+    const socket = makeSocket();
+    service.issue(socket, 7, 'en');
+    const release = service.hold(socket);
+    jest.advanceTimersByTime(UNLOCKED_TIMEOUT_MS + CARD_SESSION_GRACE_MS * 4);
+    expect(service.current(socket)).not.toBeNull();
+    release();
+    jest.advanceTimersByTime(CARD_SESSION_GRACE_MS * 2 + 1);
+    expect(service.current(socket)).toBeNull();
+  });
+
+  it('stops holding the card session once a start or stop has run longer than it may', () => {
+    const service = new CardSessionService();
+    const socket = makeSocket();
+    service.issue(socket, 7, 'en');
+    const release = service.hold(socket);
+    jest.advanceTimersByTime(CARD_SESSION_MAX_HOLD_MS + CARD_SESSION_GRACE_MS * 2 + 1);
+    expect(service.current(socket)).toBeNull();
+    release();
+  });
+
+  it('counts a released hold only once', () => {
+    const service = new CardSessionService();
+    const socket = makeSocket();
+    service.issue(socket, 7, 'en');
+    const first = service.hold(socket);
+    const second = service.hold(socket);
+    first();
+    first();
+    jest.advanceTimersByTime(UNLOCKED_TIMEOUT_MS + CARD_SESSION_GRACE_MS * 3);
+    expect(service.current(socket)).not.toBeNull();
+    second();
+  });
+
+  it('keeps the card session while any of several holds is open', () => {
+    const service = new CardSessionService();
+    const socket = makeSocket();
+    service.issue(socket, 7, 'en');
+    const first = service.hold(socket);
+    const second = service.hold(socket);
+    first();
+    jest.advanceTimersByTime(UNLOCKED_TIMEOUT_MS + CARD_SESSION_GRACE_MS * 3);
+    expect(service.current(socket)).not.toBeNull();
+    second();
   });
 
   describe('resume', () => {
