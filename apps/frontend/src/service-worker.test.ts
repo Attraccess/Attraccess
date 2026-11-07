@@ -7,12 +7,18 @@ const state = vi.hoisted(() => ({
   skipWaiting: vi.fn(),
   matchAll: vi.fn(),
   openWindow: vi.fn(),
+  addPlugins: vi.fn(),
 }));
-vi.mock('workbox-precaching', () => ({ cleanupOutdatedCaches: vi.fn(), createHandlerBoundToURL: () => vi.fn() }));
+vi.mock('workbox-precaching', () => ({
+  cleanupOutdatedCaches: vi.fn(),
+  createHandlerBoundToURL: () => vi.fn(),
+  addPlugins: state.addPlugins,
+  getCacheKeyForURL: (url: string) => `https://example.test/${url}`,
+}));
 vi.mock('workbox-routing', () => ({ NavigationRoute: class {}, registerRoute: state.registerRoute }));
 vi.mock('workbox-strategies', () => ({ CacheFirst: class {} }));
 vi.mock('workbox-expiration', () => ({ ExpirationPlugin: class {} }));
-vi.mock('workbox-core', () => ({ clientsClaim: vi.fn() }));
+vi.mock('workbox-core', () => ({ clientsClaim: vi.fn(), cacheNames: { precache: 'precache' } }));
 vi.mock('./service-worker/caching', () => ({ setupPrecaching: state.precache }));
 const handlers = new Map<string, (event: unknown) => void>();
 beforeEach(async () => {
@@ -27,22 +33,48 @@ beforeEach(async () => {
     skipWaiting: state.skipWaiting,
     registration: { showNotification: state.notification },
     clients: { matchAll: state.matchAll, openWindow: state.openWindow },
+    location: { href: 'https://example.test/' },
     addEventListener: (type: string, handler: (event: unknown) => void) => handlers.set(type, handler),
   });
   await import('./service-worker');
 });
 afterEach(() => vi.unstubAllGlobals());
-it('precaches the navigation shell and responds only to the skip-waiting message', () => {
+it('precaches the navigation shell and only skips waiting on the skip-waiting message', () => {
   expect(state.precache).toHaveBeenCalledWith([
     'app.js',
     { url: 'icon.png', revision: '1' },
     { url: 'index.html', revision: null },
   ]);
-  expect(state.skipWaiting).toHaveBeenCalledOnce();
+  expect(state.skipWaiting).not.toHaveBeenCalled();
   handlers.get('message')?.({ data: {} });
-  expect(state.skipWaiting).toHaveBeenCalledOnce();
+  expect(state.skipWaiting).not.toHaveBeenCalled();
   handlers.get('message')?.({ data: { type: 'SKIP_WAITING' } });
-  expect(state.skipWaiting).toHaveBeenCalledTimes(2);
+  expect(state.skipWaiting).toHaveBeenCalledOnce();
+});
+it('posts install and precache progress to all window clients', async () => {
+  const postMessage = vi.fn();
+  state.matchAll.mockResolvedValue([{ postMessage }]);
+  vi.stubGlobal('caches', {
+    open: async () => ({ keys: async () => [{ url: 'https://example.test/app.js' }] }),
+  });
+  const waitUntil = vi.fn();
+  handlers.get('install')?.({ waitUntil });
+  await waitUntil.mock.calls[0][0];
+  expect(state.matchAll).toHaveBeenCalledWith({ type: 'window', includeUncontrolled: true });
+  expect(postMessage).toHaveBeenLastCalledWith({ type: 'SW_UPDATE_PROGRESS', done: 0, total: 2 });
+
+  const [{ cacheDidUpdate }] = state.addPlugins.mock.calls[0][0];
+  await cacheDidUpdate();
+  await cacheDidUpdate();
+  await cacheDidUpdate();
+  expect(postMessage).toHaveBeenLastCalledWith({ type: 'SW_UPDATE_PROGRESS', done: 2, total: 2 });
+});
+it('does not fail the install when posting progress throws', async () => {
+  state.matchAll.mockRejectedValue(new Error('no clients'));
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  const waitUntil = vi.fn();
+  handlers.get('install')?.({ waitUntil });
+  await expect(waitUntil.mock.calls[0][0]).resolves.toBeUndefined();
 });
 it('shows structured push notifications with defaults and falls back to text for non-JSON payloads', () => {
   const waitUntil = vi.fn();
