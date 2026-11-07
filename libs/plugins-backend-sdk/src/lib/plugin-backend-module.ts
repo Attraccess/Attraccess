@@ -4,8 +4,8 @@ import type { PluginEntityClass } from './entity';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { PluginAuditDomainDeclaration } from './plugin-audit';
 import type { PluginFlowNodeDefinition } from './plugin-flow-node';
-import type { PluginNotificationCategory } from './plugin-notifications';
-import type { PreStartHook, ReaderUiProvider, SessionEndHook } from './reader-ui';
+import type { PluginEmailTemplate, PluginNotificationCategory } from './plugin-notifications';
+import type { PreStartHook, ReaderUiProvider, SessionEndHook, StartBlockedQuery } from './reader-ui';
 
 /**
  * Shape every backend plugin's default export must satisfy. The host calls
@@ -52,6 +52,12 @@ export interface PluginBackendModule {
   /** Optional pre-start hook (allow / confirm / block). Requires ACCESS_HOOKS. */
   preStartHook?: PreStartHook;
 
+  /**
+   * Optional query-side counterpart of `preStartHook`: reports a "start currently blocked" state the resource UI
+   * shows in place of the start button. Informational; the pre-start hook stays the gate. Requires ACCESS_HOOKS.
+   */
+  startBlockedQuery?: StartBlockedQuery;
+
   /** Optional advisory hook after a session ended. Requires ACCESS_HOOKS. */
   sessionEndHook?: SessionEndHook;
 
@@ -61,4 +67,11 @@ export interface PluginBackendModule {
    * SEND_NOTIFICATIONS permission; declaring categories without it quarantines the plugin.
    */
   notificationCategories?: PluginNotificationCategory[];
+
+  /**
+   * Optional email templates, stored and edited like core templates (key `plugin.<pluginName>.<id>`) and sent
+   * through `notifications.dispatch({ email: { template, variables } })`. Declaring them requires the
+   * SEND_NOTIFICATIONS permission; without it the plugin is quarantined.
+   */
+  emailTemplates?: PluginEmailTemplate[];
 }

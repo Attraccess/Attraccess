@@ -85,6 +85,10 @@ import { ResourceFlowsExecutorService } from '../resources/flows/execution/resou
 import { createPluginAuditContext } from './runtime/audit-context';
 
 import { preparePluginNotificationCategories } from './runtime/plugin-notifications';
+import {
+  PLUGIN_START_BLOCKED_CHANGED_EVENT,
+  type PluginStartBlockedChanged,
+} from './start-blocked/start-blocked.events';
 
 import {
   createHostNotificationsContext,
@@ -286,6 +290,7 @@ export class PluginModule {
       manifest.name,
       manifest.permissions ?? [],
       (exported as PluginBackendModule)?.notificationCategories,
+      (exported as PluginBackendModule)?.emailTemplates,
     );
     const registerCategories = () => categories.register();
 
@@ -385,6 +390,13 @@ export class PluginModule {
       ),
       manifest: PluginService.toManifestInfo(manifest),
       readerUi: { invalidate: (scope) => invalidateReaderUi(manifest.name, scope) },
+      startBlocked: {
+        invalidate: ({ resourceId }) => {
+          if (!Number.isInteger(resourceId)) return;
+          const changed: PluginStartBlockedChanged = { pluginName: manifest.name, resourceId };
+          getImplementationClass().eventsRef?.emit(PLUGIN_START_BLOCKED_CHANGED_EVENT, changed);
+        },
+      },
       logger: new Logger(`Plugin:${manifest.name}`),
       mqtt: {
         subscribe(serverId, topicFilter, handler) {

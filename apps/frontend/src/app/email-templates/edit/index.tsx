@@ -16,6 +16,7 @@ import {
   DropdownPopover,
   DropdownTrigger,
   Spinner,
+  Chip,
 } from '@heroui/react';
 import { ArrowLeft, Braces, Languages, RotateCcw } from 'lucide-react';
 import { buttonVariants } from '@heroui/styles';
@@ -122,6 +123,11 @@ export function useEditEmailTemplatePageState() {
   }, [resetTemplate, templateType, seedEditor, toast, t]);
 
   const variables = template.data?.variables ?? [];
+  // Core templates are named by the app's translations, a plugin's template by the label the plugin declared.
+  const pluginInfo = template.data?.plugin;
+  const templateTitle = pluginInfo
+    ? pluginInfo.label[language === 'de' ? 'de' : 'en']
+    : t('templateType.' + templateType);
   const copyVariable = useCallback(
     (name: string) => {
       const token = `{{${name}}}`;
@@ -160,6 +166,8 @@ export function useEditEmailTemplatePageState() {
     resetTemplate,
     onResetConfirm,
     variables,
+    templateTitle,
+    pluginInfo,
     copyVariable,
     translationsOpen,
     setTranslationsOpen,
@@ -187,6 +195,8 @@ export function EditEmailTemplatePage() {
     resetTemplate,
     onResetConfirm,
     variables,
+    templateTitle,
+    pluginInfo,
     copyVariable,
     translationsOpen,
     setTranslationsOpen,
@@ -207,7 +217,12 @@ export function EditEmailTemplatePage() {
         >
           <ArrowLeft size={18} />
         </Button>
-        <h1 className="text-base font-semibold whitespace-nowrap">{t('templateType.' + templateType)}</h1>
+        <h1 className="text-base font-semibold whitespace-nowrap">{templateTitle}</h1>
+        {pluginInfo && (
+          <Chip size="sm" variant="soft" data-cy="edit-email-template-plugin-chip">
+            {t('pluginChip', { plugin: pluginInfo.name })}
+          </Chip>
+        )}
 
         {/* Subject is edited (and translated) in the translations drawer; it still round-trips through save via `subject` state. */}
         <div className="flex items-center gap-2 ml-auto">

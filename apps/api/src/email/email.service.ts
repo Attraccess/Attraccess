@@ -20,7 +20,7 @@ import { Repository, EntityManager } from 'typeorm';
 
 import { EmailLayoutService } from '../email-layout/email-layout.service';
 
-import { EmailTemplateService } from '../email-template/email-template.service';
+import { EmailTemplateKey, EmailTemplateService } from '../email-template/email-template.service';
 
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
@@ -518,7 +518,7 @@ export class EmailService {
 
   protected async sendEmail(
     user: User,
-    templateType: EmailTemplateType,
+    templateType: EmailTemplateKey,
     context: Record<string, unknown>,
     manager?: EntityManager,
   ) {

@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource, EntityManager, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
 import type { PluginAuditContext } from './plugin-audit';
-import type { PluginReaderUiApi } from './reader-ui';
+import type { PluginReaderUiApi, PluginStartBlockedApi } from './reader-ui';
 import type { PluginNotificationsContext } from './plugin-notifications';
 import type { PluginResourceAccessContext } from './plugin-resource-access';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
@@ -199,6 +199,9 @@ export interface PluginContext {
 
   /** Notify users under plugin-declared categories. Requires SEND_NOTIFICATIONS. */
   readonly notifications: PluginNotificationsContext;
+
+  /** Tells the host UI that this plugin's `startBlockedQuery` answer changed. Requires ACCESS_HOOKS. */
+  readonly startBlocked: PluginStartBlockedApi;
 
   /** Read-only authorization, maintenance and session queries. Requires ACCESS_RESOURCES. */
   readonly resourceAccess: PluginResourceAccessContext;

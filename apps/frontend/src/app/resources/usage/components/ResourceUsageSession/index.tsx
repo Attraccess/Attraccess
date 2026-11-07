@@ -8,12 +8,14 @@ import { OtherUserSessionDisplay } from '../OtherUserSessionDisplay';
 import { ParallelSessionsDisplay } from '../ParallelSessionsDisplay';
 import { IntroductionRequiredDisplay } from '../IntroductionRequiredDisplay';
 import { RetrainingStatusBanner } from '../RetrainingStatusBanner';
+import { StartBlockedGate } from '../StartBlockedGate';
 import { StartSessionControls } from '../StartSessionControls';
 import {
   useAccessControlServiceResourceIntroducersGetNames,
   useResourcesServiceResourceUsageGetActiveSession,
   useResourcesServiceResourceUsageGetActiveSessionKey,
   useResourcesServiceResourceUsageCanControlKey,
+  useResourcesServiceResourceUsageStartBlockedKey,
   Resource,
   useResourcesServiceResourceUsageCanControl,
   useResourceMaintenancesServiceFindMaintenances,
@@ -28,11 +30,13 @@ import { FlatSection } from '../../../../../components/flatSection';
 import { RequestMaintenanceButton } from '../../../details/maintenance-management/request';
 import { InstantMaintenanceButton } from '../../../details/maintenance-management/instant';
 
-// ponytail: only these 3 events affect session/control state; health and other events don't need a refetch
+// ponytail: only these events affect session/control state; health and other events don't need a refetch.
+// start_blocked_changed comes from a plugin whose start-blocked answer may have changed (e.g. a booking began or ended).
 const SESSION_EVENTS = new Set([
   'resource.usage.session_started',
   'resource.usage.session_ended',
   'resource.usage.session_taken_over',
+  'resource.start_blocked_changed',
 ]);
 
 type ResourceUsageSessionProps = Omit<HTMLAttributes<HTMLElement>, 'children' | 'resource'> & {
@@ -55,6 +59,7 @@ export function ResourceUsageSession({
   const invalidateSessionQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageGetActiveSessionKey] });
     queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageCanControlKey] });
+    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageStartBlockedKey] });
   }, [queryClient]);
 
   useLiveUpdates({
@@ -137,11 +142,13 @@ export function ResourceUsageSession({
     return (
       <>
         {!canStartSession && <IntroductionRequiredDisplay resourceId={resourceId} />}
-        <StartSessionControls
-          resourceId={resourceId}
-          insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
-          requiresSupervision={!canStartSession}
-        />
+        <StartBlockedGate resourceId={resourceId}>
+          <StartSessionControls
+            resourceId={resourceId}
+            insufficientBalanceDesiredAmount={insufficientBalanceDesiredAmount}
+            requiresSupervision={!canStartSession}
+          />
+        </StartBlockedGate>
       </>
     );
   };

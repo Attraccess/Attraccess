@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
     subject: 'Welcome',
     body: '<mj-section><mj-column><mj-text>Hello</mj-text></mj-column></mj-section>',
     variables: ['username'],
+    plugin: undefined as undefined | { name: string; label: { en: string; de: string } },
   },
   layout: '',
   settled: true,
@@ -77,6 +78,7 @@ beforeEach(() => {
     subject: 'Welcome',
     body: '<mj-section><mj-column><mj-text>Hello</mj-text></mj-column></mj-section>',
     variables: ['username'],
+    plugin: undefined,
   };
   state.layout = '';
   state.settled = true;
@@ -102,6 +104,22 @@ it('waits for layout resolution and preserves unsaved canvas changes across back
   );
   act(() => state.update.mock.calls[0][1].onSuccess());
   expect(state.success).toHaveBeenCalledWith({ title: 'toast.saveSuccess' });
+});
+it('names a core template by the app translations and a plugin template by its label with the plugin name', async () => {
+  const { unmount } = render(<Fixture />);
+  await screen.findByRole('textbox');
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('templateType.welcome');
+  expect(screen.queryByText('pluginChip')).toBeNull();
+  unmount();
+
+  state.template = {
+    ...state.template,
+    plugin: { name: 'reservations', label: { en: 'Booking confirmed', de: 'Buchung bestätigt' } },
+  };
+  render(<Fixture />);
+  await screen.findByRole('textbox');
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Booking confirmed');
+  expect(screen.getByText('pluginChip')).toBeInTheDocument();
 });
 it('wraps global chrome for display and strips it from saved template content', async () => {
   state.layout = `<mjml><mj-head><mj-title>Brand</mj-title></mj-head><mj-body><mj-section><mj-column><mj-text>Header</mj-text></mj-column></mj-section>${CONTENT_PLACEHOLDER}</mj-body></mjml>`;

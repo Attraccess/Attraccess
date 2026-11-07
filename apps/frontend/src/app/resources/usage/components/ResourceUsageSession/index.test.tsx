@@ -5,8 +5,9 @@ import { ResourceUsageSession } from './index';
 import { createMockResource } from '../../../../../test-utils/fixtures';
 import { SupervisionMode } from '@attraccess/react-query-client';
 
-const { canControl, hasPermission, activeSession, parallel, liveUpdate, invalidateQueries, loading } = vi.hoisted(
-  () => ({
+const { canControl, hasPermission, activeSession, parallel, liveUpdate, invalidateQueries, loading, startBlocked } =
+  vi.hoisted(() => ({
+    startBlocked: { value: false },
     canControl: { value: true },
     hasPermission: { value: false },
     activeSession: { value: null as { id: number; userId: number; startTime: string } | null },
@@ -14,8 +15,7 @@ const { canControl, hasPermission, activeSession, parallel, liveUpdate, invalida
     liveUpdate: { onUpdate: undefined as undefined | ((data: Record<string, unknown>) => void) },
     invalidateQueries: vi.fn(),
     loading: { activeSession: false, canControl: false, introducers: false },
-  }),
-);
+  }));
 
 vi.mock('../../../../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 1, username: 'me' }, hasPermission: () => hasPermission.value }),
@@ -39,6 +39,11 @@ vi.mock('../StartSessionControls', () => ({
   StartSessionControls: ({ requiresSupervision }: { requiresSupervision?: boolean }) => (
     <div data-testid="start-controls" data-requires-supervision={String(!!requiresSupervision)} />
   ),
+}));
+// The gate has its own test; here it only decides between the notice and its children.
+vi.mock('../StartBlockedGate', () => ({
+  StartBlockedGate: ({ children }: { children: React.ReactNode }) =>
+    startBlocked.value ? <div data-testid="start-blocked" /> : <>{children}</>,
 }));
 vi.mock('../IntroductionRequiredDisplay', () => ({
   IntroductionRequiredDisplay: () => <div data-testid="introduction-required" />,
@@ -78,6 +83,7 @@ vi.mock('@attraccess/react-query-client', async () => ({
     isLoading: loading.canControl,
   }),
   useResourcesServiceResourceUsageCanControlKey: 'canControl',
+  useResourcesServiceResourceUsageStartBlockedKey: 'startBlocked',
   useAccessControlServiceResourceIntroducersGetNames: () => ({ data: [], isLoading: loading.introducers }),
   useResourcesServiceResourceUsageGetActiveSession: () => ({
     data: parallel.value ?? { usage: activeSession.value },
@@ -108,6 +114,7 @@ describe('ResourceUsageSession routing', () => {
     loading.introducers = false;
     activeSession.value = null;
     parallel.value = null;
+    startBlocked.value = false;
     invalidateQueries.mockClear();
   });
 
@@ -132,6 +139,25 @@ describe('ResourceUsageSession routing', () => {
 
     expect(screen.getByTestId('start-controls')).toBeInTheDocument();
     expect(screen.getByTestId('introduction-required')).toBeInTheDocument();
+  });
+
+  it('replaces the start controls with the blocked notice, keeping the introduction notice', () => {
+    startBlocked.value = true;
+    canControl.value = false;
+
+    renderSession(SupervisionMode.SUPERVISION_ALLOWED);
+
+    expect(screen.getByTestId('start-blocked')).toBeInTheDocument();
+    expect(screen.queryByTestId('start-controls')).not.toBeInTheDocument();
+    expect(screen.getByTestId('introduction-required')).toBeInTheDocument();
+  });
+
+  it('asks the start-blocked query again when a plugin reports that its answer changed', () => {
+    renderSession(SupervisionMode.SUPERVISION_ALLOWED);
+
+    liveUpdate.onUpdate?.({ eventType: 'resource.start_blocked_changed', inUse: false });
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['startBlocked'] });
   });
 
   it('still shows the introduction gate on introduction_required', () => {
@@ -220,7 +246,8 @@ describe('ResourceUsageSession routing', () => {
       renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
 
       liveUpdate.onUpdate?.({ eventType: 'resource.usage.session_ended', inUse: true, activeSessionCount: 1 });
-      expect(invalidateQueries).toHaveBeenCalledTimes(2);
+      expect(invalidateQueries).toHaveBeenCalledTimes(3);
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['startBlocked'] });
 
       invalidateQueries.mockClear();
       liveUpdate.onUpdate?.({ eventType: 'resource.health_changed', activeSessionCount: 1 });

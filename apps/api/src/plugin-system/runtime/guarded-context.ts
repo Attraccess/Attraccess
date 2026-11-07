@@ -9,6 +9,7 @@ import {
   PluginPermission,
   PluginPermissionError,
   PluginReaderUiApi,
+  PluginStartBlockedApi,
   PluginSecretsContext,
   SystemEvent,
   SystemEventHandler,
@@ -101,6 +102,10 @@ export function createGuardedContext(
     get secrets(): PluginSecretsContext {
       require(PluginPermission.MANAGE_SECRETS, 'secrets');
       return base.secrets;
+    },
+    get startBlocked(): PluginStartBlockedApi {
+      require(PluginPermission.ACCESS_HOOKS, 'startBlocked.invalidate()');
+      return base.startBlocked;
     },
     get notifications(): PluginNotificationsContext {
       require(PluginPermission.SEND_NOTIFICATIONS, 'notifications.dispatch()');

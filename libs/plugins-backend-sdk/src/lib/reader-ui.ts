@@ -236,6 +236,39 @@ export type PreStartResult =
 
 export type PreStartHook = (ctx: PreStartContext) => PreStartResult | Promise<PreStartResult>;
 
+export interface StartBlockedContext {
+  resourceId: number;
+  /** The user looking at the resource. Apply your own visibility rules before naming anybody in the reason. */
+  userId: number;
+  /** Language for texts: the user's preferred language. */
+  language: 'en' | 'de';
+  now: Date;
+}
+
+/** A start that is refused right now. Same reason shape as a `preStartHook` block. */
+export interface StartBlockedState {
+  reason: PluginBlockReason;
+  /** When the block ends, if known. The host UI refreshes itself then and shows the time. */
+  until?: Date;
+}
+
+/**
+ * Query-side counterpart of `preStartHook`: tells the UI that a start by this user is blocked right now, so it
+ * can show the reason in place of the start button instead of letting the user press it. Return null when
+ * nothing blocks. It is informational only: `preStartHook` stays the authoritative gate and must still block.
+ * Keep it cheap and side-effect free; it is called whenever a resource page is open. Failures and timeouts
+ * count as "not blocked". Requires ACCESS_HOOKS.
+ */
+export type StartBlockedQuery = (
+  ctx: StartBlockedContext,
+) => StartBlockedState | null | Promise<StartBlockedState | null>;
+
+/** Lets a plugin tell the host UI that the answer of its `startBlockedQuery` may have changed. */
+export interface PluginStartBlockedApi {
+  /** Open resource pages ask again. Call it when bookings or rules that decide the block change. */
+  invalidate(scope: { resourceId: number }): void;
+}
+
 export interface SessionEndContext {
   resourceId: number;
   userId: number;
