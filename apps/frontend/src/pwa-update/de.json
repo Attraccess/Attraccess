@@ -11,8 +11,7 @@
     "description": "Lade neu, um die neueste Version zu nutzen.",
     "reload": "Jetzt neu laden",
     "later": "Später",
-    "reopen": "Update bereit – Optionen anzeigen",
-    "dragHandle": "Update-Hinweis verschieben"
+    "reopen": "Update bereit – Optionen anzeigen"
   },
   "moveHint": "Ziehen oder mit den Pfeiltasten verschieben"
 }

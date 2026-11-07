@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  APPLY_TIMEOUT_MS,
+  BOOT_APPLY_DELAY_MS,
   BOOT_APPLY_STORAGE_KEY,
   handleChunkLoadError,
   IDLE_APPLY_MS,
@@ -30,6 +32,7 @@ function setup(
     controller?: boolean;
     waiting?: FakeWorker;
     hidden?: boolean;
+    loading?: boolean;
     storage?: ReturnType<typeof memoryStorage>;
   } = {},
 ) {
@@ -38,10 +41,11 @@ function setup(
     waiting: opts.waiting ?? null,
     update: vi.fn().mockResolvedValue(undefined),
   });
-  const sw = Object.assign(new EventTarget(), { controller: opts.controller === false ? null : {} });
+  const sw = Object.assign(new EventTarget(), { controller: (opts.controller === false ? null : {}) as object | null });
   const win = new EventTarget() as unknown as Window;
   const doc = Object.assign(new EventTarget(), {
     visibilityState: opts.hidden ? 'hidden' : 'visible',
+    readyState: opts.loading ? 'loading' : 'complete',
   }) as unknown as Document;
   const reload = vi.fn();
   const storage = opts.storage ?? memoryStorage();
@@ -122,6 +126,35 @@ describe('apply', () => {
   });
 });
 
+describe('apply that never activates', () => {
+  it('returns to ready with a warning so the user can try again', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const waiting = new FakeWorker();
+    const t = setup();
+    t.registration.waiting = waiting;
+    t.foundUpdate().setState('installed');
+    t.controller.apply();
+    expect(status()).toBe('applying');
+    vi.advanceTimersByTime(APPLY_TIMEOUT_MS);
+    expect(status()).toBe('ready');
+    expect(warn).toHaveBeenCalled();
+    expect(t.reload).not.toHaveBeenCalled();
+    t.controller.apply();
+    expect(waiting.postMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not give up once the new worker took over', () => {
+    const t = setup();
+    t.registration.waiting = new FakeWorker();
+    t.foundUpdate().setState('installed');
+    t.controller.apply();
+    t.sw.dispatchEvent(new Event('controllerchange'));
+    vi.advanceTimersByTime(APPLY_TIMEOUT_MS);
+    expect(status()).toBe('applying');
+    expect(t.reload).toHaveBeenCalledOnce();
+  });
+});
+
 describe('auto-apply triggers', () => {
   const readyTab = () => {
     const t = setup();
@@ -140,25 +173,33 @@ describe('auto-apply triggers', () => {
     expect(status()).toBe('applying');
   });
 
-  it('applies when the tab is hidden', () => {
+  it('applies when the tab is hidden and stays hidden', () => {
     const t = readyTab();
     t.hide();
+    vi.advanceTimersByTime(0);
     expect(status()).toBe('applying');
+  });
+
+  it('does not post SKIP_WAITING while the page unloads (visibility hidden, then the page is gone)', () => {
+    const t = readyTab();
+    t.hide();
+    t.controller.dispose();
+    vi.advanceTimersByTime(0);
+    expect((t.registration.waiting as unknown as FakeWorker).postMessage).not.toHaveBeenCalled();
   });
 
   it('does not apply on hidden while still downloading', () => {
     const t = setup();
     t.foundUpdate();
     t.hide();
+    vi.advanceTimersByTime(0);
     expect(status()).toBe('downloading');
   });
 
-  it('sends SKIP_WAITING on pagehide without changing state', () => {
+  it('does not send SKIP_WAITING on pagehide; the boot-time check applies after a reload', () => {
     const t = readyTab();
     t.win.dispatchEvent(new Event('pagehide'));
-    expect((t.registration.waiting as unknown as FakeWorker).postMessage).toHaveBeenCalledWith({
-      type: 'SKIP_WAITING',
-    });
+    expect((t.registration.waiting as unknown as FakeWorker).postMessage).not.toHaveBeenCalled();
     expect(status()).toBe('ready');
   });
 });
@@ -168,6 +209,8 @@ describe('boot-time waiting check', () => {
     const storage = memoryStorage();
     const waiting = new FakeWorker();
     const first = setup({ waiting, storage });
+    expect(status()).toBe('ready');
+    vi.advanceTimersByTime(BOOT_APPLY_DELAY_MS);
     expect(status()).toBe('applying');
     expect(waiting.postMessage).toHaveBeenCalledOnce();
     expect(storage.store.get(BOOT_APPLY_STORAGE_KEY)).toBe('1');
@@ -179,9 +222,35 @@ describe('boot-time waiting check', () => {
     expect(again.registration.waiting?.postMessage).not.toHaveBeenCalled();
   });
 
+  it('waits for the page load before applying', () => {
+    const waiting = new FakeWorker();
+    const t = setup({ waiting, loading: true });
+    vi.advanceTimersByTime(BOOT_APPLY_DELAY_MS * 2);
+    expect(waiting.postMessage).not.toHaveBeenCalled();
+    t.win.dispatchEvent(new Event('load'));
+    vi.advanceTimersByTime(BOOT_APPLY_DELAY_MS);
+    expect(waiting.postMessage).toHaveBeenCalledOnce();
+  });
+
   it('does nothing without a controller', () => {
     setup({ controller: false, waiting: new FakeWorker() });
     expect(status()).toBe('idle');
+  });
+});
+
+describe('page that loaded before the first service worker existed', () => {
+  it('ignores the first claim but reloads when a later update activates', () => {
+    const t = setup({ controller: false });
+    t.sw.controller = {};
+    t.sw.dispatchEvent(new Event('controllerchange'));
+    expect(t.reload).not.toHaveBeenCalled();
+    expect(status()).toBe('idle');
+
+    t.registration.waiting = new FakeWorker();
+    t.foundUpdate().setState('installed');
+    t.controller.apply();
+    t.sw.dispatchEvent(new Event('controllerchange'));
+    expect(t.reload).toHaveBeenCalledOnce();
   });
 });
 

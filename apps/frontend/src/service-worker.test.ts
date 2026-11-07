@@ -69,6 +69,27 @@ it('posts install and precache progress to all window clients', async () => {
   await cacheDidUpdate();
   expect(postMessage).toHaveBeenLastCalledWith({ type: 'SW_UPDATE_PROGRESS', done: 2, total: 2 });
 });
+it('counts a manifest entry that is listed twice only once', async () => {
+  vi.resetModules();
+  (globalThis.self as unknown as { __WB_MANIFEST: unknown[] }).__WB_MANIFEST = [
+    'app.js',
+    { url: 'icon.png', revision: '1' },
+    { url: 'icon.png', revision: '1' },
+    { url: 'new.png', revision: '2' },
+    { url: 'new.png', revision: '2' },
+  ];
+  await import('./service-worker');
+  const postMessage = vi.fn();
+  state.matchAll.mockResolvedValue([{ postMessage }]);
+  vi.stubGlobal('caches', {
+    open: async () => ({ keys: async () => [{ url: 'https://example.test/app.js' }] }),
+  });
+  const waitUntil = vi.fn();
+  handlers.get('install')?.({ waitUntil });
+  await waitUntil.mock.calls[0][0];
+  // icon.png, new.png and the index.html shell are missing from the cache; app.js is already there.
+  expect(postMessage).toHaveBeenLastCalledWith({ type: 'SW_UPDATE_PROGRESS', done: 0, total: 3 });
+});
 it('does not fail the install when posting progress throws', async () => {
   state.matchAll.mockRejectedValue(new Error('no clients'));
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);

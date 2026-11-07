@@ -46,18 +46,20 @@ function DownloadingRing({ percent, t }: { percent: number | null; t: Translate 
         aria-valuetext={percent === null ? t('downloadingTooltipIndeterminate') : `${percent}%`}
         className="relative flex size-12 cursor-grab items-center justify-center rounded-full bg-overlay shadow-overlay active:cursor-grabbing"
       >
-        <ProgressCircle
-          aria-label={t('downloading')}
-          isIndeterminate={percent === null}
-          value={percent ?? 0}
-          size="lg"
-          className="absolute inset-0 m-auto"
-        >
-          <ProgressCircleTrack>
-            <ProgressCircleTrackCircle />
-            <ProgressCircleFillCircle />
-          </ProgressCircleTrack>
-        </ProgressCircle>
+        {/* The outer element is the progressbar; hide the ring's own one so assistive tech sees a single bar. */}
+        <div aria-hidden className="absolute inset-0 flex items-center justify-center">
+          <ProgressCircle
+            aria-label={t('downloading')}
+            isIndeterminate={percent === null}
+            value={percent ?? 0}
+            size="lg"
+          >
+            <ProgressCircleTrack>
+              <ProgressCircleTrackCircle />
+              <ProgressCircleFillCircle />
+            </ProgressCircleTrack>
+          </ProgressCircle>
+        </div>
         {percent !== null && <span className="relative text-[10px] font-medium">{percent}%</span>}
       </div>
       <TooltipContent>{label}</TooltipContent>
@@ -161,7 +163,7 @@ export function PwaUpdateIndicator() {
         <Button
           isIconOnly
           variant="primary"
-          className="rounded-full shadow-overlay"
+          className="size-11 rounded-full shadow-overlay"
           aria-label={t('ready.reopen')}
           onPress={() => setCollapsed(false)}
         >

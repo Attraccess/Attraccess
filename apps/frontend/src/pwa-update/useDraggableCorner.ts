@@ -36,7 +36,12 @@ export function useDraggableCorner() {
       setOffset(null);
       return;
     }
+    // The element still carries the drag transform here; measure the new anchor without it, otherwise
+    // the snap would start from the old corner instead of where the pointer let go.
+    const dragTransform = el.style.transform;
+    el.style.transform = 'none';
     const to = el.getBoundingClientRect();
+    el.style.transform = dragTransform;
     setAnimating(false);
     setOffset({ x: from.left - to.left, y: from.top - to.top });
     const frame = requestAnimationFrame(() => {

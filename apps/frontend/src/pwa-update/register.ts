@@ -1,14 +1,33 @@
 import { registerSW } from 'virtual:pwa-register';
 import { installChunkLoadSafetyNet, setPwaUpdateApply, startPwaUpdateController } from './updateController';
 
-/** Registers the service worker and starts the update flow (replaces the old auto-reloading registerSW). */
+const SERVICE_WORKER_URL = '/service-worker.js';
+
+/**
+ * Registers the service worker and starts the update flow.
+ *
+ * Production registers the worker directly instead of through `registerSW`: in `prompt` mode the plugin
+ * reloads the page itself on `controlling`, in every tab that saw the update waiting. That would reload
+ * visible tabs without warning and reload a second time after our own reload.
+ */
 export function registerPwaUpdates() {
   installChunkLoadSafetyNet();
-  registerSW({
-    immediate: true,
-    onRegisteredSW(_url, registration) {
-      if (!registration || !import.meta.env.PROD) return;
-      setPwaUpdateApply(startPwaUpdateController({ registration }).apply);
-    },
-  });
+
+  if (!import.meta.env.PROD) {
+    registerSW({ immediate: true });
+    return;
+  }
+
+  if (!('serviceWorker' in navigator)) return;
+  void registerAndTrack();
+}
+
+async function registerAndTrack() {
+  const registering = navigator.serviceWorker.register(SERVICE_WORKER_URL, { scope: '/', type: 'classic' });
+  registering.catch((error) => console.error('Service worker registration failed', error));
+
+  // register() queues behind an install that is already running and only settles once it is done, so a page
+  // reloaded mid-download would start tracking too late to show it. An existing registration is available at once.
+  const registration = (await navigator.serviceWorker.getRegistration('/')) ?? (await registering.catch(() => undefined));
+  if (registration) setPwaUpdateApply(startPwaUpdateController({ registration }).apply);
 }

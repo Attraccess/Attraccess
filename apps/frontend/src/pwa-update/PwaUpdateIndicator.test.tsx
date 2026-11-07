@@ -30,7 +30,9 @@ describe('PwaUpdateIndicator', () => {
     expect(toastMock.info).toHaveBeenCalledOnce();
     expect(screen.queryByRole('progressbar', { name: 'downloading' })).toBeNull();
     act(() => toastMock.info.mock.calls[0][1].onAutoClose());
-    const bar = screen.getAllByRole('progressbar', { name: 'downloading' })[0];
+    // Only the outer element is exposed; the ring's own progressbar is hidden from assistive tech.
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+    const bar = screen.getByRole('progressbar', { name: 'downloading' });
     expect(bar.getAttribute('aria-valuenow')).toBe('42');
   });
 

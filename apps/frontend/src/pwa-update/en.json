@@ -11,8 +11,7 @@
     "description": "Reload to use the latest version.",
     "reload": "Reload now",
     "later": "Later",
-    "reopen": "Update ready – show options",
-    "dragHandle": "Move update notification"
+    "reopen": "Update ready – show options"
   },
   "moveHint": "Drag or use the arrow keys to move"
 }

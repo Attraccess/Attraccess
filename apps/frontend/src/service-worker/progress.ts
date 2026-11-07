@@ -15,24 +15,28 @@ async function broadcast(done: number, total: number) {
   }
 }
 
-// Workbox skips entries whose cache key (url + revision) is already cached, so only the
-// remaining ones are downloaded. Mirror that check to get a total that matches the real work.
+// Workbox skips entries whose cache key (url + revision) is already cached, and downloads each cache key
+// once even when the manifest lists it twice (includeAssets overlaps the glob). Mirror both to get a total
+// that matches the real work.
 async function countEntriesToDownload(urls: string[]): Promise<number> {
   try {
     const cache = await caches.open(cacheNames.precache);
     const cached = new Set((await cache.keys()).map((request) => request.url));
-    return urls.filter((url) => {
+    const pending = new Set<string>();
+    urls.forEach((url) => {
       const key = getCacheKeyForURL(url);
-      return !key || !cached.has(new URL(key, self.location.href).href);
-    }).length;
+      const cacheUrl = key ? new URL(key, self.location.href).href : url;
+      if (!cached.has(cacheUrl)) pending.add(cacheUrl);
+    });
+    return pending.size;
   } catch {
-    return urls.length;
+    return new Set(urls).size;
   }
 }
 
 export function setupUpdateProgress(manifestUrls: string[]) {
   let done = 0;
-  let total = manifestUrls.length;
+  let total = new Set(manifestUrls).size;
 
   addPlugins([
     {

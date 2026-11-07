@@ -11,6 +11,11 @@ export interface PwaUpdateState {
 export const usePwaUpdateStore = create<PwaUpdateState>(() => ({ status: 'idle', progress: null }));
 
 export const IDLE_APPLY_MS = 5 * 60 * 1000;
+/** Wait for the page to finish loading before the boot-time apply: Chrome can leave a waiting worker
+ * stuck when SKIP_WAITING arrives while the page is still loading. */
+export const BOOT_APPLY_DELAY_MS = 1500;
+/** How long to wait for the new worker to take over before giving up on an apply. */
+export const APPLY_TIMEOUT_MS = 8000;
 export const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 export const BOOT_APPLY_STORAGE_KEY = 'attraccess.pwaUpdate.bootApplied';
 export const ACTIVITY_EVENTS = [
@@ -57,10 +62,11 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
   const reload = options.reload ?? (() => win.location.reload());
   const session = options.sessionStorage ?? getSessionStorage();
 
-  const hadController = !!sw.controller;
+  let hadController = !!sw.controller;
   let reloading = false;
   let activatedElsewhere = false;
   let applyRequested = false;
+  let applyTimer: ReturnType<typeof setTimeout> | undefined;
   let teardownTriggers: (() => void) | null = null;
   const cleanups: Array<() => void> = [];
 
@@ -90,6 +96,18 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
     applyRequested = true;
     set({ status: 'applying' });
     postSkipWaiting();
+    applyTimer = setTimeout(giveUpApplying, APPLY_TIMEOUT_MS);
+  };
+
+  // The worker never took over (e.g. the browser ignored SKIP_WAITING): don't leave the card stuck on
+  // "applying" with disabled buttons. Back to ready, so the user or a later trigger can try again.
+  const giveUpApplying = () => {
+    if (reloading || usePwaUpdateStore.getState().status !== 'applying') return;
+    console.warn('Service worker update did not activate; keeping the update ready.');
+    applyRequested = false;
+    set({ status: 'ready' });
+    teardownTriggers?.();
+    teardownTriggers = armAutoApply();
   };
 
   const enterReady = () => {
@@ -112,21 +130,23 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
     ACTIVITY_EVENTS.forEach((e) => win.addEventListener(e, resetTimer, { passive: true, capture: true }));
     resetTimer();
 
+    // A reload or navigation also hides the page, but unloading ends before this timer can fire, so only a
+    // page that stays alive (a switched tab) applies. Posting SKIP_WAITING while the page unloads can leave
+    // Chrome with a waiting worker that never activates; the boot-time check applies after a reload instead.
+    let hiddenTimer: ReturnType<typeof setTimeout> | undefined;
     const onVisibility = () => {
-      if (doc.visibilityState === 'hidden') apply();
-    };
-    // Best effort while the page unloads, so a manual reload picks up the new version.
-    const onPageHide = () => {
-      if (!activatedElsewhere) postSkipWaiting();
+      if (doc.visibilityState !== 'hidden') return;
+      hiddenTimer = setTimeout(() => {
+        if (doc.visibilityState === 'hidden') apply();
+      }, 0);
     };
     doc.addEventListener('visibilitychange', onVisibility);
-    win.addEventListener('pagehide', onPageHide);
 
     return () => {
       if (timer) clearTimeout(timer);
+      clearTimeout(hiddenTimer);
       ACTIVITY_EVENTS.forEach((e) => win.removeEventListener(e, resetTimer, { capture: true }));
       doc.removeEventListener('visibilitychange', onVisibility);
-      win.removeEventListener('pagehide', onPageHide);
     };
   };
 
@@ -164,9 +184,13 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
   cleanups.push(() => sw.removeEventListener('message', onMessage));
 
   const onControllerChange = () => {
-    // The first claim after a fresh install is not an update.
-    if (!hadController) return;
+    // The first claim after a fresh install is not an update. Later changes in this page are.
+    if (!hadController) {
+      hadController = true;
+      return;
+    }
     markControllerChanged();
+    clearTimeout(applyTimer);
     if (applyRequested) {
       reloadOnce();
       return;
@@ -181,6 +205,19 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
   };
   sw.addEventListener('controllerchange', onControllerChange);
   cleanups.push(() => sw.removeEventListener('controllerchange', onControllerChange));
+
+  const applyAfterLoad = () => {
+    const run = () => {
+      const timer = setTimeout(apply, BOOT_APPLY_DELAY_MS);
+      cleanups.push(() => clearTimeout(timer));
+    };
+    if (doc.readyState === 'complete') {
+      run();
+      return;
+    }
+    win.addEventListener('load', run, { once: true });
+    cleanups.push(() => win.removeEventListener('load', run));
+  };
 
   // Boot: pick up an update that finished downloading before this page started.
   if (sw.controller) {
@@ -198,7 +235,7 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
         try {
           session?.setItem(BOOT_APPLY_STORAGE_KEY, '1');
           set({ status: 'ready', progress: 1 });
-          apply();
+          applyAfterLoad();
         } catch {
           // Without a working guard, never auto-apply: it could loop.
           enterReady();
@@ -220,6 +257,7 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
     apply,
     dispose() {
       if (interval) clearInterval(interval);
+      clearTimeout(applyTimer);
       teardownTriggers?.();
       cleanups.forEach((fn) => fn());
     },
