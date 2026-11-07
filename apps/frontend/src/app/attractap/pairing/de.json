@@ -100,7 +100,7 @@
   },
   "toPair": {
     "title": "Nicht gekoppelt",
-    "description": "Ein neuer Reader zeigt einen Code auf seinem Bildschirm (Lite: Farben auf seinem Ring). Wähle „Koppeln“ und gib dann den Code ein oder vergleiche die Farben. Kopple diese Reader, bevor du sie einrichten kannst. Reader, die sich mit einem Token anmelden, verarbeiten bis dahin weiter Karten, die an sie gehalten werden; Karten registrieren und zurücksetzen, Beaufsichtigung und Sammeleinweisung brauchen aber einen gekoppelten Reader, und bis zur Kopplung erscheinen sie nirgends sonst. Der Reader muss eingeschaltet und verbunden sein.",
+    "description": "Ein neuer Reader zeigt einen Code auf seinem Bildschirm (Lite: Farben auf seinem Ring). Wähle „Koppeln“ und gib dann den Code ein oder vergleiche die Farben. Kopple diese Reader, bevor du sie einrichten kannst. Reader, die sich mit einem Token anmelden, tun bis zur Kopplung nichts: keine Karten, kein Registrieren oder Zurücksetzen von Karten, keine Beaufsichtigung, keine Sammeleinweisung. Nach dem Firmware-Update zeigen sie wie ein neuer Reader ihren Code, und bis zur Kopplung erscheinen sie nirgends sonst. Der Reader muss eingeschaltet und verbunden sein.",
     "resources": "Ressourcen: {{names}}",
     "neverPaired": "Noch nicht gekoppelt",
     "pairingRemoved": "Kopplung wurde entfernt",

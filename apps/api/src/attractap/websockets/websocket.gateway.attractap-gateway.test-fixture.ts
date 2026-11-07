@@ -100,7 +100,10 @@ export function gatewayProviders(
   attractapService: unknown,
   licenseService: unknown,
   security: Provider[] = [
-    { provide: PairingService, useValue: { handleConnection: jest.fn() } },
+    {
+      provide: PairingService,
+      useValue: { handleConnection: jest.fn(), issueBindingTicket: jest.fn(() => 'ticket-1') },
+    },
     { provide: ReaderSessionService, useValue: { accept: jest.fn() } },
   ],
 ): Provider[] {

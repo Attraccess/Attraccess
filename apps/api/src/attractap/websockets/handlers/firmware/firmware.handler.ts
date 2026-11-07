@@ -6,7 +6,8 @@ import { AttractapFirmwareService } from '../../../firmware.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AttractapFirmware } from '../../../dtos/firmware.dto';
 import { validateReaderUiCapabilities } from '../../../../resources/forms/reader-ui.validation';
-import { PAIRING_REQUIRED } from '../../../reader-pairing';
+import { promptPairing } from '../../../reader-pairing';
+import { PairingService } from '../../../security/pairing.service';
 import { AttractapUiHandler } from '../ui/ui.handler';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 
@@ -22,6 +23,9 @@ export class AttractapFirmwareHandler {
 
   @Inject(MetricsService)
   private metricsService: MetricsService;
+
+  @Inject(PairingService)
+  private pairingService: PairingService;
 
   @Inject(AttractapUiHandler)
   private uiHandler: AttractapUiHandler;
@@ -94,9 +98,7 @@ export class AttractapFirmwareHandler {
     // Current firmware but not paired: after the firmware gate comes the pairing gate. The reader
     // starts pairing; one that needs the update gets it first and meets this check once it runs 2.0.0.
     if (firmwareIsUpToDate && socket.state.pairingRequired) {
-      await socket.sendMessage(
-        new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, { message: PAIRING_REQUIRED }),
-      );
+      await promptPairing(socket, this.pairingService);
       return;
     }
     if (!firmwareIsUpToDate) {

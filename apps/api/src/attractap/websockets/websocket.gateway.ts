@@ -18,7 +18,7 @@ import { WsMetricsInterceptor } from '../../metrics/instrumentation/ws/ws.interc
 import { MetricsService } from '../../metrics/metrics.service';
 import { MetricsToggleService } from '../../metrics/settings/metrics-toggle.service';
 import { AttractapService } from '../attractap.service';
-import { PAIRING_REQUIRED } from '../reader-pairing';
+import { promptPairing } from '../reader-pairing';
 import { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import { AttractapBillingHandler } from './handlers/billing/billing.handler';
 import { AttractapCardHandler } from './handlers/card/card.handler';
@@ -172,11 +172,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   /**
-   * Tells a connected reader that is not paired to pair first. Shaped like the unauthorized answer to
-   * its sign-in: the reader forgets its token and shows the pairing screen.
+   * Tells a connected reader that is not paired to pair first: it starts pairing bound to its own record.
    */
   protected async requirePairing(socket: AuthenticatedWebSocket) {
-    await socket.sendMessage(new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, { message: PAIRING_REQUIRED }));
+    await promptPairing(socket, this.pairingService, true);
   }
 
   /**

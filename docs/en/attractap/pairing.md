@@ -13,12 +13,12 @@ themselves: nobody can add a reader without an admin approving it.
 
 ## Reader states
 
-| State               | Meaning                                                                                                                                                          |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Waiting**         | A new reader shows its code and waits for an admin. It appears as a **New reader** row in the **Not paired** list while it is waiting.                           |
-| **Not paired**      | A reader registered with a token before this version. It keeps handling card taps with its token until an admin pairs it from its row. Its settings stay locked. |
-| **Paired**          | The reader has its own key and certificate and can be used and set up.                                                                                           |
-| **Pairing removed** | An admin removed the pairing. The reader disconnects within a second, shows "Pairing removed" and waits for approval again with a new key.                       |
+| State               | Meaning                                                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Waiting**         | A new reader shows its code and waits for an admin. It appears as a **New reader** row in the **Not paired** list while it is waiting.                                               |
+| **Not paired**      | A reader registered with a token before this version. It does nothing until an admin pairs it: it gets the firmware update, then shows its code and waits. Its settings stay locked. |
+| **Paired**          | The reader has its own key and certificate and can be used and set up.                                                                                                               |
+| **Pairing removed** | An admin removed the pairing. The reader disconnects within a second, shows "Pairing removed" and waits for approval again with a new key.                                           |
 
 Only paired readers are listed in the **Active Attractaps** and **Stale Attractaps** tables and can be edited.
 
@@ -76,15 +76,16 @@ console.
 
 ## Pairing a reader that already exists
 
-Readers that registered with a token before this version keep working with that token until they
-are paired. Their row in the **Not paired** list has a **Pair** button. Click it and the connected reader
-starts pairing and shows a code. Approve the code as above. The pairing is bound to the existing
+Readers that registered with a token before this version are blocked until they are paired. Once
+they run the current firmware they start pairing on their own when they connect and show a code.
+Their row in the **Not paired** list has a **Pair** button, which asks the connected reader to show
+its code again. Approve the code as above. The pairing is bound to the existing
 record, so name, machines and settings stay. If the reader is not connected, **Pair** cannot reach
 it; switch it on first. Settings of a reader that is not paired stay locked.
 
-Until it is paired, such a reader still signs members in and starts and stops machines, but it
-appears only in the **Not paired** list, where its row shows the machines it is assigned to. It
-cannot enroll or reset cards, supervise a start or run a mass introduction.
+Until it is paired, such a reader signs nobody in and starts and stops no machines. It appears only
+in the **Not paired** list, where its row shows the machines it is assigned to. It cannot enroll or
+reset cards, supervise a start or run a mass introduction.
 
 A token reader keeps its token until the first encrypted session has delivered its certificate.
 If that session never reaches a server the reader can verify (three attempts in a row), the
@@ -178,11 +179,11 @@ there is no button or command for it. The server certificate renews itself.
 
 ### Older firmware
 
-| Reader firmware             | Behaviour with this server                                                                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1.7.x and older, registered | Keeps working with its token and is updated over the air automatically. Afterwards it must be paired from its row (**Pair**). Its settings stay locked until then. |
-| 1.7.x and older, new        | Cannot enrol. It sends the old registration request and gets **no reply**; it waits. Update it with the web flasher first.                                         |
-| 1.8.0 and newer             | Pairs with the flow on this page.                                                                                                                                  |
+| Reader firmware             | Behaviour with this server                                                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.7.x and older, registered | Is updated over the air automatically (the only thing it can do with its token). Afterwards it shows its code and must be paired from its row (**Pair**). It does nothing and its settings stay locked until then. |
+| 1.7.x and older, new        | Cannot enrol. It sends the old registration request and gets **no reply**; it waits. Update it with the web flasher first.                                                                                         |
+| 1.8.0 and newer             | Pairs with the flow on this page.                                                                                                                                                                                  |
 
 ### Metrics
 

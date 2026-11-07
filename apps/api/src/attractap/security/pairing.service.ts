@@ -59,6 +59,7 @@ const HELLO_TIMEOUT_MS = 30_000;
 const MAX_MESSAGE_BYTES = 4096;
 const TICKET_TTL_MS = 5 * 60 * 1000;
 const MAX_TICKETS = 256;
+const TICKET_REUSE_MIN_REMAINING_MS = 60 * 1000;
 const APP_URL_CACHE_MS = ENROLLMENT_CODE_ROTATION_MS;
 const TERMINAL_VISIBLE_MS = 60_000;
 
@@ -305,6 +306,11 @@ export class PairingService implements OnApplicationShutdown {
     const now = Date.now();
     for (const [key, value] of this.tickets) if (value.expiresAt <= now) this.tickets.delete(key);
     if (this.tickets.size >= MAX_TICKETS) this.tickets.delete(this.tickets.keys().next().value as string);
+    // A reader asked again (reconnect, Pair button) gets the ticket it already has while it is
+    // good for a while, so repeated requests never pile up tickets.
+    for (const [key, value] of this.tickets) {
+      if (value.readerId === readerId && value.expiresAt - now > TICKET_REUSE_MIN_REMAINING_MS) return key;
+    }
     const ticket = randomBytes(16).toString('base64url');
     this.tickets.set(ticket, { readerId, expiresAt: now + TICKET_TTL_MS });
     return ticket;

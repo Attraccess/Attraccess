@@ -532,4 +532,84 @@ describe('AttractapGateway card relay rules', () => {
     expect(text).not.toContain(cardBytes);
     expect(text).not.toMatch(/[0-9a-f]{32}/i);
   });
+
+  describe('a reader that is not paired', () => {
+    const FUNCTION_EVENTS = [
+      AttractapEventType.CARD_DETECTED,
+      AttractapEventType.REQUEST_RESOURCE_LIST,
+      AttractapEventType.PROJECTS_OF_USER,
+      AttractapEventType.BILLING_REQUEST_TOPUP,
+      AttractapEventType.ENROLL_NEW_CARD_CANCEL,
+      AttractapEventType.RESET_NFC_CARD_CANCEL,
+      AttractapEventType.RESOURCE_USAGE_FORM_GET_FIELDS,
+    ];
+
+    const unpairedReader = (state: Record<string, unknown> = { cardRelay: true }) => {
+      const socket = loggedInReader();
+      Object.assign(socket.state, { pairingRequired: true, ...state });
+      return socket;
+    };
+    const startPairing = (socket: AuthenticatedWebSocket) =>
+      replies(socket).filter((data) => data.type === AttractapEventType.READER_START_PAIRING);
+
+    it.each(FUNCTION_EVENTS)(
+      'answers %s by starting pairing, bound to its record, and runs no handler',
+      async (type) => {
+        const socket = unpairedReader();
+        const cardTap = jest.spyOn(fixture.gateway['cardDetectedRouter'], 'route');
+
+        await send(socket, type);
+
+        expect(cardTap).not.toHaveBeenCalled();
+        expect(replies(socket)).toEqual([
+          expect.objectContaining({ type: AttractapEventType.READER_START_PAIRING, payload: { ticket: 'ticket-1' } }),
+        ]);
+        expect(fixture.pairingService.issueBindingTicket).toHaveBeenCalledWith(7);
+      },
+    );
+
+    it('does not restart pairing for every refused event of the same connection', async () => {
+      const socket = unpairedReader();
+
+      await send(socket, AttractapEventType.CARD_DETECTED);
+      await send(socket, AttractapEventType.CARD_DETECTED);
+      await send(socket, AttractapEventType.ENROLL_NEW_CARD);
+
+      expect(startPairing(socket)).toHaveLength(1);
+    });
+
+    it('asks again once the minute is over', async () => {
+      const socket = unpairedReader();
+      await send(socket, AttractapEventType.CARD_DETECTED);
+      socket.state.pairingPromptedAt = Date.now() - 61_000;
+
+      await send(socket, AttractapEventType.CARD_DETECTED);
+
+      expect(startPairing(socket)).toHaveLength(2);
+    });
+
+    it('tells a reader that cannot relay cards yet that pairing is required, without a ticket', async () => {
+      const socket = unpairedReader({ cardRelay: false });
+
+      await send(socket, AttractapEventType.CARD_DETECTED);
+
+      expect(replies(socket)).toEqual([
+        expect.objectContaining({
+          type: AttractapEventType.READER_UNAUTHORIZED,
+          payload: { message: 'PAIRING_REQUIRED' },
+        }),
+      ]);
+      expect(fixture.pairingService.issueBindingTicket).not.toHaveBeenCalled();
+    });
+
+    it('still serves a firmware chunk request', async () => {
+      const socket = unpairedReader();
+      const handler = jest.spyOn(fixture.gateway['firmwareHandler'], 'handleFirmwareChunkRequest').mockResolvedValue();
+
+      await send(socket, AttractapEventType.FIRMWARE_REQUEST_CHUNK, { offset: 0, length: 1 });
+
+      expect(handler).toHaveBeenCalled();
+      expect(startPairing(socket)).toHaveLength(0);
+    });
+  });
 });

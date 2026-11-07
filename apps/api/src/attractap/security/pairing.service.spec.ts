@@ -474,6 +474,17 @@ describe('PairingService', () => {
     expect(audited[0]).toMatchObject({ action: 'reader.pairing_confirmed', details: { mode: 'pair', method: 'code' } });
   });
 
+  it('hands the same reader the ticket it already has, and a new one once that ran low or was used', async () => {
+    readers.set(7, { id: 7, pairingState: 'unpaired' });
+    const first = service.issueBindingTicket(7);
+    expect(service.issueBindingTicket(7)).toBe(first);
+    expect(service.issueBindingTicket(8)).not.toBe(first);
+
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 4.5 * 60 * 1000);
+    expect(service.issueBindingTicket(7)).not.toBe(first);
+    jest.restoreAllMocks();
+  });
+
   it('refuses an unknown or already used ticket instead of listing a new reader', async () => {
     readers.set(7, { id: 7, pairingState: 'unpaired' });
     const ticket = service.issueBindingTicket(7);

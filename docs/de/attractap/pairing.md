@@ -14,12 +14,12 @@ mehr selbst registrieren: Niemand kann einen Reader hinzufügen, ohne dass ein A
 
 ## Reader-Status
 
-| Status                | Bedeutung                                                                                                                                                                                     |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Wartet**            | Ein neuer Reader zeigt seinen Code und wartet auf einen Admin. Solange er wartet, steht er als Zeile **Neuer Reader** im Block **Nicht gekoppelt**.                                           |
-| **Nicht gekoppelt**   | Ein Reader, der vor dieser Version per Token registriert wurde. Er verarbeitet mit seinem Token weiter Karten, bis ein Admin ihn in seiner Zeile koppelt. Die Einstellungen bleiben gesperrt. |
-| **Gekoppelt**         | Der Reader hat einen eigenen Schlüssel und ein Zertifikat und kann genutzt und eingerichtet werden.                                                                                           |
-| **Kopplung entfernt** | Ein Admin hat die Kopplung entfernt. Der Reader wird innerhalb einer Sekunde getrennt, zeigt „Kopplung entfernt“ und wartet mit einem neuen Schlüssel wieder auf Freigabe.                    |
+| Status                | Bedeutung                                                                                                                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wartet**            | Ein neuer Reader zeigt seinen Code und wartet auf einen Admin. Solange er wartet, steht er als Zeile **Neuer Reader** im Block **Nicht gekoppelt**.                                                              |
+| **Nicht gekoppelt**   | Ein Reader, der vor dieser Version per Token registriert wurde. Er tut nichts, bis ein Admin ihn koppelt: Er bekommt das Firmware-Update, zeigt dann seinen Code und wartet. Die Einstellungen bleiben gesperrt. |
+| **Gekoppelt**         | Der Reader hat einen eigenen Schlüssel und ein Zertifikat und kann genutzt und eingerichtet werden.                                                                                                              |
+| **Kopplung entfernt** | Ein Admin hat die Kopplung entfernt. Der Reader wird innerhalb einer Sekunde getrennt, zeigt „Kopplung entfernt“ und wartet mit einem neuen Schlüssel wieder auf Freigabe.                                       |
 
 Nur gekoppelte Reader stehen in den Tabellen **Aktive Attractaps** und **Veraltete Attractaps** und lassen sich bearbeiten.
 
@@ -83,15 +83,16 @@ auf der seriellen Konsole.
 
 ## Bereits vorhandenen Reader koppeln
 
-Reader, die vor dieser Version per Token registriert wurden, funktionieren mit diesem Token weiter,
-bis sie gekoppelt werden. In ihrer Zeile im Block **Nicht gekoppelt** steht der Button **Koppeln**. Ein
-Klick darauf lässt den verbundenen Reader die Kopplung starten und einen Code zeigen. Gib den
+Reader, die vor dieser Version per Token registriert wurden, sind bis zur Kopplung gesperrt. Sobald
+sie die aktuelle Firmware haben, starten sie beim Verbinden von selbst die Kopplung und zeigen einen
+Code. In ihrer Zeile im Block **Nicht gekoppelt** steht der Button **Koppeln**; er lässt den
+verbundenen Reader seinen Code erneut zeigen. Gib den
 Code wie oben frei. Die Kopplung ist an den bestehenden Eintrag gebunden, Name, Maschinen und
 Einstellungen bleiben also erhalten. Ist der Reader nicht verbunden, erreicht **Koppeln** ihn
 nicht; schalte ihn zuerst ein. Die Einstellungen eines nicht gekoppelten Readers bleiben gesperrt.
 
-Bis zur Kopplung meldet ein solcher Reader weiter Mitglieder an und startet und beendet Maschinen,
-erscheint aber nur im Block **Nicht gekoppelt**. Dort zeigt seine Zeile die Maschinen, denen er
+Bis zur Kopplung meldet ein solcher Reader niemanden an und startet und beendet keine Maschinen. Er
+erscheint nur im Block **Nicht gekoppelt**. Dort zeigt seine Zeile die Maschinen, denen er
 zugeordnet ist. Er kann keine Karten registrieren oder zurücksetzen, keinen Start beaufsichtigen und
 keine Sammeleinweisung ausführen.
 
@@ -194,11 +195,11 @@ sich selbst.
 
 ### Ältere Firmware
 
-| Reader-Firmware              | Verhalten mit diesem Server                                                                                                                                                                     |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1.7.x und älter, registriert | Funktioniert weiter mit seinem Token und wird automatisch per Funk aktualisiert. Danach muss er in seiner Zeile gekoppelt werden (**Koppeln**). Bis dahin bleiben seine Einstellungen gesperrt. |
-| 1.7.x und älter, neu         | Kann sich nicht anmelden. Er sendet die alte Registrierungsanfrage und bekommt **keine Antwort**; er wartet. Aktualisiere ihn zuerst mit dem Web-Flasher.                                       |
-| 1.8.0 und neuer              | Koppelt mit dem Ablauf auf dieser Seite.                                                                                                                                                        |
+| Reader-Firmware              | Verhalten mit diesem Server                                                                                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1.7.x und älter, registriert | Wird automatisch per Funk aktualisiert (das Einzige, was er mit seinem Token kann). Danach zeigt er seinen Code und muss in seiner Zeile gekoppelt werden (**Koppeln**). Bis dahin tut er nichts und seine Einstellungen bleiben gesperrt. |
+| 1.7.x und älter, neu         | Kann sich nicht anmelden. Er sendet die alte Registrierungsanfrage und bekommt **keine Antwort**; er wartet. Aktualisiere ihn zuerst mit dem Web-Flasher.                                                                                  |
+| 1.8.0 und neuer              | Koppelt mit dem Ablauf auf dieser Seite.                                                                                                                                                                                                   |
 
 ### Metriken
 

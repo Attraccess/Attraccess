@@ -282,7 +282,7 @@ describe('AttractapFirmwareHandler', () => {
         fixture.socket.state.pairingRequired = true;
       });
 
-      it('is told to pair once its firmware is current, and gets no reader UI', async () => {
+      it('is told to start pairing, bound to its own record, once its firmware is current', async () => {
         fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({ version: '2.0.0' });
 
         await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
@@ -291,12 +291,22 @@ describe('AttractapFirmwareHandler', () => {
         expect(fixture.socket.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
-              type: AttractapEventType.READER_UNAUTHORIZED,
-              payload: { message: 'PAIRING_REQUIRED' },
+              type: AttractapEventType.READER_START_PAIRING,
+              payload: { ticket: 'ticket-1' },
             }),
           }),
         );
+        expect((fixture.handler as any).pairingService.issueBindingTicket).toHaveBeenCalledWith(42);
         expect((fixture.handler as any).uiHandler.onFirmwareInfo).not.toHaveBeenCalled();
+      });
+
+      it('is asked again on every connect, with the ticket service deciding whether it is a new one', async () => {
+        fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({ version: '2.0.0' });
+
+        await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
+        await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
+
+        expect((fixture.handler as any).pairingService.issueBindingTicket).toHaveBeenCalledTimes(2);
       });
 
       it('still gets the firmware update first', async () => {

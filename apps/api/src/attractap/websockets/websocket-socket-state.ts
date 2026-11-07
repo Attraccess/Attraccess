@@ -251,6 +251,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
      * no functions (answered with PAIRING_REQUIRED) and only the firmware update and pairing flows.
      */
     pairingRequired?: boolean;
+    /** When this connection was last told to start pairing, so refused events do not repeat it. */
+    pairingPromptedAt?: number;
     /**
      * The user whose card this connection verified with the server (EV2 authentication with the
      * stored key). Never set from a UID alone or from anything the reader claims. Cleared on
