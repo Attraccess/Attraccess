@@ -24,13 +24,17 @@
     "createName": "Name",
     "createDescription": "Beschreibung",
     "createSubmit": "Flow erstellen",
-    "createError": "Der Flow konnte nicht erstellt werden."
+    "createError": "Der Flow konnte nicht erstellt werden.",
+    "editDetails": "Details von {{name}} bearbeiten",
+    "editModalTitle": "Flow-Details bearbeiten",
+    "editSubmit": "Speichern"
   },
   "editor": {
     "loadError": "Dieser Flow konnte nicht geladen werden.",
     "back": "Alle Flows",
     "noticeTitle": "Globaler Flow",
     "notice": "Läuft für jede Ressource; ein fehlerhafter oder langsamer globaler Flow wirkt sich auf Starts und Stopps an allen Maschinen aus.",
-    "enabled": "Aktiv"
+    "enabled": "Aktiv",
+    "editDetails": "Details bearbeiten"
   }
 }

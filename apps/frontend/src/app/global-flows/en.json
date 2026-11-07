@@ -24,13 +24,17 @@
     "createName": "Name",
     "createDescription": "Description",
     "createSubmit": "Create flow",
-    "createError": "The flow could not be created."
+    "createError": "The flow could not be created.",
+    "editDetails": "Edit details of {{name}}",
+    "editModalTitle": "Edit flow details",
+    "editSubmit": "Save"
   },
   "editor": {
     "loadError": "This flow could not be loaded.",
     "back": "All flows",
     "noticeTitle": "Global flow",
     "notice": "Runs for every resource; a failing or slow global flow affects starts and stops on all machines.",
-    "enabled": "Enabled"
+    "enabled": "Enabled",
+    "editDetails": "Edit details"
   }
 }

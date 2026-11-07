@@ -1,6 +1,7 @@
 import { Navigate, useParams } from 'react-router-dom';
+import { SettingsIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Spinner } from '@heroui/react';
+import { Alert, AlertContent, AlertDescription, AlertTitle, Spinner, useOverlayState } from '@heroui/react';
 import { AlertStatusIcon, LabeledSwitch, PageHeader } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
@@ -12,7 +13,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { useToastMessage } from '../../components/toastProvider';
 import { FlowEditor } from '../resources/details/flows/index';
-import { useGlobalFlowsTranslations } from './GlobalFlowsListPage';
+import { GlobalFlowDetailsModal, useGlobalFlowsTranslations } from './GlobalFlowsListPage';
 
 export function GlobalFlowEditorPage() {
   const { hasPermission } = useAuth();
@@ -21,6 +22,7 @@ export function GlobalFlowEditorPage() {
   const queryClient = useQueryClient();
   const { flowId: flowIdParam } = useParams();
   const flowId = Number(flowIdParam);
+  const detailsModal = useOverlayState();
 
   const { data: flow, isError } = useGlobalFlowsServiceGetGlobalFlow({ flowId }, undefined, {
     enabled: Number.isInteger(flowId) && flowId > 0,
@@ -59,7 +61,22 @@ export function GlobalFlowEditorPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4" data-cy="global-flow-editor">
-      <PageHeader title={flow.name} subtitle={flow.description ?? undefined} backTo="/devices/flows" noMargin />
+      <PageHeader
+        title={flow.name}
+        subtitle={flow.description ?? undefined}
+        backTo="/devices/flows"
+        noMargin
+        actions={[
+          {
+            key: 'edit-details',
+            label: t('editor.editDetails'),
+            icon: <SettingsIcon size={16} />,
+            onPress: detailsModal.open,
+            dataCy: 'global-flow-edit-details',
+          },
+        ]}
+      />
+      <GlobalFlowDetailsModal isOpen={detailsModal.isOpen} onOpenChange={detailsModal.setOpen} flow={flow} />
       <LabeledSwitch
         isSelected={flow.enabled}
         isDisabled={update.isPending}

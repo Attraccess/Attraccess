@@ -8,7 +8,7 @@ Globale Flows nutzen denselben [Flow-Editor](flows/flow-editor.md), dieselben [P
 
 Öffnen Sie in der Seitenleiste **Geräte** → **Flows** (`/devices/flows`). Sie benötigen die Berechtigung `resources.update`, die Administratoren standardmäßig haben.
 
-Die Liste zeigt jeden globalen Flow mit Name, Ein/Aus-Schalter, Anzahl der Knoten sowie Schaltflächen zum Bearbeiten und Löschen (Löschen verlangt eine Bestätigung). **Erstellen** öffnet einen Dialog für Name und optionale Beschreibung.
+Die Liste zeigt jeden globalen Flow mit Name, Ein/Aus-Schalter, Anzahl der Knoten sowie Schaltflächen zum Öffnen im Editor, zum Ändern von Name und Beschreibung und zum Löschen (Löschen verlangt eine Bestätigung). **Neuer Flow** öffnet einen Dialog für Name und optionale Beschreibung. Beides lässt sich später über die Schaltfläche für die Details in der Liste oder in der Kopfzeile des Editors ändern.
 
 Jeder Flow öffnet sich in einem eigenen Editor unter `/devices/flows/:flowId`. Der Editor zeigt über der Arbeitsfläche Name und Ein/Aus-Schalter des Flows sowie den Hinweis: _Läuft für jede Ressource; ein fehlerhafter oder langsamer globaler Flow beeinträchtigt Starts und Stopps an allen Maschinen._
 
@@ -106,7 +106,7 @@ Die Warnung auf der Ressourceneinstellungs-Seite für Maschinen mit mehreren gle
 
 Einen HTTP-Webhook senden, sobald jemand eine beliebige Maschine nutzt.
 
-1. Öffnen Sie **Geräte** → **Flows** und klicken Sie auf **Erstellen**.
+1. Öffnen Sie **Geräte** → **Flows** und klicken Sie auf **Neuer Flow**.
 2. Geben Sie den Namen `Notify on starts` ein, ergänzen Sie optional eine Beschreibung und bestätigen Sie. Der Editor öffnet sich.
 3. Fügen Sie aus der Palette den Trigger **Nutzung gestartet** hinzu.
 4. Fügen Sie einen **HTTP-Anfrage**-Knoten hinzu, setzen Sie die URL und verwenden Sie im Body Vorlagen wie `{{resource.name}}` und `{{user.username}}`. Stellen Sie sein Fehlerverhalten auf **Protokollieren und fortfahren**, damit ein nicht erreichbarer Webhook keine Starts blockiert.

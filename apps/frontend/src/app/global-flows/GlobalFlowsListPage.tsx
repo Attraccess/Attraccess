@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -24,7 +24,7 @@ import {
   TextField,
   useOverlayState,
 } from '@heroui/react';
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react';
+import { PencilIcon, PlusIcon, SettingsIcon, Trash2Icon } from 'lucide-react';
 import {
   AlertStatusIcon,
   Button,
@@ -39,6 +39,7 @@ import {
   ApiError,
   useGlobalFlowsServiceCreateGlobalFlow,
   useGlobalFlowsServiceDeleteGlobalFlow,
+  UseGlobalFlowsServiceGetGlobalFlowKeyFn,
   useGlobalFlowsServiceListGlobalFlows,
   useGlobalFlowsServiceListGlobalFlowsKey,
   useGlobalFlowsServiceUpdateGlobalFlow,
@@ -65,60 +66,96 @@ export function useGlobalFlowsTranslations() {
   });
 }
 
-function CreateGlobalFlowModal({ isOpen, onOpenChange }: { isOpen: boolean; onOpenChange: (open: boolean) => void }) {
+export const GLOBAL_FLOW_NAME_MAX_LENGTH = 200;
+export const GLOBAL_FLOW_DESCRIPTION_MAX_LENGTH = 2000;
+
+type FlowDetails = { id: number; name: string; description: string | null };
+
+/** Creates a global flow, or edits the name and description of the given one. */
+export function GlobalFlowDetailsModal({
+  isOpen,
+  onOpenChange,
+  flow,
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  flow?: FlowDetails;
+}) {
   const { t, tExists } = useGlobalFlowsTranslations();
   const navigate = useNavigate();
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState(flow?.name ?? '');
+  const [description, setDescription] = useState(flow?.description ?? '');
+
+  // Every opening starts from the saved values (or empty), never from what a cancelled attempt left behind.
+  useEffect(() => {
+    if (isOpen) {
+      setName(flow?.name ?? '');
+      setDescription(flow?.description ?? '');
+    }
+  }, [isOpen, flow?.id, flow?.name, flow?.description]);
+
+  const onError = (error: unknown) =>
+    toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' });
 
   const create = useGlobalFlowsServiceCreateGlobalFlow({
-    onSuccess: (flow) => {
+    onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: [useGlobalFlowsServiceListGlobalFlowsKey] });
       onOpenChange(false);
-      setName('');
-      setDescription('');
-      navigate(`/devices/flows/${flow.id}`);
+      navigate(`/devices/flows/${created.id}`);
     },
-    onError: (error) => toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' }),
+    onError,
+  });
+  const update = useGlobalFlowsServiceUpdateGlobalFlow({
+    onSuccess: (updated) => {
+      void queryClient.invalidateQueries({ queryKey: [useGlobalFlowsServiceListGlobalFlowsKey] });
+      void queryClient.invalidateQueries({ queryKey: UseGlobalFlowsServiceGetGlobalFlowKeyFn({ flowId: updated.id }) });
+      onOpenChange(false);
+    },
+    onError,
   });
 
+  const isPending = create.isPending || update.isPending;
   const canSubmit = name.trim().length > 0;
   const submit = () => {
     if (!canSubmit) return;
-    create.mutate({
-      requestBody: { name: name.trim(), description: description.trim() ? description.trim() : undefined },
-    });
+    const details = { name: name.trim(), description: description.trim() ? description.trim() : undefined };
+    if (flow) {
+      // An emptied description has to be sent as null, otherwise the old text would stay.
+      update.mutate({ flowId: flow.id, requestBody: { ...details, description: details.description ?? null } });
+    } else {
+      create.mutate({ requestBody: details });
+    }
   };
 
   return (
-    <StandardModal isOpen={isOpen} onOpenChange={onOpenChange} data-cy="global-flows-create-modal">
+    <StandardModal isOpen={isOpen} onOpenChange={onOpenChange} data-cy="global-flows-details-modal">
       <ModalHeader>
-        <ModalHeading>{t('list.createdModalTitle')}</ModalHeading>
+        <ModalHeading>{flow ? t('list.editModalTitle') : t('list.createdModalTitle')}</ModalHeading>
       </ModalHeader>
       <ModalBody className="flex flex-col gap-4">
-        <TextField value={name} onChange={setName} isRequired autoFocus>
+        <TextField value={name} onChange={setName} isRequired autoFocus maxLength={GLOBAL_FLOW_NAME_MAX_LENGTH}>
           <Label>{t('list.createName')}</Label>
           <Input data-cy="global-flows-create-name" />
         </TextField>
-        <TextField value={description} onChange={setDescription}>
+        <TextField value={description} onChange={setDescription} maxLength={GLOBAL_FLOW_DESCRIPTION_MAX_LENGTH}>
           <Label>{t('list.createDescription')}</Label>
           <TextArea rows={3} data-cy="global-flows-create-description" />
         </TextField>
       </ModalBody>
       <ModalFooter>
-        <Button variant="ghost" onPress={() => onOpenChange(false)} isDisabled={create.isPending}>
+        <Button variant="ghost" onPress={() => onOpenChange(false)} isDisabled={isPending}>
           {t('list.cancel')}
         </Button>
         <Button
           variant="primary"
           onPress={submit}
           isDisabled={!canSubmit}
-          isPending={create.isPending}
+          isPending={isPending}
           data-cy="global-flows-create-submit"
         >
-          {t('list.createSubmit')}
+          {flow ? t('list.editSubmit') : t('list.createSubmit')}
         </Button>
       </ModalFooter>
     </StandardModal>
@@ -133,6 +170,8 @@ export function GlobalFlowsListPage() {
   const queryClient = useQueryClient();
   const createModal = useOverlayState();
   const [flowToDelete, setFlowToDelete] = useState<ListedFlow | null>(null);
+  const [flowToEdit, setFlowToEdit] = useState<ListedFlow | null>(null);
+  const editModal = useOverlayState();
 
   const { data: flows, isLoading, isError } = useGlobalFlowsServiceListGlobalFlows();
 
@@ -224,6 +263,18 @@ export function GlobalFlowsListPage() {
                         </Button>
                         <Button
                           isIconOnly
+                          variant="ghost"
+                          aria-label={t('list.editDetails', { name: flow.name })}
+                          onPress={() => {
+                            setFlowToEdit(flow);
+                            editModal.open();
+                          }}
+                          data-cy={`global-flow-details-${flow.id}`}
+                        >
+                          <SettingsIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          isIconOnly
                           variant="danger-soft"
                           aria-label={t('list.delete', { name: flow.name })}
                           onPress={() => setFlowToDelete(flow)}
@@ -241,7 +292,12 @@ export function GlobalFlowsListPage() {
         </Table>
       )}
 
-      <CreateGlobalFlowModal isOpen={createModal.isOpen} onOpenChange={createModal.setOpen} />
+      <GlobalFlowDetailsModal isOpen={createModal.isOpen} onOpenChange={createModal.setOpen} />
+      <GlobalFlowDetailsModal
+        isOpen={editModal.isOpen}
+        onOpenChange={editModal.setOpen}
+        flow={flowToEdit ?? undefined}
+      />
 
       <StatusDialog
         isOpen={flowToDelete !== null}

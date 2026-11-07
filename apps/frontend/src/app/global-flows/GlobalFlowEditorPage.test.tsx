@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -39,5 +39,29 @@ describe('GlobalFlowEditorPage', () => {
 
     await userEvent.setup().click(screen.getByRole('switch'));
     expect(state.update).toHaveBeenCalledWith({ flowId: 9, requestBody: { enabled: false } });
+  });
+
+  it('edits the flow name and description from the header', async () => {
+    const user = userEvent.setup();
+    render(
+      <TestWrapper
+        initialRoute="/devices/flows/9"
+        routes={<Route path="/devices/flows/:flowId" element={<GlobalFlowEditorPage />} />}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Edit details' }));
+    const dialog = await screen.findByRole('dialog');
+    const name = within(dialog).getByRole('textbox', { name: 'Name' });
+    expect(name).toHaveValue('Power off all');
+
+    await user.clear(name);
+    await user.type(name, 'Power off the lab');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(state.update).toHaveBeenCalledWith({
+      flowId: 9,
+      requestBody: { name: 'Power off the lab', description: null },
+    });
   });
 });

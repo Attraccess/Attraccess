@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GlobalFlowsListPage } from './GlobalFlowsListPage';
@@ -121,5 +121,66 @@ describe('GlobalFlowsListPage', () => {
 
     expect(state.create).toHaveBeenCalledWith({ requestBody: { name: 'Lights', description: 'Turn lights off' } });
     expect(state.navigate).toHaveBeenCalledWith('/devices/flows/42');
+  });
+
+  it('starts every opening of the create modal empty, even after a cancelled attempt', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'New flow' }));
+    let dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Abandoned');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'New flow' }));
+    dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveValue('');
+    expect(state.create).not.toHaveBeenCalled();
+  });
+
+  it('limits the name and the description to what the API accepts', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'New flow' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveAttribute('maxlength', '200');
+    expect(within(dialog).getByRole('textbox', { name: 'Description' })).toHaveAttribute('maxlength', '2000');
+  });
+
+  it('edits the name and description of a flow without creating a new one', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Edit details of Power off all' }));
+    const dialog = await screen.findByRole('dialog');
+    const name = within(dialog).getByRole('textbox', { name: 'Name' });
+    const description = within(dialog).getByRole('textbox', { name: 'Description' });
+    expect(name).toHaveValue('Power off all');
+    expect(description).toHaveValue('Cuts the power');
+
+    await user.clear(name);
+    await user.type(name, 'Power off everything');
+    await user.clear(description);
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(state.update).toHaveBeenCalledWith({
+      flowId: 1,
+      requestBody: { name: 'Power off everything', description: null },
+    });
+    expect(state.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps the flow unchanged when the edit is cancelled', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Edit details of Notify' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), ' changed');
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(state.update).not.toHaveBeenCalled();
   });
 });

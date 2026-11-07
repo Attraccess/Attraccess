@@ -8,7 +8,7 @@ Global flows use the same [Flow Editor](flows/flow-editor.md), the same [payload
 
 Open **Devices** → **Flows** in the sidebar (`/devices/flows`). You need the `resources.update` permission, which administrators have by default.
 
-The list shows each global flow with its name, an on/off switch, the number of nodes, and buttons to edit or delete it (deleting asks for confirmation). **Create** opens a dialog for a name and an optional description.
+The list shows each global flow with its name, an on/off switch, the number of nodes, and buttons to open it in the editor, to change its name and description, or to delete it (deleting asks for confirmation). **New flow** opens a dialog for a name and an optional description. You can change both later with the details button in the list or in the editor header.
 
 Each flow opens in its own editor at `/devices/flows/:flowId`. The editor shows the flow's name and on/off switch above the canvas, together with this note: _Runs for every resource; a failing or slow global flow affects starts and stops on all machines._
 
@@ -106,7 +106,7 @@ The warning on the resource settings page for machines that allow several simult
 
 Send an HTTP webhook whenever anybody starts using any machine.
 
-1. Open **Devices** → **Flows** and click **Create**.
+1. Open **Devices** → **Flows** and click **New flow**.
 2. Enter the name `Notify on starts`, add a description if you like, and confirm. The editor opens.
 3. Add a **Resource Usage Started** trigger from the palette.
 4. Add an **HTTP Request** node, set the URL and use templates such as `{{resource.name}}` and `{{user.username}}` in the body. Set its failure behavior to **Log and continue**, so an unreachable webhook does not block starts.
