@@ -1,9 +1,20 @@
-import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { adjacentCorner, loadCorner, nearestCorner, saveCorner, type ArrowKey, type Corner } from './corner';
 
 // A finger wobbles more than a mouse; below this a press stays a press.
 const dragThreshold = (pointerType: string) => (pointerType === 'mouse' ? 4 : 10);
 const ARROWS: ArrowKey[] = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+const TRACKED_EVENTS = ['pointermove', 'pointerup', 'pointercancel'] as const;
+
+type PointerSample = Pick<PointerEvent, 'type' | 'clientX' | 'clientY' | 'pointerId' | 'pointerType' | 'buttons'>;
 
 const prefersReducedMotion = () =>
   typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -17,6 +28,9 @@ export function useDraggableCorner() {
   const drag = useRef<{ startX: number; startY: number; moved: boolean; rect: DOMRect } | null>(null);
   const fromRect = useRef<DOMRect | null>(null);
   const justDragged = useRef(false);
+  const stopTracking = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => stopTracking.current?.(), []);
 
   const moveTo = useCallback((next: Corner) => {
     fromRect.current = ref.current?.getBoundingClientRect() ?? null;
@@ -52,26 +66,35 @@ export function useDraggableCorner() {
     return () => cancelAnimationFrame(frame);
   }, [corner]);
 
-  // Pointer handlers run in the capture phase: the buttons inside stop pointerdown from bubbling.
-  const onPointerDown = (event: PointerEvent<HTMLElement>) => {
+  // Runs in the capture phase: the buttons inside stop pointerdown from bubbling. The rest of the gesture is
+  // followed on window, because until it becomes a drag the pointer is not captured and can leave the indicator.
+  const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0 || !ref.current) return;
+    stopTracking.current?.();
     drag.current = {
       startX: event.clientX,
       startY: event.clientY,
       moved: false,
       rect: ref.current.getBoundingClientRect(),
     };
+    const track = (e: PointerEvent) => (e.type === 'pointermove' ? onPointerMove(e) : onPointerUp(e));
+    TRACKED_EVENTS.forEach((type) => window.addEventListener(type, track, true));
+    stopTracking.current = () => {
+      TRACKED_EVENTS.forEach((type) => window.removeEventListener(type, track, true));
+      stopTracking.current = null;
+    };
   };
 
-  const onPointerMove = (event: PointerEvent<HTMLElement>) => {
+  const onPointerMove = (event: PointerSample) => {
     const d = drag.current;
     if (!d) return;
     const x = event.clientX - d.startX;
     const y = event.clientY - d.startY;
     if (!d.moved) {
-      // Without capture yet, a mouse released outside the indicator never sends us pointerup.
+      // A mouse released outside the window sends no pointerup.
       if (event.pointerType === 'mouse' && event.buttons === 0) {
         drag.current = null;
+        stopTracking.current?.();
         return;
       }
       if (Math.hypot(x, y) < dragThreshold(event.pointerType)) return;
@@ -83,9 +106,10 @@ export function useDraggableCorner() {
     setOffset({ x, y });
   };
 
-  const onPointerUp = (event: PointerEvent<HTMLElement>) => {
+  const onPointerUp = (event: PointerSample) => {
     const d = drag.current;
     drag.current = null;
+    stopTracking.current?.();
     if (!d?.moved) return;
     justDragged.current = true;
     setTimeout(() => (justDragged.current = false), 0);
@@ -127,13 +151,6 @@ export function useDraggableCorner() {
     corner,
     offset,
     animating,
-    handlers: {
-      onPointerDownCapture: onPointerDown,
-      onPointerMoveCapture: onPointerMove,
-      onPointerUpCapture: onPointerUp,
-      onPointerCancelCapture: onPointerUp,
-      onKeyDown,
-      onClickCapture,
-    },
+    handlers: { onPointerDownCapture: onPointerDown, onKeyDown, onClickCapture },
   };
 }

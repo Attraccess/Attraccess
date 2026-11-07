@@ -75,6 +75,15 @@ describe('useDraggableCorner', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
+  it('follows a fast drag whose first move already left the indicator', () => {
+    render(<Harness />);
+    const box = screen.getByTestId('box');
+    fireEvent.pointerDown(box, { button: 0, pointerId: 1, pointerType: 'mouse', clientX: 950, clientY: 730 });
+    fireEvent.pointerMove(document.body, { pointerId: 1, pointerType: 'mouse', buttons: 1, clientX: 150, clientY: 80 });
+    fireEvent.pointerUp(document.body, { pointerId: 1, pointerType: 'mouse', clientX: 150, clientY: 80 });
+    expect(localStorage.getItem('attraccess.pwaUpdateIndicator.corner')).toBe('top-left');
+  });
+
   it('forgets a press that was released outside before it became a drag', () => {
     render(<Harness />);
     const box = screen.getByTestId('box');
