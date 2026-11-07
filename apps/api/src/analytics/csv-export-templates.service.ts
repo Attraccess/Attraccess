@@ -1,8 +1,33 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { QueryFailedError, Repository } from 'typeorm';
-import { CsvExportTemplate, CsvExportType } from '@attraccess/database-entities';
-import { CreateCsvExportTemplateDto, UpdateCsvExportTemplateDto } from './dtos/csvExportTemplate.dto';
+import {
+  CsvExportTemplate,
+  CsvExportTemplateColumn,
+  CsvExportTemplateColumnType,
+  CsvExportType,
+} from '@attraccess/database-entities';
+import {
+  CreateCsvExportTemplateDto,
+  CsvExportTemplateColumnDto,
+  UpdateCsvExportTemplateDto,
+} from './dtos/csvExportTemplate.dto';
+
+// Store only the properties that belong to the column type (the DTO allows e.g. a `fieldKey` on a constant).
+function toStoredColumns(columns: CsvExportTemplateColumnDto[]): CsvExportTemplateColumn[] {
+  return columns.map(({ type, header, fieldKey, value }) =>
+    type === CsvExportTemplateColumnType.FIELD ? { type, header, fieldKey } : { type, header, value: value ?? '' },
+  );
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof QueryFailedError)) {
+    return false;
+  }
+  // '23505' = Postgres unique; SQLite reuses SQLITE_CONSTRAINT for FK/CHECK/NOT NULL too, so narrow by message
+  const code = (error as QueryFailedError & { code?: string | number }).code;
+  return code === '23505' || (code === 'SQLITE_CONSTRAINT' && error.message.includes('UNIQUE constraint failed'));
+}
 
 @Injectable()
 export class CsvExportTemplatesService {
@@ -34,7 +59,7 @@ export class CsvExportTemplatesService {
     const template = this.templateRepository.create({
       name: dto.name,
       exportType: dto.exportType,
-      columns: dto.columns,
+      columns: toStoredColumns(dto.columns),
     });
     return await this.save(template);
   }
@@ -45,7 +70,7 @@ export class CsvExportTemplatesService {
       template.name = dto.name;
     }
     if (dto.columns !== undefined) {
-      template.columns = dto.columns;
+      template.columns = toStoredColumns(dto.columns);
     }
     return await this.save(template);
   }
@@ -59,10 +84,7 @@ export class CsvExportTemplatesService {
     try {
       return await this.templateRepository.save(template);
     } catch (error) {
-      if (
-        error instanceof QueryFailedError &&
-        (/UNIQUE constraint failed/i.test(error.message) || error.message.includes('csv_export_template_name_per_type'))
-      ) {
+      if (isUniqueViolation(error)) {
         throw new ConflictException(
           `A CSV export template named "${template.name}" already exists for this export type`,
         );

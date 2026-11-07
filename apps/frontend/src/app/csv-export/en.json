@@ -29,17 +29,9 @@
     "empty": "No range selected"
   },
   "rangeCalendar": {
-    "label": "Date Range",
-    "selection": {
-      "label": "Selected Date Range",
-      "start": "Start: {{date}}",
-      "end": "End: {{date}}"
-    }
+    "label": "Date Range"
   },
   "exports": {
-    "modal": {
-      "subtitle": "from {{start}} to {{end}}"
-    },
     "card": {
       "estimatedRows": {
         "one": "~{{count}} row",
@@ -50,17 +42,12 @@
       "cta": "Configure & Export"
     },
     "resourceUsageHours": {
-      "button": "Export Resource Usage",
       "title": "Resource Usage",
       "description": "Bookings and usage hours per resource."
     },
     "billingTransactions": {
-      "button": "Export Billing Transactions",
       "title": "Billing Transactions",
       "description": "Payments, refunds and status per user."
     }
-  },
-  "page": {
-    "back": "Back to export selection"
   }
 }

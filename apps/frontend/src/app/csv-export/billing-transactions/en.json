@@ -13,7 +13,7 @@
     "items": "Items",
     "userId": "User ID",
     "userEmail": "User Email",
-    "userExternalIdentifier": "User External Identifier",
+    "userExternalIdentifier": "User External ID",
     "initiatorEmail": "Initiator Email"
   },
   "metadataField": "Resource metadata: {{key}}"

@@ -19,8 +19,6 @@ import en from './en.json';
 
 const DEFAULT_PRESET: Preset = 'last30d';
 
-export type { ExportTypeKey };
-
 export function CsvExport() {
   const { t } = useTranslations({ de, en });
   const navigate = useNavigate();

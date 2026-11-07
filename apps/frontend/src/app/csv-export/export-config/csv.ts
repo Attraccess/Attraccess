@@ -38,7 +38,11 @@ export interface ResolvedColumn<TItem> {
   getValue: (item: TItem) => string;
 }
 
-/** Quote a cell when it contains the separator, a quote, CR or LF; embedded quotes are doubled. */
+/**
+ * Quote a cell when it contains the separator, a quote, CR or LF; embedded quotes are doubled.
+ * Unlike the audit-log export, leading `= + - @` are deliberately NOT neutralised: these files are
+ * uploaded into other systems, which need the raw values (e.g. negative amounts). The docs warn about it.
+ */
 export function escapeCsvValue(value: string): string {
   if (/["\n\r]/.test(value) || value.includes(CSV_SEPARATOR)) {
     return `"${value.replace(/"/g, '""')}"`;
@@ -90,15 +94,20 @@ export function buildCsv<TItem>(columns: ResolvedColumn<TItem>[], items: TItem[]
 }
 
 let uidCounter = 0;
+/** Uids for columns added by the user or loaded from a template; never collide with default uids. */
 export function newColumnUid(): string {
   uidCounter += 1;
   return `col-${uidCounter}`;
 }
 
+/**
+ * The export type's default columns. Their uids are derived from the (unique) field key, so
+ * rebuilding the field list (page arrival, refetch) keeps every row and preview column mounted.
+ */
 export function defaultColumns<TItem>(fields: FieldDefinition<TItem>[]): ConfiguredColumn[] {
   return fields
     .filter((field) => field.selectedByDefault)
-    .map((field) => ({ uid: newColumnUid(), type: 'field', fieldKey: field.key, header: '' }));
+    .map((field) => ({ uid: `default:${field.key}`, type: 'field', fieldKey: field.key, header: '' }));
 }
 
 /** Strip the local `uid` and fields that do not apply to the column type, ready for the template API. */

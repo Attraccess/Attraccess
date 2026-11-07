@@ -4,22 +4,22 @@ Export resource usage and billing data as a CSV file for analysis, reporting, ac
 
 ## Permissions
 
-| Export | Required permission |
-|--------|---------------------|
-| **Resource usage** | `resources.reports.export` |
+| Export                   | Required permission                       |
+| ------------------------ | ----------------------------------------- |
+| **Resource usage**       | `resources.reports.export`                |
 | **Billing transactions** | `billing.manage` (and the billing module) |
 
-The **CSV Export** page is available if you have at least one of these permissions. Export types you may not use are not shown.
+The **CSV Export** page is available if you have at least one of these permissions. The landing page only shows the export types you may use. Loading the billing data additionally requires `resources.update`; without it the billing configuration page shows that the data could not be loaded.
 
 ## Exporting Data
 
 1. Open the **CSV Export** page from the sidebar navigation.
-2. Pick a date range with a preset (e.g. *Last 30 days*) or choose a custom range.
+2. Pick a date range with a preset (e.g. _Last 30 days_) or choose a custom range.
 3. Click the card of the export type you want. This opens the configuration page of that export (`/csv-export/resource-usage-hours` or `/csv-export/billing-transactions`).
 4. Choose a template or configure the columns (see below). The preview shows the first rows exactly as they will appear in the file.
 5. Click **Download CSV**. The file is downloaded to your computer once all data is loaded.
 
-The date range is part of the page address (`?start=…&end=…`), so reloading the page or sharing the link keeps it. If the range in the address is missing or invalid, the last 30 days are used. The **Back** button returns to the range selection.
+The date range is part of the page address (`?start=…&end=…`), so reloading the page or sharing the link keeps it. If the range in the address is missing or invalid, the last 30 days are used. The back arrow next to the page title returns to the range selection.
 
 <!-- TODO: Screenshot of CSV export configuration page -->
 
@@ -51,50 +51,54 @@ A template stores the complete column setup (fields, constants, custom headers, 
 You can keep editing after loading a template without saving. The download always uses what you currently see in the editor. If a template with that name already exists, an error is shown and nothing is saved.
 
 > [!NOTE]
-> If a template contains a field that is missing from the current data (for example a resource metadata key that no resource in the selected range has), the column is still exported with its header and empty values. The editor marks it as *Not available in current data* and keeps it in the template.
+> If a template contains a field that is missing from the current data (for example a resource metadata key that no resource in the selected range has), the column is still exported with its header and empty values. The editor marks it as _Not available in current data_ and keeps it in the template.
 
 ## Available Fields
 
 ### Resource usage
 
-| Field | Description |
-|-------|-------------|
-| Resource ID / Resource Name | The resource that was used |
-| User ID / User Name | The user of the session |
-| **User Email** | Email address of the user |
-| **User External Identifier** | The external identifier of the user (e.g. from your SSO provider) |
-| Start Time / End Time | Formatted for your locale (also available as ISO timestamps) |
-| Usage in Minutes / Hours | Length of the session |
-| Exact Session Duration (ms) | Session length in milliseconds |
-| Operating Duration (ms, session) | Operating time attributed to the session (if operating data is available) |
-| Operating Data Status | Whether the operating duration is final, provisional, or unavailable |
-| Start Notes / End Notes | Notes entered at the start and end of the session |
-| Supervisor ID / Supervisor Name | The supervising user, if any |
-| **Supervisor Email** | Email address of the supervising user |
-| **Resource metadata: \<key\>** | One field for every metadata key found on the resources in the loaded rows |
+| Field                            | Description                                                                |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| Resource ID / Resource Name      | The resource that was used                                                 |
+| User ID / User Name              | The user of the session                                                    |
+| **User Email**                   | Email address of the user                                                  |
+| **User External ID**             | The external identifier of the user (e.g. from your SSO provider)          |
+| Start Time / End Time            | Formatted for your locale (also available as ISO timestamps)               |
+| Usage in Minutes / Hours         | Length of the session                                                      |
+| Exact Session Duration (ms)      | Session length in milliseconds                                             |
+| Operating Duration (ms, session) | Operating time attributed to the session (if operating data is available)  |
+| Operating Data Status            | Whether the operating duration is final, provisional, or unavailable       |
+| Start Notes / End Notes          | Notes entered at the start and end of the session                          |
+| Supervisor ID / Supervisor Name  | The supervising user, if any                                               |
+| **Supervisor Email**             | Email address of the supervising user                                      |
+| **Resource metadata: \<key\>**   | One field for every metadata key found on the resources in the loaded rows |
 
 ### Billing transactions
 
-| Field | Description |
-|-------|-------------|
-| ID, Created at, Amount, Status, External reference | The transaction |
-| User, **User ID**, **User Email**, **User External Identifier** | The user who was charged |
-| Initiator, **Initiator Email** | The user who initiated the transaction |
-| Resource / Usage | Name of the resource of the related usage |
-| Refund of / Correction of | Related transaction IDs |
-| Items | Invoice items |
-| **Resource metadata: \<key\>** | One field for every metadata key of the resource of the related usage |
+| Field                                                   | Description                                                           |
+| ------------------------------------------------------- | --------------------------------------------------------------------- |
+| ID, Created at, Amount, Status, External reference      | The transaction                                                       |
+| User, **User ID**, **User Email**, **User External ID** | The user who was charged                                              |
+| Initiator, **Initiator Email**                          | The user who initiated the transaction                                |
+| Resource / Usage                                        | Name of the resource of the related usage                             |
+| Refund of / Correction of                               | Related transaction IDs                                               |
+| Items                                                   | Invoice items                                                         |
+| **Resource metadata: \<key\>**                          | One field for every metadata key of the resource of the related usage |
 
 Resource metadata values are written as text. Objects and lists are written as JSON.
 
 > [!NOTE]
-> User email addresses are only included in the CSV export data. They are not exposed by any other part of the API.
+> Regular user endpoints never include email addresses; only the CSV export data contains them. In the billing export the email fields stay empty unless you have `billing.manage` or `resources.reports.export`.
 
 ## CSV File Format
 
 - Columns are separated by a semicolon (`;`), lines by a line feed. The separator is not configurable.
 - Cells and headers containing a semicolon, a double quote, or a line break are enclosed in double quotes. Double quotes inside a cell are doubled (`"` becomes `""`), as spreadsheet applications expect.
 - Missing values are written as empty cells.
+- Values are written unchanged, including values that start with `=`, `+`, `-` or `@`, so target systems receive the original data.
+
+> [!WARNING]
+> Some fields contain text entered by users (for example session notes, user names or resource metadata). A spreadsheet application may interpret such a value as a formula. Only open exports in a spreadsheet application you trust, and do not enable external content or macros for them.
 
 > [!TIP]
 > You can open the CSV file in spreadsheet applications like Microsoft Excel, Google Sheets, or LibreOffice Calc for further analysis.

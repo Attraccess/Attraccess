@@ -114,10 +114,34 @@ describe('CsvExportTemplatesController (HTTP)', () => {
       { ...validBody, columns: [{ type: 'constant', header: 'h', value: 'v'.repeat(1025) }] },
     ],
     ['unknown column type', { ...validBody, columns: [{ type: 'other', header: 'h' }] }],
+    ['a nested array as column', { ...validBody, columns: [[]] }],
   ])('rejects %s with 400', async (_label, body) => {
     await request(app.getHttpServer()).post('/analytics/csv-export-templates').send(body).expect(400);
 
     expect(service.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['blank name', { name: '   ' }],
+    ['null name', { name: null }],
+    ['null columns', { columns: null }],
+    ['no columns', { columns: [] }],
+    ['more than 200 columns', { columns: Array(201).fill({ type: 'constant', header: 'h', value: 'v' }) }],
+    ['field column without fieldKey', { columns: [{ type: 'field', header: 'h' }] }],
+    ['unknown column type', { columns: [{ type: 'other', header: 'h' }] }],
+    ['a nested array as column', { columns: [[]] }],
+  ])('rejects a PATCH with %s with 400', async (_label, body) => {
+    await request(app.getHttpServer()).patch('/analytics/csv-export-templates/1').send(body).expect(400);
+
+    expect(service.update).not.toHaveBeenCalled();
+  });
+
+  it('accepts a PATCH with only a name', async () => {
+    service.update.mockImplementation(async (id, dto) => ({ id, ...dto }));
+
+    await request(app.getHttpServer()).patch('/analytics/csv-export-templates/1').send({ name: ' New ' }).expect(200);
+
+    expect(service.update).toHaveBeenCalledWith(1, { name: 'New' });
   });
 
   it('accepts exactly 200 columns', async () => {

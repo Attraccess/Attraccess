@@ -1,12 +1,13 @@
 import { ClassSerializerInterceptor, ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
 import { BillingTransaction, ResourceUsage, User } from '@attraccess/database-entities';
 import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
-import { toBillingTransactionExportRow, toResourceUsageExportRow } from './dtos/analyticsExportRows.dto';
+import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 import { UsersAdminController } from '../users-and-auth/users/users-admin.controller';
 import { UsersService } from '../users-and-auth/users/users.service';
 import { UserPasswordService } from '../users-and-auth/users/user-password.service';
@@ -17,6 +18,7 @@ import { AuthAuditLogger } from '../users-and-auth/rate-limiting/auth-audit.logg
 // fields only; this proves that, and that a regular user endpoint still never serializes it.
 describe('email exposure (HTTP integration, with the global ClassSerializerInterceptor)', () => {
   let app: INestApplication;
+  let permissions: string[];
 
   const makeUser = (id: number, email: string) =>
     Object.assign(new User(), { id, username: `user${id}`, email, externalIdentifier: `EXT-${id}` });
@@ -36,24 +38,18 @@ describe('email exposure (HTTP integration, with the global ClassSerializerInter
     items: [],
   });
 
-  const analyticsService = {
-    getResourceUsageHoursInDateRange: jest.fn(),
-    getBillingTransactionsInDateRange: jest.fn(),
-  };
   const usersService = { findOne: jest.fn() };
 
   beforeAll(async () => {
-    analyticsService.getResourceUsageHoursInDateRange.mockResolvedValue([[toResourceUsageExportRow(usage)], 1]);
-    analyticsService.getBillingTransactionsInDateRange.mockResolvedValue([
-      [toBillingTransactionExportRow(transaction)],
-      1,
-    ]);
     usersService.findOne.mockResolvedValue(makeUser(1, 'user@example.com'));
 
     const module = await Test.createTestingModule({
       controllers: [AnalyticsController, UsersAdminController],
       providers: [
-        { provide: AnalyticsService, useValue: analyticsService },
+        AnalyticsService,
+        { provide: getRepositoryToken(ResourceUsage), useValue: { findAndCount: async () => [[usage], 1] } },
+        { provide: getRepositoryToken(BillingTransaction), useValue: { findAndCount: async () => [[transaction], 1] } },
+        { provide: ResourceOperatingAttributionService, useValue: {} },
         { provide: UsersService, useValue: usersService },
         { provide: UserPasswordService, useValue: {} },
         { provide: BruteForceProtectionService, useValue: {} },
@@ -69,7 +65,7 @@ describe('email exposure (HTTP integration, with the global ClassSerializerInter
             id: 1,
             jwtTokenId: 'tok',
             authenticationMethod: 'session',
-            effectivePermissions: new Set(['resources.reports.export', 'resources.update', 'users.read']),
+            effectivePermissions: new Set(permissions),
           };
           return true;
         },
@@ -85,6 +81,10 @@ describe('email exposure (HTTP integration, with the global ClassSerializerInter
 
   afterAll(async () => {
     await app.close();
+  });
+
+  beforeEach(() => {
+    permissions = ['resources.reports.export', 'resources.update', 'users.read'];
   });
 
   const range = 'start=2023-01-01T00:00:00.000Z&end=2023-01-31T00:00:00.000Z';
@@ -110,6 +110,29 @@ describe('email exposure (HTTP integration, with the global ClassSerializerInter
     expect(row.initiatorEmail).toBe('initiator@example.com');
     expect(row.user.externalIdentifier).toBe('EXT-1');
     expect(row.resourceUsage.resource.metadata).toEqual({ costCenter: '4711' });
+    expect(row.user).not.toHaveProperty('email');
+    expect(row.initiator).not.toHaveProperty('email');
+  });
+
+  it('nulls the billing emails for a caller with only resources.update', async () => {
+    permissions = ['resources.update'];
+
+    const response = await request(app.getHttpServer()).get(`/analytics/billing-transactions?${range}`).expect(200);
+    const row = response.body.data[0];
+
+    expect(row.userEmail).toBeNull();
+    expect(row.initiatorEmail).toBeNull();
+    expect(JSON.stringify(response.body)).not.toContain('@example.com');
+  });
+
+  it('exposes the billing emails for a caller with resources.update and billing.manage', async () => {
+    permissions = ['resources.update', 'billing.manage'];
+
+    const response = await request(app.getHttpServer()).get(`/analytics/billing-transactions?${range}`).expect(200);
+    const row = response.body.data[0];
+
+    expect(row.userEmail).toBe('user@example.com');
+    expect(row.initiatorEmail).toBe('initiator@example.com');
     expect(row.user).not.toHaveProperty('email');
     expect(row.initiator).not.toHaveProperty('email');
   });

@@ -21,7 +21,7 @@
     "supervisorId": "Supervisor ID",
     "supervisorUsername": "Supervisor Name",
     "userEmail": "User Email",
-    "userExternalIdentifier": "User External Identifier",
+    "userExternalIdentifier": "User External ID",
     "supervisorEmail": "Supervisor Email"
   },
   "status": {

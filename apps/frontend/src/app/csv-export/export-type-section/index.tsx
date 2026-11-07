@@ -8,7 +8,6 @@ import { BillingTransactionsCard } from './billing-transactions-card';
 import { useAuth } from '../../../hooks/useAuth';
 
 import type { ExportTypeKey } from '../range-search-params';
-export type { ExportTypeKey };
 
 interface Props {
   range: RangeValue<DateValue> | null;

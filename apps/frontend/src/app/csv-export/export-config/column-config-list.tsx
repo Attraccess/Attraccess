@@ -1,10 +1,11 @@
 // Ordered column editor for the CSV export page — field/constant rows, headers, reorder, remove
 // FEATURE: CSV export — configure which columns are exported, with what header and in which order
+import { EmptyState } from '@attraccess/plugins-frontend-ui';
 import { Button, Checkbox, Chip, Input, Label, TextField } from '@heroui/react';
-import { AlertTriangleIcon, ArrowDownIcon, ArrowUpIcon, PlusIcon, Trash2Icon } from 'lucide-react';
+import { ArrowDownIcon, ArrowUpIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { Select } from '../../../components/select';
-import { ConfiguredColumn, MAX_COLUMNS, newColumnUid } from './csv';
+import { ConfiguredColumn, MAX_COLUMNS, newColumnUid, RESOURCE_METADATA_PREFIX } from './csv';
 
 export interface FieldOption {
   key: string;
@@ -24,6 +25,11 @@ interface Props {
   onChange: (update: (columns: ConfiguredColumn[]) => ConfiguredColumn[]) => void;
   /** False while the data is (re)loading: a field can only be judged unavailable once the data is there. */
   checkAvailability?: boolean;
+  /**
+   * False while later pages are not loaded yet: resource metadata keys are collected from the loaded
+   * rows only, so a metadata key may still turn up on a later page.
+   */
+  allPagesLoaded?: boolean;
   options?: OptionLite[];
   onOptionChange?: (key: string, next: boolean) => void;
   t: (key: string, vars?: Record<string, string | number>) => string;
@@ -44,6 +50,7 @@ interface RowProps {
   isLast: boolean;
   fields: FieldOption[];
   checkAvailability: boolean;
+  allPagesLoaded: boolean;
   onPatch: (uid: string, patch: Partial<ConfiguredColumn>) => void;
   onMove: (uid: string, offset: -1 | 1) => void;
   onRemove: (uid: string) => void;
@@ -52,10 +59,12 @@ interface RowProps {
 
 // Memoised: every row owns a Select over all fields, so re-rendering all rows per keystroke gets slow.
 const ColumnRow = memo(function ColumnRow(props: RowProps) {
-  const { column, position, isFirst, isLast, fields, checkAvailability, onPatch, onMove, onRemove, t } = props;
+  const { column, position, isFirst, isLast, fields, checkAvailability, allPagesLoaded, onPatch, onMove, onRemove, t } =
+    props;
 
   const fieldKnown = column.type === 'field' && fields.some((field) => field.key === column.fieldKey);
-  const isStale = checkAvailability && column.type === 'field' && !fieldKnown;
+  const mayStillAppear = !allPagesLoaded && (column.fieldKey ?? '').startsWith(RESOURCE_METADATA_PREFIX);
+  const isStale = checkAvailability && column.type === 'field' && !fieldKnown && !mayStillAppear;
   const defaultLabel = fields.find((field) => field.key === column.fieldKey)?.label ?? '';
   // a stale key stays selectable so the template keeps it; it is flagged below
   const items = useMemo(
@@ -67,104 +76,111 @@ const ColumnRow = memo(function ColumnRow(props: RowProps) {
   );
 
   return (
-    <li
-      className="flex min-w-0 flex-col gap-2 rounded-md border border-border p-3 @2xl:flex-row @2xl:items-start"
-      data-cy="csv-export-column-row"
-    >
-      <Chip size="sm" variant="soft" className="self-start @2xl:mt-8">
-        {column.type === 'field' ? t('columns.type.field') : t('columns.type.constant')}
-      </Chip>
+    <li data-cy="csv-export-column-row">
+      <div
+        role="group"
+        aria-label={t('columns.row', { n: position })}
+        className="flex min-w-0 flex-col gap-2 rounded-md border border-border p-3 @2xl:flex-row @2xl:items-start"
+      >
+        <Chip size="sm" variant="soft" className="self-start @2xl:mt-8">
+          {column.type === 'field' ? t('columns.type.field') : t('columns.type.constant')}
+        </Chip>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-2 @2xl:flex-row">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          {column.type === 'field' ? (
-            <>
-              <Label className="text-sm font-medium">{t('columns.field')}</Label>
+        <div className="flex min-w-0 flex-1 flex-col gap-2 @2xl:flex-row">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {column.type === 'field' ? (
               <Select
-                aria-label={t('columns.fieldAria', { n: position })}
+                label={t('columns.field')}
                 value={column.fieldKey}
                 items={items}
                 onChange={(key) => onPatch(column.uid, { fieldKey: key })}
                 placeholder={t('columns.fieldPlaceholder')}
                 isInvalid={isStale}
+                errorMessage={
+                  isStale ? <span data-cy="csv-export-column-unavailable">{t('columns.unavailable')}</span> : undefined
+                }
+                valueClassName="min-w-0 wrap-anywhere"
                 fullWidth
                 data-cy="csv-export-column-field"
               />
-              {isStale && (
-                <p className="flex items-start gap-1 text-xs" data-cy="csv-export-column-unavailable">
-                  <AlertTriangleIcon className="mt-px size-3.5 shrink-0 text-warning" aria-hidden />
-                  {t('columns.unavailable')}
-                </p>
-              )}
-            </>
-          ) : (
-            <TextField
-              value={column.value ?? ''}
-              onChange={(value) => onPatch(column.uid, { value })}
-              maxLength={1024}
-              fullWidth
-            >
-              <Label className="text-sm font-medium">{t('columns.value')}</Label>
-              <Input data-cy="csv-export-column-value" />
-            </TextField>
-          )}
+            ) : (
+              <TextField
+                value={column.value ?? ''}
+                onChange={(value) => onPatch(column.uid, { value })}
+                maxLength={1024}
+                fullWidth
+              >
+                <Label>{t('columns.value')}</Label>
+                <Input data-cy="csv-export-column-value" />
+              </TextField>
+            )}
+          </div>
+
+          <TextField
+            value={column.header}
+            onChange={(header) => onPatch(column.uid, { header })}
+            maxLength={255}
+            className="min-w-0 flex-1"
+            fullWidth
+          >
+            <Label>{t('columns.header')}</Label>
+            <Input
+              placeholder={column.type === 'field' ? defaultLabel || (column.fieldKey ?? '') : ''}
+              data-cy="csv-export-column-header"
+            />
+          </TextField>
         </div>
 
-        <TextField
-          value={column.header}
-          onChange={(header) => onPatch(column.uid, { header })}
-          maxLength={255}
-          className="min-w-0 flex-1"
-          fullWidth
-        >
-          <Label className="text-sm font-medium">{t('columns.header')}</Label>
-          <Input
-            placeholder={column.type === 'field' ? defaultLabel || (column.fieldKey ?? '') : ''}
-            data-cy="csv-export-column-header"
-          />
-        </TextField>
-      </div>
-
-      <div className="flex gap-1 self-end @2xl:mt-6 @2xl:self-start">
-        <Button
-          isIconOnly
-          size="sm"
-          variant="outline"
-          aria-label={t('columns.moveUp', { n: position })}
-          isDisabled={isFirst}
-          onPress={() => onMove(column.uid, -1)}
-          data-cy="csv-export-column-up"
-        >
-          <ArrowUpIcon className="size-4" />
-        </Button>
-        <Button
-          isIconOnly
-          size="sm"
-          variant="outline"
-          aria-label={t('columns.moveDown', { n: position })}
-          isDisabled={isLast}
-          onPress={() => onMove(column.uid, 1)}
-          data-cy="csv-export-column-down"
-        >
-          <ArrowDownIcon className="size-4" />
-        </Button>
-        <Button
-          isIconOnly
-          size="sm"
-          variant="outline"
-          aria-label={t('columns.remove', { n: position })}
-          onPress={() => onRemove(column.uid)}
-          data-cy="csv-export-column-remove"
-        >
-          <Trash2Icon className="size-4" />
-        </Button>
+        <div className="flex gap-1 self-end @2xl:mt-6 @2xl:self-start">
+          <Button
+            isIconOnly
+            size="sm"
+            variant="outline"
+            aria-label={t('columns.moveUp', { n: position })}
+            isDisabled={isFirst}
+            onPress={() => onMove(column.uid, -1)}
+            data-cy="csv-export-column-up"
+          >
+            <ArrowUpIcon className="size-4" />
+          </Button>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="outline"
+            aria-label={t('columns.moveDown', { n: position })}
+            isDisabled={isLast}
+            onPress={() => onMove(column.uid, 1)}
+            data-cy="csv-export-column-down"
+          >
+            <ArrowDownIcon className="size-4" />
+          </Button>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="outline"
+            aria-label={t('columns.remove', { n: position })}
+            onPress={() => onRemove(column.uid)}
+            data-cy="csv-export-column-remove"
+          >
+            <Trash2Icon className="size-4" />
+          </Button>
+        </div>
       </div>
     </li>
   );
 });
 
 export function ColumnConfigList(props: Props) {
-  const { columns, fields, onChange, checkAvailability = true, options, onOptionChange, t } = props;
+  const {
+    columns,
+    fields,
+    onChange,
+    checkAvailability = true,
+    allPagesLoaded = true,
+    options,
+    onOptionChange,
+    t,
+  } = props;
 
   const patchColumn = useCallback(
     (uid: string, patch: Partial<ConfiguredColumn>) =>
@@ -195,6 +211,8 @@ export function ColumnConfigList(props: Props) {
   );
   // the API rejects templates with more columns than this
   const atLimit = columns.length >= MAX_COLUMNS;
+  // a field column needs a field key (the API rejects it otherwise); none exist before the data is there
+  const noFields = fields.length === 0;
 
   return (
     <section className="flex min-w-0 flex-col gap-3" data-cy="csv-export-column-config">
@@ -203,7 +221,7 @@ export function ColumnConfigList(props: Props) {
         <p className="text-sm text-muted">{t('columns.description')}</p>
       </div>
 
-      {columns.length === 0 && <p className="text-sm text-muted">{t('columns.empty')}</p>}
+      {columns.length === 0 && <EmptyState message={t('columns.empty')} />}
 
       <ol className="@container flex flex-col gap-3" aria-label={t('columns.title')}>
         {columns.map((column, index) => (
@@ -215,6 +233,7 @@ export function ColumnConfigList(props: Props) {
             isLast={index === columns.length - 1}
             fields={fields}
             checkAvailability={checkAvailability}
+            allPagesLoaded={allPagesLoaded}
             onPatch={patchColumn}
             onMove={moveColumn}
             onRemove={removeColumn}
@@ -224,11 +243,23 @@ export function ColumnConfigList(props: Props) {
       </ol>
 
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" isDisabled={atLimit} onPress={addField} data-cy="csv-export-add-field">
+        <Button
+          size="sm"
+          variant="outline"
+          isDisabled={atLimit || noFields}
+          onPress={addField}
+          data-cy="csv-export-add-field"
+        >
           <PlusIcon className="size-4" />
           {t('columns.addField')}
         </Button>
-        <Button size="sm" variant="outline" isDisabled={atLimit} onPress={addConstant} data-cy="csv-export-add-constant">
+        <Button
+          size="sm"
+          variant="outline"
+          isDisabled={atLimit}
+          onPress={addConstant}
+          data-cy="csv-export-add-constant"
+        >
           <PlusIcon className="size-4" />
           {t('columns.addConstant')}
         </Button>

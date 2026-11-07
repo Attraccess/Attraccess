@@ -1,3 +1,4 @@
+import { applyDecorators } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -6,6 +7,7 @@ import {
   IsArray,
   IsEnum,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
   MaxLength,
@@ -15,6 +17,7 @@ import {
 import { CsvExportTemplateColumnType, CsvExportType } from '@attraccess/database-entities';
 
 export const CSV_EXPORT_TEMPLATE_MAX_COLUMNS = 200;
+export const CSV_EXPORT_TEMPLATE_NAME_MAX_LENGTH = 120;
 
 const trimString = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -65,16 +68,30 @@ export class CsvExportTemplateColumnDto {
   value?: string;
 }
 
+// Shared by the create and update DTOs. The update DTO skips them only for omitted fields, so `null` is a 400.
+const TemplateNameRules = () =>
+  applyDecorators(Transform(trimString), IsString(), IsNotEmpty(), MaxLength(CSV_EXPORT_TEMPLATE_NAME_MAX_LENGTH));
+
+const TemplateColumnsRules = () =>
+  applyDecorators(
+    IsArray(),
+    ArrayMinSize(1),
+    ArrayMaxSize(CSV_EXPORT_TEMPLATE_MAX_COLUMNS),
+    // ValidateNested recurses into nested arrays, so `[[]]` would pass without this.
+    IsObject({ each: true }),
+    ValidateNested({ each: true }),
+    Type(() => CsvExportTemplateColumnDto),
+  );
+
+const isProvided = (_: object, value: unknown) => value !== undefined;
+
 export class CreateCsvExportTemplateDto {
   @ApiProperty({
     description: 'The display name of the template (unique per export type)',
     example: 'Accounting upload',
-    maxLength: 120,
+    maxLength: CSV_EXPORT_TEMPLATE_NAME_MAX_LENGTH,
   })
-  @Transform(trimString)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
+  @TemplateNameRules()
   name: string;
 
   @ApiProperty({
@@ -89,12 +106,10 @@ export class CreateCsvExportTemplateDto {
   @ApiProperty({
     description: 'The ordered column configuration of the template (1 to 200 columns)',
     type: [CsvExportTemplateColumnDto],
+    minItems: 1,
+    maxItems: CSV_EXPORT_TEMPLATE_MAX_COLUMNS,
   })
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(CSV_EXPORT_TEMPLATE_MAX_COLUMNS)
-  @ValidateNested({ each: true })
-  @Type(() => CsvExportTemplateColumnDto)
+  @TemplateColumnsRules()
   columns: CsvExportTemplateColumnDto[];
 }
 
@@ -103,26 +118,21 @@ export class UpdateCsvExportTemplateDto {
     description: 'The display name of the template',
     example: 'Accounting upload',
     required: false,
-    maxLength: 120,
+    maxLength: CSV_EXPORT_TEMPLATE_NAME_MAX_LENGTH,
   })
-  @IsOptional()
-  @Transform(trimString)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
+  @ValidateIf(isProvided)
+  @TemplateNameRules()
   name?: string;
 
   @ApiProperty({
     description: 'The ordered column configuration of the template (1 to 200 columns)',
     type: [CsvExportTemplateColumnDto],
     required: false,
+    minItems: 1,
+    maxItems: CSV_EXPORT_TEMPLATE_MAX_COLUMNS,
   })
-  @IsOptional()
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(CSV_EXPORT_TEMPLATE_MAX_COLUMNS)
-  @ValidateNested({ each: true })
-  @Type(() => CsvExportTemplateColumnDto)
+  @ValidateIf(isProvided)
+  @TemplateColumnsRules()
   columns?: CsvExportTemplateColumnDto[];
 }
 

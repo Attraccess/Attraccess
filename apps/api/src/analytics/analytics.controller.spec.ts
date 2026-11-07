@@ -3,6 +3,7 @@ import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsQueryDto } from './dtos/analyticsQuery.dto';
 import { ResourceOperatingDurationsDto } from './dtos/resourceOperatingDurations.dto';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 describe('AnalyticsController', () => {
   let controller: AnalyticsController;
@@ -90,6 +91,34 @@ describe('AnalyticsController', () => {
       mockAnalyticsService.getResourceUsageHoursInDateRange.mockRejectedValue(error);
 
       await expect(controller.getResourceUsageHoursInDateRange(query)).rejects.toThrow(error);
+    });
+  });
+
+  describe('getBillingTransactionsInDateRange', () => {
+    const query = Object.assign(new AnalyticsQueryDto(), {
+      start: new Date('2023-01-01'),
+      end: new Date('2023-01-31'),
+      page: 1,
+      limit: 500,
+    });
+    const requestWith = (permissions: string[]) =>
+      ({ user: { id: 1, effectivePermissions: new Set(permissions) } }) as unknown as AuthenticatedRequest;
+
+    it.each([
+      [['resources.update'], false],
+      [['resources.update', 'billing.manage'], true],
+      [['resources.update', 'resources.reports.export'], true],
+    ])('with %j passes includeEmail=%s', async (permissions, includeEmail) => {
+      mockAnalyticsService.getBillingTransactionsInDateRange.mockResolvedValue([[], 0]);
+
+      await controller.getBillingTransactionsInDateRange(query, requestWith(permissions));
+
+      expect(service.getBillingTransactionsInDateRange).toHaveBeenCalledWith(
+        { start: query.start, end: query.end },
+        1,
+        500,
+        includeEmail,
+      );
     });
   });
 

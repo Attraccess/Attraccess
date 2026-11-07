@@ -22,6 +22,8 @@ export class CsvExportTemplatesController {
     description: 'All CSV export templates (optionally filtered by export type)',
     type: [CsvExportTemplate],
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires resources.reports.export or billing.manage' })
   @ApiOperation({
     summary: 'List CSV export templates',
     operationId: 'getCsvExportTemplates',
@@ -37,6 +39,9 @@ export class CsvExportTemplatesController {
     description: 'The CSV export template',
     type: CsvExportTemplate,
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires resources.reports.export or billing.manage' })
+  @ApiResponse({ status: 404, description: 'CSV export template not found' })
   @ApiOperation({
     summary: 'Get a CSV export template by id',
     operationId: 'getCsvExportTemplate',
@@ -52,6 +57,10 @@ export class CsvExportTemplatesController {
     description: 'The created CSV export template',
     type: CsvExportTemplate,
   })
+  @ApiResponse({ status: 400, description: 'Bad Request - Invalid input data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires resources.reports.export or billing.manage' })
+  @ApiResponse({ status: 409, description: 'A template with this name already exists for the export type' })
   @ApiOperation({
     summary: 'Create a CSV export template',
     operationId: 'createCsvExportTemplate',
@@ -67,6 +76,11 @@ export class CsvExportTemplatesController {
     description: 'The updated CSV export template',
     type: CsvExportTemplate,
   })
+  @ApiResponse({ status: 400, description: 'Bad Request - Invalid input data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires resources.reports.export or billing.manage' })
+  @ApiResponse({ status: 404, description: 'CSV export template not found' })
+  @ApiResponse({ status: 409, description: 'A template with this name already exists for the export type' })
   @ApiOperation({
     summary: 'Update a CSV export template',
     operationId: 'updateCsvExportTemplate',
@@ -82,6 +96,9 @@ export class CsvExportTemplatesController {
     status: 204,
     description: 'The template was deleted',
   })
+  @ApiResponse({ status: 401, description: 'Unauthorized - User is not authenticated' })
+  @ApiResponse({ status: 403, description: 'Forbidden - requires resources.reports.export or billing.manage' })
+  @ApiResponse({ status: 404, description: 'CSV export template not found' })
   @ApiOperation({
     summary: 'Delete a CSV export template',
     operationId: 'deleteCsvExportTemplate',

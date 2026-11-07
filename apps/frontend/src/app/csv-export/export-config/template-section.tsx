@@ -1,8 +1,9 @@
 // Template management for the CSV export page — load, save as new, update, delete
 // FEATURE: CSV export — persisted, instance-wide column configurations per export type
 import {
-  Button,
   Chip,
+  FieldError,
+  Form,
   Input,
   Label,
   ModalBody,
@@ -11,7 +12,7 @@ import {
   ModalHeading,
   TextField,
 } from '@heroui/react';
-import { StandardModal, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, StatusAlert, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   CsvExportTemplate,
@@ -25,9 +26,10 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { SaveIcon, SaveAllIcon, Trash2Icon } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { Select } from '../../../components/select';
 import { useToastMessage } from '../../../components/toastProvider';
+import { getApiErrorMessage } from '../../../utils/apiError';
 import { ConfiguredColumn, fromTemplateColumns, toTemplateColumns } from './csv';
 import de from './de.json';
 import en from './en.json';
@@ -46,6 +48,8 @@ interface Props {
 const toRequestColumns = (columns: ConfiguredColumn[]) => toTemplateColumns(columns) as CsvExportTemplateColumnDto[];
 
 const isDuplicateError = (error: unknown) => error instanceof ApiError && error.status === 409;
+// The server's message (e.g. a validation error) as toast description; undefined for non-Error rejections.
+const errorDescription = (error: unknown) => (error instanceof Error ? getApiErrorMessage(error) : undefined);
 
 export function TemplateSection(props: Props) {
   const { exportType, currentColumns, onApply } = props;
@@ -54,14 +58,30 @@ export function TemplateSection(props: Props) {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
 
-  const { data: templates } = useAnalyticsServiceGetCsvExportTemplates({ exportType });
+  const {
+    data: templates,
+    isLoading: templatesLoading,
+    isError: templatesFailed,
+  } = useAnalyticsServiceGetCsvExportTemplates({ exportType });
 
   const [activeTemplateId, setActiveTemplateId] = useState<number | null>(null);
+  // Mirrors activeTemplateId for mutation callbacks that resolve after the user may have switched templates.
+  const activeTemplateIdRef = useRef<number | null>(null);
   const [nameDraft, setNameDraft] = useState('');
+  const [nameError, setNameError] = useState<string | null>(null);
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [saveAsName, setSaveAsName] = useState('');
   const [saveAsError, setSaveAsError] = useState<string | null>(null);
+  // Set synchronously on submit: isPending only flips after a re-render, so a quick second Enter would POST again.
+  const createInFlight = useRef(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const activate = useCallback((template: Pick<CsvExportTemplate, 'id' | 'name'> | null) => {
+    activeTemplateIdRef.current = template?.id ?? null;
+    setActiveTemplateId(template?.id ?? null);
+    setNameDraft(template?.name ?? '');
+    setNameError(null);
+  }, []);
 
   const activeTemplate = useMemo(
     () => (templates ?? []).find((template) => template.id === activeTemplateId) ?? null,
@@ -85,47 +105,57 @@ export function TemplateSection(props: Props) {
 
   const createTemplate = useAnalyticsServiceCreateCsvExportTemplate({
     onSuccess: async (created) => {
+      createInFlight.current = false;
       await invalidateTemplates();
-      setActiveTemplateId(created.id);
-      setNameDraft(created.name);
+      activate(created);
       setSaveAsOpen(false);
       setSaveAsName('');
       toast.success({ title: t('templates.toasts.created', { name: created.name }) });
     },
     onError: (error) => {
-      setSaveAsError(isDuplicateError(error) ? t('templates.errors.duplicate') : t('templates.errors.saveFailed'));
+      createInFlight.current = false;
+      if (isDuplicateError(error)) {
+        setSaveAsError(t('templates.errors.duplicate'));
+        return;
+      }
+      toast.error({ title: t('templates.errors.saveFailed'), description: errorDescription(error) });
     },
   });
 
   const updateTemplate = useAnalyticsServiceUpdateCsvExportTemplate({
     onSuccess: async (updated) => {
       await invalidateTemplates();
-      setNameDraft(updated.name);
+      // the user may have switched to another template while the request was running
+      if (activeTemplateIdRef.current === updated.id) {
+        setNameDraft(updated.name);
+        setNameError(null);
+      }
       toast.success({ title: t('templates.toasts.updated', { name: updated.name }) });
     },
-    onError: (error) => {
+    onError: (error, { id }) => {
+      const duplicate = isDuplicateError(error);
+      if (duplicate && activeTemplateIdRef.current === id) setNameError(t('templates.errors.duplicate'));
       toast.error({
-        title: isDuplicateError(error) ? t('templates.errors.duplicate') : t('templates.errors.saveFailed'),
+        title: duplicate ? t('templates.errors.duplicate') : t('templates.errors.saveFailed'),
+        description: duplicate ? undefined : errorDescription(error),
       });
     },
   });
 
   const deleteTemplate = useAnalyticsServiceDeleteCsvExportTemplate({
-    onSuccess: async () => {
+    onSuccess: async (_result, { id }) => {
       await invalidateTemplates();
-      setActiveTemplateId(null);
-      setNameDraft('');
+      if (activeTemplateIdRef.current === id) activate(null);
       setDeleteOpen(false);
       toast.success({ title: t('templates.toasts.deleted') });
     },
-    onError: (error) => {
+    onError: (error, { id }) => {
       setDeleteOpen(false);
-      toast.error({ title: t('templates.errors.deleteFailed') });
+      toast.error({ title: t('templates.errors.deleteFailed'), description: errorDescription(error) });
       // somebody else may have deleted it already: stop offering a template that no longer exists
       void invalidateTemplates();
-      if (error instanceof ApiError && error.status === 404) {
-        setActiveTemplateId(null);
-        setNameDraft('');
+      if (error instanceof ApiError && error.status === 404 && activeTemplateIdRef.current === id) {
+        activate(null);
       }
     },
   });
@@ -133,18 +163,16 @@ export function TemplateSection(props: Props) {
   const selectTemplate = useCallback(
     (key: string) => {
       if (key === NO_TEMPLATE_KEY) {
-        setActiveTemplateId(null);
-        setNameDraft('');
+        activate(null);
         onApply(null);
         return;
       }
       const template = (templates ?? []).find((candidate: CsvExportTemplate) => String(candidate.id) === key);
       if (!template) return;
-      setActiveTemplateId(template.id);
-      setNameDraft(template.name);
+      activate(template);
       onApply(fromTemplateColumns(template.columns));
     },
-    [templates, onApply],
+    [templates, onApply, activate],
   );
 
   const selectItems = useMemo(
@@ -160,12 +188,15 @@ export function TemplateSection(props: Props) {
     setSaveAsError(null);
     setSaveAsOpen(true);
   };
-  const submitSaveAs = () => {
+  const submitSaveAs = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     const name = saveAsName.trim();
-    if (!name || currentColumns.length === 0) return;
+    if (!name || currentColumns.length === 0 || createInFlight.current || createTemplate.isPending) return;
+    createInFlight.current = true;
     setSaveAsError(null);
     createTemplate.mutate({ requestBody: { name, exportType, columns: toRequestColumns(currentColumns) } });
   };
+  const mutationPending = updateTemplate.isPending || deleteTemplate.isPending;
 
   return (
     <section className="flex min-w-0 flex-col gap-3" data-cy="csv-export-template-section">
@@ -187,6 +218,7 @@ export function TemplateSection(props: Props) {
           value={activeTemplateId === null ? NO_TEMPLATE_KEY : String(activeTemplateId)}
           onChange={selectTemplate}
           items={selectItems}
+          isDisabled={templatesLoading || mutationPending}
           className="min-w-0 md:max-w-xs"
           fullWidth
           data-cy="csv-export-template-select"
@@ -194,16 +226,27 @@ export function TemplateSection(props: Props) {
         {activeTemplate && (
           <TextField
             value={nameDraft}
-            onChange={setNameDraft}
+            onChange={(value) => {
+              setNameDraft(value);
+              setNameError(null);
+            }}
             maxLength={NAME_MAX_LENGTH}
+            isInvalid={nameError !== null}
             className="min-w-0 md:max-w-xs"
             fullWidth
           >
-            <Label className="text-sm font-medium">{t('templates.name')}</Label>
+            <Label>{t('templates.name')}</Label>
             <Input data-cy="csv-export-template-name" />
+            {nameError && <FieldError data-cy="csv-export-template-name-error">{nameError}</FieldError>}
           </TextField>
         )}
       </div>
+
+      {templatesFailed && (
+        <StatusAlert status="danger" data-cy="csv-export-template-load-error">
+          {t('templates.errors.loadFailed')}
+        </StatusAlert>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {activeTemplate && (
@@ -235,7 +278,13 @@ export function TemplateSection(props: Props) {
           {t('templates.saveAsNew')}
         </Button>
         {activeTemplate && (
-          <Button size="sm" variant="outline" onPress={() => setDeleteOpen(true)} data-cy="csv-export-template-delete">
+          <Button
+            size="sm"
+            variant="outline"
+            isDisabled={updateTemplate.isPending}
+            onPress={() => setDeleteOpen(true)}
+            data-cy="csv-export-template-delete"
+          >
             <Trash2Icon className="size-4" />
             {t('templates.delete')}
           </Button>
@@ -244,7 +293,7 @@ export function TemplateSection(props: Props) {
 
       <StandardModal isOpen={saveAsOpen} onOpenChange={setSaveAsOpen} size="sm">
         {({ close }) => (
-          <>
+          <Form onSubmit={submitSaveAs} className="contents" data-cy="csv-export-template-save-as-form">
             <ModalHeader>
               <ModalHeading>{t('templates.saveAsTitle')}</ModalHeading>
             </ModalHeader>
@@ -260,33 +309,26 @@ export function TemplateSection(props: Props) {
                 autoFocus
                 fullWidth
               >
-                <Label className="text-sm font-medium">{t('templates.name')}</Label>
-                <Input
-                  onKeyDown={(event) => event.key === 'Enter' && submitSaveAs()}
-                  data-cy="csv-export-template-save-as-name"
-                />
+                <Label>{t('templates.name')}</Label>
+                <Input data-cy="csv-export-template-save-as-name" />
+                {saveAsError && <FieldError data-cy="csv-export-template-save-as-error">{saveAsError}</FieldError>}
               </TextField>
-              {saveAsError && (
-                <p className="text-xs text-danger" role="alert" data-cy="csv-export-template-save-as-error">
-                  {saveAsError}
-                </p>
-              )}
             </ModalBody>
             <ModalFooter>
-              <Button variant="ghost" onPress={close}>
+              <Button variant="ghost" onPress={close} isDisabled={createTemplate.isPending}>
                 {t('templates.cancel')}
               </Button>
               <Button
+                type="submit"
                 variant="primary"
                 isDisabled={saveAsName.trim() === ''}
                 isPending={createTemplate.isPending}
-                onPress={submitSaveAs}
                 data-cy="csv-export-template-save-as-confirm"
               >
                 {t('templates.save')}
               </Button>
             </ModalFooter>
-          </>
+          </Form>
         )}
       </StandardModal>
 
@@ -304,9 +346,7 @@ export function TemplateSection(props: Props) {
         }}
         data-cy="csv-export-template-delete-dialog"
       >
-        <span className="[overflow-wrap:anywhere]">
-          {t('templates.deleteMessage', { name: activeTemplate?.name ?? '' })}
-        </span>
+        <span className="wrap-anywhere">{t('templates.deleteMessage', { name: activeTemplate?.name ?? '' })}</span>
       </StatusDialog>
     </section>
   );

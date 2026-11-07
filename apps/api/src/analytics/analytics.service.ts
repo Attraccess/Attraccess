@@ -40,7 +40,12 @@ export class AnalyticsService {
     return [usages.map(toResourceUsageExportRow), total] as const;
   }
 
-  public async getBillingTransactionsInDateRange(dateRange: DateRangeValue, page = 1, limit = 500) {
+  public async getBillingTransactionsInDateRange(
+    dateRange: DateRangeValue,
+    page = 1,
+    limit = 500,
+    includeEmail = false,
+  ) {
     const findOptions: FindManyOptions<BillingTransaction> = {
       where: {
         createdAt: Between(dateRange.start, dateRange.end),
@@ -56,7 +61,10 @@ export class AnalyticsService {
     };
 
     const [transactions, total] = await this.billingTransactionRepository.findAndCount(findOptions);
-    return [transactions.map(toBillingTransactionExportRow), total] as const;
+    return [
+      transactions.map((transaction) => toBillingTransactionExportRow(transaction, includeEmail)),
+      total,
+    ] as const;
   }
 
   public async getResourceOperatingDurations(

@@ -1,12 +1,23 @@
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ColumnConfigList } from './column-config-list';
 import { ConfiguredColumn, MAX_COLUMNS } from './csv';
 
 // 200 real HeroUI selects are far too slow for jsdom; the Select itself is not under test here
 vi.mock('../../../components/select', () => ({
-  Select: ({ value, 'data-cy': dataCy }: { value?: string; 'data-cy'?: string }) => (
-    <span data-cy={dataCy}>{value}</span>
+  Select: ({
+    value,
+    errorMessage,
+    'data-cy': dataCy,
+  }: {
+    value?: string;
+    errorMessage?: React.ReactNode;
+    'data-cy'?: string;
+  }) => (
+    <>
+      <span data-cy={dataCy}>{value}</span>
+      {errorMessage}
+    </>
   ),
 }));
 
@@ -35,6 +46,25 @@ it('flags a field that is missing from the loaded data', () => {
 it('does not flag anything while the data is still loading', () => {
   renderList([column('b', 'resourceMetadata.room')], { checkAvailability: false });
   expect(unavailable()).toHaveLength(0);
+});
+
+it('flags a missing metadata field only once all pages are loaded, other fields right away', () => {
+  renderList([column('a', 'resourceMetadata.room'), column('b', 'gone')], { allPagesLoaded: false });
+  expect(unavailable()).toHaveLength(1);
+  cleanup();
+  renderList([column('a', 'resourceMetadata.room'), column('b', 'gone')], { allPagesLoaded: true });
+  expect(unavailable()).toHaveLength(2);
+});
+
+it('offers no field column while there are no fields to pick', () => {
+  renderList([], { fields: [] });
+  expect(document.querySelector('[data-cy="csv-export-add-field"]')).toBeDisabled();
+  expect(document.querySelector('[data-cy="csv-export-add-constant"]')).toBeEnabled();
+});
+
+it('labels each row as a numbered group', () => {
+  renderList([column('a', 'resourceName'), column('b', 'username')]);
+  expect(screen.getByRole('group', { name: 'columns.row{"n":2}' })).toBeInTheDocument();
 });
 
 it('moves and removes columns by identity through functional updates', () => {

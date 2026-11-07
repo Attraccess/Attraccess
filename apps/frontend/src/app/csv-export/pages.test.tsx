@@ -57,7 +57,7 @@ it('opens the dedicated page of the clicked export type with the range in the UR
   expect(Number.isNaN(new Date(params.get('end') ?? '').getTime())).toBe(false);
   expect(screen.getByTestId('usage')).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole('button', { name: 'Back to export selection' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
   fireEvent.click(screen.getByText('open billing'));
   expect(screen.getByTestId('location').textContent).toMatch(/^\/csv-export\/billing-transactions\?/);
 });
@@ -67,6 +67,19 @@ it('keeps the range of the URL on the config page (reload or deep link)', () => 
   expect(screen.getByTestId('billing').textContent).toBe(`${START}|${END}`);
   expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Billing Transactions');
   expect(document.querySelector('[data-cy="csv-export-page-range-pill"]')).toBeTruthy();
+});
+
+it('reopens an export with the identical range after going back to the landing page', () => {
+  // local day bounds, as the landing page writes them (start of the first day, end of the last day)
+  const search = new URLSearchParams({
+    start: new Date(2026, 8, 1).toISOString(),
+    end: new Date(2026, 8, 10, 23, 59, 59, 999).toISOString(),
+  }).toString();
+  renderAt(`/csv-export/resource-usage-hours?${search}`);
+  fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
+  expect(screen.getByTestId('location').textContent).toBe(`/csv-export?${search}`);
+  fireEvent.click(screen.getByText('open billing'));
+  expect(screen.getByTestId('location').textContent).toBe(`/csv-export/billing-transactions?${search}`);
 });
 
 it.each(['', '?start=garbage&end=nope', `?start=${END}&end=${START}`])(
@@ -80,7 +93,7 @@ it.each(['', '?start=garbage&end=nope', `?start=${END}&end=${START}`])(
 
 it('the back button returns to the landing page and keeps the range', () => {
   renderAt(`/csv-export/resource-usage-hours?start=${START}&end=${END}`);
-  fireEvent.click(screen.getByRole('button', { name: 'Back to export selection' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Go back' }));
   expect(screen.getByTestId('location').textContent).toBe(
     `/csv-export?${new URLSearchParams({ start: START, end: END }).toString()}`,
   );

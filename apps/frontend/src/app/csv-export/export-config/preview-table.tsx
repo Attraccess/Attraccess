@@ -1,6 +1,6 @@
 // Preview table for the CSV export page — first N rows with selected columns
 // FEATURE: CSV export — data sample shown before download
-import { EmptyState } from '@attraccess/plugins-frontend-ui';
+import { EmptyState, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   Spinner,
@@ -15,6 +15,7 @@ import {
 } from '@heroui/react';
 import { QueryStatus } from '@tanstack/react-query';
 import { RotateCwIcon } from 'lucide-react';
+import { memo } from 'react';
 
 interface PreviewColumn {
   key: string;
@@ -32,7 +33,7 @@ interface Props {
   totalCount: number;
   previewLimit: number;
   ariaLabel: string;
-  titleLabel: (vars: { n: number }) => string;
+  titleLabel: (vars: { count: number }) => string;
   rowCountLabel: (vars: { count: number }) => string;
   errorLabel: string;
   refreshLabel: string;
@@ -40,7 +41,8 @@ interface Props {
   queryStatus: QueryStatus;
 }
 
-export function PreviewTable(props: Props) {
+// Memoised: the parent re-renders on every keystroke in the column editor, the preview only when its deferred data changes.
+export const PreviewTable = memo(function PreviewTable(props: Props) {
   const {
     columns,
     rows,
@@ -60,7 +62,7 @@ export function PreviewTable(props: Props) {
   return (
     <div className="flex flex-col gap-2 min-w-0">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{titleLabel({ n: previewLimit })}</span>
+        <span className="text-sm font-medium">{titleLabel({ count: previewLimit })}</span>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted">{rowCountLabel({ count: totalCount })}</span>
           {refetch && (
@@ -78,42 +80,44 @@ export function PreviewTable(props: Props) {
         </div>
       </div>
 
-      <div className="border border-border rounded-md">
-        {queryStatus === 'pending' ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner />
-          </div>
-        ) : queryStatus === 'error' ? (
-          <p className="px-4 py-12 text-center text-sm" role="alert" data-cy="resource-usage-export-error">
-            {errorLabel}
-          </p>
-        ) : (
-          <Table data-cy="resource-usage-export-table">
-            <TableScrollContainer>
-              <TableContent aria-label={ariaLabel}>
-                <TableHeader columns={columns}>
-                  {(column) => (
-                    <TableColumn key={column.key} id={column.key} isRowHeader={column.key === columns[0]?.key}>
-                      {column.label}
-                    </TableColumn>
-                  )}
-                </TableHeader>
-                <TableBody items={limited} renderEmptyState={() => <EmptyState />}>
-                  {(row) => (
-                    <TableRow key={row.key} id={row.key}>
-                      {row.columns.map((column) => (
-                        <TableCell style={{ whiteSpace: 'nowrap' }} key={column.key}>
-                          {column.value}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  )}
-                </TableBody>
-              </TableContent>
-            </TableScrollContainer>
-          </Table>
-        )}
-      </div>
+      {queryStatus === 'error' ? (
+        <StatusAlert status="danger" data-cy="resource-usage-export-error">
+          {errorLabel}
+        </StatusAlert>
+      ) : (
+        <div className="border border-border rounded-md">
+          {queryStatus === 'pending' ? (
+            <div className="flex items-center justify-center py-12">
+              <Spinner />
+            </div>
+          ) : (
+            <Table data-cy="resource-usage-export-table">
+              <TableScrollContainer>
+                <TableContent aria-label={ariaLabel}>
+                  <TableHeader columns={columns}>
+                    {(column) => (
+                      <TableColumn key={column.key} id={column.key} isRowHeader={column.key === columns[0]?.key}>
+                        {column.label}
+                      </TableColumn>
+                    )}
+                  </TableHeader>
+                  <TableBody items={limited} renderEmptyState={() => <EmptyState />}>
+                    {(row) => (
+                      <TableRow key={row.key} id={row.key}>
+                        {row.columns.map((column) => (
+                          <TableCell style={{ whiteSpace: 'nowrap' }} key={column.key}>
+                            {column.value}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </TableContent>
+              </TableScrollContainer>
+            </Table>
+          )}
+        </div>
+      )}
     </div>
   );
-}
+});

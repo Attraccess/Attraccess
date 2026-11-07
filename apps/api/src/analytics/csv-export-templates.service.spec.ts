@@ -28,6 +28,21 @@ describe('CsvExportTemplatesService', () => {
     updatedAt: new Date('2026-01-01'),
   };
 
+  const queryFailed = (code: string, message: string) =>
+    new QueryFailedError('INSERT', [], Object.assign(new Error(message), { code }));
+
+  // A constant with a stray fieldKey, a field with a stray value and a constant without value.
+  const mixedColumns = [
+    { type: CsvExportTemplateColumnType.CONSTANT, header: 'Org', value: 'x', fieldKey: 'resourceName' },
+    { type: CsvExportTemplateColumnType.FIELD, header: '', fieldKey: 'userId', value: 'stray' },
+    { type: CsvExportTemplateColumnType.CONSTANT, header: 'Empty' },
+  ];
+  const cleanColumns = [
+    { type: CsvExportTemplateColumnType.CONSTANT, header: 'Org', value: 'x' },
+    { type: CsvExportTemplateColumnType.FIELD, header: '', fieldKey: 'userId' },
+    { type: CsvExportTemplateColumnType.CONSTANT, header: 'Empty', value: '' },
+  ];
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -121,7 +136,10 @@ describe('CsvExportTemplatesService', () => {
     it('throws ConflictException on duplicate name per export type', async () => {
       mockRepository.create.mockReturnValue(template);
       mockRepository.save.mockRejectedValue(
-        new QueryFailedError('INSERT', [], new Error('SQLITE_CONSTRAINT: UNIQUE constraint failed')),
+        queryFailed(
+          'SQLITE_CONSTRAINT',
+          'SQLITE_CONSTRAINT: UNIQUE constraint failed: csv_export_template.exportType, csv_export_template.name',
+        ),
       );
 
       await expect(
@@ -136,11 +154,7 @@ describe('CsvExportTemplatesService', () => {
     it('throws ConflictException on postgres duplicate template names', async () => {
       mockRepository.create.mockReturnValue(template);
       mockRepository.save.mockRejectedValue(
-        new QueryFailedError(
-          'INSERT',
-          [],
-          new Error('duplicate key value violates unique constraint "csv_export_template_name_per_type"'),
-        ),
+        queryFailed('23505', 'duplicate key value violates unique constraint "csv_export_template_name_per_type"'),
       );
 
       await expect(
@@ -151,9 +165,43 @@ describe('CsvExportTemplatesService', () => {
         }),
       ).rejects.toBeInstanceOf(ConflictException);
     });
+
+    it.each([
+      ['a NOT NULL failure', queryFailed('SQLITE_CONSTRAINT', 'SQLITE_CONSTRAINT: NOT NULL constraint failed: x.name')],
+      ['another query failure', queryFailed('SQLITE_ERROR', 'SQLITE_ERROR: no such table: csv_export_template')],
+    ])('rethrows %s unchanged', async (_label, error) => {
+      mockRepository.create.mockReturnValue(template);
+      mockRepository.save.mockRejectedValue(error);
+
+      await expect(
+        service.create({ name: template.name, exportType: template.exportType, columns: template.columns }),
+      ).rejects.toBe(error);
+    });
+
+    it('stores only the properties that belong to each column type', async () => {
+      mockRepository.create.mockImplementation((entity) => entity);
+      mockRepository.save.mockImplementation(async (entity) => entity);
+
+      await service.create({
+        name: template.name,
+        exportType: template.exportType,
+        columns: mixedColumns,
+      });
+
+      expect(mockRepository.create).toHaveBeenCalledWith(expect.objectContaining({ columns: cleanColumns }));
+    });
   });
 
   describe('update', () => {
+    it('stores only the properties that belong to each column type', async () => {
+      mockRepository.findOne.mockResolvedValue({ ...template });
+      mockRepository.save.mockImplementation(async (entity) => entity);
+
+      const result = await service.update(1, { columns: mixedColumns });
+
+      expect(result.columns).toStrictEqual(cleanColumns);
+    });
+
     it('updates name and columns', async () => {
       mockRepository.findOne.mockResolvedValue({ ...template });
       mockRepository.save.mockImplementation(async (entity) => entity);

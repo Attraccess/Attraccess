@@ -8,6 +8,7 @@ import {
   FieldDefinition,
   fromTemplateColumns,
   metadataFields,
+  newColumnUid,
   resolveColumns,
   toTemplateColumns,
 } from './csv';
@@ -120,6 +121,14 @@ describe('column helpers', () => {
       { type: 'field', fieldKey: 'name', header: '' },
       { type: 'field', fieldKey: 'flag', header: '' },
     ]);
+  });
+
+  it('derives default uids from the field key so rebuilding the fields keeps them', () => {
+    const uids = defaultColumns(fields).map((column) => column.uid);
+    expect(defaultColumns(fields.map((field) => ({ ...field }))).map((column) => column.uid)).toEqual(uids);
+    // user-added and template columns can never collide with a default uid
+    expect(uids).not.toContain(newColumnUid());
+    expect(new Set(uids).size).toBe(uids.length);
   });
 
   it('round-trips through the template shape without leaking uids', () => {

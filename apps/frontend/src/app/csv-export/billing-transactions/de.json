@@ -13,8 +13,8 @@
     "items": "Positionen",
     "userId": "Benutzer-ID",
     "userEmail": "Benutzer-E-Mail",
-    "userExternalIdentifier": "Externe Benutzerkennung",
-    "initiatorEmail": "Initiator-E-Mail"
+    "userExternalIdentifier": "Externe Benutzer-ID",
+    "initiatorEmail": "E-Mail (ausgelöst von)"
   },
   "metadataField": "Ressourcen-Metadaten: {{key}}"
 }

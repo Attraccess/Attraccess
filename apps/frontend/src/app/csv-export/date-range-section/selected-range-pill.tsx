@@ -1,4 +1,4 @@
-// Selected range summary pill used in date range section and modal header
+// Selected range summary pill used in the date range section and the export page header
 // FEATURE: CSV export — show selected date range as compact summary
 import { Chip, DateValue, RangeValue } from '@heroui/react';
 import { useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';

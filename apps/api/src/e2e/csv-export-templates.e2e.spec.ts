@@ -126,6 +126,12 @@ describe('CSV export templates API (e2e)', () => {
       .post(url)
       .send({ name: 'Bad', exportType: 'resourceUsageHours', columns: [{ type: 'field', header: '' }] })
       .expect(400);
+    const existing = await request(server)
+      .post(url)
+      .send({ name: 'Existing', exportType: 'resourceUsageHours', columns })
+      .expect(201);
+    await request(server).patch(`${url}/${existing.body.id}`).send({ name: null }).expect(400);
+    await request(server).get(`${url}/${existing.body.id}`).expect(200);
 
     permissions = ['billing.manage'];
     await request(server).get(url).expect(200);

@@ -21,7 +21,7 @@
     "supervisorId": "Aufsicht-ID",
     "supervisorUsername": "Aufsicht-Name",
     "userEmail": "Benutzer-E-Mail",
-    "userExternalIdentifier": "Externe Benutzerkennung",
+    "userExternalIdentifier": "Externe Benutzer-ID",
     "supervisorEmail": "Aufsicht-E-Mail"
   },
   "status": {

@@ -13,6 +13,9 @@ describe('AnalyticsService', () => {
   const mockRepository = {
     findAndCount: jest.fn(),
   };
+  const mockBillingRepository = {
+    findAndCount: jest.fn(),
+  };
   const operatingAttributionService = {
     getForResources: jest.fn(),
   };
@@ -27,7 +30,7 @@ describe('AnalyticsService', () => {
         },
         {
           provide: getRepositoryToken(BillingTransaction),
-          useValue: {},
+          useValue: mockBillingRepository,
         },
         {
           provide: ResourceOperatingAttributionService,
@@ -194,6 +197,53 @@ describe('AnalyticsService', () => {
       const [rows] = await service.getResourceUsageHoursInDateRange(dateRange);
 
       expect(rows[0]).toMatchObject({ userEmail: null, supervisorEmail: null });
+    });
+  });
+
+  describe('getBillingTransactionsInDateRange', () => {
+    const dateRange: DateRangeValue = { start: new Date('2023-01-01'), end: new Date('2023-01-31') };
+    const transaction = {
+      id: 5,
+      user: { id: 1, email: 'user@example.com' },
+      initiator: { id: 3, email: 'initiator@example.com' },
+      resourceUsage: { id: 1, resource: { id: 1, metadata: { costCenter: '4711' } } },
+      items: [],
+    };
+
+    it('loads the user, initiator, resource and item relations and maps the emails', async () => {
+      mockBillingRepository.findAndCount.mockResolvedValue([[transaction], 1]);
+
+      const [rows, total] = await service.getBillingTransactionsInDateRange(dateRange, 2, 50, true);
+
+      expect(mockBillingRepository.findAndCount).toHaveBeenCalledWith({
+        where: { createdAt: Between(dateRange.start, dateRange.end) },
+        order: { createdAt: 'DESC', id: 'DESC', userId: 'DESC' },
+        relations: ['user', 'initiator', 'resourceUsage', 'resourceUsage.resource', 'items'],
+        skip: 50,
+        take: 50,
+      });
+      expect(total).toBe(1);
+      expect(rows[0]).toMatchObject({
+        userEmail: 'user@example.com',
+        initiatorEmail: 'initiator@example.com',
+        resourceUsage: { resource: { metadata: { costCenter: '4711' } } },
+      });
+    });
+
+    it('uses null emails when users are absent', async () => {
+      mockBillingRepository.findAndCount.mockResolvedValue([[{ id: 6, user: null, initiator: null }], 1]);
+
+      const [rows] = await service.getBillingTransactionsInDateRange(dateRange, 1, 500, true);
+
+      expect(rows[0]).toMatchObject({ userEmail: null, initiatorEmail: null });
+    });
+
+    it('omits the emails unless the caller may see them', async () => {
+      mockBillingRepository.findAndCount.mockResolvedValue([[transaction], 1]);
+
+      const [rows] = await service.getBillingTransactionsInDateRange(dateRange);
+
+      expect(rows[0]).toMatchObject({ userEmail: null, initiatorEmail: null });
     });
   });
 });

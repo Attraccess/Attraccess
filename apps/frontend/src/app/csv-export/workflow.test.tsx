@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { cleanup, fireEvent, render as renderWithoutClient, renderHook, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render as renderWithoutClient,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { CsvExportConfigContent } from './export-config';
@@ -11,6 +20,7 @@ const state = vi.hoisted(() => ({
   query: vi.fn(),
   hasNext: false,
   rows: [] as unknown[],
+  templates: [] as unknown[],
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   ApiError: class ApiError extends Error {
@@ -18,7 +28,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   CsvExportType: { RESOURCE_USAGE_HOURS: 'resourceUsageHours', BILLING_TRANSACTIONS: 'billingTransactions' },
   useAnalyticsServiceGetCsvExportTemplatesKey: 'templates',
-  useAnalyticsServiceGetCsvExportTemplates: () => ({ data: [] }),
+  useAnalyticsServiceGetCsvExportTemplates: () => ({ data: state.templates }),
   useAnalyticsServiceCreateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
   useAnalyticsServiceUpdateCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
   useAnalyticsServiceDeleteCsvExportTemplate: () => ({ mutate: vi.fn(), isPending: false }),
@@ -35,8 +45,8 @@ vi.mock('@attraccess/react-query-client', () => ({
     };
   },
 }));
-// The template section reads and writes through react-query
-const testClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+// The template section reads and writes through react-query; a fresh client per test keeps no cache across tests
+let testClient: QueryClient;
 const render = ((ui: React.ReactElement, options?: object) =>
   renderWithoutClient(ui, {
     wrapper: ({ children }) => <QueryClientProvider client={testClient}>{children}</QueryClientProvider>,
@@ -45,7 +55,10 @@ const render = ((ui: React.ReactElement, options?: object) =>
 let blob: Blob | undefined;
 beforeEach(() => {
   vi.clearAllMocks();
+  testClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   state.hasNext = false;
+  state.rows = [];
+  state.templates = [];
   blob = undefined;
   vi.spyOn(URL, 'createObjectURL').mockImplementation((value) => {
     blob = value as Blob;
@@ -71,7 +84,7 @@ const renderContent = (extra: Partial<React.ComponentProps<typeof CsvExportConfi
   render(
     <CsvExportConfigContent
       exportType={'resourceUsageHours' as never}
-      columns={columns}
+      fields={columns}
       items={items}
       filename="users"
       queryStatus="success"
@@ -79,6 +92,12 @@ const renderContent = (extra: Partial<React.ComponentProps<typeof CsvExportConfi
     />,
   );
 const download = () => screen.getByRole('button', { name: 'Download CSV' });
+const previewHeaders = () => screen.getAllByRole('columnheader').map((header) => header.textContent);
+/** Opens a HeroUI select (by its data-cy, optionally inside a container) and picks an option. */
+const pick = async (cy: string, option: string, container: HTMLElement = document.body) => {
+  await userEvent.click(container.querySelector(`[data-cy="${cy}"] button, button[data-cy="${cy}"]`) as HTMLElement);
+  await userEvent.click(await screen.findByRole('option', { name: option }));
+};
 it('starts with the default columns and previews and exports the same values', async () => {
   const option = vi.fn();
   const refresh = vi.fn();
@@ -109,7 +128,10 @@ it('adds constant columns, edits headers, reorders and removes columns in previe
   expect(screen.getAllByText('maker;space', { selector: 'td' })).toHaveLength(2);
   fireEvent.click(screen.getByRole('button', { name: 'Move column 2 up' }));
   fireEvent.click(download());
-  expect(await blob?.text()).toBe('Org;Person\n"maker;space";Alice\n"maker;space";Bob');
+  const csv = (await blob?.text()) ?? '';
+  expect(csv).toBe('Org;Person\n"maker;space";Alice\n"maker;space";Bob');
+  // the preview shows the same order as the file
+  await waitFor(() => expect(previewHeaders().join(';')).toBe(csv.split('\n')[0]));
   fireEvent.click(screen.getByRole('button', { name: 'Remove column 1' }));
   fireEvent.click(download());
   expect(await blob?.text()).toBe('Person\nAlice\nBob');
@@ -122,19 +144,95 @@ it('adds a field column and disables the download without columns', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Remove column 1' }));
   expect(download()).toBeDisabled();
 });
-it('disables the download without rows, while loading and on error', () => {
+it.each(['pending', 'error'] as const)('disables the download without rows and while the query is %s', (status) => {
   const view = renderContent({ items: [] });
   expect(download()).toBeDisabled();
   view.rerender(
     <CsvExportConfigContent
       exportType={'resourceUsageHours' as never}
-      columns={columns}
+      fields={columns}
       items={items}
       filename="u"
-      queryStatus="pending"
+      queryStatus={status}
     />,
   );
   expect(download()).toBeDisabled();
+});
+it('exports the field picked in a column select under its default label', async () => {
+  renderContent();
+  await pick('csv-export-column-field', 'ID', screen.getByRole('group', { name: 'Column 1' }));
+  await waitFor(() => expect(previewHeaders()).toEqual(['ID']));
+  fireEvent.click(download());
+  expect(await blob?.text()).toBe('ID\n1\n2');
+});
+it('exports a selected template exactly and returns to the default columns with "No template"', async () => {
+  state.templates = [
+    {
+      id: 5,
+      name: 'Accounting',
+      exportType: 'resourceUsageHours',
+      columns: [
+        { type: 'constant', header: 'Org', value: 'maker;space' },
+        { type: 'field', header: 'Person', fieldKey: 'name' },
+      ],
+    },
+  ];
+  renderContent();
+  await pick('csv-export-template-select', 'Accounting');
+  fireEvent.click(download());
+  expect(await blob?.text()).toBe('Org;Person\n"maker;space";Alice\n"maker;space";Bob');
+  await pick('csv-export-template-select', 'No template (default columns)');
+  fireEvent.click(download());
+  expect(await blob?.text()).toBe('Name\nAlice\nBob');
+});
+it('keeps the default column rows mounted when the field list is rebuilt', () => {
+  const view = renderContent();
+  const row = screen.getByRole('group', { name: 'Column 1' });
+  // a refetch or page arrival rebuilds every field definition, plus newly found metadata keys
+  view.rerender(
+    <CsvExportConfigContent
+      exportType={'resourceUsageHours' as never}
+      fields={[
+        ...columns.map((column) => ({ ...column })),
+        { key: 'resourceMetadata.room', label: 'Room', getter: () => 'r' },
+      ]}
+      items={items}
+      filename="u"
+      queryStatus="success"
+    />,
+  );
+  expect(screen.getByRole('group', { name: 'Column 1' })).toBe(row);
+});
+it('disables "Add field column" until there are fields to pick', () => {
+  renderContent({ fields: [] });
+  expect(screen.getByRole('button', { name: 'Add field column' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'Add constant column' })).toBeEnabled();
+});
+it('flags a missing metadata field only once every page is loaded', async () => {
+  state.hasNext = true;
+  state.rows = [
+    { id: 11, resourceId: 7, resource: { id: 7, name: 'Lathe', metadata: null }, user: { id: 3 }, usageInMinutes: 1 },
+  ];
+  state.templates = [
+    {
+      id: 5,
+      name: 'Rooms',
+      exportType: 'resourceUsageHours',
+      columns: [
+        { type: 'field', header: '', fieldKey: 'resourceMetadata.room' },
+        { type: 'field', header: '', fieldKey: 'gone' },
+      ],
+    },
+  ];
+  render(<ResourceUsageExport start={new Date('2026-09-01T00:00:00Z')} end={new Date('2026-09-02T00:00:00Z')} />);
+  await waitFor(() => expect(download()).toBeEnabled());
+  await pick('csv-export-template-select', 'Rooms');
+  // the metadata key may still show up on a later page; an unknown plain key cannot
+  const flagged = () => document.querySelectorAll('[data-cy="csv-export-column-unavailable"]');
+  expect(flagged()).toHaveLength(1);
+  expect(
+    within(screen.getByRole('group', { name: 'Column 2' })).getByText('Not available in current data'),
+  ).toBeVisible();
 });
 it('keeps edits when data fields change after the columns were edited', () => {
   const view = renderContent();
@@ -142,7 +240,7 @@ it('keeps edits when data fields change after the columns were edited', () => {
   view.rerender(
     <CsvExportConfigContent
       exportType={'resourceUsageHours' as never}
-      columns={[...columns, { key: 'late', label: 'Late', getter: () => 'x' }]}
+      fields={[...columns, { key: 'late', label: 'Late', getter: () => 'x' }]}
       items={items}
       filename="u"
       queryStatus="success"
@@ -156,7 +254,7 @@ it('flags a configured field that is missing from the data but keeps the column'
   view.rerender(
     <CsvExportConfigContent
       exportType={'resourceUsageHours' as never}
-      columns={[{ key: 'other', label: 'Other', getter: () => 'o' }]}
+      fields={[{ key: 'other', label: 'Other', getter: () => 'o' }]}
       items={items}
       filename="u"
       queryStatus="success"
@@ -185,7 +283,7 @@ it.each(['success', 'error'] as const)('waits for all pages and handles a final 
         </button>
         <CsvExportConfigContent
           exportType={'resourceUsageHours' as never}
-          columns={columns}
+          fields={columns}
           items={items}
           filename="users.csv"
           queryStatus={status}
@@ -236,25 +334,25 @@ it('includes session and operating duration columns in resource usage downloads'
       supervisorUser: { username: 'Mentor' },
     },
   ];
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(
-    <QueryClientProvider client={queryClient}>
-      <ResourceUsageExport start={new Date('2026-09-01T00:00:00Z')} end={new Date('2026-09-02T00:00:00Z')} />
-    </QueryClientProvider>,
-  );
+  render(<ResourceUsageExport start={new Date('2026-09-01T00:00:00Z')} end={new Date('2026-09-02T00:00:00Z')} />);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Download CSV' })).toBeEnabled());
-  expect(state.query).toHaveBeenCalledWith({ start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' });
+  // a window refocus must not refetch every page after "fetch all"
+  expect(state.query).toHaveBeenCalledWith(
+    { start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' },
+    undefined,
+    { refetchOnWindowFocus: false },
+  );
   expect(state.analytics).toHaveBeenCalledWith({
     requestBody: { resourceIds: [7], start: '2026-09-01T00:00:00.000Z', end: '2026-09-02T00:00:00.000Z' },
   });
-  // append every default-off field so the download carries the whole row
-  fireEvent.click(screen.getByRole('button', { name: 'Add field column' }));
   fireEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
   await waitFor(() => expect(blob).toBeDefined());
-  const csv = (await blob?.text()) ?? '';
-  expect(csv).toContain('Lathe');
-  expect(csv).toContain('3600000;123456');
-  expect(csv.split('\n')[0]).toContain('Operating Duration (ms, session)');
+  // no template: exactly the export type's default columns, in the historic order
+  expect(((await blob?.text()) ?? '').split('\n')).toEqual([
+    'Resource ID;Resource Name;User ID;User Name;Usage in Hours;Exact Session Duration (ms);' +
+      'Operating Duration (ms, session);Operating Data Status',
+    '7;Lathe;3;Alice;1;3600000;123456;',
+  ]);
 });
 it('offers email, external identifier, notes and resource metadata fields', async () => {
   state.rows = [
@@ -275,14 +373,13 @@ it('offers email, external identifier, notes and resource metadata fields', asyn
     },
     { id: 12, resourceId: 7, resource: { id: 7, name: 'Lathe', metadata: null }, user: { id: 4 }, usageInMinutes: 1 },
   ];
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const { result } = renderHook(
     () =>
       useResourceUsageExportState({
         start: new Date('2026-09-01T00:00:00Z'),
         end: new Date('2026-09-02T00:00:00Z'),
       }),
-    { wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider> },
+    { wrapper: ({ children }) => <QueryClientProvider client={testClient}>{children}</QueryClientProvider> },
   );
   await waitFor(() => expect(result.current.columns.some((c) => c.key === 'resourceMetadata.costCenter')).toBe(true));
   const values = (key: string) => {
