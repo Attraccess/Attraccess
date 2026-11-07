@@ -304,13 +304,12 @@
       "inputs": [
         "default",
         "{projectRoot}/cc100-runtime/package.json",
-        "{projectRoot}/cc100-runtime/pnpm-lock.yaml",
         "{projectRoot}/shared/**/*",
         "{projectRoot}/cc100-runtime/manifest.json"
       ],
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
       "options": {
-        "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-runtime ./main.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-runtime/"
+        "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-runtime ./main.cjs"
       }
     },
     "build-cc100-runtime-esbuild": {
@@ -323,7 +322,8 @@
         "{projectRoot}/backend/**/*.entity.ts",
         "{projectRoot}/modbus/**/*",
         "{projectRoot}/shared/**/*",
-        "{projectRoot}/cc100-runtime/manifest.json"
+        "{projectRoot}/cc100-runtime/manifest.json",
+        "{workspaceRoot}/pnpm-lock.yaml"
       ],
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-runtime"],
@@ -349,13 +349,12 @@
       "inputs": [
         "default",
         "{projectRoot}/cc100-runtime/package.json",
-        "{projectRoot}/cc100-runtime/pnpm-lock.yaml",
         "{projectRoot}/shared/**/*",
         "{projectRoot}/cc100-runtime/manifest.json"
       ],
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
       "options": {
-        "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-simulator ./simulator.cjs && cp apps/plugins/wago/cc100-runtime/pnpm-lock.yaml dist/apps/wago-cc100-simulator/"
+        "command": "node apps/plugins/wago/cc100-runtime/write-package.mjs dist/apps/wago-cc100-simulator ./simulator.cjs"
       }
     },
     "build-cc100-simulator-esbuild": {
@@ -365,7 +364,8 @@
         "{projectRoot}/channel-behavior.ts",
         "{projectRoot}/modbus/**/*",
         "{projectRoot}/shared/**/*",
-        "{projectRoot}/cc100-runtime/manifest.json"
+        "{projectRoot}/cc100-runtime/manifest.json",
+        "{workspaceRoot}/pnpm-lock.yaml"
       ],
       "executor": "@nx/esbuild:esbuild",
       "outputs": ["{workspaceRoot}/dist/apps/wago-cc100-simulator"],
