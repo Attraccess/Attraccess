@@ -13,6 +13,7 @@ import { MqttMessageEvent as MqttMessageReceivedEvent } from '../../../mqtt/mqtt
 import { CompanionUsbDeviceDto } from '../../../companion/companion.types';
 import { getPluginFlowNode, getPluginFlowNodeOwner } from '../../../plugin-system/flows/node-registry';
 import { NodeProcessingResult, topicMatches } from '../node-executors';
+import { resourceAndGlobalNodesWhere } from './flow-node-queries';
 
 /** Finds matching external-event trigger nodes and preserves plugin lookup ordering. */
 export class FlowTriggerDispatcher {
@@ -31,10 +32,10 @@ export class FlowTriggerDispatcher {
   async subscribeToMqttTopics() {
     const [mqttMessageReceivedNodes, mqttWaitForMessageNodes] = await Promise.all([
       this.flowNodeRepository.find({
-        where: { type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
+        where: resourceAndGlobalNodesWhere(ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED),
       }),
       this.flowNodeRepository.find({
-        where: { type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE },
+        where: resourceAndGlobalNodesWhere(ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE),
       }),
     ]);
 
@@ -69,9 +70,7 @@ export class FlowTriggerDispatcher {
     const { topic, payload, serverId } = event;
 
     const messageReceivedNodes = await this.flowNodeRepository.find({
-      where: {
-        type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
-      },
+      where: resourceAndGlobalNodesWhere(ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED),
     });
 
     const filteredMessageReceivedNodes = messageReceivedNodes.filter((node) => {
@@ -110,10 +109,10 @@ export class FlowTriggerDispatcher {
     for (;;) {
       const nodes = await this.queuedPluginFlowLookup(() =>
         this.flowNodeRepository.find({
-          where: {
-            type: nodeType as ResourceFlowNodeType,
+          where: resourceAndGlobalNodesWhere(nodeType).map((where) => ({
+            ...where,
             ...(lastId ? { id: MoreThan(lastId) } : {}),
-          },
+          })),
           order: { id: 'ASC' },
           take: pageSize,
         }),
@@ -162,7 +161,7 @@ export class FlowTriggerDispatcher {
     payload: object,
     schema: { safeParse: (d: unknown) => { success: boolean; data?: { deviceId: number } } },
   ): Promise<void> {
-    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const allNodes = await this.flowNodeRepository.find({ where: resourceAndGlobalNodesWhere(type) });
     const matching = allNodes.filter((node) => {
       const parsed = schema.safeParse(node.data ?? {});
       return parsed.success && parsed.data?.deviceId === deviceId;
@@ -176,7 +175,7 @@ export class FlowTriggerDispatcher {
     type: ResourceFlowNodeType,
     payload: CompanionUsbDeviceDto,
   ): Promise<void> {
-    const allNodes = await this.flowNodeRepository.find({ where: { type } });
+    const allNodes = await this.flowNodeRepository.find({ where: resourceAndGlobalNodesWhere(type) });
     const matching = allNodes.filter((node) => {
       const parsed = CompanionUsbDeviceNodeDataSchema.safeParse(node.data ?? {});
       if (!parsed.success || parsed.data.deviceId !== deviceId) return false;

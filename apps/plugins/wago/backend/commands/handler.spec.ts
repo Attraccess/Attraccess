@@ -154,4 +154,31 @@ describe('WAGO command form', () => {
     });
     expect(schema.required).toEqual(expect.arrayContaining(['channelId', 'action', 'expectedConfigurationRevision']));
   });
+
+  describe('channel ownership', () => {
+    const config = { controllerId: 1, channelId: 'lamp', action: 'set', value: true };
+    const description = async (...args: [number | null, boolean, number | null]) => {
+      const schema = await handler.schema(config, ...args);
+      return (schema.properties as { channelId: { description?: string } }).channelId.description;
+    };
+
+    beforeEach(() => {
+      query.andWhere.mockClear();
+      query.getMany.mockResolvedValue([{ resourceId: 7, flowId: null, id: 'other-node' }]);
+    });
+
+    it('does not skip rows with a NULL resourceId when checking resource flows', async () => {
+      query.getMany.mockResolvedValue([{ resourceId: null, flowId: 5, id: 'global-node' }]);
+      expect(await description(2, false, null)).toContain('global flow 5 / node global-node');
+      expect(query.andWhere).toHaveBeenCalledWith('(node.resourceId IS NULL OR node.resourceId <> :resourceId)', {
+        resourceId: 2,
+      });
+    });
+
+    it('treats a global flow as its own owner and excludes only its own nodes', async () => {
+      expect(await description(null, false, 5)).toContain('resource 7 / node other-node');
+      expect(query.andWhere).toHaveBeenCalledWith('(node.flowId IS NULL OR node.flowId <> :flowId)', { flowId: 5 });
+      expect(query.andWhere).not.toHaveBeenCalledWith(expect.stringContaining('node.resourceId'), expect.anything());
+    });
+  });
 });

@@ -1,6 +1,7 @@
 import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
+import { Flow } from './flow.entity';
 
 @Entity()
 export class ResourceFlowEdge {
@@ -51,12 +52,27 @@ export class ResourceFlowEdge {
   })
   updatedAt!: Date;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'integer', nullable: true })
   @ApiProperty({
-    description: 'The id of the resource that this node belongs to',
+    description: 'The id of the resource that this node belongs to; null for global-flow nodes',
     example: 1,
+    nullable: true,
+    type: Number,
   })
-  resourceId!: number;
+  resourceId!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'The id of the global flow that this node belongs to; null for resource-flow nodes',
+    example: 1,
+    nullable: true,
+    type: Number,
+  })
+  flowId!: number | null;
+
+  @ManyToOne(() => Flow, (flow) => flow.edges, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'flowId' })
+  flow!: Flow | null;
 
   @ManyToOne(() => Resource, (resource) => resource.flowEdges, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'resourceId' })
@@ -65,5 +81,5 @@ export class ResourceFlowEdge {
     type: () => Resource,
     required: false,
   })
-  resource!: Resource;
+  resource!: Resource | null;
 }

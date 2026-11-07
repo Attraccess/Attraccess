@@ -15,12 +15,9 @@ import {
   OnNodesChange,
   OnEdgesChange,
 } from '@xyflow/react';
-import {
-  ResourceFlowLog,
-  useResourceFlowsServiceGetNodeSchemas,
-  useResourcesServiceGetOneResourceById,
-} from '@attraccess/react-query-client';
+import { ResourceFlowLog, useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from '../liveLogs';
+import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
 import { AttraccessNode } from '../node/index';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import nodesDeTranslations from '../node/de.json';
@@ -38,7 +35,7 @@ export function useFlowProviderStateOutput(model: ReturnType<typeof useFlowProvi
     updateNodeData,
     addNode,
     removeNode,
-    resourceId,
+    owner,
     resource,
     liveLogs,
     addLiveLogReceiver,
@@ -91,7 +88,8 @@ export function useFlowProviderStateOutput(model: ReturnType<typeof useFlowProvi
       removeNode: removeNode,
       setNodes: setNodes,
       setEdges: setEdges,
-      resourceId: resourceId,
+      owner,
+      resourceId: owner.kind === 'resource' ? owner.resourceId : undefined,
       resourceType: (resource?.type as 'machine' | 'door') ?? 'machine',
       resourceSeparateUnlockAndUnlatch: Boolean(resource?.separateUnlockAndUnlatch),
       resourceAllowTakeOver: Boolean(resource?.allowTakeOver),
@@ -116,7 +114,7 @@ export function useFlowProviderStateOutput(model: ReturnType<typeof useFlowProvi
       removeNode,
       setNodes,
       setEdges,
-      resourceId,
+      owner,
       resource?.type,
       resource?.separateUnlockAndUnlatch,
       resource?.allowTakeOver,
@@ -134,16 +132,20 @@ export function useFlowProviderStateOutput(model: ReturnType<typeof useFlowProvi
   return { value, children: model.children } as const;
 }
 
-export function useFlowProviderState({ children, resourceId }: FlowProviderProps) {
-  const useFlowProviderStateInputsModel = useFlowProviderStateInputs({ children, resourceId });
+export function useFlowProviderState({ children, owner }: FlowProviderProps) {
+  const useFlowProviderStateInputsModel = useFlowProviderStateInputs({ children, owner });
   return useFlowProviderStateOutput(useFlowProviderStateInputsModel);
 }
 
-export function useFlowProviderStateInputs({ children, resourceId }: FlowProviderProps) {
+export function useFlowProviderStateInputs({ children, owner }: FlowProviderProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [validationErrors, setValidationErrorsState] = useState<Record<string, string>>({});
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource } = useResourcesServiceGetOneResourceById(
+    { id: owner.kind === 'resource' ? owner.resourceId : 0 },
+    undefined,
+    { enabled: owner.kind === 'resource' },
+  );
 
   const { t: tNodeTranslations, tExists: tNodeExists } = useTranslations({
     de: nodesDeTranslations,
@@ -216,11 +218,11 @@ export function useFlowProviderStateInputs({ children, resourceId }: FlowProvide
   }, []);
 
   const { liveLogs } = useLiveLogs({
-    resourceId,
+    owner,
     onUpdate: publishLiveLog,
   });
 
-  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId });
+  const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
   const flowNodeTypes = useMemo(() => {
     if (!nodeSchemas) {
       return {};
@@ -266,7 +268,7 @@ export function useFlowProviderStateInputs({ children, resourceId }: FlowProvide
     nodeSchemas,
     flowNodeTypes,
     children,
-    resourceId,
+    owner,
   } as const;
 }
 
@@ -283,7 +285,9 @@ export interface FlowContextType {
   removeNode: (nodeId: string) => void;
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-  resourceId: number;
+  owner: FlowOwner;
+  /** Only set for resource flows. */
+  resourceId: number | undefined;
   resourceType: 'machine' | 'door';
   resourceSeparateUnlockAndUnlatch: boolean;
   resourceAllowTakeOver: boolean;
@@ -300,7 +304,7 @@ export interface FlowContextType {
 
 export interface FlowProviderProps {
   children: ReactNode;
-  resourceId: number;
+  owner: FlowOwner;
 }
 
 export const FlowContext = createContext<FlowContextType | undefined>(undefined);
@@ -313,8 +317,8 @@ export function useFlowContext(): FlowContextType {
   return context;
 }
 
-export function FlowProvider({ children, resourceId }: FlowProviderProps) {
-  const { value } = useFlowProviderState({ children, resourceId });
+export function FlowProvider({ children, owner }: FlowProviderProps) {
+  const { value } = useFlowProviderState({ children, owner });
 
   return <FlowContext.Provider value={value}>{children}</FlowContext.Provider>;
 }

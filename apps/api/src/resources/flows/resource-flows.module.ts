@@ -7,8 +7,14 @@ import {
   Resource,
   BillingTransactionItem,
   ResourceFlowVariable,
+  Flow,
+  ResourceMaintenance,
+  ResourceMaintenanceRequest,
 } from '@attraccess/database-entities';
 import { ResourceFlowsController } from './resource-flows.controller';
+import { GlobalFlowsController } from './global-flows.controller';
+import { GlobalFlowsService } from './global-flows.service';
+import { FlowEventTriggersService } from './execution/flow-event-triggers.service';
 import { ResourceFlowsService } from './resource-flows.service';
 import { ResourceFlowsExecutorService } from './execution/resource-flows-executor.service';
 import { FlowLogRecorderService } from './logs/flow-log-recorder.service';
@@ -29,6 +35,9 @@ import { ResourceOperatingIntervalModule } from '../operating-intervals/resource
       Resource,
       BillingTransactionItem,
       ResourceFlowVariable,
+      Flow,
+      ResourceMaintenance,
+      ResourceMaintenanceRequest,
     ]),
     MqttModule,
     forwardRef(() => ResourceUsageModule),
@@ -37,10 +46,12 @@ import { ResourceOperatingIntervalModule } from '../operating-intervals/resource
     CompanionModule,
     ResourceOperatingIntervalModule,
   ],
-  controllers: [ResourceFlowsController, ResourceFlowVariablesController],
+  controllers: [ResourceFlowsController, GlobalFlowsController, ResourceFlowVariablesController],
   providers: [
     FlowLogRecorderService,
     ResourceFlowsService,
+    GlobalFlowsService,
+    FlowEventTriggersService,
     ResourceFlowsExecutorService,
     ResourceFlowVariablesService,
     ResourceFlowVariableTriggerService,

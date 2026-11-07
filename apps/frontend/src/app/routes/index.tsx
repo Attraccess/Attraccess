@@ -30,6 +30,8 @@ import { ResourceGroupEditPage } from '../resource-groups/index';
 import { ResourceOverview } from '../resourceOverview/index';
 import { ResourceDiagnosticsTab } from '../resources/details/diagnostics/ResourceDiagnosticsTab';
 import FlowsPage from '../resources/details/flows/index';
+import { GlobalFlowEditorPage } from '../global-flows/GlobalFlowEditorPage';
+import { GlobalFlowsListPage } from '../global-flows/GlobalFlowsListPage';
 import { FormEditorPage, FormListPage } from '../resources/details/forms/index';
 import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
 import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
@@ -254,6 +256,16 @@ const coreRoutes: RouteConfig[] = [
     path: '/resource-groups/:groupId',
     element: <ResourceGroupEditPage />,
     authRequired: true,
+  },
+  {
+    path: '/devices/flows',
+    element: <GlobalFlowsListPage />,
+    authRequired: 'resources.update',
+  },
+  {
+    path: '/devices/flows/:flowId',
+    element: <GlobalFlowEditorPage />,
+    authRequired: 'resources.update',
   },
   {
     path: '/devices/mqtt/servers',

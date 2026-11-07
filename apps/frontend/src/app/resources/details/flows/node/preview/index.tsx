@@ -2,18 +2,20 @@ import { FLOW_NODE_PREVIEW_QUERY_KEY } from '@attraccess/plugins-frontend-sdk';
 import { TFunction, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import {
   ResourceFlowNodeType,
-  ResourceFlowsService,
   useResourceMeteringServiceListResourceMeters,
   ResourceFlowNodeSchemaDto,
 } from '@attraccess/react-query-client';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { FlowOwner, flowOwnerKey, resolveFlowNodePreview } from '../../flowOwner';
 
 export interface Props {
   tNodeTranslations: TFunction;
   schema: ResourceFlowNodeSchemaDto;
   resourceId?: number;
+  /** Needed to resolve dynamic plugin previews; without it only static rows are shown. */
+  owner?: FlowOwner;
 }
 
 export type PreviewNode = { data: Record<string, unknown> } | null;
@@ -41,7 +43,7 @@ export type NodePreviewData = Array<NodePreviewRow>;
 export type PreviewBuilder = (t: TFunction, nodeData: PreviewNode) => NodePreviewData;
 
 export function useNodePreviewRows(props: Props): NodePreviewData {
-  const { tNodeTranslations: t, schema, resourceId } = props;
+  const { tNodeTranslations: t, schema, resourceId, owner } = props;
   const locale = useTranslationState((state) => state.language);
   const nodeId = useNodeId();
   const nodeData = useNodesData(nodeId as string);
@@ -52,20 +54,16 @@ export function useNodePreviewRows(props: Props): NodePreviewData {
   const resolvePreview = Boolean(
     nodeId &&
     nodeData &&
-    resourceId &&
+    owner &&
     schema.type.startsWith('plugin.') &&
     schema.configSchema.dynamic === true &&
     Array.isArray(schema.configSchema.preview),
   );
   const resolved = useQuery({
-    queryKey: [...FLOW_NODE_PREVIEW_QUERY_KEY, resourceId, schema.type, nodeData?.data],
+    queryKey: [...FLOW_NODE_PREVIEW_QUERY_KEY, owner ? flowOwnerKey(owner) : null, schema.type, nodeData?.data],
     queryFn: () => {
-      if (!resourceId || !nodeData) throw new Error('A resource and node configuration are required');
-      return ResourceFlowsService.resolveNodePreview({
-        resourceId,
-        nodeType: schema.type,
-        requestBody: { config: nodeData.data },
-      });
+      if (!owner || !nodeData) throw new Error('A flow owner and node configuration are required');
+      return resolveFlowNodePreview(owner, schema.type, nodeData.data);
     },
     enabled: resolvePreview,
     staleTime: 30_000,

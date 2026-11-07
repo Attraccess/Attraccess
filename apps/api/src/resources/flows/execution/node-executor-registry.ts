@@ -63,6 +63,10 @@ export function buildNodeExecutorRegistry(
     [ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED]: passthrough,
     [ResourceFlowNodeType.INPUT_RESOURCE_ACTIVITY_NO_ACTIVITY]: passthrough,
     [ResourceFlowNodeType.INPUT_VARIABLE_CHANGED]: passthrough,
+    [ResourceFlowNodeType.INPUT_RESOURCE_HEALTH_CHANGED]: passthrough,
+    [ResourceFlowNodeType.INPUT_RESOURCE_MAINTENANCE_CREATED]: passthrough,
+    [ResourceFlowNodeType.INPUT_RESOURCE_MAINTENANCE_FINISHED]: passthrough,
+    [ResourceFlowNodeType.INPUT_RESOURCE_MAINTENANCE_REQUEST_CREATED]: passthrough,
 
     [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_HEARTBEAT]: new HealthHeartbeatExecutor(
       dependencies.resourceHealthService,

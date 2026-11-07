@@ -33,7 +33,18 @@
     "errors": {
       "invalidJson": "Die Datei ist kein gültiges JSON.",
       "invalidStructure": "Die Datei enthält keinen gültigen Flow-Export.",
+      "unsupportedNodes": "Der Flow enthält Knoten, die hier nicht verfügbar sind, und wurde nicht importiert: {{nodes}}",
       "unknown": "Die Datei konnte nicht importiert werden."
+    }
+  },
+  "global": {
+    "noticeTitle": "Globaler Flow",
+    "notice": "Läuft für jede Ressource; ein fehlerhafter oder langsamer globaler Flow wirkt sich auf Starts und Stopps an allen Maschinen aus.",
+    "enabled": "Aktiv",
+    "back": "Alle Flows",
+    "saveUnsupportedNodes": {
+      "title": "Flow nicht gespeichert",
+      "description": "Diese Knoten sind in globalen Flows nicht verfügbar: {{nodes}}"
     }
   }
 }

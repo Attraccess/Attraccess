@@ -43,6 +43,7 @@
   - [Overview](flows/overview.md)
   - [Flow Editor](flows/flow-editor.md)
   - [Payloads, Variables & Templates](flows/payloads-variables-templates.md)
+  - [Global Flows](flows/global-flows.md)
   - [Node Types](flows/node-types.md)
   - [Meters](flows/energy-metering.md)
 

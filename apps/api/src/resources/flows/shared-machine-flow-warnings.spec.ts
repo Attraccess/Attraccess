@@ -39,7 +39,13 @@ const afterIsZero = { path: 'activeSessions.after', comparisonOperator: '=', com
 describe('findFlowsWithoutSessionCountCheck', () => {
   it('flags a trigger that reaches an external effect directly', () => {
     expect(findFlowsWithoutSessionCountCheck([node('t', STOPPED), node('h', HTTP)], edges(['t', 'h']))).toEqual([
-      { triggerNodeId: 't', triggerType: STOPPED, effectNodes: [{ nodeId: 'h', nodeType: HTTP }] },
+      {
+        flowId: null,
+        flowName: null,
+        triggerNodeId: 't',
+        triggerType: STOPPED,
+        effectNodes: [{ nodeId: 'h', nodeType: HTTP }],
+      },
     ]);
   });
 
@@ -90,7 +96,13 @@ describe('findFlowsWithoutSessionCountCheck', () => {
     ResourceFlowNodeType.INPUT_RESOURCE_USAGE_TAKEOVER,
   ])('flags the %s trigger', (trigger) => {
     expect(findFlowsWithoutSessionCountCheck([node('t', trigger), node('h', HTTP)], edges(['t', 'h']))).toEqual([
-      { triggerNodeId: 't', triggerType: trigger, effectNodes: [{ nodeId: 'h', nodeType: HTTP }] },
+      {
+        flowId: null,
+        flowName: null,
+        triggerNodeId: 't',
+        triggerType: trigger,
+        effectNodes: [{ nodeId: 'h', nodeType: HTTP }],
+      },
     ]);
   });
 
@@ -114,7 +126,13 @@ describe('findFlowsWithoutSessionCountCheck', () => {
   it('warns for a plugin output node after a session trigger and accepts it behind a count check', () => {
     const plugin = 'plugin.warnings-spec.switch';
     expect(findFlowsWithoutSessionCountCheck([node('t', STOPPED), node('p', plugin)], edges(['t', 'p']))).toEqual([
-      { triggerNodeId: 't', triggerType: STOPPED, effectNodes: [{ nodeId: 'p', nodeType: plugin }] },
+      {
+        flowId: null,
+        flowName: null,
+        triggerNodeId: 't',
+        triggerType: STOPPED,
+        effectNodes: [{ nodeId: 'p', nodeType: plugin }],
+      },
     ]);
     const guarded = [node('t', STOPPED), node('i', IF, afterIsZero), node('p', plugin)];
     expect(findFlowsWithoutSessionCountCheck(guarded, edges(['t', 'i'], ['i', 'p']))).toEqual([]);

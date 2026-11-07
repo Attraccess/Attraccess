@@ -38,11 +38,20 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
   scope.flowNodeRepository = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     find: jest.fn(async ({ where, take }: any) => {
-      const { resourceId, type, id } = where || {};
-      const nodes = scope.initialNodes.filter((node) => {
-        const isAfterLastId = id === undefined || node.id > id._value;
-        return node.type === type && (resourceId === undefined || node.resourceId === resourceId) && isAfterLastId;
-      });
+      // `where` may be a list of alternatives (resource flow nodes or nodes of enabled global flows).
+      const clauses = Array.isArray(where) ? where : [where || {}];
+      const matches = (node: ResourceFlowNode, clause: any) => {
+        const { resourceId, type, id, flowId, flow } = clause;
+        if (type !== undefined && node.type !== type) return false;
+        if (resourceId !== undefined && node.resourceId !== resourceId) return false;
+        if (id !== undefined && !(node.id > id._value)) return false;
+        if (flowId !== undefined && (node.flowId ?? null) !== null) return false;
+        if (flow !== undefined && ((node.flowId ?? null) === null || (node.flow?.enabled ?? true) !== flow.enabled)) {
+          return false;
+        }
+        return true;
+      };
+      const nodes = scope.initialNodes.filter((node) => clauses.some((clause: any) => matches(node, clause)));
       return take === undefined ? nodes : nodes.slice(0, take);
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

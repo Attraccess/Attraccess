@@ -81,6 +81,14 @@ function ResourceDiagnosticsContent({ resourceId }: { resourceId: number }) {
                               <Link href={`/resources/${resource.id}`}>{resource.name}</Link>
                             </span>
                           ))}
+                          {(node.conflictFlows ?? []).map((flow, index) => (
+                            <span key={`flow-${flow.id}`}>
+                              {(index > 0 || node.conflictResources.length > 0) && ', '}
+                              <Link href={`/devices/flows/${flow.id}`}>
+                                {t('diagnostics.globalFlow', { flow: flow.id })}
+                              </Link>
+                            </span>
+                          ))}
                         </>
                       )}
                     </li>

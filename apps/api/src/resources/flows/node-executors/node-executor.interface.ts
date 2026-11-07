@@ -1,5 +1,5 @@
 import { EntityManager } from 'typeorm';
-import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceType } from '@attraccess/database-entities';
 
 export interface NodeProcessingResult {
   payload: object;
@@ -44,6 +44,10 @@ export interface NodeExecutionContext {
   lifecycleAttemptId?: string;
   lifecycleCandidateCancellation?: boolean;
   metering?: MeteringRunContext;
+  /** The resource the run acts on: the node's own resource, or the triggering resource in a global flow. */
+  resourceId?: number | null;
+  /** The type of `resourceId`'s resource; undefined when there is none. */
+  getResourceType?(): Promise<ResourceType | undefined>;
   transactionManager?: EntityManager;
   compileTemplate(template: string, data: object): string;
   getTemplateVariables(data: object): TemplateVariables | undefined;

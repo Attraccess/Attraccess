@@ -1,7 +1,8 @@
 // Catalog state hook: groups schemas by domain and persists UI state to localStorage
 // FEATURE: Node catalog redesign — state management
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
-import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceGetNodeSchemas } from '@attraccess/react-query-client';
+import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+import { FlowOwner, schemaSupportsOwner, useFlowNodeSchemasQuery } from '../flowOwner';
 import { DOMAIN_ORDER, nodeTypeDomain } from './domains';
 
 export type Direction = 'down' | 'up' | 'both';
@@ -17,7 +18,7 @@ export interface CatalogGroup {
 }
 
 interface UseNodeCatalogArgs {
-  resourceId: number;
+  owner: FlowOwner;
 }
 
 interface UseNodeCatalogResult {
@@ -122,13 +123,13 @@ function useExpandedSnapshot(domains: string[]): string {
   );
 }
 
-export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatalogResult {
-  const { data: schemas, isLoading, isError } = useResourceFlowsServiceGetNodeSchemas({ resourceId });
+export function useNodeCatalog({ owner }: UseNodeCatalogArgs): UseNodeCatalogResult {
+  const { data: schemas, isLoading, isError } = useFlowNodeSchemasQuery(owner);
 
   const groups = useMemo<CatalogGroup[]>(() => {
     const byDomain = new Map<string, CatalogNode[]>();
     for (const schema of schemas ?? []) {
-      if (!schema.supportedByResource) continue;
+      if (!schemaSupportsOwner(schema, owner)) continue;
       const domain = nodeTypeDomain(schema.type);
       const list = byDomain.get(domain) ?? [];
       list.push({ schema, direction: getDirection(schema) });
@@ -144,7 +145,7 @@ export function useNodeCatalog({ resourceId }: UseNodeCatalogArgs): UseNodeCatal
       .sort();
     const pluginGroups = pluginDomains.map((d) => ({ domain: d, nodes: byDomain.get(d) ?? [] }));
     return [...staticGroups, ...pluginGroups];
-  }, [schemas]);
+  }, [schemas, owner]);
 
   const allDomains = useMemo(() => groups.map((g) => g.domain), [groups]);
   if (schemas !== undefined) migrateExpandedDomains(allDomains);

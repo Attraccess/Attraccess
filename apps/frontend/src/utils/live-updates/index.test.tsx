@@ -44,7 +44,7 @@ describe('live topic React lifecycle', () => {
       const committedLogs: number[][] = [];
       const hook = renderHook(
         ({ resourceId }) => {
-          const result = useLiveLogs({ resourceId, onUpdate });
+          const result = useLiveLogs({ owner: { kind: 'resource', resourceId }, onUpdate });
           useLayoutEffect(() => {
             committedLogs.push(result.liveLogs.map((log) => log.id));
           });

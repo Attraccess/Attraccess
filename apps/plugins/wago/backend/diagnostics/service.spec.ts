@@ -40,6 +40,31 @@ describe('diagnostic references', () => {
     );
     expect(refs.every((ref) => !ref.invalid && ref.conflict)).toBe(true);
   });
+  describe('global flows', () => {
+    const globalNode = (id: string, flowId: number, type = 'command', channelId = 'relay') => ({
+      id,
+      resourceId: null,
+      flowId,
+      type: `plugin.wago.${type}`,
+      data: { channelId, expectedConfigurationRevision: 2 },
+    });
+    it('links global-flow nodes to the global flow editor', () => {
+      const [reference] = diagnosticReferences([globalNode('a b', 3)], ['relay'], 2);
+      expect(reference).toMatchObject({ resourceId: null, flowId: 3, href: '/devices/flows/3?node=a%20b' });
+    });
+    it('conflicts a global flow with resource flows and other global flows but not with itself', () => {
+      const refs = diagnosticReferences(
+        [globalNode('g1', 1), globalNode('g1b', 1), globalNode('g2', 2), node('r', 4)],
+        ['relay'],
+        2,
+      );
+      expect(refs.map((ref) => ref.conflict)).toEqual([true, true, true, true]);
+      expect(refs[0]).toMatchObject({ conflictResourceIds: [4], conflictFlowIds: [2] });
+      expect(refs[3]).toMatchObject({ conflictResourceIds: [], conflictFlowIds: [1, 2] });
+      const same = diagnosticReferences([globalNode('g1', 1), globalNode('g1b', 1)], ['relay'], 2);
+      expect(same.every((ref) => !ref.conflict)).toBe(true);
+    });
+  });
   it('encodes node IDs as a single query parameter', () => {
     const id = 'node /?#&+%';
     const [reference] = diagnosticReferences([node(id, 1)], ['relay'], 2);

@@ -60,12 +60,21 @@ it('boots the commissioning plugin and empty artifact catalog without privileged
       ready: false,
     });
     const command = nodes?.find((node) => node.type === 'plugin.wago.command');
-    await expect(command?.resolveConfigSchema?.({}, { resourceId: 1 })).resolves.toMatchObject({
+    expect(nodes).toHaveLength(4);
+    for (const node of nodes ?? []) expect(node.flowScopes).toEqual(['resource', 'global']);
+    await expect(
+      command?.resolveConfigSchema?.({}, { flowScope: 'global', resourceId: null, flowId: 3 }),
+    ).resolves.toMatchObject({ dynamic: true });
+    await expect(
+      command?.resolveConfigSchema?.({}, { flowScope: 'resource', resourceId: 1, flowId: null }),
+    ).resolves.toMatchObject({
       dynamic: true,
       properties: { controllerId: { oneOf: [] } },
     });
     for (const node of nodes?.filter((node) => node !== command) ?? []) {
-      await expect(node.resolveConfigSchema?.({}, { resourceId: 1 })).resolves.toMatchObject({ dynamic: true });
+      await expect(
+        node.resolveConfigSchema?.({}, { flowScope: 'resource', resourceId: 1, flowId: null }),
+      ).resolves.toMatchObject({ dynamic: true });
       await expect(node.validateConfig?.({}, new Map())).resolves.toEqual(
         expect.arrayContaining([expect.objectContaining({ field: 'controllerId' })]),
       );

@@ -24,7 +24,7 @@ export async function configurationFlowImpacts(
   const nodes = await context.dataSource
     .getRepository(ResourceFlowNode)
     .createQueryBuilder('node')
-    .select(['node.id', 'node.resourceId', 'node.type', 'node.data'])
+    .select(['node.id', 'node.resourceId', 'node.flowId', 'node.type', 'node.data'])
     .where('node.type LIKE :type', { type: 'plugin.wago.%' })
     .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
     .getMany();
@@ -43,6 +43,11 @@ export async function configurationFlowImpacts(
     ...impact,
     references: nodes
       .filter((node) => node.data?.channelId === impact.channelId)
-      .map((node) => ({ resourceId: node.resourceId, nodeId: node.id, nodeType: node.type })),
+      .map((node) => ({
+        resourceId: node.resourceId ?? null,
+        flowId: node.flowId ?? null,
+        nodeId: node.id,
+        nodeType: node.type,
+      })),
   }));
 }

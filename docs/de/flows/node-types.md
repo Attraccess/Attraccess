@@ -2,6 +2,8 @@
 
 Diese Referenz beschreibt alle eingebauten Flow-Knoten. Der Editor gruppiert sie nach Zweck, etwa Abrechnung, Nachrichten und Flow-Steuerung, und zeigt die vom Ressourcentyp unterstützten Knoten. Nutzungs-, Aktivitäts- und Abrechnungsknoten sind für **Maschinen**; Tür-Trigger für **Türen**. Plugins können weitere Knoten mit eigenen Einstellungen ergänzen.
 
+Knoten können in **Ressourcen-Flows**, in [globalen Flows](flows/global-flows.md) oder in beiden verwendet werden. Knoten mit dem Hinweis **Nur Ressourcen-Flows** sind in globalen Flows ausgeblendet, und ein globaler Flow, der einen solchen Knoten enthält, lässt sich weder speichern noch importieren. Alle anderen Knoten funktionieren in beiden. Knoten, die auf eine Ressource wirken (z. B. **Aktive Sitzung beenden** oder **Aktivität aufzeichnen**), benötigen in einem globalen Flow eine auslösende Ressource; siehe [Die auslösende Ressource](flows/global-flows.md#die-auslösende-ressource).
+
 Lesen Sie zuerst [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) für Pfade, Datentypen und Beispiele. **Vorlage** bezeichnet hier eine Handlebars-Vorlage, die den aktuellen Eingang verwendet. Andere Einstellungen sind wörtliche Werte, sofern nicht anders beschrieben. Objekt-Payloads erhalten Ressourcenkontext; Vorlagen können gespeicherte Variablen lesen.
 
 Felder mit Vorlagenunterstützung bieten auch `add`, `subtract`, `multiply` und `divide`. Syntax und Beispiele finden Sie unter [Arithmetik und Einheitenumrechnung](flows/payloads-variables-templates.md#arithmetik-und-einheitenumrechnung).
@@ -12,7 +14,7 @@ Trigger starten einen Durchlauf und geben ihre Ereignisdaten über **Ausgang** w
 
 ### Button
 
-Typ: `input.button` · Maschinen · Editor: **Taste**
+Typ: `input.button` · Maschinen · Editor: **Taste** · Nur Ressourcen-Flows
 
 Ergänzt einen manuellen Button auf der Ressourcen-Detailseite. **Beschriftung** ist erforderlicher, wörtlicher Text. Die Payload beginnt mit Ressourcenkontext; sie enthält nicht den Benutzer, der den Button gedrückt hat. Der Button kann nur vom Besitzer einer aktiven Nutzungssitzung gedrückt werden.
 
@@ -53,6 +55,37 @@ Läuft bei einer Verriegelungsaktion. Keine Einstellungen. Verwendet dieselbe Pa
 Typ: `input.resource.door.unlatched` · Türen
 
 Läuft beim kurzen Öffnen der Türfalle. Keine Einstellungen. Verwendet dieselbe Payload-Struktur wie **Tür entriegelt**. Beispiel: Impuls an einen elektrischen Türöffner senden.
+
+### Gesundheitsstatus geändert
+
+Typ: `input.resource.health.changed` · Alle Ressourcen · Ressourcen- und globale Flows
+
+Läuft, wenn sich der Gesundheitsstatus einer Ressource tatsächlich ändert; eine Meldung mit unverändertem Status löst nicht aus. Keine Einstellungen. Die Payload enthält den Ressourcenkontext und `health: { identifier, status, previousStatus, reason }`. Beispiel: In einem globalen Flow eine MQTT- oder HTTP-Benachrichtigung senden, sobald eine beliebige Ressource nicht mehr gesund ist.
+
+| Feld                    | Beschreibung                                       |
+| ----------------------- | -------------------------------------------------- |
+| `health.identifier`     | Kennung der Gesundheitsquelle                      |
+| `health.status`         | Neuer Status                                       |
+| `health.previousStatus` | Status vor der Änderung                            |
+| `health.reason`         | Mit der Änderung gemeldeter Grund, falls vorhanden |
+
+### Wartung erstellt
+
+Typ: `input.resource.maintenance.created` · Alle Ressourcen · Ressourcen- und globale Flows
+
+Läuft, wenn ein Wartungszeitraum erstellt wird, manuell oder durch einen Wartungsplan. Keine Einstellungen. Die Payload enthält den Ressourcenkontext und `maintenance: { id, reason, startTime, endTime }`.
+
+### Wartung beendet
+
+Typ: `input.resource.maintenance.finished` · Alle Ressourcen · Ressourcen- und globale Flows
+
+Läuft, wenn ein Wartungszeitraum endet. Keine Einstellungen. Verwendet dieselbe Payload-Form wie **Wartung erstellt**, mit gesetztem `endTime`.
+
+### Wartungsanfrage erstellt
+
+Typ: `input.resource.maintenance-request.created` · Alle Ressourcen · Ressourcen- und globale Flows
+
+Läuft, wenn eine Wartungsanfrage für eine Ressource gestellt wird. Keine Einstellungen. Die Payload enthält den Ressourcenkontext und `maintenanceRequest: { id, reason, status, createdAt, createdByUser }`; `createdByUser` ist `{ id, username }` oder `null`. Es sind nur für Benutzer sichtbare Felder enthalten.
 
 ### MQTT-Nachricht empfangen
 
@@ -123,7 +156,7 @@ Wählen Sie ein **Companion-Gerät** und optionale dezimale **Hersteller-ID / Pr
 
 ### Messung starten
 
-Typ: `input.resource.metering.start` · Maschinen
+Typ: `input.resource.metering.start` · Maschinen · Nur Ressourcen-Flows
 
 Einen vordefinierten **Zähler** auswählen oder einen mit einem Namen erstellen. Bereitet diesen Zähler vor, bevor eine erfasste Sitzung startet oder übernommen wird. **Zeitlimit (Sekunden)**: 1–600, Standard **30**. Der Zweig muss **Messung bereit** erreichen. Kann ein kostenpflichtiger Zähler nicht initialisiert werden, startet die Sitzung nicht.
 
@@ -131,7 +164,7 @@ Die Payload enthält `metering: { sessionId, meterId, operationId, resourceId, u
 
 ### Messwert abfragen
 
-Typ: `input.resource.metering.collect` · Maschinen
+Typ: `input.resource.metering.collect` · Maschinen · Nur Ressourcen-Flows
 
 | Einstellung                                     | Bereich / Standard                                   |
 | ----------------------------------------------- | ---------------------------------------------------- |
@@ -361,7 +394,7 @@ Wählen Sie ein festes **Companion-Gerät**. Sendet einen Entsperrbefehl und spe
 
 ### Messung bereit
 
-Typ: `output.resource.metering.ready` · Maschinen
+Typ: `output.resource.metering.ready` · Maschinen · Nur Ressourcen-Flows
 
 | Einstellung   | Beschreibung                                                              |
 | ------------- | ------------------------------------------------------------------------- |
@@ -375,7 +408,7 @@ Beispiel nach HTTP-Antwort `{"counter":1500}`: Basiswert `{{counter}}`. Eine Ein
 
 ### Zähler melden
 
-Typ: `output.resource.metering.report`
+Typ: `output.resource.metering.report` · Nur Ressourcen-Flows
 
 | Einstellung  | Beschreibung                                                           |
 | ------------ | ---------------------------------------------------------------------- |

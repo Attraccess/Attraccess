@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Resource } from '@attraccess/react-query-client';
 import { MachineTab } from './machine';
 
-type Warning = { triggerNodeId: string; triggerType: string; effectNodes: { nodeId: string; nodeType: string }[] };
+type Warning = { flowId: number | null; flowName: string | null; triggerNodeId: string; triggerType: string; effectNodes: { nodeId: string; nodeType: string }[] };
 
 const state = vi.hoisted(() => ({
   activeSessionCount: 0,
@@ -29,6 +29,8 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 
 const stopWarning: Warning = {
+  flowId: null,
+  flowName: null,
   triggerNodeId: 'a',
   triggerType: 'input.resource.usage.stopped',
   effectNodes: [
@@ -103,6 +105,16 @@ describe('MachineTab max parallel sessions', () => {
     expect(link).toHaveAttribute('href', '/resources/5/flows');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('labels warnings of a global flow with its name and links to the global flow editor', () => {
+    state.warnings = [{ ...stopWarning, flowId: 7, flowName: 'Power off all', triggerNodeId: 'g' }];
+    mount(3);
+    const link = screen.getByRole('link', { name: 'Power off all' });
+    expect(link).toHaveAttribute('href', '/devices/flows/7');
+    expect(link).toHaveAttribute('target', '_blank');
+    // Only global flows are affected, so the resource's own flow editor is not offered.
+    expect(screen.getAllByRole('link')).toHaveLength(1);
   });
 
   it('shows the generic flow warning without a list when the check fails', () => {

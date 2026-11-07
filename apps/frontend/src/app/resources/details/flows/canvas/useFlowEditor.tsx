@@ -1,24 +1,21 @@
 import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
 import { EdgeWithDeleteButton } from '../edgeWithDeleteButton';
-import {
-  ResourceFlowLog,
-  ResourceFlowEdgeDto,
-  ResourceFlowNodeDto,
-  ApiError,
-  useResourceFlowsServiceGetResourceFlow,
-  UseResourceFlowsServiceGetResourceFlowKeyFn,
-  useResourceFlowsServiceSaveResourceFlow,
-} from '@attraccess/react-query-client';
+import { ResourceFlowLog, ResourceFlowEdgeDto, ResourceFlowNodeDto } from '@attraccess/react-query-client';
 import { nanoid } from 'nanoid';
 import JSConfetti from 'js-confetti';
 import { Node, Edge, useReactFlow } from '@xyflow/react';
 import { getLayoutedElements } from '../flowLayout';
-import { useParams } from 'react-router-dom';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAppTheme } from '@attraccess/ui';
 import { usePtrStore } from '../../../../../stores/ptr.store';
 import { NodeCatalogHandle } from '../nodeCatalog/index';
 import { useFlowContext } from '../context/index';
+import {
+  flowScopeOf,
+  useFlowCanvasQuery,
+  useFlowNodeSchemasQuery,
+  useSaveFlowCanvas,
+} from '../flowOwner';
 import { useFlowImportExport } from '../flowImportExport';
 import { useQueryClient } from '@tanstack/react-query';
 import de from '../de.json';
@@ -46,7 +43,7 @@ function areNodesEqual(node1: ResourceFlowNodeDto | Node, node2: ResourceFlowNod
 }
 
 export function useFlowsPageInnerStateInputs() {
-  const { id: resourceId } = useParams();
+  const { owner } = useFlowContext();
   const { resolvedTheme } = useAppTheme();
   const { t, tExists } = useTranslations({
     en: {
@@ -58,7 +55,7 @@ export function useFlowsPageInnerStateInputs() {
       api: API_ERROR_TRANSLATIONS_DE,
     },
   });
-  const { t: tNodeTranslations } = useTranslations({
+  const { t: tNodeTranslations, tExists: tNodeExists } = useTranslations({
     de: nodesDeTranslations,
     en: nodesEnTranslations,
   });
@@ -76,26 +73,39 @@ export function useFlowsPageInnerStateInputs() {
     data: originalFlowData,
     isFetching: isFlowFetching,
     isError: isFlowError,
-  } = useResourceFlowsServiceGetResourceFlow({ resourceId: Number(resourceId) }, undefined, {
-    enabled: !!resourceId,
-  });
+  } = useFlowCanvasQuery(owner);
   const isFlowLoading = !originalFlowData && isFlowFetching;
+  const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
+  const nodeTitle = useCallback(
+    (nodeType: string) => {
+      const titleKey = 'nodes.' + nodeType + '.title';
+      if (tNodeExists(titleKey)) return tNodeTranslations(titleKey);
+      return nodeSchemas?.find((schema) => schema.type === nodeType)?.label ?? nodeType;
+    },
+    [nodeSchemas, tNodeExists, tNodeTranslations],
+  );
 
   const toast = useToastMessage();
 
   const {
-    mutate: saveFlow,
+    save: saveFlow,
     isError: saveFailed,
     isPending: isSaving,
-  } = useResourceFlowsServiceSaveResourceFlow({
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: UseResourceFlowsServiceGetResourceFlowKeyFn({ resourceId: Number(resourceId) }),
-      });
-    },
+  } = useSaveFlowCanvas(owner, {
     onError: (error) => {
+      // 400 from a global flow: some nodes do not support global flows. Name them instead of a generic error.
+      const rejected = (error.body as { nodes?: Array<{ nodeId: string; nodeType: string }> } | undefined)?.nodes;
+      if (error.status === 400 && Array.isArray(rejected) && rejected.length > 0) {
+        toast.error({
+          title: t('global.saveUnsupportedNodes.title'),
+          description: t('global.saveUnsupportedNodes.description', {
+            nodes: [...new Set(rejected.map((node) => nodeTitle(node.nodeType)))].join(', '),
+          }),
+        });
+        return;
+      }
       toast.apiError({
-        error: error as ApiError,
+        error,
         t,
         tExists,
         baseTranslationKey: 'api',
@@ -124,12 +134,26 @@ export function useFlowsPageInnerStateInputs() {
     pasteNodes,
   } = useFlowContext();
 
+  // Checked against the node schemas of this owner's scope, so an import never loads a node the flow cannot save.
+  const findUnsupportedNodes = useCallback(
+    (importedNodes: ResourceFlowNodeDto[]) => {
+      if (!nodeSchemas) return [];
+      const scope = flowScopeOf(owner);
+      return importedNodes
+        .filter((node) => !nodeSchemas.find((schema) => schema.type === node.type)?.supportedFlowScopes?.includes(scope))
+        .map((node) => nodeTitle(node.type));
+    },
+    [nodeSchemas, owner, nodeTitle],
+  );
+
   const { handleExport, handleImportClick } = useFlowImportExport({
     nodes,
     edges,
     setNodes,
     setEdges,
-    resourceId: Number(resourceId),
+    resourceId: owner.kind === 'resource' ? owner.resourceId : undefined,
+    flowId: owner.kind === 'global' ? owner.flowId : undefined,
+    findUnsupportedNodes,
     t,
   });
 
@@ -144,7 +168,7 @@ export function useFlowsPageInnerStateInputs() {
     }
   }, [originalFlowData, setNodes, setEdges, setValidationErrors]);
   return {
-    resourceId,
+    owner,
     resolvedTheme,
     t,
     tExists,
@@ -190,7 +214,6 @@ export function useFlowsPageInnerStateNodesHaveChanged(model: ReturnType<typeof 
     nodes,
     edges,
     saveFlow,
-    resourceId,
     getInternalNode,
     setNodes,
     setEdges,
@@ -243,13 +266,10 @@ export function useFlowsPageInnerStateNodesHaveChanged(model: ReturnType<typeof 
 
   const save = useCallback(() => {
     saveFlow({
-      resourceId: Number(resourceId),
-      requestBody: {
-        nodes: nodes as ResourceFlowNodeDto[],
-        edges: edges as ResourceFlowEdgeDto[],
-      },
+      nodes: nodes as ResourceFlowNodeDto[],
+      edges: edges as ResourceFlowEdgeDto[],
     });
-  }, [nodes, edges, saveFlow, resourceId]);
+  }, [nodes, edges, saveFlow]);
 
   const layout = useCallback(() => {
     const sourceHandles = new Map(
@@ -468,7 +488,7 @@ export function useFlowsPageInnerStateOutput(model: ReturnType<typeof useFlowsPa
     [],
   );
   return {
-    resourceId: model.resourceId,
+    owner: model.owner,
     resolvedTheme: model.resolvedTheme,
     t: model.t,
     tNodeTranslations: model.tNodeTranslations,

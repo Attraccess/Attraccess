@@ -65,8 +65,19 @@ export function own<T>(values: Record<string, T>, key: string): T | undefined {
   return Object.prototype.hasOwnProperty.call(values, key) ? values[key] : undefined;
 }
 
+/** A resource flow is owned by its resource, a global flow by itself. */
+function referenceOwner(node: { resourceId: number | null; flowId?: number | null }): string {
+  return node.flowId != null ? `flow ${node.flowId}` : `resource ${node.resourceId}`;
+}
+
 export function diagnosticReferences(
-  nodes: Array<{ id: string; resourceId: number; type: string; data: Record<string, unknown> }>,
+  nodes: Array<{
+    id: string;
+    resourceId: number | null;
+    flowId?: number | null;
+    type: string;
+    data: Record<string, unknown>;
+  }>,
   channelIds: string[],
   revision: number | null,
   capabilities?: Record<string, string[]>,
@@ -74,26 +85,31 @@ export function diagnosticReferences(
   return nodes.map((node) => {
     const channelId = typeof node.data.channelId === 'string' ? node.data.channelId : '';
     const control = node.type === 'plugin.wago.command';
-    const conflictResourceIds = control
-      ? [
-          ...new Set(
-            nodes
-              .filter(
-                (other) =>
-                  other.type === 'plugin.wago.command' &&
-                  other.resourceId !== node.resourceId &&
-                  other.data.channelId === channelId,
-              )
-              .map((other) => other.resourceId),
-          ),
-        ]
+    const conflicting = control
+      ? nodes.filter(
+          (other) =>
+            other.type === 'plugin.wago.command' &&
+            referenceOwner(other) !== referenceOwner(node) &&
+            other.data.channelId === channelId,
+        )
       : [];
+    const flowId = node.flowId ?? null;
+    const conflictResourceIds = [
+      ...new Set(conflicting.map((other) => other.resourceId).filter((id): id is number => id != null)),
+    ];
+    const conflictFlowIds = [
+      ...new Set(conflicting.map((other) => other.flowId).filter((id): id is number => id != null)),
+    ];
     return {
       nodeId: node.id,
-      resourceId: node.resourceId,
+      resourceId: node.resourceId ?? null,
+      flowId,
       channelId,
       control,
-      href: `/resources/${node.resourceId}/flows?node=${encodeURIComponent(node.id)}`,
+      href:
+        flowId !== null
+          ? `/devices/flows/${flowId}?node=${encodeURIComponent(node.id)}`
+          : `/resources/${node.resourceId}/flows?node=${encodeURIComponent(node.id)}`,
       invalid:
         !channelIds.includes(channelId) ||
         (control &&
@@ -101,8 +117,9 @@ export function diagnosticReferences(
             (capabilities &&
               (!own(capabilities, channelId)?.includes('output') ||
                 (node.data.action === 'pulse' && !own(capabilities, channelId)?.includes('pulse')))))),
-      conflict: conflictResourceIds.length > 0,
+      conflict: conflicting.length > 0,
       conflictResourceIds,
+      conflictFlowIds,
     };
   });
 }
@@ -353,7 +370,14 @@ export class WagoDiagnosticsService {
       matchingNodes.push(node);
       conflictNodesByControllerId.set(controllerId, matchingNodes);
     }
-    const conflictResourceIds = [...new Set([...conflictNodesByControllerId.values()].flat().map((n) => n.resourceId))];
+    const conflictResourceIds = [
+      ...new Set(
+        [...conflictNodesByControllerId.values()]
+          .flat()
+          .map((n) => n.resourceId)
+          .filter((id): id is number => id != null),
+      ),
+    ];
     const conflictResources = conflictResourceIds.length
       ? await this.context.dataSource
           .getRepository(Resource)
@@ -385,13 +409,14 @@ export class WagoDiagnosticsService {
             appliedSnapshot?.logicalChannels.map((channel) => [channel.id, channel.capabilities]) ?? [],
           ),
         )
-          .filter((reference) => reference.resourceId === resourceId)
+          .filter((reference) => reference.flowId === null && reference.resourceId === resourceId)
           .map((reference) => ({
             ...reference,
             conflictResources: reference.conflictResourceIds.map((id) => ({
               id,
               name: resourceNames.get(id) ?? `Resource ${id}`,
             })),
+            conflictFlows: reference.conflictFlowIds.map((id) => ({ id, name: `Global flow ${id}` })),
           }));
         return {
           controllerId,

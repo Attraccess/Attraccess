@@ -20,6 +20,29 @@ export interface PluginNodeExecutionContext {
    * ({{resource.id}}, {{payload.*}}, etc.).
    */
   compileTemplate(template: string, data: object): string;
+
+  /**
+   * The resource the run acts on: the node's own resource in a resource flow, the triggering resource in a global
+   * flow. `null` (or undefined) when the run was not started by a resource event.
+   */
+  readonly resourceId?: number | null;
+}
+
+/**
+ * The kinds of flow a node can be used in: a flow bound to one resource, or a global flow that reacts to
+ * events of every resource.
+ */
+export type PluginFlowScope = 'resource' | 'global';
+
+/** Context passed to `resolveConfigSchema` while the editor or the canvas asks for a node's schema. */
+export interface PluginFlowNodeSchemaContext {
+  /** The kind of flow that contains the node. */
+  flowScope: PluginFlowScope;
+  /** The resource of a resource flow; `null` in a global flow. */
+  resourceId: number | null;
+  /** The global flow the node belongs to; `null` in a resource flow. */
+  flowId: number | null;
+  purpose?: 'editor' | 'preview';
 }
 
 export type PluginFlowFailureKind =
@@ -95,7 +118,7 @@ interface PluginFlowNodeDefinitionBase {
    */
   resolveConfigSchema?(
     currentConfig: Record<string, unknown>,
-    context: { resourceId: number; purpose?: 'editor' | 'preview' },
+    context: PluginFlowNodeSchemaContext,
   ): Promise<Record<string, unknown>>;
 
   /** Handle IDs accepted as inputs (e.g. ['input']). Empty for trigger nodes. */
@@ -109,6 +132,16 @@ interface PluginFlowNodeDefinitionBase {
    * Defaults to true. Set false to hide it from the catalog for all resources.
    */
   readonly supportedByAllResources?: boolean;
+
+  /**
+   * The flow scopes this node can be used in. Defaults to `['resource']`, so a node only appears in global
+   * flows once it opts in with `['resource', 'global']` (or `['global']`).
+   *
+   * In a global flow there is no fixed resource: `resourceId` is `null` in `resolveConfigSchema` and
+   * `validateConfig`, and a run has a triggering resource only when a resource event started it. Opt in only
+   * when the node copes with that. `supportedByAllResources` filters resource flows only.
+   */
+  readonly flowScopes?: readonly PluginFlowScope[];
 
   /**
    * Set to true for nodes that terminate a flow branch (no further chaining
