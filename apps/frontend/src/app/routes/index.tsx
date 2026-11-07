@@ -14,6 +14,7 @@ import { BillingDashboardPage } from '../billing/dashboard/index';
 import ChangelogPage from '../changelog/ChangelogPage';
 import { ConfirmDeleteAccount } from '../confirm-delete-account/index';
 import { CsvExport } from '../csv-export/index';
+import { BillingTransactionsExportPage, ResourceUsageExportPage } from '../csv-export/configure-page';
 import { Dependencies } from '../dependencies/index';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
 import FirstTimeSetupPage from '../first-time-setup/index';
@@ -318,6 +319,16 @@ const coreRoutes: RouteConfig[] = [
   {
     path: '/csv-export',
     element: <CsvExport />,
+    authRequired: ['billing.manage', 'resources.reports.export'],
+  },
+  {
+    path: '/csv-export/resource-usage-hours',
+    element: <ResourceUsageExportPage />,
+    authRequired: ['billing.manage', 'resources.reports.export'],
+  },
+  {
+    path: '/csv-export/billing-transactions',
+    element: <BillingTransactionsExportPage />,
     authRequired: ['billing.manage', 'resources.reports.export'],
   },
   {

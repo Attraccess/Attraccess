@@ -1,0 +1,59 @@
+{
+  "table": {
+    "ariaLabel": "CSV-Export"
+  },
+  "preview": {
+    "title": "Vorschau (erste {{n}})",
+    "rowCount": "{{count}} Zeilen insgesamt"
+  },
+  "actions": {
+    "refetch": "Aktualisieren",
+    "downloadCsv": "CSV herunterladen"
+  },
+  "columns": {
+    "title": "Spalten",
+    "description": "Wähle die Spalten in der Reihenfolge, in der sie in der Datei erscheinen. Eine leere Überschrift verwendet die Standardbezeichnung des Felds.",
+    "empty": "Keine Spalten konfiguriert. Füge eine Feld- oder Konstantenspalte hinzu.",
+    "type": {
+      "field": "Feld",
+      "constant": "Konstante"
+    },
+    "field": "Feld",
+    "fieldAria": "Feld von Spalte {{n}}",
+    "fieldPlaceholder": "Feld auswählen",
+    "value": "Konstanter Wert",
+    "header": "Überschrift",
+    "moveUp": "Spalte {{n}} nach oben",
+    "moveDown": "Spalte {{n}} nach unten",
+    "remove": "Spalte {{n}} entfernen",
+    "addField": "Feldspalte hinzufügen",
+    "addConstant": "Konstantenspalte hinzufügen",
+    "unavailable": "In den aktuellen Daten nicht verfügbar"
+  },
+  "templates": {
+    "title": "Vorlage",
+    "description": "Vorlagen speichern die Spaltenkonfiguration und sind für alle sichtbar, die exportieren dürfen.",
+    "label": "Vorlage",
+    "none": "Keine Vorlage (Standardspalten)",
+    "name": "Name der Vorlage",
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "update": "Änderungen speichern",
+    "saveAsNew": "Als neue Vorlage speichern",
+    "saveAsTitle": "Als neue Vorlage speichern",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Vorlage löschen",
+    "deleteTitle": "Vorlage löschen?",
+    "deleteMessage": "Die Vorlage „{{name}}“ wird für alle gelöscht. Das kann nicht rückgängig gemacht werden.",
+    "toasts": {
+      "created": "Vorlage „{{name}}“ erstellt",
+      "updated": "Vorlage „{{name}}“ gespeichert",
+      "deleted": "Vorlage gelöscht"
+    },
+    "errors": {
+      "duplicate": "Für diesen Export-Typ existiert bereits eine Vorlage mit diesem Namen.",
+      "saveFailed": "Die Vorlage konnte nicht gespeichert werden.",
+      "deleteFailed": "Die Vorlage konnte nicht gelöscht werden."
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "table": {
+    "ariaLabel": "CSV Export"
+  },
+  "preview": {
+    "title": "Preview (first {{n}})",
+    "rowCount": "{{count}} total rows"
+  },
+  "actions": {
+    "refetch": "Refresh",
+    "downloadCsv": "Download CSV"
+  },
+  "columns": {
+    "title": "Columns",
+    "description": "Choose the columns in the order they appear in the file. Leave a header empty to use the field's default label.",
+    "empty": "No columns configured. Add a field or constant column.",
+    "type": {
+      "field": "Field",
+      "constant": "Constant"
+    },
+    "field": "Field",
+    "fieldAria": "Field of column {{n}}",
+    "fieldPlaceholder": "Select a field",
+    "value": "Constant value",
+    "header": "Header",
+    "moveUp": "Move column {{n}} up",
+    "moveDown": "Move column {{n}} down",
+    "remove": "Remove column {{n}}",
+    "addField": "Add field column",
+    "addConstant": "Add constant column",
+    "unavailable": "Not available in current data"
+  },
+  "templates": {
+    "title": "Template",
+    "description": "Templates store the column setup and are shared with everyone who can export.",
+    "label": "Template",
+    "none": "No template (default columns)",
+    "name": "Template name",
+    "unsavedChanges": "Unsaved changes",
+    "update": "Save changes",
+    "saveAsNew": "Save as new template",
+    "saveAsTitle": "Save as new template",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete template",
+    "deleteTitle": "Delete template?",
+    "deleteMessage": "The template \"{{name}}\" will be deleted for everyone. This cannot be undone.",
+    "toasts": {
+      "created": "Template \"{{name}}\" created",
+      "updated": "Template \"{{name}}\" saved",
+      "deleted": "Template deleted"
+    },
+    "errors": {
+      "duplicate": "A template with this name already exists for this export type.",
+      "saveFailed": "The template could not be saved.",
+      "deleteFailed": "The template could not be deleted."
+    }
+  }
+}

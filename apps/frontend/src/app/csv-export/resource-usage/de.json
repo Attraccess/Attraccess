@@ -19,10 +19,14 @@
     "startNotes": "Start-Notizen",
     "endNotes": "End-Notizen",
     "supervisorId": "Aufsicht-ID",
-    "supervisorUsername": "Aufsicht-Name"
+    "supervisorUsername": "Aufsicht-Name",
+    "userEmail": "Benutzer-E-Mail",
+    "userExternalIdentifier": "Externe Benutzerkennung",
+    "supervisorEmail": "Betreuer-E-Mail"
   },
   "status": {
     "provisional": "Vorläufig",
     "unavailable": "Nicht verfügbar"
-  }
+  },
+  "metadataField": "Ressourcen-Metadaten: {{key}}"
 }

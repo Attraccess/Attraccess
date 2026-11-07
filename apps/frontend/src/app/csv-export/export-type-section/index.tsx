@@ -7,7 +7,8 @@ import { ResourceUsageCard } from './resource-usage-card';
 import { BillingTransactionsCard } from './billing-transactions-card';
 import { useAuth } from '../../../hooks/useAuth';
 
-export type ExportTypeKey = 'resourceUsageHours' | 'billingTransactions';
+import type { ExportTypeKey } from '../range-search-params';
+export type { ExportTypeKey };
 
 interface Props {
   range: RangeValue<DateValue> | null;

@@ -3,11 +3,13 @@ import { ExportProps as ExporterProps } from '../export-props';
 import de from './de.json';
 import en from './en.json';
 import {
-  BillingTransaction,
+  BillingTransactionExportRowDto,
+  CsvExportType,
   useAnalyticsServiceGetBillingTransactionsInDateRangeInfinite,
   useBillingServiceGetBillingConfiguration,
 } from '@attraccess/react-query-client';
-import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer';
+import { CsvExportConfigContent, ColumnDefinition } from '../export-config';
+import { metadataFields } from '../export-config/csv';
 import { useEffect, useMemo, useState } from 'react';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 
@@ -98,13 +100,28 @@ export function BillingTransactionsExport(props: ExporterProps) {
             )
             .join(', '),
       },
-    ] as ColumnDefinition<BillingTransaction>[];
-  }, [t, billingConfiguration, formatDateTimeFull]);
+      // Field keys are persisted in export templates: never rename an existing key.
+      { label: t('columns.userId'), key: 'userId', getter: (item) => item.user?.id ?? item.userId },
+      { label: t('columns.userEmail'), key: 'userEmail', getter: (item) => item.userEmail ?? '' },
+      {
+        label: t('columns.userExternalIdentifier'),
+        key: 'userExternalIdentifier',
+        getter: (item) => item.user?.externalIdentifier ?? '',
+      },
+      { label: t('columns.initiatorEmail'), key: 'initiatorEmail', getter: (item) => item.initiatorEmail ?? '' },
+      ...metadataFields(
+        billingTransactions,
+        (item: BillingTransactionExportRowDto) => item.resourceUsage?.resource?.metadata,
+        (key) => t('metadataField', { key }),
+      ),
+    ] as ColumnDefinition<BillingTransactionExportRowDto>[];
+  }, [t, billingConfiguration, formatDateTimeFull, billingTransactions]);
 
   return (
-    <CsvExportDrawerContent
+    <CsvExportConfigContent
+      exportType={CsvExportType.BILLING_TRANSACTIONS}
       queryStatus={billingConfigurationFetchStatus === 'success' ? fetchStatus : billingConfigurationFetchStatus}
-      items={billingTransactions as BillingTransaction[]}
+      items={billingTransactions as BillingTransactionExportRowDto[]}
       columns={columns}
       filename="billing-transactions.csv"
       onFetchAllPages={() => setFetchAll(true)}

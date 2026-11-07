@@ -10,6 +10,11 @@
     "correctionOf": "Korrektur von",
     "externalReference": "Externe Referenz",
     "status": "Status",
-    "items": "Positionen"
-  }
+    "items": "Positionen",
+    "userId": "Benutzer-ID",
+    "userEmail": "Benutzer-E-Mail",
+    "userExternalIdentifier": "Externe Benutzerkennung",
+    "initiatorEmail": "Initiator-E-Mail"
+  },
+  "metadataField": "Ressourcen-Metadaten: {{key}}"
 }

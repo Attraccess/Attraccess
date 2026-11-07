@@ -1,10 +1,12 @@
 import {
-  ResourceUsage,
   AnalyticsService,
+  CsvExportType,
+  ResourceUsageExportRowDto,
   useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite,
 } from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
-import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer/index';
+import { CsvExportConfigContent, ColumnDefinition } from '../export-config';
+import { metadataFields } from '../export-config/csv';
 import { useMemo, useCallback, useEffect, useState } from 'react';
 import {
   combinedOperatingDurationStatus,
@@ -18,7 +20,7 @@ import en from './en.json';
 import { useQuery } from '@tanstack/react-query';
 import type { OperatingDurationSummary } from './operating-duration';
 
-export function durationMsForSession(item: ResourceUsage, asOf: Date): number {
+export function durationMsForSession(item: ResourceUsageExportRowDto, asOf: Date): number {
   const now = new Date();
   const end = Math.min(new Date(item.endTime ?? now).getTime(), asOf.getTime(), now.getTime());
   return end - new Date(item.startTime).getTime();
@@ -147,7 +149,15 @@ export function useResourceUsageExportStateInputs(props: ExportProps) {
 }
 
 export function useResourceUsageExportStateColumns(model: ReturnType<typeof useResourceUsageExportStateInputs>) {
-  const { t, formatDateTimeFull, formatUsageDuration, props, operatingDurations, attributedDurations } = model;
+  const {
+    t,
+    formatDateTimeFull,
+    formatUsageDuration,
+    props,
+    operatingDurations,
+    attributedDurations,
+    resourceUsageExport,
+  } = model;
   const columns = useMemo(() => {
     return [
       {
@@ -250,8 +260,29 @@ export function useResourceUsageExportStateColumns(model: ReturnType<typeof useR
         key: 'supervisorUsername',
         getter: (item) => item.supervisorUser?.username ?? '',
       },
-    ] as ColumnDefinition<ResourceUsage>[];
-  }, [attributedDurations, formatUsageDuration, formatDateTimeFull, operatingDurations, props.end, t]);
+      // Field keys are persisted in export templates: never rename an existing key.
+      { label: t('columns.userEmail'), key: 'userEmail', getter: (item) => item.userEmail ?? '' },
+      {
+        label: t('columns.userExternalIdentifier'),
+        key: 'userExternalIdentifier',
+        getter: (item) => item.user?.externalIdentifier ?? '',
+      },
+      { label: t('columns.supervisorEmail'), key: 'supervisorEmail', getter: (item) => item.supervisorEmail ?? '' },
+      ...metadataFields(
+        resourceUsageExport,
+        (item: ResourceUsageExportRowDto) => item.resource?.metadata,
+        (key) => t('metadataField', { key }),
+      ),
+    ] as ColumnDefinition<ResourceUsageExportRowDto>[];
+  }, [
+    attributedDurations,
+    formatUsageDuration,
+    formatDateTimeFull,
+    operatingDurations,
+    props.end,
+    resourceUsageExport,
+    t,
+  ]);
   return { ...model, columns } as const;
 }
 
@@ -295,9 +326,10 @@ export function ResourceUsageExport(props: ExportProps) {
   // TODO: handle grouping by user and resource
 
   return (
-    <CsvExportDrawerContent
-      columns={columns as ColumnDefinition<ResourceUsage>[]}
-      items={resourceUsageExport as ResourceUsage[]}
+    <CsvExportConfigContent
+      exportType={CsvExportType.RESOURCE_USAGE_HOURS}
+      columns={columns as ColumnDefinition<ResourceUsageExportRowDto>[]}
+      items={resourceUsageExport as ResourceUsageExportRowDto[]}
       refetch={refetch}
       options={options}
       setOption={setOption}

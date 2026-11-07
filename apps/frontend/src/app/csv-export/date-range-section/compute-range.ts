@@ -3,15 +3,7 @@
 import { CalendarDate, DateValue, getLocalTimeZone, today } from '@internationalized/date';
 import { RangeValue } from '@heroui/react';
 
-export type Preset =
-  | 'today'
-  | 'yesterday'
-  | 'last7d'
-  | 'last30d'
-  | 'thisMonth'
-  | 'lastMonth'
-  | 'thisYear'
-  | 'custom';
+export type Preset = 'today' | 'yesterday' | 'last7d' | 'last30d' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'custom';
 
 export const PRESET_ORDER: Preset[] = [
   'today',
@@ -71,10 +63,7 @@ export interface DateBounds {
   end: Date;
 }
 
-export function rangeToDateBounds(
-  range: RangeValue<DateValue> | null | undefined,
-  fallback: Date,
-): DateBounds {
+export function rangeToDateBounds(range: RangeValue<DateValue> | null | undefined, fallback: Date): DateBounds {
   const tz = getLocalTimeZone();
   const start = range?.start?.toDate(tz) ?? fallback;
   const endRaw = range?.end?.toDate(tz) ?? fallback;

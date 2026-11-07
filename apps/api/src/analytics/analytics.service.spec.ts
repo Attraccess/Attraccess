@@ -92,7 +92,7 @@ describe('AnalyticsService', () => {
         take: 500,
       });
 
-      expect(result).toEqual([expectedResourceUsage, 1]);
+      expect(result).toEqual([[{ ...expectedResourceUsage[0], userEmail: null, supervisorEmail: null }], 1]);
     });
 
     it('should apply skip/take for page 2', async () => {
@@ -160,6 +160,40 @@ describe('AnalyticsService', () => {
         new Date('2023-01-15T10:00:00Z'),
         true,
       );
+    });
+  });
+  describe('export email and metadata fields', () => {
+    const dateRange: DateRangeValue = { start: new Date('2023-01-01'), end: new Date('2023-01-31') };
+
+    it('adds flat email fields to resource usage rows and keeps resource metadata', async () => {
+      mockRepository.findAndCount.mockResolvedValue([
+        [
+          {
+            id: 1,
+            user: { id: 1, email: 'user@example.com', externalIdentifier: 'EXT-1' },
+            supervisorUser: { id: 2, email: 'mentor@example.com' },
+            resource: { id: 1, metadata: { costCenter: '4711' } },
+          },
+        ],
+        1,
+      ]);
+
+      const [rows] = await service.getResourceUsageHoursInDateRange(dateRange);
+
+      expect(rows[0]).toMatchObject({
+        userEmail: 'user@example.com',
+        supervisorEmail: 'mentor@example.com',
+        user: { externalIdentifier: 'EXT-1' },
+        resource: { metadata: { costCenter: '4711' } },
+      });
+    });
+
+    it('uses null emails when users are absent', async () => {
+      mockRepository.findAndCount.mockResolvedValue([[{ id: 1, user: null, supervisorUser: null }], 1]);
+
+      const [rows] = await service.getResourceUsageHoursInDateRange(dateRange);
+
+      expect(rows[0]).toMatchObject({ userEmail: null, supervisorEmail: null });
     });
   });
 });

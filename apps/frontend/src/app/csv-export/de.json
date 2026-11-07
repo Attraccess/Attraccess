@@ -53,5 +53,8 @@
       "title": "Zahlungen",
       "description": "Zahlungen, Gutschriften und Status je Nutzer."
     }
+  },
+  "page": {
+    "back": "Zurück zur Export-Auswahl"
   }
 }
