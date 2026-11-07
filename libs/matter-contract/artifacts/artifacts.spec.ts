@@ -57,6 +57,13 @@ describe('exported artifacts', () => {
     for (const name of defRefs) expect(jsonSchema.$defs[name]).toBeDefined();
   });
 
+  it('declare the bearer service token and keep the probes anonymous', () => {
+    expect(openapi.components.securitySchemes.serviceToken).toMatchObject({ type: 'http', scheme: 'bearer' });
+    expect(openapi.security).toEqual([{ serviceToken: [] }]);
+    expect(openapi.paths['/health/live'].get.security).toEqual([]);
+    expect(openapi.paths['/v1/capabilities'].get.responses['401']).toBeDefined();
+  });
+
   it('keeps schemas small', () => {
     expect(JSON.stringify(jsonSchema).length).toBeLessThan(200_000);
   });

@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { User } from '@attraccess/database-entities';
 import { PLUGIN_AUDIT_HOST_PROVIDER, PluginPermission, PluginPermissionError } from '@attraccess/plugins-backend-sdk';
 import { PluginModule } from './plugin.module';
+import { resolveAppVersion } from '../config/app.config';
 import { PluginLiveUpdatesService } from './plugin-live-updates.service';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
@@ -229,6 +230,11 @@ describe('PluginModule', () => {
         version: '1.0.0',
         pluginDirectory: 'ctx-plugin',
       });
+    });
+
+    it('exposes the host version that plugin compatibility is checked against', () => {
+      expect(build([]).hostVersion).toBe(resolveAppVersion());
+      expect(build([]).hostVersion).toMatch(/^\d+\.\d+\.\d+/);
     });
 
     it('exposes the audit sink through the guarded context with host-bound plugin identity', async () => {

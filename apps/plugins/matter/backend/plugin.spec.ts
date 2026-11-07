@@ -2,24 +2,35 @@ import { COMPATIBILITY_TABLE, minimumAttraccessVersion } from '@attraccess/matte
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import plugin from './plugin';
+import { MATTER_AUDIT_DOMAIN } from './connection/audit';
+import { MatterConnectionController } from './connection/controller';
+import { MatterConnection } from './connection/entity';
 
 const read = (name: string) => JSON.parse(readFileSync(join(__dirname, '..', name), 'utf8'));
 
-describe('matter plugin foundation', () => {
-  it('registers an empty module: no controllers, providers or imports', () => {
+describe('matter plugin backend', () => {
+  it('registers the settings controller, its services, the entity and the audit domain', () => {
     const module = plugin.register({} as never);
-    expect(Object.keys(module)).toEqual(['module']);
+    expect(module.controllers).toEqual([MatterConnectionController]);
+    expect(module.providers).toHaveLength(3);
+    expect(plugin.entities).toEqual([MatterConnection]);
+    expect(plugin.auditDomains).toEqual([MATTER_AUDIT_DOMAIN]);
   });
 
-  it('declares no permissions, frontend, migrations or SDK frontend dependency', () => {
+  it('declares exactly the permissions it uses, a migrations entry and a frontend entry', () => {
     const pkg = read('package.json');
     const manifest = read('plugin.json');
-    expect(pkg.attraccess.permissions).toEqual([]);
-    expect(manifest.permissions).toEqual([]);
-    expect(pkg.attraccess.frontend).toBeUndefined();
-    expect(pkg.attraccess.migrations).toBeUndefined();
-    expect(manifest.main.frontend).toBeUndefined();
-    expect(pkg.peerDependencies).toEqual({ '@attraccess/plugins-backend-sdk': '^1.9.0' });
+    expect(pkg.attraccess.permissions).toEqual(['DATABASE_ACCESS', 'MANAGE_SECRETS']);
+    expect(manifest.permissions).toEqual(['DATABASE_ACCESS', 'MANAGE_SECRETS']);
+    expect(pkg.attraccess.migrations).toBe('dist/migrations.js');
+    expect(manifest.main.migrations).toEqual({ directory: 'dist', entryPoint: 'migrations.js' });
+    expect(pkg.attraccess.frontend).toBe('frontend/remoteEntry.js');
+    expect(manifest.main.frontend).toMatchObject({ entryPoint: 'remoteEntry.js' });
+  });
+
+  it('declares an audit policy with no free-form detail fields', () => {
+    const details = MATTER_AUDIT_DOMAIN.actions.flatMap((action) => Object.values(action.details ?? {}));
+    expect(details.every((field) => field.type === 'boolean' || field.oneOf !== undefined)).toBe(true);
   });
 });
 
@@ -32,6 +43,7 @@ describe('host-version declarations', () => {
   });
 
   it('use the plugin release listed in the table', () => {
+    expect(combination.plugin).toBe('0.2.0-alpha.0');
     expect(read('package.json').version).toBe(combination.plugin);
     expect(read('plugin.json').version).toBe(combination.plugin);
   });

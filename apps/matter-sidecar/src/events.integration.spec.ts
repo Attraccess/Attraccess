@@ -224,7 +224,8 @@ describe('event stream', () => {
       socket.on('close', () => resolve(text));
     });
     socket.write(
-      'GET // HTTP/1.1\r\nhost: 127.0.0.1\r\nconnection: Upgrade\r\nupgrade: websocket\r\n' +
+      `GET // HTTP/1.1\r\nhost: 127.0.0.1\r\nauthorization: ${validHeaders().authorization}\r\n` +
+        'connection: Upgrade\r\nupgrade: websocket\r\n' +
         'sec-websocket-version: 13\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n',
     );
     expect(await response).toMatch(/^HTTP\/1\.1 404 not_found/);

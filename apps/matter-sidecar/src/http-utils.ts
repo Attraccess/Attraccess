@@ -11,17 +11,32 @@ export function correlationIdFrom(headers: IncomingHttpHeaders): string {
   return typeof value === 'string' && UUID.test(value) ? value.toLowerCase() : randomUUID();
 }
 
-function hostnameOf(host: string | undefined): string | null {
+/**
+ * The host name of a `Host` header, lowercase and without the port or a trailing dot, in the form
+ * `normaliseAllowedHost` gives allow-list entries. An unbracketed value with several colons is not a valid Host and is
+ * kept whole, so it matches nothing.
+ */
+export function hostnameOf(host: string | undefined): string | null {
   if (!host) return null;
-  const end = host.startsWith('[') ? host.indexOf(']') + 1 : host.indexOf(':');
-  return (end > 0 ? host.slice(0, end) : host).toLowerCase();
+  const lower = host.toLowerCase();
+  let end = lower.length;
+  if (lower.startsWith('[')) end = lower.indexOf(']') + 1 || end;
+  else if (lower.indexOf(':') === lower.lastIndexOf(':') && lower.includes(':')) end = lower.indexOf(':');
+  return lower.slice(0, end).replace(/\.$/, '');
 }
 
-/** The sidecar is not a browser API: any Origin, and any Host that is not loopback, is refused. */
-export function checkLocalAccess(headers: IncomingHttpHeaders): string | null {
+/**
+ * The sidecar is not a browser API: any Origin is refused, and so is any Host that is neither loopback nor on the
+ * operator's allow-list. `allowedHosts` must hold normalised entries (see `normaliseAllowedHost`).
+ */
+export function checkLocalAccess(headers: IncomingHttpHeaders, allowedHosts: readonly string[] = []): string | null {
   if (headers.origin !== undefined) return 'Browser-origin requests are not accepted by the Matter sidecar.';
   const hostname = hostnameOf(headers.host);
-  if (hostname === null || !ALLOWED_HOSTNAMES.has(hostname)) return 'The Matter sidecar only answers on loopback.';
+  if (hostname === null) return 'The Matter sidecar needs a Host header.';
+  // The allow-list entries are already normalised by loadConfig, so they are compared as they are.
+  if (!ALLOWED_HOSTNAMES.has(hostname) && !allowedHosts.includes(hostname)) {
+    return 'This Host name is not allowed. The operator must list it in MATTER_SIDECAR_ALLOWED_HOSTS.';
+  }
   return null;
 }
 

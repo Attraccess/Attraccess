@@ -10,6 +10,7 @@
 // plugin can bundle its backend and its migrations entry in a single invocation
 // without each clobbering the other's output dir. Examples:
 //   node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js
+//   node ../scripts/esbuild-backend.mjs --tsconfig backend/tsconfig.json --entry ... --outfile ...   (bundles workspace libs)
 //   node ../scripts/esbuild-backend.mjs \
 //     --entry backend/plugin.ts     --outfile package/dist/index.js \
 //     --entry backend/migrations.ts --outfile package/dist/migrations.js
@@ -28,10 +29,17 @@ const HOST_SHARED_EXTERNALS = [
   '@attraccess/plugins-backend-sdk',
 ];
 
+// Optional native accelerators of `ws`. It requires them inside a try/catch and falls back to plain JavaScript, so
+// they must stay unresolved instead of failing the bundle.
+const OPTIONAL_NATIVE_EXTERNALS = ['bufferutil', 'utf-8-validate'];
+
 const { values } = parseArgs({
   options: {
     entry: { type: 'string', multiple: true },
     outfile: { type: 'string', multiple: true },
+    // A tsconfig whose `paths` resolve workspace libraries that must be bundled (such as @attraccess/matter-contract).
+    // Without it the bundler uses an inline config with decorators only and resolves no path aliases.
+    tsconfig: { type: 'string' },
   },
 });
 
@@ -39,7 +47,9 @@ const entries = values.entry ?? [];
 const outfiles = values.outfile ?? [];
 
 if (entries.length === 0 || entries.length !== outfiles.length) {
-  console.error('usage: esbuild-backend.mjs --entry <file> --outfile <file> [--entry <file> --outfile <file> ...]');
+  console.error(
+    'usage: esbuild-backend.mjs [--tsconfig <file>] --entry <file> --outfile <file> [--entry <file> --outfile <file> ...]',
+  );
   process.exit(1);
 }
 
@@ -66,8 +76,10 @@ for (const { entry, outfile } of pairs) {
     format: 'cjs',
     target: 'es2021',
     outfile,
-    external: HOST_SHARED_EXTERNALS,
-    tsconfigRaw: { compilerOptions: { experimentalDecorators: true, emitDecoratorMetadata: true } },
+    external: [...HOST_SHARED_EXTERNALS, ...OPTIONAL_NATIVE_EXTERNALS],
+    ...(values.tsconfig
+      ? { tsconfig: resolve(process.cwd(), values.tsconfig) }
+      : { tsconfigRaw: { compilerOptions: { experimentalDecorators: true, emitDecoratorMetadata: true } } }),
     logLevel: 'info',
   });
 }

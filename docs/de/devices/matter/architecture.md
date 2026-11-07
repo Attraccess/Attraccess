@@ -1,12 +1,12 @@
 # Matter: Architektur
 
-> **Nur Grundlage.** Dieses Release legt das Fundament für Matter-Unterstützung: einen versionierten Vertrag (Contract), einen eigenständigen Sidecar mit Health-, Versions- und Event-Stream-Endpunkten und ein minimales installierbares Plugin. Es kann Geräte **nicht** in Betrieb nehmen (Commissioning), nicht auflisten, keine Befehle senden, Thread nicht verwalten und keine Firmware-Updates einspielen. Planen Sie keine Gerätesteuerung damit. Diese Funktionen folgen in späteren Tickets (siehe [Wie es weitergeht](#wie-es-weitergeht)).
+> **Nur Konnektivität.** Dieses Release legt das Fundament für Matter-Unterstützung: einen versionierten Vertrag (Contract), einen eigenständigen Sidecar mit Health-, Versions- und Event-Stream-Endpunkten und ein Plugin, das sich sicher mit ihm verbindet. Es kann Geräte **nicht** in Betrieb nehmen (Commissioning), nicht auflisten, keine Befehle senden, Thread nicht verwalten und keine Firmware-Updates einspielen. Planen Sie keine Gerätesteuerung damit. Diese Funktionen folgen in späteren Tickets (siehe [Wie es weitergeht](#wie-es-weitergeht)).
 
 ## Plugin plus Sidecar
 
 Matter wird in zwei zusammenarbeitenden Teilen ausgeliefert, nicht als eingebauter Attraccess-Code:
 
-- **Das Matter-Plugin** (`apps/plugins/matter`) ist ein installierbares Attraccess-Plugin. In diesem Release besteht es nur aus dem Backend und ist leer: keine Routen, keine Berechtigungen, keine Datenbankmigrationen, kein Frontend und **keine Verbindung zum Sidecar**.
+- **Das Matter-Plugin** (`apps/plugins/matter`) ist ein installierbares Attraccess-Plugin. In diesem Release verbindet es sich mit dem Sidecar und bietet eine Admin-Seite (**Geräte → Matter**) für die Verbindungseinstellungen. Es hat noch keine Gerätefunktionen. Es braucht die Berechtigungen `DATABASE_ACCESS` und `MANAGE_SECRETS`.
 - **Der Matter-Sidecar** (`apps/matter-sidecar`) ist ein eigener Node.js-Prozess. Nur er lädt [matter.js](https://github.com/project-chip/matter.js) (`@matter/main`, auf ein exaktes Release festgelegt). Er startet und läuft ohne die Attraccess-API, ohne Datenbank, ohne Matter-Fabric und ohne in Betrieb genommenes Gerät.
 
 Eine gemeinsame Bibliothek, `libs/matter-contract`, definiert jede Anfrage, Antwort und jedes Event genau einmal, mit Laufzeitvalidierung (Zod). Sidecar und Plugin verwenden sie beide. Sie importiert niemals matter.js, Core-Code, Datenbank-Entitäten oder Plugins.
@@ -19,32 +19,32 @@ Es gibt genau **eine** Wire-Protokollversion: `1`. Es gibt keine Schemas früher
 
 Eine passende Wire-Version genügt nicht. Attraccess, das Matter-Plugin und der Sidecar müssen eine **unterstützte Kombination** bilden. Die einzige maßgebliche Tabelle ist `COMPATIBILITY_TABLE` in `libs/matter-contract/src/compatibility.ts`:
 
-| Komponente | Unterstützt |
-| --- | --- |
-| Wire-Version | `1` |
-| Attraccess | `^1.11.0` (Vorabversionen einer passenden Version werden akzeptiert) |
-| Matter-Plugin | genau `0.1.0-alpha.0` |
-| Matter-Sidecar | genau `0.1.0-alpha.0` |
-| matter.js | genau `0.18.0` (Plugin und Sidecar teilen sich ein Release) |
+| Komponente     | Unterstützt                                                          |
+| -------------- | -------------------------------------------------------------------- |
+| Wire-Version   | `1`                                                                  |
+| Attraccess     | `^1.11.0` (Vorabversionen einer passenden Version werden akzeptiert) |
+| Matter-Plugin  | genau `0.2.0-alpha.0`                                                |
+| Matter-Sidecar | genau `0.2.0-alpha.0`                                                |
+| matter.js      | genau `0.18.0` (Plugin und Sidecar teilen sich ein Release)          |
 
 `attraccess.host` (`package.json`) und `attraccessVersion.min` (`plugin.json`) des Plugins werden aus derselben Tabelle abgeleitet; ein Test prüft, dass sie übereinstimmen. Jedes neue Plugin- oder Sidecar-Release braucht eine Tabellenaktualisierung, sonst lehnt der Sidecar es ab. Der Attraccess-Bereich ist bewusst ein Bereich: Ein neues Attraccess-1.x-Release erfordert nicht automatisch ein Sidecar-Release.
 
-Release-Header sind Kompatibilitätsinformationen, **keine Authentifizierung**.
+Release-Header sind Kompatibilitätsinformationen, **keine Authentifizierung**; die Authentifizierung ist das Service-Token (siehe [Sicherheitsmodell](#sicherheitsmodell)). Ein nicht passender Sidecar braucht ein Update oder Downgrade.
 
 ## Versionierter REST- und WebSocket-Vertrag
 
 Der Vertrag umfasst acht Funktionsfamilien: `health`, `fabric`, `commissioning`, `inventory`, `commands`, `subscriptions`, `thread` und `ota`. Operationen für noch nicht implementierte Familien sind bereits definiert und prüfen ihre Eingaben, spätere Tickets müssen also nur das Verhalten ergänzen.
 
-Unversionierte Endpunkte (`/health/live`, `/health/ready`, `/version`) brauchen keine Header, damit Betreiber Probleme untersuchen können. Alles unter `/v1/` braucht diese Header:
+Unversionierte Endpunkte (`/health/live`, `/health/ready`, `/version`) brauchen keine Kompatibilitäts-Header, damit Betreiber Probleme untersuchen können (außer den beiden Health-Probes brauchen sie weiterhin das Token). Alles unter `/v1/` braucht das Token und diese Header:
 
-| Header | Bedeutung |
-| --- | --- |
-| `X-Matter-Wire-Version` | `1` |
-| `X-Attraccess-Version` | das laufende Attraccess-Release |
-| `X-Matter-Plugin-Version` | das Plugin-Release |
+| Header                     | Bedeutung                                      |
+| -------------------------- | ---------------------------------------------- |
+| `X-Matter-Wire-Version`    | `1`                                            |
+| `X-Attraccess-Version`     | das laufende Attraccess-Release                |
+| `X-Matter-Plugin-Version`  | das Plugin-Release                             |
 | `X-Matter-Sidecar-Version` | das Sidecar-Release, das der Aufrufer erwartet |
 
-Optional: `X-Correlation-Id` (eine UUID; sonst wird eine erzeugt) und `X-Request-Deadline-Ms`, das die konfigurierte Frist nur verkürzen, nie verlängern kann. Unbekannte versionierte Pfade (zum Beispiel `/v2/...`) liefern 404 und fallen nie auf `/v1` zurück.
+Dazu `Authorization: Bearer <token>` (Pflicht) und optional `X-Correlation-Id` (eine UUID; sonst wird eine erzeugt) und `X-Request-Deadline-Ms`, das die konfigurierte Frist nur verkürzen, nie verlängern kann. Unbekannte versionierte Pfade (zum Beispiel `/v2/...`) liefern 404 und fallen nie auf `/v1` zurück.
 
 Bezeichner, die Matter als 64-Bit definiert (Node- und Fabric-IDs), werden als Dezimalzeichenfolgen übertragen. matter.js-Objekte verlassen den Prozess nie.
 
@@ -52,19 +52,20 @@ Bezeichner, die Matter als 64-Bit definiert (Node- und Fabric-IDs), werden als D
 
 Jeder Fehler nutzt einen Umschlag: `{ "error": { "code", "message", "correlationId", "retryable", "outcome"?, "details"? } }`.
 
-| Code | HTTP | Bedeutung |
-| --- | --- | --- |
-| `validation_failed` | 400 | Ungültige Pfadparameter oder ungültiger Body (zu WebSocket-Nachrichten siehe [Events](#events-reihenfolge-wiedergabe-und-duplikate)) |
-| `forbidden_origin` | 403 | Browser-`Origin` oder `Host`, der nicht Loopback ist |
-| `not_found` / `method_not_allowed` | 404 / 405 | Unbekannter Pfad oder unbekannte Methode |
-| `incompatible_release` | 409 | Nicht unterstützte Release-Kombination |
-| `reconciliation_required` | 409 | Reserviert; in diesem Release kommt eine unmögliche Wiedergabe als WebSocket-Nachricht (siehe unten) |
-| `payload_too_large` | 413 | Body über dem Limit |
-| `unsupported_wire_version` | 426 | Wire-Version fehlt, ist fehlerhaft oder nicht `1` |
-| `internal_error` | 500 | Unerwarteter Fehler; es wird kein interner Text zurückgegeben |
-| `unsupported_capability` | 501 | Die Familie ist definiert, aber nicht verfügbar |
-| `sidecar_unavailable` | 503 | Der Sidecar fährt herunter oder (nur WebSocket) es sind bereits 64 Event-Stream-Clients verbunden |
-| `timeout` | 504 | Die Frist der Anfrage ist abgelaufen |
+| Code                               | HTTP      | Bedeutung                                                                                                                            |
+| ---------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `validation_failed`                | 400       | Ungültige Pfadparameter oder ungültiger Body (zu WebSocket-Nachrichten siehe [Events](#events-reihenfolge-wiedergabe-und-duplikate)) |
+| `unauthorized`                     | 401       | Fehlendes, fehlerhaftes oder falsches Service-Token (wird vor jeder Versionsprüfung geprüft)                                         |
+| `forbidden_origin`                 | 403       | Browser-`Origin`, oder ein `Host`, der weder Loopback noch in `MATTER_SIDECAR_ALLOWED_HOSTS` ist                                     |
+| `not_found` / `method_not_allowed` | 404 / 405 | Unbekannter Pfad oder unbekannte Methode                                                                                             |
+| `incompatible_release`             | 409       | Nicht unterstützte Release-Kombination                                                                                               |
+| `reconciliation_required`          | 409       | Reserviert; in diesem Release kommt eine unmögliche Wiedergabe als WebSocket-Nachricht (siehe unten)                                 |
+| `payload_too_large`                | 413       | Body über dem Limit                                                                                                                  |
+| `unsupported_wire_version`         | 426       | Wire-Version fehlt, ist fehlerhaft oder nicht `1`                                                                                    |
+| `internal_error`                   | 500       | Unerwarteter Fehler; es wird kein interner Text zurückgegeben                                                                        |
+| `unsupported_capability`           | 501       | Die Familie ist definiert, aber nicht verfügbar                                                                                      |
+| `sidecar_unavailable`              | 503       | Der Sidecar fährt herunter oder (nur WebSocket) es sind bereits 64 Event-Stream-Clients verbunden                                    |
+| `timeout`                          | 504       | Die Frist der Anfrage ist abgelaufen                                                                                                 |
 
 `GET /v1/capabilities` listet jede Familie mit `defined`, `available` und, falls nicht verfügbar, einem `reason`. In diesem Release ist nur `health` verfügbar. Eine Anfrage an eine nicht verfügbare Familie wird validiert und dann mit `unsupported_capability` beantwortet. Platzhalter täuschen nie Erfolg vor: kein vorgetäuschtes Commissioning, kein leeres Inventar, das als verbindlich dargestellt wird, kein vorgetäuscht abgeschlossener Befehl.
 
@@ -85,13 +86,42 @@ Jedes Event trägt Event-ID, Schemaversion, Zeitstempel, Korrelationskontext, St
 - **Langsame Clients.** Jeder Client hat ein Warteschlangenbudget, das auch Fehlernachrichten und die Wiedergabe nach `resume` zählt. Ein Client, der es überschreitet, wird mit Code 1013 geschlossen und aufgefordert, sich mit seinem letzten Cursor neu zu verbinden. Das Budget sollte größer sein als die Wiedergabe, die ein neu verbundener Client nachholen muss.
 - **Zu große Nachrichten.** Der WebSocket-Parser schließt sie mit Code 1009 (message too big), bevor Anwendungscode sie sieht.
 
-## Sicherheitsgrenzen
+## Sicherheitsmodell
 
-- Der Sidecar bindet **nur an Loopback** (`127.0.0.1`). Es gibt keine Option für eine entfernte Bindung.
-- Er weist jede Anfrage und jedes Upgrade mit einem Browser-`Origin`-Header oder einem Nicht-Loopback-`Host` ab und bietet kein CORS. Browser sprechen mit Attraccess, nie mit dem Sidecar.
-- Er **authentifiziert Aufrufer noch nicht**. Jeder lokale Prozess kann ihn erreichen. Dienstauthentifizierung, TLS und Proxy-Unterstützung folgen mit [ATT-1001](https://linear.app/attraccess/issue/ATT-1001). **Setzen Sie den Sidecar nicht von außen erreichbar ein.**
+Der Sidecar steuert physische Anlagen und vertraut deshalb einem Aufrufer nie allein wegen seiner Netzwerkposition.
+
+- **Dienstauthentifizierung.** Jede Anfrage und jedes WebSocket-Upgrade muss `Authorization: Bearer <token>` tragen. Ausgenommen sind nur `GET /health/live` und `GET /health/ready`: Sie bleiben für Container-Probes anonym und verraten keine Versionen. `/version`, alles unter `/v1/` und das Upgrade auf `/v1/events` brauchen das Token (`/version` braucht weiterhin keine Kompatibilitäts-Header).
+- **Das Token** besteht aus 32–512 druckbaren ASCII-Zeichen (erzeugen Sie es mit `openssl rand -base64 48`). Es kommt aus `MATTER_SIDECAR_AUTH_TOKEN` oder `MATTER_SIDECAR_AUTH_TOKEN_FILE`; ein zweites Token (`…_PREVIOUS`) wird während einer Rotation zusätzlich akzeptiert. Ohne Token startet der Sidecar nicht. Tokens werden in konstanter Zeit verglichen. Eine fehlgeschlagene Authentifizierung wird auf Warn-Ebene protokolliert (ratenbegrenzt), nie mit dem Token oder dem Header.
+- **Prüfreihenfolge.** Der Sidecar prüft in dieser Reihenfolge: (1) `Origin` und `Host` (403), (2) **Authentifizierung (401)**, (3) Herunterfahren (503, für `/v1` und den Event-Stream), (4) Wire-Version und Release-Kombination (426 / 409), (5) das WebSocket-Client-Limit (503). Ein nicht authentifizierter Aufrufer erfährt daher nichts über Versionen oder die Kompatibilitätstabelle, nicht einmal, ob ein Pfad existiert.
+- **Browser.** Eine Anfrage mit Browser-`Origin`-Header wird immer mit 403 abgewiesen, und der Sidecar bietet kein CORS. Browser sprechen mit Attraccess, nie mit dem Sidecar.
+- **Bind-Adresse und Host-Allowlist.** Standardmäßig bindet der Sidecar an `127.0.0.1` und akzeptiert nur Loopback-`Host`-Namen. `MATTER_SIDECAR_BIND_HOST` wählt ausdrücklich eine andere Adresse; dann ist `MATTER_SIDECAR_ALLOWED_HOSTS` (kommagetrennte Liste der Hostnamen, die Clients verwenden) Pflicht, und jeder andere `Host` wird mit 403 abgewiesen.
+- **TLS.** `MATTER_SIDECAR_TLS_CERT_FILE` und `MATTER_SIDECAR_TLS_KEY_FILE` (beide oder keine) lassen den Sidecar HTTPS und WSS sprechen. Eine Nicht-Loopback-Bindung **ohne** TLS wird beim Start abgelehnt, außer `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true` ist ausdrücklich gesetzt. Das ist nur für ein vertrauenswürdiges Container-Netz oder einen TLS-terminierenden Reverse-Proxy gedacht; der Sidecar protokolliert dann eine Warnung. Zertifikate werden beim Start gelesen; eine Erneuerung braucht einen Neustart. Gegenseitiges TLS (mTLS) wird nicht unterstützt.
 - Commissioning-Geheimnisse (Setup-Codes), Thread-Dataset-Material und Fabric-Geheimnisse erscheinen nur in Anfragen, nie in Antworten, Events, Health-Ausgaben oder Logs.
 - Ein generisches Matter-„On“ kann das Bedienen einer Maschine nicht autorisieren. Entriegeln, Aufschließen oder Einschalten von Geräten erfordert künftig eine eigene Berechtigung plus ausdrückliche Bestätigung. Die Durchsetzung gehört zu den späteren Feature-Tickets.
+
+## Das Plugin verbindet sich mit dem Sidecar
+
+Ein Administrator richtet die Verbindung in der Weboberfläche ein (**Geräte → Matter**): Sidecar-URL, Service-Token und optional ein CA-Zertifikat. Diese CA wird dem Standard-Truststore von Node.js hinzugefügt (den mitgelieferten Stammzertifikaten plus etwaigen `NODE_EXTRA_CA_CERTS`) und ersetzt ihn nicht. Die URL darf `http` oder `https` sein und ein Pfadpräfix für einen Reverse-Proxy tragen (`https://host/prefix` führt zu `/prefix/v1/...`). Das Token wird vom Host verschlüsselt gespeichert (`MANAGE_SECRETS`), in einer Plugin-Tabelle (`DATABASE_ACCESS`), nie wieder angezeigt und erscheint nie in Logs, Fehlern, Statusantworten oder Audit-Einträgen. Nur Benutzer mit der Berechtigung `system.plugins.manage` können die Einstellungen lesen oder ändern (eine eigene Matter-Berechtigung folgt mit [ATT-1003](https://linear.app/attraccess/issue/ATT-1003)). Jede Änderung wird ohne Geheimnisse im Audit-Log festgehalten.
+
+Das Plugin startet die Verbindung, ohne auf den Sidecar zu warten. **Ein fehlender, neu startender, ablehnender oder inkompatibler Sidecar hindert weder Attraccess noch das Plugin am Laden**; stattdessen zeigt das Plugin einen eindeutigen Zustand:
+
+| Zustand                      | Bedeutung                                                                                                                                                                                                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `not_configured`             | Noch keine URL und kein Token gespeichert.                                                                                                                                                                                                                         |
+| `connecting`                 | Ein Verbindungsversuch läuft.                                                                                                                                                                                                                                      |
+| `connected`                  | Der Sidecar antwortet, die Kombination wird unterstützt und der Event-Stream ist offen.                                                                                                                                                                            |
+| `degraded` / `unavailable`   | Verbindung verweigert, DNS-Fehler, Netzwerkfehler, Zeitüberschreitung oder 503. Wird automatisch wiederholt.                                                                                                                                                       |
+| `degraded` / `unauthorized`  | Der Sidecar antwortet 401. Prüfen Sie das Token.                                                                                                                                                                                                                   |
+| `degraded` / `incompatible`  | 409 oder 426, oder das Attraccess- oder Plugin-Release steht nicht in der Tabelle (oder Attraccess meldet seine Version nicht). Wechseln Sie auf eine unterstützte Kombination.                                                                                    |
+| `degraded` / `misconfigured` | Ungültige URL oder ungültiges Pfadpräfix, ungültiges CA-Zertifikat oder TLS-Fehler, oder ein `Host`-Name, den der Sidecar ablehnt (tragen Sie ihn in `MATTER_SIDECAR_ALLOWED_HOSTS` ein). Die Zertifikatsprüfung ist immer aktiv; sie lässt sich nicht abschalten. |
+
+**Wiederverbinden.** Nach einem Fehler versucht das Plugin es mit exponentiellem Backoff und vollem Jitter erneut (Basis 1 s, Obergrenze 60 s). Der Backoff beginnt von vorn, wenn eine Verbindung 30 Sekunden stabil war. `unauthorized`, `incompatible` und `misconfigured` wiederholen mit der Obergrenze von 60 s. Das Speichern oder Entfernen der Einstellungen verbindet sofort neu, ohne Attraccess-Neustart. Anfragen werden **nie automatisch wiederholt**; nur die Verbindungsprüfung (`/version`, `/v1/capabilities`) wiederholt sich.
+
+**Event-Stream.** Das Plugin sendet nach jedem Wiederverbinden `resume` mit seinem letzten Cursor, verwirft Events, deren ID es schon ausgeliefert hat (begrenzte Menge von 2.000 IDs) und erkennt eine Sequenzlücke innerhalb einer Stream-Instanz. Eine neue Stream-Instanz ohne Cursor ist ein Neustart, keine Lücke. Bei `reconciliation-required` (abgelaufener, verdrängter, zukünftiger oder aus einem früheren Lauf stammender Cursor) oder bei einer Lücke verwirft es Cursor und gesehene IDs, meldet den Matter-Funktionen im Plugin „Abgleich erforderlich“ und verbindet frisch neu; nichts wird stillschweigend übersprungen. Es sendet alle 30 Sekunden ein Ping und verbindet neu, wenn zwei Intervalle lang gar nichts ankommt – das erkennt halb offene Verbindungen. Nach einem 1013-Close (langsamer Client) verbindet es mit dem letzten Cursor neu.
+
+**Anfragen** tragen die Wire-Version, `X-Attraccess-Version`, `X-Matter-Plugin-Version`, `X-Matter-Sidecar-Version` (das Sidecar-Release, das die Tabelle dem Plugin zuordnet), `X-Correlation-Id` und `X-Request-Deadline-Ms`. Antworten werden gegen den Vertrag validiert. Eine Zeitüberschreitung bei einer physischen Operation wird als `uncertain` gemeldet.
+
+**Eine Wire-Version.** Es gibt keinen Fallback und keine Unterstützung früherer Versionen. Ein Sidecar mit anderer Version oder anderem Release **braucht ein Update oder Downgrade auf die unterstützte Kombination**.
 
 ## Erzeugte Vertragsdokumente
 
@@ -99,7 +129,6 @@ Jedes Event trägt Event-ID, Schemaversion, Zeitstempel, Korrelationskontext, St
 
 ## Wie es weitergeht
 
-- [ATT-1001](https://linear.app/attraccess/issue/ATT-1001): Plugin-zu-Sidecar-Client, Authentifizierung, TLS, wiederverbindender Konsument.
 - [ATT-1000](https://linear.app/attraccess/issue/ATT-1000): Produktives Packaging und Deployment.
 - [ATT-998](https://linear.app/attraccess/issue/ATT-998): Fabric-Persistenz, verschlüsseltes Backup und Wiederherstellung.
 - Spätere Matter-Feature-Tickets: Commissioning, Geräteinventar, Befehle, Subscriptions, Thread, OTA, Berechtigungen und Audit. Dass ihre Vertragsformen hier definiert sind, liefert diese Funktionen nicht.

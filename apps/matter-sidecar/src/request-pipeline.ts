@@ -1,6 +1,7 @@
 import {
   HEADER_REQUEST_DEADLINE,
   MAX_REQUEST_DEADLINE_MS,
+  OPERATIONS,
   findOperation,
   type OperationId,
   type TypedOperation,
@@ -9,6 +10,7 @@ import {
 } from '@attraccess/matter-contract';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { versionedRefusal, type RunningReleases } from './admission';
+import { UNAUTHORIZED_MESSAGE, type TokenAuthenticator } from './auth';
 import type { SidecarConfig } from './config';
 import {
   BodyTooLargeError,
@@ -37,10 +39,16 @@ export type PipelineDeps = {
   config: SidecarConfig;
   running: RunningReleases;
   logger: Logger;
+  auth: TokenAuthenticator;
   isDraining: () => boolean;
   builtIns: Partial<Record<OperationId, (correlationId: string) => { status: number; body: unknown }>>;
   features: FeatureHandlers;
 };
+
+/** The probes container platforms call without credentials. They reveal no versions. */
+const ANONYMOUS_OPERATIONS: ReadonlySet<string> = new Set(
+  OPERATIONS.filter((operation) => operation.anonymous).map((operation) => operation.id),
+);
 
 class DeadlineError extends Error {}
 
@@ -182,10 +190,17 @@ async function respond(
 
 export async function handleRequest(req: IncomingMessage, res: ServerResponse, deps: PipelineDeps): Promise<void> {
   const correlationId = correlationIdFrom(req.headers);
-  const denied = checkLocalAccess(req.headers);
+  // Check order: origin/host (403), authentication (401), draining (503), release admission (426/409).
+  const denied = checkLocalAccess(req.headers, deps.config.allowedHosts);
   if (denied) return sendError(res, { code: 'forbidden_origin', message: denied }, correlationId, true);
   const path = requestPath(req.url);
   const route = path === null ? ({ kind: 'not-found' } as const) : findOperation(req.method ?? 'GET', path);
+  // Only the container probes are anonymous. Everything else, including unknown paths, needs the token first, so an
+  // unauthenticated caller learns nothing about routes or versions.
+  const anonymous = route.kind === 'match' && ANONYMOUS_OPERATIONS.has(route.match.operation.id);
+  if (!anonymous && deps.auth.check(req.headers, req.socket.remoteAddress)) {
+    return sendError(res, { code: 'unauthorized', message: UNAUTHORIZED_MESSAGE }, correlationId, true);
+  }
   if (route.kind === 'not-found') return sendError(res, { code: 'not_found', message: 'Unknown path.' }, correlationId);
   if (route.kind === 'method-not-allowed') {
     return sendError(res, { code: 'method_not_allowed', message: 'Method not allowed.' }, correlationId);

@@ -135,7 +135,10 @@ nennt.
 | `ACCESS_HOOKS` | `preStartHook` und `sessionEndHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
-keine Berechtigung. Eine unbekannte Berechtigung führt dazu, dass das Plugin
+keine Berechtigung. Dasselbe gilt für `context.hostVersion`: die Version des
+laufenden Attraccess-Hosts, gegen die auch die Plugin-Kompatibilität geprüft
+wird. Das Feld ist optional – Hosts vor Version 1.11.0 setzen es nicht, ein
+Plugin, das es braucht, muss `undefined` behandeln. Eine unbekannte Berechtigung führt dazu, dass das Plugin
 nicht geladen wird.
 
 Einige Hinweise zur Grenze:
