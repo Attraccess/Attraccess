@@ -67,6 +67,16 @@ export interface PluginResourceAccessContext {
    */
   canMaintain(principal: PluginAccessPrincipal, resourceId: number): Promise<boolean>;
 
+  /**
+   * Whether the user may see WHO is using the resource: the same rule core applies to the current user's name in
+   * the resource UI and API (`full` activity access). `resources.update` and `resources.access.manage` holders,
+   * people introduced to the machine (or its introducers/maintainers) and, when the instance shows activity to
+   * everyone, every reader qualify. Machines whose activity is hidden from the user, and unknown users or
+   * resources, answer `false`. A plugin that shows a person's name next to a machine (for example who holds a
+   * reservation) should follow this answer instead of keeping its own rule.
+   */
+  canSeeUsageAttribution(principal: PluginAccessPrincipal, resourceId: number): Promise<boolean>;
+
   /** Whether the user holds the RBAC permission (e.g. `resources.update`), limited to a request's scope. */
   hasPermission(principal: PluginAccessPrincipal, permission: string): Promise<boolean>;
 

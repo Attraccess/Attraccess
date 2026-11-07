@@ -60,6 +60,7 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
     resourceAccess: {
       canStart: jest.fn(async () => ({ allowed: true, requiresSupervision: false, supervisionAllowed: false })),
       canMaintain: jest.fn(async () => true),
+      canSeeUsageAttribution: jest.fn(async () => true),
       hasPermission: jest.fn(async () => true),
       listResourceIdsIntroduced: jest.fn(async () => [1]),
       listResourceIdsMaintained: jest.fn(async () => [1]),

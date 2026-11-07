@@ -6,6 +6,7 @@ import { PluginEmailService } from '../../email/plugin-email.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { ResourceUsageService } from '../../resources/usage/sessions/resource-usage.service';
+import { ResourceActivityVisibilityService } from '../../resources/usage/authorization/resource-activity-visibility.service';
 import { RbacService } from '../../users-and-auth/rbac/rbac.service';
 import { createPluginNotificationsContext } from './plugin-notifications';
 import { createResourceAccessContext } from './resource-access';
@@ -35,6 +36,7 @@ export function createHostResourceAccessContext(host: PluginHostRefs): PluginRes
     usage: host.get(ResourceUsageService),
     maintenance: host.get(ResourceMaintenanceService),
     rbac: host.get(RbacService),
+    visibility: host.get(ResourceActivityVisibilityService),
     findUser: (userId) =>
       host
         .dataSource()

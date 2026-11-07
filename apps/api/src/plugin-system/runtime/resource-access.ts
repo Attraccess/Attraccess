@@ -7,6 +7,7 @@ import type {
   PluginMaintenanceWindow,
   PluginResourceAccessContext,
 } from '@attraccess/plugins-backend-sdk';
+import type { ResourceActivityVisibilityService } from '../../resources/usage/authorization/resource-activity-visibility.service';
 import type { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import type { ResourceUsageService } from '../../resources/usage/sessions/resource-usage.service';
 import type { RbacService } from '../../users-and-auth/rbac/rbac.service';
@@ -22,6 +23,7 @@ export interface ResourceAccessDeps {
     'canManageMaintenance' | 'getMaintenanceManagedResourceIds' | 'findOverlappingMaintenances'
   >;
   rbac: Pick<RbacService, 'getEffectivePermissions'>;
+  visibility: Pick<ResourceActivityVisibilityService, 'resolve'>;
   findUser(userId: number): Promise<User | null>;
   findResource(resourceId: number): Promise<Pick<Resource, 'id' | 'supervisionMode'> | null>;
   listResourceIds(): Promise<number[]>;
@@ -76,6 +78,18 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
     async canMaintain(principal, resourceId) {
       const user = await resolveUser(principal);
       return user ? getDeps().maintenance.canManageMaintenance(user, resourceId) : false;
+    },
+
+    async canSeeUsageAttribution(principal, resourceId) {
+      const deps = getDeps();
+      const user = await resolveUser(principal);
+      if (!user) return false;
+      // The visibility rule reads the attached permission set; background callers get their full RBAC set.
+      const effectivePermissions =
+        'effectivePermissions' in user ? user.effectivePermissions : await deps.rbac.getEffectivePermissions(user.id);
+      return (
+        (await deps.visibility.resolve({ ...user, effectivePermissions } as AuthenticatedUser, resourceId)) === 'full'
+      );
     },
 
     async hasPermission(principal, permission) {

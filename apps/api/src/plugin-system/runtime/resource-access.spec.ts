@@ -2,6 +2,7 @@ import { ResourceMaintenance, ResourceUsage, SupervisionMode, User } from '@attr
 import { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import { createResourceUsageServiceFixture } from '../../resources/usage/sessions/fixtures/service.test-fixture';
 import { resetTestFixture } from '../../resources/usage/sessions/fixtures/setup.test-fixture';
+import { ResourceActivityVisibilityService } from '../../resources/usage/authorization/resource-activity-visibility.service';
 import { createResourceAccessContext, ResourceAccessDeps } from './resource-access';
 
 /**
@@ -18,6 +19,7 @@ describe('plugin resourceAccess', () => {
   let groupMaintainer: boolean;
   let maintenance: jest.Mocked<ResourceAccessDeps['maintenance']>;
   let access: ReturnType<typeof createResourceAccessContext>;
+  let activityVisibility: 'all' | 'introduced';
 
   beforeEach(async () => {
     await resetTestFixture(scope as never);
@@ -55,14 +57,68 @@ describe('plugin resourceAccess', () => {
       getMaintenanceManagedResourceIds: jest.fn(),
       findOverlappingMaintenances: jest.fn(),
     };
+    activityVisibility = 'introduced';
+    const visibility = new ResourceActivityVisibilityService(
+      { getResourceActivityVisibility: async () => activityVisibility } as never,
+      { find: async () => [...resources.values()] } as never,
+      scope.service,
+    );
     access = createResourceAccessContext(() => ({
       usage: scope.service,
+      visibility,
       maintenance,
       rbac: scope.mockRbacService as never,
       findUser: async (id) => (id === user.id ? user : null),
       findResource: async (id) => resources.get(id) ?? null,
       listResourceIds: async () => [...resources.keys()],
     }));
+  });
+
+  describe('canSeeUsageAttribution', () => {
+    it('follows core: full activity access sees who uses the machine', async () => {
+      permissions = new Set(['resources.read']);
+      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      await expect(access.canSeeUsageAttribution(user.id, 1)).resolves.toBe(true);
+    });
+
+    it('denies a reader who is not introduced to the machine', async () => {
+      permissions = new Set(['resources.read']);
+      await expect(access.canSeeUsageAttribution(user.id, 1)).resolves.toBe(false);
+    });
+
+    it('denies anonymous-only access on supervised machines (free or in use, no names)', async () => {
+      permissions = new Set(['resources.read']);
+      resources.set(1, { id: 1, supervisionMode: SupervisionMode.SUPERVISION_ALLOWED });
+      await expect(access.canSeeUsageAttribution(user.id, 1)).resolves.toBe(false);
+    });
+
+    it('denies a user without read access, who sees no activity at all (hidden resource)', async () => {
+      permissions = new Set();
+      scope.mockResourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      await expect(access.canSeeUsageAttribution(user.id, 1)).resolves.toBe(false);
+    });
+
+    it('allows managers and, in "all" mode, every reader', async () => {
+      permissions = new Set(['resources.update']);
+      await expect(access.canSeeUsageAttribution(user.id, 1)).resolves.toBe(true);
+      permissions = new Set(['resources.read']);
+      activityVisibility = 'all';
+      await expect(access.canSeeUsageAttribution(user.id, 1)).resolves.toBe(true);
+    });
+
+    it('applies an API token scope: a token without resources.read sees no names', async () => {
+      permissions = new Set(['resources.read', 'resources.update']);
+      await expect(
+        access.canSeeUsageAttribution({ id: user.id, effectivePermissions: ['resources.read'] }, 1),
+      ).resolves.toBe(false);
+      await expect(
+        access.canSeeUsageAttribution({ id: user.id, effectivePermissions: ['resources.update'] }, 1),
+      ).resolves.toBe(true);
+    });
+
+    it('answers false for unknown users', async () => {
+      await expect(access.canSeeUsageAttribution(404, 1)).resolves.toBe(false);
+    });
   });
 
   describe('canStart', () => {
@@ -229,6 +285,7 @@ describe('plugin resourceAccess', () => {
     expect(Object.keys(access).sort()).toEqual(
       [
         'canMaintain',
+        'canSeeUsageAttribution',
         'canStart',
         'getActiveSessions',
         'getMaintenanceWindows',
