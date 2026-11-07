@@ -3,6 +3,7 @@ import { Attractap } from '@attraccess/database-entities';
 import { createHash } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
+import { AttractapSecureImage } from '../dtos/firmware.dto';
 import { AttractapFirmwareService } from '../firmware.service';
 import { SecureBootKeyService } from './secure-boot-key.service';
 import { secureBootKeyDigest, signSecureBootImage, verifySecureBootImage } from './secure-boot-signer';
@@ -34,6 +35,17 @@ export class SecureImageService {
     private readonly keys: SecureBootKeyService,
   ) {}
 
+  /** The image must be the one the build described: matching hash and, for the app, the profile marker. */
+  private assertPackagedImage(image: AttractapSecureImage, kind: SecureImageKind, unsigned: Buffer): void {
+    const expected = kind === 'app' ? image.appSha256 : image.bootloaderSha256;
+    if (createHash('sha256').update(unsigned).digest('hex') !== expected) {
+      throw new ConflictException(`The packaged secure ${kind} image does not match its manifest`);
+    }
+    if (kind === 'app' && !unsigned.includes(image.profileMarker)) {
+      throw new ConflictException('The secure app does not carry the secure profile marker');
+    }
+  }
+
   async getSignedImage(
     firmwareName: string,
     variantName: string,
@@ -51,6 +63,7 @@ export class SecureImageService {
     if (!key) throw new NotFoundException('No signing key for this reader');
 
     const unsigned = readFileSync(kind === 'app' ? source.appPath : source.bootloaderPath);
+    this.assertPackagedImage(source.secureImage, kind, unsigned);
     const keyDigest = secureBootKeyDigest(key);
     const cachePath = join(
       this.cacheRoot,

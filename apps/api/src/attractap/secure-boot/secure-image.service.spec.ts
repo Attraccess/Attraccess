@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from 'crypto';
+import { createHash, generateKeyPairSync } from 'crypto';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -7,7 +7,13 @@ import { secureBootKeyDigest, verifySecureBootImage } from './secure-boot-signer
 
 jest.setTimeout(60_000);
 
+const MARKER = 'attractap-secure-profile-v1';
+const sha = (data: Buffer) => createHash('sha256').update(data).digest('hex');
+
 describe('SecureImageService', () => {
+  const appContent = Buffer.concat([Buffer.alloc(9000, 1), Buffer.from(MARKER)]);
+  const bootloaderContent = Buffer.alloc(3000, 2);
+  const manifestAppSha = sha(appContent);
   const root = mkdtempSync(join(tmpdir(), 'secure-image-'));
   const previousRoot = process.env.STORAGE_ROOT;
   const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 3072 });
@@ -21,7 +27,12 @@ describe('SecureImageService', () => {
       packaged
         ? {
             firmware: {},
-            secureImage: { secureVersion, profileMarker: 'attractap-secure-profile-v1' },
+            secureImage: {
+              secureVersion,
+              profileMarker: MARKER,
+              appSha256: manifestAppSha,
+              bootloaderSha256: sha(bootloaderContent),
+            },
             appPath: join(root, 'app.bin'),
             bootloaderPath: join(root, 'bootloader.bin'),
           }
@@ -35,8 +46,8 @@ describe('SecureImageService', () => {
   beforeAll(() => {
     process.env.STORAGE_ROOT = join(root, 'storage');
     mkdirSync(root, { recursive: true });
-    writeFileSync(join(root, 'app.bin'), Buffer.alloc(9000, 1));
-    writeFileSync(join(root, 'bootloader.bin'), Buffer.alloc(3000, 2));
+    writeFileSync(join(root, 'app.bin'), appContent);
+    writeFileSync(join(root, 'bootloader.bin'), bootloaderContent);
   });
   afterAll(() => {
     if (previousRoot === undefined) delete process.env.STORAGE_ROOT;
@@ -80,5 +91,23 @@ describe('SecureImageService', () => {
     await expect(service().getSignedImage('attractap', 'touch-v2', 'app', reader)).rejects.toThrow('No secure image');
     packaged = true;
     secureVersion = 1;
+  });
+
+  it('checks the manifest hash and the profile marker before signing', async () => {
+    const original = appContent;
+    writeFileSync(join(root, 'app.bin'), Buffer.concat([original, Buffer.from('x')])); // hash differs from the manifest
+    await expect(service().getSignedImage('attractap', 'touch-v2', 'app', reader)).rejects.toThrow('does not match');
+
+    const noMarkerContent = Buffer.alloc(9000, 1);
+    writeFileSync(join(root, 'app.bin'), noMarkerContent);
+    const unmarked = { ...firmware.getSecureImageSource().secureImage, appSha256: sha(noMarkerContent) };
+    const noMarker = new SecureImageService(
+      { getSecureImageSource: () => ({ ...firmware.getSecureImageSource(), secureImage: unmarked }) } as never,
+      keys as never,
+    );
+    await expect(noMarker.getSignedImage('attractap', 'touch-v2', 'app', reader)).rejects.toThrow('profile marker');
+
+    writeFileSync(join(root, 'app.bin'), original);
+    await expect(service().getSignedImage('attractap', 'touch-v2', 'app', reader)).resolves.toBeDefined();
   });
 });
