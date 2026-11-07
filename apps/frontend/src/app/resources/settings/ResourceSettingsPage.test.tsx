@@ -39,6 +39,7 @@ vi.mock('../../../components/settingsDirectory', () => ({
   SettingsDirectory: ({ groups }: { groups: { items: { key: string; content?: React.ReactNode }[] }[] }) =>
     groups[0].items[0].content,
 }));
+vi.mock('../../plugins/PluginSettingsSlots', () => ({ ResourceSettingsPluginSlot: () => null }));
 vi.mock('../editModal/tabs/shared', () => ({
   SharedDataTab: ({
     formData,

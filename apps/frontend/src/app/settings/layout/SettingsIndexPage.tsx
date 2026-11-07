@@ -15,6 +15,7 @@ import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useSettingsSections } from './useSettingsSections';
 import en from './en.json';
 import de from './de.json';
+import { AdminSettingsPluginSlot } from '../../plugins/PluginSettingsSlots';
 import { SettingsDirectory, type SettingsDirectoryGroup } from '../../../components/settingsDirectory';
 
 const sectionIcons = {
@@ -58,6 +59,10 @@ export function SettingsIndexPage() {
       <nav aria-label={t('navLabel')}>
         <SettingsDirectory groups={directoryGroups} searchLabel={t('search')} emptyMessage={t('noResults')} />
       </nav>
+
+      <div className="mt-6 flex flex-col gap-6 empty:hidden">
+        <AdminSettingsPluginSlot />
+      </div>
     </div>
   );
 }
