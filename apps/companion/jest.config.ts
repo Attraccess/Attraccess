@@ -8,5 +8,8 @@ module.exports = {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json', diagnostics: { ignoreCodes: [2305] } }],
   },
   moduleFileExtensions: ['ts', 'js'],
-  coverageDirectory: '../../coverage/apps/companion',
+  // Unit coverage feeds the project's crap-score target.
+  collectCoverage: true,
+  coverageReporters: ['json'],
+  coverageDirectory: '../../coverage/apps/companion/test',
 };

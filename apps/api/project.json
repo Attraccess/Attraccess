@@ -156,7 +156,7 @@
           "externalDependencies": ["jest"]
         }
       ],
-      "outputs": ["{workspaceRoot}/coverage/apps/api"],
+      "outputs": ["{workspaceRoot}/coverage/apps/api/test"],
       "options": {
         "jestConfig": "apps/api/jest.config.ts",
         "testMatch": [
@@ -182,8 +182,12 @@
         "{workspaceRoot}/monitoring/grafana/dashboards/**/*",
         "{workspaceRoot}/monitoring/prometheus/prometheus.yml",
         "{workspaceRoot}/coolify.docker-compose.yml",
-        { "env": "ALERTING_GRAFANA_VERSION" },
-        { "env": "ALERTING_REAL_TIME" },
+        {
+          "env": "ALERTING_GRAFANA_VERSION"
+        },
+        {
+          "env": "ALERTING_REAL_TIME"
+        },
         {
           "externalDependencies": ["jest", "testcontainers"]
         }
@@ -290,7 +294,8 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/api"
-      }
+      },
+      "dependsOn": ["test", "test-scripts"]
     },
     "seed-dev": {
       "executor": "nx:run-commands",
@@ -310,9 +315,9 @@
           "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
         }
       ],
-      "outputs": [],
+      "outputs": ["{workspaceRoot}/coverage/apps/api/test-scripts"],
       "options": {
-        "command": "node --test apps/api/scripts/*.test.mjs"
+        "command": "node scripts/crap-score/node-test.mjs apps/api coverage/apps/api/test-scripts apps/api/scripts/*.test.mjs"
       }
     }
   }

@@ -5,31 +5,42 @@ with statement coverage: `complexity² × (1 − coverage)³ + complexity`. High
 scores identify functions that may benefit from tests or refactoring.
 
 ```sh
-pnpm crap-score                                  # all JS/TS projects
+pnpm crap-score                                  # nx run-many -t crap-score
 pnpm nx run frontend:crap-score                   # one project
-pnpm crap-score:affected --base=origin/main       # changed projects and dependents
-pnpm precommit                                    # affected checks, including CRAP enforcement
-pnpm precommit:all                                # full-workspace checks, including CRAP enforcement
+pnpm crap-score:affected --base=origin/main       # nx affected -t crap-score
+pnpm precommit                                    # affected lint, typecheck, test and crap-score
+pnpm precommit:all                                # every target in the workspace
 ```
 
-Each target runs the project's existing Jest, Vitest and Node unit suites with JSON
-coverage (Istanbul for Vitest), then writes `coverage/crap/<project>/crap-report.json`, `summary.json`,
-and `html/index.html`. The root project's directory is `@attraccess__source`.
-Successful Nx runs cache the reports together with the task result. Coverage
-lives separately from ordinary test/e2e output, so those tasks cannot overwrite
-it. The affected runner removes old project reports before asking Nx to run or
-restore each target, then validates every report against the current threshold.
-A threshold failure keeps that run's coverage, JSON, HTML, and summary reports
-on disk for CI artifact upload.
+Coverage comes from the projects' own unit test targets. Their Jest and Vitest
+configs always write Istanbul JSON coverage, and Node `node:test` suites run
+through `scripts/crap-score/node-test.mjs`, to
+`coverage/<project root>/<target>/` (`coverage/root/` for the root project). Each
+target declares that directory as an Nx output, so a cache hit restores it.
 
-The PR and merge-queue workflow runs affected targets and uploads
-`crap-score-reports` for 14 days. Test failures and reporting failures block the
-existing `precommit-check` gate. Every function has an inclusive maximum score of
-**30**: a score exactly 30 passes; any unrounded score greater than 30 fails its
-project target. Violations report the project, source path, function, line, score,
-complexity, and statement coverage. Coverage, JSON, HTML, and summary reports are
-written before enforcement, so they remain available when the limit fails. This is an additional coverage-enabled
-unit-test run; ordinary tests and Docker/hardware acceptance remain independent.
+A project's `crap-score` target lists those test targets in `dependsOn`. It reads
+exactly their coverage directories, fails if one wrote none, and writes
+`coverage/crap/<project>/crap-report.json`, `summary.json` and `html/index.html`
+(the root project's directory is `@attraccess__source`). Nx hashes the
+dependencies' coverage files (`dependentTasksOutputFiles`) together with the
+scorer, so a changed test result, scorer or limit reruns the analysis. Every
+function has an inclusive maximum score of **30**: exactly 30 passes, anything
+above fails the target and reports the project, source path, function, line,
+score, complexity and statement coverage. Reports are written before enforcement,
+so they remain available when the limit fails.
+
+Project selection is Nx's own. The PR and merge-queue workflow runs
+`nx affected -t crap-score` and uploads `crap-score-reports` for 14 days; the
+`precommit-check` gate blocks on it. `pnpm precommit` runs
+`nx affected --uncommitted -t lint,typecheck,test,crap-score`, excluding hardware
+and companion projects. Projects tagged `host:fhs` (the WAGO plugin, whose tests
+run device shell scripts against `/bin` and `/usr/bin` tools) are also excluded,
+with a notice, on hosts without that layout such as NixOS. CI runs all of them.
+
+Before running anything, the hook rejects unstaged or untracked JS/TS files and
+analysis configuration, including partially staged files, because Nx reads the
+worktree. This keeps a worktree-only fix from validating a different staged
+snapshot. Stage or discard those changes and retry.
 
 ## Scope
 
@@ -58,40 +69,17 @@ The adapter merges backend and frontend coverage for plugins, limits coverage to
 the owning project, and assigns unique function identifiers because upstream
 otherwise overwrites functions with identical names. `@typescript-eslint/parser`
 is an explicit dependency because upstream resolves it from the working directory
-under pnpm's isolated dependency layout. Vitest uses Istanbul here. For this coverage run, the frontend disables React
-Compiler via `CRAP_SCORE_COVERAGE=1`: its optimized source maps omit function
-columns needed to match coverage to complexity. Ordinary unit tests retain the
-compiler. Missing function-end columns are restored from the original source
-when there is one unambiguous match, preserving execution counts and nested
-callbacks. Upstream analysis errors fail the task instead of
-publishing a silently incomplete report.
+under pnpm's isolated dependency layout. Vitest uses Istanbul. The frontend's
+unit tests run without React Compiler, whose source maps omit the function columns
+needed to match coverage to complexity; the app build still uses it. Missing
+function-end columns are restored from the original source when there is one
+unambiguous match, preserving execution counts and nested callbacks. Upstream
+analysis errors fail the task instead of publishing a silently incomplete report.
 
-When adding a JS/TS project, add the same `crap-score` run-command target with its
-project directory. Jest configs are detected automatically. For a new Vitest
-suite, add its existing configuration to `suites()` in `run.mjs`. Add any required
-code-generation dependencies to the target as with the ordinary test target.
-Hardware TypeScript, companion, plugins, and root tooling are part of the scorer;
-the local exclusions for other checks do not exclude their CRAP targets. Native
-C/C++ remains outside this JavaScript/TypeScript check. Nx hashes the shared
-runner in every target, so scorer changes invalidate project cache entries;
-restored reports are rechecked against the current limit before the gate passes.
-Before selecting targets, the affected runner discovers every Nx project with
-maintained JS/TS source and fails if any lacks a `crap-score` target. Shared
-dependency patches are treated as workspace-wide changes and are included in
-the Nx target cache inputs, so changing the pinned scorer patch selects all
-targets and invalidates restored reports.
-
-`pnpm precommit` selects affected projects from Nx's local uncommitted change set.
-Before running checks it rejects unstaged or untracked JS/TS files and CRAP
-analysis configuration, including partially staged files, because the scorer
-reads workspace source, tests, and configuration. This prevents worktree-only
-fixes or configuration from validating a different staged snapshot and leaves
-the index and worktree untouched. Stage or discard those changes and retry. CI
-uses the PR or merge-queue base and applies the same project check. Shared-change
-detection diffs exactly the revisions Nx uses for affected selection (`--base`
-and `--head`, or the uncommitted worktree), so a shared configuration change
-always expands to every target.
-`pnpm crap-score` always runs the full workspace.
+When adding a JS/TS project, give its unit test targets coverage output in
+`coverage/<project root>/<target>/` and add a `crap-score` target that runs
+`node scripts/crap-score/run.mjs <project root>` and depends on them. Native
+C/C++ remains outside this JavaScript/TypeScript check.
 
 Run the adapter's regression checks with:
 
@@ -100,22 +88,19 @@ node --test scripts/crap-score/*.test.mjs
 ```
 
 `run.test.mjs` covers coverage merging and scoring; `enforce.test.mjs` covers the
-threshold boundary, project selection, report validation, staged-snapshot checks
-and the Husky/CI entry points.
+threshold boundary, function completeness, reading test-target coverage,
+staged-snapshot checks and the hook and CI entry points.
 
 ## Node runners and source identity
 
-Owned `.test.mjs`/`.spec.mjs` files importing `node:test` run with a Node module
-hook that collects Istanbul coverage in `node/`. Child processes inherit the
-hook through `NODE_OPTIONS`. Tests that deliberately replace their environment
-forward only the coverage variables when this mode is active. Copied CLI scripts
-are attributed to their maintained source only when their complete contents
-match exactly one source file; fixture executables do not contribute coverage.
-The root target reuses `scripts/vitest.config.mts`, the ordinary tooling-test
-configuration, including port-allocation, launcher, interactive service and example
-plugin tests. Run the complete tooling suite without coverage using `pnpm test:tooling`.
-API seeding tests live in `apps/api/scripts/` and run in `api:test-scripts` as well
-as the API's coverage report.
+Node's own coverage has no Istanbul function ranges, so `node:test` targets run
+through `node-test.mjs <project root> <coverage directory> <test files...>`. It
+loads a module hook that instruments the project's JavaScript sources; child
+processes inherit it through `NODE_OPTIONS`. Tests that deliberately replace their
+environment forward only the coverage variables when this mode is active. Copied
+CLI scripts are attributed to their maintained source only when their complete
+contents match exactly one source file; fixture executables do not contribute
+coverage.
 
 Original source function ranges canonicalize transformed function identities
 before deduplication. Missing functions receive zero counts without adding a

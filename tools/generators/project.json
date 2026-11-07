@@ -50,6 +50,7 @@
       "inputs": ["production", "!{projectRoot}/src/**/*.test-utils.ts", "^production"]
     },
     "crap-score": {
+      "dependsOn": ["test"],
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs tools/generators"

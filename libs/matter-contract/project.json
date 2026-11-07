@@ -60,7 +60,7 @@
         "{workspaceRoot}/package.json",
         { "externalDependencies": ["jest"] }
       ],
-      "outputs": ["{workspaceRoot}/coverage/libs/matter-contract"],
+      "outputs": ["{workspaceRoot}/coverage/libs/matter-contract/test"],
       "options": {
         "jestConfig": "libs/matter-contract/jest.config.ts"
       }
@@ -80,6 +80,7 @@
       }
     },
     "crap-score": {
+      "dependsOn": ["test"],
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs libs/matter-contract"

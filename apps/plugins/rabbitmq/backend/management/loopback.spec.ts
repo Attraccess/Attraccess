@@ -1,14 +1,10 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { createServer, Server } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import type { MqttServerConnectionConfig } from '@attraccess/plugins-backend-sdk';
 import { describeManagementError, managementRequest } from './transport';
+import { selfSignedCertificate } from './self-signed-certificate.test-fixture';
 
 describe('management TLS with an isolated loopback CA', () => {
-  let directory: string;
   let server: Server;
   let caCert: string;
   let url: string;
@@ -25,30 +21,9 @@ describe('management TLS with an isolated loopback CA', () => {
   };
 
   beforeAll(async () => {
-    directory = mkdtempSync(join(tmpdir(), 'rabbitmq-management-tls-'));
-    execFileSync(
-      'openssl',
-      [
-        'req',
-        '-x509',
-        '-newkey',
-        'rsa:2048',
-        '-nodes',
-        '-days',
-        '1',
-        '-subj',
-        '/CN=localhost',
-        '-addext',
-        'subjectAltName=DNS:localhost',
-        '-keyout',
-        join(directory, 'key.pem'),
-        '-out',
-        join(directory, 'ca.pem'),
-      ],
-      { stdio: 'ignore' },
-    );
-    caCert = readFileSync(join(directory, 'ca.pem'), 'utf8');
-    server = createServer({ key: readFileSync(join(directory, 'key.pem')), cert: caCert }, (request, response) => {
+    const certificate = await selfSignedCertificate('localhost', ['localhost']);
+    caCert = certificate.cert;
+    server = createServer({ key: certificate.key, cert: caCert }, (request, response) => {
       if (request.url === '/oversized') {
         response.end(Buffer.alloc(8 * 1024 * 1024 + 1));
         return;
@@ -67,7 +42,6 @@ describe('management TLS with an isolated loopback CA', () => {
 
   afterAll(async () => {
     if (server) await new Promise<void>((resolve) => server.close(() => resolve()));
-    if (directory) rmSync(directory, { recursive: true, force: true });
   });
 
   it('authenticates a private-CA management listener with matching DNS identity', async () => {

@@ -15,5 +15,17 @@ export default defineConfig({
       ),
     },
   },
-  test: { environment: 'jsdom', include: ['apps/plugins/rabbitmq/frontend/src/**/*.test.tsx'] },
+  test: {
+    environment: 'jsdom',
+    include: ['apps/plugins/rabbitmq/frontend/src/**/*.test.tsx'],
+    coverage: {
+      // Unit coverage feeds the project's crap-score target.
+      enabled: true,
+      provider: 'istanbul',
+      reporter: ['json'],
+      reportsDirectory: fileURLToPath(
+        new URL('../../../../coverage/apps/plugins/rabbitmq/test-frontend', import.meta.url),
+      ),
+    },
+  },
 });

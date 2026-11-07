@@ -1,10 +1,12 @@
 import { getCrapReport } from 'crap-score';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
-import { completeCoverage, nodeCoverage, run, summarizeScores, isSource, ownedFiles } from './run.mjs';
+import { completeCoverage, run, summarizeScores, isSource, ownedFiles, workspace } from './run.mjs';
+import { nodeCoverage } from './node-test.mjs';
 
 test('duplicate source locations collapse without losing same-line anonymous functions', async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'crap-duplicates-'));
@@ -330,7 +332,8 @@ test('Node coverage includes spawned source copies without counting fixture code
       suite,
       `import { test } from 'node:test';\nimport { execFileSync } from 'node:child_process';\ntest('child', () => execFileSync(process.execPath, [${JSON.stringify(copy)}]));`,
     );
-    const reports = nodeCoverage([file], [suite], path.join(dir, 'coverage'));
+    assert.equal(nodeCoverage([file], [suite], path.join(dir, 'coverage')), 0);
+    const reports = [JSON.parse(readFileSync(path.join(dir, 'coverage/coverage-final.json'), 'utf8'))];
     const completed = completeCoverage([file], reports)[file];
     assert.ok(Object.values(completed.f).some((count) => count > 0));
     assert.ok(reports.every((report) => Object.keys(report).every((name) => name === file)));
@@ -342,6 +345,8 @@ test('Node coverage includes spawned source copies without counting fixture code
 test('runs an Nx library suite and writes consistent JSON, HTML, and summary artifacts', async () => {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'attraccess-crap-integration-'));
   try {
+    // The env unit suite writes the coverage its crap-score target reads.
+    execFileSync('pnpm', ['exec', 'jest', '--config', 'libs/env/jest.config.ts'], { cwd: workspace, stdio: 'ignore' });
     await run('libs/env', directory);
     const summary = JSON.parse(readFileSync(path.join(directory, 'summary.json'), 'utf8'));
     const report = JSON.parse(readFileSync(path.join(directory, 'crap-report.json'), 'utf8'));
@@ -439,8 +444,6 @@ test('only the vendored OpenSCAD runtime is excluded, not maintained public scri
 });
 
 test('every JS/TS Nx project has a report target with an isolated output path', async () => {
-  const { execFileSync } = await import('node:child_process');
-  const { readFileSync } = await import('node:fs');
   const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0');
   // The firmware project also owns maintained Node tooling, so it keeps a target.
   const nativeProjects = new Set([
@@ -474,15 +477,33 @@ test('ownership retains standalone tools and assigns nested sources exactly once
   assert.deepEqual(ownedFiles('apps/a/nested', files).filter(isSource), ['apps/a/nested/main.ts']);
 });
 
-test('WAGO includes the complete serial frontend suite once, the CC100 runtime suite and host-composed acceptance suites', async () => {
-  const { suites } = await import('./run.mjs');
-  const configs = suites('apps/plugins/wago').map((suite) => suite.args[1]);
-  assert.deepEqual(configs, [
-    'apps/plugins/wago/jest.config.ts',
-    'apps/plugins/wago/frontend/vitest.config.mts',
-    'apps/plugins/wago/cc100-runtime/jest.config.ts',
-    'apps/plugins/wago/scripts/jest.audit-hooks.config.cjs',
-    'apps/plugins/wago/scripts/jest.commissioning.config.cjs',
-    'apps/plugins/wago/scripts/jest.reliability-plan.config.cjs',
-  ]);
+test('every crap-score dependency is a same-project test target with its own coverage output', async () => {
+  const { createProjectGraphAsync } = await import('@nx/devkit');
+  const { nodes } = await createProjectGraphAsync({ exitOnError: true });
+  const resolve = (output, node) =>
+    output.replace('{workspaceRoot}/', '').replace('{projectRoot}', node.data.root).replace('{projectName}', node.name);
+  const outputs = Object.values(nodes).flatMap((node) =>
+    Object.entries(node.data.targets ?? {}).flatMap(([target, config]) =>
+      (config.outputs ?? []).map((output) => ({ task: `${node.name}:${target}`, path: resolve(output, node) })),
+    ),
+  );
+  for (const node of Object.values(nodes)) {
+    const base = path.join('coverage', node.data.root === '.' ? 'root' : node.data.root);
+    for (const dependency of node.data.targets?.['crap-score']?.dependsOn ?? []) {
+      const target = typeof dependency === 'string' ? dependency.replace(`${node.name}:`, '') : dependency.target;
+      assert.ok(
+        !target.includes(':') && !target.startsWith('^'),
+        `${node.name}: ${target} is not a same-project target`,
+      );
+      assert.match(target, /^(test|e2e)($|-)/, `${node.name}: ${target} is not a test target`);
+      const coverage = path.join(base, target);
+      // Nx restores outputs by replacing them, so a parent output would delete this coverage.
+      assert.deepEqual(
+        node.data.targets[target].outputs?.map((output) => resolve(output, node)),
+        [coverage],
+      );
+      for (const output of outputs.filter((output) => coverage.startsWith(`${output.path}/`)))
+        assert.fail(`${output.task} output ${output.path} contains ${node.name}:${target} coverage`);
+    }
+  }
 });
