@@ -137,6 +137,7 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
   protected readonly ACCESS_CACHE_MAX_SIZE = 5_000;
 
   protected cacheCleanupInterval: ReturnType<typeof setInterval> | null = null;
+  protected lifecycleSweepInterval: ReturnType<typeof setInterval> | null = null;
 
   protected authorizationCacheSubscriber: Redis | null = null;
 
@@ -420,13 +421,18 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     endedUsageIdToEmit: number | null,
     activeSession: ResourceUsage | null,
     skipNoteNotification: boolean,
+    triggeredByUserId?: number,
   ): Promise<void> {
     await this.audit
       .recordResource({
         action: 'usage_session.ended',
         ...auditOrigin,
         subjectId: resourceId,
-        details: { usageId: updatedUsage.id, usageUserId: updatedUsage.userId },
+        details: {
+          usageId: updatedUsage.id,
+          usageUserId: updatedUsage.userId,
+          ...(triggeredByUserId === undefined ? {} : { triggeredByUserId }),
+        },
       })
       .catch(() => undefined);
 

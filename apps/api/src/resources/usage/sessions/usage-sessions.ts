@@ -11,7 +11,7 @@ import {
   SupervisionMode,
 } from '@attraccess/database-entities';
 
-import { AuthenticatedUser, SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 
@@ -25,34 +25,45 @@ import { FinalCollection } from '../../metering/resource-metering.service';
 
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
-import { EndSessionOptions, StartSessionOptions } from '../lifecycle/usage-lifecycle';
+import { ActiveSessionCounts, EndSessionOptions, StartSessionOptions } from '../lifecycle/usage-lifecycle';
 
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
-
-import {
-  ResourceSupervisedUsageStartedEvent,
-  ResourceUsageNoteAddedEvent,
-  ResourceUsageSessionTakenOverEvent,
-} from '../events/resource-usage.events';
-
-import { type ResourceUsageService } from './resource-usage.service';
 
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 
 import { ResourceFullError } from '../errors/resource-full.error';
 
+import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
+
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
+import { MachineBusyError } from '../errors/machine-busy.error';
 
-import { countOccupiedSlots, pickSessionToEnd } from './active-usage';
+import { activeUsageWhere, countOccupiedSlots, pickSessionToEnd } from './active-usage';
 
-import { UsageAuthorization } from '../authorization/usage-authorization';
+import { UsageSessionStartNotifications } from './usage-session-start-notifications';
 
-export abstract class UsageSessions extends UsageAuthorization {
+export abstract class UsageSessions extends UsageSessionStartNotifications {
   async endSession(
     resourceId: number,
     user: User,
     dto: EndUsageSessionDto,
     options: EndSessionOptions = {},
+  ): Promise<ResourceUsage> {
+    const attemptId = randomUUID();
+    return this.runSessionChange(
+      resourceId,
+      attemptId,
+      () => this.endSessionNow(resourceId, user, dto, options, attemptId),
+      options.withinSessionChange,
+    );
+  }
+
+  private async endSessionNow(
+    resourceId: number,
+    user: User,
+    dto: EndUsageSessionDto,
+    options: EndSessionOptions,
+    attemptId: string,
   ): Promise<ResourceUsage> {
     // skipNoteNotification: flow-ended sessions carry an auto-generated note, not a human one — skip personnel notification.
     const { skipFormSubmissions = false, skipNoteNotification = false } = options;
@@ -64,7 +75,7 @@ export abstract class UsageSessions extends UsageAuthorization {
     let activeSession: ResourceUsage | null = null;
     let endedUsageIdToEmit: number | null = null;
     let formSubmissions: FormSubmission[] = [];
-    const attemptId = randomUUID();
+    let activeSessionCounts: ActiveSessionCounts | undefined;
     const prepared = await runSerializedTransaction(
       this.resourceUsageRepository.manager,
       async (transactionalEntityManager) => {
@@ -73,13 +84,19 @@ export abstract class UsageSessions extends UsageAuthorization {
         await this.assertLifecycleAvailable(transactionalEntityManager, resourceId, sharedMachine);
         const activeSessions = await this.getActiveSessionsForResource(resourceId, transactionalEntityManager);
         activeSession = pickSessionToEnd(activeSessions, user, dto.usageId, sessionLimit);
+        activeSessionCounts = {
+          before: activeSessions.length,
+          after: Math.max(0, activeSessions.length - 1),
+          limit: sessionLimit,
+        };
         if (
           sharedMachine &&
           (await transactionalEntityManager.findOne(ResourceUsageLifecycleAttempt, {
             where: { previousUsageId: activeSession.id },
           }))
         ) {
-          throw new ConflictException('This session is already being ended');
+          // Changes of this machine take turns, so this is a stop cut off by a crash that is not cleaned up yet.
+          throw new MachineBusyError();
         }
 
         // Prefer already-populated effectivePermissions on the request-bound user (set by SessionStrategy)
@@ -149,9 +166,14 @@ export abstract class UsageSessions extends UsageAuthorization {
         undefined,
         resourceId,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-        { ...this.getResourceUsageFlowPayload(prepared.activeSession, formSubmissions), ...prepared.updateData },
+        {
+          ...this.getResourceUsageFlowPayload(prepared.activeSession, formSubmissions),
+          ...prepared.updateData,
+          activeSessions: activeSessionCounts,
+        },
         'end',
-        attemptId,
+        // The requester stops it (maybe someone else's session); a flow end passes on the user who caused it.
+        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.actorId ?? options.triggeredByUserId },
       );
       // Stop effects have run; only now read the final total. Failure leaves energy billing pending, not the stop undone.
       const final: FinalCollection = (await this.metering?.collectFinal(
@@ -192,98 +214,10 @@ export abstract class UsageSessions extends UsageAuthorization {
       endedUsageIdToEmit,
       activeSession,
       skipNoteNotification,
+      options.triggeredByUserId,
     );
 
     return updatedUsage;
-  }
-
-  protected async notifySessionStarted(
-    resourceId: number,
-    user: User,
-    dto: StartUsageSessionDto,
-    supervisorUserId: number | null,
-    auditOrigin: NonNullable<StartSessionOptions['auditOrigin']>,
-    prepared: Awaited<ReturnType<ResourceUsageService['prepareSessionStart']>>,
-    newSession: ResourceUsage,
-    endedUsageIdToEmit: number | null,
-    startedUsageIdToEmit: number | null,
-    takeoverEndedUser: User | null,
-  ): Promise<void> {
-    if (prepared.existingActiveSession) {
-      this.eventEmitter.emit(
-        ResourceUsageSessionTakenOverEvent.EVENT_NAME,
-        new ResourceUsageSessionTakenOverEvent(
-          prepared.resource,
-          prepared.attempt.transitionTime,
-          user,
-          prepared.existingActiveSession.user,
-        ),
-      );
-    }
-
-    if (endedUsageIdToEmit && takeoverEndedUser) {
-      await this.audit
-        .recordResource({
-          action: 'usage_session.ended',
-          ...auditOrigin,
-          subjectId: resourceId,
-          details: { usageId: endedUsageIdToEmit, usageUserId: takeoverEndedUser.id },
-        })
-        .catch(() => undefined);
-    }
-    if (newSession) {
-      await this.audit
-        .recordResource({
-          action: 'usage_session.started',
-          ...auditOrigin,
-          subjectId: resourceId,
-          details: {
-            usageId: newSession.id,
-            usageUserId: newSession.userId,
-            ...(supervisorUserId === null ? {} : { supervisorUserId }),
-          },
-        })
-        .catch(() => undefined);
-    }
-
-    // Emit events after the transaction committed to ensure readers can observe DB state
-    try {
-      // The taken-over session is announced by the take-over event above, never as a start.
-      if (newSession?.id) {
-        await this.emitUsageEvent(newSession.id);
-      } else if (startedUsageIdToEmit) {
-        await this.emitUsageEvent(startedUsageIdToEmit);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to emit usage events after startSession commit`, (error as Error).stack);
-    }
-
-    if (takeoverEndedUser) {
-      this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, newSession?.resource, takeoverEndedUser);
-    }
-    this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_STARTED, newSession?.resource, newSession?.user);
-
-    // Counter signal for the supervised-usage auto-promotion follow-up (ATT-486): every supervised
-    // session start is counted there to decide when to auto-create an introduction for the user.
-    if (supervisorUserId !== null && newSession?.id) {
-      this.eventEmitter.emit(
-        ResourceSupervisedUsageStartedEvent.EVENT_NAME,
-        new ResourceSupervisedUsageStartedEvent(resourceId, user.id, supervisorUserId, newSession.id),
-      );
-    }
-
-    this.metricsService.resourceUsageSessionsTotal.inc({ action: 'start' });
-    this.metricsService.resourceUsageSessionsActive.inc();
-
-    if (dto.notes?.trim()) {
-      this.eventEmitter.emit(
-        ResourceUsageNoteAddedEvent.EVENT_NAME,
-        new ResourceUsageNoteAddedEvent(resourceId, dto.notes.trim(), 'start', {
-          id: user.id,
-          username: user.username,
-        }),
-      );
-    }
   }
 
   async startSession(
@@ -291,6 +225,19 @@ export abstract class UsageSessions extends UsageAuthorization {
     user: User,
     dto: StartUsageSessionDto,
     options: StartSessionOptions = {},
+  ): Promise<ResourceUsage> {
+    const attemptId = randomUUID();
+    return this.runSessionChange(resourceId, attemptId, () =>
+      this.startSessionNow(resourceId, user, dto, options, attemptId),
+    );
+  }
+
+  private async startSessionNow(
+    resourceId: number,
+    user: User,
+    dto: StartUsageSessionDto,
+    options: StartSessionOptions,
+    attemptId: string,
   ): Promise<ResourceUsage> {
     this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto, options });
 
@@ -302,14 +249,13 @@ export abstract class UsageSessions extends UsageAuthorization {
     let startedUsageIdToEmit: number | null = null;
     let takeoverEndedUser: User | null = null;
 
-    const attemptId = randomUUID();
     let chargeTransactionId: number | undefined;
     const prepared = await this.prepareSessionStart(resourceId, user, dto, supervisorUserId, attemptId);
     takeoverEndedUser = prepared.existingActiveSession?.user ?? null;
 
     let newSession: ResourceUsage;
     try {
-      const { createdSession, existingActiveSession, formSubmissions, attempt } = prepared;
+      const { createdSession, existingActiveSession, formSubmissions, attempt, activeSessions } = prepared;
       // The outgoing session's total must be read before the meter is re-initialized for the next one.
       const outgoingFinal: FinalCollection = existingActiveSession
         ? ((await this.metering?.collectFinal(existingActiveSession.id, attempt.transitionTime)) ?? {
@@ -334,15 +280,17 @@ export abstract class UsageSessions extends UsageAuthorization {
               takeOverTime: attempt.transitionTime,
               newUser: user,
               oldUser: existingActiveSession.user,
+              activeSessions,
             }
-          : this.getResourceUsageFlowPayload(createdSession, formSubmissions),
+          : { ...this.getResourceUsageFlowPayload(createdSession, formSubmissions), activeSessions },
         existingActiveSession ? 'takeover' : 'start',
-        attemptId,
+        // The starter, or the supervisor who started it for them.
+        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.actorId ?? user.id },
       );
       newSession = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
         const currentAttempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
         if (currentAttempt.candidateUsageId !== createdSession.id) {
-          throw new ConflictException('The tentative usage session was cancelled');
+          throw new TentativeSessionCancelledError();
         }
         // The flow may have independently triggered maintenance while this start was pending.
         // Recheck the gate before making the candidate session visible.
@@ -445,17 +393,23 @@ export abstract class UsageSessions extends UsageAuthorization {
       }
 
       let existingActiveSession: ResourceUsage | null = null;
+      let publishedSessions: number;
       if (sharedMachine) {
+        publishedSessions = await transactionalEntityManager.count(ResourceUsage, {
+          where: { resourceId, ...activeUsageWhere() },
+        });
         // Capacity is decided inside this serialized transaction: published sessions and other
         // people's pending starts occupy a slot, so simultaneous starts can never exceed the limit.
         const ownSession = await transactionalEntityManager.findOne(ResourceUsage, {
           where: { resourceId, userId: user.id, usageAction: ResourceUsageAction.Usage, endTime: IsNull() },
         });
-        if (ownSession) throw new AlreadyHasActiveSessionError();
+        // A pending own session within this turn is a start cut off by a crash that is not cleaned up yet.
+        if (ownSession) throw ownSession.lifecyclePending ? new MachineBusyError() : new AlreadyHasActiveSessionError();
         const occupied = await countOccupiedSlots(transactionalEntityManager, resourceId);
         if (occupied >= sessionLimit) throw new ResourceFullError(occupied, sessionLimit);
       } else {
         const activeSessions = await this.getActiveSessionsForResource(resourceId, transactionalEntityManager);
+        publishedSessions = activeSessions.length;
         // A limit lowered to 1 can leave several sessions running; takeover needs exactly one to replace.
         existingActiveSession = activeSessions.length === 1 ? activeSessions[0] : null;
         if (activeSessions.length > 1) throw new ResourceInUseError();
@@ -579,7 +533,19 @@ export abstract class UsageSessions extends UsageAuthorization {
         formSubmissions,
         billingItems: [],
       });
-      return { resource, createdSession, existingActiveSession, attempt, formSubmissions };
+      const activeSessionCounts: ActiveSessionCounts = {
+        before: publishedSessions,
+        after: existingActiveSession ? publishedSessions : publishedSessions + 1,
+        limit: sessionLimit,
+      };
+      return {
+        resource,
+        createdSession,
+        existingActiveSession,
+        attempt,
+        formSubmissions,
+        activeSessions: activeSessionCounts,
+      };
     });
   }
 }

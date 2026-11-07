@@ -165,7 +165,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     }
 
     // The pressing owner's session is the triggering session for end-session and billing nodes.
-    await this.startFlow(button, { payload: { usageId: pressingSession.id } });
+    await this.startFlow(button, { payload: { usageId: pressingSession.id } }, undefined, new Map(), {
+      actorUserId: executingUserId,
+    });
   }
 
   @OnEvent('companion.usb_disconnected')

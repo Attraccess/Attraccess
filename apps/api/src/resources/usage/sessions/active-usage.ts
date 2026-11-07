@@ -86,12 +86,16 @@ export function pickSessionToEnd(
   throw new NoOwnActiveSessionError();
 }
 
+/** Effective number of parallel sessions. Doors and unknown resources behave like a limit of 1. */
+export function sessionLimitOf(resource: Pick<Resource, 'type' | 'maxParallelSessions'> | null | undefined): number {
+  return resource?.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
+}
+
 /** Slot usage for display and gating. Doors always behave like a limit of 1. */
 export function getSessionCapacity(
   resource: Pick<Resource, 'type' | 'maxParallelSessions'>,
   activeSessionCount: number,
 ): { activeSessionCount: number; maxParallelSessions: number; isFull: boolean } {
-  const maxParallelSessions =
-    resource.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
+  const maxParallelSessions = sessionLimitOf(resource);
   return { activeSessionCount, maxParallelSessions, isFull: activeSessionCount >= maxParallelSessions };
 }

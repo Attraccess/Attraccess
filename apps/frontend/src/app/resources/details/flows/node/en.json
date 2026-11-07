@@ -663,10 +663,23 @@
         "usage": {
           "end-session": {
             "title": "End active session",
-            "description": "Ends the current usage session, optionally with a note.",
+            "description": "Ends the triggering session, one user's session or all sessions of this machine, optionally with a note.",
             "inputs": { "input": "Input" },
             "outputs": { "output": "Output", "failure": "Failure" },
             "config": {
+              "target": {
+                "label": "Which session",
+                "helpText": "\"The triggering session\" ends the session whose start, stop or takeover ran this flow. \"The session of a user\" ends that user's session. \"All sessions\" ends every running session on this machine. Sessions that are already ending are skipped.",
+                "enum": {
+                  "triggering": "The triggering session",
+                  "user": "The session of a user",
+                  "all": "All sessions"
+                }
+              },
+              "userId": {
+                "label": "User id (templates allowed)",
+                "helpText": "Only for \"The session of a user\". A user id, or a template that resolves to one, such as \\{{user.id}}."
+              },
               "notes": { "label": "Notes (templates allowed)" },
               "failureBehavior": {
                 "label": "On failure",
@@ -679,6 +692,7 @@
               }
             },
             "preview": {
+              "target": "Which session",
               "notes": "Notes"
             }
           }

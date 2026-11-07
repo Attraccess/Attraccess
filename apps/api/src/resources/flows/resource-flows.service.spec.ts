@@ -171,3 +171,60 @@ describe('plugin node configuration schemas', () => {
     await expect(service.resolveNodeSchema(99, 'plugin.schema-test.static', {})).rejects.toThrow();
   });
 });
+
+describe('shared machine flow warnings', () => {
+  const build = (nodes: object[], edges: object[]) =>
+    new ResourceFlowsService(
+      createMock<Repository<ResourceFlowNode>>({ find: jest.fn().mockResolvedValue(nodes) }),
+      createMock<Repository<ResourceFlowEdge>>({ find: jest.fn().mockResolvedValue(edges) }),
+      createMock<Repository<Resource>>({ findOne: jest.fn().mockResolvedValue({ id: 1 }) }),
+      createMock<MqttClientService>(),
+      new EventEmitter2(),
+    );
+
+  it('lists a stop flow that reaches a plugin output without checking activeSessions', async () => {
+    registerPluginFlowNodes('warning-service-test', [
+      {
+        type: 'plugin.warning-service-test.switch',
+        label: 'Switch',
+        inputs: ['input'],
+        outputs: ['output'],
+        isOutput: true,
+        execute: jest.fn(),
+      },
+    ]);
+    const service = build(
+      [
+        { id: 'stop', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED, data: {} },
+        { id: 'power', type: 'plugin.warning-service-test.switch', data: {} },
+      ],
+      [{ id: 'e', source: 'stop', target: 'power' }],
+    );
+    await expect(service.getSharedMachineFlowWarnings(1)).resolves.toEqual([
+      {
+        triggerNodeId: 'stop',
+        triggerType: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
+        effectNodes: [{ nodeId: 'power', nodeType: 'plugin.warning-service-test.switch' }],
+      },
+    ]);
+  });
+
+  it('lists nothing for a flow guarded by an IF on activeSessions', async () => {
+    const service = build(
+      [
+        { id: 'stop', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED, data: {} },
+        {
+          id: 'if',
+          type: ResourceFlowNodeType.PROCESSING_IF,
+          data: { path: 'activeSessions.after', comparisonOperator: '=', comparisonValue: '0' },
+        },
+        { id: 'http', type: ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST, data: {} },
+      ],
+      [
+        { id: 'e1', source: 'stop', target: 'if' },
+        { id: 'e2', source: 'if', target: 'http' },
+      ],
+    );
+    await expect(service.getSharedMachineFlowWarnings(1)).resolves.toEqual([]);
+  });
+});
