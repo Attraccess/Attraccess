@@ -84,7 +84,8 @@ export class CardWriterSettingsController {
   ): Promise<CardWriterSettingsDto> {
     const paired = await this.pairedReaderIds();
     if (settings.readerIds.some((id) => !paired.has(id))) throw new BadRequestException(READER_NOT_PAIRED);
-    const before = await this.get();
+    // The stored setting, so the audit also records a revoked reader that this save removes.
+    const before = await this.policy.get();
     const after = await this.policy.set(settings);
     for (const [settingKey, oldValue, newValue] of cardWriterSettingChanges(before, after)) {
       await recordAdministrationSafely(this.audit, {

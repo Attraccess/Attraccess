@@ -129,6 +129,15 @@ describe('CardWriterSettingsController', () => {
       expect(recordAdministration).not.toHaveBeenCalled();
     });
 
+    it('records the removal of a reader whose pairing was revoked', async () => {
+      // Reader 3 was selected, then its pairing was revoked: GET no longer shows it, the stored setting still does.
+      current = { mode: 'selected', readerIds: [2, 3, 5] };
+      await controller.update({ mode: 'selected', readerIds: [2, 5] }, req);
+      expect(recordAdministration.mock.calls.map(([event]) => event.details)).toEqual([
+        { settingKey: 'attractap.cardWriterReaders', before: '2,3,5', after: '2,5' },
+      ]);
+    });
+
     it('still returns the saved setting when the audit provider fails', async () => {
       recordAdministration.mockRejectedValueOnce(new Error('down'));
       await expect(controller.update({ mode: 'selected', readerIds: [2] }, req)).resolves.toEqual({

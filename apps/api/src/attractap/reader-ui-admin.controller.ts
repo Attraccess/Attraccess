@@ -117,8 +117,11 @@ export class ReaderUiAdminController {
   @AuthAny('resources.update', 'system.plugins.manage')
   @ApiOperation({ summary: 'Open reader UI alerts', operationId: 'getReaderUiAlerts' })
   @ApiResponse({ status: 200, type: [ReaderUiAlertDto] })
-  getAlerts(): Promise<ReaderUiAlertDto[]> {
-    return this.alerts.listOpen();
+  async getAlerts(): Promise<ReaderUiAlertDto[]> {
+    // Alerts of a reader that is not paired yet stay hidden, like the reader itself.
+    const [open, paired] = await Promise.all([this.alerts.listOpen(), this.readers.getPairedReaders()]);
+    const pairedIds = new Set(paired.map((reader) => reader.id));
+    return open.filter((alert) => alert.readerId == null || pairedIds.has(alert.readerId));
   }
 
   @Post('reader-ui/alerts/:alertId/clear')

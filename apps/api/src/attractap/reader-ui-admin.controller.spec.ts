@@ -12,7 +12,10 @@ function setup() {
   const alerts = { listOpen: jest.fn().mockResolvedValue([{ id: 1 }]), clear: jest.fn(), findOpen: jest.fn() };
   const slots = { syncReader: jest.fn(), contributionsOf: jest.fn().mockReturnValue([{ plugin: 'p' }]) };
   const resources = { getResourceById: jest.fn().mockResolvedValue({ id: 3 }) };
-  const readers = { findReaderById: jest.fn().mockResolvedValue({ id: 8, pairingState: 'paired' }) };
+  const readers = {
+    findReaderById: jest.fn().mockResolvedValue({ id: 8, pairingState: 'paired' }),
+    getPairedReaders: jest.fn().mockResolvedValue([{ id: 8, pairingState: 'paired' }]),
+  };
   const controller = new ReaderUiAdminController(
     settings as never,
     alerts as never,
@@ -73,6 +76,16 @@ describe('ReaderUiAdminController', () => {
     const { controller } = setup();
     expect(await controller.getContributions(8)).toEqual([{ plugin: 'p' }]);
     expect(await controller.getAlerts()).toEqual([{ id: 1 }]);
+  });
+
+  it('hides the alerts of a reader that is not paired', async () => {
+    const { controller, alerts } = setup();
+    alerts.listOpen.mockResolvedValueOnce([
+      { id: 1, kind: 'breaker', plugin: 'p', readerId: null },
+      { id: 2, kind: 'crash-loop', readerId: 8 },
+      { id: 3, kind: 'crash-loop', readerId: 9 },
+    ]);
+    expect((await controller.getAlerts()).map((alert) => alert.id)).toEqual([1, 2]);
   });
 
   it('clears a reader crash-loop alert with resources.update and answers 404 when it is gone', async () => {

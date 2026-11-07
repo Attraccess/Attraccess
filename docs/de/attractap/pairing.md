@@ -14,12 +14,12 @@ mehr selbst registrieren: Niemand kann einen Reader hinzufügen, ohne dass ein A
 
 ## Reader-Status
 
-| Status                | Bedeutung                                                                                                                                                                               |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Wartet**            | Ein neuer Reader zeigt seinen Code und wartet auf einen Admin. Solange er wartet, steht er als Zeile **Neuer Reader** im Block **Nicht gekoppelt**.                                     |
-| **Nicht gekoppelt**   | Ein Reader, der vor dieser Version per Token registriert wurde. Er funktioniert mit seinem Token weiter, bis ein Admin ihn in seiner Zeile koppelt. Die Einstellungen bleiben gesperrt. |
-| **Gekoppelt**         | Der Reader hat einen eigenen Schlüssel und ein Zertifikat und kann genutzt und eingerichtet werden.                                                                                     |
-| **Kopplung entfernt** | Ein Admin hat die Kopplung entfernt. Der Reader wird innerhalb einer Sekunde getrennt, zeigt „Kopplung entfernt“ und wartet mit einem neuen Schlüssel wieder auf Freigabe.              |
+| Status                | Bedeutung                                                                                                                                                                                     |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wartet**            | Ein neuer Reader zeigt seinen Code und wartet auf einen Admin. Solange er wartet, steht er als Zeile **Neuer Reader** im Block **Nicht gekoppelt**.                                           |
+| **Nicht gekoppelt**   | Ein Reader, der vor dieser Version per Token registriert wurde. Er verarbeitet mit seinem Token weiter Karten, bis ein Admin ihn in seiner Zeile koppelt. Die Einstellungen bleiben gesperrt. |
+| **Gekoppelt**         | Der Reader hat einen eigenen Schlüssel und ein Zertifikat und kann genutzt und eingerichtet werden.                                                                                           |
+| **Kopplung entfernt** | Ein Admin hat die Kopplung entfernt. Der Reader wird innerhalb einer Sekunde getrennt, zeigt „Kopplung entfernt“ und wartet mit einem neuen Schlüssel wieder auf Freigabe.                    |
 
 Nur gekoppelte Reader stehen in den Tabellen **Aktive Attractaps** und **Veraltete Attractaps** und lassen sich bearbeiten.
 
@@ -84,11 +84,16 @@ auf der seriellen Konsole.
 ## Bereits vorhandenen Reader koppeln
 
 Reader, die vor dieser Version per Token registriert wurden, funktionieren mit diesem Token weiter,
-bis sie gekoppelt werden. In ihrer Zeile in der Reader-Liste steht der Button **Koppeln**. Ein
+bis sie gekoppelt werden. In ihrer Zeile im Block **Nicht gekoppelt** steht der Button **Koppeln**. Ein
 Klick darauf lässt den verbundenen Reader die Kopplung starten und einen Code zeigen. Gib den
 Code wie oben frei. Die Kopplung ist an den bestehenden Eintrag gebunden, Name, Maschinen und
 Einstellungen bleiben also erhalten. Ist der Reader nicht verbunden, erreicht **Koppeln** ihn
 nicht; schalte ihn zuerst ein. Die Einstellungen eines nicht gekoppelten Readers bleiben gesperrt.
+
+Bis zur Kopplung meldet ein solcher Reader weiter Mitglieder an und startet und beendet Maschinen,
+erscheint aber nur im Block **Nicht gekoppelt**. Dort zeigt seine Zeile die Maschinen, denen er
+zugeordnet ist. Er kann keine Karten registrieren oder zurücksetzen, keinen Start beaufsichtigen und
+keine Sammeleinweisung ausführen.
 
 Ein Token-Reader behält seinen Token, bis die erste verschlüsselte Sitzung sein Zertifikat
 geliefert hat. Erreicht diese Sitzung keinen Server, den der Reader prüfen kann (drei Versuche

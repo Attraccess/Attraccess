@@ -354,11 +354,12 @@ def test_card_writer_setting_blocks_unselected_reader(api, admin, reader, resour
     idle_reader(hooks)
     status, original = api.call("GET", "/attractap/card-writer-settings", token=admin)
     assert status == 200, original
-    other = other_paired_reader(api)
-    status, body = api.call("PUT", "/attractap/card-writer-settings",
-                            {"mode": "selected", "readerIds": [other]}, token=admin)
-    assert status == 200, body
+    other = None
     try:
+        other = other_paired_reader(api)
+        status, body = api.call("PUT", "/attractap/card-writer-settings",
+                                {"mode": "selected", "readerIds": [other]}, token=admin)
+        assert status == 200, body
         status, body, mark = start_enroll(api, admin, reader, people["dave"])
         assert (status, body["message"]) == (403, "READER_NOT_ALLOWED_TO_WRITE_CARDS"), (status, body)
         status, body, _ = start_reset(api, admin, reader, 1)
@@ -386,11 +387,17 @@ def test_card_writer_setting_blocks_unselected_reader(api, admin, reader, resour
         assert all(version == 0 for version in key_versions(emulator, "stranger").values())
         assert stored_card(api, "08d00d01") is None
     finally:
-        emulator.command("remove")
-        api.call("PUT", "/attractap/card-writer-settings",
-                 {"mode": original["mode"], "readerIds": original["readerIds"]}, token=admin)
-        delete_reader(api, other)
-        cancel_armed_screen(hooks)
+        # Each step runs even when an earlier one fails, so the extra reader record never stays behind.
+        try:
+            emulator.command("remove")
+        finally:
+            try:
+                api.call("PUT", "/attractap/card-writer-settings",
+                         {"mode": original["mode"], "readerIds": original["readerIds"]}, token=admin)
+            finally:
+                if other is not None:
+                    delete_reader(api, other)
+                cancel_armed_screen(hooks)
     idle_reader(hooks)
 
 

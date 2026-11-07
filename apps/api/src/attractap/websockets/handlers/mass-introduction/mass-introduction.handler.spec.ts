@@ -105,6 +105,22 @@ describe('AttractapMassIntroductionHandler', () => {
       expect(start.payload.remainingMs).toBeGreaterThan(0);
     });
 
+    it.each(['unpaired', 'revoked'])('refuses a %s reader and arms nothing', async (pairingState) => {
+      attractapService.findReaderById.mockResolvedValue({
+        id: READER_ID,
+        name: 'Entrance',
+        pairingState,
+        firmware: { capabilities: { cardEnrollment: true } },
+        resources: [{ id: 42 }],
+      });
+      const socket = makeSocket();
+      websocketService.sockets.set('a', socket);
+
+      await expect(arm()).rejects.toThrow(new BadRequestException('READER_NOT_PAIRED'));
+      expect(socket.state.massIntroductionFlow).toBeFalsy();
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('refuses readers that are not linked to the target', async () => {
       attractapService.findReaderById.mockResolvedValue({
         id: READER_ID,

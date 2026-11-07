@@ -68,7 +68,7 @@ Attractap readers use AES-encrypted authentication, which requires cards with ha
 
 By default every reader with a display and firmware 2.0.0 or later can enroll and reset cards. Administrators can limit this under **Settings -> RFID card enrollment**: choose **Selected readers** and tick the readers that may write cards. The enrollment and reset screens then list only those readers. All readers still let members sign in with their cards.
 
-Readers that are not paired yet appear only in the pairing session on the readers page. They are not shown in the reader list, in any picker, in the settings or in resource assignment, and they can never enroll or reset cards, supervise a start or run a mass introduction.
+Readers that are not paired yet appear only in the **Not paired** list on the readers page, where you pair them. They are not shown in the reader list, in any picker, in the settings or in resource assignment, and they can never enroll or reset cards, supervise a start or run a mass introduction.
 
 > [!IMPORTANT]
 > **Only allow paired readers you trust to enroll and reset cards.** A new card still has the public factory key, so the server writes the new card key under that factory key.
