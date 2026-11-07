@@ -4,7 +4,29 @@
   "docker-compose": {
     "managerFilePatterns": ["/(^|/)docker-compose\\.yml$/", "/(^|/)services\\.docker-compose\\.yml$/"]
   },
+  "toolSettings": {
+    "nodeMaxMemory": 1536
+  },
   "packageRules": [
+    {
+      "description": "Workspace-only packages are not on the npm registry, so skip their lookups",
+      "matchPackageNames": ["@attraccess/shared", "@attraccess/database-entities"],
+      "enabled": false
+    },
+    {
+      "description": "Group minor and patch dev dependency updates into one PR to save lockfile installs",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm non-major dev dependencies"
+    },
+    {
+      "description": "Group minor and patch runtime dependency updates into one PR to save lockfile installs",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "npm non-major dependencies"
+    },
     {
       "description": "Group all Docker image updates into a single PR",
       "matchDatasources": ["docker"],
