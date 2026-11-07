@@ -1,4 +1,6 @@
 {
+  "empty": "No firmware is available on this server.",
+  "loadFailed": "Could not load the firmware list. Check your connection and try again.",
   "demo": {
     "title": "Demo firmware",
     "description": "Runs a local mock without a server — for demos and testing only."
