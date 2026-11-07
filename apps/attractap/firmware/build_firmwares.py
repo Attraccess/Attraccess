@@ -11,6 +11,10 @@ field set must stay stable; the flasher and OTA pipeline depend on it.
 Variants that set `set(ATTRACTAP_RELEASE OFF)` are lab-only (e.g. the
 hardware-lab parking images) and are never part of a release build. Build them
 with --lab, which writes only their merged images to firmware_output_lab/.
+Lab variants that also set `set(ATTRACTAP_SECURE_LAB "true")` are for device-lab
+secure readers (ATT-1166): --lab signs them with the public lab key and writes
+{name}.hex, an Intel HEX image that keeps the gaps between partitions, for
+`esptool write-flash --encrypt`.
 """
 
 import argparse
@@ -72,6 +76,17 @@ def secure_profile_build_enabled(variant, content):
         raise ValueError(f"demo variant {variant} must not enable the secure profile build")
     return enabled
 
+def secure_lab_variant(variant, content):
+    """ATTRACTAP_SECURE_LAB: a lab-only variant built with the lab secure profile
+    (the variant file also sets ATTRACTAP_SECURE_PROFILE). Never a release variant."""
+    enabled = variant_bool_flag(variant, content, "ATTRACTAP_SECURE_LAB")
+    if enabled and is_release_variant(content):
+        raise ValueError(f"{variant} sets ATTRACTAP_SECURE_LAB but not ATTRACTAP_RELEASE OFF: "
+                         "lab secure images must never ship")
+    if enabled and not variant_bool_flag(variant, content, "ATTRACTAP_SECURE_PROFILE"):
+        raise ValueError(f"{variant} sets ATTRACTAP_SECURE_LAB but not ATTRACTAP_SECURE_PROFILE")
+    return enabled
+
 def secure_profile_hardware_tested(variant, content):
     """ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED, carried into firmwares.json.
     Demo variants can never have it, and a variant can only be marked tested
@@ -122,10 +137,12 @@ def extract_build_id(firmware_bin_path, esptool_cmd):
     print(f"Warning: Could not extract build id from {firmware_bin_path}")
     return None
 
-def run_merge_bin(esptool_cmd, out_path, flash_files):
-    """esptool merge_bin (v4) / merge-bin (v5)."""
+def run_merge_bin(esptool_cmd, out_path, flash_files, output_format=None):
+    """esptool merge_bin (v4) / merge-bin (v5); output_format "hex" writes Intel HEX."""
     for subcommand in ("merge_bin", "merge-bin"):
         merge_cmd = [*esptool_cmd, "--chip", CHIP, subcommand, "-o", out_path]
+        if output_format:
+            merge_cmd.extend(["--format", output_format])
         for offset, path in flash_files:
             merge_cmd.extend([offset, path])
         print(f"Running: {' '.join(merge_cmd)}")
@@ -149,7 +166,7 @@ def resolve_python_command():
             return cmd
     return "python3"
 
-def resolve_esptool_command():
+def resolve_esptool_command(module="esptool"):
     """Find a working esptool invocation without assuming pip-installed
     packages in the system Python (which e.g. NixOS does not even ship pip
     for). Preference order:
@@ -158,7 +175,7 @@ def resolve_esptool_command():
          esptool there ($IDF_PYTHON_ENV_PATH, or ~/.espressif/python_env/*)
       3. the current interpreter (works when esptool is importable here)
     """
-    for cmd in ("esptool.py", "esptool"):
+    for cmd in (f"{module}.py", module):
         if shutil.which(cmd):
             return [cmd]
 
@@ -173,9 +190,9 @@ def resolve_esptool_command():
     ))
     for python in idf_pythons:
         if os.path.exists(python):
-            return [python, "-m", "esptool"]
+            return [python, "-m", module]
 
-    return [resolve_python_command(), "-m", "esptool"]
+    return [resolve_python_command(), "-m", module]
 
 def generate_certificates(python_cmd):
     """Generate the adaptive-TLS CA certificate headers (src/certs/) before the
@@ -307,6 +324,33 @@ def prepare_output(name):
     os.makedirs(output_dir, exist_ok=True)
     return output_dir
 
+def package_secure_lab(build_dir, out_path, esptool_cmd):
+    """Sign a lab secure build with the lab key and merge it into Intel HEX.
+
+    Every part, the bootloader included, must be written encrypted, so a single
+    `write-flash --encrypt` can take the file. HEX keeps the gaps unwritten: an
+    encrypted write of a raw merged image would also fill them (e.g. NVS) with
+    encrypted 0xFF."""
+    sys.path.insert(0, os.path.join(FIRMWARE_DIR, "tools"))
+    import secure_lab_reader
+    try:
+        images = secure_lab_reader.flash_layout(build_dir)
+    except secure_lab_reader.LabReaderError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+    plain = [offset for offset, _, encrypted, _ in images if not encrypted]
+    if plain:
+        print(f"Error: {build_dir} has parts that are not written encrypted at {', '.join(plain)}")
+        sys.exit(1)
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            signed = secure_lab_reader.signed_images(images, tmp, resolve_esptool_command("espsecure"))
+        except secure_lab_reader.LabReaderError as e:
+            print(f"Error: signing {build_dir} with the lab key failed: {e}")
+            sys.exit(1)
+        run_merge_bin(esptool_cmd, out_path, [(offset, path) for offset, path, _ in signed], "hex")
+
 def build_lab(variants, esptool_cmd):
     """Lab-only images: merged binaries only, no release manifest."""
     if not variants:
@@ -325,7 +369,12 @@ def build_lab(variants, esptool_cmd):
             print(f"Error: {variant_path} does not set: ATTRACTAP_FIRMWARE_NAME")
             sys.exit(1)
         # INFO keeps the reader-side logs readable on lab serial consoles.
-        _, flash_files, _ = build_variant(variant, variant_path, "INFO")
+        build_dir, flash_files, _ = build_variant(variant, variant_path, "INFO")
+        if secure_lab_variant(variant, content):
+            hex_path = os.path.join(output_dir, f"{firmware_name}.hex")
+            package_secure_lab(build_dir, hex_path, esptool_cmd)
+            print(f"Signed lab secure image created at: {hex_path}")
+            continue
         merged_bin_path = os.path.join(output_dir, f"{firmware_name}.bin")
         run_merge_bin(esptool_cmd, merged_bin_path, flash_files)
         print(f"Merged lab image created at: {merged_bin_path}")
