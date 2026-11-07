@@ -47,6 +47,7 @@ import { SettingsIndexPage } from '../settings/layout/SettingsIndexPage';
 import { SettingsLayout } from '../settings/layout/SettingsLayout';
 import { SETTINGS_SECTION_PERMISSIONS } from '../settings/layout/settingsSections';
 import { AboutSection } from '../settings/sections/about/index';
+import { ReaderSecuritySection } from '../settings/sections/reader-security';
 import { AuditLogSection } from '../settings/sections/audit-log/index';
 import { EmailSection } from '../settings/sections/email/index';
 import { GeneralSection } from '../settings/sections/general/index';
@@ -443,6 +444,15 @@ const coreRoutes: RouteConfig[] = [
     element: (
       <SettingsLayout>
         <AboutSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/reader-security',
+    element: (
+      <SettingsLayout>
+        <ReaderSecuritySection />
       </SettingsLayout>
     ),
     authRequired: 'system.settings.manage',

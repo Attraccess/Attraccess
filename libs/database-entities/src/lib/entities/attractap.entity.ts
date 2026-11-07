@@ -143,6 +143,14 @@ export class Attractap {
   @ApiProperty({ description: 'SHA-256 fingerprint of the current reader public key', nullable: true })
   credentialFingerprint!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Secure Boot digest burned to KEY0 (signing key), hex', nullable: true })
+  secureBootDigest0!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Secure Boot digest burned to KEY1 (recovery key), hex', nullable: true })
+  secureBootDigest1!: string | null;
+
   @Column({ type: 'datetime', nullable: true })
   @ApiProperty({ description: 'When the reader was paired', nullable: true })
   pairedAt!: Date | null;

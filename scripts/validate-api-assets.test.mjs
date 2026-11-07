@@ -125,3 +125,42 @@ test('image verification rejects bundled files that differ from the supplied art
   fs.writeFileSync(path.join(bundled, 'attractap-firmwares', 'touch.bin'), 'mismatch');
   assert.throws(() => main([`--assets-dir=${bundled}`, `--compare-to=${source}`]), /differ/);
 });
+
+function firmwareWithSecureImage(patch = {}) {
+  const sha = (text) => createHash('sha256').update(text).digest('hex');
+  const marker = 'attractap-secure-profile-v1';
+  const entry = {
+    filename: 'touch.bin',
+    filenameOTA: 'touch-ota.bin',
+    secureImage: {
+      appFilename: 'touch-secure-app.bin',
+      bootloaderFilename: 'touch-secure-bootloader.bin',
+      secureVersion: 1,
+      profileMarker: marker,
+      appSha256: sha(`app ${marker}`),
+      bootloaderSha256: sha('boot'),
+      partitionTableSha256: sha('table'),
+      ...patch,
+    },
+  };
+  fs.writeFileSync(path.join(root, 'touch.bin'), 'firmware');
+  fs.writeFileSync(path.join(root, 'touch-ota.bin'), 'firmware');
+  fs.writeFileSync(path.join(root, 'touch-secure-app.bin'), `app ${marker}`);
+  fs.writeFileSync(path.join(root, 'touch-secure-bootloader.bin'), 'boot');
+  fs.writeFileSync(path.join(root, 'firmwares.json'), JSON.stringify({ firmwares: [entry] }));
+}
+
+test('secure images need their marker, checksums and a valid secureVersion', () => {
+  firmwareWithSecureImage();
+  validateAttractap(root);
+  firmwareWithSecureImage({ bootloaderSha256: '0'.repeat(64) });
+  assert.throws(() => validateAttractap(root), /checksum mismatch/);
+  firmwareWithSecureImage({ secureVersion: 0 });
+  assert.throws(() => validateAttractap(root), /secureVersion/);
+  firmwareWithSecureImage({ profileMarker: 'other-marker' });
+  assert.throws(() => validateAttractap(root), /profile marker/);
+  firmwareWithSecureImage({ partitionTableSha256: 'nope' });
+  assert.throws(() => validateAttractap(root), /partition table hash/);
+  firmwareWithSecureImage({ appFilename: 'touch-ota.bin' });
+  assert.throws(() => validateAttractap(root), /must not reuse/);
+});

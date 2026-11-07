@@ -1,0 +1,79 @@
+{
+  "title": "Reader security",
+  "description": "Keys for securing Attractap readers over the air. Secured readers only accept updates signed by these keys.",
+  "warning": "If you lose both the signing key and the recovery key, secured readers can never be updated again. Keep the recovery file and the signing key backup somewhere safe, and keep them apart.",
+  "error": "That did not work",
+  "cancel": "Cancel",
+  "status": {
+    "label": "Status",
+    "none": "No keys",
+    "recovery-check-pending": "Keys created, recovery check pending",
+    "restoredPending": "Restored, recovery check pending",
+    "ready": "Ready",
+    "verifiedAt": "Recovery key checked on {{date}}"
+  },
+  "fingerprints": {
+    "signing": "Signing key fingerprint",
+    "recovery": "Recovery key fingerprint"
+  },
+  "actions": {
+    "create": "Create keys",
+    "downloadRecovery": "Download recovery key",
+    "checkRecovery": "Check recovery key",
+    "downloadBackup": "Download signing key backup",
+    "restore": "Restore",
+    "regenerate": "Regenerate keys"
+  },
+  "locked": "{{count}} reader(s) have this installation's keys burned in. The keys cannot be regenerated.",
+  "passphrase": {
+    "label": "Passphrase",
+    "repeat": "Repeat passphrase",
+    "tooShort": "At least {{min}} characters.",
+    "mismatch": "The passphrases differ."
+  },
+  "file": {
+    "label": "Key file"
+  },
+  "recovery": {
+    "title": "Download recovery key",
+    "description": "The file is encrypted with a passphrase you choose. Neither the file nor the passphrase is stored here. You can download it again until you have checked it.",
+    "submit": "Download"
+  },
+  "check": {
+    "title": "Check recovery key",
+    "description": "Upload the recovery file you downloaded and enter its passphrase. If it matches, the server deletes its copy of the recovery key and secured readers can be created.",
+    "submit": "Check"
+  },
+  "restore": {
+    "title": "Restore keys",
+    "description": "Upload a signing key backup or the recovery file with its passphrase. After restoring from the recovery file, a fresh recovery key is created that you must check again.",
+    "submit": "Restore",
+    "source": {
+      "signing-backup": "Signing key backup",
+      "recovery-file": "Recovery file"
+    }
+  },
+  "regenerate": {
+    "title": "Regenerate keys?",
+    "description": "This replaces both keys. Downloaded recovery files and backups of the old keys stop being useful. It is only possible while no reader has this installation's keys burned in.",
+    "confirm": "Regenerate"
+  },
+  "toast": {
+    "created": "Keys created",
+    "recoveryDownloaded": "Recovery key downloaded",
+    "backupDownloaded": "Signing key backup downloaded",
+    "recoveryVerified": "Recovery key checked",
+    "restored": "Keys restored"
+  },
+  "whatToBackup": {
+    "title": "What to back up",
+    "secret": "AUTH_SESSION_SECRET: without it the stored keys cannot be decrypted.",
+    "database": "The database, which holds the encrypted signing key and the reader records.",
+    "recovery": "The recovery key file and its passphrase, plus a signing key backup."
+  },
+  "backup": {
+    "title": "Download signing key backup",
+    "description": "The backup is encrypted with a passphrase you choose and works with openssl and espsecure. Neither the file nor the passphrase is stored here.",
+    "submit": "Download"
+  }
+}

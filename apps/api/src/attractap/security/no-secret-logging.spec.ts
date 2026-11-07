@@ -77,6 +77,7 @@ describe('secret hygiene in logs', () => {
   const files = [
     ...sources(join(ROOT, 'security')),
     ...sources(join(ROOT, 'websockets')),
+    ...sources(join(ROOT, 'secure-boot')),
     join(ROOT, 'pairing.controller.ts'),
   ];
 

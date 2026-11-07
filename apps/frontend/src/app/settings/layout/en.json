@@ -31,6 +31,10 @@
       "label": "Security",
       "description": "Sign-in throttling, password policy, 2FA and signup domains"
     },
+    "readerSecurity": {
+      "label": "Reader security",
+      "description": "Secure Boot keys and backups for secured readers"
+    },
     "roles": {
       "label": "Roles",
       "description": "Roles and their permission sets"

@@ -4,6 +4,8 @@ export { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity
 export { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 export { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
 export { AttractapInstallation } from './entities/attractap-installation.entity';
+export { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
+export type { SecureBootKeyRole } from './entities/attractap-secure-boot-key.entity';
 export {
   ReaderUiAlert,
   ReaderUiPluginSettings,
@@ -142,6 +144,7 @@ import { Attractap } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 import { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
 import { AttractapInstallation } from './entities/attractap-installation.entity';
+import { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
 import {
   ReaderUiAlert,
   ReaderUiPluginSettings,
@@ -226,6 +229,7 @@ export const entities = {
   AttractapCrashReport,
   AttractapCredentialEvent,
   AttractapInstallation,
+  AttractapSecureBootKey,
   ReaderUiAlert,
   ReaderUiPluginSettings,
   ReaderUiReaderSettings,

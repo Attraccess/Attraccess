@@ -27,6 +27,7 @@ import {
   AttractapCrashReport,
   AttractapCredentialEvent,
   AttractapInstallation,
+  AttractapSecureBootKey,
   NFCCard,
   NFCCardPendingChange,
   Resource,
@@ -39,6 +40,9 @@ import { InstallationIdentityService } from './security/installation-identity.se
 import { PairingService } from './security/pairing.service';
 import { ReaderSessionService } from './security/reader-session.service';
 import { SessionMetrics } from './security/session-metrics';
+import { SecureBootKeyService } from './secure-boot/secure-boot-key.service';
+import { SecureImageService } from './secure-boot/secure-image.service';
+import { AttractapSecureBootKeysController } from './secure-boot/secure-boot-keys.controller';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
@@ -87,6 +91,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
       AttractapCrashReport,
       AttractapCredentialEvent,
       AttractapInstallation,
+      AttractapSecureBootKey,
       NFCCard,
       NFCCardPendingChange,
       Resource,
@@ -122,6 +127,8 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     CredentialRegistryService,
     PairingService,
     ReaderSessionService,
+    SecureBootKeyService,
+    SecureImageService,
     SessionMetrics,
     CardAccessService,
     AttractapService,
@@ -160,6 +167,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     AttractapFirmwareController,
     ResourceAttractapsController,
     AttractapPairingController,
+    AttractapSecureBootKeysController,
     ReaderUiAdminController,
   ],
 })
