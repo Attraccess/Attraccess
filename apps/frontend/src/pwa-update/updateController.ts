@@ -35,13 +35,13 @@ export interface PwaUpdateControllerOptions {
   doc?: Document;
   win?: Window;
   reload?: () => void;
-  sessionStorage?: Pick<Storage, 'getItem' | 'setItem'>;
+  sessionStorage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   checkForUpdates?: boolean;
 }
 
 const set = (state: Partial<PwaUpdateState>) => usePwaUpdateStore.setState(state);
 
-function getSessionStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
+function getSessionStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | undefined {
   try {
     return window.sessionStorage;
   } catch {
@@ -62,7 +62,8 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
   const reload = options.reload ?? (() => win.location.reload());
   const session = options.sessionStorage ?? getSessionStorage();
 
-  let hadController = !!sw.controller;
+  // A hard reload leaves the page uncontrolled although a worker is active; its next claim is still an update.
+  let hadController = !!sw.controller || !!registration.active;
   let reloading = false;
   let activatedElsewhere = false;
   let applyRequested = false;
@@ -76,6 +77,16 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
     if (reloading) return;
     reloading = true;
     reload();
+    // A beforeunload prompt ("Leave site?") can cancel the reload. If this page is still alive, the new
+    // version is active but not loaded: go back to ready so the next apply reloads.
+    const timer = setTimeout(() => {
+      reloading = false;
+      applyRequested = false;
+      activatedElsewhere = true;
+      set({ status: 'ready', progress: 1 });
+      rearmTriggers();
+    }, APPLY_TIMEOUT_MS);
+    cleanups.push(() => clearTimeout(timer));
   };
 
   const postSkipWaiting = () => {
@@ -106,6 +117,10 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
     console.warn('Service worker update did not activate; keeping the update ready.');
     applyRequested = false;
     set({ status: 'ready' });
+    rearmTriggers();
+  };
+
+  const rearmTriggers = () => {
     teardownTriggers?.();
     teardownTriggers = armAutoApply();
   };
@@ -116,8 +131,7 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
       apply();
       return;
     }
-    teardownTriggers?.();
-    teardownTriggers = armAutoApply();
+    rearmTriggers();
   };
 
   const armAutoApply = () => {
@@ -162,7 +176,9 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
       } else if (worker.state === 'redundant') {
         worker.removeEventListener('statechange', onState);
         console.warn('Service worker update failed to install; will retry on the next check.');
-        set({ status: 'idle', progress: null });
+        // An earlier update may still be waiting; keep offering that one.
+        if (registration.waiting) enterReady();
+        else set({ status: 'idle', progress: null });
       }
     };
     worker.addEventListener('statechange', onState);
@@ -177,7 +193,8 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
     const data = event.data as { type?: string; done?: number; total?: number } | undefined;
     if (data?.type !== 'SW_UPDATE_PROGRESS' || usePwaUpdateStore.getState().status !== 'downloading') return;
     if (typeof data.done === 'number' && typeof data.total === 'number' && data.total > 0) {
-      set({ progress: Math.min(1, Math.max(0, data.done / data.total)) });
+      const next = Math.min(1, Math.max(0, data.done / data.total));
+      set({ progress: Math.max(usePwaUpdateStore.getState().progress ?? 0, next) });
     }
   };
   sw.addEventListener('message', onMessage);
@@ -224,7 +241,8 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
     if (registration.waiting) {
       const alreadyTried = (() => {
         try {
-          return session?.getItem(BOOT_APPLY_STORAGE_KEY) === '1';
+          // Without a working guard, never auto-apply: it could loop.
+          return !session || session.getItem(BOOT_APPLY_STORAGE_KEY) === '1';
         } catch {
           return true;
         }
@@ -237,12 +255,18 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
           set({ status: 'ready', progress: 1 });
           applyAfterLoad();
         } catch {
-          // Without a working guard, never auto-apply: it could loop.
+          // The guard could not be stored: same as no guard.
           enterReady();
         }
       }
-    } else if (registration.installing) {
-      track(registration.installing);
+    } else {
+      // Nothing waiting: the last boot-time apply (if any) worked, so a later update may boot-apply again.
+      try {
+        session?.removeItem(BOOT_APPLY_STORAGE_KEY);
+      } catch {
+        // Keeping the guard only means a later update shows the card instead of applying at boot.
+      }
+      if (registration.installing) track(registration.installing);
     }
   }
 
@@ -268,6 +292,8 @@ export function startPwaUpdateController(options: PwaUpdateControllerOptions) {
 
 const CHUNK_RELOAD_STORAGE_KEY = 'attraccess.pwaUpdate.chunkReloadAt';
 const CHUNK_RELOAD_WINDOW_MS = 30_000;
+/** A failed lazy import this soon after the worker changed is likely a chunk the new version removed. */
+const CONTROLLER_CHANGE_WINDOW_MS = 5 * 60 * 1000;
 let controllerChangedAt: number | null = null;
 
 function markControllerChanged() {
@@ -284,12 +310,13 @@ export function handleChunkLoadError(
   const updateInPlay =
     status === 'ready' ||
     status === 'applying' ||
-    (controllerChangedAt !== null && now - controllerChangedAt < 5 * 60 * 1000);
-  if (!updateInPlay) return false;
+    (controllerChangedAt !== null && now - controllerChangedAt < CONTROLLER_CHANGE_WINDOW_MS);
+  // Without storage there is no loop guard, so never force a reload.
+  if (!updateInPlay || !storage) return false;
   try {
-    const last = Number(storage?.getItem(CHUNK_RELOAD_STORAGE_KEY) ?? 0);
+    const last = Number(storage.getItem(CHUNK_RELOAD_STORAGE_KEY) ?? 0);
     if (now - last < CHUNK_RELOAD_WINDOW_MS) return false;
-    storage?.setItem(CHUNK_RELOAD_STORAGE_KEY, String(now));
+    storage.setItem(CHUNK_RELOAD_STORAGE_KEY, String(now));
   } catch {
     return false;
   }
@@ -297,19 +324,20 @@ export function handleChunkLoadError(
   return true;
 }
 
+/** Matches the dynamic import failures of Chromium, Firefox and Safari. */
+export function isChunkLoadError(reason: unknown): boolean {
+  const message = String((reason as Error | undefined)?.message ?? reason);
+  return /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed/i.test(
+    message,
+  );
+}
+
 export function installChunkLoadSafetyNet() {
   const onPreloadError = (event: Event) => {
     if (handleChunkLoadError()) event.preventDefault();
   };
   const onRejection = (event: PromiseRejectionEvent) => {
-    const message = String((event.reason as Error | undefined)?.message ?? event.reason);
-    if (
-      /Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed/i.test(
-        message,
-      )
-    ) {
-      handleChunkLoadError();
-    }
+    if (isChunkLoadError(event.reason)) handleChunkLoadError();
   };
   window.addEventListener('vite:preloadError', onPreloadError);
   window.addEventListener('unhandledrejection', onRejection);

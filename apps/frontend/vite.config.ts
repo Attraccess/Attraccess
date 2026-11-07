@@ -95,6 +95,8 @@ export default defineConfig(({ command }) => {
         manifest: siteWebManifest,
         // 'prompt': nothing reloads the page on its own; src/pwa-update drives the update flow.
         registerType: 'prompt',
+        // src/pwa-update/register.ts registers the worker; never inject the plugin's own registerSW.js.
+        injectRegister: false,
         srcDir: 'src',
         filename: 'service-worker.ts',
         strategies: 'injectManifest',

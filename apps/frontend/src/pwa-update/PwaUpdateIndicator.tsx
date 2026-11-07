@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import {
   Button,
@@ -8,8 +9,9 @@ import {
   ProgressCircleTrackCircle,
   Tooltip,
   TooltipContent,
+  TooltipTrigger,
 } from '@heroui/react';
-import { GripVertical, RefreshCw } from 'lucide-react';
+import { GripVertical, Info, RefreshCw } from 'lucide-react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
@@ -20,6 +22,7 @@ import type { Corner } from './corner';
 const TOAST_ID = 'pwa-update-downloading';
 const TOAST_DURATION_MS = 4000;
 const INSET = '1rem';
+const ARROW_KEYS = 'ArrowUp ArrowDown ArrowLeft ArrowRight';
 
 function anchor(corner: Corner): React.CSSProperties {
   const [vertical, horizontal] = corner.split('-');
@@ -32,14 +35,16 @@ function anchor(corner: Corner): React.CSSProperties {
 
 type Translate = ReturnType<typeof useTranslations>['t'];
 
-function DownloadingRing({ percent, t }: { percent: number | null; t: Translate }) {
+function DownloadingRing({ percent, hintId, t }: { percent: number | null; hintId: string; t: Translate }) {
   const label = percent === null ? t('downloadingTooltipIndeterminate') : t('downloadingTooltip', { percent });
   return (
     <Tooltip>
-      <div
+      <TooltipTrigger
         role="progressbar"
         tabIndex={0}
         aria-label={t('downloading')}
+        aria-describedby={hintId}
+        aria-keyshortcuts={ARROW_KEYS}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent ?? undefined}
@@ -61,13 +66,21 @@ function DownloadingRing({ percent, t }: { percent: number | null; t: Translate 
           </ProgressCircle>
         </div>
         {percent !== null && <span className="relative text-[10px] font-medium">{percent}%</span>}
-      </div>
+      </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
   );
 }
 
-function ReadyCard({ applying, onLater, t }: { applying: boolean; onLater: () => void; t: Translate }) {
+interface ReadyCardProps {
+  applying: boolean;
+  titleId: string;
+  focusReload: boolean;
+  onLater: () => void;
+  t: Translate;
+}
+
+function ReadyCard({ applying, titleId, focusReload, onLater, t }: ReadyCardProps) {
   return (
     <>
       <div
@@ -78,12 +91,14 @@ function ReadyCard({ applying, onLater, t }: { applying: boolean; onLater: () =>
         <GripVertical className="size-4" />
       </div>
       <div className="flex flex-col gap-2 p-1">
-        <div aria-live="polite">
-          <p className="text-sm font-medium">{t('ready.title')}</p>
+        <div>
+          <p id={titleId} className="text-sm font-medium">
+            {t('ready.title')}
+          </p>
           <p className="text-xs text-muted">{t('ready.description')}</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="primary" isPending={applying} onPress={applyPwaUpdate}>
+          <Button size="sm" variant="primary" autoFocus={focusReload} isPending={applying} onPress={applyPwaUpdate}>
             {t('ready.reload')}
           </Button>
           <Button size="sm" variant="secondary" isDisabled={applying} onPress={onLater}>
@@ -105,6 +120,8 @@ function useDownloadToast(status: PwaUpdateStatus, t: Translate) {
       setToastDone(false);
       toast.info(t('toast.title'), {
         id: TOAST_ID,
+        // Same icon as the app's other info toasts (components/toastProvider.tsx).
+        icon: <Info className="h-5 w-5 text-accent" />,
         description: t('toast.description'),
         duration: TOAST_DURATION_MS,
         onDismiss: () => setToastDone(true),
@@ -121,15 +138,42 @@ function useDownloadToast(status: PwaUpdateStatus, t: Translate) {
   return toastDone;
 }
 
+type FocusOnMount = 'collapsed' | 'reload' | null;
+
 export function PwaUpdateIndicator() {
   const { t } = useTranslations({ en, de });
   const status = usePwaUpdateStore((s) => s.status);
+  const hintId = useId();
+  const ready = status === 'ready' || status === 'applying';
+
+  // Portal: outside pull-to-refresh (its touch handlers and transform) and last in the tab order.
+  return createPortal(
+    <>
+      {/* Mounted empty so screen readers announce the text when it appears, once per update. */}
+      <div aria-live="polite" className="sr-only">
+        {ready ? t('ready.title') : ''}
+      </div>
+      <span id={hintId} hidden>
+        {t('moveHint')}
+      </span>
+      <FloatingIndicator status={status} hintId={hintId} t={t} />
+    </>,
+    document.body,
+  );
+}
+
+function FloatingIndicator({ status, hintId, t }: { status: PwaUpdateStatus; hintId: string; t: Translate }) {
   const progress = usePwaUpdateStore((s) => s.progress);
   const { ref, corner, offset, animating, handlers } = useDraggableCorner();
   const [collapsed, setCollapsed] = useState(false);
+  // Only a user's Later / reopen moves focus; the indicator never takes focus on its own.
+  const [focusOnMount, setFocusOnMount] = useState<FocusOnMount>(null);
+  const titleId = useId();
   const toastDone = useDownloadToast(status, t);
 
   useEffect(() => {
+    // A later update must not take focus because of an earlier Later / reopen.
+    if (status === 'idle' || status === 'downloading') setFocusOnMount(null);
     if (status === 'idle') setCollapsed(false);
   }, [status]);
 
@@ -152,20 +196,26 @@ export function PwaUpdateIndicator() {
         style={style}
         {...handlers}
       >
-        <DownloadingRing percent={progress === null ? null : Math.round(progress * 100)} t={t} />
+        <DownloadingRing percent={progress === null ? null : Math.round(progress * 100)} hintId={hintId} t={t} />
       </div>
     );
   }
 
   if (collapsed) {
     return (
-      <div ref={ref} className={`fixed ${motion}`} style={style} {...handlers}>
+      <div ref={ref} className={`fixed select-none ${motion}`} style={style} {...handlers}>
         <Button
           isIconOnly
           variant="primary"
           className="size-11 rounded-full shadow-overlay"
           aria-label={t('ready.reopen')}
-          onPress={() => setCollapsed(false)}
+          aria-describedby={hintId}
+          aria-keyshortcuts={ARROW_KEYS}
+          autoFocus={focusOnMount === 'collapsed'}
+          onPress={() => {
+            setFocusOnMount('reload');
+            setCollapsed(false);
+          }}
         >
           <RefreshCw className="size-5" />
         </Button>
@@ -177,13 +227,24 @@ export function PwaUpdateIndicator() {
     <div
       ref={ref}
       role="group"
-      aria-label={t('ready.title')}
+      aria-labelledby={titleId}
+      aria-describedby={hintId}
+      aria-keyshortcuts={ARROW_KEYS}
       tabIndex={0}
       className={`fixed flex max-w-[calc(100vw-2rem)] select-none items-stretch gap-1 rounded-2xl border border-border bg-overlay p-2 shadow-overlay animate-in fade-in zoom-in-95 motion-reduce:animate-none ${motion}`}
       style={style}
       {...handlers}
     >
-      <ReadyCard applying={status === 'applying'} onLater={() => setCollapsed(true)} t={t} />
+      <ReadyCard
+        applying={status === 'applying'}
+        titleId={titleId}
+        focusReload={focusOnMount === 'reload'}
+        onLater={() => {
+          setFocusOnMount('collapsed');
+          setCollapsed(true);
+        }}
+        t={t}
+      />
     </div>
   );
 }

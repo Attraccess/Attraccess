@@ -36,26 +36,35 @@ async function countEntriesToDownload(urls: string[]): Promise<number> {
 
 export function setupUpdateProgress(manifestUrls: string[]) {
   let done = 0;
-  let total = new Set(manifestUrls).size;
+  // Only this worker's own install is reported. Workbox also caches missing entries at fetch time in an
+  // active worker; those writes are not an update download.
+  let installing = false;
+  let resolveTotal: (total: number) => void = () => undefined;
+  const total = new Promise<number>((resolve) => (resolveTotal = resolve));
 
   addPlugins([
     {
       cacheDidUpdate: async () => {
+        if (!installing) return;
         done += 1;
-        await broadcast(Math.min(done, total), total);
+        // Progress waits for the total, so the first message is always (0, total) and progress never jumps back.
+        const knownTotal = await total;
+        await broadcast(Math.min(done, knownTotal), knownTotal);
       },
     },
   ]);
 
   self.addEventListener('install', (event) => {
+    installing = true;
     event.waitUntil(
       (async () => {
-        total = await countEntriesToDownload(manifestUrls);
-        await broadcast(0, total);
-        if (total === 0) {
-          await broadcast(0, 0);
-        }
+        const count = await countEntriesToDownload(manifestUrls);
+        await broadcast(0, count);
+        resolveTotal(count);
       })(),
     );
+  });
+  self.addEventListener('activate', () => {
+    installing = false;
   });
 }

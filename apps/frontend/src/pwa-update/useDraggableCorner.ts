@@ -1,7 +1,8 @@
 import { useCallback, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { adjacentCorner, loadCorner, nearestCorner, saveCorner, type ArrowKey, type Corner } from './corner';
 
-const DRAG_THRESHOLD_PX = 4;
+// A finger wobbles more than a mouse; below this a press stays a press.
+const dragThreshold = (pointerType: string) => (pointerType === 'mouse' ? 4 : 10);
 const ARROWS: ArrowKey[] = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
 const prefersReducedMotion = () =>
@@ -51,9 +52,9 @@ export function useDraggableCorner() {
     return () => cancelAnimationFrame(frame);
   }, [corner]);
 
+  // Pointer handlers run in the capture phase: the buttons inside stop pointerdown from bubbling.
   const onPointerDown = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || !ref.current) return;
-    event.currentTarget.setPointerCapture?.(event.pointerId);
     drag.current = {
       startX: event.clientX,
       startY: event.clientY,
@@ -67,8 +68,17 @@ export function useDraggableCorner() {
     if (!d) return;
     const x = event.clientX - d.startX;
     const y = event.clientY - d.startY;
-    if (!d.moved && Math.hypot(x, y) < DRAG_THRESHOLD_PX) return;
-    d.moved = true;
+    if (!d.moved) {
+      // Without capture yet, a mouse released outside the indicator never sends us pointerup.
+      if (event.pointerType === 'mouse' && event.buttons === 0) {
+        drag.current = null;
+        return;
+      }
+      if (Math.hypot(x, y) < dragThreshold(event.pointerType)) return;
+      // Capture only once it is a drag, so a press on a button inside still reaches the button.
+      ref.current?.setPointerCapture?.(event.pointerId);
+      d.moved = true;
+    }
     setAnimating(false);
     setOffset({ x, y });
   };
@@ -99,7 +109,7 @@ export function useDraggableCorner() {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.target !== event.currentTarget || !ARROWS.includes(event.key as ArrowKey)) return;
+    if (!ARROWS.includes(event.key as ArrowKey)) return;
     event.preventDefault();
     moveTo(adjacentCorner(corner, event.key as ArrowKey));
   };
@@ -117,6 +127,13 @@ export function useDraggableCorner() {
     corner,
     offset,
     animating,
-    handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onKeyDown, onClickCapture },
+    handlers: {
+      onPointerDownCapture: onPointerDown,
+      onPointerMoveCapture: onPointerMove,
+      onPointerUpCapture: onPointerUp,
+      onPointerCancelCapture: onPointerUp,
+      onKeyDown,
+      onClickCapture,
+    },
   };
 }

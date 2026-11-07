@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ACTIVITY_EVENTS,
   APPLY_TIMEOUT_MS,
   BOOT_APPLY_DELAY_MS,
   BOOT_APPLY_STORAGE_KEY,
   handleChunkLoadError,
   IDLE_APPLY_MS,
+  isChunkLoadError,
   startPwaUpdateController,
+  UPDATE_CHECK_INTERVAL_MS,
   usePwaUpdateStore,
 } from './updateController';
 
@@ -24,6 +27,7 @@ function memoryStorage() {
     store,
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
   };
 }
 
@@ -31,14 +35,18 @@ function setup(
   opts: {
     controller?: boolean;
     waiting?: FakeWorker;
+    installing?: FakeWorker;
+    active?: boolean;
+    checkForUpdates?: boolean;
     hidden?: boolean;
     loading?: boolean;
     storage?: ReturnType<typeof memoryStorage>;
   } = {},
 ) {
   const registration = Object.assign(new EventTarget(), {
-    installing: null as FakeWorker | null,
+    installing: (opts.installing ?? null) as FakeWorker | null,
     waiting: opts.waiting ?? null,
+    active: opts.active ? {} : null,
     update: vi.fn().mockResolvedValue(undefined),
   });
   const sw = Object.assign(new EventTarget(), { controller: (opts.controller === false ? null : {}) as object | null });
@@ -56,7 +64,7 @@ function setup(
     win,
     reload,
     sessionStorage: storage,
-    checkForUpdates: false,
+    checkForUpdates: opts.checkForUpdates ?? false,
   });
   const foundUpdate = () => {
     const worker = new FakeWorker();
@@ -69,7 +77,11 @@ function setup(
     doc.dispatchEvent(new Event('visibilitychange'));
   };
   const message = (data: unknown) => sw.dispatchEvent(new MessageEvent('message', { data }));
-  return { registration, sw, win, doc, reload, controller, foundUpdate, hide, message, storage };
+  const show = () => {
+    (doc as unknown as { visibilityState: string }).visibilityState = 'visible';
+    doc.dispatchEvent(new Event('visibilitychange'));
+  };
+  return { registration, sw, win, doc, reload, controller, foundUpdate, hide, show, message, storage };
 }
 
 const status = () => usePwaUpdateStore.getState().status;
@@ -78,6 +90,7 @@ const progress = () => usePwaUpdateStore.getState().progress;
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('update detection', () => {
@@ -99,6 +112,32 @@ describe('update detection', () => {
     expect(progress()).toBe(0.25);
     worker.setState('installed');
     expect(status()).toBe('ready');
+  });
+
+  it('never moves progress backwards', () => {
+    const t = setup();
+    t.foundUpdate();
+    t.message({ type: 'SW_UPDATE_PROGRESS', done: 2, total: 4 });
+    t.message({ type: 'SW_UPDATE_PROGRESS', done: 0, total: 4 });
+    expect(progress()).toBe(0.5);
+  });
+
+  it('keeps offering a waiting update when a newer download fails', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const t = setup();
+    t.registration.waiting = new FakeWorker();
+    t.foundUpdate().setState('installed');
+    t.foundUpdate().setState('redundant');
+    expect(status()).toBe('ready');
+  });
+
+  it('checks for updates every 15 minutes until disposed', () => {
+    const t = setup({ checkForUpdates: true });
+    vi.advanceTimersByTime(UPDATE_CHECK_INTERVAL_MS);
+    expect(t.registration.update).toHaveBeenCalledOnce();
+    t.controller.dispose();
+    vi.advanceTimersByTime(UPDATE_CHECK_INTERVAL_MS * 2);
+    expect(t.registration.update).toHaveBeenCalledOnce();
   });
 
   it('returns to idle with a warning when the worker becomes redundant', () => {
@@ -123,6 +162,34 @@ describe('apply', () => {
     t.sw.dispatchEvent(new Event('controllerchange'));
     t.sw.dispatchEvent(new Event('controllerchange'));
     expect(t.reload).toHaveBeenCalledOnce();
+  });
+
+  it('does nothing unless an update is ready', () => {
+    const t = setup();
+    t.controller.apply();
+    const worker = t.foundUpdate();
+    t.registration.waiting = new FakeWorker();
+    t.controller.apply();
+    vi.advanceTimersByTime(IDLE_APPLY_MS * 2);
+    expect(status()).toBe('downloading');
+    expect(t.registration.waiting.postMessage).not.toHaveBeenCalled();
+    expect(t.reload).not.toHaveBeenCalled();
+    worker.setState('installed');
+    expect(status()).toBe('ready');
+  });
+
+  it('goes back to ready when a beforeunload prompt cancels the reload, and reloads on the next apply', () => {
+    const t = setup();
+    t.registration.waiting = new FakeWorker();
+    t.foundUpdate().setState('installed');
+    t.controller.apply();
+    t.sw.dispatchEvent(new Event('controllerchange'));
+    expect(t.reload).toHaveBeenCalledOnce();
+    // The page is still alive: the user chose to stay.
+    vi.advanceTimersByTime(APPLY_TIMEOUT_MS);
+    expect(status()).toBe('ready');
+    t.controller.apply();
+    expect(t.reload).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -149,7 +216,7 @@ describe('apply that never activates', () => {
     t.foundUpdate().setState('installed');
     t.controller.apply();
     t.sw.dispatchEvent(new Event('controllerchange'));
-    vi.advanceTimersByTime(APPLY_TIMEOUT_MS);
+    vi.advanceTimersByTime(APPLY_TIMEOUT_MS - 1);
     expect(status()).toBe('applying');
     expect(t.reload).toHaveBeenCalledOnce();
   });
@@ -163,10 +230,10 @@ describe('auto-apply triggers', () => {
     return t;
   };
 
-  it('applies after 5 minutes without input and input resets the timer', () => {
+  it.each(ACTIVITY_EVENTS)('applies after 5 minutes without input and %s resets the timer', (type) => {
     const t = readyTab();
     vi.advanceTimersByTime(IDLE_APPLY_MS - 1000);
-    t.win.dispatchEvent(new Event('keydown'));
+    t.win.dispatchEvent(new Event(type));
     vi.advanceTimersByTime(IDLE_APPLY_MS - 1000);
     expect(status()).toBe('ready');
     vi.advanceTimersByTime(1000);
@@ -177,6 +244,23 @@ describe('auto-apply triggers', () => {
     const t = readyTab();
     t.hide();
     vi.advanceTimersByTime(0);
+    expect(status()).toBe('applying');
+  });
+
+  it('does not apply when the tab is visible again before the deferred check', () => {
+    const t = readyTab();
+    t.hide();
+    t.show();
+    vi.advanceTimersByTime(0);
+    expect(status()).toBe('ready');
+  });
+
+  it('applies right away when the download finishes in a hidden tab', () => {
+    const t = setup();
+    t.registration.waiting = new FakeWorker();
+    const worker = t.foundUpdate();
+    t.hide();
+    worker.setState('installed');
     expect(status()).toBe('applying');
   });
 
@@ -218,8 +302,68 @@ describe('boot-time waiting check', () => {
 
     // Same session, worker still waiting: show the card instead of looping.
     const again = setup({ waiting: new FakeWorker(), storage });
+    vi.advanceTimersByTime(BOOT_APPLY_DELAY_MS * 2);
     expect(status()).toBe('ready');
     expect(again.registration.waiting?.postMessage).not.toHaveBeenCalled();
+    expect(again.reload).not.toHaveBeenCalled();
+  });
+
+  it('applies a later update at boot again once the earlier one went through', () => {
+    const storage = memoryStorage();
+    setup({ waiting: new FakeWorker(), storage }).controller.dispose();
+    // The reload found nothing waiting: the earlier boot-time apply worked.
+    setup({ storage }).controller.dispose();
+    expect(storage.store.has(BOOT_APPLY_STORAGE_KEY)).toBe(false);
+    const waiting = new FakeWorker();
+    setup({ waiting, storage });
+    vi.advanceTimersByTime(BOOT_APPLY_DELAY_MS);
+    expect(waiting.postMessage).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['reading', 'getItem'],
+    ['writing', 'setItem'],
+  ] as const)('never auto-applies when %s the guard throws', (_, method) => {
+    const storage = memoryStorage();
+    storage[method] = () => {
+      throw new Error('blocked');
+    };
+    const waiting = new FakeWorker();
+    const t = setup({ waiting, storage });
+    vi.advanceTimersByTime(BOOT_APPLY_DELAY_MS * 2);
+    expect(status()).toBe('ready');
+    expect(waiting.postMessage).not.toHaveBeenCalled();
+    expect(t.reload).not.toHaveBeenCalled();
+  });
+
+  it('never auto-applies without session storage', () => {
+    vi.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const waiting = new FakeWorker();
+    const registration = Object.assign(new EventTarget(), { installing: null, waiting, active: {} });
+    startPwaUpdateController({
+      registration: registration as unknown as ServiceWorkerRegistration,
+      serviceWorker: Object.assign(new EventTarget(), { controller: {} }) as unknown as ServiceWorkerContainer,
+      doc: Object.assign(new EventTarget(), {
+        visibilityState: 'visible',
+        readyState: 'complete',
+      }) as unknown as Document,
+      win: new EventTarget() as unknown as Window,
+      reload: vi.fn(),
+      checkForUpdates: false,
+    });
+    vi.advanceTimersByTime(BOOT_APPLY_DELAY_MS * 2);
+    expect(status()).toBe('ready');
+    expect(waiting.postMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps tracking an install that was already running when the page loaded', () => {
+    const installing = new FakeWorker();
+    setup({ installing });
+    expect(status()).toBe('downloading');
+    installing.setState('installed');
+    expect(status()).toBe('ready');
   });
 
   it('waits for the page load before applying', () => {
@@ -249,6 +393,14 @@ describe('page that loaded before the first service worker existed', () => {
     t.registration.waiting = new FakeWorker();
     t.foundUpdate().setState('installed');
     t.controller.apply();
+    t.sw.dispatchEvent(new Event('controllerchange'));
+    expect(t.reload).toHaveBeenCalledOnce();
+  });
+});
+
+describe('page loaded uncontrolled although a worker is active (hard reload)', () => {
+  it('treats the next claim as an update', () => {
+    const t = setup({ controller: false, active: true, hidden: true });
     t.sw.dispatchEvent(new Event('controllerchange'));
     expect(t.reload).toHaveBeenCalledOnce();
   });
@@ -284,5 +436,30 @@ describe('chunk load safety net', () => {
     expect(handleChunkLoadError(base + 10_000, storage, reload)).toBe(false);
     expect(handleChunkLoadError(base + 31_000, storage, reload)).toBe(true);
     expect(reload).toHaveBeenCalledTimes(2);
+  });
+
+  it('never forces a reload without a storage guard', () => {
+    const reload = vi.fn();
+    usePwaUpdateStore.setState({ status: 'ready' });
+    vi.spyOn(window, 'sessionStorage', 'get').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    expect(handleChunkLoadError(Date.now(), undefined, reload)).toBe(false);
+    const throwing = {
+      getItem: () => '0',
+      setItem: () => {
+        throw new Error('quota');
+      },
+    };
+    expect(handleChunkLoadError(Date.now(), throwing, reload)).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('recognises dynamic import failures of the major browsers', () => {
+    expect(isChunkLoadError(new TypeError('Failed to fetch dynamically imported module: https://x/a.js'))).toBe(true);
+    expect(isChunkLoadError(new TypeError('error loading dynamically imported module: https://x/a.js'))).toBe(true);
+    expect(isChunkLoadError(new TypeError('Importing a module script failed.'))).toBe(true);
+    expect(isChunkLoadError(new Error('Network request failed'))).toBe(false);
+    expect(isChunkLoadError(undefined)).toBe(false);
   });
 });

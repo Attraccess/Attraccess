@@ -50,7 +50,7 @@ describe('registerPwaUpdates', () => {
   it('keeps the plugin registration in dev and does not start the update controller', () => {
     vi.stubEnv('PROD', false);
     registerPwaUpdates();
-    expect(mocks.registerSW).toHaveBeenCalledWith({ immediate: true });
+    expect(mocks.registerSW).toHaveBeenCalledWith({ immediate: true, onNeedRefresh: expect.any(Function) });
     expect(register).not.toHaveBeenCalled();
     expect(mocks.start).not.toHaveBeenCalled();
   });

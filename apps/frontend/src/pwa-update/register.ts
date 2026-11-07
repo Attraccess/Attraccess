@@ -14,7 +14,8 @@ export function registerPwaUpdates() {
   installChunkLoadSafetyNet();
 
   if (!import.meta.env.PROD) {
-    registerSW({ immediate: true });
+    // Dev keeps applying a changed worker right away, as before the update prompt.
+    const updateSW = registerSW({ immediate: true, onNeedRefresh: () => void updateSW(true) });
     return;
   }
 
@@ -28,6 +29,7 @@ async function registerAndTrack() {
 
   // register() queues behind an install that is already running and only settles once it is done, so a page
   // reloaded mid-download would start tracking too late to show it. An existing registration is available at once.
-  const registration = (await navigator.serviceWorker.getRegistration('/')) ?? (await registering.catch(() => undefined));
+  const registration =
+    (await navigator.serviceWorker.getRegistration('/')) ?? (await registering.catch(() => undefined));
   if (registration) setPwaUpdateApply(startPwaUpdateController({ registration }).apply);
 }

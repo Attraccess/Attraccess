@@ -17,6 +17,28 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
+// Workers released before the update prompt skipped waiting on their own, and their pages never send
+// SKIP_WAITING. Replacing one of those must still skip waiting, or the update would wait until every tab
+// is closed. Workers that know the prompt leave this marker behind when they activate.
+const UPDATE_PROMPT_MARKER_CACHE = 'attraccess-sw-update-prompt-v1';
+self.addEventListener('install', (event) => {
+  if (!self.registration.active) return;
+  event.waitUntil(
+    caches
+      .has(UPDATE_PROMPT_MARKER_CACHE)
+      .then((hasMarker) => (hasMarker ? undefined : self.skipWaiting()))
+      .catch(() => undefined),
+  );
+});
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.open(UPDATE_PROMPT_MARKER_CACHE).then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+});
+
 const wb_manifest = self.__WB_MANIFEST;
 const precacheManifest = [...wb_manifest];
 
