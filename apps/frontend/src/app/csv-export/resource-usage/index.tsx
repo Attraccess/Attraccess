@@ -1,10 +1,13 @@
 import {
-  ResourceUsage,
   AnalyticsService,
+  CsvExportType,
+  ResourceUsageExportRowDto,
   useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite,
 } from '@attraccess/react-query-client';
 import { ExportProps } from '../export-props';
-import { CsvExportDrawerContent, ColumnDefinition } from '../export-drawer/index';
+import { CsvExportConfigContent } from '../export-config';
+import { EXPORT_QUERY_OPTIONS } from '../export-config/query-options';
+import { FieldDefinition, metadataFields } from '../export-config/csv';
 import { useMemo, useCallback, useEffect, useState } from 'react';
 import {
   combinedOperatingDurationStatus,
@@ -18,7 +21,7 @@ import en from './en.json';
 import { useQuery } from '@tanstack/react-query';
 import type { OperatingDurationSummary } from './operating-duration';
 
-export function durationMsForSession(item: ResourceUsage, asOf: Date): number {
+export function durationMsForSession(item: ResourceUsageExportRowDto, asOf: Date): number {
   const now = new Date();
   const end = Math.min(new Date(item.endTime ?? now).getTime(), asOf.getTime(), now.getTime());
   return end - new Date(item.startTime).getTime();
@@ -35,10 +38,14 @@ export function useResourceUsageExportStateInputs(props: ExportProps) {
   const [fetchAll, setFetchAll] = useState(false);
 
   const { data, status, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
-    useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite({
-      start: props.start.toISOString(),
-      end: props.end.toISOString(),
-    });
+    useAnalyticsServiceGetResourceUsageHoursInDateRangeInfinite(
+      {
+        start: props.start.toISOString(),
+        end: props.end.toISOString(),
+      },
+      undefined,
+      EXPORT_QUERY_OPTIONS,
+    );
 
   // ponytail: only fetch remaining pages after user clicks export
   useEffect(() => {
@@ -89,6 +96,8 @@ export function useResourceUsageExportStateInputs(props: ExportProps) {
       return operatingDurations;
     },
     enabled: resourceIds.length > 0 && !isFetchingAllPages,
+    // refocusing the tab must not re-request the durations of every loaded resource
+    refetchOnWindowFocus: false,
   });
   const attributedDurations = useMemo(
     () => attributedDurationByResourceAndUsage(operatingDurations),
@@ -147,8 +156,19 @@ export function useResourceUsageExportStateInputs(props: ExportProps) {
 }
 
 export function useResourceUsageExportStateColumns(model: ReturnType<typeof useResourceUsageExportStateInputs>) {
-  const { t, formatDateTimeFull, formatUsageDuration, props, operatingDurations, attributedDurations } = model;
+  const {
+    t,
+    formatDateTimeFull,
+    formatUsageDuration,
+    props,
+    operatingDurations,
+    attributedDurations,
+    resourceUsageExport,
+  } = model;
   const columns = useMemo(() => {
+    // translated once per rebuild, not once per row (each t() call compiles its template)
+    const statusLabels = { provisional: t('status.provisional'), unavailable: t('status.unavailable') };
+    // Field keys are persisted in export templates: never rename an existing key.
     return [
       {
         label: t('columns.resourceId'),
@@ -223,11 +243,7 @@ export function useResourceUsageExportStateColumns(model: ReturnType<typeof useR
       {
         label: t('columns.durationStatus'),
         key: 'durationStatus',
-        getter: (item) =>
-          combinedOperatingDurationStatus(operatingDurations?.[item.resourceId], {
-            provisional: t('status.provisional'),
-            unavailable: t('status.unavailable'),
-          }),
+        getter: (item) => combinedOperatingDurationStatus(operatingDurations?.[item.resourceId], statusLabels),
         selectedByDefault: true,
       },
       {
@@ -250,8 +266,28 @@ export function useResourceUsageExportStateColumns(model: ReturnType<typeof useR
         key: 'supervisorUsername',
         getter: (item) => item.supervisorUser?.username ?? '',
       },
-    ] as ColumnDefinition<ResourceUsage>[];
-  }, [attributedDurations, formatUsageDuration, formatDateTimeFull, operatingDurations, props.end, t]);
+      { label: t('columns.userEmail'), key: 'userEmail', getter: (item) => item.userEmail ?? '' },
+      {
+        label: t('columns.userExternalIdentifier'),
+        key: 'userExternalIdentifier',
+        getter: (item) => item.user?.externalIdentifier ?? '',
+      },
+      { label: t('columns.supervisorEmail'), key: 'supervisorEmail', getter: (item) => item.supervisorEmail ?? '' },
+      ...metadataFields(
+        resourceUsageExport,
+        (item: ResourceUsageExportRowDto) => item.resource?.metadata,
+        (key) => t('metadataField', { key }),
+      ),
+    ] as FieldDefinition<ResourceUsageExportRowDto>[];
+  }, [
+    attributedDurations,
+    formatUsageDuration,
+    formatDateTimeFull,
+    operatingDurations,
+    props.end,
+    resourceUsageExport,
+    t,
+  ]);
   return { ...model, columns } as const;
 }
 
@@ -262,6 +298,7 @@ export function useResourceUsageExportStateOutput(model: ReturnType<typeof useRe
     resourceUsageExport: model.resourceUsageExport,
     isFetchingAllPages: model.isFetchingAllPages,
     fetchStatus: model.fetchStatus,
+    hasNextPage: model.hasNextPage,
     resourceIds: model.resourceIds,
     operatingDurationsStatus: model.operatingDurationsStatus,
     options: model.options,
@@ -285,6 +322,7 @@ export function ResourceUsageExport(props: ExportProps) {
     resourceUsageExport,
     isFetchingAllPages,
     fetchStatus,
+    hasNextPage,
     resourceIds,
     operatingDurationsStatus,
     options,
@@ -295,9 +333,10 @@ export function ResourceUsageExport(props: ExportProps) {
   // TODO: handle grouping by user and resource
 
   return (
-    <CsvExportDrawerContent
-      columns={columns as ColumnDefinition<ResourceUsage>[]}
-      items={resourceUsageExport as ResourceUsage[]}
+    <CsvExportConfigContent
+      exportType={CsvExportType.RESOURCE_USAGE_HOURS}
+      fields={columns}
+      items={resourceUsageExport as ResourceUsageExportRowDto[]}
       refetch={refetch}
       options={options}
       setOption={setOption}
@@ -305,6 +344,7 @@ export function ResourceUsageExport(props: ExportProps) {
       queryStatus={
         fetchStatus !== 'success' ? fetchStatus : resourceIds.length > 0 ? operatingDurationsStatus : fetchStatus
       }
+      allPagesLoaded={!hasNextPage}
       onFetchAllPages={() => setFetchAll(true)}
       isFetchingAllPages={isFetchingAllPages}
     />

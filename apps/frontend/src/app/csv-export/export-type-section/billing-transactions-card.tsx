@@ -23,11 +23,9 @@ export function BillingTransactionsCard(props: Props) {
     return { start: bounds.start.toISOString(), end: bounds.end.toISOString() };
   }, [range, hasRange]);
 
-  const { data, status } = useAnalyticsServiceGetBillingTransactionsInDateRange(
-    { start, end },
-    [start, end],
-    { enabled: hasRange },
-  );
+  const { data, status } = useAnalyticsServiceGetBillingTransactionsInDateRange({ start, end }, [start, end], {
+    enabled: hasRange,
+  });
 
   return (
     <ExportTypeCard

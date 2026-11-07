@@ -22,34 +22,30 @@
     "custom": "Benutzerdefiniert"
   },
   "range": {
-    "summary": "{{start}} – {{end}} · {{days}} Tage",
+    "summary": {
+      "one": "{{start}} – {{end}} · {{count}} Tag",
+      "many": "{{start}} – {{end}} · {{count}} Tage"
+    },
     "empty": "Kein Zeitraum gewählt"
   },
   "rangeCalendar": {
-    "label": "Zeitraum",
-    "selection": {
-      "label": "Ausgewählter Zeitraum",
-      "start": "Start: {{date}}",
-      "end": "Ende: {{date}}"
-    }
+    "label": "Zeitraum"
   },
   "exports": {
-    "modal": {
-      "subtitle": "vom {{start}} bis zum {{end}}"
-    },
     "card": {
-      "estimatedRows": "Voraussichtlich {{count}} Zeilen",
+      "estimatedRows": {
+        "one": "Voraussichtlich {{count}} Zeile",
+        "many": "Voraussichtlich {{count}} Zeilen"
+      },
       "estimatedRowsLoading": "Lade …",
       "requireRange": "Wähle zuerst Zeitraum",
       "cta": "Konfigurieren & Exportieren"
     },
     "resourceUsageHours": {
-      "button": "Ressourcennutzung exportieren",
       "title": "Ressourcennutzung",
       "description": "Buchungen und Nutzungsstunden je Ressource."
     },
     "billingTransactions": {
-      "button": "Zahlungen exportieren",
       "title": "Zahlungen",
       "description": "Zahlungen, Gutschriften und Status je Nutzer."
     }

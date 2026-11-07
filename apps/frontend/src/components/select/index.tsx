@@ -10,6 +10,7 @@ import {
   ListBoxItem,
   Label,
   Description,
+  FieldError,
 } from '@heroui/react';
 import { ComponentProps, ReactNode } from 'react';
 
@@ -31,6 +32,10 @@ export interface Props {
   isDisabled?: boolean;
   isRequired?: boolean;
   isInvalid?: boolean;
+  /** Shown below the trigger and announced with the field while `isInvalid` is set. */
+  errorMessage?: ReactNode;
+  /** Extra classes for the rendered value, e.g. `min-w-0 wrap-anywhere` for long unbreakable values. */
+  valueClassName?: string;
   name?: string;
   disabledKeys?: Iterable<string | number>;
   variant?: 'primary' | 'secondary';
@@ -53,6 +58,8 @@ export function Select({
   isDisabled,
   isRequired,
   isInvalid,
+  errorMessage,
+  valueClassName,
   name,
   disabledKeys,
   variant,
@@ -81,9 +88,10 @@ export function Select({
       {label && <Label>{label}</Label>}
       {description && <Description>{description}</Description>}
       <SelectTrigger>
-        <SelectValue />
+        <SelectValue className={valueClassName} />
         <SelectIndicator />
       </SelectTrigger>
+      {errorMessage && <FieldError>{errorMessage}</FieldError>}
       <SelectPopover {...popoverProps}>
         <ListBox>
           {items.map((item) => (

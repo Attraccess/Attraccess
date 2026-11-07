@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
-import { Auth } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AnalyticsQueryDto } from './dtos/analyticsQuery.dto';
 import { PaginatedResourceUsageResponseDto } from './dtos/paginatedResourceUsageResponse.dto';
 import { PaginatedBillingTransactionsResponseDto } from './dtos/paginatedBillingTransactionsResponse.dto';
+import { BILLING_EXPORT_EMAIL_PERMISSIONS } from './dtos/analyticsExportRows.dto';
 import { computeNextPage } from '../types/response';
 import { ResourceOperatingDurationsDto } from './dtos/resourceOperatingDurations.dto';
 import { ResourceOperatingAttributionSummary } from '../resources/operating-intervals/resource-operating-attribution.service';
@@ -59,9 +60,19 @@ export class AnalyticsController {
   })
   public async getBillingTransactionsInDateRange(
     @Query() query: AnalyticsQueryDto,
+    @Req() request: AuthenticatedRequest,
   ): Promise<PaginatedBillingTransactionsResponseDto> {
     const { start, end, page, limit } = query;
-    const [data, total] = await this.analyticsService.getBillingTransactionsInDateRange({ start, end }, page, limit);
+    // resources.update alone does not grant access to user emails.
+    const includeEmail = BILLING_EXPORT_EMAIL_PERMISSIONS.some((permission) =>
+      request.user.effectivePermissions?.has(permission),
+    );
+    const [data, total] = await this.analyticsService.getBillingTransactionsInDateRange(
+      { start, end },
+      page,
+      limit,
+      includeEmail,
+    );
     return { data, total, page, limit, nextPage: computeNextPage(page, limit, total) };
   }
 }

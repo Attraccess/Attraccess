@@ -3,6 +3,7 @@ import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { DataSource } from 'typeorm';
+import { migrationCsvExportSeeds } from './seeds/csv-export.test-fixture';
 import { migrationFlowUsageSeeds } from './seeds/flow-usage.test-fixture';
 import { migrationIdentityNotificationSeeds } from './seeds/identity-notification.test-fixture';
 import { migrationMaintenanceSeeds } from './seeds/maintenance.test-fixture';
@@ -41,6 +42,7 @@ const seedDatabase = async (dataSource: DataSource) => {
     usage,
   );
   await migrationIdentityNotificationSeeds(dataSource, seedTag, primaryUser);
+  await migrationCsvExportSeeds(dataSource, seedTag);
 };
 
 const assertAllEntitiesHaveRows = async (dataSource: DataSource) => {
