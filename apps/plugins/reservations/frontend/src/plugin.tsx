@@ -1,10 +1,42 @@
-// Reservations plugin — frontend half. The UI (resource card, booking modal,
-// my/manage pages, settings slots) is added on top of this scaffold.
+// Reservations plugin — frontend half.
+//
+// Slots: resource.overview (bookings card), resource.settings, admin.settings, user.account.
+// Routes: /reservations (my bookings), /reservations/manage, /reservations/:id (mail deep link).
 import './styles.css';
-import type { AttraccessFrontendPlugin, AttraccessFrontendPluginAuthData } from '@attraccess/plugins-frontend-sdk';
-import type { IPluginStore } from 'react-pluggable';
+import { detectLanguage } from '@attraccess/plugins-frontend-ui';
+import { CalendarCheckIcon, CalendarClockIcon } from 'lucide-react';
+import {
+  ADMIN_SETTINGS_SLOT,
+  RESOURCE_OVERVIEW_SLOT,
+  RESOURCE_SETTINGS_SLOT,
+  USER_ACCOUNT_SLOT,
+  type AttraccessFrontendPlugin,
+  type AttraccessFrontendPluginAuthData,
+  type PluginSidebarItem,
+  type PluginSlotContribution,
+  type ResourceSlotContext,
+  type RouteConfig,
+} from '@attraccess/plugins-frontend-sdk';
+import type { PluginStore } from 'react-pluggable';
+import { listManaged } from './api';
+import de from './de.json';
+import en from './en.json';
+import { IcalFeeds } from './ical/IcalFeeds';
+import { ReservationsCard } from './overview/ReservationsCard';
+import { ManagePage } from './pages/ManagePage';
+import { MyReservationsPage } from './pages/MyReservationsPage';
+import { ReservationDeepLinkPage } from './pages/ReservationDeepLinkPage';
+import { AdminTimezoneSettings } from './settings/AdminTimezoneSettings';
+import { ResourceSettingsForm } from './settings/ResourceSettingsForm';
+
+const labels = () => (detectLanguage() === 'de' ? de : en);
 
 export default class ReservationsPlugin implements AttraccessFrontendPlugin {
+  // Users who manage reservations: resources.update holders at once, maintainers/introducers
+  // once the manage endpoint has answered (it replies 403 to everyone else).
+  pluginStore!: PluginStore;
+  private isManager = false;
+
   getPluginName(): string {
     return 'reservations-plugin@0.1.0';
   }
@@ -13,8 +45,8 @@ export default class ReservationsPlugin implements AttraccessFrontendPlugin {
     return [];
   }
 
-  init(_store: IPluginStore): void {
-    // No setup needed.
+  init(store: PluginStore): void {
+    this.pluginStore = store;
   }
 
   activate(): void {
@@ -25,11 +57,73 @@ export default class ReservationsPlugin implements AttraccessFrontendPlugin {
     // Called when the plugin is uninstalled.
   }
 
-  onApiAuthStateChange(_authData: null | AttraccessFrontendPluginAuthData): void {
-    // no-op
+  onApiAuthStateChange(authData: null | AttraccessFrontendPluginAuthData): void {
+    const user = authData?.user as { effectivePermissions?: string[] } | null | undefined;
+    this.isManager = user?.effectivePermissions?.includes('resources.update') ?? false;
+    if (!user || this.isManager) return;
+    void listManaged({ page: 1 })
+      .then(() => {
+        this.isManager = true;
+      })
+      .catch(() => {
+        this.isManager = false;
+      });
   }
 
   onApiEndpointChange(_endpoint: string): void {
     // no-op
+  }
+
+  getRoutes(): RouteConfig[] {
+    // Specific paths first; `/reservations/:id` is the mail deep link (needs a session; the host
+    // shows its normal login for anonymous visitors and renders the page afterwards).
+    return [
+      { path: '/reservations', authRequired: true, element: <MyReservationsPage /> },
+      { path: '/reservations/manage', authRequired: true, element: <ManagePage /> },
+      { path: '/reservations/:id', authRequired: true, element: <ReservationDeepLinkPage /> },
+    ];
+  }
+
+  getSidebarItems(): PluginSidebarItem[] {
+    const text = labels().sidebar;
+    const items: PluginSidebarItem[] = [
+      { label: text.my, path: '/reservations', icon: <CalendarClockIcon className="rv:w-5 rv:h-5" /> },
+    ];
+    if (this.isManager) {
+      items.push({
+        label: text.manage,
+        path: '/reservations/manage',
+        icon: <CalendarCheckIcon className="rv:w-5 rv:h-5" />,
+      });
+    }
+    return items;
+  }
+
+  getSlotContributions(): PluginSlotContribution[] {
+    const text = labels().slots;
+    const overview: PluginSlotContribution<ResourceSlotContext> = {
+      slotId: RESOURCE_OVERVIEW_SLOT,
+      key: 'reservations-overview',
+      render: ({ resourceId }) => <ReservationsCard resourceId={resourceId} />,
+    };
+    const settings: PluginSlotContribution<ResourceSlotContext> = {
+      slotId: RESOURCE_SETTINGS_SLOT,
+      key: 'reservations-settings',
+      title: text.settings,
+      render: ({ resourceId }) => <ResourceSettingsForm resourceId={resourceId} />,
+    };
+    const admin: PluginSlotContribution = {
+      slotId: ADMIN_SETTINGS_SLOT,
+      key: 'reservations-admin',
+      title: text.admin,
+      render: () => <AdminTimezoneSettings />,
+    };
+    const account: PluginSlotContribution = {
+      slotId: USER_ACCOUNT_SLOT,
+      key: 'reservations-account',
+      title: text.account,
+      render: () => <IcalFeeds />,
+    };
+    return [overview, settings, admin, account];
   }
 }
