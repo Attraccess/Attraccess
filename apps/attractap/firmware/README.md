@@ -247,6 +247,57 @@ for its **Approve** button. Each new code is also logged on the UART as
 (`ENROLLMENT_LOG_MARKER`) to approve readers without a screen, so do not reword it. Codes, keys,
 nonces and tokens are never logged otherwise.
 
+## Secure profile (ATT-1166)
+
+An optional build profile (`sdkconfig.secure`, `-DATTRACTAP_SECURE_PROFILE=ON`) for
+readers that an admin converts over the air to Secure Boot v2, release-mode flash
+encryption, NVS encryption and locked debug paths. Images are built unsigned; the
+API signs them per installation. It is never available for demo variants.
+
+- `ATTRACTAP_SECURE_PROFILE_BUILD "true"` in a variant `.cmake` makes
+  `build_firmwares.py` build the secure profile into `build/<variant>-secure/` and run
+  `tools/check_secure_profile.py` on it in every CI stage (PR, main, release). These
+  images are unsigned and never packaged. Only Touch V2 has it on.
+- `ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED` (all `"false"`) is carried into
+  `firmwares.json` and will gate the admin "Secure this reader" action. It can only be
+  `"true"` while the variant's secure build is on. Customers see no change until a
+  variant is flipped after its hardware run.
+- Standard builds refuse every fuse-burning option (Secure Boot, flash encryption, NVS
+  encryption, anti-rollback), so a web-flashable image can never burn eFuses.
+- `secure-version-floor.txt` must equal `CONFIG_BOOTLOADER_APP_SECURE_VERSION`; CI
+  fails if either decreases. The eFuse field has 16 steps: bump only for security fixes.
+
+Build the secure profile locally (always in its own build directory and sdkconfig;
+CMake refuses a reused one):
+
+```bash
+idf.py -B build/attractap-touch-v2-secure \
+  -DSDKCONFIG=$PWD/build/attractap-touch-v2-secure/sdkconfig \
+  -DATTRACTAP_VARIANT=attractap-touch-v2 -DATTRACTAP_SECURE_PROFILE=ON build
+python3 tools/check_secure_profile.py build/attractap-touch-v2-secure
+```
+
+### eFuse key block layout (fixed)
+
+| Block | Content |
+| ----- | ------- |
+| KEY0 | Secure Boot digest: per-installation signing key |
+| KEY1 | Secure Boot digest: recovery key |
+| KEY2 | Flash encryption key (XTS-AES-128) |
+| KEY3 | DS identity (HMAC key, read-protected) |
+| KEY4 | NVS encryption (HMAC key, read-protected) |
+| KEY5 | Spare |
+
+### eFuse read protection (RD_DIS)
+
+The bootloader leaves RD_DIS writable. The secure app burns the DS key (KEY3) and the
+NVS key (KEY4) read-protected on first boot and then MUST write-protect RD_DIS
+(`WR_DIS_RD_DIS`). The server marks a reader secured only after its eFuse report
+shows that lock.
+
+Lab secure readers use public keys and development-mode flash encryption; see
+`lab/secure-boot/README.md`.
+
 ## Building
 
 Prerequisites: [ESP-IDF v6.0.2](https://docs.espressif.com/projects/esp-idf/en/v6.0.2/esp32s3/get-started/index.html) installed for the `esp32s3` target. Install the project-local toolchain at `.tools/esp-idf` with `pnpm nx run attractap-firmware:setup-toolchain`, or use `INSTALL_ESP_IDF=true ./scripts/setup-dev-dependencies.sh --workspace-only` during bootstrap. Local setup and CI share `tools/setup-esp-idf.sh` and the pin in `esp-idf-version.txt`; setup repairs partial installs and verifies `idf.py` can run. No extra Python packages are needed — `esptool` is picked up from your `PATH` or from ESP-IDF's own Python environment, and `cmake`/`ninja` are installed into the IDF tool set automatically if your system lacks them.
@@ -405,6 +456,22 @@ pixels (480 x 480, origin top left as shown on screen).
 | `ui.touch.release`  | —                                                                                                     | `{"success":true}`                                          |
 | `ui.touch.swipe`    | `x1`, `y1`, `x2`, `y2`, optional `durationMs` (1-10000, default 300)                                  | `{"success":true}`                                          |
 | `ui.screenshot.get` | —                                                                                                     | header, data lines and end line (below)                     |
+| `system.heap.get`   | —                                                                                                     | `{"internalFree","internalLargest","internalMinFree","windowMinFree","windowMinLargest","psramFree"}` |
+| `system.heap.reset` | —                                                                                                     | same as `system.heap.get`, then restarts the `window*` high-water marks |
+| `ui.touch.controller.get` | — (GT911 displays only)                                                                         | `{"reads","failures"}`: GT911 register reads since boot       |
+
+`system.heap.*` report the internal (8-bit capable) heap in bytes.
+`internalMinFree` is ESP-IDF's lowest free size since boot. ESP-IDF keeps no
+minimum for the largest free block, so a 50 ms sampler task (started by the
+first `system.heap.*` command) tracks `windowMinFree` and `windowMinLargest`
+since the last `system.heap.reset`; the HIL RAM tests reset the window, run a
+workload and compare the window minima with their floors
+(`apps/attractap-lab/hil/heap_floors.py`). `ui.touch.controller.get` counts the
+GT911 register reads that succeeded and failed: LVGL polls the controller
+continuously, so `reads` grows while it answers.
+
+`-DATTRACTAP_VERSION_OVERRIDE=<string>` replaces `version.txt` in a lab build:
+the HIL update test builds its second image with it. Release builds never set it.
 
 `ui.widgets.get` lists the visible touchable widgets front to back, in the
 order LVGL hit-tests them: system layer, top layer (popups, dialogs), then the

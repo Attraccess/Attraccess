@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class NfcCardPendingChange1792400000000 implements MigrationInterface {
-  name = 'NfcCardPendingChange1792400000000';
+export class NfcCardPendingChange1792450000000 implements MigrationInterface {
+  name = 'NfcCardPendingChange1792450000000';
 
   // Tolerates an existing table: dev and lab databases may have run this migration under an earlier name.
   public async up(queryRunner: QueryRunner): Promise<void> {

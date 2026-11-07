@@ -52,18 +52,16 @@ describe('combinedOperatingDurationStatus', () => {
   const labels = { provisional: 'Provisional', unavailable: 'Unavailable' };
 
   it('keeps provisional and unavailable independent', () => {
-    expect(
-      combinedOperatingDurationStatus({ operatingDataAvailable: true, isProvisional: false }, labels),
-    ).toBe('');
-    expect(
-      combinedOperatingDurationStatus({ operatingDataAvailable: true, isProvisional: true }, labels),
-    ).toBe('Provisional');
-    expect(
-      combinedOperatingDurationStatus({ operatingDataAvailable: false, isProvisional: false }, labels),
-    ).toBe('Unavailable');
-    expect(
-      combinedOperatingDurationStatus({ operatingDataAvailable: false, isProvisional: true }, labels),
-    ).toBe('Provisional; Unavailable');
+    expect(combinedOperatingDurationStatus({ operatingDataAvailable: true, isProvisional: false }, labels)).toBe('');
+    expect(combinedOperatingDurationStatus({ operatingDataAvailable: true, isProvisional: true }, labels)).toBe(
+      'Provisional',
+    );
+    expect(combinedOperatingDurationStatus({ operatingDataAvailable: false, isProvisional: false }, labels)).toBe(
+      'Unavailable',
+    );
+    expect(combinedOperatingDurationStatus({ operatingDataAvailable: false, isProvisional: true }, labels)).toBe(
+      'Provisional; Unavailable',
+    );
   });
 
   it('returns empty for a missing summary', () => {

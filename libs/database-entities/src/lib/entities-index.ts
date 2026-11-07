@@ -50,6 +50,12 @@ export {
 } from './entities/resource-maintenance-schedule.entity';
 export { ResourceMeter } from './entities/resource-meter.entity';
 export {
+  CsvExportTemplate,
+  CsvExportTemplateColumn,
+  CsvExportTemplateColumnType,
+  CsvExportType,
+} from './entities/csv-export-template.entity';
+export {
   ResourceMeteringOperation,
   ResourceMeteringOperationKind,
   ResourceMeteringOperationStatus,
@@ -170,6 +176,7 @@ import { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource
 import { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource-maintenance-schedule-usage-hours-config.entity';
 import { ResourceMaintenanceSchedule } from './entities/resource-maintenance-schedule.entity';
 import { ResourceMeter } from './entities/resource-meter.entity';
+import { CsvExportTemplate } from './entities/csv-export-template.entity';
 import { ResourceMeteringOperation, ResourceMeteringSession } from './entities/resource-metering.entity';
 import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
 import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecycle-attempt.entity';
@@ -265,4 +272,5 @@ export const entities = {
   ResourceMeteringSession,
   ResourceMeteringOperation,
   ResourceMeter,
+  CsvExportTemplate,
 };

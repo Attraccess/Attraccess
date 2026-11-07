@@ -240,8 +240,10 @@ def send_reader_wifi(target, auth_code, place=None, timeout=60):
 
 PARKED_MARKER = b"ATTRACTAP_PARKED"
 PARK_FAILED_MARKER = b"ATTRACTAP_PARK_FAILED"
-# Complete marker lines only: the failure line names the hardware that failed.
-_PARK_REPORT = re.compile(rb"ATTRACTAP_PARK(?:ED|_FAILED)[^\n]*\n")
+# A complete marker line only. Failure lines do not end the wait: the image
+# clears the bus and retries every 2 s, so a transient failure can still park.
+_PARKED_LINE = re.compile(rb"ATTRACTAP_PARKED[^\n]*\n")
+_PARK_FAILED_LINE = re.compile(rb"ATTRACTAP_PARK_FAILED[^\n]*\n")
 
 
 def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resource_seconds=30.0,
@@ -252,7 +254,9 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
     reader profile or changed since first seen; such a reader must not be
     reused. A ``secure-lab`` reader takes a lab-signed Intel HEX image, written
     encrypted. Returns the chip MAC once the image reports ATTRACTAP_PARKED on
-    the UART. serial.log and efuse.txt stay in output.
+    the UART within marker_seconds; otherwise the last ATTRACTAP_PARK_FAILED
+    line, which names the hardware and the I2C bus state, is the error.
+    serial.log and efuse.txt stay in output.
     """
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
@@ -274,11 +278,12 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
     power_on_after_reset(target)
     target.activate(console)
     log = _record(console, output / "serial.log", marker_seconds, 1_048_576,
-                  until=_PARK_REPORT.search)
+                  until=_PARKED_LINE.search)
     target.deactivate(console)
-    if PARK_FAILED_MARKER in log:
-        line = log[log.index(PARK_FAILED_MARKER):].split(b"\n", 1)[0]
-        raise RuntimeError(f"Parking image could not park the hardware: {line.decode(errors='replace')}")
+    failures = _PARK_FAILED_LINE.findall(log)
+    if failures and not _PARKED_LINE.search(log):
+        raise RuntimeError(f"Parking image could not park the hardware ({len(failures)} attempts in "
+                           f"{marker_seconds}s): {failures[-1].decode(errors='replace').strip()}")
     if PARKED_MARKER not in log:
         raise TimeoutError(f"Parking image did not report {PARKED_MARKER.decode()} within {marker_seconds}s")
     return mac

@@ -1,6 +1,7 @@
 import { zipSync } from 'fflate';
 import { buildThreeMf } from './threemf';
 import type { CardRender } from './useCardRender';
+import { triggerDownload } from '../../utils/download';
 
 /**
  * Part colours, shared by the three.js preview and the 3MF `displaycolor`, so the file opens in
@@ -30,23 +31,8 @@ export function buildStlZip(render: CardRender): Uint8Array<ArrayBuffer> {
   });
 }
 
-/**
- * Triggers a browser download of `data` as `filename`, via a throwaway object URL and an
- * off-DOM anchor click. Shared by every download in this feature (STL/3MF here, the .scad
- * source elsewhere) so the object-URL lifetime bug below only has to be fixed once.
- *
- * `URL.revokeObjectURL` is deferred to a macrotask rather than called synchronously after
- * `click()`: Firefox and older Safari can abort the download if the URL is revoked before the
- * click has actually been dispatched to the download handler.
- */
-export function triggerDownload(data: BlobPart, filename: string): void {
-  const url = URL.createObjectURL(new Blob([data], { type: 'application/octet-stream' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
+// Shared by every download in this feature (STL/3MF here, the .scad source elsewhere).
+export { triggerDownload };
 
 /** Formats that need a finished render. */
 export type MeshFormat = 'stl' | '3mf';

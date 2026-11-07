@@ -75,36 +75,52 @@ void I2CBusLock::unlock()
     }
 }
 
-void recoverI2CBus(int sda, int scl)
+bool recoverI2CBus(int sda, int scl)
 {
     gpio_num_t sdaPin = (gpio_num_t)sda;
     gpio_num_t sclPin = (gpio_num_t)scl;
 
-    gpio_set_direction(sclPin, GPIO_MODE_OUTPUT);
-    gpio_set_direction(sdaPin, GPIO_MODE_INPUT); // sense SDA without driving it
+    // Open drain on both lines: a slave holding SDA or stretching SCL must win
+    // instead of shorting against a push-pull high.
+    gpio_set_level(sdaPin, 1);
+    gpio_set_level(sclPin, 1);
+    gpio_set_direction(sdaPin, GPIO_MODE_INPUT_OUTPUT_OD);
+    gpio_set_direction(sclPin, GPIO_MODE_INPUT_OUTPUT_OD);
     gpio_set_pull_mode(sdaPin, GPIO_PULLUP_ONLY);
-    for (int i = 0; i < 9; i++)
+    gpio_set_pull_mode(sclPin, GPIO_PULLUP_ONLY);
+    delayMicroseconds(10);
+
+    auto releaseScl = [sclPin]()
+    {
+        gpio_set_level(sclPin, 1);
+        // Allow clock stretching, but not forever.
+        for (int waited = 0; waited < 1000 && !gpio_get_level(sclPin); waited += 10)
+        {
+            delayMicroseconds(10);
+        }
+        delayMicroseconds(10);
+    };
+
+    for (int i = 0; i < 9 && !gpio_get_level(sdaPin); i++)
     {
         gpio_set_level(sclPin, 0);
         delayMicroseconds(10);
-        gpio_set_level(sclPin, 1);
-        delayMicroseconds(10);
-        if (gpio_get_level(sdaPin))
-            break; // slave released SDA — bus is free
+        releaseScl();
     }
-    // STOP condition: SDA LOW → SCL HIGH → SDA HIGH
-    gpio_set_direction(sdaPin, GPIO_MODE_OUTPUT);
+    // STOP condition: SDA LOW while SCL is low, then SCL HIGH, then SDA HIGH
+    gpio_set_level(sclPin, 0);
+    delayMicroseconds(10);
     gpio_set_level(sdaPin, 0);
     delayMicroseconds(10);
-    gpio_set_level(sclPin, 1);
-    delayMicroseconds(10);
+    releaseScl();
     gpio_set_level(sdaPin, 1);
     delayMicroseconds(10);
+    const bool released = gpio_get_level(sdaPin) && gpio_get_level(sclPin);
     // Release the pads so the i2c_master driver can claim them right after
     gpio_reset_pin(sdaPin);
     gpio_reset_pin(sclPin);
+    return released;
 }
-
 
 std::string translateReaderError(const std::string &errorKey)
 {

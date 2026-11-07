@@ -93,12 +93,14 @@ public:
  *
  * Releases any I2C slave that is holding SDA low mid-transaction (common after a
  * firmware flash or crash resets the ESP32 master without power-cycling slaves).
- * Pins are left ready for Wire.begin() to reclaim immediately after.
+ * Pins are left ready for the i2c_master driver to reclaim immediately after.
  *
  * @param sda SDA GPIO number
  * @param scl SCL GPIO number
+ * @return false if a line is still held low: a slave stuck that way (for example
+ *         a hung I/O expander MCU) only recovers when the reader loses power.
  */
-void recoverI2CBus(int sda, int scl);
+bool recoverI2CBus(int sda, int scl);
 
 /**
  * @brief Convert milliseconds to a time string in the format "HH:MM:SS"

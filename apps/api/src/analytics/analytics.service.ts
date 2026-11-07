@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DateRangeValue } from './dtos/dateRangeValue';
+import { toBillingTransactionExportRow, toResourceUsageExportRow } from './dtos/analyticsExportRows.dto';
 import { BillingTransaction, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindManyOptions, Repository } from 'typeorm';
@@ -35,10 +36,16 @@ export class AnalyticsService {
       take: limit,
     };
 
-    return await this.resourceUsageRepository.findAndCount(findOptions);
+    const [usages, total] = await this.resourceUsageRepository.findAndCount(findOptions);
+    return [usages.map(toResourceUsageExportRow), total] as const;
   }
 
-  public async getBillingTransactionsInDateRange(dateRange: DateRangeValue, page = 1, limit = 500) {
+  public async getBillingTransactionsInDateRange(
+    dateRange: DateRangeValue,
+    page = 1,
+    limit = 500,
+    includeEmail = false,
+  ) {
     const findOptions: FindManyOptions<BillingTransaction> = {
       where: {
         createdAt: Between(dateRange.start, dateRange.end),
@@ -48,12 +55,16 @@ export class AnalyticsService {
         id: 'DESC',
         userId: 'DESC',
       },
-      relations: ['user', 'resourceUsage', 'resourceUsage.resource', 'items'],
+      relations: ['user', 'initiator', 'resourceUsage', 'resourceUsage.resource', 'items'],
       skip: (page - 1) * limit,
       take: limit,
     };
 
-    return await this.billingTransactionRepository.findAndCount(findOptions);
+    const [transactions, total] = await this.billingTransactionRepository.findAndCount(findOptions);
+    return [
+      transactions.map((transaction) => toBillingTransactionExportRow(transaction, includeEmail)),
+      total,
+    ] as const;
   }
 
   public async getResourceOperatingDurations(

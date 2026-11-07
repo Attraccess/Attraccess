@@ -22,34 +22,30 @@
     "custom": "Custom"
   },
   "range": {
-    "summary": "{{start}} – {{end}} · {{days}} days",
+    "summary": {
+      "one": "{{start}} – {{end}} · {{count}} day",
+      "many": "{{start}} – {{end}} · {{count}} days"
+    },
     "empty": "No range selected"
   },
   "rangeCalendar": {
-    "label": "Date Range",
-    "selection": {
-      "label": "Selected Date Range",
-      "start": "Start: {{date}}",
-      "end": "End: {{date}}"
-    }
+    "label": "Date Range"
   },
   "exports": {
-    "modal": {
-      "subtitle": "from {{start}} to {{end}}"
-    },
     "card": {
-      "estimatedRows": "~{{count}} rows",
+      "estimatedRows": {
+        "one": "~{{count}} row",
+        "many": "~{{count}} rows"
+      },
       "estimatedRowsLoading": "Loading…",
       "requireRange": "Pick a date range first",
       "cta": "Configure & Export"
     },
     "resourceUsageHours": {
-      "button": "Export Resource Usage",
       "title": "Resource Usage",
       "description": "Bookings and usage hours per resource."
     },
     "billingTransactions": {
-      "button": "Export Billing Transactions",
       "title": "Billing Transactions",
       "description": "Payments, refunds and status per user."
     }

@@ -234,9 +234,3 @@ def test_revoke_ends_session_and_new_approval_pairs_again(api, admin, reader, ho
     assert any(event["id"] > old_key["id"] and event["state"] == "revoked"
                and event["keyFingerprint"] == old_key["keyFingerprint"] for event in events), \
         "the history must show the old key revoked"
-
-
-@pytest.mark.skip(reason="the HIL suite has no OTA pattern: it needs a served firmware image and an "
-                         "update-trigger flow that no existing test provides")
-def test_ota_inside_session():
-    pass

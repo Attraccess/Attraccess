@@ -1,0 +1,68 @@
+{
+  "table": {
+    "ariaLabel": "CSV-Export"
+  },
+  "preview": {
+    "title": {
+      "one": "Vorschau (erste {{count}} Zeile)",
+      "many": "Vorschau (erste {{count}} Zeilen)"
+    },
+    "rowCount": {
+      "one": "{{count}} Zeile insgesamt",
+      "many": "{{count}} Zeilen insgesamt"
+    },
+    "error": "Die Daten konnten nicht geladen werden. Möglicherweise fehlt dir die Berechtigung für diesen Export."
+  },
+  "actions": {
+    "refetch": "Aktualisieren",
+    "downloadCsv": "CSV herunterladen"
+  },
+  "columns": {
+    "title": "Spalten",
+    "description": "Wähle die Spalten in der Reihenfolge, in der sie in der Datei erscheinen. Eine leere Überschrift verwendet die Standardbezeichnung des Felds.",
+    "empty": "Keine Spalten konfiguriert. Füge eine Feld- oder Konstantenspalte hinzu.",
+    "row": "Spalte {{n}}",
+    "type": {
+      "field": "Feld",
+      "constant": "Konstante"
+    },
+    "field": "Feld",
+    "fieldPlaceholder": "Feld auswählen",
+    "value": "Konstanter Wert",
+    "header": "Spaltenüberschrift",
+    "moveUp": "Spalte {{n}} nach oben verschieben",
+    "moveDown": "Spalte {{n}} nach unten verschieben",
+    "remove": "Spalte {{n}} entfernen",
+    "addField": "Feldspalte hinzufügen",
+    "addConstant": "Konstantenspalte hinzufügen",
+    "unavailable": "In den aktuellen Daten nicht verfügbar",
+    "limit": "Eine Vorlage kann höchstens {{max}} Spalten enthalten."
+  },
+  "templates": {
+    "title": "Vorlagen",
+    "description": "Vorlagen speichern die Spaltenkonfiguration und sind für alle sichtbar, die exportieren dürfen.",
+    "label": "Aktive Vorlage",
+    "none": "Keine Vorlage (Standardspalten)",
+    "name": "Name der Vorlage",
+    "unsavedChanges": "Ungespeicherte Änderungen",
+    "update": "Änderungen speichern",
+    "saveAsNew": "Als neue Vorlage speichern",
+    "saveAsTitle": "Als neue Vorlage speichern",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Vorlage löschen",
+    "deleteTitle": "Vorlage löschen?",
+    "deleteMessage": "Die Vorlage „{{name}}“ wird für alle gelöscht. Das kann nicht rückgängig gemacht werden.",
+    "toasts": {
+      "created": "Vorlage „{{name}}“ erstellt",
+      "updated": "Vorlage „{{name}}“ gespeichert",
+      "deleted": "Vorlage gelöscht"
+    },
+    "errors": {
+      "duplicate": "Für diesen Export-Typ existiert bereits eine Vorlage mit diesem Namen.",
+      "saveFailed": "Die Vorlage konnte nicht gespeichert werden.",
+      "deleteFailed": "Die Vorlage konnte nicht gelöscht werden.",
+      "loadFailed": "Die Vorlagen konnten nicht geladen werden. Du kannst den Export trotzdem konfigurieren und herunterladen."
+    }
+  }
+}
