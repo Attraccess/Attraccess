@@ -98,7 +98,7 @@ export class AttractapFirmwareHandler {
           return;
         }
 
-        const assetsDir = join(__dirname, 'assets', 'attractap-firmwares');
+        const assetsDir = process.env.ATTRACTAP_FIRMWARE_ASSETS_DIR || join(__dirname, 'assets', 'attractap-firmwares');
         const otaFilename = latest.filenameOTA || latest.filename;
         const firmwarePath = join(assetsDir, otaFilename);
         if (!existsSync(firmwarePath)) {

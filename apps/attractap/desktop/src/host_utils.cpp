@@ -14,7 +14,7 @@ i2c_master_dev_handle_t addSharedI2CDevice(uint8_t, uint32_t) { return nullptr; 
 void I2CBusLock::init() {}
 void I2CBusLock::lock() {}
 void I2CBusLock::unlock() {}
-void recoverI2CBus(int, int) {}
+bool recoverI2CBus(int, int) { return true; }
 
 std::string hexToString(const uint8_t *uid, uint8_t uidLength)
 {

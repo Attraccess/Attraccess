@@ -283,12 +283,118 @@ a new approval. It runs only for the variants in `POWER_BUTTON_VARIANTS`
 skip it: their emulator has no button to press. Add a variant there once its
 places have the emulator wired to its power button.
 
+### Secure lab reader
+
+> **Never write a release (non-lab) secure image to a secure lab reader**: its
+> first boot switches flash encryption to release mode for good. The suite never
+> burns eFuses itself (only the firmware's anti-rollback version, see below).
+
+`READER_PROFILE=secure-lab` runs the same tests on the place
+`attractap-touch-v2-secure-1`: a Touch V2 with Secure Boot v2 bound to the
+public lab keys and development-mode flash encryption (ATT-1166; see
+`apps/attractap/firmware/lab/secure-boot/README.md`).
+
+```sh
+. .tools/esp-idf/export.sh
+READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil
+```
+
+- The runner builds the reader with `-DATTRACTAP_SECURE_PROFILE=ON
+  -DATTRACTAP_SECURE_LAB=ON -DATTRACTAP_TEST_HOOKS=ON`. The lab profile keeps
+  the USB console and serial command handler that the release profile compiles
+  out.
+- `tools/secure_lab_reader.py hex` signs the bootloader and app with the lab key
+  and merges them into Intel HEX. It refuses anything but a lab secure build.
+  `READER_SECURE_BUILD=<dir>` reuses an existing build directory; `READER_IMAGE`
+  is refused for this profile.
+- Before writing, the tests check the reader's eFuses against the `secure-lab`
+  profile (`efuse.check`). Then they erase the chip and write the image
+  encrypted (`ESPToolDriver.erase_and_flash_encrypted`), the same write the
+  janitor uses to park this reader.
+- When the run ends, also after a failed setup, the tests write the image
+  again, so no Wi-Fi, PIN or pairing stays on the reader even where the place
+  has no janitor. With `janitor=park`, the janitor then parks it with the
+  lab-signed parking image.
+- `run.sh` refuses to start when `READER_PROFILE` does not match the place's
+  `profile` tag (`plain` when it has none). A plain image leaves this reader
+  unbootable, and the secure write would not fit a plain reader.
+- The reader's internal heap (before pairing, after the TLS session opened, at
+  the end) is written to `reader-heap.jsonl` in the run's artifacts.
+
+If a run is killed before its own wipe, the janitor parks the reader on
+release; on a place without one, run the suite again. A branch that raises
+`CONFIG_BOOTLOADER_APP_SECURE_VERSION` burns the new version into the reader
+(anti-rollback), so lab images from older branches stop booting on it.
+
+### Updates over Wi-Fi, RAM stress and the QA runs
+
+One command per profile; each saves its artifacts in
+`apps/attractap-lab/hil-artifacts/lab-artifacts/<session>/`:
+
+```sh
+. .tools/esp-idf/export.sh
+pnpm nx run attractap-lab:hil                              # plain Touch V2, place attractap-touch-v2-1
+READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil    # Secure Boot lab reader, place attractap-touch-v2-secure-1
+pnpm nx run attractap-lab:hil -- -k "ota or ram"           # only the update and RAM tests
+```
+
+A QA run of a firmware change runs the full suite on the secure-lab place and at
+least the update (`test_ota.py`) and RAM (`test_ram.py`) tests on the plain one.
+Off the readers' LAN, add the relay variables from "In CI".
+
+**Update tests (`test_ota.py`).** The API under test offers a lab image through
+the real path (firmware info, `READER_FIRMWARE_UPDATE_REQUIRED`, chunked
+download over the websocket, `esp_ota_*`). `run.sh` builds the reader image
+twice from the same directory, the second time with
+`-DATTRACTAP_VERSION_OVERRIDE=<version>-hilota`, and starts the API with
+`ATTRACTAP_FIRMWARE_ASSETS_DIR` pointing at a scratch directory whose
+`firmwares.json` the tests rewrite (the API re-reads it when it changes; unset in
+deployments). With a prebuilt `READER_IMAGE` the tests skip unless
+`READER_OTA_IMAGE`, `READER_OTA_VERSION` and `READER_BASE_VERSION` are set;
+`NO_OTA_BUILD=1` skips the second build.
+
+- Rejected images: a wrong first byte (refused at the first chunk), a flipped
+  byte in the middle (refused at the end of the download), and on a secure lab
+  reader an unsigned image and one signed with a foreign key. Each time the reader
+  keeps its version, restarts and pairs without a new approval.
+- The good image installs; the reader boots the new version, reports it to the
+  API and stays paired. The test leaves the reader on the new version.
+- During the download the test asks the screen for its widget list every few
+  seconds (it must answer and show the `FirmwareUpdate` screen), takes camera
+  photos (`ota-flash-<seconds>s.png`) and fails on any `LCD underrun` line in the
+  reader's log. `ota-update.json` has the duration, the heap high-water marks,
+  the response times and the photo names.
+- Secure lab images are signed in the test harness with the public lab key
+  (`attractap_lab.ota_images`, espsecure). The API's signer refuses lab keys on
+  purpose and takes no part.
+- Not covered: rollback (the application confirms its image right after boot, so
+  there is nothing to roll back to without a crashing image) and anti-rollback
+  (rejecting a lower `secure_version` needs the SECURE_VERSION eFuse raised
+  first, and the tests never burn eFuses).
+
+**RAM tests (`test_ram.py`).** Each workload resets the reader's heap high-water
+window (`system.heap.reset`), runs, and checks the lowest free internal heap and
+the smallest largest free block (`windowMinFree`, `windowMinLargest`) against
+`hil/heap_floors.py`, plus that the free heap comes back afterwards. Workloads:
+cards the server does not know in a loop (NFC read, API round trip, error
+screen), Wi-Fi reconnects that re-open the websocket and the encrypted session,
+and a resource list of dozens of long names. The OTA download measures the
+same marks in `ota-update.json`. `HIL_RAM_ITERATIONS` scales the loops (default
+20). Results of every run are in `ram-<workload>.json` and `reader-heap.jsonl`.
+
+`test_touch_controller_answers` (`test_hardware.py`) checks that the GT911 answers
+its polling (register reads grow, none fail).
+
 ### In CI
 
 `.github/workflows/attractap-lab-hil.yml` runs these tests from the release
 workflow and on every push to `main`, on every reader type at once: one job
 each for the Touch V2 (`attractap-touch-v2-1`) and the Touch V1
-(`attractap-touch-1`), in parallel. It is off until the repository variable
+(`attractap-touch-1`), in parallel, and, once the repository variable
+`ATTRACTAP_LAB_HIL_SECURE_ENABLED` is `true`, one with `READER_PROFILE=secure-lab`
+on the Secure Boot lab reader (`attractap-touch-v2-secure-1`). The secure job is
+a separate switch because it relays on a third host port (below): enable it after
+the lab host runs with three `readerApiRelay.ports`. It is off until the repository variable
 `ATTRACTAP_LAB_HIL_ENABLED` is `true` (a repository variable, because the job's
 `if:` runs before the `attractap-lab` environment loads); the
 workflow file lists all variables (lab host, coordinator port, Tailscale tags,
@@ -304,10 +410,10 @@ GitHub concurrency group, which would cancel queued runs.
 
 A runner joins the tailnet, but readers only reach the lab's LAN. The runner
 therefore relays its API through the lab host: enable
-`services.attractap-lab.readerApiRelay` (default ports 20480 and 20481), which
+`services.attractap-lab.readerApiRelay` (default ports 20480 to 20482), which
 lets the `labgrid` account open exactly those remote forwards, and allow the
 ports from the readers' LAN in the host firewall. The Touch V2 job relays on
-the first port, the Touch V1 job on the next one. Set
+the first port, the Touch V1 job on the next one, the secure lab job on the third. Set
 `ATTRACTAP_LAB_API_RELAY_HOST` to the lab host's address on that LAN.
 
 ## Reader touchscreen and screenshots
@@ -473,7 +579,17 @@ ssh root@lab-host attractap-lab-janitor clear attractap-touch-v2-1  # after repa
 
 Each attempt keeps `efuse.txt` and `serial.log` under
 `/var/lib/attractap-lab-janitor/runs/PLACE/`; `journalctl -u attractap-lab-janitor`
-shows decisions. The janitor reaches the local exporter over SSH like any
+shows decisions.
+
+A parking image that cannot park prints `ATTRACTAP_PARK_FAILED`, clears the
+I2C bus and retries every 2 s; the attempt fails only if `markerSeconds` pass
+without `ATTRACTAP_PARKED`. The failure line names the line that failed, the
+I2C error, the idle SDA/SCL levels and whether the I/O expander and the PN532
+answer, for example `line=io-expander err=ESP_ERR_TIMEOUT sda=1 scl=0
+expander=ESP_ERR_TIMEOUT pn532=ESP_ERR_TIMEOUT`. An idle bus reads `sda=1
+scl=1`. A line still low after the bus clear is held by a slave (on the Touch
+V2 most likely the CH32 I/O expander MCU), which only lets go when the reader
+loses power: unplug its USB cable for at least 10 s, then `clear` the place. The janitor reaches the local exporter over SSH like any
 client, with a host-local key authorized only for the `labgrid` account.
 
 The parking image never deep-sleeps: that would power down USB-Serial-JTAG and

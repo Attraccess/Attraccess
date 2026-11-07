@@ -117,7 +117,7 @@ in {
       enable = mkEnableOption "letting lab users relay a test API to the readers' LAN with an SSH reverse tunnel (CI runners are not on that LAN)";
       ports = mkOption {
         type = types.nonEmptyListOf types.port;
-        default = [ 20480 20481 ];
+        default = [ 20480 20481 20482 ];
         description = "The only ports the labgrid account may forward, one per test run at a time. The CI hardware tests run every reader type at once, counting up from the first port. Open them to the readers' LAN in the host firewall; the module opens no ports.";
       };
     };

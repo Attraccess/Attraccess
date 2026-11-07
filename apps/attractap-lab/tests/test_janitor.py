@@ -216,10 +216,20 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
     assert all(event != "erase-and-flash" and event[0] != "erase-and-flash"
                for event in burned.events if isinstance(event, tuple))
 
-    failing = FakeTarget(FakeConsole([b"ATTRACTAP_PARK_FAILED hardware=x line=io-expander\n"]),
+    # The image retries every 2 s: the last failure line within the marker time is the error.
+    failing = FakeTarget(FakeConsole([b"ATTRACTAP_PARK_FAILED hardware=x line=io-expander err=ESP_ERR_TIMEOUT\n",
+                                      b"ATTRACTAP_PARK_FAILED hardware=x line=io-expander err=ESP_FAIL sda=1 scl=1",
+                                      b" expander=nack pn532=ack\n"]),
                          FakeFlash(espefuse_output(), []))
-    with pytest.raises(RuntimeError, match="io-expander"):
-        park(failing, tmp_path / "park.bin", tmp_path / "failing")
+    with pytest.raises(RuntimeError, match=r"2 attempts .*err=ESP_FAIL sda=1 scl=1 expander=nack pn532=ack$"):
+        park(failing, tmp_path / "park.bin", tmp_path / "failing", marker_seconds=0.5)
+    assert (tmp_path / "failing/serial.log").read_bytes().count(b"ATTRACTAP_PARK_FAILED") == 2
+
+    # A failure the image recovers from on its next attempt still parks.
+    recovered = FakeTarget(FakeConsole([b"ATTRACTAP_PARK_FAILED hardware=x line=io-expander err=ESP_ERR_TIMEOUT\n",
+                                        b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                           FakeFlash(espefuse_output(), []))
+    assert park(recovered, tmp_path / "park.bin", tmp_path / "recovered", marker_seconds=5)
 
     secure = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
                         FakeFlash(secure_output(), []))

@@ -109,8 +109,9 @@ export class EmulatedReader {
     this.tls?.write(encodeFrame(type, Buffer.isBuffer(payload) ? payload : Buffer.from(payload)));
   }
 
-  // Generous: the first handshake of a run pays cold-start and coverage-instrumentation costs.
-  public async nextFrame(predicate: (frame: Frame) => boolean = () => true, timeoutMs = 10_000): Promise<Frame> {
+  // Generous: the first handshake of a run pays cold-start and coverage-instrumentation costs, and on a
+  // full parallel test run 10 s was not always enough. Still below the 30 s test timeout of its specs.
+  public async nextFrame(predicate: (frame: Frame) => boolean = () => true, timeoutMs = 20_000): Promise<Frame> {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       const index = this.frames.findIndex(predicate);

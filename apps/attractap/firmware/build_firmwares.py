@@ -42,6 +42,61 @@ def is_release_variant(content):
     """Lab-only variants opt out with `set(ATTRACTAP_RELEASE OFF)`."""
     return not re.search(r'set\(\s*ATTRACTAP_RELEASE\s+"?OFF"?\s*\)', content, re.IGNORECASE)
 
+def is_demo_variant(content):
+    """Demo builds declare ATTRACTAP_FIRMWARE_VARIANT "demo" (CMakeLists.txt checks the same)."""
+    return extract_cmake_value(content, "ATTRACTAP_FIRMWARE_VARIANT") == "demo"
+
+def variant_bool_flag(variant, content, name):
+    """`set(<name> "true"|"false")` in a variant file (absent = False). The value may
+    be unquoted and in any case; anything else raises ValueError instead of being
+    read as False, so a typo can't silently drop a variant's secure gate."""
+    code = re.sub(r"#[^\n]*", "", content)
+    matches = re.findall(rf'set\(\s*{re.escape(name)}(?:\s+"?([^"\s)]*)"?)?\s*\)', code)
+    if not matches:
+        if re.search(rf'\b{re.escape(name)}\b', code):
+            raise ValueError(f"{variant}: cannot parse {name}; use set({name} \"true\") or \"false\"")
+        return False
+    if len(matches) > 1:
+        raise ValueError(f"{variant}: {name} is set more than once")
+    raw = matches[0]
+    if raw.lower() not in ("true", "false"):
+        raise ValueError(f"{variant}: {name} must be \"true\" or \"false\", got \"{raw}\"")
+    return raw.lower() == "true"
+
+def secure_profile_build_enabled(variant, content):
+    """ATTRACTAP_SECURE_PROFILE_BUILD: the per-variant switch that makes
+    build_firmwares.py build the secure profile and run its gates, in every CI
+    stage (PR, main, release). Demo variants can never have it."""
+    enabled = variant_bool_flag(variant, content, "ATTRACTAP_SECURE_PROFILE_BUILD")
+    if enabled and is_demo_variant(content):
+        raise ValueError(f"demo variant {variant} must not enable the secure profile build")
+    return enabled
+
+def secure_profile_hardware_tested(variant, content):
+    """ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED, carried into firmwares.json.
+    Demo variants can never have it, and a variant can only be marked tested
+    while CI builds and gates its secure profile."""
+    tested = variant_bool_flag(variant, content, "ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED")
+    if tested and is_demo_variant(content):
+        raise ValueError(f"demo variant {variant} must not be marked secure-profile hardware-tested")
+    if tested and not secure_profile_build_enabled(variant, content):
+        raise ValueError(f"{variant} is marked secure-profile hardware-tested but ATTRACTAP_SECURE_PROFILE_BUILD "
+                         "is not \"true\": CI would not build or gate the profile it advertises")
+    return tested
+
+def build_secure_profile(variant, variant_path, python_cmd):
+    """Build the secure profile of a non-demo variant and run its build gates
+    (tools/check_secure_profile.py). The images are not packaged yet: they are
+    unsigned and must never be offered to the web flasher; the API will sign
+    them per installation (ATT-1166)."""
+    build_dir, _, _ = build_variant(variant, variant_path, "ERROR", secure=True)
+    gate = os.path.join(FIRMWARE_DIR, "tools", "check_secure_profile.py")
+    if subprocess.run([python_cmd, "-I", gate, build_dir]).returncode != 0:
+        print(f"Error: Secure profile gate failed for variant '{variant}'", file=sys.stderr)
+        sys.exit(1)
+    print(f"Secure profile gate passed for {variant}")
+
+
 def extract_build_id(firmware_bin_path, esptool_cmd):
     """Best-effort: read app_elf_sha256 from the app image so the server can
     match the exact ELF to a coredump's build id. Returns lowercase hex or None."""
@@ -197,9 +252,10 @@ def lab_variants():
                    for path in glob.glob(os.path.join("variants", "*.cmake")))
     return [name for name in names if not is_release_variant(read_variant(name)[1])]
 
-def build_variant(variant, variant_path, log_level):
-    """Build one variant; returns (build_dir, flash_files, flasher_args)."""
-    build_dir = os.path.join("build", variant)
+def build_variant(variant, variant_path, log_level, secure=False):
+    """Build one variant; returns (build_dir, flash_files, flasher_args).
+    secure=True builds the ATT-1166 secure profile into build/<variant>-secure."""
+    build_dir = os.path.join("build", variant + ("-secure" if secure else ""))
     # CMake caches absolute paths to the source tree and ESP-IDF checkout.
     # Reusing a build directory from another worktree can therefore make
     # the compiler read a different checkout, or fail with a stale cache.
@@ -215,6 +271,7 @@ def build_variant(variant, variant_path, log_level):
         # Shipped images never contain the lab test hooks and keep the beeper on.
         "-DATTRACTAP_TEST_HOOKS=OFF",
         "-DATTRACTAP_BEEPER_DEFAULT=ON",
+        *(["-DATTRACTAP_SECURE_PROFILE=ON"] if secure else []),
         "build",
     ]
     print(f"Running: idf.py {' '.join(build_args)}")
@@ -315,6 +372,17 @@ def main(argv=None):
     if not variants:
         print("Error: No release variants to build")
         sys.exit(1)
+
+    # Validate the hardware-tested flags before any expensive build starts.
+    secure_tested_by_variant = {}
+    secure_build_by_variant = {}
+    for variant, _, content in variants:
+        try:
+            secure_build_by_variant[variant] = secure_profile_build_enabled(variant, content)
+            secure_tested_by_variant[variant] = secure_profile_hardware_tested(variant, content)
+        except ValueError as error:
+            print(f"Error: {error}", file=sys.stderr)
+            sys.exit(1)
     print(f"Found variants: {[v for v, _, _ in variants]}")
 
     output_dir = prepare_output("firmware_output")
@@ -328,6 +396,8 @@ def main(argv=None):
         friendly_name = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_FRIENDLY_NAME")
         firmware_variant = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_VARIANT")
         variant_friendly_name = extract_cmake_value(content, "ATTRACTAP_FIRMWARE_VARIANT_FRIENDLY_NAME")
+
+        secure_tested = secure_tested_by_variant[variant]
 
         missing = [n for n, v in [
             ("ATTRACTAP_FIRMWARE_NAME", firmware_name),
@@ -380,12 +450,18 @@ def main(argv=None):
             "elfFilename": elf_filename,
             "buildId": build_id,
             "chip": CHIP,
+            # Gate for the admin "Secure this reader" action (ATT-1166).
+            "secureProfileHardwareTested": secure_tested,
             # Keep the historically conservative flasher parameters — the
             # frontend esptool-js flasher behavior must not change.
             "flashMode": "dio",
             "flashFreq": "80m",
             "flashSize": "16MB",
         })
+
+        if secure_build_by_variant[variant]:
+            print(f"\n=== Building secure profile: {variant} ===")
+            build_secure_profile(variant, variant_path, python_cmd)
 
     with open(os.path.join(output_dir, "firmwares.json"), "w") as f:
         json.dump({"firmwares": firmware_info}, f, indent=2)
