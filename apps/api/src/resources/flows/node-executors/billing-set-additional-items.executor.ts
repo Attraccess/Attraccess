@@ -11,6 +11,7 @@ import { ResourceUsageService } from '../../usage/sessions/resource-usage.servic
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { resolveTriggeringUsage, triggeringUsageId } from './triggering-usage';
+import { requireRunMachineId } from './flow.utils';
 import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 
 export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
@@ -22,6 +23,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
   ) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+    const resourceId = await requireRunMachineId(node, ctx);
     const usageId = triggeringUsageId(input);
     const data = BillingTransactionItemCreateSchema.parse(node.data);
 
@@ -56,7 +58,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
       quantity,
     };
     if (ctx.lifecycleAttemptId) {
-      await this.resourceUsageService.stageLifecycleBillingItem(ctx.lifecycleAttemptId, node.resourceId, usageId, {
+      await this.resourceUsageService.stageLifecycleBillingItem(ctx.lifecycleAttemptId, resourceId, usageId, {
         ...item,
         externalReference: externalReference ?? null,
       });
@@ -65,7 +67,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
 
     const savePendingItem = async (manager: EntityManager): Promise<void> => {
       // The triggering session, else the newest; nothing when the triggering session ended on a shared machine.
-      const { session } = await resolveTriggeringUsage(this.resourceUsageService, node.resourceId, input, manager);
+      const { session } = await resolveTriggeringUsage(this.resourceUsageService, resourceId, input, manager);
       if (!session) {
         throw new NoUsageSessionError();
       }
@@ -74,7 +76,7 @@ export class BillingSetAdditionalItemsExecutor implements NodeExecutor {
         where: {
           // A named session keeps its own pending transaction on a single-session machine, as before.
           resourceUsageId: usageId ?? session.id,
-          resourceUsage: { resourceId: node.resourceId },
+          resourceUsage: { resourceId: resourceId },
           status: BillingTransactionStatus.Pending,
         },
       });

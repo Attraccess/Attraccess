@@ -76,7 +76,10 @@ export interface WagoDiagnostics {
   faults: Array<{ channelId: string; code: string; receivedAt: string }>;
   references: Array<{
     nodeId: string;
-    resourceId: number;
+    /** The resource of a resource-flow node; null for a global-flow node. */
+    resourceId: number | null;
+    /** The global flow of a global-flow node; null for a resource-flow node. */
+    flowId?: number | null;
     channelId: string;
     control: boolean;
     href: string;
@@ -84,6 +87,8 @@ export interface WagoDiagnostics {
     conflict: boolean;
     /** Other resources whose flows command the same channel. */
     conflictResourceIds: number[];
+    /** Global flows that command the same channel. */
+    conflictFlowIds?: number[];
   }>;
   referencesTruncated: boolean;
   events: Array<{ kind: string; receivedAt: string }>;
@@ -97,7 +102,10 @@ export interface WagoResourceDiagnostics {
     name: string;
     unavailable: boolean;
     references: Array<
-      WagoDiagnostics['references'][number] & { conflictResources: Array<{ id: number; name: string }> }
+      WagoDiagnostics['references'][number] & {
+        conflictResources: Array<{ id: number; name: string }>;
+        conflictFlows?: Array<{ id: number; name: string }>;
+      }
     >;
     referencesTruncated: boolean;
   }>;

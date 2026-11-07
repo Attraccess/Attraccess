@@ -43,6 +43,7 @@
   - [Überblick](flows/overview.md)
   - [Flow-Editor](flows/flow-editor.md)
   - [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md)
+  - [Globale Flows](flows/global-flows.md)
   - [Knotentypen](flows/node-types.md)
   - [Zähler](flows/energy-metering.md)
 

@@ -286,6 +286,42 @@ The host emits at least `SystemEvent.RESOURCE_USAGE_STARTED` and
 that throws is **isolated** by the host — its error is logged and never breaks
 the core flow that emitted the event.
 
+### Flow nodes
+
+A backend plugin can add nodes to the flow editor by returning `flowNodes` from its module (see `PluginFlowNodeDefinition` in the SDK). Trigger nodes (`isInput: true`) start flows when the plugin calls `context.flows.trigger(...)`, which needs the `TRIGGER_FLOWS` permission. The call matches the plugin's trigger nodes in resource flows **and** in enabled [global flows](flows/global-flows.md), using the same `matches` callback.
+
+#### Flow scopes
+
+Every node declares where it can be used with `flowScopes`:
+
+```ts
+const myNode: PluginFlowNodeDefinition = {
+  type: 'plugin.demo.send-on',
+  label: 'Send on',
+  flowScopes: ['resource', 'global'], // default: ['resource']
+  // ...
+};
+```
+
+- `flowScopes` is `readonly ('resource' | 'global')[]` and **defaults to `['resource']`**. A node only shows up in global flows after it opts in. Saving a global flow that contains a node without the `global` scope fails with a validation error naming the node.
+- `supportedByAllResources` filters resource flows only.
+- In a global flow there is no fixed resource. A run has a triggering resource only when a resource event started it, so opt in only when your node copes with that.
+
+#### The `resolveConfigSchema` context
+
+`resolveConfigSchema(currentConfig, context)` receives:
+
+```ts
+{
+  flowScope: 'resource' | 'global';
+  resourceId: number | null; // set only in resource flows
+  flowId: number | null; // set only in global flows
+  purpose?: 'editor' | 'preview';
+}
+```
+
+Plugins that do not opt in to global flows never see `null` in `resourceId`. Nodes that do opt in must handle both cases, and use `flowId` to identify a global flow, for example as the owner of a channel.
+
 ### Packaging the backend
 
 A backend plugin shares the host's NestJS runtime, event bus and database

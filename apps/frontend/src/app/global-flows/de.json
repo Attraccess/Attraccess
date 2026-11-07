@@ -1,0 +1,36 @@
+{
+  "list": {
+    "title": "Flows",
+    "subtitle": "Globale Flows laufen für jede Ressource und sind an keine einzelne Maschine gebunden.",
+    "create": "Neuer Flow",
+    "loadError": "Die Flows konnten nicht geladen werden.",
+    "empty": "Es gibt noch keine globalen Flows.",
+    "tableLabel": "Globale Flows",
+    "columns": {
+      "name": "Name",
+      "enabled": "Aktiv",
+      "nodes": "Knoten",
+      "actions": "Aktionen"
+    },
+    "toggle": "{{name}} aktivieren",
+    "edit": "{{name}} bearbeiten",
+    "delete": "{{name}} löschen",
+    "deleteTitle": "Flow löschen",
+    "deleteConfirmation": "Den Flow „{{name}}“ und alle seine Knoten löschen? Das kann nicht rückgängig gemacht werden.",
+    "deleteAction": "Löschen",
+    "cancel": "Abbrechen",
+    "deleted": "Flow gelöscht",
+    "createdModalTitle": "Neuer globaler Flow",
+    "createName": "Name",
+    "createDescription": "Beschreibung",
+    "createSubmit": "Flow erstellen",
+    "createError": "Der Flow konnte nicht erstellt werden."
+  },
+  "editor": {
+    "loadError": "Dieser Flow konnte nicht geladen werden.",
+    "back": "Alle Flows",
+    "noticeTitle": "Globaler Flow",
+    "notice": "Läuft für jede Ressource; ein fehlerhafter oder langsamer globaler Flow wirkt sich auf Starts und Stopps an allen Maschinen aus.",
+    "enabled": "Aktiv"
+  }
+}

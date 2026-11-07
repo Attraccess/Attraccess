@@ -68,6 +68,8 @@ import { FlowResourceMonitor } from './resource-monitor';
 
 import { buildNodeExecutorRegistry } from './node-executor-registry';
 
+import { isGlobalFlowNode, resourceOwnAndGlobalNodesWhere, triggerAppliesToResourceType } from './flow-node-queries';
+
 @Injectable()
 export class ResourceFlowsExecutorService implements OnModuleInit {
   public constructor(
@@ -76,7 +78,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     @InjectRepository(ResourceFlowEdge)
     flowEdgeRepository: Repository<ResourceFlowEdge>,
     @InjectRepository(Resource)
-    resourceRepository: Repository<Resource>,
+    protected readonly resourceRepository: Repository<Resource>,
     flowLogs: FlowLogRecorderService,
     mqttClientService: MqttClientService,
     @Inject(forwardRef(() => ResourceUsageService))
@@ -126,7 +128,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       this.heartbeatLastSeen,
       resourceHealthService,
       cronTimer,
-      (node, data) => this.startFlow(node, data),
+      (node, data, options) => this.startFlow(node, data, undefined, new Map(), options),
       this.logger,
     );
   }
@@ -226,6 +228,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     this.resourceActivity.set(resourceId, new Date());
   }
 
+  /**
+   * Runs the trigger nodes of the resource's own flow together with the matching nodes of enabled global flows,
+   * with the same transaction and options. A failing global flow therefore fails the run like the resource's own.
+   */
   public async runFlow(
     resourceId: number,
     triggerNodeType: ResourceFlowNodeType,
@@ -235,16 +241,23 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   ): Promise<object[]> {
     const repository = getFlowRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
 
-    const allNodes = await repository.find({
-      where: {
-        resourceId,
-        type: triggerNodeType,
-      },
-    });
+    const allNodes = await repository.find({ where: resourceOwnAndGlobalNodesWhere(resourceId, triggerNodeType) });
 
-    const nodes = options.metering
-      ? allNodes.filter((node) => node.data?.meterId === options.metering?.meterId)
+    // Metering runs belong to one meter of one resource; global flows never take part.
+    let nodes = options.metering
+      ? allNodes.filter((node) => !isGlobalFlowNode(node) && node.data?.meterId === options.metering?.meterId)
       : allNodes;
+
+    if (nodes.some(isGlobalFlowNode)) {
+      const resource = await getFlowRepository(Resource, this.resourceRepository, transactionManager).findOne({
+        where: { id: resourceId },
+        select: { id: true, type: true },
+      });
+      nodes = nodes.filter(
+        (node) => !isGlobalFlowNode(node) || triggerAppliesToResourceType(node.type, resource?.type),
+      );
+    }
+
     if (nodes.length === 0) {
       this.logger.debug(
         `No flow nodes found for trigger node type '${triggerNodeType}' and resource ID: ${resourceId}`,
@@ -253,7 +266,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     }
 
     // TODO: propagate errors so when calling runFlow you can react to them and they dont get ignored
-    const results = await this.startFlow(nodes, { payload: initialData }, transactionManager, new Map(), options);
+    const results = await this.startFlow(nodes, { payload: initialData }, transactionManager, new Map(), {
+      ...options,
+      triggeringResourceId: resourceId,
+    });
     return results.map((r) => r.payload);
   }
 
@@ -263,24 +279,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     eventData: UsageEventData,
   ) {
     this.logger.debug(`Looking for flow nodes of type '${eventType}' for resource ID: ${resourceId}`);
-
-    const eventNodes = await this.flowNodeRepository.find({
-      where: {
-        resourceId,
-        type: eventType,
-      },
-    });
-
-    if (eventNodes.length === 0) {
-      this.logger.debug(`No flow nodes found for event type '${eventType}' and resource ID: ${resourceId}`);
-      return;
-    }
-
-    this.logger.log(
-      `Found ${eventNodes.length} flow node(s) for event type '${eventType}' and resource ID: ${resourceId}`,
-    );
-
-    await this.startFlow(eventNodes, { payload: eventData });
+    await this.runFlow(resourceId, eventType, eventData);
   }
 
   protected async handleResourceUsage(usage: ResourceUsage, inputType: ResourceFlowNodeType) {

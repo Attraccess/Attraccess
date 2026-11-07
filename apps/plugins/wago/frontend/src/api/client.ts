@@ -124,7 +124,7 @@ export interface ConfigurationImpact {
   message: string;
   /** `channel_disabled`: the revision disables a channel that flows may read. */
   code?: 'channel_disabled';
-  references: Array<{ resourceId: number; nodeId: string; nodeType: string }>;
+  references: Array<{ resourceId: number | null; flowId?: number | null; nodeId: string; nodeType: string }>;
 }
 
 export interface ConfigurationRevision {

@@ -533,15 +533,26 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     await scope.service.triggerPluginFlows('pagination-test', 'plugin.pagination-test.trigger', () => true, {});
 
     expect(scope.flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(1, {
-      where: { type: 'plugin.pagination-test.trigger' },
+      where: [
+        { type: 'plugin.pagination-test.trigger', flowId: expect.anything() },
+        { type: 'plugin.pagination-test.trigger', flow: { enabled: true } },
+      ],
       order: { id: 'ASC' },
       take: 100,
     });
     expect(scope.flowNodeRepository.find as jest.Mock).toHaveBeenNthCalledWith(2, {
-      where: {
-        type: 'plugin.pagination-test.trigger',
-        id: expect.objectContaining({ _value: 'node-099' }),
-      },
+      where: [
+        {
+          type: 'plugin.pagination-test.trigger',
+          flowId: expect.anything(),
+          id: expect.objectContaining({ _value: 'node-099' }),
+        },
+        {
+          type: 'plugin.pagination-test.trigger',
+          flow: { enabled: true },
+          id: expect.objectContaining({ _value: 'node-099' }),
+        },
+      ],
       order: { id: 'ASC' },
       take: 100,
     });

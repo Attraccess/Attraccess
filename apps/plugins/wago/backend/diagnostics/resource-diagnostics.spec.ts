@@ -97,6 +97,37 @@ describe('resource diagnostics', () => {
       ['relay-off', [{ id: 7, name: 'Workbench outlet' }]],
     ]);
   });
+  it('flags channels shared with global flows but never lists global nodes as own references', async () => {
+    const { nodesQuery, service } = setup([1]);
+    const own = [
+      {
+        id: 'relay-on',
+        resourceId: 42,
+        flowId: null,
+        type: 'plugin.wago.command',
+        data: { controllerId: 1, channelId: 'do1' },
+      },
+    ];
+    nodesQuery.getMany
+      .mockResolvedValueOnce(own)
+      .mockResolvedValueOnce([
+        ...own,
+        {
+          id: 'global-on',
+          resourceId: null,
+          flowId: 8,
+          type: 'plugin.wago.command',
+          data: { controllerId: 1, channelId: 'do1' },
+        },
+      ]);
+    const [controller] = (await service.getResource(42)).controllers;
+    expect(controller.references.map((reference) => reference.nodeId)).toEqual(['relay-on']);
+    expect(controller.references[0]).toMatchObject({
+      conflict: true,
+      conflictResources: [],
+      conflictFlows: [{ id: 8, name: 'Global flow 8' }],
+    });
+  });
   it('keeps both endpoints behind resources.update', () => {
     const guard = new EffectivePermissionsGuard(new Reflector());
     for (const method of ['get', 'getResource'] as const) {

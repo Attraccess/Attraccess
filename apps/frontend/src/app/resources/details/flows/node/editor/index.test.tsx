@@ -7,11 +7,14 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   current: { data: {} as Record<string, unknown> },
   resolveNodeSchema: vi.fn(),
+  resolveGlobalNodeSchema: vi.fn(),
+  owner: { kind: 'resource', resourceId: 1 } as const,
 }));
 vi.mock('@xyflow/react', () => ({ useNodeId: () => 'node', useNodesData: () => mocks.current }));
-vi.mock('../../context/index', () => ({ useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1 }) }));
+vi.mock('../../context/index', () => ({ useFlowContext: () => ({ updateNodeData: mocks.update, resourceId: 1, owner: mocks.owner }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   useBillingServiceGetBillingConfiguration: () => ({ data: { minorUnit: 2 } }),
+  useGlobalFlowsServiceResolveGlobalFlowNodeSchema: () => ({ mutateAsync: mocks.resolveGlobalNodeSchema }),
   useResourceFlowsServiceResolveNodeSchema: () => ({
     mutateAsync: mocks.resolveNodeSchema,
   }),

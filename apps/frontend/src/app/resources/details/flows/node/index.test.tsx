@@ -15,6 +15,8 @@ const flowContext = vi.hoisted(() => ({
   addLiveLogReceiver: vi.fn<(receiver: (log: ResourceFlowLog) => void) => void>(),
   removeLiveLogReceiver: vi.fn(),
   removeNode: vi.fn(),
+  owner: { kind: 'resource', resourceId: 1 },
+  resourceId: 1,
 }));
 
 vi.mock('../context/index', () => ({
@@ -53,6 +55,7 @@ const schema: ResourceFlowNodeSchemaDto = {
   isInput: true,
   isOutput: false,
   supportedByResource: true,
+  supportedFlowScopes: ['resource', 'global'],
   configSchema: { properties: {} },
 };
 
@@ -147,6 +150,7 @@ describe('AttraccessNode', () => {
         nodeId: 'node-1',
         flowRunId: 'run-1',
         resourceId: 1,
+        flowId: null,
         type,
         createdAt: '2026-09-06T12:00:00Z',
       }),

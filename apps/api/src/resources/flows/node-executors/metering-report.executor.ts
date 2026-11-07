@@ -2,6 +2,7 @@ import { ResourceMeteringService } from '../../metering/resource-metering.servic
 import { MeteringReportNodeDataSchema, ResourceFlowNode } from '@attraccess/database-entities';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { requireRunResourceId } from './flow.utils';
 
 export class MeteringReportExecutor implements NodeExecutor {
   constructor(private readonly metering: ResourceMeteringService) {}
@@ -28,7 +29,7 @@ export class MeteringReportExecutor implements NodeExecutor {
       await ctx.metering.complete(report);
     } else {
       await this.metering.report(
-        node.resourceId,
+        requireRunResourceId(node, ctx),
         data.meterId,
         report,
         ctx.transactionManager,

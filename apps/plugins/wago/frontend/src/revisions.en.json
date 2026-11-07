@@ -1,6 +1,7 @@
 {
   "impacts": "Potential flow impacts",
   "impactDescription": "Publishing can change or break these channel references. Check the listed resource flows before forcing publication.",
+  "globalReference": "Global flow {{flow}}, node {{node}} ({{type}})",
   "reference": "Resource {{resource}}, node {{node}} ({{type}})",
   "noReferences": "No saved WAGO flow nodes reference this channel.",
   "accept": "I checked the affected channel references and accept these changes",

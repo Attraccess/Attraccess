@@ -2,7 +2,8 @@ import { MeterSelector } from '../../../meters/MeterSelector';
 import { Button, DrawerBody, DrawerFooter, DrawerHeader, DrawerHeading, Form, useOverlayState } from '@heroui/react';
 import { Property, PropertyInput } from './property-input/index';
 import { isValueValid, initializeValue } from './property-input/schema-values';
-import { ResourceFlowNodeSchemaDto, useResourceFlowsServiceResolveNodeSchema } from '@attraccess/react-query-client';
+import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
+import { useResolveFlowNodeSchema } from '../../flowOwner';
 import { useNodeId, useNodesData } from '@xyflow/react';
 import { useFlowContext } from '../../context/index';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -14,14 +15,14 @@ export function useNodeEditorState(props: Props) {
 
   const nodeId = useNodeId();
   const currentData = useNodesData(nodeId as string);
-  const { updateNodeData, resourceId } = useFlowContext();
+  const { updateNodeData, owner, resourceId } = useFlowContext();
   const formRef = useRef<HTMLFormElement>(null);
 
   const [data, setData] = useState<Record<string, unknown>>(currentData?.data ?? {});
   const [resolvedSchema, setResolvedSchema] = useState(schema);
   const [schemaError, setSchemaError] = useState<string>();
   const [isResolvingSchema, setIsResolvingSchema] = useState(false);
-  const { mutateAsync: resolveNodeSchema } = useResourceFlowsServiceResolveNodeSchema<ResourceFlowNodeSchemaDto>();
+  const resolveNodeSchema = useResolveFlowNodeSchema(owner);
   const schemaRequest = useRef(0);
   const schemaResolutionTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dataRef = useRef(data);
@@ -65,11 +66,7 @@ export function useNodeEditorState(props: Props) {
       setSchemaError(undefined);
 
       try {
-        const nextSchema = await resolveNodeSchema({
-          nodeType: schema.type,
-          requestBody: { config },
-          resourceId,
-        });
+        const nextSchema = await resolveNodeSchema(schema.type, config);
         if (request !== schemaRequest.current) return;
 
         setResolvedSchema(nextSchema);
@@ -89,7 +86,7 @@ export function useNodeEditorState(props: Props) {
         if (request === schemaRequest.current) setIsResolvingSchema(false);
       }
     },
-    [resourceId, resolveNodeSchema, schema.type],
+    [resolveNodeSchema, schema.type],
   );
 
   const scheduleSchemaResolution = useCallback(
@@ -224,7 +221,7 @@ export function NodeEditor(props: Props) {
               </Button>
             ) : null}
             {isResolvingSchema ? <p className="text-sm text-default-500">Refreshing configuration...</p> : null}
-            {resolvedSchema.type.includes('.resource.metering.') && (
+            {resourceId !== undefined && resolvedSchema.type.includes('.resource.metering.') && (
               <MeterSelector
                 resourceId={resourceId}
                 value={typeof data.meterId === 'number' ? data.meterId : undefined}

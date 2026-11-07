@@ -4,6 +4,7 @@ import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { NodeEditor } from './editor/index';
 import { ResourceFlowLogType, ResourceFlowLog, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { useFlowContext } from '../context/index';
+import { schemaSupportsOwner } from '../flowOwner';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNodePreviewRows } from './preview/index';
 import { DeleteConfirmationModal, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
@@ -43,7 +44,8 @@ export function useAttraccessNodeState(props: Props) {
     [nodeId],
   );
 
-  const { addLiveLogReceiver, removeLiveLogReceiver, removeNode, resourceId } = useFlowContext();
+  const { addLiveLogReceiver, removeLiveLogReceiver, removeNode, resourceId, owner } = useFlowContext();
+  const supportedByOwner = schemaSupportsOwner(schema, owner);
 
   useEffect(() => {
     if (!nodeId || previewMode) {
@@ -76,9 +78,9 @@ export function useAttraccessNodeState(props: Props) {
       'border-2 border-red-500': processingState === ProcessingState.FAILED,
       'border-2 border-green-500': processingState === ProcessingState.COMPLETED,
       'border-2 border-warning': Boolean(validationError),
-      'opacity-60 grayscale border-dashed': !schema.supportedByResource,
+      'opacity-60 grayscale border-dashed': !supportedByOwner,
     });
-  }, [processingState, schema, isSelected, validationError]);
+  }, [processingState, supportedByOwner, isSelected, validationError]);
 
   const targetHandlesWithStyles = useMemo((): { id: string; label?: string; style: React.CSSProperties }[] => {
     return schema.inputs.map((inputName, index) => {
@@ -136,7 +138,7 @@ export function useAttraccessNodeState(props: Props) {
     return true;
   }, [previewMode, schema]);
 
-  const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t, resourceId });
+  const previewRows = useNodePreviewRows({ schema, tNodeTranslations: t, resourceId, owner });
 
   // Plugin-contributed node types have no entries in the static i18n JSON files.
   // Fall back to the label/description the plugin declared in its schema definition.
@@ -161,6 +163,7 @@ export function useAttraccessNodeState(props: Props) {
     sourceHandlesWithStyles,
     isEditable,
     previewRows,
+    supportedByOwner,
     nodeTitle,
     nodeDescription,
   } as const;
@@ -203,6 +206,7 @@ export function AttraccessNode(props: Props) {
     sourceHandlesWithStyles,
     isEditable,
     previewRows,
+    supportedByOwner,
     nodeTitle,
     nodeDescription,
   } = useAttraccessNodeState(props);
@@ -355,7 +359,7 @@ export function AttraccessNode(props: Props) {
               ))}
           </div>
 
-          {!previewMode && !schema.supportedByResource && (
+          {!previewMode && !supportedByOwner && (
             <div className="text-xs text-warning mt-1 px-1 flex flex-row items-center gap-1">
               <TriangleAlertIcon size={12} /> {t('nodes.unsupportedForResourceType')}
             </div>

@@ -36,6 +36,40 @@
         }
       },
       "resource": {
+        "health": {
+          "changed": {
+            "title": "Gesundheitsstatus geändert",
+            "description": "Wird ausgelöst, wenn sich der Gesundheitsstatus einer Ressource ändert. Payload: health.identifier, health.status, health.previousStatus, health.reason.",
+            "outputs": {
+              "output": "Ausgabe"
+            }
+          }
+        },
+        "maintenance": {
+          "created": {
+            "title": "Wartung erstellt",
+            "description": "Wird ausgelöst, wenn für eine Ressource eine Wartung erstellt wird. Payload: maintenance.id, maintenance.reason, maintenance.startTime, maintenance.endTime.",
+            "outputs": {
+              "output": "Ausgabe"
+            }
+          },
+          "finished": {
+            "title": "Wartung beendet",
+            "description": "Wird ausgelöst, wenn eine Wartung einer Ressource beendet wird. Payload: maintenance.id, maintenance.reason, maintenance.startTime, maintenance.endTime.",
+            "outputs": {
+              "output": "Ausgabe"
+            }
+          }
+        },
+        "maintenance-request": {
+          "created": {
+            "title": "Wartungsanfrage erstellt",
+            "description": "Wird ausgelöst, wenn für eine Ressource eine Wartungsanfrage erstellt wird. Payload: maintenanceRequest.id, maintenanceRequest.reason, maintenanceRequest.status, maintenanceRequest.createdAt, maintenanceRequest.createdByUser.",
+            "outputs": {
+              "output": "Ausgabe"
+            }
+          }
+        },
         "usage": {
           "started": {
             "title": "Nutzung gestartet",

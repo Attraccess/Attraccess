@@ -36,6 +36,40 @@
         }
       },
       "resource": {
+        "health": {
+          "changed": {
+            "title": "Health changed",
+            "description": "Triggers when the health status of a resource changes. Payload: health.identifier, health.status, health.previousStatus, health.reason.",
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        },
+        "maintenance": {
+          "created": {
+            "title": "Maintenance created",
+            "description": "Triggers when a maintenance is created for a resource. Payload: maintenance.id, maintenance.reason, maintenance.startTime, maintenance.endTime.",
+            "outputs": {
+              "output": "Output"
+            }
+          },
+          "finished": {
+            "title": "Maintenance finished",
+            "description": "Triggers when a maintenance of a resource is finished. Payload: maintenance.id, maintenance.reason, maintenance.startTime, maintenance.endTime.",
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        },
+        "maintenance-request": {
+          "created": {
+            "title": "Maintenance request created",
+            "description": "Triggers when a maintenance request is created for a resource. Payload: maintenanceRequest.id, maintenanceRequest.reason, maintenanceRequest.status, maintenanceRequest.createdAt, maintenanceRequest.createdByUser.",
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        },
         "usage": {
           "started": {
             "title": "Usage started",

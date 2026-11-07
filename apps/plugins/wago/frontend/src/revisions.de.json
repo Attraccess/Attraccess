@@ -1,6 +1,7 @@
 {
   "impacts": "Mögliche Auswirkungen auf Abläufe",
   "impactDescription": "Die Veröffentlichung kann diese Kanalreferenzen verändern oder ungültig machen. Prüfe die aufgeführten Ressourcenabläufe vor einer erzwungenen Veröffentlichung.",
+  "globalReference": "Globaler Flow {{flow}}, Knoten {{node}} ({{type}})",
   "reference": "Ressource {{resource}}, Knoten {{node}} ({{type}})",
   "noReferences": "Keine gespeicherten WAGO-Ablaufknoten verweisen auf diesen Kanal.",
   "accept": "Ich habe die betroffenen Kanalreferenzen geprüft und akzeptiere diese Änderungen",

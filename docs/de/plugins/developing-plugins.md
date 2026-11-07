@@ -370,6 +370,42 @@ Ein Handler, der eine Ausnahme wirft, wird vom Host **isoliert** — sein Fehler
 wird protokolliert und unterbricht niemals den Kernablauf, der das Event
 gesendet hat.
 
+### Flow-Knoten
+
+Ein Backend-Plugin kann dem Flow-Editor Knoten hinzufügen, indem sein Modul `flowNodes` liefert (siehe `PluginFlowNodeDefinition` im SDK). Trigger-Knoten (`isInput: true`) starten Flows, wenn das Plugin `context.flows.trigger(...)` aufruft; dafür ist die Berechtigung `TRIGGER_FLOWS` nötig. Der Aufruf trifft die Trigger-Knoten des Plugins in Ressourcen-Flows **und** in aktivierten [globalen Flows](flows/global-flows.md), mit demselben `matches`-Callback.
+
+#### Flow-Bereiche
+
+Jeder Knoten legt mit `flowScopes` fest, wo er verwendet werden kann:
+
+```ts
+const myNode: PluginFlowNodeDefinition = {
+  type: 'plugin.demo.send-on',
+  label: 'Einschalten',
+  flowScopes: ['resource', 'global'], // Standard: ['resource']
+  // ...
+};
+```
+
+- `flowScopes` ist `readonly ('resource' | 'global')[]` und hat den **Standardwert `['resource']`**. Ein Knoten erscheint erst in globalen Flows, wenn er sich dafür freigibt. Das Speichern eines globalen Flows mit einem Knoten ohne den Bereich `global` schlägt mit einem Validierungsfehler fehl, der den Knoten nennt.
+- `supportedByAllResources` filtert nur Ressourcen-Flows.
+- In einem globalen Flow gibt es keine feste Ressource. Ein Durchlauf hat nur dann eine auslösende Ressource, wenn ein Ressourcen-Ereignis ihn gestartet hat. Geben Sie einen Knoten daher nur frei, wenn er damit umgehen kann.
+
+#### Der Kontext von `resolveConfigSchema`
+
+`resolveConfigSchema(currentConfig, context)` erhält:
+
+```ts
+{
+  flowScope: 'resource' | 'global';
+  resourceId: number | null; // nur in Ressourcen-Flows gesetzt
+  flowId: number | null; // nur in globalen Flows gesetzt
+  purpose?: 'editor' | 'preview';
+}
+```
+
+Plugins, die sich nicht für globale Flows freigeben, sehen in `resourceId` nie `null`. Knoten, die sich freigeben, müssen beide Fälle behandeln und können `flowId` nutzen, um einen globalen Flow zu identifizieren, etwa als Eigentümer eines Kanals.
+
 ## Kombinierte Plugins
 
 Sie können ein Plugin erstellen, das sowohl Frontend- als auch Backend-Funktionalität umfasst. Dies ist nützlich, wenn Ihre Erweiterung benutzerdefinierte API-Endpunkte zusammen mit einer Benutzeroberfläche benötigt.

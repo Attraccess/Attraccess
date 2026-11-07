@@ -1,6 +1,12 @@
 import { createMock } from '@golevelup/ts-jest';
 import type { PluginFlowTriggerNodeDefinition } from '@attraccess/plugins-backend-sdk';
-import { Resource, ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
+import {
+  Flow,
+  Resource,
+  ResourceFlowEdge,
+  ResourceFlowNode,
+  ResourceFlowNodeType,
+} from '@attraccess/database-entities';
 import { EntityManager, Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
@@ -157,13 +163,16 @@ describe('plugin node configuration schemas', () => {
     expect(await service.resolveNodeSchema(1, 'plugin.schema-test.dynamic', { controllerId: 7 })).toMatchObject({
       configSchema: schema,
     });
-    expect(resolve).toHaveBeenCalledWith({ controllerId: 7 }, { resourceId: 1 });
+    expect(resolve).toHaveBeenCalledWith({ controllerId: 7 }, { flowScope: 'resource', resourceId: 1, flowId: null });
     expect(
       await service.resolveNodeSchema(1, 'plugin.schema-test.dynamic', { controllerId: 7 }, 'preview'),
     ).toMatchObject({
       configSchema: { properties: {}, preview: [] },
     });
-    expect(resolve).toHaveBeenLastCalledWith({ controllerId: 7 }, { resourceId: 1, purpose: 'preview' });
+    expect(resolve).toHaveBeenLastCalledWith(
+      { controllerId: 7 },
+      { flowScope: 'resource', resourceId: 1, flowId: null, purpose: 'preview' },
+    );
     expect(await service.resolveNodeSchema(1, 'plugin.schema-test.static', {})).toMatchObject({ configSchema: schema });
     await expect(service.resolveNodeSchema(1, 'plugin.schema-test.empty', {})).rejects.toThrow('does not provide');
     await expect(service.resolveNodeSchema(1, 'plugin.schema-test.missing', {})).rejects.toThrow('not found');
@@ -173,14 +182,50 @@ describe('plugin node configuration schemas', () => {
 });
 
 describe('shared machine flow warnings', () => {
-  const build = (nodes: object[], edges: object[]) =>
+  type GlobalFlowFixture = { flow: { id: number; name: string }; nodes: object[]; edges: object[] };
+  const build = (nodes: object[], edges: object[], globalFlows: GlobalFlowFixture[] = []) =>
     new ResourceFlowsService(
-      createMock<Repository<ResourceFlowNode>>({ find: jest.fn().mockResolvedValue(nodes) }),
-      createMock<Repository<ResourceFlowEdge>>({ find: jest.fn().mockResolvedValue(edges) }),
+      createMock<Repository<ResourceFlowNode>>({
+        find: jest.fn(async ({ where }: { where: { flowId?: number } }) =>
+          where.flowId === undefined ? nodes : (globalFlows.find((g) => g.flow.id === where.flowId)?.nodes ?? []),
+        ),
+      }),
+      createMock<Repository<ResourceFlowEdge>>({
+        find: jest.fn(async ({ where }: { where: { flowId?: number } }) =>
+          where.flowId === undefined ? edges : (globalFlows.find((g) => g.flow.id === where.flowId)?.edges ?? []),
+        ),
+      }),
       createMock<Repository<Resource>>({ findOne: jest.fn().mockResolvedValue({ id: 1 }) }),
       createMock<MqttClientService>(),
       new EventEmitter2(),
+      createMock<Repository<Flow>>({ find: jest.fn().mockResolvedValue(globalFlows.map((g) => g.flow)) }),
     );
+
+  it('lists enabled global flows without an activeSessions check, labelled with the flow', async () => {
+    const service = build(
+      [],
+      [],
+      [
+        {
+          flow: { id: 5, name: 'Notify on starts' },
+          nodes: [
+            { id: 'start', type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, data: {} },
+            { id: 'http', type: ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST, data: {} },
+          ],
+          edges: [{ id: 'e', source: 'start', target: 'http' }],
+        },
+      ],
+    );
+    await expect(service.getSharedMachineFlowWarnings(1)).resolves.toEqual([
+      {
+        flowId: 5,
+        flowName: 'Notify on starts',
+        triggerNodeId: 'start',
+        triggerType: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+        effectNodes: [{ nodeId: 'http', nodeType: ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST }],
+      },
+    ]);
+  });
 
   it('lists a stop flow that reaches a plugin output without checking activeSessions', async () => {
     registerPluginFlowNodes('warning-service-test', [
@@ -202,6 +247,8 @@ describe('shared machine flow warnings', () => {
     );
     await expect(service.getSharedMachineFlowWarnings(1)).resolves.toEqual([
       {
+        flowId: null,
+        flowName: null,
         triggerNodeId: 'stop',
         triggerType: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         effectNodes: [{ nodeId: 'power', nodeType: 'plugin.warning-service-test.switch' }],

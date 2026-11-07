@@ -2,6 +2,8 @@
 
 This reference covers all built-in flow nodes. The editor groups them by purpose, such as Billing, Messaging and Flow Control, and shows nodes supported by the resource type. Usage, activity and billing nodes are for **machines**; door triggers are for **doors**. Plugins can add further nodes with their own settings.
 
+Nodes can be used in **resource flows**, in [global flows](flows/global-flows.md), or in both. Nodes marked **Resource flows only** are hidden in global flows, and a global flow that contains one cannot be saved or imported. All other nodes work in both. Nodes that act on a resource (for example **End Usage Session** or **Record activity**) need a triggering resource in a global flow; see [The triggering resource](flows/global-flows.md#the-triggering-resource).
+
 Read [Payloads, Variables & Templates](flows/payloads-variables-templates.md) first for paths, typed values and examples. **Template** below means a Handlebars template evaluated against the current input. Other settings are literal unless stated otherwise. Object payloads also receive resource context, and templates can read stored variables.
 
 Template-enabled fields also support `add`, `subtract`, `multiply` and `divide`. See [Arithmetic and Unit Conversion](flows/payloads-variables-templates.md#arithmetic-and-unit-conversion) for syntax and examples.
@@ -12,7 +14,7 @@ Triggers start a run and pass their event data through **Output**.
 
 ### Button
 
-Type: `input.button` · Machines
+Type: `input.button` · Machines · Resource flows only
 
 Adds a manual button to the resource detail page. **Label** is required, literal button text. The payload starts with resource context; it does not include the user who pressed the button.
 
@@ -55,6 +57,37 @@ Runs for a door-lock action. No settings. Uses the same payload shape as **Door 
 Type: `input.resource.door.unlatched` · Doors
 
 Runs for a brief door-unlatch action. No settings. Uses the same payload shape as **Door Unlocked**. Example: send a pulse command to an electric strike.
+
+### Health Changed
+
+Type: `input.resource.health.changed` · All resources · Resource and global flows
+
+Runs when a resource's health status really changes; a report with the same status does not fire. No settings. Payload contains the resource context and `health: { identifier, status, previousStatus, reason }`. Example: in a global flow, send an MQTT or HTTP notification when any resource becomes unhealthy.
+
+| Field                   | Description                             |
+| ----------------------- | --------------------------------------- |
+| `health.identifier`     | Identifier of the health source         |
+| `health.status`         | New status                              |
+| `health.previousStatus` | Status before the change                |
+| `health.reason`         | Reason reported with the change, if any |
+
+### Maintenance Created
+
+Type: `input.resource.maintenance.created` · All resources · Resource and global flows
+
+Runs when a maintenance window is created, either manually or from a maintenance schedule. No settings. Payload contains the resource context and `maintenance: { id, reason, startTime, endTime }`.
+
+### Maintenance Finished
+
+Type: `input.resource.maintenance.finished` · All resources · Resource and global flows
+
+Runs when a maintenance window ends. No settings. Uses the same payload shape as **Maintenance Created**, with `endTime` set.
+
+### Maintenance Request Created
+
+Type: `input.resource.maintenance-request.created` · All resources · Resource and global flows
+
+Runs when a maintenance request is submitted for a resource. No settings. Payload contains the resource context and `maintenanceRequest: { id, reason, status, createdAt, createdByUser }`, where `createdByUser` is `{ id, username }` or `null`. Only user-visible fields are included.
 
 ### MQTT Message Received
 
@@ -125,7 +158,7 @@ Select a **Companion device** and optional decimal **Vendor ID / Product ID** fi
 
 ### Metering Start
 
-Type: `input.resource.metering.start` · Machines
+Type: `input.resource.metering.start` · Machines · Resource flows only
 
 Select a predefined **Meter**, or create one with a name. Prepares that meter before a tracked session starts or is taken over. **Timeout (seconds)** is 1–600, default **30**. The branch must reach **Metering Ready**. A priced meter that cannot initialize prevents the session from starting.
 
@@ -133,7 +166,7 @@ Payload contains `metering: { sessionId, meterId, operationId, resourceId, usage
 
 ### Metering Collection
 
-Type: `input.resource.metering.collect` · Machines
+Type: `input.resource.metering.collect` · Machines · Resource flows only
 
 | Setting                         | Range / default                                |
 | ------------------------------- | ---------------------------------------------- |
@@ -365,7 +398,7 @@ Select a literal **Companion device**. Sends an unlock-screen command and saves 
 
 ### Metering Ready
 
-Type: `output.resource.metering.ready` · Machines
+Type: `output.resource.metering.ready` · Machines · Resource flows only
 
 | Setting            | Description                                                |
 | ------------------ | ---------------------------------------------------------- |
@@ -379,7 +412,7 @@ Example after HTTP returning `{"counter":1500}`: baseline `{{counter}}`. No unit
 
 ### Report Meter
 
-Type: `output.resource.metering.report`
+Type: `output.resource.metering.report` · Resource flows only
 
 | Setting         | Description                                                       |
 | --------------- | ----------------------------------------------------------------- |

@@ -16,10 +16,20 @@ const MAX_ENTRIES_PER_RECORDING = 2000;
 const MAX_PAYLOAD_CHARS = 8000;
 const SWEEP_INTERVAL_MS = 10_000;
 
+/** Recordings are keyed by the resource id of a resource flow or by `globalFlowLogKey` of a global flow. */
+export type FlowLogKey = number | string;
+
+export function globalFlowLogKey(flowId: number): string {
+  return `flow:${flowId}`;
+}
+
 export interface FlowLogInput {
   flowRunId: string;
   nodeId: string | null;
-  resourceId: number;
+  /** The resource of a resource flow; null for global-flow nodes. */
+  resourceId: number | null;
+  /** The global flow of a global-flow node; null for resource-flow nodes. */
+  flowId?: number | null;
   type: ResourceFlowLogType;
   /** Only invoked while a recording is active, so idle flows never pay for serialization. */
   payload?: () => unknown;
@@ -40,8 +50,8 @@ interface Recording {
 @Injectable()
 export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(FlowLogRecorderService.name);
-  private readonly recordings = new Map<number, Recording>();
-  private readonly subjects = new Map<number, Subject<ResourceFlowLogEvent>>();
+  private readonly recordings = new Map<FlowLogKey, Recording>();
+  private readonly subjects = new Map<FlowLogKey, Subject<ResourceFlowLogEvent>>();
   private sweepInterval?: NodeJS.Timeout;
   private nextId = 1;
 
@@ -49,9 +59,9 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
     // Doubles as SSE keep-alive and expiry sweep.
     this.sweepInterval = setInterval(() => {
       this.subjects.forEach((subject) => subject.next({ data: { keepalive: true } }));
-      this.recordings.forEach((recording, resourceId) => {
+      this.recordings.forEach((recording, key) => {
         if (recording.expiresAt.getTime() <= Date.now()) {
-          this.stop(resourceId);
+          this.stop(key);
         }
       });
     }, SWEEP_INTERVAL_MS);
@@ -66,27 +76,27 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
     this.recordings.clear();
   }
 
-  public start(resourceId: number, durationMinutes = DEFAULT_RECORDING_MINUTES): FlowLogRecordingDto {
+  public start(key: FlowLogKey, durationMinutes = DEFAULT_RECORDING_MINUTES): FlowLogRecordingDto {
     const minutes = Math.min(Math.max(Math.floor(durationMinutes), 1), MAX_RECORDING_MINUTES);
     const expiresAt = new Date(Date.now() + minutes * 60_000);
 
     // Restarting drops whatever was collected before.
-    this.recordings.set(resourceId, { startedAt: new Date(), expiresAt, logs: [] });
-    this.logger.log(`Recording flow logs for resource ${resourceId} until ${expiresAt.toISOString()}`);
+    this.recordings.set(key, { startedAt: new Date(), expiresAt, logs: [] });
+    this.logger.log(`Recording flow logs for ${key} until ${expiresAt.toISOString()}`);
 
-    return this.getStatus(resourceId);
+    return this.getStatus(key);
   }
 
-  public stop(resourceId: number): FlowLogRecordingDto {
-    if (this.recordings.delete(resourceId)) {
-      this.logger.log(`Stopped recording flow logs for resource ${resourceId}, collected logs discarded`);
+  public stop(key: FlowLogKey): FlowLogRecordingDto {
+    if (this.recordings.delete(key)) {
+      this.logger.log(`Stopped recording flow logs for ${key}, collected logs discarded`);
     }
 
-    return this.getStatus(resourceId);
+    return this.getStatus(key);
   }
 
-  public getStatus(resourceId: number): FlowLogRecordingDto {
-    const recording = this.activeRecording(resourceId);
+  public getStatus(key: FlowLogKey): FlowLogRecordingDto {
+    const recording = this.activeRecording(key);
 
     return {
       isRecording: !!recording,
@@ -95,8 +105,8 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  public getLogs(resourceId: number): ResourceFlowLogsResponseDto {
-    const recording = this.activeRecording(resourceId);
+  public getLogs(key: FlowLogKey): ResourceFlowLogsResponseDto {
+    const recording = this.activeRecording(key);
 
     return {
       recording: {
@@ -108,13 +118,17 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  public isRecording(resourceId: number): boolean {
-    return !!this.activeRecording(resourceId);
+  public isRecording(key: FlowLogKey): boolean {
+    return !!this.activeRecording(key);
   }
 
   /** No-op unless a recording is active for the resource. Never throws. */
   public record(input: FlowLogInput): void {
-    const recording = this.activeRecording(input.resourceId);
+    const key = input.flowId != null ? globalFlowLogKey(input.flowId) : input.resourceId;
+    if (key === null) {
+      return;
+    }
+    const recording = this.activeRecording(key);
     if (!recording) {
       return;
     }
@@ -124,6 +138,7 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
       flowRunId: input.flowRunId,
       nodeId: input.nodeId,
       resourceId: input.resourceId,
+      flowId: input.flowId ?? null,
       type: input.type,
       payload: this.serializePayload(input.payload),
       createdAt: new Date(),
@@ -134,33 +149,33 @@ export class FlowLogRecorderService implements OnModuleInit, OnModuleDestroy {
       recording.logs.shift();
     }
 
-    this.subjects.get(input.resourceId)?.next({ data: log });
+    this.subjects.get(key)?.next({ data: log });
   }
 
-  public subjectFor(resourceId: number): Subject<ResourceFlowLogEvent> {
-    let subject = this.subjects.get(resourceId);
+  public subjectFor(key: FlowLogKey): Subject<ResourceFlowLogEvent> {
+    let subject = this.subjects.get(key);
     if (!subject) {
       subject = new Subject<ResourceFlowLogEvent>();
-      this.subjects.set(resourceId, subject);
+      this.subjects.set(key, subject);
     }
     return subject;
   }
 
-  public releaseSubject(resourceId: number): void {
-    const subject = this.subjects.get(resourceId);
+  public releaseSubject(key: FlowLogKey): void {
+    const subject = this.subjects.get(key);
     if (subject && !subject.observed) {
-      this.subjects.delete(resourceId);
+      this.subjects.delete(key);
     }
   }
 
-  private activeRecording(resourceId: number): Recording | undefined {
-    const recording = this.recordings.get(resourceId);
+  private activeRecording(key: FlowLogKey): Recording | undefined {
+    const recording = this.recordings.get(key);
     if (!recording) {
       return undefined;
     }
 
     if (recording.expiresAt.getTime() <= Date.now()) {
-      this.stop(resourceId);
+      this.stop(key);
       return undefined;
     }
 
