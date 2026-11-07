@@ -191,6 +191,9 @@ export default plugin;
 | `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
 | `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS`    |
 | `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                                          | `ACCESS_MQTT_SERVERS`    |
+| `context.notifications.dispatch(request)`                 | Notify users under a category your plugin declared. See [Notifications](#notifications).    | `SEND_NOTIFICATIONS`     |
+| `context.resourceAccess`                                  | Read-only authorization, maintenance and session queries. See [Resource access](#resource-access-queries). | `ACCESS_RESOURCES` |
+| `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions). | `DATABASE_ACCESS` |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -208,15 +211,16 @@ naming the missing permission.
 | Permission               | Grants access to                                                                                                                                                      |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                 |
-| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources.                                                                                                       |
+| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).  |
 | `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                       |
-| `DATABASE_ACCESS`        | `context.dataSource` and `context.getRepository(...)` for any other entity.                                                                                           |
+| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` for any other entity and `context.runSerialized(...)`.                                                             |
 | `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                           |
 | `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                               |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                      |
 | `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection. |
 | `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).               |
 | `ACCESS_HOOKS`           | The `preStartHook` and `sessionEndHook` — ask for a confirmation or block a session start. See [Reader UI](#reader-ui-and-start-hooks).                               |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares. See [Notifications](#notifications).         |
 
 ### MQTT subscriptions
 
@@ -284,6 +288,91 @@ The host emits at least `SystemEvent.RESOURCE_USAGE_STARTED` and
 that throws is **isolated** by the host — its error is logged and never breaks
 the core flow that emitted the event.
 
+Further events for plugins that follow maintenance, health and live sessions
+(all require `LISTEN_EVENTS`, payloads are `Date`-typed as in the SDK):
+
+| Event                                        | Payload                                                                                   | Fires                                                                 |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `SystemEvent.MAINTENANCE_CHANGED`            | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | After a maintenance window was created, changed or finished. `endTime` is `null` while open-ended. |
+| `SystemEvent.RESOURCE_HEALTH_CHANGED`        | `{ resourceId, status, previousStatus, reason, identifier }`                              | Only on a real status transition of a health entry.                   |
+| `SystemEvent.RESOURCE_USAGE_SESSION_STARTED` | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                            | A user started a session on an idle resource (not a takeover). `supervisorUserId` is set for supervised starts. |
+| `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`          | A user took over a running session. Fires for the **new** user.       |
+| `SystemEvent.RESOURCE_USAGE_SESSION_ENDED`   | `{ resourceId, usageId, userId, startTime, endTime, reason: 'ended' \| 'taken_over' }`    | A session ended, explicitly or because it was taken over.             |
+
+### Notifications
+
+With `SEND_NOTIFICATIONS` a plugin notifies users in the app, by push and by
+email, respecting each user's notification preferences. Declare the categories
+on the backend module and dispatch under their short ids:
+
+```ts
+const plugin: PluginBackendModule = {
+  notificationCategories: [{ id: 'reminders', label: { en: 'Reminders', de: 'Erinnerungen' } }],
+  register(context) {
+    // keep `context` and call notify(context, ...) from your handlers
+    return { module: MyPluginModule };
+  },
+};
+
+async function notify(context: PluginContext, userId: number) {
+  await context.notifications.dispatch({
+    category: 'reminders',
+    recipients: [userId],
+    title: 'Your booking starts soon',
+    body: 'Booking #12 starts at 14:00.',
+    url: '/reservations/12', // relative to the application URL
+    severity: 'info', // or 'warning'
+    dedupeKey: 'reservations:reminder:12', // collapses repeated push messages
+    email: { subject: 'Booking reminder', text: 'Booking #12 starts at 14:00.' }, // html is optional
+  });
+}
+```
+
+- A category id is short and unique within the plugin (lowercase letters, digits, `-`, `_`). The host namespaces it as
+  `plugin.<pluginName>.<id>` and lists it, with your `label`, in every user's notification preferences under the
+  plugin's name. Dispatching an undeclared category is rejected.
+- Unknown user ids are skipped and duplicates are collapsed. An email is only sent when `email` is set and the
+  recipient's preferences allow email for the category. The host renders it inside the global email layout; `html`
+  is a trusted fragment, `text` is used (escaped) when `html` is omitted.
+- Dispatching is not transactional: if it fails, the plugin decides whether to retry. The reservations plugin claims
+  a "sent" flag first and never retries, so its notices are at most once.
+
+### Resource access queries
+
+`context.resourceAccess` (permission `ACCESS_RESOURCES`) answers read-only
+authorization and state questions with the same logic the core uses to authorise
+a session start, so plugin decisions never drift from it:
+
+| Method                                              | Returns                                                                                                              |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `canStart(userId, resourceId)`                      | `{ allowed, requiresSupervision, supervisionAllowed }`. Covers introductions, retraining blocks, introducers/maintainers, `resources.update` and the supervision mode. It does **not** consider live maintenance or health. |
+| `canMaintain(userId, resourceId)`                   | Whether the user can manage maintenance of the resource (permission, introducer/maintainer, group roles).             |
+| `hasPermission(userId, permission)`                 | Whether the user holds an RBAC permission such as `resources.update`.                                                |
+| `listResourceIdsIntroduced(userId)`                 | Resources the user is introduced to in the sense of `canStart` (valid introduction, introducer/maintainer, `resources.update`). |
+| `listResourceIdsMaintained(userId)`                 | Resources whose maintenance the user can manage.                                                                     |
+| `getMaintenanceWindows(resourceId, from, to)`       | Windows overlapping `[from, to)` as `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Open-ended maintenance counts until it is finished. |
+| `getActiveSessions(resourceId)`                     | Running sessions `{ usageId, userId, startTime }`, earliest first.                                                    |
+
+### Serialized transactions
+
+`context.runSerialized(fn)` (permission `DATABASE_ACCESS`) runs `fn(manager)` in
+a transaction that the host executes one at a time on SQLite. The transaction
+commits when `fn` resolves and rolls back when it throws, which makes
+check-then-write sequences such as overlap checks race-free:
+
+```ts
+await context.runSerialized(async (manager) => {
+  const clash = await manager.getRepository(Booking).count({ where: { /* overlapping window */ } });
+  if (clash > 0) throw new ConflictException('OVERLAP');
+  await manager.getRepository(Booking).save(newBooking);
+});
+```
+
+Serialization is per host process. Plugins that need exclusion across several API
+instances need a cross-instance lock of their own; the reservations plugin runs
+on a single instance for that reason (see
+[Reservations](resources/reservations.md#single-instance-operation)).
+
 ### Packaging the backend
 
 A backend plugin shares the host's NestJS runtime, event bus and database
@@ -329,6 +418,7 @@ host validates, sanitizes and renders it. Admins configure this under **Reader d
 | Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })` | `READER_UI`    |
 
 A plugin that declares `readerUi` or a hook without the matching permission **fails to load** and is quarantined.
+The first-party [Reservations](resources/reservations.md) plugin is a real-world user of both hooks: its pre-start hook blocks or confirms starts around bookings, and its session-end hook asks the holder to keep or free the rest of a booking.
 See `examples/plugin-reader-ui` for a working example.
 
 ### Slots
@@ -736,6 +826,21 @@ knowledge. Host slot ids available today:
 | ---------------------- | ------------------------------------------------- | ------------------ |
 | `mqtt.server.detail`   | MQTT server detail/edit view (extensions section) | `{ mqttServerId }` |
 | `mqtt.server.list.row` | MQTT server list, per-row action area             | `{ mqttServerId }` |
+| `resource.overview`        | Resource detail overview body (resource-level status or controls)                       | `{ resourceId }` |
+| `resource.active-session`  | Active-usage panel, directly after the host flow controls                               | `{ resourceId, usageId }` |
+| `resource.list.row`        | Resource list row, compact status area                                                  | `{ resourceId }` |
+| `resource.settings`        | Resource settings page, shown to users who may manage the resource (`resources.update`) | `{ resourceId }` |
+| `user.account`             | The signed-in user's own account page                                                   | `{ userId }` |
+| `admin.settings`           | System settings area, for users with system administration permission                   | `{}` |
+
+The slots `resource.settings`, `user.account` and `admin.settings` are rendered as
+**titled sections**: set `title` on the contribution (falls back to a generic
+plugin title). The constants `RESOURCE_OVERVIEW_SLOT`, `RESOURCE_SETTINGS_SLOT`,
+`USER_ACCOUNT_SLOT`, `ADMIN_SETTINGS_SLOT` and the context types
+(`ResourceSlotContext`, `UserSlotContext`, `AdminSettingsSlotContext`) are exported
+by `@attraccess/plugins-frontend-sdk`. The host only decides **where** a
+contribution is shown; your plugin's backend must still enforce permissions on its
+own API.
 
 ### Translations and language switching
 
