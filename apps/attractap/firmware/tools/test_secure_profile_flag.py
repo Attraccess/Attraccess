@@ -187,6 +187,17 @@ class SecureLabVariant(unittest.TestCase):
                     contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
                 b.package_secure_lab(tmp, os.path.join(tmp, "park.hex"), ["esptool"])
 
+    def test_signing_failure_is_a_clean_error(self):
+        import secure_lab_reader
+        out = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch("secure_lab_reader.flash_layout", return_value=[("0x0", "boot.bin", True, True)]), \
+                mock.patch("secure_lab_reader.signed_images",
+                           side_effect=secure_lab_reader.LabReaderError("espsecure failed")), \
+                contextlib.redirect_stdout(out), self.assertRaises(SystemExit):
+            b.package_secure_lab(tmp, os.path.join(tmp, "park.hex"), ["esptool"])
+        self.assertIn("espsecure failed", out.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

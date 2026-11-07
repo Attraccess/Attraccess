@@ -333,14 +333,22 @@ def package_secure_lab(build_dir, out_path, esptool_cmd):
     encrypted 0xFF."""
     sys.path.insert(0, os.path.join(FIRMWARE_DIR, "tools"))
     import secure_lab_reader
-    images = secure_lab_reader.flash_layout(build_dir)
+    try:
+        images = secure_lab_reader.flash_layout(build_dir)
+    except secure_lab_reader.LabReaderError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
     plain = [offset for offset, _, encrypted, _ in images if not encrypted]
     if plain:
         print(f"Error: {build_dir} has parts that are not written encrypted at {', '.join(plain)}")
         sys.exit(1)
     import tempfile
     with tempfile.TemporaryDirectory() as tmp:
-        signed = secure_lab_reader.signed_images(images, tmp, resolve_esptool_command("espsecure"))
+        try:
+            signed = secure_lab_reader.signed_images(images, tmp, resolve_esptool_command("espsecure"))
+        except secure_lab_reader.LabReaderError as e:
+            print(f"Error: signing {build_dir} with the lab key failed: {e}")
+            sys.exit(1)
         run_merge_bin(esptool_cmd, out_path, [(offset, path) for offset, path, _ in signed], "hex")
 
 def build_lab(variants, esptool_cmd):
