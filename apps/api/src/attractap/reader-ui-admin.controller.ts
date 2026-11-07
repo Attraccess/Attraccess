@@ -16,6 +16,7 @@ import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { ResourcesService } from '../resources/resources.service';
 import { AttractapService } from './attractap.service';
+import { isPaired } from './reader-pairing';
 import { ReaderUiAlertsService } from '../plugin-system/reader-ui/reader-ui-alerts.service';
 import { ReaderUiSettingsService } from '../plugin-system/reader-ui/reader-ui-settings.service';
 import {
@@ -45,7 +46,9 @@ export class ReaderUiAdminController {
   }
 
   private async requireReader(readerId: number): Promise<void> {
-    if (!(await this.readers.findReaderById(readerId))) throw new NotFoundException(`Reader ${readerId} not found`);
+    // A reader that is not paired yet is not visible outside the pairing session.
+    if (!isPaired(await this.readers.findReaderById(readerId)))
+      throw new NotFoundException(`Reader ${readerId} not found`);
   }
 
   @Get('resources/:resourceId/reader-ui-settings')

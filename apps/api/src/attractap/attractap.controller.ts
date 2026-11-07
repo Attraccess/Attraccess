@@ -79,6 +79,8 @@ export class AttractapController {
     @Body() updateData: UpdateReaderDto,
   ): Promise<UpdateReaderResponseDto> {
     this.logger.debug(`Updating reader ${readerId} (fields: ${Object.keys(updateData ?? {}).join(', ')})`);
+    // No rename and no resource assignment for a reader that is not paired yet.
+    await this.requirePairedReader(readerId);
     try {
       const updatedReader = await this.attractapService.updateReader(readerId, updateData);
 
@@ -136,9 +138,13 @@ export class AttractapController {
   })
   @ApiResponse({ status: 404, description: 'Reader not found' })
   async getReaderById(@Param('readerId', ParseIntPipe) readerId: number): Promise<Attractap> {
+    return await this.requirePairedReader(readerId);
+  }
+
+  /** A reader that is not paired yet is not visible outside the pairing session. */
+  private async requirePairedReader(readerId: number): Promise<Attractap> {
     const reader = await this.attractapService.findReaderById(readerId);
-    // A reader that is not paired yet is not visible outside the pairing session.
-    if (!isPaired(reader)) throw new NotFoundException(`Reader with ID ${readerId} not found`);
+    if (!reader || !isPaired(reader)) throw new NotFoundException(`Reader with ID ${readerId} not found`);
     return reader;
   }
 
@@ -171,6 +177,7 @@ export class AttractapController {
     type: [AttractapCrashReportDto],
   })
   async getReaderCrashReports(@Param('readerId', ParseIntPipe) readerId: number): Promise<AttractapCrashReportDto[]> {
+    await this.requirePairedReader(readerId);
     return await this.attractapService.getCrashReportsForReader(readerId);
   }
 
@@ -189,6 +196,7 @@ export class AttractapController {
     @Param('readerId', ParseIntPipe) readerId: number,
     @Param('reportId', ParseIntPipe) reportId: number,
   ): Promise<StreamableFile> {
+    await this.requirePairedReader(readerId);
     const result = await this.attractapService.getCrashReportCoredump(readerId, reportId);
 
     if (!result) {
