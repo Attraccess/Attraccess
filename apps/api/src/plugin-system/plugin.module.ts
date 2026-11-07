@@ -45,6 +45,7 @@ import { NpmPluginService } from './npm-plugin.service';
 
 import { registerPluginAuditDomains } from './audit/audit-registry';
 
+import { resolveAppVersion } from '../config/app.config';
 import { PluginClassificationService } from './plugin-classification.service';
 
 import { pluginActivationPlan } from './runtime/dependencies';
@@ -343,6 +344,8 @@ export class PluginModule {
 
   protected static createPluginContext(manifest: LoadedPluginManifest): PluginContext {
     const base: PluginContext = {
+      // The same version the host uses to check plugin compatibility.
+      hostVersion: resolveAppVersion(),
       liveUpdates: {
         register: (definition) =>
           getImplementationClass().pluginLiveUpdates().register(manifest.id, manifest.name, definition),

@@ -3,7 +3,7 @@ import { connect, type AddressInfo } from 'node:net';
 
 const originalListen = Server.prototype.listen;
 import { createSidecar } from './sidecar';
-import { configWith } from './config';
+import { configWith } from './testing/config';
 import { createLogger } from './logger';
 import { WsClient, http, simulatedPlatform, startSidecar, validHeaders } from './testing/harness';
 

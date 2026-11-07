@@ -44,8 +44,10 @@ describe('transport', () => {
     });
   });
 
-  it('reports the version values without headers so operators can troubleshoot', async () => {
-    const version = await http(running.port, 'GET', '/version');
+  it('reports the version values with the token but without release headers so operators can troubleshoot', async () => {
+    const version = await http(running.port, 'GET', '/version', {
+      headers: { authorization: validHeaders().authorization },
+    });
     expect(version.body).toMatchObject({
       sidecar: COMPATIBILITY_TABLE[0].sidecar,
       matterJs: COMPATIBILITY_TABLE[0].matterJs,
@@ -181,7 +183,7 @@ describe('transport', () => {
   });
 
   it('answers 404 for a request target that is not a valid path', async () => {
-    const result = await http(running.port, 'GET', '//');
+    const result = await http(running.port, 'GET', '//', { headers: { authorization: validHeaders().authorization } });
     expect(result.status).toBe(404);
     expect(result.body.error.code).toBe('not_found');
   });

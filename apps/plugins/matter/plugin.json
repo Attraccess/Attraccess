@@ -1,14 +1,23 @@
 {
   "name": "matter",
-  "version": "0.1.0-alpha.0",
+  "version": "0.2.0-alpha.0",
   "main": {
     "backend": {
       "directory": "dist",
       "entryPoint": "index.js"
+    },
+    "migrations": {
+      "directory": "dist",
+      "entryPoint": "migrations.js"
+    },
+    "frontend": {
+      "directory": "frontend",
+      "entryPoint": "remoteEntry.js",
+      "styles": "style.css"
     }
   },
   "attraccessVersion": {
     "min": "1.11.0"
   },
-  "permissions": []
+  "permissions": ["DATABASE_ACCESS", "MANAGE_SECRETS"]
 }

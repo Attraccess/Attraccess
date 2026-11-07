@@ -9,8 +9,10 @@ import {
   type EventEnvelope,
 } from '@attraccess/matter-contract';
 import type { IncomingMessage } from 'node:http';
+import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { WebSocket, WebSocketServer } from 'ws';
+import { UNAUTHORIZED_MESSAGE, type TokenAuthenticator } from './auth';
 import { versionedRefusal, type RunningReleases } from './admission';
 import type { SidecarConfig } from './config';
 import { checkLocalAccess, correlationIdFrom, rejectUpgrade, requestPath, type ErrorReply } from './http-utils';
@@ -129,6 +131,7 @@ export class WebSocketHub {
     private readonly running: RunningReleases,
     private readonly isDraining: () => boolean,
     private readonly logger: Logger,
+    private readonly auth: TokenAuthenticator,
   ) {
     // maxPayload makes the ws parser close oversized messages with 1009 before application code sees them.
     this.server = new WebSocketServer({ noServer: true, maxPayload: config.maxMessageBytes });
@@ -138,7 +141,7 @@ export class WebSocketHub {
   handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
     socket.on('error', () => socket.destroy());
     const correlationId = correlationIdFrom(req.headers);
-    const refusal = this.refusal(req);
+    const refusal = this.refusal(req, (socket as Socket).remoteAddress);
     if (refusal) return rejectUpgrade(socket, refusal, correlationId);
     this.server.handleUpgrade(req, socket, head, (ws) => {
       // A client that never sends its resume message would otherwise stay open forever. Pings do not count.
@@ -156,9 +159,11 @@ export class WebSocketHub {
     });
   }
 
-  private refusal(req: IncomingMessage): ErrorReply | null {
-    const denied = checkLocalAccess(req.headers);
+  /** Same order as HTTP: origin/host, authentication, path, draining, release admission, client cap. */
+  private refusal(req: IncomingMessage, remoteAddress?: string): ErrorReply | null {
+    const denied = checkLocalAccess(req.headers, this.config.allowedHosts);
     if (denied) return { code: 'forbidden_origin', message: denied };
+    if (this.auth.check(req.headers, remoteAddress)) return { code: 'unauthorized', message: UNAUTHORIZED_MESSAGE };
     if (requestPath(req.url) !== EVENTS_PATH) {
       return { code: 'not_found', message: 'Unknown path.' };
     }

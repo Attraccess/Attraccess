@@ -129,6 +129,11 @@ export interface PluginSecretsContext {
  * a minor SDK bump; removing/changing one is a major bump.
  */
 export interface PluginContext {
+  /**
+   * Version of the running Attraccess host (the one plugin compatibility is checked against). Optional for hosts
+   * predating this field, so a plugin that needs it must handle its absence.
+   */
+  readonly hostVersion?: string;
   /** Shared authenticated UI transport. Optional for hosts predating this capability. */
   readonly liveUpdates?: PluginLiveUpdatesContext;
   /** Optional for compatibility with hosts predating generic plugin audit support. */
