@@ -15,7 +15,7 @@ import { ReservationStore } from '../reservations/reservation.store';
 import { GlobalSettingsService } from '../settings/global-settings.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
 import type { ResourceSettings } from '../settings/settings.model';
-import { readerName, readerTexts, type ReaderClock } from './texts';
+import { nextLocalMidnight, readerName, readerTexts, type ReaderClock } from './texts';
 
 const MINUTE_MS = 60_000;
 
@@ -74,7 +74,10 @@ export class ReaderUiService {
     const nameOf = this.nameResolver(ctx, settings);
     const holder = own ? undefined : await nameOf(subject);
     const state = this.describe(subject, running === subject, settings, clock, holder, own !== undefined);
-    const boundaries = [state.boundary];
+    // The next start changes the state even when the details are about another booking (your own one in
+    // the early check-in window), and local midnight changes the weekday prefix of the times.
+    const boundaries = [state.boundary, nextLocalMidnight(now, clock.timeZone).getTime()];
+    if (upcoming[0]) boundaries.push(upcoming[0].startTime.getTime());
     const contributions: ReaderSlotContribution[] = [];
 
     const add = (
@@ -149,7 +152,8 @@ export class ReaderUiService {
   /**
    * Resolves holder names for this viewer: undefined for a signed-out reader (no lookup at all), for the
    * viewer's own booking, and for viewers who may not see names. The manager check is only paid when the
-   * resource did not opt in (names show either way then) and runs once per evaluation.
+   * resource did not opt in (names show either way then) and runs once per evaluation; each holder's
+   * name is looked up at most once.
    */
   private nameResolver(
     ctx: ReaderUiContext,
@@ -160,10 +164,15 @@ export class ReaderUiService {
     let allowed: Promise<boolean> | undefined;
     const mayShow = () =>
       (allowed ??= settings.showNamesOnReaders ? Promise.resolve(true) : this.access.isManager(userId, ctx.resourceId));
+    const names = new Map<number, Promise<string | undefined>>();
+    const lookup = async (holderId: number) => {
+      const name = (await this.directory.getUserNames([holderId])).get(holderId);
+      return name ? readerName(name) : undefined;
+    };
     return async (booking) => {
       if (booking.userId === userId || !(await mayShow())) return undefined;
-      const name = (await this.directory.getUserNames([booking.userId])).get(booking.userId);
-      return name ? readerName(name) : undefined;
+      if (!names.has(booking.userId)) names.set(booking.userId, lookup(booking.userId));
+      return names.get(booking.userId);
     };
   }
 

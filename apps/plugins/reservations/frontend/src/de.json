@@ -197,8 +197,8 @@
     "enabled": "Reservierungen für diese Ressource aktivieren",
     "approvalRequired": "Buchungen müssen von einer verwaltenden Person genehmigt werden",
     "checkInEnabled": "Check-in verlangen (Ressource innerhalb der Karenzzeit starten)",
-    "showNamesOnReaders": "Namen auf Lesegeräten anzeigen",
-    "showNamesOnReadersHint": "Namen werden erst angezeigt, nachdem jemand die Karte angetippt hat.",
+    "showNamesOnReaders": "Namen auf Readern anzeigen",
+    "showNamesOnReadersHint": "Namen erscheinen erst, nachdem jemand eine Karte aufgelegt hat.",
     "failed": "Die Einstellungen konnten nicht gespeichert werden",
     "whoCanBook": {
       "label": "Wer darf buchen",

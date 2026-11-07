@@ -1,30 +1,51 @@
 import { READER_UI_LIMITS } from '@attraccess/plugins-backend-sdk';
 import type { Lang } from '../notifications/host-info.service';
-import { formatTime, pick } from '../notifications/format';
+import { dayKey, formatTime, LOCALES, pick } from '../notifications/format';
 
 /** Longest holder name on a reader: the longest text around it (confirm body) still fits 80 characters. */
 export const READER_NAME_MAX = 16;
+
+const ROW_MAX = READER_UI_LIMITS.maxListRowChars;
 
 /** Hard cut to `max` characters (no room for an ellipsis on the reader). */
 export function fit(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max).trimEnd();
 }
 
+/** Punctuation and letters the host's reader sanitizer rewrites before its NFD step (same table). */
+const HOST_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\u2018|\u2019|\u201A|\u2032/g, "'"],
+  [/\u201C|\u201D|\u201E|\u2033/g, '"'],
+  [/[\u2010-\u2015]/g, '-'],
+  [/[\u2009\u200A\u202F\u2002\u2003\u2007\u2008]/g, ' '],
+  [/\u0142/g, 'l'],
+  [/\u0141/g, 'L'],
+  [/\u0111/g, 'd'],
+  [/\u0110/g, 'D'],
+  [/\u2026/g, '...'],
+  [/\u2022/g, '-'],
+  [/\u2122/g, 'TM'],
+];
+
 /**
- * A holder name as the reader may show it: Latin-1 only (the host would transliterate, this keeps the
- * length predictable) and at most READER_NAME_MAX characters.
+ * A holder name as the reader may show it: Latin-1 only and at most READER_NAME_MAX characters. Letters
+ * outside Latin-1 lose their accents like the host's sanitizer does ("Łukasz Šimek" → "Lukasz Simek");
+ * anything else becomes "?". Doing it here keeps the length the plugin truncated to.
  */
 export function readerName(name: string): string {
-  const latin1 = name
-    .normalize('NFC')
-    .replace(/[^\u0020-\u007e\u00a0-\u00ff]/g, '?')
+  const replaced = HOST_REPLACEMENTS.reduce((text, [pattern, to]) => text.replace(pattern, to), name.normalize('NFC'));
+  const latin1 = Array.from(replaced)
+    .map((char) => {
+      if (/^[\u0020-\u007e\u00a0-\u00ff]$/.test(char)) return char;
+      if (/^\s$/.test(char)) return ' ';
+      const plain = char.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return /^[\u0020-\u007e]*$/.test(plain) ? plain : '?';
+    })
+    .join('')
     .replace(/\s+/g, ' ')
     .trim();
   return fit(latin1, READER_NAME_MAX);
 }
-
-const dayKey = (date: Date, timeZone: string) =>
-  new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 
 /** What the reader needs to write a time: language, plugin timezone and "now" (for the weekday rule). */
 export interface ReaderClock {
@@ -37,13 +58,34 @@ export interface ReaderClock {
 export function readerTime(date: Date, clock: ReaderClock): string {
   const time = formatTime(date, clock);
   if (dayKey(date, clock.timeZone) === dayKey(clock.now, clock.timeZone)) return time;
-  const weekday = new Intl.DateTimeFormat(clock.lang === 'de' ? 'de-DE' : 'en-GB', {
-    timeZone: clock.timeZone,
-    weekday: 'short',
-  })
+  const weekday = new Intl.DateTimeFormat(LOCALES[clock.lang], { timeZone: clock.timeZone, weekday: 'short' })
     .format(date)
     .replace(/\.$/, '');
   return `${weekday} ${time}`;
+}
+
+const QUARTER_HOUR_MS = 15 * 60_000;
+
+/**
+ * The next local midnight after `now` in `timeZone`: the weekday rule of {@link readerTime} changes then.
+ * Starts from "24 h after today's midnight" and corrects in quarter hours (every UTC offset is a multiple
+ * of 15 minutes), which covers days of 23 or 25 hours at a daylight saving change.
+ */
+export function nextLocalMidnight(now: Date, timeZone: string): Date {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const elapsed = ((part('hour') * 60 + part('minute')) * 60 + part('second')) * 1000 + now.getUTCMilliseconds();
+  const today = dayKey(now, timeZone);
+  let at = now.getTime() - elapsed + 24 * 60 * 60_000;
+  while (dayKey(new Date(at), timeZone) === today) at += QUARTER_HOUR_MS;
+  while (dayKey(new Date(at - QUARTER_HOUR_MS), timeZone) !== today) at -= QUARTER_HOUR_MS;
+  return new Date(at);
 }
 
 const range = (start: Date, end: Date, clock: ReaderClock) => `${readerTime(start, clock)}-${readerTime(end, clock)}`;
@@ -52,17 +94,15 @@ const range = (start: Date, end: Date, clock: ReaderClock) => `${readerTime(star
 export const readerTexts = {
   /** List row, ≤ 24 characters (a long weekday form falls back to the short wording). */
   rowFreeUntil: (start: Date, c: ReaderClock) =>
-    fit(pick(c.lang, `Free until ${readerTime(start, c)}`, `Frei bis ${readerTime(start, c)}`), 24),
+    fit(pick(c.lang, `Free until ${readerTime(start, c)}`, `Frei bis ${readerTime(start, c)}`), ROW_MAX),
   rowCheckInBy: (deadline: Date, c: ReaderClock) =>
-    fit(pick(c.lang, `Check in by ${readerTime(deadline, c)}`, `Check-in bis ${readerTime(deadline, c)}`), 24),
+    fit(pick(c.lang, `Check in by ${readerTime(deadline, c)}`, `Check-in bis ${readerTime(deadline, c)}`), ROW_MAX),
   rowReservedUntil: (end: Date, c: ReaderClock) =>
-    fit(pick(c.lang, `Reserved until ${readerTime(end, c)}`, `Reserviert bis ${readerTime(end, c)}`), 24),
+    fit(pick(c.lang, `Reserved until ${readerTime(end, c)}`, `Reserviert bis ${readerTime(end, c)}`), ROW_MAX),
   rowOwnUntil: (end: Date, c: ReaderClock) => {
     const until = readerTime(end, c);
     const long = pick(c.lang, `Your booking until ${until}`, `Deine Buchung bis ${until}`);
-    return long.length <= READER_UI_LIMITS.maxListRowChars
-      ? long
-      : fit(pick(c.lang, `Yours until ${until}`, `Deine bis ${until}`), READER_UI_LIMITS.maxListRowChars);
+    return long.length <= ROW_MAX ? long : fit(pick(c.lang, `Yours until ${until}`, `Für dich bis ${until}`), ROW_MAX);
   },
 
   /** Details lines (≤ 80 characters; the holder name is already truncated). */

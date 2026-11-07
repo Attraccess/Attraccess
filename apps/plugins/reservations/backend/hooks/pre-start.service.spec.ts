@@ -513,6 +513,23 @@ describe('PreStartService', () => {
         expect(state?.reason.body).toBe('Reserved by another user until 16:00.');
       });
 
+      it('writes a time on another local day with its weekday on a reader only', async () => {
+        await h.enable(3, { maxDurationMinutes: 1440 });
+        await h.settings.warmUp();
+        h.setNow('2026-06-01T07:00:00Z');
+        await p.book(11, 3, '2026-06-01T12:00:00', '2026-06-02T06:00:00'); // ends Tue 08:00 local
+        h.setNow('2026-06-01T13:00:00Z');
+        expect(await p.preStart.evaluate(reader(10, { resourceId: 3 }))).toMatchObject({
+          reason: { body: 'Reserved by another user until Tue 08:00.' },
+        });
+        expect(await p.preStart.evaluate(reader(10, { resourceId: 3, language: 'de' }))).toMatchObject({
+          reason: { body: 'Von einer anderen Person bis Di 08:00 reserviert.' },
+        });
+        expect(await p.preStart.evaluate(ctx(10, { resourceId: 3, now: h.clock() }))).toMatchObject({
+          reason: { body: 'Reserved by another user until 08:00.' },
+        });
+      });
+
       it('gives a manager the override confirmation, blocking without a screen', async () => {
         expect(await p.preStart.evaluate(reader(99))).toMatchObject({
           decision: 'confirm',
@@ -521,6 +538,25 @@ describe('PreStartService', () => {
             body: 'Reserved by user11 until 16:00. Start anyway?',
             noScreenPolicy: 'block',
           },
+        });
+      });
+
+      it('shortens the name for a reader only, and never the fallback for a missing holder', async () => {
+        const names = jest.spyOn(h.directory, 'getUserNames');
+        names.mockResolvedValue(new Map([[11, 'Alexandra-Maximiliane Łukasz']]));
+        expect(await p.preStart.evaluate(reader(99))).toMatchObject({
+          confirmation: { body: 'Reserved by Alexandra-Maximi until 16:00. Start anyway?' },
+        });
+        expect(await p.preStart.evaluate(ctx(99, { now: h.clock() }))).toMatchObject({
+          confirmation: { body: 'Reserved by Alexandra-Maximiliane Łukasz until 16:00. Start anyway?' },
+        });
+        names.mockResolvedValue(new Map());
+        expect(await p.preStart.evaluate(reader(99, { language: 'de' }))).toMatchObject({
+          confirmation: { body: 'Von einer anderen Person bis 16:00 reserviert. Trotzdem starten?' },
+        });
+        names.mockResolvedValue(new Map([[11, '   ']]));
+        expect(await p.preStart.evaluate(reader(99))).toMatchObject({
+          confirmation: { body: 'Reserved by another user until 16:00. Start anyway?' },
         });
       });
     });

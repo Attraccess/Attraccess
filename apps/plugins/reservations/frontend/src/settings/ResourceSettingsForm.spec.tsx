@@ -146,7 +146,7 @@ describe('ResourceSettingsForm', () => {
     renderWithProviders(<ResourceSettingsForm resourceId={3} />);
     const toggle = await screen.findByRole('switch', { name: /Show names on readers/ });
     expect(toggle).not.toBeChecked();
-    expect(screen.getByText('Names are shown only after someone taps their card.')).toBeInTheDocument();
+    expect(toggle).toHaveAccessibleDescription('Names are shown only after someone taps their card.');
     await user.click(toggle);
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await screen.findByText('Settings saved');

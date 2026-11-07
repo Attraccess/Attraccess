@@ -14,7 +14,7 @@ export const ROUTES = {
 
 export const pick = (lang: Lang, en: string, de: string): string => (lang === 'de' ? de : en);
 
-const LOCALES: Record<Lang, string> = { en: 'en-GB', de: 'de-DE' };
+export const LOCALES: Record<Lang, string> = { en: 'en-GB', de: 'de-DE' };
 
 const dateTimeFormat = (lang: Lang, timeZone: string) =>
   new Intl.DateTimeFormat(LOCALES[lang], {
@@ -32,7 +32,8 @@ const dateTimeFormat = (lang: Lang, timeZone: string) =>
 const timeFormat = (lang: Lang, timeZone: string) =>
   new Intl.DateTimeFormat(LOCALES[lang], { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
-const dayKey = (date: Date, timeZone: string) =>
+/** `2026-06-01`: the local calendar day of `date` in `timeZone`. */
+export const dayKey = (date: Date, timeZone: string) =>
   new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 
 /** Where and how times are written: always the plugin timezone, in the recipient's language. */

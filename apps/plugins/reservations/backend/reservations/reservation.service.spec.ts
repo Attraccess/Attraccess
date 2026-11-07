@@ -679,6 +679,9 @@ describe('ReservationService', () => {
       expect(readers()).toHaveLength(2);
       await h.admin.update(manager, 1, { enabled: false });
       expect(readers()).toHaveLength(3);
+      await h.admin.update(manager, 1, { enabled: true });
+      expect(readers()).toHaveLength(4);
+      expect(readers().every((scope) => scope.resourceId === 1)).toBe(true);
       await h.enable(1);
       h.invalidateReaderUi.mockClear();
       await h.admin.setTimezone(manager, 'UTC');

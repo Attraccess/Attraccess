@@ -131,8 +131,10 @@ describe('SessionEndService', () => {
     it('the default "keep" leaves the booking running', async () => {
       const result = await p.sessionEnd.evaluate(ctx(10, { origin: 'reader' }));
       if (result.decision !== 'choose') throw new Error('expected a choice');
+      h.invalidateReaderUi.mockClear();
       await result.choice.onAnswer(result.choice.defaultOnTimeout);
       expect(await reservation()).toMatchObject({ status: 'confirmed', keptAt: expect.any(Date) });
+      expect(h.invalidateReaderUi).toHaveBeenCalledWith({ resourceId: 1 });
     });
 
     it('offers nothing to a user without a running booking of their own', async () => {

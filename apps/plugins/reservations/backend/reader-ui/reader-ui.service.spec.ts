@@ -309,6 +309,11 @@ describe('ReaderUiService', () => {
       expect(body(list)).toBe('Reserved by Alexandra-Maximi 10:00-16:00');
       expectHostValid(list);
       expect(readerName('Zoë 日本')).toBe('Zoë ??');
+      // Letters outside Latin-1 lose their accents like the host sanitizer does, instead of turning into "?".
+      expect(readerName('Łukasz Šimek')).toBe('Lukasz Simek');
+      expect(readerName('Đorđe\tČ')).toBe('Dorde C');
+      expect(readerName('O\u2019Brien\u2013Ng')).toBe("O'Brien-Ng");
+      expect(readerName('Zoë\u0308')).toBe('Zoë');
     });
 
     it("session area: another user's booking within the confirm window, with a countdown", async () => {
@@ -380,11 +385,39 @@ describe('ReaderUiService', () => {
       expect(expiry(await slots({ userId: OTHER }))).toEqual(['2026-06-01T11:00:00.000Z']);
     });
 
+    it('local midnight, when the weekday of a time changes', async () => {
+      await book(HOLDER, '2026-06-02T06:00:00', '2026-06-02T08:30:00'); // Tue 08:00 local
+      expect(row(await slots())).toBe('Free until Tue 08:00');
+      expect(expiry(await slots())).toEqual(['2026-06-01T22:00:00.000Z']); // Berlin midnight
+      h.setNow('2026-06-01T22:00:00Z');
+      expect(row(await slots())).toBe('Free until 08:00');
+    });
+
+    it("signed in holder: also when somebody else's earlier booking starts", async () => {
+      await h.enable(1, { confirmWindowMinutes: 0, earlyCheckInMinutes: 60 });
+      await book(OTHER, '2026-06-01T10:10:00', '2026-06-01T10:30:00');
+      await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
+      const list = await slots({ userId: HOLDER });
+      expect(row(list)).toBe('Your booking until 14:00');
+      expect(expiry(list)).toEqual(['2026-06-01T10:10:00.000Z']);
+    });
+
     it('signed in holder: also when the early check-in window opens', async () => {
       await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
       await h.enable(1, { confirmWindowMinutes: 0 });
       expect(expiry(await slots({ userId: HOLDER }))).toEqual(['2026-06-01T11:45:00.000Z']);
     });
+  });
+
+  it("looks a holder's name up once, even when the details and the session area both name them", async () => {
+    await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
+    const names = jest.spyOn(h.directory, 'getUserNames');
+    const list = await slots({ userId: MANAGER });
+    expect(body(list)).toBe('Reserved by user10 12:40-14:00');
+    expect(textOf(get(list, 'resource.details.session')?.tree as ReaderUiNode)[0]).toBe(
+      'Reserved by user10 from 12:40',
+    );
+    expect(names).toHaveBeenCalledTimes(1);
   });
 
   it('uses at most one booking query per evaluation, signed in or not', async () => {
