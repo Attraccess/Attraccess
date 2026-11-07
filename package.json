@@ -186,7 +186,7 @@
     "@nx/webpack": "22.7.12",
     "@nx/workspace": "22.7.12",
     "@originjs/vite-plugin-federation": "^1.4.1",
-    "@rolldown/plugin-babel": "^0.2.4",
+    "@rolldown/plugin-babel": "^0.3.0",
     "@rollup/plugin-url": "^8.0.2",
     "@surma/rollup-plugin-off-main-thread": "^2.2.3",
     "@svgr/rollup": "^8.1.0",
