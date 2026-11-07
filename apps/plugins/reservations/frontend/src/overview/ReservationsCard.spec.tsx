@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mockFetch, renderWithProviders, reservationFixture } from '../test-utils';
@@ -49,7 +49,71 @@ describe('ReservationsCard', () => {
     });
     const { container } = renderWithProviders(<ReservationsCard resourceId={3} />);
     await waitFor(() => expect(calls.some((call) => call.path.endsWith('/availability'))).toBe(true));
-    expect(container).toBeEmptyDOMElement();
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+  });
+
+  it('shows a spinner while the first answer is pending', () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => undefined)),
+    );
+    const { container } = renderWithProviders(<ReservationsCard resourceId={3} />);
+    expect(container.querySelector('[data-cy="reservations-loading"]')).toBeInTheDocument();
+  });
+
+  it('shows an error with Retry instead of vanishing when loading fails', async () => {
+    const user = userEvent.setup();
+    let failing = true;
+    mockFetch({
+      'GET /resources/3/availability': () =>
+        failing ? { status: 500, body: { message: 'boom' } } : { body: availability() },
+      'GET /resources/3/pending-decision': null,
+    });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    expect(await screen.findByText('Reservations could not be loaded')).toBeInTheDocument();
+    failing = false;
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('button', { name: 'Reserve' })).toBeInTheDocument();
+  });
+
+  it('keeps the card and its navigation when another range fails to load', async () => {
+    const user = userEvent.setup();
+    let requests = 0;
+    mockFetch({
+      'GET /resources/3/availability': () => (++requests === 1 ? { body: availability() } : { status: 500, body: {} }),
+      'GET /resources/3/pending-decision': null,
+    });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    await user.click(await screen.findByRole('button', { name: 'Later' }));
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reserve' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Earlier' })).toBeInTheDocument();
+  });
+
+  it('shows a running booking as the current one, whatever range is visible', async () => {
+    const start = new Date(Date.now() - 1_800_000).toISOString();
+    const end = new Date(Date.now() + 1_800_000).toISOString();
+    mockFetch({
+      'GET /resources/3/availability': availability(),
+      'GET /resources/3/pending-decision': null,
+      'GET /mine': [
+        reservationFixture({ id: 8, resourceId: 99, startTime: start, endTime: end }),
+        reservationFixture({ id: 9, resourceId: 3, startTime: start, endTime: end }),
+      ],
+    });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    expect(await screen.findByText('Current booking')).toBeInTheDocument();
+    expect(screen.queryByText('Your next booking')).not.toBeInTheDocument();
+  });
+
+  it('labels a later booking as the next one', async () => {
+    mockFetch({
+      'GET /resources/3/availability': availability(),
+      'GET /resources/3/pending-decision': null,
+      'GET /mine': [reservationFixture({ resourceId: 3 })],
+    });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    expect(await screen.findByText('Your next booking')).toBeInTheDocument();
   });
 
   it('offers the Reserve button when booking is allowed', async () => {
@@ -109,6 +173,50 @@ describe('ReservationsCard', () => {
     await screen.findByRole('alertdialog');
     await user.click(screen.getByRole('button', { name: 'Keep' }));
     await waitFor(() => expect(calls.some((call) => call.method === 'POST' && call.path === '/7/keep')).toBe(true));
+  });
+
+  it('asks again when the server holds a new pending decision after an answer', async () => {
+    const user = userEvent.setup();
+    let answered = false;
+    mockFetch({
+      'GET /resources/3/availability': availability(),
+      'GET /resources/3/pending-decision': () => ({
+        body: reservationFixture({ id: answered ? 8 : 7, canEndEarly: true }),
+      }),
+      'POST /7/keep': () => {
+        answered = true;
+        return { body: reservationFixture() };
+      },
+    });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    await screen.findByRole('alertdialog');
+    await user.click(screen.getByRole('button', { name: 'Keep' }));
+    await waitFor(() => expect(answered).toBe(true));
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent(/Keep it or free the rest\?/);
+  });
+
+  it('names the resource in the booking title and resets the form after closing', async () => {
+    const user = userEvent.setup();
+    mockFetch({
+      'GET /resources/3/availability': availability(),
+      'GET /resources/3/pending-decision': null,
+      'GET /api/resources/3': { id: 3, name: 'Laser' },
+    });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    await user.click(await screen.findByRole('button', { name: 'Reserve' }));
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(dialog).toHaveTextContent('Reserve Laser'));
+    expect(dialog).toHaveTextContent('Your booking is confirmed immediately.');
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+    const date = () => document.querySelector<HTMLInputElement>('[data-cy="reservations-booking-date"]');
+    const initial = date()?.value;
+    fireEvent.change(date() as HTMLInputElement, { target: { value: '2031-01-01' } });
+    expect(date()?.value).toBe('2031-01-01');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Reserve' }));
+    await screen.findByRole('dialog');
+    expect(date()?.value).toBe(initial);
   });
 
   it('opens the booking form with check-in rules and the approval notice', async () => {

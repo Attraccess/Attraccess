@@ -6,6 +6,7 @@ import {
 import { Component, ErrorInfo, PropsWithChildren, ReactNode, useMemo } from 'react';
 import { PlugIcon } from 'lucide-react';
 import { FlatSection } from '../../components/flatSection';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import usePluginState from './plugin.state';
 
 // Isolates a single plugin slot contribution so a throwing contribution cannot
@@ -83,6 +84,8 @@ export function PluginSlot<Context extends PluginSlotContext = PluginSlotContext
   sectionTitle,
 }: PluginSlotProps<Context>) {
   const { plugins } = usePluginState();
+  // Contribution titles follow the UI language, so they are read again when it changes.
+  const language = useTranslationState((state) => state.language);
 
   const contributions = useMemo(() => {
     return plugins.flatMap((manifest) => {
@@ -104,7 +107,7 @@ export function PluginSlot<Context extends PluginSlotContext = PluginSlotContext
           manifestName: manifest.name,
         }));
     });
-  }, [plugins, slotId]);
+  }, [plugins, slotId, language]);
 
   if (contributions.length === 0) {
     return null;

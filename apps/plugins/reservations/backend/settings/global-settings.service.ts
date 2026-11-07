@@ -34,7 +34,7 @@ export class GlobalSettingsService {
     const entity = new GlobalSettingsEntity();
     entity.key = TIMEZONE_KEY;
     entity.value = timezone;
-    await this.context.getRepository(GlobalSettingsEntity).save(entity);
+    await this.context.runSerialized((manager) => manager.getRepository(GlobalSettingsEntity).save(entity));
     this.cachedTimezone = timezone;
     return { timezone, before };
   }

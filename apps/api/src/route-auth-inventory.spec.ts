@@ -54,6 +54,8 @@ const REVIEWED_PUBLIC_ROUTES: Record<string, string> = {
   'SSOController.samlLogout': 'identity-provider provisioning, verified by the provisioning secret',
   'SSOController.oidcDeleteUser': 'identity-provider provisioning, verified by the provider client secret',
   'SSOController.samlDeleteUser': 'identity-provider provisioning, verified by the provisioning secret',
+  'IcalPublicController.feed':
+    'calendar subscription: the unguessable per-feed token is the credential; revocable, rate limited',
   'SSOController.oidcUpdatePermissions': 'identity-provider provisioning, verified by the provider client secret',
   'SSOController.samlUpdatePermissions': 'identity-provider provisioning, verified by the provisioning secret',
   'PasswordPolicyController.getPublic': 'password rules shown on the registration form',

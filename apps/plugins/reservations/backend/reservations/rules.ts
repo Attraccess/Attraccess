@@ -69,7 +69,8 @@ export function checkBookingRules(args: {
       `Bookings can be made at most ${settings.maxAdvanceDays} days ahead`,
     );
   }
-  if (start.getTime() < now.getTime() + settings.minLeadMinutes * MINUTE_MS) {
+  // With no lead requirement the clock tolerance above is the only limit on how close to now a start may be.
+  if (settings.minLeadMinutes > 0 && start.getTime() < now.getTime() + settings.minLeadMinutes * MINUTE_MS) {
     return new ReservationError(
       'LEAD_TIME_TOO_SHORT',
       `Bookings must be made at least ${settings.minLeadMinutes} minutes before they start`,

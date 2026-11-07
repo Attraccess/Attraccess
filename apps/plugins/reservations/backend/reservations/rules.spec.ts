@@ -57,6 +57,16 @@ describe('checkBookingRules', () => {
     expect(check({ minLeadMinutes: 120 }, '2026-06-01T10:00:00Z', '2026-06-01T11:00:00Z')).toBeNull();
     // lead 0 means "up to the start"
     expect(check({ minLeadMinutes: 0 }, '2026-06-01T08:00:00Z', '2026-06-01T09:00:00Z')).toBeNull();
+    // a start that the server clock has just passed still books "now" (the tolerance wins over a zero lead)
+    expect(
+      checkBookingRules({
+        settings: settings({ minLeadMinutes: 0 }),
+        timeZone: 'Europe/Berlin',
+        start: new Date('2026-06-01T08:00:00Z'),
+        end: new Date('2026-06-01T09:00:00Z'),
+        now: new Date('2026-06-01T08:00:20Z'),
+      }),
+    ).toBeNull();
   });
 
   it('checks bookable hours including the buffers', () => {

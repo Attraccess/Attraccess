@@ -3,7 +3,7 @@
 // Slots: resource.overview (bookings card), resource.settings, admin.settings, user.account.
 // Routes: /reservations (my bookings), /reservations/manage, /reservations/:id (mail deep link).
 import './styles.css';
-import { detectLanguage } from '@attraccess/plugins-frontend-ui';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { CalendarCheckIcon, CalendarClockIcon } from 'lucide-react';
 import {
   ADMIN_SETTINGS_SLOT,
@@ -29,13 +29,16 @@ import { ReservationDeepLinkPage } from './pages/ReservationDeepLinkPage';
 import { AdminTimezoneSettings } from './settings/AdminTimezoneSettings';
 import { ResourceSettingsForm } from './settings/ResourceSettingsForm';
 
-const labels = () => (detectLanguage() === 'de' ? de : en);
+// The UI language the app is showing right now (the account's locale once the user is signed in),
+// read each time the host asks for items, not the browser/stored guess `detectLanguage()` returns.
+const labels = () => (useTranslationState.getState().language === 'de' ? de : en);
 
 export default class ReservationsPlugin implements AttraccessFrontendPlugin {
   // Users who manage reservations: resources.update holders at once, maintainers/introducers
-  // once the manage endpoint has answered (it replies 403 to everyone else).
+  // once the manage endpoint has answered (it is expected to reply 403 to everyone else).
   pluginStore!: PluginStore;
   private isManager = false;
+  private readonly sidebarListeners = new Set<() => void>();
 
   getPluginName(): string {
     return 'reservations-plugin@0.1.0';
@@ -59,15 +62,23 @@ export default class ReservationsPlugin implements AttraccessFrontendPlugin {
 
   onApiAuthStateChange(authData: null | AttraccessFrontendPluginAuthData): void {
     const user = authData?.user as { effectivePermissions?: string[] } | null | undefined;
-    this.isManager = user?.effectivePermissions?.includes('resources.update') ?? false;
+    this.setManager(user?.effectivePermissions?.includes('resources.update') ?? false);
     if (!user || this.isManager) return;
     void listManaged({ page: 1 })
-      .then(() => {
-        this.isManager = true;
-      })
-      .catch(() => {
-        this.isManager = false;
-      });
+      .then(() => this.setManager(true))
+      .catch(() => this.setManager(false));
+  }
+
+  /** The host reads the sidebar items again when this changes (it re-reads them on login but not after an async check). */
+  onSidebarItemsChange(listener: () => void): () => void {
+    this.sidebarListeners.add(listener);
+    return () => this.sidebarListeners.delete(listener);
+  }
+
+  private setManager(value: boolean): void {
+    if (value === this.isManager) return;
+    this.isManager = value;
+    this.sidebarListeners.forEach((listener) => listener());
   }
 
   onApiEndpointChange(_endpoint: string): void {

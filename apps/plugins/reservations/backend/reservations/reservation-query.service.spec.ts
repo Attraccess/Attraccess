@@ -142,7 +142,8 @@ describe('ReservationQueryService', () => {
     await expect(h.queries.listManaged(manager, { page: 1, resourceId: 2 })).rejects.toMatchObject({
       code: 'FORBIDDEN',
     });
-    expect((await h.queries.listManaged(bob, { page: 1 })).items).toEqual([]);
+    // Someone who manages nothing is refused (the frontend probes this to decide whether to show the manager pages).
+    await expect(h.queries.listManaged(bob, { page: 1 })).rejects.toMatchObject({ code: 'FORBIDDEN' });
     h.grant(50, 'resources.update');
     expect((await h.queries.listManaged(principal(50), { page: 1 })).total).toBe(2);
     expect((await h.queries.listManaged(principal(50), { page: 1, resourceId: 2, status: 'confirmed' })).total).toBe(1);

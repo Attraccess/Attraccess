@@ -1,6 +1,6 @@
 import type { ReservationEntity } from '../entities/reservation.entity';
 import type { ResourceSettings } from '../settings/settings.model';
-import { NoticeText, ROUTES, TimeContext, checkInRules, formatRange, formatTime, pick } from './format';
+import { NoticeText, ROUTES, TimeContext, checkInRules, formatRange, formatTime, minutesText, pick } from './format';
 
 /** Everything a text needs besides the reservation itself. */
 export interface MessageContext extends TimeContext {
@@ -151,8 +151,8 @@ export function noShow(m: MessageContext, r: ReservationEntity, settings: Resour
     lines: [
       pick(
         lang,
-        `You did not check in within ${settings.checkInGraceMinutes} minutes after the start of your booking of ${resourceName} (${when(m, r)}). The booking was released as a no-show.`,
-        `Du hast dich nicht innerhalb von ${settings.checkInGraceMinutes} Minuten nach dem Beginn deiner Reservierung von ${resourceName} (${when(m, r)}) eingecheckt. Die Reservierung wurde als Nichterscheinen freigegeben.`,
+        `You did not check in within ${minutesText(lang, settings.checkInGraceMinutes)} after the start of your booking of ${resourceName} (${when(m, r)}). The booking was released as a no-show.`,
+        `Du hast dich nicht innerhalb von ${minutesText(lang, settings.checkInGraceMinutes)} nach dem Beginn deiner Reservierung von ${resourceName} (${when(m, r)}) eingecheckt. Die Reservierung wurde als Nichterscheinen freigegeben.`,
       ),
     ],
     path: ROUTES.reservation(r.id),

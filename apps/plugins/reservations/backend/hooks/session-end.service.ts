@@ -45,7 +45,7 @@ export class SessionEndService {
     return {
       decision: 'choose',
       choice: {
-        stepKey: `keep-or-free:${own.id}`,
+        stepKey: `keepfree-${own.id}`,
         title: pick(lang, 'Keep your booking?', 'Reservierung behalten?'),
         body: pick(
           lang,

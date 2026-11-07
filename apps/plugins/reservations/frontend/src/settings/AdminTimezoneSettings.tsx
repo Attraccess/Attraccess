@@ -9,6 +9,8 @@ import { useInvalidateReservations } from '../lib/queries';
 import { isValidTimeZone } from '../lib/time';
 import { TextInput } from '../shared/fields';
 
+const MAX_LISTED = 200;
+
 function supportedZones(): string[] {
   try {
     return (Intl as unknown as { supportedValuesOf: (key: string) => string[] }).supportedValuesOf('timeZone');
@@ -45,10 +47,14 @@ export function AdminTimezoneSettings() {
     onError: (failure) => setError(describeError(failure, t)),
   });
 
-  const matches = useMemo(() => {
+  const savedZone = query.data?.timezone;
+  const allMatches = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    return (needle ? zones.filter((zone) => zone.toLowerCase().includes(needle)) : zones).slice(0, 200);
-  }, [zones, filter]);
+    const found = needle ? zones.filter((zone) => zone.toLowerCase().includes(needle)) : zones;
+    // The saved zone leads the list so the current selection is visible without scrolling.
+    return savedZone && found.includes(savedZone) ? [savedZone, ...found.filter((zone) => zone !== savedZone)] : found;
+  }, [zones, filter, savedZone]);
+  const matches = useMemo(() => allMatches.slice(0, MAX_LISTED), [allMatches]);
 
   if (query.isError || !query.data) return null;
   const valid = isValidTimeZone(timezone);
@@ -65,7 +71,11 @@ export function AdminTimezoneSettings() {
         value={filter}
         onChange={setFilter}
         placeholder={t('admin.searchPlaceholder')}
-        description={t('admin.matches', { count: matches.length })}
+        description={
+          allMatches.length > matches.length
+            ? t('admin.matchesTruncated', { total: allMatches.length, shown: matches.length })
+            : t('admin.matches', { count: allMatches.length })
+        }
         data-cy="reservations-admin-search"
       />
       <ListBox

@@ -1,8 +1,8 @@
-import type { PreStartContext } from '@attraccess/plugins-backend-sdk';
+import { READER_UI_LIMITS, type PreStartContext } from '@attraccess/plugins-backend-sdk';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { Part2, createPart2 } from '../testing/part2.test-utils';
-import { PreStartService } from './pre-start.service';
+import { PreStartService, overrideStepKey, reservationStepKey } from './pre-start.service';
 
 describe('PreStartService', () => {
   let h: Harness;
@@ -102,12 +102,12 @@ describe('PreStartService', () => {
       expect(result).toMatchObject({
         decision: 'confirm',
         confirmation: {
-          stepKey: `override:${reservation.id}`,
+          stepKey: `override-${reservation.id}`,
           body: 'Reserved by user11 until 16:00. Start anyway?',
           noScreenPolicy: 'block',
         },
       });
-      expect(await p.preStart.evaluate(ctx(99, { confirmedStepKeys: [`override:${reservation.id}`] }))).toEqual({
+      expect(await p.preStart.evaluate(ctx(99, { confirmedStepKeys: [`override-${reservation.id}`] }))).toEqual({
         decision: 'allow',
       });
     });
@@ -147,7 +147,7 @@ describe('PreStartService', () => {
       expect(result).toEqual({
         decision: 'confirm',
         confirmation: expect.objectContaining({
-          stepKey: `reservation:${reservation.id}`,
+          stepKey: `reservation-${reservation.id}`,
           body: 'Reserved from 14:00, you have 40 min. Start anyway?',
           countdownTo: new Date('2026-06-01T12:00:00Z'),
           noScreenPolicy: 'block',
@@ -156,15 +156,20 @@ describe('PreStartService', () => {
           tone: 'warning',
         }),
       });
-      const again = await p.preStart.evaluate(ctx(10, { confirmedStepKeys: [`reservation:${reservation.id}`] }));
+      const again = await p.preStart.evaluate(ctx(10, { confirmedStepKeys: [`reservation-${reservation.id}`] }));
       expect(again).toEqual({ decision: 'allow' });
+    });
+
+    it('uses step keys the host accepts (the host rejects anything else as an invalid hook result)', () => {
+      expect(reservationStepKey(123456789)).toMatch(READER_UI_LIMITS.idPattern);
+      expect(overrideStepKey(123456789)).toMatch(READER_UI_LIMITS.idPattern);
     });
 
     it('asks managers the normal confirmation (override is for running bookings only)', async () => {
       h.setNow('2026-06-01T11:20:00Z');
       expect(await p.preStart.evaluate(ctx(99))).toMatchObject({
         decision: 'confirm',
-        confirmation: { stepKey: expect.stringMatching(/^reservation:/) },
+        confirmation: { stepKey: expect.stringMatching(/^reservation-/) },
       });
     });
 

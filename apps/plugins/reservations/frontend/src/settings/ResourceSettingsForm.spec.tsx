@@ -59,7 +59,7 @@ describe('ResourceSettingsForm', () => {
     expect(warning).toHaveTextContent('4 upcoming bookings');
     expect(calls.some((call) => call.method === 'PUT')).toBe(false);
 
-    await user.click(screen.getByRole('button', { name: 'Disable and cancel 4' }));
+    await user.click(screen.getByRole('button', { name: 'Disable and cancel 4 bookings' }));
     await waitFor(() => expect(calls.some((call) => call.method === 'PUT')).toBe(true));
     const put = calls.find((call) => call.method === 'PUT');
     expect(put?.body).toMatchObject({ enabled: false, cancelFutureBookings: true });
@@ -90,5 +90,46 @@ describe('ResourceSettingsForm', () => {
     expect(screen.getByDisplayValue('17:00')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove range' }));
     expect(screen.queryByDisplayValue('09:00')).not.toBeInTheDocument();
+  });
+
+  it('keeps Save disabled until something changed', async () => {
+    const user = userEvent.setup();
+    mockFetch({ 'GET /resources/3/settings': settings });
+    renderWithProviders(<ResourceSettingsForm resourceId={3} />);
+    const save = await screen.findByRole('button', { name: 'Save' });
+    expect(save).toBeDisabled();
+    await user.click(screen.getByRole('switch', { name: /need approval/ }));
+    expect(save).toBeEnabled();
+    await user.click(screen.getByRole('switch', { name: /need approval/ }));
+    expect(save).toBeDisabled();
+  });
+
+  it('shows a visible error message for an invalid number', async () => {
+    const user = userEvent.setup();
+    mockFetch({ 'GET /resources/3/settings': settings });
+    renderWithProviders(<ResourceSettingsForm resourceId={3} />);
+    const input = await screen.findByRole('textbox', { name: /Time step/ });
+    await user.clear(input);
+    await user.type(input, '7');
+    await user.tab();
+    const field = document.querySelector('[data-cy="reservations-setting-timeStepMinutes"]');
+    // HeroUI hides the description of invalid fields, so the message has to live in the error slot.
+    expect(field?.querySelector('[data-slot="field-error"]')).toHaveTextContent('must divide 1440');
+  });
+
+  it('switches Enable back on when the disable warning is cancelled', async () => {
+    const user = userEvent.setup();
+    mockFetch({
+      'GET /resources/3/settings': settings,
+      'GET /resources/3/settings/future-bookings-count': { count: 4 },
+    });
+    renderWithProviders(<ResourceSettingsForm resourceId={3} />);
+    const toggle = await screen.findByRole('switch', { name: /Enable reservations/ });
+    await user.click(toggle);
+    expect(toggle).not.toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByRole('alertdialog');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.getByRole('switch', { name: /Enable reservations/ })).toBeChecked());
   });
 });

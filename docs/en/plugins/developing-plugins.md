@@ -330,7 +330,8 @@ async function notify(context: PluginContext, userId: number) {
 
 - A category id is short and unique within the plugin (lowercase letters, digits, `-`, `_`). The host namespaces it as
   `plugin.<pluginName>.<id>` and lists it, with your `label`, in every user's notification preferences under the
-  plugin's name. Dispatching an undeclared category is rejected.
+  plugin's name. Dispatching an undeclared category is rejected. Declaring categories without `SEND_NOTIFICATIONS`
+  quarantines the plugin at load time.
 - Unknown user ids are skipped and duplicates are collapsed. An email is only sent when `email` is set and the
   recipient's preferences allow email for the category. The host renders it inside the global email layout; `html`
   is a trusted fragment, `text` is used (escaped) when `html` is omitted.

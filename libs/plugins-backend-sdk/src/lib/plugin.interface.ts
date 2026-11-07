@@ -3,7 +3,7 @@ import { Resource, ResourceHealthStatus, User } from '@attraccess/database-entit
 export enum SystemEvent {
   RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED',
   RESOURCE_USAGE_ENDED = 'RESOURCE_USAGE_ENDED',
-  /** A maintenance window was created or finished. See {@link MaintenanceChangedPayload}. */
+  /** A maintenance window was created, updated or finished. See {@link MaintenanceChangedPayload}. */
   MAINTENANCE_CHANGED = 'MAINTENANCE_CHANGED',
   /** A resource health entry changed status. See {@link ResourceHealthChangedPayload}. */
   RESOURCE_HEALTH_CHANGED = 'RESOURCE_HEALTH_CHANGED',
@@ -15,7 +15,7 @@ export enum SystemEvent {
   RESOURCE_USAGE_SESSION_ENDED = 'RESOURCE_USAGE_SESSION_ENDED',
 }
 
-/** Emitted after a maintenance window was created or finished (committed to the database). */
+/** Emitted after a maintenance window was created, updated or finished (committed to the database). */
 export interface MaintenanceChangedPayload {
   resourceId: number;
   maintenanceId: number;

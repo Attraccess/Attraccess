@@ -1,5 +1,14 @@
 import { Button, StandardModal, StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
-import { Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextArea, TextField } from '@heroui/react';
+import {
+  Label,
+  ModalBody,
+  ModalCloseTrigger,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  TextArea,
+  TextField,
+} from '@heroui/react';
 import { useMutation } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { createReservation } from '../api';
@@ -7,7 +16,7 @@ import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
 import { useAvailability, useInvalidateReservations } from '../lib/queries';
 import { validDurations, validStarts } from '../lib/slots';
-import { addLocalDays, formatDuration, fromDateKey, localDateOf, startOfLocalDay, toDateKey } from '../lib/time';
+import { addLocalDays, fromDateKey, localDateOf, startOfLocalDay, toDateKey } from '../lib/time';
 import type { Availability, Reservation } from '../lib/types';
 import { useFormatters } from '../lib/useFormatters';
 import { SelectField, TextInput } from '../shared/fields';
@@ -29,7 +38,8 @@ export function BookingModal(props: Readonly<Props>) {
   const invalidate = useInvalidateReservations();
   const zone = availability.timezone;
 
-  const [dateKey, setDateKey] = useState(() => toDateKey(localDateOf(new Date(), zone)));
+  const today = () => toDateKey(localDateOf(new Date(), zone));
+  const [dateKey, setDateKey] = useState(today);
   const [startIso, setStartIso] = useState('');
   const [duration, setDuration] = useState('');
   const [note, setNote] = useState('');
@@ -65,6 +75,17 @@ export function BookingModal(props: Readonly<Props>) {
   );
   const durationValue = durations.includes(Number(duration)) ? duration : '';
 
+  // Every way of closing (Escape, X, Cancel, success) starts the next opening from a clean form.
+  const setOpen = (open: boolean) => {
+    if (!open) {
+      setDateKey(today());
+      setStartIso('');
+      setDuration('');
+      setNote('');
+    }
+    onOpenChange(open);
+  };
+
   const mutation = useMutation({
     mutationFn: () =>
       createReservation({
@@ -74,12 +95,9 @@ export function BookingModal(props: Readonly<Props>) {
         note: note.trim() || undefined,
       }),
     onSuccess: async (reservation) => {
-      setNote('');
-      setStartIso('');
-      setDuration('');
       await invalidate();
       onBooked(reservation);
-      onOpenChange(false);
+      setOpen(false);
     },
     onError: (failure) => {
       setError(describeError(failure, t));
@@ -93,9 +111,12 @@ export function BookingModal(props: Readonly<Props>) {
 
   return (
     <>
-      <StandardModal isOpen={isOpen} onOpenChange={onOpenChange} size="md" data-cy="reservations-booking-modal">
+      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="md" data-cy="reservations-booking-modal">
+        <ModalCloseTrigger aria-label={t('common.close')} />
         <ModalHeader>
-          <ModalHeading>{t('booking.title', { resource: props.resourceName ?? '' })}</ModalHeading>
+          <ModalHeading>
+            {props.resourceName ? t('booking.title', { resource: props.resourceName }) : t('booking.titleGeneric')}
+          </ModalHeading>
         </ModalHeader>
         <ModalBody className="rv:flex rv:flex-col rv:gap-4 rv:p-1">
           <TextInput
@@ -126,12 +147,12 @@ export function BookingModal(props: Readonly<Props>) {
             label={t('booking.duration')}
             value={durationValue}
             onChange={setDuration}
-            options={durations.map((minutes) => ({ key: String(minutes), label: formatDuration(minutes) }))}
+            options={durations.map((minutes) => ({ key: String(minutes), label: format.duration(minutes) }))}
             isDisabled={durations.length === 0}
             description={t('booking.durationHint', {
               step: rules.timeStepMinutes,
-              min: formatDuration(rules.minDurationMinutes),
-              max: formatDuration(rules.maxDurationMinutes),
+              min: format.duration(rules.minDurationMinutes),
+              max: format.duration(rules.maxDurationMinutes),
             })}
             data-cy="reservations-booking-duration"
           />
@@ -139,11 +160,17 @@ export function BookingModal(props: Readonly<Props>) {
             <Label>{t('booking.note')}</Label>
             <TextArea maxLength={500} rows={2} />
           </TextField>
-          {rules.approvalRequired && <StatusAlert status="accent">{t('booking.approvalNeeded')}</StatusAlert>}
+          {rules.approvalRequired ? (
+            <StatusAlert status="accent">{t('booking.approvalNeeded')}</StatusAlert>
+          ) : (
+            <p className="rv:text-sm rv:text-muted" data-cy="reservations-booking-instant">
+              {t('booking.instantNote')}
+            </p>
+          )}
           <CheckInRules rules={rules} />
         </ModalBody>
         <ModalFooter>
-          <Button variant="tertiary" onPress={() => onOpenChange(false)}>
+          <Button variant="tertiary" onPress={() => setOpen(false)}>
             {t('common.cancel')}
           </Button>
           <Button

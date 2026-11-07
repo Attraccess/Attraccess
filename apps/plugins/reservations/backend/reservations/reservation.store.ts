@@ -225,12 +225,17 @@ export class ReservationStore {
 
   /** Conditional status transition; true when this call moved the row out of one of `from`. */
   async transition(id: number, from: ReservationStatus[], changes: Partial<ReservationEntity>): Promise<boolean> {
-    const result = await this.repo
-      .createQueryBuilder()
-      .update(ReservationEntity)
-      .set(changes)
-      .where('id = :id AND status IN (:...from)', { id, from })
-      .execute();
+    // Writes run in the host's serialized transaction queue: on SQLite a second writer would otherwise fail with
+    // SQLITE_BUSY while another request (or a core write) holds the lock.
+    const result = await this.context.runSerialized((manager) =>
+      manager
+        .getRepository(ReservationEntity)
+        .createQueryBuilder()
+        .update(ReservationEntity)
+        .set(changes)
+        .where('id = :id AND status IN (:...from)', { id, from })
+        .execute(),
+    );
     return (result.affected ?? 0) === 1;
   }
 
@@ -241,13 +246,15 @@ export class ReservationStore {
    */
   async claimFlag(id: number, flag: ReminderFlag, at: Date, manager?: EntityManager): Promise<boolean> {
     if (!REMINDER_FLAGS.includes(flag)) throw new Error(`Unknown reminder flag ${String(flag)}`);
-    const repo = manager ? manager.getRepository(ReservationEntity) : this.repo;
-    const result = await repo
-      .createQueryBuilder()
-      .update(ReservationEntity)
-      .set({ [flag]: at })
-      .where(`id = :id AND ${flag} IS NULL`, { id })
-      .execute();
+    const claim = (m: EntityManager) =>
+      m
+        .getRepository(ReservationEntity)
+        .createQueryBuilder()
+        .update(ReservationEntity)
+        .set({ [flag]: at })
+        .where(`id = :id AND ${flag} IS NULL`, { id })
+        .execute();
+    const result = await (manager ? claim(manager) : this.context.runSerialized(claim));
     return (result.affected ?? 0) === 1;
   }
 
@@ -262,9 +269,10 @@ export class ReservationStore {
     at: Date,
     manager?: EntityManager,
   ): Promise<boolean> {
-    const repo = (manager ?? this.context.dataSource.manager).getRepository(NoticeEntity);
+    const insert = (m: EntityManager) =>
+      m.getRepository(NoticeEntity).insert({ reservationId, kind, refKey, sentAt: at });
     try {
-      await repo.insert({ reservationId, kind, refKey, sentAt: at });
+      await (manager ? insert(manager) : this.context.runSerialized(insert));
       return true;
     } catch (error) {
       if (/UNIQUE|constraint/i.test(String((error as { message?: string })?.message))) return false;
@@ -284,11 +292,13 @@ export class ReservationStore {
 
   /** Release a notice claim (when the send failed and should be retried next tick). */
   async releaseNotice(reservationId: number, kind: string, refKey: string): Promise<void> {
-    await this.context.dataSource
-      .getRepository(NoticeEntity)
-      .createQueryBuilder()
-      .delete()
-      .where('reservationId = :reservationId AND kind = :kind AND refKey = :refKey', { reservationId, kind, refKey })
-      .execute();
+    await this.context.runSerialized((manager) =>
+      manager
+        .getRepository(NoticeEntity)
+        .createQueryBuilder()
+        .delete()
+        .where('reservationId = :reservationId AND kind = :kind AND refKey = :refKey', { reservationId, kind, refKey })
+        .execute(),
+    );
   }
 }

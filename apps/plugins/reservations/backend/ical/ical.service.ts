@@ -75,6 +75,11 @@ export class IcalService {
     return this.context.getRepository(IcalFeedEntity);
   }
 
+  /** Writes go through the host's serialized queue so concurrent requests never hit SQLITE_BUSY. */
+  private save(feed: IcalFeedEntity): Promise<IcalFeedEntity> {
+    return this.context.runSerialized((manager) => manager.getRepository(IcalFeedEntity).save(feed));
+  }
+
   private toDto(feed: IcalFeedEntity): IcalFeedDto {
     return {
       id: feed.id,
@@ -119,7 +124,7 @@ export class IcalService {
       throw new ReservationError('FEED_LIMIT', `You can have at most ${MAX_FEEDS_PER_USER} calendar feeds`);
     }
     const token = randomBytes(32).toString('base64url');
-    const feed = await this.repo.save(
+    const feed = await this.save(
       Object.assign(new IcalFeedEntity(), {
         userId: actor.userId,
         name: input.name.trim(),
@@ -143,7 +148,7 @@ export class IcalService {
     const feed = await this.load(actor.userId, id);
     if (input.name !== undefined) feed.name = input.name.trim();
     if (input.selection !== undefined) feed.selection = JSON.stringify(assertSelection(input.selection));
-    return this.toDto(await this.repo.save(feed));
+    return this.toDto(await this.save(feed));
   }
 
   /** New token; the old one stops working immediately (its hash is overwritten). */
@@ -153,13 +158,13 @@ export class IcalService {
     feed.tokenHash = hashToken(token);
     feed.tokenPrefix = token.slice(0, TOKEN_PREFIX_LENGTH);
     feed.lastUsedAt = null;
-    return this.secretResult(await this.repo.save(feed), token);
+    return this.secretResult(await this.save(feed), token);
   }
 
   async revoke(actor: PluginAuditPrincipal, id: number): Promise<void> {
     const feed = await this.load(actor.userId, id);
     feed.revokedAt = this.clock();
-    await this.repo.save(feed);
+    await this.save(feed);
     await this.audit.record('feed_revoked', actor, { type: 'feed', id: feed.id }, { feedName: feed.name });
   }
 
@@ -172,7 +177,9 @@ export class IcalService {
     if (!feed || feed.revokedAt) return null;
     const now = this.clock();
     if (!feed.lastUsedAt || now.getTime() - feed.lastUsedAt.getTime() > 60_000) {
-      await this.repo.update({ id: feed.id }, { lastUsedAt: now }).catch(() => undefined);
+      await this.context
+        .runSerialized((manager) => manager.getRepository(IcalFeedEntity).update({ id: feed.id }, { lastUsedAt: now }))
+        .catch(() => undefined);
     }
     return this.render(feed, now);
   }

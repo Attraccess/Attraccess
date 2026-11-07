@@ -1,5 +1,6 @@
 // Timezone arithmetic for the booking UI. Mirrors the backend's rules on top of the
 // platform `Intl` database; instants are UTC `Date`s, wall-clock values are explicit tuples.
+import { detectLanguage } from '@attraccess/plugins-frontend-ui';
 
 export interface LocalDate {
   year: number;
@@ -223,11 +224,14 @@ export function formatDayHeading(date: LocalDate, timeZone: string, locale: stri
   );
 }
 
-export function formatDuration(minutes: number): string {
+/** "1 h 15 min" in the UI language ("1 Std. 15 Min." in German). */
+export function formatDuration(minutes: number, locale: string = detectLanguage()): string {
+  const unit = (value: number, name: 'hour' | 'minute') =>
+    new Intl.NumberFormat(locale, { style: 'unit', unit: name, unitDisplay: 'short' }).format(value);
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  if (hours === 0) return `${rest} min`;
-  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+  if (hours === 0) return unit(rest, 'minute');
+  return rest === 0 ? unit(hours, 'hour') : `${unit(hours, 'hour')} ${unit(rest, 'minute')}`;
 }
 
 export function browserTimeZone(): string {

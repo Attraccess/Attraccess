@@ -1,6 +1,7 @@
 // Small HeroUI form building blocks shared by the settings, feed and filter forms.
 import {
   Description,
+  FieldError,
   Input,
   Label,
   ListBox,
@@ -73,10 +74,11 @@ export function NumberInput(props: {
   max?: number;
   step?: number;
   description?: ReactNode;
-  isInvalid?: boolean;
+  /** Shown instead of the description while set. HeroUI hides the description of invalid fields. */
+  errorMessage?: ReactNode;
   'data-cy'?: string;
 }) {
-  const { label, value, onChange, min, max, step, description, isInvalid } = props;
+  const { label, value, onChange, min, max, step, description, errorMessage } = props;
   return (
     <NumberField
       value={Number.isFinite(value) ? value : undefined}
@@ -84,7 +86,7 @@ export function NumberInput(props: {
       minValue={min}
       maxValue={max}
       step={step}
-      isInvalid={isInvalid}
+      isInvalid={Boolean(errorMessage)}
       data-cy={props['data-cy']}
     >
       <Label>{label}</Label>
@@ -94,6 +96,7 @@ export function NumberInput(props: {
         <NumberFieldIncrementButton>+</NumberFieldIncrementButton>
       </NumberFieldGroup>
       {description && <Description>{description}</Description>}
+      <FieldError>{errorMessage}</FieldError>
     </NumberField>
   );
 }

@@ -28,6 +28,30 @@ Ein Frontend-Plugin kann:
 > [!TIP]
 > Lesen Sie die SDK-Dokumentation, die mit `@attraccess/plugins-frontend-sdk` mitgeliefert wird, für eine detaillierte API-Referenz, Beispiele und Typdefinitionen.
 
+### Slots (eingebettete Erweiterungspunkte)
+
+Neben eigenen Routen kann ein Frontend-Plugin über `getSlotContributions()` UI **in** Host-Seiten einbetten. Jeder
+Beitrag nennt eine `slotId`, eine `render(context)`-Funktion und optional `key` und `title`. Unbekannte Slot-IDs werden
+ignoriert, und jeder Beitrag läuft in einer Error Boundary. Verfügbare Slots:
+
+| Slot-ID                   | Ort                                                                                | Kontext                    |
+| ------------------------- | ---------------------------------------------------------------------------------- | -------------------------- |
+| `mqtt.server.detail`      | Detail-/Bearbeitungsansicht eines MQTT-Servers                                     | `{ mqttServerId }`         |
+| `mqtt.server.list.row`    | MQTT-Serverliste, Aktionsbereich pro Zeile                                         | `{ mqttServerId }`         |
+| `resource.overview`       | Hauptbereich der Ressourcen-Detailseite                                            | `{ resourceId }`           |
+| `resource.active-session` | Panel der aktiven Nutzung, direkt nach den Flow-Bedienelementen                    | `{ resourceId, usageId }`  |
+| `resource.list.row`       | Kompakter Statusbereich einer Ressourcenzeile                                      | `{ resourceId }`           |
+| `resource.settings`       | Einstellungsseite der Ressource, für Nutzende, die sie verwalten dürfen (`resources.update`) | `{ resourceId }` |
+| `user.account`            | Kontoseite der angemeldeten Person                                                 | `{ userId }`               |
+| `admin.settings`          | Bereich der Systemeinstellungen, für Nutzende mit Systemverwaltungs-Berechtigung   | `{}`                       |
+
+`resource.settings`, `user.account` und `admin.settings` werden als **Abschnitte mit Titel** dargestellt: Setzen Sie
+`title` am Beitrag (sonst gilt ein allgemeiner Plugin-Titel). Die Konstanten `RESOURCE_OVERVIEW_SLOT`,
+`RESOURCE_SETTINGS_SLOT`, `USER_ACCOUNT_SLOT`, `ADMIN_SETTINGS_SLOT` und die Kontexttypen (`ResourceSlotContext`,
+`UserSlotContext`, `AdminSettingsSlotContext`) exportiert `@attraccess/plugins-frontend-sdk`. Der Host entscheidet nur,
+**wo** ein Beitrag angezeigt wird; das Backend Ihres Plugins muss Berechtigungen an der eigenen API weiterhin selbst
+durchsetzen.
+
 ## Abhängigkeiten von anderen Attraccess-Plugins
 
 Deklariere Plugin-Abhängigkeiten in `package.json` unter `attraccess.dependencies`:
@@ -74,7 +98,7 @@ Teilen Sie Ihre Abhängigkeiten in zwei Gruppen auf:
 
 | Abhängigkeit | Deklaration | Grund |
 |---------------|-------------|-------|
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebündelte Kopie gilt als *anderer* Typ und verbindet sich stillschweigend nicht. |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebündelte Kopie gilt als *anderer* Typ und verbindet sich stillschweigend nicht. |
 | `@attraccess/plugins-backend-sdk` und Ihr eigener Code | Normal bündeln | Kann sicher in Ihr Artefakt aufgenommen werden. |
 
 Liefern Sie einen **CommonJS**-Einstiegspunkt (`index.js`) aus, kein ES-Modul (`index.mjs`). Verweisen Sie im `plugin.json`-Manifest darauf:
@@ -95,7 +119,8 @@ esbuild src/index.ts \
   --bundle --platform=node --format=cjs --outfile=dist/index.js \
   --external:@nestjs/common --external:@nestjs/core \
   --external:@nestjs/event-emitter --external:eventemitter2 \
-  --external:typeorm --external:reflect-metadata
+  --external:typeorm --external:reflect-metadata \
+  --external:@nestjs/swagger --external:class-validator --external:class-transformer
 ```
 
 > [!WARNING]
@@ -413,7 +438,8 @@ async function notify(context: PluginContext, userId: number) {
 
 - Eine Kategorie-ID ist kurz und im Plugin eindeutig (Kleinbuchstaben, Ziffern, `-`, `_`). Der Host stellt ihr
   `plugin.<Pluginname>.<id>` voran und listet sie mit Ihrem `label` in den Benachrichtigungseinstellungen jeder Person
-  unter dem Namen des Plugins. Das Senden unter einer nicht deklarierten Kategorie wird abgelehnt.
+  unter dem Namen des Plugins. Das Senden unter einer nicht deklarierten Kategorie wird abgelehnt. Deklariert ein
+  Plugin Kategorien ohne `SEND_NOTIFICATIONS`, wird es beim Laden unter Quarantäne gestellt.
 - Unbekannte Benutzer-IDs werden übersprungen, Duplikate zusammengefasst. Eine E-Mail wird nur gesendet, wenn `email`
   gesetzt ist und die Einstellungen der Person E-Mail für die Kategorie erlauben. Der Host rendert sie im globalen
   E-Mail-Layout; `html` ist ein vertrauenswürdiges Fragment, ohne `html` wird `text` (maskiert) verwendet.
@@ -453,30 +479,6 @@ await context.runSerialized(async (manager) => {
 Die Serialisierung gilt pro Host-Prozess. Plugins, die Ausschluss über mehrere API-Instanzen brauchen, benötigen eine
 eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
 [Reservierungen](resources/reservations.md#betrieb-mit-einer-instanz)).
-
-### Frontend-Slots
-
-Neben eigenen Routen kann ein Frontend-Plugin über `getSlotContributions()` UI **in** Host-Seiten einbetten. Jeder
-Beitrag nennt eine `slotId`, eine `render(context)`-Funktion und optional `key` und `title`. Unbekannte Slot-IDs werden
-ignoriert, und jeder Beitrag läuft in einer Error Boundary. Verfügbare Slots:
-
-| Slot-ID                   | Ort                                                                                | Kontext                    |
-| ------------------------- | ---------------------------------------------------------------------------------- | -------------------------- |
-| `mqtt.server.detail`      | Detail-/Bearbeitungsansicht eines MQTT-Servers                                     | `{ mqttServerId }`         |
-| `mqtt.server.list.row`    | MQTT-Serverliste, Aktionsbereich pro Zeile                                         | `{ mqttServerId }`         |
-| `resource.overview`       | Hauptbereich der Ressourcen-Detailseite                                            | `{ resourceId }`           |
-| `resource.active-session` | Panel der aktiven Nutzung, direkt nach den Flow-Bedienelementen                    | `{ resourceId, usageId }`  |
-| `resource.list.row`       | Kompakter Statusbereich einer Ressourcenzeile                                      | `{ resourceId }`           |
-| `resource.settings`       | Einstellungsseite der Ressource, für Nutzende, die sie verwalten dürfen (`resources.update`) | `{ resourceId }` |
-| `user.account`            | Kontoseite der angemeldeten Person                                                 | `{ userId }`               |
-| `admin.settings`          | Bereich der Systemeinstellungen, für Nutzende mit Systemverwaltungs-Berechtigung   | `{}`                       |
-
-`resource.settings`, `user.account` und `admin.settings` werden als **Abschnitte mit Titel** dargestellt: Setzen Sie
-`title` am Beitrag (sonst gilt ein allgemeiner Plugin-Titel). Die Konstanten `RESOURCE_OVERVIEW_SLOT`,
-`RESOURCE_SETTINGS_SLOT`, `USER_ACCOUNT_SLOT`, `ADMIN_SETTINGS_SLOT` und die Kontexttypen (`ResourceSlotContext`,
-`UserSlotContext`, `AdminSettingsSlotContext`) exportiert `@attraccess/plugins-frontend-sdk`. Der Host entscheidet nur,
-**wo** ein Beitrag angezeigt wird; das Backend Ihres Plugins muss Berechtigungen an der eigenen API weiterhin selbst
-durchsetzen.
 
 ## Kombinierte Plugins
 

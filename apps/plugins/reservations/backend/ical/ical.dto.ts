@@ -3,10 +3,12 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsDefined,
   IsInt,
   IsOptional,
   IsString,
   MaxLength,
+  Matches,
   Min,
   MinLength,
   ValidateNested,
@@ -48,9 +50,11 @@ export class CreateIcalFeedBody {
   @IsString()
   @MinLength(1)
   @MaxLength(100)
+  @Matches(/\S/, { message: 'name must not be blank' })
   name!: string;
 
   @ApiProperty({ type: IcalSelectionDto, description: 'At least one selector must be set' })
+  @IsDefined()
   @ValidateNested()
   @Type(() => IcalSelectionDto)
   selection!: IcalSelectionDto;
@@ -62,6 +66,7 @@ export class UpdateIcalFeedBody {
   @IsString()
   @MinLength(1)
   @MaxLength(100)
+  @Matches(/\S/, { message: 'name must not be blank' })
   name?: string;
 
   @ApiPropertyOptional({ type: IcalSelectionDto })

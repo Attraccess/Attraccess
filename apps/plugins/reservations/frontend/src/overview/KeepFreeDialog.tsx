@@ -1,6 +1,6 @@
 import { StatusDialog } from '@attraccess/plugins-frontend-ui';
 import { useMutation } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { reservationAction } from '../api';
 import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
@@ -24,7 +24,15 @@ export function KeepFreeDialog(props: Readonly<{ resourceId: number; timezone: s
     onError: (failure) => setError(describeError(failure, t)),
   });
 
+  // An answered question stays closed only until the server's pending decision changes (answered
+  // -> none, or a different booking): then the next question must be able to open the dialog.
   const reservation = decision.data ?? null;
+  const reservationId = reservation?.id ?? null;
+  const { reset } = answer;
+  useEffect(() => {
+    reset();
+  }, [reservationId, reset]);
+
   return (
     <>
       <StatusDialog

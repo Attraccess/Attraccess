@@ -13,8 +13,8 @@ export function stillNeeded(m: MessageContext, r: ReservationEntity): NoticeText
     lines: [
       pick(
         lang,
-        `Your booking of ${resourceName} for ${when(m, r)} starts in about two days. Please tell us whether you still need it. If you do not answer, the booking stays.`,
-        `Deine Reservierung von ${resourceName} für ${when(m, r)} beginnt in etwa zwei Tagen. Bitte gib uns Bescheid, ob du sie noch brauchst. Ohne Antwort bleibt die Reservierung bestehen.`,
+        `Your booking of ${resourceName} for ${when(m, r)} starts within the next two days. Please tell us whether you still need it. If you do not answer, the booking stays.`,
+        `Deine Reservierung von ${resourceName} für ${when(m, r)} beginnt in den nächsten zwei Tagen. Bitte gib uns Bescheid, ob du sie noch brauchst. Ohne Antwort bleibt die Reservierung bestehen.`,
       ),
     ],
     actions: [

@@ -19,7 +19,7 @@ export function BookableHoursEditor({ value, onChange, errors }: Readonly<Props>
   const setDay = (day: Weekday, ranges: { start: string; end: string }[]) => onChange({ ...value, [day]: ranges });
 
   return (
-    <div className="rv:flex rv:flex-col rv:gap-3" data-cy="reservations-bookable-hours">
+    <div className="rv:flex rv:min-w-0 rv:flex-col rv:gap-3" data-cy="reservations-bookable-hours">
       <p className="rv:text-sm rv:text-muted">{t('settings.hours.description')}</p>
       {DISPLAY_ORDER.map((day) => {
         const ranges = value[day] ?? [];
@@ -50,9 +50,10 @@ export function BookableHoursEditor({ value, onChange, errors }: Readonly<Props>
                     )
                   }
                   isInvalid={Boolean(error)}
+                  className="rv:min-w-0 rv:flex-1"
                 >
                   <Label>{t('settings.hours.from')}</Label>
-                  <Input placeholder="09:00" maxLength={5} />
+                  <Input placeholder="09:00" maxLength={5} fullWidth />
                 </TextField>
                 <TextField
                   value={range.end}
@@ -63,13 +64,15 @@ export function BookableHoursEditor({ value, onChange, errors }: Readonly<Props>
                     )
                   }
                   isInvalid={Boolean(error)}
+                  className="rv:min-w-0 rv:flex-1"
                 >
                   <Label>{t('settings.hours.to')}</Label>
-                  <Input placeholder="17:00" maxLength={5} />
+                  <Input placeholder="17:00" maxLength={5} fullWidth />
                 </TextField>
                 <Button
                   isIconOnly
                   variant="ghost"
+                  className="rv:shrink-0"
                   aria-label={t('settings.hours.removeRange')}
                   onPress={() =>
                     setDay(

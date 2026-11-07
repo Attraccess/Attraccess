@@ -17,7 +17,7 @@ interface Entry {
 
 const BAR_CLASS: Record<Entry['kind'], string> = {
   mine: 'rv:bg-accent',
-  other: 'rv:bg-default',
+  other: 'rv:bg-muted',
   pending: 'rv:bg-warning',
   maintenance: 'rv:bg-danger',
 };

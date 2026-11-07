@@ -310,7 +310,7 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         backTo={`/resources/${resourceId}`}
       />
       <SettingsDirectory groups={groups} searchLabel={model.t('search')} emptyMessage={model.t('noResults')} />
-      <div className="mt-6 flex flex-col gap-6 empty:hidden">
+      <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col gap-6 empty:hidden">
         <ResourceSettingsPluginSlot resourceId={resourceId} />
       </div>
     </div>

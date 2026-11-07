@@ -94,6 +94,17 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       onEvent: () => ({ off: () => undefined }),
       emitEvent: () => undefined,
       flows: { trigger: async () => undefined },
+      notifications: {
+        dispatch: async () => {
+          throw new Error('Unexpected fixture notification');
+        },
+      },
+      resourceAccess: new Proxy({} as PluginContext['resourceAccess'], {
+        get: () => () => {
+          throw new Error('Unexpected fixture resource access query');
+        },
+      }),
+      runSerialized: (fn) => state.db.transaction((manager) => fn(manager)),
       secrets: {
         encrypt: (value) => encryption.encryptForPlugin(pluginId, value),
         decrypt: (value) => encryption.decryptForPlugin(pluginId, value),
