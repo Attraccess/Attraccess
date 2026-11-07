@@ -170,6 +170,15 @@
         }
       }
     },
+    "publish": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["pack-test"],
+      "options": {
+        "cwd": "apps/plugins/matter",
+        "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
     "crap-score": {
       "dependsOn": ["test", "test-frontend"],
       "executor": "nx:run-commands",

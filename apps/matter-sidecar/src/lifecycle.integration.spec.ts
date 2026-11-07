@@ -32,17 +32,23 @@ describe('lifecycle', () => {
   // server because it stops accepting at once.
   it('lets an in-flight versioned request finish while refusing new connections', async () => {
     let release: () => void = () => undefined;
+    let handlerStarted: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => (handlerStarted = resolve));
     const running = await startSidecar(
       {},
       {
         features: {
           'inventory.list': () =>
-            new Promise((resolve) => (release = () => resolve({ authoritative: false, nodes: [] }))),
+            new Promise((resolve) => {
+              release = () => resolve({ authoritative: false, nodes: [] });
+              handlerStarted();
+            }),
         },
       },
     );
     const inFlight = http(running.port, 'GET', '/v1/nodes', { headers: validHeaders() });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Stop only once the handler runs, so the request is past admission and cannot be refused as draining.
+    await started;
     const stopping = running.stop();
     await expect(http(running.port, 'GET', '/health/ready')).rejects.toThrow();
     release();
