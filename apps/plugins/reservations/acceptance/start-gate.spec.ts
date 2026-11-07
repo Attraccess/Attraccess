@@ -44,6 +44,9 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
   let h: Harness;
   let app: INestApplication;
   const startSession = jest.fn();
+  let failurePolicy: 'fail-closed' | 'fail-open';
+  let pluginLoaded: boolean;
+  let pluginBroken: boolean;
 
   const start = (body: object = {}) => request(app.getHttpServer()).post('/resources/1/usage/start').send(body);
   const sessionStartedFor = () => startSession.mock.calls.map((call) => call[1].id);
@@ -75,14 +78,22 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
     await services.book(HOLDER, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
     h.setNow(NOW);
 
+    failurePolicy = 'fail-closed';
+    pluginLoaded = true;
+    pluginBroken = false;
+    const hook: typeof preStartHook = async (ctx) => {
+      if (pluginBroken) throw new Error('plugin crashed');
+      return preStartHook(ctx);
+    };
+    // A quarantined or unloaded plugin contributes no hooks at all.
     const registry = {
-      preStartHooks: () => [{ plugin: 'reservations', hook: preStartHook }],
-      startBlockedQueries: () => [{ plugin: 'reservations', query: startBlockedQuery }],
+      preStartHooks: () => (pluginLoaded ? [{ plugin: 'reservations', hook }] : []),
+      startBlockedQueries: () => (pluginLoaded ? [{ plugin: 'reservations', query: startBlockedQuery }] : []),
       sessionEndHooks: () => [],
     };
     const hooks = new ReaderUiHooksService(
       registry as never,
-      { failurePolicy: async () => 'fail-closed' } as never,
+      { failurePolicy: async () => failurePolicy } as never,
       { onCleared: () => undefined, raise: async () => ({}), clearWhere: async () => undefined } as never,
       { recordAttractap: async () => undefined } as never,
       { get: () => ({}) } as never,
@@ -219,4 +230,43 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
     expect(response.body).toMatchObject({ code: 'START_BLOCKED', reason: { code: 'HOOK_UNAVAILABLE' } });
     expect(startSession).not.toHaveBeenCalled();
   }, 15_000);
+
+  describe('when the plugin fails or is quarantined', () => {
+    const startOn = (resourceId: number) =>
+      request(app.getHttpServer()).post(`/resources/${resourceId}/usage/start`).send({});
+
+    it('refuses every start, also on resources without reservations, while a crashing hook runs under the default fail-closed policy', async () => {
+      pluginBroken = true;
+      jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      principal = as(OTHER, via);
+      for (const resourceId of [1, 2]) {
+        const response = await startOn(resourceId);
+        expect(response.status).toBe(403);
+        expect(response.body.reason.code).toBe('HOOK_UNAVAILABLE');
+      }
+      expect(startSession).not.toHaveBeenCalled();
+    });
+
+    it('lets starts through when an admin set the resource to fail-open (the only way a crashing plugin stops blocking)', async () => {
+      pluginBroken = true;
+      failurePolicy = 'fail-open';
+      principal = as(OTHER, via);
+      expect((await startOn(2)).status).toBe(201);
+    });
+
+    it('answers a resource without reservations from memory, so a healthy plugin never blocks it', async () => {
+      principal = as(OTHER, via);
+      expect((await startOn(2)).status).toBe(201);
+    });
+
+    it('starts without any hook once the plugin is quarantined: nothing is blocked, reserved resources included', async () => {
+      pluginLoaded = false;
+      principal = as(OTHER, via);
+      expect((await startOn(2)).status).toBe(201);
+      expect((await startOn(1)).status).toBe(201);
+      expect((await request(app.getHttpServer()).get('/resources/1/usage/start-blocked')).body).toEqual({
+        blocked: false,
+      });
+    });
+  });
 });
