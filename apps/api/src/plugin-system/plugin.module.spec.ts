@@ -26,6 +26,8 @@ import { LiveTopicsModule } from './../live-updates/live-topics.module';
 import { MqttModule } from './../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from './../mqtt/mqtt-credential-provisioning.service';
 import * as readerUiWiring from './runtime/reader-ui-wiring';
+import { PluginSystemEventsBridge } from './plugin-system-events.bridge';
+import { listPluginNotificationCategories } from '../notifications/plugin-notification-categories';
 
 describe('PluginModule', () => {
   const fixture = registerPluginModuleFixture();
@@ -69,6 +71,7 @@ describe('PluginModule', () => {
         NpmPluginService,
         PluginClassificationService,
         PluginLiveUpdatesService,
+        PluginSystemEventsBridge,
       ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
@@ -378,6 +381,76 @@ describe('PluginModule', () => {
       expect(triggerPluginFlows).toHaveBeenCalledWith('ctx-plugin', 'plugin.test.trigger', expect.any(Function), {
         event: 'x',
       });
+    });
+  });
+
+  describe('runSerialized', () => {
+    it('runs the callback in a transaction of the host connection', async () => {
+      const transaction = jest.fn(async (work: (manager: unknown) => Promise<unknown>) => work('tx-manager'));
+      const host = {
+        manager: { connection: { options: { type: 'postgres' } }, transaction },
+      } as unknown as DataSource;
+      new PluginModule(host, new EventEmitter2(), { get: jest.fn() } as unknown as ModuleRef);
+      const context = (
+        PluginModule as unknown as {
+          createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+        }
+      ).createPluginContext(fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+
+      await expect(context.runSerialized(async (manager) => `ran:${String(manager)}`)).resolves.toBe('ran:tx-manager');
+      expect(transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('is denied without DATABASE_ACCESS', () => {
+      const context = (
+        PluginModule as unknown as {
+          createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+        }
+      ).createPluginContext(fixture.manifest({ permissions: [] }));
+      expect(() => context.runSerialized(async () => 1)).toThrow(PluginPermissionError);
+    });
+  });
+
+  describe('notification categories', () => {
+    function writePlugin(name: string, permissions: PluginPermission[], body: string): void {
+      mkdirSync(join(fixture.root, name, 'dist'), { recursive: true });
+      writeFileSync(
+        join(fixture.root, name, 'plugin.json'),
+        JSON.stringify({
+          name,
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          permissions,
+          attraccessVersion: { min: '1.0.0' },
+        }),
+      );
+      writeFileSync(join(fixture.root, name, 'dist', 'index.js'), `module.exports = { default: { ${body} } };`);
+    }
+    const categories = "notificationCategories: [{ id: 'reminder', label: { en: 'Reminder', de: 'Erinnerung' } }]";
+
+    it('registers declared categories namespaced under the plugin name', () => {
+      writePlugin('booking', [PluginPermission.SEND_NOTIFICATIONS], `${categories}, register: () => ({ module: class M {} })`);
+      PluginModule.forRoot();
+      expect(listPluginNotificationCategories()).toEqual([
+        expect.objectContaining({ key: 'plugin.booking.reminder', pluginName: 'booking', id: 'reminder' }),
+      ]);
+    });
+
+    it('quarantines a plugin declaring categories without SEND_NOTIFICATIONS', () => {
+      writePlugin('sneaky', [], `${categories}, register: () => ({ module: class M {} })`);
+      const module = PluginModule.forRoot();
+      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(listPluginNotificationCategories().some((category) => category.pluginName === 'sneaky')).toBe(false);
+    });
+
+    it('leaves no category behind when register() throws', () => {
+      writePlugin(
+        'broken-cats',
+        [PluginPermission.SEND_NOTIFICATIONS],
+        `${categories}, register: () => { throw new Error('boom'); }`,
+      );
+      PluginModule.forRoot();
+      expect(listPluginNotificationCategories().some((category) => category.pluginName === 'broken-cats')).toBe(false);
     });
   });
 

@@ -4,6 +4,8 @@ import {
   MqttServerConnectionConfig,
   PluginContext,
   PluginFlowsContext,
+  PluginNotificationsContext,
+  PluginResourceAccessContext,
   PluginPermission,
   PluginPermissionError,
   PluginReaderUiApi,
@@ -14,6 +16,7 @@ import {
   SystemEventSubscription,
 } from '@attraccess/plugins-backend-sdk';
 import { Type } from '@nestjs/common';
+import type { EntityManager } from 'typeorm';
 import type { PluginSandboxService } from '../plugin-sandbox.service';
 
 interface PluginSandboxServicePluginGuardedContextContext {
@@ -98,6 +101,18 @@ export function createGuardedContext(
     get secrets(): PluginSecretsContext {
       require(PluginPermission.MANAGE_SECRETS, 'secrets');
       return base.secrets;
+    },
+    get notifications(): PluginNotificationsContext {
+      require(PluginPermission.SEND_NOTIFICATIONS, 'notifications.dispatch()');
+      return base.notifications;
+    },
+    get resourceAccess(): PluginResourceAccessContext {
+      require(PluginPermission.ACCESS_RESOURCES, 'resourceAccess');
+      return base.resourceAccess;
+    },
+    runSerialized<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T> {
+      require(PluginPermission.DATABASE_ACCESS, 'runSerialized()');
+      return base.runSerialized(fn);
     },
   };
 }

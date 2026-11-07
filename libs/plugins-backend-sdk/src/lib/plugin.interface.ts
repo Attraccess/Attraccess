@@ -1,18 +1,82 @@
-import { Resource, User } from '@attraccess/database-entities';
+import { Resource, ResourceHealthStatus, User } from '@attraccess/database-entities';
 
 export enum SystemEvent {
   RESOURCE_USAGE_STARTED = 'RESOURCE_USAGE_STARTED',
   RESOURCE_USAGE_ENDED = 'RESOURCE_USAGE_ENDED',
+  /** A maintenance window was created or finished. See {@link MaintenanceChangedPayload}. */
+  MAINTENANCE_CHANGED = 'MAINTENANCE_CHANGED',
+  /** A resource health entry changed status. See {@link ResourceHealthChangedPayload}. */
+  RESOURCE_HEALTH_CHANGED = 'RESOURCE_HEALTH_CHANGED',
+  /** A user started a session on an idle resource (not a takeover). */
+  RESOURCE_USAGE_SESSION_STARTED = 'RESOURCE_USAGE_SESSION_STARTED',
+  /** A user took over a running session. Fires for the NEW user. */
+  RESOURCE_USAGE_SESSION_TAKEN_OVER = 'RESOURCE_USAGE_SESSION_TAKEN_OVER',
+  /** A session ended, either explicitly or because it was taken over. */
+  RESOURCE_USAGE_SESSION_ENDED = 'RESOURCE_USAGE_SESSION_ENDED',
+}
+
+/** Emitted after a maintenance window was created or finished (committed to the database). */
+export interface MaintenanceChangedPayload {
+  resourceId: number;
+  maintenanceId: number;
+  action: 'created' | 'updated' | 'finished';
+  startTime: Date;
+  /** Null while the maintenance is open-ended (no end set, not finished). */
+  endTime: Date | null;
+}
+
+/** Emitted after a resource health entry changed status. Only real status transitions fire. */
+export interface ResourceHealthChangedPayload {
+  resourceId: number;
+  status: ResourceHealthStatus;
+  previousStatus: ResourceHealthStatus | null;
+  reason: string | null;
+  /** Identifier of the health entry (resources can carry several independent entries). */
+  identifier: string;
+}
+
+export interface ResourceUsageSessionStartedPayload {
+  resourceId: number;
+  usageId: number;
+  userId: number;
+  startTime: Date;
+  /** Set when the session was started under supervision. */
+  supervisorUserId: number | null;
+}
+
+export interface ResourceUsageSessionTakenOverPayload {
+  resourceId: number;
+  /** The new session. */
+  usageId: number;
+  /** The user who took over (the new session owner). */
+  userId: number;
+  startTime: Date;
+  previousUsageId: number;
+  previousUserId: number;
+}
+
+export interface ResourceUsageSessionEndedPayload {
+  resourceId: number;
+  usageId: number;
+  userId: number;
+  startTime: Date;
+  endTime: Date | null;
+  /** 'taken_over' when the session ended because another user took it over. */
+  reason: 'ended' | 'taken_over';
 }
 
 export type SystemEventPayload = {
   [SystemEvent.RESOURCE_USAGE_STARTED]: { resource: Resource; user: User };
   [SystemEvent.RESOURCE_USAGE_ENDED]: { resource: Resource; user: User };
+  [SystemEvent.MAINTENANCE_CHANGED]: MaintenanceChangedPayload;
+  [SystemEvent.RESOURCE_HEALTH_CHANGED]: ResourceHealthChangedPayload;
+  [SystemEvent.RESOURCE_USAGE_SESSION_STARTED]: ResourceUsageSessionStartedPayload;
+  [SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER]: ResourceUsageSessionTakenOverPayload;
+  [SystemEvent.RESOURCE_USAGE_SESSION_ENDED]: ResourceUsageSessionEndedPayload;
 };
 
 export type SystemEventResponse = {
-  [SystemEvent.RESOURCE_USAGE_STARTED]: null;
-  [SystemEvent.RESOURCE_USAGE_ENDED]: null;
+  [E in SystemEvent]: null;
 };
 
 /**
@@ -62,6 +126,8 @@ export enum PluginPermission {
   READER_UI = 'READER_UI',
   /** Register pre-start and session-end hooks that can confirm or block session starts. */
   ACCESS_HOOKS = 'ACCESS_HOOKS',
+  /** Send in-app, push and email notifications to users via notifications.dispatch(). */
+  SEND_NOTIFICATIONS = 'SEND_NOTIFICATIONS',
 }
 
 /**
@@ -70,7 +136,8 @@ export enum PluginPermission {
  */
 export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = {
   [PluginPermission.READ_USERS]: 'Read user accounts from the database.',
-  [PluginPermission.ACCESS_RESOURCES]: 'Read and write resources from the database.',
+  [PluginPermission.ACCESS_RESOURCES]:
+    'Read and write resources from the database and query resource access, maintenance windows and active sessions.',
   [PluginPermission.READ_SETTINGS]: 'Read application settings from the database.',
   [PluginPermission.DATABASE_ACCESS]: 'Access the raw database connection and any other entity repository.',
   [PluginPermission.EMIT_EVENTS]: 'Publish events on the shared application event bus.',
@@ -82,6 +149,8 @@ export const PLUGIN_PERMISSION_DESCRIPTIONS: Record<PluginPermission, string> = 
   [PluginPermission.READER_UI]: 'Show widgets on Attractap reader screens.',
   [PluginPermission.ACCESS_HOOKS]:
     'Ask users for confirmation or block resource session starts through pre-start hooks.',
+  [PluginPermission.SEND_NOTIFICATIONS]:
+    'Send notifications to users (in-app, push and email) under plugin-declared notification categories.',
 };
 
 /**

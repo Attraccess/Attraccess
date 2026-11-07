@@ -4,6 +4,7 @@ import type { PluginEntityClass } from './entity';
 import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credential-provisioning';
 import type { PluginAuditDomainDeclaration } from './plugin-audit';
 import type { PluginFlowNodeDefinition } from './plugin-flow-node';
+import type { PluginNotificationCategory } from './plugin-notifications';
 import type { PreStartHook, ReaderUiProvider, SessionEndHook } from './reader-ui';
 
 /**
@@ -53,4 +54,11 @@ export interface PluginBackendModule {
 
   /** Optional advisory hook after a session ended. Requires ACCESS_HOOKS. */
   sessionEndHook?: SessionEndHook;
+
+  /**
+   * Optional notification categories this plugin dispatches under. They appear in user notification
+   * preferences grouped under the plugin name as `plugin.<pluginName>.<id>`. Dispatching requires the
+   * SEND_NOTIFICATIONS permission; declaring categories without it quarantines the plugin.
+   */
+  notificationCategories?: PluginNotificationCategory[];
 }
