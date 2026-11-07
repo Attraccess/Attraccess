@@ -95,8 +95,9 @@ When you stop your session during your own running booking, you are asked: **Kee
 
 When someone starts a resource, the plugin checks the bookings of **other** users. Only confirmed bookings count.
 
-- **Someone else's booking is running:** the start is refused with "Reserved by another user until 16:00". The name
-  of the holder is never shown to people who may not see it.
+- **Someone else's booking is running:** the start is refused with "Reserved by another user until 16:00", or
+  "Reserved by Alex Example until 16:00" if you may see who is using the machine (see
+  [Who sees the holder's name](#who-sees-the-holders-name)).
 - **Someone else's booking starts soon:** if it starts within the resource's confirmation window (60 minutes by
   default), you are asked to confirm: "Reserved from 14:00, you have 40 min. Start anyway?". On a reader without a
   screen the start is refused by default. If several bookings start within the window, you confirm each of them.
@@ -114,6 +115,22 @@ shows the plugin's title and reason, and the reason names the time the block end
 16:00."). The notice updates by itself when a booking begins, ends or is cancelled. If the page is out of date and you
 press Start anyway, the start is still refused with the same message. Managers and maintainers do not see the notice;
 they start through the override confirmation above.
+
+### Who sees the holder's name
+
+The holder's name follows the rule Attraccess already uses for **who is currently using a machine**: whoever may see the
+name of the current user of a resource may also see who holds a booking on it. Everyone else gets the anonymous text
+("another user", "Reserved") and times only.
+
+- **Sees the name:** the holder; managers and maintainers of the resource; and everybody who may see the usage of the
+  machine under the instance setting for resource activity (people introduced to the machine, or all readers when the
+  instance shows activity to everyone).
+- **Does not see the name:** people who may only see "free or in use" (supervised-use machines), and people who may not
+  see the machine's activity at all.
+- **Where it applies:** the notice on the resource page, the refusal when you press Start, the availability view in the
+  booking card and the calendar feeds. Notes, reasons and decisions of a booking stay visible to the holder and the
+  managers only. Managers always get the override confirmation that names the holder.
+- A calendar feed is checked when it is requested, with the permissions of the feed's owner at that time.
 
 ### Reminders and notifications
 
@@ -159,8 +176,8 @@ On your account page, the section **Calendar feeds (iCal)** lets you subscribe t
 - Only resources you may see **at the time the calendar is requested** are included.
 - Confirmed bookings appear as events, pending bookings as **tentative** events. Cancelled bookings disappear. The
   feed covers the last 30 days up to the booking horizon of each resource.
-- The title is "Resource – Reserved" for other people's bookings and "Resource – Name" for your own bookings and
-  for resources you manage.
+- The title is "Resource – Name" for your own bookings, for resources you manage and for resources where you may see
+  who is using the machine ([rule](#who-sees-the-holders-name)); otherwise it is "Resource – Reserved".
 
 > [!WARNING]
 > The feed URL is a secret: anybody who has it can read the feed without signing in. It is shown **only once**, when

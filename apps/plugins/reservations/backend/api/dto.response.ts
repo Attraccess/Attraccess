@@ -31,8 +31,9 @@ export class ReservationErrorDto {
 }
 
 /**
- * A booking. Holder identity (userId, userName), note and decision details are only filled for the
- * holder and managers of the resource; everybody else sees times and buffers only.
+ * A booking. The holder's id, note and decision details are only filled for the holder and managers of the
+ * resource. `userName` is also filled for viewers who may see the current user of the machine (core's usage
+ * attribution rule); everybody else sees times and buffers only.
  */
 export class ReservationDto {
   @ApiProperty({ type: Number })

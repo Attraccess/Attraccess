@@ -428,6 +428,7 @@ resources yield negative answers (`false`, all-false, `[]`) rather than errors.
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `canStart(principal, resourceId)`                   | `{ allowed, requiresSupervision, supervisionAllowed }`. Covers introductions, retraining blocks, introducers/maintainers, `resources.update` and the supervision mode. It does **not** consider live maintenance or health. |
 | `canMaintain(principal, resourceId)`                | Whether the user can manage maintenance of the resource (`resources.maintenance.manage`, introducer/maintainer of the resource or one of its groups). Same check as core's maintenance API. |
+| `canSeeUsageAttribution(principal, resourceId)`    | Whether the user may see **who** is using the resource: core's rule for the current user's name in the resource UI and API (`resources.update`/`resources.access.manage`, people introduced to the machine, everybody when the instance shows activity to all). `false` for supervised-use machines (free/in use only) and when the activity is hidden from the user. |
 | `hasPermission(principal, permission)`              | Whether the user holds an RBAC permission such as `resources.update`, limited to the request's scope.                |
 | `listResourceIdsIntroduced(principal)`              | Resources the user is introduced to in the sense of `canStart` (valid introduction, introducer/maintainer, `resources.update`). |
 | `listResourceIdsMaintained(principal)`              | Resources whose maintenance the user can manage.                                                                     |
@@ -682,9 +683,10 @@ const startBlockedQuery: StartBlockedQuery = async (ctx) => {
 - **Informational only.** The server still runs `preStartHook` for every start, so the hook must keep blocking; a start
   that slips through, or a stale page, ends in the usual error toast. Readers keep using the hook alone.
 - **Privacy is yours.** The query runs for the user who looks at the page (`ctx.userId`). The reason is shown to that
-  user as written, so apply your own visibility rules and never name somebody the user may not see. The reservations
-  plugin never names the holder to non-managers and returns nothing for managers, who start through an override
-  confirmation.
+  user as written, so apply your own visibility rules and never name somebody the user may not see. When the reason names a person, ask
+  `context.resourceAccess.canSeeUsageAttribution(ctx.userId, ctx.resourceId)` instead of keeping your own rule: it is
+  the rule core applies to the current user of a machine. The reservations plugin names the holder exactly then, and
+  returns nothing for managers, who start through an override confirmation.
 - **Keep it cheap.** It runs whenever a resource page with a start button is open (about every 30 seconds per page, plus
   when you invalidate). It has the hook timeout; a timeout, an error or an invalid answer count as "not blocked" and
   never open the pre-start circuit breaker.

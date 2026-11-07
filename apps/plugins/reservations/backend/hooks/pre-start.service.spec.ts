@@ -96,6 +96,27 @@ describe('PreStartService', () => {
       expect(JSON.stringify(result)).not.toContain('user11');
     });
 
+    it("names the holder to a viewer who may see the machine's current user (core attribution rule), en + de", async () => {
+      h.allowAttribution(10, 1);
+      expect(await p.preStart.evaluate(ctx(10))).toEqual({
+        decision: 'block',
+        reason: { code: 'RESERVED', title: 'Reserved', body: 'Reserved by user11 until 16:00.' },
+      });
+      expect(await p.preStart.evaluate(ctx(10, { language: 'de' }))).toMatchObject({
+        reason: { body: 'Von user11 bis 16:00 reserviert.' },
+      });
+      // Someone else without that access still gets the anonymous text.
+      const other = await p.preStart.evaluate(ctx(12));
+      expect(other).toMatchObject({ reason: { body: 'Reserved by another user until 16:00.' } });
+      expect(JSON.stringify(other)).not.toContain('user11');
+    });
+
+    it('does not name the holder on a machine whose activity is hidden from the viewer', async () => {
+      h.allowAttribution(10, 2);
+      const result = await p.preStart.evaluate(ctx(10));
+      expect(JSON.stringify(result)).not.toContain('user11');
+    });
+
     it('speaks German to German users', async () => {
       const result = await p.preStart.evaluate(ctx(10, { language: 'de' }));
       expect(result).toMatchObject({
@@ -291,6 +312,27 @@ describe('PreStartService', () => {
         until: new Date('2026-06-01T14:00:00Z'),
       });
       expect(JSON.stringify(blocked)).not.toContain('user11');
+    });
+
+    it("names the holder exactly when the gate does: viewers who may see the machine's current user", async () => {
+      await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T12:30:00Z');
+      h.allowAttribution(10, 1);
+      const named = await query(10);
+      expect(named?.reason.body).toBe('Reserved by user11 until 16:00.');
+      expect(await p.preStart.evaluate(ctx(10))).toMatchObject({ reason: named?.reason });
+      expect((await query(10, { language: 'de' }))?.reason.body).toBe('Von user11 bis 16:00 reserviert.');
+      const anonymous = await query(12);
+      expect(anonymous?.reason.body).toBe('Reserved by another user until 16:00.');
+      expect(JSON.stringify(anonymous)).not.toContain('user11');
+    });
+
+    it('stays silent on a hidden resource even for a viewer with attribution access', async () => {
+      await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T12:30:00Z');
+      h.allowAttribution(10, 1);
+      h.state.hidden.add(1);
+      expect(await query(10)).toBeNull();
     });
 
     it('writes the reason in the requested language', async () => {

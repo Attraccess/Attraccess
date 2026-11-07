@@ -35,6 +35,19 @@ export class AccessService {
     return this.context.resourceAccess.hasPermission(accessPrincipal(subject), 'resources.update');
   }
 
+  /**
+   * Resources (of `resourceIds`) whose current user's name the subject may see, by core's rule
+   * (`resourceAccess.canSeeUsageAttribution`). The plugin shows a booking holder's name to exactly these viewers,
+   * on top of the holder themselves and the resource's managers.
+   */
+  async attributionResourceIds(subject: AccessSubject, resourceIds: number[]): Promise<Set<number>> {
+    const access = this.context.resourceAccess;
+    const principal = accessPrincipal(subject);
+    const ids = [...new Set(resourceIds)];
+    const allowed = await Promise.all(ids.map((id) => access.canSeeUsageAttribution(principal, id)));
+    return new Set(ids.filter((_, index) => allowed[index]));
+  }
+
   /** Resources the user manages: `null` means all (resources.update), otherwise the maintained ids. */
   async managedResourceIds(subject: AccessSubject): Promise<number[] | null> {
     const access = this.context.resourceAccess;

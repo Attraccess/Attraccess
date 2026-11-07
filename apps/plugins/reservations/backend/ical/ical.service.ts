@@ -268,14 +268,21 @@ export class IcalService {
     const managedIds = new Set(managed ?? []);
     const seesHolder = (r: { userId: number; resourceId: number }) =>
       r.userId === feed.userId || managed === null || managedIds.has(r.resourceId);
+    // The holder's name also goes to viewers who may see the machine's current user (core's attribution rule);
+    // notes stay with the holder and managers.
+    const attributed = await this.access.attributionResourceIds(
+      feed.userId,
+      inRange.filter((r) => !seesHolder(r)).map((r) => r.resourceId),
+    );
+    const seesName = (r: { userId: number; resourceId: number }) => seesHolder(r) || attributed.has(r.resourceId);
     const [resourceNames, userNames] = await Promise.all([
       this.directory.getResourceNames(inRange.map((r) => r.resourceId)),
-      this.directory.getUserNames(inRange.filter(seesHolder).map((r) => r.userId)),
+      this.directory.getUserNames(inRange.filter(seesName).map((r) => r.userId)),
     ]);
     const events: IcalEvent[] = inRange.map((r) => {
       const resource = resourceNames.get(r.resourceId) ?? `#${r.resourceId}`;
       const full = seesHolder(r);
-      const holder = full ? (userNames.get(r.userId) ?? `#${r.userId}`) : pick(lang, 'Reserved', 'Reserviert');
+      const holder = seesName(r) ? (userNames.get(r.userId) ?? `#${r.userId}`) : pick(lang, 'Reserved', 'Reserviert');
       const lines = [
         ...(r.status === 'pending' ? [pick(lang, 'Waiting for approval', 'Wartet auf Genehmigung')] : []),
         ...(full && r.note ? [r.note] : []),

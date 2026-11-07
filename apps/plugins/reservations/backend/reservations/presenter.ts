@@ -5,14 +5,17 @@ export interface Viewer {
   userId: number;
   /** Whether the viewer manages the reservation's resource. */
   isManager: (resourceId: number) => boolean;
+  /** Whether core lets the viewer see who uses the resource; they then also see who holds a booking. */
+  seesHolderName: (resourceId: number) => boolean;
 }
 
 const iso = (date: Date | null): string | null => (date ? date.toISOString() : null);
 
 /**
- * Maps a reservation to its API shape. Holder identity, note and decision/cancel details leave this
- * function ONLY for the holder and managers of the resource; everyone else gets times, buffers and the
- * status. This is the single redaction point for API (and part 2's iCal).
+ * Maps a reservation to its API shape. Note and decision/cancel details leave this function ONLY for the holder
+ * and managers of the resource. The holder's NAME also goes to viewers who may see the current user's name of
+ * the machine (core's usage attribution rule); everyone else gets times, buffers and the status. This is the
+ * single redaction point for the API (iCal applies the same rules).
  */
 export function presentReservation(
   reservation: ReservationEntity,
@@ -38,7 +41,7 @@ export function presentReservation(
     status: reservation.status,
     mine,
     userId: full ? reservation.userId : null,
-    userName: full ? context.userName : null,
+    userName: full || viewer.seesHolderName(reservation.resourceId) ? context.userName : null,
     note: full ? reservation.note : null,
     createdAt: full ? iso(reservation.createdAt) : null,
     endedEarlyAt: full ? iso(reservation.endedEarlyAt) : null,

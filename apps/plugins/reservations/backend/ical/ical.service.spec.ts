@@ -262,6 +262,18 @@ describe('IcalService', () => {
       expect(events(await render(manager.token))).toEqual(['Resource 1 – user10', 'Resource 1 – user11']);
     });
 
+    it("names the holder to viewers who may see the machine's current user, but never shows the note", async () => {
+      const others = await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
+      await h.dataSource.getRepository(ReservationEntity).update({ id: others.id }, { note: 'secret' });
+      h.allowAttribution(10, 1);
+      const user = await ical.create(principal(10), { name: 'u', selection: selection({ resourceIds: [1] }) });
+      const rendered = await render(user.token);
+      expect(events(rendered)).toEqual(['Resource 1 – user11']);
+      expect(JSON.stringify(rendered)).not.toContain('secret');
+      const other = await ical.create(principal(12), { name: 'o', selection: selection({ resourceIds: [1] }) });
+      expect(events(await render(other.token))).toEqual(['Resource 1 – Reserved']);
+    });
+
     it('resolves manager rights with one lookup (resources.update sees every holder)', async () => {
       await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
       await p.book(11, 2, '2026-06-03T08:00:00', '2026-06-03T09:00:00');

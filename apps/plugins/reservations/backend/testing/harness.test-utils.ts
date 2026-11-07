@@ -40,6 +40,7 @@ interface AccessState {
   sessions: { usageId: number; resourceId: number; userId: number; startTime: Date }[];
   introduced: Map<number, number[]>; // userId -> resourceIds
   maintained: Map<number, number[]>; // extra maintained ids (besides makeManager)
+  attribution: Map<number, Set<number>>; // userId -> resourceIds whose users' names they may see
   hidden: Set<number>; // resourceIds only in hidden groups (invisible to everyone in these tests)
 }
 
@@ -65,6 +66,7 @@ export async function createHarness() {
     sessions: [],
     introduced: new Map(),
     maintained: new Map(),
+    attribution: new Map(),
     hidden: new Set(),
   };
   const dispatch = jest.fn(async (_request: unknown) => undefined);
@@ -118,6 +120,9 @@ export async function createHarness() {
     runSerialized,
     getRepository: (entity: never) => dataSource.getRepository(entity),
     resourceAccess: {
+      // Core's rule for the current user's name; scripted per user and resource.
+      canSeeUsageAttribution: async (subject: PluginAccessPrincipal, resourceId: number) =>
+        state.attribution.get(idOf(subject))?.has(resourceId) ?? false,
       hasPermission: async (subject: PluginAccessPrincipal, permission: string) =>
         permissionsOf(subject).has(permission),
       // Like the host: the maintenance permission counts as maintainer of every resource.
@@ -219,6 +224,10 @@ export async function createHarness() {
     },
     makeManager(userId: number, resourceId: number) {
       state.maintainers.set(userId, new Set([...(state.maintainers.get(userId) ?? []), resourceId]));
+    },
+    /** Lets the user see who uses the resource (core's usage attribution rule). */
+    allowAttribution(userId: number, resourceId: number) {
+      state.attribution.set(userId, new Set([...(state.attribution.get(userId) ?? []), resourceId]));
     },
     grant(userId: number, permission: string) {
       state.permissions.set(userId, new Set([...(state.permissions.get(userId) ?? []), permission]));

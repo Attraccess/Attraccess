@@ -102,6 +102,21 @@ describe('ReservationQueryService', () => {
     ]);
   });
 
+  it("names the holder, but nothing else, for viewers who may see the machine's current user", async () => {
+    await h.reservations.create(alice, { resourceId: 1, ...slot(8, 9), note: 'secret project' });
+    h.allowAttribution(bob.userId, 1);
+    const [seen] = (await h.queries.availability(bob, 1, ...range)).reservations;
+    expect(seen).toMatchObject({ mine: false, userName: 'user10', note: null, cancelReason: null, canCancel: false });
+    // A viewer without that access, and the same viewer on a machine whose names are hidden from them, get none.
+    const carol = principal(12);
+    expect((await h.queries.availability(carol, 1, ...range)).reservations[0].userName).toBeNull();
+    h.allowAttribution(bob.userId, 2);
+    await h.enable(2);
+    await h.reservations.create(alice, { resourceId: 2, ...slot(8, 9) });
+    expect((await h.queries.availability(bob, 2, ...range)).reservations[0].userName).toBe('user10');
+    expect((await h.queries.availability(carol, 2, ...range)).reservations[0].userName).toBeNull();
+  });
+
   it('validates ranges and resources', async () => {
     await expect(h.queries.availability(bob, 1, range[1], range[0])).rejects.toMatchObject({ code: 'INVALID_RANGE' });
     await expect(h.queries.availability(bob, 1, range[0], at('2026-09-01T00:00:00'))).rejects.toMatchObject({

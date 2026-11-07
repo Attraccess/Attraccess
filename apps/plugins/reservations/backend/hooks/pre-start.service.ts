@@ -102,8 +102,8 @@ export class PreStartService {
    * The UI counterpart of the block in {@link whenActive}: a booking of another user is running now and the
    * viewer may not override it. Managers see nothing (they start through the override confirmation), and
    * a booking that merely starts soon is not a block (it is only a confirmation at start). The host
-   * checks again at start, so this is informational and uses the same answer as the gate. Like the plugin's
-   * own endpoints it says nothing about resources the viewer may not see (hidden groups).
+   * checks again at start, so this is informational and uses the same answer as the gate, including who is named.
+   * Like the plugin's own endpoints it says nothing about resources the viewer may not see (hidden groups).
    */
   async evaluateStartBlocked(ctx: StartBlockedContext, deadline = hookDeadline()): Promise<StartBlockedState | null> {
     if (!this.settings.isWarm) {
@@ -116,7 +116,18 @@ export class PreStartService {
     if (await this.access.isManager(ctx.userId, ctx.resourceId)) return null;
     if ((await this.visibility.filterVisible(ctx.userId, [ctx.resourceId])).length === 0) return null;
     const timeZone = await this.globalSettings.getTimezone();
-    return { reason: reservedReason(ctx.language, active.endTime, timeZone), until: active.endTime };
+    const holder = await this.holderNameFor(ctx.userId, active);
+    return { reason: reservedReason(ctx.language, active.endTime, timeZone, holder), until: active.endTime };
+  }
+
+  /**
+   * The booking holder's name for a viewer who may see who uses the machine (core's usage attribution rule, the
+   * same one that decides who sees the current user of a running session); null for everyone else.
+   */
+  private async holderNameFor(viewerId: number, booking: ReservationEntity): Promise<string | null> {
+    if (!(await this.access.attributionResourceIds(viewerId, [booking.resourceId])).has(booking.resourceId))
+      return null;
+    return (await this.directory.getUserNames([booking.userId])).get(booking.userId) ?? null;
   }
 
   /** Block for non-managers; for managers the next unconfirmed override, or null when all are confirmed. */
@@ -130,7 +141,8 @@ export class PreStartService {
     const timeZone = await this.globalSettings.getTimezone();
     const until = formatTime(unconfirmed.endTime, { lang, timeZone });
     if (!isManager) {
-      return { decision: 'block', reason: reservedReason(lang, unconfirmed.endTime, timeZone) };
+      const holder = await this.holderNameFor(ctx.userId, unconfirmed);
+      return { decision: 'block', reason: reservedReason(lang, unconfirmed.endTime, timeZone, holder) };
     }
     const name =
       (await this.directory.getUserNames([unconfirmed.userId])).get(unconfirmed.userId) ??
@@ -154,12 +166,17 @@ export class PreStartService {
   }
 }
 
-/** Reason shown to a user who may not start during someone else's booking. The holder is never named. */
-function reservedReason(lang: 'en' | 'de', endTime: Date, timeZone: string): PluginBlockReason {
+/**
+ * Reason shown to a user who may not start during someone else's booking. The holder is named only when the viewer
+ * may see who uses the machine (`holder` is then set), otherwise the text stays anonymous.
+ */
+function reservedReason(lang: 'en' | 'de', endTime: Date, timeZone: string, holder: string | null): PluginBlockReason {
   const until = formatTime(endTime, { lang, timeZone });
   return {
     code: 'RESERVED',
     title: pick(lang, 'Reserved', 'Reserviert'),
-    body: pick(lang, `Reserved by another user until ${until}.`, `Von einer anderen Person bis ${until} reserviert.`),
+    body: holder
+      ? pick(lang, `Reserved by ${holder} until ${until}.`, `Von ${holder} bis ${until} reserviert.`)
+      : pick(lang, `Reserved by another user until ${until}.`, `Von einer anderen Person bis ${until} reserviert.`),
   };
 }

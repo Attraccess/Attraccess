@@ -49,9 +49,18 @@ export class ReservationQueryService {
     const managed = rows.every((row) => known.has(row.resourceId)) ? [] : await this.access.managedResourceIds(actor);
     const managedIds = new Set(managed ?? []);
     const isManager = (resourceId: number) => known.get(resourceId) ?? (managed === null || managedIds.has(resourceId));
-    const viewer: Viewer = { userId: actor.userId, isManager };
+    // Only the resources of other people's bookings need core's attribution answer.
+    const attributed = await this.access.attributionResourceIds(
+      actor,
+      rows.filter((row) => row.userId !== actor.userId && !isManager(row.resourceId)).map((row) => row.resourceId),
+    );
+    const viewer: Viewer = {
+      userId: actor.userId,
+      isManager,
+      seesHolderName: (resourceId) => attributed.has(resourceId),
+    };
     const visibleUserIds = rows
-      .filter((row) => row.userId === actor.userId || viewer.isManager(row.resourceId))
+      .filter((row) => row.userId === actor.userId || isManager(row.resourceId) || attributed.has(row.resourceId))
       .map((row) => row.userId);
     const [resourceNames, userNames] = await Promise.all([
       this.directory.getResourceNames(rows.map((row) => row.resourceId)),

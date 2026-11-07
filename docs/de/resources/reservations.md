@@ -102,8 +102,9 @@ freigeben?**
 
 Beim Start einer Ressource prüft das Plugin die Buchungen **anderer** Personen. Nur bestätigte Buchungen zählen.
 
-- **Eine fremde Buchung läuft:** Der Start wird mit „Von einer anderen Person bis 16:00 reserviert.“ abgelehnt. Der
-  Name der buchenden Person wird nie Personen gezeigt, die ihn nicht sehen dürfen.
+- **Eine fremde Buchung läuft:** Der Start wird mit „Von einer anderen Person bis 16:00 reserviert.“ abgelehnt, oder
+  mit „Von Alex Beispiel bis 16:00 reserviert.“, wenn Sie sehen dürfen, wer die Maschine nutzt (siehe
+  [Wer den Namen der buchenden Person sieht](#wer-den-namen-der-buchenden-person-sieht)).
 - **Eine fremde Buchung beginnt bald:** Beginnt sie innerhalb des Bestätigungsfensters der Ressource
   (standardmäßig 60 Minuten), werden Sie um Bestätigung gebeten: „Reserviert ab 14:00, du hast 40 Min. Trotzdem
   starten?“. Auf einem Reader ohne Bildschirm wird der Start standardmäßig abgelehnt. Beginnen mehrere Buchungen
@@ -123,6 +124,24 @@ anderen Person bis 16:00 reserviert.“). Der Hinweis aktualisiert sich von selb
 oder storniert wird. Ist die Seite veraltet und Sie drücken trotzdem auf Start, wird der Start weiterhin mit derselben
 Meldung abgelehnt. Verwaltende und Wartende sehen den Hinweis nicht; sie starten über die oben beschriebene
 Override-Bestätigung.
+
+### Wer den Namen der buchenden Person sieht
+
+Der Name der buchenden Person folgt der Regel, die Attraccess bereits für **wer eine Maschine gerade nutzt** verwendet:
+Wer den Namen der aktuellen Nutzerin oder des aktuellen Nutzers einer Ressource sehen darf, sieht auch, wer darauf
+gebucht hat. Alle anderen erhalten den anonymen Text („einer anderen Person“, „Reserviert“) und nur die Zeiten.
+
+- **Sieht den Namen:** die buchende Person; Verwaltende und Wartende der Ressource; und alle, die die Nutzung der
+  Maschine nach der Instanz-Einstellung für Ressourcenaktivität sehen dürfen (in die Maschine eingewiesene Personen,
+  oder alle Lesenden, wenn die Instanz die Aktivität für alle zeigt).
+- **Sieht den Namen nicht:** Personen, die nur „frei oder in Benutzung“ sehen (Maschinen mit Aufsicht), und Personen,
+  die die Aktivität der Maschine gar nicht sehen dürfen.
+- **Wo das gilt:** der Hinweis auf der Ressourcenseite, die Ablehnung beim Drücken von Start, die
+  Verfügbarkeitsansicht in der Buchungskarte und die Kalender-Feeds. Notizen, Gründe und Entscheidungen einer Buchung
+  sehen weiterhin nur die buchende Person und die Verwaltenden. Verwaltende erhalten immer die Override-Bestätigung,
+  die die buchende Person nennt.
+- Ein Kalender-Feed wird beim Abruf geprüft, mit den Berechtigungen der Feed-Besitzerin oder des Feed-Besitzers zu
+  diesem Zeitpunkt.
 
 ### Erinnerungen und Benachrichtigungen
 
@@ -170,8 +189,9 @@ Auf Ihrer Kontoseite können Sie im Abschnitt **Kalender-Feeds (iCal)** Buchunge
 - Enthalten sind nur Ressourcen, die Sie **zum Zeitpunkt des Kalenderabrufs** sehen dürfen.
 - Bestätigte Buchungen erscheinen als Termine, ausstehende als **vorläufige** Termine. Stornierte Buchungen
   verschwinden. Der Feed deckt die letzten 30 Tage bis zum Buchungshorizont der jeweiligen Ressource ab.
-- Der Titel lautet „Ressource – Reserviert“ bei Buchungen anderer und „Ressource – Name“ bei Ihren eigenen Buchungen
-  und bei Ressourcen, die Sie verwalten.
+- Der Titel lautet „Ressource – Name“ bei Ihren eigenen Buchungen, bei Ressourcen, die Sie verwalten, und bei
+  Ressourcen, bei denen Sie sehen dürfen, wer die Maschine nutzt
+  ([Regel](#wer-den-namen-der-buchenden-person-sieht)); sonst „Ressource – Reserviert“.
 
 > [!WARNING]
 > Die Feed-URL ist ein Geheimnis: Wer sie kennt, kann den Feed ohne Anmeldung lesen. Sie wird **nur einmal**

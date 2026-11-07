@@ -345,8 +345,10 @@ const startBlockedQuery: StartBlockedQuery = async (ctx) => {
   nutzen weiterhin nur den Hook.
 - **Datenschutz liegt bei Ihnen.** Die Abfrage läuft für die Person, die die Seite ansieht (`ctx.userId`). Der Grund
   wird ihr wörtlich angezeigt; wenden Sie also Ihre eigenen Sichtbarkeitsregeln an und nennen Sie niemanden, den die
-  Person nicht sehen darf. Das Reservierungs-Plugin nennt Nicht-Verwaltenden nie die buchende Person und liefert für
-  Verwaltende nichts, die über eine Override-Bestätigung starten.
+  Person nicht sehen darf. Nennt der Grund eine Person, fragen Sie
+  `context.resourceAccess.canSeeUsageAttribution(ctx.userId, ctx.resourceId)`, statt eine eigene Regel zu pflegen:
+  Es ist die Regel, die der Kern auf den aktuellen Nutzer einer Maschine anwendet. Das Reservierungs-Plugin nennt die
+  buchende Person genau dann und liefert für Verwaltende nichts, die über eine Override-Bestätigung starten.
 - **Günstig halten.** Sie läuft, solange eine Ressourcenseite mit Start-Knopf offen ist (etwa alle 30 Sekunden pro
   Seite, dazu bei jedem Invalidieren). Es gilt das Hook-Timeout; Timeout, Fehler oder eine ungültige Antwort zählen als
   „nicht blockiert“ und öffnen nie den Circuit Breaker des Pre-Start-Hooks.
@@ -578,6 +580,7 @@ Scheduler. Unbekannte Personen und Ressourcen ergeben negative Antworten (`false
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `canStart(principal, resourceId)`             | `{ allowed, requiresSupervision, supervisionAllowed }`. Berücksichtigt Einweisungen, Nachschulungssperren, Einweisende/Wartende, `resources.update` und den Aufsichtsmodus. Aktuelle Wartung oder Gesundheit werden **nicht** berücksichtigt. |
 | `canMaintain(principal, resourceId)`          | Ob die Person die Wartung der Ressource verwalten darf (`resources.maintenance.manage`, Einweisende/Wartende der Ressource oder einer ihrer Gruppen). Dieselbe Prüfung wie die Wartungs-API des Kerns. |
+| `canSeeUsageAttribution(principal, resourceId)` | Ob die Person sehen darf, **wer** die Ressource nutzt: die Regel des Kerns für den Namen der aktuellen Nutzerin oder des aktuellen Nutzers in Ressourcen-UI und -API (`resources.update`/`resources.access.manage`, in die Maschine eingewiesene Personen, alle, wenn die Instanz die Aktivität für alle zeigt). `false` bei Maschinen mit Aufsicht (nur frei/in Benutzung) und wenn die Aktivität für die Person verborgen ist. |
 | `hasPermission(principal, permission)`        | Ob die Person eine RBAC-Berechtigung wie `resources.update` besitzt, beschränkt auf den Bereich der Anfrage.          |
 | `listResourceIdsIntroduced(principal)`        | Ressourcen, in die die Person im Sinne von `canStart` eingewiesen ist (gültige Einweisung, Einweisende/Wartende, `resources.update`). |
 | `listResourceIdsMaintained(principal)`        | Ressourcen, deren Wartung die Person verwalten darf.                                                                 |

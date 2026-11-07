@@ -11,6 +11,8 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js'],
   moduleNameMapper: {
+    // Same ESM-only mapping as the API's own jest config (the start gate pulls in core's usage service).
+    '^lodash-es$': 'lodash',
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
 };
