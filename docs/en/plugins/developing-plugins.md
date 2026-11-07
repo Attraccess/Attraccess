@@ -87,9 +87,7 @@ Declare plugin dependencies in `package.json` under `attraccess.dependencies`:
 ```json
 {
   "attraccess": {
-    "dependencies": [
-      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
-    ]
+    "dependencies": [{ "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }]
   }
 }
 ```
@@ -192,7 +190,7 @@ export default plugin;
 | `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                   | `RESOLVE_HOST_PROVIDERS` |
 | `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
 | `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS`    |
-| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                             | `ACCESS_MQTT_SERVERS`    |
+| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                                          | `ACCESS_MQTT_SERVERS`    |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -217,8 +215,8 @@ naming the missing permission.
 | `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                               |
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                      |
 | `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection. |
-| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                |
-| `ACCESS_HOOKS`           | The `preStartHook` and `sessionEndHook` — ask for a confirmation or block a session start. See [Reader UI](#reader-ui-and-start-hooks).                                |
+| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).               |
+| `ACCESS_HOOKS`           | The `preStartHook` and `sessionEndHook` — ask for a confirmation or block a session start. See [Reader UI](#reader-ui-and-start-hooks).                               |
 
 ### MQTT subscriptions
 
@@ -293,10 +291,10 @@ connection. For dependency-injection identities to line up, your build must use
 the _same_ copies of those packages the host already loaded — it must **not**
 bundle its own. Split dependencies into two groups:
 
-| Dependency                                                                                                | How to declare it                                  | Why                                                                                                                                                  |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, **externalized** at build time | They carry the DI identities, the shared event bus and the single DB connection. A bundled copy is a _different_ type and silently fails to connect. |
-| `@attraccess/plugins-backend-sdk` and your own code                                                       | bundle normally                                    | Safe — the SDK's runtime surface is `Symbol.for()`, identity-safe across copies.                                                                     |
+| Dependency                                                                                                                                                           | How to declare it                                  | Why                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, **externalized** at build time | They carry the DI identities, the shared event bus and the single DB connection. A bundled copy is a _different_ type and silently fails to connect. |
+| `@attraccess/plugins-backend-sdk` and your own code                                                                                                                  | bundle normally                                    | Safe — the SDK's runtime surface is `Symbol.for()`, identity-safe across copies.                                                                     |
 
 Ship a **CommonJS** entry point (`index.js`), not an ES module. A minimal
 [esbuild](https://esbuild.github.io/) build that follows the rule:
@@ -307,6 +305,7 @@ esbuild backend/plugin.ts \
   --external:@nestjs/common --external:@nestjs/core \
   --external:@nestjs/event-emitter --external:eventemitter2 \
   --external:typeorm --external:reflect-metadata \
+  --external:@nestjs/swagger --external:class-validator --external:class-transformer \
   --external:@attraccess/plugins-backend-sdk
 ```
 
@@ -996,15 +995,15 @@ so they share the workspace toolchain, caching and CI.
   plugin. Plugin source changes require running `install-dev` again; this target
   does not watch plugin sources.
 
-  | Target           | Produces                                                                |
-  | ---------------- | ----------------------------------------------------------------------- |
-  | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized) |
-  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)              |
+  | Target           | Produces                                                                       |
+  | ---------------- | ------------------------------------------------------------------------------ |
+  | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized)        |
+  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)                     |
   | `build`          | stages `package.json` and `plugin.json` in `package/` (depends on both builds) |
-  | `zip`            | `dist/plugin-<name>.zip` — uploadable in the Plugins UI                 |
-  | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)            |
-  | `pack-test`      | validates the packed tarball and loads its backend                      |
-  | `publish`        | publishes a new package version to npm                                  |
+  | `zip`            | `dist/plugin-<name>.zip` — uploadable in the Plugins UI                        |
+  | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)                   |
+  | `pack-test`      | validates the packed tarball and loads its backend                             |
+  | `publish`        | publishes a new package version to npm                                         |
 
   ```bash
    # Build and pack a single plugin app:

@@ -1,0 +1,150 @@
+{
+  "name": "plugin-reservations",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/plugins/reservations",
+  "tags": ["type:plugin", "scope:plugin"],
+  "// lint": "lint runs from the workspace root on purpose: @nx/enforce-module-boundaries no-ops when eslint runs from inside a project directory. See eslint.config.cjs for the plugin isolation rules.",
+  "targets": {
+    "install-dev": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node apps/plugins/scripts/install-dev-plugin.mjs --src apps/plugins/reservations/package"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/frontend/src/**/*", "{workspaceRoot}/eslint.config.cjs"],
+      "outputs": [],
+      "options": {
+        "command": "eslint apps/plugins/reservations/backend apps/plugins/reservations/frontend/src --max-warnings=0 && prettier --check apps/plugins/reservations/backend apps/plugins/reservations/frontend/src"
+      }
+    },
+    "test-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"
+      ],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/reservations/test-frontend"],
+      "options": {
+        "cwd": "apps/plugins/reservations",
+        "command": "pnpm exec vitest run --root frontend"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "dependsOn": ["test-frontend"],
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        {
+          "externalDependencies": ["jest"]
+        }
+      ],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/reservations/test"],
+      "options": {
+        "jestConfig": "apps/plugins/reservations/jest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "build-backend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/backend/**/*", "{workspaceRoot}/apps/plugins/scripts/esbuild-backend.mjs"],
+      "outputs": ["{projectRoot}/package/dist"],
+      "options": {
+        "cwd": "apps/plugins/reservations",
+        "command": "node ../scripts/esbuild-backend.mjs --entry backend/plugin.ts --outfile package/dist/index.js --entry backend/migrations.ts --outfile package/dist/migrations.js"
+      }
+    },
+    "build-frontend": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/frontend/**/*",
+        "{workspaceRoot}/libs/plugins-frontend-sdk/src/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/vite-federation.config.mjs",
+        "{workspaceRoot}/apps/plugins/scripts/host-shared-placeholder.mjs"
+      ],
+      "outputs": ["{projectRoot}/package/frontend"],
+      "options": {
+        "cwd": "apps/plugins/reservations",
+        "command": "pnpm exec vite build --config frontend/vite.config.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build-backend", "build-frontend"],
+      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
+      "outputs": ["{projectRoot}/package/package.json", "{projectRoot}/package/plugin.json"],
+      "options": {
+        "cwd": "apps/plugins/reservations",
+        "command": "node -e \"for (const file of ['package.json', 'plugin.json']) require('fs').copyFileSync(file, 'package/' + file)\""
+      }
+    },
+    "zip": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/package/**/*", "{workspaceRoot}/apps/plugins/scripts/zip-plugin.mjs"],
+      "outputs": ["{projectRoot}/dist/plugin-reservations.zip"],
+      "options": {
+        "cwd": "apps/plugins/reservations",
+        "command": "node ../scripts/zip-plugin.mjs --src package --out dist/plugin-reservations.zip"
+      }
+    },
+    "pack": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["build"],
+      "inputs": ["{projectRoot}/package/**/*"],
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "apps/plugins/reservations",
+        "command": "rm -rf dist && mkdir dist && (cd package && npm pack --pack-destination ../dist)"
+      }
+    },
+    "pack-test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "dependsOn": ["pack", "plugins-backend-sdk:build"],
+      "inputs": [
+        "{projectRoot}/package/**/*",
+        "{workspaceRoot}/apps/plugins/scripts/verify-packed-plugin.mjs",
+        "{workspaceRoot}/package.json"
+      ],
+      "options": {
+        "cwd": "apps/plugins/reservations",
+        "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js dist/migrations.js frontend/remoteEntry.js frontend/style.css",
+        "env": {
+          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0"
+        }
+      }
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "dependsOn": ["pack-test"],
+      "options": {
+        "cwd": "apps/plugins/reservations",
+        "command": "node ../scripts/publish-plugin.mjs package dist"
+      }
+    },
+    "crap-score": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node scripts/crap-score/run.mjs apps/plugins/reservations"
+      },
+      "dependsOn": ["test", "test-frontend"]
+    }
+  }
+}
