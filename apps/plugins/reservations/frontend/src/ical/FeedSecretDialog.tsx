@@ -1,7 +1,7 @@
 import { Button, StatusDialog } from '@attraccess/plugins-frontend-ui';
 import { Input } from '@heroui/react';
 import { CheckIcon, CopyIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useReservationsTranslations } from '../i18n';
 import type { IcalFeedSecret } from '../lib/types';
 
@@ -10,6 +10,12 @@ export function FeedSecretDialog(props: Readonly<{ secret: IcalFeedSecret | null
   const { t } = useReservationsTranslations();
   const [copied, setCopied] = useState(false);
   const { secret } = props;
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 3000);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   const copy = async () => {
     if (!secret) return;
@@ -44,8 +50,14 @@ export function FeedSecretDialog(props: Readonly<{ secret: IcalFeedSecret | null
             onFocus={(event) => event.currentTarget.select()}
             data-cy="reservations-feed-url"
           />
-          <Button isIconOnly variant="secondary" aria-label={t('feeds.secret.copy')} onPress={() => void copy()}>
+          <Button
+            variant="secondary"
+            className="rv:shrink-0"
+            onPress={() => void copy()}
+            data-cy="reservations-feed-copy"
+          >
             {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+            <span aria-live="polite">{copied ? t('feeds.secret.copied') : t('feeds.secret.copy')}</span>
           </Button>
         </div>
       </div>

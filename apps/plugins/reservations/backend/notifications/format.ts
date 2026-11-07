@@ -57,6 +57,13 @@ export function formatRange(start: Date, end: Date, time: TimeContext): string {
 }
 
 /** Check-in rules paragraph used in the confirmation and the 24h reminder. */
+/** "1 minute" / "15 minutes" (en), "1 Minute" / "15 Minuten" (de). */
+export function minutesText(lang: Lang, count: number): string {
+  return lang === 'de'
+    ? `${count} ${count === 1 ? 'Minute' : 'Minuten'}`
+    : `${count} ${count === 1 ? 'minute' : 'minutes'}`;
+}
+
 export function checkInRules(
   settings: Pick<ResourceSettings, 'checkInEnabled' | 'checkInGraceMinutes' | 'earlyCheckInMinutes'>,
   lang: Lang,
@@ -72,8 +79,8 @@ export function checkInRules(
   const grace = settings.checkInGraceMinutes;
   return pick(
     lang,
-    `Check-in is required: start a session on the resource ${early > 0 ? `up to ${early} minutes before the start or ` : ''}within ${grace} minutes after the start. Without a check-in the booking is released as a no-show.`,
-    `Ein Check-in ist erforderlich: Starte ${early > 0 ? `bis zu ${early} Minuten vor dem Beginn oder ` : ''}innerhalb von ${grace} Minuten nach dem Beginn eine Sitzung an der Ressource. Ohne Check-in wird die Reservierung als Nichterscheinen freigegeben.`,
+    `Check-in is required: start a session on the resource ${early > 0 ? `up to ${minutesText(lang, early)} before the start or ` : ''}within ${minutesText(lang, grace)} after the start. Without a check-in the booking is released as a no-show.`,
+    `Ein Check-in ist erforderlich: Starte ${early > 0 ? `bis zu ${minutesText(lang, early)} vor dem Beginn oder ` : ''}innerhalb von ${minutesText(lang, grace)} nach dem Beginn eine Sitzung an der Ressource. Ohne Check-in wird die Reservierung als Nichterscheinen freigegeben.`,
   );
 }
 

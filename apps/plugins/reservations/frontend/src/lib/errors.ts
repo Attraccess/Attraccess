@@ -26,9 +26,17 @@ const KNOWN_CODES = new Set([
   'FORBIDDEN',
   'RESERVATION_NOT_FOUND',
   'RESOURCE_NOT_FOUND',
+  'FEED_LIMIT',
+  'FEED_NOT_FOUND',
+  'INVALID_FEED',
 ]);
 
 type Translate = (key: string, data?: Record<string, unknown>) => string;
+
+/** Localised text for a known error code (e.g. the reason a booking is not possible), else the raw text. */
+export function describeCode(code: string, t: Translate): string {
+  return KNOWN_CODES.has(code) ? t(`errors.${code}`, { count: 0 }) : code;
+}
 
 /** Localised text for an API failure: a typed code wins, then the HTTP status, then the raw message. */
 export function describeError(error: unknown, t: Translate): string {

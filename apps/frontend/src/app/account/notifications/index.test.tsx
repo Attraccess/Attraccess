@@ -217,6 +217,40 @@ describe('NotificationPreferencesForm', () => {
     });
   });
 
+  it('lists the categories a plugin declares under the plugin name and updates them by their namespaced key', async () => {
+    const original = hoisted.preferences;
+    hoisted.preferences = {
+      ...original,
+      pluginCategories: [
+        {
+          category: 'plugin.reservations.bookings',
+          pluginName: 'reservations',
+          label: { en: 'Bookings', de: 'Buchungen' },
+          channels: { email: true, push: false, toast: true },
+        },
+      ],
+    } as typeof original;
+    try {
+      const user = userEvent.setup();
+      renderForm();
+
+      expect(screen.getByRole('heading', { name: 'reservations' })).toBeInTheDocument();
+      expect(screen.getAllByText('Bookings').length).toBeGreaterThan(0);
+      expect(screen.getByTestId('notifications-plugin.reservations.bookings-email')).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+
+      await user.click(screen.getByTestId('notifications-plugin.reservations.bookings-email'));
+
+      expect(hoisted.mutate).toHaveBeenCalledWith({
+        requestBody: { category: 'plugin.reservations.bookings', channels: { email: false } },
+      });
+    } finally {
+      hoisted.preferences = original;
+    }
+  });
+
   it('enables a push preference without subscribing this device', async () => {
     const user = userEvent.setup();
     renderForm();

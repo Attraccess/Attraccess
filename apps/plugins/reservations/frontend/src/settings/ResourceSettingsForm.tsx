@@ -1,4 +1,4 @@
-import { Button, LabeledSwitch, StatusDialog } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { ReservationsApiError, getFutureBookingsCount, getResourceSettings, updateResourceSettings } from '../api';
@@ -17,6 +17,17 @@ const toValues = (settings: ResourceSettings): ResourceSettingsValues => {
   void _resourceId;
   return values;
 };
+
+/** Weekdays without ranges mean the same as absent ones, so they must not count as a change. */
+const comparable = (values: ResourceSettingsValues) =>
+  JSON.stringify({
+    ...values,
+    bookableHours: Object.fromEntries(
+      Object.entries(values.bookableHours)
+        .filter(([, ranges]) => ranges && ranges.length > 0)
+        .sort(([a], [b]) => a.localeCompare(b)),
+    ),
+  });
 
 const NUMBER_GROUPS: { title: string; fields: NumericField[] }[] = [
   {
@@ -50,6 +61,10 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
   }, [query.data]);
 
   const errors = useMemo(() => (values ? validateSettingsForm(values) : {}), [values]);
+  const dirty = useMemo(
+    () => Boolean(values && query.data && comparable(values) !== comparable(toValues(query.data))),
+    [values, query.data],
+  );
 
   const save = useMutation({
     mutationFn: (cancelFutureBookings?: boolean) =>
@@ -88,10 +103,29 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
     save.mutate(undefined);
   };
 
-  if (query.isError || !values) return null;
+  // Users who do not manage the resource get nothing at all; any other failure is shown with a retry.
+  if (query.error instanceof ReservationsApiError && query.error.status === 403) return null;
+  if (query.isError) {
+    return (
+      <div className="rv:flex rv:flex-col rv:items-start rv:gap-2" data-cy="reservations-settings-load-error">
+        <StatusAlert status="danger" title={t('settings.loadFailed')}>
+          {describeError(query.error, t)}
+        </StatusAlert>
+        <Button size="sm" variant="secondary" onPress={() => void query.refetch()}>
+          {t('common.retry')}
+        </Button>
+      </div>
+    );
+  }
+  if (!values) return null;
   const set = <K extends keyof ResourceSettingsValues>(key: K, value: ResourceSettingsValues[K]) =>
     setValues({ ...values, [key]: value });
   const invalid = Object.keys(errors).length > 0;
+  // The server still has reservations enabled after a cancelled warning, so the switch goes back on.
+  const cancelDisable = () => {
+    setConfirmDisable(null);
+    setValues({ ...values, enabled: true });
+  };
   const whoOptions: { key: WhoCanBook; label: string }[] = (['can-start', 'managers-only', 'any-user'] as const).map(
     (key) => ({ key, label: t(`settings.whoCanBook.${key}`) }),
   );
@@ -120,7 +154,7 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
         </LabeledSwitch>
       </div>
       {NUMBER_GROUPS.map((group) => (
-        <fieldset key={group.title} className="rv:flex rv:flex-col rv:gap-3">
+        <fieldset key={group.title} className="rv:flex rv:min-w-0 rv:flex-col rv:gap-3">
           <legend className="rv:mb-2 rv:text-sm rv:font-semibold">{t(`settings.groups.${group.title}`)}</legend>
           <div className="rv:grid rv:gap-4 rv:sm:grid-cols-2">
             {group.fields.map((field) => {
@@ -134,11 +168,11 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
                   onChange={(value) => set(field, value)}
                   min={min}
                   max={max}
-                  isInvalid={Boolean(message)}
-                  description={
+                  description={t(`settings.hints.${field}`, { min, max })}
+                  errorMessage={
                     message
                       ? t(`settings.validation.${message}`, { min, max, step: values.timeStepMinutes })
-                      : t(`settings.hints.${field}`, { min, max })
+                      : undefined
                   }
                   data-cy={`reservations-setting-${field}`}
                 />
@@ -147,7 +181,7 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
           </div>
         </fieldset>
       ))}
-      <fieldset className="rv:flex rv:flex-col rv:gap-3">
+      <fieldset className="rv:flex rv:min-w-0 rv:flex-col rv:gap-3">
         <legend className="rv:mb-2 rv:text-sm rv:font-semibold">{t('settings.groups.hours')}</legend>
         <BookableHoursEditor
           value={values.bookableHours}
@@ -158,7 +192,7 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
       <div>
         <Button
           variant="primary"
-          isDisabled={invalid}
+          isDisabled={invalid || !dirty}
           isPending={save.isPending}
           onPress={() => void checkAndSave()}
           data-cy="reservations-settings-save"
@@ -168,7 +202,7 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
       </div>
       <StatusDialog
         isOpen={confirmDisable !== null}
-        onClose={() => setConfirmDisable(null)}
+        onClose={cancelDisable}
         status="warning"
         title={t('settings.disableWarning.title')}
         action={{

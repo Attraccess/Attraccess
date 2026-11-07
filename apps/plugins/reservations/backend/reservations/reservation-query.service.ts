@@ -77,6 +77,10 @@ export class ReservationQueryService {
     filter: { resourceId?: number; status?: ReservationStatus; from?: Date; to?: Date; page: number },
   ): Promise<ManagedReservationListDto> {
     const managedIds = await this.access.managedResourceIds(actor.userId);
+    // The manager pages and the frontend's "do I manage anything" probe rely on this being a 403, not an empty list.
+    if (managedIds !== null && managedIds.length === 0) {
+      throw new ReservationError('FORBIDDEN', 'You do not manage any resource');
+    }
     let resourceIds = managedIds;
     if (filter.resourceId !== undefined) {
       if (managedIds !== null && !managedIds.includes(filter.resourceId)) {

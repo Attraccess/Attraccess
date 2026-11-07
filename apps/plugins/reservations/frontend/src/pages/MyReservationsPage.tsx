@@ -2,9 +2,9 @@ import { PageHeader } from '@attraccess/plugins-frontend-ui';
 import { Card } from '@heroui/react';
 import { Link } from 'react-router-dom';
 import { useReservationsTranslations } from '../i18n';
-import { describeError } from '../lib/errors';
 import { useIsManagerAnywhere, useMyReservations, usePluginTimezone } from '../lib/queries';
 import { IcalFeeds } from '../ical/IcalFeeds';
+import { listState } from '../shared/queryState';
 import { ReservationsTable } from '../shared/ReservationsTable';
 import { useReservationActions } from '../shared/useReservationActions';
 
@@ -29,11 +29,11 @@ export function MyReservationsPage() {
           <Card.Title>{t('my.upcoming')}</Card.Title>
         </Card.Header>
         <Card.Content>
-          {upcoming.isError && <p className="rv:text-danger">{describeError(upcoming.error, t)}</p>}
           <ReservationsTable
             items={upcoming.data ?? []}
             timezone={timezone}
             ariaLabel={t('my.upcoming')}
+            {...listState(upcoming)}
             onAction={actions.ask}
           />
         </Card.Content>
@@ -43,11 +43,11 @@ export function MyReservationsPage() {
           <Card.Title>{t('my.past')}</Card.Title>
         </Card.Header>
         <Card.Content>
-          {past.isError && <p className="rv:text-danger">{describeError(past.error, t)}</p>}
           <ReservationsTable
             items={past.data ?? []}
             timezone={timezone}
             ariaLabel={t('my.past')}
+            {...listState(past)}
             onAction={actions.ask}
           />
         </Card.Content>

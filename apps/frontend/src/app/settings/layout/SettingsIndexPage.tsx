@@ -60,7 +60,7 @@ export function SettingsIndexPage() {
         <SettingsDirectory groups={directoryGroups} searchLabel={t('search')} emptyMessage={t('noResults')} />
       </nav>
 
-      <div className="mt-6 flex flex-col gap-6 empty:hidden">
+      <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col gap-6 empty:hidden">
         <AdminSettingsPluginSlot />
       </div>
     </div>

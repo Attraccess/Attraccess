@@ -50,7 +50,7 @@ export function presentReservation(
     checkedInAt: full ? iso(reservation.checkedInAt) : null,
     canCancel: full && live && future && !running,
     canEndEarly: full && running,
-    canKeep: mine && live && future,
+    canKeep: mine && live && future && !reservation.keptAt,
     canDecide: manager && reservation.status === 'pending' && !started,
   };
 }

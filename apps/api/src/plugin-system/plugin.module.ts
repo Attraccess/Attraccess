@@ -336,6 +336,8 @@ export class PluginModule {
         {
           provide: `plugin-mqtt-cleanup:${manifest.id}`,
           useFactory: () => ({
+            // Closing the bootstrap's throwaway app unregisters the categories, so each app registers them again.
+            onModuleInit: () => registerCategories(),
             onModuleDestroy: () => {
               getImplementationClass().pluginMqtt().clearPlugin(manifest.id);
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);

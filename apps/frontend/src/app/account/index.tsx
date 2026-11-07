@@ -168,7 +168,7 @@ export default function AccountPage() {
       <PageHeader title={t('title')} subtitle={t('subtitle')} backTo="/" />
       <SettingsDirectory groups={groups} searchLabel={t('search')} emptyMessage={t('noResults')} />
       {me && (
-        <div className="mt-6 flex flex-col gap-6 empty:hidden">
+        <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col gap-6 empty:hidden">
           <UserAccountPluginSlot userId={me.id} />
         </div>
       )}

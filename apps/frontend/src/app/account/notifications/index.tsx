@@ -9,7 +9,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, useTranslations, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { usePushNotifications } from '../../../hooks/usePushNotifications';
 import { useToastMessage } from '../../../components/toastProvider';
 import en from './en.json';
@@ -18,6 +18,20 @@ import de from './de.json';
 export type NotificationChannel = 'email' | 'push' | 'toast';
 
 export const channels: NotificationChannel[] = ['email', 'push', 'toast'];
+
+/** One preference row: a core category or a category a plugin declared (keyed `plugin.<plugin>.<id>`). */
+export interface PreferenceRow {
+  key: string;
+  label: string;
+  description?: string;
+}
+
+export interface PreferenceGroup {
+  id: string;
+  label: string;
+  description?: string;
+  rows: PreferenceRow[];
+}
 
 export function getCategoryPreference(
   preferences: NotificationCategoryPreferenceDto[] | undefined,
@@ -65,6 +79,43 @@ export function useNotificationPreferencesFormState() {
   );
 
   const { data: preferences, isLoading } = useNotificationsServiceNotificationsGetPreferences();
+  const language = useTranslationState((state) => state.language);
+
+  const groups: PreferenceGroup[] = useMemo(() => {
+    const core = categoryGroups.map((group) => ({
+      id: group.id,
+      label: t(`groups.${group.id}.label`),
+      description: t(`groups.${group.id}.description`),
+      rows: group.categories.map((category) => ({
+        key: category,
+        label: t(`categories.${category}.label`),
+        description: t(`categories.${category}.description`),
+      })),
+    }));
+    const byPlugin = new Map<string, PreferenceRow[]>();
+    for (const category of preferences?.pluginCategories ?? []) {
+      const rows = byPlugin.get(category.pluginName) ?? [];
+      rows.push({ key: category.category, label: category.label[language] ?? category.label.en });
+      byPlugin.set(category.pluginName, rows);
+    }
+    return [
+      ...core,
+      ...[...byPlugin].map(([pluginName, rows]) => ({
+        id: `plugin-${pluginName}`,
+        label: pluginName,
+        description: t('groups.plugin.description'),
+        rows,
+      })),
+    ];
+  }, [categoryGroups, preferences, language, t]);
+
+  /** Current channel flags of a core or plugin category. */
+  const preferenceOf = useCallback(
+    (key: string) =>
+      preferences?.categories.find((preference) => preference.category === key) ??
+      preferences?.pluginCategories?.find((preference) => preference.category === key),
+    [preferences],
+  );
 
   const { mutate, mutateAsync } = useNotificationsServiceNotificationsUpdatePreferences({
     onSuccess: () => {
@@ -87,23 +138,21 @@ export function useNotificationPreferencesFormState() {
   });
 
   const updateChannel = useCallback(
-    (category: NotificationCategory, channel: NotificationChannel, value: boolean) => {
+    (category: string, channel: NotificationChannel, value: boolean) => {
       mutate({ requestBody: { category, channels: { [channel]: value } } });
     },
     [mutate],
   );
 
   const toggleCategory = useCallback(
-    (category: NotificationCategory, value: boolean) => {
+    (category: string, value: boolean) => {
       mutate({ requestBody: { category, channels: { email: value, push: value, toast: value } } });
     },
     [mutate],
   );
 
   const runBulkUpdate = useCallback(
-    async (
-      updates: Array<{ category: NotificationCategory; channelValues: Partial<Record<NotificationChannel, boolean>> }>,
-    ) => {
+    async (updates: Array<{ category: string; channelValues: Partial<Record<NotificationChannel, boolean>> }>) => {
       isBulkUpdatingRef.current = true;
       setIsBulkUpdating(true);
       try {
@@ -127,7 +176,7 @@ export function useNotificationPreferencesFormState() {
   );
 
   const toggleGroupChannel = useCallback(
-    (groupCategories: NotificationCategory[], channel: NotificationChannel, value: boolean) => {
+    (groupCategories: string[], channel: NotificationChannel, value: boolean) => {
       void runBulkUpdate(groupCategories.map((category) => ({ category, channelValues: { [channel]: value } })));
     },
     [runBulkUpdate],
@@ -136,43 +185,42 @@ export function useNotificationPreferencesFormState() {
   const toggleAll = useCallback(
     (value: boolean) => {
       void runBulkUpdate(
-        categoryGroups
-          .flatMap((g) => g.categories)
+        groups
+          .flatMap((g) => g.rows.map((row) => row.key))
           .map((category) => ({
             category,
             channelValues: { email: value, push: value, toast: value },
           })),
       );
     },
-    [categoryGroups, runBulkUpdate],
+    [groups, runBulkUpdate],
   );
 
   const isCategoryAllEnabled = useCallback(
-    (category: NotificationCategory) =>
-      channels.every((ch) => Boolean(getCategoryPreference(preferences?.categories, category)?.channels[ch])),
-    [preferences],
+    (category: string) => channels.every((ch) => Boolean(preferenceOf(category)?.channels[ch])),
+    [preferenceOf],
   );
 
   const isGroupChannelAllEnabled = useCallback(
-    (groupCategories: NotificationCategory[], channel: NotificationChannel) =>
-      groupCategories.every((cat) => Boolean(getCategoryPreference(preferences?.categories, cat)?.channels[channel])),
-    [preferences],
+    (groupCategories: string[], channel: NotificationChannel) =>
+      groupCategories.every((cat) => Boolean(preferenceOf(cat)?.channels[channel])),
+    [preferenceOf],
   );
 
   const isAllEnabled = useMemo(
-    () => categoryGroups.flatMap((g) => g.categories).every((cat) => isCategoryAllEnabled(cat)),
-    [categoryGroups, isCategoryAllEnabled],
+    () => groups.flatMap((g) => g.rows).every((row) => isCategoryAllEnabled(row.key)),
+    [groups, isCategoryAllEnabled],
   );
 
   const disabled = isLoading || isBulkUpdating;
 
-  const renderChannelSwitch = (category: NotificationCategory, channel: NotificationChannel) => {
-    const preference = getCategoryPreference(preferences?.categories, category);
-    const selected = Boolean(preference?.channels[channel]);
+  const renderChannelSwitch = (row: PreferenceRow, channel: NotificationChannel) => {
+    const category = row.key;
+    const selected = Boolean(preferenceOf(category)?.channels[channel]);
 
     return (
       <LabeledSwitch
-        aria-label={`${t(`categories.${category}.label`)} ${t(`columns.${channel}`)}`}
+        aria-label={`${row.label} ${t(`columns.${channel}`)}`}
         isSelected={selected}
         isDisabled={disabled}
         onChange={(value) => updateChannel(category, channel, value)}
@@ -186,7 +234,7 @@ export function useNotificationPreferencesFormState() {
     push,
     showSuccess,
     showError,
-    categoryGroups,
+    groups,
     toggleCategory,
     toggleGroupChannel,
     toggleAll,
@@ -204,7 +252,7 @@ export function NotificationPreferencesForm() {
     push,
     showSuccess,
     showError,
-    categoryGroups,
+    groups,
     toggleCategory,
     toggleGroupChannel,
     toggleAll,
@@ -233,12 +281,12 @@ export function NotificationPreferencesForm() {
       </div>
 
       <div data-testid="notification-preferences-mobile" className="flex flex-row gap-4 flex-wrap">
-        {categoryGroups.map((group) => {
+        {groups.map((group) => {
           return (
             <section key={group.id} data-testid={`notification-group-${group.id}`} className="flex flex-col gap-3">
               <div className="flex flex-col gap-1">
-                <h3 className="text-sm font-semibold text-default-700">{t(`groups.${group.id}.label`)}</h3>
-                <p className="text-xs text-default-500">{t(`groups.${group.id}.description`)}</p>
+                <h3 className="text-sm font-semibold text-default-700">{group.label}</h3>
+                {group.description && <p className="text-xs text-default-500">{group.description}</p>}
               </div>
 
               <div
@@ -252,9 +300,18 @@ export function NotificationPreferencesForm() {
                     <LabeledSwitch
                       size="sm"
                       aria-label={`${t('toggleAll.toggleChannel')} ${t(`columns.${channel}`)}`}
-                      isSelected={isGroupChannelAllEnabled(group.categories, channel)}
+                      isSelected={isGroupChannelAllEnabled(
+                        group.rows.map((row) => row.key),
+                        channel,
+                      )}
                       isDisabled={disabled}
-                      onChange={(value) => toggleGroupChannel(group.categories, channel, value)}
+                      onChange={(value) =>
+                        toggleGroupChannel(
+                          group.rows.map((row) => row.key),
+                          channel,
+                          value,
+                        )
+                      }
                       data-testid={`notifications-toggle-channel-${group.id}-${channel}`}
                       data-cy={`notifications-toggle-channel-${group.id}-${channel}`}
                     />
@@ -264,15 +321,16 @@ export function NotificationPreferencesForm() {
               </div>
 
               <div className="flex flex-col gap-3 lg:gap-0 lg:divide-y lg:divide-default-200 lg:rounded-lg lg:border lg:border-default-200">
-                {group.categories.map((category) => {
+                {group.rows.map((row) => {
+                  const category = row.key;
                   return (
                     <div
                       key={category}
                       className="rounded-lg border border-default-200 p-3 lg:grid lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(4rem,6rem))_minmax(4rem,6rem)] lg:gap-3 lg:rounded-none lg:border-0"
                     >
                       <div className="flex flex-col gap-1">
-                        <span className="text-sm font-medium">{t(`categories.${category}.label`)}</span>
-                        <span className="text-xs text-default-500">{t(`categories.${category}.description`)}</span>
+                        <span className="text-sm font-medium">{row.label}</span>
+                        {row.description && <span className="text-xs text-default-500">{row.description}</span>}
                       </div>
 
                       <div className="mt-3 flex flex-col divide-y divide-default-200 lg:contents lg:divide-y-0">
@@ -282,13 +340,13 @@ export function NotificationPreferencesForm() {
                             className="flex min-h-11 items-center justify-between gap-4 py-2 lg:min-h-0 lg:justify-center lg:py-0"
                           >
                             <span className="text-sm text-default-700 lg:hidden">{t(`columns.${channel}`)}</span>
-                            {renderChannelSwitch(category, channel)}
+                            {renderChannelSwitch(row, channel)}
                           </div>
                         ))}
                         <div className="flex min-h-11 items-center justify-between gap-4 py-2 lg:min-h-0 lg:justify-center lg:py-0">
                           <span className="text-sm text-default-700 lg:hidden">{t('columns.all')}</span>
                           <LabeledSwitch
-                            aria-label={`${t(`categories.${category}.label`)} ${t('columns.all')}`}
+                            aria-label={`${row.label} ${t('columns.all')}`}
                             isSelected={isCategoryAllEnabled(category)}
                             isDisabled={disabled}
                             onChange={(value) => toggleCategory(category, value)}

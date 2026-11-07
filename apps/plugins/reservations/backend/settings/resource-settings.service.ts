@@ -117,18 +117,21 @@ export class ResourceSettingsService implements OnModuleInit {
     patch: Partial<ResourceSettingsValues>,
   ): Promise<{ before: ResourceSettings; after: ResourceSettings }> {
     const before = await this.get(resourceId);
-    const merged = finalizeSettings(mergeSettings(settingsValues(before), patch));
-    const errors = validateSettings(merged);
+    // Validate the raw input first: normalizing assumes a well-formed structure and would otherwise
+    // crash on it (500) or silently drop unknown weekdays.
+    const requested = mergeSettings(settingsValues(before), patch);
+    const errors = validateSettings(requested);
     if (errors.length > 0) {
       throw new ReservationError('INVALID_SETTINGS', 'Invalid reservation settings', { errors });
     }
+    const merged = finalizeSettings(requested);
     const entity = new ResourceSettingsEntity();
     Object.assign(entity, merged, {
       resourceId,
       bookableHours: JSON.stringify(merged.bookableHours),
       updatedAt: new Date(),
     });
-    await this.context.getRepository(ResourceSettingsEntity).save(entity);
+    await this.context.runSerialized((manager) => manager.getRepository(ResourceSettingsEntity).save(entity));
     const after: ResourceSettings = { resourceId, ...merged };
     this.cache.set(resourceId, after);
     return { before, after };

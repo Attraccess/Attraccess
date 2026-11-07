@@ -301,7 +301,7 @@ All endpoints are under `/api/reservations` and accept a session cookie **or** a
 | `GET /resources/:resourceId/pending-decision`               | Your running booking awaiting a keep/free answer, or `null`.                           |
 | `POST /`                                                    | Book (`resourceId`, `startTime`, and `endTime` or `durationMinutes`, optional `note`). |
 | `GET /mine?scope=upcoming\|past&status=`                    | Your bookings.                                                                         |
-| `GET /manage?resourceId=&status=&from=&to=&page=`           | Bookings of the resources you manage (25 per page).                                    |
+| `GET /manage?resourceId=&status=&from=&to=&page=`           | Bookings of the resources you manage (25 per page); 403 if you manage none.            |
 | `GET /:id`                                                  | One booking (holder or manager).                                                       |
 | `POST /:id/cancel`                                          | Cancel (body: optional `reason`, used by managers).                                    |
 | `POST /:id/end-early`                                       | End a running booking now.                                                             |

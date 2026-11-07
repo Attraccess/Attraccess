@@ -27,7 +27,10 @@ import { MqttModule } from './../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from './../mqtt/mqtt-credential-provisioning.service';
 import * as readerUiWiring from './runtime/reader-ui-wiring';
 import { PluginSystemEventsBridge } from './plugin-system-events.bridge';
-import { listPluginNotificationCategories } from '../notifications/plugin-notification-categories';
+import {
+  listPluginNotificationCategories,
+  unregisterPluginNotificationCategories,
+} from '../notifications/plugin-notification-categories';
 
 describe('PluginModule', () => {
   const fixture = registerPluginModuleFixture();
@@ -176,7 +179,8 @@ describe('PluginModule', () => {
       const queue = jest.spyOn(readerUiWiring, 'queueReaderUiContributions').mockImplementation(() => undefined);
       jest.spyOn(readerUiWiring, 'queueReaderUiLoadFailure').mockImplementation(() => undefined);
       PluginModule.forRoot();
-      if (queued) expect(queue).toHaveBeenCalledWith('hooked', expect.objectContaining({ preStartHook: expect.any(Function) }));
+      if (queued)
+        expect(queue).toHaveBeenCalledWith('hooked', expect.objectContaining({ preStartHook: expect.any(Function) }));
       else expect(queue).not.toHaveBeenCalled();
     });
 
@@ -429,10 +433,37 @@ describe('PluginModule', () => {
     const categories = "notificationCategories: [{ id: 'reminder', label: { en: 'Reminder', de: 'Erinnerung' } }]";
 
     it('registers declared categories namespaced under the plugin name', () => {
-      writePlugin('booking', [PluginPermission.SEND_NOTIFICATIONS], `${categories}, register: () => ({ module: class M {} })`);
+      writePlugin(
+        'booking',
+        [PluginPermission.SEND_NOTIFICATIONS],
+        `${categories}, register: () => ({ module: class M {} })`,
+      );
       PluginModule.forRoot();
       expect(listPluginNotificationCategories()).toEqual([
         expect.objectContaining({ key: 'plugin.booking.reminder', pluginName: 'booking', id: 'reminder' }),
+      ]);
+    });
+
+    it('registers the categories again when the application that closed before the real one started', () => {
+      writePlugin(
+        'rebooted',
+        [PluginPermission.SEND_NOTIFICATIONS],
+        `${categories}, register: () => ({ module: class M {} })`,
+      );
+      const [pluginImport] = PluginModule.forRoot().imports.slice(3) as Array<{
+        providers: Array<{ provide: string; useFactory: () => { onModuleInit: () => void } }>;
+      }>;
+      const cleanup = pluginImport.providers.find((provider) =>
+        String(provider.provide).startsWith('plugin-mqtt-cleanup:'),
+      );
+      // What closing the throwaway configuration app does to the process-wide registry.
+      unregisterPluginNotificationCategories('rebooted');
+      expect(listPluginNotificationCategories().some((category) => category.pluginName === 'rebooted')).toBe(false);
+
+      cleanup.useFactory().onModuleInit();
+
+      expect(listPluginNotificationCategories().filter((category) => category.pluginName === 'rebooted')).toEqual([
+        expect.objectContaining({ key: 'plugin.rebooted.reminder', id: 'reminder' }),
       ]);
     });
 

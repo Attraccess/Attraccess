@@ -1,4 +1,5 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import {
   getAvailability,
@@ -31,7 +32,8 @@ export function useInvalidateReservations() {
   return useCallback(() => client.invalidateQueries({ queryKey: [ROOT_KEY] }), [client]);
 }
 
-export function useAvailability(resourceId: number, from: Date, to: Date, enabled = true) {
+/** `keepPrevious` keeps showing the last range while the next one loads (day/week navigation). */
+export function useAvailability(resourceId: number, from: Date, to: Date, enabled = true, keepPrevious = false) {
   const fromIso = from.toISOString();
   const toIso = to.toISOString();
   return useQuery({
@@ -40,7 +42,25 @@ export function useAvailability(resourceId: number, from: Date, to: Date, enable
     staleTime: 15_000,
     retry: false,
     enabled,
+    placeholderData: keepPrevious ? keepPreviousData : undefined,
   });
+}
+
+const hostApi = createPluginApiClient('');
+
+/** The resource's display name from the host API; undefined until known (or when it cannot be read). */
+export function useResourceName(resourceId: number): string | undefined {
+  const query = useQuery({
+    queryKey: [ROOT_KEY, 'resource-name', resourceId],
+    queryFn: async ({ signal }) => {
+      const response = await hostApi.fetch(`/api/resources/${resourceId}`, { signal });
+      if (!response.ok) throw new Error(`Request failed (HTTP ${response.status}).`);
+      return ((JSON.parse(await response.text()) as { name?: string }).name ?? null) as string | null;
+    },
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  return query.data ?? undefined;
 }
 
 /**
@@ -52,7 +72,7 @@ export function usePendingDecision(resourceId: number, enabled: boolean) {
     queryKey: keys.pending(resourceId),
     queryFn: ({ signal }) => getPendingDecision(resourceId, signal),
     enabled,
-    refetchInterval: 10_000,
+    refetchInterval: 5_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     staleTime: 5_000,
@@ -75,7 +95,12 @@ export function useManagedReservations(filter: ManageFilter) {
 }
 
 export function useReservation(id: number) {
-  return useQuery({ queryKey: keys.reservation(id), queryFn: () => getReservation(id), retry: false });
+  return useQuery({
+    queryKey: keys.reservation(id),
+    queryFn: () => getReservation(id),
+    enabled: Number.isInteger(id) && id > 0,
+    retry: false,
+  });
 }
 
 export function useFeeds() {
@@ -102,7 +127,10 @@ export function usePluginTimezone(): string | null {
   return query.data?.timezone ?? null;
 }
 
-/** True when the user may manage reservations of at least one resource (the manage list answers 403 otherwise). */
+/**
+ * True when the user may manage reservations of at least one resource. Relies on the manage list
+ * answering 403 to users who manage nothing; a 200 (even an empty page) counts as manager.
+ */
 export function useIsManagerAnywhere(): boolean {
   const query = useQuery({
     queryKey: [ROOT_KEY, 'is-manager'],

@@ -370,13 +370,15 @@ export class ReservationService {
 
   /** Holder started a session inside the check-in window. True when this call recorded the check-in. */
   async markCheckedIn(id: number, usageId: number, at: Date): Promise<boolean> {
-    const result = await this.context
-      .getRepository(ReservationEntity)
-      .createQueryBuilder()
-      .update(ReservationEntity)
-      .set({ checkedInAt: at, checkedInUsageId: usageId })
-      .where("id = :id AND status = 'confirmed' AND checkedInAt IS NULL", { id })
-      .execute();
+    const result = await this.context.runSerialized((manager) =>
+      manager
+        .getRepository(ReservationEntity)
+        .createQueryBuilder()
+        .update(ReservationEntity)
+        .set({ checkedInAt: at, checkedInUsageId: usageId })
+        .where("id = :id AND status = 'confirmed' AND checkedInAt IS NULL", { id })
+        .execute(),
+    );
     return (result.affected ?? 0) === 1;
   }
 }

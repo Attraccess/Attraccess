@@ -61,4 +61,31 @@ describe('IcalFeeds', () => {
     await user.click(screen.getAllByRole('button', { name: 'Revoke' }).at(-1) as HTMLElement);
     await waitFor(() => expect(calls.some((call) => call.method === 'DELETE')).toBe(true));
   });
+
+  it('pluralises the selection summary and shows only a short id', async () => {
+    mockFetch({
+      'GET /ical/feeds': [
+        { ...feed(1, 'One'), selection: { ...selection, introduced: false, groupIds: [1], resourceIds: [4] } },
+        { ...feed(2, 'Two'), selection: { ...selection, introduced: false, groupIds: [1, 2], resourceIds: [4, 5] } },
+      ],
+    });
+    renderWithProviders(<IcalFeeds />);
+    expect(await screen.findByText('1 group, 1 resource')).toBeInTheDocument();
+    expect(screen.getByText('2 groups, 2 resources')).toBeInTheDocument();
+    expect(screen.getAllByText(/abcd…/)).toHaveLength(2);
+    expect(screen.queryByText(/abcd1/)).not.toBeInTheDocument();
+  });
+
+  it('confirms a copied link on the button', async () => {
+    const user = userEvent.setup();
+    mockFetch({
+      'GET /ical/feeds': [feed(1, 'Phone')],
+      'POST /ical/feeds/1/regenerate': { feed: feed(1, 'Phone'), url: 'https://example.test/x.ics', token: 'x' },
+    });
+    renderWithProviders(<IcalFeeds />);
+    await user.click(await screen.findByRole('button', { name: 'Regenerate' }));
+    await user.click(screen.getAllByRole('button', { name: 'Regenerate' }).at(-1) as HTMLElement);
+    await user.click(await screen.findByRole('button', { name: 'Copy link' }));
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument();
+  });
 });

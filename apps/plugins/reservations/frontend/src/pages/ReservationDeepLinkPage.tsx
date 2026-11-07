@@ -19,6 +19,7 @@ export function ReservationDeepLinkPage() {
   const params = useParams();
   const [search] = useSearchParams();
   const id = Number(params.id);
+  const validId = Number.isInteger(id) && id > 0;
   const requested = search.get('action');
   const timezone = usePluginTimezone();
   const format = useFormatters(timezone);
@@ -38,9 +39,9 @@ export function ReservationDeepLinkPage() {
   return (
     <div className="rv:flex rv:flex-col rv:gap-6" data-cy="reservations-detail-page">
       <PageHeader title={t('detail.title')} backTo="/reservations" noMargin />
-      {query.isError && (
+      {(query.isError || !validId) && (
         <StatusAlert status="danger" title={t('detail.loadFailed')}>
-          {describeError(query.error, t)}
+          {validId ? describeError(query.error, t) : t('errors.RESERVATION_NOT_FOUND')}
         </StatusAlert>
       )}
       {reservation && (

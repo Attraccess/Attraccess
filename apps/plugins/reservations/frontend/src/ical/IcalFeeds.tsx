@@ -93,7 +93,7 @@ export function IcalFeeds() {
                     ? t('feeds.lastUsed', { date: format.dateTime(feed.lastUsedAt) })
                     : t('feeds.neverUsed')}
                 {' · '}
-                {feed.tokenPrefix}…
+                {feed.tokenPrefix.slice(0, 4)}…
               </span>
             </div>
             {!feed.revokedAt && (

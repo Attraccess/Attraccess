@@ -4,10 +4,13 @@
   "slots": { "settings": "Reservations", "admin": "Reservations", "account": "Calendar feeds (iCal)" },
   "common": {
     "cancel": "Cancel",
+    "close": "Close",
     "back": "Back",
     "save": "Save",
     "edit": "Edit",
-    "done": "Done"
+    "done": "Done",
+    "retry": "Retry",
+    "loading": "Loading"
   },
   "weekdays": {
     "mon": "Monday",
@@ -47,14 +50,20 @@
     "NOT_CANCELLABLE": "This booking can no longer be cancelled.",
     "ALREADY_STARTED": "This booking has already started.",
     "ALREADY_FINISHED": "This booking has already finished.",
-    "FUTURE_BOOKINGS_EXIST": "There are {{count}} upcoming bookings.",
+    "FUTURE_BOOKINGS_EXIST": {
+      "one": "There is {{count}} upcoming booking.",
+      "many": "There are {{count}} upcoming bookings."
+    },
     "INVALID_RANGE": "The selected time range is not valid.",
     "INVALID_SETTINGS": "Some settings are not valid.",
     "INVALID_TIMEZONE": "This timezone is not valid.",
     "RANGE_TOO_LARGE": "The requested time range is too large.",
     "FORBIDDEN": "You are not allowed to do this.",
     "RESERVATION_NOT_FOUND": "This reservation does not exist.",
-    "RESOURCE_NOT_FOUND": "This resource does not exist."
+    "RESOURCE_NOT_FOUND": "This resource does not exist.",
+    "FEED_LIMIT": "You have reached the maximum number of calendar feeds. Revoke one you no longer use first.",
+    "FEED_NOT_FOUND": "This calendar feed does not exist or was revoked.",
+    "INVALID_FEED": "Choose at least one source for the calendar feed."
   },
   "card": {
     "title": "Reservations",
@@ -63,6 +72,8 @@
     "cannotBook": "Booking is not available",
     "managerHint": "As a manager you see who holds each booking.",
     "next": "Your next booking",
+    "current": "Current booking",
+    "loadFailed": "Reservations could not be loaded",
     "day": "Day",
     "week": "Week",
     "previous": "Earlier",
@@ -77,6 +88,7 @@
   },
   "booking": {
     "title": "Reserve {{resource}}",
+    "titleGeneric": "Reserve resource",
     "date": "Date",
     "timezoneHint": "Times are in {{timezone}}",
     "start": "Start",
@@ -85,6 +97,7 @@
     "note": "Note (optional)",
     "noSlots": "No free start times on this day.",
     "approvalNeeded": "A manager has to approve this booking before it becomes valid.",
+    "instantNote": "Your booking is confirmed immediately.",
     "submit": "Reserve",
     "requestSubmit": "Request reservation",
     "failedTitle": "Reservation failed",
@@ -138,12 +151,9 @@
     }
   },
   "table": {
-    "resource": "Resource",
-    "when": "When",
-    "user": "User",
-    "status": "Status",
-    "actions": "Actions",
-    "empty": "No bookings"
+    "empty": "No bookings",
+    "loadFailed": "Bookings could not be loaded",
+    "reason": "Reason: {{reason}}"
   },
   "my": {
     "title": "My reservations",
@@ -153,6 +163,7 @@
     "manageLink": "Manage reservations"
   },
   "manage": {
+    "denied": "You do not manage any resource, so there is nothing to show here.",
     "title": "Manage reservations",
     "subtitle": "Approve requests and oversee all bookings of your resources",
     "pending": "Waiting for approval",
@@ -178,6 +189,7 @@
     "cannotCancel": "This booking can no longer be cancelled."
   },
   "settings": {
+    "loadFailed": "The reservation settings could not be loaded",
     "enabled": "Enable reservations for this resource",
     "approvalRequired": "Bookings need approval by a manager",
     "checkInEnabled": "Require check-in (start the resource within the grace period)",
@@ -242,13 +254,19 @@
     },
     "disableWarning": {
       "title": "Disable reservations?",
-      "body": "{{count}} upcoming bookings exist. Disabling reservations cancels them and notifies the holders.",
-      "confirm": "Disable and cancel {{count}}"
+      "body": {
+        "one": "{{count}} upcoming booking exists. Disabling reservations cancels it and notifies the holder.",
+        "many": "{{count}} upcoming bookings exist. Disabling reservations cancels them and notifies the holders."
+      },
+      "confirm": { "one": "Disable and cancel {{count}} booking", "many": "Disable and cancel {{count}} bookings" }
     },
     "saved": {
       "title": "Settings saved",
       "body": "The reservation settings were saved. They apply to new bookings.",
-      "bodyCancelled": "The settings were saved and {{count}} upcoming bookings were cancelled."
+      "bodyCancelled": {
+        "one": "The settings were saved and {{count}} upcoming booking was cancelled.",
+        "many": "The settings were saved and {{count}} upcoming bookings were cancelled."
+      }
     }
   },
   "admin": {
@@ -258,6 +276,7 @@
     "search": "Search timezones",
     "searchPlaceholder": "e.g. Europe/Berlin",
     "matches": "{{count}} matching",
+    "matchesTruncated": "{{total}} matching, showing the first {{shown}}. Type to narrow the list.",
     "list": "Timezones",
     "saved": "Timezone saved",
     "savedBody": "Reservations now use {{timezone}}.",
@@ -277,8 +296,8 @@
       "ownOnly": "Only my own bookings",
       "introduced": "Resources I am introduced to",
       "maintained": "Resources I maintain",
-      "groups": "{{count}} groups",
-      "resources": "{{count}} resources"
+      "groups": { "one": "{{count}} group", "many": "{{count}} groups" },
+      "resources": { "one": "{{count}} resource", "many": "{{count}} resources" }
     },
     "form": {
       "createTitle": "New calendar feed",
@@ -299,7 +318,8 @@
       "title": "Feed \"{{name}}\" is ready",
       "body": "Copy this link now. For security it is shown only once; if you lose it, regenerate the feed.",
       "url": "Feed link",
-      "copy": "Copy link"
+      "copy": "Copy link",
+      "copied": "Copied"
     },
     "regenerate": {
       "label": "Regenerate",

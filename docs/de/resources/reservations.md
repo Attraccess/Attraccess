@@ -88,7 +88,7 @@ Zeitfenster wird sofort frei.
 Beenden Sie Ihre Sitzung während Ihrer eigenen laufenden Buchung, werden Sie gefragt: **Behalten oder Rest
 freigeben?**
 
-- Im Web erscheint ein Dialog auf der Ressourcenseite („Ihre Buchung läuft bis 16:00. Behalten oder den Rest
+- Im Web erscheint ein Dialog auf der Ressourcenseite („Deine Buchung läuft bis 16:00. Behalten oder den Rest
   freigeben?“). Ignorieren Sie ihn, bleibt die Buchung bestehen. Die Frage wird 15 Minuten lang gemerkt.
 - Auf einem Attractap-Reader mit Bildschirm erscheint die Frage nach dem Stopp. Ohne Antwort gilt **Behalten**.
 
@@ -96,10 +96,10 @@ freigeben?**
 
 Beim Start einer Ressource prüft das Plugin die Buchungen **anderer** Personen. Nur bestätigte Buchungen zählen.
 
-- **Eine fremde Buchung läuft:** Der Start wird mit „Reserviert von einer anderen Person bis 16:00“ abgelehnt. Der
+- **Eine fremde Buchung läuft:** Der Start wird mit „Von einer anderen Person bis 16:00 reserviert.“ abgelehnt. Der
   Name der buchenden Person wird nie Personen gezeigt, die ihn nicht sehen dürfen.
 - **Eine fremde Buchung beginnt bald:** Beginnt sie innerhalb des Bestätigungsfensters der Ressource
-  (standardmäßig 60 Minuten), werden Sie um Bestätigung gebeten: „Reserviert ab 14:00, Sie haben 40 Min. Trotzdem
+  (standardmäßig 60 Minuten), werden Sie um Bestätigung gebeten: „Reserviert ab 14:00, du hast 40 Min. Trotzdem
   starten?“. Auf einem Reader ohne Bildschirm wird der Start standardmäßig abgelehnt.
 - **Ihre eigene Buchung:** Während oder kurz vor Ihrer eigenen Buchung starten Sie ohne Rückfrage.
 - **Wartende und Verwaltende** können eine laufende Buchung nach ausdrücklicher Bestätigung übersteuern. Die buchende
@@ -309,26 +309,26 @@ Gut zu wissen:
 Alle Endpunkte liegen unter `/api/reservations` und akzeptieren ein Sitzungs-Cookie **oder** ein API-Token
 (`Authorization: Bearer <token>`, siehe [API-Referenz](developer/api-reference.md)). Zeiten sind ISO 8601.
 
-| Methode und Pfad                                            | Zweck                                                                                     |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `GET /resources/:resourceId/availability?from=&to=`         | Buchungen, Regeln und Ihre Buchungsberechtigung für einen Zeitraum (höchstens 62 Tage).   |
-| `GET /resources/:resourceId/pending-decision`               | Ihre laufende Buchung, die auf „behalten/freigeben“ wartet, oder `null`.                  |
-| `POST /`                                                    | Buchen (`resourceId`, `startTime` und `endTime` oder `durationMinutes`, optional `note`). |
-| `GET /mine?scope=upcoming\|past&status=`                    | Ihre Buchungen.                                                                           |
-| `GET /manage?resourceId=&status=&from=&to=&page=`           | Buchungen der Ressourcen, die Sie verwalten (25 pro Seite).                               |
-| `GET /:id`                                                  | Eine Buchung (Buchende oder Verwaltende).                                                 |
-| `POST /:id/cancel`                                          | Stornieren (Body: optionaler `reason`, für Verwaltende).                                  |
-| `POST /:id/end-early`                                       | Eine laufende Buchung jetzt beenden.                                                      |
-| `POST /:id/keep`                                            | Die Buchung behalten (nur Buchende).                                                      |
-| `POST /:id/approve`, `POST /:id/reject`                     | Ausstehende Buchung entscheiden (Verwaltende, optionaler `reason`).                       |
-| `GET /resources/:resourceId/manager-access`                 | Ob Sie die Ressource verwalten.                                                           |
-| `GET` / `PUT /resources/:resourceId/settings`               | Einstellungen der Ressource lesen oder ändern (Verwaltende). `PUT` ist eine Teiländerung. |
-| `GET /resources/:resourceId/settings/future-bookings-count` | Buchungen, die ein Deaktivieren stornieren würde.                                         |
-| `GET` / `PUT /settings/global`                              | Plugin-weite Einstellungen (Zeitzone). `PUT` benötigt `system.settings.manage`.           |
-| `GET`, `POST /ical/feeds`                                   | Ihre Kalender-Feeds auflisten oder anlegen.                                               |
-| `PATCH`, `DELETE /ical/feeds/:id`                           | Einen Feed umbenennen oder neu auswählen, oder widerrufen.                                |
-| `POST /ical/feeds/:id/regenerate`                           | Eine neue geheime URL ausstellen.                                                         |
-| `GET /ical/<token>.ics`                                     | Der Kalender (ohne Sitzung; das Token ist die Zugangsberechtigung).                       |
+| Methode und Pfad                                            | Zweck                                                                                      |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `GET /resources/:resourceId/availability?from=&to=`         | Buchungen, Regeln und Ihre Buchungsberechtigung für einen Zeitraum (höchstens 62 Tage).    |
+| `GET /resources/:resourceId/pending-decision`               | Ihre laufende Buchung, die auf „behalten/freigeben“ wartet, oder `null`.                   |
+| `POST /`                                                    | Buchen (`resourceId`, `startTime` und `endTime` oder `durationMinutes`, optional `note`).  |
+| `GET /mine?scope=upcoming\|past&status=`                    | Ihre Buchungen.                                                                            |
+| `GET /manage?resourceId=&status=&from=&to=&page=`           | Buchungen der Ressourcen, die Sie verwalten (25 pro Seite); 403, wenn Sie keine verwalten. |
+| `GET /:id`                                                  | Eine Buchung (Buchende oder Verwaltende).                                                  |
+| `POST /:id/cancel`                                          | Stornieren (Body: optionaler `reason`, für Verwaltende).                                   |
+| `POST /:id/end-early`                                       | Eine laufende Buchung jetzt beenden.                                                       |
+| `POST /:id/keep`                                            | Die Buchung behalten (nur Buchende).                                                       |
+| `POST /:id/approve`, `POST /:id/reject`                     | Ausstehende Buchung entscheiden (Verwaltende, optionaler `reason`).                        |
+| `GET /resources/:resourceId/manager-access`                 | Ob Sie die Ressource verwalten.                                                            |
+| `GET` / `PUT /resources/:resourceId/settings`               | Einstellungen der Ressource lesen oder ändern (Verwaltende). `PUT` ist eine Teiländerung.  |
+| `GET /resources/:resourceId/settings/future-bookings-count` | Buchungen, die ein Deaktivieren stornieren würde.                                          |
+| `GET` / `PUT /settings/global`                              | Plugin-weite Einstellungen (Zeitzone). `PUT` benötigt `system.settings.manage`.            |
+| `GET`, `POST /ical/feeds`                                   | Ihre Kalender-Feeds auflisten oder anlegen.                                                |
+| `PATCH`, `DELETE /ical/feeds/:id`                           | Einen Feed umbenennen oder neu auswählen, oder widerrufen.                                 |
+| `POST /ical/feeds/:id/regenerate`                           | Eine neue geheime URL ausstellen.                                                          |
+| `GET /ical/<token>.ics`                                     | Der Kalender (ohne Sitzung; das Token ist die Zugangsberechtigung).                        |
 
 Beispiel: Eine Ressource für 60 Minuten mit einem API-Token buchen.
 

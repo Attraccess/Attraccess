@@ -1,7 +1,7 @@
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { Part2, createPart2 } from '../testing/part2.test-utils';
-import type { SessionEndContext } from '@attraccess/plugins-backend-sdk';
+import { READER_UI_LIMITS, type SessionEndContext } from '@attraccess/plugins-backend-sdk';
 
 describe('SessionEndService', () => {
   let h: Harness;
@@ -43,6 +43,12 @@ describe('SessionEndService', () => {
         defaultOnTimeout: 'keep',
       },
     });
+  });
+
+  it('uses a step key the host accepts', async () => {
+    const result = await p.sessionEnd.evaluate(ctx(10));
+    if (result.decision !== 'choose') throw new Error('expected a choice');
+    expect(result.choice.stepKey).toMatch(READER_UI_LIMITS.idPattern);
   });
 
   it('answers nothing for other users, outside the booking and for disabled resources', async () => {

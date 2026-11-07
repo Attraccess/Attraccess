@@ -13,8 +13,8 @@ const ALLOW: PreStartResult = Object.freeze({ decision: 'allow' }) as PreStartRe
 const MINUTE_MS = 60_000;
 export const WARM_BUDGET_MS = 700;
 
-export const reservationStepKey = (id: number) => `reservation:${id}`;
-export const overrideStepKey = (id: number) => `override:${id}`;
+export const reservationStepKey = (id: number) => `reservation-${id}`;
+export const overrideStepKey = (id: number) => `override-${id}`;
 
 /**
  * Pre-start gate. Hot path of every session start, so:
