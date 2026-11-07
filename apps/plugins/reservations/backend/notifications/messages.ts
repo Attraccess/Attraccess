@@ -110,7 +110,7 @@ export function endedEarlyByManager(m: MessageContext, r: ReservationEntity): No
       pick(
         lang,
         `A manager ended your running booking of ${resourceName}. It now ends at ${formatTime(r.endTime, m)}.`,
-        `Eine verwaltende Person hat deine laufende Reservierung von ${resourceName} vorzeitig beendet. Sie endete um ${formatTime(r.endTime, m)}.`,
+        `Eine verwaltende Person hat deine laufende Reservierung von ${resourceName} vorzeitig beendet. Sie endet jetzt um ${formatTime(r.endTime, m)}.`,
       ),
     ],
     path: ROUTES.reservation(r.id),

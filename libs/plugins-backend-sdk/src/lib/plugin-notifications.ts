@@ -21,7 +21,9 @@ export interface PluginNotificationCategory {
  * Email template a plugin declares through {@link PluginBackendModule.emailTemplates}. It works like a core
  * template: the host stores it per installation (key `plugin.<pluginName>.<id>`), lists it in the admin email
  * template editor under the plugin's name, renders it inside the global layout, and admins can edit subject,
- * body and translations. The declaration only seeds it: an installed template is never overwritten.
+ * body and translations. The declaration only seeds it, with its shipped translations: an installed template is
+ * never overwritten ("reset to default" restores the declared version). A malformed declaration, including a
+ * Handlebars syntax error, an unknown helper or a partial, quarantines the plugin.
  *
  * Texts use the template translation helper, `{{t "key" "English default" name=user.username}}`; the English
  * default is inline and `translations.de` carries the German texts (every key used must be present).

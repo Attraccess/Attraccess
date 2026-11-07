@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { addLocalDays, localDateOf, toDateKey } from '../lib/time';
 import type { Availability } from '../lib/types';
 import { mockFetch, renderWithProviders } from '../test-utils';
@@ -36,8 +36,16 @@ const availability: Availability = {
 
 vi.setConfig({ testTimeout: 30_000 });
 
+// A Tuesday, 10:00 in Europe/Berlin: "today" cannot change between the test and the component.
+// Only Date is faked; it keeps running from there.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+  vi.setSystemTime(new Date('2030-01-15T09:00:00.000Z'));
+});
+
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 

@@ -18,11 +18,8 @@ export function pluginNotificationCategoryKey(pluginName: string, id: string): P
   return `plugin.${pluginName}.${id}`;
 }
 
-/**
- * Registers the categories one plugin declares. Replaces any earlier registration of the same plugin so
- * a reload never accumulates stale entries. Throws on a malformed declaration (quarantines the plugin).
- */
-export function registerPluginNotificationCategories(
+/** Throws on a malformed declaration, which quarantines the plugin. Registering it afterwards cannot fail. */
+export function validatePluginNotificationCategories(
   pluginName: string,
   categories: readonly PluginNotificationCategory[],
 ): void {
@@ -42,6 +39,17 @@ export function registerPluginNotificationCategories(
     }
     seen.add(category.id);
   }
+}
+
+/**
+ * Registers the categories one plugin declares. Replaces any earlier registration of the same plugin so
+ * a reload never accumulates stale entries. Throws on a malformed declaration (quarantines the plugin).
+ */
+export function registerPluginNotificationCategories(
+  pluginName: string,
+  categories: readonly PluginNotificationCategory[],
+): void {
+  validatePluginNotificationCategories(pluginName, categories);
 
   unregisterPluginNotificationCategories(pluginName);
   for (const category of categories) {

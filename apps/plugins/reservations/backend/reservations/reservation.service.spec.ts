@@ -546,20 +546,79 @@ describe('ReservationService', () => {
   describe('start-blocked invalidation', () => {
     const invalidated = () => h.invalidateStartBlocked.mock.calls.map(([scope]) => scope);
 
-    it('tells the host after every change that decides whether a start is blocked', async () => {
-      await h.enable(1, { approvalRequired: true });
-      const pending = await book(alice, [8, 9]);
-      expect(invalidated()).toEqual([{ resourceId: 1 }]);
-      await h.reservations.approve(manager, pending.id);
-      const cancelled = await book(bob, [10, 11]);
-      await h.reservations.approve(manager, cancelled.id);
-      await h.reservations.cancel(bob, cancelled.id);
-      await h.enable(1, { approvalRequired: false });
-      const running = await book(alice, [12, 13]);
+    /** Runs one operation and returns only the invalidations it caused. */
+    const invalidatedBy = async (operation: () => Promise<unknown>) => {
+      h.invalidateStartBlocked.mockClear();
+      await operation();
+      return invalidated();
+    };
+
+    beforeEach(() => h.makeManager(99, 2));
+
+    it('tells the host when a booking is created', async () => {
+      await h.enable(2);
+      expect(await invalidatedBy(() => book(alice, [8, 9], 2))).toEqual([{ resourceId: 2 }]);
+    });
+
+    it('tells the host when a pending booking is approved or rejected', async () => {
+      await h.enable(2, { approvalRequired: true });
+      const approved = await book(alice, [8, 9], 2);
+      const rejected = await book(bob, [10, 11], 2);
+      expect(await invalidatedBy(() => h.reservations.approve(manager, approved.id))).toEqual([{ resourceId: 2 }]);
+      expect(await invalidatedBy(() => h.reservations.reject(manager, rejected.id))).toEqual([{ resourceId: 2 }]);
+    });
+
+    it('tells the host when a booking is cancelled', async () => {
+      await h.enable(2);
+      const booking = await book(alice, [8, 9], 2);
+      expect(await invalidatedBy(() => h.reservations.cancel(alice, booking.id))).toEqual([{ resourceId: 2 }]);
+    });
+
+    it('tells the host when the rest of a running booking is freed', async () => {
+      await h.enable(2);
+      const running = await book(alice, [12, 13], 2);
       h.setNow('2026-06-02T12:30:00Z');
-      await h.reservations.endEarly(alice, running.id);
-      expect(invalidated().length).toBeGreaterThanOrEqual(6);
-      expect(new Set(invalidated().map((scope) => scope.resourceId))).toEqual(new Set([1]));
+      expect(await invalidatedBy(() => h.reservations.endEarly(alice, running.id))).toEqual([{ resourceId: 2 }]);
+    });
+
+    it('stays quiet when the holder keeps a booking (keeping does not decide a start)', async () => {
+      await h.enable(2);
+      const booking = await book(alice, [8, 9], 2);
+      expect(await invalidatedBy(() => h.reservations.keep(alice, booking.id))).toEqual([]);
+    });
+
+    it('tells the host when the scheduler moves a booking (no-show)', async () => {
+      await h.enable(2);
+      const booking = await book(alice, [8, 9], 2);
+      expect(await invalidatedBy(() => h.reservations.markNoShow(booking.id))).toEqual([{ resourceId: 2 }]);
+      expect(await invalidatedBy(() => h.reservations.markNoShow(booking.id))).toEqual([]);
+    });
+
+    it('tells the host once when disabling cancels the future bookings, and not when nothing was cancelled', async () => {
+      await h.enable(2);
+      await book(alice, [8, 9], 2);
+      await book(bob, [10, 11], 2);
+      expect(await invalidatedBy(() => h.reservations.cancelFutureBookings(manager, 2))).toEqual([{ resourceId: 2 }]);
+      expect(await invalidatedBy(() => h.reservations.cancelFutureBookings(manager, 2))).toEqual([]);
+    });
+
+    it('tells the host when a manager changes the settings of a resource', async () => {
+      await h.enable(2);
+      expect(await invalidatedBy(() => h.admin.update(manager, 2, { maxDurationMinutes: 60 }))).toEqual([
+        { resourceId: 2 },
+      ]);
+      // Saving the same values again changes nothing the start check depends on.
+      expect(await invalidatedBy(() => h.admin.update(manager, 2, { maxDurationMinutes: 60 }))).toEqual([]);
+    });
+
+    it('tells the host when a manager disables the resource and cancels its future bookings', async () => {
+      await h.enable(2);
+      await book(alice, [8, 9], 2);
+      const scopes = await invalidatedBy(() =>
+        h.admin.update(manager, 2, { enabled: false, cancelFutureBookings: true }),
+      );
+      // Once for the cancelled bookings, once for the settings change.
+      expect(scopes).toEqual([{ resourceId: 2 }, { resourceId: 2 }]);
     });
 
     it('never fails the change when the host cannot be told', async () => {

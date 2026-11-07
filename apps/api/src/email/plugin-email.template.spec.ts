@@ -130,6 +130,17 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
     expect(sendMail).not.toHaveBeenCalled();
   });
 
+  it('refuses a template of another plugin whose name extends this one with a "."', async () => {
+    registerPluginEmailTemplates('demo.x', [{ ...confirmed, id: 'secret' }]);
+    try {
+      // `plugin.demo` + `x.secret` is the key of plugin `demo.x`'s template `secret`.
+      await expect(service.sendPluginTemplate('demo', alice, 'x.secret', variables)).rejects.toThrow(/undeclared/);
+      expect(sendMail).not.toHaveBeenCalled();
+    } finally {
+      unregisterPluginEmailTemplates('demo.x');
+    }
+  });
+
   it('sends nothing to a recipient without an email address', async () => {
     await service.sendPluginTemplate('demo', { ...alice, email: '' } as User, 'confirmed', variables);
     expect(sendMail).not.toHaveBeenCalled();

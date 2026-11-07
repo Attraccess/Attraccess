@@ -73,6 +73,7 @@ describe('PreStartService', () => {
       h.store,
       h.access,
       h.directory,
+      h.visibility,
       h.clock,
     );
     await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
@@ -317,6 +318,18 @@ describe('PreStartService', () => {
       await h.dataSource.getRepository(ReservationEntity).update({ userId: 11 }, { status: 'cancelled' });
       expect(await query(10)).toBeNull();
       expect(await query(10, { resourceId: 2 })).toBeNull();
+    });
+
+    it('says nothing about a resource the viewer may not see, and checks visibility only for a running booking', async () => {
+      const filterVisible = jest.spyOn(h.visibility, 'filterVisible');
+      expect(await query(10)).toBeNull();
+      expect(filterVisible).not.toHaveBeenCalled();
+      await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T12:30:00Z');
+      expect(await query(10)).not.toBeNull();
+      h.state.hidden.add(1);
+      expect(await query(10)).toBeNull();
+      expect(filterVisible).toHaveBeenLastCalledWith(10, [1]);
     });
 
     it('answers a disabled resource from memory without a database query', async () => {

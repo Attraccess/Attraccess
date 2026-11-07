@@ -12,10 +12,11 @@ export interface Button {
   de: string;
   /** Path after the application URL; Handlebars allowed. */
   path: string;
+  condition?: Condition;
 }
 
 export interface TemplateSpec {
-  id: string;
+  readonly id: string;
   label: { en: string; de: string };
   subject: { en: string; de: string };
   paragraphs: readonly Paragraph[];
@@ -50,7 +51,7 @@ const CHECK_IN: readonly Paragraph[] = [
   ],
 ];
 
-export const TEMPLATE_SPECS: readonly TemplateSpec[] = [
+export const TEMPLATE_SPECS = [
   {
     id: 'pending-approval',
     label: { en: 'Booking request awaiting approval', de: 'Reservierungsanfrage wartet auf Genehmigung' },
@@ -123,7 +124,7 @@ export const TEMPLATE_SPECS: readonly TemplateSpec[] = [
       [
         'body',
         'A manager ended your running booking of <strong>{resource}</strong>. It now ends at {end}.',
-        'Eine verwaltende Person hat deine laufende Reservierung von <strong>{resource}</strong> vorzeitig beendet. Sie endete um {end}.',
+        'Eine verwaltende Person hat deine laufende Reservierung von <strong>{resource}</strong> vorzeitig beendet. Sie endet jetzt um {end}.',
       ],
     ],
     buttons: [OPEN],
@@ -201,7 +202,7 @@ export const TEMPLATE_SPECS: readonly TemplateSpec[] = [
   {
     id: 'reminder-24h',
     label: { en: 'Reminder 24 h before', de: 'Erinnerung 24 Std. vorher' },
-    subject: { en: 'Reminder: {resource} tomorrow', de: 'Erinnerung: {resource} morgen' },
+    subject: { en: 'Reminder: {resource} from {start}', de: 'Erinnerung: {resource} ab {start}' },
     paragraphs: [
       [
         'body',
@@ -222,19 +223,40 @@ export const TEMPLATE_SPECS: readonly TemplateSpec[] = [
     paragraphs: [
       [
         'body_until',
-        '<strong>{resource}</strong> is in maintenance from {mstart} until {mend}. Your booking ({when}) overlaps this period and was not cancelled automatically. You may not be able to use the resource.',
-        '<strong>{resource}</strong> befindet sich ab {mstart} bis {mend} in Wartung. Deine Reservierung ({when}) überschneidet sich mit diesem Zeitraum und wurde nicht automatisch storniert. Möglicherweise kannst du die Ressource nicht nutzen.',
+        '<strong>{resource}</strong> is in maintenance from {mstart} until {mend}.',
+        '<strong>{resource}</strong> befindet sich ab {mstart} bis {mend} in Wartung.',
         'if:maintenance.hasEnd',
       ],
       [
         'body_open_end',
-        '<strong>{resource}</strong> is in maintenance from {mstart} (no end announced yet). Your booking ({when}) overlaps this period and was not cancelled automatically. You may not be able to use the resource.',
-        '<strong>{resource}</strong> befindet sich ab {mstart} (noch ohne angekündigtes Ende) in Wartung. Deine Reservierung ({when}) überschneidet sich mit diesem Zeitraum und wurde nicht automatisch storniert. Möglicherweise kannst du die Ressource nicht nutzen.',
+        '<strong>{resource}</strong> is in maintenance from {mstart} (no end announced yet).',
+        '<strong>{resource}</strong> befindet sich ab {mstart} (noch ohne angekündigtes Ende) in Wartung.',
         'unless:maintenance.hasEnd',
+      ],
+      [
+        'affected_one',
+        'Your booking ({bookings}) overlaps this period and was not cancelled automatically. You may not be able to use the resource.',
+        'Deine Reservierung ({bookings}) überschneidet sich mit diesem Zeitraum und wurde nicht automatisch storniert. Möglicherweise kannst du die Ressource nicht nutzen.',
+        'if:maintenance.single',
+      ],
+      [
+        'affected_many',
+        'These bookings of yours overlap this period and were not cancelled automatically: {bookings}. You may not be able to use the resource.',
+        'Diese Reservierungen von dir überschneiden sich mit diesem Zeitraum und wurden nicht automatisch storniert: {bookings}. Möglicherweise kannst du die Ressource nicht nutzen.',
+        'unless:maintenance.single',
       ],
       ['reason', 'Reason: {mreason}', 'Grund: {mreason}', 'if:maintenance.reason'],
     ],
-    buttons: [OPEN],
+    buttons: [
+      { ...OPEN, condition: 'if:maintenance.single' },
+      {
+        key: 'button_mine',
+        en: 'Open my bookings',
+        de: 'Meine Reservierungen öffnen',
+        path: '/reservations',
+        condition: 'unless:maintenance.single',
+      },
+    ],
   },
   {
     id: 'health-unhealthy',
@@ -270,8 +292,8 @@ export const TEMPLATE_SPECS: readonly TemplateSpec[] = [
     paragraphs: [
       [
         'body',
-        '<strong>{resource}</strong> is reserved from {start}. Please finish and sign out in time.',
-        '<strong>{resource}</strong> ist ab {start} reserviert. Bitte beende deine Sitzung rechtzeitig und melde dich ab.',
+        '<strong>{resource}</strong> is reserved from {start}. Please end your session in time.',
+        '<strong>{resource}</strong> ist ab {start} reserviert. Bitte beende deine Sitzung rechtzeitig.',
       ],
     ],
   },
@@ -301,8 +323,8 @@ export const TEMPLATE_SPECS: readonly TemplateSpec[] = [
     paragraphs: [
       [
         'body',
-        '<strong>{resource}</strong> has been reserved since {start} (until {end}). Please finish and sign out now; your session is not ended automatically.',
-        '<strong>{resource}</strong> ist seit {start} reserviert (bis {end}). Bitte beende deine Sitzung jetzt und melde dich ab; sie wird nicht automatisch beendet.',
+        '<strong>{resource}</strong> has been reserved since {start} (until {end}). Please end your session now; it is not ended automatically.',
+        '<strong>{resource}</strong> ist seit {start} reserviert (bis {end}). Bitte beende deine Sitzung jetzt; sie wird nicht automatisch beendet.',
       ],
     ],
   },
@@ -335,4 +357,4 @@ export const TEMPLATE_SPECS: readonly TemplateSpec[] = [
     ],
     buttons: [{ key: 'button', en: 'Open reservations', de: 'Reservierungen öffnen', path: '/reservations/manage' }],
   },
-];
+] as const satisfies readonly TemplateSpec[];

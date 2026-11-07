@@ -7,21 +7,16 @@ const { query, refetch } = vi.hoisted(() => ({
   query: {
     data: undefined as undefined | Record<string, unknown>,
     pending: false,
+    error: false,
     options: undefined as undefined | Record<string, unknown>,
   },
   refetch: vi.fn(),
 }));
 
-vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
-  useTranslations: () => ({ t: (key: string, values?: Record<string, string>) => `${key}:${values?.time ?? ''}` }),
-  useDateTimeFormatter: () => (value: string) => `formatted(${value})`,
-}));
-
 vi.mock('@attraccess/react-query-client', () => ({
   useResourcesServiceResourceUsageStartBlocked: (_params: unknown, _key: unknown, options: Record<string, unknown>) => {
     query.options = options;
-    return { data: query.data, isPending: query.pending, refetch };
+    return { data: query.data, isPending: query.pending, isError: query.error, refetch };
   },
 }));
 
@@ -39,6 +34,7 @@ describe('StartBlockedGate', () => {
     vi.setSystemTime(new Date('2026-06-01T12:00:00Z'));
     query.data = undefined;
     query.pending = false;
+    query.error = false;
     refetch.mockClear();
   });
   afterEach(() => vi.useRealTimers());
@@ -58,21 +54,22 @@ describe('StartBlockedGate', () => {
     expect(screen.queryByTestId('start')).not.toBeInTheDocument();
   });
 
-  it('replaces the start controls with the reason and the end time', () => {
+  it('replaces the start controls with the plugin reason only, adding no end time in another timezone', () => {
     query.data = { blocked: true, reason, until: '2026-06-01T14:00:00.000Z', plugin: 'reservations' };
     renderGate();
     expect(screen.queryByTestId('start')).not.toBeInTheDocument();
     const notice = screen.getByText('Reserved').closest('[data-cy="start-blocked-notice"]');
     expect(notice).toBeInTheDocument();
-    expect(notice).toHaveTextContent('Reserved by another user until 16:00.');
-    expect(notice).toHaveTextContent('until:formatted(2026-06-01T14:00:00.000Z)');
+    expect(notice?.textContent).toBe('Reserved' + reason.body);
   });
 
-  it('omits the end time when the plugin gives none', () => {
+  it('shows the start controls straight away when the question fails, without retrying first', () => {
+    query.error = true;
     query.data = { blocked: true, reason };
     renderGate();
-    expect(screen.getByText(reason.body)).toBeInTheDocument();
-    expect(screen.queryByText(/^until:/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('start')).toBeInTheDocument();
+    expect(screen.queryByTestId('start-blocked-notice')).not.toBeInTheDocument();
+    expect(query.options).toMatchObject({ retry: false });
   });
 
   it('polls as a safety net next to the live events', () => {

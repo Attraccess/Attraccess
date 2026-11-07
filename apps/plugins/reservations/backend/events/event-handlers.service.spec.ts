@@ -270,22 +270,62 @@ describe('ReservationEventHandlers', () => {
       expect(sent('maintenance')).toHaveLength(4);
     });
 
-    it('sends one mail per holder however many of their bookings are affected, naming the earliest', async () => {
+    it('sends one mail per holder listing all of their affected bookings, and later only the newly affected ones', async () => {
       const first = await p.book(10, 1, '2026-06-02T08:00:00', '2026-06-02T09:00:00');
-      await p.book(10, 1, '2026-06-02T10:00:00', '2026-06-02T11:00:00');
       await p.book(10, 1, '2026-06-03T10:00:00', '2026-06-03T11:00:00');
       await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
       const event = maintenance(5, '2026-06-02T00:00:00', '2026-06-04T00:00:00');
       await h.emit(SystemEvent.MAINTENANCE_CHANGED, event);
+      const claim = jest.spyOn(h.store, 'claimNotice');
       await p.newEvents().onMaintenance(event); // a restarted instance does not tell them again
+      expect(claim).not.toHaveBeenCalled(); // already-told bookings are read, not claimed again
+      const mails = () => sent('maintenance') as (Dispatched & { email: { variables: Record<string, never> } })[];
       expect(
-        sent('maintenance')
+        mails()
           .map((m) => m.recipients)
           .sort(),
       ).toEqual([[10], [11]]);
-      expect(sent('maintenance').find((m) => m.recipients[0] === 10)?.dedupeKey).toBe(
-        `reservations:maintenance:${first.id}:5`,
-      );
+      const toHolder = mails().find((m) => m.recipients[0] === 10);
+      expect(toHolder?.dedupeKey).toBe(`reservations:maintenance:${first.id}:5`);
+      expect(toHolder?.body).toContain('These bookings of yours overlap this period');
+      expect(toHolder?.email.variables['maintenance']).toMatchObject({
+        single: false,
+        bookings: 'Tue, 2 Jun 2026, 10:00 CEST – 11:00; Wed, 3 Jun 2026, 12:00 CEST – 13:00',
+      });
+
+      // The window grows: only the newly affected booking is named, in its own mail.
+      const later = await p.book(10, 1, '2026-06-05T08:00:00', '2026-06-05T09:00:00');
+      await h.emit(SystemEvent.MAINTENANCE_CHANGED, {
+        ...maintenance(5, '2026-06-02T00:00:00', '2026-06-06T00:00:00'),
+        action: 'updated',
+      });
+      expect(claim).toHaveBeenCalledTimes(1);
+      const update = mails().at(-1);
+      expect(update?.dedupeKey).toBe(`reservations:maintenance:${later.id}:5`);
+      expect(update?.email.variables['maintenance']).toMatchObject({ single: true });
+      expect(update?.body).toContain('Your booking (Fri, 5 Jun 2026, 10:00 CEST – 11:00) overlaps');
+    });
+
+    it('still tells the other holders when the notice to one holder fails, and does not retry that one', async () => {
+      const failing = await p.book(11, 1, '2026-06-02T08:00:00', '2026-06-02T09:00:00'); // told first
+      await p.book(10, 1, '2026-06-02T10:00:00', '2026-06-02T11:00:00');
+      await p.book(10, 1, '2026-06-03T10:00:00', '2026-06-03T11:00:00');
+      await p.book(12, 1, '2026-06-03T12:00:00', '2026-06-03T13:00:00');
+      h.dispatch.mockImplementation(async (request) => {
+        if ((request as Dispatched).recipients.includes(11)) throw new Error('mail server down');
+        return undefined;
+      });
+      const event = maintenance(5, '2026-06-02T00:00:00', '2026-06-04T00:00:00');
+
+      await expect(p.events.onMaintenance(event)).resolves.toBeUndefined();
+      expect(sent('maintenance').map((m) => m.recipients)).toEqual([[11], [10], [12]]);
+
+      // Claimed before sending (at most once): the failed holder's booking stays marked as told.
+      const notices = await h.store.findNotices([failing.id], 'maintenance');
+      expect(notices.map((notice) => notice.refKey)).toEqual(['5']);
+      h.dispatch.mockClear();
+      await h.emit(SystemEvent.MAINTENANCE_CHANGED, { ...event, action: 'updated' });
+      expect(sent('maintenance')).toEqual([]);
     });
 
     it('covers open-ended maintenance and ignores finished events', async () => {

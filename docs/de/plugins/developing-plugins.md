@@ -539,15 +539,19 @@ await context.notifications.dispatch({
   `<mjml>`-Wurzel, das der Host in das globale Layout setzt. Die englischen Texte sind die Standardwerte der
   `t`-Aufrufe; `translations.de` ist Pflicht und muss jeden `t`-Schlüssel enthalten (sonst wird das Plugin unter
   Quarantäne gestellt). Weitere Sprachen können neben `de` stehen. IDs bestehen aus Kleinbuchstaben, Ziffern, `-` und
-  `_` und sind im Plugin eindeutig.
+  `_` und sind im Plugin eindeutig. Betreff und Text müssen gültiges Handlebars sein und dürfen nur `t` und die
+  eingebauten Helfer (`if`, `unless`, `each`, `with`) verwenden; Partials und Decorators werden nicht unterstützt. Jeder
+  Fehler in der Deklaration, auch ein Handlebars-Syntaxfehler, stellt das Plugin beim Laden unter Quarantäne; dann wird
+  keiner seiner Hooks, keine Kategorie und keine Vorlage registriert.
 - **Variablen.** `user.*`, `host.*` und `url` sind immer vorhanden; Ihr `variables`-Objekt wird daneben gelegt und kann
   sie nie ersetzen. Werte werden vom `t`-Helfer und von `{{ }}` HTML-maskiert. Listen Sie unter `variables` alle
   Variablen auf, die der Editor anbieten soll. Die Sprache bestimmt das Profil der empfangenden Person, nie das Plugin.
-- **Speichern und Upgrades.** Der Host speichert eine deklarierte Vorlage, sobald sie gebraucht wird (beim Start und
-  beim Laden des Plugins). Das ist idempotent: Eine installierte Vorlage wird **nie überschrieben**, Änderungen von
-  Betreff, Text und Übersetzungen durch Admins überstehen also Plugin-Upgrades. Nur die Variablenliste folgt der
-  Deklaration, und mitgelieferte Übersetzungsschlüssel, die einer Installation fehlen, werden ergänzt. **Auf
-  Standard zurücksetzen** im Editor stellt die deklarierte Fassung wieder her. Vorlagen eines deaktivierten oder
+- **Speichern und Upgrades.** Der Host speichert eine deklarierte Vorlage beim Start, wenn ihr Plugin zum ersten Mal
+  mit ihr geladen wird, zusammen mit den mitgelieferten Übersetzungen. Danach gehört die gespeicherte Vorlage den
+  Admins: Betreff, Text und Übersetzungen werden **nie überschrieben**, ihre Änderungen (auch gelöschte Übersetzungen)
+  überstehen also Neustarts und Plugin-Upgrades, und neue Standardtexte eines Plugin-Updates ersetzen die gespeicherten
+  nicht. Nur die Variablenliste folgt der Deklaration. **Standard wiederherstellen** im Editor stellt die aktuell
+  deklarierte Fassung mit ihren mitgelieferten Übersetzungen wieder her. Vorlagen eines deaktivierten oder
   deinstallierten Plugins bleiben gespeichert, werden aber weder gelistet noch gesendet.
 - **Admin-Oberfläche.** Plugin-Vorlagen stehen in derselben Vorlagenliste wie die Kernvorlagen, danach, nach Plugin
   gruppiert und mit dem Namen des Plugins gekennzeichnet; Editor, Übersetzungsdialog und Zurücksetzen funktionieren

@@ -84,7 +84,7 @@ import { ResourceFlowsExecutorService } from '../resources/flows/execution/resou
 
 import { createPluginAuditContext } from './runtime/audit-context';
 
-import { preparePluginNotificationCategories } from './runtime/plugin-notifications';
+import { preparePluginNotifications } from './runtime/plugin-notifications';
 import {
   PLUGIN_START_BLOCKED_CHANGED_EVENT,
   type PluginStartBlockedChanged,
@@ -284,9 +284,9 @@ export class PluginModule {
       if (readerUiContributions) queueReaderUiContributions(manifest.name, readerUiContributions);
     };
 
-    // Notification categories need SEND_NOTIFICATIONS. They are registered once the module was built, so a
-    // quarantined plugin leaves no category behind.
-    const categories = preparePluginNotificationCategories(
+    // Notification categories and email templates need SEND_NOTIFICATIONS and are validated here, before anything
+    // is queued. They are registered once the module was built, so a quarantined plugin leaves none behind.
+    const categories = preparePluginNotifications(
       manifest.name,
       manifest.permissions ?? [],
       (exported as PluginBackendModule)?.notificationCategories,
@@ -298,8 +298,8 @@ export class PluginModule {
       this.logger.warn(
         `Plugin ${manifest.name} does not export a register(context) factory; loading its default export as a static module.`,
       );
-      queueReaderUi();
       registerCategories();
+      queueReaderUi();
       return exported as DynamicModule;
     }
 
@@ -309,8 +309,8 @@ export class PluginModule {
       MqttCredentialProvisioningService.register(credentialProvider(context));
       this.logger.log(`Registered MQTT credential provider from plugin ${manifest.name}.`);
     }
-    queueReaderUi();
     registerCategories();
+    queueReaderUi();
     return {
       ...pluginModule,
       providers: [

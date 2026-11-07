@@ -30,7 +30,8 @@ export class PluginEmailService extends EmailService {
     variables: Record<string, unknown>,
   ): Promise<void> {
     const key = pluginEmailTemplateKey(pluginName, templateId);
-    if (!getPluginEmailTemplate(key)) {
+    // Plugin names may contain ".", so the key alone could name a template of plugin "<this>.<x>".
+    if (getPluginEmailTemplate(key)?.pluginName !== pluginName) {
       throw new Error(
         `Plugin "${pluginName}" sent undeclared email template "${templateId}". ` +
           'Declare it in emailTemplates of the plugin backend module.',

@@ -22,7 +22,13 @@ const r = {
   decisionReason: 'Fine',
   cancelReason: 'Broken',
 } as ReservationEntity;
-const settings = { ...DEFAULT_SETTINGS, enabled: true };
+const r2 = {
+  ...r,
+  id: 8,
+  startTime: new Date('2026-06-02T08:00:00Z'),
+  endTime: new Date('2026-06-02T09:00:00Z'),
+} as ReservationEntity;
+const settings = { ...DEFAULT_SETTINGS, resourceId: 1, enabled: true };
 
 /** One call per message builder: the emails the notifier can send. */
 const notices = [
@@ -37,15 +43,16 @@ const notices = [
   lifecycle.noShow(m, r, settings),
   ops.stillNeeded(m, r),
   ops.reminder24h(m, r, settings),
-  ops.maintenanceAffected(m, r, { startTime: r.startTime, endTime: r.endTime, reason: 'Belt' }),
-  ops.maintenanceAffected(m, r, { startTime: r.startTime, endTime: null, reason: null }),
+  ops.maintenanceAffected(m, [r], { startTime: r.startTime, endTime: r.endTime, reason: 'Belt' }),
+  ops.maintenanceAffected(m, [r], { startTime: r.startTime, endTime: null, reason: null }),
   ops.healthUnhealthy(m, r, 'Door open'),
   ops.healthRecovered(m, r),
-  ops.handover(m, r.startTime),
+  ops.handover(m, r),
   ops.overrunForHolder(m, r),
   ops.overrunForUser(m, r),
   ops.overrideForHolder(m, r, 'Bob'),
   ops.overrideForManagers(m, r, 'Bob', 'Ada'),
+  ops.maintenanceAffected(m, [r, r2], { startTime: r.startTime, endTime: r2.endTime, reason: null }),
 ];
 
 const paths = (value: unknown, prefix = ''): string[] =>
@@ -117,5 +124,40 @@ describe('reservation email templates', () => {
     expect(text(12)).toContain('no end announced yet');
     expect(text(12)).not.toContain('Reason:');
     expect(text(2, 'de')).toContain('wurde genehmigt');
+  });
+
+  it('lists every affected booking of the holder in the maintenance mail, in the plugin timezone', () => {
+    const many = notices[notices.length - 1];
+    const en = renderEmail(many.email, 'en');
+    expect(en.text).toContain('These bookings of yours overlap');
+    expect(en.text).toContain('Mon, 1 Jun 2026, 14:00 CEST – 15:00; Tue, 2 Jun 2026, 10:00 CEST – 11:00');
+    expect(en.hrefs).toEqual(['https://app.test/reservations']);
+    const window = { startTime: r.startTime, endTime: r2.endTime, reason: null };
+    const de = renderEmail(ops.maintenanceAffected({ ...m, lang: 'de' }, [r, r2], window).email, 'de');
+    expect(de.text).toContain('Diese Reservierungen von dir');
+    expect(de.text).toContain('Mo., 1. Juni 2026, 14:00 MESZ – 15:00; Di., 2. Juni 2026, 10:00 MESZ – 11:00');
+    const one = renderEmail(notices[11].email, 'en');
+    expect(one.text).toContain('Your booking (Mon, 1 Jun 2026, 14:00 CEST – 15:00) overlaps');
+    expect(one.hrefs).toEqual(['https://app.test/reservations/7']);
+  });
+
+  it('gives mails to users other than the holder only the resource and the times (no note, reasons, holder or id)', () => {
+    for (const notice of [ops.handover(m, r), ops.overrunForUser(m, r)]) {
+      expect(notice.email.variables).toEqual({
+        resource: { name: 'Laser' },
+        reservation: {
+          when: 'Mon, 1 Jun 2026, 14:00 CEST – 15:00',
+          startTime: '14:00',
+          endTime: '15:00',
+        },
+      });
+      expect(JSON.stringify(notice)).not.toMatch(/Rush|Fine|Broken|Ada/);
+    }
+  });
+
+  it('does not promise "tomorrow" in the 24h reminder subject (it can go out later after downtime)', () => {
+    const reminder = ops.reminder24h(m, r, settings).email;
+    expect(renderEmail(reminder, 'en').subject).toBe('Reminder: Laser from 14:00');
+    expect(renderEmail(reminder, 'de').subject).toBe('Erinnerung: Laser ab 14:00');
   });
 });

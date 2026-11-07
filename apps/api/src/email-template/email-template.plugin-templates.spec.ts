@@ -71,8 +71,41 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
 
     expect(await stored()).toMatchObject({ subject: 'Admin subject' });
     expect((await stored())?.body).toContain('Mine');
-    // the admin's German subject stays; a shipped key the admin's set lacks is added
-    expect(await translations()).toEqual({ 'de:subject': 'Admin Betreff', 'de:body': 'Neu' });
+    // the admin's German set stays as it is; new shipped defaults do not fill it up
+    expect(await translations()).toEqual({ 'de:subject': 'Admin Betreff' });
+  });
+
+  it('does not bring back translations an admin deleted when it syncs again', async () => {
+    await service.onApplicationBootstrap();
+    await service.deleteTranslations(KEY, 'de');
+
+    registerPluginEmailTemplates('demo', [declared()]); // what a reboot or plugin reload does
+    await service.findAll();
+
+    expect(await translations()).toEqual({});
+    expect(await service.getTranslationsMap(KEY, 'de')).toEqual({});
+  });
+
+  it('retries a template that could not be stored instead of treating the sync as done', async () => {
+    const sync = jest.spyOn(
+      service as unknown as { syncPluginTemplate: (declared: unknown) => Promise<void> },
+      'syncPluginTemplate',
+    );
+    sync.mockRejectedValueOnce(new Error('database is locked'));
+    await service.onApplicationBootstrap();
+    expect(await stored()).toBeNull();
+
+    await expect(service.findOne(KEY)).resolves.toMatchObject({ subject: declared().subject });
+    expect(sync).toHaveBeenCalledTimes(2);
+  });
+
+  it('runs another sync for a caller arriving after the registry changed during a running one', async () => {
+    const first = service.findAll();
+    registerPluginEmailTemplates('demo', [declared(), declared({ id: 'second' })]);
+    await expect(service.findOne('plugin.demo.second' as EmailTemplateType)).resolves.toMatchObject({
+      type: 'plugin.demo.second',
+    });
+    await first;
   });
 
   it('follows a changed variable list of the declaration', async () => {

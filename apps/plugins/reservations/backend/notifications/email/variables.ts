@@ -13,19 +13,37 @@ export interface EmailTimeContext extends TimeContext {
   resourceName: string;
 }
 
-/** Variables every booking mail shares: the resource and the booking, times in the plugin timezone. */
+/**
+ * What anyone who can see the resource may know about a booking: the resource and the times (decision 14).
+ * Mails to someone other than the holder or a manager get only these, so an admin who adds
+ * `{{reservation.note}}` or `{{holder.name}}` to such a template cannot leak the holder's data.
+ */
+export function slotVariables(
+  m: EmailTimeContext,
+  r: Pick<ReservationEntity, 'startTime' | 'endTime'>,
+): { resource: { name: string }; reservation: Record<string, unknown> } {
+  return {
+    resource: { name: m.resourceName },
+    reservation: {
+      when: formatRange(r.startTime, r.endTime, m),
+      startTime: formatTime(r.startTime, m),
+      endTime: formatTime(r.endTime, m),
+    },
+  };
+}
+
+/** Variables every mail to the holder or a manager shares: the slot plus the booking's own fields. */
 export function bookingVariables(
   m: EmailTimeContext,
   r: ReservationEntity,
   options: { viaApproval?: boolean } = {},
 ): Record<string, unknown> {
+  const slot = slotVariables(m, r);
   return {
-    resource: { name: m.resourceName },
+    resource: slot.resource,
     reservation: {
       id: r.id,
-      when: formatRange(r.startTime, r.endTime, m),
-      startTime: formatTime(r.startTime, m),
-      endTime: formatTime(r.endTime, m),
+      ...slot.reservation,
       note: r.note ?? '',
       viaApproval: options.viaApproval ?? false,
       // A direct confirmation has no manager comment to quote; approvals and rejections show theirs.

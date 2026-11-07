@@ -483,6 +483,23 @@ describe('PluginModule', () => {
       PluginModule.forRoot();
       expect(listPluginNotificationCategories().some((category) => category.pluginName === 'broken-cats')).toBe(false);
     });
+
+    it('quarantines a plugin with a malformed email template before queueing hooks or registering categories', () => {
+      const brokenTemplate =
+        "emailTemplates: [{ id: 'confirmed', label: { en: 'C', de: 'B' }, variables: [], subject: '{{t \"s\" \"Hi\"}}'," +
+        " body: '<mj-text>x</mj-text>', translations: { de: {} } }]";
+      writePlugin(
+        'broken-mail',
+        [PluginPermission.SEND_NOTIFICATIONS, PluginPermission.ACCESS_HOOKS],
+        `${categories}, ${brokenTemplate}, preStartHook: () => ({ decision: 'allow' }), register: () => ({ module: class M {} })`,
+      );
+      const queue = jest.spyOn(readerUiWiring, 'queueReaderUiContributions').mockImplementation(() => undefined);
+      jest.spyOn(readerUiWiring, 'queueReaderUiLoadFailure').mockImplementation(() => undefined);
+
+      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(queue).not.toHaveBeenCalled();
+      expect(listPluginNotificationCategories().some((category) => category.pluginName === 'broken-mail')).toBe(false);
+    });
   });
 
   describe('requireRef', () => {

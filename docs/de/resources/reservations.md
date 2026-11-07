@@ -116,12 +116,13 @@ Beim Start einer Ressource prüft das Plugin die Buchungen **anderer** Personen.
 
 Nur ausstehende Buchungen blockieren keinen Start.
 
-**Die Ressourcenseite zeigt eine Sperre, bevor Sie auf Start drücken.** Solange eine fremde Buchung läuft und Sie nicht
-starten dürfen, ersetzt die Seite den Start-Knopf durch einen Hinweis, wie bei „Sie benötigen eine Einweisung“ und „in
-Benutzung“: Er zeigt den Grund und, wenn bekannt, wann die Sperre endet („Von einer anderen Person bis 16:00
-reserviert.“). Der Hinweis aktualisiert sich von selbst, wenn eine Buchung beginnt, endet oder storniert wird. Ist die
-Seite veraltet und Sie drücken trotzdem auf Start, wird der Start weiterhin mit derselben Meldung abgelehnt.
-Verwaltende und Wartende sehen den Hinweis nicht; sie starten über die oben beschriebene Override-Bestätigung.
+**Die Ressourcenseite zeigt eine Sperre, bevor Sie auf Start drücken.** Solange eine fremde Buchung läuft und Sie
+nicht starten dürfen, ersetzt die Seite den Start-Knopf durch einen Hinweis, wie bei „Sie benötigen eine Einweisung“
+und „in Benutzung“: Er zeigt Titel und Grund des Plugins, und der Grund nennt, wann die Sperre endet („Von einer
+anderen Person bis 16:00 reserviert.“). Der Hinweis aktualisiert sich von selbst, wenn eine Buchung beginnt, endet
+oder storniert wird. Ist die Seite veraltet und Sie drücken trotzdem auf Start, wird der Start weiterhin mit derselben
+Meldung abgelehnt. Verwaltende und Wartende sehen den Hinweis nicht; sie starten über die oben beschriebene
+Override-Bestätigung.
 
 ### Erinnerungen und Benachrichtigungen
 
@@ -136,9 +137,9 @@ gesendet. Die Texte nutzen Ihre Sprache, sofern bekannt, sonst die Standardsprac
 | 48 Stunden vor Beginn                                      | „Brauchen Sie die Buchung noch?“ mit **Behalten** und **Stornieren**. Nur, wenn die Buchung mindestens 48 Stunden im Voraus bestätigt wurde (bei genehmigungspflichtigen Buchungen: genehmigt) und Sie nicht schon **Behalten** gewählt haben. Keine Antwort behält die Buchung. |
 | 24 Stunden vor Beginn                                      | Erinnerung inklusive Check-in-Regeln. Entfällt für Buchungen, die weniger als 24 Stunden im Voraus bestätigt (gebucht oder genehmigt) wurden: Ihre Bestätigungs-E-Mail enthält die Regeln bereits.                                                                               |
 | Buchung abgelehnt, abgelaufen, storniert, nicht erschienen | Information, was passiert ist und warum.                                                                                                                                                                                                                                         |
-| Wartung überschneidet Ihre Buchung                         | Nur Information. Buchungen werden nicht automatisch storniert.                                                                                                                                                                                                                   |
+| Wartung überschneidet Ihre Buchung                         | Ein Hinweis pro Wartung, der alle Ihre betroffenen Buchungen aufführt. Buchungen werden nicht automatisch storniert.                                                                                                                                                             |
 | Ressource wird gestört / erholt sich                       | Für Buchungen, die laufen oder innerhalb von 24 Stunden beginnen.                                                                                                                                                                                                                |
-| Vor dem Beginn einer fremden Buchung                       | Bei laufender Sitzung: „Die Ressource ist ab 14:00 reserviert. Bitte rechtzeitig fertig werden und abmelden.“                                                                                                                                                                    |
+| Vor dem Beginn einer fremden Buchung                       | Bei laufender Sitzung: „Die Ressource ist ab 14:00 reserviert. Bitte beende deine Sitzung rechtzeitig.“                                                                                                                                                                          |
 | Fremde Sitzung läuft bei Ihrem Beginn noch                 | Sie und die andere Person werden informiert (geprüft in den ersten fünf Minuten Ihrer Buchung). Die Sitzung wird nicht beendet.                                                                                                                                                  |
 | Jemand hat Ihre Buchung übersteuert                        | Sie erfahren, wer trotzdem gestartet hat.                                                                                                                                                                                                                                        |
 
@@ -296,9 +297,11 @@ reservations“ gekennzeichnet:
 - Bearbeiten Sie Betreff und Text im visuellen Editor und die deutschen und englischen Texte im Dialog
   **Übersetzungen**. **Variablen** zeigt, was Sie verwenden können, etwa `{{reservation.when}}` oder
   `{{resource.name}}`.
-- **Ihre Änderungen bleiben erhalten.** Installieren oder Aktualisieren des Plugins ergänzt nur Vorlagen, die Sie noch
-  nicht haben; eine von Ihnen geänderte Vorlage oder Übersetzung wird nie überschrieben. **Auf Standard
-  zurücksetzen** stellt die mit dem Plugin gelieferte Fassung wieder her.
+- **Gespeicherte Vorlagen gehören Ihnen.** Betreff, Text und mitgelieferte Übersetzungen des Plugins werden nur
+  übernommen, wenn eine Vorlage zum ersten Mal gespeichert wird (bei der Installation oder wenn ein Update eine neue
+  Vorlage mitbringt). Danach gehören Betreff, Text und Übersetzungen den Administratoren: Ein Update des Plugins
+  überschreibt sie nie, egal ob Sie sie geändert haben oder nicht. **Auf Standard zurücksetzen** stellt die Fassung des
+  installierten Plugins samt Übersetzungen wieder her; so erhalten Sie verbesserte Texte aus einem Update.
 - Jede empfangende Person erhält die Mail in ihrer eigenen Sprache; welche Mail wer erhält, bestimmen weiterhin die
   Benachrichtigungskategorien. E-Mails brauchen die [SMTP-Konfiguration](setup/smtp-email.md) und die
   Anwendungs-URL, wie alle Attraccess-E-Mails.
@@ -326,7 +329,9 @@ Start, der normalerweise eine Bestätigung verlangt, wird auf diesem Weg daher a
 - Über ein Wartungsfenster hinweg kann nicht gebucht werden, auch nicht über offene Wartung (sie zählt ab ihrem
   Beginn bis zum Abschluss).
 - Wird eine Wartung angelegt oder geändert und überschneidet bestehende Buchungen, erhalten die Buchenden **einen**
-  Hinweis pro Wartung, egal wie viele ihrer Buchungen betroffen sind (er nennt die früheste). Buchungen werden **nicht** automatisch storniert; die Verwaltenden entscheiden.
+  Hinweis, der alle ihre betroffenen Buchungen aufführt. Betrifft eine spätere Änderung weitere ihrer Buchungen, folgt
+  ein weiterer Hinweis, der nur die neu betroffenen nennt. Buchungen werden **nicht** automatisch storniert; die
+  Verwaltenden entscheiden.
 - Wird eine Ressource gestört, werden Buchende von Buchungen informiert, die laufen oder innerhalb von 24 Stunden
   beginnen, und noch einmal bei Erholung.
 

@@ -388,15 +388,19 @@ await context.notifications.dispatch({
 - **Declaration.** `subject` is a Handlebars string (usually one `t` call), `body` an MJML **fragment** without an
   `<mjml>` root, which the host places in the global layout. English texts are the inline defaults of the `t` calls;
   `translations.de` is required and must contain every `t` key (the plugin is quarantined otherwise). More locales may
-  be added next to `de`. Ids use lowercase letters, digits, `-` and `_`, and are unique within the plugin.
+  be added next to `de`. Ids use lowercase letters, digits, `-` and `_`, and are unique within the plugin. Subject and
+  body must be valid Handlebars using only `t` and the built-in helpers (`if`, `unless`, `each`, `with`); partials and
+  decorators are not supported. Any declaration error, including a Handlebars syntax error, quarantines the plugin at
+  load time, so none of its hooks, categories or templates are registered.
 - **Variables.** `user.*`, `host.*` and `url` are always available; your `variables` object is merged next to them and
   can never replace them. Values are HTML-escaped by the `t` helper and by `{{ }}`. List every variable the editor
   should offer in `variables`. The locale of the recipient decides the language; a plugin never picks it.
-- **Storing and upgrades.** The host stores a declared template the first time it is needed (at startup and when the
-  plugin loads). It is idempotent: an installed template is **never overwritten**, so admin edits of subject, body and
-  translations survive plugin upgrades. Only the variable list follows the declaration, and shipped translation keys an
-  installation lacks are added. **Reset to default** in the editor restores the declared version. Templates of a
-  plugin that is disabled or uninstalled stay stored but are neither listed nor sendable.
+- **Storing and upgrades.** The host stores a declared template at startup, the first time its plugin is loaded with
+  it, together with the shipped translations. From then on the stored template belongs to the admins: subject, body
+  and translations are **never overwritten**, so their edits (including deleted translations) survive restarts and
+  plugin upgrades, and new defaults a plugin update ships do not replace the stored ones. Only the variable list
+  follows the declaration. **Reset to default** in the editor restores the currently declared version with its shipped
+  translations. Templates of a plugin that is disabled or uninstalled stay stored but are neither listed nor sendable.
 - **Admin UI.** Plugin templates appear in the same template list as core templates, after them, grouped by plugin
   and marked with the plugin's name; the editor, the translations dialog and the reset action work the same way.
 - **Sending.** `email: { template, variables }` goes through `notifications.dispatch`, so each recipient's

@@ -16,6 +16,7 @@ import {
   DropdownPopover,
   DropdownTrigger,
   Spinner,
+  Skeleton,
   Chip,
 } from '@heroui/react';
 import { ArrowLeft, Braces, Languages, RotateCcw } from 'lucide-react';
@@ -124,10 +125,12 @@ export function useEditEmailTemplatePageState() {
 
   const variables = template.data?.variables ?? [];
   // Core templates are named by the app's translations, a plugin's template by the label the plugin declared.
+  // Plugin keys (`plugin.<plugin>.<id>`) have no app translation, so their title waits for the loaded label.
   const pluginInfo = template.data?.plugin;
-  const templateTitle = pluginInfo
-    ? pluginInfo.label[language === 'de' ? 'de' : 'en']
-    : t('templateType.' + templateType);
+  const isPluginTemplate = templateType?.startsWith('plugin.') ?? false;
+  let templateTitle: string | null = null;
+  if (pluginInfo) templateTitle = pluginInfo.label[language === 'de' ? 'de' : 'en'];
+  else if (!isPluginTemplate) templateTitle = t('templateType.' + templateType);
   const copyVariable = useCallback(
     (name: string) => {
       const token = `{{${name}}}`;
@@ -217,7 +220,12 @@ export function EditEmailTemplatePage() {
         >
           <ArrowLeft size={18} />
         </Button>
-        <h1 className="text-base font-semibold whitespace-nowrap">{templateTitle}</h1>
+        {/* Plugin labels can be long; let the title wrap instead of pushing the page wider than a phone screen. */}
+        {templateTitle === null ? (
+          <Skeleton className="h-5 w-48 rounded-md" data-cy="edit-email-template-title-skeleton" />
+        ) : (
+          <h1 className="text-base font-semibold min-w-0 break-words">{templateTitle}</h1>
+        )}
         {pluginInfo && (
           <Chip size="sm" variant="soft" data-cy="edit-email-template-plugin-chip">
             {t('pluginChip', { plugin: pluginInfo.name })}

@@ -8,7 +8,7 @@ import { getPluginEmailTemplate } from '../../email-template/plugin-email-templa
 import {
   createPluginNotificationsContext,
   PluginNotificationDeps,
-  preparePluginNotificationCategories,
+  preparePluginNotifications,
 } from './plugin-notifications';
 
 describe('plugin notifications context', () => {
@@ -95,6 +95,19 @@ describe('plugin notifications context', () => {
     }
   });
 
+  it('rejects a category of another plugin whose name extends this one with a "."', async () => {
+    registerPluginNotificationCategories('booking.x', [{ id: 'secret', label: { en: 'S', de: 'S' } }]);
+    try {
+      // `plugin.booking` + `x.secret` is the key of plugin `booking.x`'s category `secret`.
+      await expect(context.dispatch({ category: 'x.secret', recipients: [1], title: 't', body: 'b' })).rejects.toThrow(
+        /undeclared/,
+      );
+      expect(deps.dispatch).not.toHaveBeenCalled();
+    } finally {
+      unregisterPluginNotificationCategories('booking.x');
+    }
+  });
+
   it('does nothing when no recipient exists', async () => {
     deps.findUsers.mockResolvedValue([]);
     await context.dispatch({ category: 'reminder', recipients: [404], title: 't', body: 'b' });
@@ -118,7 +131,7 @@ describe('plugin notifications context', () => {
   });
 });
 
-describe('preparePluginNotificationCategories with email templates', () => {
+describe('preparePluginNotifications with email templates', () => {
   const template = {
     id: 'confirmed',
     label: { en: 'Confirmed', de: 'Bestätigt' },
@@ -129,18 +142,13 @@ describe('preparePluginNotificationCategories with email templates', () => {
   };
 
   it('quarantines a plugin that declares templates without SEND_NOTIFICATIONS', () => {
-    expect(() => preparePluginNotificationCategories('booking', [PluginPermission.READ_USERS], [], [template])).toThrow(
+    expect(() => preparePluginNotifications('booking', [PluginPermission.READ_USERS], [], [template])).toThrow(
       PluginPermissionError,
     );
   });
 
   it('registers the templates with the categories and removes them again', () => {
-    const registration = preparePluginNotificationCategories(
-      'booking',
-      [PluginPermission.SEND_NOTIFICATIONS],
-      [],
-      [template],
-    );
+    const registration = preparePluginNotifications('booking', [PluginPermission.SEND_NOTIFICATIONS], [], [template]);
     expect(getPluginEmailTemplate('plugin.booking.confirmed')).toBeUndefined();
     registration.register();
     registration.register();
@@ -149,13 +157,14 @@ describe('preparePluginNotificationCategories with email templates', () => {
     expect(getPluginEmailTemplate('plugin.booking.confirmed')).toBeUndefined();
   });
 
-  it('rejects a malformed template when registering, so the plugin is quarantined', () => {
-    const registration = preparePluginNotificationCategories(
-      'booking',
-      [PluginPermission.SEND_NOTIFICATIONS],
-      [],
-      [{ ...template, translations: { de: {} } }],
-    );
-    expect(() => registration.register()).toThrow(/no German translation/);
+  it.each([
+    ['a template without German text', [], [{ ...template, translations: { de: {} } }], /no German translation/],
+    ['a template with a Handlebars syntax error', [], [{ ...template, body: '{{#if x}}' }], /not a valid template/],
+    ['a malformed category', [{ id: 'Bad Id', label: { en: 'x', de: 'y' } }], [template], /invalid notification/],
+  ])('rejects %s while preparing, before anything is registered', (_name, categories, templates, message) => {
+    expect(() =>
+      preparePluginNotifications('booking', [PluginPermission.SEND_NOTIFICATIONS], categories, templates),
+    ).toThrow(message);
+    expect(getPluginEmailTemplate('plugin.booking.confirmed')).toBeUndefined();
   });
 });

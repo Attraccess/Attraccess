@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   },
   layout: '',
   settled: true,
+  loaded: true,
   update: vi.fn(),
   reset: vi.fn(),
   success: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   useEmailTemplatesServiceEmailTemplateControllerFindOne: () => {
     const [, refresh] = useReducer((n: number) => n + 1, 0);
     state.refresh = refresh;
-    return { data: state.template };
+    return { data: state.loaded ? state.template : undefined };
   },
   useEmailLayoutServiceEmailLayoutControllerFindGlobal: () => ({
     data: { body: state.layout },
@@ -62,9 +63,9 @@ vi.mock('./TranslationsSection', () => ({
     return <div>Translations editor</div>;
   },
 }));
-function Fixture() {
+function Fixture({ type = 'welcome' }: { type?: string }) {
   return (
-    <MemoryRouter initialEntries={['/settings/email/templates/welcome']}>
+    <MemoryRouter initialEntries={[`/settings/email/templates/${type}`]}>
       <Routes>
         <Route path="/settings/email/templates/:type" element={<EditEmailTemplatePage />} />
         <Route path="/settings/email/templates" element={<div>Template list</div>} />
@@ -82,6 +83,7 @@ beforeEach(() => {
   };
   state.layout = '';
   state.settled = true;
+  state.loaded = true;
 });
 afterEach(cleanup);
 it('waits for layout resolution and preserves unsaved canvas changes across background refetches', async () => {
@@ -120,6 +122,30 @@ it('names a core template by the app translations and a plugin template by its l
   await screen.findByRole('textbox');
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Booking confirmed');
   expect(screen.getByText('pluginChip')).toBeInTheDocument();
+});
+it('shows a placeholder instead of a raw translation key while a plugin template loads', () => {
+  state.loaded = false;
+  render(<Fixture type="plugin.reservations.booking-confirmed" />);
+  expect(screen.queryByRole('heading', { level: 1 })).toBeNull();
+  expect(screen.queryByText(/templateType\./)).toBeNull();
+  expect(document.querySelector('[data-cy="edit-email-template-title-skeleton"]')).not.toBeNull();
+
+  state.template = {
+    ...state.template,
+    plugin: { name: 'reservations', label: { en: 'Booking confirmed', de: 'Buchung bestätigt' } },
+  };
+  act(() => {
+    state.loaded = true;
+    state.refresh();
+  });
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Booking confirmed');
+});
+it('lets a long title wrap instead of forcing one line', async () => {
+  render(<Fixture />);
+  await screen.findByRole('textbox');
+  const heading = screen.getByRole('heading', { level: 1 });
+  expect(heading).not.toHaveClass('whitespace-nowrap');
+  expect(heading).toHaveClass('min-w-0');
 });
 it('wraps global chrome for display and strips it from saved template content', async () => {
   state.layout = `<mjml><mj-head><mj-title>Brand</mj-title></mj-head><mj-body><mj-section><mj-column><mj-text>Header</mj-text></mj-column></mj-section>${CONTENT_PLACEHOLDER}</mj-body></mjml>`;

@@ -1,5 +1,6 @@
 import { extractTranslationKeys, isFullMjmlDocument } from '@attraccess/shared';
 import type { PluginEmailTemplate, PluginLocalizedLabel } from '@attraccess/plugins-backend-sdk';
+import { checkTemplateSyntax } from './template-syntax';
 
 export type PluginEmailTemplateKey = `plugin.${string}`;
 
@@ -62,6 +63,12 @@ function validate(pluginName: string, template: PluginEmailTemplate): void {
   if (!template.translations || !Object.values(template.translations).every(isTextMap) || !template.translations.de) {
     throw new Error(`${where} needs translations.de (a map of translation key to text).`);
   }
+  try {
+    checkTemplateSyntax('The subject', template.subject);
+    checkTemplateSyntax('The body', template.body);
+  } catch (error) {
+    throw new Error(`${where}: ${(error as Error).message}`);
+  }
   const missing = extractTranslationKeys(`${template.subject}\n${template.body}`)
     .map(({ key }) => key)
     .filter((key) => typeof template.translations.de[key] !== 'string');
@@ -70,11 +77,8 @@ function validate(pluginName: string, template: PluginEmailTemplate): void {
   }
 }
 
-/**
- * Registers the email templates one plugin declares. Replaces any earlier registration of the same plugin so
- * a reload never accumulates stale entries. Throws on a malformed declaration (quarantines the plugin).
- */
-export function registerPluginEmailTemplates(pluginName: string, templates: readonly PluginEmailTemplate[]): void {
+/** Throws on a malformed declaration, which quarantines the plugin. Registering it afterwards cannot fail. */
+export function validatePluginEmailTemplates(pluginName: string, templates: readonly PluginEmailTemplate[]): void {
   const seen = new Set<string>();
   for (const template of templates) {
     validate(pluginName, template);
@@ -82,6 +86,14 @@ export function registerPluginEmailTemplates(pluginName: string, templates: read
       throw new Error(`Plugin "${pluginName}" declares email template "${template.id}" twice.`);
     seen.add(template.id);
   }
+}
+
+/**
+ * Registers the email templates one plugin declares. Replaces any earlier registration of the same plugin so
+ * a reload never accumulates stale entries. Throws on a malformed declaration (quarantines the plugin).
+ */
+export function registerPluginEmailTemplates(pluginName: string, templates: readonly PluginEmailTemplate[]): void {
+  validatePluginEmailTemplates(pluginName, templates);
 
   unregisterPluginEmailTemplates(pluginName);
   for (const template of templates) {

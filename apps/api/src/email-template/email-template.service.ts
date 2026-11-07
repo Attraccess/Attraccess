@@ -33,7 +33,7 @@ export interface TemplateTranslations {
 export class EmailTemplateService implements OnApplicationBootstrap {
   private readonly logger = new Logger(EmailTemplateService.name);
   private syncedVersion = -1;
-  private syncing: Promise<void> | null = null;
+  private syncing: Promise<number> | null = null;
 
   constructor(
     @InjectRepository(EmailTemplate)
@@ -150,31 +150,46 @@ export class EmailTemplateService implements OnApplicationBootstrap {
 
   /**
    * Stores the templates the loaded plugins declare. Idempotent and cheap once nothing changed: it runs again only
-   * when the registry changed. A template that is not stored yet is inserted with its shipped texts. A stored one
-   * keeps everything an admin may have edited (subject, body, translations); only its variable list, which the editor
-   * cannot change, follows the declaration, and shipped translation keys it lacks are added.
+   * when the registry changed, or when storing a template failed last time. A template that is not stored yet is
+   * inserted with its shipped texts and translations. From then on it belongs to the admins: subject, body and
+   * translations stay as they are (also when a plugin update ships new defaults; "reset to default" restores them),
+   * only its variable list, which the editor cannot change, follows the declaration.
    */
   private async syncPluginTemplates(): Promise<void> {
-    if (this.syncedVersion === pluginEmailTemplatesVersion()) return;
-    this.syncing ??= this.runPluginSync().finally(() => {
-      this.syncing = null;
-    });
-    await this.syncing;
+    for (;;) {
+      if (this.syncedVersion === pluginEmailTemplatesVersion()) return;
+      this.syncing ??= this.runPluginSync().finally(() => {
+        this.syncing = null;
+      });
+      const attempted = await this.syncing;
+      // A sync that started before the registry changed again is stale: run another one. A failed sync of the
+      // current version is retried by the next caller, not in a loop here.
+      if (attempted === pluginEmailTemplatesVersion()) return;
+    }
   }
 
-  private async runPluginSync(): Promise<void> {
+  /** @returns the registry version it synced; `syncedVersion` advances only when every template was stored. */
+  private async runPluginSync(): Promise<number> {
     const version = pluginEmailTemplatesVersion();
+    let stored = true;
     for (const declared of listPluginEmailTemplates()) {
+      const where = `Email template "${declared.key}" of plugin ${declared.pluginName}`;
       try {
         await this.mjmlService.validateAndConvert(`<mjml><mj-body>${declared.body}</mj-body></mjml>`);
+      } catch (error) {
+        // Invalid MJML stays invalid until the plugin changes, which changes the registry version: no retry.
+        this.logger.error(`${where} was not registered: ${(error as Error).message}`);
+        continue;
+      }
+      try {
         await this.syncPluginTemplate(declared);
       } catch (error) {
-        this.logger.error(
-          `Email template "${declared.key}" of plugin ${declared.pluginName} was not registered: ${(error as Error).message}`,
-        );
+        stored = false;
+        this.logger.error(`${where} could not be stored, retrying on next use: ${(error as Error).message}`);
       }
     }
-    this.syncedVersion = version;
+    if (stored) this.syncedVersion = version;
+    return version;
   }
 
   private async syncPluginTemplate(declared: RegisteredPluginEmailTemplate): Promise<void> {
@@ -182,17 +197,20 @@ export class EmailTemplateService implements OnApplicationBootstrap {
       const templates = manager.getRepository(EmailTemplate);
       const type = declared.key as unknown as EmailTemplateType;
       const existing = await templates.findOneBy({ type });
-      if (!existing) {
-        // orIgnore: a second instance seeding at the same time is a no-op instead of a conflict.
-        await templates
-          .createQueryBuilder()
-          .insert()
-          .values({ type, subject: declared.subject, body: declared.body, variables: declared.variables })
-          .orIgnore()
-          .execute();
-      } else if (existing.variables.join(',') !== declared.variables.join(',')) {
-        await templates.update({ type }, { variables: declared.variables });
+      if (existing) {
+        if (existing.variables.join(',') !== declared.variables.join(',')) {
+          await templates.update({ type }, { variables: declared.variables });
+        }
+        return;
       }
+      // orIgnore: a second instance seeding at the same time is a no-op instead of a conflict.
+      await templates
+        .createQueryBuilder()
+        .insert()
+        .values({ type, subject: declared.subject, body: declared.body, variables: declared.variables })
+        .orIgnore()
+        .execute();
+      // Translations are seeded with the row only, so ones an admin deleted later stay deleted.
       const shipped = shippedPluginTranslations(declared);
       if (shipped.length > 0) {
         await manager

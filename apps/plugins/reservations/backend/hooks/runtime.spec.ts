@@ -22,7 +22,7 @@ function coldServices() {
   } as unknown as ResourceSettingsService;
   const unused = {} as never;
   return {
-    preStart: new PreStartService(settings, unused, unused, unused, unused, () => new Date()),
+    preStart: new PreStartService(settings, unused, unused, unused, unused, unused, () => new Date()),
     sessionEnd: new SessionEndService(settings, {} as GlobalSettingsService, unused, unused, unused, () => new Date()),
   };
 }
@@ -42,7 +42,7 @@ describe('hook runtime', () => {
     setTimeout(
       () =>
         publishHookServices({
-          preStart: { evaluate: async () => ({ decision: 'allow' }) },
+          preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
           sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
         }),
       10,
@@ -53,7 +53,7 @@ describe('hook runtime', () => {
 
   it('withdraws the services on shutdown', async () => {
     publishHookServices({
-      preStart: { evaluate: async () => ({ decision: 'allow' }) },
+      preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
       sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
     });
     publishHookServices(null);

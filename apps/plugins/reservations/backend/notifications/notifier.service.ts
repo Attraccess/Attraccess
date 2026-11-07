@@ -179,13 +179,15 @@ export class ReservationNotifications implements ReservationNotifier {
     );
   }
 
-  notifyMaintenance(r: ReservationEntity, window: MaintenanceSpan, maintenanceId: number): Promise<boolean> {
+  /** One notice to the holder of `bookings` (one holder, ordered by start) naming all of them. */
+  notifyMaintenance(bookings: ReservationEntity[], window: MaintenanceSpan, maintenanceId: number): Promise<boolean> {
+    const [first] = bookings;
     return this.send(
       'availability',
-      r.resourceId,
-      [r.userId],
-      `reservations:maintenance:${r.id}:${maintenanceId}`,
-      (m) => ops.maintenanceAffected(m, r, window),
+      first.resourceId,
+      [first.userId],
+      `reservations:maintenance:${first.id}:${maintenanceId}`,
+      (m) => ops.maintenanceAffected(m, bookings, window),
     );
   }
 
@@ -197,7 +199,7 @@ export class ReservationNotifications implements ReservationNotifier {
 
   notifyHandover(r: ReservationEntity, sessionUserIds: number[]): Promise<boolean> {
     return this.send('handover', r.resourceId, sessionUserIds, `reservations:handover:${r.id}`, (m) =>
-      ops.handover(m, r.startTime),
+      ops.handover(m, r),
     );
   }
 

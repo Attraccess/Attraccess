@@ -53,6 +53,9 @@ describe('plugin email template registry', () => {
       { translations: { de: { subject: 'x' } } },
       /no German translation for: body/,
     ],
+    ['a Handlebars syntax error in the subject', { subject: '{{#if x}}open' }, /The subject is not a valid template/],
+    ['an unknown helper in the body', { body: '<mj-text>{{shout x}}</mj-text>' }, /The body is not a valid template/],
+    ['a partial in the body', { body: '<mj-text>{{> footer}}</mj-text>' }, /partials and decorators/],
   ])('rejects %s', (_name, patch, message) => {
     expect(() => registerPluginEmailTemplates('demo', [template(patch as Partial<PluginEmailTemplate>)])).toThrow(
       message,

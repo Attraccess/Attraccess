@@ -1,7 +1,7 @@
 import type { ReservationEntity } from '../entities/reservation.entity';
 import type { ResourceSettings } from '../settings/settings.model';
 import { NoticeText, ROUTES, checkInRules, formatDateTime, formatRange, formatTime, pick } from './format';
-import { bookingVariables, checkInVariables } from './email/variables';
+import { bookingVariables, checkInVariables, slotVariables } from './email/variables';
 import type { MessageContext, Span } from './messages';
 
 const when = (m: MessageContext, r: Span) => formatRange(r.startTime, r.endTime, m);
@@ -30,7 +30,11 @@ export function reminder24h(m: MessageContext, r: ReservationEntity, settings: R
       template: 'reminder-24h',
       variables: { ...bookingVariables(m, r), checkIn: checkInVariables(settings, lang) },
     },
-    title: pick(lang, `Reminder: ${resourceName} tomorrow`, `Erinnerung: ${resourceName} morgen`),
+    title: pick(
+      lang,
+      `Reminder: ${resourceName} from ${formatTime(r.startTime, m)}`,
+      `Erinnerung: ${resourceName} ab ${formatTime(r.startTime, m)}`,
+    ),
     lines: [
       pick(
         lang,
@@ -49,21 +53,45 @@ export interface MaintenanceSpan {
   reason: string | null;
 }
 
-export function maintenanceAffected(m: MessageContext, r: ReservationEntity, window: MaintenanceSpan): NoticeText {
+/**
+ * One notice per holder and maintenance, listing every booking of that holder it newly affects (ordered by
+ * start). `reservation.*` still describes the first booking for templates stored before the list existed.
+ */
+export function maintenanceAffected(
+  m: MessageContext,
+  bookings: readonly ReservationEntity[],
+  window: MaintenanceSpan,
+): NoticeText {
   const { lang, resourceName } = m;
+  const [first] = bookings;
+  const single = bookings.length === 1;
+  const list = bookings.map((r) => when(m, r)).join('; ');
   const until = window.endTime
     ? pick(lang, ` until ${formatDateTime(window.endTime, m)}`, ` bis ${formatDateTime(window.endTime, m)}`)
     : pick(lang, ' (no end announced yet)', ' (noch ohne angekündigtes Ende)');
+  const affected = single
+    ? pick(
+        lang,
+        `Your booking (${list}) overlaps this period and was not cancelled automatically.`,
+        `Deine Reservierung (${list}) überschneidet sich mit diesem Zeitraum und wurde nicht automatisch storniert.`,
+      )
+    : pick(
+        lang,
+        `These bookings of yours overlap this period and were not cancelled automatically: ${list}.`,
+        `Diese Reservierungen von dir überschneiden sich mit diesem Zeitraum und wurden nicht automatisch storniert: ${list}.`,
+      );
   return {
     email: {
       template: 'maintenance-affected',
       variables: {
-        ...bookingVariables(m, r),
+        ...bookingVariables(m, first),
         maintenance: {
           start: formatDateTime(window.startTime, m),
           end: window.endTime ? formatDateTime(window.endTime, m) : '',
           hasEnd: !!window.endTime,
           reason: window.reason ?? '',
+          bookings: list,
+          single,
         },
       },
     },
@@ -75,12 +103,12 @@ export function maintenanceAffected(m: MessageContext, r: ReservationEntity, win
     lines: [
       pick(
         lang,
-        `${resourceName} is in maintenance from ${formatDateTime(window.startTime, m)}${until}. Your booking (${when(m, r)}) overlaps this period and was not cancelled automatically. You may not be able to use the resource.`,
-        `${resourceName} befindet sich ab ${formatDateTime(window.startTime, m)}${until} in Wartung. Deine Reservierung (${when(m, r)}) überschneidet sich mit diesem Zeitraum und wurde nicht automatisch storniert. Möglicherweise kannst du die Ressource nicht nutzen.`,
+        `${resourceName} is in maintenance from ${formatDateTime(window.startTime, m)}${until}. ${affected} You may not be able to use the resource.`,
+        `${resourceName} befindet sich ab ${formatDateTime(window.startTime, m)}${until} in Wartung. ${affected} Möglicherweise kannst du die Ressource nicht nutzen.`,
       ),
       ...(window.reason ? [pick(lang, `Reason: ${window.reason}`, `Grund: ${window.reason}`)] : []),
     ],
-    path: ROUTES.reservation(r.id),
+    path: single ? ROUTES.reservation(first.id) : ROUTES.mine,
     severity: 'warning',
   };
 }
@@ -119,20 +147,17 @@ export function healthRecovered(m: MessageContext, r: ReservationEntity): Notice
   };
 }
 
-/** To users with a running session shortly before someone else's booking starts. */
-export function handover(m: MessageContext, startTime: Date): NoticeText {
+/** To users with a running session shortly before someone else's booking starts (not the holder: slot only). */
+export function handover(m: MessageContext, r: Span): NoticeText {
   const { lang, resourceName } = m;
   return {
-    email: {
-      template: 'handover',
-      variables: { resource: { name: resourceName }, reservation: { startTime: formatTime(startTime, m) } },
-    },
+    email: { template: 'handover', variables: slotVariables(m, r) },
     title: pick(lang, `${resourceName} is reserved soon`, `${resourceName} ist bald reserviert`),
     lines: [
       pick(
         lang,
-        `${resourceName} is reserved from ${formatTime(startTime, m)}. Please finish and sign out in time.`,
-        `${resourceName} ist ab ${formatTime(startTime, m)} reserviert. Bitte beende deine Sitzung rechtzeitig und melde dich ab.`,
+        `${resourceName} is reserved from ${formatTime(r.startTime, m)}. Please end your session in time.`,
+        `${resourceName} ist ab ${formatTime(r.startTime, m)} reserviert. Bitte beende deine Sitzung rechtzeitig.`,
       ),
     ],
     severity: 'warning',
@@ -157,17 +182,17 @@ export function overrunForHolder(m: MessageContext, r: ReservationEntity): Notic
   };
 }
 
-/** Booking started while another user's session still runs: to that user. */
-export function overrunForUser(m: MessageContext, r: ReservationEntity): NoticeText {
+/** Booking started while another user's session still runs: to that user (not the holder: slot only). */
+export function overrunForUser(m: MessageContext, r: Span): NoticeText {
   const { lang, resourceName } = m;
   return {
-    email: { template: 'overrun-user', variables: bookingVariables(m, r) },
+    email: { template: 'overrun-user', variables: slotVariables(m, r) },
     title: pick(lang, `Please finish on ${resourceName}`, `Bitte beende die Nutzung von ${resourceName}`),
     lines: [
       pick(
         lang,
-        `${resourceName} has been reserved since ${formatTime(r.startTime, m)} (until ${formatTime(r.endTime, m)}). Please finish and sign out now; your session is not ended automatically.`,
-        `${resourceName} ist seit ${formatTime(r.startTime, m)} reserviert (bis ${formatTime(r.endTime, m)}). Bitte beende deine Sitzung jetzt und melde dich ab; sie wird nicht automatisch beendet.`,
+        `${resourceName} has been reserved since ${formatTime(r.startTime, m)} (until ${formatTime(r.endTime, m)}). Please end your session now; it is not ended automatically.`,
+        `${resourceName} ist seit ${formatTime(r.startTime, m)} reserviert (bis ${formatTime(r.endTime, m)}). Bitte beende deine Sitzung jetzt; sie wird nicht automatisch beendet.`,
       ),
     ],
     severity: 'warning',

@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockFetch, renderWithProviders, reservationFixture } from '../test-utils';
 import { ReservationsCard } from './ReservationsCard';
 
@@ -44,8 +44,18 @@ const running = () =>
 
 vi.setConfig({ testTimeout: 30_000 });
 
+// A Tuesday, 10:00 in Europe/Berlin: the now-relative bookings below stay inside one day and one
+// week whatever the wall clock says. Only Date is faked; it keeps running from there.
+const NOW = new Date('2030-01-15T09:00:00.000Z');
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true });
+  vi.setSystemTime(NOW);
+});
+
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 

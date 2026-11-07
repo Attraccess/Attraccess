@@ -110,10 +110,10 @@ Bookings that are only pending never block a start.
 
 **The resource page shows a block before you press Start.** While someone else's booking is running and you may not
 start, the page replaces the Start button with a notice, like the "you need an introduction" and "in use" notices: it
-shows the reason and, when known, the time the block ends ("Reserved by another user until 16:00."). The notice
-updates by itself when a booking begins, ends or is cancelled. If the page is out of date and you press Start anyway,
-the start is still refused with the same message. Managers and maintainers do not see the notice; they start through
-the override confirmation above.
+shows the plugin's title and reason, and the reason names the time the block ends ("Reserved by another user until
+16:00."). The notice updates by itself when a booking begins, ends or is cancelled. If the page is out of date and you
+press Start anyway, the start is still refused with the same message. Managers and maintainers do not see the notice;
+they start through the override confirmation above.
 
 ### Reminders and notifications
 
@@ -128,9 +128,9 @@ language when it is known, otherwise the default language of the installation. T
 | 48 hours before the start                       | "Do you still need this booking?" with **Keep** and **Cancel**. Only if the booking was confirmed at least 48 hours ahead (for bookings that need approval: approved) and you have not already chosen **Keep**. No answer keeps the booking. |
 | 24 hours before the start                       | Reminder including the check-in rules. Skipped for bookings confirmed (made or approved) less than 24 hours ahead: their confirmation email already carries the rules.                                                                       |
 | Booking rejected, expired, cancelled or no show | Information about what happened and why.                                                                                                                                                                                                     |
-| Maintenance overlaps your booking               | Information only. Bookings are not cancelled automatically.                                                                                                                                                                                  |
+| Maintenance overlaps your booking               | One notice per maintenance listing all your affected bookings. Bookings are not cancelled automatically.                                                                                                                                     |
 | Resource becomes unhealthy / recovers           | For bookings that are running or start within 24 hours.                                                                                                                                                                                      |
-| Before someone else's booking starts            | If you have a running session: "The resource is reserved from 14:00. Please finish and sign out in time."                                                                                                                                    |
+| Before someone else's booking starts            | If you have a running session: "The resource is reserved from 14:00. Please end your session in time."                                                                                                                                       |
 | Someone else's session still runs at your start | You and the other user are informed (checked during the first five minutes of your booking). The session is not ended.                                                                                                                       |
 | Someone overrode your booking                   | You are told who started anyway.                                                                                                                                                                                                             |
 
@@ -282,9 +282,11 @@ reservations":
 
 - Edit the subject and the body in the visual editor, and the German and English texts in the **Translations**
   dialog. **Variables** lists what you can use, for example `{{reservation.when}}` or `{{resource.name}}`.
-- **Your edits are kept.** Installing or updating the plugin only adds templates you do not have yet; it never
-  overwrites a template or translation you changed. **Reset to default** restores the version shipped with the
-  plugin.
+- **The templates are yours once stored.** The plugin's subject, body and shipped translations are copied only when a
+  template is stored for the first time (when the plugin is installed, or when an update adds a new template). After
+  that, subject, body and translations belong to the administrators: updating the plugin never overwrites them,
+  whether you changed them or not. **Reset to default** restores the version shipped with the installed plugin,
+  including its translations; use it to get improved texts from a plugin update.
 - Each recipient gets the mail in their own language; the notification categories still decide who receives which
   mail. Emails need the [SMTP configuration](setup/smtp-email.md) and the application URL, as all Attraccess emails.
 - If you disable or uninstall the plugin, its templates are hidden and kept for later.
@@ -309,8 +311,9 @@ normally ask for a confirmation is therefore refused on that path.
 
 - A booking cannot be made across a maintenance window, including open-ended maintenance (it counts from its start
   until it is finished).
-- When maintenance is created or changed and overlaps existing bookings, holders get **one** notice per
-  maintenance, however many of their bookings it affects (it names the earliest). Bookings are **not** cancelled automatically; managers decide.
+- When maintenance is created or changed and overlaps existing bookings, each holder gets **one** notice that lists
+  all of their affected bookings. If a change later affects more of their bookings, they get one more notice that
+  lists only the newly affected ones. Bookings are **not** cancelled automatically; managers decide.
 - When a resource becomes unhealthy, holders of bookings running or starting within 24 hours are told, and again
   once it recovers.
 

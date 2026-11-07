@@ -57,7 +57,7 @@ export function createBackgroundServices(h: Harness) {
     newScheduler,
     events: newEvents(),
     newEvents,
-    preStart: new PreStartService(h.settings, h.globalSettings, h.store, h.access, h.directory, h.clock),
+    preStart: new PreStartService(h.settings, h.globalSettings, h.store, h.access, h.directory, h.visibility, h.clock),
     sessionEnd: new SessionEndService(h.settings, h.globalSettings, h.store, h.reservations, decisions, h.clock),
     /** Creates a confirmed booking directly through the service. */
     async book(userId: number, resourceId: number, start: string, end: string) {

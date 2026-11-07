@@ -17,10 +17,15 @@
     "lint": {
       "executor": "nx:run-commands",
       "cache": true,
-      "inputs": ["{projectRoot}/backend/**/*", "{projectRoot}/frontend/src/**/*", "{workspaceRoot}/eslint.config.cjs"],
+      "inputs": [
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/frontend/src/**/*",
+        "{projectRoot}/acceptance/**/*",
+        "{workspaceRoot}/eslint.config.cjs"
+      ],
       "outputs": [],
       "options": {
-        "command": "eslint apps/plugins/reservations/backend apps/plugins/reservations/frontend/src --max-warnings=0 && prettier --check apps/plugins/reservations/backend apps/plugins/reservations/frontend/src"
+        "command": "eslint apps/plugins/reservations/backend apps/plugins/reservations/frontend/src apps/plugins/reservations/acceptance --max-warnings=0 && prettier --check apps/plugins/reservations/backend apps/plugins/reservations/frontend/src apps/plugins/reservations/acceptance"
       }
     },
     "test-frontend": {
@@ -53,6 +58,23 @@
       "options": {
         "jestConfig": "apps/plugins/reservations/jest.config.ts",
         "passWithNoTests": true
+      }
+    },
+    "test-acceptance": {
+      "executor": "@nx/jest:jest",
+      "cache": true,
+      "inputs": [
+        "default",
+        "^production",
+        "{workspaceRoot}/jest.preset.js",
+        "{workspaceRoot}/apps/api/src/email-template/**/*",
+        {
+          "externalDependencies": ["jest", "mjml"]
+        }
+      ],
+      "outputs": [],
+      "options": {
+        "jestConfig": "apps/plugins/reservations/jest.acceptance.config.ts"
       }
     },
     "build-backend": {

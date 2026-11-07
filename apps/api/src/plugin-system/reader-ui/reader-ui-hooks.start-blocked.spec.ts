@@ -87,4 +87,35 @@ describe('ReaderUiHooksService.queryStartBlocked', () => {
     expect(preStart).toHaveBeenCalled();
     expect(audit.recordAttractap).toHaveBeenCalledTimes(1); // the pre-start decision only
   });
+
+  it('opens its own breaker after repeated failures and closes it again on the first valid answer', async () => {
+    let failing = true;
+    const query = jest.fn(() => {
+      if (failing) throw new Error('boom');
+      return blocked;
+    });
+    const { service } = setup({ a: query });
+    for (let i = 0; i < 5; i += 1) await service.queryStartBlocked(run);
+    expect(query).toHaveBeenCalledTimes(5);
+    await expect(service.queryStartBlocked(run)).resolves.toBeNull();
+    expect(query).toHaveBeenCalledTimes(5); // open: the plugin is not asked
+
+    failing = false;
+    await jest.advanceTimersByTimeAsync(60_000);
+    await expect(service.queryStartBlocked(run)).resolves.toEqual({ plugin: 'a', reason: blocked.reason });
+    for (let i = 0; i < 3; i += 1) await expect(service.queryStartBlocked(run)).resolves.not.toBeNull();
+    expect(query).toHaveBeenCalledTimes(9);
+  });
+
+  it('counts a valid "not blocked" answer as a success, so earlier failures do not accumulate', async () => {
+    let calls = 0;
+    const query = jest.fn(() => {
+      calls += 1;
+      if (calls % 4 === 0) return null;
+      throw new Error('boom');
+    });
+    const { service } = setup({ a: query });
+    for (let i = 0; i < 12; i += 1) await service.queryStartBlocked(run);
+    expect(query).toHaveBeenCalledTimes(12);
+  });
 });

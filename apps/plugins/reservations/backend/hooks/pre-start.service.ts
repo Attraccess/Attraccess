@@ -8,6 +8,7 @@ import type {
 import { Inject, Injectable } from '@nestjs/common';
 import { Clock, RESERVATION_CLOCK } from '../constants';
 import type { ReservationEntity } from '../entities/reservation.entity';
+import { VisibilityService } from '../ical/visibility.service';
 import { formatTime, pick } from '../notifications/format';
 import { AccessService } from '../reservations/access.service';
 import { DirectoryService } from '../reservations/directory.service';
@@ -39,6 +40,7 @@ export class PreStartService {
     @Inject(ReservationStore) private readonly store: ReservationStore,
     @Inject(AccessService) private readonly access: AccessService,
     @Inject(DirectoryService) private readonly directory: DirectoryService,
+    @Inject(VisibilityService) private readonly visibility: VisibilityService,
     @Inject(RESERVATION_CLOCK) private readonly clock: Clock,
   ) {}
 
@@ -100,7 +102,8 @@ export class PreStartService {
    * The UI counterpart of the block in {@link whenActive}: a booking of another user is running now and the
    * viewer may not override it. Managers see nothing (they start through the override confirmation), and
    * a booking that merely starts soon is not a block (it is only a confirmation at start). The host
-   * checks again at start, so this is informational and uses the same answer as the gate.
+   * checks again at start, so this is informational and uses the same answer as the gate. Like the plugin's
+   * own endpoints it says nothing about resources the viewer may not see (hidden groups).
    */
   async evaluateStartBlocked(ctx: StartBlockedContext, deadline = hookDeadline()): Promise<StartBlockedState | null> {
     if (!this.settings.isWarm) {
@@ -111,6 +114,7 @@ export class PreStartService {
     const active = (await this.store.findActiveForResource(ctx.resourceId, now)).find((r) => r.userId !== ctx.userId);
     if (!active) return null;
     if (await this.access.isManager(ctx.userId, ctx.resourceId)) return null;
+    if ((await this.visibility.filterVisible(ctx.userId, [ctx.resourceId])).length === 0) return null;
     const timeZone = await this.globalSettings.getTimezone();
     return { reason: reservedReason(ctx.language, active.endTime, timeZone), until: active.endTime };
   }

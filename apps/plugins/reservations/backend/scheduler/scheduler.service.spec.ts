@@ -347,7 +347,7 @@ describe('ReservationScheduler', () => {
       expect(mails).toHaveLength(1);
       expect(mails[0].recipients).toEqual([12]);
       expect(mails[0].body).toContain('is reserved from 14:00');
-      expect(mails[0].body).toContain('Please finish and sign out in time');
+      expect(mails[0].body).toContain('Please end your session in time.');
     });
 
     it('stays silent while nobody else is running a session, and tells a late starter inside the window', async () => {

@@ -17,6 +17,7 @@ export const PLACEHOLDERS: Readonly<Record<string, string>> = {
   mstart: 'maintenance.start',
   mend: 'maintenance.end',
   mreason: 'maintenance.reason',
+  bookings: 'maintenance.bookings',
   details: 'health.reason',
 };
 
@@ -43,8 +44,11 @@ const paragraph = ([key, en, , condition]: Paragraph): string =>
 
 function body(spec: TemplateSpec): string {
   const greeting = `<mj-text padding="0 0 12px 0">{{t "greeting" "${GREETING.en}" name=user.username}}</mj-text>`;
-  const buttons = (spec.buttons ?? []).map(
-    (b) => `<mj-button href="{{host.frontend}}${b.path}" align="center">{{t "${b.key}" "${b.en}"}}</mj-button>`,
+  const buttons = (spec.buttons ?? []).map((b) =>
+    wrap(
+      b.condition,
+      `<mj-button href="{{host.frontend}}${b.path}" align="center">{{t "${b.key}" "${b.en}"}}</mj-button>`,
+    ),
   );
   return [
     '<mj-section background-color="#FFFFFF" padding="32px 20px 24px 20px">',
@@ -81,4 +85,5 @@ function toTemplate(spec: TemplateSpec): PluginEmailTemplate {
 
 /** The `PluginBackendModule.emailTemplates` declaration. */
 export const EMAIL_TEMPLATES: PluginEmailTemplate[] = TEMPLATE_SPECS.map(toTemplate);
-export type EmailTemplateId = string;
+/** The declared ids, so a typo at a call site fails the typecheck. */
+export type EmailTemplateId = (typeof TEMPLATE_SPECS)[number]['id'];

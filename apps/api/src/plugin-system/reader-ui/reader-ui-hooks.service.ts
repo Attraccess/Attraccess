@@ -167,7 +167,7 @@ export class ReaderUiHooksService {
         );
         continue;
       }
-      if (result.value) return { plugin, ...result.value };
+      if (result.value.state) return { plugin, ...result.value.state };
     }
     return null;
   }
@@ -320,17 +320,20 @@ function validBlockReason(reason: PluginBlockReason | undefined): PluginBlockRea
   return { code: reason.code, title: title.value, body: body.value };
 }
 
-/** null = invalid. A well-formed "not blocked" is an empty result. */
+/**
+ * null = invalid. Every valid answer, including "not blocked" (`state: null`), counts as a breaker success, so
+ * an opened start-blocked breaker closes again once the plugin answers.
+ */
 function normalizeStartBlocked(
   raw: StartBlockedState | null | undefined,
-): NeutralResult<{ reason: PluginBlockReason; until?: string } | null> | null {
-  if (raw === null || raw === undefined) return new NeutralResult(null);
+): { state: { reason: PluginBlockReason; until?: string } | null } | null {
+  if (raw === null || raw === undefined) return { state: null };
   if (typeof raw !== 'object') return null;
   const reason = validBlockReason(raw.reason);
   if (!reason) return null;
   const untilMs = raw.until === undefined ? undefined : new Date(raw.until).getTime();
   if (untilMs !== undefined && !Number.isFinite(untilMs)) return null;
-  return new NeutralResult({ reason, ...(untilMs === undefined ? {} : { until: new Date(untilMs).toISOString() }) });
+  return { state: { reason, ...(untilMs === undefined ? {} : { until: new Date(untilMs).toISOString() }) } };
 }
 
 function normalizeSessionEnd(raw: SessionEndResult): PluginChoice | 'none' | null {
