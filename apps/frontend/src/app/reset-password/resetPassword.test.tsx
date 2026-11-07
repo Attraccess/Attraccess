@@ -38,14 +38,22 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 vi.mock('../../components/toastProvider', () => ({ useToastMessage: () => ({ error: vi.fn(), success: vi.fn() }) }));
 
-describe('ResetPassword completion labels', () => {
-  beforeEach(() => {
-    navigateMock.mockReset();
-    state.locale = 'en';
-    state.pending = false;
-    state.success = true;
-  });
+const VIEWPORT_HEIGHT_CLASS = /(^|:)(min-)?h-(screen|[dsl]vh|\[[^\]]*vh[^\]]*\])$/;
 
+function viewportHeightClasses(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('[class]')).flatMap((el) =>
+    Array.from(el.classList).filter((token) => VIEWPORT_HEIGHT_CLASS.test(token)),
+  );
+}
+
+beforeEach(() => {
+  navigateMock.mockReset();
+  state.locale = 'en';
+  state.pending = false;
+  state.success = true;
+});
+
+describe('ResetPassword completion labels', () => {
   it.each(['en', 'de'] as const)('renders the translated sign-in action in %s', async (locale) => {
     state.locale = locale;
     const translations = locale === 'en' ? en : de;
@@ -81,20 +89,12 @@ describe('ResetPassword completion labels', () => {
 });
 
 describe('ResetPassword layout', () => {
-  beforeEach(() => {
-    navigateMock.mockReset();
-    state.locale = 'en';
-    state.pending = false;
-    state.success = true;
-  });
-
   it('renders the form without its own full-height centering wrapper', () => {
     state.success = false;
     const { container } = render(<ResetPassword />);
 
     expect(screen.getByRole('button', { name: en.submit })).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveAttribute('data-cy', 'reset-password-form');
-    expect(container.querySelector('.min-h-screen')).not.toBeInTheDocument();
+    expect(viewportHeightClasses(container)).toEqual([]);
   });
 
   it('renders the success card without its own full-height centering wrapper', () => {
@@ -102,7 +102,6 @@ describe('ResetPassword layout', () => {
     const { container } = render(<ResetPassword />);
 
     expect(screen.getByText(en.success.title)).toBeInTheDocument();
-    expect(container.firstElementChild).toHaveAttribute('data-cy', 'reset-password-success-card');
-    expect(container.querySelector('.min-h-screen')).not.toBeInTheDocument();
+    expect(viewportHeightClasses(container)).toEqual([]);
   });
 });

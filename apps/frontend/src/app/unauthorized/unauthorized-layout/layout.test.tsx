@@ -38,5 +38,10 @@ describe('UnauthorizedLayout', () => {
     expect(formColumn).toContainElement(screen.getByTestId('form-content'));
     expect(formColumn).toHaveClass('flex', 'items-start', 'lg:items-center', 'justify-center');
     expect(formColumn).not.toHaveClass('items-center');
+
+    const alignmentClasses = Array.from(formColumn?.classList ?? [])
+      .filter((token) => /(^|:)items-/.test(token))
+      .sort();
+    expect(alignmentClasses).toEqual(['items-start', 'lg:items-center']);
   });
 });
