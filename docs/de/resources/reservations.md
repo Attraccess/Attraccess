@@ -116,11 +116,19 @@ Beim Start einer Ressource prüft das Plugin die Buchungen **anderer** Personen.
 
 Nur ausstehende Buchungen blockieren keinen Start.
 
+**Die Ressourcenseite zeigt eine Sperre, bevor Sie auf Start drücken.** Solange eine fremde Buchung läuft und Sie nicht
+starten dürfen, ersetzt die Seite den Start-Knopf durch einen Hinweis, wie bei „Sie benötigen eine Einweisung“ und „in
+Benutzung“: Er zeigt den Grund und, wenn bekannt, wann die Sperre endet („Von einer anderen Person bis 16:00
+reserviert.“). Der Hinweis aktualisiert sich von selbst, wenn eine Buchung beginnt, endet oder storniert wird. Ist die
+Seite veraltet und Sie drücken trotzdem auf Start, wird der Start weiterhin mit derselben Meldung abgelehnt.
+Verwaltende und Wartende sehen den Hinweis nicht; sie starten über die oben beschriebene Override-Bestätigung.
+
 ### Erinnerungen und Benachrichtigungen
 
 Sie erhalten Benachrichtigungen in der App, per Push und per E-Mail, je nach Ihren Benachrichtigungseinstellungen
 (siehe [Benachrichtigungskategorien](#benachrichtigungskategorien)). Jede Mitteilung wird höchstens einmal
-gesendet. Die Texte nutzen Ihre Sprache, sofern bekannt, sonst die Standardsprache der Installation.
+gesendet. Die Texte nutzen Ihre Sprache, sofern bekannt, sonst die Standardsprache der Installation. Die E-Mails sind
+[E-Mail-Vorlagen](#e-mail-vorlagen), die Administratoren bearbeiten können.
 
 | Wann                                                       | Was                                                                                                                                                                                                                                                                              |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -147,8 +155,8 @@ in Attraccess.
 - Das Öffnen des Links ändert nichts. Die Seite fragt in einem Dialog nach Ihrer Bestätigung, bevor sie die Buchung
   behält oder storniert.
 
-Die Links in E-Mails setzen voraus, dass die öffentliche URL der Anwendung (`backend_url`) konfiguriert ist; siehe
-[Umgebungsvariablen](installation/environment-variables.md).
+Die Links in E-Mails werden aus der öffentlichen URL der Anwendung (`backend_url`) gebildet, die konfiguriert sein
+muss, wie bei jeder Attraccess-E-Mail; siehe [Umgebungsvariablen](installation/environment-variables.md).
 
 ### Kalender-Feeds (iCal)
 
@@ -187,7 +195,7 @@ Feeds sind ratenbegrenzt. Widerrufene und unbekannte Feeds antworten gleich mit 
 | `LISTEN_EVENTS`      | Sitzungsstart/-ende, Wartungs- und Gesundheitsänderungen (Check-in, Hinweise).                        |
 | `ACCESS_RESOURCES`   | Lesende Prüfung, wer eine Ressource starten oder warten darf, und Wartungsfenster.                    |
 | `READ_USERS`         | Namen und Sprachen von Buchenden und Verwaltenden.                                                    |
-| `READ_SETTINGS`      | Die öffentliche Anwendungs-URL für Links in E-Mails.                                                  |
+| `READ_SETTINGS`      | Die öffentliche Anwendungs-URL für Kalender-Feed-Links und die Standardsprache.                       |
 | `SEND_NOTIFICATIONS` | Benachrichtigungen in der App, per Push und per E-Mail.                                               |
 
 3. Das Plugin benötigt Attraccess 1.11.0 oder neuer.
@@ -266,6 +274,35 @@ Benachrichtigungseinstellungen unter dem Namen des Plugins einstellen kann:
 | Reservierungen: Verfügbarkeit             | Wartung überschneidet eine Buchung, Ressource gestört oder erholt.              |
 | Reservierungen: Übergabe                  | Übergabe-Erinnerungen und Hinweise bei Überschreitung.                          |
 | Reservierungen: Starts trotz Reservierung | Wartende oder Verwaltende haben während einer Buchung gestartet.                |
+
+### E-Mail-Vorlagen
+
+Jede E-Mail des Plugins ist eine **E-Mail-Vorlage**, die Sie wie die E-Mails des Systems bearbeiten, unter
+**Einstellungen → E-Mail → Vorlagen**. Die Vorlagen des Plugins stehen nach den Systemvorlagen und sind mit „Plugin:
+reservations“ gekennzeichnet:
+
+| Vorlage                                                                                                      | Gesendet, wenn                                                                     |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Reservierungsanfrage wartet auf Genehmigung                                                                  | Eine Buchung wartet auf Genehmigung (an die Verwaltenden).                         |
+| Reservierung bestätigt                                                                                       | Eine Buchung bestätigt oder genehmigt wurde, mit den Check-in-Regeln.              |
+| Reservierung abgelehnt / Reservierungsanfrage abgelaufen                                                     | Eine Anfrage abgelehnt wurde oder bis zu ihrem Beginn niemand entschied.           |
+| Reservierung von Verwaltung storniert / Laufende Reservierung vorzeitig beendet / Reservierung entfernt      | Verwaltende eine Buchung geändert oder entfernt haben oder Reservierungen deaktiviert wurden. |
+| Nicht eingecheckt, Reservierung verfallen                                                                    | Eine Buchung als Nichterscheinen freigegeben wurde.                                |
+| Erinnerung 48 Std. vorher: noch benötigt? / Erinnerung 24 Std. vorher                                        | Die Erinnerungen vor einer Buchung.                                                |
+| Wartung betrifft eine Reservierung / Ressource hat ein Problem / Ressource funktioniert wieder               | Wartung oder der Zustand der Ressource eine Buchung betrifft.                      |
+| Bald reserviert (an die aktuelle Person) / Reservierung begonnen, Ressource noch belegt / Reservierung begonnen, bitte beenden | Übergabe- und Überschreitungshinweise.                          |
+| Start trotz Reservierung (an die Buchenden / an die Verwaltung)                                              | Verwaltende während einer Buchung gestartet haben.                                 |
+
+- Bearbeiten Sie Betreff und Text im visuellen Editor und die deutschen und englischen Texte im Dialog
+  **Übersetzungen**. **Variablen** zeigt, was Sie verwenden können, etwa `{{reservation.when}}` oder
+  `{{resource.name}}`.
+- **Ihre Änderungen bleiben erhalten.** Installieren oder Aktualisieren des Plugins ergänzt nur Vorlagen, die Sie noch
+  nicht haben; eine von Ihnen geänderte Vorlage oder Übersetzung wird nie überschrieben. **Auf Standard
+  zurücksetzen** stellt die mit dem Plugin gelieferte Fassung wieder her.
+- Jede empfangende Person erhält die Mail in ihrer eigenen Sprache; welche Mail wer erhält, bestimmen weiterhin die
+  Benachrichtigungskategorien. E-Mails brauchen die [SMTP-Konfiguration](setup/smtp-email.md) und die
+  Anwendungs-URL, wie alle Attraccess-E-Mails.
+- Deaktivieren oder deinstallieren Sie das Plugin, werden seine Vorlagen ausgeblendet und für später aufbewahrt.
 
 ### Startprüfung und Hook-Ausfälle
 

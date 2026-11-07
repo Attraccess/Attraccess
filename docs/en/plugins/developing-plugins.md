@@ -192,6 +192,7 @@ export default plugin;
 | `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS`    |
 | `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                                          | `ACCESS_MQTT_SERVERS`    |
 | `context.notifications.dispatch(request)`                 | Notify users under a category your plugin declared. See [Notifications](#notifications).    | `SEND_NOTIFICATIONS`     |
+| `context.startBlocked.invalidate({ resourceId })`         | Tell open resource pages that your `startBlockedQuery` answer changed. See [Start-blocked state](#start-blocked-state). | `ACCESS_HOOKS` |
 | `context.resourceAccess`                                  | Read-only authorization, maintenance and session queries. See [Resource access](#resource-access-queries). | `ACCESS_RESOURCES` |
 | `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions). | `DATABASE_ACCESS` |
 
@@ -219,8 +220,8 @@ naming the missing permission.
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                      |
 | `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection. |
 | `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).               |
-| `ACCESS_HOOKS`           | The `preStartHook` and `sessionEndHook` — ask for a confirmation or block a session start. See [Reader UI](#reader-ui-and-start-hooks).                               |
-| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares. See [Notifications](#notifications).         |
+| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook` and `startBlockedQuery` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks).                               |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).         |
 
 ### MQTT subscriptions
 
@@ -323,7 +324,8 @@ async function notify(context: PluginContext, userId: number) {
     url: '/reservations/12', // relative to the application URL
     severity: 'info', // or 'warning'
     dedupeKey: 'reservations:reminder:12', // collapses repeated push messages
-    email: { subject: 'Booking reminder', text: 'Booking #12 starts at 14:00.' }, // html is optional
+    // an email template your plugin declared, see Email templates below
+    email: { template: 'reminder', variables: { booking: { id: 12, start: '14:00' } } },
   });
 }
 ```
@@ -333,10 +335,74 @@ async function notify(context: PluginContext, userId: number) {
   plugin's name. Dispatching an undeclared category is rejected. Declaring categories without `SEND_NOTIFICATIONS`
   quarantines the plugin at load time.
 - Unknown user ids are skipped and duplicates are collapsed. An email is only sent when `email` is set and the
-  recipient's preferences allow email for the category. The host renders it inside the global email layout; `html`
-  is a trusted fragment, `text` is used (escaped) when `html` is omitted.
+  recipient's preferences allow email for the category. The host renders it inside the global email layout.
+  Prefer an [email template](#email-templates): admins can edit it. Raw content (`email: { subject, text, html? }`)
+  remains possible for mails that must not be edited; `html` is a trusted fragment, `text` is used (escaped) when
+  `html` is omitted.
 - Dispatching is not transactional: if it fails, the plugin decides whether to retry. The reservations plugin claims
   a "sent" flag first and never retries, so its notices are at most once.
+
+### Email templates
+
+Mails a plugin sends should be editable like the system's own mails. A plugin declares its templates on the backend
+module, and the host stores, lists and renders them with the same mechanism as the core templates: the global layout,
+per-locale translations, the editor under **Settings → Email → Templates**, and the `{{t "key" "default"}}` helper.
+Declaring templates requires `SEND_NOTIFICATIONS`; without it the plugin is quarantined at load time.
+
+```ts
+const plugin: PluginBackendModule = {
+  notificationCategories: [{ id: 'reminders', label: { en: 'Reminders', de: 'Erinnerungen' } }],
+  emailTemplates: [
+    {
+      id: 'reminder', // short id; the stored key is plugin.<pluginName>.reminder
+      label: { en: 'Booking reminder', de: 'Buchungserinnerung' }, // name in the template list
+      variables: ['booking.id', 'booking.start'], // offered in the editor ("Variables")
+      subject: '{{t "subject" "Reminder: booking {id}" id=booking.id}}',
+      body: `<mj-section><mj-column>
+  <mj-text>{{t "greeting" "Hello {name}," name=user.username}}</mj-text>
+  <mj-text>{{t "body" "Your booking starts at {start}." start=booking.start}}</mj-text>
+  <mj-button href="{{host.frontend}}/reservations/{{booking.id}}">{{t "open" "Open booking"}}</mj-button>
+</mj-column></mj-section>`,
+      translations: {
+        de: {
+          subject: 'Erinnerung: Buchung {id}',
+          greeting: 'Hallo {name},',
+          body: 'Ihre Buchung beginnt um {start}.',
+          open: 'Buchung öffnen',
+        },
+      },
+    },
+  ],
+  register: (context) => ({ module: MyPluginModule }),
+};
+
+await context.notifications.dispatch({
+  category: 'reminders',
+  recipients: [userId],
+  title: 'Your booking starts soon',
+  body: 'Booking #12 starts at 14:00.',
+  email: { template: 'reminder', variables: { booking: { id: 12, start: '14:00' } } },
+});
+```
+
+- **Declaration.** `subject` is a Handlebars string (usually one `t` call), `body` an MJML **fragment** without an
+  `<mjml>` root, which the host places in the global layout. English texts are the inline defaults of the `t` calls;
+  `translations.de` is required and must contain every `t` key (the plugin is quarantined otherwise). More locales may
+  be added next to `de`. Ids use lowercase letters, digits, `-` and `_`, and are unique within the plugin.
+- **Variables.** `user.*`, `host.*` and `url` are always available; your `variables` object is merged next to them and
+  can never replace them. Values are HTML-escaped by the `t` helper and by `{{ }}`. List every variable the editor
+  should offer in `variables`. The locale of the recipient decides the language; a plugin never picks it.
+- **Storing and upgrades.** The host stores a declared template the first time it is needed (at startup and when the
+  plugin loads). It is idempotent: an installed template is **never overwritten**, so admin edits of subject, body and
+  translations survive plugin upgrades. Only the variable list follows the declaration, and shipped translation keys an
+  installation lacks are added. **Reset to default** in the editor restores the declared version. Templates of a
+  plugin that is disabled or uninstalled stay stored but are neither listed nor sendable.
+- **Admin UI.** Plugin templates appear in the same template list as core templates, after them, grouped by plugin
+  and marked with the plugin's name; the editor, the translations dialog and the reset action work the same way.
+- **Sending.** `email: { template, variables }` goes through `notifications.dispatch`, so each recipient's
+  preferences for the category apply. Sending a template the plugin did not declare is rejected. An invalid MJML body is
+  logged and the template is not registered, while the plugin's other templates still work. The application URL must
+  be configured (as for every core mail).
 
 ### Resource access queries
 
@@ -471,6 +537,7 @@ host validates, sanitizes and renders it. Admins configure this under **Reader d
 | Slot widgets        | `readerUi` (provider or `(context) => provider`)          | `READER_UI`    |
 | Pre-start hook      | `preStartHook`                                            | `ACCESS_HOOKS` |
 | Advisory after-stop | `sessionEndHook`                                          | `ACCESS_HOOKS` |
+| Start-blocked state | `startBlockedQuery` and `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS` |
 | Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })` | `READER_UI`    |
 
 A plugin that declares `readerUi` or a hook without the matching permission **fails to load** and is quarantined.
@@ -584,6 +651,44 @@ or `block`; the `choose` and `info` start steps of the schema are reserved for a
   repeated crashes) follow the resource's no-screen policy: `block` (default), `card-confirm` (Lite: a second tap
   by the same user) or `allow-with-warning` (starts without a confirmation). `PluginConfirmation.noScreenPolicy`
   sets your default, admins can override it per resource.
+
+### Start-blocked state
+
+`preStartHook` only answers when somebody presses Start. To let the resource page show the reason **instead of the
+Start button**, a plugin also declares the query-side counterpart `startBlockedQuery`:
+
+```ts
+const startBlockedQuery: StartBlockedQuery = async (ctx) => {
+  const until = await endOfRunningBooking(ctx.resourceId, ctx.userId); // your own lookup
+  if (!until) return null; // nothing blocks
+  const de = ctx.language === 'de';
+  return {
+    reason: {
+      code: 'RESERVED',
+      title: de ? 'Reserviert' : 'Reserved',
+      body: de ? 'Von einer anderen Person reserviert.' : 'Reserved by another user.',
+    },
+    until, // optional Date: the UI shows it and refreshes itself then
+  };
+};
+```
+
+- **Same shape as a block.** `reason` is the `{ code, title, body }` of a `preStartHook` block, with the same limits and
+  reserved codes; `until` is optional. Return `null` for "not blocked".
+- **Informational only.** The server still runs `preStartHook` for every start, so the hook must keep blocking; a start
+  that slips through, or a stale page, ends in the usual error toast. Readers keep using the hook alone.
+- **Privacy is yours.** The query runs for the user who looks at the page (`ctx.userId`). The reason is shown to that
+  user as written, so apply your own visibility rules and never name somebody the user may not see. The reservations
+  plugin never names the holder to non-managers and returns nothing for managers, who start through an override
+  confirmation.
+- **Keep it cheap.** It runs whenever a resource page with a start button is open (about every 30 seconds per page, plus
+  when you invalidate). It has the hook timeout; a timeout, an error or an invalid answer count as "not blocked" and
+  never open the pre-start circuit breaker.
+- **Live.** Call `context.startBlocked.invalidate({ resourceId })` whenever something that decides the answer changed
+  (a booking was created, cancelled, started or ended). The host sends a `resource.start_blocked_changed` live event and
+  open pages ask again at once. Viewers who may not follow the resource live still refresh by polling and at `until`.
+- The HTTP side is `GET /api/resources/:resourceId/usage/start-blocked`, answering `{ blocked, reason?, until?, plugin? }`
+  for the signed-in user.
 
 ### After-stop question
 

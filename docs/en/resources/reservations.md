@@ -108,11 +108,19 @@ When someone starts a resource, the plugin checks the bookings of **other** user
 
 Bookings that are only pending never block a start.
 
+**The resource page shows a block before you press Start.** While someone else's booking is running and you may not
+start, the page replaces the Start button with a notice, like the "you need an introduction" and "in use" notices: it
+shows the reason and, when known, the time the block ends ("Reserved by another user until 16:00."). The notice
+updates by itself when a booking begins, ends or is cancelled. If the page is out of date and you press Start anyway,
+the start is still refused with the same message. Managers and maintainers do not see the notice; they start through
+the override confirmation above.
+
 ### Reminders and notifications
 
 You receive notifications in the app, as push message and by email, according to your notification preferences
 (see [notification categories](#notification-categories)). Each notice is sent at most once. The texts use your
-language when it is known, otherwise the default language of the installation.
+language when it is known, otherwise the default language of the installation. The emails are
+[email templates](#email-templates) that administrators can edit.
 
 | When                                            | What                                                                                                                                                                                                                                         |
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -138,8 +146,8 @@ Action links in emails ("Keep", "Cancel") are plain links to `/reservations/<id>
 - Opening the link changes nothing. The page asks for your confirmation in a dialog before it keeps or cancels
   the booking.
 
-The links in emails need the application's public URL to be configured (`backend_url`); see
-[Environment variables](installation/environment-variables.md).
+The links in emails are built from the application's public URL (`backend_url`), which has to be configured, as for
+every Attraccess email; see [Environment variables](installation/environment-variables.md).
 
 ### Calendar feeds (iCal)
 
@@ -176,7 +184,7 @@ Feeds are rate limited. Revoked and unknown feeds answer the same `404`.
 | `LISTEN_EVENTS`      | Session start/end, maintenance and health changes (check-in, notices).             |
 | `ACCESS_RESOURCES`   | Read-only checks of who may start or maintain a resource, and maintenance windows. |
 | `READ_USERS`         | Names and languages of holders and managers.                                       |
-| `READ_SETTINGS`      | The public application URL for links in emails.                                    |
+| `READ_SETTINGS`      | The public application URL for calendar feed links, and the default language.      |
 | `SEND_NOTIFICATIONS` | In-app, push and email notifications.                                              |
 
 3. The plugin needs Attraccess 1.11.0 or newer.
@@ -253,6 +261,33 @@ notification preferences under the plugin's name:
 | Reservations: availability | Maintenance overlapping a booking, resource unhealthy or recovered. |
 | Reservations: handover     | Handover reminders and overrun notices.                             |
 | Reservations: overrides    | A maintainer or manager started during a booking.                   |
+
+### Email templates
+
+Every email of the plugin is an **email template** that you edit like the system's own emails, under
+**Settings → Email → Templates**. The plugin's templates are listed after the system templates, marked "Plugin:
+reservations":
+
+| Template                                               | Sent when                                                   |
+| ------------------------------------------------------ | ----------------------------------------------------------- |
+| Booking request awaiting approval                      | A booking waits for approval (to the managers).             |
+| Booking confirmed                                      | A booking is confirmed or approved, with the check-in rules. |
+| Booking rejected / Booking request expired             | A request was rejected, or nobody decided before its start. |
+| Booking cancelled by a manager / Running booking ended early / Booking removed (reservations switched off) | A manager changed or removed a booking, or reservations were switched off. |
+| Not checked in, booking released                       | A booking was released as a no-show.                        |
+| Reminder 48 h before: still needed? / Reminder 24 h before | The reminders before a booking.                         |
+| Maintenance affects a booking / Resource has a problem / Resource works again | Maintenance or the health of the resource affects a booking. |
+| Reserved soon (to the current user) / Booking started, resource still in use / Booking started, please finish | Handover and overrun notices. |
+| Started during a booking (to the holder / to the managers) | A manager started during a booking.                     |
+
+- Edit the subject and the body in the visual editor, and the German and English texts in the **Translations**
+  dialog. **Variables** lists what you can use, for example `{{reservation.when}}` or `{{resource.name}}`.
+- **Your edits are kept.** Installing or updating the plugin only adds templates you do not have yet; it never
+  overwrites a template or translation you changed. **Reset to default** restores the version shipped with the
+  plugin.
+- Each recipient gets the mail in their own language; the notification categories still decide who receives which
+  mail. Emails need the [SMTP configuration](setup/smtp-email.md) and the application URL, as all Attraccess emails.
+- If you disable or uninstall the plugin, its templates are hidden and kept for later.
 
 ### Start checks and hook failures
 
