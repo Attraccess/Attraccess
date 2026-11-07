@@ -37,9 +37,9 @@
           "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
         }
       ],
-      "outputs": [],
+      "outputs": ["{workspaceRoot}/coverage/apps/attractap-lab/test-scripts"],
       "options": {
-        "command": "node --test apps/attractap-lab/real-cards/*.test.mjs apps/attractap-lab/real-cards/replay/*.test.mjs"
+        "command": "node scripts/crap-score/node-test.mjs apps/attractap-lab coverage/apps/attractap-lab/test-scripts apps/attractap-lab/real-cards/*.test.mjs apps/attractap-lab/real-cards/replay/*.test.mjs"
       }
     },
     "smoke": {
@@ -61,7 +61,8 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/attractap-lab"
-      }
+      },
+      "dependsOn": ["test-scripts"]
     }
   }
 }
