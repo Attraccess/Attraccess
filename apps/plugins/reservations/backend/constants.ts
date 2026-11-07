@@ -7,5 +7,3 @@ export const RESERVATION_NOTIFIER = Symbol.for('attraccess.reservations.notifier
 export const RESERVATION_CLOCK = Symbol.for('attraccess.reservations.clock');
 
 export type Clock = () => Date;
-
-export const NOTIFICATION_CATEGORY_IDS = ['reservations'] as const;

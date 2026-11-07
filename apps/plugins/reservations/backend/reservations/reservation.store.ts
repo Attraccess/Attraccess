@@ -167,6 +167,20 @@ export class ReservationStore {
       .getMany();
   }
 
+  /** Bookings an iCal feed shows (pending, confirmed, ended) in [from, to), optionally only one holder's. */
+  findForCalendar(resourceIds: number[], from: Date, to: Date, userId?: number): Promise<ReservationEntity[]> {
+    if (resourceIds.length === 0) return Promise.resolve([]);
+    const query = this.repo
+      .createQueryBuilder('r')
+      .where('r.resourceId IN (:...resourceIds) AND r.status IN (:...statuses)', {
+        resourceIds,
+        statuses: ['pending', 'confirmed', 'completed'],
+      })
+      .andWhere('r.endTime > :from AND r.startTime < :to', { from, to });
+    if (userId !== undefined) query.andWhere('r.userId = :userId', { userId });
+    return query.orderBy('r.startTime', 'ASC').take(5000).getMany();
+  }
+
   /** Occupying bookings (pending + confirmed) overlapping [from, to) for availability views. */
   findOccupying(resourceId: number, from: Date, to: Date): Promise<ReservationEntity[]> {
     return this.findLiveOverlapping(resourceId, from, to);
@@ -256,6 +270,16 @@ export class ReservationStore {
       if (/UNIQUE|constraint/i.test(String((error as { message?: string })?.message))) return false;
       throw error;
     }
+  }
+
+  /** Notices of the given kind already claimed for these reservations. */
+  async findNotices(reservationIds: number[], kind: string): Promise<NoticeEntity[]> {
+    if (reservationIds.length === 0) return [];
+    return this.context
+      .getRepository(NoticeEntity)
+      .createQueryBuilder('n')
+      .where('n.kind = :kind AND n.reservationId IN (:...reservationIds)', { kind, reservationIds })
+      .getMany();
   }
 
   /** Release a notice claim (when the send failed and should be retried next tick). */

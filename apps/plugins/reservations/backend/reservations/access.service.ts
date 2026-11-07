@@ -25,6 +25,11 @@ export class AccessService {
     return access.canMaintain(userId, resourceId);
   }
 
+  /** Holds `resources.update` (sees and manages every resource). */
+  hasUpdatePermission(userId: number): Promise<boolean> {
+    return this.context.resourceAccess.hasPermission(userId, 'resources.update');
+  }
+
   /** Resources the user manages: `null` means all (resources.update), otherwise the maintained ids. */
   async managedResourceIds(userId: number): Promise<number[] | null> {
     const access = this.context.resourceAccess;

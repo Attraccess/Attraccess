@@ -27,6 +27,9 @@ interface AccessState {
   maintainers: Map<number, Set<number>>; // userId -> resourceIds
   canStart: Map<number, { allowed: boolean; requiresSupervision: boolean; supervisionAllowed: boolean }>;
   maintenance: { maintenanceId: number; resourceId: number; startTime: Date; endTime: Date | null; reason: null }[];
+  sessions: { usageId: number; resourceId: number; userId: number; startTime: Date }[];
+  introduced: Map<number, number[]>; // userId -> resourceIds
+  maintained: Map<number, number[]>; // extra maintained ids (besides makeManager)
 }
 
 /** Real SQLite (temp file), real services, scripted host facade. Time is controlled via `setNow`. */
@@ -42,7 +45,17 @@ export async function createHarness() {
   await dataSource.runMigrations();
 
   let now = new Date('2026-06-01T08:00:00.000Z');
-  const state: AccessState = { permissions: new Map(), maintainers: new Map(), canStart: new Map(), maintenance: [] };
+  const state: AccessState = {
+    permissions: new Map(),
+    maintainers: new Map(),
+    canStart: new Map(),
+    maintenance: [],
+    sessions: [],
+    introduced: new Map(),
+    maintained: new Map(),
+  };
+  const dispatch = jest.fn(async (_request: unknown) => undefined);
+  const handlers = new Map<string, ((payload: never) => unknown)[]>();
   const knownResources = new Set([1, 2, 3]);
   const audit = { record: jest.fn(async () => ({ status: 'recorded' as const })) };
   const notifier = {
@@ -66,14 +79,30 @@ export async function createHarness() {
     audit,
     dataSource,
     logger: console,
+    notifications: { dispatch },
+    onEvent: (event: string, handler: (payload: never) => unknown) => {
+      handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+      return {
+        off: () =>
+          handlers.set(
+            event,
+            (handlers.get(event) ?? []).filter((h) => h !== handler),
+          ),
+      };
+    },
     runSerialized,
     getRepository: (entity: never) => dataSource.getRepository(entity),
     resourceAccess: {
       hasPermission: async (userId: number, permission: string) =>
         state.permissions.get(userId)?.has(permission) ?? false,
+      // Like the host: the maintenance permission counts as maintainer of every resource.
       canMaintain: async (userId: number, resourceId: number) =>
-        state.maintainers.get(userId)?.has(resourceId) ?? false,
+        (state.permissions.get(userId)?.has('resources.maintenance.manage') ?? false) ||
+        (state.maintainers.get(userId)?.has(resourceId) ?? false),
       listResourceIdsMaintained: async (userId: number) => [...(state.maintainers.get(userId) ?? [])],
+      listResourceIdsIntroduced: async (userId: number) => state.introduced.get(userId) ?? [],
+      getActiveSessions: async (resourceId: number) =>
+        state.sessions.filter((session) => session.resourceId === resourceId),
       canStart: async (userId: number) =>
         state.canStart.get(userId) ?? { allowed: false, requiresSupervision: false, supervisionAllowed: false },
       getMaintenanceWindows: async (resourceId: number, from: Date, to: Date) =>
@@ -126,6 +155,12 @@ export async function createHarness() {
     state,
     audit,
     notifier,
+    dispatch,
+    clock,
+    /** Delivers a host event to the plugin's subscribers (like the host's emitter). */
+    async emit(event: string, payload: unknown) {
+      for (const handler of handlers.get(event) ?? []) await handler(payload as never);
+    },
     store,
     settings,
     globalSettings,
