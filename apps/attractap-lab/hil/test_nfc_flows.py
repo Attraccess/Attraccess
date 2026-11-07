@@ -33,6 +33,21 @@ def rows(api, sql, *args):
         return db.execute(sql, args).fetchall()
 
 
+def other_paired_reader(api):
+    """A second paired reader record (never connected): the setting only accepts paired readers."""
+    with sqlite3.connect(api.database) as db:
+        cursor = db.execute(
+            "INSERT INTO attractap (name, apiTokenHash, pairingState, firmwareCapabilitiesCardrelay) "
+            "VALUES ('HIL other reader', 'unused', 'paired', 1)"
+        )
+        return cursor.lastrowid
+
+
+def delete_reader(api, reader_id):
+    with sqlite3.connect(api.database) as db:
+        db.execute("DELETE FROM attractap WHERE id = ?", (reader_id,))
+
+
 def pending(api, uid, kind):
     return rows(api, "SELECT id FROM nfc_card_pending_change WHERE uid = ? AND kind = ?", uid, kind)
 
@@ -339,8 +354,9 @@ def test_card_writer_setting_blocks_unselected_reader(api, admin, reader, resour
     idle_reader(hooks)
     status, original = api.call("GET", "/attractap/card-writer-settings", token=admin)
     assert status == 200, original
+    other = other_paired_reader(api)
     status, body = api.call("PUT", "/attractap/card-writer-settings",
-                            {"mode": "selected", "readerIds": [reader["id"] + 1000]}, token=admin)
+                            {"mode": "selected", "readerIds": [other]}, token=admin)
     assert status == 200, body
     try:
         status, body, mark = start_enroll(api, admin, reader, people["dave"])
@@ -361,7 +377,7 @@ def test_card_writer_setting_blocks_unselected_reader(api, admin, reader, resour
 
         # Switched away while armed: a presented card is refused without being touched.
         status, body = api.call("PUT", "/attractap/card-writer-settings",
-                                {"mode": "selected", "readerIds": [reader["id"] + 1000]}, token=admin)
+                                {"mode": "selected", "readerIds": [other]}, token=admin)
         assert status == 200, body
         probe = reader["console"].mark()
         present_until(emulator, "stranger", lambda: "READER_NOT_ALLOWED_TO_WRITE_CARDS" in reader["console"].since(probe),
@@ -373,6 +389,7 @@ def test_card_writer_setting_blocks_unselected_reader(api, admin, reader, resour
         emulator.command("remove")
         api.call("PUT", "/attractap/card-writer-settings",
                  {"mode": original["mode"], "readerIds": original["readerIds"]}, token=admin)
+        delete_reader(api, other)
         cancel_armed_screen(hooks)
     idle_reader(hooks)
 

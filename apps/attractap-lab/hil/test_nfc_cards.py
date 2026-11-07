@@ -114,9 +114,14 @@ def sign_out(hooks, timeout=10):
         listing = hooks.widgets()
         button = next((text for text in SIGN_OUT if find(listing, text)), None)
         if button:
-            hooks.tap_text(button)
-            break
-        dismiss_popup(hooks)
+            try:
+                hooks.tap_text(button)
+                break
+            except ReaderCommandError as error:  # the screen changed between listing and tapping: look again
+                if error.code != "WIDGET_NOT_FOUND":
+                    raise
+        else:
+            dismiss_popup(hooks)
         assert time.monotonic() < deadline, f"no sign-out button on {listing['screen']}"
         time.sleep(0.3)
     while signed_in(hooks):
