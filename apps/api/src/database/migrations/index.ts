@@ -193,3 +193,5 @@ export * from './1792100000000-attractap-reader-ui-capabilities';
 export * from './1792200000000-reader-ui-settings';
 export * from './1792300000000-sso-role-claim-paths';
 export * from './1792400000000-csv-export-template';
+export * from './1792450000000-nfc-card-pending-change';
+export * from './1792500000000-attractap-card-relay-capability';

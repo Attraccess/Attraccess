@@ -53,6 +53,18 @@ class AttractapCapabilities {
   })
   hasLeds!: boolean;
 
+  @Column({
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  @ApiProperty({
+    description:
+      'Whether the reader relays card APDUs to the server and holds no card keys (firmware 2.0.0 and later). Readers without it get no card functions.',
+    example: true,
+    default: false,
+  })
+  cardRelay!: boolean;
   @Column({ type: 'simple-json', nullable: true })
   @ApiProperty({
     description:

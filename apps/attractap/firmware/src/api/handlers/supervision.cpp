@@ -12,25 +12,6 @@ void API::requestSupervision(uint32_t resourceId)
     this->sendMessage("SUPERVISION_REQUEST", payload);
 }
 
-void API::requestSupervisorCardAuthenticationData(uint8_t *uid, uint8_t uidLength, uint32_t resourceId)
-{
-    this->logger.info("Requesting supervisor card authentication data");
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    payload["uid"] = hexToString(uid, uidLength);
-    payload["resourceId"] = resourceId;
-    this->sendMessage("REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA", payload);
-}
-
-void API::confirmSupervisorCardAuth(uint32_t resourceId)
-{
-    this->logger.info("Confirming supervisor card authentication");
-    JsonDocument doc;
-    JsonObject payload = doc.to<JsonObject>();
-    payload["resourceId"] = resourceId;
-    this->sendMessage("SUPERVISOR_CARD_AUTH_CONFIRMED", payload);
-}
-
 void API::cancelSupervision()
 {
     JsonDocument doc;
@@ -110,26 +91,6 @@ void API::onSupervisorCardAuthenticationData(JsonObject data)
     SupervisorCardAuthenticationResponse response;
     response.error = payload["error"].is<const char *>() ? payload["error"].as<std::string>() : std::string("");
     response.username = payload["username"].is<const char *>() ? payload["username"].as<std::string>() : std::string("");
-    response.keyNo = payload["keyNo"].is<uint8_t>() ? payload["keyNo"].as<uint8_t>() : 0;
-
-    std::string keyHex = payload["key"].is<const char *>() ? payload["key"].as<std::string>() : std::string("");
-    if (keyHex.length() == 32)
-    {
-        uint8_t keyBytes[16];
-        if (stringToHexArray(keyHex, keyBytes, 16))
-        {
-            memcpy(response.keyBytes, keyBytes, 16);
-            response.keyLen = 16;
-        }
-        else if (response.error.length() == 0)
-        {
-            response.error = "Invalid hex key";
-        }
-    }
-    else if (keyHex.length() > 0 && response.error.length() == 0)
-    {
-        response.error = "Invalid key length";
-    }
 
     this->supervisorCardAuthenticationResponseCallback(response);
 }

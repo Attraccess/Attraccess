@@ -11,6 +11,7 @@ check, and the reader is wiped the same way when the run ends.
 
 import json
 import os
+import re
 from pathlib import Path
 import socket
 import time
@@ -27,6 +28,7 @@ from attractap_lab.reader_screen import ReaderTestHooks
 from attractap_lab.workflow import claim, flash_reader, send_reader_wifi
 
 from support import Api, ReaderConsole
+import wire as wiretap
 
 ENVIRONMENT = Path(__file__).parents[1] / "example-emulator-env.yaml"
 PROFILE = os.environ.get("READER_PROFILE") or efuse.PLAIN
@@ -92,6 +94,40 @@ def emulator_log(request, artifacts):
         lines = request.getfixturevalue("emulator").read_log(0.5)
         with (artifacts / "emulator.log").open("a") as out:
             out.write(f"===== {request.node.name}\n" + "\n".join(lines) + "\n")
+
+
+@pytest.fixture(scope="session")
+def wire():
+    """Plaintext of the reader conversation when the lab API runs with the wiretap preload."""
+    tap = wiretap.from_env()
+    if tap is None:
+        pytest.skip("needs WIRETAP_FILE: the lab API preloaded with real-cards/wiretap.cjs")
+    return tap
+
+
+@pytest.fixture(autouse=True)
+def rf_stats(request, artifacts):
+    """Per test: card exchanges the server made and PN532 exchange failures the reader logged.
+
+    The reader logs every failed InDataExchange ("PN532 InDataExchange status 0x..") and reports
+    it to the server as CARD_REMOVED, so failures / exchanges is the radio failure rate.
+    """
+    tap = wiretap.from_env()
+    if "reader" not in request.fixturenames or tap is None:
+        yield
+        return
+    console = request.getfixturevalue("reader")["console"]
+    wire_mark, log_mark, started = tap.mark(), console.mark(), time.time()
+    yield
+    log = console.since(log_mark)
+    entry = {
+        "test": request.node.nodeid, "start": started, "seconds": round(time.time() - started, 1),
+        "exchanges": tap.exchanges(wire_mark),
+        "pn532_failures": len(re.findall(r"PN532 InDataExchange status 0x[0-9A-Fa-f]+", log)),
+        "statuses": sorted(set(re.findall(r"PN532 InDataExchange status (0x[0-9A-Fa-f]+)", log))),
+    }
+    with (artifacts / "rf-stats.jsonl").open("a") as out:
+        out.write(json.dumps(entry) + "\n")
 
 
 def open_console(target, console):

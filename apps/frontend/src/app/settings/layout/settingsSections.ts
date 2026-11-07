@@ -79,6 +79,12 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     permission: 'system.settings.manage',
   },
   {
+    key: 'attractap',
+    path: '/settings/attractap',
+    group: 'operations',
+    permission: 'system.settings.manage',
+  },
+  {
     key: 'auditLog',
     path: '/settings/audit-log',
     group: 'operations',

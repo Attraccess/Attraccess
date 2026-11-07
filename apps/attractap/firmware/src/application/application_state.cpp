@@ -75,6 +75,11 @@ void Application::updateLedState() {
   if (State::consumeSessionProblemNotice()) {
     this->led.triggerError();
   }
+  // A card the server did not verify: the error flash, as for a wrong-key card on firmware 1.x.
+  if (this->cardRejectedLedPending) {
+    this->cardRejectedLedPending = false;
+    this->led.triggerError();
+  }
 }
 #endif
 
@@ -160,6 +165,10 @@ bool Application::processConnectionState()
   if (!apiState.authenticated ||
       (!networkState.ethernet_connected && !networkState.wifi_connected) ||
       !websocketState.connected) {
+    // The server's commands for an open card conversation can no longer arrive, and a late one
+    // after the reconnect belongs to a session the server already dropped: close it now instead of
+    // keeping the card (and presence probing) blocked until the relay's own timeout.
+    this->cardRelay.cancel();
 #ifdef HAS_LVGL_DISPLAY
     this->resetSessionOnDisconnect();
     // Drop any pending/active enrollment. The trigger is set asynchronously by
@@ -299,6 +308,8 @@ bool Application::processCardFlowState()
   if (this->state == APPLICATION_STATE_SUPERVISION) {
     SupervisionFlow::Outcome outcome = this->supervision.tick(millis());
     if (outcome != SupervisionFlow::Outcome::None) {
+      // Cancelled or timed out while the server may still talk to the supervisor card: free it.
+      if (outcome == SupervisionFlow::Outcome::ReturnToRouting) this->cardRelay.cancel();
       this->externalState = EXTERNAL_STATE_NONE;
       this->state = APPLICATION_STATE_INIT;
       const bool hadLogin = this->unlocked;
@@ -326,6 +337,7 @@ bool Application::processCardFlowState()
   // countdown runs out or someone presses cancel. Nobody is signed in, so routing starts fresh.
   if (this->state == APPLICATION_STATE_MASS_INTRODUCTION) {
     if (this->massIntroduction.tick(millis()) == MassIntroductionFlow::Outcome::ReturnToRouting) {
+      this->cardRelay.cancel(); // the session ended mid-card: the server's commands stop reaching it
       this->externalState = EXTERNAL_STATE_NONE;
       this->state = APPLICATION_STATE_INIT;
     }
@@ -354,8 +366,8 @@ bool Application::processAuthenticationState()
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
-  // This must run before the AUTHENTICATE_CARD early return (card lifted while
-  // waiting for its key). Otherwise that wait would never expire.
+  // This must run before the AUTHENTICATE_CARD early return (no server verdict
+  // for the tapped card). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
     this->finishCardAuthentication(false);
     this->beeper.errorBeep();
@@ -394,22 +406,12 @@ bool Application::processAuthenticationState()
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
 
-#ifndef HAS_LVGL_DISPLAY
-    // For non-display mode, process authentication immediately since the card
-    // is still present and won't trigger another detection event
-    this->processCardAuthenticationData();
-#else
+#ifdef HAS_LVGL_DISPLAY
     this->nfc.enableCardDetection();
-    // The card that triggered the auth-data request is still on the reader.
-    // handleCardDetection() only emits a detection event on an absent->present
-    // transition, so it will not re-fire while the card stays put. Authenticate
-    // immediately instead of forcing the user to remove and re-present the card
-    // (the double-tap bug). If the card was already lifted, fall back to the
-    // detection callback on the next presentation.
-    if (this->nfc.isCardPresent()) {
-      this->processCardAuthenticationData();
-    }
 #endif
+    // The server already verified the card through the relay, so there is nothing left to do with
+    // the card itself: show the outcome right away.
+    this->processCardAuthenticationData();
     return true;
   }
 
@@ -506,6 +508,11 @@ void Application::renderResourceState()
   }
 #else
 
+  if (this->sessionEndNotifyAtMs != 0 && static_cast<int32_t>(millis() - this->sessionEndNotifyAtMs) >= 0) {
+    this->sessionEndNotifyAtMs = 0;
+    this->api.sendReaderSessionEnded();
+  }
+
 #ifdef HAS_WS2812_LED
   // Card-confirm window over: nothing starts (fail closed).
   if (this->liteStep.expired(millis())) this->closeLiteStep();
@@ -559,6 +566,9 @@ void Application::renderResourceState()
 #endif
       }
     }
+
+    // The card action is done: the server forgets the user once the action request is behind it.
+    this->sessionEndNotifyAtMs = millis() + 1500;
 
     // Reset state back to waiting for card
     this->state = APPLICATION_STATE_WAIT_FOR_CARD;

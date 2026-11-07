@@ -21,7 +21,7 @@ describe('AttractapFormsHandler', () => {
     });
 
     it('returns empty object when formDrafts present but key missing', () => {
-      const socket = fixture.createMockSocket({ state: { lastAuthenticatedUserId: 1, formDrafts: {} } });
+      const socket = fixture.createMockSocket({ state: { verifiedUserId: 1, formDrafts: {} } });
       expect(fixture.handler.getFormDraft(socket, 10, ResourceFormAction.START)).toEqual({});
     });
 
@@ -29,7 +29,7 @@ describe('AttractapFormsHandler', () => {
       const stored = { 1: 'a', 2: 'b' };
       const socket = fixture.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           formDrafts: { [`10:${ResourceFormAction.START}`]: stored },
         },
       });
@@ -41,7 +41,7 @@ describe('AttractapFormsHandler', () => {
     it('deletes the key when formDrafts present', () => {
       const socket = fixture.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           formDrafts: {
             [`10:${ResourceFormAction.START}`]: { 1: 'a' },
             [`11:${ResourceFormAction.END}`]: { 2: 'b' },
@@ -65,7 +65,7 @@ describe('AttractapFormsHandler', () => {
     it('clears only the cancelled form draft', () => {
       const socket = fixture.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           formDrafts: {
             [`10:${ResourceFormAction.START}`]: { 1: 'a' },
             [`11:${ResourceFormAction.END}`]: { 2: 'b' },
@@ -111,7 +111,7 @@ describe('AttractapFormsHandler', () => {
       ]);
       const socket = fixture.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           formDrafts: { [`10:${ResourceFormAction.START}`]: { 1: 'req-value', 2: 'opt-value' } },
         },
       });
@@ -185,7 +185,7 @@ describe('AttractapFormsHandler', () => {
       ]);
       const socket = fixture.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           formDrafts: { [`10:${ResourceFormAction.START}`]: { 1: '', 2: null } },
         },
       });
@@ -317,7 +317,7 @@ describe('AttractapFormsHandler', () => {
       });
       const socket = fixture.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           formDrafts: { [`10:${ResourceFormAction.START}`]: { 1: 'draft-1' } },
         },
       });
@@ -414,12 +414,25 @@ describe('AttractapFormsHandler', () => {
       );
     });
 
+    it('does not keep answers when another user logged in while they were checked', async () => {
+      fixture.mockResourceActionGuard.validateResourceAction.mockResolvedValue(true);
+      const socket = fixture.createMockSocket();
+      fixture.mockResourceFormsService.validatePageAnswers.mockImplementation(async () => {
+        socket.state.verifiedUserId = 2;
+        return { valid: true, errors: {} };
+      });
+
+      await fixture.handler.handleResourceUsageFormSubmitPage(socket, eventData);
+
+      expect(socket.state.formDrafts).toBeUndefined();
+    });
+
     it('merges into an existing draft for the same key when valid', async () => {
       fixture.mockResourceActionGuard.validateResourceAction.mockResolvedValue(true);
       fixture.mockResourceFormsService.validatePageAnswers.mockResolvedValue({ valid: true, errors: {} });
       const socket = fixture.createMockSocket({
         state: {
-          lastAuthenticatedUserId: 1,
+          verifiedUserId: 1,
           formDrafts: { [`10:${ResourceFormAction.START}`]: { 9: 'existing' } },
         },
       });

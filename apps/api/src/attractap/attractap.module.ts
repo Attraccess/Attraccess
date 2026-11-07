@@ -28,6 +28,7 @@ import {
   AttractapCredentialEvent,
   AttractapInstallation,
   NFCCard,
+  NFCCardPendingChange,
   Resource,
   User,
 } from '@attraccess/database-entities';
@@ -63,6 +64,12 @@ import { ResourceOperatingAttributionModule } from '../resources/operating-inter
 import { AuditModule } from '../audit/audit.module';
 import { DeviceEnrollmentModule } from '../device-enrollment/device-enrollment.module';
 import { SettingsModule } from '../settings/settings.module';
+import { CardConversationService } from './websockets/card-conversation.service';
+import { CardDetectedRouter } from './websockets/card-detected.router';
+import { CardOperationsService } from './websockets/card-operations.service';
+import { CardWriterPolicyService } from './websockets/card-writer-policy.service';
+import { CardWriterSettingsController } from './card-writer-settings.controller';
+import { EncryptionModule } from '../encryption/encryption.module';
 import { ReaderUiModule } from '../plugin-system/reader-ui/reader-ui.module';
 import { AttractapUiHandler } from './websockets/handlers/ui/ui.handler';
 import { CardSessionService } from './websockets/handlers/ui/card-session.service';
@@ -81,6 +88,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
       AttractapCredentialEvent,
       AttractapInstallation,
       NFCCard,
+      NFCCardPendingChange,
       Resource,
       User,
     ]),
@@ -103,6 +111,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     AuditModule,
     DeviceEnrollmentModule,
     SettingsModule,
+    EncryptionModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,
     ReaderUiModule,
@@ -116,6 +125,10 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     SessionMetrics,
     CardAccessService,
     AttractapService,
+    CardConversationService,
+    CardDetectedRouter,
+    CardOperationsService,
+    CardWriterPolicyService,
     WebsocketService,
     AttractapGateway,
     WebSocketEventService,
@@ -143,6 +156,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
   controllers: [
     AttractapController,
     AttractapNfcCardsController,
+    CardWriterSettingsController,
     AttractapFirmwareController,
     ResourceAttractapsController,
     AttractapPairingController,

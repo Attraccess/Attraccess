@@ -75,8 +75,8 @@ void ReaderWorkflow::testTransientRouting()
     assert(lv_screen_active() == Display::confirmScreen.getScreen());
     tapCard();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen() && !Display::transientActive());
-    assert(server.count("REQUEST_CARD_AUTHENTICATION_DATA") > 0);
-    server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","language":"de","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})");
+    assert(server.count("CARD_DETECTED") > 0);
+    server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","language":"de","hasIntroduction":true})");
     pump(250); nfc.setPresent(0, false); list();
     assert(label(lv_screen_active(), "Abmelden") && lv_obj_is_visible(label(lv_screen_active(), "Abmelden")));
 
@@ -88,15 +88,15 @@ void ReaderWorkflow::testTransientRouting()
     click("Abmelden");
     list(false);
     tapCard();
-    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_NOT_FOUND"})"); pump();
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_REMOVED"})"); pump();
     nfc.setPresent(0, false); pump();
-    assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Karte nicht gefunden"));
+    assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Karte zu früh entfernt"));
     // A card tapped meanwhile dismisses it and signs in as usual.
-    const auto requests = server.count("REQUEST_CARD_AUTHENTICATION_DATA");
+    const auto requests = server.count("CARD_DETECTED");
     tapCard();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen() && !Display::transientActive());
-    assert(server.count("REQUEST_CARD_AUTHENTICATION_DATA") == requests + 1);
-    server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","language":"de","keyNo":0,"key":"00000000000000000000000000000000","hasIntroduction":true})");
+    assert(server.count("CARD_DETECTED") == requests + 1);
+    server.push("CARD_AUTHENTICATION_DATA", "{\"username\":\"" + username + R"(","language":"de","hasIntroduction":true})");
     pump(250); nfc.setPresent(0, false); list();
     assert(State::getApiState().userAuthenticated);
     // A drawer that is open when a full-screen flow appears under it (a late top-up refusal)

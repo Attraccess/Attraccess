@@ -12,6 +12,8 @@ const api = vi.hoisted(() => ({
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   resourceQuery: { isLoading: false, isError: false } as { isLoading: boolean; isError: boolean },
+  alerts: [] as unknown[],
+  readers: undefined as unknown[] | undefined,
   clearPending: false,
   saveResource: vi.fn(),
   saveReader: vi.fn(),
@@ -31,15 +33,10 @@ vi.mock('../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: api.toastSuccess, error: api.toastError }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
-  useAttractapServiceGetReaders: () => ({ data: [{ id: 7, name: 'Laser reader' }] }),
+  useAttractapServiceGetReaders: () => ({ data: api.readers }),
 }));
 vi.mock('./readerUiApi', () => ({
-  useReaderUiAlerts: () => ({
-    data: [
-      { id: 1, kind: 'breaker-open', message: '5 failures', plugin: 'reservations', readerId: null, createdAt: '' },
-      { id: 2, kind: 'crash-loop', message: 'panic', plugin: null, readerId: 7, createdAt: '' },
-    ],
-  }),
+  useReaderUiAlerts: () => ({ data: api.alerts }),
   useClearReaderUiAlert: () => ({ mutate: api.clear, isPending: api.clearPending }),
   useResourceReaderUiSettings: () => ({
     ...api.resourceQuery,
@@ -93,6 +90,11 @@ describe('reader UI admin', () => {
     vi.clearAllMocks();
     api.resourceQuery = { isLoading: false, isError: false };
     api.clearPending = false;
+    api.alerts = [
+      { id: 1, kind: 'breaker-open', message: '5 failures', plugin: 'reservations', readerId: null, createdAt: '' },
+      { id: 2, kind: 'crash-loop', message: 'panic', plugin: null, readerId: 7, createdAt: '' },
+    ];
+    api.readers = [{ id: 7, name: 'Laser reader', pairingState: 'paired' }];
   });
 
   it('lists alerts built from kind, plugin and reader, and clears one', async () => {
@@ -117,6 +119,27 @@ describe('reader UI admin', () => {
     render(<ReaderUiAlerts readerId={7} />);
     expect(screen.queryByText('alerts.kind.breaker-open')).not.toBeInTheDocument();
     expect(screen.getByText('alerts.kind.crash-loop')).toBeInTheDocument();
+  });
+
+  it('hides alerts of readers that are not paired once the reader list has loaded', () => {
+    api.alerts = [
+      ...api.alerts,
+      { id: 3, kind: 'crash-loop', message: 'panic', plugin: null, readerId: 9, createdAt: '' },
+    ];
+    api.readers = [
+      { id: 7, name: 'Laser reader', pairingState: 'paired' },
+      { id: 9, name: 'Token reader', pairingState: 'unpaired' },
+    ];
+    render(<ReaderUiAlerts />);
+    expect(document.querySelector('[data-cy="reader-ui-alert-1"]')).not.toBeNull();
+    expect(document.querySelector('[data-cy="reader-ui-alert-2"]')).not.toBeNull();
+    expect(document.querySelector('[data-cy="reader-ui-alert-3"]')).toBeNull();
+  });
+
+  it('keeps reader alerts while the reader list is still loading', () => {
+    api.readers = undefined;
+    render(<ReaderUiAlerts />);
+    expect(document.querySelector('[data-cy="reader-ui-alert-2"]')).not.toBeNull();
   });
 
   it('shows contributions with resource names, readable slots and translated reasons', () => {

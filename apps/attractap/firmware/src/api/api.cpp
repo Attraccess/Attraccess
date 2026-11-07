@@ -145,7 +145,7 @@ bool API::sendMessage(const char *type, JsonObject payload, uint32_t messageId)
             this->logger.error("Failed to serialize event to buffer (small)");
             return false;
         }
-        this->logger.info((std::string("Sending reader event: ") + type).c_str());
+        this->logSendingEvent(type);
         return this->transport.sendMessage(json, n);
     }
 
@@ -161,8 +161,20 @@ bool API::sendMessage(const char *type, JsonObject payload, uint32_t messageId)
         this->logger.error("Failed to serialize event to dynamically allocated buffer");
         return false;
     }
-    this->logger.info((std::string("Sending reader event: ") + type).c_str());
+    this->logSendingEvent(type);
     return this->transport.sendMessage(json.get(), n);
+}
+
+void API::logSendingEvent(const char *type)
+{
+    // A tap relays 6 to 32 card answers; an INFO line each would hold up the main loop on the
+    // USB serial in the middle of the card conversation.
+    if (strcmp(type, "CARD_APDU_RESPONSE") == 0)
+    {
+        this->logger.debugf("Sending reader event: %s", type);
+        return;
+    }
+    this->logger.info((std::string("Sending reader event: ") + type).c_str());
 }
 
 void API::disableConnectionAttempts()
@@ -249,10 +261,6 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     {
         this->onMassIntroductionStart(inboundDoc["data"].as<JsonObject>());
     }
-    else if (strcmp(eventType, "MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA") == 0)
-    {
-        this->onMassIntroductionCardAuthenticationData(inboundDoc["data"].as<JsonObject>());
-    }
     else if (strcmp(eventType, "MASS_INTRODUCTION_RESULT") == 0)
     {
         this->onMassIntroductionResult(inboundDoc["data"].as<JsonObject>());
@@ -268,12 +276,6 @@ void API::dispatchIncomingEvent(const char *eventType, uint32_t requestId)
     else if (strcmp(eventType, "ENROLL_NEW_CARD") == 0)
     {
         this->onEnrollNewCard(inboundDoc["data"].as<JsonObject>());
-    }
-    else if (strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0)
-    {
-        // The server only sends us this event to report an error; the happy
-        // path responds with ENROLL_NEW_CARD instead.
-        this->onEnrollNewCardRequestNFCKeyError(inboundDoc["data"].as<JsonObject>());
     }
     else if (strcmp(eventType, "RESET_NFC_CARD") == 0)
     {
@@ -397,7 +399,19 @@ void API::processIncomingMessage(const char *buf, size_t len)
     const char *eventType = inboundDoc["data"]["type"].as<const char *>();
     if (!eventType)
     {
-        logger.error((std::string("Missing event type, payload: ") + std::string(buf, len)).c_str());
+        logger.errorf("Missing event type in %u byte message", static_cast<unsigned>(len));
+        return;
+    }
+
+    // Card APDUs are the latency-critical path of a tap: handled before anything else, never ACKed.
+    if (strcmp(eventType, "CARD_APDU") == 0)
+    {
+        this->onCardApdu(inboundDoc["data"].as<JsonObject>());
+        return;
+    }
+    if (strcmp(eventType, "CARD_CONVERSATION_END") == 0)
+    {
+        this->onCardConversationEnd(inboundDoc["data"].as<JsonObject>());
         return;
     }
 
@@ -423,12 +437,15 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // that must not surface as a user-facing error dialog; route them to the handler.
     bool isCrashReportEvent = strcmp(eventType, "READER_CRASH_REPORT") == 0;
 
-    // Enrollment key-request errors (e.g. CARD_ALREADY_ENROLLED) must reach the
-    // enrollment handler so it can show the in-screen message and re-arm card
-    // detection. The generic interceptor would otherwise pop a generic dialog
-    // and return before recovery runs, wedging the reader with detection off
-    // until enrollment times out (ATT-503).
-    bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD_REQUEST_NFC_KEY") == 0;
+    // Enrollment and reset errors (e.g. CARD_ALREADY_ENROLLED, WRONG_CARD) must reach their
+    // handlers so they can show the in-screen message and re-arm card detection. The generic
+    // interceptor would otherwise pop a generic dialog and return before recovery runs, wedging
+    // the reader with detection off until the flow times out (ATT-503).
+    bool isEnrollKeyRequestEvent = strcmp(eventType, "ENROLL_NEW_CARD") == 0 || strcmp(eventType, "RESET_NFC_CARD") == 0;
+
+    // A rejected tap (CARD_NOT_FOUND, CARD_AUTHENTICATION_FAILED, BUSY, ...) belongs to the pending
+    // sign-in: its handler ends the "checking card" state and says why the sign-in failed.
+    bool isCardAuthenticationEvent = strcmp(eventType, "CARD_AUTHENTICATION_DATA") == 0;
 
     // Two-card supervision errors (e.g. SUPERVISOR_NOT_AUTHORIZED, NO_SUPERVISORS_AVAILABLE) are
     // recoverable in-flow: the supervision screen surfaces them and either keeps waiting or aborts
@@ -441,15 +458,14 @@ void API::processIncomingMessage(const char *buf, size_t len)
     // Mass introduction errors (e.g. CARD_NOT_FOUND, CARD_MISMATCH) concern one tapped card; the
     // scan screen shows them and keeps waiting for the next card (ATT-1151).
     bool isMassIntroductionEvent = strcmp(eventType, "MASS_INTRODUCTION_START") == 0 ||
-                                   strcmp(eventType, "MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA") == 0 ||
                                    strcmp(eventType, "MASS_INTRODUCTION_RESULT") == 0 ||
                                    strcmp(eventType, "MASS_INTRODUCTION_END") == 0;
 
     // Early error handling: if payload.error is present and non-empty, raise error callback and stop
     // Background stats failures must not interrupt start/stop controls with an error.
     const bool isUsageStatsEvent = strcmp(eventType, "RESOURCE_USAGE_STATS") == 0;
-    if (!isUsageStatsEvent && !isUiEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isSupervisionEvent &&
-        !isMassIntroductionEvent && inboundDoc["data"]["payload"].is<JsonObject>())
+    if (!isUsageStatsEvent && !isUiEvent && !isCrashReportEvent && !isEnrollKeyRequestEvent && !isCardAuthenticationEvent &&
+        !isSupervisionEvent && !isMassIntroductionEvent && inboundDoc["data"]["payload"].is<JsonObject>())
     {
         JsonObject payload = inboundDoc["data"]["payload"].as<JsonObject>();
         if (payload["error"].is<const char *>())

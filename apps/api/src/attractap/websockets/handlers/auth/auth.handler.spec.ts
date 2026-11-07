@@ -75,7 +75,9 @@ describe('AttractapAuthHandler', () => {
     it.each([{ payload: { firmware: { name: 'attractap' } } }, { payload: {} }])(
       'creates nothing and sends no reply: readers join through pairing',
       async (data) => {
-        await expect(handler.handleReaderRegister(mockSocket as any, data as AttractapEvent['data'])).resolves.toBeUndefined();
+        await expect(
+          handler.handleReaderRegister(mockSocket as any, data as AttractapEvent['data']),
+        ).resolves.toBeUndefined();
 
         expect(mockAttractapService.createNewReader).not.toHaveBeenCalled();
         expect(mockAudit.recordAttractap).not.toHaveBeenCalled();
@@ -279,7 +281,7 @@ describe('AttractapAuthHandler', () => {
       expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
     });
 
-    it('sets readerId, sends READER_AUTHENTICATED, and pushes the resource list on a valid token', async () => {
+    it('sets readerId and sends READER_AUTHENTICATED on a valid token, marking the reader as not paired', async () => {
       mockAttractapService.findReaderById.mockResolvedValue({
         id: 42,
         name: 'Reader A',
@@ -309,29 +311,28 @@ describe('AttractapAuthHandler', () => {
           }),
         }),
       );
+      // Signed in by token means not paired: no functions, and no resources to show.
+      expect(mockSocket.state.pairingRequired).toBe(true);
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+    });
+
+    it('signs a paired reader in by its certificate without the pairing gate and pushes the resource list', async () => {
+      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader A', pairingState: 'paired' });
+      mockSocket.state.pairingRequired = true;
+
+      await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(true);
+
+      expect(mockSocket.state.pairingRequired).toBe(false);
       expect(mockResourceListService.sendResourceListToSocket).toHaveBeenCalledWith(mockSocket);
     });
 
-    it('sends READER_AUTHENTICATED before pushing the resource list', async () => {
-      mockAttractapService.findReaderById.mockResolvedValue({
-        id: 42,
-        name: 'Reader A',
-        apiTokenHash: 'hashed',
-        pairingState: 'unpaired',
-      });
-      mockVerifyToken.mockResolvedValue(true);
+    it('does not sign a reader in by certificate that is no longer paired', async () => {
+      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader A', pairingState: 'revoked' });
 
-      const callOrder: string[] = [];
-      mockSocket.sendMessage.mockImplementation(async () => {
-        callOrder.push('sendMessage');
-      });
-      mockResourceListService.sendResourceListToSocket.mockImplementation(async () => {
-        callOrder.push('sendResourceList');
-      });
+      await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(false);
 
-      await handler.handleAuthentication(mockSocket as any, data);
-
-      expect(callOrder).toEqual(['sendMessage', 'sendResourceList']);
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
     });
 
     it('does not send the unauthorized response on the happy path', async () => {

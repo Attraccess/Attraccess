@@ -276,6 +276,20 @@ pytest. Logs, the emulator trace and camera photos land in
 `apps/attractap-lab/hil-artifacts/lab-artifacts/<session>`. These tests are
 not part of `pnpm nx run attractap-lab:test`, which runs without hardware.
 
+The reader's connection is TLS inside the WebSocket, so the plaintext the
+`wire` fixture reads (card session ids, personalised resource lists, APDUs)
+only exists inside the API process. The runner therefore starts the API with
+the `real-cards/wiretap.cjs` preload (`NODE_OPTIONS=--require …`, passed
+through `pnpm serve` and nx to the API) and exports `WIRETAP_FILE`
+(`hil-artifacts/wiretap.jsonl`, emptied at the start of each run). Against an
+API started by hand without the preload, the tests that need the wire
+(`test_z_matrix_extra.py`) skip. The file holds card APDUs in full: lab
+evidence only, never commit it.
+
+The tests in `test_nfc_cards.py` build on each other: one whose prerequisite
+(an enrolled card from an earlier test) is missing fails and names it, so
+run that file whole rather than picking single tests from it with `-k`.
+
 `test_power_cycle_stays_paired` switches the reader off with its power button,
 waits, switches it on again and expects it to open its secure session without
 a new approval. It runs only for the variants in `POWER_BUTTON_VARIANTS`

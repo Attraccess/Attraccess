@@ -65,8 +65,8 @@ void trimString(std::string &s);
  *   expander register access).
  * - The lock is strictly a LEAF lock: while holding it, never take lv_lock,
  *   never fire application callbacks, never block on queues/other mutexes.
- * - Recursive, so nested NFC helpers (e.g. getAvailableKeyNo -> authenticate)
- *   are safe on the same task.
+ * - Recursive, so nested NFC calls (e.g. the card detection callback calling
+ *   enableCardDetection() while NFC::loop() holds the lock) are safe on the same task.
  */
 class I2CBusLock
 {

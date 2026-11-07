@@ -51,7 +51,7 @@ export class AttractapUiHandler {
   public handleStepResult(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) {
     const payload = eventData.payload ?? {};
     // The reader is still signed in while it answers, so the card session must not run out underneath.
-    this.cardSessions.resume(socket, payload.cardSessionId, socket.state?.lastAuthenticatedUserId);
+    this.cardSessions.resume(socket, payload.cardSessionId, socket.state?.verifiedUserId);
     this.steps.handleResult(socket, payload);
   }
 
@@ -59,13 +59,26 @@ export class AttractapUiHandler {
     this.slots.renderReport(socket, eventData.payload ?? {});
   }
 
-  public handleCardSessionEnded(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']) {
+  /**
+   * Ends the named card session. Returns true when that was the login of the verified user (the reader
+   * signed out by itself, logout or timeout); the gateway then ends the login as on READER_SESSION_ENDED.
+   * False for an unknown or older card session: a user who tapped since stays signed in.
+   */
+  public handleCardSessionEnded(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']): boolean {
     const id = eventData.payload?.cardSessionId;
     if (typeof id !== 'string') {
       this.logger.debug('CARD_SESSION_ENDED without cardSessionId ignored');
-      return;
+      return false;
     }
-    this.cardSessions.end(socket, id, 'reader');
+    const session = socket.state?.cardSession;
+    return Boolean(
+      this.cardSessions.end(socket, id, 'reader') && session && socket.state.verifiedUserId === session.userId,
+    );
+  }
+
+  /** The reader's login ended (READER_SESSION_ENDED): its card session ends with it. */
+  public endCardSession(socket: AuthenticatedWebSocket) {
+    if (socket.state?.cardSession) this.cardSessions.end(socket, socket.state.cardSession.id, 'reader');
   }
 
   /** Socket closed: steps are discarded and timers released. */

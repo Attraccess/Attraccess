@@ -8,7 +8,6 @@
     "readerLabel": "Reader",
     "readerPlaceholder": "Select a reader",
     "readerDescription": "Only connected readers linked to this resource (or a resource of this group) are listed.",
-    "startFailed": "Could not start the mass introduction",
     "cancel": "Cancel",
     "start": "Start"
   },

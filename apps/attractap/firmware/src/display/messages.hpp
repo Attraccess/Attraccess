@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include "../state/language.hpp"
-#include "messages.catalog.hpp"
+#include "messages.catalog.card-relay.hpp"
 
 // Firmware-owned text is identified independently of its displayed wording.
 namespace FirmwareI18n {
@@ -15,7 +15,8 @@ inline const char *messageText(Message id, const std::string &locale) {
         std::fprintf(stderr, "Unknown firmware message identifier: %zu\n", index);
         return "Something went wrong. Please try again.";
     }
-    const auto &entry = catalog[index];
+    constexpr size_t mainEntries = sizeof(catalog) / sizeof(catalog[0]);
+    const auto &entry = index < mainEntries ? catalog[index] : cardRelayCatalog[index - mainEntries];
     return Language::text(entry.en, entry.de, locale);
 }
 
@@ -91,6 +92,21 @@ inline Text knownReaderError(const std::string &code) {
     if (code == "CARD_MISMATCH") return Message::ErrorCardMismatch;
     if (code == "NO_MASS_INTRODUCTION_IN_PROGRESS") return Message::ErrorNoMassIntroductionInProgress;
     if (code == "MASS_INTRODUCTION_FAILED") return Message::ErrorMassIntroductionFailed;
+    if (code == "CARD_AUTHENTICATION_FAILED") return Message::ErrorCardAuthenticationFailed;
+    if (code == "CARD_NOT_SUPPORTED") return Message::ErrorCardNotSupported;
+    if (code == "BUSY") return Message::ErrorServerBusy;
+    if (code == "CARD_REMOVED") return Message::ErrorCardRemoved;
+    if (code == "CARD_TIMEOUT") return Message::ErrorCardTimeout;
+    if (code == "ENROLL_NOT_CONFIRMED") return Message::ErrorEnrollNotConfirmed;
+    if (code == "NO_FREE_KEY_SLOT") return Message::ErrorNoFreeKeySlot;
+    if (code == "CARD_NOT_FACTORY") return Message::ErrorCardNotFactory;
+    if (code == "RESET_NOT_CONFIRMED") return Message::ErrorResetNotConfirmed;
+    if (code == "WRONG_CARD") return Message::ErrorWrongCard;
+    if (code == "CARD_KEY_UNAVAILABLE") return Message::ErrorCardKeyUnavailable;
+    if (code == "CARD_MASTER_KEY_UNKNOWN") return Message::ErrorCardKeyUnavailable;
+    if (code == "FIRMWARE_UPDATE_REQUIRED") return Message::ErrorFirmwareUpdateRequired;
+    if (code == "READER_NOT_ALLOWED_TO_WRITE_CARDS") return Message::ErrorReaderNotAllowedToWriteCards;
+    if (code == "ENROLLMENT_EXPIRED" || code == "RESET_EXPIRED") return Message::ErrorCardOperationExpired;
     return Text();
 }
 inline Text readerError(const std::string &code) {

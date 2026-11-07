@@ -4,13 +4,16 @@ RFID cards are the physical keys that let users access machines and doors via At
 
 ## How RFID Cards Work
 
-When a user holds an RFID card to an Attractap reader, the reader sends the card's unique ID to the Attraccess backend. The backend checks:
+When a user holds an RFID card to an Attractap reader, the reader sends the card's unique ID to the Attraccess backend. The backend then talks to the card **through the reader** and checks:
 
 1. Is this card registered in the system?
-2. Which user account is the card linked to?
-3. Does that user have permission to use the assigned resource?
+2. Does the card prove it holds the secret key stored for it? (A copied card ID is not enough.)
+3. Which user account is the card linked to?
+4. Does that user have permission to use the assigned resource?
 
-If all checks pass, access is granted.
+If all checks pass, access is granted. The reader only passes messages between the backend and the card: **card keys are created and checked by the server, and a tap never exposes a card key to the reader**. A reader that is offline grants nothing.
+
+Card keys are random, 16 bytes each, and stored encrypted. See [Security Settings](settings/security.md) for backing up the secret that protects them.
 
 ## Managing RFID Cards
 
@@ -22,6 +25,11 @@ Open **RFID Cards** in the sidebar to manage your own cards. The list shows each
 2. Select a connected Attractap that supports card enrollment
 3. Click **Enroll** and follow the instructions on the reader
 
+A card is only registered after the server has checked that the card accepted its new key. If the card is pulled away or the write fails, nothing is recorded; present the same card again and the enrollment is finished.
+
+> [!NOTE]
+> Readers need firmware 2.0.0 or later for every card function. Readers on older firmware are offered the 2.0.0 update automatically when they connect (see [Firmware Updates](attractap/firmware-updates.md)). Until they run it, the server rejects their card taps and they cannot enroll or reset cards. Cards that were enrolled before keep working once the reader is updated.
+
 ### Activating and Deactivating Cards
 
 Use **Activate** or **Deactivate** next to a card and confirm the action. Activating a card automatically deactivates your other cards, so only one card is active per user. Deactivate a lost card immediately to revoke its access without needing the physical card.
@@ -32,7 +40,7 @@ Use **Activate** or **Deactivate** next to a card and confirm the action. Activa
 2. Select a connected Attractap and confirm **Delete**
 3. Follow the instructions on the reader to reset the physical card
 
-The card is removed from the account after the reader confirms the reset succeeded. The physical card is required; use **Deactivate** if it is unavailable.
+The card is removed from the account after the server has checked that the card is back in its factory state. The physical card is required; use **Deactivate** if it is unavailable.
 
 ## Multiple Cards Per User
 
@@ -55,6 +63,20 @@ Attractap readers use AES-encrypted authentication, which requires cards with ha
 
 > [!NOTE]
 > On MIFARE DESFire cards, Attractap stores its keys in a dedicated DESFire application (AID `0xACCE55`), which is created automatically during enrollment. Other applications on the card (e.g. existing access systems) are not touched.
+
+## Which Readers May Enroll and Reset Cards
+
+By default every reader with a display and firmware 2.0.0 or later can enroll and reset cards. Administrators can limit this under **Settings -> RFID card enrollment**: choose **Selected readers** and tick the readers that may write cards. The enrollment and reset screens then list only those readers. All readers still let members sign in with their cards.
+
+Readers that are not paired yet appear only in the **Not paired** list on the readers page, where you pair them. They are not shown in the reader list, in any picker, in the settings or in resource assignment, and they can never enroll or reset cards, supervise a start or run a mass introduction. The server treats such a reader like one with outdated firmware: no card taps, doors, resources or flows. It only takes firmware updates, and the server asks it to pair, so it shows its code.
+
+> [!IMPORTANT]
+> **Only allow paired readers you trust to enroll and reset cards.** A new card still has the public factory key, so the server writes the new card key under that factory key.
+>
+> - **The connection:** a [paired reader](attractap/pairing.md) talks to the server over an encrypted connection, so nobody listening on the network can read the key. A reader that is not paired yet still connects unencrypted. A reader that is not paired yet cannot enroll or reset cards at all.
+> - **The reader itself:** the reader that relays the write can still work out the new key. A reader that was tampered with could therefore copy cards enrolled or reset on it. Use **Settings -> RFID card enrollment** to keep this to readers in a place you control, for example the front desk. Secured reader firmware, planned for a later release, is meant to address tampered readers.
+>
+> Normal taps are not affected: when a card is used, the server checks it without the key ever passing through the reader.
 
 ## Administrator Features
 

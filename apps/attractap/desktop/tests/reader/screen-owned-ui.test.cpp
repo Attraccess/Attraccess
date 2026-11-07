@@ -105,17 +105,17 @@ void ReaderWorkflow::testScreenOwnedUi()
     click("Lasercutter");
     assert(lv_screen_active() == Display::lockscreen.getScreen());
     nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
-    server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Wrong card","language":"de","keyNo":0,"key":"11111111111111111111111111111111"})"); pump();
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_AUTHENTICATION_FAILED","username":"Wrong card","language":"de"})"); pump();
     assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Anmeldung fehlgeschlagen"));
     display.capture(output, "sign-in-failed");
     // A card tapped meanwhile dismisses it and signs in as usual.
-    const auto requests = server.count("REQUEST_CARD_AUTHENTICATION_DATA");
+    const auto requests = server.count("CARD_DETECTED");
     nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
     assert(lv_screen_active() != Display::statusScreen.getScreen());
-    assert(server.count("REQUEST_CARD_AUTHENTICATION_DATA") == requests + 1);
+    assert(server.count("CARD_DETECTED") == requests + 1);
     nfc.setPresent(0, false); pump();
-    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_NOT_FOUND"})"); pump();
-    assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Karte nicht gefunden"));
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_REMOVED"})"); pump();
+    assert(lv_screen_active() == Display::statusScreen.getScreen() && label(lv_screen_active(), "Karte zu früh entfernt"));
     clearStatus();
     assert(lv_screen_active() == Display::lockscreen.getScreen());
     click(LV_SYMBOL_LEFT);

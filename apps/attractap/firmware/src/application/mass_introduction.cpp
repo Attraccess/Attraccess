@@ -40,18 +40,6 @@ void MassIntroductionFlow::onStart(const API::MassIntroductionStartCommand &comm
     enqueue(event);
 }
 
-void MassIntroductionFlow::onCardAuthentication(const API::MassIntroductionCardAuthenticationResponse &response) {
-    Event event = {};
-    event.type = EventType::CardAuthentication;
-    event.keyNo = response.keyNo;
-    event.keyLen = response.keyLen;
-    memcpy(event.keyBytes, response.keyBytes, sizeof(event.keyBytes));
-    copyText(event.sessionId, response.sessionId, sizeof(event.sessionId));
-    copyText(event.name, response.username, sizeof(event.name));
-    copyText(event.code, response.error, sizeof(event.code));
-    enqueue(event);
-}
-
 void MassIntroductionFlow::onResult(const API::MassIntroductionResult &result) {
     Event event = {};
     event.type = EventType::Result;
@@ -169,7 +157,6 @@ MassIntroductionFlow::Outcome MassIntroductionFlow::tick(uint32_t now) {
             render(MassIntroductionScreen::STATUS_WAITING);
         }
         break;
-    case Phase::RequestedAuth:
     case Phase::AwaitingResult:
         if (now - phaseChangedAtMs > RESPONSE_TIMEOUT_MS) {
             logger.error("MassIntroduction: no server response for card");
@@ -222,9 +209,6 @@ void MassIntroductionFlow::processEvent(const Event &event, uint32_t now) {
             cardDetected = true;
         }
         break;
-    case EventType::CardAuthentication:
-        if (phase == Phase::RequestedAuth && isActiveSession(event.sessionId)) handleCardAuthentication(event, now);
-        break;
     case EventType::Result:
         if (phase == Phase::AwaitingResult && isActiveSession(event.sessionId)) handleResult(event, now);
         break;
@@ -268,28 +252,6 @@ void MassIntroductionFlow::handleStart(const Event &event) {
     strlcpy(pendingIntroducer, event.introducer, sizeof(pendingIntroducer));
     pendingReceivedAtMs = event.receivedAtMs;
     pendingRemainingMs = event.remainingMs;
-}
-
-void MassIntroductionFlow::handleCardAuthentication(const Event &event, uint32_t now) {
-    if (event.code[0] != '\0' || event.keyLen != 16) {
-        logger.infof("MassIntroduction: card rejected error=%s", event.code);
-        showResult(MassIntroductionScreen::STATUS_ERROR, FirmwareI18n::readerError(event.code), now);
-        return;
-    }
-    strlcpy(participantName, event.name, sizeof(participantName));
-    uint8_t key[16];
-    memcpy(key, event.keyBytes, sizeof(key));
-    const bool authenticated = nfc.authenticate(event.keyNo, key);
-    memset(key, 0, sizeof(key));
-    if (!authenticated) {
-        // Stay in the session; the person can simply tap again.
-        logger.error("MassIntroduction: card authentication failed");
-        showResult(MassIntroductionScreen::STATUS_ERROR, FirmwareI18n::Message::CouldNotReadCard, now);
-        return;
-    }
-    api.confirmMassIntroductionCardAuth(sessionId, cardUid, cardUidLength);
-    phase = Phase::AwaitingResult;
-    phaseChangedAtMs = now;
 }
 
 void MassIntroductionFlow::handleResult(const Event &event, uint32_t now) {
@@ -362,8 +324,9 @@ void MassIntroductionFlow::leave(const char *reason, bool notifyServer) {
 void MassIntroductionFlow::beginCard(uint32_t now) {
     logger.infof("MassIntroduction: card uid=%s", hexToString(cardUid, cardUidLength).c_str());
     nfc.disableCardDetection();
-    api.requestMassIntroductionCardAuthenticationData(sessionId, cardUid, cardUidLength);
-    phase = Phase::RequestedAuth;
+    // The server authenticates the card through the relay and answers with the result.
+    api.sendCardDetected("mass-introduction", cardUid, cardUidLength, 0, sessionId);
+    phase = Phase::AwaitingResult;
     phaseChangedAtMs = now;
     participantName[0] = '\0';
     statusMessage.clear();
