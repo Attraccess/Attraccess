@@ -11,6 +11,7 @@ import {
 import { Button, PageHeader, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './en.json';
 import de from './de.json';
+import { UserAccountPluginSlot } from '../plugins/PluginSettingsSlots';
 import { UsernameForm } from './username';
 import { EmailForm } from './email';
 import { SetPasswordForm } from '../user-management/details/components/setPasswordForm';
@@ -166,6 +167,11 @@ export default function AccountPage() {
     <div>
       <PageHeader title={t('title')} subtitle={t('subtitle')} backTo="/" />
       <SettingsDirectory groups={groups} searchLabel={t('search')} emptyMessage={t('noResults')} />
+      {me && (
+        <div className="mt-6 flex flex-col gap-6 empty:hidden">
+          <UserAccountPluginSlot userId={me.id} />
+        </div>
+      )}
 
       <StatusDialog
         isOpen={isOpen}
