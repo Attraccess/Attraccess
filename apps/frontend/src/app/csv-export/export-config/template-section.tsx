@@ -220,6 +220,7 @@ export function TemplateSection(props: Props) {
           items={selectItems}
           isDisabled={templatesLoading || mutationPending}
           className="min-w-0 md:max-w-xs"
+          valueClassName="min-w-0 wrap-anywhere"
           fullWidth
           data-cy="csv-export-template-select"
         />
