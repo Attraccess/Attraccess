@@ -9,5 +9,8 @@ module.exports = {
   // Jest from multiplying those subprocesses across the host's CPU count.
   maxWorkers: 1,
   moduleFileExtensions: ['ts', 'js'],
-  coverageDirectory: '../../../../coverage/apps/wago-cc100-runtime',
+  // Unit coverage feeds the project's crap-score target.
+  collectCoverage: true,
+  coverageReporters: ['json'],
+  coverageDirectory: '../../../../coverage/apps/plugins/wago/test-cc100-runtime',
 };

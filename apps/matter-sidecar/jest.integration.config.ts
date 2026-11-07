@@ -5,4 +5,8 @@ export default {
   displayName: 'matter-sidecar-integration',
   testMatch: ['<rootDir>/src/**/*.integration.spec.ts'],
   testTimeout: 30_000,
+  // Coverage feeds the project's crap-score target.
+  collectCoverage: true,
+  coverageReporters: ['json'],
+  coverageDirectory: '../../coverage/apps/matter-sidecar/test-integration',
 };

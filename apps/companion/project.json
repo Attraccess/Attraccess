@@ -28,7 +28,7 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["companion-ws-client:build", "build-renderer"],
-      "// inputs": "electron-builder with no target flag builds for the host only, so this target's outputs are platform-specific while its file inputs are identical on every runner. The runtime input keeps the three CI runners (linux/mac/windows) on separate hashes \u2014 without it they share one entry in the remote cache and two of the three restore the wrong platform's dist/.",
+      "// inputs": "electron-builder with no target flag builds for the host only, so this target's outputs are platform-specific while its file inputs are identical on every runner. The runtime input keeps the three CI runners (linux/mac/windows) on separate hashes — without it they share one entry in the remote cache and two of the three restore the wrong platform's dist/.",
       "inputs": [
         "production",
         "^production",
@@ -72,7 +72,7 @@
           "externalDependencies": ["jest"]
         }
       ],
-      "outputs": ["{workspaceRoot}/coverage/apps/companion"],
+      "outputs": ["{workspaceRoot}/coverage/apps/companion/test"],
       "options": {
         "jestConfig": "apps/companion/jest.config.ts",
         "passWithNoTests": true
@@ -88,14 +88,16 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/companion"
-      }
+      },
+      "dependsOn": ["test", "test-renderer"]
     },
     "test-renderer": {
       "executor": "nx:run-commands",
       "cache": true,
       "options": {
         "command": "vitest run --config apps/companion/renderer/vitest.config.mts"
-      }
+      },
+      "outputs": ["{workspaceRoot}/coverage/apps/companion/test-renderer"]
     }
   }
 }

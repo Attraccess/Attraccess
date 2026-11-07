@@ -30,6 +30,32 @@ test('host checks require the pinned Node and pnpm versions', () => {
   assert.equal(checkHost('check_pnpm', 'pnpm() { echo 10.34.6; }').status, 0);
 });
 
+test('host setup continues when nvm has no installed default version', (t) => {
+  const home = mkdtempSync(path.join(os.tmpdir(), 'bootstrap-nvm-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  mkdirSync(path.join(home, '.nvm'));
+  // A fresh nvm install returns non-zero from nvm.sh until a Node version is installed.
+  writeFileSync(path.join(home, '.nvm/nvm.sh'), 'return 3\n');
+  const stubs = [
+    'check_docker',
+    'check_docker_compose',
+    'check_node',
+    'resolve_pnpm_version',
+    'check_pnpm',
+    'check_python',
+  ];
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      `. scripts/setup-host-dependencies.sh; ${stubs.map((name) => `${name}() { :; }`).join('; ')}; setup_host_dependencies; echo done`,
+    ],
+    { encoding: 'utf8', env: { ...process.env, HOME: home } },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.trim(), 'done');
+});
+
 test('standalone docker-compose does not satisfy the services command requirement', () => {
   const result = checkHost('check_docker_compose', 'docker() { return 1; }; docker-compose() { return 0; }');
   assert.equal(result.status, 1);

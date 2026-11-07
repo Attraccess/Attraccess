@@ -96,7 +96,10 @@
         "parallel": false,
         "cwd": "."
       },
-      "cache": false
+      "cache": false,
+      "dependsOn": [
+        "test-node"
+      ]
     },
     "flash": {
       "executor": "nx:run-commands",
@@ -124,6 +127,22 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/attractap/firmware"
+      },
+      "dependsOn": [
+        "test-node"
+      ]
+    },
+    "test-node": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "default"
+      ],
+      "outputs": [
+        "{workspaceRoot}/coverage/apps/attractap/firmware/test-node"
+      ],
+      "options": {
+        "command": "node scripts/crap-score/node-test.mjs apps/attractap/firmware coverage/apps/attractap/firmware/test-node apps/attractap/firmware/tests/ota/hardware-soak.test.mjs"
       }
     }
   }

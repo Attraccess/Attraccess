@@ -136,7 +136,7 @@
           "externalDependencies": ["jest"]
         }
       ],
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"]
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}/test"]
     },
     "typecheck": {
       "cache": true,
@@ -162,7 +162,7 @@
     "e2e": {
       "cache": true,
       "inputs": ["testing", "^production"],
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"]
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}/e2e"]
     },
     "build-migration-datasource": {
       "cache": true,
@@ -199,6 +199,9 @@
         "{workspaceRoot}/patches/**/*",
         {
           "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version + '-' + process.cwd()\""
+        },
+        {
+          "dependentTasksOutputFiles": "**/coverage-final.json"
         }
       ],
       "outputs": ["{workspaceRoot}/coverage/crap/{projectName}"]

@@ -1,4 +1,26 @@
 # Git exports these paths to hooks. Child checks create temporary repositories,
 # so let their Git commands discover those repositories from their own cwd.
 unset GIT_DIR GIT_WORK_TREE
+
+# Hooks started from GUIs, agents or Nix shells often miss nvm's PATH and pick up
+# whatever Node the system has. Use the pinned version when nvm can provide it.
+if [ -f .nvmrc ]; then
+    want=$(tr -d 'v \n' < .nvmrc)
+    nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+    if [ "$(node -v 2>/dev/null)" != "v$want" ] && [ -s "$nvm_sh" ]; then
+        . "$nvm_sh" --no-use || true
+        nvm use --silent "$want" >/dev/null 2>&1 || true
+    fi
+    have=$(node -v 2>/dev/null)
+    if [ "${have%%.*}" != "v${want%%.*}" ]; then
+        echo "pre-commit needs Node ${want%%.*} (.nvmrc: $want), found ${have:-no node}." >&2
+        echo "Run 'nvm install' or commit from a shell with Node ${want%%.*} on PATH." >&2
+        exit 1
+    fi
+fi
+
+# A long-lived Nx daemon goes stale across Node switches and parallel worktrees; the
+# hook's few graph computations cost about a second each without it.
+export NX_DAEMON=false
+
 pnpm precommit

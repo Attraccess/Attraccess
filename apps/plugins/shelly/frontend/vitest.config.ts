@@ -16,5 +16,17 @@ export default defineConfig({
       ),
     },
   },
-  test: { environment: 'jsdom', include: ['src/**/*.spec.tsx'] },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.spec.tsx'],
+    coverage: {
+      // Unit coverage feeds the project's crap-score target.
+      enabled: true,
+      provider: 'istanbul',
+      reporter: ['json'],
+      reportsDirectory: fileURLToPath(
+        new URL('../../../../coverage/apps/plugins/shelly/test-frontend', import.meta.url),
+      ),
+    },
+  },
 });

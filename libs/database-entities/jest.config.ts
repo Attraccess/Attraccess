@@ -6,6 +6,9 @@ module.exports = {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/libs/database-entities',
+  // Unit coverage feeds the project's crap-score target.
+  collectCoverage: true,
+  coverageReporters: ['json'],
+  coverageDirectory: '../../coverage/libs/database-entities/test',
   passWithNoTests: true,
 };
