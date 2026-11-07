@@ -1,0 +1,30 @@
+{
+  "name": "reservations",
+  "version": "0.1.0",
+  "main": {
+    "backend": {
+      "directory": "dist",
+      "entryPoint": "index.js"
+    },
+    "migrations": {
+      "directory": "dist",
+      "entryPoint": "migrations.js"
+    },
+    "frontend": {
+      "directory": "frontend",
+      "entryPoint": "remoteEntry.js",
+      "styles": "style.css"
+    }
+  },
+  "attraccessVersion": {
+    "min": "1.11.0"
+  },
+  "permissions": [
+    "DATABASE_ACCESS",
+    "ACCESS_HOOKS",
+    "LISTEN_EVENTS",
+    "ACCESS_RESOURCES",
+    "READ_USERS",
+    "SEND_NOTIFICATIONS"
+  ]
+}
