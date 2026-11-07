@@ -137,7 +137,7 @@ name of the current user of a resource may also see who holds a booking on it. E
 
 ### Attractap readers
 
-On an Attractap Touch reader (firmware 1.9.0 or newer) the plugin adds reservation information to the screen, asks
+On an Attractap Touch reader with current firmware the plugin adds reservation information to the screen, asks
 before a start that would collide with a booking, and treats a start on the reader as the check-in. The plugin
 needs the permission to show widgets on Attractap reader screens, which an administrator approves when
 installing or updating it (see [Reader display](attractap/reader-ui.md)). All times are in the plugin's
@@ -175,7 +175,7 @@ returns to the texts above.
 | Another person's booking starts within the confirmation window | Asks "Reserved from 14:00, you have 40 min. Start anyway?" with a countdown. Cancel or no answer starts nothing. The holder is named only if you may see names. |
 | Another person's booking is running                            | Refuses: "Reserved by another user until 16:00" (with the name, if you may see names). Managers get the override question instead and the holder is named.      |
 | You start within your booking or its early check-in window     | No question. The start checks the booking in and the screen updates.                                                                                            |
-| You stop a session inside your own running booking             | Asks "Keep or free the rest?". **Free rest** ends the booking early. No answer within 15 seconds keeps the booking.                                             |
+| You stop a session inside your own running booking             | Asks "Keep it or free the rest?". **Free rest** ends the booking early. No answer within 15 seconds keeps the booking.                                          |
 
 Freeing a booking without a session is only possible in the web UI. Booking itself is not possible on the reader.
 

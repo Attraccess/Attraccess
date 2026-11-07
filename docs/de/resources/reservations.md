@@ -150,7 +150,7 @@ Zeiten. Welche Regel gilt, legt die Einstellung
 
 ### Attractap-Reader
 
-Auf einem Attractap-Touch-Reader (Firmware 1.9.0 oder neuer) zeigt das Plugin Reservierungsinformationen auf dem
+Auf einem Attractap-Touch-Reader mit aktueller Firmware zeigt das Plugin Reservierungsinformationen auf dem
 Bildschirm an, fragt vor einem Start nach, der mit einer Buchung kollidiert, und wertet einen Start am Reader als
 Check-in. Für die Reader-Widgets braucht das Plugin die Berechtigung, Widgets auf Attractap-Reader-Bildschirmen anzuzeigen, die eine
 administrierende Person bei Installation oder Update freigibt (siehe [Reader-Anzeige](attractap/reader-ui.md)).
@@ -179,25 +179,25 @@ Kartensitzung, kehrt der Reader zu den Texten oben zurück.
   14:00-16:00“).
 - **Alle anderen** sehen die Texte oben, es sei denn, die Ressource schaltet **Namen auf Readern anzeigen** ein; dann
   nennen auch für sie die Details die buchende Person.
-- **Während du die Ressource nutzt** und die Buchung einer anderen Person im Bestätigungsfenster beginnt, zeigt der
+- **Während Sie die Ressource nutzen** und die Buchung einer anderen Person im Bestätigungsfenster beginnt, zeigt der
   Sitzungsbereich „Reserviert ab 14:00“ mit einem Countdown (mit Namen nach den Regeln oben).
 - Die **Liste zeigt nie Namen**, weder angemeldet noch abgemeldet. Lange Namen werden gekürzt.
 
 **Am Reader starten.**
 
-| Situation                                                                      | Was der Reader tut                                                                                                                                                                        |
-| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Die Buchung einer anderen Person beginnt im Bestätigungsfenster                | Fragt „Reserviert ab 14:00, du hast 40 Min. Trotzdem starten?“ mit Countdown. Abbrechen oder keine Antwort startet nichts. Der Name steht nur dabei, wenn du Namen sehen darfst.          |
-| Die Buchung einer anderen Person läuft                                         | Lehnt ab: „Von einer anderen Person bis 16:00 reserviert“ (mit Namen, wenn du Namen sehen darfst). Verwaltende bekommen stattdessen die Override-Frage, die buchende Person wird genannt. |
-| Du startest innerhalb deiner Buchung oder ihres Fensters für frühes Einchecken | Keine Frage. Der Start checkt die Buchung ein und der Bildschirm aktualisiert sich.                                                                                                       |
-| Du beendest eine Sitzung innerhalb deiner eigenen laufenden Buchung            | Fragt „Behalten oder den Rest freigeben?“. **Rest freigeben** beendet die Buchung vorzeitig. Ohne Antwort innerhalb von 15 Sekunden bleibt die Buchung bestehen.                          |
+| Situation                                                                     | Was der Reader tut                                                                                                                                                                         |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Die Buchung einer anderen Person beginnt im Bestätigungsfenster               | Fragt „Reserviert ab 14:00, du hast 40 Min. Trotzdem starten?“ mit Countdown. Abbrechen oder keine Antwort startet nichts. Der Name steht nur dabei, wenn Sie Namen sehen dürfen.          |
+| Die Buchung einer anderen Person läuft                                        | Lehnt ab: „Von einer anderen Person bis 16:00 reserviert“ (mit Namen, wenn Sie Namen sehen dürfen). Verwaltende bekommen stattdessen die Override-Frage, die buchende Person wird genannt. |
+| Sie starten innerhalb Ihrer Buchung oder ihres Fensters für frühes Einchecken | Keine Frage. Der Start checkt die Buchung ein und der Bildschirm aktualisiert sich.                                                                                                        |
+| Sie beenden eine Sitzung innerhalb Ihrer eigenen laufenden Buchung            | Fragt „Behalten oder den Rest freigeben?“. **Rest freigeben** beendet die Buchung vorzeitig. Ohne Antwort innerhalb von 15 Sekunden bleibt die Buchung bestehen.                           |
 
 Eine Buchung ohne Sitzung freizugeben ist nur in der Weboberfläche möglich. Buchen selbst ist am Reader nicht möglich.
 
 **Namen auf Readern anzeigen** (Ressourceneinstellung, standardmäßig aus). Sie ändert nur, was eine Person sieht,
-die **nach dem Auflegen einer Karte** weder buchende Person noch verwaltend ist: Namen in den Ressourcendetails und in
+die **nach dem Auflegen einer Karte** weder die Buchung hält noch die Ressource verwaltet: Namen in den Ressourcendetails und in
 den Bestätigungs- und Ablehnungstexten des Readers. Ein abgemeldeter Reader ist nie betroffen. Der Hilfetext des
-Schalters lautet: „Namen werden erst angezeigt, nachdem jemand die Karte angetippt hat.“ Beim Speichern aktualisieren
+Schalters lautet: „Namen erscheinen erst, nachdem jemand eine Karte aufgelegt hat.“ Beim Speichern aktualisieren
 sich die Reader sofort.
 
 **Reader ohne Bildschirm.** Attractap-Lite-Reader, Touch-Reader mit älterer Firmware und Reader, deren
