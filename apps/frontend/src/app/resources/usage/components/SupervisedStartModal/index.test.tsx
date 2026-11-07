@@ -57,6 +57,7 @@ vi.mock('@attraccess/react-query-client', () => ({
         id: 5,
         name: 'Workshop reader',
         resources: [{ id: 42 }],
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: true, cardRelay: true } },
       },
       // Elsewhere in the building — offered behind the disclosure.
@@ -64,6 +65,7 @@ vi.mock('@attraccess/react-query-client', () => ({
         id: 6,
         name: 'Lobby reader',
         resources: [{ id: 7 }],
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: true, cardRelay: true } },
       },
       // No display, so it cannot run the supervision screen at all.
@@ -71,6 +73,7 @@ vi.mock('@attraccess/react-query-client', () => ({
         id: 7,
         name: 'Lite reader',
         resources: [{ id: 42 }],
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: false, cardRelay: true } },
       },
       // Firmware before 2.0.0 does not relay cards; the server refuses it.
@@ -78,6 +81,7 @@ vi.mock('@attraccess/react-query-client', () => ({
         id: 8,
         name: 'Old firmware reader',
         resources: [{ id: 42 }],
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: true, cardRelay: false } },
       },
     ],

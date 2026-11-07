@@ -15,9 +15,10 @@ export function cardWritingBlocker(reader: Pick<Attractap, 'firmware'>): CardWri
 }
 
 /**
- * A reader that is not paired yet still talks to the server unencrypted, so a card key written
- * through it could be read by anyone on the network. Card writing is not blocked, only flagged.
+ * Readers that completed pairing. A reader that is not paired yet appears in the pairing session
+ * only; the API already leaves it out of the reader list, and every picker and list filters again
+ * so a stale cache or an older API cannot leak one.
  */
-export function connectsUnencrypted(reader: Pick<Attractap, 'pairingState'>): boolean {
-  return reader.pairingState !== 'paired';
+export function pairedReadersOnly<T extends Pick<Attractap, 'pairingState'>>(readers: T[] | undefined): T[] {
+  return (readers ?? []).filter((reader) => reader.pairingState === 'paired');
 }

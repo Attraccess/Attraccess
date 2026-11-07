@@ -1,6 +1,5 @@
 {
   "loading": "Reader werden geladen...",
-  "notPaired": "Nicht gekoppelt – die Verbindung ist nicht verschlüsselt",
   "empty": {
     "noConnectedReader": {
       "title": "Kein Reader verbunden",

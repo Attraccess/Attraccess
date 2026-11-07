@@ -60,6 +60,7 @@ export function registerAttractapSupervisionHandlerFixture() {
     attractapService = {
       findReaderById: jest.fn().mockResolvedValue({
         id: READER_ID,
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: true } },
         resources: [{ id: RESOURCE_ID }],
       }),

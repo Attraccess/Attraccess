@@ -7,6 +7,7 @@ import { AuditService } from '../audit/audit.service';
 import { LicenseService } from '../license/license.service';
 import { projectAdministrationAuditEvent } from '../audit/policies/administration';
 import { CardWriterSettingsController, cardWriterSettingChanges } from './card-writer-settings.controller';
+import { AttractapService } from './attractap.service';
 import { CardWriterPolicyService } from './websockets/card-writer-policy.service';
 import { CardWriterSettingsDto } from './dtos/card-writer-settings.dto';
 
@@ -38,6 +39,47 @@ describe('CardWriterSettingsController', () => {
     });
   });
 
+  describe('readers that are not paired', () => {
+    const paired = [{ id: 2 }, { id: 5 }];
+    let stored: CardWriterSettingsDto;
+    let controller: CardWriterSettingsController;
+    const set = jest.fn(async (next: CardWriterSettingsDto) => (stored = { ...next }));
+
+    beforeEach(async () => {
+      set.mockClear();
+      stored = { mode: 'selected', readerIds: [2, 3, 5] };
+      const moduleRef = await Test.createTestingModule({
+        controllers: [CardWriterSettingsController],
+        providers: [
+          { provide: CardWriterPolicyService, useValue: { get: jest.fn(async () => stored), set } },
+          { provide: AttractapService, useValue: { getPairedReaders: jest.fn(async () => paired) } },
+          {
+            provide: AuditService,
+            useValue: { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) },
+          },
+          { provide: LicenseService, useValue: {} },
+        ],
+      }).compile();
+      controller = moduleRef.get(CardWriterSettingsController);
+    });
+
+    it('never reports a reader that is not paired, even one named before its pairing was removed', async () => {
+      await expect(controller.get()).resolves.toEqual({ mode: 'selected', readerIds: [2, 5] });
+    });
+
+    it('refuses to save a reader that is not paired', async () => {
+      await expect(
+        controller.update({ mode: 'selected', readerIds: [2, 3] }, { user: { id: 1 } } as AuthenticatedRequest),
+      ).rejects.toThrow('READER_NOT_PAIRED');
+      expect(set).not.toHaveBeenCalled();
+    });
+
+    it('saves paired readers', async () => {
+      await controller.update({ mode: 'selected', readerIds: [5] }, { user: { id: 1 } } as AuthenticatedRequest);
+      expect(set).toHaveBeenCalledWith({ mode: 'selected', readerIds: [5] });
+    });
+  });
+
   describe('PUT audit', () => {
     let current: CardWriterSettingsDto;
     let controller: CardWriterSettingsController;
@@ -57,6 +99,7 @@ describe('CardWriterSettingsController', () => {
               set: jest.fn(async (next: CardWriterSettingsDto) => (current = { ...next })),
             },
           },
+          { provide: AttractapService, useValue: { getPairedReaders: jest.fn(async () => [{ id: 2 }, { id: 5 }]) } },
           { provide: AuditService, useValue: { recordAdministration } },
           { provide: LicenseService, useValue: {} },
         ],
@@ -88,9 +131,9 @@ describe('CardWriterSettingsController', () => {
 
     it('still returns the saved setting when the audit provider fails', async () => {
       recordAdministration.mockRejectedValueOnce(new Error('down'));
-      await expect(controller.update({ mode: 'selected', readerIds: [1] }, req)).resolves.toEqual({
+      await expect(controller.update({ mode: 'selected', readerIds: [2] }, req)).resolves.toEqual({
         mode: 'selected',
-        readerIds: [1],
+        readerIds: [2],
       });
     });
   });

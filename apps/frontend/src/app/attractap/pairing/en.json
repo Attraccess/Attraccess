@@ -109,7 +109,6 @@
     "resume": "Continue",
     "requestFailed": "Could not start pairing",
     "notConnected": "The reader is not connected right now. Switch it on and try again.",
-    "diagnostics": "Diagnostics",
     "delete": "Delete"
   },
   "kind": {

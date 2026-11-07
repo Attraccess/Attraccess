@@ -14,7 +14,7 @@ import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { SettingsSaveBar } from '../../components/SettingsSaveBar';
 import { useToastMessage } from '../../../../components/toastProvider';
-import { cardWritingBlocker, connectsUnencrypted } from '../../../attractap/cardWriting';
+import { cardWritingBlocker, pairedReadersOnly } from '../../../attractap/cardWriting';
 import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import en from './en.json';
@@ -35,7 +35,8 @@ export function AttractapSection() {
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useAttractapServiceGetCardWriterSettings();
-  const { data: readers, isLoading: readersLoading } = useAttractapServiceGetReaders();
+  const { data: allReaders, isLoading: readersLoading } = useAttractapServiceGetReaders();
+  const readers = allReaders ? pairedReadersOnly(allReaders) : undefined;
 
   // A key absent from the draft means "untouched": the field then shows the server's value, so a
   // background refetch can never overwrite what the operator is typing.
@@ -120,11 +121,6 @@ export function AttractapSection() {
                     {blocker ? (
                       <Description data-testid={`card-writer-reader-${reader.id}-blocker`}>
                         {t(`readers.blockers.${blocker}`)}
-                      </Description>
-                    ) : null}
-                    {connectsUnencrypted(reader) ? (
-                      <Description data-testid={`card-writer-reader-${reader.id}-not-paired`}>
-                        {t('readers.notPaired')}
                       </Description>
                     ) : null}
                   </Checkbox>

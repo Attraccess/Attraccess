@@ -68,10 +68,12 @@ Attractap readers use AES-encrypted authentication, which requires cards with ha
 
 By default every reader with a display and firmware 2.0.0 or later can enroll and reset cards. Administrators can limit this under **Settings -> RFID card enrollment**: choose **Selected readers** and tick the readers that may write cards. The enrollment and reset screens then list only those readers. All readers still let members sign in with their cards.
 
+Readers that are not paired yet appear only in the pairing session on the readers page. They are not shown in the reader list, in any picker, in the settings or in resource assignment, and they can never enroll or reset cards, supervise a start or run a mass introduction.
+
 > [!IMPORTANT]
 > **Only allow paired readers you trust to enroll and reset cards.** A new card still has the public factory key, so the server writes the new card key under that factory key.
 >
-> - **The connection:** a [paired reader](attractap/pairing.md) talks to the server over an encrypted connection, so nobody listening on the network can read the key. A reader that is not paired yet still connects unencrypted. Pair a reader before you allow it to enroll or reset cards; the settings and the reader lists mark readers that are not paired.
+> - **The connection:** a [paired reader](attractap/pairing.md) talks to the server over an encrypted connection, so nobody listening on the network can read the key. A reader that is not paired yet still connects unencrypted. A reader that is not paired yet cannot enroll or reset cards at all.
 > - **The reader itself:** the reader that relays the write can still work out the new key. A reader that was tampered with could therefore copy cards enrolled or reset on it. Use **Settings -> RFID card enrollment** to keep this to readers in a place you control, for example the front desk. Secured reader firmware, planned for a later release, is meant to address tampered readers.
 >
 > Normal taps are not affected: when a card is used, the server checks it without the key ever passing through the reader.

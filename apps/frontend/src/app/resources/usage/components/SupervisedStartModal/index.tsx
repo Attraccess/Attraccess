@@ -39,7 +39,7 @@ import {
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
 import { useToastMessage } from '../../../../../components/toastProvider';
-import { cardWritingBlocker } from '../../../../attractap/cardWriting';
+import { cardWritingBlocker, pairedReadersOnly } from '../../../../attractap/cardWriting';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
 import en from './translations/en.json';
@@ -205,7 +205,7 @@ export function useSupervisedStartModalState({
   const { resourceReaders, otherReaders } = useMemo(() => {
     // Supervision runs on the reader's screen and relays the introducer's card, like card writing:
     // the server refuses readers without a display or on firmware before 2.0.0.
-    const capable = (allReaders ?? []).filter((reader) => cardWritingBlocker(reader) === null);
+    const capable = pairedReadersOnly(allReaders).filter((reader) => cardWritingBlocker(reader) === null);
     return {
       resourceReaders: capable.filter((reader) => reader.resources?.some((r) => r.id === resourceId)),
       otherReaders: capable.filter((reader) => !reader.resources?.some((r) => r.id === resourceId)),

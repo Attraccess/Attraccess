@@ -38,6 +38,7 @@ import { ResourceListService } from '../resource-list/resource-list.service';
 import { AttractapSupervisionHandler } from '../supervision/supervision.handler';
 import { CardSessionService } from '../ui/card-session.service';
 import { CARD_WRITE_START_ERRORS, assertReaderRelaysCards } from './card-write-errors';
+import { assertReaderPaired } from '../../../reader-pairing';
 
 export { CARD_WRITE_START_ERRORS } from './card-write-errors';
 
@@ -207,6 +208,7 @@ export class AttractapCardHandler {
     if (!reader) {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.READER_NOT_FOUND);
     }
+    assertReaderPaired(reader);
     await this.assertWriterAllowed(data.readerId);
 
     const user = await this.usersService.findOne({ id: data.userId });
@@ -303,6 +305,7 @@ export class AttractapCardHandler {
       throw new NotFoundException(CARD_WRITE_START_ERRORS.READER_NOT_FOUND);
     }
 
+    assertReaderPaired(reader);
     if (!reader.firmware.capabilities.cardEnrollment) {
       throw new BadRequestException(CARD_WRITE_START_ERRORS.READER_CARD_ENROLLMENT_NOT_SUPPORTED);
     }

@@ -1,5 +1,5 @@
 import { Button, Card } from '@heroui/react';
-import { ActivityIcon, Trash2Icon } from 'lucide-react';
+import { Trash2Icon } from 'lucide-react';
 import { PageHeader, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
@@ -7,7 +7,6 @@ import {
   useAttractapServiceRequestReaderPairing,
 } from '@attraccess/react-query-client';
 import { ReactNode, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import { AttractapDeleteModal } from '../AttractapList/delete';
 import { PairingDialog, PairingDialogProps } from './PairingDialog';
@@ -18,24 +17,13 @@ import en from './en.json';
 
 type OpenDialog = Pick<PairingDialogProps, 'pairingId' | 'waitForReaderId' | 'presetTargetReaderId'>;
 
-/** Actions of a reader record that is not paired: pair it, look at its diagnostics, or delete it. */
+/** Actions of a reader record that is not paired: pair it or delete it. Its diagnostics wait until it is paired. */
 function RecordActions(props: Readonly<{ readerId: number; pair: ReactNode }>) {
   const { t } = useTranslations({ de, en });
-  const navigate = useNavigate();
   const { readerId } = props;
   return (
     <div className="flex items-center gap-1">
       {props.pair}
-      <Button
-        size="sm"
-        variant="ghost"
-        isIconOnly
-        aria-label={t('toPair.diagnostics')}
-        onPress={() => navigate(`/attractap/readers/${readerId}/diagnostics`)}
-        data-cy={`attractap-to-pair-diagnostics-${readerId}`}
-      >
-        <ActivityIcon className="size-4" />
-      </Button>
       <AttractapDeleteModal readerId={readerId}>
         {(onOpen) => (
           <Button

@@ -12,6 +12,7 @@ import { MassIntroductionService } from '../../../../resources/mass-introduction
 import { MassIntroductionEndReason } from '../../../../resources/mass-introductions/dtos/massIntroductionLiveEvent.dto';
 import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
 import { AttractapService } from '../../../attractap.service';
+import { assertReaderPaired } from '../../../reader-pairing';
 import { CardOperationsService } from '../../card-operations.service';
 import { assertReaderRelaysCards } from '../card/card-write-errors';
 import { WebsocketService } from '../../websocket.service';
@@ -140,6 +141,7 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
     if (!reader) {
       throw new NotFoundException(`Reader not found: ${readerId}`);
     }
+    assertReaderPaired(reader);
     // Every reader that can enroll cards can run the scan flow; readers without a screen just cannot
     // show its progress.
     if (!reader.firmware?.capabilities?.cardEnrollment) {

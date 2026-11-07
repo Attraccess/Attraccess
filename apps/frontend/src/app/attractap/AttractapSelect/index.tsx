@@ -1,5 +1,4 @@
 import {
-  Attractap,
   AttractapCapabilities,
   useAttractapServiceGetCardWriterSettings,
   useAttractapServiceGetReaders,
@@ -8,7 +7,7 @@ import { Alert } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useEffect, useMemo, useState } from 'react';
 import { Select } from '../../../components/select';
-import { cardWritingBlocker, connectsUnencrypted } from '../cardWriting';
+import { cardWritingBlocker, pairedReadersOnly } from '../cardWriting';
 import de from './de.json';
 import en from './en.json';
 
@@ -33,7 +32,8 @@ type EmptyReason = 'noConnectedReader' | 'firmwareUpdateRequired' | 'noCardEnrol
 
 export function AttractapSelect(props: Props) {
   const { t } = useTranslations({ en, de });
-  const { data: readers, isLoading: readersLoading } = useAttractapServiceGetReaders();
+  const { data: allReaders, isLoading: readersLoading } = useAttractapServiceGetReaders();
+  const readers = useMemo(() => pairedReadersOnly(allReaders), [allReaders]);
   const { data: cardWriterSettings, isLoading: settingsLoading } = useAttractapServiceGetCardWriterSettings(undefined, {
     enabled: !!props.forCardWriting,
   });
@@ -50,7 +50,7 @@ export function AttractapSelect(props: Props) {
 
   const { offered, emptyReason } = useMemo(() => {
     // last connection within 30s
-    const connected = (readers ?? [])
+    const connected = readers
       .filter((r) => r.lastConnection && new Date(r.lastConnection).getTime() > now - 30000)
       .filter((r) => !props.readerIds || props.readerIds.includes(r.id));
     // Readers on firmware before 2.0.0 cannot take part, whatever the setting says.
@@ -84,18 +84,12 @@ export function AttractapSelect(props: Props) {
     return { offered, emptyReason };
   }, [readers, now, props.requiredCapabilities, props.readerIds, props.forCardWriting, cardWriterSettings]);
 
-  // A card key written through a reader that is not paired could be read on the network. The hint
-  // also shows in the trigger once the reader is picked.
-  const notPairedHint = (reader: Attractap) =>
-    props.forCardWriting && connectsUnencrypted(reader) ? t('notPaired') : undefined;
-  const selected = readers?.find((r) => r.id === props.selection);
+  const selected = readers.find((r) => r.id === props.selection);
 
   return (
     <>
       <Select
-        items={
-          isLoading ? [] : offered.map((r) => ({ key: r.id.toString(), label: r.name, description: notPairedHint(r) }))
-        }
+        items={isLoading ? [] : offered.map((r) => ({ key: r.id.toString(), label: r.name }))}
         label={props.label}
         aria-label={props.ariaLabel}
         placeholder={isLoading ? t('loading') : (selected?.name ?? props.placeholder)}

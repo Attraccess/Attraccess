@@ -56,6 +56,7 @@ describe('AttractapMassIntroductionHandler', () => {
       findReaderById: jest.fn().mockResolvedValue({
         id: READER_ID,
         name: 'Entrance',
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: true } },
         resources: [{ id: 42 }],
       }),
@@ -108,6 +109,7 @@ describe('AttractapMassIntroductionHandler', () => {
       attractapService.findReaderById.mockResolvedValue({
         id: READER_ID,
         name: 'Front door',
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: true } },
         resources: [{ id: 99 }],
       });
@@ -119,7 +121,11 @@ describe('AttractapMassIntroductionHandler', () => {
     });
 
     it('rejects readers whose firmware lacks the capability', async () => {
-      attractapService.findReaderById.mockResolvedValue({ id: READER_ID, firmware: { capabilities: {} } });
+      attractapService.findReaderById.mockResolvedValue({
+        id: READER_ID,
+        pairingState: 'paired',
+        firmware: { capabilities: {} },
+      });
       websocketService.sockets.set('a', makeSocket());
 
       await expect(arm()).rejects.toBeInstanceOf(BadRequestException);

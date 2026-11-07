@@ -69,9 +69,26 @@ describe('AttractapCardHandler', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
+    it.each(['unpaired', 'revoked'])('refuses to arm enrollment on a %s reader', async (pairingState) => {
+      const socket = startEnrollOfNewNfcCardScope.createMockSocket();
+      startEnrollOfNewNfcCardScope.websocketService.sockets.set(socket.id, socket);
+      startEnrollOfNewNfcCardScope.attractapService.findReaderById.mockResolvedValueOnce({
+        id: 42,
+        pairingState,
+        firmware: { capabilities: { cardEnrollment: true, cardRelay: true } },
+      });
+
+      await expect(
+        startEnrollOfNewNfcCardScope.handler.startEnrollOfNewNfcCard({ readerId: 42, userId: 1 }),
+      ).rejects.toThrow('READER_NOT_PAIRED');
+      expect(socket.state.enrollment).toBeFalsy();
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+    });
+
     it('throws when the reader does not support card enrollment', async () => {
       startEnrollOfNewNfcCardScope.attractapService.findReaderById.mockResolvedValueOnce({
         id: 42,
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: false } },
       });
 
@@ -377,6 +394,21 @@ describe('AttractapCardHandler', () => {
       expect(await first).toEqual(expect.objectContaining({ message: 'READER_BUSY' }));
       expect(socket.sendMessage).toHaveBeenCalledTimes(1);
       expect(socket.state.resetNfcCardData).toEqual(expect.objectContaining({ cardId: 8 }));
+    });
+
+    it.each(['unpaired', 'revoked'])('refuses to arm a reset on a %s reader', async (pairingState) => {
+      const socket = startResetOfNfcCardScope.createMockSocket();
+      startResetOfNfcCardScope.websocketService.sockets.set(socket.id, socket);
+      startResetOfNfcCardScope.attractapService.findReaderById.mockResolvedValueOnce({
+        id: 42,
+        pairingState,
+        firmware: { capabilities: { cardEnrollment: true, cardRelay: true } },
+      });
+
+      await expect(
+        startResetOfNfcCardScope.handler.startResetOfNfcCard({ readerId: 42, userId: 1, cardId: 7 }),
+      ).rejects.toThrow('READER_NOT_PAIRED');
+      expect(socket.state.resetNfcCardData).toBeFalsy();
     });
 
     it('throws when the reader is not found', async () => {

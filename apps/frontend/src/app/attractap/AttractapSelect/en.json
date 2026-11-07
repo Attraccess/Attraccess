@@ -1,6 +1,5 @@
 {
   "loading": "Loading readers...",
-  "notPaired": "Not paired – the connection is not encrypted",
   "empty": {
     "noConnectedReader": {
       "title": "No reader connected",

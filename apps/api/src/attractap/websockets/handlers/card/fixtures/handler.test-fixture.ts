@@ -32,6 +32,7 @@ export function createAttractapCardHandlerFixture() {
 
   const mockReaderWithEnrollment = {
     id: 42,
+    pairingState: 'paired',
     firmware: { capabilities: { cardEnrollment: true } },
   };
 

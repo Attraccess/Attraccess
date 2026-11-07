@@ -175,6 +175,10 @@
     "title": "Firmware update required",
     "description": "The selected Attractap needs firmware 2.0.0 or later for card functions. It is offered the update automatically; try again once it has installed it."
   },
+  "READER_NOT_PAIRED": {
+    "title": "Reader not paired",
+    "description": "This Attractap is not paired yet. Pair it first; until then it is only available in the pairing session."
+  },
   "READER_NOT_ALLOWED_TO_WRITE_CARDS": {
     "title": "Reader not allowed",
     "description": "This Attractap is not allowed to enroll or reset RFID cards. Choose another reader, or ask an administrator to allow it under Settings → RFID card enrollment."

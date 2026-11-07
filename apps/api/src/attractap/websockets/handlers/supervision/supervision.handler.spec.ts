@@ -66,6 +66,7 @@ describe('AttractapSupervisionHandler', () => {
       fixture.websocketService.sockets.set('a', fixture.makeSocket());
       fixture.attractapService.findReaderById.mockResolvedValueOnce({
         id: fixture.READER_ID,
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: true } },
         resources: [{ id: 5, type: 'machine', maxParallelSessions: 2 }],
       });
@@ -79,6 +80,7 @@ describe('AttractapSupervisionHandler', () => {
       fixture.websocketService.sockets.set('a', socket);
       fixture.attractapService.findReaderById.mockResolvedValueOnce({
         id: fixture.READER_ID,
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: true } },
         resources: [{ id: 5, type: 'machine', maxParallelSessions: 2 }],
       });
@@ -90,6 +92,21 @@ describe('AttractapSupervisionHandler', () => {
 
     it('refuses an offline reader', async () => {
       await expect(fixture.arm()).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it.each(['unpaired', 'revoked'])('refuses a %s reader and arms nothing', async (pairingState) => {
+      fixture.attractapService.findReaderById.mockResolvedValueOnce({
+        id: fixture.READER_ID,
+        pairingState,
+        firmware: { capabilities: { cardEnrollment: true } },
+        resources: [{ id: fixture.RESOURCE_ID }],
+      });
+      const socket = fixture.makeSocket();
+      fixture.websocketService.sockets.set('a', socket);
+
+      await expect(fixture.arm()).rejects.toThrow('READER_NOT_PAIRED');
+      expect(socket.state.supervisionFlow).toBeNull();
+      expect(socket.sendMessage).not.toHaveBeenCalled();
     });
 
     it('refuses a reader on firmware that cannot relay card commands, also when only one socket lacks it', async () => {
@@ -104,6 +121,7 @@ describe('AttractapSupervisionHandler', () => {
       fixture.websocketService.sockets.set('a', fixture.makeSocket());
       fixture.attractapService.findReaderById.mockResolvedValueOnce({
         id: fixture.READER_ID,
+        pairingState: 'paired',
         firmware: { capabilities: { cardEnrollment: false } },
         resources: [],
       });

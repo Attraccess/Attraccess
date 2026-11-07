@@ -128,31 +128,25 @@ describe('AttractapSelect for card writing', () => {
     expect(screen.getByTestId('attractap-select-empty')).toHaveTextContent('Settings → RFID card enrollment');
   });
 
-  it('marks readers that are not paired in the list', async () => {
-    readersQuery([reader(1, 'Entrance', {}), reader(5, 'Legacy', {}, new Date(), 'unpaired')]);
+  it('never offers a reader that is not paired, in any picker', async () => {
+    readersQuery([
+      reader(1, 'Entrance', {}),
+      reader(5, 'Legacy', {}, new Date(), 'unpaired'),
+      reader(6, 'Removed', {}, new Date(), 'revoked'),
+    ]);
     settingsQuery({ mode: 'all', readerIds: [] });
-    render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
-    expect(await options()).toEqual(['Entrance', 'LegacyNot paired – the connection is not encrypted']);
+    const writing = render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
+    expect(await options()).toEqual(['Entrance']);
+    writing.unmount();
+    render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} />);
+    expect(await options()).toEqual(['Entrance']);
   });
 
-  it.each([
-    { pairingState: 'paired', hinted: false },
-    { pairingState: 'unpaired', hinted: true },
-    { pairingState: 'revoked', hinted: true },
-  ])('hints under the picker when the picked reader is $pairingState', ({ pairingState, hinted }) => {
-    readersQuery([reader(5, 'Front desk', {}, new Date(), pairingState)]);
+  it('does not show a picked reader that is not paired', () => {
+    readersQuery([reader(5, 'Legacy', {}, new Date(), 'unpaired')]);
     settingsQuery({ mode: 'all', readerIds: [] });
     render(<AttractapSelect selection={5} onSelectionChange={vi.fn()} forCardWriting />);
-    expect(screen.getByRole('button', { name: /Front desk/ })).toHaveTextContent(
-      hinted ? 'Front deskNot paired – the connection is not encrypted' : /^Front desk$/,
-    );
-  });
-
-  it('does not mark readers that are not paired in other pickers', async () => {
-    readersQuery([reader(5, 'Legacy', {}, new Date(), 'unpaired')]);
-    render(<AttractapSelect selection={5} onSelectionChange={vi.fn()} />);
-    expect(screen.queryByText('Not paired – the connection is not encrypted')).toBeNull();
-    expect(await options()).toEqual(['Legacy']);
+    expect(screen.queryByText('Legacy')).toBeNull();
   });
 
   it('does not explain an empty list for other pickers', () => {

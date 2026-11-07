@@ -8,6 +8,7 @@ import {
   useAttractapServiceGetReaderByIdKey,
   useAttractapServiceGetReaderCredentialHistoryKey,
   useAttractapServiceGetReaders,
+  useAttractapServiceGetReadersToPair,
   useAttractapServiceGetReadersKey,
   useAttractapServiceResolvePairing,
 } from '@attraccess/react-query-client';
@@ -227,7 +228,13 @@ export function usePairingFlow(props: PairingFlowProps) {
 
   const active = useActivePairing(props, resolved, pickedId);
   const { current, resolvedByCode, refetch } = active;
-  const { data: readers } = useAttractapServiceGetReaders();
+  // The pairing session sees every reader record: paired ones and the ones that are not paired yet.
+  const { data: pairedReaders } = useAttractapServiceGetReaders();
+  const { data: unpairedReaders } = useAttractapServiceGetReadersToPair();
+  const readers = useMemo(
+    () => (pairedReaders || unpairedReaders ? [...(pairedReaders ?? []), ...(unpairedReaders ?? [])] : undefined),
+    [pairedReaders, unpairedReaders],
+  );
 
   const refreshLists = () =>
     Promise.all(
@@ -280,7 +287,12 @@ export function usePairingFlow(props: PairingFlowProps) {
   });
 
   const idle = !resolving && !approve.isPending;
-  const cancelAndClose = useCancelAndClose(current, () => approve.isPending || submitting.current, onClose, refreshLists);
+  const cancelAndClose = useCancelAndClose(
+    current,
+    () => approve.isPending || submitting.current,
+    onClose,
+    refreshLists,
+  );
   const blocked = countdown.secondsLeft > 0;
   const normalizedCode = normalizeEnrollmentCode(codeInput);
   const bound = current?.boundReaderId != null;

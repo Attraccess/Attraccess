@@ -109,7 +109,6 @@
     "resume": "Fortsetzen",
     "requestFailed": "Kopplung konnte nicht gestartet werden",
     "notConnected": "Der Reader ist gerade nicht verbunden. Schalte ihn ein und versuche es erneut.",
-    "diagnostics": "Diagnose",
     "delete": "Löschen"
   },
   "kind": {

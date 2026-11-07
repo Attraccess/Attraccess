@@ -43,7 +43,7 @@ describe('AttractapSessionHandler when the reader login ends mid-action', () => 
       resourceFlowsExecutorService: { pressButton: jest.fn().mockResolvedValue({}) },
       billingService: { getResourceUsageCharge: jest.fn().mockResolvedValue(null) },
       supervisionService: { settleByCard: jest.fn() },
-      cardSessions: { resume: jest.fn().mockReturnValue(false) },
+      cardSessions: { hold: jest.fn().mockReturnValue(() => undefined), resume: jest.fn().mockReturnValue(false) },
       startGate: {
         run: jest.fn().mockResolvedValue({ kind: 'proceed' }),
         afterStop: jest.fn().mockResolvedValue(undefined),

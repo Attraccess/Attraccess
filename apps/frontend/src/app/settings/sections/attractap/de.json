@@ -25,8 +25,7 @@
     "blockers": {
       "firmwareUpdateRequired": "Kann erst mit Firmware 2.0.0 oder neuer Karten beschreiben.",
       "noCardEnrollment": "Dieses Reader-Modell kann keine Karten registrieren oder zurücksetzen."
-    },
-    "notPaired": "Nicht gekoppelt – die Verbindung ist nicht verschlüsselt"
+    }
   },
   "success": {
     "title": "Einstellungen gespeichert",

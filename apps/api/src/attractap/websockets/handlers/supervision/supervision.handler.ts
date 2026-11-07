@@ -21,6 +21,7 @@ import { ResourceUsageService } from '../../../../resources/usage/sessions/resou
 import { UsersService } from '../../../../users-and-auth/users/users.service';
 
 import { AttractapService } from '../../../attractap.service';
+import { assertReaderPaired } from '../../../reader-pairing';
 
 import { CardOperationsService } from '../../card-operations.service';
 import { assertReaderRelaysCards } from '../card/card-write-errors';
@@ -297,6 +298,7 @@ export class AttractapSupervisionHandler implements OnModuleInit {
     if (!reader) {
       throw new NotFoundException(`Reader not found: ${readerId}`);
     }
+    assertReaderPaired(reader);
 
     // Supervision draws its whole UI on the reader's screen; display-less readers cannot run it.
     if (!reader.firmware.capabilities.cardEnrollment) {

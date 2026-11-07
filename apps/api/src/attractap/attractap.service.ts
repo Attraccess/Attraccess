@@ -13,7 +13,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository, FindManyOptions, In, DeleteResult } from 'typeorm';
+import { Repository, FindManyOptions, In, Not, DeleteResult } from 'typeorm';
 
 import { AuditService } from '../audit/audit.service';
 
@@ -370,6 +370,26 @@ export class AttractapService {
 
   public async getAllReaders(options?: FindManyOptions<Attractap>): Promise<Attractap[]> {
     return await this.readerRepository.find(options);
+  }
+
+  /**
+   * Readers that completed pairing. Every list the rest of the product reads (readers page,
+   * pickers, resource assignment, card writer setting) uses this one; unpaired readers belong to
+   * the pairing session only.
+   */
+  public async getPairedReaders(options: FindManyOptions<Attractap> = {}): Promise<Attractap[]> {
+    const where = options.where;
+    return await this.readerRepository.find({
+      ...options,
+      where: Array.isArray(where)
+        ? where.map((clause) => ({ ...clause, pairingState: 'paired' as const }))
+        : { ...(where ?? {}), pairingState: 'paired' as const },
+    });
+  }
+
+  /** Readers that must be paired before they can be used: the pairing session's list. */
+  public async getReadersToPair(): Promise<Attractap[]> {
+    return await this.readerRepository.find({ where: { pairingState: Not('paired') }, relations: ['resources'] });
   }
 
   /** A new card key: 16 random bytes from the system CSPRNG, hex encoded. Nothing about it is derivable. */

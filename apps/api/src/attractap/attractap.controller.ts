@@ -25,6 +25,7 @@ import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
 
 import { AttractapService } from './attractap.service';
+import { isPaired } from './reader-pairing';
 
 import { UpdateReaderResponseDto } from './dtos/update-reader-response.dto';
 
@@ -105,7 +106,23 @@ export class AttractapController {
     // `resources` is a plain ManyToMany with no eager loading, so without this the relation is
     // absent from the response entirely. Callers that group readers by resource — the supervised
     // start popup (ATT-816) — silently see every reader as unattached.
-    return await this.attractapService.getAllReaders({ relations: ['resources'] });
+    // Readers that are not paired yet are listed by GET /attractap/readers/to-pair, for the pairing session only.
+    return await this.attractapService.getPairedReaders({ relations: ['resources'] });
+  }
+
+  @Get('to-pair')
+  @Auth('resources.update')
+  @ApiOperation({
+    summary: 'Readers that are not paired yet (pairing session only)',
+    operationId: 'getReadersToPair',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Readers that were never paired or whose pairing was removed',
+    type: [Attractap],
+  })
+  async getReadersToPair(): Promise<Attractap[]> {
+    return await this.attractapService.getReadersToPair();
   }
 
   @Get(':readerId')
@@ -119,7 +136,10 @@ export class AttractapController {
   })
   @ApiResponse({ status: 404, description: 'Reader not found' })
   async getReaderById(@Param('readerId', ParseIntPipe) readerId: number): Promise<Attractap> {
-    return await this.attractapService.findReaderById(readerId);
+    const reader = await this.attractapService.findReaderById(readerId);
+    // A reader that is not paired yet is not visible outside the pairing session.
+    if (!isPaired(reader)) throw new NotFoundException(`Reader with ID ${readerId} not found`);
+    return reader;
   }
 
   @Delete(':readerId')

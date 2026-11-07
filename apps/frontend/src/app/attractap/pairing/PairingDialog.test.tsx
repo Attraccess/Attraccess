@@ -54,6 +54,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   useAttractapServiceGetPairings: () => ({ data: mocks.pairings.current }),
   useAttractapServiceGetReaders: () => ({ data: mocks.readers.current }),
+  useAttractapServiceGetReadersToPair: () => ({ data: [] }),
   useAttractapServiceApprovePairing: (options: Record<string, (value: unknown) => unknown>) => {
     mocks.approveOptions.current = options;
     return { mutate: mocks.approve, isPending: false };
@@ -134,7 +135,8 @@ describe('PairingDialog', () => {
     mocks.refetch
       .mockReset()
       .mockImplementation(async () => ({ data: mocks.refetchResult.current ?? mocks.pairing.current }));
-    for (const fn of [mocks.approve, mocks.cancel, mocks.resolve, mocks.toast.success, mocks.toast.error]) fn.mockClear();
+    for (const fn of [mocks.approve, mocks.cancel, mocks.resolve, mocks.toast.success, mocks.toast.error])
+      fn.mockClear();
   });
   afterEach(() => setSecureContext(true));
 

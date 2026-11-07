@@ -116,15 +116,7 @@ describe('ReadersToPair', () => {
       within(card)
         .getAllByRole('button')
         .map((b) => b.textContent || b.getAttribute('aria-label')),
-    ).toEqual([
-      'toPair.pair',
-      'toPair.diagnostics',
-      'toPair.delete',
-      'toPair.pair',
-      'toPair.diagnostics',
-      'toPair.delete',
-      'toPair.pair',
-    ]);
+    ).toEqual(['toPair.pair', 'toPair.delete', 'toPair.pair', 'toPair.delete', 'toPair.pair']);
   });
 
   it('deletes a reader record that is not paired', async () => {
@@ -134,11 +126,9 @@ describe('ReadersToPair', () => {
     expect(mocks.deleteModal).toHaveBeenCalledWith(1);
   });
 
-  it('opens the diagnostics of a reader record that is not paired', async () => {
-    const user = userEvent.setup();
-    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(3, 'revoked')]} />);
-    await user.click(screen.getByRole('button', { name: 'toPair.diagnostics' }));
-    expect(mocks.navigate).toHaveBeenCalledWith('/attractap/readers/3/diagnostics');
+  it('offers no diagnostics for a reader that is not paired: those wait until it is paired', () => {
+    render(<ReadersToPair onPaired={mocks.onPaired} readers={[reader(3, 'revoked'), reader(1, 'unpaired')]} />);
+    expect(screen.queryByRole('button', { name: 'toPair.diagnostics' })).toBeNull();
   });
 
   it('lets a reader whose pairing was removed take over its own record', async () => {

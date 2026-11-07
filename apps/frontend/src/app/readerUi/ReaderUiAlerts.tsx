@@ -1,3 +1,4 @@
+import { pairedReadersOnly } from '../attractap/cardWriting';
 import { Alert, AlertContent, AlertDescription, AlertTitle, Button } from '@heroui/react';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useAttractapServiceGetReaders } from '@attraccess/react-query-client';
@@ -45,7 +46,8 @@ export function ReaderUiAlerts({ readerId }: Readonly<{ readerId?: number }>) {
   const { data } = useReaderUiAlerts();
   const alerts = (data ?? []).filter((alert) => readerId === undefined || alert.readerId === readerId);
   const needsReaders = alerts.some((alert) => alert.readerId !== null);
-  const { data: readers } = useAttractapServiceGetReaders(undefined, { enabled: needsReaders });
+  const { data: allReaders } = useAttractapServiceGetReaders(undefined, { enabled: needsReaders });
+  const readers = allReaders ? pairedReadersOnly(allReaders) : undefined;
   const readerName = (id: number | null) => readers?.find((reader) => reader.id === id)?.name;
 
   return (

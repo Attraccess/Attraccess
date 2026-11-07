@@ -68,10 +68,12 @@ Attractap-Leser verwenden AES-verschluesselte Authentifizierung, die Karten mit 
 
 Standardmäßig kann jeder Reader mit Display und Firmware 2.0.0 oder neuer Karten registrieren und zurücksetzen. Administratoren können das unter **Einstellungen -> RFID-Kartenregistrierung** begrenzen: Wählen Sie **Ausgewählten Readern** und kreuzen Sie die Reader an, die Karten beschreiben dürfen. Die Bildschirme zum Registrieren und Zurücksetzen zeigen dann nur diese Reader. Alle Reader lassen Mitglieder sich weiterhin mit ihrer Karte anmelden.
 
+Noch nicht gekoppelte Reader erscheinen nur in der Kopplungssitzung auf der Reader-Seite. Sie werden weder in der Reader-Liste, in Auswahlfeldern, in den Einstellungen noch bei der Ressourcenzuordnung angezeigt und können niemals Karten registrieren oder zurücksetzen, einen Start beaufsichtigen oder eine Sammeleinweisung ausführen.
+
 > [!IMPORTANT]
 > **Erlauben Sie nur gekoppelten, vertrauenswürdigen Readern, Karten zu registrieren und zurückzusetzen.** Eine neue Karte hat noch den öffentlich bekannten Werksschlüssel, deshalb schreibt der Server den neuen Kartenschlüssel unter diesem Werksschlüssel.
 >
-> - **Die Verbindung:** Ein [gekoppelter Reader](attractap/pairing.md) spricht über eine verschlüsselte Verbindung mit dem Server, niemand im Netzwerk kann den Schlüssel mitlesen. Ein noch nicht gekoppelter Reader verbindet sich weiterhin unverschlüsselt. Koppeln Sie einen Reader, bevor Sie ihm das Registrieren und Zurücksetzen von Karten erlauben; die Einstellungen und die Reader-Auswahl kennzeichnen nicht gekoppelte Reader.
+> - **Die Verbindung:** Ein [gekoppelter Reader](attractap/pairing.md) spricht über eine verschlüsselte Verbindung mit dem Server, niemand im Netzwerk kann den Schlüssel mitlesen. Ein noch nicht gekoppelter Reader verbindet sich weiterhin unverschlüsselt. Ein noch nicht gekoppelter Reader kann Karten überhaupt nicht registrieren oder zurücksetzen.
 > - **Der Reader selbst:** Der Reader, der den Schreibvorgang weiterreicht, kann den neuen Schlüssel weiterhin ermitteln. Ein manipulierter Reader könnte so Karten kopieren, die an ihm registriert oder zurückgesetzt wurden. Beschränken Sie das unter **Einstellungen -> RFID-Kartenregistrierung** auf Reader an einem Ort, den Sie kontrollieren, zum Beispiel am Empfang. Gegen manipulierte Reader soll abgesicherte Reader-Firmware helfen, die für eine spätere Version geplant ist.
 >
 > Das normale Vorhalten einer Karte ist nicht betroffen: Der Server prüft die Karte, ohne dass der Schlüssel über den Reader läuft.

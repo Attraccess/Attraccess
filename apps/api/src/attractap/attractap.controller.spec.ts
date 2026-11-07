@@ -8,7 +8,9 @@ describe('AttractapController', () => {
   // Instantiated directly: routing this through the Nest testing module would drag in the auth and
   // license guards, none of which this test is about.
   const attractapService = {
-    getAllReaders: jest.fn().mockResolvedValue([]),
+    getPairedReaders: jest.fn().mockResolvedValue([]),
+    getReadersToPair: jest.fn().mockResolvedValue([]),
+    findReaderById: jest.fn(),
     deleteReader: jest.fn(),
     recordReaderDeregistration: jest.fn().mockResolvedValue(undefined),
   };
@@ -26,7 +28,31 @@ describe('AttractapController', () => {
   it('loads the resources relation when listing readers', async () => {
     await controller.getReaders();
 
-    expect(attractapService.getAllReaders).toHaveBeenCalledWith(expect.objectContaining({ relations: ['resources'] }));
+    expect(attractapService.getPairedReaders).toHaveBeenCalledWith(
+      expect.objectContaining({ relations: ['resources'] }),
+    );
+  });
+
+  // Readers that are not paired yet exist for the pairing session only.
+  it('lists only paired readers; the unpaired ones come from the pairing session list', async () => {
+    const paired = [{ id: 1, pairingState: 'paired' }];
+    const unpaired = [{ id: 2, pairingState: 'unpaired' }];
+    attractapService.getPairedReaders.mockResolvedValueOnce(paired);
+    attractapService.getReadersToPair.mockResolvedValueOnce(unpaired);
+
+    await expect(controller.getReaders()).resolves.toBe(paired);
+    await expect(controller.getReadersToPair()).resolves.toBe(unpaired);
+  });
+
+  it.each(['unpaired', 'revoked'])('does not show a %s reader by id', async (pairingState) => {
+    attractapService.findReaderById.mockResolvedValueOnce({ id: 4, pairingState });
+    await expect(controller.getReaderById(4)).rejects.toThrow('not found');
+  });
+
+  it('shows a paired reader by id', async () => {
+    const reader = { id: 4, pairingState: 'paired' };
+    attractapService.findReaderById.mockResolvedValueOnce(reader);
+    await expect(controller.getReaderById(4)).resolves.toBe(reader);
   });
 
   it('records a deleted reader with the API-token principal', async () => {
