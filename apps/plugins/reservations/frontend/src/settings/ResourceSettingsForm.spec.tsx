@@ -23,6 +23,7 @@ const settings = {
   checkInGraceMinutes: 15,
   earlyCheckInMinutes: 15,
   handoverReminderMinutes: 15,
+  showNamesOnReaders: false,
   bookableHours: {},
 };
 
@@ -134,5 +135,21 @@ describe('ResourceSettingsForm', () => {
     await screen.findByRole('alertdialog');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await waitFor(() => expect(screen.getByRole('switch', { name: /Enable reservations/ })).toBeChecked());
+  });
+
+  it('opts in to names on readers with a help text and saves it', async () => {
+    const user = userEvent.setup();
+    const calls = mockFetch({
+      'GET /resources/3/settings': settings,
+      'PUT /resources/3/settings': { settings: { ...settings, showNamesOnReaders: true }, cancelledBookings: 0 },
+    });
+    renderWithProviders(<ResourceSettingsForm resourceId={3} />);
+    const toggle = await screen.findByRole('switch', { name: /Show names on readers/ });
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText('Names are shown only after someone taps their card.')).toBeInTheDocument();
+    await user.click(toggle);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await screen.findByText('Settings saved');
+    expect(calls.find((call) => call.method === 'PUT')?.body).toMatchObject({ showNamesOnReaders: true });
   });
 });

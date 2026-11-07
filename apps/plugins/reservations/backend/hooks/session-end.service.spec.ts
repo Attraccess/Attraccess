@@ -1,7 +1,7 @@
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
-import { READER_UI_LIMITS, type SessionEndContext } from '@attraccess/plugins-backend-sdk';
+import { READER_UI_CAPABILITIES_NONE, READER_UI_LIMITS, type SessionEndContext } from '@attraccess/plugins-backend-sdk';
 
 describe('SessionEndService', () => {
   let h: Harness;
@@ -92,5 +92,51 @@ describe('SessionEndService', () => {
     expect(p.decisions.get(10, 1, h.clock().getTime())).toBeNull();
     p.decisions.record(10, 1, 1, h.clock().getTime()); // a late SESSION_ENDED event
     expect(p.decisions.get(10, 1, h.clock().getTime())).toBeNull();
+  });
+
+  describe('stopping on a reader', () => {
+    it('asks keep/free with the 15 s default keep, within the host limits', async () => {
+      const result = await p.sessionEnd.evaluate(ctx(10, { origin: 'reader', language: 'de' }));
+      if (result.decision !== 'choose') throw new Error('expected a choice');
+      expect(result.choice).toMatchObject({
+        title: 'Reservierung behalten?',
+        defaultOnTimeout: 'keep',
+        expiresInSec: 15,
+        choices: [
+          { id: 'keep', label: 'Behalten' },
+          { id: 'free', label: 'Rest freigeben' },
+        ],
+      });
+      expect(result.choice.expiresInSec).toBeLessThanOrEqual(30);
+      for (const choice of result.choice.choices) expect(choice.label.length).toBeLessThanOrEqual(31);
+    });
+
+    it('"free" ends the booking early and refreshes the reader slots', async () => {
+      const result = await p.sessionEnd.evaluate(ctx(10, { origin: 'reader' }));
+      if (result.decision !== 'choose') throw new Error('expected a choice');
+      h.invalidateReaderUi.mockClear();
+      await result.choice.onAnswer('free');
+      expect(await reservation()).toMatchObject({ status: 'completed', endedEarlyAt: expect.any(Date) });
+      expect(h.invalidateReaderUi).toHaveBeenCalledWith({ resourceId: 1 });
+      expect(
+        await p.readerUi.getSlotContributions({
+          readerId: 1,
+          resourceId: 1,
+          capabilities: READER_UI_CAPABILITIES_NONE,
+          language: 'en',
+        }),
+      ).toEqual([]);
+    });
+
+    it('the default "keep" leaves the booking running', async () => {
+      const result = await p.sessionEnd.evaluate(ctx(10, { origin: 'reader' }));
+      if (result.decision !== 'choose') throw new Error('expected a choice');
+      await result.choice.onAnswer(result.choice.defaultOnTimeout);
+      expect(await reservation()).toMatchObject({ status: 'confirmed', keptAt: expect.any(Date) });
+    });
+
+    it('offers nothing to a user without a running booking of their own', async () => {
+      expect(await p.sessionEnd.evaluate(ctx(11, { origin: 'reader' }))).toEqual({ decision: 'none' });
+    });
   });
 });

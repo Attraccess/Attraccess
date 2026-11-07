@@ -6,4 +6,7 @@ export const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 export const RESERVATION_NOTIFIER = Symbol.for('attraccess.reservations.notifier');
 export const RESERVATION_CLOCK = Symbol.for('attraccess.reservations.clock');
 
+/** A booking shows as "Free until" on a reader this long before it starts. */
+export const READER_HORIZON_MS = 24 * 60 * 60_000;
+
 export type Clock = () => Date;

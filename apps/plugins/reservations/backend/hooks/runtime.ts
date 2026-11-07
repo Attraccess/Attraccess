@@ -1,5 +1,8 @@
 import type {
   PreStartContext,
+  ReaderSlotContribution,
+  ReaderUiContext,
+  ReaderUiProvider,
   PreStartResult,
   SessionEndContext,
   SessionEndResult,
@@ -14,6 +17,7 @@ export interface HookServices {
     evaluateStartBlocked(ctx: StartBlockedContext, deadline?: number): Promise<StartBlockedState | null>;
   };
   sessionEnd: { evaluate(ctx: SessionEndContext, deadline?: number): Promise<SessionEndResult> };
+  readerUi: { getSlotContributions(ctx: ReaderUiContext, deadline?: number): Promise<ReaderSlotContribution[]> };
 }
 
 /**
@@ -97,3 +101,11 @@ export async function startBlockedQuery(ctx: StartBlockedContext): Promise<Start
   const deadline = hookDeadline();
   return (await resolveHookServices(deadline)).preStart.evaluateStartBlocked(ctx, deadline);
 }
+
+/** `PluginBackendModule.readerUi`: slot contributions for Attractap readers (same shared deadline). */
+export const readerUiProvider: ReaderUiProvider = {
+  async getSlotContributions(ctx: ReaderUiContext): Promise<ReaderSlotContribution[]> {
+    const deadline = hookDeadline();
+    return (await resolveHookServices(deadline)).readerUi.getSlotContributions(ctx, deadline);
+  },
+};

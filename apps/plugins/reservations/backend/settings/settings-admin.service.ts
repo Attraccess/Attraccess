@@ -65,7 +65,7 @@ export class SettingsAdminService {
       return { ...updated, cancelledBookings: cancelled };
     });
     const changed = changedSettingKeys(settingsValues(before), settingsValues(after));
-    if (changed.length > 0) this.reservations.invalidateStartBlocked(resourceId);
+    if (changed.length > 0) this.reservations.invalidateViews(resourceId);
     if (changed.length > 0 || cancelledBookings > 0) {
       await this.reservations.auditLog.record(
         'settings_changed',
@@ -88,6 +88,8 @@ export class SettingsAdminService {
   async setTimezone(actor: ReservationActor, timezone: string): Promise<{ timezone: string; defaultTimezone: string }> {
     const { before } = await this.globalSettings.setTimezone(timezone);
     if (before !== timezone) {
+      // Reader slots write times in this timezone.
+      for (const resourceId of this.settings.getEnabledResourceIds()) this.reservations.invalidateViews(resourceId);
       await this.reservations.auditLog.record(
         'settings_changed',
         actor,

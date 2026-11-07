@@ -325,4 +325,106 @@ describe('PreStartService', () => {
       expect(find).not.toHaveBeenCalled();
     });
   });
+
+  describe('reader origin: names only after the card tap, to those who may see them', () => {
+    const reader = (userId: number, patch: Partial<PreStartContext> = {}) =>
+      ctx(userId, { origin: 'reader', ...patch });
+    const reservationOf = () => h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ userId: 11 });
+
+    describe('booking starts soon', () => {
+      beforeEach(async () => {
+        await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+        h.setNow('2026-06-01T11:20:00Z');
+      });
+
+      it('asks to confirm without a name, with the no-screen policy block', async () => {
+        const result = await p.preStart.evaluate(reader(10));
+        expect(result).toMatchObject({
+          decision: 'confirm',
+          confirmation: {
+            stepKey: `reservation-${(await reservationOf()).id}`,
+            body: 'Reserved from 14:00, you have 40 min. Start anyway?',
+            noScreenPolicy: 'block',
+          },
+        });
+        expect(JSON.stringify(result)).not.toContain('user11');
+        expect(await p.preStart.evaluate(reader(10, { language: 'de' }))).toMatchObject({
+          confirmation: { body: 'Reserviert ab 14:00, du hast 40 Min. Trotzdem starten?' },
+        });
+      });
+
+      it('names the holder to a manager starting on a reader', async () => {
+        expect(await p.preStart.evaluate(reader(99))).toMatchObject({
+          confirmation: { body: 'Reserved by user11 from 14:00, you have 40 min. Start anyway?' },
+        });
+        expect(await p.preStart.evaluate(reader(99, { language: 'de' }))).toMatchObject({
+          confirmation: { body: 'Reserviert von user11 ab 14:00, du hast 40 Min. Trotzdem starten?' },
+        });
+      });
+
+      it('names the holder to anybody when the resource opted in, within the host text limit', async () => {
+        await h.settings.update(1, { showNamesOnReaders: true });
+        expect(await p.preStart.evaluate(reader(10))).toMatchObject({
+          confirmation: { body: 'Reserved by user11 from 14:00, you have 40 min. Start anyway?' },
+        });
+        jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map([[11, 'An extremely long user name 日本']]));
+        const long = await p.preStart.evaluate(reader(10, { language: 'de' }));
+        if (long.decision !== 'confirm') throw new Error('expected a confirmation');
+        expect(long.confirmation.body.length).toBeLessThanOrEqual(READER_UI_LIMITS.maxTextChars);
+        expect(long.confirmation.body).toContain('An extremely lon');
+        expect(long.confirmation.body).not.toContain('日');
+      });
+
+      it('never names the holder for web starts, even with the opt-in', async () => {
+        await h.settings.update(1, { showNamesOnReaders: true });
+        expect(JSON.stringify(await p.preStart.evaluate(ctx(10)))).not.toContain('user11');
+        expect(JSON.stringify(await p.preStart.evaluate(ctx(99)))).not.toContain('user11');
+      });
+    });
+
+    describe('booking is running', () => {
+      beforeEach(async () => {
+        await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+        h.setNow('2026-06-01T12:30:00Z');
+      });
+
+      it('refuses a non-manager without a name', async () => {
+        const result = await p.preStart.evaluate(reader(10));
+        expect(result).toEqual({
+          decision: 'block',
+          reason: { code: 'RESERVED', title: 'Reserved', body: 'Reserved by another user until 16:00.' },
+        });
+      });
+
+      it('names the holder in the refusal only with the opt-in', async () => {
+        await h.settings.update(1, { showNamesOnReaders: true });
+        expect(await p.preStart.evaluate(reader(10))).toMatchObject({
+          decision: 'block',
+          reason: { code: 'RESERVED', body: 'Reserved by user11 until 16:00.' },
+        });
+        expect(await p.preStart.evaluate(reader(10, { language: 'de' }))).toMatchObject({
+          reason: { body: 'Von user11 bis 16:00 reserviert.' },
+        });
+        // The web UI query keeps its nameless reason.
+        const state = await p.preStart.evaluateStartBlocked({
+          resourceId: 1,
+          userId: 10,
+          language: 'en',
+          now: h.clock(),
+        });
+        expect(state?.reason.body).toBe('Reserved by another user until 16:00.');
+      });
+
+      it('gives a manager the override confirmation, blocking without a screen', async () => {
+        expect(await p.preStart.evaluate(reader(99))).toMatchObject({
+          decision: 'confirm',
+          confirmation: {
+            stepKey: `override-${(await reservationOf()).id}`,
+            body: 'Reserved by user11 until 16:00. Start anyway?',
+            noScreenPolicy: 'block',
+          },
+        });
+      });
+    });
+  });
 });
