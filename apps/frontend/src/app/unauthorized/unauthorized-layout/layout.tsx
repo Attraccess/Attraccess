@@ -52,7 +52,7 @@ export function UnauthorizedLayout({ children }: UnauthorizedLayoutProps) {
 
         <div
           className="w-full lg:w-1/2 flex items-start lg:items-center justify-center p-6 sm:p-12 lg:p-16"
-          data-testid="unauthorized-form-column"
+          data-cy="unauthorized-form-column"
         >
           <div className="w-full max-w-md space-y-8">
             <div className="flex items-center lg:hidden">

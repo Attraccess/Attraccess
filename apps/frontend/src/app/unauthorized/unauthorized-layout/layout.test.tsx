@@ -3,10 +3,6 @@ import React from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { UnauthorizedLayout } from './layout';
 
-function classesOf(element: Element | null): Set<string> {
-  return new Set(element?.className.split(/\s+/).filter(Boolean) ?? []);
-}
-
 function renderLayout() {
   return render(
     <UnauthorizedLayout>
@@ -29,24 +25,18 @@ describe('UnauthorizedLayout', () => {
     const { container } = renderLayout();
     const outer = container.firstElementChild;
     expect(outer).not.toBeNull();
-    const classes = classesOf(outer);
-    expect(classes.has('overflow-y-auto')).toBe(true);
-    expect(classes.has('h-[var(--vvh,100dvh)]')).toBe(true);
+    expect(outer).toHaveClass('overflow-y-auto', 'h-[var(--vvh,100dvh)]');
 
     const content = outer?.firstElementChild ?? null;
-    expect(classesOf(content).has('flex')).toBe(true);
-    expect(classesOf(content).has('min-h-full')).toBe(true);
+    expect(content).toHaveClass('flex', 'min-h-full');
   });
 
-  it('applies top alignment to the form column with an lg-and-up centered override', () => {
-    renderLayout();
-    const formColumn = screen.getByTestId('unauthorized-form-column');
+  it('top-aligns the form column below lg so the auth CTA stays above the fold on small screens', () => {
+    const { container } = renderLayout();
+    const formColumn = container.querySelector('[data-cy="unauthorized-form-column"]');
+    expect(formColumn).not.toBeNull();
     expect(formColumn).toContainElement(screen.getByTestId('form-content'));
-    const classes = classesOf(formColumn);
-    expect(classes.has('flex')).toBe(true);
-    expect(classes.has('items-start')).toBe(true);
-    expect(classes.has('lg:items-center')).toBe(true);
-    expect(classes.has('justify-center')).toBe(true);
-    expect(classes.has('items-center')).toBe(false);
+    expect(formColumn).toHaveClass('flex', 'items-start', 'lg:items-center', 'justify-center');
+    expect(formColumn).not.toHaveClass('items-center');
   });
 });
