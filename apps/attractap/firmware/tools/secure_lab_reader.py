@@ -150,13 +150,15 @@ def flash_layout(build_dir):
     return images
 
 
-def signed_images(images, tmp):
-    """Sign the bootloader and the app with the lab key; other images pass through."""
+def signed_images(images, tmp, espsecure=("espsecure",)):
+    """Sign the bootloader and the app with the lab key; other images pass through.
+
+    espsecure: command prefix, e.g. (python, "-m", "espsecure") outside an ESP-IDF shell."""
     out = []
     for offset, path, encrypted, needs_signature in images:
         if needs_signature:
             signed = os.path.join(tmp, os.path.basename(path).replace(".bin", "-lab-signed.bin"))
-            run(["espsecure", "sign-data", "--version", "2", "--keyfile", SIGNING_KEY, "-o", signed, path], capture=True)
+            run([*espsecure, "sign-data", "--version", "2", "--keyfile", SIGNING_KEY, "-o", signed, path], capture=True)
             path = signed
         out.append((offset, path, encrypted))
     return out

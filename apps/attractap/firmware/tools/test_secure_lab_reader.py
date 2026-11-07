@@ -98,6 +98,20 @@ class Helpers(unittest.TestCase):
         with self.assertRaisesRegex(r.LabReaderError, "cannot read"):
             r.flash_layout("/nonexistent/build")
 
+    def test_signed_images_signs_only_bootloader_and_app(self):
+        images = [("0x0", "/b/bootloader.bin", True, True), ("0x8000", "/b/pt.bin", True, False),
+                  ("0x10000", "/b/attractap.bin", True, True)]
+        with mock.patch.object(r, "run") as run:
+            out = r.signed_images(images, "/tmp/x", ("py", "-m", "espsecure"))
+        self.assertEqual(out, [("0x0", "/tmp/x/bootloader-lab-signed.bin", True), ("0x8000", "/b/pt.bin", True),
+                               ("0x10000", "/tmp/x/attractap-lab-signed.bin", True)])
+        self.assertEqual([c.args[0] for c in run.call_args_list], [
+            ["py", "-m", "espsecure", "sign-data", "--version", "2", "--keyfile", r.SIGNING_KEY,
+             "-o", "/tmp/x/bootloader-lab-signed.bin", "/b/bootloader.bin"],
+            ["py", "-m", "espsecure", "sign-data", "--version", "2", "--keyfile", r.SIGNING_KEY,
+             "-o", "/tmp/x/attractap-lab-signed.bin", "/b/attractap.bin"],
+        ])
+
     def test_missing_tool_is_a_clean_error(self):
         with mock.patch.object(r.subprocess, "run", side_effect=FileNotFoundError()), \
                 contextlib.redirect_stdout(io.StringIO()):
