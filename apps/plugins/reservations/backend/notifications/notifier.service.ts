@@ -28,7 +28,8 @@ export type NotificationCategoryId = (typeof NOTIFICATION_CATEGORIES)[number]['i
 /**
  * Sends every notification of the plugin through `context.notifications.dispatch`. Texts are built per
  * recipient language (the host takes one title/body per call, so recipients are grouped by language),
- * times are written in the plugin timezone, and each mail carries {subject, text, html}.
+ * times are written in the plugin timezone, and each mail is an admin-editable email template of the plugin
+ * (`emailTemplates`) rendered by the host in the recipient's language.
  *
  * Delivery is at-most-once by design: callers claim their persisted flag/notice BEFORE sending, and a
  * failed dispatch is logged and reported as `false` but never retried, so a flaky mail server cannot
@@ -59,10 +60,9 @@ export class ReservationNotifications implements ReservationNotifier {
     const recipients = [...new Set(recipientIds)];
     if (recipients.length === 0) return false;
     try {
-      const [resource, timeZone, baseUrl, languages] = await Promise.all([
+      const [resource, timeZone, languages] = await Promise.all([
         this.directory.getResource(resourceId),
         this.globalSettings.getTimezone(),
-        this.hostInfo.getBaseUrl(),
         this.hostInfo.languagesOf(recipients),
       ]);
       const resourceName = resource?.name ?? `#${resourceId}`;
@@ -72,7 +72,7 @@ export class ReservationNotifications implements ReservationNotifier {
         byLanguage.set(lang, [...(byLanguage.get(lang) ?? []), id]);
       }
       for (const [lang, ids] of byLanguage) {
-        const rendered = renderNotice(build({ lang, timeZone, resourceName }), baseUrl);
+        const rendered = renderNotice(build({ lang, timeZone, resourceName }));
         await this.context.notifications.dispatch({
           category,
           recipients: ids,

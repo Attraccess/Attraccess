@@ -65,6 +65,7 @@ export class SettingsAdminService {
       return { ...updated, cancelledBookings: cancelled };
     });
     const changed = changedSettingKeys(settingsValues(before), settingsValues(after));
+    if (changed.length > 0) this.reservations.invalidateStartBlocked(resourceId);
     if (changed.length > 0 || cancelledBookings > 0) {
       await this.reservations.auditLog.record(
         'settings_changed',

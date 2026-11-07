@@ -68,6 +68,7 @@ export async function createHarness() {
     hidden: new Set(),
   };
   const dispatch = jest.fn(async (_request: unknown) => undefined);
+  const invalidateStartBlocked = jest.fn((_scope: { resourceId: number }) => undefined);
   const handlers = new Map<string, ((payload: never) => unknown)[]>();
   const knownResources = new Set([1, 2, 3]);
   const audit = { record: jest.fn(async () => ({ status: 'recorded' as const })) };
@@ -103,6 +104,7 @@ export async function createHarness() {
     dataSource,
     logger: console,
     notifications: { dispatch },
+    startBlocked: { invalidate: invalidateStartBlocked },
     onEvent: (event: string, handler: (payload: never) => unknown) => {
       handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       return {
@@ -193,6 +195,7 @@ export async function createHarness() {
     audit,
     notifier,
     dispatch,
+    invalidateStartBlocked,
     clock,
     /** Delivers a host event to the plugin's subscribers (like the host's emitter). */
     async emit(event: string, payload: unknown) {

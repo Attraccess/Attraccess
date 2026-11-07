@@ -542,4 +542,32 @@ describe('ReservationService', () => {
       expect(results.map((r) => r.resourceId)).toEqual([1, 2]);
     });
   });
+
+  describe('start-blocked invalidation', () => {
+    const invalidated = () => h.invalidateStartBlocked.mock.calls.map(([scope]) => scope);
+
+    it('tells the host after every change that decides whether a start is blocked', async () => {
+      await h.enable(1, { approvalRequired: true });
+      const pending = await book(alice, [8, 9]);
+      expect(invalidated()).toEqual([{ resourceId: 1 }]);
+      await h.reservations.approve(manager, pending.id);
+      const cancelled = await book(bob, [10, 11]);
+      await h.reservations.approve(manager, cancelled.id);
+      await h.reservations.cancel(bob, cancelled.id);
+      await h.enable(1, { approvalRequired: false });
+      const running = await book(alice, [12, 13]);
+      h.setNow('2026-06-02T12:30:00Z');
+      await h.reservations.endEarly(alice, running.id);
+      expect(invalidated().length).toBeGreaterThanOrEqual(6);
+      expect(new Set(invalidated().map((scope) => scope.resourceId))).toEqual(new Set([1]));
+    });
+
+    it('never fails the change when the host cannot be told', async () => {
+      await h.enable(1);
+      h.invalidateStartBlocked.mockImplementation(() => {
+        throw new Error('host is shutting down');
+      });
+      expect((await book()).status).toBe('confirmed');
+    });
+  });
 });

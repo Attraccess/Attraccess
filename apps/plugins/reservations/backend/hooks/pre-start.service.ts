@@ -1,4 +1,10 @@
-import type { PreStartContext, PreStartResult } from '@attraccess/plugins-backend-sdk';
+import type {
+  PluginBlockReason,
+  PreStartContext,
+  PreStartResult,
+  StartBlockedContext,
+  StartBlockedState,
+} from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { Clock, RESERVATION_CLOCK } from '../constants';
 import type { ReservationEntity } from '../entities/reservation.entity';
@@ -90,6 +96,25 @@ export class PreStartService {
     };
   }
 
+  /**
+   * The UI counterpart of the block in {@link whenActive}: a booking of another user is running now and the
+   * viewer may not override it. Managers see nothing (they start through the override confirmation), and
+   * a booking that merely starts soon is not a block (it is only a confirmation at start). The host
+   * checks again at start, so this is informational and uses the same answer as the gate.
+   */
+  async evaluateStartBlocked(ctx: StartBlockedContext, deadline = hookDeadline()): Promise<StartBlockedState | null> {
+    if (!this.settings.isWarm) {
+      await waitUntil(this.settings.whenReady(), deadline, 'Reservation settings are not loaded yet');
+    }
+    if (!this.settings.getCachedSettings(ctx.resourceId).enabled) return null;
+    const now = ctx.now ?? this.clock();
+    const active = (await this.store.findActiveForResource(ctx.resourceId, now)).find((r) => r.userId !== ctx.userId);
+    if (!active) return null;
+    if (await this.access.isManager(ctx.userId, ctx.resourceId)) return null;
+    const timeZone = await this.globalSettings.getTimezone();
+    return { reason: reservedReason(ctx.language, active.endTime, timeZone), until: active.endTime };
+  }
+
   /** Block for non-managers; for managers the next unconfirmed override, or null when all are confirmed. */
   private async whenActive(ctx: PreStartContext, active: ReservationEntity[]): Promise<PreStartResult | null> {
     const { language: lang } = ctx;
@@ -101,19 +126,7 @@ export class PreStartService {
     const timeZone = await this.globalSettings.getTimezone();
     const until = formatTime(unconfirmed.endTime, { lang, timeZone });
     if (!isManager) {
-      return {
-        decision: 'block',
-        reason: {
-          code: 'RESERVED',
-          title: pick(lang, 'Reserved', 'Reserviert'),
-          // The holder is never named to a non-manager.
-          body: pick(
-            lang,
-            `Reserved by another user until ${until}.`,
-            `Von einer anderen Person bis ${until} reserviert.`,
-          ),
-        },
-      };
+      return { decision: 'block', reason: reservedReason(lang, unconfirmed.endTime, timeZone) };
     }
     const name =
       (await this.directory.getUserNames([unconfirmed.userId])).get(unconfirmed.userId) ??
@@ -135,4 +148,14 @@ export class PreStartService {
       },
     };
   }
+}
+
+/** Reason shown to a user who may not start during someone else's booking. The holder is never named. */
+function reservedReason(lang: 'en' | 'de', endTime: Date, timeZone: string): PluginBlockReason {
+  const until = formatTime(endTime, { lang, timeZone });
+  return {
+    code: 'RESERVED',
+    title: pick(lang, 'Reserved', 'Reserviert'),
+    body: pick(lang, `Reserved by another user until ${until}.`, `Von einer anderen Person bis ${until} reserviert.`),
+  };
 }

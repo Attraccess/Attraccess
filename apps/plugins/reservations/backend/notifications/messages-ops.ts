@@ -1,6 +1,7 @@
 import type { ReservationEntity } from '../entities/reservation.entity';
 import type { ResourceSettings } from '../settings/settings.model';
 import { NoticeText, ROUTES, checkInRules, formatDateTime, formatRange, formatTime, pick } from './format';
+import { bookingVariables, checkInVariables } from './email/variables';
 import type { MessageContext, Span } from './messages';
 
 const when = (m: MessageContext, r: Span) => formatRange(r.startTime, r.endTime, m);
@@ -9,6 +10,7 @@ const when = (m: MessageContext, r: Span) => formatRange(r.startTime, r.endTime,
 export function stillNeeded(m: MessageContext, r: ReservationEntity): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'still-needed', variables: bookingVariables(m, r) },
     title: pick(lang, `Do you still need ${resourceName}?`, `Brauchst du ${resourceName} noch?`),
     lines: [
       pick(
@@ -17,13 +19,6 @@ export function stillNeeded(m: MessageContext, r: ReservationEntity): NoticeText
         `Deine Reservierung von ${resourceName} für ${when(m, r)} beginnt in den nächsten zwei Tagen. Bitte gib uns Bescheid, ob du sie noch brauchst. Ohne Antwort bleibt die Reservierung bestehen.`,
       ),
     ],
-    actions: [
-      { label: pick(lang, 'Keep booking', 'Reservierung behalten'), path: ROUTES.reservationAction(r.id, 'keep') },
-      {
-        label: pick(lang, 'Cancel booking', 'Reservierung stornieren'),
-        path: ROUTES.reservationAction(r.id, 'cancel'),
-      },
-    ],
     path: ROUTES.reservation(r.id),
   };
 }
@@ -31,6 +26,10 @@ export function stillNeeded(m: MessageContext, r: ReservationEntity): NoticeText
 export function reminder24h(m: MessageContext, r: ReservationEntity, settings: ResourceSettings): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: {
+      template: 'reminder-24h',
+      variables: { ...bookingVariables(m, r), checkIn: checkInVariables(settings, lang) },
+    },
     title: pick(lang, `Reminder: ${resourceName} tomorrow`, `Erinnerung: ${resourceName} morgen`),
     lines: [
       pick(
@@ -40,7 +39,6 @@ export function reminder24h(m: MessageContext, r: ReservationEntity, settings: R
       ),
       checkInRules(settings, lang),
     ],
-    actions: [{ label: pick(lang, 'Open booking', 'Reservierung öffnen'), path: ROUTES.reservation(r.id) }],
     path: ROUTES.reservation(r.id),
   };
 }
@@ -57,6 +55,18 @@ export function maintenanceAffected(m: MessageContext, r: ReservationEntity, win
     ? pick(lang, ` until ${formatDateTime(window.endTime, m)}`, ` bis ${formatDateTime(window.endTime, m)}`)
     : pick(lang, ' (no end announced yet)', ' (noch ohne angekündigtes Ende)');
   return {
+    email: {
+      template: 'maintenance-affected',
+      variables: {
+        ...bookingVariables(m, r),
+        maintenance: {
+          start: formatDateTime(window.startTime, m),
+          end: window.endTime ? formatDateTime(window.endTime, m) : '',
+          hasEnd: !!window.endTime,
+          reason: window.reason ?? '',
+        },
+      },
+    },
     title: pick(
       lang,
       `Maintenance affects your booking: ${resourceName}`,
@@ -70,7 +80,6 @@ export function maintenanceAffected(m: MessageContext, r: ReservationEntity, win
       ),
       ...(window.reason ? [pick(lang, `Reason: ${window.reason}`, `Grund: ${window.reason}`)] : []),
     ],
-    actions: [{ label: pick(lang, 'Open booking', 'Reservierung öffnen'), path: ROUTES.reservation(r.id) }],
     path: ROUTES.reservation(r.id),
     severity: 'warning',
   };
@@ -79,6 +88,7 @@ export function maintenanceAffected(m: MessageContext, r: ReservationEntity, win
 export function healthUnhealthy(m: MessageContext, r: ReservationEntity, reason: string | null): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'health-unhealthy', variables: { ...bookingVariables(m, r), health: { reason: reason ?? '' } } },
     title: pick(lang, `${resourceName} has a problem`, `${resourceName} hat ein Problem`),
     lines: [
       pick(
@@ -96,6 +106,7 @@ export function healthUnhealthy(m: MessageContext, r: ReservationEntity, reason:
 export function healthRecovered(m: MessageContext, r: ReservationEntity): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'health-recovered', variables: bookingVariables(m, r) },
     title: pick(lang, `${resourceName} works again`, `${resourceName} funktioniert wieder`),
     lines: [
       pick(
@@ -112,6 +123,10 @@ export function healthRecovered(m: MessageContext, r: ReservationEntity): Notice
 export function handover(m: MessageContext, startTime: Date): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: {
+      template: 'handover',
+      variables: { resource: { name: resourceName }, reservation: { startTime: formatTime(startTime, m) } },
+    },
     title: pick(lang, `${resourceName} is reserved soon`, `${resourceName} ist bald reserviert`),
     lines: [
       pick(
@@ -128,6 +143,7 @@ export function handover(m: MessageContext, startTime: Date): NoticeText {
 export function overrunForHolder(m: MessageContext, r: ReservationEntity): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'overrun-holder', variables: bookingVariables(m, r) },
     title: pick(lang, `${resourceName} is still in use`, `${resourceName} ist noch in Benutzung`),
     lines: [
       pick(
@@ -145,6 +161,7 @@ export function overrunForHolder(m: MessageContext, r: ReservationEntity): Notic
 export function overrunForUser(m: MessageContext, r: ReservationEntity): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'overrun-user', variables: bookingVariables(m, r) },
     title: pick(lang, `Please finish on ${resourceName}`, `Bitte beende die Nutzung von ${resourceName}`),
     lines: [
       pick(
@@ -161,6 +178,7 @@ export function overrunForUser(m: MessageContext, r: ReservationEntity): NoticeT
 export function overrideForHolder(m: MessageContext, r: ReservationEntity, starterName: string): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'override-holder', variables: { ...bookingVariables(m, r), actor: { name: starterName } } },
     title: pick(
       lang,
       `${resourceName} was started during your booking`,
@@ -187,6 +205,10 @@ export function overrideForManagers(
 ): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: {
+      template: 'override-managers',
+      variables: { ...bookingVariables(m, r), actor: { name: starterName }, holder: { name: holderName } },
+    },
     title: pick(lang, `Override start on ${resourceName}`, `Start trotz Reservierung an ${resourceName}`),
     lines: [
       pick(

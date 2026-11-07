@@ -1,4 +1,9 @@
-import { READER_UI_LIMITS, type PreStartContext } from '@attraccess/plugins-backend-sdk';
+import {
+  READER_UI_LIMITS,
+  type PreStartContext,
+  type StartBlockedContext,
+  type StartBlockedState,
+} from '@attraccess/plugins-backend-sdk';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
@@ -268,5 +273,56 @@ describe('PreStartService', () => {
     await p.book(11, 2, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
     h.setNow('2026-06-01T12:30:00Z');
     expect(await p.preStart.evaluate(ctx(10))).toEqual({ decision: 'allow' });
+  });
+
+  describe('start-blocked query (resource UI)', () => {
+    const query = (userId: number, patch: Partial<StartBlockedContext> = {}): Promise<StartBlockedState | null> =>
+      p.preStart.evaluateStartBlocked({ resourceId: 1, userId, language: 'en', now: h.clock(), ...patch });
+
+    it('reports a running booking of another user with the same reason as the gate, and when it ends', async () => {
+      await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T12:30:00Z');
+      const blocked = await query(10);
+      const gate = await p.preStart.evaluate(ctx(10));
+      expect(gate).toMatchObject({ decision: 'block', reason: blocked?.reason });
+      expect(blocked).toEqual({
+        reason: { code: 'RESERVED', title: 'Reserved', body: 'Reserved by another user until 16:00.' },
+        until: new Date('2026-06-01T14:00:00Z'),
+      });
+      expect(JSON.stringify(blocked)).not.toContain('user11');
+    });
+
+    it('writes the reason in the requested language', async () => {
+      await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T12:30:00Z');
+      expect((await query(10, { language: 'de' }))?.reason.body).toBe('Von einer anderen Person bis 16:00 reserviert.');
+    });
+
+    it('is empty for the holder, for managers, before the start and after the end', async () => {
+      await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      expect(await query(10)).toBeNull();
+      h.setNow('2026-06-01T12:30:00Z');
+      expect(await query(11)).toBeNull();
+      expect(await query(99)).toBeNull();
+      h.setNow('2026-06-01T14:00:00Z');
+      expect(await query(10)).toBeNull();
+    });
+
+    it('does not report a booking that only starts later, a cancelled one, or another resource', async () => {
+      h.setNow('2026-06-01T12:30:00Z');
+      await p.book(11, 1, '2026-06-01T12:45:00', '2026-06-01T14:00:00');
+      expect(await query(10)).toBeNull();
+      h.setNow('2026-06-01T13:15:00Z');
+      expect(await query(10)).not.toBeNull();
+      await h.dataSource.getRepository(ReservationEntity).update({ userId: 11 }, { status: 'cancelled' });
+      expect(await query(10)).toBeNull();
+      expect(await query(10, { resourceId: 2 })).toBeNull();
+    });
+
+    it('answers a disabled resource from memory without a database query', async () => {
+      const find = jest.spyOn(h.store, 'findActiveForResource');
+      expect(await query(10, { resourceId: 2 })).toBeNull();
+      expect(find).not.toHaveBeenCalled();
+    });
   });
 });

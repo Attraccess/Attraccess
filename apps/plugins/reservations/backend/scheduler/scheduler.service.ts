@@ -49,6 +49,8 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
   private timer: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private inflight: Promise<void> | null = null;
+  /** Bookings that started up to here were already announced to the resource pages. */
+  private startsAnnouncedUntil: Date | null = null;
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
@@ -97,6 +99,7 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     const steps: [string, (at: Date) => Promise<void>][] = [
       ['expire pending', (at) => this.expirePending(at)],
       ['no-show', (at) => this.markNoShows(at)],
+      ['announce starts', (at) => this.announceStarts(at)],
       ['complete', (at) => this.completeEnded(at)],
       ['still needed', (at) => this.stillNeeded(at)],
       ['24h reminder', (at) => this.reminder24h(at)],
@@ -124,6 +127,19 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
       } catch (error) {
         this.logger.error(`reservation ${item.id}: ${error instanceof Error ? error.message : String(error)}`);
       }
+    }
+  }
+
+  /**
+   * A booking that just started blocks other users' starts, which no request announces. Open resource pages
+   * learn about it here, within a tick. (Ends are announced when `complete` finishes the booking.)
+   */
+  private async announceStarts(now: Date): Promise<void> {
+    const from = this.startsAnnouncedUntil ?? new Date(now.getTime() - 2 * TICK_INTERVAL_MS);
+    const started = await this.store.findUpcomingConfirmed(from, now);
+    this.startsAnnouncedUntil = now;
+    for (const resourceId of new Set(started.map((r) => r.resourceId))) {
+      this.reservations.invalidateStartBlocked(resourceId);
     }
   }
 

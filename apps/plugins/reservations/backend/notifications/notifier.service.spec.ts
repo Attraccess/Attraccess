@@ -2,6 +2,7 @@ import plugin from '../plugin';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
+import { renderEmail } from '../testing/email-render.test-utils';
 import { NOTIFICATION_CATEGORIES } from './notifier.service';
 
 type Request = {
@@ -12,7 +13,7 @@ type Request = {
   url?: string;
   severity?: string;
   dedupeKey: string;
-  email: { subject: string; text: string; html: string };
+  email: { template: string; variables: Record<string, unknown> };
 };
 
 describe('ReservationNotifications', () => {
@@ -57,10 +58,13 @@ describe('ReservationNotifications', () => {
       expect(de.title).toBe('Reservierungsanfrage für Resource 1');
       expect(de.body).toContain('user10 möchte Resource 1 für');
       expect(de.body).toMatch(/14:00 MESZ – 15:30/);
-      expect(en.email.html).toContain('&lt;b&gt;Rush&lt;/b&gt; job');
-      expect(en.email.html).not.toContain('<b>Rush');
-      expect(en.email.text).toContain('Review requests: https://app.test/reservations/manage');
-      expect(en.email.subject).toBe(en.title);
+      expect(en.email.template).toBe('pending-approval');
+      const mail = renderEmail(en.email, 'en');
+      expect(mail.html).toContain('&lt;b&gt;Rush&lt;/b&gt; job');
+      expect(mail.html).not.toContain('<b>Rush');
+      expect(mail.hrefs).toEqual(['https://app.test/reservations/manage']);
+      expect(mail.subject).toBe(en.title);
+      expect(renderEmail(de.email, 'de').subject).toBe(de.title);
     });
 
     it('writes winter times with CET', async () => {
@@ -78,7 +82,7 @@ describe('ReservationNotifications', () => {
       await p.notifications.onConfirmed(booking, { viaApproval: false });
       expect(calls()).toHaveLength(1);
       expect(calls()[0]).toMatchObject({ category: 'bookings', recipients: [10], url: `/reservations/${booking.id}` });
-      expect(calls()[0].email.text).toContain(
+      expect(renderEmail(calls()[0].email, 'en').text).toContain(
         'Check-in is required: start a session on the resource up to 15 minutes before the start or within 15 minutes after the start',
       );
     });
@@ -92,7 +96,10 @@ describe('ReservationNotifications', () => {
       expect(calls()[0].title).toBe('Reservierung bestätigt: Resource 1');
       expect(calls()[0].body).toContain('wurde genehmigt');
       expect(calls()[0].body).toContain('Kommentar: Viel Spaß');
-      expect(calls()[0].email.text).toContain('Ein Check-in ist erforderlich');
+      const mail = renderEmail(calls()[0].email, 'de');
+      expect(mail.text).toContain('wurde genehmigt');
+      expect(mail.text).toContain('Kommentar: Viel Spaß');
+      expect(mail.text).toContain('Ein Check-in ist erforderlich');
     });
   });
 
@@ -133,19 +140,13 @@ describe('ReservationNotifications', () => {
     await expect(p.notifications.notifyReminder24h(booking)).resolves.toBe(true);
   });
 
-  it('omits links when the application URL is not configured', async () => {
-    p.info.baseUrl = null;
-    const booking = await load((await p.book(10, 1, '2026-06-04T12:00:00', '2026-06-04T13:00:00')).id);
-    await p.notifications.notifyStillNeeded(booking);
-    expect(calls()[0].email.text).not.toContain('http');
-    expect(calls()[0].url).toBe(`/reservations/${booking.id}`);
-  });
-
   it('puts keep/cancel deep links without tokens into the "still needed" mail', async () => {
     const booking = await load((await p.book(10, 1, '2026-06-04T12:00:00', '2026-06-04T13:00:00')).id);
     await p.notifications.notifyStillNeeded(booking);
-    expect(calls()[0].email.html).toContain(`href="https://app.test/reservations/${booking.id}?action=keep"`);
-    expect(calls()[0].email.html).toContain(`href="https://app.test/reservations/${booking.id}?action=cancel"`);
+    expect(renderEmail(calls()[0].email, 'en').hrefs).toEqual([
+      `https://app.test/reservations/${booking.id}?action=keep`,
+      `https://app.test/reservations/${booking.id}?action=cancel`,
+    ]);
   });
 
   it('writes the German no-show and expiry texts', async () => {
@@ -188,7 +189,8 @@ describe('ReservationNotifications', () => {
     const booking = await load((await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T13:00:00')).id);
     await p.notifications.notifyOverrun(booking, [12]);
     await p.notifications.notifyHandover(booking, [12]);
-    for (const request of calls()) expect(request.body + request.email.text).not.toMatch(/user1[0-9]/);
+    for (const request of calls())
+      expect(request.body + renderEmail(request.email, 'en').text).not.toMatch(/user1[0-9]/);
     expect(calls().map((r) => r.recipients)).toEqual([[11], [12], [12]]);
   });
 });
