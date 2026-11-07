@@ -36,6 +36,7 @@
   - [Documentation](resources/documentation.md)
   - [Introductions](resources/introductions.md)
   - [Maintenance](resources/maintenance.md)
+  - [Reservations](resources/reservations.md)
   - [Usage Tracking](resources/usage-tracking.md)
   - [CSV Export](resources/csv-export.md)
 

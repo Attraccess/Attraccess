@@ -79,6 +79,29 @@ describe('NotificationDispatchService', () => {
     });
   });
 
+  it('respects per-channel preferences for plugin categories', async () => {
+    const sendEmail = jest.fn().mockResolvedValue(undefined);
+    preferences.isChannelEnabled.mockImplementation(
+      async (_userId: number, _category: string, channel: NotificationChannel) => channel === NotificationChannel.TOAST,
+    );
+
+    await service.dispatch({
+      category: 'plugin.booking.reminder',
+      recipients: [recipient],
+      title: 'Soon',
+      body: 'Your slot starts soon',
+      sendEmail,
+    });
+
+    expect(preferences.isChannelEnabled).toHaveBeenCalledWith(2, 'plugin.booking.reminder', NotificationChannel.PUSH);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect(push.sendToUser).not.toHaveBeenCalled();
+    expect(live.emitToUser).toHaveBeenCalledWith(
+      2,
+      expect.objectContaining({ category: 'plugin.booking.reminder', title: 'Soon' }),
+    );
+  });
+
   it('uses the system default for notification text without changing recipient preferences', async () => {
     settings.resolveLanguage.mockImplementation(async (locale) => locale?.trim() || 'de');
     const guest = { id: 3, email: 'guest@example.com' } as User;

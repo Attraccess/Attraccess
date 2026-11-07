@@ -30,6 +30,8 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
 
   let events: EventEmitter2;
 
+  let pluginEvents: { emit: jest.Mock };
+
   let flow: { runFlow: jest.Mock; trackResourceActivity: jest.Mock };
 
   let billing: {
@@ -166,6 +168,12 @@ export function createUsageLifecyclePersistenceAroundExternalFlowsFixture() {
     },
     set events(value: typeof events) {
       events = value;
+    },
+    get pluginEvents() {
+      return pluginEvents;
+    },
+    set pluginEvents(value: typeof pluginEvents) {
+      pluginEvents = value;
     },
     get usage() {
       return usage;

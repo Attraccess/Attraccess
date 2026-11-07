@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { type User } from '@attraccess/database-entities';
 import type { PreStartOrigin } from '@attraccess/plugins-backend-sdk';
 import type { ReaderUiLanguage } from '../../../plugin-system/reader-ui/host-texts';
-import { ReaderUiHooksService, type PreStartOutcome } from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
+import {
+  ReaderUiHooksService,
+  type PreStartOutcome,
+  type StartBlockedView,
+} from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { ResourceUsageService } from '../sessions/resource-usage.service';
 import { StartBlockedException, StartConfirmationRequiredException } from './start-confirmation.errors';
@@ -57,6 +61,18 @@ export class PreStartService {
       readerId: input.readerId,
       cardSessionId: input.cardSessionId,
       satisfied: new Map(Object.entries(input.satisfied ?? {}).map(([plugin, keys]) => [plugin, new Set(keys)])),
+    });
+  }
+
+  /**
+   * Whether a plugin reports this user's start as blocked right now, for the resource UI to show in place of the
+   * start button. Informational: {@link gateHttp} stays the authority and still refuses the start.
+   */
+  async queryStartBlocked(resourceId: number, user: User): Promise<StartBlockedView | null> {
+    return this.hooks.queryStartBlocked({
+      resourceId,
+      userId: user.id,
+      language: await this.settings.resolveLanguage(user.locale),
     });
   }
 

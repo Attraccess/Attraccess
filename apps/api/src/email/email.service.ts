@@ -20,7 +20,7 @@ import { Repository, EntityManager } from 'typeorm';
 
 import { EmailLayoutService } from '../email-layout/email-layout.service';
 
-import { EmailTemplateService } from '../email-template/email-template.service';
+import { EmailTemplateKey, EmailTemplateService } from '../email-template/email-template.service';
 
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
@@ -518,7 +518,7 @@ export class EmailService {
 
   protected async sendEmail(
     user: User,
-    templateType: EmailTemplateType,
+    templateType: EmailTemplateKey,
     context: Record<string, unknown>,
     manager?: EntityManager,
   ) {
@@ -527,36 +527,34 @@ export class EmailService {
       const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
 
       const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);
-      const { transporter, from } = await this.createTransporter();
-
       this.logger.debug(
         `Sending email to: ${user.email} using ${templateType} template with subject: ${dbTemplate.subject}`,
       );
-      await this.externalCallTimer.time('smtp', 'send', () =>
-        transporter.sendMail({
-          to: user.email,
-          from,
-          subject,
-          html: body,
-          attachments: [
-            {
-              filename: 'logo.png',
-              path: EMAIL_LOGO_PATH,
-              contentType: 'image/png',
-              cid: EMAIL_LOGO_CID,
-            },
-          ],
-        }),
-      );
-      if (typeof transporter.close === 'function') {
-        transporter.close();
-      }
+      await this.deliverEmail(user, subject, body);
       this.metricsService.emailSentTotal.inc({ status: 'success' });
       this.logger.debug(`Email sent successfully to: ${user.email}`);
     } catch (error) {
       this.metricsService.emailSentTotal.inc({ status: 'fail' });
       this.logger.error(`Failed to send email to: ${user.email}`, error.stack);
       throw error;
+    }
+  }
+
+  /** Hands one rendered email to the SMTP transport, with the layout's inline logo attached. */
+  protected async deliverEmail(user: User, subject: string, html: string, text?: string): Promise<void> {
+    const { transporter, from } = await this.createTransporter();
+    await this.externalCallTimer.time('smtp', 'send', () =>
+      transporter.sendMail({
+        to: user.email,
+        from,
+        subject,
+        html,
+        ...(text ? { text } : {}),
+        attachments: [{ filename: 'logo.png', path: EMAIL_LOGO_PATH, contentType: 'image/png', cid: EMAIL_LOGO_CID }],
+      }),
+    );
+    if (typeof transporter.close === 'function') {
+      transporter.close();
     }
   }
 

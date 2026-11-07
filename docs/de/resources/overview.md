@@ -37,3 +37,4 @@ Die Startseite von Attraccess zeigt alle verfügbaren Ressourcen in einer Übers
 - [Gruppen](resources/resource-groups.md) – Ressourcen organisieren
 - [Einweisungen](resources/introductions.md) – Zugang verwalten
 - [Wartung](resources/maintenance.md) – Wartungen planen
+- [Reservierungen](resources/reservations.md) – Ressourcen im Voraus buchen (Plugin)

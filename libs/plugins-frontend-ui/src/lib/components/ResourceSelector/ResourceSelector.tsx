@@ -75,11 +75,17 @@ export function ResourceSelector(props: Readonly<Props>) {
             selectionMode={multiple ? 'multiple' : 'single'}
             selectedKeys={new Set(selection.map(String))}
             onSelectionChange={(keys) => {
-              if (keys === 'all') {
-                onSelectionChange((resourceSearchResults?.data ?? []).map((r) => r.id));
+              const visibleIds = (resourceSearchResults?.data ?? []).map((r) => r.id);
+              if (!multiple) {
+                onSelectionChange(keys === 'all' ? visibleIds : Array.from(keys).map((k) => Number(k)));
                 return;
               }
-              onSelectionChange(Array.from(keys).map((k) => Number(k)));
+              // The header checkbox only acts on the rows the search shows: selections hidden by the
+              // current search are kept, both when selecting and when clearing all visible rows.
+              const visible = new Set(visibleIds);
+              const hidden = selection.filter((id) => !visible.has(id));
+              const chosen = keys === 'all' ? visibleIds : Array.from(keys).map((k) => Number(k));
+              onSelectionChange([...new Set([...hidden, ...chosen])]);
             }}
           >
             <TableHeader>

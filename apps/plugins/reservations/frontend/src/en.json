@@ -1,0 +1,346 @@
+{
+  "title": "Reservations",
+  "sidebar": { "my": "My reservations", "manage": "Manage reservations" },
+  "slots": { "settings": "Reservations", "admin": "Reservations", "account": "Calendar feeds (iCal)" },
+  "common": {
+    "cancel": "Cancel",
+    "close": "Close",
+    "back": "Back",
+    "save": "Save",
+    "edit": "Edit",
+    "done": "Done",
+    "retry": "Retry",
+    "loading": "Loading",
+    "timesIn": "Times in {{timezone}}",
+    "pagination": "Pages",
+    "previousPage": "Previous page",
+    "nextPage": "Next page"
+  },
+  "weekdays": {
+    "mon": "Monday",
+    "tue": "Tuesday",
+    "wed": "Wednesday",
+    "thu": "Thursday",
+    "fri": "Friday",
+    "sat": "Saturday",
+    "sun": "Sunday"
+  },
+  "status": {
+    "pending": "Pending approval",
+    "confirmed": "Confirmed",
+    "rejected": "Rejected",
+    "cancelled": "Cancelled",
+    "expired": "Expired",
+    "no_show": "No show",
+    "completed": "Completed"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "NOT_FOUND": "This reservation or resource does not exist.",
+    "RESERVATIONS_DISABLED": "Reservations are not enabled for this resource.",
+    "NOT_ALLOWED_TO_BOOK": "You are not allowed to book this resource.",
+    "IN_THE_PAST": "The booking would start in the past.",
+    "OFF_TIME_STEP": "Start and duration must fit the booking time step.",
+    "DURATION_TOO_SHORT": "The booking is shorter than the minimum duration.",
+    "DURATION_TOO_LONG": "The booking is longer than the maximum duration.",
+    "BEYOND_MAX_ADVANCE": "This is too far in the future to book.",
+    "LEAD_TIME_TOO_SHORT": "It is too late to book this slot.",
+    "OUTSIDE_BOOKABLE_HOURS": "The slot is outside the bookable hours.",
+    "USER_BOOKING_LIMIT": "You have reached the maximum number of active bookings for this resource.",
+    "OVERLAP": "The slot overlaps another booking. Please choose a different time.",
+    "MAINTENANCE": "The resource is in maintenance during this time.",
+    "NOT_PENDING": "This booking is no longer waiting for approval.",
+    "NOT_ACTIVE": "This booking is not active.",
+    "NOT_CANCELLABLE": "This booking can no longer be cancelled.",
+    "ALREADY_STARTED": "This booking has already started.",
+    "ALREADY_FINISHED": "This booking has already finished.",
+    "FUTURE_BOOKINGS_EXIST": {
+      "one": "There is {{count}} upcoming booking.",
+      "many": "There are {{count}} upcoming bookings."
+    },
+    "INVALID_RANGE": "The selected time range is not valid.",
+    "INVALID_SETTINGS": "Some settings are not valid.",
+    "INVALID_TIMEZONE": "This timezone is not valid.",
+    "RANGE_TOO_LARGE": "The requested time range is too large.",
+    "FORBIDDEN": "You are not allowed to do this.",
+    "RESERVATION_NOT_FOUND": "This reservation does not exist.",
+    "RESOURCE_NOT_FOUND": "This resource does not exist.",
+    "FEED_LIMIT": "You have reached the maximum number of calendar feeds. Revoke one you no longer use first.",
+    "FEED_NOT_FOUND": "This calendar feed does not exist or was revoked.",
+    "INVALID_FEED": "Choose at least one source for the calendar feed."
+  },
+  "card": {
+    "title": "Reservations",
+    "reserve": "Reserve",
+    "cannotBook": "Booking is not available",
+    "view": "View",
+    "managerHint": "As a manager you see who holds each booking.",
+    "next": "Your next booking",
+    "current": "Current booking",
+    "loadFailed": "Reservations could not be loaded",
+    "day": "Day",
+    "week": "Week",
+    "previous": "Earlier",
+    "nextRange": "Later",
+    "dayBarLabel": "Booked times of the day",
+    "free": "No bookings",
+    "reserved": "Reserved",
+    "reservedPending": "Reserved (pending approval)",
+    "yours": "Your booking",
+    "maintenance": "Maintenance",
+    "openEnd": "open end"
+  },
+  "booking": {
+    "title": "Reserve {{resource}}",
+    "titleGeneric": "Reserve resource",
+    "date": "Date",
+    "timezoneHint": "Times are in {{timezone}}",
+    "start": "Start",
+    "duration": "Duration",
+    "durationHint": "In steps of {{step}} min, from {{min}} to {{max}}",
+    "note": "Note (optional)",
+    "noSlots": "No free start times on this day.",
+    "approvalNeeded": "A manager has to approve this booking before it becomes valid.",
+    "instantNote": "Your booking is confirmed immediately.",
+    "submit": "Reserve",
+    "requestSubmit": "Request reservation",
+    "failedTitle": "Reservation failed",
+    "bookedTitle": "Reservation confirmed",
+    "bookedBody": "Your booking for {{range}} is confirmed.",
+    "requestedTitle": "Reservation requested",
+    "requestedBody": "Your request for {{range}} is waiting for approval."
+  },
+  "checkIn": {
+    "required": "Check in by starting the resource: from {{early}} min before the start until {{grace}} min after it. Without check-in the booking is released.",
+    "requiredFromStart": "Check in by starting the resource: from the start until {{grace}} min after it. Without check-in the booking is released.",
+    "notRequired": "No check-in is required; the booking stays until it ends."
+  },
+  "keepFree": {
+    "title": "Your booking runs until {{until}}. Keep it or free the rest?",
+    "body": "You stopped using the resource before your booking ended. Keep the rest of the booking, or release it for others?",
+    "keep": "Keep",
+    "free": "Free rest"
+  },
+  "actions": {
+    "reasonLabel": "Reason (optional)",
+    "commentLabel": "Comment (optional)",
+    "failedTitle": "Action failed",
+    "cancel": {
+      "label": "Cancel",
+      "title": "Cancel this booking?",
+      "body": "The booking {{range}} for {{resource}} will be cancelled and the slot freed.",
+      "confirm": "Cancel booking"
+    },
+    "end-early": {
+      "label": "End early",
+      "title": "End this booking early?",
+      "body": "The booking for {{resource}} ends now and the rest of the slot (until {{until}}) is freed.",
+      "confirm": "End booking"
+    },
+    "keep": {
+      "label": "Keep",
+      "title": "Keep this booking?",
+      "body": "The booking {{range}} for {{resource}} stays as it is.",
+      "confirm": "Keep booking"
+    },
+    "approve": {
+      "label": "Approve",
+      "title": "Approve this booking?",
+      "body": "The booking {{range}} for {{resource}} will be confirmed.",
+      "confirm": "Approve"
+    },
+    "reject": {
+      "label": "Reject",
+      "title": "Reject this booking?",
+      "body": "The booking {{range}} for {{resource}} will be rejected and the holder notified.",
+      "confirm": "Reject"
+    }
+  },
+  "table": {
+    "empty": "No bookings",
+    "loadFailed": "Bookings could not be loaded",
+    "reason": "Reason: {{reason}}"
+  },
+  "my": {
+    "title": "My reservations",
+    "subtitle": "Your upcoming and past bookings",
+    "upcoming": "Upcoming",
+    "past": "Past",
+    "manageLink": "Manage reservations"
+  },
+  "manage": {
+    "denied": "You do not manage any resource, so there is nothing to show here.",
+    "title": "Manage reservations",
+    "subtitle": "Approve requests and oversee all bookings of your resources",
+    "pending": "Waiting for approval",
+    "pendingHint": "Approve or reject requests; the holder is notified.",
+    "all": "All bookings",
+    "filters": {
+      "resource": "Resource",
+      "allResources": "All resources",
+      "searchResources": "Search resources",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "from": "From",
+      "to": "To"
+    }
+  },
+  "detail": {
+    "title": "Reservation",
+    "loadFailed": "The reservation could not be loaded",
+    "holder": "Booked by {{name}}",
+    "cannotKeep": "This booking can no longer be kept.",
+    "cannotCancel": "This booking can no longer be cancelled."
+  },
+  "settings": {
+    "loadFailed": "The reservation settings could not be loaded",
+    "enabled": "Enable reservations for this resource",
+    "approvalRequired": "Bookings need approval by a manager",
+    "checkInEnabled": "Require check-in (start the resource within the grace period)",
+    "failed": "Settings could not be saved",
+    "whoCanBook": {
+      "label": "Who can book",
+      "can-start": "Everyone who can start the resource",
+      "managers-only": "Managers only",
+      "any-user": "Any signed-in user"
+    },
+    "groups": {
+      "rules": "Booking rules",
+      "limits": "Buffers and limits",
+      "checkIn": "Check-in and reminders",
+      "hours": "Bookable hours"
+    },
+    "fields": {
+      "timeStepMinutes": "Time step (minutes)",
+      "minDurationMinutes": "Minimum duration (minutes)",
+      "maxDurationMinutes": "Maximum duration (minutes)",
+      "maxAdvanceDays": "Book at most this many days ahead",
+      "minLeadMinutes": "Latest booking before start (minutes)",
+      "bufferBeforeMinutes": "Buffer before a booking (minutes)",
+      "bufferAfterMinutes": "Buffer after a booking (minutes)",
+      "maxActiveBookingsPerUser": "Active bookings per user",
+      "confirmWindowMinutes": "Ask to confirm starting this long before a reservation (minutes)",
+      "checkInGraceMinutes": "Check-in grace period (minutes)",
+      "earlyCheckInMinutes": "Early check-in window (minutes)",
+      "handoverReminderMinutes": "Handover reminder before a reservation (minutes)"
+    },
+    "hints": {
+      "timeStepMinutes": "Starts and durations snap to this step; {{min}} to {{max}}, must divide 1440.",
+      "minDurationMinutes": "Shortest booking, a multiple of the step.",
+      "maxDurationMinutes": "Longest booking, a multiple of the step.",
+      "maxAdvanceDays": "{{min}} to {{max}} days.",
+      "minLeadMinutes": "0 allows booking right up to the start.",
+      "bufferBeforeMinutes": "Kept free before each booking.",
+      "bufferAfterMinutes": "Kept free after each booking.",
+      "maxActiveBookingsPerUser": "0 means unlimited.",
+      "confirmWindowMinutes": "0 never asks. Maximum {{max}}.",
+      "checkInGraceMinutes": "{{min}} to {{max}} minutes after the start.",
+      "earlyCheckInMinutes": "How early the holder may start. {{min}} to {{max}}.",
+      "handoverReminderMinutes": "Notifies the current user. 0 turns it off."
+    },
+    "validation": {
+      "range": "Enter a whole number from {{min}} to {{max}}.",
+      "stepDividesDay": "The step must divide 1440 minutes evenly.",
+      "multipleOfStep": "Must be a multiple of {{step}} minutes.",
+      "maxBelowMin": "Must not be shorter than the minimum duration.",
+      "tooManyRanges": "At most 8 ranges per day.",
+      "timeFormat": "Use HH:mm, for example 09:00. The end may be 24:00.",
+      "endAfterStart": "The end must be after the start.",
+      "overlap": "Ranges must not overlap."
+    },
+    "hours": {
+      "description": "Bookings must lie fully inside these hours. A day without ranges is closed once any other day has ranges; with no ranges at all the resource is bookable around the clock.",
+      "allDay": "No range set",
+      "addRange": "Add range",
+      "addRangeTo": "Add range on {{day}}",
+      "removeRange": "Remove range {{index}} on {{day}}",
+      "from": "From",
+      "to": "Until",
+      "fromLabel": "From ({{day}}, range {{index}})",
+      "toLabel": "Until ({{day}}, range {{index}})"
+    },
+    "disableWarning": {
+      "title": "Disable reservations?",
+      "body": {
+        "one": "{{count}} upcoming booking exists. Disabling reservations cancels it and notifies the holder.",
+        "many": "{{count}} upcoming bookings exist. Disabling reservations cancels them and notifies the holders."
+      },
+      "confirm": { "one": "Disable and cancel {{count}} booking", "many": "Disable and cancel {{count}} bookings" }
+    },
+    "saved": {
+      "title": "Settings saved",
+      "body": "The reservation settings were saved. They apply to new bookings.",
+      "bodyCancelled": {
+        "one": "The settings were saved and {{count}} upcoming booking was cancelled.",
+        "many": "The settings were saved and {{count}} upcoming bookings were cancelled."
+      }
+    }
+  },
+  "admin": {
+    "description": "The timezone used for bookable hours, the booking time grid, notifications and calendar feeds.",
+    "loadFailed": "The timezone setting could not be loaded",
+    "current": "Timezone",
+    "default": "server default: {{timezone}}",
+    "search": "Search timezones",
+    "searchPlaceholder": "e.g. Europe/Berlin",
+    "matches": "{{count}} matching",
+    "matchesTruncated": "{{total}} matching, showing the first {{shown}}. Type to narrow the list.",
+    "list": "Timezones",
+    "saved": "Timezone saved",
+    "savedBody": "Reservations now use {{timezone}}.",
+    "failed": "Timezone could not be saved"
+  },
+  "feeds": {
+    "title": "Calendar feeds",
+    "description": "Subscribe to reservations in your calendar app. Each feed has its own secret link; anyone with the link can read the feed.",
+    "create": "New feed",
+    "empty": "No feeds yet",
+    "revoked": "Revoked",
+    "revokedAt": "Revoked on {{date}}",
+    "lastUsed": "Last used {{date}}",
+    "neverUsed": "Never used",
+    "failed": "Action failed",
+    "loadFailed": "Calendar feeds could not be loaded",
+    "selection": {
+      "ownOnly": "Only my own bookings",
+      "introduced": "Resources I am introduced to",
+      "maintained": "Resources I maintain",
+      "groups": { "one": "{{count}} group", "many": "{{count}} groups" },
+      "resources": { "one": "{{count}} resource", "many": "{{count}} resources" }
+    },
+    "form": {
+      "createTitle": "New calendar feed",
+      "editTitle": "Edit calendar feed",
+      "name": "Name",
+      "ownOnly": "Only my own bookings",
+      "introduced": "All resources I am introduced to",
+      "maintained": "All resources I maintain",
+      "groups": "Resource groups",
+      "noGroups": "No groups available",
+      "resources": "Specific resources",
+      "searchResources": "Search resources",
+      "selectedCount": "{{count}} selected",
+      "needSelection": "Choose at least one source for this feed.",
+      "create": "Create feed"
+    },
+    "secret": {
+      "title": "Feed \"{{name}}\" is ready",
+      "body": "Copy this link now. For security it is shown only once; if you lose it, regenerate the feed.",
+      "url": "Feed link",
+      "copy": "Copy link",
+      "copied": "Copied"
+    },
+    "regenerate": {
+      "label": "Regenerate",
+      "title": "Regenerate \"{{name}}\"?",
+      "body": "A new link is created and the old one stops working immediately. Calendars using the old link lose access.",
+      "confirm": "Regenerate"
+    },
+    "revoke": {
+      "label": "Revoke",
+      "title": "Revoke \"{{name}}\"?",
+      "body": "The link stops working for good. This cannot be undone.",
+      "confirm": "Revoke"
+    }
+  }
+}

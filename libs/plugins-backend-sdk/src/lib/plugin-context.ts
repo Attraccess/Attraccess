@@ -1,9 +1,11 @@
 import { LoggerService, Type } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
+import { DataSource, EntityManager, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import type { MqttCredentialProvisioningHostProvider } from './mqtt-credential-provisioning';
 import type { PluginAuditContext } from './plugin-audit';
-import type { PluginReaderUiApi } from './reader-ui';
+import type { PluginReaderUiApi, PluginStartBlockedApi } from './reader-ui';
+import type { PluginNotificationsContext } from './plugin-notifications';
+import type { PluginResourceAccessContext } from './plugin-resource-access';
 import type { PluginLiveUpdatesContext } from './plugin-live-updates';
 import { SystemEvent, SystemEventHandler, SystemEventPayload, SystemEventSubscription } from './plugin.interface';
 /**
@@ -194,6 +196,28 @@ export interface PluginContext {
 
   /** Encrypt and decrypt this plugin's secret material. Requires MANAGE_SECRETS. */
   readonly secrets: PluginSecretsContext;
+
+  /** Notify users under plugin-declared categories. Requires SEND_NOTIFICATIONS. */
+  readonly notifications: PluginNotificationsContext;
+
+  /** Tells the host UI that this plugin's `startBlockedQuery` answer changed. Requires ACCESS_HOOKS. */
+  readonly startBlocked: PluginStartBlockedApi;
+
+  /** Read-only authorization, maintenance and session queries. Requires ACCESS_RESOURCES. */
+  readonly resourceAccess: PluginResourceAccessContext;
+
+  /**
+   * Run `fn` in a serialized database transaction. Concurrent callers (core lifecycle writes included)
+   * run one at a time on SQLite, so check-then-write sequences such as overlap checks are race-free.
+   * The transaction commits when `fn` resolves and rolls back when it throws. Requires DATABASE_ACCESS.
+   *
+   * The queue is shared with every core session start and end, so keep `fn` short and limited to database
+   * work through the given manager: no HTTP, MQTT, email or other I/O inside. Do not nest calls: a
+   * runSerialized started inside `fn` would wait for `fn` itself, so the host rejects it with an error;
+   * pass the manager down instead. Core services that write through the same queue (session start/end)
+   * must not be awaited inside `fn` either.
+   */
+  runSerialized<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T>;
 }
 
 export { PluginBackendModule } from './plugin-backend-module';

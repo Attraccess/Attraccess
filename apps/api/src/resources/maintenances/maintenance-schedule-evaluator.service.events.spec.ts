@@ -164,7 +164,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
   describe('onMaintenanceChanged', () => {
     it('should call evaluateResource when maintenance changed (e.g. marked done)', async () => {
       const evalSpy = jest.spyOn(fixture.service, 'evaluateResource').mockResolvedValue();
-      const event = new ResourceMaintenanceChangedEvent(fixture.resourceId, 99);
+      const event = new ResourceMaintenanceChangedEvent(fixture.resourceId, 99, 'finished');
 
       fixture.service.onMaintenanceChanged(event);
       await new Promise((resolve) => setImmediate(resolve));
@@ -174,7 +174,7 @@ describe('MaintenanceScheduleEvaluatorService', () => {
 
     it('should not call evaluateResource when resourceId is null', async () => {
       const evalSpy = jest.spyOn(fixture.service, 'evaluateResource').mockResolvedValue();
-      const event = new ResourceMaintenanceChangedEvent(null as never, 99);
+      const event = new ResourceMaintenanceChangedEvent(null as never, 99, 'finished');
 
       fixture.service.onMaintenanceChanged(event);
       await new Promise((resolve) => setImmediate(resolve));

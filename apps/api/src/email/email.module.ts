@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EmailService } from './email.service';
+import { PluginEmailService } from './plugin-email.service';
 import { EmailTemplateModule } from '../email-template/email-template.module';
 import { EmailLayoutModule } from '../email-layout/email-layout.module';
 import { SettingsModule } from '../settings/settings.module';
@@ -13,7 +14,7 @@ import { User } from '@attraccess/database-entities';
     SettingsModule,
     TypeOrmModule.forFeature([User]),
   ],
-  providers: [EmailService],
-  exports: [EmailService],
+  providers: [EmailService, PluginEmailService],
+  exports: [EmailService, PluginEmailService],
 })
 export class EmailModule {}

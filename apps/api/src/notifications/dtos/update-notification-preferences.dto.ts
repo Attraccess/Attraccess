@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsObject, IsOptional, ValidateNested } from 'class-validator';
+import { IsBoolean, IsString, IsObject, IsOptional, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { NotificationCategory } from '../notification-types';
 
@@ -21,9 +21,12 @@ export class UpdateNotificationChannelsDto {
 }
 
 export class UpdateNotificationPreferencesDto {
-  @IsEnum(NotificationCategory)
-  @ApiProperty({ enum: NotificationCategory, enumName: 'NotificationCategory' })
-  category!: NotificationCategory;
+  @IsString()
+  @ApiProperty({
+    description: 'A core NotificationCategory value, or the `plugin.<pluginName>.<id>` key of a plugin category',
+    example: NotificationCategory.MESSAGES,
+  })
+  category!: string;
 
   @IsObject()
   @ValidateNested()
