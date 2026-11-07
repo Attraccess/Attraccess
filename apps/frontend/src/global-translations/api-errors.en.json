@@ -177,7 +177,7 @@
   },
   "READER_NOT_PAIRED": {
     "title": "Reader not paired",
-    "description": "This Attractap is not paired yet. Pair it first; until then it is only available in the pairing session."
+    "description": "This Attractap is not paired yet. Pair it first on the Attractap Readers page under \"Not paired\"."
   },
   "READER_NOT_ALLOWED_TO_WRITE_CARDS": {
     "title": "Reader not allowed",

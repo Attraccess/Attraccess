@@ -97,7 +97,7 @@ describe('AttractapSelect for card writing', () => {
     {
       reason: 'no reader is connected',
       readers: [reader(1, 'Entrance', {}, new Date(Date.now() - 60_000))],
-      title: 'No reader connected',
+      title: 'No paired reader connected',
     },
     {
       reason: 'the connected readers run old firmware',
@@ -120,6 +120,14 @@ describe('AttractapSelect for card writing', () => {
     render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
     expect(screen.getByTestId('attractap-select-empty')).toHaveTextContent(title);
     expect(screen.getByRole('button')).toBeDisabled();
+  });
+
+  // After an upgrade every reader is unpaired until an administrator pairs it: say where that happens.
+  it('points to pairing when no paired reader is connected', () => {
+    readersQuery([reader(1, 'Entrance', {}, new Date(Date.now() - 60_000))]);
+    settingsQuery({ mode: 'all', readerIds: [] });
+    render(<AttractapSelect selection={null} onSelectionChange={vi.fn()} forCardWriting />);
+    expect(screen.getByTestId('attractap-select-empty')).toHaveTextContent('under "Not paired"');
   });
 
   it('points to the card enrollment setting when no reader is allowed', () => {

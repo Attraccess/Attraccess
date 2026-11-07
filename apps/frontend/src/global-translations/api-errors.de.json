@@ -177,7 +177,7 @@
   },
   "READER_NOT_PAIRED": {
     "title": "Reader nicht gekoppelt",
-    "description": "Dieser Attractap ist noch nicht gekoppelt. Koppeln Sie ihn zuerst; bis dahin ist er nur in der Kopplungssitzung verfügbar."
+    "description": "Dieser Attractap ist noch nicht gekoppelt. Koppeln Sie ihn zuerst auf der Seite „Attractap-Lesegeräte“ unter „Nicht gekoppelt“."
   },
   "READER_NOT_ALLOWED_TO_WRITE_CARDS": {
     "title": "Reader nicht erlaubt",

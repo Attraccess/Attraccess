@@ -20,7 +20,7 @@
     "label": "Allowed readers",
     "description": "Pick the readers that may enroll and reset RFID cards.",
     "loading": "Loading readers",
-    "none": "There are no readers yet.",
+    "none": "There are no paired readers yet. Pair readers on the Attractap Readers page under \"Not paired\".",
     "required": "Select at least one reader, or choose all readers.",
     "blockers": {
       "firmwareUpdateRequired": "Cannot write cards until it runs firmware 2.0.0 or later.",

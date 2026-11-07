@@ -2,8 +2,8 @@
   "loading": "Loading readers...",
   "empty": {
     "noConnectedReader": {
-      "title": "No reader connected",
-      "description": "No Attractap is connected right now. Switch one on and wait until it is online."
+      "title": "No paired reader connected",
+      "description": "No paired Attractap is connected right now. Readers must be paired before they can be used here; an administrator pairs them on the Attractap Readers page under \"Not paired\". If a paired reader is switched off, switch it on and wait until it is online."
     },
     "firmwareUpdateRequired": {
       "title": "Firmware update required",

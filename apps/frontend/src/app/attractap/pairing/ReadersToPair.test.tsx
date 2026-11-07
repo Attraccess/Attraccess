@@ -37,7 +37,9 @@ vi.mock('@attraccess/react-query-client', () => ({
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useTranslations: () => ({ t: (key: string) => key }),
+  useTranslations: () => ({
+    t: (key: string, vars?: { names?: string }) => (vars?.names ? `${key}: ${vars.names}` : key),
+  }),
   useDateTimeFormatter: () => (value: string) => `at ${value}`,
   PageHeader: ({ title, subtitle }: { title: string; subtitle: string }) => (
     <div>
@@ -92,7 +94,7 @@ describe('ReadersToPair', () => {
     expect(document.querySelector('[data-cy="attractap-readers-to-pair"]')).toBeNull();
   });
 
-  it('lists every reader that is not paired the same way; only reader records can be deleted or diagnosed', () => {
+  it('lists every reader that is not paired the same way; only reader records can be deleted', () => {
     mocks.pairings.current = [pairing('dev', { kind: 'lite' })];
     render(
       <ReadersToPair
@@ -117,6 +119,19 @@ describe('ReadersToPair', () => {
         .getAllByRole('button')
         .map((b) => b.textContent || b.getAttribute('aria-label')),
     ).toEqual(['toPair.pair', 'toPair.delete', 'toPair.pair', 'toPair.delete', 'toPair.pair']);
+  });
+
+  it('shows which resources a reader that is not paired still controls', () => {
+    const withResources = {
+      ...reader(1, 'unpaired'),
+      resources: [{ name: 'Lathe' }, { name: 'Drill' }],
+    } as unknown as Attractap;
+    render(<ReadersToPair onPaired={mocks.onPaired} readers={[withResources, reader(3, 'revoked')]} />);
+    expect(document.querySelector('[data-cy="attractap-to-pair-resources-1"]')?.textContent).toBe(
+      'toPair.resources: Lathe, Drill',
+    );
+    // A record without resources gets no empty line.
+    expect(document.querySelector('[data-cy="attractap-to-pair-resources-3"]')).toBeNull();
   });
 
   it('deletes a reader record that is not paired', async () => {

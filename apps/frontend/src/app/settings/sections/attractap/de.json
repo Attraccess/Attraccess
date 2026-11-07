@@ -20,7 +20,7 @@
     "label": "Erlaubte Reader",
     "description": "Wählen Sie die Reader, die RFID-Karten registrieren und zurücksetzen dürfen.",
     "loading": "Reader werden geladen",
-    "none": "Es gibt noch keine Reader.",
+    "none": "Es gibt noch keine gekoppelten Reader. Koppeln Sie Reader auf der Seite „Attractap-Lesegeräte“ unter „Nicht gekoppelt“.",
     "required": "Wählen Sie mindestens einen Reader oder entscheiden Sie sich für alle Reader.",
     "blockers": {
       "firmwareUpdateRequired": "Kann erst mit Firmware 2.0.0 oder neuer Karten beschreiben.",

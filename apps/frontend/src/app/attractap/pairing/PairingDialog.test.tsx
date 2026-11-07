@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
   pairingOptions: { current: undefined as unknown },
   invalidateQueries: vi.fn(() => Promise.resolve()),
   readers: { current: [] as unknown[] },
+  readersToPair: { current: [] as unknown[] },
   selects: [] as Array<{ items: Array<{ key: string; label: string }>; onChange?: (key: string) => void }>,
 }));
 
@@ -54,7 +55,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   useAttractapServiceGetPairings: () => ({ data: mocks.pairings.current }),
   useAttractapServiceGetReaders: () => ({ data: mocks.readers.current }),
-  useAttractapServiceGetReadersToPair: () => ({ data: [] }),
+  useAttractapServiceGetReadersToPair: () => ({ data: mocks.readersToPair.current }),
   useAttractapServiceApprovePairing: (options: Record<string, (value: unknown) => unknown>) => {
     mocks.approveOptions.current = options;
     return { mutate: mocks.approve, isPending: false };
@@ -65,6 +66,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: mocks.resolve, isPending: false };
   },
   useAttractapServiceGetReadersKey: 'readers',
+  useAttractapServiceGetReadersToPairKey: 'readers-to-pair',
   useAttractapServiceGetReaderByIdKey: 'reader-by-id',
   useAttractapServiceGetReaderCredentialHistoryKey: 'history',
   useAttractapServiceGetPairingsKey: 'pairings',
@@ -126,10 +128,12 @@ describe('PairingDialog', () => {
     setSecureContext(true);
     mocks.pairing.current = waiting();
     mocks.pairings.current = [];
-    mocks.readers.current = [
-      { id: 7, name: 'Door', pairingState: 'paired' },
+    mocks.readers.current = [{ id: 7, name: 'Door', pairingState: 'paired' }];
+    mocks.readersToPair.current = [
       { id: 8, name: 'Old token reader', pairingState: 'unpaired' },
+      { id: 9, name: 'Removed reader', pairingState: 'revoked' },
     ];
+    mocks.invalidateQueries.mockClear();
     mocks.selects.length = 0;
     mocks.refetchResult.current = undefined;
     mocks.refetch
@@ -263,6 +267,15 @@ describe('PairingDialog', () => {
       });
       expect(mocks.toast.success).toHaveBeenCalledWith(expect.objectContaining({ title: 'Reader paired' }));
       expect(onPaired).toHaveBeenCalledWith(9);
+    });
+
+    it('refreshes both reader lists after pairing', async () => {
+      open({ pairingId: 'p1' });
+      await act(async () => {
+        await mocks.approveOptions.current?.onSuccess?.(waiting({ state: 'completed', targetReaderId: 9 }));
+      });
+      expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers'] });
+      expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers-to-pair'] });
     });
 
     it('says the reader was paired again when it took over a record', async () => {
@@ -649,11 +662,29 @@ describe('PairingDialog', () => {
   });
 
   describe('takeover picker', () => {
-    it('offers every reader, also a token reader that was never paired', () => {
-      open({ pairingId: 'p1' });
+    const pickerLabels = () => {
       act(() => mocks.selects[0]?.onChange?.('takeover'));
-      const picker = mocks.selects.at(-1);
-      expect(picker?.items.map((item) => item.label)).toEqual(['Door', 'Old token reader']);
+      return mocks.selects.at(-1)?.items.map((item) => item.label);
+    };
+
+    it('offers every reader, also a never-paired token reader and one whose pairing was removed', () => {
+      open({ pairingId: 'p1' });
+      expect(pickerLabels()).toEqual(['Door', 'Old token reader', 'Removed reader']);
+    });
+
+    it('lists a reader that is in both lists (just paired) once, as the paired entry', () => {
+      mocks.readers.current = [
+        { id: 7, name: 'Door', pairingState: 'paired' },
+        { id: 8, name: 'Old token reader (paired)', pairingState: 'paired' },
+      ];
+      open({ pairingId: 'p1' });
+      expect(pickerLabels()).toEqual(['Door', 'Old token reader (paired)', 'Removed reader']);
+    });
+
+    it('names a preset target that is only in the list of readers to pair', () => {
+      mocks.pairings.current = [];
+      open({ presetTargetReaderId: 9 });
+      expect(screen.getByText('This reader takes over Removed reader.')).toBeInTheDocument();
     });
   });
 });

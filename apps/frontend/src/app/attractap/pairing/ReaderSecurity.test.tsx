@@ -14,9 +14,10 @@ const mocks = vi.hoisted(() => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
   pairingDialog: vi.fn(),
   pairingRemoved: vi.fn(),
+  invalidateQueries: vi.fn(),
 }));
 
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
 vi.mock('@attraccess/react-query-client', () => ({
   useAttractapServiceGetPairings: () => ({ data: mocks.pairings.current }),
   useAttractapServiceGetReaderCredentialHistory: () => ({ data: mocks.history.current }),
@@ -25,6 +26,7 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: mocks.revoke, isPending: false };
   },
   useAttractapServiceGetReadersKey: 'readers',
+  useAttractapServiceGetReadersToPairKey: 'readers-to-pair',
   useAttractapServiceGetReaderCredentialHistoryKey: 'history',
   UseAttractapServiceGetReaderByIdKeyFn: () => ['reader'],
   useUsersServiceGetOneUserById: ({ id }: { id: number }) => ({ data: { id, username: `user-${id}` } }),
@@ -92,6 +94,9 @@ describe('ReaderSecurity', () => {
 
     act(() => mocks.revokeOptions.current?.onSuccess?.());
     expect(mocks.toast.success).toHaveBeenCalledWith({ title: 'security.revoked' });
+    // The reader moves from the paired list to the one under Not paired: both are refreshed.
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers'] });
+    expect(mocks.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['readers-to-pair'] });
     // A reader without pairing cannot be edited, so the editor closes.
     expect(mocks.pairingRemoved).toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());

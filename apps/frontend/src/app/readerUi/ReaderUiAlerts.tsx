@@ -44,11 +44,15 @@ function AlertRow({ alert, readerName }: Readonly<{ alert: ReaderUiAlert; reader
 export function ReaderUiAlerts({ readerId }: Readonly<{ readerId?: number }>) {
   const { t } = useTranslations({ en, de });
   const { data } = useReaderUiAlerts();
-  const alerts = (data ?? []).filter((alert) => readerId === undefined || alert.readerId === readerId);
-  const needsReaders = alerts.some((alert) => alert.readerId !== null);
+  const forReader = (data ?? []).filter((alert) => readerId === undefined || alert.readerId === readerId);
+  const needsReaders = forReader.some((alert) => alert.readerId !== null);
   const { data: allReaders } = useAttractapServiceGetReaders(undefined, { enabled: needsReaders });
   const readers = allReaders ? pairedReadersOnly(allReaders) : undefined;
   const readerName = (id: number | null) => readers?.find((reader) => reader.id === id)?.name;
+  // Readers that are not paired are only shown under Not paired, so their alerts are hidden here.
+  const alerts = forReader.filter(
+    (alert) => alert.readerId === null || !readers || readers.some((reader) => reader.id === alert.readerId),
+  );
 
   return (
     <div className="flex flex-col gap-2" data-cy="reader-ui-alerts">

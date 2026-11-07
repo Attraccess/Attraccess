@@ -45,8 +45,8 @@ function RecordActions(props: Readonly<{ readerId: number; pair: ReactNode }>) {
 /**
  * Everything that must be paired before it can be used: readers that were never paired, readers
  * whose pairing was removed, and new readers that wait for approval. Reader records can also be
- * deleted or diagnosed; a new reader can only be paired. Codes are never shown here; the admin
- * reads them from the reader.
+ * deleted; a new reader can only be paired. Codes are never shown here; the admin reads them from
+ * the reader.
  */
 export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: (readerId: number) => void }>) {
   const { t } = useTranslations({ de, en });
@@ -70,6 +70,12 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
     onError: (error) => toast.error({ title: t('toPair.requestFailed'), description: apiErrorMessage(error) }),
   });
 
+  // A token reader still controls these machines until it is paired.
+  const resourcesOf = (reader: Attractap) => {
+    const names = (reader.resources ?? []).map((resource) => resource.name);
+    return names.length > 0 ? t('toPair.resources', { names: names.join(', ') }) : undefined;
+  };
+
   const pair = (reader: Attractap) => {
     const pairing = runningFor(reader.id);
     if (pairing) setDialog({ pairingId: pairing.id });
@@ -92,6 +98,8 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
                 kind={readerKindOf(reader.firmware)}
                 name={reader.name}
                 detail={t(reader.pairingState === 'revoked' ? 'toPair.pairingRemoved' : 'toPair.neverPaired')}
+                note={resourcesOf(reader)}
+                noteCy={`attractap-to-pair-resources-${reader.id}`}
                 action={
                   <RecordActions
                     readerId={reader.id}

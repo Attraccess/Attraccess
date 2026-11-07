@@ -2,8 +2,8 @@
   "loading": "Reader werden geladen...",
   "empty": {
     "noConnectedReader": {
-      "title": "Kein Reader verbunden",
-      "description": "Gerade ist kein Attractap verbunden. Schalten Sie einen ein und warten Sie, bis er online ist."
+      "title": "Kein gekoppelter Reader verbunden",
+      "description": "Gerade ist kein gekoppelter Attractap verbunden. Reader müssen gekoppelt sein, bevor sie hier verwendet werden können; eine Administratorin oder ein Administrator koppelt sie auf der Seite „Attractap-Lesegeräte“ unter „Nicht gekoppelt“. Ist ein gekoppelter Reader ausgeschaltet, schalten Sie ihn ein und warten Sie, bis er online ist."
     },
     "firmwareUpdateRequired": {
       "title": "Firmware-Update erforderlich",
