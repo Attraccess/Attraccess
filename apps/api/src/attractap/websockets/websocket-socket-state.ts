@@ -248,11 +248,11 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     cardRelay?: boolean;
     /**
      * The reader signed in with its legacy token but is not paired. Like firmware before 2.0.0 it gets
-     * no functions (answered with PAIRING_REQUIRED) and only the firmware update and pairing flows.
+     * no functions, only the firmware update and the push to start pairing bound to its record.
      */
     pairingRequired?: boolean;
-    /** When this connection was last told to start pairing, so refused events do not repeat it. */
-    pairingPromptedAt?: number;
+    /** This connection's firmware info was handled and no update was offered, so pairing comes next. */
+    updateCheckDone?: boolean;
     /**
      * The user whose card this connection verified with the server (EV2 authentication with the
      * stored key). Never set from a UID alone or from anything the reader claims. Cleared on

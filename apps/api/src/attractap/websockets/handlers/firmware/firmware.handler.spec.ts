@@ -298,15 +298,16 @@ describe('AttractapFirmwareHandler', () => {
         );
         expect((fixture.handler as any).pairingService.issueBindingTicket).toHaveBeenCalledWith(42);
         expect((fixture.handler as any).uiHandler.onFirmwareInfo).not.toHaveBeenCalled();
+        expect(fixture.socket.state.updateCheckDone).toBe(true);
       });
 
-      it('is asked again on every connect, with the ticket service deciding whether it is a new one', async () => {
+      it('is asked again on every connect, with the pairing service deciding whether it is time', async () => {
         fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({ version: '2.0.0' });
 
         await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
         await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
 
-        expect((fixture.handler as any).pairingService.issueBindingTicket).toHaveBeenCalledTimes(2);
+        expect((fixture.handler as any).pairingService.claimAutoPrompt).toHaveBeenCalledTimes(2);
       });
 
       it('still gets the firmware update first', async () => {
@@ -322,12 +323,62 @@ describe('AttractapFirmwareHandler', () => {
 
         await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
 
+        expect(fixture.socket.state.updateCheckDone).toBeUndefined();
         expect(fixture.socket.sendMessage).toHaveBeenCalledTimes(1);
         expect(fixture.socket.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({ type: AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED }),
           }),
         );
+      });
+
+      const startPairing = () =>
+        expect(fixture.socket.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              type: AttractapEventType.READER_START_PAIRING,
+              payload: { ticket: 'ticket-1' },
+            }),
+          }),
+        );
+
+      it('starts pairing on firmware before 2.0.0 too, when that firmware is the latest known', async () => {
+        fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({ version: '1.11.1' });
+
+        await fixture.handler.handleFirmwareInfo(fixture.socket, {
+          payload: { name: 'attractap', variant: 'touch', version: '1.11.1' },
+        } as AttractapEvent['data']);
+
+        expect(fixture.socket.sendMessage).toHaveBeenCalledTimes(1);
+        startPairing();
+        expect(fixture.socket.sendMessage).not.toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ type: AttractapEventType.READER_UNAUTHORIZED }) }),
+        );
+      });
+
+      it('starts pairing when the server knows no firmware for it', async () => {
+        fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue(null);
+
+        await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
+
+        expect(fixture.socket.sendMessage).toHaveBeenCalledTimes(1);
+        startPairing();
+      });
+
+      it('starts pairing when the update it needs cannot be offered', async () => {
+        fixture.mockFirmwareService.getFirmwareDefinition.mockResolvedValue({
+          name: 'attractap',
+          variant: 'touch',
+          version: '2.1.0',
+          filename: 'fw.bin',
+        });
+        fixture.mockExistsSync.mockReturnValue(false);
+
+        await fixture.handler.handleFirmwareInfo(fixture.socket, { payload: info } as AttractapEvent['data']);
+
+        expect(fixture.socket.sendMessage).toHaveBeenCalledTimes(1);
+        startPairing();
+        expect(fixture.mockMetricsService.attractapFirmwareUpdatesTotal.inc).not.toHaveBeenCalled();
       });
     });
 

@@ -102,7 +102,11 @@ export function gatewayProviders(
   security: Provider[] = [
     {
       provide: PairingService,
-      useValue: { handleConnection: jest.fn(), issueBindingTicket: jest.fn(() => 'ticket-1') },
+      useValue: {
+        handleConnection: jest.fn(),
+        issueBindingTicket: jest.fn(() => 'ticket-1'),
+        claimAutoPrompt: jest.fn(() => true),
+      },
     },
     { provide: ReaderSessionService, useValue: { accept: jest.fn() } },
   ],

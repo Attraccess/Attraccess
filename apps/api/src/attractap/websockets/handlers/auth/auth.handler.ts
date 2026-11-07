@@ -113,9 +113,10 @@ export class AttractapAuthHandler {
     const language = this.websocketService.readerLanguage ?? storedLanguage;
     socket.readerId = reader.id;
     socket.readerName = reader.name;
-    // Only unpaired readers sign in by token. It stays connected for the firmware update (readers before
-    // 2.0.0 cannot pair), but offers no functions until the reader is paired.
+    // Only unpaired readers sign in by token. It stays connected for the firmware update and the push to
+    // start pairing, but offers no functions until the reader is paired.
     socket.state.pairingRequired = true;
+    socket.state.updateCheckDone = false;
     this.metricsService.attractapReaderConnected.set({ reader_id: String(reader.id), reader_name: reader.name }, 1);
 
     const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {

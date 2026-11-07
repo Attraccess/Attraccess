@@ -46,10 +46,10 @@ import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './we
 import { randomBytes } from 'crypto';
 import type { IncomingMessage } from 'http';
 
-/** Card relay events: a card conversation must not wait for the reader's lastConnection update. */
 /**
- * The only events a reader that is not paired may send: signing in again, the firmware update (readers
- * before 2.0.0 cannot pair) and its crash report. Everything else is answered with PAIRING_REQUIRED.
+ * The only events a reader that is not paired may send: signing in again, the firmware update, its crash
+ * report and the end of its login. Everything else runs no handler; the reader is asked to start pairing
+ * (see promptPairing for how often).
  */
 const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
   AttractapEventType.READER_AUTHENTICATE,
@@ -60,6 +60,7 @@ const ALLOWED_WHILE_PAIRING_REQUIRED = new Set<AttractapEventType>([
   AttractapEventType.READER_SESSION_ENDED,
 ]);
 
+/** Card relay events: a card conversation must not wait for the reader's lastConnection update. */
 const SKIPS_ACTIVITY_WRITE = new Set<AttractapEventType>([
   AttractapEventType.CARD_DETECTED,
   AttractapEventType.CARD_APDU_RESPONSE,
@@ -175,7 +176,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
    * Tells a connected reader that is not paired to pair first: it starts pairing bound to its own record.
    */
   protected async requirePairing(socket: AuthenticatedWebSocket) {
-    await promptPairing(socket, this.pairingService, true);
+    await promptPairing(socket, this.pairingService);
   }
 
   /**
@@ -355,6 +356,10 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     } catch (error) {
       this.logger.error(`Failed to send heartbeat ack to client ${socket.id}: ${(error as Error).message}`);
     }
+    // A blocked reader whose pairing failed is back on its token and sends little else, so its
+    // heartbeats ask it again once the per-reader limit allows. Not before its update check: a reader
+    // that needs the update gets that first.
+    if (socket.state.pairingRequired && socket.state.updateCheckDone) await this.requirePairing(socket);
 
     await this.clientWasActive(socket);
   }

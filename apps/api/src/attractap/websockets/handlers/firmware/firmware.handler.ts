@@ -94,57 +94,56 @@ export class AttractapFirmwareHandler {
         this.logger.warn(`Reader UI sync after firmware info failed: ${(error as Error).message}`);
       });
 
-    const firmwareIsUpToDate = await this.isFirmwareLatest(data.payload);
-    // Current firmware but not paired: after the firmware gate comes the pairing gate. The reader
-    // starts pairing; one that needs the update gets it first and meets this check once it runs 2.0.0.
-    if (firmwareIsUpToDate && socket.state.pairingRequired) {
-      await promptPairing(socket, this.pairingService);
-      return;
-    }
-    if (!firmwareIsUpToDate) {
-      this.logger.debug('Firmware is not up to date, notifying client to start OTA');
+    // Firmware gate first: a reader that needs the update gets it. Then the pairing gate: a reader that
+    // is not paired starts pairing, also when no update could be offered.
+    if (!(await this.isFirmwareLatest(data.payload)) && (await this.offerFirmwareUpdate(socket, data.payload))) return;
+    socket.state.updateCheckDone = true;
+    if (socket.state.pairingRequired) await promptPairing(socket, this.pairingService);
+  }
 
-      try {
-        const current = data.payload as AttractapFirmware;
-        const latest = await this.firmwareService.getFirmwareDefinition(current.name, current.variant);
-        if (!latest) {
-          this.logger.warn(
-            `No firmware definition found for ${current.name}/${current.variant}; treating as up-to-date for now.`,
-          );
-          return;
-        }
-
-        const assetsDir = join(__dirname, 'assets', 'attractap-firmwares');
-        const otaFilename = latest.filenameOTA || latest.filename;
-        const firmwarePath = join(assetsDir, otaFilename);
-        if (!existsSync(firmwarePath)) {
-          this.logger.error(`OTA firmware binary not found at ${firmwarePath}`);
-          return;
-        }
-        const size = statSync(firmwarePath).size;
-        if (!size || size < 1024) {
-          this.logger.error(`OTA firmware size is suspicious (${size} bytes) for ${otaFilename}`);
-          return;
-        }
-
-        // Store OTA context for this socket
-        socket.state.ota = { path: firmwarePath, size } as AuthenticatedWebSocket['state']['ota'];
-
-        await socket.sendMessage(
-          new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
-            available: {
-              name: latest.name,
-              variant: latest.variant,
-              version: String(latest.version),
-              totalSize: size,
-            },
-          }),
+  /** Sends READER_FIRMWARE_UPDATE_REQUIRED; false when no update can be offered. */
+  private async offerFirmwareUpdate(socket: AuthenticatedWebSocket, current: AttractapFirmware): Promise<boolean> {
+    this.logger.debug('Firmware is not up to date, notifying client to start OTA');
+    try {
+      const latest = await this.firmwareService.getFirmwareDefinition(current.name, current.variant);
+      if (!latest) {
+        this.logger.warn(
+          `No firmware definition found for ${current.name}/${current.variant}; treating as up-to-date for now.`,
         );
-        this.metricsService.attractapFirmwareUpdatesTotal.inc({ reader_id: String(socket.readerId) });
-      } catch (err) {
-        this.logger.error(`Failed to prepare firmware update notice: ${(err as Error).message}`);
+        return false;
       }
-      return;
+
+      const assetsDir = join(__dirname, 'assets', 'attractap-firmwares');
+      const otaFilename = latest.filenameOTA || latest.filename;
+      const firmwarePath = join(assetsDir, otaFilename);
+      if (!existsSync(firmwarePath)) {
+        this.logger.error(`OTA firmware binary not found at ${firmwarePath}`);
+        return false;
+      }
+      const size = statSync(firmwarePath).size;
+      if (!size || size < 1024) {
+        this.logger.error(`OTA firmware size is suspicious (${size} bytes) for ${otaFilename}`);
+        return false;
+      }
+
+      // Store OTA context for this socket
+      socket.state.ota = { path: firmwarePath, size } as AuthenticatedWebSocket['state']['ota'];
+
+      await socket.sendMessage(
+        new AttractapEvent(AttractapEventType.READER_FIRMWARE_UPDATE_REQUIRED, {
+          available: {
+            name: latest.name,
+            variant: latest.variant,
+            version: String(latest.version),
+            totalSize: size,
+          },
+        }),
+      );
+      this.metricsService.attractapFirmwareUpdatesTotal.inc({ reader_id: String(socket.readerId) });
+      return true;
+    } catch (err) {
+      this.logger.error(`Failed to prepare firmware update notice: ${(err as Error).message}`);
+      return false;
     }
   }
 

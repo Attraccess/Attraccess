@@ -76,12 +76,18 @@ console.
 
 ## Pairing a reader that already exists
 
-Readers that registered with a token before this version are blocked until they are paired. Once
-they run the current firmware they start pairing on their own when they connect and show a code.
+Readers that registered with a token before this version are blocked until they are paired. When
+such a reader connects, the server first offers it a firmware update if one is due, then asks it to
+pair, and the reader shows a code. A reader on firmware 1.8.0 or newer for which the server has no
+update pairs on its current firmware. A reader on 1.7.x shows its code only after the update; if the
+server has no update for it, update it with the web flasher.
+
 Their row in the **Not paired** list has a **Pair** button, which asks the connected reader to show
-its code again. Approve the code as above. The pairing is bound to the existing
-record, so name, machines and settings stay. If the reader is not connected, **Pair** cannot reach
-it; switch it on first. Settings of a reader that is not paired stay locked.
+its code right away (readers on firmware before 1.8.0 ignore it). If a pairing does not finish, the
+reader is asked again on its own about two minutes later. Approve the code as above. The
+pairing is bound to the existing record, so name, machines and settings stay. If the reader is not
+connected, **Pair** cannot reach it; switch it on first. Settings of a reader that is not paired
+stay locked.
 
 Until it is paired, such a reader signs nobody in and starts and stops no machines. It appears only
 in the **Not paired** list, where its row shows the machines it is assigned to. It cannot enroll or

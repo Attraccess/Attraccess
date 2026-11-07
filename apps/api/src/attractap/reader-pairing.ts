@@ -13,35 +13,28 @@ export const READER_NOT_PAIRED = 'READER_NOT_PAIRED';
 export const isPaired = (reader: Pick<Attractap, 'pairingState'> | null | undefined): boolean =>
   reader?.pairingState === 'paired';
 
-/** What a connected reader that is not paired gets instead of any function; the reader starts pairing. */
+/** Why a card tap of a reader that is not paired is refused. */
 export const PAIRING_REQUIRED = 'PAIRING_REQUIRED';
 
 export function assertReaderPaired(reader: Pick<Attractap, 'pairingState'>): void {
   if (!isPaired(reader)) throw new BadRequestException(READER_NOT_PAIRED);
 }
 
-/** A reader that was just asked to start pairing is not asked again by its next refused events for this long. */
-const PAIRING_PROMPT_INTERVAL_MS = 60 * 1000;
-
 /**
- * Tells a connected reader that is not paired to pair. A token reader on current firmware gets
- * READER_START_PAIRING with a ticket bound to its own record, so the pairing stays attached to that
- * record (name, machines, settings). READER_UNAUTHORIZED would make it drop its token and start an
- * unbound pairing, orphaning the record. Readers that cannot relay cards yet get PAIRING_REQUIRED.
- * `throttle` skips the push when this connection was prompted a moment ago (refused events).
+ * Tells a connected reader that is not paired to pair. It gets READER_START_PAIRING with a ticket bound
+ * to its own record, so the pairing stays attached to that record (name, machines, settings). Firmware
+ * 1.8.0 and newer pairs with it; older firmware ignores the unknown event and keeps its token for the
+ * firmware update. Never READER_UNAUTHORIZED: every firmware drops its token on it, and pairs unbound
+ * (orphaning the record) or, before 1.8.0, cannot come back at all.
+ * Not while this connection runs a firmware update, and at most every two minutes per reader (the
+ * pairing service decides), since a failed pairing sends the reader straight back here.
  */
 export async function promptPairing(
   socket: AuthenticatedWebSocket,
-  pairing: { issueBindingTicket(readerId: number): string },
-  throttle = false,
+  pairing: { issueBindingTicket(readerId: number): string; claimAutoPrompt(readerId: number): boolean },
 ): Promise<void> {
-  if (!socket.state.cardRelay || typeof socket.readerId !== 'number') {
-    await socket.sendMessage(new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, { message: PAIRING_REQUIRED }));
-    return;
-  }
-  const now = Date.now();
-  if (throttle && now - (socket.state.pairingPromptedAt ?? 0) < PAIRING_PROMPT_INTERVAL_MS) return;
-  socket.state.pairingPromptedAt = now;
+  if (typeof socket.readerId !== 'number' || socket.state.ota) return;
+  if (!pairing.claimAutoPrompt(socket.readerId)) return;
   await socket.sendMessage(
     new AttractapEvent(AttractapEventType.READER_START_PAIRING, {
       ticket: pairing.issueBindingTicket(socket.readerId),

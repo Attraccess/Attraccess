@@ -83,13 +83,18 @@ auf der seriellen Konsole.
 
 ## Bereits vorhandenen Reader koppeln
 
-Reader, die vor dieser Version per Token registriert wurden, sind bis zur Kopplung gesperrt. Sobald
-sie die aktuelle Firmware haben, starten sie beim Verbinden von selbst die Kopplung und zeigen einen
-Code. In ihrer Zeile im Block **Nicht gekoppelt** steht der Button **Koppeln**; er lässt den
-verbundenen Reader seinen Code erneut zeigen. Gib den
-Code wie oben frei. Die Kopplung ist an den bestehenden Eintrag gebunden, Name, Maschinen und
-Einstellungen bleiben also erhalten. Ist der Reader nicht verbunden, erreicht **Koppeln** ihn
-nicht; schalte ihn zuerst ein. Die Einstellungen eines nicht gekoppelten Readers bleiben gesperrt.
+Reader, die vor dieser Version per Token registriert wurden, sind bis zur Kopplung gesperrt. Verbindet
+sich ein solcher Reader, bietet ihm der Server zuerst ein fälliges Firmware-Update an und fordert ihn
+dann zur Kopplung auf; der Reader zeigt einen Code. Ein Reader mit Firmware 1.8.0 oder neuer, für den
+der Server kein Update hat, koppelt mit seiner aktuellen Firmware. Ein Reader mit 1.7.x zeigt seinen
+Code erst nach dem Update; hat der Server kein Update für ihn, aktualisiere ihn mit dem Web-Flasher.
+
+In ihrer Zeile im Block **Nicht gekoppelt** steht der Button **Koppeln**; er lässt den verbundenen
+Reader seinen Code sofort zeigen (Reader mit Firmware vor 1.8.0 ignorieren ihn). Wird eine Kopplung
+nicht abgeschlossen, fordert der Server den Reader etwa zwei Minuten später von selbst erneut auf.
+Gib den Code wie oben frei. Die Kopplung ist an den bestehenden Eintrag gebunden, Name, Maschinen und
+Einstellungen bleiben also erhalten. Ist der Reader nicht verbunden, erreicht **Koppeln** ihn nicht;
+schalte ihn zuerst ein. Die Einstellungen eines nicht gekoppelten Readers bleiben gesperrt.
 
 Bis zur Kopplung meldet ein solcher Reader niemanden an und startet und beendet keine Maschinen. Er
 erscheint nur im Block **Nicht gekoppelt**. Dort zeigt seine Zeile die Maschinen, denen er

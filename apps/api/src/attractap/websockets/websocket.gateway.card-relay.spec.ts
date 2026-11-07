@@ -534,15 +534,17 @@ describe('AttractapGateway card relay rules', () => {
   });
 
   describe('a reader that is not paired', () => {
-    const FUNCTION_EVENTS = [
-      AttractapEventType.CARD_DETECTED,
-      AttractapEventType.REQUEST_RESOURCE_LIST,
-      AttractapEventType.PROJECTS_OF_USER,
-      AttractapEventType.BILLING_REQUEST_TOPUP,
-      AttractapEventType.ENROLL_NEW_CARD_CANCEL,
-      AttractapEventType.RESET_NFC_CARD_CANCEL,
-      AttractapEventType.RESOURCE_USAGE_FORM_GET_FIELDS,
-    ];
+    // The only events it may send. Any other event, including one added later, is gated.
+    const ALLOWED = new Set<string>([
+      AttractapEventType.READER_AUTHENTICATE,
+      AttractapEventType.READER_REGISTER,
+      AttractapEventType.READER_FIRMWARE_INFO,
+      AttractapEventType.FIRMWARE_REQUEST_CHUNK,
+      AttractapEventType.READER_CRASH_REPORT,
+      AttractapEventType.READER_SESSION_ENDED,
+    ]);
+    const gatedEvents = () =>
+      (Object.keys(fixture.gateway['eventHandlers']) as AttractapEventType[]).filter((type) => !ALLOWED.has(type));
 
     const unpairedReader = (state: Record<string, unknown> = { cardRelay: true }) => {
       const socket = loggedInReader();
@@ -552,54 +554,82 @@ describe('AttractapGateway card relay rules', () => {
     const startPairing = (socket: AuthenticatedWebSocket) =>
       replies(socket).filter((data) => data.type === AttractapEventType.READER_START_PAIRING);
 
-    it.each(FUNCTION_EVENTS)(
-      'answers %s by starting pairing, bound to its record, and runs no handler',
-      async (type) => {
+    it('gates every event but signing in, the firmware update, crash reports and the end of a login', async () => {
+      const types = gatedEvents();
+      expect(types).toEqual(
+        expect.arrayContaining([
+          AttractapEventType.CARD_DETECTED,
+          AttractapEventType.START_RESOURCE_USAGE_SESSION,
+          AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
+          AttractapEventType.SUPERVISION_REQUEST,
+          AttractapEventType.REQUEST_RESOURCE_LIST,
+        ]),
+      );
+      for (const type of types) {
         const socket = unpairedReader();
-        const cardTap = jest.spyOn(fixture.gateway['cardDetectedRouter'], 'route');
+        const handler = jest.spyOn(fixture.gateway['eventHandlers'], type).mockResolvedValue(undefined);
 
         await send(socket, type);
 
-        expect(cardTap).not.toHaveBeenCalled();
-        expect(replies(socket)).toEqual([
-          expect.objectContaining({ type: AttractapEventType.READER_START_PAIRING, payload: { ticket: 'ticket-1' } }),
-        ]);
-        expect(fixture.pairingService.issueBindingTicket).toHaveBeenCalledWith(7);
-      },
-    );
+        expect({ type, handled: handler.mock.calls.length }).toEqual({ type, handled: 0 });
+        expect({ type, replies: replies(socket) }).toEqual({
+          type,
+          replies: [
+            expect.objectContaining({
+              type: AttractapEventType.READER_START_PAIRING,
+              payload: { ticket: 'ticket-1' },
+            }),
+          ],
+        });
+      }
+      expect(fixture.pairingService.issueBindingTicket).toHaveBeenCalledWith(7);
+    });
 
-    it('does not restart pairing for every refused event of the same connection', async () => {
+    it('sends nothing when the pairing service says this reader was asked a moment ago', async () => {
+      fixture.pairingService.claimAutoPrompt.mockReturnValueOnce(false);
       const socket = unpairedReader();
 
       await send(socket, AttractapEventType.CARD_DETECTED);
-      await send(socket, AttractapEventType.CARD_DETECTED);
-      await send(socket, AttractapEventType.ENROLL_NEW_CARD);
+
+      expect(fixture.pairingService.claimAutoPrompt).toHaveBeenCalledWith(7);
+      expect(replies(socket)).toEqual([]);
+      expect(fixture.pairingService.issueBindingTicket).not.toHaveBeenCalled();
+    });
+
+    it('does not interrupt a firmware update running on this connection', async () => {
+      const socket = unpairedReader({ cardRelay: false, ota: { path: '/tmp/fw.bin', size: 4096 } });
+
+      await send(socket, AttractapEventType.REQUEST_RESOURCE_LIST);
+
+      expect(startPairing(socket)).toHaveLength(0);
+      expect(fixture.pairingService.claimAutoPrompt).not.toHaveBeenCalled();
+    });
+
+    it('asks again from its heartbeats, since a reader whose pairing failed sends little else', async () => {
+      const socket = unpairedReader();
+      (socket as unknown as { send: jest.Mock }).send = jest.fn();
+      await fixture.gateway.onHeartbeat(socket);
+      expect(startPairing(socket)).toHaveLength(0); // its firmware info was not handled yet
+      socket.state.updateCheckDone = true;
+
+      await fixture.gateway.onHeartbeat(socket);
+      fixture.pairingService.claimAutoPrompt.mockReturnValueOnce(false);
+      await fixture.gateway.onHeartbeat(socket);
 
       expect(startPairing(socket)).toHaveLength(1);
+      expect(fixture.pairingService.claimAutoPrompt).toHaveBeenCalledTimes(2);
     });
 
-    it('asks again once the minute is over', async () => {
-      const socket = unpairedReader();
-      await send(socket, AttractapEventType.CARD_DETECTED);
-      socket.state.pairingPromptedAt = Date.now() - 61_000;
-
-      await send(socket, AttractapEventType.CARD_DETECTED);
-
-      expect(startPairing(socket)).toHaveLength(2);
-    });
-
-    it('tells a reader that cannot relay cards yet that pairing is required, without a ticket', async () => {
+    it('asks a reader on firmware before 2.0.0 to pair as well, never telling it to drop its token', async () => {
+      // Firmware 1.8.0+ pairs with the ticket; older firmware ignores it. READER_UNAUTHORIZED would
+      // make either drop its token and lose its record.
       const socket = unpairedReader({ cardRelay: false });
 
       await send(socket, AttractapEventType.CARD_DETECTED);
 
       expect(replies(socket)).toEqual([
-        expect.objectContaining({
-          type: AttractapEventType.READER_UNAUTHORIZED,
-          payload: { message: 'PAIRING_REQUIRED' },
-        }),
+        expect.objectContaining({ type: AttractapEventType.READER_START_PAIRING, payload: { ticket: 'ticket-1' } }),
       ]);
-      expect(fixture.pairingService.issueBindingTicket).not.toHaveBeenCalled();
     });
 
     it('still serves a firmware chunk request', async () => {

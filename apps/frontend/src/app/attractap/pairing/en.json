@@ -100,7 +100,7 @@
   },
   "toPair": {
     "title": "Not paired",
-    "description": "A new reader shows a code on its screen (Lite: colours on its ring). Press Pair, then type the code or compare the colours. Pair these readers before you can set them up. Readers that sign in with a token do nothing until they are paired: no card taps, no enrolling or resetting cards, no supervision or mass introduction. After the firmware update they show their code like a new reader, and they are not listed anywhere else until they are paired. The reader must be switched on and connected.",
+    "description": "A new reader shows a code on its screen (Lite: colours on its ring). Press Pair, then type the code or compare the colours. Pair these readers before you can set them up. Readers that sign in with a token do nothing until they are paired: no card taps, no enrolling or resetting cards, no supervision or mass introduction. Once the server asks them to pair (after any firmware update that is due), they show their code like a new reader, and they are not listed anywhere else until they are paired. The reader must be switched on and connected.",
     "resources": "Resources: {{names}}",
     "neverPaired": "Not paired yet",
     "pairingRemoved": "Pairing was removed",
