@@ -35,7 +35,9 @@ The `*-park` variants (`attractap-touch-park`, `attractap-touch-v2-park`,
 `attractap-lite-ethernet-park`) build `park/` instead of the reader app: the
 [hardware lab](../../attractap-lab/README.md) janitor flashes them between lab sessions to
 turn off the screen, LEDs, beeper and NFC while keeping USB-Serial-JTAG
-available. They set `set(ATTRACTAP_RELEASE OFF)`, so release builds skip
+available. `attractap-touch-v2-secure-lab-park` is the Touch V2 parking image
+with the lab secure profile, for device-lab secure readers (ATT-1166). They set
+`set(ATTRACTAP_RELEASE OFF)`, so release builds skip
 them even if listed; any variant can use that tag to stay out of releases. The firmware version
 lives in `version.txt` — bump it whenever firmware source changes (CI enforces
 this).
@@ -282,7 +284,10 @@ into `build/<variant>/`, and writes `firmware_output/` containing per variant:
 - `firmwares.json` — manifest consumed by the Attraccess API/frontend
 
 Build the lab-only parking images (no manifest, not part of a release) into
-`firmware_output_lab/<name>.bin`, one merged image per hardware family:
+`firmware_output_lab/<name>.bin`, one merged image per hardware family.
+Variants that set `ATTRACTAP_SECURE_LAB "true"` are signed with the public lab
+key instead and written as `firmware_output_lab/<name>.hex` (Intel HEX, for
+`esptool write-flash --encrypt` on a lab secure reader):
 
 ```bash
 python3 build_firmwares.py --lab  # or: pnpm nx run attractap-firmware:build-lab

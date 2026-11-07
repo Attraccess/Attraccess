@@ -52,3 +52,10 @@ Known lab secure readers:
 | Reader | USB serial | Provisioned | Lab place |
 | ------ | ---------- | ----------- | --------- |
 | Touch V2 (cracked display glass) | `DC:B4:D9:21:71:C8` | 2026-10-30 | `attractap-touch-v2-secure-1` |
+
+In a lab place, tag the reader `profile=secure-lab` and give its `variant` tag
+a janitor image built from `variants/attractap-touch-v2-secure-lab-park.cmake`
+(`attractap_touch_v2_secure_lab_park.hex`). The lab janitor then parks it
+between sessions with that image, signed with the lab key and written encrypted
+(see the hardware lab README, "Reader parking"). Without an image for its
+`variant` tag, the janitor leaves the place alone.
