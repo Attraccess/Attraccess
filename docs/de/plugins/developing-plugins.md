@@ -157,8 +157,8 @@ nennt.
 | `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen. |
 | `ACCESS_MQTT_SERVERS` | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen. |
 | `READER_UI` | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
-| `ACCESS_HOOKS` | `preStartHook` und `sessionEndHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
-| `SEND_NOTIFICATIONS` | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden. Siehe [Benachrichtigungen](#benachrichtigungen). |
+| `ACCESS_HOOKS` | `preStartHook`, `sessionEndHook` und `startBlockedQuery` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
+| `SEND_NOTIFICATIONS` | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen). |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
 keine Berechtigung. Dasselbe gilt für `context.hostVersion`: die Version des
@@ -198,6 +198,7 @@ siehe [Reader-Anzeige](attractap/reader-ui.md).
 | Slot-Widgets                   | `readerUi` (Provider oder `(context) => provider`)        | `READER_UI`    |
 | Pre-Start-Hook                 | `preStartHook`                                            | `ACCESS_HOOKS` |
 | Beratende Frage nach dem Stopp | `sessionEndHook`                                          | `ACCESS_HOOKS` |
+| Start-blockiert-Zustand        | `startBlockedQuery` und `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS` |
 | Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })` | `READER_UI`    |
 
 Ein Plugin, das `readerUi` oder einen Hook ohne die passende Berechtigung deklariert, **wird nicht geladen** und
@@ -316,6 +317,46 @@ Ein Vertrag für Reader, Web-UI, API-Clients und die Supervision-Freigabe. Ein H
   `allow-with-warning` (startet ohne Bestätigung). `PluginConfirmation.noScreenPolicy` setzt Ihren Standard;
   Admins können ihn pro Ressource überschreiben.
 
+### Start-blockiert-Zustand
+
+`preStartHook` antwortet nur, wenn jemand auf Start drückt. Damit die Ressourcenseite den Grund **anstelle des
+Start-Knopfs** anzeigen kann, deklariert ein Plugin zusätzlich das abfrageseitige Gegenstück `startBlockedQuery`:
+
+```ts
+const startBlockedQuery: StartBlockedQuery = async (ctx) => {
+  const until = await endOfRunningBooking(ctx.resourceId, ctx.userId); // eigene Abfrage
+  if (!until) return null; // nichts blockiert
+  const de = ctx.language === 'de';
+  return {
+    reason: {
+      code: 'RESERVED',
+      title: de ? 'Reserviert' : 'Reserved',
+      body: de ? 'Von einer anderen Person reserviert.' : 'Reserved by another user.',
+    },
+    until, // optionales Date: die Oberfläche zeigt es an und aktualisiert sich dann selbst
+  };
+};
+```
+
+- **Gleiche Form wie ein Block.** `reason` ist das `{ code, title, body }` eines `preStartHook`-Blocks mit denselben
+  Grenzen und reservierten Codes; `until` ist optional. `null` bedeutet „nicht blockiert“.
+- **Nur zur Information.** Der Server führt für jeden Start weiterhin `preStartHook` aus, der Hook muss also weiter
+  blockieren; ein Start, der doch durchkommt, oder eine veraltete Seite endet im üblichen Fehler-Hinweis. Reader
+  nutzen weiterhin nur den Hook.
+- **Datenschutz liegt bei Ihnen.** Die Abfrage läuft für die Person, die die Seite ansieht (`ctx.userId`). Der Grund
+  wird ihr wörtlich angezeigt; wenden Sie also Ihre eigenen Sichtbarkeitsregeln an und nennen Sie niemanden, den die
+  Person nicht sehen darf. Das Reservierungs-Plugin nennt Nicht-Verwaltenden nie die buchende Person und liefert für
+  Verwaltende nichts, die über eine Override-Bestätigung starten.
+- **Günstig halten.** Sie läuft, solange eine Ressourcenseite mit Start-Knopf offen ist (etwa alle 30 Sekunden pro
+  Seite, dazu bei jedem Invalidieren). Es gilt das Hook-Timeout; Timeout, Fehler oder eine ungültige Antwort zählen als
+  „nicht blockiert“ und öffnen nie den Circuit Breaker des Pre-Start-Hooks.
+- **Live.** Rufen Sie `context.startBlocked.invalidate({ resourceId })` auf, wenn sich etwas ändert, das die Antwort
+  bestimmt (Buchung angelegt, storniert, begonnen oder beendet). Der Host sendet ein Live-Ereignis
+  `resource.start_blocked_changed`, und offene Seiten fragen sofort neu. Wer die Ressource nicht live verfolgen darf,
+  aktualisiert weiterhin per Polling und zum Zeitpunkt `until`.
+- Die HTTP-Seite ist `GET /api/resources/:resourceId/usage/start-blocked` und antwortet für die angemeldete Person mit
+  `{ blocked, reason?, until?, plugin? }`.
+
 ### Frage nach dem Stopp
 
 `sessionEndHook` läuft nach dem Ende einer Sitzung und kann `{ decision: 'choose', choice }` mit bis zu 4
@@ -431,7 +472,8 @@ async function notify(context: PluginContext, userId: number) {
     url: '/reservations/12', // relativ zur Anwendungs-URL
     severity: 'info', // oder 'warning'
     dedupeKey: 'reservations:reminder:12', // fasst wiederholte Push-Nachrichten zusammen
-    email: { subject: 'Buchungserinnerung', text: 'Buchung #12 beginnt um 14:00.' }, // html ist optional
+    // eine vom Plugin deklarierte E-Mail-Vorlage, siehe E-Mail-Vorlagen unten
+    email: { template: 'reminder', variables: { booking: { id: 12, start: '14:00' } } },
   });
 }
 ```
@@ -442,10 +484,78 @@ async function notify(context: PluginContext, userId: number) {
   Plugin Kategorien ohne `SEND_NOTIFICATIONS`, wird es beim Laden unter Quarantäne gestellt.
 - Unbekannte Benutzer-IDs werden übersprungen, Duplikate zusammengefasst. Eine E-Mail wird nur gesendet, wenn `email`
   gesetzt ist und die Einstellungen der Person E-Mail für die Kategorie erlauben. Der Host rendert sie im globalen
-  E-Mail-Layout; `html` ist ein vertrauenswürdiges Fragment, ohne `html` wird `text` (maskiert) verwendet.
+  E-Mail-Layout. Bevorzugen Sie eine [E-Mail-Vorlage](#e-mail-vorlagen): Admins können sie bearbeiten. Rohinhalt
+  (`email: { subject, text, html? }`) bleibt für Mails möglich, die nicht bearbeitbar sein sollen; `html` ist ein
+  vertrauenswürdiges Fragment, ohne `html` wird `text` (maskiert) verwendet.
 - Das Senden ist nicht transaktional: Schlägt es fehl, entscheidet das Plugin, ob es wiederholt. Das
   Reservierungs-Plugin beansprucht zuerst ein „gesendet“-Flag und wiederholt nie, seine Mitteilungen gehen also
   höchstens einmal raus.
+
+### E-Mail-Vorlagen
+
+Mails eines Plugins sollen wie die Mails des Systems bearbeitbar sein. Ein Plugin deklariert seine Vorlagen am
+Backend-Modul, und der Host speichert, listet und rendert sie mit demselben Mechanismus wie die Kernvorlagen: globales
+Layout, Übersetzungen pro Sprache, der Editor unter **Einstellungen → E-Mail → Vorlagen** und der Helfer
+`{{t "key" "default"}}`. Das Deklarieren von Vorlagen erfordert `SEND_NOTIFICATIONS`; ohne diese Berechtigung wird das
+Plugin beim Laden unter Quarantäne gestellt.
+
+```ts
+const plugin: PluginBackendModule = {
+  notificationCategories: [{ id: 'reminders', label: { en: 'Reminders', de: 'Erinnerungen' } }],
+  emailTemplates: [
+    {
+      id: 'reminder', // kurze ID; der gespeicherte Schlüssel ist plugin.<Pluginname>.reminder
+      label: { en: 'Booking reminder', de: 'Buchungserinnerung' }, // Name in der Vorlagenliste
+      variables: ['booking.id', 'booking.start'], // im Editor unter „Variablen“ angeboten
+      subject: '{{t "subject" "Reminder: booking {id}" id=booking.id}}',
+      body: `<mj-section><mj-column>
+  <mj-text>{{t "greeting" "Hello {name}," name=user.username}}</mj-text>
+  <mj-text>{{t "body" "Your booking starts at {start}." start=booking.start}}</mj-text>
+  <mj-button href="{{host.frontend}}/reservations/{{booking.id}}">{{t "open" "Open booking"}}</mj-button>
+</mj-column></mj-section>`,
+      translations: {
+        de: {
+          subject: 'Erinnerung: Buchung {id}',
+          greeting: 'Hallo {name},',
+          body: 'Ihre Buchung beginnt um {start}.',
+          open: 'Buchung öffnen',
+        },
+      },
+    },
+  ],
+  register: (context) => ({ module: MyPluginModule }),
+};
+
+await context.notifications.dispatch({
+  category: 'reminders',
+  recipients: [userId],
+  title: 'Ihre Buchung beginnt bald',
+  body: 'Buchung #12 beginnt um 14:00.',
+  email: { template: 'reminder', variables: { booking: { id: 12, start: '14:00' } } },
+});
+```
+
+- **Deklaration.** `subject` ist ein Handlebars-String (meist ein `t`-Aufruf), `body` ein MJML-**Fragment** ohne
+  `<mjml>`-Wurzel, das der Host in das globale Layout setzt. Die englischen Texte sind die Standardwerte der
+  `t`-Aufrufe; `translations.de` ist Pflicht und muss jeden `t`-Schlüssel enthalten (sonst wird das Plugin unter
+  Quarantäne gestellt). Weitere Sprachen können neben `de` stehen. IDs bestehen aus Kleinbuchstaben, Ziffern, `-` und
+  `_` und sind im Plugin eindeutig.
+- **Variablen.** `user.*`, `host.*` und `url` sind immer vorhanden; Ihr `variables`-Objekt wird daneben gelegt und kann
+  sie nie ersetzen. Werte werden vom `t`-Helfer und von `{{ }}` HTML-maskiert. Listen Sie unter `variables` alle
+  Variablen auf, die der Editor anbieten soll. Die Sprache bestimmt das Profil der empfangenden Person, nie das Plugin.
+- **Speichern und Upgrades.** Der Host speichert eine deklarierte Vorlage, sobald sie gebraucht wird (beim Start und
+  beim Laden des Plugins). Das ist idempotent: Eine installierte Vorlage wird **nie überschrieben**, Änderungen von
+  Betreff, Text und Übersetzungen durch Admins überstehen also Plugin-Upgrades. Nur die Variablenliste folgt der
+  Deklaration, und mitgelieferte Übersetzungsschlüssel, die einer Installation fehlen, werden ergänzt. **Auf
+  Standard zurücksetzen** im Editor stellt die deklarierte Fassung wieder her. Vorlagen eines deaktivierten oder
+  deinstallierten Plugins bleiben gespeichert, werden aber weder gelistet noch gesendet.
+- **Admin-Oberfläche.** Plugin-Vorlagen stehen in derselben Vorlagenliste wie die Kernvorlagen, danach, nach Plugin
+  gruppiert und mit dem Namen des Plugins gekennzeichnet; Editor, Übersetzungsdialog und Zurücksetzen funktionieren
+  gleich.
+- **Senden.** `email: { template, variables }` läuft über `notifications.dispatch`, die Einstellungen jeder Person für
+  die Kategorie gelten also. Eine nicht deklarierte Vorlage zu senden wird abgelehnt. Ein ungültiger MJML-Text wird
+  protokolliert und die Vorlage nicht registriert, die übrigen Vorlagen des Plugins funktionieren weiter. Die
+  Anwendungs-URL muss konfiguriert sein (wie bei jeder Kern-Mail).
 
 ### Ressourcen-Zugriff (Abfragen)
 
