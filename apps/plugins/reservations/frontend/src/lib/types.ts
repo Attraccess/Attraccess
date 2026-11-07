@@ -89,6 +89,7 @@ export interface ResourceSettings {
   checkInGraceMinutes: number;
   earlyCheckInMinutes: number;
   handoverReminderMinutes: number;
+  showNamesOnReaders: boolean;
   bookableHours: BookableHours;
 }
 

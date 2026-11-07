@@ -1,5 +1,5 @@
 import { Button, LabeledSwitch, StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
-import { Fieldset, Spinner } from '@heroui/react';
+import { Description, Fieldset, Spinner } from '@heroui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { ReservationsApiError, getFutureBookingsCount, getResourceSettings, updateResourceSettings } from '../api';
@@ -159,6 +159,16 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
         <LabeledSwitch isSelected={values.checkInEnabled} onChange={(value) => set('checkInEnabled', value)}>
           {t('settings.checkInEnabled')}
         </LabeledSwitch>
+        <div className="rv:flex rv:flex-col rv:gap-1">
+          <LabeledSwitch
+            isSelected={values.showNamesOnReaders}
+            onChange={(value) => set('showNamesOnReaders', value)}
+            data-cy="reservations-setting-showNamesOnReaders"
+          >
+            {t('settings.showNamesOnReaders')}
+          </LabeledSwitch>
+          <Description>{t('settings.showNamesOnReadersHint')}</Description>
+        </div>
       </div>
       {NUMBER_GROUPS.map((group) => (
         <Fieldset key={group.title} className="rv:min-w-0">

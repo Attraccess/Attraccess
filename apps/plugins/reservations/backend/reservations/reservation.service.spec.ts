@@ -629,4 +629,70 @@ describe('ReservationService', () => {
       expect((await book()).status).toBe('confirmed');
     });
   });
+
+  describe('reader slot invalidation', () => {
+    const readers = () => h.invalidateReaderUi.mock.calls.map(([scope]) => scope);
+
+    it('refreshes readers for every change they can see, by resource id only', async () => {
+      await h.enable(1);
+      const first = await book(alice, [8, 9]);
+      expect(readers()).toEqual([{ resourceId: 1 }]);
+      h.setNow('2026-06-02T08:30:00Z');
+      await h.reservations.markCheckedIn(first.id, 7, h.clock());
+      expect(readers()).toHaveLength(2);
+      await h.reservations.markCheckedIn(first.id, 7, h.clock()); // already checked in: nothing changed
+      expect(readers()).toHaveLength(2);
+      await h.reservations.keep(alice, first.id);
+      expect(readers()).toHaveLength(3);
+      await h.reservations.endEarly(alice, first.id);
+      expect(readers()).toHaveLength(4);
+      const second = await book(bob, [12, 13]);
+      await h.reservations.cancel(bob, second.id);
+      expect(readers()).toHaveLength(6);
+      expect(readers().every((scope) => Object.keys(scope).join() === 'resourceId')).toBe(true);
+    });
+
+    it('covers approval, rejection and the scheduler transitions', async () => {
+      await h.enable(1, { approvalRequired: true });
+      const pending = await book(alice, [8, 9]);
+      expect(readers()).toEqual([]); // an unconfirmed booking changes nothing on a reader
+      await h.reservations.approve(manager, pending.id);
+      expect(readers()).toHaveLength(1);
+      const other = await book(bob, [10, 11]);
+      await h.reservations.reject(manager, other.id);
+      expect(readers()).toHaveLength(2);
+      const third = await book(bob, [12, 13]);
+      await h.reservations.markExpired(third.id);
+      expect(readers()).toHaveLength(3);
+      await h.reservations.markNoShow(pending.id);
+      expect(readers()).toHaveLength(4);
+    });
+
+    it('covers settings changes, disabling with cancellation, and a timezone change', async () => {
+      await h.enable(1);
+      h.invalidateReaderUi.mockClear();
+      await h.admin.update(manager, 1, { confirmWindowMinutes: 30 });
+      expect(readers()).toEqual([{ resourceId: 1 }]);
+      await h.admin.update(manager, 1, { confirmWindowMinutes: 30 }); // unchanged
+      expect(readers()).toHaveLength(1);
+      await h.admin.update(manager, 1, { showNamesOnReaders: true });
+      expect(readers()).toHaveLength(2);
+      await h.admin.update(manager, 1, { enabled: false });
+      expect(readers()).toHaveLength(3);
+      await h.enable(1);
+      h.invalidateReaderUi.mockClear();
+      await h.admin.setTimezone(manager, 'UTC');
+      expect(readers()).toEqual([{ resourceId: 1 }]);
+      await h.admin.setTimezone(manager, 'UTC');
+      expect(readers()).toHaveLength(1);
+    });
+
+    it('never fails the change when the readers cannot be told (no READER_UI permission)', async () => {
+      await h.enable(1);
+      h.invalidateReaderUi.mockImplementation(() => {
+        throw new Error('missing READER_UI permission');
+      });
+      expect((await book()).status).toBe('confirmed');
+    });
+  });
 });

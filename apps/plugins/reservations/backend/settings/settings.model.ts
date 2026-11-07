@@ -24,6 +24,8 @@ export interface ResourceSettings {
   checkInGraceMinutes: number;
   earlyCheckInMinutes: number;
   handoverReminderMinutes: number;
+  /** Signed-in card users see holder names on Attractap readers (never on a signed-out reader). */
+  showNamesOnReaders: boolean;
   bookableHours: BookableHours;
 }
 
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: ResourceSettingsValues = {
   checkInGraceMinutes: 15,
   earlyCheckInMinutes: 15,
   handoverReminderMinutes: 15,
+  showNamesOnReaders: false,
   bookableHours: {},
 };
 
@@ -101,7 +104,7 @@ export function validateSettings(values: ResourceSettingsValues): SettingsFieldE
   if (!(WHO_CAN_BOOK as readonly string[]).includes(values.whoCanBook)) {
     errors.push({ field: 'whoCanBook', message: `must be one of ${WHO_CAN_BOOK.join(', ')}` });
   }
-  for (const flag of ['enabled', 'approvalRequired', 'checkInEnabled'] as const) {
+  for (const flag of ['enabled', 'approvalRequired', 'checkInEnabled', 'showNamesOnReaders'] as const) {
     if (typeof values[flag] !== 'boolean') errors.push({ field: flag, message: 'must be a boolean' });
   }
   errors.push(...validateBookableHours(values.bookableHours));
