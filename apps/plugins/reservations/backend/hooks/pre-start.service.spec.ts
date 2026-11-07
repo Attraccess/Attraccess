@@ -1,12 +1,12 @@
 import { READER_UI_LIMITS, type PreStartContext } from '@attraccess/plugins-backend-sdk';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
-import { Part2, createPart2 } from '../testing/part2.test-utils';
+import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
 import { PreStartService, overrideStepKey, reservationStepKey } from './pre-start.service';
 
 describe('PreStartService', () => {
   let h: Harness;
-  let p: Part2;
+  let p: BackgroundServices;
 
   const ctx = (userId: number, patch: Partial<PreStartContext> = {}): PreStartContext => ({
     resourceId: 1,
@@ -21,7 +21,7 @@ describe('PreStartService', () => {
 
   beforeEach(async () => {
     h = await createHarness();
-    p = createPart2(h);
+    p = createBackgroundServices(h);
     await h.enable(1, { confirmWindowMinutes: 60 });
     await h.settings.warmUp();
     h.makeManager(99, 1);
@@ -38,19 +38,21 @@ describe('PreStartService', () => {
     expect(isManager).not.toHaveBeenCalled();
   });
 
-  it('answers disabled resources in microseconds (perf sanity)', async () => {
+  it('answers disabled resources from memory on every call (perf sanity)', async () => {
+    const getRepository = jest.spyOn(h.dataSource, 'getRepository');
     const started = process.hrtime.bigint();
     for (let i = 0; i < 5000; i += 1) await p.preStart.evaluate(ctx(10, { resourceId: 2 }));
     const perCallMs = Number(process.hrtime.bigint() - started) / 1e6 / 5000;
-    expect(perCallMs).toBeLessThan(0.5);
+    expect(getRepository).not.toHaveBeenCalled();
+    // Generous bound: the call count above is the real guarantee; this only catches pathological slowness
+    // (coverage instrumentation and loaded CI hosts are far below it).
+    expect(perCallMs).toBeLessThan(20);
   });
 
   it('uses exactly one indexed query for an enabled resource without conflicts', async () => {
     const query = jest.spyOn(h.store, 'findConfirmedOverlapping');
     const isManager = jest.spyOn(h.access, 'isManager');
-    const started = Date.now();
     expect(await p.preStart.evaluate(ctx(10))).toEqual({ decision: 'allow' });
-    expect(Date.now() - started).toBeLessThan(300);
     expect(query).toHaveBeenCalledTimes(1);
     expect(isManager).not.toHaveBeenCalled();
   });
@@ -187,6 +189,59 @@ describe('PreStartService', () => {
       const isManager = jest.spyOn(h.access, 'isManager');
       await p.preStart.evaluate(ctx(10));
       expect(isManager).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('several bookings of other users', () => {
+    const insert = (userId: number, start: string, end: string) =>
+      h.dataSource.getRepository(ReservationEntity).save(
+        Object.assign(new ReservationEntity(), {
+          resourceId: 1,
+          userId,
+          startTime: new Date(`${start}Z`),
+          endTime: new Date(`${end}Z`),
+          bufferBeforeMinutes: 0,
+          bufferAfterMinutes: 0,
+          status: 'confirmed',
+          createdAt: h.clock(),
+        }),
+      );
+
+    it('asks about each upcoming booking in the window in turn', async () => {
+      const a = await p.book(11, 1, '2026-06-01T11:30:00', '2026-06-01T11:45:00');
+      const b = await p.book(12, 1, '2026-06-01T12:00:00', '2026-06-01T13:00:00');
+      h.setNow('2026-06-01T11:10:00Z');
+      expect(await p.preStart.evaluate(ctx(10))).toMatchObject({
+        decision: 'confirm',
+        confirmation: { stepKey: reservationStepKey(a.id), body: expect.stringContaining('from 13:30') },
+      });
+      expect(await p.preStart.evaluate(ctx(10, { confirmedStepKeys: [reservationStepKey(a.id)] }))).toMatchObject({
+        decision: 'confirm',
+        confirmation: { stepKey: reservationStepKey(b.id), body: expect.stringContaining('from 14:00') },
+      });
+      const both = [reservationStepKey(a.id), reservationStepKey(b.id)];
+      expect(await p.preStart.evaluate(ctx(10, { confirmedStepKeys: both }))).toEqual({ decision: 'allow' });
+    });
+
+    it('asks a manager about every running booking, then about the next upcoming one', async () => {
+      const first = await insert(11, '2026-06-01T12:00:00', '2026-06-01T13:00:00');
+      const second = await insert(12, '2026-06-01T12:10:00', '2026-06-01T12:45:00');
+      const next = await p.book(13, 1, '2026-06-01T13:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T12:30:00Z');
+      const keys: string[] = [];
+      const asked: string[] = [];
+      for (;;) {
+        const result = await p.preStart.evaluate(ctx(99, { confirmedStepKeys: keys }));
+        if (result.decision !== 'confirm') {
+          expect(result).toEqual({ decision: 'allow' });
+          break;
+        }
+        asked.push(result.confirmation.stepKey);
+        keys.push(result.confirmation.stepKey);
+      }
+      expect(asked).toEqual([overrideStepKey(first.id), overrideStepKey(second.id), reservationStepKey(next.id)]);
+      // non-managers stay blocked whatever they send
+      expect(await p.preStart.evaluate(ctx(10, { confirmedStepKeys: keys }))).toMatchObject({ decision: 'block' });
     });
   });
 

@@ -1,11 +1,11 @@
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
-import { Part2, createPart2 } from '../testing/part2.test-utils';
+import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
 import { READER_UI_LIMITS, type SessionEndContext } from '@attraccess/plugins-backend-sdk';
 
 describe('SessionEndService', () => {
   let h: Harness;
-  let p: Part2;
+  let p: BackgroundServices;
 
   const ctx = (userId: number, patch: Partial<SessionEndContext> = {}): SessionEndContext => ({
     resourceId: 1,
@@ -19,7 +19,7 @@ describe('SessionEndService', () => {
 
   beforeEach(async () => {
     h = await createHarness();
-    p = createPart2(h);
+    p = createBackgroundServices(h);
     await h.enable(1);
     await h.settings.warmUp();
     await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');

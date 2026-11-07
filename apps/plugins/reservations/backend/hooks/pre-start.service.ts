@@ -8,10 +8,10 @@ import { DirectoryService } from '../reservations/directory.service';
 import { ReservationStore } from '../reservations/reservation.store';
 import { GlobalSettingsService } from '../settings/global-settings.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
+import { hookDeadline, waitUntil } from './runtime';
 
 const ALLOW: PreStartResult = Object.freeze({ decision: 'allow' }) as PreStartResult;
 const MINUTE_MS = 60_000;
-export const WARM_BUDGET_MS = 700;
 
 export const reservationStepKey = (id: number) => `reservation-${id}`;
 export const overrideStepKey = (id: number) => `override-${id}`;
@@ -22,7 +22,8 @@ export const overrideStepKey = (id: number) => `override-${id}`;
  * - enabled resources cost exactly one indexed query (confirmed bookings overlapping [now, now + window]);
  * - permission checks and name lookups only run when a conflicting booking of someone else exists.
  * Only confirmed bookings of OTHER users count; pending, cancelled, no-show, expired and ended-early
- * (completed) bookings never block or ask.
+ * (completed) bookings never block or ask. Every booking that applies is asked about in turn: a
+ * confirmation only covers its own step key, so the next unconfirmed booking is asked on the retry.
  */
 @Injectable()
 export class PreStartService {
@@ -35,21 +36,14 @@ export class PreStartService {
     @Inject(RESERVATION_CLOCK) private readonly clock: Clock,
   ) {}
 
-  /** Before the cache is warm a resource may still be enabled: wait briefly, never wrongly allow. */
-  private async awaitWarmCache(): Promise<void> {
-    let timer: NodeJS.Timeout | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error('Reservation settings are not loaded yet')), WARM_BUDGET_MS);
-    });
-    try {
-      await Promise.race([this.settings.whenReady(), timeout]);
-    } finally {
-      clearTimeout(timer);
+  /**
+   * `deadline` (epoch ms) bounds the wait for a cold settings cache: before it is warm a resource may
+   * still be enabled, so never wrongly allow; past the deadline this throws and the host policy applies.
+   */
+  async evaluate(ctx: PreStartContext, deadline = hookDeadline()): Promise<PreStartResult> {
+    if (!this.settings.isWarm) {
+      await waitUntil(this.settings.whenReady(), deadline, 'Reservation settings are not loaded yet');
     }
-  }
-
-  async evaluate(ctx: PreStartContext): Promise<PreStartResult> {
-    if (!this.settings.isWarm) await this.awaitWarmCache();
     const settings = this.settings.getCachedSettings(ctx.resourceId);
     if (!settings.enabled) return ALLOW;
 
@@ -62,11 +56,17 @@ export class PreStartService {
     if (others.length === 0) return ALLOW;
 
     const nowMs = now.getTime();
-    const active = others.find((r) => r.startTime.getTime() <= nowMs);
-    if (active) return this.whenActive(ctx, active);
+    const active = others.filter((r) => r.startTime.getTime() <= nowMs);
+    if (active.length > 0) {
+      const verdict = await this.whenActive(ctx, active);
+      if (verdict) return verdict;
+    }
 
-    const upcoming = others[0]; // ordered by start: the next one
-    if (ctx.confirmedStepKeys.includes(reservationStepKey(upcoming.id))) return ALLOW;
+    // Ordered by start: the next booking not confirmed yet.
+    const upcoming = others.find(
+      (r) => r.startTime.getTime() > nowMs && !ctx.confirmedStepKeys.includes(reservationStepKey(r.id)),
+    );
+    if (!upcoming) return ALLOW;
     const timeZone = await this.globalSettings.getTimezone();
     const { language: lang } = ctx;
     const minutes = Math.max(1, Math.ceil((upcoming.startTime.getTime() - nowMs) / MINUTE_MS));
@@ -90,12 +90,16 @@ export class PreStartService {
     };
   }
 
-  private async whenActive(ctx: PreStartContext, active: ReservationEntity): Promise<PreStartResult> {
+  /** Block for non-managers; for managers the next unconfirmed override, or null when all are confirmed. */
+  private async whenActive(ctx: PreStartContext, active: ReservationEntity[]): Promise<PreStartResult | null> {
     const { language: lang } = ctx;
     const isManager = await this.access.isManager(ctx.userId, ctx.resourceId);
-    if (isManager && ctx.confirmedStepKeys.includes(overrideStepKey(active.id))) return ALLOW;
+    const unconfirmed = isManager
+      ? active.find((r) => !ctx.confirmedStepKeys.includes(overrideStepKey(r.id)))
+      : active[0];
+    if (!unconfirmed) return null;
     const timeZone = await this.globalSettings.getTimezone();
-    const until = formatTime(active.endTime, { lang, timeZone });
+    const until = formatTime(unconfirmed.endTime, { lang, timeZone });
     if (!isManager) {
       return {
         decision: 'block',
@@ -112,12 +116,12 @@ export class PreStartService {
       };
     }
     const name =
-      (await this.directory.getUserNames([active.userId])).get(active.userId) ??
+      (await this.directory.getUserNames([unconfirmed.userId])).get(unconfirmed.userId) ??
       pick(lang, 'another user', 'einer anderen Person');
     return {
       decision: 'confirm',
       confirmation: {
-        stepKey: overrideStepKey(active.id),
+        stepKey: overrideStepKey(unconfirmed.id),
         title: pick(lang, 'Reserved', 'Reserviert'),
         body: pick(
           lang,

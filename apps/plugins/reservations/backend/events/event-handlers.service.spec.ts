@@ -1,13 +1,13 @@
-import { SystemEvent } from '@attraccess/plugins-backend-sdk';
+import { type ResourceHealthChangedPayload, SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { PendingDecisionService } from '../hooks/pending-decision.service';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { ReservationQueryService } from '../reservations/reservation-query.service';
 import { Harness, createHarness } from '../testing/harness.test-utils';
-import { Part2, createPart2 } from '../testing/part2.test-utils';
+import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
 
 describe('ReservationEventHandlers', () => {
   let h: Harness;
-  let p: Part2;
+  let p: BackgroundServices;
 
   type Dispatched = { category: string; recipients: number[]; body: string; dedupeKey: string };
   const sent = (prefix: string): Dispatched[] =>
@@ -25,7 +25,7 @@ describe('ReservationEventHandlers', () => {
 
   beforeEach(async () => {
     h = await createHarness();
-    p = createPart2(h);
+    p = createBackgroundServices(h);
     await h.enable(1);
     await h.settings.warmUp();
     h.makeManager(99, 1);
@@ -69,6 +69,15 @@ describe('ReservationEventHandlers', () => {
       expect((await row(booking.id)).checkedInUsageId).toBe(3);
     });
 
+    it('does not check in at or after the end of the booking', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T08:30:00', '2026-06-01T09:00:00');
+      h.setNow('2026-06-01T09:00:00Z');
+      await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_STARTED, started(10, 5));
+      h.setNow('2026-06-01T09:30:00Z');
+      await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_STARTED, started(10, 6));
+      expect((await row(booking.id)).checkedInAt).toBeNull();
+    });
+
     it('counts a supervised start when the holder is the requester, and takeovers for the new user', async () => {
       const first = await p.book(10, 1, '2026-06-01T08:00:00', '2026-06-01T09:00:00');
       await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_STARTED, started(10, 7, 77));
@@ -85,6 +94,42 @@ describe('ReservationEventHandlers', () => {
         previousUserId: 10,
       });
       expect((await row(second.id)).checkedInUsageId).toBe(8);
+    });
+
+    it('checks in with a session that started before the window and ended inside the booking', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T09:00:00', '2026-06-01T10:00:00');
+      const other = await p.book(11, 1, '2026-06-01T10:00:00', '2026-06-01T11:00:00');
+      h.setNow('2026-06-01T09:05:00Z');
+      const ended = (userId: number, usageId: number, startTime: string) => ({
+        resourceId: 1,
+        usageId,
+        userId,
+        startTime: new Date(startTime),
+        endTime: h.clock(),
+        reason: 'ended' as const,
+      });
+      await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_ENDED, ended(10, 31, '2026-06-01T08:00:00Z'));
+      await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_ENDED, ended(11, 32, '2026-06-01T08:00:00Z'));
+      expect(await row(booking.id)).toMatchObject({
+        checkedInAt: new Date('2026-06-01T09:00:00Z'),
+        checkedInUsageId: 31,
+      });
+      // Another user's booking, and a session that never reached the booking, do not count.
+      expect((await row(other.id)).checkedInAt).toBeNull();
+    });
+
+    it('does not check in with a session that ended before the booking started', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T09:00:00', '2026-06-01T10:00:00');
+      h.setNow('2026-06-01T08:50:00Z');
+      await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_ENDED, {
+        resourceId: 1,
+        usageId: 33,
+        userId: 10,
+        startTime: new Date('2026-06-01T08:00:00Z'),
+        endTime: h.clock(),
+        reason: 'ended',
+      });
+      expect((await row(booking.id)).checkedInAt).toBeNull();
     });
 
     it('ignores resources without reservations', async () => {
@@ -104,8 +149,8 @@ describe('ReservationEventHandlers', () => {
       await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_STARTED, started(99, 200));
       await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_STARTED, started(99, 200));
       expect(
-        h.audit.record.mock.calls.filter(
-          ([call]) => (call as { action: string }).action === 'reservations.override_start',
+        (h.audit.record.mock.calls as unknown as [{ action: string }][]).filter(
+          ([call]) => call.action === 'reservations.override_start',
         ),
       ).toHaveLength(1);
       expect(h.audit.record).toHaveBeenCalledWith(
@@ -246,13 +291,14 @@ describe('ReservationEventHandlers', () => {
       status: 'healthy' | 'unhealthy',
       previousStatus: 'healthy' | 'unhealthy' | null,
       identifier = 'mqtt',
-    ) => ({
-      resourceId: 1,
-      status,
-      previousStatus,
-      reason: status === 'unhealthy' ? 'Door sensor offline' : null,
-      identifier,
-    });
+    ) =>
+      ({
+        resourceId: 1,
+        status,
+        previousStatus,
+        reason: status === 'unhealthy' ? 'Door sensor offline' : null,
+        identifier,
+      }) as unknown as ResourceHealthChangedPayload;
 
     it('notifies holders of active bookings and bookings starting within 24h, then tells the same holders on recovery', async () => {
       h.setNow('2026-06-01T06:00:00Z');

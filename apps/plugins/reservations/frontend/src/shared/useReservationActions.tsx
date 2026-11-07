@@ -84,7 +84,8 @@ export function useReservationActions(options: { timezone?: string | null; onDon
             </p>
             {reasonAllowed(pending) && (
               <TextField value={reason} onChange={setReason}>
-                <Label>{t('actions.reasonLabel')}</Label>
+                {/* Mails show an approval's text as a comment; everything else is a reason. */}
+                <Label>{t(pending.action === 'approve' ? 'actions.commentLabel' : 'actions.reasonLabel')}</Label>
                 <TextArea maxLength={500} rows={2} />
               </TextField>
             )}

@@ -39,9 +39,10 @@ describe('ResourceSettingsForm', () => {
       'GET /resources/3/settings': () => ({ status: 403, body: { code: 'FORBIDDEN', message: 'no' } }),
     });
     const { container } = renderWithProviders(<ResourceSettingsForm resourceId={3} />);
-    await waitFor(() => expect(calls).toHaveLength(1));
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(container).toBeEmptyDOMElement();
+    // While the request runs a spinner shows; once the 403 has settled nothing is left.
+    expect(container.querySelector('[data-cy="reservations-settings-loading"]')).toBeInTheDocument();
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(calls).toHaveLength(1);
   });
 
   it('warns with the booking count before disabling and then saves with cancelFutureBookings', async () => {
@@ -88,7 +89,9 @@ describe('ResourceSettingsForm', () => {
     await user.click(adds[0]);
     expect(screen.getByDisplayValue('09:00')).toBeInTheDocument();
     expect(screen.getByDisplayValue('17:00')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Remove range' }));
+    expect(screen.getByRole('textbox', { name: 'From (Monday, range 1)' })).toHaveValue('09:00');
+    expect(screen.getByRole('textbox', { name: 'Until (Monday, range 1)' })).toHaveValue('17:00');
+    await user.click(screen.getByRole('button', { name: 'Remove range 1 on Monday' }));
     expect(screen.queryByDisplayValue('09:00')).not.toBeInTheDocument();
   });
 

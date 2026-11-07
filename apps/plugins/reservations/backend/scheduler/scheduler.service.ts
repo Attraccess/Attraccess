@@ -12,6 +12,18 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const STILL_NEEDED_LEAD_MS = 48 * HOUR_MS;
 const REMINDER_LEAD_MS = 24 * HOUR_MS;
+/**
+ * The overrun notice is about the moment a booking starts. It is only checked for bookings that started
+ * within the last few ticks, so a running booking does not cost a session lookup every minute until it
+ * ends; the window still covers a missed or delayed tick. A tick that runs later than this (e.g. after a
+ * longer downtime) skips the notice.
+ */
+export const OVERRUN_CHECK_WINDOW_MS = 5 * TICK_INTERVAL_MS;
+/** A no-show found later than this after its deadline (API was down) is recorded without a mail. */
+export const NO_SHOW_NOTICE_WINDOW_MS = 5 * TICK_INTERVAL_MS;
+
+/** When the booking became confirmed: the approval of a request, otherwise its creation. */
+const confirmedAt = (r: ReservationEntity): number => (r.decidedAt ?? r.createdAt).getTime();
 
 /**
  * The plugin's minute loop: expiry, no-show, completion, reminders, handover and overrun notices.
@@ -28,7 +40,8 @@ const REMINDER_LEAD_MS = 24 * HOUR_MS;
  * (`... WHERE flag IS NULL`, proceed only if one row changed) and sends afterwards. A restart or a
  * double tick therefore never sends twice. A send that fails after the claim is NOT retried: for
  * emails at-most-once is preferred over a duplicate. The loop never ends, locks or takes over a
- * session; handover and overrun only notify.
+ * session; handover and overrun only notify. Bookings of resources whose reservations are disabled get
+ * no reminders, handover/overrun notices or no-show release; they only complete or expire.
  */
 @Injectable()
 export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
@@ -99,6 +112,10 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private isEnabled(r: ReservationEntity): boolean {
+    return this.settings.getCachedSettings(r.resourceId).enabled;
+  }
+
   /** Runs `work` for each item; one failing item does not stop the others. */
   private async each(items: ReservationEntity[], work: (item: ReservationEntity) => Promise<void>): Promise<void> {
     for (const item of items) {
@@ -117,14 +134,39 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /**
+   * No-show at start + grace with the CURRENT settings. The deadline is capped at the end, and this step
+   * runs before completion, so a booking whose grace period reaches its end still becomes a no-show.
+   */
   private async markNoShows(now: Date): Promise<void> {
-    await this.each(await this.store.findConfirmedStartedNotEnded(now), async (r) => {
+    await this.each(await this.store.findNoShowCandidates(now), async (r) => {
       const settings = this.settings.getCachedSettings(r.resourceId);
       if (!settings.enabled || !settings.checkInEnabled || r.checkedInAt) return;
-      if (now.getTime() < r.startTime.getTime() + settings.checkInGraceMinutes * MINUTE_MS) return;
+      const deadline = Math.min(r.startTime.getTime() + settings.checkInGraceMinutes * MINUTE_MS, r.endTime.getTime());
+      if (now.getTime() < deadline) return;
+      if (await this.checkInRunningSession(r, now)) return;
       if (!(await this.reservations.markNoShow(r.id))) return;
-      if (await this.store.claimFlag(r.id, 'noShowNotifiedAt', now)) await this.notifications.notifyNoShow(r);
+      // After downtime, a booking whose deadline passed long ago still becomes a no-show, but its "slot
+      // released" mail would only be noise: claim the flag without sending.
+      const late = now.getTime() - deadline > NO_SHOW_NOTICE_WINDOW_MS;
+      if ((await this.store.claimFlag(r.id, 'noShowNotifiedAt', now)) && !late)
+        await this.notifications.notifyNoShow(r);
     });
+  }
+
+  /**
+   * Check-in events only fire when a session starts or is taken over. A holder whose session was already
+   * running when the booking began (started before the early check-in window, or carried over from their
+   * own back-to-back booking) is checked in here, at the no-show deadline, instead of being released.
+   * True when such a session runs (the booking must then not become a no-show).
+   */
+  private async checkInRunningSession(r: ReservationEntity, now: Date): Promise<boolean> {
+    const session = (await this.context.resourceAccess.getActiveSessions(r.resourceId)).find(
+      (candidate) => candidate.userId === r.userId && candidate.startTime.getTime() < r.endTime.getTime(),
+    );
+    if (!session) return false;
+    await this.reservations.markCheckedIn(r.id, session.usageId, now);
+    return true;
   }
 
   private async completeEnded(now: Date): Promise<void> {
@@ -134,24 +176,27 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * 48h: only bookings made at least 48h ahead (otherwise the holder just booked and knows), and only
-   * while the start is still more than 24h away (the 24h reminder takes over after that).
+   * 48h: only bookings confirmed at least 48h ahead (otherwise the holder just booked, or was just
+   * approved, and knows), not when already kept, and only while the start is still more than 24h away
+   * (the 24h reminder takes over after that).
    */
   private async stillNeeded(now: Date): Promise<void> {
     const upcoming = await this.store.findUpcomingConfirmed(now, new Date(now.getTime() + STILL_NEEDED_LEAD_MS));
     await this.each(upcoming, async (r) => {
+      if (!this.isEnabled(r) || r.keptAt) return;
       const start = r.startTime.getTime();
-      if (r.createdAt.getTime() > start - STILL_NEEDED_LEAD_MS) return;
-      if (start - now.getTime() <= REMINDER_LEAD_MS || r.keptAt) return;
+      if (confirmedAt(r) > start - STILL_NEEDED_LEAD_MS) return;
+      if (start - now.getTime() <= REMINDER_LEAD_MS) return;
       if (await this.store.claimFlag(r.id, 'stillNeededSentAt', now)) await this.notifications.notifyStillNeeded(r);
     });
   }
 
-  /** 24h: skipped for bookings made inside that window (their confirmation already carried the rules). */
+  /** 24h: skipped for bookings confirmed inside that window (their confirmation already carried the rules). */
   private async reminder24h(now: Date): Promise<void> {
     const upcoming = await this.store.findUpcomingConfirmed(now, new Date(now.getTime() + REMINDER_LEAD_MS));
     await this.each(upcoming, async (r) => {
-      if (r.createdAt.getTime() > r.startTime.getTime() - REMINDER_LEAD_MS) return;
+      if (!this.isEnabled(r)) return;
+      if (confirmedAt(r) > r.startTime.getTime() - REMINDER_LEAD_MS) return;
       if (await this.store.claimFlag(r.id, 'reminder24hSentAt', now)) await this.notifications.notifyReminder24h(r);
     });
   }
@@ -165,8 +210,9 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     if (widest === 0) return;
     const upcoming = await this.store.findUpcomingConfirmed(now, new Date(now.getTime() + widest * MINUTE_MS));
     await this.each(upcoming, async (r) => {
-      const minutes = this.settings.getCachedSettings(r.resourceId).handoverReminderMinutes;
-      if (minutes <= 0 || r.startTime.getTime() - now.getTime() > minutes * MINUTE_MS) return;
+      const settings = this.settings.getCachedSettings(r.resourceId);
+      const minutes = settings.handoverReminderMinutes;
+      if (!settings.enabled || minutes <= 0 || r.startTime.getTime() - now.getTime() > minutes * MINUTE_MS) return;
       const others = (await this.context.resourceAccess.getActiveSessions(r.resourceId)).filter(
         (session) => session.userId !== r.userId,
       );
@@ -181,11 +227,13 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
   /**
    * A booking started while another user's session (started BEFORE the booking) still runs: tell the
    * holder and that user. Sessions that began during the booking are manager overrides (handled by the
-   * session-start event). The session itself is never touched.
+   * session-start event). The session itself is never touched. Only bookings that started within
+   * OVERRUN_CHECK_WINDOW_MS are looked at (see there).
    */
   private async overrun(now: Date): Promise<void> {
-    await this.each(await this.store.findConfirmedStartedNotEnded(now), async (r) => {
-      if (r.overrunSentAt) return;
+    const recent = await this.store.findUpcomingConfirmed(new Date(now.getTime() - OVERRUN_CHECK_WINDOW_MS), now);
+    await this.each(recent, async (r) => {
+      if (!this.isEnabled(r) || r.overrunSentAt || r.endTime.getTime() <= now.getTime()) return;
       const lingering = (await this.context.resourceAccess.getActiveSessions(r.resourceId)).filter(
         (session) => session.userId !== r.userId && session.startTime.getTime() < r.startTime.getTime(),
       );

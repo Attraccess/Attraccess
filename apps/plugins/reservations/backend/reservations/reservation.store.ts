@@ -19,8 +19,8 @@ export interface ManagedListFilter {
 }
 
 /**
- * Persistence for reservations. Read helpers are indexed on (resourceId, status, startTime, endTime).
- * State transitions are conditional UPDATEs and return whether THIS call changed the row, which is what
+ * Persistence for reservations. Per-resource reads use the (resourceId, status, startTime, endTime)
+ * index; the scheduler's cross-resource scans use (status, startTime) and (status, endTime). State transitions are conditional UPDATEs and return whether THIS call changed the row, which is what
  * makes double ticks / concurrent requests idempotent.
  */
 @Injectable()
@@ -55,7 +55,7 @@ export class ReservationStore {
       .getMany();
   }
 
-  /** Confirmed bookings starting in (from, to] across all resources (reminders). */
+  /** Confirmed bookings starting in (from, to] across all resources (reminders, handover, overrun). */
   findUpcomingConfirmed(from: Date, to: Date): Promise<ReservationEntity[]> {
     return this.repo
       .createQueryBuilder('r')
@@ -64,11 +64,14 @@ export class ReservationStore {
       .getMany();
   }
 
-  /** Confirmed bookings that started and have not ended yet (no-show checks, overrun, completion). */
-  findConfirmedStartedNotEnded(now: Date): Promise<ReservationEntity[]> {
+  /**
+   * Confirmed bookings that started and have no check-in yet (no-show step). Ended ones are included on
+   * purpose: a grace period reaching the end must still end in no_show, not in completed.
+   */
+  findNoShowCandidates(now: Date): Promise<ReservationEntity[]> {
     return this.repo
       .createQueryBuilder('r')
-      .where('r.status = :status AND r.startTime <= :now AND r.endTime > :now', { status: 'confirmed', now })
+      .where('r.status = :status AND r.startTime <= :now AND r.checkedInAt IS NULL', { status: 'confirmed', now })
       .getMany();
   }
 
@@ -106,6 +109,20 @@ export class ReservationStore {
       .andWhere('r.checkedInAt IS NULL AND r.startTime <= :windowStart AND r.endTime > :now', { windowStart, now })
       .orderBy('r.startTime', 'ASC')
       .getOne();
+  }
+
+  /** The holder's confirmed, not yet checked-in bookings overlapping [from, to) (a session that ran in them). */
+  findUncheckedOverlapping(userId: number, resourceId: number, from: Date, to: Date): Promise<ReservationEntity[]> {
+    return this.repo
+      .createQueryBuilder('r')
+      .where('r.resourceId = :resourceId AND r.userId = :userId AND r.status = :status', {
+        resourceId,
+        userId,
+        status: 'confirmed',
+      })
+      .andWhere('r.checkedInAt IS NULL AND r.startTime < :to AND r.endTime > :from', { from, to })
+      .orderBy('r.startTime', 'ASC')
+      .getMany();
   }
 
   /** Pending + confirmed bookings of the resource overlapping [from, to) (maintenance/health notices). */
@@ -155,8 +172,8 @@ export class ReservationStore {
       .getCount();
   }
 
-  /** Pending/confirmed bookings of the resource starting after `now`. */
-  findFutureLive(resourceId: number, now: Date): Promise<ReservationEntity[]> {
+  /** Number of pending/confirmed bookings of the resource starting after `now` (a COUNT, no rows loaded). */
+  countFutureLive(resourceId: number, now: Date): Promise<number> {
     return this.repo
       .createQueryBuilder('r')
       .where('r.resourceId = :resourceId AND r.status IN (:...statuses) AND r.startTime > :now', {
@@ -164,7 +181,26 @@ export class ReservationStore {
         statuses: ['pending', 'confirmed'],
         now,
       })
-      .getMany();
+      .getCount();
+  }
+
+  /**
+   * Applies `changes` to every pending/confirmed booking of the resource starting after `now`, in one
+   * serialized transaction (select + one UPDATE with the same predicate), and returns the changed rows.
+   */
+  cancelFutureLive(resourceId: number, now: Date, changes: Partial<ReservationEntity>): Promise<ReservationEntity[]> {
+    const where = 'resourceId = :resourceId AND status IN (:...statuses) AND startTime > :now';
+    const parameters = { resourceId, statuses: ['pending', 'confirmed'], now };
+    return this.context.runSerialized(async (manager) => {
+      const repo = manager.getRepository(ReservationEntity);
+      const rows = await repo
+        .createQueryBuilder('r')
+        .where('r.resourceId = :resourceId AND r.status IN (:...statuses) AND r.startTime > :now', parameters)
+        .getMany();
+      if (rows.length === 0) return [];
+      await repo.createQueryBuilder().update(ReservationEntity).set(changes).where(where, parameters).execute();
+      return rows.map((row) => Object.assign(row, changes));
+    });
   }
 
   /** Bookings an iCal feed shows (pending, confirmed, ended) in [from, to), optionally only one holder's. */
@@ -223,8 +259,18 @@ export class ReservationStore {
     return { items, total };
   }
 
-  /** Conditional status transition; true when this call moved the row out of one of `from`. */
-  async transition(id: number, from: ReservationStatus[], changes: Partial<ReservationEntity>): Promise<boolean> {
+  /**
+   * Conditional status transition; true when this call moved the row out of one of `from`. With
+   * `notCheckedIn` the row must also still lack a check-in (no-show must lose against a check-in that
+   * was saved after the scheduler loaded the row).
+   */
+  async transition(
+    id: number,
+    from: ReservationStatus[],
+    changes: Partial<ReservationEntity>,
+    options: { notCheckedIn?: boolean } = {},
+  ): Promise<boolean> {
+    const where = `id = :id AND status IN (:...from)${options.notCheckedIn ? ' AND checkedInAt IS NULL' : ''}`;
     // Writes run in the host's serialized transaction queue: on SQLite a second writer would otherwise fail with
     // SQLITE_BUSY while another request (or a core write) holds the lock.
     const result = await this.context.runSerialized((manager) =>
@@ -233,7 +279,7 @@ export class ReservationStore {
         .createQueryBuilder()
         .update(ReservationEntity)
         .set(changes)
-        .where('id = :id AND status IN (:...from)', { id, from })
+        .where(where, { id, from })
         .execute(),
     );
     return (result.affected ?? 0) === 1;

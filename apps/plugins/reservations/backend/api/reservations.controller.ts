@@ -6,7 +6,7 @@ import { BOOKING_CONFLICT_CODES, STATE_CONFLICT_CODES, ReservationError } from '
 import { ReservationQueryService } from '../reservations/reservation-query.service';
 import { ReservationService } from '../reservations/reservation.service';
 import { CreateReservationBody, ReasonBody } from './dto.request';
-import { AvailabilityDto, ManagedReservationListDto, ReservationDto } from './dto.response';
+import { AvailabilityDto, ManagedReservationListDto, ManagerAccessDto, ReservationDto } from './dto.response';
 import { validated } from './pipes';
 import { ApiReservationErrors, parseDate, parseInteger, parseStatus, principalOf, requireDate } from './support';
 
@@ -47,7 +47,7 @@ export class ReservationsController {
   @ApiOperation({
     summary: 'Bookings, booking rules and the caller’s booking permission of a resource for a time range',
     description:
-      'Lists pending and confirmed bookings overlapping [from, to). Other users’ bookings carry no holder identity; the holder and managers see names.',
+      'Lists pending and confirmed bookings and maintenance that can collide with a booking inside [from, to), i.e. the range widened by the resource’s buffers. Other users’ bookings carry no holder identity; the holder and managers see names. Resources the caller cannot see answer 404.',
   })
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiQuery({ name: 'from', type: String, description: 'ISO 8601 start of the range (inclusive)' })
@@ -87,6 +87,16 @@ export class ReservationsController {
       (scope as 'upcoming' | 'past' | undefined) ?? 'upcoming',
       parseStatus(status),
     );
+  }
+
+  @Get('manage/access')
+  @ApiOperation({
+    summary: 'Whether the caller manages any resource (shows the manager pages)',
+    description: 'True for resources.update holders and for maintainers/introducers of at least one resource.',
+  })
+  @ApiOkResponse({ type: ManagerAccessDto })
+  managerAccess(@Req() request: AuthenticatedRequest): Promise<ManagerAccessDto> {
+    return this.queries.managerAccess(principalOf(request));
   }
 
   @Get('manage')

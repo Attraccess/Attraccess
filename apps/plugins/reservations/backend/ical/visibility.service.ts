@@ -1,8 +1,9 @@
-import { Resource, ResourceGroup, type PluginContext } from '@attraccess/plugins-backend-sdk';
+import { Resource, ResourceGroup, SupervisionMode, User, type PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { Brackets } from 'typeorm';
 import { PLUGIN_CONTEXT } from '../constants';
 import { AccessService } from '../reservations/access.service';
+import { type AccessSubject, subjectUserId } from '../reservations/actor';
 
 /** Same predicate core uses for hidden resource groups (ResourceGroupsService.ACTIVE_INTRODUCTION_EXISTS_SQL). */
 const ACTIVE_INTRODUCTION_EXISTS_SQL = `EXISTS (
@@ -29,8 +30,12 @@ export class VisibilityService {
     @Inject(AccessService) private readonly access: AccessService,
   ) {}
 
-  /** The subset of `resourceIds` (existing resources) the user may see. */
-  async filterVisible(userId: number, resourceIds: number[]): Promise<number[]> {
+  /**
+   * The subset of `resourceIds` (existing resources) the user may see. A request actor's scope applies to the
+   * `resources.update` shortcut, as core applies an API token's scope to its group visibility.
+   */
+  async filterVisible(subject: AccessSubject, resourceIds: number[]): Promise<number[]> {
+    const userId = subjectUserId(subject);
     const ids = [...new Set(resourceIds)];
     if (ids.length === 0) return [];
     const base = this.context
@@ -38,7 +43,7 @@ export class VisibilityService {
       .createQueryBuilder('resource')
       .select('resource.id', 'id')
       .where('resource.id IN (:...ids)', { ids });
-    if (!(await this.access.hasUpdatePermission(userId))) {
+    if (!(await this.access.hasUpdatePermission(subject))) {
       const visibleGroups = this.context
         .getRepository(ResourceGroup)
         .createQueryBuilder('vg')
@@ -54,6 +59,32 @@ export class VisibilityService {
         .setParameters({ ...visibleGroups.getParameters(), notHidden: false, userId });
     }
     const rows = await base.distinct(true).getRawMany<{ id: number }>();
+    return rows.map((row) => Number(row.id));
+  }
+
+  /**
+   * Whether the account exists, is not soft-deleted and not disabled. Deleting or disabling a user keeps
+   * their role rows, so anything acting on their behalf without a session (iCal feeds) must check this.
+   */
+  async isActiveAccount(userId: number): Promise<boolean> {
+    // `find*` skips soft-deleted rows (User has a DeleteDateColumn).
+    const user = await this.context
+      .getRepository(User)
+      .findOne({ where: { id: userId }, select: { id: true, isDisabled: true } });
+    return user !== null && !user.isDisabled;
+  }
+
+  /** The subset of `resourceIds` whose sessions always need a supervisor (`supervision_required`). */
+  async resourceIdsRequiringSupervision(resourceIds: number[]): Promise<number[]> {
+    const ids = [...new Set(resourceIds)];
+    if (ids.length === 0) return [];
+    const rows = await this.context
+      .getRepository(Resource)
+      .createQueryBuilder('resource')
+      .select('resource.id', 'id')
+      .where('resource.id IN (:...ids)', { ids })
+      .andWhere('resource.supervisionMode = :mode', { mode: SupervisionMode.SUPERVISION_REQUIRED })
+      .getRawMany<{ id: number }>();
     return rows.map((row) => Number(row.id));
   }
 

@@ -296,18 +296,33 @@ export class AvailabilityDto {
   @ApiProperty({ type: String, description: 'IANA timezone used for hours and the step grid' })
   timezone!: string;
 
-  @ApiProperty({ type: Boolean })
+  @ApiProperty({
+    type: Boolean,
+    description: 'Caller manages the resource; always false while reservations are disabled',
+  })
   isManager!: boolean;
 
-  @ApiProperty({ type: () => CanBookDto })
+  @ApiProperty({
+    type: () => CanBookDto,
+    description:
+      'Whether the caller may book now: RESERVATIONS_DISABLED, NOT_ALLOWED_TO_BOOK, or USER_BOOKING_LIMIT when the caller already holds maxActiveBookingsPerUser pending/confirmed bookings that have not ended',
+  })
   canBook!: CanBookDto;
 
   @ApiProperty({ type: () => PublicBookingRulesDto })
   rules!: PublicBookingRulesDto;
 
-  @ApiProperty({ type: () => [ReservationDto], description: 'Pending and confirmed bookings overlapping the range' })
+  @ApiProperty({
+    type: () => [ReservationDto],
+    description:
+      'Pending and confirmed bookings whose blocked span [startTime - their bufferBeforeMinutes, endTime + their bufferAfterMinutes) overlaps [from - rules.bufferBeforeMinutes, to + rules.bufferAfterMinutes): every booking a new booking inside [from, to) can collide with, including ones just outside the range',
+  })
   reservations!: ReservationDto[];
 
-  @ApiProperty({ type: () => [MaintenanceSpanDto] })
+  @ApiProperty({
+    type: () => [MaintenanceSpanDto],
+    description:
+      'Maintenance windows overlapping [from - rules.bufferBeforeMinutes, to + rules.bufferAfterMinutes). A booking conflicts when its span including its buffers overlaps one',
+  })
   maintenance!: MaintenanceSpanDto[];
 }

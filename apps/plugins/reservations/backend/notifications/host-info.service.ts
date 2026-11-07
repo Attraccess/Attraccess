@@ -79,7 +79,8 @@ export class HostInfoService {
    * Users managing the resource: everyone holding `resources.update` / `resources.maintenance.manage`
    * (role join, one query) plus introducers and maintainers of the resource or of one of its groups
    * (one query). This is exactly the set for which AccessService.isManager is true, resolved in two
-   * queries instead of one permission check per user.
+   * queries instead of one permission check per user. Soft-deleted users are skipped like core's
+   * RbacService.getUserIdsWithPermission does (they keep their role and introducer rows).
    */
   async managerIdsOf(resourceId: number): Promise<number[]> {
     const [introducers, permitted] = await Promise.all([
@@ -87,16 +88,17 @@ export class HostInfoService {
         .getRepository(ResourceIntroducer)
         .createQueryBuilder('introducer')
         .select('introducer.userId', 'userId')
+        .innerJoin('introducer.user', 'user', 'user.deletedAt IS NULL')
         .leftJoin('introducer.resourceGroup', 'group')
         .leftJoin('group.resources', 'resource')
-        .where('introducer.resourceId = :resourceId', { resourceId })
-        .orWhere('resource.id = :resourceId', { resourceId })
+        .where('(introducer.resourceId = :resourceId OR resource.id = :resourceId)', { resourceId })
         .getRawMany<{ userId: number }>(),
       this.context
         .getRepository(UserRole)
         .createQueryBuilder('ur')
         .select('ur.userId', 'userId')
         .distinct(true)
+        .innerJoin('ur.user', 'user', 'user.deletedAt IS NULL')
         .innerJoin('ur.role', 'role')
         .innerJoin('role.rolePermissions', 'rp')
         .where('rp.permissionKey IN (:...keys)', { keys: MANAGER_PERMISSIONS })

@@ -1,3 +1,6 @@
+import { Logger } from '@nestjs/common';
+import { SelectQueryBuilder } from 'typeorm';
+import { ReservationEntity } from '../entities/reservation.entity';
 import { ReservationError } from './errors';
 import { Harness, at, createHarness, principal } from '../testing/harness.test-utils';
 
@@ -41,6 +44,17 @@ describe('ReservationService', () => {
     it('rejects unknown resources with 404', async () => {
       await h.enable(1);
       expect(await codeOf(book(alice, [8, 9], 77))).toBe('RESOURCE_NOT_FOUND');
+    });
+
+    it('answers resources hidden from the user (hidden groups) like unknown ones', async () => {
+      await h.enable(1);
+      h.state.hidden.add(1);
+      const visible = jest.spyOn(h.visibility, 'filterVisible');
+      expect(await codeOf(book())).toBe('RESOURCE_NOT_FOUND');
+      expect(visible).toHaveBeenCalledWith(alice, [1]);
+      expect(await h.dataSource.query('SELECT COUNT(*) AS n FROM reservations_reservation')).toEqual([{ n: 0 }]);
+      h.state.hidden.delete(1);
+      expect((await book()).status).toBe('confirmed');
     });
 
     it('creates a confirmed booking with buffer snapshot, audit and notifier', async () => {
@@ -251,10 +265,13 @@ describe('ReservationService', () => {
       expect(await codeOf(h.reservations.approve(manager, pending.id))).toBe('NOT_PENDING');
     });
 
-    it('only managers may decide; the holder cannot approve their own booking', async () => {
+    it('only managers may decide; strangers get 404 like for a missing id, the holder a 403', async () => {
       const pending = await book();
+      expect(await codeOf(h.reservations.approve(bob, pending.id))).toBe('RESERVATION_NOT_FOUND');
+      expect(await codeOf(h.reservations.reject(bob, pending.id))).toBe('RESERVATION_NOT_FOUND');
+      expect(await codeOf(h.reservations.approve(bob, 9999))).toBe('RESERVATION_NOT_FOUND');
       expect(await codeOf(h.reservations.approve(alice, pending.id))).toBe('FORBIDDEN');
-      expect(await codeOf(h.reservations.reject(bob, pending.id))).toBe('FORBIDDEN');
+      expect((await h.store.findById(pending.id))?.status).toBe('pending');
     });
 
     it('cannot decide once the start passed', async () => {
@@ -337,8 +354,61 @@ describe('ReservationService', () => {
       expect(result).toMatchObject({ cancelledBookings: 2, settings: { enabled: false } });
       const row = await h.store.findById(a.id);
       expect(row).toMatchObject({ status: 'cancelled', cancelReason: 'reservations disabled', cancelledBy: 99 });
+      await h.reservations.flushNotifications();
       expect(h.notifier.onRemoved).toHaveBeenCalledTimes(2);
       expect(h.settings.getCachedSettings(1).enabled).toBe(false);
+    });
+
+    it('counts with a COUNT query and cancels in one write, notifying in the background', async () => {
+      await h.enable(1, { maxActiveBookingsPerUser: 0 });
+      for (let hour = 8; hour < 18; hour += 1) await book(alice, [hour, hour + 1]);
+      const getMany = jest.spyOn(SelectQueryBuilder.prototype, 'getMany');
+      const getCount = jest.spyOn(SelectQueryBuilder.prototype, 'getCount');
+      expect(await h.admin.futureBookingsCount(manager, 1)).toBe(10);
+      expect(getCount).toHaveBeenCalledTimes(1);
+      expect(getMany).not.toHaveBeenCalled();
+      getMany.mockRestore();
+      getCount.mockRestore();
+
+      const releases: (() => void)[] = [];
+      h.notifier.onRemoved.mockImplementation(() => new Promise<void>((resolve) => releases.push(resolve)));
+      const result = await h.admin.update(manager, 1, { enabled: false, cancelFutureBookings: true });
+      // the request returned while every mail is still in flight, and only 4 run at a time
+      expect(result.cancelledBookings).toBe(10);
+      expect(h.notifier.onRemoved).toHaveBeenCalledTimes(4);
+      expect(await h.dataSource.getRepository(ReservationEntity).countBy({ status: 'cancelled' })).toBe(10);
+      while (releases.length > 0) {
+        releases.shift()?.();
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      await h.reservations.flushNotifications();
+      expect(h.notifier.onRemoved).toHaveBeenCalledTimes(10);
+    });
+
+    it('takes the booking lock while disabling, so a racing create is cancelled or refused', async () => {
+      await h.enable(1);
+      let release!: () => void;
+      const held = h.reservations.withResourceLock(1, () => new Promise<void>((resolve) => (release = resolve)));
+      const update = h.admin.update(manager, 1, { enabled: false, cancelFutureBookings: true });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(h.settings.getCachedSettings(1).enabled).toBe(true); // still waiting for the lock
+      release();
+      await held;
+      await update;
+      expect(h.settings.getCachedSettings(1).enabled).toBe(false);
+
+      for (const createFirst of [true, false]) {
+        await h.enable(1);
+        const create = book(principal(20 + Number(createFirst)), createFirst ? [8, 9] : [10, 11]);
+        const disable = h.admin.update(manager, 1, { enabled: false, cancelFutureBookings: true });
+        const [created] = await Promise.allSettled([create, disable]);
+        if (created.status === 'fulfilled') {
+          expect((await h.store.findById(created.value.id))?.status).toBe('cancelled');
+        } else {
+          expect(created.reason).toMatchObject({ code: 'RESERVATIONS_DISABLED' });
+        }
+      }
+      expect(await h.dataSource.getRepository(ReservationEntity).countBy({ status: 'confirmed' })).toBe(0);
     });
 
     it('can disable while keeping the bookings', async () => {
@@ -360,10 +430,22 @@ describe('ReservationService', () => {
       const confirmed = await book(alice, [10, 11]);
       expect(await h.reservations.markCheckedIn(confirmed.id, 5, at('2026-06-02T10:00:00'))).toBe(true);
       expect(await h.reservations.markCheckedIn(confirmed.id, 6, at('2026-06-02T10:01:00'))).toBe(false);
-      expect(await h.reservations.markNoShow(confirmed.id)).toBe(true);
-      expect(await h.reservations.markNoShow(confirmed.id)).toBe(false);
+      const unchecked = await book(alice, [12, 13]);
+      expect(await h.reservations.markNoShow(unchecked.id)).toBe(true);
+      expect(await h.reservations.markNoShow(unchecked.id)).toBe(false);
       expect(h.audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'reservations.expired' }));
       expect(h.audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'reservations.no_show' }));
+    });
+
+    it('never marks a checked-in booking as no-show (check-in saved after the tick loaded the row)', async () => {
+      await h.enable(1);
+      const booking = await book(alice, [8, 9]);
+      const loadedByTick = await h.store.findById(booking.id);
+      expect(loadedByTick?.checkedInAt).toBeNull();
+      await h.reservations.markCheckedIn(booking.id, 5, at('2026-06-02T08:10:00'));
+      expect(await h.reservations.markNoShow(booking.id)).toBe(false);
+      expect(await h.store.findById(booking.id)).toMatchObject({ status: 'confirmed', checkedInUsageId: 5 });
+      expect(h.audit.record).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'reservations.no_show' }));
     });
 
     it('claims flags and notices once', async () => {
@@ -393,6 +475,45 @@ describe('ReservationService', () => {
       expect(
         await h.store.findUpcomingConfirmed(new Date('2026-06-02T07:00:00Z'), new Date('2026-06-02T08:00:00Z')),
       ).toHaveLength(1);
+    });
+  });
+
+  describe('notifications', () => {
+    beforeEach(() => h.enable(1, { approvalRequired: true }));
+
+    it('are sent after the commit without holding up the request', async () => {
+      let release!: () => void;
+      const slowMail = new Promise<void>((resolve) => (release = resolve));
+      const settled = jest.fn();
+      h.notifier.onPending.mockReturnValue(slowMail);
+      h.notifier.onConfirmed.mockReturnValue(slowMail);
+      h.notifier.onCancelled.mockReturnValue(slowMail);
+      const pending = await book();
+      expect(h.notifier.onPending).toHaveBeenCalledTimes(1);
+      expect((await h.reservations.approve(manager, pending.id)).status).toBe('confirmed');
+      expect(h.notifier.onConfirmed).toHaveBeenCalledWith(expect.anything(), { viaApproval: true });
+      expect((await h.reservations.cancel(alice, pending.id)).status).toBe('cancelled');
+      expect(h.notifier.onCancelled).toHaveBeenCalledTimes(1);
+      void h.reservations.flushNotifications().then(settled);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(settled).not.toHaveBeenCalled(); // all three mails still in flight
+      release();
+      await h.reservations.flushNotifications();
+      expect(settled).toHaveBeenCalled();
+    });
+
+    it('log failures instead of rejecting (no unhandled rejection)', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      h.notifier.onPending.mockRejectedValue(new Error('smtp down'));
+      h.notifier.onRejected.mockImplementation(() => {
+        throw new Error('sync failure');
+      });
+      const pending = await book();
+      await h.reservations.reject(manager, pending.id);
+      await h.reservations.flushNotifications();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('smtp down'));
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('sync failure'));
+      warn.mockRestore();
     });
   });
 

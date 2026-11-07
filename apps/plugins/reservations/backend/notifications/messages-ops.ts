@@ -149,8 +149,8 @@ export function overrunForUser(m: MessageContext, r: ReservationEntity): NoticeT
     lines: [
       pick(
         lang,
-        `${resourceName} is reserved since ${formatTime(r.startTime, m)} until ${formatTime(r.endTime, m)}. Please finish and sign out now; your session is not ended automatically.`,
-        `${resourceName} ist seit ${formatTime(r.startTime, m)} bis ${formatTime(r.endTime, m)} reserviert. Bitte beende deine Sitzung jetzt und melde dich ab; sie wird nicht automatisch beendet.`,
+        `${resourceName} has been reserved since ${formatTime(r.startTime, m)} (until ${formatTime(r.endTime, m)}). Please finish and sign out now; your session is not ended automatically.`,
+        `${resourceName} ist seit ${formatTime(r.startTime, m)} reserviert (bis ${formatTime(r.endTime, m)}). Bitte beende deine Sitzung jetzt und melde dich ab; sie wird nicht automatisch beendet.`,
       ),
     ],
     severity: 'warning',
@@ -187,7 +187,7 @@ export function overrideForManagers(
 ): NoticeText {
   const { lang, resourceName } = m;
   return {
-    title: pick(lang, `Override start on ${resourceName}`, `Übersteuerter Start an ${resourceName}`),
+    title: pick(lang, `Override start on ${resourceName}`, `Start trotz Reservierung an ${resourceName}`),
     lines: [
       pick(
         lang,

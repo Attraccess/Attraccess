@@ -293,7 +293,7 @@ Further events for plugins that follow maintenance, health and live sessions
 
 | Event                                        | Payload                                                                                   | Fires                                                                 |
 | -------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `SystemEvent.MAINTENANCE_CHANGED`            | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | After a maintenance window was created, changed or finished. `endTime` is `null` while open-ended. |
+| `SystemEvent.MAINTENANCE_CHANGED`            | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | After a maintenance window was created or finished. Core currently emits `created` and `finished` only; `updated` is reserved for a future edit path. `endTime` is `null` while open-ended. |
 | `SystemEvent.RESOURCE_HEALTH_CHANGED`        | `{ resourceId, status, previousStatus, reason, identifier }`                              | Only on a real status transition of a health entry.                   |
 | `SystemEvent.RESOURCE_USAGE_SESSION_STARTED` | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                            | A user started a session on an idle resource (not a takeover). `supervisorUserId` is set for supervised starts. |
 | `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`          | A user took over a running session. Fires for the **new** user.       |
@@ -342,15 +342,25 @@ async function notify(context: PluginContext, userId: number) {
 
 `context.resourceAccess` (permission `ACCESS_RESOURCES`) answers read-only
 authorization and state questions with the same logic the core uses to authorise
-a session start, so plugin decisions never drift from it:
+a session start, so plugin decisions never drift from it.
+
+Methods marked with `principal` take either a user id or the request's user
+(`PluginAccessPrincipal = number | { id, effectivePermissions? }`). **Pass
+`request.user` for request-driven checks** so API-token scopes apply: an API
+token only carries the permissions it was created with, and permission-based
+grants are limited to that set (intersected with the user's current
+permissions), exactly as on core routes. Introducer/maintainer roles and
+introductions still count. A plain user id resolves the user's full RBAC
+permissions; use it for background work such as schedulers. Unknown users and
+resources yield negative answers (`false`, all-false, `[]`) rather than errors.
 
 | Method                                              | Returns                                                                                                              |
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `canStart(userId, resourceId)`                      | `{ allowed, requiresSupervision, supervisionAllowed }`. Covers introductions, retraining blocks, introducers/maintainers, `resources.update` and the supervision mode. It does **not** consider live maintenance or health. |
-| `canMaintain(userId, resourceId)`                   | Whether the user can manage maintenance of the resource (permission, introducer/maintainer, group roles).             |
-| `hasPermission(userId, permission)`                 | Whether the user holds an RBAC permission such as `resources.update`.                                                |
-| `listResourceIdsIntroduced(userId)`                 | Resources the user is introduced to in the sense of `canStart` (valid introduction, introducer/maintainer, `resources.update`). |
-| `listResourceIdsMaintained(userId)`                 | Resources whose maintenance the user can manage.                                                                     |
+| `canStart(principal, resourceId)`                   | `{ allowed, requiresSupervision, supervisionAllowed }`. Covers introductions, retraining blocks, introducers/maintainers, `resources.update` and the supervision mode. It does **not** consider live maintenance or health. |
+| `canMaintain(principal, resourceId)`                | Whether the user can manage maintenance of the resource (`resources.maintenance.manage`, introducer/maintainer of the resource or one of its groups). Same check as core's maintenance API. |
+| `hasPermission(principal, permission)`              | Whether the user holds an RBAC permission such as `resources.update`, limited to the request's scope.                |
+| `listResourceIdsIntroduced(principal)`              | Resources the user is introduced to in the sense of `canStart` (valid introduction, introducer/maintainer, `resources.update`). |
+| `listResourceIdsMaintained(principal)`              | Resources whose maintenance the user can manage.                                                                     |
 | `getMaintenanceWindows(resourceId, from, to)`       | Windows overlapping `[from, to)` as `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Open-ended maintenance counts until it is finished. |
 | `getActiveSessions(resourceId)`                     | Running sessions `{ usageId, userId, startTime }`, earliest first.                                                    |
 
@@ -368,6 +378,15 @@ await context.runSerialized(async (manager) => {
   await manager.getRepository(Booking).save(newBooking);
 });
 ```
+
+The queue is shared with every core session start and end, so:
+
+- keep `fn` short and limited to database work through the given `manager`; do
+  no HTTP, MQTT, email or other non-database I/O inside it;
+- do not nest calls. A `runSerialized` started inside `fn` would wait for `fn`
+  itself, so the host rejects it with an error instead of hanging. Pass the
+  `manager` down to helpers instead, and do not await core operations that write
+  through the same queue (such as starting or ending a session) inside `fn`.
 
 Serialization is per host process. Plugins that need exclusion across several API
 instances need a cross-instance lock of their own; the reservations plugin runs
@@ -832,7 +851,7 @@ knowledge. Host slot ids available today:
 | `resource.list.row`        | Resource list row, compact status area                                                  | `{ resourceId }` |
 | `resource.settings`        | Resource settings page, shown to users who may manage the resource (`resources.update`) | `{ resourceId }` |
 | `user.account`             | The signed-in user's own account page                                                   | `{ userId }` |
-| `admin.settings`           | System settings area, for users with system administration permission                   | `{}` |
+| `admin.settings`           | System settings index, only for users with the `system.settings.manage` permission      | `{}` |
 
 The slots `resource.settings`, `user.account` and `admin.settings` are rendered as
 **titled sections**: set `title` on the contribution (falls back to a generic

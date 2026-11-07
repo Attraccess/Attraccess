@@ -1,4 +1,5 @@
 import { Button, LabeledSwitch, StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
+import { Fieldset, Spinner } from '@heroui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { ReservationsApiError, getFutureBookingsCount, getResourceSettings, updateResourceSettings } from '../api';
@@ -117,7 +118,13 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
       </div>
     );
   }
-  if (!values) return null;
+  if (!values) {
+    return (
+      <div className="rv:flex rv:justify-center rv:py-4" data-cy="reservations-settings-loading">
+        <Spinner size="sm" aria-label={t('common.loading')} />
+      </div>
+    );
+  }
   const set = <K extends keyof ResourceSettingsValues>(key: K, value: ResourceSettingsValues[K]) =>
     setValues({ ...values, [key]: value });
   const invalid = Object.keys(errors).length > 0;
@@ -154,8 +161,8 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
         </LabeledSwitch>
       </div>
       {NUMBER_GROUPS.map((group) => (
-        <fieldset key={group.title} className="rv:flex rv:min-w-0 rv:flex-col rv:gap-3">
-          <legend className="rv:mb-2 rv:text-sm rv:font-semibold">{t(`settings.groups.${group.title}`)}</legend>
+        <Fieldset key={group.title} className="rv:min-w-0">
+          <Fieldset.Legend>{t(`settings.groups.${group.title}`)}</Fieldset.Legend>
           <div className="rv:grid rv:gap-4 rv:sm:grid-cols-2">
             {group.fields.map((field) => {
               const [min, max] = INTEGER_RANGES[field];
@@ -179,16 +186,16 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
               );
             })}
           </div>
-        </fieldset>
+        </Fieldset>
       ))}
-      <fieldset className="rv:flex rv:min-w-0 rv:flex-col rv:gap-3">
-        <legend className="rv:mb-2 rv:text-sm rv:font-semibold">{t('settings.groups.hours')}</legend>
+      <Fieldset className="rv:min-w-0">
+        <Fieldset.Legend>{t('settings.groups.hours')}</Fieldset.Legend>
         <BookableHoursEditor
           value={values.bookableHours}
           onChange={(hours) => set('bookableHours', hours)}
           errors={errors}
         />
-      </fieldset>
+      </Fieldset>
       <div>
         <Button
           variant="primary"

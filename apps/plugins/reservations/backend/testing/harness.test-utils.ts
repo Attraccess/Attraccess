@@ -1,4 +1,4 @@
-import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginAccessPrincipal, PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -8,8 +8,10 @@ import { IcalFeedEntity } from '../entities/ical-feed.entity';
 import { NoticeEntity } from '../entities/notice.entity';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { ResourceSettingsEntity } from '../entities/resource-settings.entity';
-import { CreateReservations1790000000000 } from '../migrations/1790000000000-create-reservations';
+import * as pluginMigrations from '../migrations';
 import { AccessService } from '../reservations/access.service';
+import type { ReservationActor } from '../reservations/actor';
+import type { VisibilityService } from '../ical/visibility.service';
 import type { DirectoryService } from '../reservations/directory.service';
 import type { ReservationNotifier } from '../reservations/notifier';
 import { ReservationQueryService } from '../reservations/reservation-query.service';
@@ -22,6 +24,14 @@ import type { ResourceSettingsValues } from '../settings/settings.model';
 
 export const principal = (userId: number): PluginAuditPrincipal => ({ userId, authenticationMethod: 'session' });
 
+/** A request actor authenticated with an API token scoped to `scope` (what `principalOf` builds for it). */
+export const tokenActor = (userId: number, scope: string[], apiTokenId = 1): ReservationActor => ({
+  userId,
+  authenticationMethod: 'api-token',
+  apiTokenId,
+  effectivePermissions: new Set(scope),
+});
+
 interface AccessState {
   permissions: Map<number, Set<string>>;
   maintainers: Map<number, Set<number>>; // userId -> resourceIds
@@ -30,6 +40,7 @@ interface AccessState {
   sessions: { usageId: number; resourceId: number; userId: number; startTime: Date }[];
   introduced: Map<number, number[]>; // userId -> resourceIds
   maintained: Map<number, number[]>; // extra maintained ids (besides makeManager)
+  hidden: Set<number>; // resourceIds only in hidden groups (invisible to everyone in these tests)
 }
 
 /** Real SQLite (temp file), real services, scripted host facade. Time is controlled via `setNow`. */
@@ -39,7 +50,8 @@ export async function createHarness() {
     type: 'sqlite',
     database: join(dir, 'db.sqlite'),
     entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
-    migrations: [CreateReservations1790000000000],
+    // Every migration the plugin registers (migrations.ts), as the host would run them.
+    migrations: Object.values(pluginMigrations),
     synchronize: false,
   }).initialize();
   await dataSource.runMigrations();
@@ -53,6 +65,7 @@ export async function createHarness() {
     sessions: [],
     introduced: new Map(),
     maintained: new Map(),
+    hidden: new Set(),
   };
   const dispatch = jest.fn(async (_request: unknown) => undefined);
   const handlers = new Map<string, ((payload: never) => unknown)[]>();
@@ -75,6 +88,16 @@ export async function createHarness() {
     return next;
   };
 
+  // Like the host: a principal with effectivePermissions (a request's user) only uses the permissions inside that
+  // scope; a plain id uses the user's full permissions. Maintainer roles and introductions are not permissions.
+  const idOf = (subject: PluginAccessPrincipal) => (typeof subject === 'number' ? subject : subject.id);
+  const permissionsOf = (subject: PluginAccessPrincipal): Set<string> => {
+    const own = state.permissions.get(idOf(subject)) ?? new Set<string>();
+    if (typeof subject === 'number' || subject.effectivePermissions === undefined) return own;
+    const scope = new Set(subject.effectivePermissions);
+    return new Set([...own].filter((permission) => scope.has(permission)));
+  };
+
   const context = {
     audit,
     dataSource,
@@ -93,18 +116,22 @@ export async function createHarness() {
     runSerialized,
     getRepository: (entity: never) => dataSource.getRepository(entity),
     resourceAccess: {
-      hasPermission: async (userId: number, permission: string) =>
-        state.permissions.get(userId)?.has(permission) ?? false,
+      hasPermission: async (subject: PluginAccessPrincipal, permission: string) =>
+        permissionsOf(subject).has(permission),
       // Like the host: the maintenance permission counts as maintainer of every resource.
-      canMaintain: async (userId: number, resourceId: number) =>
-        (state.permissions.get(userId)?.has('resources.maintenance.manage') ?? false) ||
-        (state.maintainers.get(userId)?.has(resourceId) ?? false),
-      listResourceIdsMaintained: async (userId: number) => [...(state.maintainers.get(userId) ?? [])],
-      listResourceIdsIntroduced: async (userId: number) => state.introduced.get(userId) ?? [],
+      canMaintain: async (subject: PluginAccessPrincipal, resourceId: number) =>
+        permissionsOf(subject).has('resources.maintenance.manage') ||
+        (state.maintainers.get(idOf(subject))?.has(resourceId) ?? false),
+      // Like the host: the maintenance permission manages every resource.
+      listResourceIdsMaintained: async (subject: PluginAccessPrincipal) =>
+        permissionsOf(subject).has('resources.maintenance.manage')
+          ? [...knownResources]
+          : [...(state.maintainers.get(idOf(subject)) ?? [])],
+      listResourceIdsIntroduced: async (subject: PluginAccessPrincipal) => state.introduced.get(idOf(subject)) ?? [],
       getActiveSessions: async (resourceId: number) =>
         state.sessions.filter((session) => session.resourceId === resourceId),
-      canStart: async (userId: number) =>
-        state.canStart.get(userId) ?? { allowed: false, requiresSupervision: false, supervisionAllowed: false },
+      canStart: async (subject: PluginAccessPrincipal) =>
+        state.canStart.get(idOf(subject)) ?? { allowed: false, requiresSupervision: false, supervisionAllowed: false },
       getMaintenanceWindows: async (resourceId: number, from: Date, to: Date) =>
         state.maintenance.filter(
           (window) =>
@@ -121,6 +148,14 @@ export async function createHarness() {
     getUserNames: async (ids: number[]) => new Map(ids.map((id) => [id, `user${id}`])),
   } as unknown as DirectoryService;
 
+  const visibility = {
+    filterVisible: async (_userId: number, ids: number[]) =>
+      [...new Set(ids)].filter((id) => knownResources.has(id) && !state.hidden.has(id)),
+    resourceIdsOfGroups: async () => [],
+    isActiveAccount: async () => true,
+    resourceIdsRequiringSupervision: async () => [],
+  } as unknown as VisibilityService;
+
   const clock = () => now;
   const store = new ReservationStore(context);
   const settings = new ResourceSettingsService(context);
@@ -133,6 +168,7 @@ export async function createHarness() {
     globalSettings,
     access,
     directory,
+    visibility,
     notifier,
     clock,
   );
@@ -145,6 +181,7 @@ export async function createHarness() {
     directory,
     reservations,
     clock,
+    visibility,
   );
   const admin = new SettingsAdminService(settings, globalSettings, reservations, access, directory);
   await globalSettings.setTimezone('Europe/Berlin');
@@ -169,6 +206,7 @@ export async function createHarness() {
     queries,
     admin,
     directory,
+    visibility,
     setNow: (value: string | Date) => {
       now = new Date(value);
     },
@@ -183,6 +221,7 @@ export async function createHarness() {
       state.permissions.set(userId, new Set([...(state.permissions.get(userId) ?? []), permission]));
     },
     async close() {
+      await reservations.flushNotifications();
       await dataSource.destroy();
       rmSync(dir, { recursive: true, force: true });
     },

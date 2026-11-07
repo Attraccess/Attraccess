@@ -1,20 +1,27 @@
-import type { AuthenticatedRequest, PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
+import type { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { UnauthorizedException, applyDecorators } from '@nestjs/common';
 import { ApiConflictResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiBadRequestResponse } from '@nestjs/swagger';
 import { RESERVATION_STATUSES, ReservationStatus } from '../entities/reservation.entity';
+import type { ReservationActor } from '../reservations/actor';
 import { ReservationError } from '../reservations/errors';
 import { ReservationErrorDto } from './dto.response';
 
-/** Acting principal from the guard-authenticated request (never from the body). */
-export function principalOf(request: Pick<AuthenticatedRequest, 'user'>): PluginAuditPrincipal {
+/**
+ * Acting principal from the guard-authenticated request (never from the body). It carries the request's effective
+ * permissions, which core narrows to the token's scope for API-token requests, so every access check applies them.
+ */
+export function principalOf(request: Pick<AuthenticatedRequest, 'user'>): ReservationActor {
   const user = request?.user;
   if (!user || !Number.isSafeInteger(user.id) || user.id <= 0) throw new UnauthorizedException();
   const method = user.authenticationMethod ?? 'session';
   if (method === 'api-token' && !Number.isSafeInteger(user.apiTokenId)) throw new UnauthorizedException();
+  // Without its scope an API-token request would act with the owner's full permissions: refuse instead.
+  if (method === 'api-token' && !user.effectivePermissions) throw new UnauthorizedException();
   return {
     userId: user.id,
     authenticationMethod: method,
     ...(method === 'api-token' ? { apiTokenId: user.apiTokenId } : {}),
+    ...(user.effectivePermissions ? { effectivePermissions: new Set(user.effectivePermissions) } : {}),
   };
 }
 

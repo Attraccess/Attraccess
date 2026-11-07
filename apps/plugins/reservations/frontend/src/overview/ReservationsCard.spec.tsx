@@ -34,6 +34,14 @@ const availability = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+/** The viewer's own confirmed booking of resource 3 that runs right now. */
+const running = () =>
+  reservationFixture({
+    resourceId: 3,
+    startTime: new Date(Date.now() - 1_800_000).toISOString(),
+    endTime: new Date(Date.now() + 1_800_000).toISOString(),
+  });
+
 vi.setConfig({ testTimeout: 30_000 });
 
 afterEach(() => {
@@ -52,13 +60,48 @@ describe('ReservationsCard', () => {
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
-  it('shows a spinner while the first answer is pending', () => {
+  it('renders nothing, not even a spinner, while the first answer is pending', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => new Promise(() => undefined)),
     );
     const { container } = renderWithProviders(<ReservationsCard resourceId={3} />);
-    expect(container.querySelector('[data-cy="reservations-loading"]')).toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('marks the selected view for assistive technology', async () => {
+    const user = userEvent.setup();
+    mockFetch({ 'GET /resources/3/availability': availability() });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    // A single-selection toggle group is a radio group: the chosen view is announced as checked.
+    expect(await screen.findByRole('radiogroup', { name: 'View' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Week' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Day' })).not.toBeChecked();
+    await user.click(screen.getByRole('radio', { name: 'Day' }));
+    expect(screen.getByRole('radio', { name: 'Day' })).toBeChecked();
+  });
+
+  it('does not poll for a keep-or-free question without a running booking of the viewer', async () => {
+    const calls = mockFetch({
+      'GET /resources/3/availability': availability({ reservations: [reservationFixture({ resourceId: 3 })] }),
+      'GET /resources/3/pending-decision': null,
+    });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    await screen.findByRole('button', { name: 'Reserve' });
+    await waitFor(() => expect(calls.some((call) => call.path === '/mine')).toBe(true));
+    expect(calls.some((call) => call.path.endsWith('/pending-decision'))).toBe(false);
+  });
+
+  it('asks keep or free within about 5 s after the holder stopped', async () => {
+    let stopped = false;
+    const calls = mockFetch({
+      'GET /resources/3/availability': availability({ reservations: [running()] }),
+      'GET /resources/3/pending-decision': () => ({ body: stopped ? reservationFixture({ canEndEarly: true }) : null }),
+    });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    await waitFor(() => expect(calls.some((call) => call.path.endsWith('/pending-decision'))).toBe(true));
+    stopped = true;
+    expect(await screen.findByRole('alertdialog', {}, { timeout: 7_000 })).toHaveTextContent(/Keep it or free/);
   });
 
   it('shows an error with Retry instead of vanishing when loading fails', async () => {
@@ -149,7 +192,7 @@ describe('ReservationsCard', () => {
   it('asks keep or free after the session ended and frees the rest on request', async () => {
     const user = userEvent.setup();
     const calls = mockFetch({
-      'GET /resources/3/availability': availability(),
+      'GET /resources/3/availability': availability({ reservations: [running()] }),
       'GET /resources/3/pending-decision': reservationFixture({ canEndEarly: true }),
       'POST /7/end-early': reservationFixture({ status: 'completed' }),
     });
@@ -165,7 +208,7 @@ describe('ReservationsCard', () => {
   it('keeps the booking when the dialog is closed with Keep', async () => {
     const user = userEvent.setup();
     const calls = mockFetch({
-      'GET /resources/3/availability': availability(),
+      'GET /resources/3/availability': availability({ reservations: [running()] }),
       'GET /resources/3/pending-decision': reservationFixture({ canEndEarly: true }),
       'POST /7/keep': reservationFixture(),
     });
@@ -179,7 +222,7 @@ describe('ReservationsCard', () => {
     const user = userEvent.setup();
     let answered = false;
     mockFetch({
-      'GET /resources/3/availability': availability(),
+      'GET /resources/3/availability': availability({ reservations: [running()] }),
       'GET /resources/3/pending-decision': () => ({
         body: reservationFixture({ id: answered ? 8 : 7, canEndEarly: true }),
       }),
@@ -231,5 +274,15 @@ describe('ReservationsCard', () => {
     expect(dialog).toHaveTextContent('A manager has to approve this booking');
     expect(dialog).toHaveTextContent('15 min before the start until 15 min after it');
     expect(screen.getByRole('button', { name: 'Request reservation' })).toBeDisabled();
+  });
+
+  it('words the check-in window without "0 min before" when early check-in is off', async () => {
+    const user = userEvent.setup();
+    mockFetch({ 'GET /resources/3/availability': availability({ rules: { ...rules, earlyCheckInMinutes: 0 } }) });
+    renderWithProviders(<ReservationsCard resourceId={3} />);
+    await user.click(await screen.findByRole('button', { name: 'Reserve' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('from the start until 15 min after it');
+    expect(dialog).not.toHaveTextContent('0 min before');
   });
 });

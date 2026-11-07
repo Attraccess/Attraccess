@@ -72,9 +72,14 @@ When check-in is enabled for the resource, you check in simply by **starting a s
 the check-in window: from a few minutes before your booking starts (the early check-in window) until it ends. You
 do not need to do anything else, and a supervised start counts when you are the one who requested it.
 
+A session of yours that is **already running** when your booking starts counts as well, for example when you started
+before the early check-in window or kept your session running from your previous booking right before. Such a
+session is recognised at the end of the grace period and checks you in then.
+
 If you have not checked in by the start time plus the grace period, the booking becomes a **no show**, the slot
-is freed for others and you receive an email. If check-in is disabled for the resource, the booking simply stays
-until its end. Your confirmation and reminder emails state the check-in rules for that resource.
+is freed for others and you receive an email. When the grace period is as long as the booking or longer, an unused
+booking becomes a no show at its end. The current check-in settings of the resource apply, also to bookings made
+before a change. If check-in is disabled for the resource, the booking simply stays until its end. Your confirmation and reminder emails state the check-in rules for that resource.
 
 ### Ending early: keep or free the rest
 
@@ -94,7 +99,7 @@ When someone starts a resource, the plugin checks the bookings of **other** user
   of the holder is never shown to people who may not see it.
 - **Someone else's booking starts soon:** if it starts within the resource's confirmation window (60 minutes by
   default), you are asked to confirm: "Reserved from 14:00, you have 40 min. Start anyway?". On a reader without a
-  screen the start is refused by default.
+  screen the start is refused by default. If several bookings start within the window, you confirm each of them.
 - **Your own booking:** you may start during or shortly before your own booking without any question.
 - **Maintainers and managers** can override a running booking after an explicit confirmation. The holder and the
   managers are notified, and the override is recorded in the [audit log](settings/audit-log.md).
@@ -109,17 +114,20 @@ You receive notifications in the app, as push message and by email, according to
 (see [notification categories](#notification-categories)). Each notice is sent at most once. The texts use your
 language when it is known, otherwise the default language of the installation.
 
-| When                                            | What                                                                                                                                     |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Booking confirmed or approved                   | Confirmation including the check-in rules.                                                                                               |
-| 48 hours before the start                       | "Do you still need this booking?" with **Keep** and **Cancel**. Only if you booked at least 48 hours ahead. No answer keeps the booking. |
-| 24 hours before the start                       | Reminder including the check-in rules.                                                                                                   |
-| Booking rejected, expired, cancelled or no show | Information about what happened and why.                                                                                                 |
-| Maintenance overlaps your booking               | Information only. Bookings are not cancelled automatically.                                                                              |
-| Resource becomes unhealthy / recovers           | For bookings that are running or start within 24 hours.                                                                                  |
-| Before someone else's booking starts            | If you have a running session: "The resource is reserved from 14:00. Please finish and sign out in time."                                |
-| Someone else's session still runs at your start | You and the other user are informed. The session is not ended.                                                                           |
-| Someone overrode your booking                   | You are told who started anyway.                                                                                                         |
+| When                                            | What                                                                                                                                                                                                                                         |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Booking confirmed or approved                   | Confirmation including the check-in rules.                                                                                                                                                                                                   |
+| 48 hours before the start                       | "Do you still need this booking?" with **Keep** and **Cancel**. Only if the booking was confirmed at least 48 hours ahead (for bookings that need approval: approved) and you have not already chosen **Keep**. No answer keeps the booking. |
+| 24 hours before the start                       | Reminder including the check-in rules. Skipped for bookings confirmed (made or approved) less than 24 hours ahead: their confirmation email already carries the rules.                                                                       |
+| Booking rejected, expired, cancelled or no show | Information about what happened and why.                                                                                                                                                                                                     |
+| Maintenance overlaps your booking               | Information only. Bookings are not cancelled automatically.                                                                                                                                                                                  |
+| Resource becomes unhealthy / recovers           | For bookings that are running or start within 24 hours.                                                                                                                                                                                      |
+| Before someone else's booking starts            | If you have a running session: "The resource is reserved from 14:00. Please finish and sign out in time."                                                                                                                                    |
+| Someone else's session still runs at your start | You and the other user are informed (checked during the first five minutes of your booking). The session is not ended.                                                                                                                       |
+| Someone overrode your booking                   | You are told who started anyway.                                                                                                                                                                                                             |
+
+Resources whose reservations are disabled send no reminders, handover or overrun notices for bookings that were kept
+when disabling.
 
 ### Email links
 
@@ -213,14 +221,17 @@ permission may have to reload the page once before the entry appears.
 
 Bookable hours apply to **bookings only**, not to spontaneous starts. The rule: once **any** weekday has a range,
 weekdays without a range are **closed**. With no ranges at all, the resource is bookable around the clock. A booking
-including its buffers must lie completely inside one range on one day. A range ending at 24:00 may join the next
-day's range starting at 00:00.
+including its buffers must lie completely inside one range on one day. Ranges that touch on the same day stay
+separate: with 08:00-12:00 and 12:00-16:00 a booking from 11:00 to 13:00 is refused. Only a range ending at 24:00
+joins the next day's range starting at 00:00.
 
 #### Disabling reservations
 
 If you disable reservations while pending or confirmed future bookings exist, the settings page warns you with the
 number of affected bookings. When you confirm, those bookings are cancelled with the reason "reservations
-disabled" and their holders are notified. After disabling, every start is allowed again.
+disabled" and their holders are notified (in the background, so saving returns right away). A booking that someone
+creates at the same moment is either cancelled with the others or refused. After disabling, every start is allowed
+again.
 
 ### Timezone
 
@@ -284,9 +295,13 @@ The plugin records the audit domain **reservations**: `created`, `approved`, `re
 
 Behaviour you should know about:
 
-- The scheduler ticks once a minute (expiry, no-show, completion, reminders, handover). Each notice is claimed in
-  the database before it is sent, so restarts and double ticks never send a notice twice. Notices are
+- The scheduler ticks once a minute (expiry, no-show, completion, reminders, handover, overrun). Each notice is
+  claimed in the database before it is sent, so restarts and double ticks never send a notice twice. Notices are
   **at most once**: if sending fails after the claim, it is not retried.
+- The overrun check runs only during the first five minutes of a booking. If the API is down for longer than that
+  around a booking's start, that overrun notice is skipped.
+- Notifications triggered by an action (booking, approval, cancellation, ending early, disabling) are sent in the
+  background after the change is saved, so the action does not wait for the mail server.
 - The pending "keep or free the rest?" decisions of web users are held in memory. After an API restart the question
   is gone and the booking is kept.
 
@@ -294,6 +309,14 @@ Behaviour you should know about:
 
 All endpoints are under `/api/reservations` and accept a session cookie **or** an API token
 (`Authorization: Bearer <token>`, see the [API reference](developer/api-reference.md)). Times are ISO 8601.
+An API token acts with the token's permissions: manager actions (approving, cancelling or ending other people's
+bookings, the manager list, resource settings, managers-only booking) need `resources.update` or
+`resources.maintenance.manage` on the token itself. Maintainer and introducer rights from your roles still apply.
+Creating a calendar feed and regenerating its URL need a browser session (403 with an API token), because a feed URL
+shows your bookings with all your rights, like an API token does.
+Starting a resource with an API token goes through the core start check, which applies the token's permissions; the
+plugin's own override check (confirmation instead of a block during someone else's booking) still uses the permissions
+of your roles, because the start hook does not receive the token's scope.
 
 | Method and path                                             | Purpose                                                                                |
 | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |

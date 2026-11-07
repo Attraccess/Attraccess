@@ -7,8 +7,11 @@ import { ReservationEventHandlers } from '../events/event-handlers.service';
 import { ReservationScheduler } from '../scheduler/scheduler.service';
 import type { Harness } from './harness.test-utils';
 
-/** Part-2 services on top of the part-1 harness, with a scripted host-info facade. */
-export function createPart2(h: Harness) {
+/**
+ * The services that run outside a request (notifications, scheduler, event handlers, pre-start and
+ * session-end hooks) on top of the core harness, with a scripted host-info facade.
+ */
+export function createBackgroundServices(h: Harness) {
   const info = {
     managers: new Map<number, number[]>(),
     languages: new Map<number, Lang>(),
@@ -69,4 +72,4 @@ export function createPart2(h: Harness) {
     },
   };
 }
-export type Part2 = ReturnType<typeof createPart2>;
+export type BackgroundServices = ReturnType<typeof createBackgroundServices>;

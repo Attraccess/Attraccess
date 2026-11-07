@@ -18,7 +18,7 @@ import {
   type RouteConfig,
 } from '@attraccess/plugins-frontend-sdk';
 import type { PluginStore } from 'react-pluggable';
-import { listManaged } from './api';
+import { getManageAccess, resetManageAccess } from './api';
 import de from './de.json';
 import en from './en.json';
 import { IcalFeeds } from './ical/IcalFeeds';
@@ -35,9 +35,12 @@ const labels = () => (useTranslationState.getState().language === 'de' ? de : en
 
 export default class ReservationsPlugin implements AttraccessFrontendPlugin {
   // Users who manage reservations: resources.update holders at once, maintainers/introducers
-  // once the manage endpoint has answered (it is expected to reply 403 to everyone else).
+  // once `GET /manage/access` has answered.
   pluginStore!: PluginStore;
   private isManager = false;
+  /** Bumped on every auth change, so an answer for an earlier session cannot win. */
+  private authGeneration = 0;
+  private authUserId: number | undefined;
   private readonly sidebarListeners = new Set<() => void>();
 
   getPluginName(): string {
@@ -61,12 +64,24 @@ export default class ReservationsPlugin implements AttraccessFrontendPlugin {
   }
 
   onApiAuthStateChange(authData: null | AttraccessFrontendPluginAuthData): void {
-    const user = authData?.user as { effectivePermissions?: string[] } | null | undefined;
-    this.setManager(user?.effectivePermissions?.includes('resources.update') ?? false);
-    if (!user || this.isManager) return;
-    void listManaged({ page: 1 })
-      .then(() => this.setManager(true))
-      .catch(() => this.setManager(false));
+    const user = authData?.user as { id?: number; effectivePermissions?: string[] } | null | undefined;
+    if (user?.id !== this.authUserId) resetManageAccess();
+    this.authUserId = user?.id;
+    const generation = ++this.authGeneration;
+    const direct = user?.effectivePermissions?.includes('resources.update') ?? false;
+    if (!user || direct) {
+      this.setManager(direct);
+      return;
+    }
+    // Repeated notifications while a probe runs share its request (see getManageAccess).
+    void getManageAccess()
+      .then(
+        ({ isManager }) => isManager,
+        () => false,
+      )
+      .then((isManager) => {
+        if (generation === this.authGeneration) this.setManager(isManager);
+      });
   }
 
   /** The host reads the sidebar items again when this changes (it re-reads them on login but not after an async check). */

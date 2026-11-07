@@ -1,7 +1,7 @@
-import type { PluginAuditPrincipal } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import type { ReservationDto } from '../api/dto.response';
 import { Clock, RESERVATION_CLOCK } from '../constants';
+import type { ReservationActor } from '../reservations/actor';
 import { ReservationQueryService } from '../reservations/reservation-query.service';
 import { ReservationStore } from '../reservations/reservation.store';
 import { PendingDecisionStore } from './pending-decisions';
@@ -17,7 +17,7 @@ export class PendingDecisionService {
   ) {}
 
   /** The caller's booking still awaiting a keep/free answer on the resource, or null. */
-  async get(actor: PluginAuditPrincipal, resourceId: number): Promise<ReservationDto | null> {
+  async get(actor: ReservationActor, resourceId: number): Promise<ReservationDto | null> {
     const now = this.clock();
     const id = this.decisions.get(actor.userId, resourceId, now.getTime());
     if (id === null) return null;

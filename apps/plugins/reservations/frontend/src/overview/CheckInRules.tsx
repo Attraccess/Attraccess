@@ -6,9 +6,11 @@ export function CheckInRules({ rules }: Readonly<{ rules: BookingRules }>) {
   const { t } = useReservationsTranslations();
   return (
     <p className="rv:text-sm rv:text-muted" data-cy="reservations-checkin-rules">
-      {rules.checkInEnabled
-        ? t('checkIn.required', { grace: rules.checkInGraceMinutes, early: rules.earlyCheckInMinutes })
-        : t('checkIn.notRequired')}
+      {!rules.checkInEnabled
+        ? t('checkIn.notRequired')
+        : rules.earlyCheckInMinutes > 0
+          ? t('checkIn.required', { grace: rules.checkInGraceMinutes, early: rules.earlyCheckInMinutes })
+          : t('checkIn.requiredFromStart', { grace: rules.checkInGraceMinutes })}
     </p>
   );
 }

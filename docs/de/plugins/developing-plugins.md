@@ -43,7 +43,7 @@ ignoriert, und jeder Beitrag läuft in einer Error Boundary. Verfügbare Slots:
 | `resource.list.row`       | Kompakter Statusbereich einer Ressourcenzeile                                      | `{ resourceId }`           |
 | `resource.settings`       | Einstellungsseite der Ressource, für Nutzende, die sie verwalten dürfen (`resources.update`) | `{ resourceId }` |
 | `user.account`            | Kontoseite der angemeldeten Person                                                 | `{ userId }`               |
-| `admin.settings`          | Bereich der Systemeinstellungen, für Nutzende mit Systemverwaltungs-Berechtigung   | `{}`                       |
+| `admin.settings`          | Übersicht der Systemeinstellungen, nur für Nutzende mit der Berechtigung `system.settings.manage` | `{}` |
 
 `resource.settings`, `user.account` und `admin.settings` werden als **Abschnitte mit Titel** dargestellt: Setzen Sie
 `title` am Beitrag (sonst gilt ein allgemeiner Plugin-Titel). Die Konstanten `RESOURCE_OVERVIEW_SLOT`,
@@ -401,7 +401,7 @@ Weitere Events für Plugins, die Wartung, Gesundheit und laufende Sitzungen verf
 
 | Event                                           | Payload                                                                                   | Wird gesendet                                                         |
 | ----------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `SystemEvent.MAINTENANCE_CHANGED`               | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | Nachdem ein Wartungsfenster angelegt, geändert oder beendet wurde. `endTime` ist `null`, solange kein Ende gesetzt ist. |
+| `SystemEvent.MAINTENANCE_CHANGED`               | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | Nachdem ein Wartungsfenster angelegt oder beendet wurde. Core sendet derzeit nur `created` und `finished`; `updated` ist für einen künftigen Bearbeitungspfad reserviert. `endTime` ist `null`, solange kein Ende gesetzt ist. |
 | `SystemEvent.RESOURCE_HEALTH_CHANGED`           | `{ resourceId, status, previousStatus, reason, identifier }`                              | Nur bei einem echten Statuswechsel eines Gesundheitseintrags.         |
 | `SystemEvent.RESOURCE_USAGE_SESSION_STARTED`    | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                            | Eine Person startet eine Sitzung auf einer freien Ressource (keine Übernahme). `supervisorUserId` ist bei beaufsichtigten Starts gesetzt. |
 | `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`             | Eine Person übernimmt eine laufende Sitzung. Gilt für die **neue** Person. |
@@ -450,15 +450,23 @@ async function notify(context: PluginContext, userId: number) {
 ### Ressourcen-Zugriff (Abfragen)
 
 `context.resourceAccess` (Berechtigung `ACCESS_RESOURCES`) beantwortet lesende Berechtigungs- und Zustandsfragen mit
-derselben Logik, mit der der Kern einen Sitzungsstart autorisiert, sodass Plugin-Entscheidungen nicht davon abweichen:
+derselben Logik, mit der der Kern einen Sitzungsstart autorisiert, sodass Plugin-Entscheidungen nicht davon abweichen.
+
+Methoden mit `principal` nehmen eine Benutzer-ID oder den Benutzer der Anfrage entgegen
+(`PluginAccessPrincipal = number | { id, effectivePermissions? }`). **Übergeben Sie bei anfragebezogenen Prüfungen
+`request.user`**, damit die Bereiche von API-Tokens gelten: Ein API-Token trägt nur die Berechtigungen, mit denen es
+erstellt wurde, und berechtigungsbasierte Freigaben werden auf diese Menge beschränkt (geschnitten mit den aktuellen
+Berechtigungen der Person), genau wie bei Kern-Routen. Rollen als Einweisende/Wartende und Einweisungen zählen
+weiterhin. Eine reine Benutzer-ID löst die vollen RBAC-Berechtigungen auf; nutzen Sie sie für Hintergrundarbeit wie
+Scheduler. Unbekannte Personen und Ressourcen ergeben negative Antworten (`false`, alles `false`, `[]`) statt Fehlern.
 
 | Methode                                       | Liefert                                                                                                              |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `canStart(userId, resourceId)`                | `{ allowed, requiresSupervision, supervisionAllowed }`. Berücksichtigt Einweisungen, Nachschulungssperren, Einweisende/Wartende, `resources.update` und den Aufsichtsmodus. Aktuelle Wartung oder Gesundheit werden **nicht** berücksichtigt. |
-| `canMaintain(userId, resourceId)`             | Ob die Person die Wartung der Ressource verwalten darf (Berechtigung, Einweisende/Wartende, Gruppenrollen).          |
-| `hasPermission(userId, permission)`           | Ob die Person eine RBAC-Berechtigung wie `resources.update` besitzt.                                                 |
-| `listResourceIdsIntroduced(userId)`           | Ressourcen, in die die Person im Sinne von `canStart` eingewiesen ist (gültige Einweisung, Einweisende/Wartende, `resources.update`). |
-| `listResourceIdsMaintained(userId)`           | Ressourcen, deren Wartung die Person verwalten darf.                                                                 |
+| `canStart(principal, resourceId)`             | `{ allowed, requiresSupervision, supervisionAllowed }`. Berücksichtigt Einweisungen, Nachschulungssperren, Einweisende/Wartende, `resources.update` und den Aufsichtsmodus. Aktuelle Wartung oder Gesundheit werden **nicht** berücksichtigt. |
+| `canMaintain(principal, resourceId)`          | Ob die Person die Wartung der Ressource verwalten darf (`resources.maintenance.manage`, Einweisende/Wartende der Ressource oder einer ihrer Gruppen). Dieselbe Prüfung wie die Wartungs-API des Kerns. |
+| `hasPermission(principal, permission)`        | Ob die Person eine RBAC-Berechtigung wie `resources.update` besitzt, beschränkt auf den Bereich der Anfrage.          |
+| `listResourceIdsIntroduced(principal)`        | Ressourcen, in die die Person im Sinne von `canStart` eingewiesen ist (gültige Einweisung, Einweisende/Wartende, `resources.update`). |
+| `listResourceIdsMaintained(principal)`        | Ressourcen, deren Wartung die Person verwalten darf.                                                                 |
 | `getMaintenanceWindows(resourceId, from, to)` | Fenster, die `[from, to)` überschneiden, als `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Offene Wartung zählt bis zu ihrem Abschluss. |
 | `getActiveSessions(resourceId)`               | Laufende Sitzungen `{ usageId, userId, startTime }`, die früheste zuerst.                                            |
 
@@ -475,6 +483,14 @@ await context.runSerialized(async (manager) => {
   await manager.getRepository(Booking).save(newBooking);
 });
 ```
+
+Die Warteschlange teilt sich `runSerialized` mit jedem Sitzungsstart und -ende des Kerns. Deshalb:
+
+- `fn` kurz halten und auf Datenbankarbeit über den übergebenen `manager` beschränken; keine HTTP-, MQTT-, E-Mail-
+  oder andere Nicht-Datenbank-Ein-/Ausgabe darin;
+- Aufrufe nicht verschachteln. Ein in `fn` gestartetes `runSerialized` würde auf `fn` selbst warten; der Host weist
+  es deshalb mit einem Fehler ab, statt zu hängen. Geben Sie stattdessen den `manager` an Hilfsfunktionen weiter und
+  warten Sie in `fn` nicht auf Kern-Vorgänge, die über dieselbe Warteschlange schreiben (etwa Sitzungsstart oder -ende).
 
 Die Serialisierung gilt pro Host-Prozess. Plugins, die Ausschluss über mehrere API-Instanzen brauchen, benötigen eine
 eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe

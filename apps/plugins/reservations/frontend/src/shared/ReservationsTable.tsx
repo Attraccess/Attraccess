@@ -1,5 +1,5 @@
 import { Button, EmptyState, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
-import { Link } from 'react-router-dom';
+import { Link } from '@heroui/react';
 import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
 import type { Reservation } from '../lib/types';
@@ -66,7 +66,7 @@ export function ReservationsTable({
           >
             <div className="rv:flex rv:min-w-0 rv:flex-col rv:gap-1">
               <span className="rv:flex rv:flex-wrap rv:items-center rv:gap-2">
-                <Link to={`/reservations/${item.id}`} className="rv:font-medium rv:underline">
+                <Link href={`/reservations/${item.id}`} className="rv:font-medium">
                   {item.resourceName ?? `#${item.resourceId}`}
                 </Link>
                 <StatusChip status={item.status} />

@@ -7,6 +7,28 @@ const valid = (patch: Partial<ResourceSettingsValues> = {}): ResourceSettingsVal
 });
 
 describe('settings validation', () => {
+  it('ships the defaults the requirements define', () => {
+    expect(DEFAULT_SETTINGS).toEqual({
+      enabled: false,
+      approvalRequired: false,
+      timeStepMinutes: 15,
+      minDurationMinutes: 15,
+      maxDurationMinutes: 240,
+      maxAdvanceDays: 30,
+      minLeadMinutes: 0,
+      bufferBeforeMinutes: 0,
+      bufferAfterMinutes: 0,
+      maxActiveBookingsPerUser: 3,
+      whoCanBook: 'can-start',
+      confirmWindowMinutes: 60,
+      checkInEnabled: true,
+      checkInGraceMinutes: 15,
+      earlyCheckInMinutes: 15,
+      handoverReminderMinutes: 15,
+      bookableHours: {},
+    });
+  });
+
   it('accepts the defaults', () => {
     expect(validateSettings(valid())).toEqual([]);
   });

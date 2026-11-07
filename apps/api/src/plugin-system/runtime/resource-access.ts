@@ -1,69 +1,92 @@
 import { Resource, SupervisionMode, User } from '@attraccess/database-entities';
 import type {
+  AuthenticatedUser,
+  PluginAccessPrincipal,
   PluginActiveSession,
   PluginCanStartResult,
   PluginMaintenanceWindow,
   PluginResourceAccessContext,
 } from '@attraccess/plugins-backend-sdk';
-import { NotFoundException } from '@nestjs/common';
-import type { ResourceIntroducersService } from '../../resources/introducers/resourceIntroducers.service';
 import type { ResourceMaintenanceService } from '../../resources/maintenances/maintenance.service';
 import type { ResourceUsageService } from '../../resources/usage/sessions/resource-usage.service';
 import type { RbacService } from '../../users-and-auth/rbac/rbac.service';
 
-const MAINTENANCE_MANAGE_PERMISSION = 'resources.maintenance.manage';
 const LOOKUP_CONCURRENCY = 20;
+const NO_START: PluginCanStartResult = { allowed: false, requiresSupervision: false, supervisionAllowed: false };
 
 /** Core services and lookups the plugin-facing access queries delegate to. */
 export interface ResourceAccessDeps {
   usage: Pick<ResourceUsageService, 'canControllResource' | 'getActiveSessionsForResource'>;
-  introducers: Pick<ResourceIntroducersService, 'canMaintain'>;
-  maintenance: Pick<ResourceMaintenanceService, 'getMaintenanceManagedResourceIds' | 'findOverlappingMaintenances'>;
+  maintenance: Pick<
+    ResourceMaintenanceService,
+    'canManageMaintenance' | 'getMaintenanceManagedResourceIds' | 'findOverlappingMaintenances'
+  >;
   rbac: Pick<RbacService, 'getEffectivePermissions'>;
   findUser(userId: number): Promise<User | null>;
   findResource(resourceId: number): Promise<Pick<Resource, 'id' | 'supervisionMode'> | null>;
   listResourceIds(): Promise<number[]>;
 }
 
-/** Plugin-facing, read-only facade over core authorization. Holds no logic of its own beyond composition. */
+/**
+ * Plugin-facing, read-only facade over core authorization. Holds no logic of its own beyond composition.
+ *
+ * A principal carrying `effectivePermissions` (an HTTP request's user) is handed to core services as an
+ * AuthenticatedUser with that set, intersected with the user's current RBAC permissions. Core services read the
+ * attached set instead of the user's full RBAC permissions, so API-token scopes apply exactly as on core routes.
+ */
 export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): PluginResourceAccessContext {
-  const hasPermission = async (userId: number, permission: string): Promise<boolean> =>
-    (await getDeps().rbac.getEffectivePermissions(userId)).has(permission);
+  const principalId = (principal: PluginAccessPrincipal): number =>
+    typeof principal === 'number' ? principal : principal.id;
+
+  /** The permissions a principal may use, or undefined when core should resolve the user's full RBAC set. */
+  const scopedPermissions = async (principal: PluginAccessPrincipal): Promise<Set<string> | undefined> => {
+    if (typeof principal === 'number' || principal.effectivePermissions === undefined) return undefined;
+    const current = await getDeps().rbac.getEffectivePermissions(principal.id);
+    return new Set([...principal.effectivePermissions].filter((permission) => current.has(permission)));
+  };
+
+  /** Loads the user and attaches the request scope, mirroring what core's auth strategy hands its services. */
+  const resolveUser = async (principal: PluginAccessPrincipal): Promise<User | AuthenticatedUser | null> => {
+    const user = await getDeps().findUser(principalId(principal));
+    if (!user) return null;
+    const effectivePermissions = await scopedPermissions(principal);
+    return effectivePermissions ? ({ ...user, effectivePermissions } as AuthenticatedUser) : user;
+  };
 
   return {
-    async canStart(userId, resourceId): Promise<PluginCanStartResult> {
+    async canStart(principal, resourceId): Promise<PluginCanStartResult> {
       const deps = getDeps();
       const resource = await deps.findResource(resourceId);
-      if (!resource) throw new NotFoundException(`Resource with ID ${resourceId} not found`);
+      const user = resource ? await resolveUser(principal) : null;
+      if (!resource || !user) return { ...NO_START };
       const supervisionAllowed =
         resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED ||
         resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED;
-      const user = await deps.findUser(userId);
-      const canControl = user ? await deps.usage.canControllResource(resourceId, user) : false;
+      const canControl = await deps.usage.canControllResource(resourceId, user);
       // Same rules as the solo-start guard and the reader's requiresSupervisor flag.
-      const requiresSupervision =
-        resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
-        (resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !canControl);
       return {
         allowed: canControl && resource.supervisionMode !== SupervisionMode.SUPERVISION_REQUIRED,
-        requiresSupervision: user ? requiresSupervision : false,
-        supervisionAllowed: user ? supervisionAllowed : false,
+        requiresSupervision:
+          resource.supervisionMode === SupervisionMode.SUPERVISION_REQUIRED ||
+          (resource.supervisionMode === SupervisionMode.SUPERVISION_ALLOWED && !canControl),
+        supervisionAllowed,
       };
     },
 
-    async canMaintain(userId, resourceId) {
-      const deps = getDeps();
-      return (
-        (await hasPermission(userId, MAINTENANCE_MANAGE_PERMISSION)) ||
-        (await deps.introducers.canMaintain(resourceId, userId, true))
-      );
+    async canMaintain(principal, resourceId) {
+      const user = await resolveUser(principal);
+      return user ? getDeps().maintenance.canManageMaintenance(user, resourceId) : false;
     },
 
-    hasPermission,
+    async hasPermission(principal, permission) {
+      const permissions =
+        (await scopedPermissions(principal)) ?? (await getDeps().rbac.getEffectivePermissions(principalId(principal)));
+      return permissions.has(permission);
+    },
 
-    async listResourceIdsIntroduced(userId) {
+    async listResourceIdsIntroduced(principal) {
       const deps = getDeps();
-      const user = await deps.findUser(userId);
+      const user = await resolveUser(principal);
       if (!user) return [];
       const resourceIds = await deps.listResourceIds();
       const introduced: number[] = [];
@@ -75,9 +98,9 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
       return introduced;
     },
 
-    async listResourceIdsMaintained(userId) {
+    async listResourceIdsMaintained(principal) {
       const deps = getDeps();
-      const user = await deps.findUser(userId);
+      const user = await resolveUser(principal);
       if (!user) return [];
       const resourceIds = await deps.listResourceIds();
       const maintained = await deps.maintenance.getMaintenanceManagedResourceIds(user, resourceIds);

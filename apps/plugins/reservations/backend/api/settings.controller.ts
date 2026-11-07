@@ -44,7 +44,7 @@ export class ReservationSettingsController {
   ): Promise<ManagerAccessDto> {
     if (!(await this.directory.getResource(resourceId)))
       throw new ReservationError('RESOURCE_NOT_FOUND', 'Resource not found');
-    return { isManager: await this.access.isManager(principalOf(request).userId, resourceId) };
+    return { isManager: await this.access.isManager(principalOf(request), resourceId) };
   }
 
   @Get('resources/:resourceId/settings')

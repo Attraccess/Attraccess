@@ -109,11 +109,26 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
     await this.notifications.notifyOverrideStart(active, userId);
   }
 
-  /** The holder stopped a session in their own running booking: remember the keep/free question. */
+  /**
+   * A session ended. If it ran inside the holder's own booking without a check-in (it started before the
+   * early check-in window and ended before the no-show deadline), it counts as the check-in. When the holder
+   * stopped it in their own running booking, remember the keep/free question.
+   */
   async onSessionEnded(event: SystemEventPayload[SystemEvent.RESOURCE_USAGE_SESSION_ENDED]): Promise<void> {
-    if (event.reason !== 'ended') return;
     if (!this.settings.getCachedSettings(event.resourceId).enabled) return;
     const now = this.clock();
+    const sessionEnd = event.endTime ?? now;
+    const ranIn = await this.store.findUncheckedOverlapping(
+      event.userId,
+      event.resourceId,
+      event.startTime,
+      sessionEnd,
+    );
+    for (const booking of ranIn) {
+      const at = new Date(Math.max(booking.startTime.getTime(), event.startTime.getTime()));
+      await this.reservations.markCheckedIn(booking.id, event.usageId, at);
+    }
+    if (event.reason !== 'ended') return;
     const own = (await this.store.findActiveForResource(event.resourceId, now)).find((r) => r.userId === event.userId);
     if (own) this.decisions.record(event.userId, event.resourceId, own.id, now.getTime());
   }

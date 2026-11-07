@@ -1,10 +1,12 @@
-import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK, RESERVATION_NOTIFIER } from '../constants';
 import { ReservationEntity, ReservationStatus } from '../entities/reservation.entity';
+import { VisibilityService } from '../ical/visibility.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
 import { GlobalSettingsService } from '../settings/global-settings.service';
 import { AccessService } from './access.service';
+import type { ReservationActor } from './actor';
 import { ReservationAudit } from './audit';
 import { DirectoryService } from './directory.service';
 import { ReservationError } from './errors';
@@ -15,6 +17,10 @@ import { blockedSpan, checkBookingRules, spansOverlap } from './rules';
 
 export const MAX_TEXT_LENGTH = 500;
 export const DISABLED_REASON = 'reservations disabled';
+/** How many "booking removed" notices a bulk cancellation sends in parallel (keeps SMTP load modest). */
+export const BULK_NOTICE_CONCURRENCY = 4;
+/** How long shutdown waits for background notifications still in flight. */
+const SHUTDOWN_FLUSH_MS = 10_000;
 
 export interface CreateReservationInput {
   resourceId: number;
@@ -28,12 +34,19 @@ export function cleanText(value: string | null | undefined): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-/** Commands on reservations: create, cancel, end early, keep, approve/reject and scheduler transitions. */
+/**
+ * Commands on reservations: create, cancel, end early, keep, approve/reject and scheduler transitions.
+ *
+ * Notifications are sent in the background after the change committed: a slow mail server never holds
+ * up a request. Delivery errors are caught and logged; the notifier's persisted claims keep every
+ * notice at most once.
+ */
 @Injectable()
-export class ReservationService {
+export class ReservationService implements OnModuleDestroy {
   private readonly logger = new Logger('Reservations');
   private readonly mutex = new KeyedMutex();
   private readonly audit: ReservationAudit;
+  private readonly pendingNotices = new Set<Promise<void>>();
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
@@ -42,23 +55,73 @@ export class ReservationService {
     @Inject(GlobalSettingsService) private readonly globalSettings: GlobalSettingsService,
     @Inject(AccessService) private readonly access: AccessService,
     @Inject(DirectoryService) private readonly directory: DirectoryService,
+    @Inject(VisibilityService) private readonly visibility: VisibilityService,
     @Inject(RESERVATION_NOTIFIER) private readonly notifier: ReservationNotifier,
     @Inject(RESERVATION_CLOCK) private readonly clock: Clock,
   ) {
     this.audit = new ReservationAudit(context.audit, this.logger);
   }
 
-  /** Audit writer shared with settings/feed code and part 2 (override_start, no_show, ...). */
+  /** Audit writer shared with the settings, feed, event and scheduler code (override_start, no_show, ...). */
   get auditLog(): ReservationAudit {
     return this.audit;
   }
 
-  private async notify(label: string, send: () => Promise<void> | void): Promise<void> {
+  /** Lets background notifications finish (bounded) before the host closes the database. */
+  async onModuleDestroy(): Promise<void> {
+    let timer: NodeJS.Timeout | undefined;
+    const limit = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, SHUTDOWN_FLUSH_MS);
+      timer.unref();
+    });
+    await Promise.race([this.flushNotifications(), limit]);
+    clearTimeout(timer);
+  }
+
+  /** Resolves once every background notification started so far has settled (shutdown and tests). */
+  async flushNotifications(): Promise<void> {
+    while (this.pendingNotices.size > 0) await Promise.all([...this.pendingNotices]);
+  }
+
+  /**
+   * Runs `work` under the per-resource lock that serialises booking creation. Settings changes that
+   * disable reservations take it too, so a concurrent create either commits first (and is cancelled)
+   * or sees `enabled: false`.
+   */
+  withResourceLock<T>(resourceId: number, work: () => Promise<T>): Promise<T> {
+    return this.mutex.run(resourceId, work);
+  }
+
+  private async deliver(label: string, send: () => Promise<void> | void): Promise<void> {
     try {
       await send();
     } catch (error) {
       this.logger.warn(`notifier ${label} failed: ${error instanceof Error ? error.message : String(error)}`);
     }
+  }
+
+  private track(task: Promise<void>): void {
+    this.pendingNotices.add(task);
+    void task.finally(() => this.pendingNotices.delete(task));
+  }
+
+  /** Fire-and-forget: never awaited by the request, never rejects (errors are logged in `deliver`). */
+  private notify(label: string, send: () => Promise<void> | void): void {
+    this.track(this.deliver(label, send));
+  }
+
+  /** Background notices for many bookings, at most BULK_NOTICE_CONCURRENCY at a time. */
+  private notifyEach<T>(label: string, items: T[], send: (item: T) => Promise<void> | void): void {
+    if (items.length === 0) return;
+    const queue = [...items];
+    const worker = async () => {
+      for (let item = queue.shift(); item !== undefined; item = queue.shift()) {
+        const current = item;
+        await this.deliver(label, () => send(current));
+      }
+    };
+    const workers = Array.from({ length: Math.min(BULK_NOTICE_CONCURRENCY, queue.length) }, worker);
+    this.track(Promise.all(workers).then(() => undefined));
   }
 
   // ---------------------------------------------------------------- create
@@ -68,12 +131,14 @@ export class ReservationService {
    * transaction), so of N concurrent overlapping requests exactly one succeeds. Throws a typed
    * `ReservationError` (409 with `{ code, message }`) for every violated rule.
    */
-  async create(actor: PluginAuditPrincipal, input: CreateReservationInput): Promise<ReservationEntity> {
+  async create(actor: ReservationActor, input: CreateReservationInput): Promise<ReservationEntity> {
     const resource = await this.directory.getResource(input.resourceId);
-    if (!resource) throw new ReservationError('RESOURCE_NOT_FOUND', 'Resource not found');
+    // A resource hidden from the actor (hidden groups) is answered like an unknown one.
+    const visible = resource ? await this.visibility.filterVisible(actor, [input.resourceId]) : [];
+    if (!visible.includes(input.resourceId)) throw new ReservationError('RESOURCE_NOT_FOUND', 'Resource not found');
     const created = await this.mutex.run(input.resourceId, async () => {
       const settings = await this.settings.get(input.resourceId);
-      const canBook = await this.access.canBook(actor.userId, input.resourceId, settings);
+      const canBook = await this.access.canBook(actor, input.resourceId, settings);
       if (!canBook.allowed && canBook.reason) {
         throw new ReservationError(
           canBook.reason,
@@ -138,8 +203,8 @@ export class ReservationService {
         holderUserId: created.userId,
       },
     );
-    if (created.status === 'pending') await this.notify('onPending', () => this.notifier.onPending(created));
-    else await this.notify('onConfirmed', () => this.notifier.onConfirmed(created, { viaApproval: false }));
+    if (created.status === 'pending') this.notify('onPending', () => this.notifier.onPending(created));
+    else this.notify('onConfirmed', () => this.notifier.onConfirmed(created, { viaApproval: false }));
     return created;
   }
 
@@ -153,17 +218,17 @@ export class ReservationService {
 
   /** Loads a reservation for an actor: non-holders that do not manage the resource get a 404. */
   async getForActor(
-    actor: PluginAuditPrincipal,
+    actor: ReservationActor,
     id: number,
   ): Promise<{ reservation: ReservationEntity; isHolder: boolean; isManager: boolean }> {
     const reservation = await this.load(id);
     const isHolder = reservation.userId === actor.userId;
-    const isManager = await this.access.isManager(actor.userId, reservation.resourceId);
+    const isManager = await this.access.isManager(actor, reservation.resourceId);
     if (!isHolder && !isManager) throw new ReservationError('RESERVATION_NOT_FOUND', 'Reservation not found');
     return { reservation, isHolder, isManager };
   }
 
-  async cancel(actor: PluginAuditPrincipal, id: number, reason?: string | null): Promise<ReservationEntity> {
+  async cancel(actor: ReservationActor, id: number, reason?: string | null): Promise<ReservationEntity> {
     const { reservation, isHolder, isManager } = await this.getForActor(actor, id);
     const now = this.clock();
     const live = reservation.status === 'pending' || reservation.status === 'confirmed';
@@ -192,14 +257,14 @@ export class ReservationService {
         reason: cleaned,
       },
     );
-    await this.notify('onCancelled', () =>
+    this.notify('onCancelled', () =>
       this.notifier.onCancelled(updated, { byUserId: actor.userId, byHolder: isHolder }),
     );
     return updated;
   }
 
   /** Ends an active booking now (endTime = now) and frees the slot. Holder or manager. */
-  async endEarly(actor: PluginAuditPrincipal, id: number): Promise<ReservationEntity> {
+  async endEarly(actor: ReservationActor, id: number): Promise<ReservationEntity> {
     const { reservation, isHolder, isManager } = await this.getForActor(actor, id);
     const now = this.clock();
     const active =
@@ -224,12 +289,12 @@ export class ReservationService {
         byManager: !isHolder && isManager,
       },
     );
-    await this.notify('onEndedEarly', () => this.notifier.onEndedEarly(updated, { byUserId: actor.userId }));
+    this.notify('onEndedEarly', () => this.notifier.onEndedEarly(updated, { byUserId: actor.userId }));
     return updated;
   }
 
   /** Holder keeps the booking ("still needed" answer / keep the rest after stopping). Idempotent. */
-  async keep(actor: PluginAuditPrincipal, id: number): Promise<ReservationEntity> {
+  async keep(actor: ReservationActor, id: number): Promise<ReservationEntity> {
     const reservation = await this.load(id);
     if (reservation.userId !== actor.userId)
       throw new ReservationError('RESERVATION_NOT_FOUND', 'Reservation not found');
@@ -243,22 +308,27 @@ export class ReservationService {
 
   // -------------------------------------------------------------- approval
 
-  async approve(actor: PluginAuditPrincipal, id: number, reason?: string | null): Promise<ReservationEntity> {
+  async approve(actor: ReservationActor, id: number, reason?: string | null): Promise<ReservationEntity> {
     return this.decide(actor, id, 'confirmed', reason);
   }
 
-  async reject(actor: PluginAuditPrincipal, id: number, reason?: string | null): Promise<ReservationEntity> {
+  async reject(actor: ReservationActor, id: number, reason?: string | null): Promise<ReservationEntity> {
     return this.decide(actor, id, 'rejected', reason);
   }
 
   private async decide(
-    actor: PluginAuditPrincipal,
+    actor: ReservationActor,
     id: number,
     target: 'confirmed' | 'rejected',
     reason?: string | null,
   ): Promise<ReservationEntity> {
     const reservation = await this.load(id);
-    if (!(await this.access.isManager(actor.userId, reservation.resourceId))) {
+    if (!(await this.access.isManager(actor, reservation.resourceId))) {
+      // Like everywhere else, a booking the caller may not see does not exist for them. Only the holder,
+      // who knows their own request, learns that deciding is not theirs to do.
+      if (reservation.userId !== actor.userId) {
+        throw new ReservationError('RESERVATION_NOT_FOUND', 'Reservation not found');
+      }
       throw new ReservationError('FORBIDDEN', 'Only managers of this resource can decide on bookings');
     }
     if (reservation.status !== 'pending')
@@ -286,47 +356,46 @@ export class ReservationService {
       },
     );
     if (target === 'confirmed')
-      await this.notify('onConfirmed', () => this.notifier.onConfirmed(updated, { viaApproval: true }));
-    else await this.notify('onRejected', () => this.notifier.onRejected(updated));
+      this.notify('onConfirmed', () => this.notifier.onConfirmed(updated, { viaApproval: true }));
+    else this.notify('onRejected', () => this.notifier.onRejected(updated));
     return updated;
   }
 
   // -------------------------------------------------- disabling a resource
 
-  async countFutureBookings(resourceId: number): Promise<number> {
-    return (await this.store.findFutureLive(resourceId, this.clock())).length;
+  countFutureBookings(resourceId: number): Promise<number> {
+    return this.store.countFutureLive(resourceId, this.clock());
   }
 
-  /** Cancels every future pending/confirmed booking of the resource (reason `reservations disabled`). */
-  async cancelFutureBookings(actor: PluginAuditPrincipal, resourceId: number): Promise<number> {
-    const future = await this.store.findFutureLive(resourceId, this.clock());
-    let cancelled = 0;
-    for (const reservation of future) {
-      const changed = await this.store.transition(reservation.id, ['pending', 'confirmed'], {
-        status: 'cancelled',
-        cancelledBy: actor.userId,
-        cancelReason: DISABLED_REASON,
-      });
-      if (!changed) continue;
-      cancelled += 1;
-      const updated = await this.load(reservation.id);
+  /**
+   * Cancels every future pending/confirmed booking of the resource (reason `reservations disabled`) in
+   * one serialized write, audits each and notifies the holders in the background. Callers that disable
+   * the resource hold `withResourceLock` around this.
+   */
+  async cancelFutureBookings(actor: ReservationActor, resourceId: number): Promise<number> {
+    const cancelled = await this.store.cancelFutureLive(resourceId, this.clock(), {
+      status: 'cancelled',
+      cancelledBy: actor.userId,
+      cancelReason: DISABLED_REASON,
+    });
+    for (const reservation of cancelled) {
       await this.audit.record(
         'cancelled',
         actor,
-        { type: 'reservation', id: updated.id },
+        { type: 'reservation', id: reservation.id },
         {
           resourceId,
-          holderUserId: updated.userId,
-          byManager: updated.userId !== actor.userId,
+          holderUserId: reservation.userId,
+          byManager: reservation.userId !== actor.userId,
           reason: DISABLED_REASON,
           bulk: true,
         },
       );
-      await this.notify('onRemoved', () =>
-        this.notifier.onRemoved(updated, { byUserId: actor.userId, reason: DISABLED_REASON }),
-      );
     }
-    return cancelled;
+    this.notifyEach('onRemoved', cancelled, (reservation) =>
+      this.notifier.onRemoved(reservation, { byUserId: actor.userId, reason: DISABLED_REASON }),
+    );
+    return cancelled.length;
   }
 
   // ------------------------------------------- scheduler / hook transitions
@@ -336,8 +405,9 @@ export class ReservationService {
     from: ReservationStatus[],
     changes: Partial<ReservationEntity>,
     action: 'no_show' | 'expired' | null,
+    options: { notCheckedIn?: boolean } = {},
   ): Promise<boolean> {
-    const changed = await this.store.transition(id, from, changes);
+    const changed = await this.store.transition(id, from, changes, options);
     if (changed && action) {
       const updated = await this.load(id);
       await this.audit.record(
@@ -353,9 +423,12 @@ export class ReservationService {
     return changed;
   }
 
-  /** confirmed -> no_show. True only for the call that made the transition (send the holder email then). */
+  /**
+   * confirmed -> no_show, only while the booking still has no check-in. True only for the call that made
+   * the transition (send the holder email then).
+   */
   markNoShow(id: number): Promise<boolean> {
-    return this.system(id, ['confirmed'], { status: 'no_show' }, 'no_show');
+    return this.system(id, ['confirmed'], { status: 'no_show' }, 'no_show', { notCheckedIn: true });
   }
 
   /** pending -> expired (still pending at start). True only for the call that made the transition. */

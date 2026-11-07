@@ -1,8 +1,8 @@
-import { Button, StatusDialog } from '@attraccess/plugins-frontend-ui';
-import { ListBox, ListBoxItem } from '@heroui/react';
+import { Button, StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
+import { ListBox, ListBoxItem, Spinner } from '@heroui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { getGlobalSettings, updateGlobalSettings } from '../api';
+import { ReservationsApiError, getGlobalSettings, updateGlobalSettings } from '../api';
 import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
 import { useInvalidateReservations } from '../lib/queries';
@@ -56,14 +56,34 @@ export function AdminTimezoneSettings() {
   }, [zones, filter, savedZone]);
   const matches = useMemo(() => allMatches.slice(0, MAX_LISTED), [allMatches]);
 
-  if (query.isError || !query.data) return null;
+  // The host shows this slot to settings admins only; a 403 still means "not for you".
+  if (query.error instanceof ReservationsApiError && query.error.status === 403) return null;
+  if (query.isError) {
+    return (
+      <div className="rv:flex rv:flex-col rv:items-start rv:gap-2" data-cy="reservations-admin-load-error">
+        <StatusAlert status="danger" title={t('admin.loadFailed')}>
+          {describeError(query.error, t)}
+        </StatusAlert>
+        <Button size="sm" variant="secondary" onPress={() => void query.refetch()}>
+          {t('common.retry')}
+        </Button>
+      </div>
+    );
+  }
+  if (!query.data) {
+    return (
+      <div className="rv:flex rv:justify-center rv:py-4" data-cy="reservations-admin-loading">
+        <Spinner size="sm" aria-label={t('common.loading')} />
+      </div>
+    );
+  }
   const valid = isValidTimeZone(timezone);
 
   return (
     <div className="rv:flex rv:flex-col rv:gap-3" data-cy="reservations-admin-settings">
       <p className="rv:text-sm rv:text-muted">{t('admin.description')}</p>
       <p className="rv:text-sm">
-        {t('admin.current')}: <strong>{timezone}</strong> (
+        {t('admin.current')}: <strong data-cy="reservations-admin-current">{query.data.timezone}</strong> (
         {t('admin.default', { timezone: query.data.defaultTimezone })})
       </p>
       <TextInput
@@ -106,7 +126,7 @@ export function AdminTimezoneSettings() {
         </Button>
       </div>
       <StatusDialog isOpen={saved} onClose={() => setSaved(false)} status="success" title={t('admin.saved')}>
-        {t('admin.savedBody', { timezone })}
+        {t('admin.savedBody', { timezone: query.data.timezone })}
       </StatusDialog>
       <StatusDialog isOpen={error !== null} onClose={() => setError(null)} status="error" title={t('admin.failed')}>
         {error ?? ''}

@@ -1,4 +1,4 @@
-import { Auth, type AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { Auth, type AuthenticatedRequest, SessionOnlyGuard } from '@attraccess/plugins-backend-sdk';
 import {
   Body,
   Controller,
@@ -16,10 +16,12 @@ import {
   Post,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBody,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
@@ -30,12 +32,15 @@ import { validated } from '../api/pipes';
 import { ApiReservationErrors, principalOf } from '../api/support';
 import { Clock, RESERVATION_CLOCK } from '../constants';
 import { CreateIcalFeedBody, IcalFeedDto, IcalFeedSecretDto, UpdateIcalFeedBody } from './ical.dto';
-import { IcalService } from './ical.service';
+import { FEED_TOKEN_PATTERN, IcalService, hashToken } from './ical.service';
 import { RateLimiter } from './rate-limiter';
 
 const FEED_ID = { name: 'id', type: Number } as const;
 
-/** Feed management for the signed-in user (session or API token). */
+/**
+ * Feed management for the signed-in user (session or API token). Issuing a feed URL needs a browser session, like
+ * issuing an API token in core: the URL renders with the owner's full rights, so a narrower API token must not mint one.
+ */
 @ApiTags('Reservations')
 @Auth()
 @Controller('reservations/ical/feeds')
@@ -50,6 +55,8 @@ export class IcalFeedsController {
   }
 
   @Post()
+  @UseGuards(SessionOnlyGuard)
+  @ApiForbiddenResponse({ description: 'Session authentication required (API tokens cannot issue feed URLs)' })
   @ApiOperation({
     summary: 'Create a calendar feed',
     description: 'The subscription URL and token are returned ONLY here and on regenerate.',
@@ -80,6 +87,8 @@ export class IcalFeedsController {
 
   @Post(':id/regenerate')
   @HttpCode(200)
+  @UseGuards(SessionOnlyGuard)
+  @ApiForbiddenResponse({ description: 'Session authentication required (API tokens cannot issue feed URLs)' })
   @ApiOperation({
     summary: 'Issue a new secret URL; the old one answers 404 immediately',
     description: 'The new URL and token are returned ONLY here.',
@@ -106,7 +115,9 @@ export const ICAL_RATE_LIMIT = { perFeedPerMinute: 60, perIpPerMinute: 240 } as 
 /**
  * Public calendar endpoint: NO auth guard on purpose, the secret token in the URL is the credential
  * (core registers no global authentication guard, only the cross-site write guard, which ignores GET).
- * Unknown and revoked tokens answer an identical 404. Rate limited per IP+token and per IP.
+ * Unknown and revoked tokens answer an identical 404. Malformed tokens answer 404 before any rate-limit
+ * bookkeeping; well-formed ones are limited per IP first and, only when that passes, per IP + feed (keyed on
+ * the token's hash, so keys have a fixed length).
  */
 @ApiTags('Reservations')
 @Controller('reservations/ical')
@@ -134,9 +145,11 @@ export class IcalPublicController {
   ): Promise<string> {
     if (!file.endsWith('.ics')) throw new NotFoundException();
     const token = file.slice(0, -4);
+    if (!FEED_TOKEN_PATTERN.test(token)) throw new NotFoundException();
     const now = this.clock().getTime();
-    const ip = request.ip ?? 'unknown';
-    const wait = Math.max(this.perIp.hit(ip, now), this.perFeed.hit(`${ip}|${token}`, now));
+    const ip = (request.ip ?? 'unknown').slice(0, 64);
+    let wait = this.perIp.hit(ip, now);
+    if (wait === 0) wait = this.perFeed.hit(`${ip}|${hashToken(token)}`, now);
     if (wait > 0) {
       response.setHeader('Retry-After', String(wait));
       throw new HttpException('Too many requests', HttpStatus.TOO_MANY_REQUESTS);

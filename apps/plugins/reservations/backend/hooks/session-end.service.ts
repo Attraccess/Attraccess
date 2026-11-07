@@ -1,8 +1,7 @@
 import type { SessionEndContext, SessionEndResult } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Clock, RESERVATION_CLOCK } from '../constants';
-import { pick } from '../notifications/format';
-import { formatTime } from '../notifications/format';
+import { formatTime, pick } from '../notifications/format';
 import { ReservationAudit } from '../reservations/audit';
 import { ReservationError } from '../reservations/errors';
 import { ReservationService } from '../reservations/reservation.service';
@@ -10,6 +9,7 @@ import { ReservationStore } from '../reservations/reservation.store';
 import { GlobalSettingsService } from '../settings/global-settings.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
 import { PendingDecisionStore } from './pending-decisions';
+import { hookDeadline, waitUntil } from './runtime';
 
 const NONE: SessionEndResult = Object.freeze({ decision: 'none' }) as SessionEndResult;
 
@@ -31,8 +31,11 @@ export class SessionEndService {
     @Inject(RESERVATION_CLOCK) private readonly clock: Clock,
   ) {}
 
-  async evaluate(ctx: SessionEndContext): Promise<SessionEndResult> {
-    if (!this.settings.isWarm) await this.settings.whenReady();
+  /** `deadline` (epoch ms) bounds the wait for the settings cache; past it this throws (host policy applies). */
+  async evaluate(ctx: SessionEndContext, deadline = hookDeadline()): Promise<SessionEndResult> {
+    if (!this.settings.isWarm) {
+      await waitUntil(this.settings.whenReady(), deadline, 'Reservation settings are not loaded yet');
+    }
     if (!this.settings.getCachedSettings(ctx.resourceId).enabled) return NONE;
     const now = ctx.now ?? this.clock();
     const own = (await this.store.findActiveForResource(ctx.resourceId, now)).find((r) => r.userId === ctx.userId);

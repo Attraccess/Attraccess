@@ -80,7 +80,7 @@ export function checkInRules(
   return pick(
     lang,
     `Check-in is required: start a session on the resource ${early > 0 ? `up to ${minutesText(lang, early)} before the start or ` : ''}within ${minutesText(lang, grace)} after the start. Without a check-in the booking is released as a no-show.`,
-    `Ein Check-in ist erforderlich: Starte ${early > 0 ? `bis zu ${minutesText(lang, early)} vor dem Beginn oder ` : ''}innerhalb von ${minutesText(lang, grace)} nach dem Beginn eine Sitzung an der Ressource. Ohne Check-in wird die Reservierung als Nichterscheinen freigegeben.`,
+    `Ein Check-in ist erforderlich: Starte ${early > 0 ? `bis zu ${minutesText(lang, early)} vor dem Beginn oder ` : ''}innerhalb von ${minutesText(lang, grace)} nach dem Beginn eine Sitzung an der Ressource. Ohne Check-in verfällt die Reservierung und der Zeitraum wird für andere freigegeben.`,
   );
 }
 

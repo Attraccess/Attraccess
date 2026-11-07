@@ -39,6 +39,41 @@ describe('bookable hours', () => {
     expect(isWithinBookableHours(split, BERLIN, d('2026-06-01T09:00:00Z'), d('2026-06-01T12:00:00Z'))).toBe(false);
   });
 
+  it('does not join touching ranges on the same day: a booking must lie inside one range', () => {
+    const touching = weekdays([
+      { start: '08:00', end: '12:00' },
+      { start: '12:00', end: '16:00' },
+    ]);
+    // Mon 11:00-13:00 local (CEST) = 09:00Z-11:00Z spans both ranges
+    expect(isWithinBookableHours(touching, BERLIN, d('2026-06-01T09:00:00Z'), d('2026-06-01T11:00:00Z'))).toBe(false);
+    expect(isWithinBookableHours(touching, BERLIN, d('2026-06-01T09:00:00Z'), d('2026-06-01T10:00:00Z'))).toBe(true);
+    expect(isWithinBookableHours(touching, BERLIN, d('2026-06-01T10:00:00Z'), d('2026-06-01T14:00:00Z'))).toBe(true);
+    expect(bookableIntervals(touching, BERLIN, d('2026-06-01T06:00:00Z'), d('2026-06-01T15:00:00Z'))).toEqual(
+      expect.arrayContaining([
+        { start: d('2026-06-01T06:00:00Z'), end: d('2026-06-01T10:00:00Z') },
+        { start: d('2026-06-01T10:00:00Z'), end: d('2026-06-01T14:00:00Z') },
+      ]),
+    );
+  });
+
+  it('chains 24:00 -> 00:00 over several days but still keeps same-day ranges apart', () => {
+    const allDay = [{ start: '00:00', end: '24:00' }];
+    const chain: BookableHours = { mon: allDay, tue: allDay, wed: [{ start: '00:00', end: '06:00' }] };
+    // Mon 00:00 -> Wed 06:00 local is one interval
+    expect(isWithinBookableHours(chain, BERLIN, d('2026-05-31T22:00:00Z'), d('2026-06-03T04:00:00Z'))).toBe(true);
+    const split: BookableHours = {
+      mon: [
+        { start: '00:00', end: '12:00' },
+        { start: '12:00', end: '24:00' },
+      ],
+      tue: [{ start: '00:00', end: '06:00' }],
+    };
+    // Mon 20:00 -> Tue 02:00 crosses midnight inside one joined range
+    expect(isWithinBookableHours(split, BERLIN, d('2026-06-01T18:00:00Z'), d('2026-06-02T00:00:00Z'))).toBe(true);
+    // Mon 11:00 -> 13:00 crosses the same-day boundary
+    expect(isWithinBookableHours(split, BERLIN, d('2026-06-01T09:00:00Z'), d('2026-06-01T11:00:00Z'))).toBe(false);
+  });
+
   it('joins a range ending at 24:00 with the next day starting at 00:00', () => {
     const night: BookableHours = {
       mon: [{ start: '18:00', end: '24:00' }],

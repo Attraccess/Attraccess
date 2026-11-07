@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import {
   getAvailability,
   getGlobalSettings,
+  getManageAccess,
   getManagerAccess,
   getPendingDecision,
   getReservation,
@@ -12,6 +13,7 @@ import {
   listMine,
   type ManageFilter,
 } from '../api';
+import { browserTimeZone } from './time';
 import type { ReservationStatus } from './types';
 
 export const ROOT_KEY = 'reservations';
@@ -64,15 +66,17 @@ export function useResourceName(resourceId: number): string | undefined {
 }
 
 /**
- * The keep-or-free question after the holder's session ended during an active booking. Light by
- * design: one tiny GET every 10 s, only while the tab is visible, plus a refetch on focus.
+ * The keep-or-free question after the holder's session ended during an active booking. Callers
+ * enable it only while the viewer holds a booking of this resource that runs right now (the only
+ * time the server can hold such a question); then one tiny GET every 5 s while the tab is
+ * visible, plus a refetch on focus, so the question appears within seconds of stopping.
  */
 export function usePendingDecision(resourceId: number, enabled: boolean) {
   return useQuery({
     queryKey: keys.pending(resourceId),
     queryFn: ({ signal }) => getPendingDecision(resourceId, signal),
     enabled,
-    refetchInterval: 5_000,
+    refetchInterval: enabled ? 5_000 : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     staleTime: 5_000,
@@ -116,7 +120,11 @@ export function useManagerAccess(resourceId: number) {
   });
 }
 
-/** The plugin timezone for pages that list reservations without an availability payload. */
+/**
+ * The plugin timezone for pages that list reservations without an availability payload. Null while
+ * it loads, so callers can wait instead of formatting in another zone; the browser's zone if it
+ * cannot be read.
+ */
 export function usePluginTimezone(): string | null {
   const query = useQuery({
     queryKey: [ROOT_KEY, 'global-settings'],
@@ -124,19 +132,17 @@ export function usePluginTimezone(): string | null {
     staleTime: 5 * 60_000,
     retry: false,
   });
-  return query.data?.timezone ?? null;
+  if (query.data) return query.data.timezone;
+  return query.isError ? browserTimeZone() : null;
 }
 
-/**
- * True when the user may manage reservations of at least one resource. Relies on the manage list
- * answering 403 to users who manage nothing; a 200 (even an empty page) counts as manager.
- */
+/** True when the user may manage reservations of at least one resource. */
 export function useIsManagerAnywhere(): boolean {
   const query = useQuery({
-    queryKey: [ROOT_KEY, 'is-manager'],
-    queryFn: () => listManaged({ page: 1 }).then(() => true),
+    queryKey: [ROOT_KEY, 'manage-access'],
+    queryFn: getManageAccess,
     staleTime: 5 * 60_000,
     retry: false,
   });
-  return query.data === true;
+  return query.data?.isManager === true;
 }

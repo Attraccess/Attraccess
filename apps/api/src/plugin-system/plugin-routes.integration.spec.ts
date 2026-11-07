@@ -62,6 +62,9 @@ const SHARED = [
   'eventemitter2',
   'typeorm',
   'reflect-metadata',
+  '@nestjs/swagger',
+  'class-validator',
+  'class-transformer',
   '@attraccess/plugins-backend-sdk',
 ];
 

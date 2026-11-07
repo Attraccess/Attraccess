@@ -10,7 +10,11 @@
     "edit": "Edit",
     "done": "Done",
     "retry": "Retry",
-    "loading": "Loading"
+    "loading": "Loading",
+    "timesIn": "Times in {{timezone}}",
+    "pagination": "Pages",
+    "previousPage": "Previous page",
+    "nextPage": "Next page"
   },
   "weekdays": {
     "mon": "Monday",
@@ -67,9 +71,9 @@
   },
   "card": {
     "title": "Reservations",
-    "timezone": "Times in {{timezone}}",
     "reserve": "Reserve",
     "cannotBook": "Booking is not available",
+    "view": "View",
     "managerHint": "As a manager you see who holds each booking.",
     "next": "Your next booking",
     "current": "Current booking",
@@ -108,6 +112,7 @@
   },
   "checkIn": {
     "required": "Check in by starting the resource: from {{early}} min before the start until {{grace}} min after it. Without check-in the booking is released.",
+    "requiredFromStart": "Check in by starting the resource: from the start until {{grace}} min after it. Without check-in the booking is released.",
     "notRequired": "No check-in is required; the booking stays until it ends."
   },
   "keepFree": {
@@ -118,6 +123,7 @@
   },
   "actions": {
     "reasonLabel": "Reason (optional)",
+    "commentLabel": "Comment (optional)",
     "failedTitle": "Action failed",
     "cancel": {
       "label": "Cancel",
@@ -172,14 +178,12 @@
     "filters": {
       "resource": "Resource",
       "allResources": "All resources",
+      "searchResources": "Search resources",
       "status": "Status",
       "allStatuses": "All statuses",
       "from": "From",
       "to": "To"
-    },
-    "page": "Page {{page}} of {{total}}",
-    "previous": "Previous",
-    "next": "Next"
+    }
   },
   "detail": {
     "title": "Reservation",
@@ -248,9 +252,12 @@
       "description": "Bookings must lie fully inside these hours. A day without ranges is closed once any other day has ranges; with no ranges at all the resource is bookable around the clock.",
       "allDay": "No range set",
       "addRange": "Add range",
-      "removeRange": "Remove range",
+      "addRangeTo": "Add range on {{day}}",
+      "removeRange": "Remove range {{index}} on {{day}}",
       "from": "From",
-      "to": "Until"
+      "to": "Until",
+      "fromLabel": "From ({{day}}, range {{index}})",
+      "toLabel": "Until ({{day}}, range {{index}})"
     },
     "disableWarning": {
       "title": "Disable reservations?",
@@ -271,6 +278,7 @@
   },
   "admin": {
     "description": "The timezone used for bookable hours, the booking time grid, notifications and calendar feeds.",
+    "loadFailed": "The timezone setting could not be loaded",
     "current": "Timezone",
     "default": "server default: {{timezone}}",
     "search": "Search timezones",
@@ -292,6 +300,7 @@
     "lastUsed": "Last used {{date}}",
     "neverUsed": "Never used",
     "failed": "Action failed",
+    "loadFailed": "Calendar feeds could not be loaded",
     "selection": {
       "ownOnly": "Only my own bookings",
       "introduced": "Resources I am introduced to",
