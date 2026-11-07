@@ -140,6 +140,14 @@ export class UpdateResourceSettingsBody {
   @IsInt()
   handoverReminderMinutes?: number;
 
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Signed-in card users see holder names on Attractap readers (never on a signed-out reader)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  showNamesOnReaders?: boolean;
+
   @ApiPropertyOptional(BOOKABLE_HOURS_SCHEMA)
   @IsOptional()
   @IsObject()

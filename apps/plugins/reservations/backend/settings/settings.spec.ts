@@ -25,6 +25,7 @@ describe('settings validation', () => {
       checkInGraceMinutes: 15,
       earlyCheckInMinutes: 15,
       handoverReminderMinutes: 15,
+      showNamesOnReaders: false,
       bookableHours: {},
     });
   });
@@ -48,6 +49,7 @@ describe('settings validation', () => {
     [{ checkInGraceMinutes: 241 }, 'checkInGraceMinutes'],
     [{ earlyCheckInMinutes: 241 }, 'earlyCheckInMinutes'],
     [{ handoverReminderMinutes: 1.5 }, 'handoverReminderMinutes'],
+    [{ showNamesOnReaders: 'yes' as unknown as boolean }, 'showNamesOnReaders'],
     [{ whoCanBook: 'nobody' as never }, 'whoCanBook'],
     [{ bookableHours: { mon: [{ start: '10:00', end: '09:00' }] } }, 'bookableHours.mon'],
   ])('rejects %j', (patch, field) => {

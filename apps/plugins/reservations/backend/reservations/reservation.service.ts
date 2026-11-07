@@ -63,15 +63,21 @@ export class ReservationService implements OnModuleDestroy {
   }
 
   /**
-   * Open resource pages ask the host again whether a start is blocked. Called after every change that can
-   * decide the answer; never throws (the page also refreshes on its own).
+   * Open resource pages ask the host again whether a start is blocked, and Attractap readers re-read the
+   * reservation slots. Called after every change that can decide either answer; never throws (the page
+   * also refreshes on its own and the slots expire at their next state boundary). `readers: false` is for
+   * changes readers cannot see (an unconfirmed booking).
    */
-  invalidateStartBlocked(resourceId: number): void {
-    try {
-      this.context.startBlocked.invalidate({ resourceId });
-    } catch (error) {
-      this.logger.debug(`start-blocked invalidation failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  invalidateViews(resourceId: number, readers = true): void {
+    const attempt = (what: string, invalidate: () => void) => {
+      try {
+        invalidate();
+      } catch (error) {
+        this.logger.debug(`${what} invalidation failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    };
+    attempt('start-blocked', () => this.context.startBlocked.invalidate({ resourceId }));
+    if (readers) attempt('reader-ui', () => this.context.readerUi?.invalidate({ resourceId }));
   }
 
   /** Audit writer shared with the settings, feed, event and scheduler code (override_start, no_show, ...). */
@@ -217,7 +223,7 @@ export class ReservationService implements OnModuleDestroy {
     );
     if (created.status === 'pending') this.notify('onPending', () => this.notifier.onPending(created));
     else this.notify('onConfirmed', () => this.notifier.onConfirmed(created, { viaApproval: false }));
-    this.invalidateStartBlocked(created.resourceId);
+    this.invalidateViews(created.resourceId, created.status === 'confirmed');
     return created;
   }
 
@@ -273,7 +279,7 @@ export class ReservationService implements OnModuleDestroy {
     this.notify('onCancelled', () =>
       this.notifier.onCancelled(updated, { byUserId: actor.userId, byHolder: isHolder }),
     );
-    this.invalidateStartBlocked(updated.resourceId);
+    this.invalidateViews(updated.resourceId);
     return updated;
   }
 
@@ -304,7 +310,7 @@ export class ReservationService implements OnModuleDestroy {
       },
     );
     this.notify('onEndedEarly', () => this.notifier.onEndedEarly(updated, { byUserId: actor.userId }));
-    this.invalidateStartBlocked(updated.resourceId);
+    this.invalidateViews(updated.resourceId);
     return updated;
   }
 
@@ -318,6 +324,7 @@ export class ReservationService implements OnModuleDestroy {
       throw new ReservationError('ALREADY_FINISHED', 'This reservation is no longer active');
     }
     if (!reservation.keptAt) await this.store.transition(id, [reservation.status], { keptAt: this.clock() });
+    this.invalidateViews(reservation.resourceId);
     return this.load(id);
   }
 
@@ -373,7 +380,7 @@ export class ReservationService implements OnModuleDestroy {
     if (target === 'confirmed')
       this.notify('onConfirmed', () => this.notifier.onConfirmed(updated, { viaApproval: true }));
     else this.notify('onRejected', () => this.notifier.onRejected(updated));
-    this.invalidateStartBlocked(updated.resourceId);
+    this.invalidateViews(updated.resourceId);
     return updated;
   }
 
@@ -411,7 +418,7 @@ export class ReservationService implements OnModuleDestroy {
     this.notifyEach('onRemoved', cancelled, (reservation) =>
       this.notifier.onRemoved(reservation, { byUserId: actor.userId, reason: DISABLED_REASON }),
     );
-    if (cancelled.length > 0) this.invalidateStartBlocked(resourceId);
+    if (cancelled.length > 0) this.invalidateViews(resourceId);
     return cancelled.length;
   }
 
@@ -427,7 +434,7 @@ export class ReservationService implements OnModuleDestroy {
     const changed = await this.store.transition(id, from, changes, options);
     if (changed) {
       const updated = await this.load(id);
-      this.invalidateStartBlocked(updated.resourceId);
+      this.invalidateViews(updated.resourceId);
       if (action)
         await this.audit.record(
           action,
@@ -471,6 +478,11 @@ export class ReservationService implements OnModuleDestroy {
         .where("id = :id AND status = 'confirmed' AND checkedInAt IS NULL", { id })
         .execute(),
     );
-    return (result.affected ?? 0) === 1;
+    const checkedIn = (result.affected ?? 0) === 1;
+    if (checkedIn) {
+      const booking = await this.store.findById(id);
+      if (booking) this.invalidateViews(booking.resourceId);
+    }
+    return checkedIn;
   }
 }
