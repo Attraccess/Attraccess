@@ -1,3 +1,317 @@
 {
-  "title": "Reservierungen"
+  "title": "Reservierungen",
+  "sidebar": { "my": "Meine Reservierungen", "manage": "Reservierungen verwalten" },
+  "slots": { "settings": "Reservierungen", "admin": "Reservierungen", "account": "Kalender-Feeds (iCal)" },
+  "common": {
+    "cancel": "Abbrechen",
+    "back": "Zurück",
+    "save": "Speichern",
+    "edit": "Bearbeiten",
+    "done": "Fertig"
+  },
+  "weekdays": {
+    "mon": "Montag",
+    "tue": "Dienstag",
+    "wed": "Mittwoch",
+    "thu": "Donnerstag",
+    "fri": "Freitag",
+    "sat": "Samstag",
+    "sun": "Sonntag"
+  },
+  "status": {
+    "pending": "Wartet auf Freigabe",
+    "confirmed": "Bestätigt",
+    "rejected": "Abgelehnt",
+    "cancelled": "Storniert",
+    "expired": "Abgelaufen",
+    "no_show": "Nicht erschienen",
+    "completed": "Abgeschlossen"
+  },
+  "errors": {
+    "generic": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+    "NOT_FOUND": "Diese Reservierung oder Ressource existiert nicht.",
+    "RESERVATIONS_DISABLED": "Für diese Ressource sind Reservierungen nicht aktiviert.",
+    "NOT_ALLOWED_TO_BOOK": "Du darfst diese Ressource nicht buchen.",
+    "IN_THE_PAST": "Die Buchung würde in der Vergangenheit beginnen.",
+    "OFF_TIME_STEP": "Start und Dauer müssen zum Buchungsraster passen.",
+    "DURATION_TOO_SHORT": "Die Buchung ist kürzer als die Mindestdauer.",
+    "DURATION_TOO_LONG": "Die Buchung ist länger als die Höchstdauer.",
+    "BEYOND_MAX_ADVANCE": "Das liegt zu weit in der Zukunft, um es zu buchen.",
+    "LEAD_TIME_TOO_SHORT": "Für diesen Zeitraum ist es zu spät zum Buchen.",
+    "OUTSIDE_BOOKABLE_HOURS": "Der Zeitraum liegt außerhalb der buchbaren Zeiten.",
+    "USER_BOOKING_LIMIT": "Du hast die maximale Anzahl aktiver Buchungen für diese Ressource erreicht.",
+    "OVERLAP": "Der Zeitraum überschneidet sich mit einer anderen Buchung. Bitte wähle eine andere Zeit.",
+    "MAINTENANCE": "Die Ressource ist in dieser Zeit in Wartung.",
+    "NOT_PENDING": "Diese Buchung wartet nicht mehr auf Freigabe.",
+    "NOT_ACTIVE": "Diese Buchung ist nicht aktiv.",
+    "NOT_CANCELLABLE": "Diese Buchung kann nicht mehr storniert werden.",
+    "ALREADY_STARTED": "Diese Buchung hat bereits begonnen.",
+    "ALREADY_FINISHED": "Diese Buchung ist bereits beendet.",
+    "FUTURE_BOOKINGS_EXIST": "Es gibt {{count}} kommende Buchungen.",
+    "INVALID_RANGE": "Der gewählte Zeitraum ist ungültig.",
+    "INVALID_SETTINGS": "Einige Einstellungen sind ungültig.",
+    "INVALID_TIMEZONE": "Diese Zeitzone ist ungültig.",
+    "RANGE_TOO_LARGE": "Der angefragte Zeitraum ist zu groß.",
+    "FORBIDDEN": "Dazu hast du keine Berechtigung.",
+    "RESERVATION_NOT_FOUND": "Diese Reservierung existiert nicht.",
+    "RESOURCE_NOT_FOUND": "Diese Ressource existiert nicht."
+  },
+  "card": {
+    "title": "Reservierungen",
+    "timezone": "Zeiten in {{timezone}}",
+    "reserve": "Reservieren",
+    "cannotBook": "Buchen ist nicht möglich",
+    "managerHint": "Als Verwalter siehst du, wer welche Buchung hält.",
+    "next": "Deine nächste Buchung",
+    "day": "Tag",
+    "week": "Woche",
+    "previous": "Früher",
+    "nextRange": "Später",
+    "dayBarLabel": "Gebuchte Zeiten des Tages",
+    "free": "Keine Buchungen",
+    "reserved": "Reserviert",
+    "reservedPending": "Reserviert (wartet auf Freigabe)",
+    "yours": "Deine Buchung",
+    "maintenance": "Wartung",
+    "openEnd": "offenes Ende"
+  },
+  "booking": {
+    "title": "{{resource}} reservieren",
+    "date": "Datum",
+    "timezoneHint": "Zeiten in {{timezone}}",
+    "start": "Beginn",
+    "duration": "Dauer",
+    "durationHint": "In Schritten von {{step}} Min., von {{min}} bis {{max}}",
+    "note": "Notiz (optional)",
+    "noSlots": "An diesem Tag gibt es keine freien Startzeiten.",
+    "approvalNeeded": "Ein Verwalter muss diese Buchung freigeben, bevor sie gültig wird.",
+    "submit": "Reservieren",
+    "requestSubmit": "Reservierung anfragen",
+    "failedTitle": "Reservierung fehlgeschlagen",
+    "bookedTitle": "Reservierung bestätigt",
+    "bookedBody": "Deine Buchung für {{range}} ist bestätigt.",
+    "requestedTitle": "Reservierung angefragt",
+    "requestedBody": "Deine Anfrage für {{range}} wartet auf Freigabe."
+  },
+  "checkIn": {
+    "required": "Einchecken durch Starten der Ressource: ab {{early}} Min. vor Beginn bis {{grace}} Min. nach Beginn. Ohne Check-in wird die Buchung freigegeben.",
+    "notRequired": "Ein Check-in ist nicht nötig; die Buchung bleibt bis zum Ende bestehen."
+  },
+  "keepFree": {
+    "title": "Deine Buchung läuft bis {{until}}. Behalten oder den Rest freigeben?",
+    "body": "Du hast die Ressource beendet, bevor deine Buchung abgelaufen ist. Möchtest du den Rest der Buchung behalten oder für andere freigeben?",
+    "keep": "Behalten",
+    "free": "Rest freigeben"
+  },
+  "actions": {
+    "reasonLabel": "Grund (optional)",
+    "failedTitle": "Aktion fehlgeschlagen",
+    "cancel": {
+      "label": "Stornieren",
+      "title": "Diese Buchung stornieren?",
+      "body": "Die Buchung {{range}} für {{resource}} wird storniert und der Zeitraum freigegeben.",
+      "confirm": "Buchung stornieren"
+    },
+    "end-early": {
+      "label": "Vorzeitig beenden",
+      "title": "Diese Buchung vorzeitig beenden?",
+      "body": "Die Buchung für {{resource}} endet jetzt und der Rest (bis {{until}}) wird freigegeben.",
+      "confirm": "Buchung beenden"
+    },
+    "keep": {
+      "label": "Behalten",
+      "title": "Diese Buchung behalten?",
+      "body": "Die Buchung {{range}} für {{resource}} bleibt unverändert bestehen.",
+      "confirm": "Buchung behalten"
+    },
+    "approve": {
+      "label": "Freigeben",
+      "title": "Diese Buchung freigeben?",
+      "body": "Die Buchung {{range}} für {{resource}} wird bestätigt.",
+      "confirm": "Freigeben"
+    },
+    "reject": {
+      "label": "Ablehnen",
+      "title": "Diese Buchung ablehnen?",
+      "body": "Die Buchung {{range}} für {{resource}} wird abgelehnt und der Inhaber benachrichtigt.",
+      "confirm": "Ablehnen"
+    }
+  },
+  "table": {
+    "resource": "Ressource",
+    "when": "Wann",
+    "user": "Nutzer",
+    "status": "Status",
+    "actions": "Aktionen",
+    "empty": "Keine Buchungen"
+  },
+  "my": {
+    "title": "Meine Reservierungen",
+    "subtitle": "Deine kommenden und vergangenen Buchungen",
+    "upcoming": "Kommend",
+    "past": "Vergangen",
+    "manageLink": "Reservierungen verwalten"
+  },
+  "manage": {
+    "title": "Reservierungen verwalten",
+    "subtitle": "Anfragen freigeben und alle Buchungen deiner Ressourcen im Blick behalten",
+    "pending": "Wartet auf Freigabe",
+    "pendingHint": "Anfragen freigeben oder ablehnen; der Inhaber wird benachrichtigt.",
+    "all": "Alle Buchungen",
+    "filters": {
+      "resource": "Ressource",
+      "allResources": "Alle Ressourcen",
+      "status": "Status",
+      "allStatuses": "Alle Status",
+      "from": "Von",
+      "to": "Bis"
+    },
+    "page": "Seite {{page}} von {{total}}",
+    "previous": "Zurück",
+    "next": "Weiter"
+  },
+  "detail": {
+    "title": "Reservierung",
+    "loadFailed": "Die Reservierung konnte nicht geladen werden",
+    "holder": "Gebucht von {{name}}",
+    "cannotKeep": "Diese Buchung kann nicht mehr behalten werden.",
+    "cannotCancel": "Diese Buchung kann nicht mehr storniert werden."
+  },
+  "settings": {
+    "enabled": "Reservierungen für diese Ressource aktivieren",
+    "approvalRequired": "Buchungen müssen von einem Verwalter freigegeben werden",
+    "checkInEnabled": "Check-in verlangen (Ressource innerhalb der Karenzzeit starten)",
+    "failed": "Die Einstellungen konnten nicht gespeichert werden",
+    "whoCanBook": {
+      "label": "Wer darf buchen",
+      "can-start": "Alle, die die Ressource starten dürfen",
+      "managers-only": "Nur Verwalter",
+      "any-user": "Jeder angemeldete Nutzer"
+    },
+    "groups": {
+      "rules": "Buchungsregeln",
+      "limits": "Puffer und Limits",
+      "checkIn": "Check-in und Erinnerungen",
+      "hours": "Buchbare Zeiten"
+    },
+    "fields": {
+      "timeStepMinutes": "Zeitraster (Minuten)",
+      "minDurationMinutes": "Mindestdauer (Minuten)",
+      "maxDurationMinutes": "Höchstdauer (Minuten)",
+      "maxAdvanceDays": "Höchstens so viele Tage im Voraus buchen",
+      "minLeadMinutes": "Späteste Buchung vor Beginn (Minuten)",
+      "bufferBeforeMinutes": "Puffer vor einer Buchung (Minuten)",
+      "bufferAfterMinutes": "Puffer nach einer Buchung (Minuten)",
+      "maxActiveBookingsPerUser": "Aktive Buchungen pro Nutzer",
+      "confirmWindowMinutes": "Bestätigung zum Starten so lange vor einer Reservierung (Minuten)",
+      "checkInGraceMinutes": "Karenzzeit für den Check-in (Minuten)",
+      "earlyCheckInMinutes": "Frühes Einchecken (Minuten)",
+      "handoverReminderMinutes": "Übergabe-Erinnerung vor einer Reservierung (Minuten)"
+    },
+    "hints": {
+      "timeStepMinutes": "Beginn und Dauer rasten auf diesem Raster ein; {{min}} bis {{max}}, muss 1440 teilen.",
+      "minDurationMinutes": "Kürzeste Buchung, ein Vielfaches des Rasters.",
+      "maxDurationMinutes": "Längste Buchung, ein Vielfaches des Rasters.",
+      "maxAdvanceDays": "{{min}} bis {{max}} Tage.",
+      "minLeadMinutes": "0 erlaubt Buchungen bis zum Beginn.",
+      "bufferBeforeMinutes": "Wird vor jeder Buchung freigehalten.",
+      "bufferAfterMinutes": "Wird nach jeder Buchung freigehalten.",
+      "maxActiveBookingsPerUser": "0 bedeutet unbegrenzt.",
+      "confirmWindowMinutes": "0 fragt nie. Höchstens {{max}}.",
+      "checkInGraceMinutes": "{{min}} bis {{max}} Minuten nach dem Beginn.",
+      "earlyCheckInMinutes": "Wie früh der Inhaber starten darf. {{min}} bis {{max}}.",
+      "handoverReminderMinutes": "Benachrichtigt den aktuellen Nutzer. 0 schaltet es aus."
+    },
+    "validation": {
+      "range": "Gib eine ganze Zahl von {{min}} bis {{max}} ein.",
+      "stepDividesDay": "Das Raster muss 1440 Minuten ohne Rest teilen.",
+      "multipleOfStep": "Muss ein Vielfaches von {{step}} Minuten sein.",
+      "maxBelowMin": "Darf nicht kürzer als die Mindestdauer sein.",
+      "tooManyRanges": "Höchstens 8 Zeiträume pro Tag.",
+      "timeFormat": "Format HH:mm, zum Beispiel 09:00. Das Ende darf 24:00 sein.",
+      "endAfterStart": "Das Ende muss nach dem Beginn liegen.",
+      "overlap": "Zeiträume dürfen sich nicht überschneiden."
+    },
+    "hours": {
+      "description": "Buchungen müssen vollständig in diesen Zeiten liegen. Ein Tag ohne Zeitraum ist geschlossen, sobald ein anderer Tag Zeiträume hat; ganz ohne Zeiträume ist die Ressource rund um die Uhr buchbar.",
+      "allDay": "Kein Zeitraum festgelegt",
+      "addRange": "Zeitraum hinzufügen",
+      "removeRange": "Zeitraum entfernen",
+      "from": "Von",
+      "to": "Bis"
+    },
+    "disableWarning": {
+      "title": "Reservierungen deaktivieren?",
+      "body": "Es gibt {{count}} kommende Buchungen. Beim Deaktivieren werden sie storniert und die Inhaber benachrichtigt.",
+      "confirm": "Deaktivieren und {{count}} stornieren"
+    },
+    "saved": {
+      "title": "Einstellungen gespeichert",
+      "body": "Die Reservierungseinstellungen wurden gespeichert. Sie gelten für neue Buchungen.",
+      "bodyCancelled": "Die Einstellungen wurden gespeichert und {{count}} kommende Buchungen storniert."
+    }
+  },
+  "admin": {
+    "description": "Die Zeitzone für buchbare Zeiten, das Buchungsraster, Benachrichtigungen und Kalender-Feeds.",
+    "current": "Zeitzone",
+    "default": "Server-Standard: {{timezone}}",
+    "search": "Zeitzonen suchen",
+    "searchPlaceholder": "z. B. Europe/Berlin",
+    "matches": "{{count}} Treffer",
+    "list": "Zeitzonen",
+    "saved": "Zeitzone gespeichert",
+    "savedBody": "Reservierungen verwenden jetzt {{timezone}}.",
+    "failed": "Die Zeitzone konnte nicht gespeichert werden"
+  },
+  "feeds": {
+    "title": "Kalender-Feeds",
+    "description": "Abonniere Reservierungen in deiner Kalender-App. Jeder Feed hat einen eigenen geheimen Link; wer den Link kennt, kann den Feed lesen.",
+    "create": "Neuer Feed",
+    "empty": "Noch keine Feeds",
+    "revoked": "Widerrufen",
+    "revokedAt": "Widerrufen am {{date}}",
+    "lastUsed": "Zuletzt genutzt {{date}}",
+    "neverUsed": "Nie genutzt",
+    "failed": "Aktion fehlgeschlagen",
+    "selection": {
+      "ownOnly": "Nur meine eigenen Buchungen",
+      "introduced": "Ressourcen, in die ich eingewiesen bin",
+      "maintained": "Ressourcen, die ich betreue",
+      "groups": "{{count}} Gruppen",
+      "resources": "{{count}} Ressourcen"
+    },
+    "form": {
+      "createTitle": "Neuer Kalender-Feed",
+      "editTitle": "Kalender-Feed bearbeiten",
+      "name": "Name",
+      "ownOnly": "Nur meine eigenen Buchungen",
+      "introduced": "Alle Ressourcen, in die ich eingewiesen bin",
+      "maintained": "Alle Ressourcen, die ich betreue",
+      "groups": "Ressourcengruppen",
+      "noGroups": "Keine Gruppen verfügbar",
+      "resources": "Bestimmte Ressourcen",
+      "searchResources": "Ressourcen suchen",
+      "selectedCount": "{{count}} ausgewählt",
+      "needSelection": "Wähle mindestens eine Quelle für diesen Feed.",
+      "create": "Feed erstellen"
+    },
+    "secret": {
+      "title": "Feed „{{name}}“ ist bereit",
+      "body": "Kopiere diesen Link jetzt. Aus Sicherheitsgründen wird er nur einmal angezeigt; falls du ihn verlierst, erzeuge den Feed neu.",
+      "url": "Feed-Link",
+      "copy": "Link kopieren"
+    },
+    "regenerate": {
+      "label": "Neu erzeugen",
+      "title": "„{{name}}“ neu erzeugen?",
+      "body": "Es wird ein neuer Link erstellt und der alte funktioniert sofort nicht mehr. Kalender mit dem alten Link verlieren den Zugriff.",
+      "confirm": "Neu erzeugen"
+    },
+    "revoke": {
+      "label": "Widerrufen",
+      "title": "„{{name}}“ widerrufen?",
+      "body": "Der Link funktioniert dauerhaft nicht mehr. Das lässt sich nicht rückgängig machen.",
+      "confirm": "Widerrufen"
+    }
+  }
 }
