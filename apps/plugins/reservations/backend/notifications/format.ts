@@ -1,5 +1,6 @@
-import type { PluginNotificationEmail } from '@attraccess/plugins-backend-sdk';
+import type { PluginNotificationEmailTemplate } from '@attraccess/plugins-backend-sdk';
 import type { ResourceSettings } from '../settings/settings.model';
+import type { EmailRef } from './email/variables';
 import type { Lang } from './host-info.service';
 
 /** Frontend routes of the plugin, used for in-app links and email deep links. */
@@ -84,17 +85,13 @@ export function checkInRules(
   );
 }
 
-export interface NoticeAction {
-  label: string;
-  path: string;
-}
-
 /** Language-neutral shape every message builder returns. */
 export interface NoticeText {
   title: string;
-  /** Paragraphs; joined with blank lines in the email and with line breaks in the in-app body. */
+  /** Paragraphs of the in-app body, joined with line breaks. */
   lines: string[];
-  actions?: NoticeAction[];
+  /** The email: an admin-editable template and its variables. */
+  email: EmailRef;
   /** In-app link (relative). */
   path?: string;
   severity?: 'info' | 'warning';
@@ -105,33 +102,16 @@ export interface RenderedNotice {
   body: string;
   url?: string;
   severity?: 'info' | 'warning';
-  email: PluginNotificationEmail;
+  email: PluginNotificationEmailTemplate;
 }
 
-export function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-/** Turns a notice into dispatch content. Links need the public base URL; without one only the in-app link remains. */
-export function renderNotice(notice: NoticeText, baseUrl: string | null): RenderedNotice {
-  const links = baseUrl ? (notice.actions ?? []).map((a) => ({ label: a.label, url: `${baseUrl}${a.path}` })) : [];
-  const text = [...notice.lines, ...links.map((link) => `${link.label}: ${link.url}`)].join('\n\n');
-  const html = [
-    ...notice.lines.map((line) => `<p>${escapeHtml(line).replace(/\n/g, '<br>')}</p>`),
-    ...(links.length
-      ? [`<p>${links.map((l) => `<a href="${escapeHtml(l.url)}">${escapeHtml(l.label)}</a>`).join(' &middot; ')}</p>`]
-      : []),
-  ].join('');
+/** Turns a notice into dispatch content. */
+export function renderNotice(notice: NoticeText): RenderedNotice {
   return {
     title: notice.title,
     body: notice.lines.join('\n'),
     url: notice.path,
     severity: notice.severity,
-    email: { subject: notice.title, text, html },
+    email: { template: notice.email.template, variables: notice.email.variables },
   };
 }

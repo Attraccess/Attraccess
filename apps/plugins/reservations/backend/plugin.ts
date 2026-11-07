@@ -12,12 +12,13 @@ import { PendingDecisionService } from './hooks/pending-decision.service';
 import { PendingDecisionStore } from './hooks/pending-decisions';
 import { PreStartService } from './hooks/pre-start.service';
 import { HookServicePublisher } from './hooks/publisher';
-import { preStartHook, sessionEndHook } from './hooks/runtime';
+import { preStartHook, sessionEndHook, startBlockedQuery } from './hooks/runtime';
 import { SessionEndService } from './hooks/session-end.service';
 import { IcalFeedsController, IcalPublicController } from './ical/ical.controller';
 import { IcalService } from './ical/ical.service';
 import { VisibilityService } from './ical/visibility.service';
 import { HostInfoService } from './notifications/host-info.service';
+import { EMAIL_TEMPLATES } from './notifications/email/build';
 import { NOTIFICATION_CATEGORIES, ReservationNotifications } from './notifications/notifier.service';
 import { ReservationScheduler } from './scheduler/scheduler.service';
 import { ReservationsController } from './api/reservations.controller';
@@ -43,9 +44,11 @@ const plugin: PluginBackendModule = {
   entities: [ReservationEntity, ResourceSettingsEntity, GlobalSettingsEntity, IcalFeedEntity, NoticeEntity],
   auditDomains: [RESERVATIONS_AUDIT_DOMAIN],
   notificationCategories: [...NOTIFICATION_CATEGORIES],
+  emailTemplates: EMAIL_TEMPLATES,
   // The host calls the hooks as plain functions; they reach the services through hooks/runtime.
   preStartHook,
   sessionEndHook,
+  startBlockedQuery,
   register(context: PluginContext): DynamicModule {
     return {
       module: ReservationsPluginModule,

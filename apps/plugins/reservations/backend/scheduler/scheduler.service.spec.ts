@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
+import { renderEmail } from '../testing/email-render.test-utils';
 import { OVERRUN_CHECK_WINDOW_MS, TICK_INTERVAL_MS } from './scheduler.service';
 
 describe('ReservationScheduler', () => {
@@ -14,7 +15,7 @@ describe('ReservationScheduler', () => {
     title: string;
     body: string;
     dedupeKey: string;
-    email: { text: string };
+    email: { template: string; variables: Record<string, unknown> };
   };
   const sent = (prefix = ''): Dispatched[] =>
     h.dispatch.mock.calls
@@ -80,6 +81,24 @@ describe('ReservationScheduler', () => {
     });
   });
 
+  it('tells open resource pages when a booking starts and when it ends, once per tick window', async () => {
+    await h.settings.update(1, { checkInEnabled: false });
+    const booking = await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T13:00:00');
+    h.invalidateStartBlocked.mockClear();
+    h.setNow('2026-06-01T11:59:00Z');
+    await p.scheduler.tick();
+    expect(h.invalidateStartBlocked).not.toHaveBeenCalled();
+    h.setNow('2026-06-01T12:00:00Z');
+    await p.scheduler.tick();
+    expect(h.invalidateStartBlocked.mock.calls).toEqual([[{ resourceId: 1 }]]);
+    await p.scheduler.tick();
+    expect(h.invalidateStartBlocked).toHaveBeenCalledTimes(1);
+    h.setNow('2026-06-01T13:00:00Z');
+    await p.scheduler.tick();
+    expect(await status(booking.id)).toBe('completed');
+    expect(h.invalidateStartBlocked).toHaveBeenCalledTimes(2);
+  });
+
   it('expires pending bookings at their start and tells the holder once', async () => {
     await h.settings.update(1, { approvalRequired: true });
     const booking = await p.book(10, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
@@ -108,7 +127,7 @@ describe('ReservationScheduler', () => {
       await p.newScheduler().tick();
       expect(await status(booking.id)).toBe('no_show');
       expect(sent('no-show')).toHaveLength(1);
-      expect(sent('no-show')[0].email.text).toContain('no-show');
+      expect(renderEmail(sent('no-show')[0].email, 'en').text).toContain('no-show');
       expect(h.audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'reservations.no_show' }));
     });
 
@@ -227,9 +246,12 @@ describe('ReservationScheduler', () => {
       const mails = sent('still-needed');
       expect(mails).toHaveLength(1);
       expect(mails[0].dedupeKey).toBe(`reservations:still-needed:${early.id}`);
-      expect(mails[0].email.text).toContain(`https://app.test/reservations/${early.id}?action=keep`);
-      expect(mails[0].email.text).toContain(`https://app.test/reservations/${early.id}?action=cancel`);
-      expect(mails[0].email.text).not.toMatch(/token/i);
+      const mail = renderEmail(mails[0].email, 'en');
+      expect(mail.hrefs).toEqual([
+        `https://app.test/reservations/${early.id}?action=keep`,
+        `https://app.test/reservations/${early.id}?action=cancel`,
+      ]);
+      expect(mail.html).not.toMatch(/token/i);
       // a booking made less than 48h ahead of its start never gets the question
       h.setNow('2026-06-02T13:00:00Z');
       const late = await p.book(11, 1, '2026-06-04T12:00:00', '2026-06-04T13:00:00');
@@ -293,8 +315,8 @@ describe('ReservationScheduler', () => {
       await p.newScheduler().tick();
       const mails = sent('reminder-24h');
       expect(mails.map((m) => m.dedupeKey)).toEqual([`reservations:reminder-24h:${early.id}`]);
-      expect(mails[0].email.text).toContain('Check-in is required');
-      expect(mails[0].email.text).toContain('within 15 minutes after the start');
+      expect(renderEmail(mails[0].email, 'en').text).toContain('Check-in is required');
+      expect(renderEmail(mails[0].email, 'en').text).toContain('within 15 minutes after the start');
       expect(fresh.id).not.toBe(early.id);
     });
 
@@ -303,7 +325,7 @@ describe('ReservationScheduler', () => {
       await p.book(10, 1, '2026-06-02T12:00:00', '2026-06-02T13:00:00');
       h.setNow('2026-06-01T12:30:00Z');
       await p.scheduler.tick();
-      expect(sent('reminder-24h')[0].email.text).toContain('Check-in is not required');
+      expect(renderEmail(sent('reminder-24h')[0].email, 'en').text).toContain('Check-in is not required');
     });
   });
 

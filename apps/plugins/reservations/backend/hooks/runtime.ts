@@ -3,11 +3,16 @@ import type {
   PreStartResult,
   SessionEndContext,
   SessionEndResult,
+  StartBlockedContext,
+  StartBlockedState,
 } from '@attraccess/plugins-backend-sdk';
 
-/** The two services the host-called hooks delegate to; `deadline` is an epoch-ms bound for their waits. */
+/** The services the host-called hooks delegate to; `deadline` is an epoch-ms bound for their waits. */
 export interface HookServices {
-  preStart: { evaluate(ctx: PreStartContext, deadline?: number): Promise<PreStartResult> };
+  preStart: {
+    evaluate(ctx: PreStartContext, deadline?: number): Promise<PreStartResult>;
+    evaluateStartBlocked(ctx: StartBlockedContext, deadline?: number): Promise<StartBlockedState | null>;
+  };
   sessionEnd: { evaluate(ctx: SessionEndContext, deadline?: number): Promise<SessionEndResult> };
 }
 
@@ -85,4 +90,10 @@ export async function preStartHook(ctx: PreStartContext): Promise<PreStartResult
 export async function sessionEndHook(ctx: SessionEndContext): Promise<SessionEndResult> {
   const deadline = hookDeadline();
   return (await resolveHookServices(deadline)).sessionEnd.evaluate(ctx, deadline);
+}
+
+/** `PluginBackendModule.startBlockedQuery`: the UI-facing twin of the pre-start block (same shared deadline). */
+export async function startBlockedQuery(ctx: StartBlockedContext): Promise<StartBlockedState | null> {
+  const deadline = hookDeadline();
+  return (await resolveHookServices(deadline)).preStart.evaluateStartBlocked(ctx, deadline);
 }

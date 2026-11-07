@@ -1,6 +1,7 @@
 import type { ReservationEntity } from '../entities/reservation.entity';
 import type { ResourceSettings } from '../settings/settings.model';
 import { NoticeText, ROUTES, TimeContext, checkInRules, formatRange, formatTime, minutesText, pick } from './format';
+import { bookingVariables, checkInVariables } from './email/variables';
 
 /** Everything a text needs besides the reservation itself. */
 export interface MessageContext extends TimeContext {
@@ -15,6 +16,7 @@ const when = (m: MessageContext, r: Span) => formatRange(r.startTime, r.endTime,
 export function pendingForManagers(m: MessageContext, r: ReservationEntity, holderName: string): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'pending-approval', variables: { ...bookingVariables(m, r), holder: { name: holderName } } },
     title: pick(lang, `Booking request for ${resourceName}`, `Reservierungsanfrage für ${resourceName}`),
     lines: [
       pick(
@@ -24,7 +26,6 @@ export function pendingForManagers(m: MessageContext, r: ReservationEntity, hold
       ),
       ...(r.note ? [pick(lang, `Note: ${r.note}`, `Hinweis: ${r.note}`)] : []),
     ],
-    actions: [{ label: pick(lang, 'Review requests', 'Anfragen prüfen'), path: ROUTES.manage }],
     path: ROUTES.manage,
   };
 }
@@ -38,6 +39,10 @@ export function confirmed(
 ): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: {
+      template: 'confirmed',
+      variables: { ...bookingVariables(m, r, { viaApproval }), checkIn: checkInVariables(settings, lang) },
+    },
     title: pick(lang, `Booking confirmed: ${resourceName}`, `Reservierung bestätigt: ${resourceName}`),
     lines: [
       viaApproval
@@ -56,7 +61,6 @@ export function confirmed(
         : []),
       checkInRules(settings, lang),
     ],
-    actions: [{ label: pick(lang, 'Open booking', 'Reservierung öffnen'), path: ROUTES.reservation(r.id) }],
     path: ROUTES.reservation(r.id),
   };
 }
@@ -64,6 +68,7 @@ export function confirmed(
 export function rejected(m: MessageContext, r: ReservationEntity): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'rejected', variables: bookingVariables(m, r) },
     title: pick(lang, `Booking rejected: ${resourceName}`, `Reservierung abgelehnt: ${resourceName}`),
     lines: [
       pick(
@@ -81,6 +86,7 @@ export function rejected(m: MessageContext, r: ReservationEntity): NoticeText {
 export function cancelledByManager(m: MessageContext, r: ReservationEntity): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'cancelled-by-manager', variables: bookingVariables(m, r) },
     title: pick(lang, `Booking cancelled: ${resourceName}`, `Reservierung storniert: ${resourceName}`),
     lines: [
       pick(
@@ -98,6 +104,7 @@ export function cancelledByManager(m: MessageContext, r: ReservationEntity): Not
 export function endedEarlyByManager(m: MessageContext, r: ReservationEntity): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'ended-early', variables: bookingVariables(m, r) },
     title: pick(lang, `Booking ended early: ${resourceName}`, `Reservierung vorzeitig beendet: ${resourceName}`),
     lines: [
       pick(
@@ -115,6 +122,7 @@ export function endedEarlyByManager(m: MessageContext, r: ReservationEntity): No
 export function removed(m: MessageContext, r: ReservationEntity): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'removed', variables: bookingVariables(m, r) },
     title: pick(lang, `Booking removed: ${resourceName}`, `Reservierung entfernt: ${resourceName}`),
     lines: [
       pick(
@@ -131,6 +139,7 @@ export function removed(m: MessageContext, r: ReservationEntity): NoticeText {
 export function expired(m: MessageContext, r: ReservationEntity): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: { template: 'expired', variables: bookingVariables(m, r) },
     title: pick(lang, `Booking request expired: ${resourceName}`, `Reservierungsanfrage abgelaufen: ${resourceName}`),
     lines: [
       pick(
@@ -147,6 +156,10 @@ export function expired(m: MessageContext, r: ReservationEntity): NoticeText {
 export function noShow(m: MessageContext, r: ReservationEntity, settings: ResourceSettings): NoticeText {
   const { lang, resourceName } = m;
   return {
+    email: {
+      template: 'no-show',
+      variables: { ...bookingVariables(m, r), checkIn: checkInVariables(settings, lang) },
+    },
     title: pick(
       lang,
       `Not checked in – booking released: ${resourceName}`,

@@ -62,6 +62,18 @@ export class ReservationService implements OnModuleDestroy {
     this.audit = new ReservationAudit(context.audit, this.logger);
   }
 
+  /**
+   * Open resource pages ask the host again whether a start is blocked. Called after every change that can
+   * decide the answer; never throws (the page also refreshes on its own).
+   */
+  invalidateStartBlocked(resourceId: number): void {
+    try {
+      this.context.startBlocked.invalidate({ resourceId });
+    } catch (error) {
+      this.logger.debug(`start-blocked invalidation failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   /** Audit writer shared with the settings, feed, event and scheduler code (override_start, no_show, ...). */
   get auditLog(): ReservationAudit {
     return this.audit;
@@ -205,6 +217,7 @@ export class ReservationService implements OnModuleDestroy {
     );
     if (created.status === 'pending') this.notify('onPending', () => this.notifier.onPending(created));
     else this.notify('onConfirmed', () => this.notifier.onConfirmed(created, { viaApproval: false }));
+    this.invalidateStartBlocked(created.resourceId);
     return created;
   }
 
@@ -260,6 +273,7 @@ export class ReservationService implements OnModuleDestroy {
     this.notify('onCancelled', () =>
       this.notifier.onCancelled(updated, { byUserId: actor.userId, byHolder: isHolder }),
     );
+    this.invalidateStartBlocked(updated.resourceId);
     return updated;
   }
 
@@ -290,6 +304,7 @@ export class ReservationService implements OnModuleDestroy {
       },
     );
     this.notify('onEndedEarly', () => this.notifier.onEndedEarly(updated, { byUserId: actor.userId }));
+    this.invalidateStartBlocked(updated.resourceId);
     return updated;
   }
 
@@ -358,6 +373,7 @@ export class ReservationService implements OnModuleDestroy {
     if (target === 'confirmed')
       this.notify('onConfirmed', () => this.notifier.onConfirmed(updated, { viaApproval: true }));
     else this.notify('onRejected', () => this.notifier.onRejected(updated));
+    this.invalidateStartBlocked(updated.resourceId);
     return updated;
   }
 
@@ -395,6 +411,7 @@ export class ReservationService implements OnModuleDestroy {
     this.notifyEach('onRemoved', cancelled, (reservation) =>
       this.notifier.onRemoved(reservation, { byUserId: actor.userId, reason: DISABLED_REASON }),
     );
+    if (cancelled.length > 0) this.invalidateStartBlocked(resourceId);
     return cancelled.length;
   }
 
@@ -408,17 +425,19 @@ export class ReservationService implements OnModuleDestroy {
     options: { notCheckedIn?: boolean } = {},
   ): Promise<boolean> {
     const changed = await this.store.transition(id, from, changes, options);
-    if (changed && action) {
+    if (changed) {
       const updated = await this.load(id);
-      await this.audit.record(
-        action,
-        ReservationAudit.systemPrincipal(updated.userId),
-        { type: 'reservation', id },
-        {
-          resourceId: updated.resourceId,
-          holderUserId: updated.userId,
-        },
-      );
+      this.invalidateStartBlocked(updated.resourceId);
+      if (action)
+        await this.audit.record(
+          action,
+          ReservationAudit.systemPrincipal(updated.userId),
+          { type: 'reservation', id },
+          {
+            resourceId: updated.resourceId,
+            holderUserId: updated.userId,
+          },
+        );
     }
     return changed;
   }
