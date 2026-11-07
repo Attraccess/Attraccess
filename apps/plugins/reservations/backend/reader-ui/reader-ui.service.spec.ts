@@ -404,4 +404,28 @@ describe('ReaderUiService', () => {
     expect(row(await slots())).toBe('Free until 08:00');
     expect(readerTime(new Date('2026-06-01T12:00:00Z'), { lang: 'en', timeZone: 'UTC', now: h.clock() })).toBe('12:00');
   });
+
+  describe('weekday rule', () => {
+    const berlin = (now: string) => ({ lang: 'en' as const, timeZone: 'Europe/Berlin', now: new Date(now) });
+
+    it('decides "another local day" by the plugin timezone, not by UTC', () => {
+      // 22:30Z on 31 May is already 00:30 on 1 June in Berlin: the same local day runs until 22:00Z.
+      const clock = berlin('2026-05-31T22:30:00Z');
+      expect(readerTime(new Date('2026-05-31T23:00:00Z'), clock)).toBe('01:00');
+      expect(readerTime(new Date('2026-06-01T21:30:00Z'), clock)).toBe('23:30');
+      expect(readerTime(new Date('2026-06-01T22:30:00Z'), clock)).toBe('Tue 00:30');
+      expect(readerTime(new Date('2026-06-01T22:30:00Z'), { ...clock, lang: 'de' })).toBe('Di 00:30');
+    });
+
+    it('keeps local wall-clock times across the daylight saving changes', () => {
+      // Berlin 2026-03-29 02:00 -> 03:00 and 2026-10-25 03:00 -> 02:00.
+      const spring = berlin('2026-03-28T22:00:00Z');
+      expect(readerTime(new Date('2026-03-29T00:59:00Z'), spring)).toBe('Sun 01:59');
+      expect(readerTime(new Date('2026-03-29T01:00:00Z'), spring)).toBe('Sun 03:00');
+      const autumn = berlin('2026-10-24T12:00:00Z');
+      expect(readerTime(new Date('2026-10-25T00:30:00Z'), autumn)).toBe('Sun 02:30');
+      expect(readerTime(new Date('2026-10-25T01:30:00Z'), autumn)).toBe('Sun 02:30');
+      expect(readerTime(new Date('2026-10-25T23:30:00Z'), autumn)).toBe('Mon 00:30');
+    });
+  });
 });
