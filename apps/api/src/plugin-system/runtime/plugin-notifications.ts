@@ -1,5 +1,6 @@
 import type { User } from '@attraccess/database-entities';
 import {
+  PluginEmailTemplate,
   PluginNotificationCategory,
   PluginNotificationRequest,
   PluginNotificationsContext,
@@ -14,10 +15,14 @@ import {
   unregisterPluginNotificationCategories,
 } from '../../notifications/plugin-notification-categories';
 import type { PluginEmailService } from '../../email/plugin-email.service';
+import {
+  registerPluginEmailTemplates,
+  unregisterPluginEmailTemplates,
+} from '../../email-template/plugin-email-templates';
 
 export interface PluginNotificationDeps {
   dispatcher: Pick<NotificationDispatchService, 'dispatch'>;
-  email: Pick<PluginEmailService, 'sendPluginEmail'>;
+  email: Pick<PluginEmailService, 'sendPluginEmail' | 'sendPluginTemplate'>;
   findUsers(userIds: number[]): Promise<User[]>;
 }
 
@@ -47,15 +52,20 @@ export function createPluginNotificationsContext(
         url: request.url,
         severity: request.severity,
         dedupeKey: request.dedupeKey,
-        sendEmail: email ? (recipient) => deps.email.sendPluginEmail(recipient, email) : undefined,
+        sendEmail: email
+          ? (recipient) =>
+              'template' in email
+                ? deps.email.sendPluginTemplate(pluginName, recipient, email.template, email.variables)
+                : deps.email.sendPluginEmail(recipient, email)
+          : undefined,
       });
     },
   };
 }
 
-/** Registration handle for a plugin's notification categories. */
+/** Registration handle for a plugin's notification categories and email templates. */
 export interface PluginNotificationCategoryRegistration {
-  /** (Re-)registers the categories. Idempotent; a no-op when the plugin declares none. */
+  /** (Re-)registers the categories and templates. Idempotent; a no-op when the plugin declares none. */
   register(): void;
   unregister(): void;
 }
@@ -69,15 +79,25 @@ export function preparePluginNotificationCategories(
   pluginName: string,
   permissions: readonly PluginPermission[],
   categories: readonly PluginNotificationCategory[] | undefined,
+  emailTemplates?: readonly PluginEmailTemplate[],
 ): PluginNotificationCategoryRegistration {
   const declared = categories ?? [];
-  if (declared.length && !permissions.includes(PluginPermission.SEND_NOTIFICATIONS)) {
+  const templates = emailTemplates ?? [];
+  const canNotify = permissions.includes(PluginPermission.SEND_NOTIFICATIONS);
+  if (declared.length && !canNotify) {
     throw new PluginPermissionError(pluginName, 'notificationCategories', PluginPermission.SEND_NOTIFICATIONS);
+  }
+  if (templates.length && !canNotify) {
+    throw new PluginPermissionError(pluginName, 'emailTemplates', PluginPermission.SEND_NOTIFICATIONS);
   }
   return {
     register: () => {
       if (declared.length) registerPluginNotificationCategories(pluginName, declared);
+      if (templates.length) registerPluginEmailTemplates(pluginName, templates);
     },
-    unregister: () => unregisterPluginNotificationCategories(pluginName),
+    unregister: () => {
+      unregisterPluginNotificationCategories(pluginName);
+      if (templates.length) unregisterPluginEmailTemplates(pluginName);
+    },
   };
 }

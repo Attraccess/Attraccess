@@ -99,6 +99,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
           throw new Error('Unexpected fixture notification');
         },
       },
+      startBlocked: { invalidate: () => undefined },
       resourceAccess: new Proxy({} as PluginContext['resourceAccess'], {
         get: () => () => {
           throw new Error('Unexpected fixture resource access query');

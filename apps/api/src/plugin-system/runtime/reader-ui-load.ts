@@ -6,12 +6,14 @@ import {
   type PreStartHook,
   type ReaderUiProvider,
   type SessionEndHook,
+  type StartBlockedQuery,
 } from '@attraccess/plugins-backend-sdk';
 
 export interface ReaderUiContributions {
   readerUi?: ReaderUiProvider;
   preStartHook?: PreStartHook;
   sessionEndHook?: SessionEndHook;
+  startBlockedQuery?: StartBlockedQuery;
 }
 
 /**
@@ -38,6 +40,7 @@ export function collectReaderUiContributions(
   for (const [field, hook] of [
     ['preStartHook', exported.preStartHook],
     ['sessionEndHook', exported.sessionEndHook],
+    ['startBlockedQuery', exported.startBlockedQuery],
   ] as const) {
     if (!hook) continue;
     if (!granted.has(PluginPermission.ACCESS_HOOKS)) {
@@ -49,5 +52,5 @@ export function collectReaderUiContributions(
   if (out.readerUi && typeof out.readerUi.getSlotContributions !== 'function') {
     throw new Error(`Plugin ${pluginName}: readerUi.getSlotContributions must be a function`);
   }
-  return out.readerUi || out.preStartHook || out.sessionEndHook ? out : null;
+  return out.readerUi || out.preStartHook || out.sessionEndHook || out.startBlockedQuery ? out : null;
 }

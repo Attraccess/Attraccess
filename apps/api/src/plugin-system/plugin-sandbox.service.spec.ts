@@ -56,6 +56,7 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
     },
     getMqttCredentialProvisioning: () => ({}) as never,
     notifications: { dispatch: jest.fn(async () => undefined) },
+    startBlocked: { invalidate: jest.fn() },
     resourceAccess: {
       canStart: jest.fn(async () => ({ allowed: true, requiresSupervision: false, supervisionAllowed: false })),
       canMaintain: jest.fn(async () => true),
@@ -301,6 +302,17 @@ describe('PluginSandboxService', () => {
       const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.SEND_NOTIFICATIONS]);
       await granted.notifications.dispatch(request);
       expect(base.notifications.dispatch).toHaveBeenCalledWith(request);
+    });
+
+    it('gates startBlocked.invalidate() behind ACCESS_HOOKS', () => {
+      const base = buildBaseContext(events);
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.startBlocked).toThrow(PluginPermissionError);
+      expect(() => denied.startBlocked).toThrow(/ACCESS_HOOKS/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.ACCESS_HOOKS]);
+      granted.startBlocked.invalidate({ resourceId: 3 });
+      expect(base.startBlocked.invalidate).toHaveBeenCalledWith({ resourceId: 3 });
     });
 
     it('gates resourceAccess behind ACCESS_RESOURCES', async () => {

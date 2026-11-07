@@ -4,9 +4,10 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } 
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { AuditService } from '../audit/audit.service';
 import { EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
-import { EmailTemplateService, TemplateTranslations } from './email-template.service';
+import { EmailTemplateService, ListedEmailTemplate, TemplateTranslations } from './email-template.service';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { UpsertTranslationsDto } from './dto/upsert-translations.dto';
+import { ListedEmailTemplateDto } from './dto/listed-email-template.dto';
 import { GetTranslationsResponseDto } from './dto/get-translations-response.dto';
 
 @ApiTags('Email Templates')
@@ -20,9 +21,9 @@ export class EmailTemplateController {
 
   @Get()
   @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'List all email templates' })
-  @ApiResponse({ status: 200, description: 'List of email templates', type: [EmailTemplate] })
-  findAll(): Promise<EmailTemplate[]> {
+  @ApiOperation({ summary: 'List all email templates, including those declared by loaded plugins' })
+  @ApiResponse({ status: 200, description: 'List of email templates', type: [ListedEmailTemplateDto] })
+  findAll(): Promise<ListedEmailTemplate[]> {
     return this.emailTemplateService.findAll();
   }
 
@@ -30,10 +31,10 @@ export class EmailTemplateController {
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get an email template by type' })
   @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
-  @ApiResponse({ status: 200, type: EmailTemplate })
+  @ApiResponse({ status: 200, type: ListedEmailTemplateDto })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  findOne(@Param('type') type: EmailTemplateType): Promise<EmailTemplate> {
-    return this.emailTemplateService.findOne(type);
+  findOne(@Param('type') type: EmailTemplateType): Promise<ListedEmailTemplate> {
+    return this.emailTemplateService.findOneListed(type);
   }
 
   @Patch(':type')
