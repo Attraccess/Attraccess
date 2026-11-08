@@ -554,31 +554,6 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
     expect(scope.service.startFlow).toHaveBeenCalledTimes(101);
   });
 
-  it('starts plugin triggers of resource flows and enabled global flows only', async () => {
-    registerPluginFlowNodes('global-plugin-test', [
-      {
-        type: 'plugin.global-plugin-test.trigger',
-        label: 'Global plugin trigger',
-        configSchema: {},
-        inputs: [],
-        outputs: ['output'],
-        isInput: true,
-      },
-    ]);
-    const type = 'plugin.global-plugin-test.trigger' as ResourceFlowNodeType;
-    scope.initialNodes = [
-      scope.createNode({ id: 'a-resource', type }),
-      scope.createNode({ id: 'b-enabled', type, resourceId: null, flowId: 1, flow: { enabled: true } } as never),
-      scope.createNode({ id: 'c-disabled', type, resourceId: null, flowId: 2, flow: { enabled: false } } as never),
-    ];
-    jest.spyOn(scope.service, 'startFlow').mockResolvedValue([]);
-
-    await scope.service.triggerPluginFlows('global-plugin-test', type, () => true, {});
-
-    const started = (scope.service.startFlow as jest.Mock).mock.calls.map(([node]) => node.id);
-    expect(started).toEqual(['a-resource', 'b-enabled']);
-  });
-
   it('evaluates concurrent plugin triggers in order without waiting for earlier flow runs', async () => {
     registerPluginFlowNodes('ordering-test', [
       {

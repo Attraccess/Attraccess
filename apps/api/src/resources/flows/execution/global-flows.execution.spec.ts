@@ -5,6 +5,7 @@ import {
   ResourceHealthStatus,
   ResourceType,
 } from '@attraccess/database-entities';
+import { registerPluginFlowNodes } from '../../../plugin-system/flows/node-registry';
 import { ResourceHealthChangedEvent } from '../../health/events/resource-health-changed.event';
 import { registerResourceHealthServiceFixture } from '../../health/resource-health.service.resource-health-service.test-fixture';
 import { FlowEventTriggersService } from './flow-event-triggers.service';
@@ -276,6 +277,33 @@ describe('global flows', () => {
       scope.service.runFlow(3, ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED, {}),
     ).rejects.toBeInstanceOf(FlowExecutionError);
     expect(reachedOrder).toEqual(['e-broken', 'e-error']);
+  });
+});
+
+describe('global plugin triggers', () => {
+  it('starts plugin triggers of resource flows and enabled global flows only', async () => {
+    registerPluginFlowNodes('global-plugin-test', [
+      {
+        type: 'plugin.global-plugin-test.trigger',
+        label: 'Global plugin trigger',
+        configSchema: {},
+        inputs: [],
+        outputs: ['output'],
+        isInput: true,
+      },
+    ]);
+    const type = 'plugin.global-plugin-test.trigger' as ResourceFlowNodeType;
+    scope.initialNodes = [
+      scope.createNode({ id: 'a-resource', type }),
+      scope.createNode({ id: 'b-enabled', type, resourceId: null, flowId: 1, flow: { enabled: true } } as never),
+      scope.createNode({ id: 'c-disabled', type, resourceId: null, flowId: 2, flow: { enabled: false } } as never),
+    ];
+    jest.spyOn(scope.service, 'startFlow').mockResolvedValue([]);
+
+    await scope.service.triggerPluginFlows('global-plugin-test', type, () => true, {});
+
+    const started = (scope.service.startFlow as jest.Mock).mock.calls.map(([node]) => node.id);
+    expect(started).toEqual(['a-resource', 'b-enabled']);
   });
 });
 
