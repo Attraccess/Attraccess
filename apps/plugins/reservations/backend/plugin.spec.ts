@@ -23,6 +23,7 @@ describe('plugin module wiring', () => {
         plugin.preStartHook?.({
           resourceId: 2,
           userId: 1,
+          principal: 1,
           action: 'start',
           origin: 'web',
           confirmedStepKeys: [],

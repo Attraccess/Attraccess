@@ -120,15 +120,17 @@ they start through the override confirmation above.
 
 The holder's name follows the rule Attraccess already uses for **who is currently using a machine**: whoever may see the
 name of the current user of a resource may also see who holds a booking on it. Everyone else gets the anonymous text
-("another user", "Reserved") and times only.
+("another user", "Reserved") and times only. Which rule applies is set by
+[**Who can see resource activity**](settings/overview.md#resource-activity-visibility).
 
-- **Sees the name:** the holder; managers and maintainers of the resource; and everybody who may see the usage of the
-  machine under the instance setting for resource activity (people introduced to the machine, or all readers when the
-  instance shows activity to everyone).
-- **Does not see the name:** people who may only see "free or in use" (supervised-use machines), and people who may not
-  see the machine's activity at all.
-- **Where it applies:** the notice on the resource page, the refusal when you press Start, the availability view in the
-  booking card and the calendar feeds. Notes, reasons and decisions of a booking stay visible to the holder and the
+- **Sees the name:** the holder; managers and maintainers of the resource; everybody with **Manage Resource Access**
+  (`resources.access.manage`); and everybody who may see the usage of the machine under that setting. With the default,
+  **Everyone with Read Resources**, that is everybody with **Read Resources**; with **Only people introduced to the
+  resource**, the people introduced to the machine.
+- **Does not see the name:** people who may only see **Available** or **In Use** (supervised-use machines with the
+  "introduced" setting), and people who may not see the machine's activity at all.
+- **Where it applies:** the notice on the resource page, the refusal when you press Start (in the web interface, the API
+  and on the reader), the availability view in the booking card and the calendar feeds. Notes, reasons and decisions of a booking stay visible to the holder and the
   managers only. Managers always get the override confirmation that names the holder.
 - A calendar feed is checked when it is requested, with the permissions of the feed's owner at that time.
 
@@ -365,13 +367,14 @@ Behaviour you should know about:
 All endpoints are under `/api/reservations` and accept a session cookie **or** an API token
 (`Authorization: Bearer <token>`, see the [API reference](developer/api-reference.md)). Times are ISO 8601.
 An API token acts with the token's permissions: manager actions (approving, cancelling or ending other people's
-bookings, the manager list, resource settings, managers-only booking) need `resources.update` or
-`resources.maintenance.manage` on the token itself. Maintainer and introducer rights from your roles still apply.
+bookings, the manager list, resource settings, managers-only booking) need `resources.update` on the token itself.
+Maintainer and introducer rights from your roles still apply.
 Creating a calendar feed and regenerating its URL need a browser session (403 with an API token), because a feed URL
 shows your bookings with all your rights, like an API token does.
-Starting a resource with an API token goes through the core start check, which applies the token's permissions; the
-plugin's own override check (confirmation instead of a block during someone else's booking) still uses the permissions
-of your roles, because the start hook does not receive the token's scope.
+Starting a resource with an API token goes through the core start check and the plugin's start check, and both apply
+the token's permissions: without `resources.update` on the token (and without a maintainer or introducer role) you get
+the block instead of the override confirmation, and the block names the holder only if the token may see who uses the
+machine.
 
 | Method and path                                             | Purpose                                                                                |
 | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { type User } from '@attraccess/database-entities';
-import type { PreStartOrigin } from '@attraccess/plugins-backend-sdk';
+import type { AuthenticatedUser, PluginAccessPrincipal, PreStartOrigin } from '@attraccess/plugins-backend-sdk';
 import type { ReaderUiLanguage } from '../../../plugin-system/reader-ui/host-texts';
 import {
   ReaderUiHooksService,
@@ -54,6 +54,7 @@ export class PreStartService {
     return this.hooks.runPreStart({
       resourceId: input.resourceId,
       userId: input.user.id,
+      principal: hookPrincipal(input.user),
       action: input.forceTakeOver ? 'takeover' : 'start',
       projectId: input.projectId,
       origin: input.origin,
@@ -72,6 +73,7 @@ export class PreStartService {
     return this.hooks.queryStartBlocked({
       resourceId,
       userId: user.id,
+      principal: hookPrincipal(user),
       language: await this.settings.resolveLanguage(user.locale),
     });
   }
@@ -146,4 +148,13 @@ export class PreStartService {
       });
     }
   }
+}
+
+/**
+ * The hooks' view of the starter: a request's user keeps its permissions (narrowed to an API token's scope), a user
+ * loaded for a reader or supervision start is the plain id (full RBAC). A copy, so a plugin cannot change the request.
+ */
+function hookPrincipal(user: User | AuthenticatedUser): PluginAccessPrincipal {
+  const scope = (user as Partial<AuthenticatedUser>).effectivePermissions;
+  return scope ? { id: user.id, effectivePermissions: [...scope] } : user.id;
 }

@@ -11,7 +11,14 @@ export interface ReservationActor extends PluginAuditPrincipal {
 }
 
 /** Subject of an access check: a request actor (scope applies) or a plain user id (full permissions). */
-export type AccessSubject = number | ReservationActor;
+export type AccessSubject = number | Pick<ReservationActor, 'userId' | 'effectivePermissions'>;
+
+/** The subject of a host hook's principal: web and API starts keep the request's scope, others are plain ids. */
+export function subjectOfPrincipal(principal: PluginAccessPrincipal): AccessSubject {
+  if (typeof principal === 'number') return principal;
+  const { id, effectivePermissions } = principal;
+  return { userId: id, effectivePermissions: effectivePermissions ? new Set(effectivePermissions) : undefined };
+}
 
 export function subjectUserId(subject: AccessSubject): number {
   return typeof subject === 'number' ? subject : subject.userId;

@@ -47,7 +47,7 @@ export class ReservationsController {
   @ApiOperation({
     summary: 'Bookings, booking rules and the caller’s booking permission of a resource for a time range',
     description:
-      'Lists pending and confirmed bookings and maintenance that can collide with a booking inside [from, to), i.e. the range widened by the resource’s buffers. Other users’ bookings carry no holder id; the holder name is shown to the holder, managers and everyone who may see who uses the resource (core’s activity-visibility rule). Resources the caller cannot see answer 404.',
+      'Lists pending and confirmed bookings and maintenance that can collide with a booking inside [from, to), i.e. the range widened by the resource’s buffers. Other users’ bookings carry a holder id only for managers of the resource; the holder name is shown to the holder, managers and everyone who may see who uses the resource (core’s activity-visibility rule). Resources the caller cannot see answer 404.',
   })
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiQuery({ name: 'from', type: String, description: 'ISO 8601 start of the range (inclusive)' })

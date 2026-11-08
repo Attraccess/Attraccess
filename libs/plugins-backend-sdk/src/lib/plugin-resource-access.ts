@@ -73,7 +73,8 @@ export interface PluginResourceAccessContext {
    * people introduced to the machine (or its introducers/maintainers) and, when the instance shows activity to
    * everyone, every reader qualify. Machines whose activity is hidden from the user, and unknown users or
    * resources, answer `false`. A plugin that shows a person's name next to a machine (for example who holds a
-   * reservation) should follow this answer instead of keeping its own rule.
+   * reservation) should follow this answer instead of keeping its own rule. Like core's rule it does not look at
+   * hidden resource groups or account state: check that the user may see the resource at all first.
    */
   canSeeUsageAttribution(principal: PluginAccessPrincipal, resourceId: number): Promise<boolean>;
 

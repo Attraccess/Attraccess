@@ -74,7 +74,7 @@
     "reserve": "Reservieren",
     "cannotBook": "Buchen ist nicht möglich",
     "view": "Ansicht",
-    "managerHint": "Als verwaltende Person siehst du, wer welche Buchung hält.",
+    "managerHint": "Als verwaltende Person siehst du bei jeder Buchung, wer sie hält, und ihre Notizen und Gründe.",
     "next": "Deine nächste Buchung",
     "current": "Aktuelle Buchung",
     "loadFailed": "Reservierungen konnten nicht geladen werden",

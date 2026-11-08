@@ -1,9 +1,13 @@
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginAccessPrincipal, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { PLUGIN_CONTEXT } from '../constants';
 import type { ResourceSettings } from '../settings/settings.model';
-import { type AccessSubject, accessPrincipal } from './actor';
+import { type AccessSubject, accessPrincipal, subjectUserId } from './actor';
+import { mapWithConcurrency } from './concurrency';
 import type { BookingConflictCode } from './errors';
+
+/** Core attribution lookups in flight at once (each loads the user and may run several access queries). */
+const LOOKUP_CONCURRENCY = 8;
 
 export interface CanBookResult {
   allowed: boolean;
@@ -21,13 +25,13 @@ export class AccessService {
 
   /**
    * Manager of the resource: `resources.update` permission, or maintainer/introducer of the resource or
-   * its group (`canMaintain`).
+   * its group. Only the roles count, not the global `resources.maintenance.manage` permission (`canMaintain`
+   * alone would grant every resource for it); roles apply whatever an API token's scope.
    */
   async isManager(subject: AccessSubject, resourceId: number): Promise<boolean> {
     const access = this.context.resourceAccess;
-    const principal = accessPrincipal(subject);
-    if (await access.hasPermission(principal, 'resources.update')) return true;
-    return access.canMaintain(principal, resourceId);
+    if (await access.hasPermission(accessPrincipal(subject), 'resources.update')) return true;
+    return access.canMaintain(rolesOnly(subject), resourceId);
   }
 
   /** Holds `resources.update` (sees and manages every resource). */
@@ -44,16 +48,17 @@ export class AccessService {
     const access = this.context.resourceAccess;
     const principal = accessPrincipal(subject);
     const ids = [...new Set(resourceIds)];
-    const allowed = await Promise.all(ids.map((id) => access.canSeeUsageAttribution(principal, id)));
+    const allowed = await mapWithConcurrency(ids, LOOKUP_CONCURRENCY, (id) =>
+      access.canSeeUsageAttribution(principal, id),
+    );
     return new Set(ids.filter((_, index) => allowed[index]));
   }
 
-  /** Resources the user manages: `null` means all (resources.update), otherwise the maintained ids. */
+  /** Resources the user manages: `null` means all (resources.update), otherwise the maintained ids (roles only). */
   async managedResourceIds(subject: AccessSubject): Promise<number[] | null> {
     const access = this.context.resourceAccess;
-    const principal = accessPrincipal(subject);
-    if (await access.hasPermission(principal, 'resources.update')) return null;
-    return access.listResourceIdsMaintained(principal);
+    if (await access.hasPermission(accessPrincipal(subject), 'resources.update')) return null;
+    return access.listResourceIdsMaintained(rolesOnly(subject));
   }
 
   /**
@@ -77,4 +82,9 @@ export class AccessService {
     }
     return { allowed: false, reason: 'NOT_ALLOWED_TO_BOOK' };
   }
+}
+
+/** An empty permission scope: core then answers maintainer/introducer roles only. */
+function rolesOnly(subject: AccessSubject): PluginAccessPrincipal {
+  return { id: subjectUserId(subject), effectivePermissions: [] };
 }

@@ -7,6 +7,8 @@
  * parity test keeps both in sync.
  */
 
+import type { PluginAccessPrincipal } from './plugin-resource-access';
+
 export type ReaderUiTone = 'primary' | 'success' | 'warning' | 'danger';
 export type ReaderUiIconName = 'ok' | 'warning' | 'bell' | 'lock' | 'clock';
 export type ReaderUiTextStyle = 'title' | 'body' | 'small';
@@ -198,6 +200,12 @@ export type PreStartOrigin = 'web' | 'api' | 'reader' | 'supervision';
 export interface PreStartContext {
   resourceId: number;
   userId: number;
+  /**
+   * The starter as a `resourceAccess` principal. Web and API starts carry the request's permissions (an API token's
+   * scope), reader and supervision starts the plain user id. Pass it to `resourceAccess` instead of `userId`, so
+   * permission checks in the hook apply the same scope as core's own start checks.
+   */
+  principal: PluginAccessPrincipal;
   action: 'start' | 'takeover';
   projectId?: number;
   origin: PreStartOrigin;
@@ -240,6 +248,8 @@ export interface StartBlockedContext {
   resourceId: number;
   /** The user looking at the resource. Apply your own visibility rules before naming anybody in the reason. */
   userId: number;
+  /** The viewer as a `resourceAccess` principal, with the request's permissions (an API token's scope). */
+  principal: PluginAccessPrincipal;
   /** Language for texts: the user's preferred language. */
   language: 'en' | 'de';
   now: Date;

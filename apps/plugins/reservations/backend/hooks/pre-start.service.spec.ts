@@ -16,6 +16,7 @@ describe('PreStartService', () => {
   const ctx = (userId: number, patch: Partial<PreStartContext> = {}): PreStartContext => ({
     resourceId: 1,
     userId,
+    principal: userId,
     action: 'start',
     origin: 'web',
     confirmedStepKeys: [],
@@ -111,7 +112,7 @@ describe('PreStartService', () => {
       expect(JSON.stringify(other)).not.toContain('user11');
     });
 
-    it('does not name the holder on a machine whose activity is hidden from the viewer', async () => {
+    it('names the holder per resource: attribution on another machine does not count', async () => {
       h.allowAttribution(10, 2);
       const result = await p.preStart.evaluate(ctx(10));
       expect(JSON.stringify(result)).not.toContain('user11');
@@ -141,11 +142,35 @@ describe('PreStartService', () => {
       });
     });
 
-    it('treats resources.update and resources.maintenance.manage holders as managers', async () => {
+    it('treats resources.update holders as managers, but not holders of the global maintenance permission', async () => {
       h.grant(50, 'resources.update');
       h.grant(51, 'resources.maintenance.manage');
       expect(await p.preStart.evaluate(ctx(50))).toMatchObject({ decision: 'confirm' });
-      expect(await p.preStart.evaluate(ctx(51))).toMatchObject({ decision: 'confirm' });
+      expect(await p.preStart.evaluate(ctx(51))).toMatchObject({ decision: 'block' });
+    });
+
+    it('applies the starter’s API-token scope: no override and no name for a token without those permissions', async () => {
+      h.grant(50, 'resources.update');
+      h.allowAttribution(50, 1);
+      const narrow = { id: 50, effectivePermissions: ['resources.maintenance.manage'] };
+      const result = await p.preStart.evaluate(ctx(50, { principal: narrow, origin: 'api' }));
+      expect(result).toEqual({
+        decision: 'block',
+        reason: { code: 'RESERVED', title: 'Reserved', body: 'Reserved by another user until 16:00.' },
+      });
+      // The same user through a session (or a token that carries the permission) keeps the override.
+      const full = { id: 50, effectivePermissions: ['resources.update'] };
+      expect(await p.preStart.evaluate(ctx(50, { principal: full, origin: 'api' }))).toMatchObject({
+        decision: 'confirm',
+      });
+    });
+
+    it('cuts a very long holder name, so the reason always fits the host’s text limit', async () => {
+      const long = 'x'.repeat(200);
+      jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map([[11, long]]));
+      h.allowAttribution(10, 1);
+      const result = await p.preStart.evaluate(ctx(10));
+      expect(result).toMatchObject({ reason: { body: `Reserved by ${'x'.repeat(39)}… until 16:00.` } });
     });
 
     it('allows the holder, also on takeover', async () => {
@@ -299,7 +324,14 @@ describe('PreStartService', () => {
 
   describe('start-blocked query (resource UI)', () => {
     const query = (userId: number, patch: Partial<StartBlockedContext> = {}): Promise<StartBlockedState | null> =>
-      p.preStart.evaluateStartBlocked({ resourceId: 1, userId, language: 'en', now: h.clock(), ...patch });
+      p.preStart.evaluateStartBlocked({
+        resourceId: 1,
+        userId,
+        principal: userId,
+        language: 'en',
+        now: h.clock(),
+        ...patch,
+      });
 
     it('reports a running booking of another user with the same reason as the gate, and when it ends', async () => {
       await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
@@ -312,6 +344,17 @@ describe('PreStartService', () => {
         until: new Date('2026-06-01T14:00:00Z'),
       });
       expect(JSON.stringify(blocked)).not.toContain('user11');
+    });
+
+    it('applies the viewer’s API-token scope to the name and to the manager exception', async () => {
+      await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T12:30:00Z');
+      h.grant(50, 'resources.update');
+      h.allowAttribution(50, 1);
+      // A session (full permissions) is a manager: nothing to show.
+      expect(await query(50)).toBeNull();
+      const narrow = await query(50, { principal: { id: 50, effectivePermissions: ['resources.maintenance.manage'] } });
+      expect(narrow?.reason.body).toBe('Reserved by another user until 16:00.');
     });
 
     it("names the holder exactly when the gate does: viewers who may see the machine's current user", async () => {

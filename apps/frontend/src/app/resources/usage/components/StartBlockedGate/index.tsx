@@ -22,12 +22,16 @@ interface StartBlockedGateProps {
  * The plugin's reason text already names the end time in the plugin's timezone, so the gate does not add its own.
  */
 export function StartBlockedGate({ resourceId, children }: Readonly<StartBlockedGateProps>) {
-  const { data, isPending, refetch } = useResourcesServiceResourceUsageStartBlocked({ resourceId }, undefined, {
-    refetchInterval: START_BLOCKED_POLL_MS,
-    // The server treats a failing plugin as "not blocked" and checks every start anyway, so an error here should
-    // show the start controls right away instead of keeping the skeleton up through several retries.
-    retry: false,
-  });
+  const { data, isPending, isError, refetch } = useResourcesServiceResourceUsageStartBlocked(
+    { resourceId },
+    undefined,
+    {
+      refetchInterval: START_BLOCKED_POLL_MS,
+      // The server treats a failing plugin as "not blocked" and checks every start anyway, so an error before the first
+      // answer should show the start controls right away instead of keeping the skeleton up through several retries.
+      retry: false,
+    },
+  );
 
   const untilMs = data?.blocked && data.until ? new Date(data.until).getTime() : null;
   useEffect(() => {
@@ -40,8 +44,10 @@ export function StartBlockedGate({ resourceId, children }: Readonly<StartBlocked
   // Until the first answer is there, the start controls would flash up and vanish again when the notice follows.
   if (isPending) return <Skeleton className="h-10 w-full rounded-lg" />;
   // A failed refresh keeps the last answer (react-query holds on to `data`), so a blocked notice does not flip to
-  // the start controls for one poll interval just because the network blinked. Without any answer, fail open.
-  if (!data?.blocked || !data.reason) return <>{children}</>;
+  // the start controls for one poll interval just because the network blinked. Without any answer, or when the
+  // refresh after the announced end failed, fail open: the notice must not outlive its own end time.
+  const expired = isError && untilMs !== null && untilMs <= Date.now();
+  if (!data?.blocked || !data.reason || expired) return <>{children}</>;
 
   return (
     <Alert status="warning" data-cy="start-blocked-notice">

@@ -98,14 +98,14 @@ describe('API-token scope', () => {
     expect(await codeOf(h.reservations.approve(stale, pending.id))).toBe('RESERVATION_NOT_FOUND');
   });
 
-  it('a token without resources.maintenance.manage does not inherit the owner’s maintenance rights', async () => {
+  it('the global maintenance permission makes nobody a reservation manager, with a token or without', async () => {
     await h.enable(1, { approvalRequired: true });
     h.grant(40, 'resources.maintenance.manage');
     const pending = await h.reservations.create(alice, { resourceId: 1, ...slot(8, 9) });
-    expect(await codeOf(h.reservations.approve(tokenActor(40, ['resources.read']), pending.id))).toBe(
-      'RESERVATION_NOT_FOUND',
-    );
-    expect((await h.reservations.approve(principal(40), pending.id)).status).toBe('confirmed');
+    for (const actor of [tokenActor(40, ['resources.maintenance.manage']), principal(40)]) {
+      expect(await codeOf(h.reservations.approve(actor, pending.id))).toBe('RESERVATION_NOT_FOUND');
+    }
+    expect(await h.queries.managerAccess(principal(40))).toEqual({ isManager: false });
   });
 
   it('maintainer/introducer rights still apply to a narrow token, as in core', async () => {

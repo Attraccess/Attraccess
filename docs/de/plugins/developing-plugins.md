@@ -304,6 +304,10 @@ Ein Vertrag für Reader, Web-UI, API-Clients und die Supervision-Freigabe. Ein H
 - Bei mehreren Plugins gewinnt jedes `block`; sonst werden die Bestätigungen nacheinander in Host-Reihenfolge
   gefragt. Jede Wiederholung sendet nur die neueste Schritt-ID; der Host merkt sich die früheren Bestätigungen
   desselben Startversuchs.
+- `ctx.principal` ist die startende Person als `resourceAccess`-Prinzipal. Bei Starts über Web und API trägt es die
+  Berechtigungen der Anfrage, sodass der Umfang eines API-Tokens gilt; bei Starts am Reader und über die
+  Supervision-Freigabe ist es die reine Nutzer-ID. Übergeben Sie es statt `ctx.userId` an `context.resourceAccess`,
+  wenn der Hook Berechtigungen prüft.
 - Der Hook läuft nach der schreibgeschützten Start-Prüfung des Hosts; wer ohnehin abgelehnt würde, sieht keinen
   Schritt.
 - Eine Übernahme ist ein Start für die neue Person (`action: 'takeover'`). **Stopp und Notaus laufen nie durch
@@ -343,10 +347,11 @@ const startBlockedQuery: StartBlockedQuery = async (ctx) => {
 - **Nur zur Information.** Der Server führt für jeden Start weiterhin `preStartHook` aus, der Hook muss also weiter
   blockieren; ein Start, der doch durchkommt, oder eine veraltete Seite endet im üblichen Fehler-Hinweis. Reader
   nutzen weiterhin nur den Hook.
-- **Datenschutz liegt bei Ihnen.** Die Abfrage läuft für die Person, die die Seite ansieht (`ctx.userId`). Der Grund
+- **Datenschutz liegt bei Ihnen.** Die Abfrage läuft für die Person, die die Seite ansieht (`ctx.userId`, mit dem
+  Umfang der Anfrage in `ctx.principal`). Der Grund
   wird ihr wörtlich angezeigt; wenden Sie also Ihre eigenen Sichtbarkeitsregeln an und nennen Sie niemanden, den die
   Person nicht sehen darf. Nennt der Grund eine Person, fragen Sie
-  `context.resourceAccess.canSeeUsageAttribution(ctx.userId, ctx.resourceId)`, statt eine eigene Regel zu pflegen:
+  `context.resourceAccess.canSeeUsageAttribution(ctx.principal, ctx.resourceId)`, statt eine eigene Regel zu pflegen:
   Es ist die Regel, die der Kern auf den aktuellen Nutzer einer Maschine anwendet. Das Reservierungs-Plugin nennt die
   buchende Person genau dann und liefert für Verwaltende nichts, die über eine Override-Bestätigung starten.
 - **Günstig halten.** Sie läuft, solange eine Ressourcenseite mit Start-Knopf offen ist (etwa alle 30 Sekunden pro
@@ -580,7 +585,7 @@ Scheduler. Unbekannte Personen und Ressourcen ergeben negative Antworten (`false
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `canStart(principal, resourceId)`             | `{ allowed, requiresSupervision, supervisionAllowed }`. Berücksichtigt Einweisungen, Nachschulungssperren, Einweisende/Wartende, `resources.update` und den Aufsichtsmodus. Aktuelle Wartung oder Gesundheit werden **nicht** berücksichtigt. |
 | `canMaintain(principal, resourceId)`          | Ob die Person die Wartung der Ressource verwalten darf (`resources.maintenance.manage`, Einweisende/Wartende der Ressource oder einer ihrer Gruppen). Dieselbe Prüfung wie die Wartungs-API des Kerns. |
-| `canSeeUsageAttribution(principal, resourceId)` | Ob die Person sehen darf, **wer** die Ressource nutzt: die Regel des Kerns für den Namen der aktuellen Nutzerin oder des aktuellen Nutzers in Ressourcen-UI und -API (`resources.update`/`resources.access.manage`, in die Maschine eingewiesene Personen, alle, wenn die Instanz die Aktivität für alle zeigt). `false` bei Maschinen mit Aufsicht (nur frei/in Benutzung) und wenn die Aktivität für die Person verborgen ist. |
+| `canSeeUsageAttribution(principal, resourceId)` | Ob die Person sehen darf, **wer** die Ressource nutzt: die Regel des Kerns für den Namen der aktuellen Nutzerin oder des aktuellen Nutzers in Ressourcen-UI und -API (`resources.update`/`resources.access.manage`, in die Maschine eingewiesene Personen, alle, wenn die Instanz die Aktivität für alle zeigt). `false`, wo die Person nur frei/in Benutzung sieht (Maschinen mit beaufsichtigter Nutzung im Modus „eingewiesen“), wenn die Aktivität für sie verborgen ist und für unbekannte Ressourcen. Prüft weder verborgene Gruppen noch den Kontostatus. |
 | `hasPermission(principal, permission)`        | Ob die Person eine RBAC-Berechtigung wie `resources.update` besitzt, beschränkt auf den Bereich der Anfrage.          |
 | `listResourceIdsIntroduced(principal)`        | Ressourcen, in die die Person im Sinne von `canStart` eingewiesen ist (gültige Einweisung, Einweisende/Wartende, `resources.update`). |
 | `listResourceIdsMaintained(principal)`        | Ressourcen, deren Wartung die Person verwalten darf.                                                                 |

@@ -12,7 +12,7 @@ import { PLUGIN_CONTEXT } from '../constants';
 export type Lang = 'en' | 'de';
 
 /** Permissions that make a user a manager of every resource (mirrors AccessService.isManager). */
-const MANAGER_PERMISSIONS = ['resources.update', 'resources.maintenance.manage'];
+const MANAGER_PERMISSIONS = ['resources.update'];
 
 export function normalizeLanguage(locale: string | null | undefined, fallback: Lang): Lang {
   const tag = (locale ?? '').toLowerCase();
@@ -76,8 +76,8 @@ export class HostInfoService {
   }
 
   /**
-   * Users managing the resource: everyone holding `resources.update` / `resources.maintenance.manage`
-   * (role join, one query) plus introducers and maintainers of the resource or of one of its groups
+   * Users managing the resource: everyone holding `resources.update` (role join, one query; the global
+   * `resources.maintenance.manage` permission makes nobody a reservation manager) plus introducers and maintainers of the resource or of one of its groups
    * (one query). This is exactly the set for which AccessService.isManager is true, resolved in two
    * queries instead of one permission check per user. Soft-deleted users are skipped like core's
    * RbacService.getUserIdsWithPermission does (they keep their role and introducer rows).

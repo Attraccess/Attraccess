@@ -39,13 +39,13 @@ describe('StartBlockedGate', () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it('shows the start controls while nothing blocks, and when the question failed', () => {
+  it('shows the start controls while nothing blocks', () => {
     renderGate();
     expect(screen.getByTestId('start')).toBeInTheDocument();
     query.data = { blocked: false };
     renderGate();
     expect(screen.getAllByTestId('start')).toHaveLength(2);
-    expect(screen.queryByTestId('start-blocked-notice')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-cy="start-blocked-notice"]')).toBeNull();
   });
 
   it('holds the start controls back until the first answer, so they do not flash before a notice', () => {
@@ -77,6 +77,16 @@ describe('StartBlockedGate', () => {
     renderGate();
     expect(screen.getByText('Reserved').closest('[data-cy="start-blocked-notice"]')).toBeInTheDocument();
     expect(screen.queryByTestId('start')).not.toBeInTheDocument();
+  });
+
+  it('fails open when the refresh after the announced end failed, so the notice never outlives its end', () => {
+    query.data = { blocked: true, reason, until: '2026-06-01T11:59:00.000Z' };
+    renderGate();
+    // Still waiting for the refresh: the last answer stays.
+    expect(document.querySelector('[data-cy="start-blocked-notice"]')).not.toBeNull();
+    query.error = true;
+    renderGate();
+    expect(screen.getByTestId('start')).toBeInTheDocument();
   });
 
   it('polls as a safety net next to the live events', () => {

@@ -82,6 +82,8 @@ export function createResourceAccessContext(getDeps: () => ResourceAccessDeps): 
 
     async canSeeUsageAttribution(principal, resourceId) {
       const deps = getDeps();
+      // Core's rule grants managers and "all" mode every id, so an unknown resource is ruled out here.
+      if (!(await deps.findResource(resourceId))) return false;
       const user = await resolveUser(principal);
       if (!user) return false;
       // The visibility rule reads the attached permission set; background callers get their full RBAC set.

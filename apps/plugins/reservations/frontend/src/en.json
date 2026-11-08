@@ -74,7 +74,7 @@
     "reserve": "Reserve",
     "cannotBook": "Booking is not available",
     "view": "View",
-    "managerHint": "As a manager you see who holds each booking.",
+    "managerHint": "As a manager you see the holder, notes and reasons of every booking.",
     "next": "Your next booking",
     "current": "Current booking",
     "loadFailed": "Reservations could not be loaded",

@@ -11,6 +11,7 @@ import type { ReservationEntity } from '../entities/reservation.entity';
 import { VisibilityService } from '../ical/visibility.service';
 import { formatTime, pick } from '../notifications/format';
 import { AccessService } from '../reservations/access.service';
+import { type AccessSubject, subjectOfPrincipal } from '../reservations/actor';
 import { DirectoryService } from '../reservations/directory.service';
 import { ReservationStore } from '../reservations/reservation.store';
 import { GlobalSettingsService } from '../settings/global-settings.service';
@@ -19,6 +20,8 @@ import { hookDeadline, waitUntil } from './runtime';
 
 const ALLOW: PreStartResult = Object.freeze({ decision: 'allow' }) as PreStartResult;
 const MINUTE_MS = 60_000;
+/** Longer names are cut, so the reason stays within the host's text limit and is never refused as invalid. */
+const MAX_HOLDER_NAME_CHARS = 40;
 
 export const reservationStepKey = (id: number) => `reservation-${id}`;
 export const overrideStepKey = (id: number) => `override-${id}`;
@@ -113,10 +116,12 @@ export class PreStartService {
     const now = ctx.now ?? this.clock();
     const active = (await this.store.findActiveForResource(ctx.resourceId, now)).find((r) => r.userId !== ctx.userId);
     if (!active) return null;
-    if (await this.access.isManager(ctx.userId, ctx.resourceId)) return null;
-    if ((await this.visibility.filterVisible(ctx.userId, [ctx.resourceId])).length === 0) return null;
+    // The viewer's request scope (an API token's) applies to every check, as in core's own answers.
+    const viewer = subjectOfPrincipal(ctx.principal);
+    if (await this.access.isManager(viewer, ctx.resourceId)) return null;
+    if ((await this.visibility.filterVisible(viewer, [ctx.resourceId])).length === 0) return null;
     const timeZone = await this.globalSettings.getTimezone();
-    const holder = await this.holderNameFor(ctx.userId, active);
+    const holder = await this.holderNameFor(viewer, active);
     return { reason: reservedReason(ctx.language, active.endTime, timeZone, holder), until: active.endTime };
   }
 
@@ -124,16 +129,17 @@ export class PreStartService {
    * The booking holder's name for a viewer who may see who uses the machine (core's usage attribution rule, the
    * same one that decides who sees the current user of a running session); null for everyone else.
    */
-  private async holderNameFor(viewerId: number, booking: ReservationEntity): Promise<string | null> {
-    if (!(await this.access.attributionResourceIds(viewerId, [booking.resourceId])).has(booking.resourceId))
-      return null;
-    return (await this.directory.getUserNames([booking.userId])).get(booking.userId) ?? null;
+  private async holderNameFor(viewer: AccessSubject, booking: ReservationEntity): Promise<string | null> {
+    if (!(await this.access.attributionResourceIds(viewer, [booking.resourceId])).has(booking.resourceId)) return null;
+    return shorten((await this.directory.getUserNames([booking.userId])).get(booking.userId) ?? null);
   }
 
   /** Block for non-managers; for managers the next unconfirmed override, or null when all are confirmed. */
   private async whenActive(ctx: PreStartContext, active: ReservationEntity[]): Promise<PreStartResult | null> {
     const { language: lang } = ctx;
-    const isManager = await this.access.isManager(ctx.userId, ctx.resourceId);
+    // The starter's request scope applies: a token without `resources.update` gets no manager override.
+    const starter = subjectOfPrincipal(ctx.principal);
+    const isManager = await this.access.isManager(starter, ctx.resourceId);
     const unconfirmed = isManager
       ? active.find((r) => !ctx.confirmedStepKeys.includes(overrideStepKey(r.id)))
       : active[0];
@@ -141,11 +147,11 @@ export class PreStartService {
     const timeZone = await this.globalSettings.getTimezone();
     const until = formatTime(unconfirmed.endTime, { lang, timeZone });
     if (!isManager) {
-      const holder = await this.holderNameFor(ctx.userId, unconfirmed);
+      const holder = await this.holderNameFor(starter, unconfirmed);
       return { decision: 'block', reason: reservedReason(lang, unconfirmed.endTime, timeZone, holder) };
     }
     const name =
-      (await this.directory.getUserNames([unconfirmed.userId])).get(unconfirmed.userId) ??
+      shorten((await this.directory.getUserNames([unconfirmed.userId])).get(unconfirmed.userId) ?? null) ??
       pick(lang, 'another user', 'einer anderen Person');
     return {
       decision: 'confirm',
@@ -164,6 +170,11 @@ export class PreStartService {
       },
     };
   }
+}
+
+function shorten(name: string | null): string | null {
+  const chars = name === null ? [] : Array.from(name);
+  return chars.length > MAX_HOLDER_NAME_CHARS ? `${chars.slice(0, MAX_HOLDER_NAME_CHARS - 1).join('')}…` : name;
 }
 
 /**

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   READER_UI_LIMITS,
   READER_UI_TIMING,
+  type PluginAccessPrincipal,
   type PluginBlockReason,
   type PluginChoice,
   type PluginConfirmation,
@@ -27,6 +28,8 @@ import { ReaderUiRegistry } from './reader-ui.registry';
 export interface PreStartRun {
   resourceId: number;
   userId: number;
+  /** Handed to the hooks: carries the request's permissions (API-token scope) for web and API starts. */
+  principal: PluginAccessPrincipal;
   action: 'start' | 'takeover';
   projectId?: number;
   origin: PreStartOrigin;
@@ -62,6 +65,7 @@ type NormalizedOutcome = PreStartOutcome & { auditCode?: string };
 export interface StartBlockedRun {
   resourceId: number;
   userId: number;
+  principal: PluginAccessPrincipal;
   language: ReaderUiLanguage;
 }
 
@@ -123,6 +127,7 @@ export class ReaderUiHooksService {
           hook({
             resourceId: run.resourceId,
             userId: run.userId,
+            principal: run.principal,
             action: run.action,
             projectId: run.projectId,
             origin: run.origin,

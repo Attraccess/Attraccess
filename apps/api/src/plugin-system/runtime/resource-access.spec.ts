@@ -116,8 +116,11 @@ describe('plugin resourceAccess', () => {
       ).resolves.toBe(true);
     });
 
-    it('answers false for unknown users', async () => {
+    it('answers false for unknown users and unknown resources, also for managers and in "all" mode', async () => {
       await expect(access.canSeeUsageAttribution(404, 1)).resolves.toBe(false);
+      permissions = new Set(['resources.read', 'resources.update']);
+      activityVisibility = 'all';
+      await expect(access.canSeeUsageAttribution(user.id, 999)).resolves.toBe(false);
     });
   });
 

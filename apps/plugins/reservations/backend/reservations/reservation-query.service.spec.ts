@@ -1,5 +1,5 @@
 import { ReservationError } from './errors';
-import { Harness, at, createHarness, principal } from '../testing/harness.test-utils';
+import { Harness, at, createHarness, principal, tokenActor } from '../testing/harness.test-utils';
 
 const slot = (startHour: number, endHour: number, day = '2026-06-02') => ({
   startTime: at(`${day}T${String(startHour).padStart(2, '0')}:00:00`),
@@ -106,15 +106,29 @@ describe('ReservationQueryService', () => {
     await h.reservations.create(alice, { resourceId: 1, ...slot(8, 9), note: 'secret project' });
     h.allowAttribution(bob.userId, 1);
     const [seen] = (await h.queries.availability(bob, 1, ...range)).reservations;
-    expect(seen).toMatchObject({ mine: false, userName: 'user10', note: null, cancelReason: null, canCancel: false });
-    // A viewer without that access, and the same viewer on a machine whose names are hidden from them, get none.
+    expect(seen).toMatchObject({
+      mine: false,
+      userName: 'user10',
+      userId: null,
+      createdAt: null,
+      note: null,
+      cancelReason: null,
+      canCancel: false,
+    });
+    // A viewer without that access gets no name.
     const carol = principal(12);
     expect((await h.queries.availability(carol, 1, ...range)).reservations[0].userName).toBeNull();
-    h.allowAttribution(bob.userId, 2);
+    // Attribution is per machine: bob gets no name on resource 2, where he may not see the current user.
     await h.enable(2);
     await h.reservations.create(alice, { resourceId: 2, ...slot(8, 9) });
-    expect((await h.queries.availability(bob, 2, ...range)).reservations[0].userName).toBe('user10');
-    expect((await h.queries.availability(carol, 2, ...range)).reservations[0].userName).toBeNull();
+    expect((await h.queries.availability(bob, 2, ...range)).reservations[0].userName).toBeNull();
+    h.allowAttribution(carol.userId, 2);
+    expect((await h.queries.availability(carol, 2, ...range)).reservations[0].userName).toBe('user10');
+    // A token whose scope may not see who uses machines gets no name, whatever the owner may see.
+    expect(
+      (await h.queries.availability(tokenActor(bob.userId, ['resources.maintenance.manage']), 1, ...range))
+        .reservations[0].userName,
+    ).toBeNull();
   });
 
   it('validates ranges and resources', async () => {
@@ -274,7 +288,8 @@ describe('ReservationQueryService', () => {
     expect(await h.queries.managerAccess(bob)).toEqual({ isManager: false });
     h.grant(50, 'resources.update');
     expect(await h.queries.managerAccess(principal(50))).toEqual({ isManager: true });
+    // Core's maintenance permission alone does not make a reservation manager (only maintainer/introducer roles do).
     h.grant(51, 'resources.maintenance.manage');
-    expect(await h.queries.managerAccess(principal(51))).toEqual({ isManager: true });
+    expect(await h.queries.managerAccess(principal(51))).toEqual({ isManager: false });
   });
 });

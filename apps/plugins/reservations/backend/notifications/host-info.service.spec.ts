@@ -51,7 +51,7 @@ describe('HostInfoService (real host entities)', () => {
     expect((await info.languagesOf([9])).get(9)).toBe('en');
   });
 
-  it('finds managers: permission holders plus resource and group introducers/maintainers', async () => {
+  it('finds managers: resources.update holders plus resource and group introducers/maintainers', async () => {
     await db.sql(
       `INSERT INTO role (id, key, name, description, isSystemManaged, isDefault, createdAt, updatedAt) VALUES (1, 'admin', 'Admin', '', 0, 0, datetime('now'), datetime('now')), (2, 'maint', 'Maint', '', 0, 0, datetime('now'), datetime('now')), (3, 'other', 'Other', '', 0, 0, datetime('now'), datetime('now'))`,
     );
@@ -70,13 +70,14 @@ describe('HostInfoService (real host entities)', () => {
     await db.sql(
       `INSERT INTO resource_introducer (type, resourceGroupId, userId, grantedAt) VALUES ('maintainer', 10, 4, datetime('now')), ('introducer', 11, 7, datetime('now'))`,
     );
-    expect((await info.managerIdsOf(1)).sort()).toEqual([1, 2, 3, 4]);
-    expect((await info.managerIdsOf(2)).sort()).toEqual([1, 2, 5]);
+    // User 2 only holds the global maintenance permission: no reservation manager (like AccessService.isManager).
+    expect((await info.managerIdsOf(1)).sort()).toEqual([1, 3, 4]);
+    expect((await info.managerIdsOf(2)).sort()).toEqual([1, 5]);
 
     // soft-deleted users keep their role and introducer rows but are no managers anymore
     await db.sql(`UPDATE "user" SET deletedAt = datetime('now') WHERE id IN (1, 3, 5)`);
-    expect((await info.managerIdsOf(1)).sort()).toEqual([2, 4]);
-    expect((await info.managerIdsOf(2)).sort()).toEqual([2]);
+    expect((await info.managerIdsOf(1)).sort()).toEqual([4]);
+    expect((await info.managerIdsOf(2)).sort()).toEqual([]);
   });
 
   it('counts unhealthy health entries', async () => {

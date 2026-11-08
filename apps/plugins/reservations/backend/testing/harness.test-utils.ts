@@ -22,6 +22,9 @@ import { ResourceSettingsService } from '../settings/resource-settings.service';
 import { SettingsAdminService } from '../settings/settings-admin.service';
 import type { ResourceSettingsValues } from '../settings/settings.model';
 
+/** Permissions under which core may show who uses a machine at all. */
+const ATTRIBUTION_SCOPE = ['resources.read', 'resources.update', 'resources.access.manage'];
+
 export const principal = (userId: number): PluginAuditPrincipal => ({ userId, authenticationMethod: 'session' });
 
 /** A request actor authenticated with an API token scoped to `scope` (what `principalOf` builds for it). */
@@ -120,9 +123,13 @@ export async function createHarness() {
     runSerialized,
     getRepository: (entity: never) => dataSource.getRepository(entity),
     resourceAccess: {
-      // Core's rule for the current user's name; scripted per user and resource.
+      // Core's rule for the current user's name; scripted per user and resource. Like core, a request scope without
+      // resources.read (or update / access.manage) sees nobody's name.
       canSeeUsageAttribution: async (subject: PluginAccessPrincipal, resourceId: number) =>
-        state.attribution.get(idOf(subject))?.has(resourceId) ?? false,
+        (typeof subject === 'number' ||
+          subject.effectivePermissions === undefined ||
+          ATTRIBUTION_SCOPE.some((permission) => new Set(subject.effectivePermissions).has(permission))) &&
+        (state.attribution.get(idOf(subject))?.has(resourceId) ?? false),
       hasPermission: async (subject: PluginAccessPrincipal, permission: string) =>
         permissionsOf(subject).has(permission),
       // Like the host: the maintenance permission counts as maintainer of every resource.

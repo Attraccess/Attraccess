@@ -127,17 +127,21 @@ Override-Bestätigung.
 
 ### Wer den Namen der buchenden Person sieht
 
-Der Name der buchenden Person folgt der Regel, die Attraccess bereits für **wer eine Maschine gerade nutzt** verwendet:
-Wer den Namen der aktuellen Nutzerin oder des aktuellen Nutzers einer Ressource sehen darf, sieht auch, wer darauf
-gebucht hat. Alle anderen erhalten den anonymen Text („einer anderen Person“, „Reserviert“) und nur die Zeiten.
+Der Name der buchenden Person folgt der Regel, die Attraccess bereits für die Anzeige verwendet, **wer eine Maschine
+gerade nutzt**: Wer den Namen der aktuellen Nutzerin oder des aktuellen Nutzers einer Ressource sehen darf, sieht auch,
+wer darauf gebucht hat. Alle anderen erhalten den anonymen Text („einer anderen Person“, „Reserviert“) und nur die
+Zeiten. Welche Regel gilt, legt die Einstellung
+[**Wer die Ressourcennutzung sehen darf**](settings/overview.md#sichtbarkeit-der-ressourcennutzung) fest.
 
-- **Sieht den Namen:** die buchende Person; Verwaltende und Wartende der Ressource; und alle, die die Nutzung der
-  Maschine nach der Instanz-Einstellung für Ressourcenaktivität sehen dürfen (in die Maschine eingewiesene Personen,
-  oder alle Lesenden, wenn die Instanz die Aktivität für alle zeigt).
-- **Sieht den Namen nicht:** Personen, die nur „frei oder in Benutzung“ sehen (Maschinen mit Aufsicht), und Personen,
-  die die Aktivität der Maschine gar nicht sehen dürfen.
-- **Wo das gilt:** der Hinweis auf der Ressourcenseite, die Ablehnung beim Drücken von Start, die
-  Verfügbarkeitsansicht in der Buchungskarte und die Kalender-Feeds. Notizen, Gründe und Entscheidungen einer Buchung
+- **Sieht den Namen:** die buchende Person; Verwaltende und Wartende der Ressource; alle mit **Ressourcen-Zugriff
+  verwalten** (`resources.access.manage`); und alle, die die Nutzung der Maschine nach dieser Einstellung sehen dürfen.
+  Mit dem Standard **Alle mit „Ressourcen lesen“** sind das alle mit **Ressourcen lesen**; mit **Nur in die Ressource
+  eingewiesene Personen** die in die Maschine eingewiesenen Personen.
+- **Sieht den Namen nicht:** Personen, die nur **Verfügbar** oder **In Benutzung** sehen (Maschinen, die beaufsichtigte
+  Nutzung erlauben oder erfordern, bei der Einstellung „Nur eingewiesene Personen“), und Personen, die die Aktivität
+  der Maschine gar nicht sehen dürfen.
+- **Wo das gilt:** der Hinweis auf der Ressourcenseite, die Ablehnung beim Drücken von Start (in der Web-Oberfläche,
+  über die API und am Reader), die Verfügbarkeitsansicht in der Buchungskarte und die Kalender-Feeds. Notizen, Gründe und Entscheidungen einer Buchung
   sehen weiterhin nur die buchende Person und die Verwaltenden. Verwaltende erhalten immer die Override-Bestätigung,
   die die buchende Person nennt.
 - Ein Kalender-Feed wird beim Abruf geprüft, mit den Berechtigungen der Feed-Besitzerin oder des Feed-Besitzers zu
@@ -388,13 +392,13 @@ Alle Endpunkte liegen unter `/api/reservations` und akzeptieren ein Sitzungs-Coo
 (`Authorization: Bearer <token>`, siehe [API-Referenz](developer/api-reference.md)). Zeiten sind ISO 8601.
 Ein API-Token handelt mit den Berechtigungen des Tokens: Verwalteraktionen (fremde Buchungen genehmigen, stornieren
 oder vorzeitig beenden, die Verwalterliste, Ressourceneinstellungen, Buchen bei „nur Verwalter“) brauchen
-`resources.update` oder `resources.maintenance.manage` am Token selbst. Wartungs- und Einweiserrechte aus Ihren Rollen
-gelten weiterhin.
+`resources.update` am Token selbst. Wartungs- und Einweiserrechte aus Ihren Rollen gelten weiterhin.
 Einen Kalender-Feed anlegen und seine URL neu erzeugen geht nur mit einer Browser-Sitzung (403 mit einem API-Token),
 denn eine Feed-URL zeigt Ihre Buchungen mit allen Ihren Rechten, wie ein API-Token.
-Ein Start mit einem API-Token läuft durch die Startprüfung des Kerns, die die Berechtigungen des Tokens anwendet; die
-eigene Übersteuerungsprüfung des Plugins (Bestätigung statt Sperre während einer fremden Buchung) nutzt weiterhin die
-Berechtigungen Ihrer Rollen, weil der Start-Hook den Umfang des Tokens nicht erhält.
+Ein Start mit einem API-Token läuft durch die Startprüfung des Kerns und die des Plugins, und beide wenden die
+Berechtigungen des Tokens an: Ohne `resources.update` am Token (und ohne Wartungs- oder Einweiserrolle) erhalten Sie die
+Sperre statt der Override-Bestätigung, und die Sperre nennt die buchende Person nur, wenn das Token sehen darf, wer die
+Maschine nutzt.
 
 | Methode und Pfad                                            | Zweck                                                                                      |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ |

@@ -274,6 +274,17 @@ describe('IcalService', () => {
       expect(events(await render(other.token))).toEqual(['Resource 1 – Reserved']);
     });
 
+    it('decides the name per machine, and never puts a user id into the title of an attributed viewer', async () => {
+      await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
+      await p.book(11, 2, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
+      h.allowAttribution(10, 1);
+      const feed = await ical.create(principal(10), { name: 'u', selection: selection({ resourceIds: [1, 2] }) });
+      expect(events(await render(feed.token))).toEqual(['Resource 1 – user11', 'Resource 2 – Reserved']);
+      // The holder's user row is gone: an attributed viewer gets the anonymous label, not the holder's id.
+      jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map());
+      expect(events(await render(feed.token))).toEqual(['Resource 1 – Reserved', 'Resource 2 – Reserved']);
+    });
+
     it('resolves manager rights with one lookup (resources.update sees every holder)', async () => {
       await p.book(11, 1, '2026-06-03T08:00:00', '2026-06-03T09:00:00');
       await p.book(11, 2, '2026-06-03T08:00:00', '2026-06-03T09:00:00');

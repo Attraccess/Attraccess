@@ -2,7 +2,7 @@ import type { StartBlockedQuery } from '@attraccess/plugins-backend-sdk';
 import { ReaderUiHooksService, type StartBlockedRun } from './reader-ui-hooks.service';
 
 const blocked = { reason: { code: 'RESERVED', title: 'Reserved', body: 'Reserved until 16:00.' } };
-const run: StartBlockedRun = { resourceId: 3, userId: 7, language: 'en' };
+const run: StartBlockedRun = { resourceId: 3, userId: 7, principal: 7, language: 'en' };
 
 function setup(queries: Record<string, StartBlockedQuery>, preStart: Record<string, () => unknown> = {}) {
   const registry = {
@@ -48,7 +48,13 @@ describe('ReaderUiHooksService.queryStartBlocked', () => {
   it('hands the plugin the user, the resource, the language and the time', async () => {
     const query = jest.fn().mockResolvedValue(null);
     await setup({ a: query }).service.queryStartBlocked({ ...run, language: 'de' });
-    expect(query).toHaveBeenCalledWith({ resourceId: 3, userId: 7, language: 'de', now: expect.any(Date) });
+    expect(query).toHaveBeenCalledWith({
+      resourceId: 3,
+      userId: 7,
+      principal: 7,
+      language: 'de',
+      now: expect.any(Date),
+    });
   });
 
   it('treats a failing, hanging or invalid query as not blocked and never throws', async () => {

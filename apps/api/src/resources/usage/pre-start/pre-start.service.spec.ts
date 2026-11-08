@@ -72,13 +72,31 @@ describe('PreStartService', () => {
 
     await expect(service.queryStartBlocked(3, { id: 7, locale: 'de-AT' } as any)).resolves.toBe(view);
     expect(settings.resolveLanguage).toHaveBeenCalledWith('de-AT');
-    expect(hooks.queryStartBlocked).toHaveBeenCalledWith({ resourceId: 3, userId: 7, language: 'de' });
+    expect(hooks.queryStartBlocked).toHaveBeenCalledWith({ resourceId: 3, userId: 7, principal: 7, language: 'de' });
   });
 
   it('answers null when no plugin blocks the start', async () => {
     const { service, hooks } = setup();
     await expect(service.queryStartBlocked(3, { id: 7, locale: null } as any)).resolves.toBeNull();
-    expect(hooks.queryStartBlocked).toHaveBeenCalledWith({ resourceId: 3, userId: 7, language: 'en' });
+    expect(hooks.queryStartBlocked).toHaveBeenCalledWith({ resourceId: 3, userId: 7, principal: 7, language: 'en' });
+  });
+
+  it('hands the hooks a request user with its permissions (an API token scope), a loaded user as the plain id', async () => {
+    const { service, hooks } = setup({ decision: 'allow' });
+    const scoped = new Set(['resources.read']);
+    const tokenUser = { id: 7, locale: 'en', effectivePermissions: scoped } as any;
+    await service.gateHttp(3, tokenUser, {}, { origin: 'api', apiTokenId: 4 });
+    const principal = hooks.runPreStart.mock.calls.at(-1)?.[0].principal;
+    expect(principal).toEqual({ id: 7, effectivePermissions: ['resources.read'] });
+    // A copy: the plugin cannot change the request's permissions.
+    expect(principal.effectivePermissions).not.toBe(scoped);
+    await service.queryStartBlocked(3, tokenUser);
+    expect(hooks.queryStartBlocked.mock.calls.at(-1)?.[0].principal).toEqual({
+      id: 7,
+      effectivePermissions: ['resources.read'],
+    });
+    await service.evaluate({ resourceId: 3, user: { id: 8 } as any, origin: 'reader', language: 'en' });
+    expect(hooks.runPreStart.mock.calls.at(-1)?.[0].principal).toBe(8);
   });
 
   it('allows', async () => {

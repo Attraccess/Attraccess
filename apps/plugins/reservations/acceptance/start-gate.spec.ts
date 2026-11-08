@@ -18,13 +18,17 @@ const NOW = new Date('2026-06-01T12:30:00.000Z');
 const HOLDER = 10;
 const OTHER = 11;
 const MANAGER = 99;
+/** Holds resources.update through a role, without a maintainer or introducer role on the resource. */
+const UPDATER = 98;
 
-type Principal = { id: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+type Principal = { id: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number; scope?: string[] };
 let principal: Principal = { id: OTHER, authenticationMethod: 'session' };
 
+/** The request user core's auth builds: `effectivePermissions` is the session's set or the API token's scope. */
 class FakeAuth implements CanActivate {
   canActivate(context: ExecutionContext) {
-    context.switchToHttp().getRequest().user = { locale: 'en', effectivePermissions: new Set(), ...principal };
+    const { scope = ['resources.read', 'resources.update'], ...user } = principal;
+    context.switchToHttp().getRequest().user = { locale: 'en', effectivePermissions: new Set(scope), ...user };
     return true;
   }
 }
@@ -187,6 +191,20 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
     const retried = await start({ confirmedStepIds: [asked.body.stepId] });
     expect(retried.status).toBe(201);
     expect(sessionStartedFor()).toEqual([MANAGER]);
+  });
+
+  it('applies an API token’s scope in the plugin: without resources.update there is no override, only the block', async () => {
+    h.grant(UPDATER, 'resources.update');
+    principal = as(UPDATER, via);
+    expect((await start()).status).toBe(409);
+
+    principal = { ...as(UPDATER, 'api-token'), scope: ['resources.read'] };
+    const refused = await start();
+    expect(refused.status).toBe(403);
+    expect(refused.body).toMatchObject({ code: 'START_BLOCKED', reason: { code: 'RESERVED' } });
+    const state = await request(app.getHttpServer()).get('/resources/1/usage/start-blocked');
+    expect(state.body).toMatchObject({ blocked: true, reason: refused.body.reason });
+    expect(startSession).not.toHaveBeenCalled();
   });
 
   it('accepts a step id once only, and only from the principal it was issued to', async () => {

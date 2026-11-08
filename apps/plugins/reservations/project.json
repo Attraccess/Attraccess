@@ -28,6 +28,26 @@
         "command": "eslint apps/plugins/reservations/backend apps/plugins/reservations/frontend/src apps/plugins/reservations/acceptance --max-warnings=0 && prettier --check apps/plugins/reservations/backend apps/plugins/reservations/frontend/src apps/plugins/reservations/acceptance"
       }
     },
+    "// typecheck": "ts-jest only transpiles (isolatedModules), so the specs are type-checked here. The spec config keeps module commonjs for ts-jest; tsc gets bundler resolution on the command line because node16 resolution needs module node16.",
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{projectRoot}/backend/**/*",
+        "{projectRoot}/acceptance/**/*",
+        "{projectRoot}/tsconfig.spec.json",
+        "{workspaceRoot}/tsconfig.base.json",
+        "{workspaceRoot}/libs/plugins-backend-sdk/src/**/*",
+        "{workspaceRoot}/apps/api/src/**/*",
+        {
+          "externalDependencies": ["typescript"]
+        }
+      ],
+      "outputs": [],
+      "options": {
+        "command": "tsc --noEmit -p apps/plugins/reservations/backend/tsconfig.json && tsc --noEmit -p apps/plugins/reservations/tsconfig.spec.json --module esnext --moduleResolution bundler"
+      }
+    },
     "test-frontend": {
       "executor": "nx:run-commands",
       "cache": true,

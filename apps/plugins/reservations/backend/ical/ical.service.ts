@@ -6,6 +6,7 @@ import { IcalFeedEntity } from '../entities/ical-feed.entity';
 import { HostInfoService } from '../notifications/host-info.service';
 import { pick } from '../notifications/format';
 import { AccessService } from '../reservations/access.service';
+import { mapWithConcurrency } from '../reservations/concurrency';
 import { DirectoryService } from '../reservations/directory.service';
 import { ReservationError } from '../reservations/errors';
 import { ReservationAudit } from '../reservations/audit';
@@ -282,7 +283,9 @@ export class IcalService {
     const events: IcalEvent[] = inRange.map((r) => {
       const resource = resourceNames.get(r.resourceId) ?? `#${r.resourceId}`;
       const full = seesHolder(r);
-      const holder = seesName(r) ? (userNames.get(r.userId) ?? `#${r.userId}`) : pick(lang, 'Reserved', 'Reserviert');
+      // The `#id` fallback (user row gone) only for viewers who may see the holder's id.
+      const name = seesName(r) ? (userNames.get(r.userId) ?? (full ? `#${r.userId}` : null)) : null;
+      const holder = name ?? pick(lang, 'Reserved', 'Reserviert');
       const lines = [
         ...(r.status === 'pending' ? [pick(lang, 'Waiting for approval', 'Wartet auf Genehmigung')] : []),
         ...(full && r.note ? [r.note] : []),
@@ -299,18 +302,4 @@ export class IcalService {
     });
     return buildCalendar({ name: feed.name, timeZone, events });
   }
-}
-
-/** Like `Promise.all(items.map(fn))`, with at most `limit` calls in flight. Results keep the input order. */
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index]);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
 }
