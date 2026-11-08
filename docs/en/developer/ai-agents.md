@@ -9,7 +9,11 @@ Attraccess documentation is easy to consume for AI agents: an `llms.txt` index f
 
 ## llms.txt
 
-`https://docs.attraccess.org/llms.txt` follows the [llms.txt](https://llmstxt.org/) convention. It lists every documentation page, English first and then German, with a link to the raw Markdown file and a one-line description. An agent can read the index and then fetch only the pages it needs, for example `https://docs.attraccess.org/en/getting-started/overview.md`.
+`https://docs.attraccess.org/llms.txt` follows the [llms.txt](https://llmstxt.org/) convention. It lists every documentation page, English first and then German, with a link to the raw Markdown file and a one-line description. An agent can read the index and then fetch only the pages it needs, for example:
+
+```text
+https://docs.attraccess.org/en/getting-started/overview.md
+```
 
 The file is generated from the two sidebars (`docs/en/_sidebar.md` and `docs/de/_sidebar.md`) and committed to the repository. It is available in the same way when the documentation is served by your own Attraccess instance under `/docs/`, but the links in it always point to `docs.attraccess.org`.
 

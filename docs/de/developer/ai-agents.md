@@ -9,7 +9,11 @@ Die Attraccess-Dokumentation lässt sich gut von KI-Agenten nutzen: ein `llms.tx
 
 ## llms.txt
 
-`https://docs.attraccess.org/llms.txt` folgt der [llms.txt](https://llmstxt.org/)-Konvention. Die Datei listet alle Dokumentationsseiten auf, zuerst Englisch, dann Deutsch, jeweils mit Link auf die Markdown-Rohdatei und einer einzeiligen Beschreibung. Ein Agent liest den Index und lädt dann nur die benötigten Seiten, zum Beispiel `https://docs.attraccess.org/de/getting-started/overview.md`.
+`https://docs.attraccess.org/llms.txt` folgt der [llms.txt](https://llmstxt.org/)-Konvention. Die Datei listet alle Dokumentationsseiten auf, zuerst Englisch, dann Deutsch, jeweils mit Link auf die Markdown-Rohdatei und einer einzeiligen Beschreibung. Ein Agent liest den Index und lädt dann nur die benötigten Seiten, zum Beispiel:
+
+```text
+https://docs.attraccess.org/de/getting-started/overview.md
+```
 
 Die Datei wird aus den beiden Seitenleisten (`docs/en/_sidebar.md` und `docs/de/_sidebar.md`) erzeugt und im Repository eingecheckt. Sie ist auch erreichbar, wenn die Dokumentation von Ihrer eigenen Attraccess-Instanz unter `/docs/` ausgeliefert wird; die Links darin zeigen aber immer auf `docs.attraccess.org`.
 
