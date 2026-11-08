@@ -21,7 +21,7 @@ import {
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { DataSource, Repository, OptimisticLockVersionMismatchError, QueryFailedError } from 'typeorm';
+import { DataSource, EntityManager, Repository, OptimisticLockVersionMismatchError, QueryFailedError } from 'typeorm';
 
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 
@@ -108,14 +108,17 @@ export class PasswordPolicyService implements OnModuleInit {
 
   protected readonly logger = new Logger(PasswordPolicyService.name);
 
-  protected async persistAudit(input: {
-    event: 'global_policy_updated' | 'override_upserted' | 'override_deleted';
-    audit: AuditContext;
-    role: PasswordPolicyRole | null;
-    before: object | null;
-    after: object | null;
-    changedFields: string[];
-  }): Promise<void> {
+  protected async persistAudit(
+    input: {
+      event: 'global_policy_updated' | 'override_upserted' | 'override_deleted';
+      audit: AuditContext;
+      role: PasswordPolicyRole | null;
+      before: object | null;
+      after: object | null;
+      changedFields: string[];
+    },
+    transaction: EntityManager,
+  ): Promise<void> {
     const action =
       input.event === 'global_policy_updated'
         ? 'password_policy_updated'
@@ -127,21 +130,24 @@ export class PasswordPolicyService implements OnModuleInit {
     if (input.before) details.before = JSON.stringify(input.before);
     if (input.after) details.after = JSON.stringify(input.after);
     if (input.changedFields.length === 1) details.field = input.changedFields[0];
-    await this.identityAudit?.record({
-      action,
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      actorId: input.audit.actorId ?? undefined,
-      authenticationMethod: input.audit.authenticationMethod,
-      apiTokenId: input.audit.apiTokenId ?? undefined,
-      subjectType: 'identity.password_policy',
-      subjectId: PASSWORD_POLICY_SINGLETON_ID,
-      details,
-      request: {
-        ipAddress: input.audit.ip ?? undefined,
-        userAgent: input.audit.userAgent ?? undefined,
+    await this.identityAudit?.record(
+      {
+        action,
+        operationId: randomUUID(),
+        outcome: 'succeeded',
+        actorId: input.audit.actorId ?? undefined,
+        authenticationMethod: input.audit.authenticationMethod,
+        apiTokenId: input.audit.apiTokenId ?? undefined,
+        subjectType: 'identity.password_policy',
+        subjectId: PASSWORD_POLICY_SINGLETON_ID,
+        details,
+        request: {
+          ipAddress: input.audit.ip ?? undefined,
+          userAgent: input.audit.userAgent ?? undefined,
+        },
       },
-    });
+      transaction,
+    );
   }
 
   protected toConfig(row: PasswordPolicy): PasswordPolicyConfig {
@@ -371,9 +377,10 @@ export class PasswordPolicyService implements OnModuleInit {
             changedFields: Object.keys(sanitized),
           };
         }
+        // Inside the transaction: the audit row commits or rolls back with the change.
+        if (auditInput) await this.persistAudit(auditInput, manager);
         return saved;
       });
-      if (auditInput) await this.persistAudit(auditInput);
       return saved;
     } catch (err) {
       this.rethrowConcurrencyOrSqliteConflict(err);
@@ -401,8 +408,8 @@ export class PasswordPolicyService implements OnModuleInit {
             changedFields: [],
           };
         }
+        if (auditInput) await this.persistAudit(auditInput, manager);
       });
-      if (auditInput) await this.persistAudit(auditInput);
     } catch (err) {
       this.rethrowConcurrencyOrSqliteConflict(err);
     }
@@ -515,9 +522,9 @@ export class PasswordPolicyService implements OnModuleInit {
             changedFields: Object.keys(sanitized),
           };
         }
+        if (auditInput) await this.persistAudit(auditInput, manager);
         return after;
       });
-      if (auditInput) await this.persistAudit(auditInput);
       return after;
     } catch (err) {
       this.rethrowConcurrencyOrSqliteConflict(err);
