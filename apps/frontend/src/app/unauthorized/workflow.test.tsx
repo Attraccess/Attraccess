@@ -16,7 +16,7 @@ const state = vi.hoisted(() => ({
   callbackUrl: vi.fn(),
   apiError: vi.fn(),
   toastError: vi.fn(),
-  callbacks: undefined as undefined | { onSuccess: () => void; onError: (error: Error) => void },
+  callbacks: undefined as undefined | { onSuccess: () => void; onError: (error: Error) => void; onSettled: () => void },
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   SSOProviderType: { OIDC: 'OIDC', SAML: 'SAML' },
@@ -154,6 +154,20 @@ it('decodes an account-link token, submits its password and redirects only on su
   expect(screen.getByRole('dialog')).toBeTruthy();
   act(() => state.callbacks?.onSuccess());
   await waitFor(() => expect(window.location.href).toBe('http://localhost/linked'));
+});
+it('sends one request per submit so a double click cannot burn a second password attempt', async () => {
+  const token =
+    btoa(JSON.stringify({ email: 'alex@example.test', providerId: 7, providerType: 'OIDC' })) + '.signature';
+  state.providers = [{ id: 7, name: 'Company', type: 'OIDC' }];
+  mount(`/?accountLinking=required&ssoLinkToken=${encodeURIComponent(token)}`, true);
+  const button = await screen.findByRole('button', { name: 'Link account' });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-password' } });
+  fireEvent.click(button);
+  fireEvent.click(button);
+  expect(state.link).toHaveBeenCalledTimes(1);
+  act(() => state.callbacks?.onSettled());
+  fireEvent.click(button);
+  expect(state.link).toHaveBeenCalledTimes(2);
 });
 it('survives malformed tokens, favors an explicit email, and refuses a missing token', async () => {
   state.providers = [{ id: 7, name: 'Company', type: 'OIDC' }];

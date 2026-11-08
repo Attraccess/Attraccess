@@ -135,7 +135,7 @@
     "identity.registration": "Kontoregistrierung",
     "identity.password_reset_requested": "Passwortzurücksetzung angefordert",
     "identity.password_reset_completed": "Passwort zurückgesetzt",
-    "identity.sso_account_link": "SSO-Konto verknüpft",
+    "identity.sso_account_link": "SSO-Kontoverknüpfung",
     "identity.two_factor_setup_started": "Zwei-Faktor-Einrichtung gestartet",
     "identity.two_factor_enabled": "Zwei-Faktor-Authentifizierung aktiviert",
     "identity.two_factor_disabled": "Zwei-Faktor-Authentifizierung deaktiviert",

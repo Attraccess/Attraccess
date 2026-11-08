@@ -101,7 +101,7 @@ describe('SsoController rate limiting (ATT-1223)', () => {
 
         await expect(link()).rejects.toThrow('INVALID_LINK_TOKEN');
 
-        expect(fixture.bruteForce.recordFailure).toHaveBeenCalledWith('sso_link_account', '203.0.113.9', null, null);
+        expect(fixture.bruteForce.recordFailure).toHaveBeenCalledWith('sso_link_account', '203.0.113.9', null, 'invalid-link-token');
         expect(fixture.authAudit.log).toHaveBeenCalledWith(
           expect.objectContaining({ outcome: 'invalid_token', reason: 'INVALID_LINK_TOKEN' }),
         );
@@ -116,7 +116,7 @@ describe('SsoController rate limiting (ATT-1223)', () => {
           await expect(link()).rejects.toThrow(code);
 
           expect(authService.validateAuthenticationDetails).not.toHaveBeenCalled();
-          expect(fixture.bruteForce.recordFailure).toHaveBeenCalledWith('sso_link_account', '203.0.113.9', null, null);
+          expect(fixture.bruteForce.recordFailure).toHaveBeenCalledWith('sso_link_account', '203.0.113.9', null, 'invalid-link-token');
         },
       );
 

@@ -65,6 +65,13 @@ import { SSOLinkTokenPayload, SSOLinkTokenService } from '../link-token.service'
 import { SSOService } from '../sso.service';
 import { discoveryPathSegment, discoveryUrl, requestDiscoveryJson } from './discovery-client';
 
+/**
+ * Token-level failures carry no account. They are recorded under this bucket so they only feed the coarse per-IP
+ * counter: a null username would share the empty-username key, which trips at maxAttempts and blocks every account
+ * behind the same IP.
+ */
+const INVALID_LINK_TOKEN_BUCKET = 'invalid-link-token';
+
 /** Null, undefined and an empty list all mean "defaults"; returns the list only when custom paths are set. */
 function customRolePaths(value: string[] | null | undefined): string[] | null {
   return value && value.length > 0 ? value : null;
@@ -231,7 +238,7 @@ export abstract class SsoProviderRoutes {
   }
 
   private async rejectLinkToken(error: unknown, ip: string): Promise<never> {
-    await this.bruteForce.recordFailure('sso_link_account', ip, null, null);
+    await this.bruteForce.recordFailure('sso_link_account', ip, null, INVALID_LINK_TOKEN_BUCKET);
     await this.authAudit.log({
       type: 'sso_link_account',
       outcome: 'invalid_token',

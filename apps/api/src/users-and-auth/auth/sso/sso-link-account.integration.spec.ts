@@ -231,6 +231,16 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
     expect(blocked.status).toBe(429);
   });
 
+  it('does not throttle other accounts before the coarse per-IP limit when tokens are rejected', async () => {
+    for (let i = 0; i < policy.maxAttempts + 2; i += 1) {
+      expect((await post('garbage', 'x')).status).toBeLessThan(429);
+    }
+
+    const bob = await post(await issue('bob@example.com', 'sub-bob'), 'right');
+
+    expect(bob.status).toBe(201);
+  });
+
   it('rejects tokens without a token id', async () => {
     const issued = await issue();
     const [encoded] = issued.split('.');

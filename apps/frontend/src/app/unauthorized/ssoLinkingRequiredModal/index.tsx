@@ -27,7 +27,7 @@ import en from './en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
 import { getApiErrorMessage, getTranslationKeyForApiError } from '../../../utils/apiError';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useCallbackURL } from '../use-sso-callback-url';
 
 interface Props {
@@ -73,6 +73,8 @@ export function SSOLinkingRequiredModal(props: Props) {
   }, [query]);
 
   const [password, setPassword] = useState('');
+  // A double click fires before the pending state re-renders; the second request would burn a password attempt.
+  const requestInFlight = useRef(false);
 
   const cleanHref = useMemo(() => {
     const url = new URL(window.location.href);
@@ -91,6 +93,9 @@ export function SSOLinkingRequiredModal(props: Props) {
   );
 
   const { mutate: linkMutation, isPending: linkingIsLoading } = useAuthenticationServiceLinkUserToExternalAccount({
+    onSettled: () => {
+      requestInFlight.current = false;
+    },
     onSuccess: () => {
       window.location.href = callbackURL;
     },
@@ -121,9 +126,10 @@ export function SSOLinkingRequiredModal(props: Props) {
   });
 
   const linkUser = useCallback(() => {
-    if (!linkToken) {
+    if (!linkToken || requestInFlight.current) {
       return;
     }
+    requestInFlight.current = true;
 
     linkMutation({
       requestBody: {
