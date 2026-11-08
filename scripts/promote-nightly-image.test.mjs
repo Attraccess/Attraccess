@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
+  imageRefs,
   isMissingTagError,
   promotionCommands,
   revisionFromImageConfig,
@@ -69,4 +70,10 @@ test('only a missing tag counts as "no nightly-latest yet"', () => {
   assert.equal(isMissingTagError({ stderr: 'ERROR: denied: permission_denied' }), false);
   assert.equal(isMissingTagError({ stderr: 'dial tcp: i/o timeout' }), false);
   assert.equal(isMissingTagError(new Error('boom')), false);
+});
+
+test('imageRefs prefixes GHCR and keeps Docker Hub as is, skipping unset names', () => {
+  assert.deepEqual(imageRefs({ GHCR_IMAGE_NAME: 'o/app', DOCKERHUB_IMAGE_NAME: 'o/app' }), ['ghcr.io/o/app', 'o/app']);
+  assert.deepEqual(imageRefs({ DOCKERHUB_IMAGE_NAME: 'o/app' }), ['o/app']);
+  assert.deepEqual(imageRefs({}), []);
 });

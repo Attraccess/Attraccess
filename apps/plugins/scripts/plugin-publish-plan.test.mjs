@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, test } from 'node:test';
@@ -15,7 +15,9 @@ import {
   parseArgs,
   planPublish,
   readChannelState,
+  summarizePlan,
   versionExistsMessage,
+  writeOutputs,
 } from './plugin-publish-plan.mjs';
 
 // Each test gets its own repository with one root commit, so tests don't depend on each other's order.
@@ -298,4 +300,45 @@ test('formatPlan shows the version each planned plugin publishes as', () => {
   assert.match(text, /PUBLISH {2}@x\/a as 0\.2\.0 {2}\(r; latest=unpublished\)/);
   assert.match(text, /skip {5}@x\/b {2}\(s; latest=1\.0\.0 @ aaaaaaa\)/);
   assert.match(text, /@x\/c as 0\.1\.0 {2}\(t; latest=0\.1\.0-n\)/);
+});
+
+const samplePlan = [
+  { project: 'plugin-a', name: '@x/a', publish: true, version: '1.0.0', reason: 'never published' },
+  { project: 'plugin-b', name: '@x/b', publish: false, reason: 'unchanged since abc' },
+];
+
+test('summarizePlan describes a dry run without publishing', () => {
+  const text = summarizePlan({ plan: samplePlan, channel: 'next', taken: [], dryRun: true });
+  assert.match(text, /PUBLISH {2}@x\/a as 1\.0\.0/);
+  assert.match(text, /Dry run: 1 to publish, 1 skipped; nothing published\./);
+});
+
+test('summarizePlan lists the projects to publish and every taken version', () => {
+  const text = summarizePlan({ plan: samplePlan, channel: 'latest', taken: [samplePlan[0]], dryRun: false });
+  assert.match(text, /Publishing: plugin-a\./);
+  assert.match(text, /ERROR: .*@x\/a/);
+});
+
+test('summarizePlan says nothing is published when the plan is empty', () => {
+  const text = summarizePlan({ plan: [samplePlan[1]], channel: 'next', taken: [], dryRun: false });
+  assert.match(text, /Publishing: nothing\./);
+});
+
+test('writeOutputs writes the JSON plan and the step summary', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'plan-out-'));
+  const previous = process.env.GITHUB_STEP_SUMMARY;
+  process.env.GITHUB_STEP_SUMMARY = join(dir, 'summary.md');
+  const log = console.log;
+  console.log = () => {};
+  try {
+    writeOutputs({ summary: 'S', out: join(dir, 'plan.json'), channel: 'next', head: 'h', plan: samplePlan });
+  } finally {
+    console.log = log;
+    if (previous === undefined) delete process.env.GITHUB_STEP_SUMMARY;
+    else process.env.GITHUB_STEP_SUMMARY = previous;
+  }
+  const written = JSON.parse(readFileSync(join(dir, 'plan.json'), 'utf8'));
+  assert.deepEqual(written, { channel: 'next', head: 'h', plan: samplePlan });
+  assert.match(readFileSync(join(dir, 'summary.md'), 'utf8'), /### Plugin publish plan \(`next`\)/);
+  rmSync(dir, { recursive: true, force: true });
 });

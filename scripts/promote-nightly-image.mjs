@@ -49,27 +49,32 @@ function report(message) {
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
 }
 
+export function imageRefs(env) {
+  return [env.GHCR_IMAGE_NAME && `ghcr.io/${env.GHCR_IMAGE_NAME}`, env.DOCKERHUB_IMAGE_NAME].filter(Boolean);
+}
+
+function promote({ images, head, revision }) {
+  for (const args of promotionCommands({ images, head, digest: process.env.IMAGE_DIGEST })) {
+    imagetools(...args);
+    report(`Moved ${args[2]} to ${args[3]} (previous revision: ${revision?.slice(0, 7) ?? 'none'}).`);
+  }
+}
+
 function main() {
   const head = process.env.GITHUB_SHA;
-  const images = [
-    process.env.GHCR_IMAGE_NAME && `ghcr.io/${process.env.GHCR_IMAGE_NAME}`,
-    process.env.DOCKERHUB_IMAGE_NAME,
-  ].filter(Boolean);
+  const images = imageRefs(process.env);
   if (!head || images.length === 0)
     throw new Error('GITHUB_SHA and GHCR_IMAGE_NAME/DOCKERHUB_IMAGE_NAME are required.');
 
   const historyFetched = refreshHistory();
   const revision = currentRevision(`${images[0]}:nightly-latest`);
-  if (!shouldMoveNightlyLatest({ head, currentRevision: revision, git: localGit, historyFetched })) {
-    report(
-      `Kept nightly-latest: it already carries newer commit ${revision.slice(0, 7)} (this run is ${head.slice(0, 7)}).`,
-    );
+  if (shouldMoveNightlyLatest({ head, currentRevision: revision, git: localGit, historyFetched })) {
+    promote({ images, head, revision });
     return;
   }
-  for (const args of promotionCommands({ images, head, digest: process.env.IMAGE_DIGEST })) {
-    imagetools(...args);
-    report(`Moved ${args[2]} to ${args[3]} (previous revision: ${revision?.slice(0, 7) ?? 'none'}).`);
-  }
+  report(
+    `Kept nightly-latest: it already carries newer commit ${revision.slice(0, 7)} (this run is ${head.slice(0, 7)}).`,
+  );
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) main();

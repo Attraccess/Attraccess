@@ -218,11 +218,7 @@ export function parseArgs(argv) {
   return options;
 }
 
-function main(argv) {
-  const { channel, dryRun, out, head: headArg } = parseArgs(argv);
-  refreshHistory();
-  const head = headArg ?? run('git', ['rev-parse', 'HEAD']).trim();
-
+function buildPlan(channel, head) {
   const projects = listPluginProjects();
   const affected = new Map();
   const plan = planPublish({
@@ -241,20 +237,28 @@ function main(argv) {
     if (p.publish)
       p.version = channelVersion(projects.find((x) => x.project === p.project).packageVersion, channel, runInfo);
   }
+  return plan;
+}
 
-  // A release must not publish some plugins and then fail on the next: find every taken version up front.
-  const taken = CHANNELS[channel].nightly
-    ? []
-    : plan.filter((p) => p.publish && npmView(`${p.name}@${p.version}`, 'version'));
+// A release must not publish some plugins and then fail on the next: find every taken version up front.
+function takenVersions(plan, channel) {
+  if (CHANNELS[channel].nightly) return [];
+  return plan.filter((p) => p.publish && npmView(`${p.name}@${p.version}`, 'version'));
+}
 
+export function summarizePlan({ plan, channel, taken, dryRun }) {
   const toPublish = plan.filter((p) => p.publish).map((p) => p.project);
-  const summary = [
+  const closing = dryRun
+    ? `Dry run: ${toPublish.length} to publish, ${plan.length - toPublish.length} skipped; nothing published.`
+    : `Publishing: ${toPublish.join(', ') || 'nothing'}. Each publish re-checks the dist-tag first.`;
+  return [
     formatPlan(plan, channel),
     ...taken.map((p) => `ERROR: ${versionExistsMessage(p.name, p.version)}`),
-    dryRun
-      ? `Dry run: ${toPublish.length} to publish, ${plan.length - toPublish.length} skipped; nothing published.`
-      : `Publishing: ${toPublish.join(', ') || 'nothing'}. Each publish re-checks the dist-tag first.`,
+    closing,
   ].join('\n');
+}
+
+export function writeOutputs({ summary, out, channel, head, plan }) {
   console.log(summary);
   if (out) writeFileSync(out, `${JSON.stringify({ channel, head, plan }, null, 2)}\n`);
   if (process.env.GITHUB_STEP_SUMMARY)
@@ -262,9 +266,9 @@ function main(argv) {
       process.env.GITHUB_STEP_SUMMARY,
       `### Plugin publish plan (\`${channel}\`)\n\n\`\`\`\n${summary}\n\`\`\`\n`,
     );
+}
 
-  if (taken.length > 0) return 1;
-  if (dryRun || toPublish.length === 0) return 0;
+function publishPlanned(toPublish, channel, head) {
   const result = spawnSync(
     'pnpm',
     ['nx', 'run-many', '--target=publish', `--projects=${toPublish.join(',')}`, '--parallel=3'],
@@ -273,6 +277,21 @@ function main(argv) {
   );
   if (result.error) throw result.error;
   return result.status ?? 1;
+}
+
+function main(argv) {
+  const { channel, dryRun, out, head: headArg } = parseArgs(argv);
+  refreshHistory();
+  const head = headArg ?? run('git', ['rev-parse', 'HEAD']).trim();
+
+  const plan = buildPlan(channel, head);
+  const taken = takenVersions(plan, channel);
+  writeOutputs({ summary: summarizePlan({ plan, channel, taken, dryRun }), out, channel, head, plan });
+
+  const toPublish = plan.filter((p) => p.publish).map((p) => p.project);
+  if (taken.length > 0) return 1;
+  if (dryRun || toPublish.length === 0) return 0;
+  return publishPlanned(toPublish, channel, head);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
