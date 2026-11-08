@@ -905,7 +905,7 @@ groups:
           severity: critical
         annotations:
           summary: "Audit records dropped"
-          description: "One or more audit records could not be stored in the last 5 minutes. Check the API log for 'Audit record dropped' and the reason label of attraccess_audit_records_dropped_total."
+          description: "About {{ humanize $values.A.Value }} audit records could not be stored in the last 5 minutes; the changes they describe were applied. Check the API log for 'Audit record dropped' lines (domain, action, reason, code). storage_error: the insert failed, see the SQLite code (SQLITE_BUSY means the database stayed locked for 5 s). queue_full: more than 1,000 audit writes were waiting. storage_unavailable: audit storage is not available (startup failed or in-memory database). shutting_down: expected while the API restarts. settings_unavailable: the audit settings could not be read. invalid_event: an event was rejected, which points to a bug. The alert clears about 5 minutes after the last drop."
         data:
           - refId: A
             relativeTimeRange:
