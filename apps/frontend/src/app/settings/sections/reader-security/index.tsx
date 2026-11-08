@@ -1,11 +1,5 @@
-import { Chip, Spinner } from '@heroui/react';
-import {
-  Button,
-  StatusAlert,
-  StatusDialog,
-  useDateTimeFormatter,
-  useTranslations,
-} from '@attraccess/plugins-frontend-ui';
+import { Spinner } from '@heroui/react';
+import { Button, StatusAlert, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useAttractapServiceCheckRecoveryKey,
   useAttractapServiceCreateSecureBootKeys,
@@ -22,16 +16,12 @@ import { useToastMessage } from '../../../../components/toastProvider';
 import { triggerDownload } from '../../../../utils/download';
 import { apiErrorMessage } from '../../../attractap/pairing/pairingUtils';
 import { SettingsSection } from '../../components/SettingsSection';
-import { SettingsRow } from '../../components/SettingsRow';
+import { BackupHint, KeyActions, KeyStatus, type KeyDialog } from './KeyOverview';
 import { KeyFileDialog } from './KeyFileDialog';
 import { PassphraseDialog } from './PassphraseDialog';
 import { useSingleFlight } from './useSingleFlight';
 import de from './de.json';
 import en from './en.json';
-
-type Dialog = 'recovery' | 'backup' | 'check' | 'restore' | 'regenerate' | null;
-
-const STATUS_COLOR = { none: 'default', 'recovery-check-pending': 'warning', ready: 'success' } as const;
 
 /**
  * Secure Boot keys of this installation (ATT-1205): create them, prove the recovery key, back the
@@ -42,10 +32,9 @@ export function ReaderSecuritySection() {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
   const queryClient = useQueryClient();
-  const formatDateTime = useDateTimeFormatter();
   const { data: license } = useLicenseServiceGetLicenseInformation();
   const { data: keys, isLoading, isError, refetch } = useAttractapServiceGetSecureBootKeys();
-  const [dialog, setDialog] = useState<Dialog>(null);
+  const [dialog, setDialog] = useState<KeyDialog>(null);
   const once = useSingleFlight();
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetSecureBootKeysKey] });
@@ -75,7 +64,7 @@ export function ReaderSecuritySection() {
   const restore = useAttractapServiceRestoreSecureBootKeys({ onSuccess: () => done(t('toast.restored')) });
 
   // A dialog opens clean: an error from an earlier attempt must not greet the next one.
-  const openDialog = (next: Dialog) => {
+  const openDialog = (next: KeyDialog) => {
     downloadRecovery.reset();
     downloadBackup.reset();
     check.reset();
@@ -119,85 +108,15 @@ export function ReaderSecuritySection() {
   }
 
   const hasKeys = keys.status !== 'none';
-  const verifiedAt = keys.recoveryKey?.verifiedAt;
-  const statusLabel =
-    keys.status === 'recovery-check-pending' && keys.restored
-      ? t('status.restoredPending')
-      : t(`status.${keys.status}`);
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
       <StatusAlert status="warning" data-cy="reader-security-warning">
         {t('warning')}
       </StatusAlert>
-
-      <div className="flex flex-col">
-        <SettingsRow
-          label={t('status.label')}
-          hint={verifiedAt ? t('status.verifiedAt', { date: String(formatDateTime(verifiedAt)) }) : undefined}
-        >
-          <Chip color={STATUS_COLOR[keys.status]} data-cy="reader-security-status">
-            {statusLabel}
-          </Chip>
-        </SettingsRow>
-
-        {keys.signingKey ? (
-          <SettingsRow label={t('fingerprints.signing')} stacked>
-            <code className="break-all text-xs">{keys.signingKey.fingerprint}</code>
-          </SettingsRow>
-        ) : null}
-        {keys.recoveryKey ? (
-          <SettingsRow label={t('fingerprints.recovery')} stacked>
-            <code className="break-all text-xs">{keys.recoveryKey.fingerprint}</code>
-          </SettingsRow>
-        ) : null}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {!hasKeys ? (
-          <Button isPending={create.isPending} onPress={createKeys} data-cy="reader-security-create">
-            {t('actions.create')}
-          </Button>
-        ) : null}
-        {keys.status === 'recovery-check-pending' ? (
-          <>
-            <Button onPress={() => openDialog('recovery')} data-cy="reader-security-download-recovery">
-              {t('actions.downloadRecovery')}
-            </Button>
-            <Button onPress={() => openDialog('check')} data-cy="reader-security-check-recovery">
-              {t('actions.checkRecovery')}
-            </Button>
-          </>
-        ) : null}
-        {hasKeys ? (
-          <Button variant="secondary" onPress={() => openDialog('backup')} data-cy="reader-security-download-backup">
-            {t('actions.downloadBackup')}
-          </Button>
-        ) : null}
-        {keys.restoreAllowed ? (
-          <Button variant="secondary" onPress={() => openDialog('restore')} data-cy="reader-security-restore">
-            {t('actions.restore')}
-          </Button>
-        ) : null}
-        {hasKeys && keys.readersWithBurnedDigests === 0 ? (
-          <Button variant="tertiary" onPress={() => openDialog('regenerate')} data-cy="reader-security-regenerate">
-            {t('actions.regenerate')}
-          </Button>
-        ) : null}
-      </div>
-      {hasKeys && keys.readersWithBurnedDigests > 0 ? (
-        <p className="text-sm text-muted">{t('locked', { count: keys.readersWithBurnedDigests })}</p>
-      ) : null}
-
-      <div className="flex flex-col gap-1 text-sm text-muted" data-cy="reader-security-backup-hint">
-        <strong className="text-foreground">{t('whatToBackup.title')}</strong>
-        <ul className="list-disc pl-5">
-          <li>{t('whatToBackup.secret')}</li>
-          <li>{t('whatToBackup.database')}</li>
-          <li>{t('whatToBackup.recovery')}</li>
-          <li>{t('whatToBackup.signingBackup')}</li>
-        </ul>
-      </div>
+      <KeyStatus keys={keys} />
+      <KeyActions keys={keys} isCreating={create.isPending} onCreate={createKeys} onOpen={openDialog} />
+      <BackupHint />
 
       <PassphraseDialog
         key={`recovery-${dialog === 'recovery'}`}

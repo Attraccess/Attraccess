@@ -34,6 +34,14 @@ def secure_version(build_dir):
     return version
 
 
+def build_file(build_dir, flasher_args, key, fallback):
+    """Path of a build output. Secure Boot builds leave the bootloader out of
+    flasher_args.json (it is flashed once, by hand), so fall back to its fixed build path."""
+    entry = flasher_args.get(key)
+    relative = entry["file"] if isinstance(entry, dict) and entry.get("file") else fallback
+    return os.path.join(build_dir, relative)
+
+
 def package_secure_images(build_dir, output_dir, firmware_name, firmware_variant):
     """Copy the secure app, bootloader into output_dir and return the `secureImage` manifest entry.
 
@@ -41,9 +49,11 @@ def package_secure_images(build_dir, output_dir, firmware_name, firmware_variant
     must not be signed, so it is left out of the release rather than shipped half-ready."""
     with open(os.path.join(build_dir, "flasher_args.json")) as f:
         flasher_args = json.load(f)
-    app_src = os.path.join(build_dir, flasher_args["app"]["file"])
-    bootloader_src = os.path.join(build_dir, flasher_args["bootloader"]["file"])
-    table_src = os.path.join(build_dir, flasher_args["partition-table"]["file"])
+    app_src = build_file(build_dir, flasher_args, "app", "attractap.bin")
+    bootloader_src = build_file(build_dir, flasher_args, "bootloader", os.path.join("bootloader", "bootloader.bin"))
+    table_src = build_file(
+        build_dir, flasher_args, "partition-table", os.path.join("partition_table", "partition-table.bin")
+    )
     with open(app_src, "rb") as f:
         if SECURE_PROFILE_MARKER.encode() not in f.read():
             print(f"Warning: secure app of {firmware_variant} lacks the profile marker; "

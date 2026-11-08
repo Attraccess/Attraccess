@@ -9,15 +9,16 @@ sys.path.insert(0, FIRMWARE_DIR)
 import secure_packaging as p  # noqa: E402
 
 
-def make_build(root, app=b"app " + p.SECURE_PROFILE_MARKER.encode(), version=2):
+def make_build(root, app=b"app " + p.SECURE_PROFILE_MARKER.encode(), version=2, flasher_keys=None):
     files = {"app.bin": app, "bootloader/bootloader.bin": b"boot", "partition_table/partition-table.bin": b"table"}
     for name, data in files.items():
         os.makedirs(os.path.dirname(os.path.join(root, name)), exist_ok=True)
         with open(os.path.join(root, name), "wb") as f:
             f.write(data)
     with open(os.path.join(root, "flasher_args.json"), "w") as f:
-        json.dump({"app": {"file": "app.bin"}, "bootloader": {"file": "bootloader/bootloader.bin"},
-                   "partition-table": {"file": "partition_table/partition-table.bin"}}, f)
+        args = {"app": {"file": "app.bin"}, "bootloader": {"file": "bootloader/bootloader.bin"},
+                "partition-table": {"file": "partition_table/partition-table.bin"}}
+        json.dump(args if flasher_keys is None else {k: args[k] for k in flasher_keys}, f)
     os.makedirs(os.path.join(root, "config"), exist_ok=True)
     with open(os.path.join(root, "config", "sdkconfig.json"), "w") as f:
         json.dump({"X": True, "BOOTLOADER_APP_SECURE_VERSION": version}, f)
@@ -37,6 +38,14 @@ class SecurePackaging(unittest.TestCase):
             self.assertEqual(entry["bootloaderSha256"], p.sha256_file(os.path.join(build, "bootloader/bootloader.bin")))
             self.assertEqual(entry["partitionTableSha256"], p.sha256_file(os.path.join(build, "partition_table/partition-table.bin")))
             self.assertEqual(sorted(os.listdir(out)), [entry["appFilename"], entry["bootloaderFilename"]])
+
+    def test_bootloader_missing_from_flasher_args_uses_build_path(self):
+        # Secure Boot builds list neither the bootloader nor, here, the partition table in flasher_args.json.
+        with tempfile.TemporaryDirectory() as build, tempfile.TemporaryDirectory() as out:
+            make_build(build, flasher_keys=["app"])
+            entry = p.package_secure_images(build, out, "attractap", "touch-v2")
+            self.assertEqual(entry["bootloaderSha256"], p.sha256_file(os.path.join(build, "bootloader/bootloader.bin")))
+            self.assertEqual(entry["partitionTableSha256"], p.sha256_file(os.path.join(build, "partition_table/partition-table.bin")))
 
     def test_app_without_marker_is_not_packaged(self):
         with tempfile.TemporaryDirectory() as build, tempfile.TemporaryDirectory() as out:
