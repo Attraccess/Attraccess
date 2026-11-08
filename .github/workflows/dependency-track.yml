@@ -43,7 +43,7 @@ jobs:
           fi
 
       - name: Upload SBOM to Dependency-Track
-        uses: DependencyTrack/gh-upload-sbom@v3
+        uses: DependencyTrack/gh-upload-sbom@v4
         with:
           serverHostname: ${{ vars.DEPENDENCYTRACK_HOSTNAME }}
           apiKey: ${{ secrets.DEPENDENCYTRACK_API_KEY }}
