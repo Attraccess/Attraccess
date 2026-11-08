@@ -161,18 +161,15 @@ Benutzung“, Wartung und so weiter) hat immer Vorrang vor dem Hinweis des Plugi
 **Vor dem Auflegen einer Karte.** Ein Reader, an dem niemand angemeldet ist, zeigt nur Zeiten und Zustände, nie Namen
 oder andere personenbezogene Daten, auch nicht für Personen, die sonst Namen sehen dürfen:
 
-| Situation                                                                                | Ressourcenliste        | Ressourcendetails                             |
-| ---------------------------------------------------------------------------------------- | ---------------------- | --------------------------------------------- |
-| Nichts läuft, nichts beginnt innerhalb von 24 Stunden                                    | nichts                 | nichts                                        |
-| Die nächste Buchung beginnt innerhalb von 24 Stunden, keine läuft                        | „Frei bis 14:00“       | „Frei bis 14:00“, „Reserviert 14:00-16:00“    |
-| Eine Buchung läuft, Check-in ist verlangt, aber noch nicht erfolgt, vor Ablauf der Frist | „Res., Check-in 14:15“ | „Reserviert 14:00-16:00 (Check-in bis 14:15)“ |
-| Eine Buchung läuft und ist eingecheckt (oder Check-in ist ausgeschaltet)                 | „Reserviert bis 16:00“ | „Reserviert 14:00-16:00“                      |
+| Situation                                                                                | Ressourcenliste            | Ressourcendetails                             |
+| ---------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------- |
+| Nichts läuft, nichts beginnt innerhalb von 24 Stunden                                    | nichts                     | nichts                                        |
+| Die nächste Buchung beginnt innerhalb von 24 Stunden, keine läuft                        | „Frei bis 14:00“           | „Frei bis 14:00“, „Reserviert 14:00-16:00“    |
+| Eine Buchung läuft, Check-in ist verlangt, aber noch nicht erfolgt, vor Ablauf der Frist | „Res., Check-in bis 14:15“ | „Reserviert 14:00-16:00 (Check-in bis 14:15)“ |
+| Eine Buchung läuft und ist eingecheckt (oder Check-in ist ausgeschaltet)                 | „Reserviert bis 16:00“     | „Reserviert 14:00-16:00“                      |
 
-Die Listenzeile fasst 24 Zeichen. Beim offenen Check-in zeigt sie den längsten Text, der passt: „Reserviert von Alex
-(Check-in bis 14:15)“ (nur nach dem Auflegen einer Karte, für Personen, die Namen sehen dürfen), dann „Reserviert
-(Check-in bis 14:15)“, dann das kurze „Res., Check-in 14:15“. Mit den üblichen Zeiten sind alle außer der kurzen Form
-länger als 24 Zeichen, die Liste zeigt also die kurze Form; die Details haben immer den vollen Text (mit den Zeiten
-der Buchung). Eine Zeit an einem anderen Tag behält die kurze Form („Res., Check-in Di 00:05“).
+Die Listenzeile fasst 24 Zeichen, deshalb ist der offene Check-in dort gekürzt; eine Frist an einem anderen Tag
+lautet „Res., Check-in Di 00:05“. Die Details haben immer den vollen Text.
 
 Die Zeiten sind Beginn und Ende der Buchung ohne Puffer. Die Texte folgen der Standardsprache der Installation.
 
@@ -180,24 +177,24 @@ Die Zeiten sind Beginn und Ende der Buchung ohne Puffer. Die Texte folgen der St
 Kartensitzung, kehrt der Reader zu den Texten oben zurück.
 
 - **Die eigene Buchung** (laufend oder beginnt im Fenster für frühes Einchecken): Die Liste zeigt „Deine Buchung bis
-  16:00“, die Details „Deine Buchung 14:00-16:00“, solange der Check-in noch offen ist mit „(Check-in bis 14:15)“.
+  16:00“ („Für dich bis Mi 16:00“, wenn sie an einem anderen Tag endet), die Details „Deine Buchung 14:00-16:00“,
+  solange der Check-in noch offen ist mit „(Check-in bis 14:15)“.
 - **Wer den Namen der buchenden Person sehen darf** (Verwaltende der Ressource und alle anderen, die sehen dürfen, wer
   die Maschine nutzt, siehe [Wer den Namen der buchenden Person sieht](#wer-den-namen-der-buchenden-person-sieht)),
   sieht ihn auch in den Details („Reserviert von Alex 14:00-16:00“, „Reserviert von Alex 14:00-16:00 (Check-in bis
   14:15)“). Alle anderen sehen die Texte oben.
 - **Während Sie die Ressource nutzen** und die Buchung einer anderen Person im Bestätigungsfenster beginnt, zeigt der
   Sitzungsbereich „Reserviert ab 14:00“ mit einem Countdown (mit Namen nach den Regeln oben).
-- Die **Liste zeigt einen Namen nur, wenn der Text in 24 Zeichen passt**; das tut praktisch kein Listentext. Lange
-  Namen werden gekürzt.
+- Die **Liste zeigt nie Namen**, weder angemeldet noch abgemeldet. Lange Namen werden in den Details gekürzt.
 
 **Am Reader starten.**
 
-| Situation                                                                     | Was der Reader tut                                                                                                                                                                         |
-| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Die Buchung einer anderen Person beginnt im Bestätigungsfenster               | Fragt „Reserviert ab 14:00, du hast 40 Min. Trotzdem starten?“ mit Countdown. Abbrechen oder keine Antwort startet nichts. Der Name steht nur dabei, wenn Sie Namen sehen dürfen.          |
-| Die Buchung einer anderen Person läuft                                        | Lehnt ab: „Von einer anderen Person bis 16:00 reserviert“ (mit Namen, wenn Sie Namen sehen dürfen). Verwaltende bekommen stattdessen die Override-Frage, die buchende Person wird genannt. |
-| Sie starten innerhalb Ihrer Buchung oder ihres Fensters für frühes Einchecken | Keine Frage. Der Start checkt die Buchung ein und der Bildschirm aktualisiert sich.                                                                                                        |
-| Sie beenden eine Sitzung innerhalb Ihrer eigenen laufenden Buchung            | Fragt „Behalten oder den Rest freigeben?“. **Rest freigeben** beendet die Buchung vorzeitig. Ohne Antwort innerhalb von 15 Sekunden bleibt die Buchung bestehen.                           |
+| Situation                                                                 | Was der Reader tut                                                                                                                                                                         |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Die Buchung einer anderen Person beginnt im Bestätigungsfenster           | Fragt „Reserviert ab 14:00, du hast 40 Min. Trotzdem starten?“ mit Countdown. Abbrechen oder keine Antwort startet nichts. Der Name steht nur dabei, wenn Sie Namen sehen dürfen.          |
+| Die Buchung einer anderen Person läuft                                    | Lehnt ab: „Von einer anderen Person bis 16:00 reserviert“ (mit Namen, wenn Sie Namen sehen dürfen). Verwaltende bekommen stattdessen die Override-Frage, die buchende Person wird genannt. |
+| Sie starten innerhalb Ihrer Buchung oder im Fenster für frühes Einchecken | Keine Frage. Der Start checkt die Buchung ein und der Bildschirm aktualisiert sich.                                                                                                        |
+| Sie beenden eine Sitzung innerhalb Ihrer eigenen laufenden Buchung        | Fragt „Behalten oder den Rest freigeben?“. **Rest freigeben** beendet die Buchung vorzeitig. Ohne Antwort innerhalb von 15 Sekunden bleibt die Buchung bestehen.                           |
 
 Eine Buchung ohne Sitzung freizugeben ist nur in der Weboberfläche möglich. Buchen selbst ist am Reader nicht möglich.
 
@@ -211,9 +208,10 @@ Plugin-Hinweise nach Abstürzen pausiert sind, können nichts davon anzeigen:
 | Plugin-Hinweise pausiert | keine              | Dieselbe Einstellung.                                                                                             | Abgelehnt                                                  | keine, die Buchung bleibt bestehen |
 
 **Reader ohne Bildschirm** ist unter [Reader-Anzeige](attractap/reader-ui.md#reader-ohne-bildschirm) beschrieben:
-**Start blockieren** (Standard), **Mit zweitem Auflegen der Karte bestätigen** (nur Lite) oder **Mit Warnung
-starten**. Das Übergehen einer laufenden Buchung durch Verwaltende braucht immer einen Bildschirm und wird ohne
-Bildschirm blockiert. Der Check-in funktioniert auf jedem Readertyp, sofern die buchende Person den Start macht.
+**Plugin-Standard** (Voreinstellung; dieses Plugin schlägt Blockieren vor), **Start blockieren**, **Mit zweitem Auflegen
+der Karte bestätigen** (nur Lite) oder **Mit Warnung starten**. Dieselbe Einstellung entscheidet über das Übergehen
+einer laufenden Buchung durch Verwaltende; für alle anderen wird ein Start während der laufenden Buchung einer anderen
+Person immer abgelehnt. Der Check-in funktioniert auf jedem Readertyp, sofern die buchende Person den Start macht.
 
 ### Erinnerungen und Benachrichtigungen
 
