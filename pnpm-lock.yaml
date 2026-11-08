@@ -366,8 +366,8 @@ importers:
         specifier: ^0.4.3
         version: 0.4.3(react@19.2.8)
       react-qrcode-logo:
-        specifier: ^3.0.0
-        version: 3.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: ^4.0.0
+        version: 4.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-router-dom:
         specifier: 7.18.4
         version: 7.18.4(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -11535,6 +11535,7 @@ packages:
   image-size@0.5.5:
     resolution: {integrity: sha512-6TDAlDPZxUFCv+fuOkIoXT/V/f3Qbq8e37p+YOiYrUv3v9cc3/6x78VdfPgFVaB9dZYeLUfKgHRebpkm/oP2VQ==}
     engines: {node: '>=0.10.0'}
+    deprecated: Please migrate to image-size@2.x
     hasBin: true
 
   immer@11.1.15:
@@ -12892,10 +12893,6 @@ packages:
 
   lodash.isboolean@3.0.3:
     resolution: {integrity: sha512-Bz5mupy2SVbPHURB98VAcw+aHh4vRV5IPNhILUCsOzRmsTmSQ17jIuqopAentWoehktxGd9e/hbIXq980/1QJg==}
-
-  lodash.isequal@4.5.0:
-    resolution: {integrity: sha512-pDo3lu8Jhfjqls6GkMgpahsF9kCyayhgykjyLMNFTKWrpVdAQtYyB4muAMWozBB4ig/dtWAmsMxLEI8wuz+DYQ==}
-    deprecated: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
 
   lodash.isinteger@4.0.4:
     resolution: {integrity: sha512-DBwtEWN2caHQ9/imiNeEA5ys1JoRtRfY3d7V9wkqtbycnAmTvRRmbHKDV4a0EYc678/dia0jrte4tjYwVBaZUA==}
@@ -15018,8 +15015,8 @@ packages:
 
       (For a CapTP with native promises, see @endo/eventual-send and @endo/captp)
 
-  qrcode-generator@1.5.0:
-    resolution: {integrity: sha512-sqo7otiDq5rA4djRkFI7IjLQqxRrLpIou0d3rqr03JJLUGf5raPh91xCio+lFFbQf0SlcVckStz0EmDEX3EeZA==}
+  qrcode-generator@2.0.4:
+    resolution: {integrity: sha512-mZSiP6RnbHl4xL2Ap5HfkjLnmxfKcPWpWe/c+5XxCuetEenqmNFf1FH/ftXPCtFG5/TDobjsjz6sSNL0Sr8Z9g==}
 
   qs@6.15.3:
     resolution: {integrity: sha512-O9gl3zCl5h5blw1KGUzQKhA5oUXSl8rwUIM5o0S3nCXMliSvy5Dzx7/DJcI+SwgICv+IneSZwhBh1oSyEHA71A==}
@@ -15150,8 +15147,8 @@ packages:
     peerDependencies:
       react: 19.2.8
 
-  react-qrcode-logo@3.0.0:
-    resolution: {integrity: sha512-2+vZ3GNBdUpYxIKyt6SFZsDGXa0xniyUQ0wPI4O0hJTzRjttPIx1pPnH9IWQmp/4nDMoN47IBhi3Breu1KudYw==}
+  react-qrcode-logo@4.1.0:
+    resolution: {integrity: sha512-drcieitJFX3u66XpFn+4PxsCzrQo5nAMXsyOtiuTZCJPUQwGwysIlr14MjKbXDhBNz3iOqM8/yV5K1mllt/mTw==}
     peerDependencies:
       react: 19.2.8
       react-dom: 19.2.8
@@ -33996,8 +33993,6 @@ snapshots:
 
   lodash.isboolean@3.0.3: {}
 
-  lodash.isequal@4.5.0: {}
-
   lodash.isinteger@4.0.4: {}
 
   lodash.isnumber@3.0.3: {}
@@ -36980,7 +36975,7 @@ snapshots:
 
   q@1.5.1: {}
 
-  qrcode-generator@1.5.0: {}
+  qrcode-generator@2.0.4: {}
 
   qs@6.15.3:
     dependencies:
@@ -37146,10 +37141,9 @@ snapshots:
       react: 19.2.8
       semver: 7.8.5
 
-  react-qrcode-logo@3.0.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  react-qrcode-logo@4.1.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      lodash.isequal: 4.5.0
-      qrcode-generator: 1.5.0
+      qrcode-generator: 2.0.4
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
