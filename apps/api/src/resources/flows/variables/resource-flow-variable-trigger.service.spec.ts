@@ -88,4 +88,67 @@ describe('ResourceFlowVariableTriggerService', () => {
     });
     expect((input.payload as Record<string, unknown>).variables).toBeDefined();
   });
+
+  describe('global flows', () => {
+    const globalNode = (
+      id: string,
+      flowId: number,
+      watches: Array<{ scope: string; key: string }>,
+      source: 'any' | 'exclude-self' = 'any',
+    ) => ({ ...node(id, null as never, watches, source), flowId }) as ResourceFlowNode;
+
+    it('fires a resource-scope watch for any resource and makes it the triggering resource', async () => {
+      const global = globalNode('g', 1, [{ scope: 'resource', key: 'a' }]);
+      nodeRepo.find.mockResolvedValueOnce([global]);
+
+      await triggerService.handle(
+        new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.RESOURCE, 42, 'a', 0, 1, new Date(), 42),
+      );
+
+      expect(executor.startFlow).toHaveBeenCalledTimes(1);
+      expect(executor.startFlow.mock.calls[0][4]).toEqual({ triggeringResourceId: 42 });
+      expect(variables.getMany).toHaveBeenCalledWith(ResourceFlowVariableScope.RESOURCE, 42, ['a']);
+    });
+
+    it('fires a global-scope watch without a triggering resource', async () => {
+      nodeRepo.find.mockResolvedValueOnce([globalNode('g', 1, [{ scope: 'global', key: 'a' }])]);
+
+      await triggerService.handle(
+        new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'a', 0, 1, new Date(), null),
+      );
+
+      expect(executor.startFlow.mock.calls[0][4]).toEqual({ triggeringResourceId: null });
+    });
+
+    it('excludes changes made by the same global flow when source is exclude-self', async () => {
+      nodeRepo.find.mockResolvedValueOnce([
+        globalNode('self', 1, [{ scope: 'global', key: 'a' }], 'exclude-self'),
+        globalNode('other', 2, [{ scope: 'global', key: 'a' }], 'exclude-self'),
+      ]);
+
+      await triggerService.handle(
+        new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.GLOBAL, null, 'a', 0, 1, new Date(), null, 1),
+      );
+
+      expect(executor.startFlow.mock.calls.map(([n]) => (n as ResourceFlowNode).id)).toEqual(['other']);
+    });
+  });
+
+  it('only loads variable triggers of resource flows and enabled global flows', async () => {
+    nodeRepo.find.mockResolvedValueOnce([]);
+
+    await triggerService.handle(
+      new ResourceFlowVariableChangedEvent(ResourceFlowVariableScope.RESOURCE, 7, 'a', 0, 1, new Date(), 7),
+    );
+
+    expect(nodeRepo.find).toHaveBeenCalledWith({
+      where: [
+        expect.objectContaining({ type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED, resourceId: 7 }),
+        {
+          type: ResourceFlowNodeType.INPUT_VARIABLE_CHANGED,
+          flow: { enabled: true, scope: 'global' },
+        },
+      ],
+    });
+  });
 });

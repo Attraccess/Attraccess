@@ -34,11 +34,17 @@ export function ImpactWarning({
               {impact.references.length ? (
                 impact.references.map((reference) => (
                   <p key={reference.nodeId}>
-                    {t('revisions.reference', {
-                      resource: reference.resourceId,
-                      node: reference.nodeId,
-                      type: reference.nodeType,
-                    })}
+                    {reference.flowId != null
+                      ? t('revisions.globalReference', {
+                          flow: reference.flowName ?? `#${reference.flowId}`,
+                          node: reference.nodeId,
+                          type: reference.nodeType,
+                        })
+                      : t('revisions.reference', {
+                          resource: reference.resourceId,
+                          node: reference.nodeId,
+                          type: reference.nodeType,
+                        })}
                   </p>
                 ))
               ) : (

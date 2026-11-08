@@ -8,6 +8,9 @@ import { getPluginFlowNode } from '../../plugin-system/flows/node-registry';
 import { coreNodeHasExternalEffect } from './schemas/core-node-schemas';
 
 export interface SharedMachineFlowWarning {
+  /** The global flow the trigger belongs to; null for the resource's own flow. */
+  flowId: number | null;
+  flowName: string | null;
   triggerNodeId: string;
   triggerType: string;
   /** Nodes with an external effect that a start, stop or takeover reaches without an active session check. */
@@ -47,6 +50,7 @@ function checksSessionCount(node: ResourceFlowNode): boolean {
 export function findFlowsWithoutSessionCountCheck(
   nodes: ResourceFlowNode[],
   edges: ResourceFlowEdge[],
+  flow: { id: number; name: string } | null = null,
 ): SharedMachineFlowWarning[] {
   const nodesById = new Map(nodes.map((node) => [node.id, node]));
   const outgoing = new Map<string, string[]>();
@@ -73,6 +77,8 @@ export function findFlowsWithoutSessionCountCheck(
     }
     if (unguardedEffects.size > 0) {
       warnings.push({
+        flowId: flow?.id ?? null,
+        flowName: flow?.name ?? null,
         triggerNodeId: trigger.id,
         triggerType: trigger.type,
         effectNodes: [...unguardedEffects].map(([nodeId, nodeType]) => ({ nodeId, nodeType })),

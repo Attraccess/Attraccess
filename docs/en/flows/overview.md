@@ -1,10 +1,10 @@
 # Flows & Automation
 
-Flows are visual automation workflows that you can attach to any resource. They let you automate actions when something happens -- for example, sending an MQTT message when a machine is turned on, or triggering billing when a session ends.
+Flows are visual automation workflows that you can attach to a resource, or run for all resources as a [global flow](flows/global-flows.md). They let you automate actions when something happens -- for example, sending an MQTT message when a machine is turned on, or triggering billing when a session ends.
 
 ## What is a Flow?
 
-A flow is a chain of connected nodes on a visual canvas. Each flow belongs to a specific resource and is built from three types of nodes:
+A flow is a chain of connected nodes on a visual canvas. Each flow belongs to a specific resource (or is a [global flow](flows/global-flows.md)) and is built from three types of nodes:
 
 | Node Category       | Purpose                              | Examples                                           |
 | ------------------- | ------------------------------------ | -------------------------------------------------- |
@@ -33,6 +33,10 @@ Here are some common examples:
 - **Notifications** -- Send an HTTP webhook to Slack or email when a resource is unlocked
 - **Safety** -- End a usage session automatically after a period of inactivity
 
+## Resource Flows and Global Flows
+
+A **resource flow** belongs to one resource and reacts to that resource's events. A [**global flow**](flows/global-flows.md) is not tied to a resource: administrators create it under **Devices** → **Flows**, and it reacts to events from any resource, for example to notify a channel whenever any machine starts. Global flows use the same editor and nodes, but they run inside every start and stop, so a failing or slow global flow affects all machines.
+
 ## Creating Your First Flow
 
 1. Open the [detail page](resources/resource-details.md) of a resource
@@ -47,6 +51,7 @@ Here are some common examples:
 
 - [Flow Editor](flows/flow-editor.md) -- How to use the visual editor
 - [Payloads, Variables & Templates](flows/payloads-variables-templates.md) -- Work with node data and stored values
+- [Global Flows](flows/global-flows.md) -- Flows that react to every resource
 - [Node Types](flows/node-types.md) -- All available node types
 - [MQTT & IoT](devices/mqtt/overview.md) -- Connect your hardware
 - [Billing](billing/overview.md) -- Automate cost tracking

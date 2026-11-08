@@ -1,8 +1,24 @@
-import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Check,
+  Entity,
+  Index,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
+import { Flow } from './flow.entity';
 
 @Entity()
+@Index('IDX_resource_flow_edge_flow', ['flowId'])
+// Every node step looks up the edges leaving it.
+@Index('IDX_resource_flow_edge_source', ['source'])
+// Exactly one owner: a resource flow or a global flow.
+@Check('CHK_resource_flow_edge_owner', '("resourceId" IS NULL) <> ("flowId" IS NULL)')
 export class ResourceFlowEdge {
   @PrimaryColumn({ type: 'text' })
   @ApiProperty({
@@ -51,12 +67,27 @@ export class ResourceFlowEdge {
   })
   updatedAt!: Date;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'integer', nullable: true })
   @ApiProperty({
-    description: 'The id of the resource that this node belongs to',
+    description: 'The id of the resource that this node belongs to; null for global-flow nodes',
     example: 1,
+    nullable: true,
+    type: Number,
   })
-  resourceId!: number;
+  resourceId!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'The id of the global flow that this node belongs to; null for resource-flow nodes',
+    example: 1,
+    nullable: true,
+    type: Number,
+  })
+  flowId!: number | null;
+
+  @ManyToOne(() => Flow, (flow) => flow.edges, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'flowId', foreignKeyConstraintName: 'FK_resource_flow_edge_flow' })
+  flow!: Flow | null;
 
   @ManyToOne(() => Resource, (resource) => resource.flowEdges, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'resourceId' })
@@ -65,5 +96,5 @@ export class ResourceFlowEdge {
     type: () => Resource,
     required: false,
   })
-  resource!: Resource;
+  resource!: Resource | null;
 }

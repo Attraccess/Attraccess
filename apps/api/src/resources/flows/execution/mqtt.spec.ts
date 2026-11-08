@@ -199,11 +199,13 @@ describe('ResourceFlowsExecutorService MQTT', () => {
     flowNodeRepository = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       find: jest.fn(async ({ where }: any) => {
-        if (where?.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED) {
-          return initialNodes.filter((n) => n.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED);
-        }
-        const { resourceId, type } = where || {};
-        return initialNodes.filter((n) => (resourceId ? n.resourceId === resourceId : true) && n.type === type);
+        const clauses = Array.isArray(where) ? where : [where || {}];
+        return initialNodes.filter((n) =>
+          clauses.some(
+            ({ resourceId, type }: { resourceId?: number; type?: string }) =>
+              (resourceId ? n.resourceId === resourceId : true) && n.type === type,
+          ),
+        );
       }),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       findOne: jest.fn(async ({ where }: any) => {

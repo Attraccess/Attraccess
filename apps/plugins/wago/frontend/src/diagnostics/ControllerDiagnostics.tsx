@@ -229,9 +229,13 @@ export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId
               <p>{t('diagnostics.referenceWarning')}</p>
               {d.references.length === 0 && <p>{t('diagnostics.noReferences')}</p>}
               {d.references.map((ref) => (
-                <p key={`${ref.resourceId}-${ref.nodeId}`}>
-                  <a href={ref.href}>{t('diagnostics.reference', { resource: ref.resourceId, node: ref.nodeId })}</a>:{' '}
-                  {ref.channelId} ({t(ref.control ? 'diagnostics.control' : 'diagnostics.readEvent')})
+                <p key={`${ref.flowId != null ? `flow-${ref.flowId}` : ref.resourceId}-${ref.nodeId}`}>
+                  <a href={ref.href}>
+                    {ref.flowId != null
+                      ? t('diagnostics.globalReference', { flow: ref.flowName ?? `#${ref.flowId}`, node: ref.nodeId })
+                      : t('diagnostics.reference', { resource: ref.resourceId, node: ref.nodeId })}
+                  </a>
+                  : {ref.channelId} ({t(ref.control ? 'diagnostics.control' : 'diagnostics.readEvent')})
                   {ref.invalid ? t('diagnostics.invalidReference') : ''}
                   {ref.conflict ? t('diagnostics.conflictingReference') : ''}
                 </p>

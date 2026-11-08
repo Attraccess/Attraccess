@@ -61,6 +61,7 @@ vi.mock('../../routes/index', () => ({
     { path: '/wago', authRequired: 'resources.update' },
     { path: '/printers', authRequired: true },
     { path: '/printers/bambulab', authRequired: 'resources.update' },
+    { path: '/devices/flows', authRequired: 'resources.update' },
     { path: '/devices/mqtt/servers', authRequired: 'system.settings.manage' },
     { path: '/devices/companion', authRequired: 'system.settings.manage' },
   ],
@@ -124,6 +125,37 @@ describe('plugin sidebar placement', () => {
     await user.click(screen.getByRole('button', { name: 'Devices' }));
 
     expect(within(screen.getByRole('menu', { name: 'Devices' })).getByRole('menuitem', { name: 'WAGO' })).toBeVisible();
+  });
+
+  it('shows Flows in Devices for operators who only have resources.update', async () => {
+    // No plugin entries, so Flows alone has to make the Devices group appear.
+    state.items = [];
+    const user = userEvent.setup();
+    renderSidebar();
+
+    const trigger = screen.getByRole('button', { name: 'Devices' });
+    await user.click(trigger);
+
+    const devices = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+    if (!devices) throw new Error('Devices panel is missing');
+    expect(within(devices).getByRole('link', { name: 'Flows' })).toHaveAttribute('href', '/devices/flows');
+    expect(
+      within(devices)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/devices/flows']);
+  });
+
+  it('includes Flows in the collapsed Devices menu', async () => {
+    state.items = [];
+    const user = userEvent.setup();
+    renderSidebar(true);
+
+    await user.click(screen.getByRole('button', { name: 'Devices' }));
+
+    const menu = screen.getByRole('menu', { name: 'Devices' });
+    expect(within(menu).getByRole('menuitem', { name: 'Flows' })).toBeVisible();
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(1);
   });
 
   it('hides WAGO and the empty Devices group without the route permission', () => {

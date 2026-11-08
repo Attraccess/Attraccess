@@ -228,10 +228,11 @@ export abstract class WagoRegistry extends WagoServiceState {
 
   async commandSchema(
     config: Record<string, unknown>,
-    resourceId: number,
+    resourceId: number | null,
     previewOnly = false,
+    flowId: number | null = null,
   ): Promise<Record<string, unknown>> {
-    return this.commands.schema(config, resourceId, previewOnly);
+    return this.commands.schema(config, resourceId, previewOnly, flowId);
   }
 
   onModuleDestroy(): void {

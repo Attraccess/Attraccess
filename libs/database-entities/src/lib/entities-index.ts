@@ -72,6 +72,7 @@ export { ResourceMaintenance } from './entities/resource.maintenance';
 export { AutoIntroductionTarget, SupervisionMode } from './entities/resource.supervision';
 export { ResourceType } from './entities/resource.type';
 export { ResourceFlowEdge } from './entities/resourceFlowEdge';
+export { Flow, type FlowScope } from './entities/flow.entity';
 export {
   BillingTransactionItemCreateSchema,
   ButtonNodeDataSchema,
@@ -182,6 +183,7 @@ import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecyc
 import { Resource } from './entities/resource.entity';
 import { ResourceMaintenance } from './entities/resource.maintenance';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
+import { Flow } from './entities/flow.entity';
 import { ResourceFlowNode } from './entities/resourceFlowNode';
 import { ResourceFlowVariable } from './entities/resourceFlowVariable';
 import { ResourceGroup } from './entities/resourceGroup.entity';
@@ -229,6 +231,7 @@ export const entities = {
   EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowEdge,
+  Flow,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
