@@ -19,7 +19,7 @@ Beide sind RSA-3072-Schlüssel. Die Seite zeigt nur ihre Fingerabdrücke.
 
 ## Einrichten
 
-1. Klicke auf **Schlüssel erstellen**. Der Status lautet _Schlüssel erstellt, Prüfung offen_.
+1. Klicke auf **Schlüssel erstellen**. Der Status lautet _Schlüssel erstellt, Prüfung des Wiederherstellungsschlüssels offen_.
 2. Klicke auf **Wiederherstellungsschlüssel herunterladen**, wähle eine Passphrase mit mindestens
    12 Zeichen (zweimal eingeben) und bewahre Datei und Passphrase sicher auf. Der Download lässt sich
    wiederholen, bis die Prüfung bestanden ist.
@@ -31,20 +31,23 @@ Vor Schritt 3 kann kein Leser abgesichert werden. Das erzwingt der Server, nicht
 
 ## Sichern
 
-- **Backup des Signaturschlüssels herunterladen** ist jederzeit möglich und mit einer Passphrase deiner
-  Wahl geschützt.
+- **Backup des Signaturschlüssels herunterladen** ist möglich, sobald Schlüssel existieren. Es verlangt
+  eine Passphrase mit mindestens 12 Zeichen (zweimal eingeben), genau wie beim Wiederherstellungsschlüssel.
 - Sichere außerdem `AUTH_SESSION_SECRET` (ohne ihn lassen sich die gespeicherten Schlüssel nicht
   entschlüsseln), die Datenbank und die Wiederherstellungsdatei samt Passphrase.
 
 > **Warnung:** Gehen Signaturschlüssel und Wiederherstellungsschlüssel beide verloren, können
 > abgesicherte Leser nie wieder aktualisiert werden.
 
-Die heruntergeladenen Dateien sind verschlüsselte PKCS#8-PEM-Dateien. `openssl` und `espsecure` können
-sie mit der Passphrase verwenden, zum Beispiel um eine Notfall-Firmware mit dem
-Wiederherstellungsschlüssel zu signieren:
+Die heruntergeladenen Dateien sind verschlüsselte PKCS#8-PEM-Dateien. `openssl` liest sie mit der
+Passphrase. `espsecure` kann verschlüsselte Schlüssel nicht lesen, entschlüssele deshalb zuerst eine
+temporäre Kopie, zum Beispiel um eine Notfall-Firmware mit dem Wiederherstellungsschlüssel zu signieren
+(Syntax von esptool 5.x; ältere Versionen nutzen `espsecure.py sign_data`):
 
 ```bash
-espsecure sign-data --version 2 --keyfile attraccess-recovery-key.pem --output app-signed.bin app.bin
+openssl pkey -in attraccess-recovery-key.pem -out recovery-key-plain.pem   # fragt nach der Passphrase
+espsecure sign-data --version 2 --keyfile recovery-key-plain.pem --output app-signed.bin app.bin
+shred -u recovery-key-plain.pem                                            # unverschlüsselte Kopie löschen
 ```
 
 ## Wiederherstellen
@@ -56,13 +59,18 @@ wird dieser Schlüssel zum Signaturschlüssel (die Leser vertrauen ihm als zweit
 ein **neuer Wiederherstellungsschlüssel** erzeugt, der die Prüfung bestehen muss, bevor ein weiterer Leser
 abgesichert werden kann.
 
-**Schlüssel neu erzeugen** ist nur möglich, solange bei keinem Leser die Schlüssel dieser Installation
-eingebrannt sind.
+Eine Wiederherstellung aus einem **Backup des Signaturschlüssels** ersetzt nur den Signaturschlüssel;
+Wiederherstellungsschlüssel und sein Status bleiben unverändert. Ein Schlüssel, der bereits der
+Signaturschlüssel ist, wird abgelehnt.
+
+**Schlüssel neu erzeugen** ersetzt beide Schlüssel, Wiederherstellungsdateien und Backups der alten
+Schlüssel sind danach nutzlos. Es ist nur möglich, solange bei keinem Leser die Schlüssel dieser
+Installation eingebrannt sind.
 
 ## Grenzen
 
 - Widerruf und Rotation der Schlüssel bereits abgesicherter Leser werden noch nicht unterstützt.
 - Ein abgesicherter Leser kann nicht in eine andere Installation umziehen.
 - Der Schutz richtet sich gegen Angreifer mit kurzem physischem Zugriff. Er macht keine Aussagen gegen
-  Glitching, Seitenkanal- oder invasive Angriffe, und die digitale Signatur des Chips belegt die
-  Schlüsselnutzung, ist aber keine Remote-Attestierung.
+  Glitching, Seitenkanal- oder invasive Angriffe, und das DS-Modul (Digital Signature) des Chips belegt
+  die Schlüsselnutzung, ist aber keine Remote-Attestierung.

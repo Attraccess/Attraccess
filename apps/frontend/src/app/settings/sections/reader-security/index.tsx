@@ -18,6 +18,7 @@ import { SettingsRow } from '../../components/SettingsRow';
 import { KeyFileDialog } from './KeyFileDialog';
 import { PassphraseDialog } from './PassphraseDialog';
 import { saveTextFile } from './saveKeyFile';
+import { useSingleFlight } from './useSingleFlight';
 import de from './de.json';
 import en from './en.json';
 
@@ -35,8 +36,9 @@ export function ReaderSecuritySection() {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const formatDateTime = useDateTimeFormatter();
-  const { data: keys, isLoading } = useAttractapServiceGetSecureBootKeys();
+  const { data: keys, isLoading, isError, refetch } = useAttractapServiceGetSecureBootKeys();
   const [dialog, setDialog] = useState<Dialog>(null);
+  const once = useSingleFlight();
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetSecureBootKeysKey] });
   const done = (title: string) => {
@@ -64,6 +66,30 @@ export function ReaderSecuritySection() {
   const check = useAttractapServiceCheckRecoveryKey({ onSuccess: () => done(t('toast.recoveryVerified')) });
   const restore = useAttractapServiceRestoreSecureBootKeys({ onSuccess: () => done(t('toast.restored')) });
 
+  // A dialog opens clean: an error from an earlier attempt must not greet the next one.
+  const openDialog = (next: Dialog) => {
+    downloadRecovery.reset();
+    downloadBackup.reset();
+    check.reset();
+    restore.reset();
+    setDialog(next);
+  };
+  const createKeys = () => once((settle) => create.mutate(undefined, { onSettled: settle }));
+
+  if (!keys && isError) {
+    return (
+      <SettingsSection title={t('title')} description={t('description')}>
+        <p className="text-sm text-danger" data-cy="reader-security-load-error">
+          {t('loadFailed')}
+        </p>
+        <div>
+          <Button variant="secondary" onPress={() => void refetch()} data-cy="reader-security-retry">
+            {t('retry')}
+          </Button>
+        </div>
+      </SettingsSection>
+    );
+  }
   if (isLoading || !keys) return <Spinner />;
 
   const hasKeys = keys.status !== 'none';
@@ -101,32 +127,32 @@ export function ReaderSecuritySection() {
 
       <div className="flex flex-wrap gap-2">
         {!hasKeys ? (
-          <Button isPending={create.isPending} onPress={() => create.mutate()} data-cy="reader-security-create">
+          <Button isPending={create.isPending} onPress={createKeys} data-cy="reader-security-create">
             {t('actions.create')}
           </Button>
         ) : null}
         {keys.status === 'recovery-check-pending' ? (
           <>
-            <Button onPress={() => setDialog('recovery')} data-cy="reader-security-download-recovery">
+            <Button onPress={() => openDialog('recovery')} data-cy="reader-security-download-recovery">
               {t('actions.downloadRecovery')}
             </Button>
-            <Button onPress={() => setDialog('check')} data-cy="reader-security-check-recovery">
+            <Button onPress={() => openDialog('check')} data-cy="reader-security-check-recovery">
               {t('actions.checkRecovery')}
             </Button>
           </>
         ) : null}
         {hasKeys ? (
-          <Button variant="secondary" onPress={() => setDialog('backup')} data-cy="reader-security-download-backup">
+          <Button variant="secondary" onPress={() => openDialog('backup')} data-cy="reader-security-download-backup">
             {t('actions.downloadBackup')}
           </Button>
         ) : null}
         {keys.restoreAllowed ? (
-          <Button variant="secondary" onPress={() => setDialog('restore')} data-cy="reader-security-restore">
+          <Button variant="secondary" onPress={() => openDialog('restore')} data-cy="reader-security-restore">
             {t('actions.restore')}
           </Button>
         ) : null}
         {hasKeys && keys.readersWithBurnedDigests === 0 ? (
-          <Button variant="tertiary" onPress={() => setDialog('regenerate')} data-cy="reader-security-regenerate">
+          <Button variant="tertiary" onPress={() => openDialog('regenerate')} data-cy="reader-security-regenerate">
             {t('actions.regenerate')}
           </Button>
         ) : null}
@@ -151,7 +177,9 @@ export function ReaderSecuritySection() {
         isPending={downloadRecovery.isPending}
         error={downloadRecovery.error}
         onClose={() => setDialog(null)}
-        onSubmit={(passphrase) => downloadRecovery.mutate({ requestBody: { passphrase } })}
+        onSubmit={(passphrase) =>
+          once((settle) => downloadRecovery.mutate({ requestBody: { passphrase } }, { onSettled: settle }))
+        }
       />
       <PassphraseDialog
         key={`backup-${dialog === 'backup'}`}
@@ -160,7 +188,9 @@ export function ReaderSecuritySection() {
         isPending={downloadBackup.isPending}
         error={downloadBackup.error}
         onClose={() => setDialog(null)}
-        onSubmit={(passphrase) => downloadBackup.mutate({ requestBody: { passphrase } })}
+        onSubmit={(passphrase) =>
+          once((settle) => downloadBackup.mutate({ requestBody: { passphrase } }, { onSettled: settle }))
+        }
       />
       <KeyFileDialog
         key={`check-${dialog === 'check'}`}
@@ -169,7 +199,9 @@ export function ReaderSecuritySection() {
         isPending={check.isPending}
         error={check.error}
         onClose={() => setDialog(null)}
-        onSubmit={({ pem, passphrase }) => check.mutate({ requestBody: { pem, passphrase } })}
+        onSubmit={({ pem, passphrase }) =>
+          once((settle) => check.mutate({ requestBody: { pem, passphrase } }, { onSettled: settle }))
+        }
       />
       <KeyFileDialog
         key={`restore-${dialog === 'restore'}`}
@@ -178,7 +210,7 @@ export function ReaderSecuritySection() {
         isPending={restore.isPending}
         error={restore.error}
         onClose={() => setDialog(null)}
-        onSubmit={(requestBody) => restore.mutate({ requestBody })}
+        onSubmit={(requestBody) => once((settle) => restore.mutate({ requestBody }, { onSettled: settle }))}
       />
       <StatusDialog
         isOpen={dialog === 'regenerate'}
@@ -188,7 +220,7 @@ export function ReaderSecuritySection() {
         action={{
           label: t('regenerate.confirm'),
           isPending: create.isPending,
-          onPress: () => create.mutate(),
+          onPress: createKeys,
           'data-cy': 'reader-security-regenerate-confirm',
         }}
       >

@@ -1,9 +1,22 @@
 import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Input, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
+import {
+  Input,
+  Label,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  ModalHeading,
+  Radio,
+  RadioGroup,
+  TextField,
+} from '@heroui/react';
 import { useState } from 'react';
 import { apiErrorMessage } from '../../../attractap/pairing/pairingUtils';
 import de from './de.json';
 import en from './en.json';
+
+const SOURCES = ['signing-backup', 'recovery-file'] as const;
+type Source = (typeof SOURCES)[number];
 
 interface Props {
   isOpen: boolean;
@@ -12,7 +25,7 @@ interface Props {
   isPending: boolean;
   error?: unknown;
   onClose: () => void;
-  onSubmit: (input: { pem: string; passphrase: string; source: 'signing-backup' | 'recovery-file' }) => void;
+  onSubmit: (input: { pem: string; passphrase: string; source: Source }) => void;
 }
 
 /** Upload a key file and give its passphrase. The file never leaves the browser except in the request. */
@@ -20,7 +33,7 @@ export function KeyFileDialog({ isOpen, kind, isPending, error, onClose, onSubmi
   const { t } = useTranslations({ en, de });
   const [pem, setPem] = useState('');
   const [passphrase, setPassphrase] = useState('');
-  const [source, setSource] = useState<'signing-backup' | 'recovery-file'>('signing-backup');
+  const [source, setSource] = useState<Source>('signing-backup');
 
   const readFile = async (file: File | undefined) => setPem(file ? await file.text() : '');
 
@@ -31,32 +44,43 @@ export function KeyFileDialog({ isOpen, kind, isPending, error, onClose, onSubmi
       data-cy={`reader-security-${kind}-dialog`}
     >
       {({ close }) => (
-        <>
+        <form
+          className="contents"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (pem && passphrase && !isPending) onSubmit({ pem, passphrase, source });
+          }}
+        >
           <ModalHeader>
             <ModalHeading>{t(`${kind}.title`)}</ModalHeading>
           </ModalHeader>
           <ModalBody className="flex flex-col gap-3">
             <p className="text-sm text-muted">{t(`${kind}.description`)}</p>
             {kind === 'restore' ? (
-              <fieldset className="flex flex-col gap-1 text-sm">
-                {(['signing-backup', 'recovery-file'] as const).map((value) => (
-                  <label key={value} className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="restore-source"
-                      checked={source === value}
-                      onChange={() => setSource(value)}
-                    />
-                    {t(`restore.source.${value}`)}
-                  </label>
+              <RadioGroup
+                value={source}
+                onChange={(value) => setSource(value as Source)}
+                data-cy="reader-security-source"
+              >
+                <Label className="sr-only">{t('restore.title')}</Label>
+                {SOURCES.map((value) => (
+                  <Radio key={value} value={value} data-cy={`reader-security-source-${value}`}>
+                    <Radio.Content>
+                      <Radio.Control>
+                        <Radio.Indicator />
+                      </Radio.Control>
+                      <Label>{t(`restore.source.${value}`)}</Label>
+                    </Radio.Content>
+                  </Radio>
                 ))}
-              </fieldset>
+              </RadioGroup>
             ) : null}
             <label className="flex flex-col gap-1 text-sm">
               {t('file.label')}
               <input
                 type="file"
                 accept=".pem,.key,text/plain"
+                className="block w-full cursor-pointer text-sm file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-default file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground"
                 onChange={(event) => void readFile(event.target.files?.[0])}
                 data-cy="reader-security-key-file"
               />
@@ -72,15 +96,15 @@ export function KeyFileDialog({ isOpen, kind, isPending, error, onClose, onSubmi
               {t('cancel')}
             </Button>
             <Button
+              type="submit"
               isDisabled={!pem || !passphrase}
               isPending={isPending}
-              onPress={() => onSubmit({ pem, passphrase, source })}
               data-cy="reader-security-file-submit"
             >
               {t(`${kind}.submit`)}
             </Button>
           </ModalFooter>
-        </>
+        </form>
       )}
     </StandardModal>
   );

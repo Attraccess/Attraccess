@@ -1,19 +1,28 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAttractapServiceGetSecureBootKeys } from '@attraccess/react-query-client';
 import { ReaderSecuritySection } from './index';
 
-const mutation = () => ({ mutate: vi.fn(), isPending: false, error: null });
+const mutations = vi.hoisted(() => {
+  const make = () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false, error: null as unknown });
+  return {
+    create: make(),
+    downloadRecovery: make(),
+    downloadBackup: make(),
+    check: make(),
+    restore: make(),
+  };
+});
 
 vi.mock('@attraccess/react-query-client', () => ({
   useAttractapServiceGetSecureBootKeys: vi.fn(),
   useAttractapServiceGetSecureBootKeysKey: 'keys',
-  useAttractapServiceCreateSecureBootKeys: () => mutation(),
-  useAttractapServiceDownloadRecoveryKey: () => mutation(),
-  useAttractapServiceDownloadSigningKeyBackup: () => mutation(),
-  useAttractapServiceCheckRecoveryKey: () => mutation(),
-  useAttractapServiceRestoreSecureBootKeys: () => mutation(),
+  useAttractapServiceCreateSecureBootKeys: () => mutations.create,
+  useAttractapServiceDownloadRecoveryKey: () => mutations.downloadRecovery,
+  useAttractapServiceDownloadSigningKeyBackup: () => mutations.downloadBackup,
+  useAttractapServiceCheckRecoveryKey: () => mutations.check,
+  useAttractapServiceRestoreSecureBootKeys: () => mutations.restore,
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
 vi.mock('../../../../components/toastProvider', () => ({
@@ -78,5 +87,64 @@ describe('ReaderSecuritySection', () => {
     expect(screen.queryByText('actions.regenerate')).not.toBeInTheDocument();
     expect(screen.queryByText('actions.restore')).not.toBeInTheDocument();
     expect(screen.getByText('actions.downloadBackup')).toBeInTheDocument();
+  });
+
+  it('sends a fast double press on "create" only once', () => {
+    keys({});
+    render(<ReaderSecuritySection />);
+    const button = screen.getByText('actions.create');
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(mutations.create.mutate).toHaveBeenCalledTimes(1);
+
+    // Once the request settles, the next press goes through again.
+    const settle = (mutations.create.mutate.mock.calls[0][1] as { onSettled: () => void }).onSettled;
+    act(() => settle());
+    fireEvent.click(button);
+    expect(mutations.create.mutate).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens a dialog without the error of an earlier attempt', () => {
+    keys({ status: 'recovery-check-pending', signingKey: key, recoveryKey: { ...key, verifiedAt: null } });
+    render(<ReaderSecuritySection />);
+    fireEvent.click(screen.getByText('actions.checkRecovery'));
+    expect(mutations.check.reset).toHaveBeenCalledTimes(1);
+    expect(mutations.restore.reset).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an error with a retry instead of an endless spinner when the status cannot be loaded', () => {
+    const refetch = vi.fn();
+    vi.mocked(useAttractapServiceGetSecureBootKeys).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    } as unknown as ReturnType<typeof useAttractapServiceGetSecureBootKeys>);
+    render(<ReaderSecuritySection />);
+    expect(screen.getByText('loadFailed')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('retry'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('submits the passphrase dialog with Enter once the passphrases are valid', () => {
+    keys({ status: 'recovery-check-pending', signingKey: key, recoveryKey: { ...key, verifiedAt: null } });
+    render(<ReaderSecuritySection />);
+    fireEvent.click(screen.getByText('actions.downloadRecovery'));
+    const first = document.querySelector('[data-cy="reader-security-passphrase"]') as HTMLInputElement;
+    const repeat = document.querySelector('[data-cy="reader-security-passphrase-repeat"]') as HTMLInputElement;
+    const form = first.closest('form') as HTMLFormElement;
+
+    fireEvent.change(first, { target: { value: 'too short' } });
+    fireEvent.change(repeat, { target: { value: 'too short' } });
+    fireEvent.submit(form);
+    expect(mutations.downloadRecovery.mutate).not.toHaveBeenCalled();
+
+    fireEvent.change(first, { target: { value: 'long enough passphrase' } });
+    fireEvent.change(repeat, { target: { value: 'long enough passphrase' } });
+    fireEvent.submit(form);
+    expect(mutations.downloadRecovery.mutate).toHaveBeenCalledWith(
+      { requestBody: { passphrase: 'long enough passphrase' } },
+      expect.anything(),
+    );
   });
 });

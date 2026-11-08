@@ -3,6 +3,8 @@
   "description": "Keys for securing Attractap readers over the air. Secured readers only accept updates signed by these keys.",
   "warning": "If you lose both the signing key and the recovery key, secured readers can never be updated again. Keep the recovery file and the signing key backup somewhere safe, and keep them apart.",
   "error": "That did not work",
+  "loadFailed": "The key status could not be loaded.",
+  "retry": "Try again",
   "cancel": "Cancel",
   "status": {
     "label": "Status",
@@ -73,7 +75,7 @@
   },
   "backup": {
     "title": "Download signing key backup",
-    "description": "The backup is encrypted with a passphrase you choose and works with openssl and espsecure. Neither the file nor the passphrase is stored here.",
+    "description": "The backup is encrypted with a passphrase you choose and can be read with openssl. Decrypt a temporary copy before using it with espsecure. Neither the file nor the passphrase is stored here.",
     "submit": "Download"
   }
 }

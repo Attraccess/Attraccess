@@ -260,6 +260,8 @@
     "projectId": "Project ID",
     "memberId": "Member ID",
     "userId": "User ID",
+    "signingFingerprint": "Signing key fingerprint",
+    "recoveryFingerprint": "Recovery key fingerprint",
     "invitationId": "Invitation ID",
     "role": "Role",
     "changedFields": "Changed fields",

@@ -28,18 +28,23 @@ No reader can be secured before step 3 has passed. The server enforces this, not
 
 ## Back up
 
-- **Download signing key backup** is available at any time and is protected by a passphrase you choose.
+- **Download signing key backup** is available as soon as keys exist. It asks for a passphrase of at least
+  12 characters (entered twice), just like the recovery key.
 - Also back up `AUTH_SESSION_SECRET` (without it the stored keys cannot be decrypted), the database, and
   the recovery key file with its passphrase.
 
 > **Warning:** If you lose both the signing key and the recovery key, secured readers can never be
 > updated again.
 
-The downloaded files are encrypted PKCS#8 PEM files. `openssl` and `espsecure` can use them with the
-passphrase, for example to sign an emergency firmware image with the recovery key:
+The downloaded files are encrypted PKCS#8 PEM files. `openssl` reads them with the passphrase.
+`espsecure` cannot read encrypted keys, so decrypt a temporary copy first, for example to sign an
+emergency firmware image with the recovery key (esptool 5.x syntax; older versions use
+`espsecure.py sign_data`):
 
 ```bash
-espsecure sign-data --version 2 --keyfile attraccess-recovery-key.pem --output app-signed.bin app.bin
+openssl pkey -in attraccess-recovery-key.pem -out recovery-key-plain.pem   # asks for the passphrase
+espsecure sign-data --version 2 --keyfile recovery-key-plain.pem --output app-signed.bin app.bin
+shred -u recovery-key-plain.pem                                            # remove the unencrypted copy
 ```
 
 ## Restore
@@ -50,12 +55,16 @@ After restoring from the **recovery file**, that key becomes the signing key (th
 their second key) and a **fresh recovery key** is created that has to pass the check before any new
 reader can be secured.
 
-**Regenerate keys** is only possible while no reader has this installation's keys burned in.
+Restoring a **signing key backup** replaces only the signing key; the recovery key and its status stay as
+they are. Restoring a key that already is the signing key is rejected.
+
+**Regenerate keys** replaces both keys, so recovery files and backups of the old keys stop being useful.
+It is only possible while no reader has this installation's keys burned in.
 
 ## Limits
 
 - Key revocation and rotation for already-secured readers are not supported yet.
 - A secured reader cannot be moved to another installation.
 - The protection targets an attacker with brief physical access. It makes no claims against glitching,
-  side-channel or invasive attacks, and the chip's digital signature proves key use but is not remote
-  attestation.
+  side-channel or invasive attacks, and the chip's digital signature (DS) peripheral proves key use but is
+  not remote attestation.

@@ -33,7 +33,10 @@ import subprocess
 
 import sys
 
-from secure_packaging import package_secure_images
+# The packager lives next to this script; put its directory on the path so the script also loads
+# when it is imported from elsewhere (CI tests, tooling) and not only when run from this directory.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from secure_packaging import package_secure_images  # noqa: E402
 
 CHIP = "esp32s3"
 

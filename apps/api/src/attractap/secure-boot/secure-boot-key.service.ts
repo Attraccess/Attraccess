@@ -45,6 +45,18 @@ export class SecureBootKeyService {
     private readonly encryption: EncryptionService,
   ) {}
 
+  /**
+   * Key changes check the current rows, then replace them, with slow key generation in between. Two
+   * of them at once (a double press, a second tab) would each pass the check and leave two key pairs
+   * behind, so they run one at a time.
+   */
+  private queue: Promise<unknown> = Promise.resolve();
+  private exclusive<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(task, task);
+    this.queue = run.catch(() => undefined);
+    return run;
+  }
+
   private async latest(role: SecureBootKeyRole): Promise<AttractapSecureBootKey | null> {
     return await this.keys.findOne({ where: { role }, order: { id: 'DESC' } });
   }
@@ -80,7 +92,11 @@ export class SecureBootKeyService {
     }
   }
 
-  async createKeys(): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
+  createKeys(): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
+    return this.exclusive(() => this.replaceKeys());
+  }
+
+  private async replaceKeys(): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
     if ((await this.keys.count()) > 0) {
       if ((await this.burnedReaderCount()) > 0) {
         throw new ConflictException('Keys cannot be regenerated while readers have digests burned with them');
@@ -114,7 +130,13 @@ export class SecureBootKeyService {
 
   private privateKeyOf(row: AttractapSecureBootKey): KeyObject {
     if (!row.privateKeyEncrypted) throw new ConflictException('The private key is no longer held by the server');
-    return createPrivateKey(this.encryption.decrypt(row.privateKeyEncrypted));
+    let pem: string;
+    try {
+      pem = this.encryption.decrypt(row.privateKeyEncrypted);
+    } catch {
+      throw new ConflictException('The stored key cannot be decrypted. Was AUTH_SESSION_SECRET changed?');
+    }
+    return createPrivateKey(pem);
   }
 
   private exportEncrypted(key: KeyObject, passphrase: string): string {
@@ -156,7 +178,11 @@ export class SecureBootKeyService {
     return key;
   }
 
-  async checkRecoveryKey(pem: string, passphrase: string): Promise<{ fingerprint: string }> {
+  checkRecoveryKey(pem: string, passphrase: string): Promise<{ fingerprint: string }> {
+    return this.exclusive(() => this.verifyRecoveryKey(pem, passphrase));
+  }
+
+  private async verifyRecoveryKey(pem: string, passphrase: string): Promise<{ fingerprint: string }> {
     const recovery = await this.latest('recovery');
     if (!recovery) throw new ConflictException('No keys have been created yet');
     if (recovery.verifiedAt) throw new ConflictException('The recovery key was already verified');
@@ -179,7 +205,15 @@ export class SecureBootKeyService {
    * Restore from a signing-key backup or from the recovery file. A recovery file becomes the signing
    * key (the readers' KEY1 matches it) and a fresh recovery key is created that must pass the check.
    */
-  async restore(
+  restore(
+    source: RestoreSource,
+    pem: string,
+    passphrase: string,
+  ): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
+    return this.exclusive(() => this.restoreKeys(source, pem, passphrase));
+  }
+
+  private async restoreKeys(
     source: RestoreSource,
     pem: string,
     passphrase: string,

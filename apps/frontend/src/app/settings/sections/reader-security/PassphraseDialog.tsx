@@ -31,7 +31,13 @@ export function PassphraseDialog({ isOpen, kind, isPending, error, onClose, onSu
       data-cy={`reader-security-${kind}-dialog`}
     >
       {({ close }) => (
-        <>
+        <form
+          className="contents"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!tooShort && !mismatch && !isPending) onSubmit(passphrase);
+          }}
+        >
           <ModalHeader>
             <ModalHeading>{t(`${kind}.title`)}</ModalHeading>
           </ModalHeader>
@@ -56,15 +62,15 @@ export function PassphraseDialog({ isOpen, kind, isPending, error, onClose, onSu
               {t('cancel')}
             </Button>
             <Button
+              type="submit"
               isDisabled={tooShort || mismatch}
               isPending={isPending}
-              onPress={() => onSubmit(passphrase)}
               data-cy="reader-security-passphrase-submit"
             >
               {t(`${kind}.submit`)}
             </Button>
           </ModalFooter>
-        </>
+        </form>
       )}
     </StandardModal>
   );

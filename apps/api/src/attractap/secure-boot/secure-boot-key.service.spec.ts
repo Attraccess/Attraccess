@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { AttractapSecureBootKey } from '@attraccess/database-entities';
 import { createPublicKey, generateKeyPairSync } from 'crypto';
 import { EncryptionService } from '../../encryption/encryption.service';
@@ -51,6 +52,31 @@ describe('SecureBootKeyService', () => {
       expect(row.publicKeyPem).toContain('PUBLIC KEY');
     }
     expect(JSON.stringify(await service.getState())).not.toContain('PRIVATE KEY');
+  });
+
+  it('keeps exactly one key pair when key creation is requested concurrently', async () => {
+    const { keys, service } = setup();
+
+    await Promise.all([service.createKeys(), service.createKeys(), service.createKeys()]);
+
+    expect(keys.rows.filter((row) => row.role === 'signing')).toHaveLength(1);
+    expect(keys.rows.filter((row) => row.role === 'recovery')).toHaveLength(1);
+    const state = await service.getState();
+    expect(state.signingKey?.fingerprint).toBe(keys.rows.find((row) => row.role === 'signing')?.fingerprint);
+  });
+
+  it('fails cleanly, without key material, when AUTH_SESSION_SECRET is no longer the one the keys were stored with', async () => {
+    const { keys, service } = setup();
+    await service.createKeys();
+    const otherSecret = new EncryptionService({ get: () => ({ AUTH_SESSION_SECRET: 'another-secret' }) } as never);
+    const rotated = new SecureBootKeyService(keys as never, { count: async () => 0 } as never, otherSecret);
+
+    const failure = await rotated.downloadSigningKeyBackup(PASSPHRASE).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(ConflictException);
+    expect((failure as Error).message).toContain('AUTH_SESSION_SECRET');
+    expect((failure as Error).message).not.toContain('PRIVATE');
+    await expect(rotated.downloadRecoveryKey(PASSPHRASE)).rejects.toThrow('AUTH_SESSION_SECRET');
   });
 
   it('checks the recovery file, then deletes the private key', async () => {

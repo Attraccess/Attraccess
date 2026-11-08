@@ -2,6 +2,8 @@
   "title": "Lesegerätesicherheit",
   "description": "Schlüssel, um Attractap-Lesegeräte über das Netzwerk abzusichern. Abgesicherte Lesegeräte akzeptieren nur Updates, die mit diesen Schlüsseln signiert sind.",
   "warning": "Gehen Signaturschlüssel und Wiederherstellungsschlüssel beide verloren, können abgesicherte Lesegeräte nie wieder aktualisiert werden. Bewahre die Wiederherstellungsdatei und das Backup des Signaturschlüssels sicher und getrennt voneinander auf.",
+  "loadFailed": "Der Schlüsselstatus konnte nicht geladen werden.",
+  "retry": "Erneut versuchen",
   "error": "Das hat nicht geklappt",
   "cancel": "Abbrechen",
   "status": {
@@ -47,7 +49,7 @@
   },
   "backup": {
     "title": "Backup des Signaturschlüssels herunterladen",
-    "description": "Das Backup wird mit einer Passphrase deiner Wahl verschlüsselt und funktioniert mit openssl und espsecure. Weder Datei noch Passphrase werden hier gespeichert.",
+    "description": "Das Backup wird mit einer Passphrase deiner Wahl verschlüsselt und kann mit openssl gelesen werden. Entschlüssele für espsecure eine temporäre Kopie. Weder Datei noch Passphrase werden hier gespeichert.",
     "submit": "Herunterladen"
   },
   "check": {
