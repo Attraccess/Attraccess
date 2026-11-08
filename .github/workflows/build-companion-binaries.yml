@@ -39,7 +39,7 @@ jobs:
       - name: Build Linux companion (x64 + arm64)
         run: pnpm nx run companion:build
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: companion-linux-${{ github.run_id }}
           path: |
@@ -73,7 +73,7 @@ jobs:
         if: ${{ env.HAS_APPLE_CERT == 'true' && always() }}
         run: '[ -n "$KEYCHAIN_PATH" ] && security delete-keychain "$KEYCHAIN_PATH" || true'
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: companion-macos-${{ github.run_id }}
           path: apps/companion/dist/companion_mac_universal.dmg
@@ -98,7 +98,7 @@ jobs:
         shell: bash
         run: pnpm nx run companion:build
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: companion-windows-${{ github.run_id }}
           path: apps/companion/dist/companion_win_x64.exe

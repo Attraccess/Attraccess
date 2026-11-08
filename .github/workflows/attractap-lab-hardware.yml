@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v31
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: attractap-firmware-${{ inputs.firmware_run_id }}
           run-id: ${{ inputs.firmware_run_id }}
@@ -90,7 +90,7 @@ jobs:
             --config apps/attractap-lab/example-env.yaml \
             --place "$LG_PLACE" --image "firmware/$FIRMWARE_FILE" \
             --output lab-artifacts --log-seconds 15
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: attractap-lab-${{ github.run_id }}

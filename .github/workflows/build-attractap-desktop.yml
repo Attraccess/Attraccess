@@ -47,7 +47,7 @@ jobs:
           test "$(lipo -archs "$app/Contents/MacOS/attractap-desktop")" = '${{ matrix.arch }}'
           codesign --verify --deep --strict "$app"
       - name: Upload macOS download
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: attractap-simulator-macos-${{ matrix.arch }}-${{ github.run_id }}
           path: dist/apps/attractap-desktop/packages/attractap-simulator-macos-${{ matrix.arch }}.dmg
