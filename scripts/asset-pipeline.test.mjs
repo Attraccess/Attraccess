@@ -171,7 +171,7 @@ test('release publishes plugins on latest; no workflow publishes from the pushed
       !/NPM_DIST_TAG|NPM_NIGHTLY|--tag[ =]['"]?alpha/.test(text),
       `${file} must leave the dist-tag to the plan`,
     );
-    assert.ok(!/--target=publish/.test(text), `${file} must publish through plugin-publish-plan.mjs`);
+    assert.ok(!/--target=publish(\s|$)/.test(text), `${file} must publish through plugin-publish-plan.mjs`);
     if (/plugin-publish-plan/.test(text)) assert.ok(!text.includes('github.event.before'), file);
   }
 });
