@@ -118,7 +118,7 @@ With the **RabbitMQ plugin** installed, an MQTT server that Attraccess detects a
 
 Notes:
 
-- The user configured on the MQTT server needs the RabbitMQ tag from the table (`administrator` also covers everything `monitoring` can do). Without it the panels show the error RabbitMQ returned.
+- The user configured on the MQTT server needs the RabbitMQ tag from the table (`administrator` also covers everything `monitoring` can do). Without it the panels show an error that names the missing privilege.
 - Users without `system.settings.manage` only see the read-only panels; write actions and the message explorer are hidden and are also refused by the server.
 - The message explorer uses the shared MQTT connection of Attraccess. Payloads over 64 KiB are shortened, and when a topic is very busy messages are dropped and the explorer tells you how many. Publishing and subscribing are written to the audit log (topic and size only, never the payload). Publishing can trigger real devices, so use it with care.
 

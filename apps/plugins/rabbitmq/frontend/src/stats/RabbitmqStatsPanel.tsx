@@ -32,11 +32,12 @@ function Stat({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function Alarm({ alarm, children }: { alarm: boolean | null; children: ReactNode }) {
+  const { t } = useRabbitmqTranslations();
   return (
     <span className="rmq:flex rmq:items-center rmq:gap-1 rmq:whitespace-nowrap">
       {children}
       {alarm === true && (
-        <Chip size="sm" color="danger" variant="soft">
+        <Chip size="sm" color="danger" variant="soft" title={t('stats.alarm')} aria-label={t('stats.alarm')}>
           !
         </Chip>
       )}
@@ -44,12 +45,12 @@ function Alarm({ alarm, children }: { alarm: boolean | null; children: ReactNode
   );
 }
 
-function ratio(used: number | null, total: number | null): string {
-  return used === null ? '–' : `${formatNumber(used)} / ${formatNumber(total)}`;
+function ratio(used: number | null, total: number | null, locale: string): string {
+  return used === null ? '–' : `${formatNumber(used, locale)} / ${formatNumber(total, locale)}`;
 }
 
 export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
-  const { t } = useRabbitmqTranslations();
+  const { t, language } = useRabbitmqTranslations();
   const { data, error, loading, reload } = usePolledResource(
     () => fetchStats(mqttServerId),
     STATS_POLL_INTERVAL_MS,
@@ -92,12 +93,12 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
               <Stat label={t('stats.version')} value={overview.rabbitmqVersion ?? '–'} />
               <Stat label={t('stats.erlang')} value={overview.erlangVersion ?? '–'} />
               <Stat label={t('stats.cluster')} value={overview.clusterName ?? '–'} />
-              <Stat label={t('stats.connections')} value={formatNumber(overview.connections)} />
-              <Stat label={t('stats.channels')} value={formatNumber(overview.channels)} />
-              <Stat label={t('stats.queues')} value={formatNumber(overview.queues)} />
-              <Stat label={t('stats.consumers')} value={formatNumber(overview.consumers)} />
-              <Stat label={t('stats.ready')} value={formatNumber(overview.messagesReady)} />
-              <Stat label={t('stats.unacked')} value={formatNumber(overview.messagesUnacknowledged)} />
+              <Stat label={t('stats.connections')} value={formatNumber(overview.connections, language)} />
+              <Stat label={t('stats.channels')} value={formatNumber(overview.channels, language)} />
+              <Stat label={t('stats.queues')} value={formatNumber(overview.queues, language)} />
+              <Stat label={t('stats.consumers')} value={formatNumber(overview.consumers, language)} />
+              <Stat label={t('stats.ready')} value={formatNumber(overview.messagesReady, language)} />
+              <Stat label={t('stats.unacked')} value={formatNumber(overview.messagesUnacknowledged, language)} />
               <Stat label={t('stats.publishRate')} value={formatRate(overview.publishRate, '/s')} />
               <Stat label={t('stats.deliverRate')} value={formatRate(overview.deliverRate, '/s')} />
             </div>
@@ -135,8 +136,8 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
                               {formatBytes(node.diskFree)} / {formatBytes(node.diskFreeLimit)}
                             </Alarm>
                           </TableCell>
-                          <TableCell>{ratio(node.fdUsed, node.fdTotal)}</TableCell>
-                          <TableCell>{ratio(node.socketsUsed, node.socketsTotal)}</TableCell>
+                          <TableCell>{ratio(node.fdUsed, node.fdTotal, language)}</TableCell>
+                          <TableCell>{ratio(node.socketsUsed, node.socketsTotal, language)}</TableCell>
                           <TableCell className="rmq:whitespace-nowrap">{formatDuration(node.uptime)}</TableCell>
                         </TableRow>
                       )}
@@ -168,9 +169,9 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
                           <TableCell className="rmq:font-medium">{queue.name}</TableCell>
                           <TableCell>{queue.vhost}</TableCell>
                           <TableCell>{queue.type ?? '–'}</TableCell>
-                          <TableCell>{formatNumber(queue.messagesReady)}</TableCell>
-                          <TableCell>{formatNumber(queue.messagesUnacknowledged)}</TableCell>
-                          <TableCell>{formatNumber(queue.consumers)}</TableCell>
+                          <TableCell>{formatNumber(queue.messagesReady, language)}</TableCell>
+                          <TableCell>{formatNumber(queue.messagesUnacknowledged, language)}</TableCell>
+                          <TableCell>{formatNumber(queue.consumers, language)}</TableCell>
                           <TableCell>{queue.state ?? '–'}</TableCell>
                         </TableRow>
                       )}

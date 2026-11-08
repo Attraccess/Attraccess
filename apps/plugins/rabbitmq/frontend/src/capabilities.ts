@@ -13,9 +13,11 @@ export interface RabbitmqCapabilities {
 const api = createPluginApiClient('/api/rabbitmq/capabilities');
 
 // Fails closed: manage controls stay hidden until the backend says otherwise.
-export function useCapabilities(): RabbitmqCapabilities {
+// `enabled` keeps servers that are not RabbitMQ brokers from calling the plugin API at all.
+export function useCapabilities(enabled = true): RabbitmqCapabilities {
   const [capabilities, setCapabilities] = useState<RabbitmqCapabilities>({ canManage: false });
   useEffect(() => {
+    if (!enabled) return undefined;
     let active = true;
     api
       .request<RabbitmqCapabilities>('')
@@ -26,6 +28,6 @@ export function useCapabilities(): RabbitmqCapabilities {
     return () => {
       active = false;
     };
-  }, []);
+  }, [enabled]);
   return capabilities;
 }

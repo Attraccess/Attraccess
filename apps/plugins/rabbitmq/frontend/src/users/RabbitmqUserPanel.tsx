@@ -182,6 +182,7 @@ export function RabbitmqUserPanel({ mqttServerId, canManage = false }: { mqttSer
         isOpen={model.formOpen}
         user={model.formUser}
         vhosts={model.data?.vhosts ?? []}
+        existingUsernames={model.data?.users.map((user) => user.name)}
         onClose={() => model.setFormOpen(false)}
         onSaved={() => void model.reload()}
       />

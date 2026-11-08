@@ -14,8 +14,8 @@ export function formatRate(value: number | null, suffix: string): string {
   return value == null ? '–' : `${value.toFixed(1)} ${suffix}`;
 }
 
-export function formatNumber(value: number | null): string {
-  return value == null ? '–' : value.toLocaleString();
+export function formatNumber(value: number | null, locale?: string): string {
+  return value == null ? '–' : value.toLocaleString(locale);
 }
 
 export function formatDuration(ms: number | null): string {
@@ -28,6 +28,6 @@ export function formatDuration(ms: number | null): string {
   return `${minutes}m`;
 }
 
-export function formatTimestamp(ms: number | null): string {
-  return ms == null ? '–' : new Date(ms).toLocaleString();
+export function formatTimestamp(ms: number | null, locale?: string): string {
+  return ms == null ? '–' : new Date(ms).toLocaleString(locale);
 }

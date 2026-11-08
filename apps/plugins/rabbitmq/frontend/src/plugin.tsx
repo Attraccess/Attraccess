@@ -53,7 +53,7 @@ function RabbitmqDataPanels({ mqttServerId, canManage }: { mqttServerId: number;
 // layout is unchanged unless a RabbitMQ broker is positively detected.
 export function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
   const { result } = useDetection(mqttServerId);
-  const { canManage } = useCapabilities();
+  const { canManage } = useCapabilities(result?.isRabbitMQ === true);
 
   if (!result?.isRabbitMQ) {
     return null;

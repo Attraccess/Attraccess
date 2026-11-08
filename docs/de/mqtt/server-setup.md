@@ -118,7 +118,7 @@ Mit dem installierten **RabbitMQ-Plugin** zeigt ein MQTT-Server, den Attraccess 
 
 Hinweise:
 
-- Der am MQTT-Server konfigurierte Benutzer benötigt das Tag aus der Tabelle (`administrator` deckt alles ab, was `monitoring` kann). Fehlt es, zeigen die Bereiche die Fehlermeldung von RabbitMQ.
+- Der am MQTT-Server konfigurierte Benutzer benötigt das Tag aus der Tabelle (`administrator` deckt alles ab, was `monitoring` kann). Fehlt es, zeigen die Bereiche eine Fehlermeldung, die die fehlende Berechtigung nennt.
 - Benutzer ohne `system.settings.manage` sehen nur die lesenden Bereiche; Schreibaktionen und der Nachrichten-Explorer sind ausgeblendet und werden auch vom Server abgelehnt.
 - Der Nachrichten-Explorer nutzt die gemeinsame MQTT-Verbindung von Attraccess. Payloads über 64 KiB werden gekürzt; bei sehr aktiven Topics werden Nachrichten verworfen und die Anzahl angezeigt. Veröffentlichen und Abonnieren werden im Audit-Log protokolliert (nur Topic und Größe, nie die Payload). Veröffentlichen kann echte Geräte auslösen – bitte mit Vorsicht verwenden.
 

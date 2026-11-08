@@ -135,6 +135,26 @@ it('validates creation then saves trimmed names, parsed tags and default MQTT pe
   expect(onClose).toHaveBeenCalledOnce();
 });
 
+it('refuses to create a user over an existing name instead of overwriting it', async () => {
+  request.mockResolvedValue(undefined);
+  render(
+    <RabbitmqUserFormModal
+      mqttServerId={7}
+      isOpen
+      user={null}
+      vhosts={['/']}
+      existingUsernames={['admin']}
+      onSaved={vi.fn()}
+      onClose={vi.fn()}
+    />,
+  );
+  fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'admin' } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'fixture-password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Create user' }));
+  expect(await screen.findByText('A user with this name already exists. Edit it instead.')).toBeTruthy();
+  expect(request).not.toHaveBeenCalled();
+});
+
 it('keeps existing passwords when editing and preserves the form after failed saves', async () => {
   request.mockRejectedValueOnce(new Error('Management unavailable')).mockResolvedValueOnce(undefined);
   const onSaved = vi.fn(),

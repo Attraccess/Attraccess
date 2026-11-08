@@ -32,7 +32,7 @@ import { closeConnection, fetchConnections, type RabbitmqConnection } from './co
 export const CONNECTIONS_POLL_INTERVAL_MS = 10_000;
 
 export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServerId: number; canManage: boolean }) {
-  const { t } = useRabbitmqTranslations();
+  const { t, language } = useRabbitmqTranslations();
   const { data, error, loading, reload } = usePolledResource(
     () => fetchConnections(mqttServerId),
     CONNECTIONS_POLL_INTERVAL_MS,
@@ -59,6 +59,8 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
       void reload();
     } catch (err) {
       setCloseError(err instanceof Error && err.message ? err.message : t('connections.closeError'));
+      // The client may be gone already (or the broker changed): show the current list behind the dialog.
+      void reload();
     } finally {
       setClosing(false);
     }
@@ -120,7 +122,7 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
                 <TableBody items={data.connections}>
                   {(connection) => (
                     <TableRow key={connection.name} id={connection.name}>
-                      <TableCell className="rmq:font-medium" title={connection.name}>
+                      <TableCell className="rmq:font-medium rmq:whitespace-nowrap" title={connection.name}>
                         {connection.clientId ?? connection.name}
                       </TableCell>
                       <TableCell>{connection.user ?? '–'}</TableCell>
@@ -129,8 +131,10 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
                       </TableCell>
                       <TableCell className="rmq:whitespace-nowrap">{connection.protocol ?? '–'}</TableCell>
                       <TableCell>{connection.state ?? '–'}</TableCell>
-                      <TableCell className="rmq:whitespace-nowrap">{formatTimestamp(connection.connectedAt)}</TableCell>
-                      <TableCell>{formatNumber(connection.channels)}</TableCell>
+                      <TableCell className="rmq:whitespace-nowrap">
+                        {formatTimestamp(connection.connectedAt, language)}
+                      </TableCell>
+                      <TableCell>{formatNumber(connection.channels, language)}</TableCell>
                       <TableCell className="rmq:whitespace-nowrap rmq:text-xs">
                         ↓ {formatBytes(connection.recvBytes)} ({formatRate(connection.recvRate, 'B/s')})
                         <br />↑ {formatBytes(connection.sendBytes)} ({formatRate(connection.sendRate, 'B/s')})

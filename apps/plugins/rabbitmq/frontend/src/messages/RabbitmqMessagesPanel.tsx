@@ -11,6 +11,7 @@ import { useRabbitmqTranslations } from '../i18n';
 import { decodePayload } from './payload';
 import {
   isPublishableTopic,
+  isValidTopicFilter,
   liveIdentifier,
   publishMessage,
   type RabbitmqLiveEvent,
@@ -25,7 +26,7 @@ interface LogEntry extends RabbitmqLiveMessage {
 }
 
 function MessageRow({ entry }: { entry: LogEntry }) {
-  const { t } = useRabbitmqTranslations();
+  const { t, language } = useRabbitmqTranslations();
   const decoded = decodePayload(entry.payload);
   return (
     <li
@@ -33,7 +34,7 @@ function MessageRow({ entry }: { entry: LogEntry }) {
       data-cy="rabbitmq-message-row"
     >
       <div className="rmq:flex rmq:flex-wrap rmq:items-center rmq:gap-2 rmq:text-xs rmq:text-default-500">
-        <span>{new Date(entry.receivedAt).toLocaleTimeString()}</span>
+        <span>{new Date(entry.receivedAt).toLocaleTimeString(language)}</span>
         <Chip size="sm" variant="soft">
           {entry.topic}
         </Chip>
@@ -101,6 +102,7 @@ export function RabbitmqMessagesPanel({ mqttServerId }: { mqttServerId: number }
     setSubscribedFilter(filter.trim() === '' ? '#' : filter.trim());
   };
 
+  const filterInvalid = filter.trim() !== '' && !isValidTopicFilter(filter.trim());
   const topicInvalid = topic.length > 0 && !isPublishableTopic(topic);
 
   const publish = async () => {
@@ -134,17 +136,28 @@ export function RabbitmqMessagesPanel({ mqttServerId }: { mqttServerId: number }
       </Card.Header>
       <Card.Content className="rmq:flex rmq:flex-col rmq:gap-4">
         <div className="rmq:flex rmq:flex-row rmq:flex-wrap rmq:items-end rmq:gap-2">
-          <TextField value={filter} onChange={setFilter} className="rmq:grow">
+          <TextField value={filter} onChange={setFilter} isInvalid={filterInvalid} className="rmq:grow">
             <Label>{t('messages.filter')}</Label>
             <Input autoComplete="off" placeholder="#" data-cy="rabbitmq-messages-filter-input" />
+            {filterInvalid && <p className="rmq:text-xs rmq:text-danger">{t('messages.filterInvalid')}</p>}
           </TextField>
           {subscribedFilter === null ? (
-            <Button variant="primary" onPress={subscribe} data-cy="rabbitmq-messages-subscribe-button">
+            <Button
+              variant="primary"
+              onPress={subscribe}
+              isDisabled={filterInvalid}
+              data-cy="rabbitmq-messages-subscribe-button"
+            >
               {t('messages.subscribe')}
             </Button>
           ) : (
             <>
-              <Button variant="secondary" onPress={subscribe} data-cy="rabbitmq-messages-resubscribe-button">
+              <Button
+                variant="secondary"
+                onPress={subscribe}
+                isDisabled={filterInvalid}
+                data-cy="rabbitmq-messages-resubscribe-button"
+              >
                 {t('messages.resubscribe')}
               </Button>
               <Button variant="secondary" onPress={togglePause} data-cy="rabbitmq-messages-pause-button">

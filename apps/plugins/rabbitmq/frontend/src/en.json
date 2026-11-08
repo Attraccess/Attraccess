@@ -43,6 +43,7 @@
     "save": "Save changes",
     "create": "Create user",
     "usernameRequired": "Username is required.",
+    "usernameTaken": "A user with this name already exists. Edit it instead.",
     "passwordRequired": "Password is required when creating a user.",
     "saveError": "Saving the user failed."
   },
@@ -101,6 +102,7 @@
     "consumers": "Consumers",
     "ready": "Messages ready",
     "unacked": "Messages unacknowledged",
+    "alarm": "Alarm active",
     "publishRate": "Publish rate",
     "deliverRate": "Deliver rate",
     "nodes": "Nodes",
@@ -137,6 +139,7 @@
     "pausedNotice": "Paused — new messages are ignored until you resume.",
     "publishTitle": "Publish a message",
     "topic": "Topic",
+    "filterInvalid": "Use a valid MQTT topic filter: + and # must fill a whole level, # only at the end (max. 256 bytes).",
     "topicInvalid": "Enter a topic without the wildcards + or #.",
     "payload": "Payload",
     "qos": "QoS",

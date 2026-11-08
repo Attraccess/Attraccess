@@ -43,6 +43,7 @@
     "save": "Änderungen speichern",
     "create": "Benutzer erstellen",
     "usernameRequired": "Ein Benutzername ist erforderlich.",
+    "usernameTaken": "Ein Benutzer mit diesem Namen existiert bereits. Bearbeite ihn stattdessen.",
     "passwordRequired": "Zum Erstellen eines Benutzers ist ein Passwort erforderlich.",
     "saveError": "Benutzer konnte nicht gespeichert werden."
   },
@@ -101,6 +102,7 @@
     "consumers": "Consumer",
     "ready": "Nachrichten bereit",
     "unacked": "Nachrichten unbestätigt",
+    "alarm": "Alarm aktiv",
     "publishRate": "Veröffentlichungsrate",
     "deliverRate": "Zustellrate",
     "nodes": "Knoten",
@@ -137,6 +139,7 @@
     "pausedNotice": "Pausiert – neue Nachrichten werden bis zum Fortsetzen ignoriert.",
     "publishTitle": "Nachricht veröffentlichen",
     "topic": "Topic",
+    "filterInvalid": "Gib einen gültigen MQTT-Topic-Filter ein: + und # müssen eine ganze Ebene ausfüllen, # nur am Ende (max. 256 Bytes).",
     "topicInvalid": "Gib ein Topic ohne die Platzhalter + oder # ein.",
     "payload": "Payload",
     "qos": "QoS",

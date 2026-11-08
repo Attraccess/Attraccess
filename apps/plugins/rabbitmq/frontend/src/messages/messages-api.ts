@@ -39,3 +39,15 @@ export function publishMessage(mqttServerId: number, body: PublishBody): Promise
 export function isPublishableTopic(topic: string): boolean {
   return topic.length > 0 && !/[+#]/.test(topic);
 }
+
+// Mirrors the backend's topic-filter rules (MQTT 3.1.1 §4.7): `+` and `#` must
+// occupy a whole level, `#` only the last one, and the filter stays within 256 bytes.
+export function isValidTopicFilter(filter: string): boolean {
+  if (filter.length === 0 || new TextEncoder().encode(filter).length > 256 || filter.includes('\0')) return false;
+  const levels = filter.split('/');
+  return levels.every((level, index) => {
+    if (level === '#') return index === levels.length - 1;
+    if (level === '+') return true;
+    return !level.includes('#') && !level.includes('+');
+  });
+}

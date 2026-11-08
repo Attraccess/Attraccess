@@ -5,7 +5,7 @@ import { RabbitmqStatsPanel } from './stats/RabbitmqStatsPanel';
 import { MESSAGE_LOG_CAP, RabbitmqMessagesPanel } from './messages/RabbitmqMessagesPanel';
 import { RabbitmqUserPanel } from './users/RabbitmqUserPanel';
 import { decodePayload } from './messages/payload';
-import { liveIdentifier } from './messages/messages-api';
+import { isValidTopicFilter, liveIdentifier } from './messages/messages-api';
 import { useCapabilities } from './capabilities';
 import { renderHook } from '@testing-library/react';
 import { RabbitmqDetailSlot } from './plugin';
@@ -117,8 +117,15 @@ it('keeps the close dialog open and shows the error when closing fails', async (
   render(<RabbitmqConnectionsPanel mqttServerId={4} canManage />);
   fireEvent.click(await screen.findByRole('button', { name: 'Close connection sensor-1' }));
   const dialog = await screen.findByRole('alertdialog');
+  const loadsBefore = request.mock.calls.filter(([, options]) => options?.method !== 'DELETE').length;
   fireEvent.click(within(dialog).getByRole('button', { name: 'Close connection' }));
   expect(await within(dialog).findByText('Broker refused')).toBeTruthy();
+  // The client may already be gone: the list behind the dialog is refreshed too.
+  await waitFor(() =>
+    expect(request.mock.calls.filter(([, options]) => options?.method !== 'DELETE').length).toBeGreaterThan(
+      loadsBefore,
+    ),
+  );
 });
 
 it('polls connections while visible, pauses while hidden and stops on unmount', async () => {
@@ -227,6 +234,16 @@ it('fetches capabilities and fails closed', async () => {
   expect(denied.result.current.canManage).toBe(false);
 });
 
+it('does not call the capabilities endpoint while disabled', async () => {
+  request.mockClear();
+  const disabled = renderHook(() => useCapabilities(false));
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(request).not.toHaveBeenCalled();
+  expect(disabled.result.current.canManage).toBe(false);
+});
+
 it('hides the user write actions without the manage tier', async () => {
   request.mockImplementation(async (path: string) => {
     if (path.includes('/detection/'))
@@ -301,6 +318,18 @@ it('subscribes, shows newest first, pauses, clears and releases on unsubscribe a
   fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
   expect(live.options?.enabled).toBe(true);
   unmount();
+});
+
+it('validates topic filters like the backend and blocks invalid subscriptions', () => {
+  for (const valid of ['#', '+', 'a/b', 'a/+/b', 'a/#', '+/#', 'ä/ö']) expect(isValidTopicFilter(valid)).toBe(true);
+  for (const invalid of ['', 'a/#/b', 'a/b#', '+a', 'a+', 'a/\0', 'x'.repeat(257)])
+    expect(isValidTopicFilter(invalid)).toBe(false);
+
+  render(<RabbitmqMessagesPanel mqttServerId={11} />);
+  fireEvent.change(screen.getByRole('textbox', { name: /Topic filter/ }), { target: { value: 'a/#/b' } });
+  expect(screen.getByText(/Use a valid MQTT topic filter/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
+  expect(live.options?.enabled).toBe(false);
 });
 
 it('caps the log', () => {
