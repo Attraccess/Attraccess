@@ -94,7 +94,7 @@
     "publish": {
       "inputs": [
         "{workspaceRoot}/apps/plugins/scripts/publish-plugin.mjs",
-        "{workspaceRoot}/apps/plugins/scripts/plugin-publish-plan.mjs"
+        "{workspaceRoot}/apps/plugins/scripts/npm-dist-tag.mjs"
       ]
     },
     "lint": {
