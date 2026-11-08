@@ -16,13 +16,16 @@ async function eventually<T>(read: () => Promise<T>, done: (value: T) => boolean
 describe('AuditRecordsDropped alert against real Prometheus and Grafana', () => {
   let stack: AlertingStack;
   const state = async () => (await stack.instances(ALERT))[0] as AlertInstance | undefined;
-  const notified = (status: string) =>
-    stack.notifications.filter((n) => n.alertname === ALERT && n.status === status);
+  const notified = (status: string) => stack.notifications.filter((n) => n.alertname === ALERT && n.status === status);
 
   beforeAll(async () => {
     // Only the evaluation interval is shortened; the audit rule has no pending period.
     stack = await AlertingStack.start(scaledRules(SHIPPED_RULES, '90s', '10s'));
-    await eventually(() => stack.targetsUp(), (up) => up === 2, 60);
+    await eventually(
+      () => stack.targetsUp(),
+      (up) => up === 2,
+      60,
+    );
   });
 
   afterAll(async () => {
@@ -45,7 +48,11 @@ describe('AuditRecordsDropped alert against real Prometheus and Grafana', () => 
     stack.dropAuditRecords('resource', 'storage_error');
 
     await eventually(state, (i) => i?.state === 'Alerting', 120);
-    await eventually(async () => notified('firing'), (n) => n.length > 0, 60);
+    await eventually(
+      async () => notified('firing'),
+      (n) => n.length > 0,
+      60,
+    );
     expect(notified('firing')[0].title).toContain('FIRING');
   });
 });

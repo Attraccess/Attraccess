@@ -14,6 +14,8 @@ import {
 
 import { BadRequestException } from '@nestjs/common';
 
+import { EntityManager } from 'typeorm';
+
 import { rm } from 'node:fs/promises';
 
 import { MeteringReadyExecutor, MeteringReport, MeteringReportExecutor } from '../../flows/node-executors';
@@ -841,8 +843,36 @@ describe('Flow-defined metering', () => {
         const ended = await reconciliationScope.endWithMissingFinal();
         const session = await reconciliationScope.parentScope.sessionOf(ended.id);
         const before = await reconciliationScope.parentScope.items(ended.id);
+        // Every manager a real transaction hands to its callback, on the main or the resource-lifecycle connection.
+        const transactionManagers: EntityManager[] = [];
+        const auditedInOpenTransaction: boolean[] = [];
+        const startTransaction = EntityManager.prototype.transaction;
+        const transactionSpy = jest.spyOn(EntityManager.prototype, 'transaction').mockImplementation(function (
+          this: EntityManager,
+          ...args: unknown[]
+        ) {
+          // The callback is the first or second argument (after an optional isolation level).
+          const wrapped = args.map((arg) =>
+            typeof arg === 'function'
+              ? (manager: EntityManager) => {
+                  transactionManagers.push(manager);
+                  return (arg as (manager: EntityManager) => Promise<unknown>)(manager);
+                }
+              : arg,
+          );
+          return (startTransaction as (...a: unknown[]) => Promise<unknown>).apply(this, wrapped);
+        } as never);
+        reconciliationScope.parentScope.audit.recordBillingTransaction.mockImplementation(
+          async (_event: unknown, manager?: EntityManager) => {
+            auditedInOpenTransaction.push(manager?.queryRunner?.isTransactionActive === true);
+          },
+        );
 
-        await reconciliationScope.parentScope.metering.retrySettlement(1, session.id, 1);
+        try {
+          await reconciliationScope.parentScope.metering.retrySettlement(1, session.id, 1);
+        } finally {
+          transactionSpy.mockRestore();
+        }
         expect(await reconciliationScope.parentScope.items(ended.id)).toEqual(before);
         const {
           original,
@@ -864,6 +894,12 @@ describe('Flow-defined metering', () => {
           }),
           expect.anything(),
         );
+        // Written with the settlement transaction's own manager while that transaction is still open.
+
+        expect(transactionManagers).toContain(
+          reconciliationScope.parentScope.audit.recordBillingTransaction.mock.calls[0][1],
+        );
+        expect(auditedInOpenTransaction).toEqual([true]);
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).toHaveBeenCalledWith(
           corrections[0].id,
         );

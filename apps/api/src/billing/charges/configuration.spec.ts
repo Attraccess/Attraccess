@@ -546,9 +546,7 @@ describe('BillingService', () => {
       );
 
       expect(billingServiceChargeForResourceUsageScope.billingTransactionRepository.save).not.toHaveBeenCalled();
-      expect(
-        billingServiceChargeForResourceUsageScope.auditService.recordBillingTransaction,
-      ).not.toHaveBeenCalled();
+      expect(billingServiceChargeForResourceUsageScope.auditService.recordBillingTransaction).not.toHaveBeenCalled();
       expect(
         billingServiceChargeForResourceUsageScope.liveNotificationsService.notifyTransactionUpdate,
       ).not.toHaveBeenCalled();

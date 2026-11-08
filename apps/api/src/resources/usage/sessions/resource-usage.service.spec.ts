@@ -47,6 +47,8 @@ import { createSupervisedStartFixture } from './fixtures/supervised-start.test-f
 
 import { mockRbacService } from './fixtures/rbac.test-fixture';
 
+import { captureTransactions, CapturedTransaction } from './fixtures/transaction-capture.test-fixture';
+
 export type ResourceUsageServiceTestScope = ReturnType<typeof createResourceUsageServiceFixture>;
 
 export type EndSessionTestScope = ReturnType<typeof createEndSessionFixture>;
@@ -54,6 +56,13 @@ export type EndSessionTestScope = ReturnType<typeof createEndSessionFixture>;
 export type StartSessionTestScope = ReturnType<typeof createStartSessionFixture>;
 
 export type SupervisedStartTestScope = ReturnType<typeof createSupervisedStartFixture>;
+
+/** Exactly one transaction wrote audit rows; returns it so callers can check the manager identity. */
+function onlyAuditTransaction(transactions: CapturedTransaction[]): CapturedTransaction {
+  const auditing = transactions.filter((transaction) => transaction.auditCalls.length > 0);
+  expect(auditing).toHaveLength(1);
+  return auditing[0];
+}
 
 describe('ResourceUsageService', () => {
   // Expose transactional entity manager for assertions
@@ -518,6 +527,85 @@ describe('ResourceUsageService', () => {
       expect(startSessionScope.flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(mockNewUsage.resourceId);
     });
 
+    it('audits the take-over as the old session ending and the new one starting, inside the start transaction', async () => {
+      const dto: StartUsageSessionDto = { notes: 'Test session', forceTakeOver: true };
+
+      startSessionScope.resourceRepository.findOne.mockResolvedValue(startSessionScope.mockResourceWithTakeOver);
+      startSessionScope.resourceMaintenanceService.hasActiveMaintenance.mockResolvedValue(false);
+      startSessionScope.resourceIntroductionService.hasValidIntroduction.mockResolvedValue(true);
+      startSessionScope.resourceGroupsIntroductionsService.hasValidIntroduction.mockResolvedValue(false);
+      startSessionScope.resourceIntroducersService.isIntroducer.mockResolvedValue(false);
+      startSessionScope.resourceGroupsIntroducersService.isIntroducer.mockResolvedValue(false);
+      startSessionScope.resourceGroupsService.getGroupsOfResource.mockResolvedValue([]);
+
+      const mockActiveSession = {
+        id: 10,
+        resourceId: 1,
+        userId: 9,
+        startTime: new Date(),
+        user: { id: 9 } as User,
+      } as ResourceUsage;
+      const updatedEndedSession = {
+        ...mockActiveSession,
+        endTime: new Date(),
+        endNotes: 'Session ended due to takeover by user 1',
+      } as ResourceUsage;
+      const mockNewUsage = { id: 11, resourceId: 1, userId: 1, user: { id: 1, billingFactor: 100 } } as ResourceUsage;
+
+      startSessionScope.resourceUsageRepository.findOne
+        .mockResolvedValueOnce(mockActiveSession) // getActiveSession
+        .mockResolvedValueOnce(mockNewUsage) // candidate in prepare
+        .mockResolvedValueOnce(updatedEndedSession) // previous session at finish
+        .mockResolvedValueOnce(mockNewUsage) // finalized candidate
+        .mockResolvedValueOnce(updatedEndedSession) // emitUsageEvent for ended
+        .mockResolvedValueOnce(mockNewUsage); // emitUsageEvent for started
+
+      (startSessionScope.transactionalEntityManager.createQueryBuilder as jest.Mock)
+        .mockReturnValueOnce(
+          startSessionScope.createMockQueryBuilder(null) as unknown as SelectQueryBuilder<ResourceUsage>,
+        )
+        .mockReturnValueOnce(
+          startSessionScope.createMockQueryBuilder(null) as unknown as SelectQueryBuilder<ResourceUsage>,
+        );
+
+      const transactions = captureTransactions(
+        startSessionScope.resourceUsageRepository.manager as unknown as { transaction: jest.Mock },
+        startSessionScope.transactionalEntityManager,
+        startSessionScope.mockAuditService.recordResource,
+      );
+
+      await startSessionScope.service.startSession(1, startSessionScope.mockUser, dto);
+
+      // Both rows are written in the transaction that ends the old session and finalizes the new one,
+      // so the take-over and its audit trail commit or roll back together.
+      const auditTransaction = onlyAuditTransaction(transactions);
+      expect(startSessionScope.mockAuditService.recordResource).toHaveBeenCalledTimes(2);
+      expect(auditTransaction.auditCalls).toEqual([
+        [
+          {
+            action: 'usage_session.ended',
+            actorId: 1,
+            authenticationMethod: 'session',
+            subjectId: 1,
+            details: { usageId: 10, usageUserId: 9 },
+          },
+          expect.anything(),
+        ],
+        [
+          {
+            action: 'usage_session.started',
+            actorId: 1,
+            authenticationMethod: 'session',
+            subjectId: 1,
+            details: { usageId: 11, usageUserId: 1 },
+          },
+          expect.anything(),
+        ],
+      ]);
+      expect(auditTransaction.auditCalls[0][1]).toBe(auditTransaction.manager);
+      expect(auditTransaction.auditCalls[1][1]).toBe(auditTransaction.manager);
+    });
+
     it('should throw ResourceMaintenanceInUseException when resource is under maintenance and user cannot manage maintenance', async () => {
       const dto: StartUsageSessionDto = { notes: 'Test session' };
 
@@ -760,6 +848,12 @@ describe('ResourceUsageService', () => {
         mockQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
+      const transactions = captureTransactions(
+        startSessionScope.resourceUsageRepository.manager as unknown as { transaction: jest.Mock },
+        startSessionScope.transactionalEntityManager,
+        startSessionScope.mockAuditService.recordResource,
+      );
+
       const result = await startSessionScope.service.startSession(1, { id: 1 } as User, dto);
 
       expect(result).toMatchObject({ id: 1, resourceId: 1, userId: 1, endTime: null, isFinalized: true });
@@ -773,16 +867,21 @@ describe('ResourceUsageService', () => {
         createdSession.resourceId,
       );
       // Written inside the session's transaction, so the row commits or rolls back with it.
-      expect(startSessionScope.mockAuditService.recordResource).toHaveBeenCalledWith(
-        {
-          action: 'usage_session.started',
-          actorId: 1,
-          authenticationMethod: 'session',
-          subjectId: 1,
-          details: { usageId: 1, usageUserId: 1 },
-        },
-        expect.objectContaining({ getRepository: expect.any(Function) }),
-      );
+      const auditTransaction = onlyAuditTransaction(transactions);
+      expect(startSessionScope.mockAuditService.recordResource).toHaveBeenCalledTimes(1);
+      expect(auditTransaction.auditCalls).toEqual([
+        [
+          {
+            action: 'usage_session.started',
+            actorId: 1,
+            authenticationMethod: 'session',
+            subjectId: 1,
+            details: { usageId: 1, usageUserId: 1 },
+          },
+          expect.anything(),
+        ],
+      ]);
+      expect(auditTransaction.auditCalls[0][1]).toBe(auditTransaction.manager);
     });
   });
 

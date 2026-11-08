@@ -10,7 +10,7 @@ import {
 import { CreateProjectDto } from './dto/create.dto';
 import { FileUpload } from './../common/types/file-upload.types';
 import { FindManyProjectsQueryDto } from './dto/find-many-query.dto';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ProjectsService } from './projects.service';
 import { FileStorageService } from './../common/services/file-storage.service';
 import { ProjectAccessService } from './project-access.service';
@@ -23,6 +23,20 @@ import { UpdateProjectDto } from './dto/update.dto';
 
 describe('ProjectsService', () => {
   const fixture = registerProjectsServiceFixture();
+
+  /** Records the manager the next project transaction hands to its callback. */
+  function captureNextTransactionManager(): { manager?: unknown } {
+    const captured: { manager?: unknown } = {};
+    const transaction = (fixture.projectRepository.manager as unknown as { transaction: jest.Mock }).transaction;
+    const handOut = transaction.getMockImplementation() as (work: (manager: unknown) => unknown) => Promise<unknown>;
+    transaction.mockImplementationOnce((work: (manager: unknown) => unknown) =>
+      handOut((manager) => {
+        captured.manager = manager;
+        return work(manager);
+      }),
+    );
+    return captured;
+  }
 
   describe('findMany', () => {
     it('returns projects with access metadata', async () => {
@@ -136,6 +150,7 @@ describe('ProjectsService', () => {
       fixture.resourceUsageRepository.update.mockResolvedValue({} as never);
       fixture.projectRepository.delete.mockResolvedValueOnce({ affected: 1 } as never);
       fixture.projectAccessService.ensureOwner.mockResolvedValueOnce({ id: 99, name: '   ', logo: null } as Project);
+      const transaction = captureNextTransactionManager();
 
       await fixture.service.deleteOne(7, 99);
 
@@ -146,6 +161,8 @@ describe('ProjectsService', () => {
         }),
         expect.anything(),
       );
+      expect(transaction.manager).toBeDefined();
+      expect(fixture.audit.recordProject.mock.calls[0][1]).toBe(transaction.manager);
     });
 
     it('stores the logo when provided', async () => {
@@ -206,6 +223,7 @@ describe('ProjectsService', () => {
         name: 'Deleted',
         logo: null,
       } as Project);
+      const transaction = captureNextTransactionManager();
       await fixture.service.deleteOne(7, 99);
 
       expect(fixture.resourceUsageRepository.update).toHaveBeenCalledWith({ projectId: 99 }, { projectId: null });
@@ -220,8 +238,11 @@ describe('ProjectsService', () => {
           subjectId: 99,
           details: { projectId: 99, 'before.name': 'Deleted', 'before.hasLogo': 0 },
         },
-        expect.objectContaining({ getRepository: expect.any(Function) }),
+        expect.anything(),
       );
+      // The audit row is written with the delete's transaction manager, so it rolls back with the delete.
+      expect(transaction.manager).toBeDefined();
+      expect(fixture.audit.recordProject.mock.calls[0][1]).toBe(transaction.manager);
     });
 
     it('rolls back usage detachment when the project delete affects no row', async () => {
@@ -255,7 +276,23 @@ describe('ProjectsService', () => {
           "INSERT INTO resource_usage (usageAction, resourceId, startTime, projectId) VALUES ('usage', 1, CURRENT_TIMESTAMP, 1)",
         );
         const projects = source.getRepository(Project);
-        const sqliteAudit = { recordProject: jest.fn().mockResolvedValue(undefined) };
+        const auditedInOpenTransaction: boolean[] = [];
+        const transactionManagers: EntityManager[] = [];
+        const sqliteAudit = {
+          recordProject: jest.fn(async (_event: unknown, manager?: EntityManager) => {
+            auditedInOpenTransaction.push(manager?.queryRunner?.isTransactionActive === true);
+          }),
+        };
+        const startTransaction = projects.manager.transaction.bind(projects.manager) as (
+          work: (manager: EntityManager) => Promise<unknown>,
+        ) => Promise<unknown>;
+        jest.spyOn(projects.manager, 'transaction').mockImplementation(((
+          work: (manager: EntityManager) => Promise<unknown>,
+        ) =>
+          startTransaction((manager) => {
+            transactionManagers.push(manager);
+            return work(manager);
+          })) as never);
         const sqliteMetrics = { projectsTotal: { inc: jest.fn(), dec: jest.fn() } };
         const sqliteService = new ProjectsService(
           projects,
@@ -285,6 +322,9 @@ describe('ProjectsService', () => {
         await sqliteService.deleteOne(1, 1);
         expect((await source.query('SELECT projectId FROM resource_usage WHERE id = 1'))[0].projectId).toBeNull();
         expect(sqliteAudit.recordProject).toHaveBeenCalledTimes(1);
+        // Written with the delete's own (still open) transaction manager.
+        expect(sqliteAudit.recordProject.mock.calls[0][1]).toBe(transactionManagers[1]);
+        expect(auditedInOpenTransaction).toEqual([true]);
         expect(sqliteMetrics.projectsTotal.dec).toHaveBeenCalledTimes(1);
         await expect(sqliteService.deleteOne(1, 1)).rejects.toBeInstanceOf(NotFoundException);
         expect(sqliteAudit.recordProject).toHaveBeenCalledTimes(1);

@@ -38,6 +38,8 @@ import { createSupervisedStartFixture } from './fixtures/supervised-start.test-f
 
 import { mockRbacService } from './fixtures/rbac.test-fixture';
 
+import { captureTransactions } from './fixtures/transaction-capture.test-fixture';
+
 export type ResourceUsageServiceTestScope = ReturnType<typeof createResourceUsageServiceFixture>;
 
 export type EndSessionTestScope = ReturnType<typeof createEndSessionFixture>;
@@ -132,6 +134,12 @@ describe('ResourceUsageService', () => {
         mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
+      const transactions = captureTransactions(
+        endSessionScope.resourceUsageRepository.manager as unknown as { transaction: jest.Mock },
+        endSessionScope.transactionalEntityManager,
+        endSessionScope.mockAuditService.recordResource,
+      );
+
       const result = await endSessionScope.service.endSession(1, endSessionScope.mockUser, dto);
 
       expect(result).toBe(mockUpdatedSession);
@@ -153,16 +161,23 @@ describe('ResourceUsageService', () => {
         id: endSessionScope.mockUser.id,
         username: endSessionScope.mockUser.username,
       });
-      expect(endSessionScope.mockAuditService.recordResource).toHaveBeenCalledWith(
-        {
-          action: 'usage_session.ended',
-          actorId: 1,
-          authenticationMethod: 'session',
-          subjectId: 1,
-          details: { usageId: 1, usageUserId: 1 },
-        },
-        expect.objectContaining({ getRepository: expect.any(Function) }),
-      );
+      // Written with the manager of the transaction that ends the session, so it commits or rolls back with it.
+      const auditing = transactions.filter((transaction) => transaction.auditCalls.length > 0);
+      expect(auditing).toHaveLength(1);
+      expect(endSessionScope.mockAuditService.recordResource).toHaveBeenCalledTimes(1);
+      expect(auditing[0].auditCalls).toEqual([
+        [
+          {
+            action: 'usage_session.ended',
+            actorId: 1,
+            authenticationMethod: 'session',
+            subjectId: 1,
+            details: { usageId: 1, usageUserId: 1 },
+          },
+          expect.anything(),
+        ],
+      ]);
+      expect(auditing[0].auditCalls[0][1]).toBe(auditing[0].manager);
     });
 
     it('runs the stopped-session flow after reservation but before usage finalization', async () => {
