@@ -54,6 +54,20 @@ function buildBaseContext(events: EventEmitter2): PluginContext {
       encrypt: (value) => `encrypted:${value}`,
       decrypt: (value) => value.replace('encrypted:', ''),
     },
+    getMqttCredentialProvisioning: () => ({}) as never,
+    notifications: { dispatch: jest.fn(async () => undefined) },
+    startBlocked: { invalidate: jest.fn() },
+    resourceAccess: {
+      canStart: jest.fn(async () => ({ allowed: true, requiresSupervision: false, supervisionAllowed: false })),
+      canMaintain: jest.fn(async () => true),
+      canSeeUsageAttribution: jest.fn(async () => true),
+      hasPermission: jest.fn(async () => true),
+      listResourceIdsIntroduced: jest.fn(async () => [1]),
+      listResourceIdsMaintained: jest.fn(async () => [1]),
+      getMaintenanceWindows: jest.fn(async () => []),
+      getActiveSessions: jest.fn(async () => []),
+    },
+    runSerialized: jest.fn(async (fn) => fn({} as never)),
   };
 }
 
@@ -277,6 +291,47 @@ describe('PluginSandboxService', () => {
       const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.TRIGGER_FLOWS]);
       await granted.flows.trigger('plugin.test.trigger', () => true, {});
       expect(base.flows.trigger).toHaveBeenCalledWith('plugin.test.trigger', expect.any(Function), {});
+    });
+
+    it('gates notifications.dispatch() behind SEND_NOTIFICATIONS', async () => {
+      const base = buildBaseContext(events);
+      const request = { category: 'c', recipients: [1], title: 't', body: 'b' };
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.notifications).toThrow(PluginPermissionError);
+      expect(() => denied.notifications).toThrow(/SEND_NOTIFICATIONS/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.SEND_NOTIFICATIONS]);
+      await granted.notifications.dispatch(request);
+      expect(base.notifications.dispatch).toHaveBeenCalledWith(request);
+    });
+
+    it('gates startBlocked.invalidate() behind ACCESS_HOOKS', () => {
+      const base = buildBaseContext(events);
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.startBlocked).toThrow(PluginPermissionError);
+      expect(() => denied.startBlocked).toThrow(/ACCESS_HOOKS/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.ACCESS_HOOKS]);
+      granted.startBlocked.invalidate({ resourceId: 3 });
+      expect(base.startBlocked.invalidate).toHaveBeenCalledWith({ resourceId: 3 });
+    });
+
+    it('gates resourceAccess behind ACCESS_RESOURCES', async () => {
+      const base = buildBaseContext(events);
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.resourceAccess).toThrow(/ACCESS_RESOURCES/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.ACCESS_RESOURCES]);
+      await expect(granted.resourceAccess.canStart(1, 2)).resolves.toMatchObject({ allowed: true });
+    });
+
+    it('gates runSerialized() behind DATABASE_ACCESS', async () => {
+      const base = buildBaseContext(events);
+      const denied = PluginSandboxService.createGuardedContext(base, []);
+      expect(() => denied.runSerialized(async () => 1)).toThrow(/DATABASE_ACCESS/);
+
+      const granted = PluginSandboxService.createGuardedContext(base, [PluginPermission.DATABASE_ACCESS]);
+      await expect(granted.runSerialized(async () => 42)).resolves.toBe(42);
     });
 
     it('gates host-managed secret encryption behind MANAGE_SECRETS', () => {

@@ -41,6 +41,7 @@ function setup(
 const run = (satisfied: PreStartRun['satisfied'] = new Map()): PreStartRun => ({
   resourceId: 3,
   userId: 7,
+  principal: 7,
   action: 'start',
   origin: 'reader',
   language: 'en',

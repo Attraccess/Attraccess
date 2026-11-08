@@ -26,6 +26,10 @@ const HOST_SHARED_EXTERNALS = [
   'eventemitter2',
   'typeorm',
   'reflect-metadata',
+  // DTO validation/OpenAPI decorators share the host's global metadata registries.
+  '@nestjs/swagger',
+  'class-validator',
+  'class-transformer',
   '@attraccess/plugins-backend-sdk',
 ];
 

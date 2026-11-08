@@ -36,6 +36,7 @@
   - [Dokumentation](resources/documentation.md)
   - [Einweisungen](resources/introductions.md)
   - [Wartung](resources/maintenance.md)
+  - [Reservierungen](resources/reservations.md)
   - [Nutzungsverfolgung](resources/usage-tracking.md)
   - [CSV-Export](resources/csv-export.md)
 

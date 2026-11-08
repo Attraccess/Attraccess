@@ -37,3 +37,4 @@ The Attraccess home page shows all available resources in an overview. You can:
 - [Groups](resources/resource-groups.md) – Organize resources
 - [Introductions](resources/introductions.md) – Manage access
 - [Maintenance](resources/maintenance.md) – Schedule maintenance
+- [Reservations](resources/reservations.md) – Book a resource in advance (plugin)

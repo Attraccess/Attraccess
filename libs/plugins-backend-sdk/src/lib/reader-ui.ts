@@ -7,6 +7,8 @@
  * parity test keeps both in sync.
  */
 
+import type { PluginAccessPrincipal } from './plugin-resource-access';
+
 export type ReaderUiTone = 'primary' | 'success' | 'warning' | 'danger';
 export type ReaderUiIconName = 'ok' | 'warning' | 'bell' | 'lock' | 'clock';
 export type ReaderUiTextStyle = 'title' | 'body' | 'small';
@@ -198,6 +200,12 @@ export type PreStartOrigin = 'web' | 'api' | 'reader' | 'supervision';
 export interface PreStartContext {
   resourceId: number;
   userId: number;
+  /**
+   * The starter as a `resourceAccess` principal. Web and API starts carry the request's permissions (an API token's
+   * scope), reader and supervision starts the plain user id. Pass it to `resourceAccess` instead of `userId`, so
+   * permission checks in the hook apply the same scope as core's own start checks.
+   */
+  principal: PluginAccessPrincipal;
   action: 'start' | 'takeover';
   projectId?: number;
   origin: PreStartOrigin;
@@ -235,6 +243,41 @@ export type PreStartResult =
   | { decision: 'block'; reason: PluginBlockReason };
 
 export type PreStartHook = (ctx: PreStartContext) => PreStartResult | Promise<PreStartResult>;
+
+export interface StartBlockedContext {
+  resourceId: number;
+  /** The user looking at the resource. Apply your own visibility rules before naming anybody in the reason. */
+  userId: number;
+  /** The viewer as a `resourceAccess` principal, with the request's permissions (an API token's scope). */
+  principal: PluginAccessPrincipal;
+  /** Language for texts: the user's preferred language. */
+  language: 'en' | 'de';
+  now: Date;
+}
+
+/** A start that is refused right now. Same reason shape as a `preStartHook` block. */
+export interface StartBlockedState {
+  reason: PluginBlockReason;
+  /** When the block ends, if known. The host UI refreshes itself then and shows the time. */
+  until?: Date;
+}
+
+/**
+ * Query-side counterpart of `preStartHook`: tells the UI that a start by this user is blocked right now, so it
+ * can show the reason in place of the start button instead of letting the user press it. Return null when
+ * nothing blocks. It is informational only: `preStartHook` stays the authoritative gate and must still block.
+ * Keep it cheap and side-effect free; it is called whenever a resource page is open. Failures and timeouts
+ * count as "not blocked". Requires ACCESS_HOOKS.
+ */
+export type StartBlockedQuery = (
+  ctx: StartBlockedContext,
+) => StartBlockedState | null | Promise<StartBlockedState | null>;
+
+/** Lets a plugin tell the host UI that the answer of its `startBlockedQuery` may have changed. */
+export interface PluginStartBlockedApi {
+  /** Open resource pages ask again. Call it when bookings or rules that decide the block change. */
+  invalidate(scope: { resourceId: number }): void;
+}
 
 export interface SessionEndContext {
   resourceId: number;

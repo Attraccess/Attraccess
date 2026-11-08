@@ -1,0 +1,52 @@
+{
+  "name": "@attraccess/plugin-reservations",
+  "version": "0.1.0-alpha.0",
+  "description": "Official Attraccess plugin to reserve resources for a specific time window.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "apps/plugins/reservations"
+  },
+  "homepage": "https://attraccess.org",
+  "keywords": [
+    "attraccess-plugin",
+    "attraccess",
+    "reservations",
+    "booking"
+  ],
+  "files": [
+    "dist",
+    "frontend"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@attraccess/plugins-backend-sdk": "^1.9.0",
+    "@attraccess/plugins-frontend-sdk": "^1.9.0",
+    "@attraccess/plugins-frontend-ui": "^1.11.0"
+  },
+  "attraccess": {
+    "displayName": "Reservations",
+    "description": "Reserve a resource for a specific time window.",
+    "host": "^1.11.0",
+    "backend": "dist/index.js",
+    "frontend": "frontend/remoteEntry.js",
+    "migrations": "dist/migrations.js",
+    "styles": "frontend/style.css",
+    "permissions": [
+      "DATABASE_ACCESS",
+      "ACCESS_HOOKS",
+      "LISTEN_EVENTS",
+      "ACCESS_RESOURCES",
+      "READ_USERS",
+      "READ_SETTINGS",
+      "SEND_NOTIFICATIONS"
+    ],
+    "sdk": {
+      "backend": "^1.9.0",
+      "frontend": "^1.9.0"
+    }
+  }
+}

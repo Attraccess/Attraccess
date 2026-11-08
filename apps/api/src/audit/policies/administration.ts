@@ -123,7 +123,14 @@ export const SETTING_KEYS = [
 
 export const settings = { settingKey: enumeration(...SETTING_KEYS), before: text, after: text };
 
-export const template = { templateType: enumeration(...Object.values(EmailTemplateType)) };
+const coreTemplateType = enumeration(...Object.values(EmailTemplateType));
+
+/** A core template type or a plugin template key, `plugin.<plugin name>.<template id>`. */
+export const templateType: Check = (v) =>
+  coreTemplateType(v) ||
+  (typeof v === 'string' && v.length <= 256 && /^plugin\.[a-zA-Z0-9_.@/-]+\.[a-z0-9][a-z0-9_-]*$/.test(v));
+
+export const template = { templateType };
 
 export const mqtt = {
   serverName: text,

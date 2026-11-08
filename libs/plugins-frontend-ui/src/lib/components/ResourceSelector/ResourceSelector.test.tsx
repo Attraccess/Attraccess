@@ -46,3 +46,14 @@ it('renders an empty loading result safely in single-selection mode', () => {
   expect(screen.getByRole('textbox', { name: 'Search resources' })).toBeInTheDocument();
   expect(screen.queryByRole('checkbox', { name: 'Resources' })).not.toBeInTheDocument();
 });
+it('keeps selections hidden by the search when the header checkbox selects or clears the visible rows', async () => {
+  const user = userEvent.setup();
+  const selected = vi.fn();
+  const { rerender } = render(<ResourceSelector selection={[7]} onSelectionChange={selected} />);
+  const header = screen.getAllByRole('checkbox')[0];
+  await user.click(header);
+  expect(selected).toHaveBeenLastCalledWith([7, 1, 2]);
+  rerender(<ResourceSelector selection={[7, 1, 2]} onSelectionChange={selected} />);
+  await user.click(screen.getAllByRole('checkbox')[0]);
+  expect(selected).toHaveBeenLastCalledWith([7]);
+});

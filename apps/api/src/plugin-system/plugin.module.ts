@@ -52,6 +52,8 @@ import { pluginActivationPlan } from './runtime/dependencies';
 
 import { PluginEventsService } from './plugin-events.service';
 
+import { PluginSystemEventsBridge } from './plugin-system-events.bridge';
+
 import { registerPluginFlowNodes } from './flows/node-registry';
 
 import { collectReaderUiContributions } from './runtime/reader-ui-load';
@@ -81,6 +83,20 @@ import { EncryptionService } from '../encryption/encryption.service';
 import { ResourceFlowsExecutorService } from '../resources/flows/execution/resource-flows-executor.service';
 
 import { createPluginAuditContext } from './runtime/audit-context';
+
+import { preparePluginNotifications } from './runtime/plugin-notifications';
+import {
+  PLUGIN_START_BLOCKED_CHANGED_EVENT,
+  type PluginStartBlockedChanged,
+} from './start-blocked/start-blocked.events';
+
+import {
+  createHostNotificationsContext,
+  createHostResourceAccessContext,
+  PluginHostRefs,
+} from './runtime/host-contexts';
+
+import { createPluginRunSerialized } from './runtime/plugin-serialized';
 
 function getImplementationClass(): typeof PluginModule {
   return require('./plugin.module').PluginModule;
@@ -126,6 +142,7 @@ export class PluginModule {
           NpmPluginService,
           PluginClassificationService,
           PluginLiveUpdatesService,
+          PluginSystemEventsBridge,
         ],
         exports: [PluginEventsService],
         controllers: [PluginController],
@@ -201,6 +218,7 @@ export class PluginModule {
         NpmPluginService,
         PluginClassificationService,
         PluginLiveUpdatesService,
+        PluginSystemEventsBridge,
         ReaderUiWiring,
       ],
       exports: [PluginEventsService],
@@ -266,10 +284,21 @@ export class PluginModule {
       if (readerUiContributions) queueReaderUiContributions(manifest.name, readerUiContributions);
     };
 
+    // Notification categories and email templates need SEND_NOTIFICATIONS and are validated here, before anything
+    // is queued. They are registered once the module was built, so a quarantined plugin leaves none behind.
+    const categories = preparePluginNotifications(
+      manifest.name,
+      manifest.permissions ?? [],
+      (exported as PluginBackendModule)?.notificationCategories,
+      (exported as PluginBackendModule)?.emailTemplates,
+    );
+    const registerCategories = () => categories.register();
+
     if (typeof (exported as PluginBackendModule)?.register !== 'function') {
       this.logger.warn(
         `Plugin ${manifest.name} does not export a register(context) factory; loading its default export as a static module.`,
       );
+      registerCategories();
       queueReaderUi();
       return exported as DynamicModule;
     }
@@ -280,6 +309,7 @@ export class PluginModule {
       MqttCredentialProvisioningService.register(credentialProvider(context));
       this.logger.log(`Registered MQTT credential provider from plugin ${manifest.name}.`);
     }
+    registerCategories();
     queueReaderUi();
     return {
       ...pluginModule,
@@ -288,10 +318,13 @@ export class PluginModule {
         {
           provide: `plugin-mqtt-cleanup:${manifest.id}`,
           useFactory: () => ({
+            // Closing the bootstrap's throwaway app unregisters the categories, so each app registers them again.
+            onModuleInit: () => registerCategories(),
             onModuleDestroy: () => {
               getImplementationClass().pluginMqtt().clearPlugin(manifest.id);
               getImplementationClass().pluginLiveUpdates().clearPlugin(manifest.id);
               unregisterReaderUi(manifest.name);
+              categories.unregister();
             },
           }),
         },
@@ -357,6 +390,13 @@ export class PluginModule {
       ),
       manifest: PluginService.toManifestInfo(manifest),
       readerUi: { invalidate: (scope) => invalidateReaderUi(manifest.name, scope) },
+      startBlocked: {
+        invalidate: ({ resourceId }) => {
+          if (!Number.isInteger(resourceId)) return;
+          const changed: PluginStartBlockedChanged = { pluginName: manifest.name, resourceId };
+          getImplementationClass().eventsRef?.emit(PLUGIN_START_BLOCKED_CHANGED_EVENT, changed);
+        },
+      },
       logger: new Logger(`Plugin:${manifest.name}`),
       mqtt: {
         subscribe(serverId, topicFilter, handler) {
@@ -455,9 +495,26 @@ export class PluginModule {
           decrypt: (ciphertext) => encryption.decryptForPlugin(manifest.id, ciphertext),
         };
       },
+      notifications: createHostNotificationsContext(manifest.name, getImplementationClass().hostRefs()),
+      resourceAccess: createHostResourceAccessContext(getImplementationClass().hostRefs()),
+      runSerialized: createPluginRunSerialized(
+        manifest.name,
+        () => getImplementationClass().hostRefs().dataSource().manager,
+      ),
     };
 
     return PluginSandboxService.createGuardedContext(base, manifest.permissions ?? []);
+  }
+
+  /** Lazy host accessors for the runtime context factories; each call throws until bootstrap completed. */
+  protected static hostRefs(): PluginHostRefs {
+    return {
+      get: (token) =>
+        getImplementationClass()
+          .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
+          .get(token, { strict: false }),
+      dataSource: () => getImplementationClass().requireRef(getImplementationClass().dataSourceRef, 'DataSource'),
+    };
   }
 
   /** Discard host instances when the temporary configuration app is closed. */

@@ -17,6 +17,14 @@ Attraccess includes default templates for:
 - **Email Verification** – Email address confirmation
 - **Project Invitation** – Invitation to a project
 
+## Plugin Templates
+
+Plugins can bring their own email templates (the reservations plugin, for example, for booking confirmations and
+reminders). They appear in the same list after the core templates, marked with a **Plugin: &lt;name&gt;** chip, and
+are edited and translated the same way. Once a plugin template is stored, it is yours: plugin upgrades leave your
+version unchanged, so new default texts of a plugin update do not overwrite it. Use **Reset to Default** to switch to
+the plugin's current default texts and translations.
+
 ## Editing Templates
 
 1. Select a template from the list

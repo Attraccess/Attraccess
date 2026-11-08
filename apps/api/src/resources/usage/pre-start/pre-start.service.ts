@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { type User } from '@attraccess/database-entities';
-import type { PreStartOrigin } from '@attraccess/plugins-backend-sdk';
+import type { AuthenticatedUser, PluginAccessPrincipal, PreStartOrigin } from '@attraccess/plugins-backend-sdk';
 import type { ReaderUiLanguage } from '../../../plugin-system/reader-ui/host-texts';
-import { ReaderUiHooksService, type PreStartOutcome } from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
+import {
+  ReaderUiHooksService,
+  type PreStartOutcome,
+  type StartBlockedView,
+} from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { ResourceUsageService } from '../sessions/resource-usage.service';
 import { StartBlockedException, StartConfirmationRequiredException } from './start-confirmation.errors';
@@ -50,6 +54,7 @@ export class PreStartService {
     return this.hooks.runPreStart({
       resourceId: input.resourceId,
       userId: input.user.id,
+      principal: hookPrincipal(input.user),
       action: input.forceTakeOver ? 'takeover' : 'start',
       projectId: input.projectId,
       origin: input.origin,
@@ -57,6 +62,19 @@ export class PreStartService {
       readerId: input.readerId,
       cardSessionId: input.cardSessionId,
       satisfied: new Map(Object.entries(input.satisfied ?? {}).map(([plugin, keys]) => [plugin, new Set(keys)])),
+    });
+  }
+
+  /**
+   * Whether a plugin reports this user's start as blocked right now, for the resource UI to show in place of the
+   * start button. Informational: {@link gateHttp} stays the authority and still refuses the start.
+   */
+  async queryStartBlocked(resourceId: number, user: User): Promise<StartBlockedView | null> {
+    return this.hooks.queryStartBlocked({
+      resourceId,
+      userId: user.id,
+      principal: hookPrincipal(user),
+      language: await this.settings.resolveLanguage(user.locale),
     });
   }
 
@@ -130,4 +148,13 @@ export class PreStartService {
       });
     }
   }
+}
+
+/**
+ * The hooks' view of the starter: a request's user keeps its permissions (narrowed to an API token's scope), a user
+ * loaded for a reader or supervision start is the plain id (full RBAC). A copy, so a plugin cannot change the request.
+ */
+function hookPrincipal(user: User | AuthenticatedUser): PluginAccessPrincipal {
+  const scope = (user as Partial<AuthenticatedUser>).effectivePermissions;
+  return scope ? { id: user.id, effectivePermissions: [...scope] } : user.id;
 }
