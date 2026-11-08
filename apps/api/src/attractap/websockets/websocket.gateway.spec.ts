@@ -4,6 +4,7 @@ import { LicenseModuleType } from '../../license/license.service';
 import { PAIRING_SUBPROTOCOL } from '../security/session-framing';
 import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
+import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
 describe('AttractapGateway', () => {
@@ -108,7 +109,7 @@ describe('AttractapGateway', () => {
       expect(fixture.websocketService.sockets.size).toBe(1);
       const registeredSocket = Array.from(fixture.websocketService.sockets.values())[0];
       expect(registeredSocket.readerId).toBeNull();
-      expect(registeredSocket.state.lastAuthenticatedUserId).toBeNull();
+      expect(registeredSocket.state.verifiedUserId).toBeNull();
 
       expect(mockClient.send).toHaveBeenCalled();
       const sendMock = mockClient.send as jest.Mock;
@@ -183,7 +184,7 @@ describe('AttractapGateway', () => {
       const socket = fixture.createMockSocket({
         id: 'disc-ota',
         state: {
-          lastAuthenticatedUserId: null,
+          verifiedUserId: null,
           enrollNewCardData: null,
           resetNfcCardData: null,
           ota: { path: '/tmp/test', size: 1024, fd: 999 },
@@ -319,16 +320,19 @@ describe('AttractapGateway', () => {
       await expect(fixture.gateway.disconnectReader(999)).resolves.toBeUndefined();
     });
 
-    it('closes all sockets for the given reader', async () => {
+    it('terminates all sockets for the given reader, token and session alike', async () => {
       const socket1 = fixture.createMockSocket({ id: 'dr-1', readerId: 5 });
-      const socket2 = fixture.createMockSocket({ id: 'dr-2', readerId: 5 });
-      fixture.websocketService.sockets.set('dr-1', socket1);
-      fixture.websocketService.sockets.set('dr-2', socket2);
+      const socket2 = fixture.createMockSocket({ id: 'dr-2', readerId: 5, transport: 'session' });
+      const other = fixture.createMockSocket({ id: 'dr-3', readerId: 6 });
+      for (const socket of [socket1, socket2, other]) fixture.websocketService.sockets.set(socket.id, socket);
 
       await fixture.gateway.disconnectReader(5);
 
-      expect(socket1.close).toHaveBeenCalled();
-      expect(socket2.close).toHaveBeenCalled();
+      // A closing handshake would leave the socket registered for this reader for up to 30 s.
+      expect(socket1.terminate).toHaveBeenCalled();
+      expect(socket2.terminate).toHaveBeenCalled();
+      expect(socket1.close).not.toHaveBeenCalled();
+      expect(other.terminate).not.toHaveBeenCalled();
     });
   });
   it('sends language updates only to open authenticated readers', async () => {

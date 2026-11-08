@@ -161,6 +161,21 @@ describe('desktop simulator against an isolated real API', () => {
     return observed;
   }
 
+  /**
+   * Waits until a full-screen notice (#2044) is gone. The reader may leave it on its own (the state
+   * it was raised in changed), so OK is clicked only while the notice is still up, as the desktop
+   * tests' clearStatus() does.
+   */
+  async function dismissNotice(text: string) {
+    await waitFor(async () => {
+      const { labels } = await desktop().command('inspect');
+      if (!labels.includes(text)) return true;
+      // Not requireSuccess: the notice may close between the inspect and the click.
+      if (labels.includes('OK')) await desktop().exchange(JSON.stringify({ action: 'click', text: 'OK' }), 'click OK');
+      return false;
+    }, `the "${text}" notice to close`);
+  }
+
   function socket(): AuthenticatedWebSocket {
     const connections = [...api().get(WebsocketService).sockets.values()].filter((item) => item.readerId === reader.id);
     if (connections.length !== 1)
@@ -285,7 +300,7 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().screen('resources');
     await desktop().click(resource.name);
     await authenticate();
-    expect(socket().state.lastAuthenticatedUserId).toBe(user1.id);
+    expect(socket().state.verifiedUserId).toBe(user1.id);
     const diagnostics = readFileSync(join(desktop().screenshots, 'observations.ndjson'), 'utf8');
     for (const line of diagnostics.trim().split('\n')) expect(JSON.parse(line)).not.toHaveProperty('devicePin');
     expect(diagnostics).not.toContain('7391');
@@ -328,7 +343,9 @@ describe('desktop simulator against an isolated real API', () => {
 
     // And a new key: the credential history (as the admin API reports it) names different keys.
     const history = async (readerId: number) => {
-      const token = await api().get(SessionService).createSession(pairingAdmin as User);
+      const token = await api()
+        .get(SessionService)
+        .createSession(pairingAdmin as User);
       desktop().diagnostics.remember(token);
       const response = await fetch(`${endpoint}${prefix}/attractap/readers/${readerId}/credentials`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -350,9 +367,10 @@ describe('desktop simulator against an isolated real API', () => {
   it('enrolls cards, rejects unknown and incorrect keys, and recovers from write failure and removal', async () => {
     await start('cards');
     await desktop().present(3);
-    await desktop().text('Karte nicht gefunden');
+    // Unknown, inactive and unverifiable cards all get the same notice (firmware rejectedCard).
+    await desktop().text('Anmeldung fehlgeschlagen');
     await desktop().snapshot('unknown-card');
-    await desktop().click('OK');
+    await dismissNotice('Anmeldung fehlgeschlagen');
     await desktop().screen('locked');
     expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
     await desktop().remove(3);
@@ -363,14 +381,16 @@ describe('desktop simulator against an isolated real API', () => {
     await desktop().authenticationFailure();
     expect(await db.getRepository(ResourceUsage).countBy({ resourceId: resource.id })).toBe(0);
     await desktop().snapshot('incorrect-key');
-    await desktop().click('OK');
+    await dismissNotice('Anmeldung fehlgeschlagen');
     await desktop().remove();
     await desktop().command('corrupt-key', { card: 0, slot: card.keyNo });
     await authenticate();
     await desktop().click('Abmelden');
-    for (const [index, fault] of [
-      [1, 'write'],
-      [2, 'removeOnWrite'],
+    // The server only records a card after the card proved the new key. A refused write and a card
+    // pulled out mid-write both leave nothing behind and say why.
+    for (const [index, fault, message] of [
+      [1, 'write', 'Karte nicht bestätigt, bitte erneut auflegen'],
+      [2, 'removeOnWrite', 'Karte zu früh entfernt'],
     ] as const) {
       const candidate = await user(`failed-${index}`);
       await desktop().command('faults', { card: index, [fault]: true });
@@ -379,7 +399,7 @@ describe('desktop simulator against an isolated real API', () => {
       );
       await desktop().screen('enrollment');
       await desktop().present(index);
-      await desktop().text('Karte konnte nicht\ngeschrieben werden');
+      await desktop().text(message);
       expect(await db.getRepository(NFCCard).count({ where: { user: { id: candidate.id }, isActive: true } })).toBe(0);
       if (fault === 'removeOnWrite') expect((await desktop().command('inspect')).removedOnWrite).toBe(true);
       await desktop().snapshot(`failed-enrollment-${index}`);
@@ -462,7 +482,7 @@ describe('desktop simulator against an isolated real API', () => {
     );
     const usage = await db.getRepository(ResourceUsage).findOneByOrFail({ resourceId: resource.id, userId: owner.id });
     expect(usage.endTime).toBeNull();
-    expect(socket().state.lastAuthenticatedUserId).toBe(owner.id);
+    expect(socket().state.verifiedUserId).toBe(owner.id);
     const persistedReader = await db
       .getRepository(Attractap)
       .findOneOrFail({ where: { id: reader.id }, relations: ['resources'] });

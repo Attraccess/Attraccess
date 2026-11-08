@@ -30,7 +30,8 @@ import { massIntroductionUrl } from '../../../mass-introduction/MassIntroduction
 import { PeopleTarget } from '../types';
 import { MassIntroductionEndState, MassIntroductionSessionState, secondsUntil } from './useMassIntroductionSession';
 
-const REQUIRED_READER_CAPABILITIES = { cardEnrollment: true };
+// The scan screen needs a display, and firmware 2.0.0 or later (card relay) or the server refuses the reader.
+const REQUIRED_READER_CAPABILITIES = { cardEnrollment: true, cardRelay: true };
 
 /** Choices made before starting; owned by the drawer so the footer's Start button can read them. */
 export interface MassIntroductionSetup {
@@ -58,7 +59,7 @@ export function MassIntroductionContent(props: Readonly<MassIntroductionContentP
   const { phase, session, endReason } = state;
 
   if (phase === 'setup') {
-    return <SetupStep t={t} target={target} error={state.startError} setup={setup} onSetupChange={onSetupChange} />;
+    return <SetupStep t={t} target={target} setup={setup} onSetupChange={onSetupChange} />;
   }
 
   if (phase === 'active' && session) {
@@ -130,12 +131,11 @@ export function MassIntroductionActions({ t, state, setup, onClose }: Readonly<M
 interface SetupStepProps {
   t: TFunction;
   target: PeopleTarget;
-  error: string | null;
   setup: MassIntroductionSetup;
   onSetupChange: (setup: MassIntroductionSetup) => void;
 }
 
-function SetupStep({ t, target, error, setup, onSetupChange }: Readonly<SetupStepProps>) {
+function SetupStep({ t, target, setup, onSetupChange }: Readonly<SetupStepProps>) {
   // Only readers linked to the resource (or a resource of the group) may show the scan screen.
   const isResource = target.type === 'resource';
   const resourceReaders = useAttractapServiceGetResourceAttractaps({ resourceId: target.id }, undefined, {
@@ -168,14 +168,6 @@ function SetupStep({ t, target, error, setup, onSetupChange }: Readonly<SetupSte
           />
           <Description>{t('setup.readerDescription')}</Description>
         </div>
-      )}
-      {error && (
-        <Alert status="danger" data-cy="mass-introduction-start-error">
-          <AlertContent>
-            <AlertTitle>{t('setup.startFailed')}</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </AlertContent>
-        </Alert>
       )}
     </div>
   );

@@ -39,9 +39,6 @@ public:
         std::string supervisorNames[MAX_INTRODUCERS];
     };
     struct SupervisorCardAuthenticationResponse {
-        uint8_t keyNo = 0;
-        uint8_t keyBytes[16] = {};
-        uint8_t keyLen = 0;
         std::string error;
     };
     struct SupervisionResolvedResult {
@@ -57,38 +54,32 @@ public:
     uint32_t requests = 0;
     uint32_t cancels = 0;
     uint32_t cardAuthRequests = 0;
-    uint32_t confirmations = 0;
     uint32_t lastCardAuthResourceId = 0;
+    std::string lastCardPurpose;
     void requestSupervision(uint32_t) { ++requests; }
-    void requestSupervisorCardAuthenticationData(uint8_t *, uint8_t, uint32_t resourceId) {
+    void sendCardDetected(const char *purpose, const uint8_t *, uint8_t, uint32_t resourceId = 0, const char * = nullptr) {
         ++cardAuthRequests;
+        lastCardPurpose = purpose;
         lastCardAuthResourceId = resourceId;
     }
-    void confirmSupervisorCardAuth(uint32_t) { ++confirmations; }
     void cancelSupervision() { ++cancels; }
 };
 
 class NFC : public INfc {
 public:
-    bool authenticateResult = true;
     uint32_t enabled = 0;
     uint32_t disabled = 0;
     void setup() override {}
     void loop() override {}
-    bool changeKey(uint8_t, uint8_t *, uint8_t *, uint8_t *, uint8_t) override { return false; }
     void resetCardPresence() override {}
     void enableCardDetection() override { ++enabled; }
     void disableCardDetection() override { ++disabled; }
     bool suspend() override { ++disabled; return true; }
     void setCardDetectionCallback(std::function<void(uint8_t *, uint8_t)>) override {}
     void setCardRemovalCallback(std::function<void(uint32_t)>) override {}
-    bool getAvailableKeyNo(uint8_t *, uint8_t *, uint8_t *) override { return false; }
     bool isCardPresent() override { return false; }
-    uint8_t *getFactoryKey() override { return factoryKey; }
-    bool authenticate(uint8_t, uint8_t *) override { return authenticateResult; }
-
-private:
-    uint8_t factoryKey[16] = {};
+    bool transceive(const uint8_t *, uint8_t, uint8_t *, uint8_t *) override { return false; }
+    void setConversationActive(bool) override {}
 };
 
 class Beeper {

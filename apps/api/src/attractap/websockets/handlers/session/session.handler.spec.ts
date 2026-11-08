@@ -21,7 +21,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
   let mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number; readerId: number };
+    state: { verifiedUserId: number; readerId: number };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };
@@ -198,13 +198,19 @@ describe('AttractapSessionHandler – session + flow button', () => {
       );
     });
 
-    it('attaches the supervisor and settles the web request for a two-card supervised start', async () => {
-      (fixture.mockSocket.state as any).supervisionFlow = {
+    it.each([
+      ['attaches the supervisor and settles the web request for a two-card supervised start', {}, true],
+      ['ignores a supervisor approval for another requester', { requesterUserId: 99 }, false],
+      ['ignores a supervisor approval of a web-started flow', { webInitiated: true }, false],
+    ])('%s', async (_label, overrides, used) => {
+      const flow = {
         resourceId: 10,
         requesterUserId: 1,
         requestId: 'req-1',
         approvedSupervisorUserId: 2,
+        ...overrides,
       };
+      (fixture.mockSocket.state as any).supervisionFlow = flow;
 
       await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
@@ -212,17 +218,12 @@ describe('AttractapSessionHandler – session + flow button', () => {
         10,
         fixture.mockUser,
         { projectId: 7, formSubmissions: [] },
-        { supervisorUserId: 2, auditOrigin: { actorId: 1, authenticationMethod: null } },
+        { ...(used ? { supervisorUserId: 2 } : {}), auditOrigin: { actorId: 1, authenticationMethod: null } },
       );
-      expect(fixture.mockSupervisionService.settleByCard).toHaveBeenCalledWith('req-1');
-      expect((fixture.mockSocket.state as any).supervisionFlow).toBeNull();
-      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
-            payload: { success: true },
-          }),
-        }),
+      expect(fixture.mockSupervisionService.settleByCard.mock.calls).toEqual(used ? [['req-1']] : []);
+      expect((fixture.mockSocket.state as any).supervisionFlow).toBe(used ? null : flow);
+      expect(fixture.mockSocket.sendMessage.mock.calls.at(-1)[0].data).toEqual(
+        expect.objectContaining({ type: AttractapEventType.START_RESOURCE_USAGE_SESSION, payload: { success: true } }),
       );
     });
 
@@ -910,8 +911,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         'rejects %s without looking up or disclosing readings',
         async (error) => {
           if (error === 'USER_NOT_AUTHENTICATED')
-            (readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket.state as any).lastAuthenticatedUserId =
-              null;
+            (readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket.state as any).verifiedUserId = null;
           else readerAccessWithTheActualResourceGuardScope.reader.resources = [];
           await readerAccessWithTheActualResourceGuardScope.parentScope.handler.handleResourceUsageStats(
             readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket as any,
@@ -949,7 +949,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
     it('discards results when the card changes during the lookup', async () => {
       liveUsageStatsScope.metering.getLive.mockImplementation(async () => {
-        liveUsageStatsScope.mockSocket.state.lastAuthenticatedUserId = 2;
+        liveUsageStatsScope.mockSocket.state.verifiedUserId = 2;
         return { meters: [] };
       });
       await liveUsageStatsScope.handler.handleResourceUsageStats(
@@ -975,7 +975,7 @@ export type AttractapSessionHandlerSessionFlowButtonTestScope = {
   mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number; readerId: number };
+    state: { verifiedUserId: number; readerId: number };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };

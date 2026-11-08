@@ -2,7 +2,6 @@ import {
   Controller,
   Get,
   Inject,
-  Post,
   Req,
   Body,
   Patch,
@@ -14,10 +13,8 @@ import {
   SerializeOptions,
 } from '@nestjs/common';
 import { Auth, AuthenticatedRequest, NFCCard } from '@attraccess/plugins-backend-sdk';
-import { ApiOperation, ApiResponse, ApiTags, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { AttractapService } from './attractap.service';
-import { AppKeyRequestDto } from './dtos/app-key-request.dto';
-import { AppKeyResponseDto } from './dtos/app-key-response.dto';
 import { NfcCardSetActiveStateDto } from './dtos/rfid-card-set-active-state.dto';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { LicenseModuleType } from '../license/license.service';
@@ -33,30 +30,6 @@ export class AttractapNfcCardsController {
     private readonly attractapService: AttractapService,
     private readonly cardAccess: CardAccessService,
   ) {}
-
-  @Post('keys')
-  @Auth('users.update')
-  @ApiOperation({ summary: 'Get the app key for a card by UID', operationId: 'getAppKeyByUid' })
-  @ApiBody({ type: AppKeyRequestDto })
-  @ApiResponse({
-    status: 200,
-    description: 'The app key for the card',
-    type: AppKeyResponseDto,
-  })
-  async getAppKeyByUid(
-    @Body() appKeyRequest: AppKeyRequestDto,
-    @Req() req: AuthenticatedRequest,
-  ): Promise<AppKeyResponseDto> {
-    const key = await this.attractapService.generateNTAG424Key({
-      keyNo: appKeyRequest.keyNo,
-      cardUID: appKeyRequest.cardUID,
-      userId: req.user.id,
-    });
-
-    return {
-      key: this.attractapService.uint8ArrayToHexString(key),
-    };
-  }
 
   @Get()
   @Auth()

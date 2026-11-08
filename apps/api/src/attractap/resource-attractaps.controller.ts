@@ -18,7 +18,7 @@ export class ResourceAttractapsController {
   @ApiOperation({ summary: 'Get the readers linked to a resource', operationId: 'getResourceAttractaps' })
   @ApiResponse({ status: 200, type: [Attractap] })
   async getResourceAttractaps(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<Attractap[]> {
-    return this.attractapService.getAllReaders({ where: { resources: { id: resourceId } } });
+    return this.attractapService.getPairedReaders({ where: { resources: { id: resourceId } } });
   }
 
   @Get('resource-groups/:groupId/attractaps')
@@ -29,6 +29,6 @@ export class ResourceAttractapsController {
   })
   @ApiResponse({ status: 200, type: [Attractap] })
   async getResourceGroupAttractaps(@Param('groupId', ParseIntPipe) groupId: number): Promise<Attractap[]> {
-    return this.attractapService.getAllReaders({ where: { resources: { groups: { id: groupId } } } });
+    return this.attractapService.getPairedReaders({ where: { resources: { groups: { id: groupId } } } });
   }
 }

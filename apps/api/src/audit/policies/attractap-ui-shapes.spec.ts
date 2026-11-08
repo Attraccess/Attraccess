@@ -24,7 +24,7 @@ function capture() {
 }
 
 function socket(): any {
-  return { id: 's', readerId: 5, state: { lastAuthenticatedUserId: 7 }, sendMessage: jest.fn().mockResolvedValue(true) };
+  return { id: 's', readerId: 5, state: { verifiedUserId: 7 }, sendMessage: jest.fn().mockResolvedValue(true) };
 }
 
 const confirmation = { stepKey: 'res-conflict', title: 'Reserved from 14:00', body: 'Start anyway?' };

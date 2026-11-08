@@ -125,3 +125,12 @@ export type ResourceActivityVisibility = (typeof RESOURCE_ACTIVITY_VISIBILITY_VA
 
 /** A missing stored value means "all", so upgraded instances keep today's behaviour without a migration. */
 export const RESOURCE_ACTIVITY_VISIBILITY_DEFAULT: ResourceActivityVisibility = 'all';
+
+export const ATTRACTAP_PARENT = 'attractap';
+
+export const ATTRACTAP_KEYS = {
+  /** "all" (default when unset) or "selected": which readers may enroll and reset cards. */
+  cardWriterMode: 'card_writer_mode',
+  /** JSON array of reader ids allowed to enroll and reset cards when the mode is "selected". */
+  cardWriterReaders: 'card_writer_readers',
+} as const;

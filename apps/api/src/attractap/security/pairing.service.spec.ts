@@ -474,6 +474,37 @@ describe('PairingService', () => {
     expect(audited[0]).toMatchObject({ action: 'reader.pairing_confirmed', details: { mode: 'pair', method: 'code' } });
   });
 
+  it('hands the same reader the ticket it already has, and a new one once that ran low', async () => {
+    readers.set(7, { id: 7, pairingState: 'unpaired' });
+    const first = service.issueBindingTicket(7);
+    expect(service.issueBindingTicket(7)).toBe(first);
+    expect(service.issueBindingTicket(8)).not.toBe(first);
+
+    jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 4.5 * 60 * 1000);
+    expect(service.issueBindingTicket(7)).not.toBe(first);
+  });
+
+  it('hands out a new ticket once the old one was used', async () => {
+    readers.set(7, { id: 7, pairingState: 'unpaired' });
+    const first = service.issueBindingTicket(7);
+    await announce({ ticket: first });
+
+    expect(service.issueBindingTicket(7)).not.toBe(first);
+  });
+
+  it('lets a token reader be asked on its own to pair at most every two minutes', () => {
+    const start = Date.now();
+    const now = jest.spyOn(Date, 'now').mockReturnValue(start);
+    expect(service.claimAutoPrompt(7)).toBe(true);
+    expect(service.claimAutoPrompt(7)).toBe(false);
+    expect(service.claimAutoPrompt(8)).toBe(true);
+
+    now.mockReturnValue(start + 119_000);
+    expect(service.claimAutoPrompt(7)).toBe(false);
+    now.mockReturnValue(start + 120_000);
+    expect(service.claimAutoPrompt(7)).toBe(true);
+  });
+
   it('refuses an unknown or already used ticket instead of listing a new reader', async () => {
     readers.set(7, { id: 7, pairingState: 'unpaired' });
     const ticket = service.issueBindingTicket(7);

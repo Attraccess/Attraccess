@@ -60,7 +60,7 @@ describe('AttractapSessionHandler stop on a machine shared by several people', (
     ({
       id: 'sock-1',
       readerId: 42,
-      state: { lastAuthenticatedUserId: 7 },
+      state: { verifiedUserId: 7 },
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
     }) as any;

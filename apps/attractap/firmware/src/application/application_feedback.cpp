@@ -119,7 +119,12 @@ void Application::handleReaderError(const std::string &eventType, const std::str
     if (!signingIn) return;
     this->beeper.errorBeep();
     this->nfc.enableCardDetection();
-    this->showSignInFailed(FirmwareI18n::readerError(code));
+    // Unknown, inactive and unverifiable cards get one answer (as a wrong-key card did on firmware
+    // 1.x), so a copied UID does not reveal whether it belongs to a member. Other reasons (busy,
+    // card pulled, update needed, ...) are the reader's to fix and are named.
+    const bool rejectedCard = code == "CARD_AUTHENTICATION_FAILED" || code == "CARD_NOT_FOUND" || code == "CARD_NOT_ACTIVE";
+    this->showSignInFailed(rejectedCard ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseTapAValidNfcCard)
+                                        : FirmwareI18n::readerError(code));
   } else if (eventType == "BILLING_REQUEST_TOPUP") {
     // The top-up request was refused: back to the amount, with the reason on "Top up". Only for
     // the request this reader is waiting on, and never over another flow.

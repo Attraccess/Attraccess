@@ -325,8 +325,8 @@ export class DesktopFixture {
     await this.present(card);
     await waitFor(() => {
       this.assertRunning();
-      return this.output.includes('Authentication failed');
-    }, 'local NFC authentication rejection');
+      return this.output.includes('CARD_AUTHENTICATION_FAILED');
+    }, 'server-side card authentication rejection');
     await this.screen('locked');
     const { labels } = await this.command('inspect');
     if (labels.includes('Ressource verwenden')) throw new Error('Wrong card key unlocked the reader');

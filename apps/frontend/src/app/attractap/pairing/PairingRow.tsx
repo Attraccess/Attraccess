@@ -11,8 +11,17 @@ export function readerKindOf(firmware: { name?: string } | null | undefined): Re
   return firmware?.name?.includes('lite') ? 'lite' : 'touch';
 }
 
-/** One reader that needs pairing: its type, its name, one line of context and one action. */
-export function PairingRow(props: Readonly<{ kind: ReaderKind; name: string; detail: string; action: ReactNode }>) {
+/** One reader that needs pairing: its type, its name, one or two lines of context and one action. */
+export function PairingRow(
+  props: Readonly<{
+    kind: ReaderKind;
+    name: string;
+    detail: string;
+    note?: string;
+    noteCy?: string;
+    action: ReactNode;
+  }>,
+) {
   const { t } = useTranslations({ de, en });
   return (
     <div className="flex items-center justify-between gap-2">
@@ -22,6 +31,11 @@ export function PairingRow(props: Readonly<{ kind: ReaderKind; name: string; det
           <span>{props.name}</span>
         </div>
         <span className="text-xs text-default-500">{props.detail}</span>
+        {props.note && (
+          <span className="text-xs text-default-500" data-cy={props.noteCy}>
+            {props.note}
+          </span>
+        )}
       </div>
       {props.action}
     </div>

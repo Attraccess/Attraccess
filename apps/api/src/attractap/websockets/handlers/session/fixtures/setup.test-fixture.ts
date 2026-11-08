@@ -13,7 +13,7 @@ export function resetTestFixture(scope: AttractapSessionHandlerSessionFlowButton
   scope.mockSocket = {
     id: 'sock-1',
     readerId: 42,
-    state: { lastAuthenticatedUserId: 1, readerId: 42 },
+    state: { verifiedUserId: 1, readerId: 42 },
     sendMessage: jest.fn().mockResolvedValue(undefined),
     sendBinaryData: jest.fn(),
   };

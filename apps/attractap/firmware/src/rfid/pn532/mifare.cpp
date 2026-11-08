@@ -72,11 +72,9 @@ uint8_t Adafruit_PN532::mifareclassic_AuthenticateBlock(uint8_t *uid,
 
 #ifdef MIFAREDEBUG
   PN532DEBUGPRINT.print(F("Trying to authenticate card "));
-  Adafruit_PN532::PrintHex(_uid, _uidLen);
   PN532DEBUGPRINT.print(F("Using authentication KEY "));
   PN532DEBUGPRINT.print(keyNumber ? 'B' : 'A');
   PN532DEBUGPRINT.print(F(": "));
-  Adafruit_PN532::PrintHex(_key, 6);
 #endif
 
   // Prepare the authentication command //
@@ -106,7 +104,6 @@ uint8_t Adafruit_PN532::mifareclassic_AuthenticateBlock(uint8_t *uid,
   {
 #ifdef PN532DEBUG
     PN532DEBUGPRINT.print(F("Authentification failed: "));
-    Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 12);
 #endif
     return 0;
   }
@@ -161,7 +158,6 @@ uint8_t Adafruit_PN532::mifareclassic_ReadDataBlock(uint8_t blockNumber,
   {
 #ifdef MIFAREDEBUG
     PN532DEBUGPRINT.println(F("Unexpected response"));
-    Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 26);
 #endif
     return 0;
   }
@@ -174,7 +170,6 @@ uint8_t Adafruit_PN532::mifareclassic_ReadDataBlock(uint8_t blockNumber,
 #ifdef MIFAREDEBUG
   PN532DEBUGPRINT.print(F("Block "));
   PN532DEBUGPRINT.println(blockNumber);
-  Adafruit_PN532::PrintHexChar(data, 16);
 #endif
 
   return 1;
@@ -305,7 +300,6 @@ uint8_t Adafruit_PN532::mifareultralight_ReadPage(uint8_t page,
   readdata(pn532_packetbuffer, 26);
 #ifdef MIFAREDEBUG
   PN532DEBUGPRINT.println(F("Received: "));
-  Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 26);
 #endif
 
   /* If byte 8 isn't 0x00 we probably have an error */
@@ -322,7 +316,6 @@ uint8_t Adafruit_PN532::mifareultralight_ReadPage(uint8_t page,
   {
 #ifdef MIFAREDEBUG
     PN532DEBUGPRINT.println(F("Unexpected response reading block: "));
-    Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 26);
 #endif
     return 0;
   }
@@ -332,7 +325,6 @@ uint8_t Adafruit_PN532::mifareultralight_ReadPage(uint8_t page,
   PN532DEBUGPRINT.print(F("Page "));
   PN532DEBUGPRINT.print(page);
   PN532DEBUGPRINT.println(F(":"));
-  Adafruit_PN532::PrintHexChar(buffer, 4);
 #endif
 
   // Return OK signal

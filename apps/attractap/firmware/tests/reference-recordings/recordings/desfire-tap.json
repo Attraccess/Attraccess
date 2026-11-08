@@ -1,0 +1,18 @@
+{
+  "name": "desfire-tap",
+  "cardKind": "desfire",
+  "operation": "tap",
+  "success": true,
+  "storedKey": "606162636465666768696a6b6c6d6e6f",
+  "newKey": "404142434445464748494a4b4c4d4e4f",
+  "wrongKey": "707172737475767778797a7b7c7d7e7f",
+  "randomBytesConsumed": "101112131415161718191a1b1c1d1e1f",
+  "exchanges": [
+    { "tx": "9060000000", "rx": "04010112001a0591af" },
+    { "tx": "90af000000", "rx": "0404020102110591af" },
+    { "tx": "90af000000", "rx": "046a152b4c8001020304050607089100" },
+    { "tx": "905a00000355ceac00", "rx": "9100" },
+    { "tx": "9071000005010300000000", "rx": "9baed6f330c74fb4c8fe6b901c820e9991af" },
+    { "tx": "90af000020a453a423688245418056e5f21d7974b24d568a87aa3528a88b9d8b18e08391b100", "rx": "1b9fd72b547f45f3803abd61174f00a599b8ae0f6cfdab0d3783f3e103e8a5919100" }
+  ]
+}

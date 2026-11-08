@@ -59,6 +59,13 @@ const HELLO_TIMEOUT_MS = 30_000;
 const MAX_MESSAGE_BYTES = 4096;
 const TICKET_TTL_MS = 5 * 60 * 1000;
 const MAX_TICKETS = 256;
+const TICKET_REUSE_MIN_REMAINING_MS = 60 * 1000;
+/**
+ * A token reader is asked on its own to start pairing at most this often. A pairing it started from its
+ * token that fails (rate limit, cancel, expiry) sends it straight back to the token, so without this the
+ * server would ask again on every reconnect.
+ */
+const AUTO_PROMPT_INTERVAL_MS = 2 * 60 * 1000;
 const APP_URL_CACHE_MS = ENROLLMENT_CODE_ROTATION_MS;
 const TERMINAL_VISIBLE_MS = 60_000;
 
@@ -74,6 +81,8 @@ export class PairingService implements OnApplicationShutdown {
   private readonly helloTimers = new WeakMap<WebSocket, NodeJS.Timeout>();
   /** One-time tickets that let a token reader bind its pairing request to its own record. */
   private readonly tickets = new Map<string, { readerId: number; expiresAt: number }>();
+  /** When each token reader was last asked on its own (not by the Pair button) to start pairing. */
+  private readonly autoPrompts = new Map<number, number>();
   private appUrl: { value: string | null; fetchedAt: number } | null = null;
 
   public constructor(
@@ -304,10 +313,25 @@ export class PairingService implements OnApplicationShutdown {
   public issueBindingTicket(readerId: number): string {
     const now = Date.now();
     for (const [key, value] of this.tickets) if (value.expiresAt <= now) this.tickets.delete(key);
+    // A reader asked again (reconnect, Pair button) gets the ticket it already has while it is
+    // good for a while, so repeated requests never pile up tickets.
+    for (const [key, value] of this.tickets) {
+      if (value.readerId === readerId && value.expiresAt - now > TICKET_REUSE_MIN_REMAINING_MS) return key;
+    }
     if (this.tickets.size >= MAX_TICKETS) this.tickets.delete(this.tickets.keys().next().value as string);
     const ticket = randomBytes(16).toString('base64url');
     this.tickets.set(ticket, { readerId, expiresAt: now + TICKET_TTL_MS });
     return ticket;
+  }
+
+  /** Whether a token reader may be asked on its own to start pairing now; counts the ask when it may. */
+  public claimAutoPrompt(readerId: number): boolean {
+    const now = Date.now();
+    const last = this.autoPrompts.get(readerId);
+    if (last !== undefined && now - last < AUTO_PROMPT_INTERVAL_MS) return false;
+    for (const [id, at] of this.autoPrompts) if (now - at >= AUTO_PROMPT_INTERVAL_MS) this.autoPrompts.delete(id);
+    this.autoPrompts.set(readerId, now);
+    return true;
   }
 
   /** The one admin action: checks the code or pattern, then enrolls and pairs in one go. */

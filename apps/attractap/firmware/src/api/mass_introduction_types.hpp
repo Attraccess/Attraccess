@@ -4,8 +4,8 @@
 #include <string>
 
 // Mass introduction (ATT-1151). An introducer arms this reader from the web UI; every cardholder
-// who taps here is introduced to the session's resource or group. Each card is crypto-verified like
-// a supervisor card: UID lookup, key handed out, reader authenticates, reader confirms.
+// who taps here is introduced to the session's resource or group. The server verifies each card
+// through the relay before it introduces the owner.
 struct ApiMassIntroduction
 {
     // MASS_INTRODUCTION_START: shows the scan screen until END, cancel or local expiry.
@@ -15,17 +15,6 @@ struct ApiMassIntroduction
         std::string targetName;
         std::string introducerUsername;
         uint32_t remainingMs = 0;
-    };
-
-    // MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA: the tapped card's key, or why it was rejected.
-    struct MassIntroductionCardAuthenticationResponse
-    {
-        std::string sessionId;
-        uint8_t keyNo = 0;
-        uint8_t keyBytes[16] = {0};
-        uint8_t keyLen = 0;
-        std::string username;
-        std::string error;
     };
 
     // MASS_INTRODUCTION_RESULT: outcome for the card confirmed last.

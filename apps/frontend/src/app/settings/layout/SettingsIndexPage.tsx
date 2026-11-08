@@ -1,5 +1,6 @@
 import {
   ActivityIcon,
+  NfcIcon,
   FileClockIcon,
   InfoIcon,
   LockKeyholeIcon,
@@ -25,6 +26,7 @@ const sectionIcons = {
   roles: UsersIcon,
   sso: ShieldIcon,
   monitoring: ActivityIcon,
+  attractap: NfcIcon,
   auditLog: FileClockIcon,
   plugins: PlugIcon,
 } as const;

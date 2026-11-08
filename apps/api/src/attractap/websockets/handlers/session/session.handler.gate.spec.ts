@@ -35,7 +35,7 @@ function setup() {
   const socket: any = {
     id: 's',
     readerId: 5,
-    state: { lastAuthenticatedUserId: 1 },
+    state: { verifiedUserId: 1 },
     sendMessage: jest.fn().mockResolvedValue(undefined),
   };
   const replies = (type: AttractapEventType) =>

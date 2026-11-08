@@ -9,7 +9,7 @@ export function makeSocket(overrides: Record<string, unknown> = {}): any {
     readyState: 1,
     sendMessage: jest.fn().mockResolvedValue(true),
     sendBinaryData: jest.fn(),
-    state: { lastAuthenticatedUserId: 7 },
+    state: { verifiedUserId: 7 },
     ...overrides,
   };
 }

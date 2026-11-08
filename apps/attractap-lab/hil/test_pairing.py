@@ -13,7 +13,8 @@ from attractap_lab.enrollment import latest_code
 from attractap_lab.workflow import reader_power
 
 from conftest import POWER_BUTTON_VARIANTS, READER_VARIANT, approve_pairing, open_console
-from test_nfc_cards import login, requires, sign_out
+from test_nfc_cards import card_ids, enroll, login, sign_out
+from test_nfc_flows import make_factory
 
 REVOKE_DISCONNECT_SECONDS = 1.0
 ROTATION_SECONDS = 35  # codes rotate every 30 s
@@ -201,9 +202,12 @@ def test_power_cycle_stays_paired(target, reader, hooks):
     expect_still_paired(reader, hooks, mark)
 
 
-def test_login_inside_session(reader, resource, emulator, state, hooks):
-    requires(state, "alice-card")
+def test_login_inside_session(api, admin, reader, resource, emulator, users, state, hooks):
+    """A tap inside the paired session logs in; the card is enrolled here unless an earlier test did it."""
     wait_status(hooks, "authenticated", 30)
+    if state.get("alice-card") not in card_ids(api, admin, users["alice"]):
+        make_factory(api, emulator, "alice")
+        state["alice-card"] = enroll(api, admin, reader, emulator, users["alice"], "alice")
     login(reader, emulator, hooks)
     sign_out(hooks)
 

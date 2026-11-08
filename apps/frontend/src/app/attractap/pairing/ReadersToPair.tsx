@@ -1,5 +1,5 @@
 import { Button, Card } from '@heroui/react';
-import { ActivityIcon, Trash2Icon } from 'lucide-react';
+import { Trash2Icon } from 'lucide-react';
 import { PageHeader, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Attractap,
@@ -7,7 +7,6 @@ import {
   useAttractapServiceRequestReaderPairing,
 } from '@attraccess/react-query-client';
 import { ReactNode, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useToastMessage } from '../../../components/toastProvider';
 import { AttractapDeleteModal } from '../AttractapList/delete';
 import { PairingDialog, PairingDialogProps } from './PairingDialog';
@@ -18,24 +17,13 @@ import en from './en.json';
 
 type OpenDialog = Pick<PairingDialogProps, 'pairingId' | 'waitForReaderId' | 'presetTargetReaderId'>;
 
-/** Actions of a reader record that is not paired: pair it, look at its diagnostics, or delete it. */
+/** Actions of a reader record that is not paired: pair it or delete it. Its diagnostics wait until it is paired. */
 function RecordActions(props: Readonly<{ readerId: number; pair: ReactNode }>) {
   const { t } = useTranslations({ de, en });
-  const navigate = useNavigate();
   const { readerId } = props;
   return (
     <div className="flex items-center gap-1">
       {props.pair}
-      <Button
-        size="sm"
-        variant="ghost"
-        isIconOnly
-        aria-label={t('toPair.diagnostics')}
-        onPress={() => navigate(`/attractap/readers/${readerId}/diagnostics`)}
-        data-cy={`attractap-to-pair-diagnostics-${readerId}`}
-      >
-        <ActivityIcon className="size-4" />
-      </Button>
       <AttractapDeleteModal readerId={readerId}>
         {(onOpen) => (
           <Button
@@ -57,8 +45,8 @@ function RecordActions(props: Readonly<{ readerId: number; pair: ReactNode }>) {
 /**
  * Everything that must be paired before it can be used: readers that were never paired, readers
  * whose pairing was removed, and new readers that wait for approval. Reader records can also be
- * deleted or diagnosed; a new reader can only be paired. Codes are never shown here; the admin
- * reads them from the reader.
+ * deleted; a new reader can only be paired. Codes are never shown here; the admin reads them from
+ * the reader.
  */
 export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: (readerId: number) => void }>) {
   const { t } = useTranslations({ de, en });
@@ -82,6 +70,12 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
     onError: (error) => toast.error({ title: t('toPair.requestFailed'), description: apiErrorMessage(error) }),
   });
 
+  // A token reader still controls these machines until it is paired.
+  const resourcesOf = (reader: Attractap) => {
+    const names = (reader.resources ?? []).map((resource) => resource.name);
+    return names.length > 0 ? t('toPair.resources', { names: names.join(', ') }) : undefined;
+  };
+
   const pair = (reader: Attractap) => {
     const pairing = runningFor(reader.id);
     if (pairing) setDialog({ pairingId: pairing.id });
@@ -104,6 +98,8 @@ export function ReadersToPair(props: Readonly<{ readers: Attractap[]; onPaired: 
                 kind={readerKindOf(reader.firmware)}
                 name={reader.name}
                 detail={t(reader.pairingState === 'revoked' ? 'toPair.pairingRemoved' : 'toPair.neverPaired')}
+                note={resourcesOf(reader)}
+                noteCy={`attractap-to-pair-resources-${reader.id}`}
                 action={
                   <RecordActions
                     readerId={reader.id}

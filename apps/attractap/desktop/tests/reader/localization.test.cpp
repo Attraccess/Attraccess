@@ -25,19 +25,19 @@ void ReaderWorkflow::testLocalization()
     // Exercise the API parser and application error callback for a tapped card, then refresh
     // the status screen.
     tapCard();
-    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_NOT_ACTIVE"})");
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_REMOVED"})");
     pump();
     assert(lv_screen_active() == Display::statusScreen.getScreen());
-    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Card is inactive")));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Card removed too early")));
     defaultLanguage("de");
-    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte ist nicht aktiv")));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte zu früh entfernt")));
     display.capture(output, "i18n-status-german");
     clearStatus();
     tapCard();
-    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_NOT_ACTIVE"})"); pump();
-    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte ist nicht aktiv")));
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_REMOVED"})"); pump();
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Karte zu früh entfernt")));
     defaultLanguage("en");
-    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Card is inactive")));
+    assert(lv_obj_is_visible(requireLabel(lv_screen_active(), "Card removed too early")));
     display.capture(output, "i18n-status-english");
     clearStatus();
     tapCard();
@@ -198,9 +198,9 @@ void ReaderWorkflow::testLocalization()
     State::setWebsocketState(true, "reader.test", 80, false);
     server.push("READER_AUTHENTICATED", R"({"name":"Test reader","language":"en"})"); list(false); pump();
     assert(State::getActiveLanguage() == "en");
-    // A failed NFC verification cannot activate the advertised language.
+    // A card the server could not verify cannot activate the advertised language.
     nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump();
-    server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Wrong card","language":"de","keyNo":0,"key":"11111111111111111111111111111111"})"); pump();
+    server.push("CARD_AUTHENTICATION_DATA", R"({"error":"CARD_AUTHENTICATION_FAILED","username":"Wrong card","language":"de"})"); pump();
     assert(!State::getApiState().userAuthenticated && State::getActiveLanguage() == "en");
     assert(label(lv_screen_active(), "Sign-in failed"));
     display.capture(output, "i18n-failed-verification-default");

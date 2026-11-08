@@ -42,6 +42,45 @@ Die Sitzungssicherheit wird ueber Umgebungsvariablen gesteuert:
 > [!TIP]
 > Wenn Sie den `AUTH_SESSION_SECRET` aendern, werden alle bestehenden Benutzersitzungen ungueltig und die Benutzer muessen sich erneut anmelden.
 
+## Kartenschlüssel, Kopplungsschlüssel der Reader und `AUTH_SESSION_SECRET`
+
+Die Schlüssel der Attractap-Karten werden nur vom Server erzeugt und geprüft; beim Vorhalten einer Karte erfährt ein Reader ihren Schlüssel nicht. (Ausnahme sind das Registrieren und Zurücksetzen von Karten, siehe [RFID-Karten](attractap/rfid-cards.md#welche-reader-karten-registrieren-und-zurücksetzen-dürfen).) Der Server speichert jeden Schlüssel verschlüsselt mit einem aus `AUTH_SESSION_SECRET` abgeleiteten Schlüssel. Dasselbe gilt für die Kopplungsschlüssel der Reader: die privaten Schlüssel der Zertifizierungsstelle für Reader und des Serverzertifikats (siehe [Reader koppeln](attractap/pairing.md#datensicherung)).
+
+> [!WARNING]
+> **Sichern Sie `AUTH_SESSION_SECRET` zusammen mit den Datenbank-Backups.** Ohne das Secret lassen sich die gespeicherten Kartenschlüssel und Kopplungsschlüssel nicht lesen. Bereits registrierte Karten können dann weder genutzt noch von Attraccess zurückgesetzt werden und müssen mit anderen Werkzeugen gelöscht werden. Gekoppelte Reader können sich nicht mehr verbinden und müssen neu gekoppelt werden.
+
+Wird das Secret geändert, sind die gespeicherten Kartenschlüssel und Kopplungsschlüssel unlesbar, bis sie neu verschlüsselt wurden. So tauschen Sie das Secret gezielt aus:
+
+1. Stoppen Sie die API und sichern Sie die Datenbank (siehe [Backup & Wiederherstellung](installation/backup-restore.md)). Mit Docker Compose: `docker compose stop attraccess`.
+2. Laden Sie beide Secrets in Ihre Shell. `read -rs` zeigt die Eingabe nicht an, so landen die Secrets weder im Shell-Verlauf noch in der Prozessliste. Geben Sie jedes Secret ein und drücken Sie Enter:
+
+   ```bash
+   read -rs OLD_AUTH_SESSION_SECRET && export OLD_AUTH_SESSION_SECRET
+   read -rs NEW_AUTH_SESSION_SECRET && export NEW_AUTH_SESSION_SECRET
+   ```
+
+3. Prüfen Sie, ob sich alle gespeicherten Kartenschlüssel und Kopplungsschlüssel mit dem alten Secret lesen lassen. `--dry-run` liest alle Schlüssel und schreibt nichts. (Der Befehl heißt `reencrypt-card-keys`, stellt aber auch die Kopplungsschlüssel der Reader um.)
+
+   **Docker Compose** (der Befehl ist im Image enthalten; `-e NAME` ohne Wert übernimmt die Variable aus Ihrer Shell):
+
+   ```bash
+   docker compose run --rm --no-deps -e OLD_AUTH_SESSION_SECRET -e NEW_AUTH_SESSION_SECRET \
+     attraccess node /app/dist/apps/api/scripts/reencrypt-card-keys.mjs --dry-run
+   ```
+
+   **Installation aus dem Quellcode** (im Wurzelverzeichnis des Repositorys, mit demselben `STORAGE_ROOT` wie die API):
+
+   ```bash
+   pnpm nx run api:reencrypt-card-keys -- --dry-run
+   ```
+
+   Der Befehl verwendet `<STORAGE_ROOT>/attraccess.sqlite` (Standard: `./storage/attraccess.sqlite`). Mit `--db <Pfad>` geben Sie die Datenbankdatei direkt an.
+4. Führen Sie denselben Befehl ohne `--dry-run` aus. Alle Schlüssel werden in einer Transaktion umgestellt; lässt sich einer mit dem alten Secret nicht lesen, bleibt alles unverändert. Die Ausgabe nennt, wie viele Kartenschlüssel und Kopplungsschlüssel umgestellt wurden.
+5. Setzen Sie `AUTH_SESSION_SECRET` auf den neuen Wert (zum Beispiel in Ihrer `.env`-Datei), löschen Sie die Shell-Variablen mit `unset OLD_AUTH_SESSION_SECRET NEW_AUTH_SESSION_SECRET` und starten Sie die API (`docker compose up -d`). Gekoppelte Reader verbinden sich wieder, ohne neu gekoppelt zu werden.
+
+> [!WARNING]
+> Der Befehl stellt nur Kartenschlüssel und Kopplungsschlüssel der Reader um. `AUTH_SESSION_SECRET` schützt alles, was Attraccess verschlüsselt speichert: auch den Lizenzschlüssel, Zugangsdaten von SSO-Anbietern, Zwei-Faktor-Geheimnisse sowie MQTT- und Zahlungs-Zugangsdaten. Nach einer Änderung lassen sich diese Werte nicht mehr lesen. Die API startet dann unter Umständen nicht mehr, weil der Lizenzschlüssel unlesbar ist, und die Werte müssen neu eingegeben werden. Tauschen Sie das Secret nur aus, wenn es sein muss, zum Beispiel nach einem Leck.
+
 ## Best Practices
 
 - Verwenden Sie in Produktionsumgebungen immer **HTTPS**. Siehe [SSL einrichten](installation/ssl-setup.md).

@@ -29,7 +29,7 @@ function setup() {
   const socket: any = {
     id: 's',
     readerId: 5,
-    state: { lastAuthenticatedUserId: 1 },
+    state: { verifiedUserId: 1 },
     sendMessage: jest.fn().mockResolvedValue(undefined),
   };
   const lastReply = () => socket.sendMessage.mock.calls.at(-1)[0].data.payload;

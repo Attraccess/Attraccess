@@ -46,7 +46,8 @@ this).
 
 Firmware 1.6.5 adds English/German display localization. The server sends a
 default language in `READER_AUTHENTICATED`, a cardholder language in
-`CARD_AUTHENTICATION_DATA`, and default changes through `READER_LANGUAGE`.
+`CARD_AUTHENTICATION_DATA` (its verdict after a tap, see
+[Card relay protocol](#card-relay-protocol-200)), and default changes through `READER_LANGUAGE`.
 `CARD_AUTHENTICATION_DATA.languageFallback` marks a missing or unsupported
 cardholder preference. The canonical `language` still supplies the current fallback
 to older readers; current firmware follows live default changes during that session.
@@ -95,19 +96,17 @@ arms any reader that reports `capabilities.cardEnrollment`. Firmware older than
 1.7.0 acknowledges and ignores these events, so readers must be updated before
 they can take part in mass introductions.
 
-| Direction       | Event                                                | Payload                                                                                     |
-| --------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Server → reader | `MASS_INTRODUCTION_START`                            | `sessionId`, `targetName`, `introducerUsername`, `remainingMs`                              |
-| Reader → server | `REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA` | `sessionId`, `uid` (lowercase hex)                                                          |
-| Server → reader | `MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA`         | `sessionId` plus `keyNo`, `key`, `username`, or `error`                                     |
-| Reader → server | `MASS_INTRODUCTION_CARD_AUTH_CONFIRMED`              | `sessionId`, `uid`                                                                          |
-| Server → reader | `MASS_INTRODUCTION_RESULT`                           | `sessionId`, `success` plus `username`, `alreadyIntroduced`, `participantCount`, or `error` |
-| Reader → server | `MASS_INTRODUCTION_CANCEL`                           | `sessionId`                                                                                 |
-| Server → reader | `MASS_INTRODUCTION_END`                              | `sessionId`, `reason` (`expired`, `cancelled`, `revoked`)                                   |
+| Direction       | Event                      | Payload                                                                                     |
+| --------------- | -------------------------- | ------------------------------------------------------------------------------------------- |
+| Server → reader | `MASS_INTRODUCTION_START`  | `sessionId`, `targetName`, `introducerUsername`, `remainingMs`                              |
+| Reader → server | `CARD_DETECTED`            | `purpose: "mass-introduction"`, `sessionId`, `uid`, `detectionId` (card relay, below)       |
+| Server → reader | `MASS_INTRODUCTION_RESULT` | `sessionId`, `success` plus `username`, `alreadyIntroduced`, `participantCount`, or `error` |
+| Reader → server | `MASS_INTRODUCTION_CANCEL` | `sessionId`                                                                                 |
+| Server → reader | `MASS_INTRODUCTION_END`    | `sessionId`, `reason` (`expired`, `cancelled`, `revoked`)                                   |
 
-Each tapped card is authenticated with its key like a supervisor card before it
-is confirmed. Errors stay on the scan screen instead of opening the generic error
-popup. After each result the screen waits for the next card. A card left on the
+Since 2.0.0 the server checks each tapped card through the card relay (like a
+supervisor card) before it introduces the user; the reader never sees a card key.
+Errors stay on the scan screen instead of opening the generic error popup. After each result the screen waits for the next card. A card left on the
 reader is not read again. A reader that is busy (someone signed in, another flow
 active, a firmware update) replies to `START` with `MASS_INTRODUCTION_CANCEL`.
 The cancel button, the local countdown and an `END` for the shown session return
@@ -117,6 +116,44 @@ the reader to its normal screens. A disconnect does too. Messages for any other
 `MassIntroduction: introduced user=… already=… count=…`,
 `MassIntroduction: refused session=… reason=…` and
 `MassIntroduction: ended reason=… session=…`.
+
+## Card relay protocol (2.0.0)
+
+Firmware 2.0.0 holds no card keys and no card session state (ATT-1145). The server runs all
+DESFire EV2/EV3 and NTAG 424 card crypto and the reader relays complete commands (APDUs) between
+the server and the card, one at a time. The reader announces this with
+`capabilities.cardRelay: true` in its firmware info; the server gives older readers no card
+functions and answers their card events with `FIRMWARE_UPDATE_REQUIRED`. The key-carrying events of
+firmware 1.x (`CARD_AUTHENTICATION_DATA` with `keyNo`/`key`, enrollment and reset key events,
+`REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA` and friends) are gone.
+
+| Direction       | Event                   | Payload                                                                                                                                                                        |
+| --------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Reader → server | `CARD_DETECTED`         | `purpose` (`tap`, `enroll`, `reset`, `supervisor`, `mass-introduction`), `uid` (lowercase hex), `detectionId`, optional `resourceId`, optional `sessionId` (mass introduction) |
+| Server → reader | `CARD_APDU`             | `conversationId`, `detectionId`, `seq`, `apdu` (hex, at most 62 bytes)                                                                                                         |
+| Reader → server | `CARD_APDU_RESPONSE`    | `conversationId`, `seq`, `response` (hex, the card's answer including status bytes, at most 56 bytes)                                                                          |
+| Reader → server | `CARD_REMOVED`          | `conversationId` (the card did not answer: it left the field)                                                                                                                  |
+| Server → reader | `CARD_CONVERSATION_END` | `detectionId`, optional `conversationId` (absent when the server refused the card before any command)                                                                          |
+| Reader → server | `READER_SESSION_ENDED`  | none: the reader's login ended (logout or timeout), the server forgets the verified user                                                                                       |
+
+Every card presentation gets a new `detectionId` (per boot, counting from 1). The server echoes
+it in `CARD_APDU` and `CARD_CONVERSATION_END`, so a late message for an earlier card can neither
+take over nor close the conversation of the card on the reader now. The reader runs one
+conversation at a time; commands for another `conversationId` or `detectionId`, commands over
+62 bytes (the PN532 packet buffer is 64 bytes) and commands without a `CARD_DETECTED` are dropped.
+`CARD_APDU` is not acknowledged. While a conversation is open the reader does not probe the card
+for presence. It closes the conversation on `CARD_CONVERSATION_END`, when the card stops answering
+(`CARD_REMOVED`), when the flow that opened it ends, when `CARD_DETECTED` could not be sent, on a
+disconnect, and at the latest after 20 s (the server gives up after 15 s).
+
+The result arrives as the flow's usual event: `CARD_AUTHENTICATION_DATA` (`username`, `language`,
+`cardSessionId`, … or `error`) for a tap, `SUPERVISOR_CARD_AUTHENTICATION_DATA`,
+`MASS_INTRODUCTION_RESULT`, and `ENROLL_NEW_CARD` / `RESET_NFC_CARD` with `success` or `error`.
+`ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO` and `RESET_NFC_CARD` with a `username` keep their 1.x
+names but only arm the enrollment and reset screens; the server writes the card through the relay
+and reports success only after the card proved the new key or its factory state. Readers send
+`CARD_APDU_RESPONSE` without an INFO serial line (DEBUG only); every other event is logged as
+`Sending reader event: <TYPE>`.
 
 ## Pairing and session protocol (1.8.0)
 

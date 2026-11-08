@@ -112,6 +112,8 @@ void API::sendFirmwareInfo()
     char uiCaps[ui::CAPABILITIES_UI_SCRATCH];
     ui::buildFirmwareInfo(event, {FIRMWARE_NAME, FIRMWARE_VARIANT, FIRMWARE_VERSION, resetReason, millis()}, traits,
                           uiCaps, sizeof uiCaps);
+    // This reader relays card APDUs to the server and holds no card keys (firmware 2.0.0+).
+    event["data"]["payload"]["capabilities"]["cardRelay"] = true;
 
     // The ui block makes this message ~730 B; 256 B would be truncated silently.
     char json[JSON_OUTBUF_AUTH];

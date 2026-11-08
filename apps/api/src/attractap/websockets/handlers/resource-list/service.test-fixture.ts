@@ -25,7 +25,7 @@ export function registerResourceListServiceFixture() {
     return {
       id: 'socket-1',
       readerId: 42,
-      state: { lastAuthenticatedUserId: null },
+      state: { verifiedUserId: null },
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
       ...overrides,

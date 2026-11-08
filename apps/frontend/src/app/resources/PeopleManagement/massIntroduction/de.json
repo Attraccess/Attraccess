@@ -8,7 +8,6 @@
     "readerLabel": "Leser",
     "readerPlaceholder": "Leser auswählen",
     "readerDescription": "Es werden nur verbundene Leser angezeigt, die mit dieser Ressource (oder einer Ressource dieser Gruppe) verknüpft sind.",
-    "startFailed": "Die Sammeleinweisung konnte nicht gestartet werden",
     "cancel": "Abbrechen",
     "start": "Starten"
   },

@@ -429,7 +429,7 @@ describe('UiSlotService', () => {
     it('only syncs readers in scope and coalesces bursts', async () => {
       const t = setup(() => [header('A')]);
       const other = { ...t.socket, id: 'sock-2', readerId: 6, sendMessage: jest.fn().mockResolvedValue(true) };
-      other.state = { lastAuthenticatedUserId: null };
+      other.state = { verifiedUserId: null };
       t.sockets.set(other.id, other);
       await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
       await t.service.onFirmwareInfo(other, TOUCH_UI);
