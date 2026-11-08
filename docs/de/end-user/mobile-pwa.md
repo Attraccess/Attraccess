@@ -50,6 +50,16 @@ Nach der Installation können Sie Attraccess auf Ihrem Handy genauso nutzen wie 
 
 Die Benutzeroberfläche passt sich automatisch an kleinere Bildschirme an.
 
+## App-Updates
+
+Wenn eine neue Version von Attraccess verfügbar ist, lädt die App sie im Hintergrund herunter, während Sie weiterarbeiten können:
+
+1. Ein kurzer Hinweis informiert Sie, dass ein Update heruntergeladen wird.
+2. Unten rechts erscheint eine kleine runde Fortschrittsanzeige. Ziehen Sie sie (oder nutzen Sie die Pfeiltasten, wenn sie fokussiert ist) in eine andere Ecke, falls sie im Weg ist; Attraccess merkt sich Ihre Wahl.
+3. Ist der Download abgeschlossen, wird daraus eine Karte **Update bereit**. Mit **Jetzt neu laden** wechseln Sie zur neuen Version, mit **Später** wird sie zu einer kleinen Schaltfläche, die Sie erneut antippen können.
+
+Das Update wird außerdem automatisch angewendet, wenn es unkritisch ist: wenn Sie zu einem anderen Tab oder einer anderen App wechseln, nach 5 Minuten ohne Aktivität oder wenn Sie die Seite neu laden oder schließen. Nicht gespeicherte Eingaben können dabei verloren gehen.
+
 ## Offline-Unterstützung
 
 Attraccess bietet grundlegende Offline-Funktionalität:

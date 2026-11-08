@@ -15,6 +15,7 @@ export default defineConfig({
   resolve: {
     alias: {
       'virtual:__federation__': path.join(__dirname, 'src/test-utils/federation-stub.ts'),
+      'virtual:pwa-register': path.join(__dirname, 'src/test-utils/pwa-register-stub.ts'),
     },
   },
   test: {
