@@ -14,7 +14,7 @@ runs:
       run: |
         echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
         echo "node-version=$(tr -d '[:space:]' < .nvmrc)" >> "$GITHUB_OUTPUT"
-    - uses: docker/build-push-action@v6
+    - uses: docker/build-push-action@v7
       with:
         context: .
         file: apps/plugins/wago/cc100-runtime/Dockerfile
