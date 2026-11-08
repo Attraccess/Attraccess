@@ -1,4 +1,5 @@
 # CSV Export
+<!-- llms-description: Export resource usage and billing data as CSV: permissions, choosing columns, templates, available fields and file format. -->
 
 Export resource usage and billing data as a CSV file for analysis, reporting, accounting, or upload into other systems. You decide which columns the file contains, what their headers are called, and in which order they appear. Saved **templates** make the same setup reusable.
 

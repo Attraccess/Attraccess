@@ -1,4 +1,5 @@
 # MQTT-Server einrichten
+<!-- llms-description: So verbinden Sie Attraccess mit einem MQTT-Broker und testen die Verbindung, inklusive gängiger Broker und mehrerer Server. -->
 
 Diese Anleitung erklaert, wie Sie Attraccess mit einem MQTT-Broker verbinden, um MQTT in Ihren Automatisierungs-Flows nutzen zu koennen.
 

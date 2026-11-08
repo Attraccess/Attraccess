@@ -1,4 +1,5 @@
 # Flow-Editor
+<!-- llms-description: So nutzen Sie den visuellen Flow-Editor, um Knoten hinzuzufügen, zu verbinden, zu konfigurieren und automatisch anzuordnen. -->
 
 Der Flow-Editor ist ein visuelles Drag-and-Drop-Werkzeug zum Erstellen von Automatisierungs-Workflows. Er ist über den Tab **Flows** auf jeder Ressourcen-Detailseite erreichbar.
 

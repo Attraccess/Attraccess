@@ -1,4 +1,5 @@
 # E-Mail / SMTP-Konfiguration
+<!-- llms-description: SMTP-Server für Kontobestätigungen, Passwort-Zurücksetzungen und Einladungen konfigurieren, mit Anbieterbeispielen und Test per Mailpit. -->
 
 Attraccess benötigt einen E-Mail-Server (SMTP), um E-Mails zu versenden – zum Beispiel für die Kontobestätigung, Passwort-Zurücksetzungen und Einladungen.
 

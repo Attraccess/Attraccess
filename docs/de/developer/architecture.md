@@ -1,4 +1,5 @@
 # Architektur
+<!-- llms-description: Beschreibt das Attraccess-NX-Monorepo: Anwendungen, Bibliotheken, Datenbank und Authentifizierung. -->
 
 Attraccess ist als NX-Monorepo aufgebaut und enthält mehrere Anwendungen sowie gemeinsam genutzte Bibliotheken. Diese Seite gibt einen Überblick über die Projektorganisation.
 

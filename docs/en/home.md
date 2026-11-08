@@ -1,4 +1,5 @@
 # Attraccess Documentation
+<!-- llms-description: Landing page of the Attraccess documentation: what Attraccess is, who the docs are for, a quick start and a feature overview. -->
 
 Welcome to the official documentation for **Attraccess** – machine access control and resource management for industry, R&D and universities.
 

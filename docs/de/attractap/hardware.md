@@ -1,4 +1,5 @@
 # Attractap Hardware
+<!-- llms-description: Beschreibt die Attractap-Hardwarevarianten, Kernkomponenten, Konnektivität, Firmware-Updates und Montage. -->
 
 Attractap-Leser sind in mehreren Hardwarevarianten verfuegbar. Diese Seite beschreibt die verschiedenen Konfigurationen, ihre Komponenten und Verbindungsmoeglichkeiten.
 

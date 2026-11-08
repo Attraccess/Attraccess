@@ -1,4 +1,5 @@
 # Metriken-Referenz
+<!-- llms-description: Referenz aller Metriken am Endpunkt /api/metrics: HTTP, Authentifizierung, Benutzer, Ressourcen und Attractap-Geräte. -->
 
 Diese Seite listet alle Metriken auf, die Attraccess am `/api/metrics`-Endpunkt bereitstellt. Die Metriken verwenden das [Prometheus-Exposition-Format](https://prometheus.io/docs/instrumenting/exposition_formats/).
 

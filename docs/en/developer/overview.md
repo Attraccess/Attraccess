@@ -1,4 +1,5 @@
 # Developer Overview
+<!-- llms-description: Developer entry point: tech stack, prerequisites, getting started, development workflow, project structure and useful commands. -->
 
 This guide helps you get started with Attraccess development. Attraccess is a source-available web application for machine access control and resource management in industry, R&D and universities.
 

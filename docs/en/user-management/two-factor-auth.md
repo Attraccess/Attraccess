@@ -1,4 +1,5 @@
 # Two-Factor Authentication
+<!-- llms-description: How TOTP-based two-factor authentication works and how to enable, use and disable it in Attraccess. -->
 
 Attraccess supports two-factor authentication (2FA) via TOTP (Time-based One-Time Password). This requires an additional security code when logging in.
 

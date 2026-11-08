@@ -1,4 +1,5 @@
 # Reader-Sicherheit (Secure-Boot-Schlüssel)
+<!-- llms-description: Wie Attractap-Touch-V2-Leser abgesichert werden, damit sie nur mit Ihren Secure-Boot-Schlüsseln signierte Firmware akzeptieren; mit Backup. -->
 
 Attractap-Touch-V2-Reader können **abgesichert** werden: Danach akzeptieren sie nur noch Firmware, die
 von _deiner_ Installation signiert ist, ihr Flash ist verschlüsselt und ihre Server-Identität ist an den

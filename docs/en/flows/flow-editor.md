@@ -1,4 +1,5 @@
 # Flow Editor
+<!-- llms-description: How to use the visual flow editor to add, connect and configure nodes and auto-layout automation workflows. -->
 
 The Flow Editor is a visual drag-and-drop tool for building automation workflows. It is accessible from the **Flows** tab on any resource detail page.
 

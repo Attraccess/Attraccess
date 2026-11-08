@@ -1,4 +1,5 @@
 # Architecture
+<!-- llms-description: Describes the Attraccess NX monorepo: applications, libraries, database, authentication and NestJS API conventions. -->
 
 Attraccess is structured as an NX monorepo containing multiple applications and shared libraries. This page provides an overview of the project organization.
 

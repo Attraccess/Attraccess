@@ -1,4 +1,5 @@
 # Introductions
+<!-- llms-description: Explains introductions (safety briefings that grant access to a resource), their roles, and how to grant, revoke and manage them. -->
 
 An introduction is a safety briefing that grants a user access to a resource. Before a user can start a usage session, they must be introduced to the resource (or to a group that contains the resource).
 

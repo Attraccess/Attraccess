@@ -1,4 +1,5 @@
 # Plugins entwickeln
+<!-- llms-description: Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks. -->
 
 Attraccess stellt SDKs für die Entwicklung eigener Plugins bereit. Sie können Frontend-Erweiterungen, Backend-Erweiterungen oder beides erstellen.
 

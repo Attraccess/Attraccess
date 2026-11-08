@@ -1,4 +1,5 @@
 # Mein Konto
+<!-- llms-description: So verwalten Sie Ihr eigenes Konto: Profil, Sicherheit, RFID-Karten und Konto löschen. -->
 
 Verwalten Sie Ihre persönlichen Kontoeinstellungen in Attraccess. Sie erreichen Ihre Kontoeinstellungen, indem Sie auf Ihr Profilsymbol in der oberen rechten Ecke klicken.
 Suchen Sie eine Einstellung über das Suchfeld und öffnen Sie dann den zugehörigen Eintrag. Die Einstellungen sind nach Identität, Anmeldung und Zugriff, Einstellungen sowie erweiterten Aktionen gruppiert.

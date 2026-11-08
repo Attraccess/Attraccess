@@ -1,4 +1,5 @@
 # Usage Tracking
+<!-- llms-description: How usage sessions are started, ended, shared between users, linked to projects and reviewed in the usage history. -->
 
 Attraccess tracks who uses which resource and when. Every usage session is recorded in the resource's usage history.
 

@@ -1,4 +1,5 @@
 # Formulare
+<!-- llms-description: Stellt Formulare vor, die bei der Ressourcennutzung abgefragt werden, inklusive Anzeigezeitpunkten, Feldtypen und Einreichungen. -->
 
 Mit Formularen können Sie Informationen von Benutzern erfassen, wenn diese mit einer Ressource interagieren. Jedes Formular ist an eine bestimmte Ressource gebunden und kann zu verschiedenen Zeitpunkten während einer Nutzungssitzung angezeigt werden.
 

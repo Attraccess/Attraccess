@@ -1,4 +1,5 @@
 # Attractap Setup
+<!-- llms-description: Guide to connect a new Attractap reader to your network, pair it with Attraccess and assign resources to it. -->
 
 This guide walks you through pairing a new Attractap reader in Attraccess and assigning it to a resource.
 

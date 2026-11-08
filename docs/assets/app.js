@@ -75,6 +75,7 @@ window.$docsify = {
   routerMode: 'hash',
   plugins: [
     function (hook, vm) {
+      hideDescriptionsFromSearch();
       hook.doneEach(function () {
         updateLangSwitcher();
       });
@@ -82,7 +83,54 @@ window.$docsify = {
   ],
 };
 
+// The search plugin indexes raw page text, including the hidden llms.txt description comments.
+// Strip them from the text it fetches so they never show up in results or snippets.
+function hideDescriptionsFromSearch() {
+  var originalGet = window.Docsify.get;
+  window.Docsify.get = function () {
+    var request = originalGet.apply(this, arguments);
+    return {
+      then: function (onSuccess, onError) {
+        return request.then(function (text) {
+          return onSuccess(String(text).replace(/<!--\s*llms-description:[\s\S]*?-->\s*\n?/g, ''));
+        }, onError);
+      },
+    };
+  };
+}
+
 // ===== Language Switching =====
+// Returns true when the language changes (the page then reloads after delayMs).
+function setLanguage(lang, delayMs) {
+  if (['de', 'en'].indexOf(lang) === -1 || lang === currentLang) return false;
+  localStorage.setItem('attraccess-docs-lang', lang);
+  window.setTimeout(function () {
+    window.location.reload();
+  }, delayMs || 0);
+  return true;
+}
+
+// Opens a docs page by its language-prefixed path (e.g. "en/getting-started/overview.md").
+// Other-language pages use the "#/<lang>/..." hash handled at load, followed by a reload.
+function navigateDocs(path) {
+  var parts = /^(de|en)\/(.*?)(\.md)?$/.exec(path);
+  if (!parts) return false;
+  var sameLang = parts[1] === currentLang;
+  window.location.hash = '#/' + (sameLang ? '' : parts[1] + '/') + (parts[2] === 'home' ? '' : parts[2]);
+  if (!sameLang) setLanguage(parts[1], 150);
+  return !sameLang;
+}
+
+// Small API for scripts such as webmcp.js
+window.AttraccessDocs = {
+  docsBase: docsBase,
+  getLanguage: function () {
+    return currentLang;
+  },
+  setLanguage: setLanguage,
+  navigate: navigateDocs,
+};
+
 function updateLangSwitcher() {
   var links = document.querySelectorAll('.lang-switcher a');
   links.forEach(function (link) {
@@ -95,9 +143,8 @@ document.getElementById('langSwitcher').addEventListener('click', function (e) {
   e.preventDefault();
   var langEl = e.target.closest ? e.target.closest('a[data-lang]') : e.target;
   var lang = langEl ? langEl.getAttribute('data-lang') : null;
-  if (!lang || lang === currentLang) return;
-  localStorage.setItem('attraccess-docs-lang', lang);
-  window.location.reload();
+  if (!lang) return;
+  setLanguage(lang, 0);
 });
 
 // ===== Theme Toggle — set on html element =====

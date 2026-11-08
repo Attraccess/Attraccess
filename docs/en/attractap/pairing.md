@@ -1,4 +1,5 @@
 # Reader Pairing and Encrypted Connection
+<!-- llms-description: How a reader joins an installation with one admin approval, reader states, re-pairing and the encrypted connection. -->
 
 A new Attractap reader joins your installation through **one approval by an admin**. The reader
 shows a short code that changes every 30 seconds (Touch readers on the screen and as a QR code,

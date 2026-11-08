@@ -1,4 +1,5 @@
 # Using the Attractap Reader
+<!-- llms-description: How to use an Attractap touch reader: sign in with a card, start or stop machines, open doors, view usage and complete forms. -->
 
 Use your RFID card and the Attractap touch display to start or stop a machine, open a door, or request supervision. The reader shows the machines and doors assigned to it and the actions available to you.
 

@@ -1,4 +1,5 @@
 # Overview
+<!-- llms-description: Introduces Attraccess as a source-available platform for machine access control, with its key features, technology stack and licensing. -->
 
 ## What is Attraccess?
 

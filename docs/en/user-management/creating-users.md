@@ -1,4 +1,5 @@
 # Creating Users
+<!-- llms-description: The ways users get an account: self-registration, SSO registration, project invitations and creation by an administrator. -->
 
 There are several ways to create new users in Attraccess.
 

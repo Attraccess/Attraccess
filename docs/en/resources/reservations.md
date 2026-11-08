@@ -1,4 +1,5 @@
 # Reservations
+<!-- llms-description: The Reservations plugin lets members book a resource for a time window; covers member use, administration and the API. -->
 
 The **Reservations** plugin lets members book a resource for a specific time window in advance. While a booking is
 active, nobody else can start the resource. Starting shortly before someone else's booking asks for a confirmation.

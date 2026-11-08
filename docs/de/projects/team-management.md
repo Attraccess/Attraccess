@@ -1,4 +1,5 @@
 # Teamverwaltung
+<!-- llms-description: Mitglieder zu einem Projekt einladen, Einladungen annehmen, Teamrollen verwalten und Mitglieder entfernen. -->
 
 Projekte unterstützen teambasierte Zusammenarbeit. Sie können Mitglieder einladen, Rollen verwalten und koordinieren, wer an Ihrem Projekt arbeitet.
 

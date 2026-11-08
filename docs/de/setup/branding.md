@@ -1,4 +1,5 @@
 # Erscheinungsbild
+<!-- llms-description: Anwendungs-URL, Logo und Name, Farbmodus und E-Mail-Layout an das Erscheinungsbild Ihrer Organisation anpassen. -->
 
 Attraccess kann an das Erscheinungsbild Ihrer Organisation angepasst werden.
 

@@ -1,4 +1,5 @@
 # Überblick
+<!-- llms-description: Stellt Attraccess als Plattform mit öffentlich einsehbarem Quellcode für Maschinenzugang vor, mit Hauptfunktionen, Technologie und Lizenzierung. -->
 
 ## Was ist Attraccess?
 

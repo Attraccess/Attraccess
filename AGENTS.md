@@ -5,6 +5,7 @@ RULES:
 - do not commit auto-generated code (e.g. react-query api client)
 - do not manually modify the CHANGELOG.md, it is auto generated
 - do not commit specs/plan files, repo is code/docs only.
+- every page linked from a docs sidebar needs `<!-- llms-description: <one sentence> -->` directly below its H1, written in the page's language. After any sidebar or description change run `node scripts/generate-llms-txt.mjs` and commit `docs/llms.txt` (it is a published file, not generated code); CI fails otherwise.
 
 ## Worktree Bootstrap
 

@@ -1,4 +1,5 @@
 # Den Attractap-Leser benutzen
+<!-- llms-description: So bedienen Sie den Attractap-Touchleser: mit Karte anmelden, Maschinen starten oder beenden, Türen öffnen und Formulare ausfüllen. -->
 
 Mit Ihrer RFID-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
 

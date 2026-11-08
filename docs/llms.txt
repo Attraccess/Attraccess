@@ -1,0 +1,251 @@
+# Attraccess
+
+> Attraccess is source-available machine access control and resource management software for industry, R&D and universities. It is self-hosted and combines Attractap RFID readers, flows, billing and plugins.
+
+The documentation pages are plain Markdown files. English pages live under https://docs.attraccess.org/en/, German pages under https://docs.attraccess.org/de/. The documentation site is https://docs.attraccess.org/.
+
+## English
+- [Home](https://docs.attraccess.org/en/home.md): Landing page of the Attraccess documentation: what Attraccess is, who the docs are for, a quick start and a feature overview.
+
+## English: Getting Started
+- [Overview](https://docs.attraccess.org/en/getting-started/overview.md): Introduces Attraccess as a source-available platform for machine access control, with its key features, technology stack and licensing.
+- [System Requirements](https://docs.attraccess.org/en/getting-started/requirements.md): Lists the server, network, client and optional component requirements for running Attraccess as a Docker container.
+- [Quick Start](https://docs.attraccess.org/en/getting-started/quick-start.md): Step-by-step guide to get Attraccess running in minutes with Docker Compose and complete the first-time setup.
+
+## English: Installation
+- [Docker Compose](https://docs.attraccess.org/en/installation/docker-compose.md): Recommended production installation of Attraccess with Docker Compose, including project directory, environment variables and first start.
+- [Portainer](https://docs.attraccess.org/en/installation/portainer.md): Installs Attraccess as a stack in Portainer, including environment variables, deployment, first-time setup and stack updates.
+- [Environment Variables](https://docs.attraccess.org/en/installation/environment-variables.md): Reference of all environment variables that configure Attraccess: required settings, application, logging, storage, SMTP and TLS.
+- [SSL Setup](https://docs.attraccess.org/en/installation/ssl-setup.md): How to serve Attraccess over HTTPS using a reverse proxy, self-signed or custom certificates, and what SSO requires.
+- [Updating](https://docs.attraccess.org/en/installation/updating.md): How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, or pin a specific version.
+- [Backup & Restore](https://docs.attraccess.org/en/installation/backup-restore.md): Explains what Attraccess data to back up, how to create a backup and how to restore it.
+
+## English: First-Time Setup
+- [Setup Wizard](https://docs.attraccess.org/en/setup/first-time-setup.md): Walks through the first-run setup wizard: application settings, email settings, administrator account and email verification.
+- [Email / SMTP](https://docs.attraccess.org/en/setup/smtp-email.md): Configure the SMTP email server Attraccess uses for verification, password resets and invitations, with provider examples and Mailpit testing.
+- [Email Templates](https://docs.attraccess.org/en/setup/email-templates.md): Manage and customize the email templates Attraccess sends, including available templates, plugin templates and placeholders.
+- [Branding](https://docs.attraccess.org/en/setup/branding.md): Customize the application URL, logo and name, color mode and email layout to match your organization.
+
+## English: User Management
+- [Overview](https://docs.attraccess.org/en/user-management/overview.md): Overview of user management: creating accounts, assigning permissions and configuring login methods as an administrator.
+- [Creating Users](https://docs.attraccess.org/en/user-management/creating-users.md): The ways users get an account: self-registration, SSO registration, project invitations and creation by an administrator.
+- [Permissions](https://docs.attraccess.org/en/user-management/permissions.md): Explains the role-based permission model, default roles, permission keys, assigning roles and SSO-managed roles.
+- [SSO Overview](https://docs.attraccess.org/en/user-management/sso-overview.md): Overview of Single Sign-On with OIDC and SAML: prerequisites, providers, auto-discovery, permission mapping and account linking.
+- [OIDC Setup](https://docs.attraccess.org/en/user-management/sso-oidc.md): How to create and configure an OpenID Connect SSO provider, including the callback URL and testing the login.
+- [SAML Setup](https://docs.attraccess.org/en/user-management/sso-saml.md): How to create and configure a SAML SSO provider, including service provider metadata and testing the login.
+- [Two-Factor Authentication](https://docs.attraccess.org/en/user-management/two-factor-auth.md): How TOTP-based two-factor authentication works and how to enable, use and disable it in Attraccess.
+
+## English: Resources
+- [Overview](https://docs.attraccess.org/en/resources/overview.md): Introduces resources, the core of Attraccess: machines, tools and equipment whose access and usage you manage, and their types.
+- [Creating Resources](https://docs.attraccess.org/en/resources/creating-resources.md): How to create, edit and delete a resource, which requires the Manage Resources permission.
+- [Detail Page](https://docs.attraccess.org/en/resources/resource-details.md): Describes the resource detail page, which brings all information and management functions of a resource together.
+- [Groups](https://docs.attraccess.org/en/resources/resource-groups.md): How resource groups combine several resources so introductions can be managed at the group level.
+- [Documentation](https://docs.attraccess.org/en/resources/documentation.md): How to attach documentation to a resource so users can operate it safely, including documentation types and viewing them.
+- [Introductions](https://docs.attraccess.org/en/resources/introductions.md): Explains introductions (safety briefings that grant access to a resource), their roles, and how to grant, revoke and manage them.
+- [Maintenance](https://docs.attraccess.org/en/resources/maintenance.md): Track resource maintenance with manual records and automated maintenance schedules, including the required permissions.
+- [Reservations](https://docs.attraccess.org/en/resources/reservations.md): The Reservations plugin lets members book a resource for a time window; covers member use, administration and the API.
+- [Usage Tracking](https://docs.attraccess.org/en/resources/usage-tracking.md): How usage sessions are started, ended, shared between users, linked to projects and reviewed in the usage history.
+- [CSV Export](https://docs.attraccess.org/en/resources/csv-export.md): Export resource usage and billing data as CSV: permissions, choosing columns, templates, available fields and file format.
+
+## English: Flows & Automation
+- [Overview](https://docs.attraccess.org/en/flows/overview.md): Introduces flows, visual automations for resources, with use cases, resource versus global flows and creating a first flow.
+- [Flow Editor](https://docs.attraccess.org/en/flows/flow-editor.md): How to use the visual flow editor to add, connect and configure nodes and auto-layout automation workflows.
+- [Payloads, Variables & Templates](https://docs.attraccess.org/en/flows/payloads-variables-templates.md): Explains flow payloads, trigger data, templates, arithmetic and unit conversion, and persistent flow variables.
+- [Global Flows](https://docs.attraccess.org/en/flows/global-flows.md): Global flows run independently of one resource and react to any resource, MQTT, Companion or variables; covers nodes and triggers.
+- [Node Types](https://docs.attraccess.org/en/flows/node-types.md): Reference of all built-in flow nodes, grouped into input triggers, processing nodes and output actions.
+- [Meters](https://docs.attraccess.org/en/flows/energy-metering.md): Named meters per resource for electricity, water or any value, with cumulative counters, session boundaries and optional billing.
+
+## English: Forms
+- [Overview](https://docs.attraccess.org/en/forms/overview.md): Introduces forms collected from users at points of resource use, including when forms are shown, field types and submissions.
+- [Creating Forms](https://docs.attraccess.org/en/forms/creating-forms.md): How to create, edit and delete forms and their fields for a resource, which requires the Manage Resources permission.
+
+## English: Projects
+- [Overview](https://docs.attraccess.org/en/projects/overview.md): Introduces projects that group usage sessions across resources under a common purpose and for collaborating teams.
+- [Creating Projects](https://docs.attraccess.org/en/projects/creating-projects.md): How any logged-in user can create, edit and delete a project.
+- [Team Management](https://docs.attraccess.org/en/projects/team-management.md): Invite members to a project, accept invitations, manage team roles and remove members.
+
+## English: Attractap RFID Reader
+- [Overview](https://docs.attraccess.org/en/attractap/overview.md): Introduces Attractap, the ESP32-based RFID reader for machine and door access, with features, workflow and hardware variants.
+- [Using the Reader](https://docs.attraccess.org/en/attractap/using-the-reader.md): How to use an Attractap touch reader: sign in with a card, start or stop machines, open doors, view usage and complete forms.
+- [Hardware](https://docs.attraccess.org/en/attractap/hardware.md): Describes the Attractap hardware variants, core components, connectivity, firmware updates and mounting.
+- [Setup](https://docs.attraccess.org/en/attractap/setup.md): Guide to connect a new Attractap reader to your network, pair it with Attraccess and assign resources to it.
+- [Reader Pairing](https://docs.attraccess.org/en/attractap/pairing.md): How a reader joins an installation with one admin approval, reader states, re-pairing and the encrypted connection.
+- [RFID Cards](https://docs.attraccess.org/en/attractap/rfid-cards.md): How RFID cards link to user accounts, how to manage cards, supported card types and which readers may enroll or reset cards.
+- [Firmware Updates](https://docs.attraccess.org/en/attractap/firmware-updates.md): How Attractap readers receive over-the-air firmware updates from the Attraccess backend, firmware variants and troubleshooting.
+- [Reader Security](https://docs.attraccess.org/en/attractap/reader-security.md): How to secure Attractap Touch V2 readers so they only accept firmware signed with your own Secure Boot keys, including backup and restore.
+- [Reader Display](https://docs.attraccess.org/en/attractap/reader-ui.md): How plugins show notes and prompts on Attractap reader screens, which readers support them, and the related admin settings and alerts.
+- [LED Guide (Lite)](https://docs.attraccess.org/en/attractap/led-guide.md): Explains the LED ring animations and one-time feedback signals of the display-less Attractap Lite reader.
+
+## English: Devices
+- [MQTT](https://docs.attraccess.org/en/devices/mqtt/overview.md): Introduces MQTT and IoT: why use MQTT with Attraccess, how it works and how it integrates with flows.
+- [MQTT Server Setup](https://docs.attraccess.org/en/devices/mqtt/server-setup.md): How to add and test an MQTT broker connection in Attraccess, including common brokers, multiple servers and connection status.
+- [MQTT Examples](https://docs.attraccess.org/en/devices/mqtt/examples.md): Practical MQTT examples: relay power control, receiving sensor data and using MQTT in flows for resource usage events.
+- [Guided WAGO CC100 Commissioning](https://docs.attraccess.org/en/devices/wago-cc100-commissioning.md): Guide to commission a WAGO CC100 controller in an on-premises, air-gapped installation, including MQTT claim and recovery.
+- [WAGO CC100 Docker Runtime](https://docs.attraccess.org/en/devices/wago-cc100-runtime.md): Configure the WAGO CC100 Docker runtime: terminals and live controls, MQTT server or SSH address changes, and deployment paths.
+- [WAGO Production Support](https://docs.attraccess.org/en/devices/wago-production-support.md): States tested WAGO CC100 compatibility, broker settings, enforced and measured limits, runbooks and what is not promised.
+- [WAGO Recovery Runbooks](https://docs.attraccess.org/en/devices/wago-recovery-runbooks.md): Six runbooks for operating the WAGO CC100 integration, such as credential compromise, broker outage and controller replacement.
+- [WAGO Threat Model and Pen-Test Brief](https://docs.attraccess.org/en/devices/wago-threat-model.md): Threat model and pen-test brief for the WAGO CC100 integration, covering actors, trust boundaries and attack surfaces.
+- [WAGO Safety Boundary](https://docs.attraccess.org/en/devices/wago-safety-boundary.md): States that the WAGO integration is for operational control, not a safety function, with a wording checklist for reviewers.
+- [Matter: Architecture](https://docs.attraccess.org/en/devices/matter/architecture.md): Architecture of the Matter integration: a plugin plus a sidecar, versioned REST and WebSocket contract, errors and events.
+- [Matter: Operator Guide](https://docs.attraccess.org/en/devices/matter/operator.md): Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation.
+
+## English: Billing
+- [Overview](https://docs.attraccess.org/en/billing/overview.md): Introduces billing: how credits are deducted for resource usage, the credit system, payment integration and required permission.
+- [Configuration](https://docs.attraccess.org/en/billing/configuration.md): How to enable billing per resource, choose billing models, bill metered consumption and manage user credit balances.
+- [Transactions](https://docs.attraccess.org/en/billing/transactions.md): How to view, filter and inspect credit transactions in the billing dashboard and which permission is required.
+
+## English: Plugins
+- [Overview](https://docs.attraccess.org/en/plugins/overview.md): Introduces the plugin system that extends Attraccess with frontend pages and backend endpoints, plugin management and SDKs.
+- [Installing Plugins](https://docs.attraccess.org/en/plugins/installing-plugins.md): How to upload, enable, disable and remove plugins in the web interface, with troubleshooting.
+- [Developing Plugins](https://docs.attraccess.org/en/plugins/developing-plugins.md): Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration.
+- [Database Migrations](https://docs.attraccess.org/en/plugins/database-migrations.md): How a plugin ships TypeORM migrations for its own tables: declaring, writing and bundling the migrations entry.
+
+## English: Monitoring & Metrics
+- [Overview](https://docs.attraccess.org/en/monitoring/overview.md): Overview of built-in Prometheus metrics and Grafana dashboards for monitoring Attraccess, with security notes.
+- [Setup](https://docs.attraccess.org/en/monitoring/setup.md): How to enable the metrics endpoint and generate the API key Prometheus uses to scrape Attraccess.
+- [Prometheus & Grafana](https://docs.attraccess.org/en/monitoring/prometheus-grafana.md): Set up Prometheus and Grafana with Attraccess's bundled dashboards on Coolify or manual Docker Compose, including bearer token and provisioning.
+- [Metrics Reference](https://docs.attraccess.org/en/monitoring/metrics-reference.md): Reference of all metrics at the /api/metrics endpoint: HTTP, authentication, user, resource and Attractap device metrics.
+
+## English: System Settings
+- [Overview](https://docs.attraccess.org/en/settings/overview.md): Administrator overview of System Settings: application settings, resource activity visibility, email and additional settings.
+- [Security](https://docs.attraccess.org/en/settings/security.md): Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting.
+- [Audit log](https://docs.attraccess.org/en/settings/audit-log.md): How to browse, filter, inspect and export the audit log of recorded activity and control recording and retention.
+
+## English: Developer Guide
+- [Overview](https://docs.attraccess.org/en/developer/overview.md): Developer entry point: tech stack, prerequisites, getting started, development workflow, project structure and useful commands.
+- [Architecture](https://docs.attraccess.org/en/developer/architecture.md): Describes the Attraccess NX monorepo: applications, libraries, database, authentication and NestJS API conventions.
+- [API Log Destinations](https://docs.attraccess.org/en/developer/logging.md): How the API routes logs to destinations with RoutedLogger, including registering a driver and startup ownership.
+- [API Reference](https://docs.attraccess.org/en/developer/api-reference.md): Describes the REST API and its OpenAPI docs, the generated API client and React Query hooks, authentication and key modules.
+- [AI Agents (llms.txt & WebMCP)](https://docs.attraccess.org/en/developer/ai-agents.md): Explains the llms.txt index and the experimental WebMCP tools of the docs site, how to try them in Chrome and how to add pages.
+- [Contributing](https://docs.attraccess.org/en/developer/contributing.md): How to contribute to Attraccess: forking, branching, code style, testing, issue tracking and reporting bugs.
+
+## English: End User Guide
+- [Overview](https://docs.attraccess.org/en/end-user/overview.md): Starting page of the end user guide for operators, employees, researchers and students who use machines through Attraccess.
+- [Logging In](https://docs.attraccess.org/en/end-user/login.md): The ways to log in to Attraccess: password, SSO, two-factor authentication, registration and password reset.
+- [My Account](https://docs.attraccess.org/en/end-user/account.md): How to manage your own account: profile, security, RFID cards and account deletion.
+- [Using Resources](https://docs.attraccess.org/en/end-user/using-resources.md): How to find resources, get introduced, start supervised sessions and start and end usage sessions.
+- [Mobile Usage (PWA)](https://docs.attraccess.org/en/end-user/mobile-pwa.md): How to install Attraccess as a Progressive Web App on iOS and Android, with updates and offline support.
+
+## English: FAQ & Help
+- [Common Issues](https://docs.attraccess.org/en/faq/common-issues.md): Common problems and fixes, such as SSO login failures, emails not sending, resource access, RFID cards and database issues.
+- [Glossary](https://docs.attraccess.org/en/faq/glossary.md): Glossary of key terms used across the Attraccess documentation, covering general, hardware, protocol and web terms.
+
+## Deutsch
+- [Startseite](https://docs.attraccess.org/de/home.md): Startseite der Attraccess-Dokumentation: Was Attraccess ist, für wen die Doku gedacht ist, Schnelleinstieg und Funktionsübersicht.
+
+## Deutsch: Erste Schritte
+- [Überblick](https://docs.attraccess.org/de/getting-started/overview.md): Stellt Attraccess als Plattform mit öffentlich einsehbarem Quellcode für Maschinenzugang vor, mit Hauptfunktionen, Technologie und Lizenzierung.
+- [Systemanforderungen](https://docs.attraccess.org/de/getting-started/requirements.md): Listet die Server-, Netzwerk-, Client- und optionalen Anforderungen für den Betrieb von Attraccess als Docker-Container auf.
+- [Schnellstart](https://docs.attraccess.org/de/getting-started/quick-start.md): Anleitung, um Attraccess in wenigen Minuten mit Docker Compose zu starten und die Ersteinrichtung abzuschließen.
+
+## Deutsch: Installation
+- [Docker Compose](https://docs.attraccess.org/de/installation/docker-compose.md): Empfohlene Produktivinstallation von Attraccess mit Docker Compose, inklusive Projektverzeichnis, Umgebungsvariablen und erstem Start.
+- [Portainer](https://docs.attraccess.org/de/installation/portainer.md): Installation von Attraccess als Stack in Portainer, inklusive Umgebungsvariablen, Deployment, Ersteinrichtung und Stack-Update.
+- [Umgebungsvariablen](https://docs.attraccess.org/de/installation/environment-variables.md): Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Speicher, SMTP und TLS.
+- [SSL einrichten](https://docs.attraccess.org/de/installation/ssl-setup.md): Wie Attraccess per HTTPS bereitgestellt wird: Reverse Proxy, selbst-signierte oder eigene Zertifikate und Anforderungen für SSO.
+- [Aktualisierung](https://docs.attraccess.org/de/installation/updating.md): So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer oder legen eine feste Version fest.
+- [Backup & Wiederherstellung](https://docs.attraccess.org/de/installation/backup-restore.md): Erklärt, welche Attraccess-Daten gesichert werden, wie Sie ein Backup erstellen und wiederherstellen.
+
+## Deutsch: Ersteinrichtung
+- [Einrichtungsassistent](https://docs.attraccess.org/de/setup/first-time-setup.md): Führt durch den Einrichtungsassistenten beim ersten Start: Anwendungs- und E-Mail-Einstellungen, Administrator-Konto und E-Mail-Bestätigung.
+- [E-Mail / SMTP](https://docs.attraccess.org/de/setup/smtp-email.md): SMTP-Server für Kontobestätigungen, Passwort-Zurücksetzungen und Einladungen konfigurieren, mit Anbieterbeispielen und Test per Mailpit.
+- [E-Mail-Vorlagen](https://docs.attraccess.org/de/setup/email-templates.md): E-Mail-Vorlagen von Attraccess verwalten und anpassen, inklusive verfügbarer Vorlagen, Plugin-Vorlagen und Platzhalter.
+- [Erscheinungsbild](https://docs.attraccess.org/de/setup/branding.md): Anwendungs-URL, Logo und Name, Farbmodus und E-Mail-Layout an das Erscheinungsbild Ihrer Organisation anpassen.
+
+## Deutsch: Benutzerverwaltung
+- [Überblick](https://docs.attraccess.org/de/user-management/overview.md): Überblick über die Benutzerverwaltung: Konten anlegen, Berechtigungen vergeben und Anmeldemethoden als Administrator konfigurieren.
+- [Benutzer anlegen](https://docs.attraccess.org/de/user-management/creating-users.md): Die Wege zu einem Benutzerkonto: Selbstregistrierung, SSO-Registrierung, Projekteinladungen und Anlegen durch einen Administrator.
+- [Berechtigungen](https://docs.attraccess.org/de/user-management/permissions.md): Erklärt die vier Systemberechtigungen, wie Administratoren sie vergeben, SSO-verwaltete Berechtigungen und Zugriff auf fremde RFID-Karten.
+- [SSO Überblick](https://docs.attraccess.org/de/user-management/sso-overview.md): Überblick über Single Sign-On mit OIDC und SAML: Voraussetzungen, Anbieter, automatische Erkennung, Berechtigungszuordnung und Kontoverknüpfung.
+- [OIDC einrichten](https://docs.attraccess.org/de/user-management/sso-oidc.md): So legen Sie einen OpenID-Connect-SSO-Anbieter an und konfigurieren ihn, inklusive Callback-URL und Test der Anmeldung.
+- [SAML einrichten](https://docs.attraccess.org/de/user-management/sso-saml.md): So legen Sie einen SAML-SSO-Anbieter an und konfigurieren ihn, inklusive Service-Provider-Metadaten und Test der Anmeldung.
+- [Zwei-Faktor-Authentifizierung](https://docs.attraccess.org/de/user-management/two-factor-auth.md): Wie die TOTP-basierte Zwei-Faktor-Authentifizierung funktioniert und wie Sie sie in Attraccess aktivieren, nutzen und deaktivieren.
+
+## Deutsch: Ressourcen
+- [Überblick](https://docs.attraccess.org/de/resources/overview.md): Stellt Ressourcen als Kern von Attraccess vor: Maschinen, Geräte und Werkzeuge, deren Zugang und Nutzung Sie verwalten, und ihre Typen.
+- [Ressourcen erstellen](https://docs.attraccess.org/de/resources/creating-resources.md): So legen Sie eine Ressource an, bearbeiten und löschen sie; erfordert die Berechtigung Ressourcen verwalten.
+- [Detailseite](https://docs.attraccess.org/de/resources/resource-details.md): Beschreibt die Detailseite einer Ressource, die alle Informationen und Verwaltungsfunktionen an einem Ort bündelt.
+- [Gruppen](https://docs.attraccess.org/de/resources/resource-groups.md): Wie Ressourcengruppen mehrere Ressourcen zusammenfassen, damit Einweisungen auf Gruppenebene verwaltet werden können.
+- [Dokumentation](https://docs.attraccess.org/de/resources/documentation.md): Wie Sie einer Ressource Dokumentation für die sichere Bedienung hinzufügen, inklusive Dokumentationstypen und Anzeige.
+- [Einweisungen](https://docs.attraccess.org/de/resources/introductions.md): Erklärt Einweisungen (Sicherheitsunterweisungen für den Zugang zu einer Ressource), ihre Rollen sowie Erteilen, Entziehen und Verwalten.
+- [Wartung](https://docs.attraccess.org/de/resources/maintenance.md): Wartung von Ressourcen mit manuellen Einträgen und automatisierten Wartungsplänen nachverfolgen, inklusive nötiger Berechtigungen.
+- [Reservierungen](https://docs.attraccess.org/de/resources/reservations.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; behandelt Nutzung, Administration und API.
+- [Nutzungsverfolgung](https://docs.attraccess.org/de/resources/usage-tracking.md): Wie Nutzungssitzungen gestartet, beendet, gemeinsam genutzt, mit Projekten verknüpft und in der Nutzungshistorie eingesehen werden.
+- [CSV-Export](https://docs.attraccess.org/de/resources/csv-export.md): Nutzungs- und Abrechnungsdaten als CSV exportieren: Berechtigungen, Spalten, Vorlagen, verfügbare Felder und Dateiformat.
+
+## Deutsch: Flows & Automatisierung
+- [Überblick](https://docs.attraccess.org/de/flows/overview.md): Stellt Flows als visuelle Automatisierungen vor, mit Anwendungsfällen, Ressourcen- und globalen Flows und dem ersten Flow.
+- [Flow-Editor](https://docs.attraccess.org/de/flows/flow-editor.md): So nutzen Sie den visuellen Flow-Editor, um Knoten hinzuzufügen, zu verbinden, zu konfigurieren und automatisch anzuordnen.
+- [Payloads, Variablen & Vorlagen](https://docs.attraccess.org/de/flows/payloads-variables-templates.md): Erklärt Flow-Payloads, Trigger-Daten, Vorlagen, Arithmetik, Einheitenumrechnung und dauerhaft gespeicherte Flow-Variablen.
+- [Globale Flows](https://docs.attraccess.org/de/flows/global-flows.md): Globale Flows laufen unabhängig von einer Ressource und reagieren auf jede Ressource, MQTT, Companion oder Variablen; mit Knoten und Triggern.
+- [Knotentypen](https://docs.attraccess.org/de/flows/node-types.md): Referenz aller eingebauten Flow-Knoten, gegliedert in Eingabe-Trigger, Verarbeitungs-Knoten und Ausgabe-Aktionen.
+- [Zähler](https://docs.attraccess.org/de/flows/energy-metering.md): Benannte Zähler pro Ressource für Strom, Wasser oder beliebige Werte, mit Sitzungsgrenzen, kumulativen Zählern und optionaler Abrechnung.
+
+## Deutsch: Formulare
+- [Überblick](https://docs.attraccess.org/de/forms/overview.md): Stellt Formulare vor, die bei der Ressourcennutzung abgefragt werden, inklusive Anzeigezeitpunkten, Feldtypen und Einreichungen.
+- [Formulare erstellen](https://docs.attraccess.org/de/forms/creating-forms.md): So erstellen, bearbeiten und löschen Sie Formulare und Felder einer Ressource; erfordert die Berechtigung Ressourcen verwalten.
+
+## Deutsch: Projekte
+- [Überblick](https://docs.attraccess.org/de/projects/overview.md): Stellt Projekte vor, die Nutzungssitzungen über Ressourcen hinweg unter einem gemeinsamen Zweck bündeln und Teams zusammenbringen.
+- [Projekte erstellen](https://docs.attraccess.org/de/projects/creating-projects.md): So kann jeder angemeldete Benutzer ein Projekt erstellen, bearbeiten und löschen.
+- [Teamverwaltung](https://docs.attraccess.org/de/projects/team-management.md): Mitglieder zu einem Projekt einladen, Einladungen annehmen, Teamrollen verwalten und Mitglieder entfernen.
+
+## Deutsch: Attractap RFID-Leser
+- [Überblick](https://docs.attraccess.org/de/attractap/overview.md): Stellt Attractap vor, den ESP32-basierten RFID-Leser für Maschinen- und Türzugang, mit Funktionen, Ablauf und Hardware-Varianten.
+- [Leser benutzen](https://docs.attraccess.org/de/attractap/using-the-reader.md): So bedienen Sie den Attractap-Touchleser: mit Karte anmelden, Maschinen starten oder beenden, Türen öffnen und Formulare ausfüllen.
+- [Hardware](https://docs.attraccess.org/de/attractap/hardware.md): Beschreibt die Attractap-Hardwarevarianten, Kernkomponenten, Konnektivität, Firmware-Updates und Montage.
+- [Einrichtung](https://docs.attraccess.org/de/attractap/setup.md): Anleitung, einen neuen Attractap-Leser mit dem Netzwerk zu verbinden, mit Attraccess zu koppeln und Ressourcen zuzuweisen.
+- [Reader koppeln](https://docs.attraccess.org/de/attractap/pairing.md): Wie ein Leser mit einer Admin-Freigabe in die Installation aufgenommen wird: Status, erneutes Koppeln und verschlüsselte Verbindung.
+- [RFID-Karten](https://docs.attraccess.org/de/attractap/rfid-cards.md): Wie RFID-Karten mit Benutzerkonten verknüpft sind, Kartenverwaltung, Kartentypen und welche Leser Karten registrieren oder zurücksetzen dürfen.
+- [Firmware-Updates](https://docs.attraccess.org/de/attractap/firmware-updates.md): Wie Attractap-Leser Over-the-Air-Firmware-Updates vom Attraccess-Backend erhalten, inklusive Firmware-Varianten und Fehlerbehebung.
+- [Reader-Sicherheit](https://docs.attraccess.org/de/attractap/reader-security.md): Wie Attractap-Touch-V2-Leser abgesichert werden, damit sie nur mit Ihren Secure-Boot-Schlüsseln signierte Firmware akzeptieren; mit Backup.
+- [Reader-Anzeige](https://docs.attraccess.org/de/attractap/reader-ui.md): Wie Plugins Hinweise und Abfragen auf Attractap-Bildschirmen anzeigen, welche Leser das können, sowie Admin-Einstellungen und Alarme.
+
+## Deutsch: MQTT & IoT
+- [Überblick](https://docs.attraccess.org/de/mqtt/overview.md): Stellt MQTT und IoT vor: Nutzen mit Attraccess, Funktionsweise und Integration in Flows.
+- [Server einrichten](https://docs.attraccess.org/de/mqtt/server-setup.md): So verbinden Sie Attraccess mit einem MQTT-Broker und testen die Verbindung, inklusive gängiger Broker und mehrerer Server.
+- [Beispiele](https://docs.attraccess.org/de/mqtt/examples.md): Praktische MQTT-Beispiele: Maschinensteuerung über Relais, Sensordaten empfangen und MQTT in Flows für Nutzungsereignisse.
+
+## Deutsch: Geräte
+- [Matter: Architektur](https://docs.attraccess.org/de/devices/matter/architecture.md): Architektur der Matter-Integration: Plugin plus Sidecar, versionierter REST- und WebSocket-Vertrag, Fehler und Events.
+- [Matter: Betriebsanleitung](https://docs.attraccess.org/de/devices/matter/operator.md): Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation.
+
+## Deutsch: Abrechnung
+- [Überblick](https://docs.attraccess.org/de/billing/overview.md): Stellt die Abrechnung vor: Credits werden bei Ressourcennutzung abgezogen; Credit-System, Zahlungsintegration und nötige Berechtigung.
+- [Konfiguration](https://docs.attraccess.org/de/billing/configuration.md): So aktivieren Sie die Abrechnung pro Ressource, wählen Abrechnungsmodelle, rechnen Zählerverbrauch ab und verwalten Credit-Guthaben.
+- [Transaktionen](https://docs.attraccess.org/de/billing/transactions.md): Credit-Transaktionen im Abrechnungs-Dashboard ansehen, filtern und prüfen, inklusive erforderlicher Berechtigung.
+
+## Deutsch: Plugins
+- [Überblick](https://docs.attraccess.org/de/plugins/overview.md): Stellt das Plugin-System vor, das Attraccess um Frontend-Seiten und Backend-Endpunkte erweitert, mit Verwaltung und SDKs.
+- [Plugins installieren](https://docs.attraccess.org/de/plugins/installing-plugins.md): Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung.
+- [Plugins entwickeln](https://docs.attraccess.org/de/plugins/developing-plugins.md): Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks.
+
+## Deutsch: Monitoring & Metriken
+- [Überblick](https://docs.attraccess.org/de/monitoring/overview.md): Überblick über integrierte Prometheus-Metriken und Grafana-Dashboards zur Überwachung von Attraccess, inklusive Sicherheitshinweisen.
+- [Einrichtung](https://docs.attraccess.org/de/monitoring/setup.md): So aktivieren Sie den Metriken-Endpunkt und erzeugen den API-Schlüssel, mit dem Prometheus Attraccess abruft.
+- [Prometheus & Grafana](https://docs.attraccess.org/de/monitoring/prometheus-grafana.md): Prometheus und Grafana mit den gebündelten Attraccess-Dashboards per Coolify oder Docker Compose einrichten, inklusive Bearer-Token.
+- [Metriken-Referenz](https://docs.attraccess.org/de/monitoring/metrics-reference.md): Referenz aller Metriken am Endpunkt /api/metrics: HTTP, Authentifizierung, Benutzer, Ressourcen und Attractap-Geräte.
+
+## Deutsch: Systemeinstellungen
+- [Überblick](https://docs.attraccess.org/de/settings/overview.md): Administratorübersicht der Systemeinstellungen: Anwendung, Sichtbarkeit der Ressourcennutzung, E-Mail und weitere Einstellungen.
+- [Sicherheit](https://docs.attraccess.org/de/settings/security.md): Sicherheitseinstellungen für Sitzungs-Cookies und Authentifizierung: SameSite, Sitzungskonfiguration, Kartenschlüssel und Rate-Limiting.
+- [Audit-Protokoll](https://docs.attraccess.org/de/settings/audit-log.md): Wie Sie das Audit-Protokoll durchsuchen, filtern, prüfen und exportieren sowie Aufzeichnung und Aufbewahrung steuern.
+
+## Deutsch: Für Entwickler
+- [Überblick](https://docs.attraccess.org/de/developer/overview.md): Einstieg für Entwickler: Technologie-Stack, Voraussetzungen, erste Schritte, Entwicklungsablauf, Projektstruktur und nützliche Befehle.
+- [Architektur](https://docs.attraccess.org/de/developer/architecture.md): Beschreibt das Attraccess-NX-Monorepo: Anwendungen, Bibliotheken, Datenbank und Authentifizierung.
+- [API-Log-Ziele](https://docs.attraccess.org/de/developer/logging.md): Wie die API Logs mit RoutedLogger an Ziele leitet, inklusive Treiber-Registrierung und Start-Lebenszyklus.
+- [API-Referenz](https://docs.attraccess.org/de/developer/api-reference.md): Beschreibt die REST-API mit OpenAPI-Doku, generiertem API-Client und React-Query-Hooks, Authentifizierung und wichtigen Modulen.
+- [KI-Agenten (llms.txt & WebMCP)](https://docs.attraccess.org/de/developer/ai-agents.md): Erklärt den llms.txt-Index und die experimentellen WebMCP-Werkzeuge der Doku, das Ausprobieren in Chrome und das Hinzufügen von Seiten.
+- [Mitwirken](https://docs.attraccess.org/de/developer/contributing.md): Wie Sie zu Attraccess beitragen: Fork, Branch, Code-Stil, Tests, Issue-Tracking und Fehlermeldungen.
+
+## Deutsch: Für Endbenutzer
+- [Überblick](https://docs.attraccess.org/de/end-user/overview.md): Startseite des Endbenutzer-Leitfadens für Maschinenbediener, Mitarbeitende, Forschende und Studierende, die Attraccess nutzen.
+- [Anmeldung](https://docs.attraccess.org/de/end-user/login.md): Die Anmeldemöglichkeiten bei Attraccess: Passwort, SSO, Zwei-Faktor-Authentifizierung, Registrierung und Passwort zurücksetzen.
+- [Mein Konto](https://docs.attraccess.org/de/end-user/account.md): So verwalten Sie Ihr eigenes Konto: Profil, Sicherheit, RFID-Karten und Konto löschen.
+- [Ressourcen nutzen](https://docs.attraccess.org/de/end-user/using-resources.md): Wie Sie Ressourcen finden, eingewiesen werden, beaufsichtigte Sitzungen starten sowie Nutzungssitzungen starten und beenden.
+- [Mobile Nutzung (PWA)](https://docs.attraccess.org/de/end-user/mobile-pwa.md): Wie Sie Attraccess als Progressive Web App auf iOS und Android installieren, inklusive Updates und Offline-Unterstützung.
+
+## Deutsch: FAQ & Hilfe
+- [Häufige Probleme](https://docs.attraccess.org/de/faq/common-issues.md): Häufige Probleme und Lösungen, etwa SSO-Anmeldefehler, nicht versendete E-Mails, Ressourcenzugriff, RFID-Karten und Datenbankprobleme.
+- [Glossar](https://docs.attraccess.org/de/faq/glossary.md): Glossar zentraler Begriffe der Attraccess-Dokumentation zu Allgemeinem, Hardware, Protokollen und Web.

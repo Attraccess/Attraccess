@@ -1,4 +1,5 @@
 # Glossar
+<!-- llms-description: Glossar zentraler Begriffe der Attraccess-Dokumentation zu Allgemeinem, Hardware, Protokollen und Web. -->
 
 Dieses Glossar erklärt wichtige Begriffe, die in der Attraccess-Dokumentation verwendet werden.
 

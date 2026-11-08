@@ -1,4 +1,5 @@
 # Monitoring & Metrics
+<!-- llms-description: Overview of built-in Prometheus metrics and Grafana dashboards for monitoring Attraccess, with security notes. -->
 
 Attraccess includes built-in monitoring support using **Prometheus** for metrics collection and **Grafana** for visualization. IT and operations teams can monitor resource usage, application health and operational performance alongside their existing infrastructure.
 

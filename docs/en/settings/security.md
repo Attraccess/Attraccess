@@ -1,4 +1,5 @@
 # Security Settings
+<!-- llms-description: Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting. -->
 
 Attraccess provides several security-related settings for session cookies and authentication. These settings affect how users stay logged in and how the application handles cross-site requests.
 

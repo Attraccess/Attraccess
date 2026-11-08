@@ -1,4 +1,5 @@
 # Setup Wizard
+<!-- llms-description: Walks through the first-run setup wizard: application settings, email settings, administrator account and email verification. -->
 
 When you start Attraccess for the first time and no user account exists yet, you are automatically redirected to the setup wizard. It guides you through the basic configuration in four steps.
 

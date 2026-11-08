@@ -1,4 +1,5 @@
 # Node Types
+<!-- llms-description: Reference of all built-in flow nodes, grouped into input triggers, processing nodes and output actions. -->
 
 This reference covers all built-in flow nodes. The editor groups them by purpose, such as Billing, Messaging and Flow Control, and shows nodes supported by the resource type. Usage, activity and billing nodes are for **machines**; door triggers are for **doors**. Plugins can add further nodes with their own settings.
 

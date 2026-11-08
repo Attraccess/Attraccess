@@ -103,6 +103,7 @@
   - [Architektur](developer/architecture.md)
   - [API-Log-Ziele](developer/logging.md)
   - [API-Referenz](developer/api-reference.md)
+  - [KI-Agenten (llms.txt & WebMCP)](developer/ai-agents.md)
   - [Mitwirken](developer/contributing.md)
 
 - **Für Endbenutzer**

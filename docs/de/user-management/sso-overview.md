@@ -1,4 +1,5 @@
 # Single Sign-On (SSO)
+<!-- llms-description: Überblick über Single Sign-On mit OIDC und SAML: Voraussetzungen, Anbieter, automatische Erkennung, Berechtigungszuordnung und Kontoverknüpfung. -->
 
 Attraccess unterstützt Single Sign-On (SSO) über zwei Protokolle: **OpenID Connect (OIDC)** und **SAML**. Damit können sich Ihre Benutzer mit ihrem bestehenden Organisationskonto anmelden.
 

@@ -1,4 +1,5 @@
 # Reader display
+<!-- llms-description: How plugins show notes and prompts on Attractap reader screens, which readers support them, and the related admin settings and alerts. -->
 
 Plugins, for example a reservation plugin, can show short notes on the screen of Attractap readers, ask members
 for a confirmation before a machine starts, refuse a start with a reason, and ask a short question after a stop.

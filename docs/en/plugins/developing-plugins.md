@@ -1,4 +1,5 @@
 # Developing Plugins
+<!-- llms-description: Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration. -->
 
 Attraccess plugins extend the platform with new API endpoints, background
 behaviour, and UI pages — without forking the core. A plugin can ship a

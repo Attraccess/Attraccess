@@ -1,4 +1,5 @@
 # SSL Setup
+<!-- llms-description: How to serve Attraccess over HTTPS using a reverse proxy, self-signed or custom certificates, and what SSO requires. -->
 
 HTTPS is strongly recommended for running Attraccess in production, especially if you want to use SSO (Single Sign-On).
 

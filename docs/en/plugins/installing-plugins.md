@@ -1,4 +1,5 @@
 # Installing Plugins
+<!-- llms-description: How to upload, enable, disable and remove plugins in the web interface, with troubleshooting. -->
 
 Plugins are installed by uploading them through the Attraccess web interface. This page explains how to upload, enable and manage plugins.
 
