@@ -2,18 +2,11 @@ import { AuditLog } from '@attraccess/database-entities';
 
 import { PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
 import { randomUUID } from 'crypto';
 
-import {
-  DataSource,
-  EntitySubscriberInterface,
-  QueryRunner,
-  EntityManager,
-  TransactionCommitEvent,
-  TransactionRollbackEvent,
-} from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 
 import { SettingsStoreService } from '../settings/settings-store.service';
 
@@ -26,7 +19,11 @@ import {
   SsoAuditEvent,
 } from './audit-policy';
 
-import { BillingTransactionAuditEvent, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
+import { SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
+
+import { AuditMetrics } from '../metrics/definitions/audit.metrics';
+
+import { AUDIT_METRICS } from '../metrics/definitions/tokens';
 
 import { Interval } from '@nestjs/schedule';
 
@@ -37,13 +34,11 @@ import { AuditStorage } from './persistence/audit-storage';
 export { BillingTransactionAuditEvent } from './persistence/audit-storage';
 
 @Injectable()
-export class AuditService
-  extends AuditStorage
-  implements PluginAuditHostProvider, EntitySubscriberInterface, OnModuleInit, OnModuleDestroy
-{
+export class AuditService extends AuditStorage implements PluginAuditHostProvider, OnModuleInit, OnModuleDestroy {
   constructor(
     protected readonly source: DataSource,
     protected readonly settings: SettingsStoreService,
+    @Inject(AUDIT_METRICS) protected readonly metrics: AuditMetrics,
   ) {
     super();
   }
@@ -62,26 +57,14 @@ export class AuditService
 
   protected writeTail: Promise<void> = Promise.resolve();
 
-  protected contended = false;
-
-  protected subscribed = false;
-
-  protected readonly billingEvents = new WeakMap<
-    QueryRunner,
-    Array<{
-      event: BillingTransactionAuditEvent;
-      transactionDepth: number;
-      resolve: (receipt: PluginAuditReceipt) => void;
-    }>
-  >();
-
   async onModuleInit(): Promise<void> {
     if (this.storage?.isInitialized || this.stopping) return;
-    this.source.subscribers.push(this);
-    this.subscribed = true;
-    // A separate connection guarantees that a receipt follows autocommit, never a
-    // savepoint in the application's shared SQLite transaction. No schema sync.
-    if (this.source.options.type !== 'sqlite' || this.source.options.database === ':memory:') return;
+    // A separate connection guarantees that a write without a caller transaction follows autocommit,
+    // never a savepoint in another request's shared SQLite transaction. No schema sync.
+    if (this.source.options.type !== 'sqlite' || this.source.options.database === ':memory:') {
+      this.logger.warn('Audit storage unavailable: requires a file-backed SQLite database');
+      return;
+    }
     const storage = new DataSource({
       type: 'sqlite',
       database: this.source.options.database,
@@ -89,7 +72,7 @@ export class AuditService
       synchronize: false,
       migrationsRun: false,
       logging: false,
-      busyTimeout: 10,
+      busyTimeout: SQLITE_BUSY_TIMEOUT_MS,
     });
     try {
       await storage.initialize();
@@ -97,25 +80,28 @@ export class AuditService
       await storage.query('PRAGMA synchronous = FULL');
       this.storage = storage;
       await this.cleanup();
-    } catch {
+    } catch (error) {
+      // Only the error name: the driver message may contain the database path.
+      this.logger.error(
+        `Audit storage initialization failed: ${error instanceof Error ? error.name : 'unknown error'}`,
+      );
       if (storage.isInitialized) await storage.destroy().catch(() => undefined);
     }
   }
 
   async onModuleDestroy(): Promise<void> {
     this.stopping = true;
-    if (this.subscribed) this.source.subscribers.splice(this.source.subscribers.indexOf(this), 1);
     while (this.pending || this.cleaning || this.activeReads) await new Promise((resolve) => setTimeout(resolve, 5));
     const storage = this.storage;
     this.storage = undefined;
     if (storage?.isInitialized) await storage.destroy().catch(() => undefined);
   }
 
-  async recordSso(event: SsoAuditEvent): Promise<PluginAuditReceipt> {
-    try {
-      const snapshot = projectSsoAuditEvent(event);
-      if (!snapshot) return { status: 'unavailable' };
-      return await this.recordSnapshot({
+  async recordSso(event: SsoAuditEvent, transaction?: EntityManager): Promise<PluginAuditReceipt> {
+    const snapshot = this.project(() => projectSsoAuditEvent(event));
+    if (!snapshot) return this.drop(undefined, 'invalid_event');
+    return this.recordSnapshot(
+      {
         domain: 'sso',
         pluginId: null,
         action: snapshot.action,
@@ -129,17 +115,16 @@ export class AuditService
         ipAddress: null,
         userAgent: null,
         details: snapshot.details,
-      });
-    } catch {
-      return { status: 'unavailable' };
-    }
+      },
+      { transaction },
+    );
   }
 
-  async recordIdentity(event: IdentityAuditEvent): Promise<PluginAuditReceipt> {
-    try {
-      const snapshot = projectIdentityAuditEvent(event);
-      if (!snapshot) return { status: 'unavailable' };
-      return await this.recordSnapshot({
+  async recordIdentity(event: IdentityAuditEvent, transaction?: EntityManager): Promise<PluginAuditReceipt> {
+    const snapshot = this.project(() => projectIdentityAuditEvent(event));
+    if (!snapshot) return this.drop(undefined, 'invalid_event');
+    return this.recordSnapshot(
+      {
         domain: 'identity',
         pluginId: null,
         action: snapshot.action,
@@ -153,17 +138,19 @@ export class AuditService
         ipAddress: snapshot.ipAddress,
         userAgent: snapshot.userAgent,
         details: snapshot.details,
-      });
-    } catch {
-      return { status: 'unavailable' };
-    }
+      },
+      { transaction },
+    );
   }
 
-  async recordAttractap(event: AttractapAuditEvent): Promise<void> {
-    try {
-      const snapshot = projectAttractapAuditEvent(event);
-      if (!snapshot) return;
-      await this.recordSnapshot({
+  async recordAttractap(event: AttractapAuditEvent, transaction?: EntityManager): Promise<void> {
+    const snapshot = this.project(() => projectAttractapAuditEvent(event));
+    if (!snapshot) {
+      this.drop(undefined, 'invalid_event');
+      return;
+    }
+    await this.recordSnapshot(
+      {
         domain: 'attractap',
         pluginId: 'core',
         action: `attractap.${snapshot.action}`,
@@ -179,10 +166,9 @@ export class AuditService
         ipAddress: null,
         userAgent: null,
         details: snapshot.details,
-      });
-    } catch {
-      /* Audit persistence must not affect Attractap operations. */
-    }
+      },
+      { transaction },
+    );
   }
 
   @Interval(60 * 60 * 1000)
@@ -227,50 +213,5 @@ export class AuditService
     } finally {
       this.cleaning = false;
     }
-  }
-
-  /** Defers billing audit writes until the supplied transaction has committed. */
-  recordBillingTransactionAfterCommit(
-    event: BillingTransactionAuditEvent,
-    transactionManager?: EntityManager,
-  ): Promise<PluginAuditReceipt> {
-    const queryRunner = transactionManager?.queryRunner;
-    if (!queryRunner?.isTransactionActive) return this.recordBillingTransaction(event);
-    return new Promise((resolve) => {
-      const events = this.billingEvents.get(queryRunner) ?? [];
-      events.push({ event, transactionDepth: this.transactionDepth(queryRunner), resolve });
-      this.billingEvents.set(queryRunner, events);
-    });
-  }
-
-  afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
-    // Nested transaction commits release a savepoint; wait for the owning transaction.
-    if (queryRunner.isTransactionActive) {
-      const transactionDepth = this.transactionDepth(queryRunner);
-      for (const event of this.billingEvents.get(queryRunner) ?? []) {
-        event.transactionDepth = Math.min(event.transactionDepth, transactionDepth);
-      }
-      return;
-    }
-    const events = this.billingEvents.get(queryRunner);
-    if (!events) return;
-    this.billingEvents.delete(queryRunner);
-    for (const { event, resolve } of events) void this.recordBillingTransaction(event).then(resolve);
-  }
-
-  afterTransactionRollback({ queryRunner }: TransactionRollbackEvent): void {
-    const events = this.billingEvents.get(queryRunner);
-    if (!events) return;
-    const transactionDepth = this.transactionDepth(queryRunner);
-    const retainedEvents = events.filter((event) => event.transactionDepth <= transactionDepth);
-    for (const event of events) {
-      if (event.transactionDepth > transactionDepth) event.resolve({ status: 'unavailable' });
-    }
-    if (retainedEvents.length) this.billingEvents.set(queryRunner, retainedEvents);
-    else this.billingEvents.delete(queryRunner);
-  }
-
-  protected transactionDepth(queryRunner: QueryRunner): number {
-    return (queryRunner as QueryRunner & { transactionDepth: number }).transactionDepth;
   }
 }

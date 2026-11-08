@@ -776,7 +776,7 @@ describe('Flow-defined metering', () => {
           expect(reconciliationScope.parentScope.onCollect).not.toHaveBeenCalled();
           expect((await reconciliationScope.parentScope.correctionsOf(ended.id)).corrections).toEqual([]);
           expect(await reconciliationScope.parentScope.items(ended.id)).toEqual(before);
-          expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+          expect(reconciliationScope.parentScope.audit.recordBillingTransaction).not.toHaveBeenCalled();
           expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
         },
       );
@@ -809,7 +809,7 @@ describe('Flow-defined metering', () => {
         ]);
         expect(await reconciliationScope.parentScope.items(ended.id)).toEqual(before);
         expect((await reconciliationScope.parentScope.correctionsOf(ended.id)).corrections).toEqual([]);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).not.toHaveBeenCalled();
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
       });
 
@@ -853,8 +853,8 @@ describe('Flow-defined metering', () => {
           expect.objectContaining({ amount: -45, status: 'completed', initiatorId: 1, resourceUsageId: null }),
         ]);
         expect(corrections[0].userId).toBe(original.userId);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).toHaveBeenCalledTimes(1);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).toHaveBeenCalledWith(
+        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).toHaveBeenCalledTimes(1);
+        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).toHaveBeenCalledWith(
           expect.objectContaining({
             transactionId: corrections[0].id,
             userId: original.userId,
@@ -950,7 +950,7 @@ describe('Flow-defined metering', () => {
         );
         expect((await reconciliationScope.parentScope.items(ended.id)).transaction.amount).toBe(0);
         expect((await reconciliationScope.parentScope.correctionsOf(ended.id)).corrections).toEqual([]);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).not.toHaveBeenCalled();
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
       });
 

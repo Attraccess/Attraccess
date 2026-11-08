@@ -1,5 +1,5 @@
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,7 +15,9 @@ import { AuditQueryDto } from './dto/audit-query.dto';
 import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
-import { setupAuditDatabase } from './audit.test-fixture';
+import { closeResourceTransactionConnection, runSerializedTransaction } from '../database/run-serialized-transaction';
+import { MAX_PENDING_AUDIT_WRITES, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
+import { createTestAuditMetrics, droppedRecords, setupAuditDatabase } from './audit.test-fixture';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
   it('upgrades additively, survives connection restart and principal deletion, prevents updates, and reverts', async () => {
@@ -33,7 +35,7 @@ describe('durable audit SQLite', () => {
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
     fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
-    fixture.service = new AuditService(fixture.source, fixture.store);
+    fixture.service = new AuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect((await fixture.service.list(new AuditQueryDto())).items).toEqual([
       expect.objectContaining({ actorId: 42, details: { revision: 2 } }),
@@ -155,130 +157,146 @@ describe('durable audit SQLite', () => {
     );
   });
 
-  it('never acknowledges or persists an event in an originating transaction that rolls back', async () => {
+  it('records while an unrelated transaction is open on the main connection', async () => {
     const runner = fixture.source.createQueryRunner();
     await runner.startTransaction();
-    const receipt = fixture.service.record(fixture.event());
-    await runner.rollbackTransaction();
-    expect(await receipt).toEqual({ status: 'unavailable' });
-    expect((await fixture.service.list(new AuditQueryDto())).items).toHaveLength(0);
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+    try {
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+    } finally {
+      await runner.rollbackTransaction();
+      await runner.release();
+    }
+    expect((await fixture.service.list(new AuditQueryDto())).items).toHaveLength(1);
+    expect(await droppedRecords(fixture.metrics)).toEqual({});
   });
 
-  it('records a billing event only after its originating transaction commits', async () => {
-    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
-    let receipt: Promise<{ status: string }> | undefined;
-    await fixture.source.transaction(async (manager) => {
-      receipt = fixture.service.recordBillingTransactionAfterCommit(
-        {
-          transactionId: 8,
-          userId: 42,
-          amount: 0,
-          status: 'pending',
-          source: 'resource-usage',
-        },
-        manager,
-      );
-      expect((await fixture.service.list({ limit: 1 })).items).toHaveLength(0);
+  describe('inside the caller transaction', () => {
+    const billing = (transactionId: number) => ({
+      transactionId,
+      userId: 42,
+      amount: 0,
+      status: 'pending',
+      source: 'resource-usage',
     });
-    await expect(receipt).resolves.toEqual({ status: 'recorded' });
-    expect((await fixture.service.list({ limit: 1 })).items[0]).toMatchObject({ subjectId: 8, domain: 'billing' });
-  });
+    const auditedSubjects = async () =>
+      (await fixture.service.list({ limit: 10 })).items.map((item) => item.subjectId).sort();
 
-  it('discards a billing event when its originating transaction rolls back', async () => {
-    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
-    let receipt: Promise<{ status: string }> | undefined;
-    await expect(
-      fixture.source.transaction(async (manager) => {
-        receipt = fixture.service.recordBillingTransactionAfterCommit(
-          {
-            transactionId: 8,
-            userId: 42,
-            amount: 0,
-            status: 'pending',
-            source: 'resource-usage',
-          },
-          manager,
-        );
-        throw new Error('rollback');
-      }),
-    ).rejects.toThrow('rollback');
-    await expect(receipt).resolves.toEqual({ status: 'unavailable' });
-    expect((await fixture.service.list({ limit: 1 })).items).toHaveLength(0);
-  });
-
-  it('retains outer billing events when a nested transaction rolls back', async () => {
-    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
-    let outerReceipt: Promise<{ status: string }> | undefined;
-    let nestedReceipt: Promise<{ status: string }> | undefined;
-    await fixture.source.transaction(async (manager) => {
-      outerReceipt = fixture.service.recordBillingTransactionAfterCommit(
-        {
-          transactionId: 8,
-          userId: 42,
-          amount: 0,
-          status: 'pending',
-          source: 'resource-usage',
-        },
-        manager,
-      );
-      await expect(
-        manager.transaction(async (nestedManager) => {
-          nestedReceipt = fixture.service.recordBillingTransactionAfterCommit(
-            {
-              transactionId: 9,
-              userId: 42,
-              amount: 0,
-              status: 'pending',
-              source: 'resource-usage',
-            },
-            nestedManager,
-          );
-          throw new Error('nested rollback');
-        }),
-      ).rejects.toThrow('nested rollback');
+    beforeEach(async () => {
+      await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
+      await fixture.source.query('CREATE TABLE business_change (id integer PRIMARY KEY)');
     });
-    await expect(outerReceipt).resolves.toEqual({ status: 'recorded' });
-    await expect(nestedReceipt).resolves.toEqual({ status: 'unavailable' });
-    expect((await fixture.service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
-  });
 
-  it('retains billing events from a committed savepoint when a sibling savepoint rolls back', async () => {
-    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
-    let committedReceipt: Promise<{ status: string }> | undefined;
-    let rolledBackReceipt: Promise<{ status: string }> | undefined;
-    await fixture.source.transaction(async (manager) => {
-      await manager.transaction(async (nestedManager) => {
-        committedReceipt = fixture.service.recordBillingTransactionAfterCommit(
-          {
-            transactionId: 8,
-            userId: 42,
-            amount: 0,
-            status: 'pending',
-            source: 'resource-usage',
-          },
-          nestedManager,
-        );
+    afterEach(async () => {
+      await closeResourceTransactionConnection(fixture.source);
+    });
+
+    // The main connection shares one query runner; the resource-lifecycle connection is a second, independent one.
+    const connections = {
+      main: (work: Parameters<typeof runSerializedTransaction>[1]) => fixture.source.transaction(work),
+      'resource-lifecycle': (work: Parameters<typeof runSerializedTransaction>[1]) =>
+        runSerializedTransaction(fixture.source.manager, work),
+    };
+
+    describe.each(Object.entries(connections))('on the %s connection', (_name, run) => {
+      it('commits the audit row with the change', async () => {
+        await run(async (manager) => {
+          await manager.query('INSERT INTO business_change VALUES (1)');
+          expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({ status: 'recorded' });
+          // Not visible to other connections before the caller commits.
+          expect(await auditedSubjects()).toEqual([]);
+        });
+        expect(await auditedSubjects()).toEqual([8]);
+        expect(await fixture.source.query('SELECT * FROM business_change')).toHaveLength(1);
+        expect(await droppedRecords(fixture.metrics)).toEqual({});
       });
-      await expect(
-        manager.transaction(async (nestedManager) => {
-          rolledBackReceipt = fixture.service.recordBillingTransactionAfterCommit(
-            {
-              transactionId: 9,
-              userId: 42,
-              amount: 0,
-              status: 'pending',
-              source: 'resource-usage',
-            },
-            nestedManager,
-          );
-          throw new Error('nested rollback');
-        }),
-      ).rejects.toThrow('nested rollback');
+
+      it('rolls back with the caller transaction', async () => {
+        await expect(
+          run(async (manager) => {
+            await manager.query('INSERT INTO business_change VALUES (1)');
+            expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({
+              status: 'recorded',
+            });
+            throw new Error('rollback');
+          }),
+        ).rejects.toThrow('rollback');
+        expect(await auditedSubjects()).toEqual([]);
+        expect(await fixture.source.query('SELECT * FROM business_change')).toEqual([]);
+      });
+
+      it('keeps rows of an outer and a committed savepoint when a sibling savepoint rolls back', async () => {
+        await run(async (manager) => {
+          await fixture.service.recordBillingTransaction(billing(8), manager);
+          await manager.transaction(async (nested) => {
+            await fixture.service.recordBillingTransaction(billing(9), nested);
+          });
+          await expect(
+            manager.transaction(async (nested) => {
+              await fixture.service.recordBillingTransaction(billing(10), nested);
+              throw new Error('nested rollback');
+            }),
+          ).rejects.toThrow('nested rollback');
+        });
+        expect(await auditedSubjects()).toEqual([8, 9]);
+      });
+
+      it('keeps the business change, logs and counts when the audit insert fails', async () => {
+        await fixture.source.query(
+          "CREATE TRIGGER fail_audit_insert BEFORE INSERT ON audit_log BEGIN SELECT RAISE(ABORT, 'secret-detail'); END",
+        );
+        const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+        try {
+          await run(async (manager) => {
+            await manager.query('INSERT INTO business_change VALUES (1)');
+            expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({
+              status: 'unavailable',
+            });
+            // The failed savepoint is gone: the transaction keeps working and later audit rows still land.
+            await manager.query('INSERT INTO business_change VALUES (2)');
+            await manager.query('DROP TRIGGER fail_audit_insert');
+            expect(await fixture.service.recordBillingTransaction(billing(9), manager)).toEqual({ status: 'recorded' });
+          });
+          expect(await fixture.source.query('SELECT id FROM business_change ORDER BY id')).toEqual([
+            { id: 1 },
+            { id: 2 },
+          ]);
+          expect(await auditedSubjects()).toEqual([9]);
+          expect(await droppedRecords(fixture.metrics)).toEqual({ 'billing:storage_error': 1 });
+          expect(error).toHaveBeenCalledTimes(1);
+          const line = String(error.mock.calls[0][0]);
+          expect(line).toContain('domain=billing action=billing.transaction.created reason=storage_error');
+          expect(line).toContain('code=SQLITE_CONSTRAINT');
+          expect(line).not.toContain('secret-detail');
+        } finally {
+          error.mockRestore();
+        }
+      });
     });
-    await expect(committedReceipt).resolves.toEqual({ status: 'recorded' });
-    await expect(rolledBackReceipt).resolves.toEqual({ status: 'unavailable' });
-    expect((await fixture.service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
+
+    it('writes without the audit queue, even while the audit connection is saturated', async () => {
+      const storage = (fixture.service as unknown as { storage: DataSource }).storage;
+      const insert = jest.spyOn(storage, 'getRepository');
+      await fixture.source.transaction(async (manager) => {
+        expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({ status: 'recorded' });
+      });
+      expect(insert).not.toHaveBeenCalled();
+      insert.mockRestore();
+    });
+
+    it('does not write when audit or the domain is disabled, and does not count a drop', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      await fixture.store.setPlainSetting('audit', 'domains', '[]');
+      await fixture.source.transaction(async (manager) => {
+        expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({ status: 'unavailable' });
+      });
+      await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
+      await fixture.store.setPlainSetting('audit', 'enabled', 'false');
+      expect(await fixture.service.recordBillingTransaction(billing(9))).toEqual({ status: 'unavailable' });
+      expect(await auditedSubjects()).toEqual([]);
+      expect(await droppedRecords(fixture.metrics)).toEqual({});
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
   });
 
   it('filters and paginates without duplication; hides expired rows and cleans them', async () => {
@@ -431,7 +449,7 @@ describe('durable audit SQLite', () => {
     ]) {
       for (const [key, value] of Object.entries(disabled))
         await fixture.store.setPlainSetting('audit', key, JSON.stringify(value));
-      const sink = new AuditService(fixture.source, fixture.store);
+      const sink = new AuditService(fixture.source, fixture.store, fixture.metrics);
       await sink.onModuleInit();
       expect(await sink.record(fixture.event())).toEqual({ status: 'unavailable' });
       await sink.onModuleDestroy();
@@ -446,11 +464,14 @@ describe('durable audit SQLite', () => {
       details: { 'after.name': 'Lathe', 'after.type': 'machine' },
     });
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(0);
+    expect(await droppedRecords(fixture.metrics)).toEqual({});
     expect(await fixture.service.record({ ...fixture.event(), details: { password: 'not-stored' } })).toEqual({
       status: 'unavailable',
     });
+    expect(await droppedRecords(fixture.metrics)).toEqual({ 'unknown:invalid_event': 1 });
     await fixture.source.query('DROP TABLE audit_log');
     expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    expect(await droppedRecords(fixture.metrics)).toEqual({ 'unknown:invalid_event': 1, 'demo:storage_error': 1 });
     await expect(fixture.service.cleanup()).resolves.toBeUndefined();
   });
 
@@ -462,11 +483,29 @@ describe('durable audit SQLite', () => {
     ).rejects.toThrow('CHECK constraint');
   });
 
-  it('bounds outstanding writes without an unbounded queue', async () => {
+  it('records every one of many concurrent writes', async () => {
     const receipts = await Promise.all(Array.from({ length: 40 }, () => fixture.service.record(fixture.event())));
-    expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(8);
-    expect(await fixture.source.getRepository(AuditLog).count()).toBe(8);
+    expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(40);
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(40);
+    expect(await droppedRecords(fixture.metrics)).toEqual({});
   });
+
+  it('rejects writes above the pending cap as queue_full and records the rest', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      const receipts = await Promise.all(
+        Array.from({ length: MAX_PENDING_AUDIT_WRITES + 25 }, () => fixture.service.record(fixture.event())),
+      );
+      expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(MAX_PENDING_AUDIT_WRITES);
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(MAX_PENDING_AUDIT_WRITES);
+      expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:queue_full': 25 });
+      expect(warn).toHaveBeenCalledTimes(25);
+      expect(String(warn.mock.calls[0][0])).toContain('reason=queue_full');
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+    } finally {
+      warn.mockRestore();
+    }
+  }, 60_000);
 
   it('persists validated settings across store and service restarts, and fails closed on read failure', async () => {
     expect(await readAuditSettings(fixture.store)).toEqual(fixture.config);
@@ -484,7 +523,7 @@ describe('durable audit SQLite', () => {
       plugin_domains_disabled: [],
       retention_days: 2,
     });
-    fixture.service = new AuditService(fixture.source, fixture.store);
+    fixture.service = new AuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
     await settings.updateAuditSettings({ enabled: true, domains: ['resource'] });
@@ -513,21 +552,24 @@ describe('durable audit SQLite', () => {
     }
   });
 
-  it('bounds admission before settings awaits and recovers after settings failure', async () => {
+  it('counts writes as settings_unavailable while settings cannot be read and recovers afterwards', async () => {
     let release: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     const read = jest.spyOn(fixture.store, 'getPlainSetting').mockImplementation(async () => {
       await gate;
       throw new Error('private');
     });
     const pending = Array.from({ length: 8 }, () => fixture.service.record(fixture.event()));
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
-    expect(read).toHaveBeenCalledTimes(32);
     release();
     expect((await Promise.all(pending)).every((receipt) => receipt.status === 'unavailable')).toBe(true);
+    expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:settings_unavailable': 8 });
+    expect(warn).toHaveBeenCalledTimes(8);
+    expect(String(warn.mock.calls[0][0])).not.toContain('private');
     read.mockRestore();
+    warn.mockRestore();
     expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
   });
 
@@ -557,21 +599,55 @@ describe('durable audit SQLite', () => {
     expect((await fixture.service.list({ limit: 10, to: new Date(0).toISOString() })).items).toHaveLength(0);
   });
 
-  it('declines writes under SQLite contention within a deadline and recovers', async () => {
-    await fixture.source.query('PRAGMA busy_timeout = 10');
+  it('waits for a held SQLite write lock instead of dropping the write', async () => {
+    expect(SQLITE_BUSY_TIMEOUT_MS).toBe(5000);
     const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
     try {
       await lock.query('BEGIN IMMEDIATE');
-      const start = Date.now();
-      const receipts = await Promise.all(Array.from({ length: 8 }, () => fixture.service.record(fixture.event())));
-      expect(receipts.every((receipt) => receipt.status === 'unavailable')).toBe(true);
-      expect(Date.now() - start).toBeLessThan(2500);
+      const receipts = Promise.all(Array.from({ length: 8 }, () => fixture.service.record(fixture.event())));
+      await new Promise((resolve) => setTimeout(resolve, 400));
       await lock.query('ROLLBACK');
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+      expect((await receipts).every((receipt) => receipt.status === 'recorded')).toBe(true);
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(8);
+      expect(await droppedRecords(fixture.metrics)).toEqual({});
     } finally {
       await lock.destroy();
     }
-  }, 10_000);
+  }, 15_000);
+
+  it('logs and counts storage_unavailable when the audit connection cannot exist', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const memory = new DataSource({ type: 'sqlite', database: ':memory:' });
+    const metrics = createTestAuditMetrics();
+    const sink = new AuditService(memory, fixture.store, metrics);
+    await sink.onModuleInit();
+    try {
+      expect(await sink.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(await droppedRecords(metrics)).toEqual({ 'demo:storage_unavailable': 1 });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('reason=storage_unavailable'));
+    } finally {
+      await sink.onModuleDestroy();
+      warn.mockRestore();
+    }
+  });
+
+  it('counts invalid events of every domain as invalid_event without storing them', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      expect(await fixture.service.recordResource({ action: 'nope' } as never)).toBe(false);
+      await fixture.service.recordProject({ action: 'nope' } as never);
+      expect(await fixture.service.recordBillingTransaction({ transactionId: -1 } as never)).toEqual({
+        status: 'unavailable',
+      });
+      expect(await droppedRecords(fixture.metrics)).toEqual({
+        'unknown:invalid_event': 2,
+        'billing:invalid_event': 1,
+      });
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(0);
+    } finally {
+      warn.mockRestore();
+    }
+  });
 
   it('uses one safe event snapshot before settings awaits and waits safely for shutdown', async () => {
     let release: () => void;
@@ -597,6 +673,7 @@ describe('durable audit SQLite', () => {
     const writes = Array.from({ length: 8 }, () => fixture.service.record(fixture.event()));
     const shutdown = fixture.service.onModuleDestroy();
     expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:shutting_down': 1 });
     await Promise.all([...writes, shutdown]);
     await expect(fixture.service.list({ limit: 1 })).rejects.toThrow('Audit storage unavailable');
   });
@@ -668,7 +745,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       },
     ]);
     const migratedStore = new SettingsStoreService(source.getRepository(Setting), null);
-    const migratedAudit = new AuditService(source, migratedStore);
+    const migratedAudit = new AuditService(source, migratedStore, createTestAuditMetrics());
     await migratedAudit.onModuleInit();
     const migratedList = await new AuditController(migratedAudit).list({ limit: 10 });
     const migratedOversizedEvent = migratedList.items.find((item) => item.details.legacyAuditId === 2);

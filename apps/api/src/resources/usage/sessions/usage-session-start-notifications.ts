@@ -4,8 +4,6 @@ import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 
 import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 
-import { StartSessionOptions } from '../lifecycle/usage-lifecycle';
-
 import {
   ResourceSupervisedUsageStartedEvent,
   ResourceUsageNoteAddedEvent,
@@ -16,14 +14,13 @@ import { type ResourceUsageService } from './resource-usage.service';
 
 import { UsageSessionChanges } from './usage-session-changes';
 
-/** Audit entries, events and metrics once a start or takeover has committed. */
+/** Events and metrics once a start or takeover has committed. */
 export abstract class UsageSessionStartNotifications extends UsageSessionChanges {
   protected async notifySessionStarted(
     resourceId: number,
     user: User,
     dto: StartUsageSessionDto,
     supervisorUserId: number | null,
-    auditOrigin: NonNullable<StartSessionOptions['auditOrigin']>,
     prepared: Awaited<ReturnType<ResourceUsageService['prepareSessionStart']>>,
     newSession: ResourceUsage,
     endedUsageIdToEmit: number | null,
@@ -40,31 +37,6 @@ export abstract class UsageSessionStartNotifications extends UsageSessionChanges
           prepared.existingActiveSession.user,
         ),
       );
-    }
-
-    if (endedUsageIdToEmit && takeoverEndedUser) {
-      await this.audit
-        .recordResource({
-          action: 'usage_session.ended',
-          ...auditOrigin,
-          subjectId: resourceId,
-          details: { usageId: endedUsageIdToEmit, usageUserId: takeoverEndedUser.id },
-        })
-        .catch(() => undefined);
-    }
-    if (newSession) {
-      await this.audit
-        .recordResource({
-          action: 'usage_session.started',
-          ...auditOrigin,
-          subjectId: resourceId,
-          details: {
-            usageId: newSession.id,
-            usageUserId: newSession.userId,
-            ...(supervisorUserId === null ? {} : { supervisorUserId }),
-          },
-        })
-        .catch(() => undefined);
     }
 
     // Emit events after the transaction committed to ensure readers can observe DB state

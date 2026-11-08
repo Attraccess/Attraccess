@@ -150,6 +150,7 @@ sum(
 | `attraccess_mqtt_servers_healthy` | Gauge | -- | Anzahl gesunder MQTT-Server |
 | `attraccess_plugins_loaded` | Gauge | -- | Anzahl geladener Plugins |
 | `attraccess_email_sent_total` | Counter | `status` | Gesendete E-Mails nach Zustellstatus |
+| `attraccess_audit_records_dropped_total` | Counter | `domain`, `reason` | Audit-Einträge, die nicht gespeichert wurden. `domain` ist die Audit-Domäne (`unknown`, wenn das Ereignis abgelehnt wurde, bevor die Domäne feststand). `reason` ist `storage_error` (Einfügen fehlgeschlagen, z. B. SQLite-Busy-Timeout oder Constraint), `queue_full` (mehr als 1.000 wartende Schreibvorgänge), `storage_unavailable` (Audit-Verbindung nicht verfügbar), `shutting_down`, `settings_unavailable` oder `invalid_event`. Deaktiviertes Audit oder eine deaktivierte Domäne ist kein Verlust. Alarm: `AuditRecordsDropped` |
 | `attraccess_websocket_connections_active` | Gauge | -- | Aktive WebSocket-Verbindungen |
 
 ## WebSocket-Timing

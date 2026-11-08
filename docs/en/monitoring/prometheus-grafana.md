@@ -271,6 +271,10 @@ Things to know:
 - **Long reader lists** are capped at about 200 characters (`; +N more`) so the Pushover message stays under Pushover's 1,024-character limit and keeps its Silence and View links. Reader names are shortened to 40 characters and `<` and `>` are removed, because Pushover renders the message as HTML.
 - **Upgrades:** the former single `AttractapReaderCrashes` rule keeps its UID and is replaced in place, so the old wording does not survive. An existing Grafana silence on `AttractapReaderCrashes` therefore also mutes the new crash warning until it expires.
 
+## Audit warning
+
+`AuditRecordsDropped` is a critical Grafana alert. It fires as soon as `attraccess_audit_records_dropped_total` increased in the last 5 minutes, which means at least one audit record could not be stored. The change the record described still went through. The API log has one `Audit record dropped` line per drop with the domain, action, reason and the SQLite error code (never event details). The `reason` label of the metric tells you whether storage failed (`storage_error`), the write queue overflowed (`queue_full`), or the audit storage never started (`storage_unavailable`).
+
 ## Exposing Prometheus Externally (Optional)
 
 By default, Prometheus is only exposed internally (no `ports` mapping). If you need direct access for debugging:

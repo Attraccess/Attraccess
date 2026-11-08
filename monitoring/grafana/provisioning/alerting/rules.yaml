@@ -895,6 +895,56 @@ groups:
                     type: last
                     params: []
 
+      - uid: audit-records-dropped
+        title: AuditRecordsDropped
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Audit records dropped"
+          description: "One or more audit records could not be stored in the last 5 minutes. Check the API log for 'Audit record dropped' and the reason label of attraccess_audit_records_dropped_total."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum(increase(attraccess_audit_records_dropped_total{job="attraccess"}[5m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
       - uid: high-event-loop-lag
         title: HighEventLoopLag
         condition: C

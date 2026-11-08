@@ -35,17 +35,39 @@ import {
   ResourceAuditEvent,
 } from '../audit-policy';
 
-import { DataSource, QueryRunner } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
+
+import { AuditDropReason, AuditMetrics } from '../../metrics/definitions/audit.metrics';
 
 import { SettingsStoreService } from '../../settings/settings-store.service';
 
 export const billingStatuses = new Set(['pending', 'completed', 'failed']);
 
-export const billingSources = new Set(['manual', 'resource-usage', 'refund', 'sumup-topup', 'energy-correction']);
+export const billingSources = new Set([
+  'manual',
+  'resource-usage',
+  'refund',
+  'sumup-topup',
+  'energy-correction',
+  'meter-correction',
+]);
 
-export const SQLITE_BUSY_TIMEOUT_MS = 10;
+/** Same wait as the resource-lifecycle connection: an audit write waits for the SQLite lock instead of being dropped. */
+export const SQLITE_BUSY_TIMEOUT_MS = 5000;
 
-export const SQLITE_CONTENTION_RECOVERY_DELAY_MS = 500;
+/** Writes without a caller transaction queue on the audit connection; beyond this they are dropped as `queue_full`. */
+export const MAX_PENDING_AUDIT_WRITES = 1000;
+
+class SettingsUnavailableError extends Error {}
+
+/** Only the SQLite result code is safe to log; the driver message may contain SQL parameters. */
+function sqliteErrorCode(error: unknown): string | undefined {
+  const candidates = [
+    (error as { code?: unknown })?.code,
+    (error as { driverError?: { code?: unknown } })?.driverError?.code,
+  ];
+  return candidates.find((code): code is string => typeof code === 'string' && /^SQLITE_[A-Z_]+$/.test(code));
+}
 
 export interface BillingTransactionAuditEvent {
   transactionId: number;
@@ -162,11 +184,14 @@ export abstract class AuditStorage {
   }
 
   /** Host bridge for plugin audit events: validated against the recording plugin's registered domain declaration. */
-  async record(event: PluginAuditEvent & { pluginId: string }): Promise<PluginAuditReceipt> {
-    try {
-      const snapshot = projectPluginAuditEvent(event);
-      if (!snapshot) return { status: 'unavailable' };
-      return await this.recordSnapshot({
+  async record(
+    event: PluginAuditEvent & { pluginId: string },
+    transaction?: EntityManager,
+  ): Promise<PluginAuditReceipt> {
+    const snapshot = this.project(() => projectPluginAuditEvent(event));
+    if (!snapshot) return this.drop(undefined, 'invalid_event');
+    return this.recordSnapshot(
+      {
         domain: snapshot.domain,
         pluginId: snapshot.pluginId,
         action: snapshot.action,
@@ -180,44 +205,112 @@ export abstract class AuditStorage {
         ipAddress: null,
         userAgent: null,
         details: snapshot.details,
-      });
+      },
+      { transaction },
+    );
+  }
+
+  /** Runs an event projection; a projection that throws is treated like one that rejects the event. */
+  protected project<T>(projection: () => T | null | undefined): T | undefined {
+    try {
+      return projection() ?? undefined;
     } catch {
-      // Never log the event, SQLite parameters, or exception (may contain secrets).
-      return { status: 'unavailable' };
+      return undefined;
     }
   }
 
+  /**
+   * Stores one audit row and never rejects. With an active caller transaction the row is inserted in a
+   * savepoint of that transaction: it commits or rolls back with the caller's change, and a failed insert
+   * only rolls back the savepoint. Without one it is written on the separate audit connection.
+   * Every write that is not stored (other than disabled audit or domain) is logged and counted.
+   */
   protected async recordSnapshot(
     event: Omit<AuditLog, 'id' | 'at'>,
-    finalSettingsChange = false,
+    { finalSettingsChange = false, transaction }: { finalSettingsChange?: boolean; transaction?: EntityManager } = {},
   ): Promise<PluginAuditReceipt> {
-    if (this.stopping || !this.storage?.isInitialized || this.pending >= 8) return { status: 'unavailable' };
-    if (this.source.createQueryRunner().isTransactionActive) return { status: 'unavailable' };
-    this.pending++;
+    const { domain, action } = event;
     try {
-      const config = await readAuditSettings(this.settings);
-      if ((!finalSettingsChange && (!config.enabled || !this.domainEnabled(config, event.domain))) || this.stopping)
-        return { status: 'unavailable' };
-      const unavailable = await this.serializeStorageWrite<PluginAuditReceipt | undefined>(async () => {
-        if (this.contended) {
-          // Drop the already-admitted burst, then give the first later write a short chance
-          // to observe a released SQLite lock without reviving the whole stale burst.
-          if (this.pending > 1) return { status: 'unavailable' };
-          await new Promise<void>((resolve) => setTimeout(resolve, SQLITE_CONTENTION_RECOVERY_DELAY_MS));
-          this.contended = false;
-        }
-        try {
-          await this.storage.getRepository(AuditLog).insert({ at: new Date(), ...event });
-        } catch {
-          this.contended = true;
-          return { status: 'unavailable' };
-        }
-      });
-      if (unavailable) return unavailable;
-      return { status: 'recorded' };
-    } finally {
-      this.pending--;
+      const callerTransaction = transaction?.queryRunner?.isTransactionActive ? transaction : undefined;
+      if (callerTransaction) {
+        // Runs on the caller's connection: no audit queue, no pending cap, no other connection to wait for.
+        if (!(await this.auditEnabled(event, finalSettingsChange))) return { status: 'unavailable' };
+        return await this.insertInTransaction(callerTransaction, event);
+      }
+      if (this.stopping) return this.drop(domain, 'shutting_down', action);
+      if (this.pending >= MAX_PENDING_AUDIT_WRITES) return this.drop(domain, 'queue_full', action);
+      this.pending++;
+      try {
+        if (!(await this.auditEnabled(event, finalSettingsChange))) return { status: 'unavailable' };
+        return await this.insertOnAuditConnection(event);
+      } finally {
+        this.pending--;
+      }
+    } catch (error) {
+      return this.drop(
+        domain,
+        error instanceof SettingsUnavailableError ? 'settings_unavailable' : 'storage_error',
+        action,
+        error,
+      );
     }
+  }
+
+  /** False when audit or the event's domain is switched off (not a drop). Throws SettingsUnavailableError if unreadable. */
+  private async auditEnabled(event: Omit<AuditLog, 'id' | 'at'>, finalSettingsChange: boolean): Promise<boolean> {
+    let config: AuditSettings;
+    try {
+      config = await readAuditSettings(this.settings);
+    } catch {
+      throw new SettingsUnavailableError();
+    }
+    return finalSettingsChange || (config.enabled && this.domainEnabled(config, event.domain));
+  }
+
+  private async insertInTransaction(
+    transaction: EntityManager,
+    event: Omit<AuditLog, 'id' | 'at'>,
+  ): Promise<PluginAuditReceipt> {
+    try {
+      // A nested TypeORM transaction is a SAVEPOINT on the caller's query runner.
+      await transaction.transaction((savepoint) => savepoint.insert(AuditLog, { at: new Date(), ...event }));
+      return { status: 'recorded' };
+    } catch (error) {
+      return this.drop(event.domain, 'storage_error', event.action, error);
+    }
+  }
+
+  private async insertOnAuditConnection(event: Omit<AuditLog, 'id' | 'at'>): Promise<PluginAuditReceipt> {
+    return this.serializeStorageWrite<PluginAuditReceipt>(async () => {
+      const storage = this.storage;
+      if (this.stopping) return this.drop(event.domain, 'shutting_down', event.action);
+      if (!storage?.isInitialized) return this.drop(event.domain, 'storage_unavailable', event.action);
+      try {
+        await storage.getRepository(AuditLog).insert({ at: new Date(), ...event });
+        return { status: 'recorded' };
+      } catch (error) {
+        return this.drop(event.domain, 'storage_error', event.action, error);
+      }
+    });
+  }
+
+  /** Logs and counts an audit record that was not stored. Never logs event data or the raw exception. */
+  protected drop(
+    domain: string | undefined,
+    reason: AuditDropReason,
+    action?: string,
+    error?: unknown,
+  ): PluginAuditReceipt {
+    const domainLabel = domain ?? 'unknown';
+    const code = sqliteErrorCode(error);
+    const message = `Audit record dropped: domain=${domainLabel}${action ? ` action=${action}` : ''} reason=${reason}${
+      code ? ` code=${code}` : ''
+    }`;
+    // Never log the event, SQLite parameters, or exception message (may contain secrets).
+    if (reason === 'storage_error') this.logger.error(message);
+    else this.logger.warn(message);
+    this.metrics.recordsDropped.inc({ domain: domainLabel, reason });
+    return { status: 'unavailable' };
   }
 
   /** Serializes every write on the audit storage connection, including cleanup transactions. */
@@ -251,22 +344,26 @@ export abstract class AuditStorage {
   }
 
   /** Billing events are projected from scalar transaction fields only, never provider payloads. */
-  async recordBillingTransaction(event: BillingTransactionAuditEvent): Promise<PluginAuditReceipt> {
-    try {
-      if (
-        !Number.isSafeInteger(event.transactionId) ||
-        event.transactionId <= 0 ||
-        !Number.isSafeInteger(event.userId) ||
-        event.userId <= 0 ||
-        !Number.isSafeInteger(event.amount) ||
-        !billingStatuses.has(event.status) ||
-        (event.previousStatus !== undefined && !billingStatuses.has(event.previousStatus)) ||
-        !billingSources.has(event.source)
-      )
-        return { status: 'unavailable' };
-      const actorId = event.initiatorId ?? event.userId;
-      if (!Number.isSafeInteger(actorId) || actorId <= 0) return { status: 'unavailable' };
-      return await this.recordSnapshot({
+  async recordBillingTransaction(
+    event: BillingTransactionAuditEvent,
+    transaction?: EntityManager,
+  ): Promise<PluginAuditReceipt> {
+    const actorId = event.initiatorId ?? event.userId;
+    if (
+      !Number.isSafeInteger(event.transactionId) ||
+      event.transactionId <= 0 ||
+      !Number.isSafeInteger(event.userId) ||
+      event.userId <= 0 ||
+      !Number.isSafeInteger(event.amount) ||
+      !billingStatuses.has(event.status) ||
+      (event.previousStatus !== undefined && !billingStatuses.has(event.previousStatus)) ||
+      !billingSources.has(event.source) ||
+      !Number.isSafeInteger(actorId) ||
+      actorId <= 0
+    )
+      return this.drop('billing', 'invalid_event');
+    return this.recordSnapshot(
+      {
         domain: 'billing',
         pluginId: 'billing',
         action: event.previousStatus === undefined ? 'billing.transaction.created' : 'billing.transaction.updated',
@@ -285,136 +382,107 @@ export abstract class AuditStorage {
           ...(event.previousStatus === undefined ? {} : { previousStatus: event.previousStatus }),
           source: event.source,
         },
-      });
-    } catch {
-      return { status: 'unavailable' };
-    }
+      },
+      { transaction },
+    );
   }
 
-  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>): Promise<boolean> {
-    try {
-      const snapshot = projectResourceAuditEvent({ ...event, operationId: randomUUID() });
-      const storage = this.storage;
-      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return false;
-      this.pending++;
-      try {
-        const config = await readAuditSettings(this.settings);
-        if (!config.enabled || !config.domains.includes('resource') || this.stopping) return false;
-        await this.serializeStorageWrite(() =>
-          storage.getRepository(AuditLog).insert({
-            at: new Date(),
-            domain: 'resource',
-            pluginId: 'core',
-            action: snapshot.action,
-            operationId: snapshot.operationId,
-            actorId: snapshot.actorId,
-            authenticationMethod:
-              snapshot.authenticationMethod === undefined
-                ? snapshot.actorId === null
-                  ? null
-                  : 'session'
-                : snapshot.authenticationMethod,
-            apiTokenId: snapshot.apiTokenId ?? null,
-            outcome: 'succeeded',
-            subjectType: snapshot.subjectType ?? 'resource',
-            subjectId: snapshot.subjectId,
-            ipAddress: null,
-            userAgent: null,
-            details: snapshot.details,
-          }),
-        );
-        return true;
-      } finally {
-        this.pending--;
-      }
-    } catch {
-      /* Audit persistence must not affect resource operations. */
+  async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>, transaction?: EntityManager): Promise<boolean> {
+    const snapshot = this.project(() => projectResourceAuditEvent({ ...event, operationId: randomUUID() }));
+    if (!snapshot) {
+      this.drop(undefined, 'invalid_event');
       return false;
     }
+    const receipt = await this.recordSnapshot(
+      {
+        domain: 'resource',
+        pluginId: 'core',
+        action: snapshot.action,
+        operationId: snapshot.operationId,
+        actorId: snapshot.actorId,
+        authenticationMethod:
+          snapshot.authenticationMethod === undefined
+            ? snapshot.actorId === null
+              ? null
+              : 'session'
+            : snapshot.authenticationMethod,
+        apiTokenId: snapshot.apiTokenId ?? null,
+        outcome: 'succeeded',
+        subjectType: snapshot.subjectType ?? 'resource',
+        subjectId: snapshot.subjectId,
+        ipAddress: null,
+        userAgent: null,
+        details: snapshot.details,
+      },
+      { transaction },
+    );
+    return receipt.status === 'recorded';
   }
 
   /** Records only reviewed scalar administration metadata; callers must never pass request bodies. */
   async recordAdministration(
     event: AdministrationAuditEvent,
     previousAuditSettings?: PreviousAuditSettings,
+    transaction?: EntityManager,
   ): Promise<PluginAuditReceipt> {
-    try {
-      const snapshot = projectAdministrationAuditEvent(event);
-      if (!snapshot) return { status: 'unavailable' };
-      // A successful change that turns recording off is its own final event. The exception
-      // is restricted to audit settings and the caller's previously enabled administration policy.
-      const finalSettingsChange =
-        snapshot.action === 'settings.updated' &&
-        String(snapshot.details.settingKey).startsWith('audit.') &&
-        previousAuditSettings?.enabled === true &&
-        previousAuditSettings.domains.includes('administration');
-      return await this.recordSnapshot(
-        {
-          domain: 'administration',
-          pluginId: 'core',
-          action: snapshot.action,
-          operationId: snapshot.operationId ?? randomUUID(),
-          actorId: snapshot.actorId,
-          authenticationMethod: snapshot.authenticationMethod ?? 'session',
-          apiTokenId: snapshot.apiTokenId ?? null,
-          outcome: snapshot.outcome ?? 'succeeded',
-          subjectType: snapshot.subjectType,
-          subjectId: snapshot.subjectId,
-          details: snapshot.details,
-          ipAddress: null,
-          userAgent: null,
-        },
-        finalSettingsChange,
-      );
-    } catch {
-      // Audit persistence must not affect administration operations.
-      return { status: 'unavailable' };
-    }
+    const snapshot = this.project(() => projectAdministrationAuditEvent(event));
+    if (!snapshot) return this.drop(undefined, 'invalid_event');
+    // A successful change that turns recording off is its own final event. The exception
+    // is restricted to audit settings and the caller's previously enabled administration policy.
+    const finalSettingsChange =
+      snapshot.action === 'settings.updated' &&
+      String(snapshot.details.settingKey).startsWith('audit.') &&
+      previousAuditSettings?.enabled === true &&
+      previousAuditSettings.domains.includes('administration');
+    return this.recordSnapshot(
+      {
+        domain: 'administration',
+        pluginId: 'core',
+        action: snapshot.action,
+        operationId: snapshot.operationId ?? randomUUID(),
+        actorId: snapshot.actorId,
+        authenticationMethod: snapshot.authenticationMethod ?? 'session',
+        apiTokenId: snapshot.apiTokenId ?? null,
+        outcome: snapshot.outcome ?? 'succeeded',
+        subjectType: snapshot.subjectType,
+        subjectId: snapshot.subjectId,
+        details: snapshot.details,
+        ipAddress: null,
+        userAgent: null,
+      },
+      { finalSettingsChange, transaction },
+    );
   }
 
-  async recordProject(event: Omit<ProjectAuditEvent, 'operationId'>): Promise<void> {
-    try {
-      const snapshot = projectProjectAuditEvent({ ...event, operationId: randomUUID() });
-      const storage = this.storage;
-      if (!snapshot || this.stopping || !storage?.isInitialized || this.pending >= 8) return;
-      this.pending++;
-      try {
-        const config = await readAuditSettings(this.settings);
-        if (!config.enabled || !config.domains.includes('project') || this.stopping) return;
-        await this.serializeStorageWrite(() =>
-          storage.getRepository(AuditLog).insert({
-            at: new Date(),
-            domain: 'project',
-            pluginId: 'core',
-            action: snapshot.action,
-            operationId: snapshot.operationId,
-            actorId: snapshot.actorId,
-            authenticationMethod: snapshot.authenticationMethod ?? 'session',
-            apiTokenId: snapshot.apiTokenId ?? null,
-            outcome: 'succeeded',
-            subjectType: snapshot.subjectType,
-            subjectId: snapshot.subjectId,
-            ipAddress: null,
-            userAgent: null,
-            details: snapshot.details,
-          }),
-        );
-      } finally {
-        this.pending--;
-      }
-    } catch {
-      /* Audit persistence must not affect project operations. */
+  async recordProject(event: Omit<ProjectAuditEvent, 'operationId'>, transaction?: EntityManager): Promise<void> {
+    const snapshot = this.project(() => projectProjectAuditEvent({ ...event, operationId: randomUUID() }));
+    if (!snapshot) {
+      this.drop(undefined, 'invalid_event');
+      return;
     }
+    await this.recordSnapshot(
+      {
+        domain: 'project',
+        pluginId: 'core',
+        action: snapshot.action,
+        operationId: snapshot.operationId,
+        actorId: snapshot.actorId,
+        authenticationMethod: snapshot.authenticationMethod ?? 'session',
+        apiTokenId: snapshot.apiTokenId ?? null,
+        outcome: 'succeeded',
+        subjectType: snapshot.subjectType,
+        subjectId: snapshot.subjectId,
+        ipAddress: null,
+        userAgent: null,
+        details: snapshot.details,
+      },
+      { transaction },
+    );
   }
 
   protected abstract readonly logger: Logger;
 
-  protected abstract readonly billingEvents: WeakMap<
-    QueryRunner,
-    { event: BillingTransactionAuditEvent; transactionDepth: number; resolve: (receipt: PluginAuditReceipt) => void }[]
-  >;
-
-  protected abstract transactionDepth(queryRunner: QueryRunner): number;
+  protected abstract readonly metrics: AuditMetrics;
 
   protected abstract storage?: DataSource;
 
@@ -425,8 +493,6 @@ export abstract class AuditStorage {
   protected abstract readonly settings: SettingsStoreService;
 
   protected abstract readonly source: DataSource;
-
-  protected abstract contended: boolean;
 
   protected abstract writeTail: Promise<void>;
 

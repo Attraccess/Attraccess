@@ -209,15 +209,13 @@ export class ReaderSessionService implements OnModuleDestroy {
     this.rejections.clear();
     for (const entry of entries) {
       if (!entry.readerId) continue; // the audit log needs a reader to attach the event to
-      await this.audit
-        .recordAttractap({
-          action: 'reader.handshake_rejected',
-          actorId: null,
-          authenticationMethod: null,
-          subjectId: entry.readerId,
-          details: { reason: entry.reason, count: entry.count },
-        })
-        .catch(() => undefined);
+      await this.audit.recordAttractap({
+        action: 'reader.handshake_rejected',
+        actorId: null,
+        authenticationMethod: null,
+        subjectId: entry.readerId,
+        details: { reason: entry.reason, count: entry.count },
+      });
     }
   }
 }

@@ -153,13 +153,16 @@ describe('ResourceUsageService', () => {
         id: endSessionScope.mockUser.id,
         username: endSessionScope.mockUser.username,
       });
-      expect(endSessionScope.mockAuditService.recordResource).toHaveBeenCalledWith({
-        action: 'usage_session.ended',
-        actorId: 1,
-        authenticationMethod: 'session',
-        subjectId: 1,
-        details: { usageId: 1, usageUserId: 1 },
-      });
+      expect(endSessionScope.mockAuditService.recordResource).toHaveBeenCalledWith(
+        {
+          action: 'usage_session.ended',
+          actorId: 1,
+          authenticationMethod: 'session',
+          subjectId: 1,
+          details: { usageId: 1, usageUserId: 1 },
+        },
+        expect.objectContaining({ getRepository: expect.any(Function) }),
+      );
     });
 
     it('runs the stopped-session flow after reservation but before usage finalization', async () => {

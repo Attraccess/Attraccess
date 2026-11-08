@@ -119,12 +119,6 @@ describe('ReaderUiSettingsService', () => {
     );
   });
 
-  it('does not fail the save when auditing fails', async () => {
-    const { service, audit } = setup();
-    audit.recordAttractap.mockRejectedValue(new Error('down'));
-    await expect(service.setReader(2, false, { id: 9 })).resolves.toBeUndefined();
-  });
-
   it('records the real principal: an API token change is audited as api-token with its id', async () => {
     const { service, audit } = setup();
     await service.setReader(2, false, { id: 9, authenticationMethod: 'api-token', apiTokenId: 31 });

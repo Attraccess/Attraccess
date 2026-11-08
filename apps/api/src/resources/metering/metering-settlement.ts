@@ -108,7 +108,7 @@ export class MeteringSettlement {
         failureReason: null,
         settledAt: new Date(),
       });
-      void this.audit.recordBillingTransactionAfterCommit(
+      await this.audit.recordBillingTransaction(
         {
           transactionId: correction.id,
           userId: correction.userId,

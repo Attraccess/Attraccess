@@ -868,7 +868,7 @@ describe('BillingService', () => {
       expect(manager.update).toHaveBeenCalledWith(BillingTransaction, 77, expect.objectContaining({ amount: -24 }));
       expect(transaction).toEqual(expect.objectContaining({ id: 77, amount: -24 }));
       expect(
-        handleResourceSessionStartedEventScope.auditService.recordBillingTransactionAfterCommit,
+        handleResourceSessionStartedEventScope.auditService.recordBillingTransaction,
       ).toHaveBeenCalledWith(
         {
           transactionId: 77,

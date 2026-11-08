@@ -547,7 +547,7 @@ describe('BillingService', () => {
 
       expect(billingServiceChargeForResourceUsageScope.billingTransactionRepository.save).not.toHaveBeenCalled();
       expect(
-        billingServiceChargeForResourceUsageScope.auditService.recordBillingTransactionAfterCommit,
+        billingServiceChargeForResourceUsageScope.auditService.recordBillingTransaction,
       ).not.toHaveBeenCalled();
       expect(
         billingServiceChargeForResourceUsageScope.liveNotificationsService.notifyTransactionUpdate,

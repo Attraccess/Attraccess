@@ -30,18 +30,16 @@ export async function clearEntry(
   await context.healthRepository.remove(entry);
 
   if (entry.status === ResourceHealthStatus.UNHEALTHY) {
-    await context.audit
-      .recordResource({
-        action: 'health.transition',
-        ...auditOrigin,
-        subjectId: resourceId,
-        details: {
-          previousStatus: entry.status,
-          status: ResourceHealthStatus.HEALTHY,
-          healthSource: entry.source,
-        },
-      })
-      .catch(() => undefined);
+    await context.audit.recordResource({
+      action: 'health.transition',
+      ...auditOrigin,
+      subjectId: resourceId,
+      details: {
+        previousStatus: entry.status,
+        status: ResourceHealthStatus.HEALTHY,
+        healthSource: entry.source,
+      },
+    });
     context.logger.log(
       `Resource ${resourceId} health entry cleared (identifier="${entry.identifier}"): ${entry.status} -> cleared`,
     );

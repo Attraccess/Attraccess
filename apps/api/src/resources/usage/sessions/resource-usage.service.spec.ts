@@ -772,13 +772,17 @@ describe('ResourceUsageService', () => {
       expect(startSessionScope.flowExecutorService.trackResourceActivity).toHaveBeenCalledWith(
         createdSession.resourceId,
       );
-      expect(startSessionScope.mockAuditService.recordResource).toHaveBeenCalledWith({
-        action: 'usage_session.started',
-        actorId: 1,
-        authenticationMethod: 'session',
-        subjectId: 1,
-        details: { usageId: 1, usageUserId: 1 },
-      });
+      // Written inside the session's transaction, so the row commits or rolls back with it.
+      expect(startSessionScope.mockAuditService.recordResource).toHaveBeenCalledWith(
+        {
+          action: 'usage_session.started',
+          actorId: 1,
+          authenticationMethod: 'session',
+          subjectId: 1,
+          details: { usageId: 1, usageUserId: 1 },
+        },
+        expect.objectContaining({ getRepository: expect.any(Function) }),
+      );
     });
   });
 

@@ -144,6 +144,7 @@ describe('ProjectsService', () => {
           action: 'project.deleted',
           details: { projectId: 99, 'before.hasLogo': 0, 'before.nameOmitted': 1 },
         }),
+        expect.anything(),
       );
     });
 
@@ -209,15 +210,18 @@ describe('ProjectsService', () => {
 
       expect(fixture.resourceUsageRepository.update).toHaveBeenCalledWith({ projectId: 99 }, { projectId: null });
       expect(fixture.projectRepository.delete).toHaveBeenCalledWith(99);
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith({
-        action: 'project.deleted',
-        actorId: 7,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project',
-        subjectId: 99,
-        details: { projectId: 99, 'before.name': 'Deleted', 'before.hasLogo': 0 },
-      });
+      expect(fixture.audit.recordProject).toHaveBeenCalledWith(
+        {
+          action: 'project.deleted',
+          actorId: 7,
+          authenticationMethod: 'session',
+          apiTokenId: undefined,
+          subjectType: 'project',
+          subjectId: 99,
+          details: { projectId: 99, 'before.name': 'Deleted', 'before.hasLogo': 0 },
+        },
+        expect.objectContaining({ getRepository: expect.any(Function) }),
+      );
     });
 
     it('rolls back usage detachment when the project delete affects no row', async () => {

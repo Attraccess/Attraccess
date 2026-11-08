@@ -1,6 +1,7 @@
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
 import httpRequest from 'supertest';
 import { AuditService } from '../../../../api/src/audit/audit.service';
+import { createTestAuditMetrics } from '../../../../api/src/audit/audit.test-fixture';
 import { SettingsStoreService } from '../../../../api/src/settings/settings-store.service';
 import { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
 import { WagoCommissioningService } from '../../backend/commissioning/service';
@@ -68,7 +69,11 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       entities: [...Object.values(entities), ...plugin.entities],
       synchronize: false,
     }).initialize();
-    state.audit = new AuditService(state.db, new SettingsStoreService(state.db.getRepository(Setting), null));
+    state.audit = new AuditService(
+      state.db,
+      new SettingsStoreService(state.db.getRepository(Setting), null),
+      createTestAuditMetrics(),
+    );
     await state.audit.onModuleInit();
     state.mqtt = new FixtureMqtt();
     state.revoke.mockReset().mockResolvedValue(undefined);
@@ -318,7 +323,11 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.audit.onModuleDestroy();
     await state.db.destroy();
     await state.db.initialize();
-    state.audit = new AuditService(state.db, new SettingsStoreService(state.db.getRepository(Setting), null));
+    state.audit = new AuditService(
+      state.db,
+      new SettingsStoreService(state.db.getRepository(Setting), null),
+      createTestAuditMetrics(),
+    );
     await state.audit.onModuleInit();
     state.wago = new WagoService(state.context);
     state.commissioning = new WagoCommissioningService(state.context, state.wago, state.artifacts);
@@ -393,7 +402,11 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.audit.onModuleDestroy();
     await state.db.destroy();
     await state.db.initialize();
-    state.audit = new AuditService(state.db, new SettingsStoreService(state.db.getRepository(Setting), null));
+    state.audit = new AuditService(
+      state.db,
+      new SettingsStoreService(state.db.getRepository(Setting), null),
+      createTestAuditMetrics(),
+    );
     await state.audit.onModuleInit();
     expect(await state.db.getRepository(AuditLog).find({ order: { id: 'ASC' } })).toEqual(before);
     expect((await state.audit.list({ limit: 100 })).items).toHaveLength(4);

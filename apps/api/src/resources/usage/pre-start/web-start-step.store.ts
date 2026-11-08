@@ -122,23 +122,21 @@ export class WebStartStepStore {
     reasonCode: string,
   ): void {
     const viaToken = step.apiTokenId !== undefined;
-    void this.audit
-      .recordAttractap({
-        action,
-        subjectType: 'resource',
-        actorId: step.userId,
-        authenticationMethod: viaToken ? 'api-token' : 'session',
-        ...(viaToken ? { apiTokenId: step.apiTokenId } : {}),
-        subjectId: step.resourceId,
-        details: {
-          plugin: step.plugin,
-          userId: step.userId,
-          resourceId: step.resourceId,
-          decision,
-          reasonCode,
-          origin: step.origin,
-        },
-      })
-      .catch(() => undefined);
+    void this.audit.recordAttractap({
+      action,
+      subjectType: 'resource',
+      actorId: step.userId,
+      authenticationMethod: viaToken ? 'api-token' : 'session',
+      ...(viaToken ? { apiTokenId: step.apiTokenId } : {}),
+      subjectId: step.resourceId,
+      details: {
+        plugin: step.plugin,
+        userId: step.userId,
+        resourceId: step.resourceId,
+        decision,
+        reasonCode,
+        origin: step.origin,
+      },
+    });
   }
 }

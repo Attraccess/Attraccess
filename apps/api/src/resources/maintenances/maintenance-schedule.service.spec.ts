@@ -137,6 +137,7 @@ describe('MaintenanceScheduleService', () => {
         subjectId: 1,
         details: expect.objectContaining({ scheduleId: 10, enabled: 1, usageThreshold: 12 }),
       }),
+      expect.anything(),
     );
   });
 

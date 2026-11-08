@@ -258,6 +258,10 @@ Hinweise:
 - **Lange Lesegeräte-Listen** werden auf etwa 200 Zeichen begrenzt (`; +N more`), damit die Pushover-Nachricht unter der Pushover-Grenze von 1.024 Zeichen bleibt und ihre Links zum Stummschalten und Ansehen behält. Namen von Lesegeräten werden auf 40 Zeichen gekürzt und `<` sowie `>` entfernt, weil Pushover die Nachricht als HTML darstellt.
 - **Upgrades:** Die frühere einzelne Regel `AttractapReaderCrashes` behält ihre UID und wird an Ort und Stelle ersetzt, der alte Wortlaut bleibt also nicht erhalten. Eine bestehende Grafana-Stummschaltung auf `AttractapReaderCrashes` unterdrückt daher auch die neue Crash-Warnung, bis sie abläuft.
 
+## Audit-Warnung
+
+`AuditRecordsDropped` ist ein kritischer Grafana-Alarm. Er löst aus, sobald `attraccess_audit_records_dropped_total` in den letzten 5 Minuten gestiegen ist, also mindestens ein Audit-Eintrag nicht gespeichert werden konnte. Die beschriebene Änderung selbst wurde trotzdem durchgeführt. Das API-Log enthält pro Verlust eine Zeile `Audit record dropped` mit Domäne, Aktion, Grund und SQLite-Fehlercode (nie Ereignisdetails). Das Label `reason` der Metrik zeigt, ob die Speicherung fehlschlug (`storage_error`), die Schreibwarteschlange überlief (`queue_full`) oder der Audit-Speicher nie gestartet wurde (`storage_unavailable`).
+
 ## Prometheus extern verfügbar machen (optional)
 
 Standardmäßig ist Prometheus nur intern verfügbar (keine `ports`-Zuordnung). Wenn Sie direkten Zugriff zum Debuggen benötigen:

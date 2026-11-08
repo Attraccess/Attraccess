@@ -150,6 +150,7 @@ sum(
 | `attraccess_mqtt_servers_healthy` | Gauge | -- | Number of healthy MQTT servers |
 | `attraccess_plugins_loaded` | Gauge | -- | Number of loaded plugins |
 | `attraccess_email_sent_total` | Counter | `status` | Emails sent by delivery status |
+| `attraccess_audit_records_dropped_total` | Counter | `domain`, `reason` | Audit records that were not stored. `domain` is the audit domain (`unknown` if the event was rejected before its domain was known). `reason` is `storage_error` (insert failed, e.g. SQLite busy timeout or constraint), `queue_full` (more than 1,000 writes waiting), `storage_unavailable` (audit connection not available), `shutting_down`, `settings_unavailable` or `invalid_event`. Disabled audit or a disabled domain is not a drop. Alert: `AuditRecordsDropped` |
 | `attraccess_websocket_connections_active` | Gauge | -- | Active WebSocket connections |
 
 ## WebSocket Timing
