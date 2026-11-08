@@ -54,9 +54,6 @@ export class ResourceSettingsEntity {
   @Column({ type: 'integer', default: 15 })
   handoverReminderMinutes!: number;
 
-  @Column({ type: 'boolean', default: false })
-  showNamesOnReaders!: boolean;
-
   /** JSON, see BookableHours. '{}' = bookable 24/7. */
   @Column({ type: 'text', default: '{}' })
   bookableHours!: string;

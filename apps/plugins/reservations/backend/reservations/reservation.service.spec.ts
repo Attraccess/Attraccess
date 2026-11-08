@@ -677,12 +677,10 @@ describe('ReservationService', () => {
       expect(readers()).toEqual([{ resourceId: 1 }]);
       await h.admin.update(manager, 1, { confirmWindowMinutes: 30 }); // unchanged
       expect(readers()).toHaveLength(1);
-      await h.admin.update(manager, 1, { showNamesOnReaders: true });
-      expect(readers()).toHaveLength(2);
       await h.admin.update(manager, 1, { enabled: false });
-      expect(readers()).toHaveLength(3);
+      expect(readers()).toHaveLength(2);
       await h.admin.update(manager, 1, { enabled: true });
-      expect(readers()).toHaveLength(4);
+      expect(readers()).toHaveLength(3);
       expect(readers().every((scope) => scope.resourceId === 1)).toBe(true);
       await h.enable(1);
       h.invalidateReaderUi.mockClear();

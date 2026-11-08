@@ -1,7 +1,7 @@
 import { Button, LabeledSwitch, StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
-import { Description, Fieldset, Spinner } from '@heroui/react';
+import { Fieldset, Spinner } from '@heroui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ReservationsApiError, getFutureBookingsCount, getResourceSettings, updateResourceSettings } from '../api';
 import { useReservationsTranslations } from '../i18n';
 import { describeError } from '../lib/errors';
@@ -46,7 +46,6 @@ const NUMBER_GROUPS: { title: string; fields: NumericField[] }[] = [
 export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: number }>) {
   const { t } = useReservationsTranslations();
   const invalidate = useInvalidateReservations();
-  const namesHintId = useId();
   const query = useQuery({
     queryKey: ['reservations', 'settings', resourceId],
     queryFn: () => getResourceSettings(resourceId),
@@ -160,17 +159,6 @@ export function ResourceSettingsForm({ resourceId }: Readonly<{ resourceId: numb
         <LabeledSwitch isSelected={values.checkInEnabled} onChange={(value) => set('checkInEnabled', value)}>
           {t('settings.checkInEnabled')}
         </LabeledSwitch>
-        <div className="rv:flex rv:flex-col rv:gap-1">
-          <LabeledSwitch
-            isSelected={values.showNamesOnReaders}
-            onChange={(value) => set('showNamesOnReaders', value)}
-            aria-describedby={namesHintId}
-            data-cy="reservations-setting-showNamesOnReaders"
-          >
-            {t('settings.showNamesOnReaders')}
-          </LabeledSwitch>
-          <Description id={namesHintId}>{t('settings.showNamesOnReadersHint')}</Description>
-        </div>
       </div>
       {NUMBER_GROUPS.map((group) => (
         <Fieldset key={group.title} className="rv:min-w-0">

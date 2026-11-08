@@ -197,8 +197,6 @@
     "enabled": "Enable reservations for this resource",
     "approvalRequired": "Bookings need approval by a manager",
     "checkInEnabled": "Require check-in (start the resource within the grace period)",
-    "showNamesOnReaders": "Show names on readers",
-    "showNamesOnReadersHint": "Names are shown only after someone taps their card.",
     "failed": "Settings could not be saved",
     "whoCanBook": {
       "label": "Who can book",

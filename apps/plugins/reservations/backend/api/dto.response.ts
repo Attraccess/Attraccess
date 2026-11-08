@@ -201,9 +201,6 @@ export class ResourceSettingsDto {
   @ApiProperty({ type: Number })
   handoverReminderMinutes!: number;
 
-  @ApiProperty({ type: Boolean })
-  showNamesOnReaders!: boolean;
-
   @ApiProperty(BOOKABLE_HOURS_SCHEMA)
   bookableHours!: Record<string, BookableRangeDto[]>;
 }

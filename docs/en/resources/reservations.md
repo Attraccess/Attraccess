@@ -131,7 +131,7 @@ name of the current user of a resource may also see who holds a booking on it. E
 - **Does not see the name:** people who may only see **Available** or **In Use** (supervised-use machines with the
   "introduced" setting), and people who may not see the machine's activity at all.
 - **Where it applies:** the notice on the resource page, the refusal when you press Start (in the web interface, the API
-  and on the reader), the availability view in the booking card and the calendar feeds. Notes, reasons and decisions of a booking stay visible to the holder and the
+  and on the reader), the availability view in the booking card, the calendar feeds and Attractap readers after a card tap (see [Attractap readers](#attractap-readers)). Notes, reasons and decisions of a booking stay visible to the holder and the
   managers only. Managers always get the override confirmation that names the holder.
 - A calendar feed is checked when it is requested, with the permissions of the feed's owner at that time.
 
@@ -145,7 +145,7 @@ installing or updating it (see [Reader display](attractap/reader-ui.md)). All ti
 bookings are shown. The reader's own status ("In use", maintenance and so on) always wins over the plugin's note.
 
 **Before a card is tapped.** A reader nobody is signed in to shows times and states only, never names or other
-personal data, whatever the settings:
+personal data, whoever may otherwise see names:
 
 | Situation                                                                        | Resource list          | Resource details                           |
 | -------------------------------------------------------------------------------- | ---------------------- | ------------------------------------------ |
@@ -161,9 +161,9 @@ returns to the texts above.
 
 - **Your own booking** (running, or starting within the early check-in window): the list shows "Your booking until
   16:00", the details "Your booking 14:00-16:00", with "check in by 14:15" while the check-in is still open.
-- **Managers of the resource** also see who holds a booking on the details ("Reserved by Alex 14:00-16:00").
-- **Everybody else** sees the texts above, unless the resource turns on **Show names on readers**; then the details
-  name the holder, too.
+- **Who may see the holder's name** (managers of the resource and everybody else who may see who uses the machine,
+  see [Who sees the holder's name](#who-sees-the-holders-name)) also sees it on the details ("Reserved by Alex
+  14:00-16:00"). Everybody else sees the texts above.
 - **While you are using the resource** and somebody else's booking starts within the confirmation window, the
   session area shows "Reserved from 14:00" with a countdown (with the name under the rules above).
 - The **list never shows names**, signed in or not. Long names are shortened.
@@ -178,11 +178,6 @@ returns to the texts above.
 | You stop a session inside your own running booking             | Asks "Keep it or free the rest?". **Free rest** ends the booking early. No answer within 15 seconds keeps the booking.                                          |
 
 Freeing a booking without a session is only possible in the web UI. Booking itself is not possible on the reader.
-
-**Show names on readers** (resource setting, off by default). It only changes what a person sees **after tapping a
-card** and who is not the holder or a manager: holder names on the resource details and in the reader's confirmation
-and refusal texts. It never affects a signed-out reader. The switch's help text says: "Names are shown only after
-someone taps their card." Saving it updates the readers right away.
 
 **Readers without a screen.** Attractap Lite readers, Touch readers with older firmware and readers whose plugin
 notes are paused after crashes cannot show anything of the above:
@@ -280,25 +275,24 @@ still work.
 Open the resource's settings page. The **Reservations** section is shown to users with the **Manage Resources**
 permission (the API also allows the resource's maintainers). Reservations are **disabled** by default.
 
-| Setting                         | Default      | Allowed values / meaning                                                                                                                    |
-| ------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reservations enabled            | off          | Turns the feature on for this resource.                                                                                                     |
-| Approval required               | off          | New bookings are pending until a manager decides. Applies to managers' own bookings, too.                                                   |
-| Time step (minutes)             | 15           | 5 to 240, must divide 1440. Start and duration snap to this grid.                                                                           |
-| Minimum duration (minutes)      | 15           | 1 to 1440, a multiple of the time step.                                                                                                     |
-| Maximum duration (minutes)      | 240          | 1 to 10080, a multiple of the time step, not below the minimum.                                                                             |
-| Maximum advance (days)          | 30           | 1 to 730. How far ahead bookings are possible.                                                                                              |
-| Minimum lead time (minutes)     | 0            | 0 to 10080. The latest a booking can be made before its start. 0 means up to the start (never in the past).                                 |
-| Buffer before / after (minutes) | 0 / 0        | 0 to 1440 each. Kept free around a booking and counted for overlaps.                                                                        |
-| Active bookings per user        | 3            | 0 to 100 (pending and confirmed with a future end). 0 means unlimited.                                                                      |
-| Who can book                    | `can-start`  | `can-start`, `managers-only` or `any-user`.                                                                                                 |
-| Confirmation window (minutes)   | 60           | 0 to 1440. Starting this close before someone else's booking asks for confirmation. 0 means never ask.                                      |
-| Check-in enabled                | on           | Bookings need a session start to avoid becoming a no show.                                                                                  |
-| Check-in grace (minutes)        | 15           | 1 to 240. Time after the start until a booking without check-in becomes a no show.                                                          |
-| Early check-in (minutes)        | 15           | 0 to 240. How long before the start a check-in counts.                                                                                      |
-| Handover reminder (minutes)     | 15           | 0 to 1440. Notifies users with a running session this long before a reservation starts.                                                     |
-| Show names on readers           | off          | Signed-in card users who are neither holder nor manager see holder names on Attractap readers, see [Attractap readers](#attractap-readers). |
-| Bookable hours                  | empty (24/7) | Per weekday, zero or more ranges `HH:mm-HH:mm`.                                                                                             |
+| Setting                         | Default      | Allowed values / meaning                                                                                    |
+| ------------------------------- | ------------ | ----------------------------------------------------------------------------------------------------------- |
+| Reservations enabled            | off          | Turns the feature on for this resource.                                                                     |
+| Approval required               | off          | New bookings are pending until a manager decides. Applies to managers' own bookings, too.                   |
+| Time step (minutes)             | 15           | 5 to 240, must divide 1440. Start and duration snap to this grid.                                           |
+| Minimum duration (minutes)      | 15           | 1 to 1440, a multiple of the time step.                                                                     |
+| Maximum duration (minutes)      | 240          | 1 to 10080, a multiple of the time step, not below the minimum.                                             |
+| Maximum advance (days)          | 30           | 1 to 730. How far ahead bookings are possible.                                                              |
+| Minimum lead time (minutes)     | 0            | 0 to 10080. The latest a booking can be made before its start. 0 means up to the start (never in the past). |
+| Buffer before / after (minutes) | 0 / 0        | 0 to 1440 each. Kept free around a booking and counted for overlaps.                                        |
+| Active bookings per user        | 3            | 0 to 100 (pending and confirmed with a future end). 0 means unlimited.                                      |
+| Who can book                    | `can-start`  | `can-start`, `managers-only` or `any-user`.                                                                 |
+| Confirmation window (minutes)   | 60           | 0 to 1440. Starting this close before someone else's booking asks for confirmation. 0 means never ask.      |
+| Check-in enabled                | on           | Bookings need a session start to avoid becoming a no show.                                                  |
+| Check-in grace (minutes)        | 15           | 1 to 240. Time after the start until a booking without check-in becomes a no show.                          |
+| Early check-in (minutes)        | 15           | 0 to 240. How long before the start a check-in counts.                                                      |
+| Handover reminder (minutes)     | 15           | 0 to 1440. Notifies users with a running session this long before a reservation starts.                     |
+| Bookable hours                  | empty (24/7) | Per weekday, zero or more ranges `HH:mm-HH:mm`.                                                             |
 
 Changes affect only **new** bookings; existing bookings are kept. The confirmation window and the check-in rules
 always use the current values.

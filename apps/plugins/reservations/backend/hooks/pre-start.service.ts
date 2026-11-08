@@ -17,7 +17,6 @@ import { DirectoryService } from '../reservations/directory.service';
 import { ReservationStore } from '../reservations/reservation.store';
 import { GlobalSettingsService } from '../settings/global-settings.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
-import type { ResourceSettings } from '../settings/settings.model';
 import { hookDeadline, waitUntil } from './runtime';
 
 const ALLOW: PreStartResult = Object.freeze({ decision: 'allow' }) as PreStartResult;
@@ -71,7 +70,7 @@ export class PreStartService {
     const nowMs = now.getTime();
     const active = others.filter((r) => r.startTime.getTime() <= nowMs);
     if (active.length > 0) {
-      const verdict = await this.whenActive(ctx, active, settings, now);
+      const verdict = await this.whenActive(ctx, active, now);
       if (verdict) return verdict;
     }
 
@@ -83,7 +82,7 @@ export class PreStartService {
     const { language: lang } = ctx;
     const minutes = Math.max(1, Math.ceil((upcoming.startTime.getTime() - nowMs) / MINUTE_MS));
     const from = await this.timeText(ctx, upcoming.startTime, now);
-    const holder = await this.holderForReader(ctx, settings, upcoming);
+    const holder = await this.holderForReader(ctx, upcoming);
     return {
       decision: 'confirm',
       confirmation: {
@@ -144,23 +143,17 @@ export class PreStartService {
   }
 
   /**
-   * The holder's name for a start made on a reader, when the starter may see it: a manager of the resource,
-   * or anybody when the resource opted in (`showNamesOnReaders`). Starts are made by an identified user, so
-   * this is always "after the card tap". Web and API starts keep their texts (no name lookup, no change).
-   * `checkManager: false` skips the manager lookup (the caller already knows the starter is not one).
+   * The holder's name in the "starts soon" question on a reader: for managers of the resource and for viewers who
+   * may see who uses the machine (core's usage attribution rule, as in {@link holderNameFor}), shortened for the
+   * reader. Starts are made by an identified user, so this is always "after the card tap". Web and API starts keep
+   * the nameless ATT-881 question (no lookup).
    */
-  private async holderForReader(
-    ctx: PreStartContext,
-    settings: ResourceSettings,
-    booking: ReservationEntity,
-    checkManager = true,
-  ): Promise<string | undefined> {
+  private async holderForReader(ctx: PreStartContext, booking: ReservationEntity): Promise<string | undefined> {
     if (ctx.origin !== 'reader') return undefined;
-    const allowed =
-      settings.showNamesOnReaders || (checkManager && (await this.access.isManager(subjectOfPrincipal(ctx.principal), ctx.resourceId)));
-    if (!allowed) return undefined;
-    const name = (await this.directory.getUserNames([booking.userId])).get(booking.userId);
-    return name ? readerName(name) : undefined;
+    const name = (await this.access.isManager(subjectOfPrincipal(ctx.principal), ctx.resourceId))
+      ? (await this.directory.getUserNames([booking.userId])).get(booking.userId)
+      : await this.holderNameFor(subjectOfPrincipal(ctx.principal), booking);
+    return name ? readerName(name) || undefined : undefined;
   }
 
   /** A time in a start text: readers follow the reader rule (weekday on another local day), web and API keep `HH:MM`. */
@@ -174,7 +167,6 @@ export class PreStartService {
   private async whenActive(
     ctx: PreStartContext,
     active: ReservationEntity[],
-    settings: ResourceSettings,
     now: Date,
   ): Promise<PreStartResult | null> {
     const { language: lang } = ctx;
@@ -187,8 +179,8 @@ export class PreStartService {
     if (!unconfirmed) return null;
     const until = await this.timeText(ctx, unconfirmed.endTime, now);
     if (!isManager) {
-      const holder =
-        (await this.holderForReader(ctx, settings, unconfirmed, false)) ?? (await this.holderNameFor(starter, unconfirmed));
+      const found = await this.holderNameFor(subjectOfPrincipal(ctx.principal), unconfirmed);
+      const holder = found && ctx.origin === 'reader' ? readerName(found) : found;
       return { decision: 'block', reason: reservedReason(lang, until, holder) };
     }
     // Managers always see the holder; only a reader needs the short, Latin-1 form of the name.

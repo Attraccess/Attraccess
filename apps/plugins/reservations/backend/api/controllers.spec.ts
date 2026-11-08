@@ -5,7 +5,7 @@ import { PendingDecisionService } from '../hooks/pending-decision.service';
 import { PendingDecisionStore } from '../hooks/pending-decisions';
 import { ReservationQueryService } from '../reservations/reservation-query.service';
 import { Harness, createHarness } from '../testing/harness.test-utils';
-import { CreateReservationBody, UpdateGlobalSettingsBody, UpdateResourceSettingsBody } from './dto.request';
+import { CreateReservationBody, UpdateGlobalSettingsBody } from './dto.request';
 import { validated } from './pipes';
 import { IcalFeedsController } from '../ical/ical.controller';
 import { ReservationsController } from './reservations.controller';
@@ -128,24 +128,6 @@ describe('controllers', () => {
     expect(await settings.managerAccess(1, request(99))).toEqual({ isManager: true });
     const updated = await settings.updateSettings(1, { maxDurationMinutes: 120 }, request(99));
     expect(updated).toMatchObject({ cancelledBookings: 0, settings: { maxDurationMinutes: 120 } });
-  });
-
-  it('reads and saves the names-on-readers opt-in (default off, managers only)', async () => {
-    expect(await settings.getSettings(1, request(99))).toMatchObject({ showNamesOnReaders: false });
-    await expect(settings.updateSettings(1, { showNamesOnReaders: true }, request(10))).rejects.toMatchObject({
-      status: 403,
-    });
-    const updated = await settings.updateSettings(1, { showNamesOnReaders: true }, request(99));
-    expect(updated.settings.showNamesOnReaders).toBe(true);
-    expect(h.settings.getCachedSettings(1).showNamesOnReaders).toBe(true);
-    expect(h.invalidateReaderUi).toHaveBeenCalledWith({ resourceId: 1 });
-  });
-
-  it('validates the names-on-readers flag in the request body', async () => {
-    const pipe = validated(UpdateResourceSettingsBody);
-    const transform = (body: unknown) => pipe.transform(body, { type: 'body', metatype: UpdateResourceSettingsBody });
-    await expect(transform({ showNamesOnReaders: true })).resolves.toMatchObject({ showNamesOnReaders: true });
-    await expect(transform({ showNamesOnReaders: 'yes' })).rejects.toMatchObject({ status: 400 });
   });
 
   it('exposes the global settings', async () => {

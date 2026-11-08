@@ -460,8 +460,8 @@ describe('PreStartService', () => {
         });
       });
 
-      it('names the holder to anybody when the resource opted in, within the host text limit', async () => {
-        await h.settings.update(1, { showNamesOnReaders: true });
+      it('names the holder to a viewer who may see who uses the machine, within the host text limit', async () => {
+        h.allowAttribution(10, 1);
         expect(await p.preStart.evaluate(reader(10))).toMatchObject({
           confirmation: { body: 'Reserved by user11 from 14:00, you have 40 min. Start anyway?' },
         });
@@ -473,8 +473,8 @@ describe('PreStartService', () => {
         expect(long.confirmation.body).not.toContain('日');
       });
 
-      it('never names the holder for web starts, even with the opt-in', async () => {
-        await h.settings.update(1, { showNamesOnReaders: true });
+      it('keeps the nameless ATT-881 question for web starts', async () => {
+        h.allowAttribution(10, 1);
         expect(JSON.stringify(await p.preStart.evaluate(ctx(10)))).not.toContain('user11');
         expect(JSON.stringify(await p.preStart.evaluate(ctx(99)))).not.toContain('user11');
       });
@@ -494,8 +494,8 @@ describe('PreStartService', () => {
         });
       });
 
-      it('names the holder in the refusal only with the opt-in', async () => {
-        await h.settings.update(1, { showNamesOnReaders: true });
+      it('names the holder in the refusal only to viewers who may see who uses the machine, like the web', async () => {
+        h.allowAttribution(10, 1);
         expect(await p.preStart.evaluate(reader(10))).toMatchObject({
           decision: 'block',
           reason: { code: 'RESERVED', body: 'Reserved by user11 until 16:00.' },
@@ -503,14 +503,21 @@ describe('PreStartService', () => {
         expect(await p.preStart.evaluate(reader(10, { language: 'de' }))).toMatchObject({
           reason: { body: 'Von user11 bis 16:00 reserviert.' },
         });
-        // The web UI query keeps its nameless reason.
+        // The web notice follows the same rule; only the reader shortens long names.
         const state = await p.preStart.evaluateStartBlocked({
           resourceId: 1,
           userId: 10,
           language: 'en',
           now: h.clock(),
         });
-        expect(state?.reason.body).toBe('Reserved by another user until 16:00.');
+        expect(state?.reason.body).toBe('Reserved by user11 until 16:00.');
+        jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map([[11, 'Alexandra-Maximiliane Łukasz']]));
+        expect(await p.preStart.evaluate(reader(10))).toMatchObject({
+          reason: { body: 'Reserved by Alexandra-Maximi until 16:00.' },
+        });
+        expect(await p.preStart.evaluate(ctx(10, { now: h.clock() }))).toMatchObject({
+          reason: { body: 'Reserved by Alexandra-Maximiliane Łukasz until 16:00.' },
+        });
       });
 
       it('writes a time on another local day with its weekday on a reader only', async () => {

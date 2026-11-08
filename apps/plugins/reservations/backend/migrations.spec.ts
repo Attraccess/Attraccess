@@ -50,35 +50,9 @@ describe('plugin migrations', () => {
       `EXPLAIN QUERY PLAN SELECT id FROM reservations_reservation WHERE status = 'confirmed' AND endTime <= '2026-06-01'`,
     );
     expect(JSON.stringify(plan)).toContain('IDX_reservations_reservation_status_end');
-    await dataSource.undoLastMigration(); // add-show-names-on-readers
-    await dataSource.undoLastMigration(); // add-reservation-status-indexes
+    await dataSource.undoLastMigration();
     expect(await indexes()).toEqual(['IDX_reservations_reservation_slot', 'IDX_reservations_reservation_user']);
     await dataSource.runMigrations();
     expect(await indexes()).toHaveLength(4);
-  });
-
-  it('adds showNamesOnReaders off by default, keeps existing rows, and reverts', async () => {
-    await dataSource.runMigrations();
-    const columns = async () =>
-      (await dataSource.query(`PRAGMA table_info("reservations_resource_settings")`)) as {
-        name: string;
-        dflt_value: string;
-        notnull: number;
-      }[];
-    expect((await columns()).find((c) => c.name === 'showNamesOnReaders')).toMatchObject({
-      notnull: 1,
-      dflt_value: '0',
-    });
-    expect(new pluginMigrations.AddShowNamesOnReaders1790000000002().name).toBe('AddShowNamesOnReaders1790000000002');
-
-    await dataSource.undoLastMigration();
-    expect((await columns()).map((c) => c.name)).not.toContain('showNamesOnReaders');
-    await dataSource.query(
-      `INSERT INTO "reservations_resource_settings" ("resourceId", "enabled", "updatedAt") VALUES (7, 1, '2026-06-01')`,
-    );
-    await dataSource.runMigrations();
-    expect(
-      await dataSource.query(`SELECT "enabled", "showNamesOnReaders" FROM "reservations_resource_settings"`),
-    ).toEqual([{ enabled: 1, showNamesOnReaders: 0 }]);
   });
 });

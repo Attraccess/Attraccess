@@ -209,32 +209,34 @@ describe('ReaderUiService', () => {
       expect(row(await slots({ language: 'de' }))).toBe('Reserviert bis Di 10:00');
     });
 
-    it('never contains names or user data, with the opt-in off or on, and does no user lookups', async () => {
+    it('never contains names or user data, and does no user or permission lookups', async () => {
+      // Everybody may see who uses the machine here: a signed-out reader still shows no name.
+      h.allowAttribution(OTHER, 1);
+      h.allowAttribution(HOLDER, 1);
       const names = jest.spyOn(h.directory, 'getUserNames');
       const manager = jest.spyOn(h.access, 'isManager');
+      const attribution = jest.spyOn(h.access, 'attributionResourceIds');
       const states: [string, string, string][] = [
         ['2026-06-01T12:00:00', '2026-06-01T14:00:00', '2026-06-01T10:00:00Z'], // upcoming
         ['2026-06-01T08:00:00', '2026-06-01T14:00:00', '2026-06-01T08:05:00Z'], // running, no check-in
         ['2026-06-01T08:00:00', '2026-06-01T14:00:00', '2026-06-01T08:30:00Z'], // running
       ];
-      for (const showNamesOnReaders of [false, true]) {
-        await h.enable(1, { showNamesOnReaders });
-        for (const [start, end, now] of states) {
-          const booking = await book(HOLDER, start, end);
-          h.setNow(now);
-          for (const language of ['en', 'de'] as const) {
-            const list = await slots({ language });
-            expect(list.length).toBeGreaterThan(0);
-            const dump = JSON.stringify(list);
-            expect(dump).not.toContain(`user${HOLDER}`);
-            expect(dump).not.toContain('user');
-            expect(dump).not.toContain(String(HOLDER) + '"');
-          }
-          await h.dataSource.getRepository(ReservationEntity).delete({ id: booking.id });
+      for (const [start, end, now] of states) {
+        const booking = await book(HOLDER, start, end);
+        h.setNow(now);
+        for (const language of ['en', 'de'] as const) {
+          const list = await slots({ language });
+          expect(list.length).toBeGreaterThan(0);
+          const dump = JSON.stringify(list);
+          expect(dump).not.toContain(`user${HOLDER}`);
+          expect(dump).not.toContain('user');
+          expect(dump).not.toContain(String(HOLDER) + '"');
         }
+        await h.dataSource.getRepository(ReservationEntity).delete({ id: booking.id });
       }
       expect(names).not.toHaveBeenCalled();
       expect(manager).not.toHaveBeenCalled();
+      expect(attribution).not.toHaveBeenCalled();
     });
   });
 
@@ -283,13 +285,13 @@ describe('ReaderUiService', () => {
       expectHostValid(en);
     });
 
-    it('other users see the public texts unless the resource opted in', async () => {
+    it("other users see the public texts unless they may see who uses the machine (core's rule)", async () => {
       await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
       const names = jest.spyOn(h.directory, 'getUserNames');
       expect(body(await slots({ userId: OTHER }))).toBe('Reserved 14:00-16:00');
       expect(names).not.toHaveBeenCalled();
 
-      await h.enable(1, { showNamesOnReaders: true });
+      h.allowAttribution(OTHER, 1);
       const en = await slots({ userId: OTHER });
       expect(body(en)).toBe('Reserved by user10 14:00-16:00');
       expect(row(en)).toBe('Free until 14:00');
@@ -298,7 +300,7 @@ describe('ReaderUiService', () => {
     });
 
     it('names the running holder after check-in, truncated and Latin-1 safe', async () => {
-      await h.enable(1, { showNamesOnReaders: true });
+      h.allowAttribution(OTHER, 1);
       jest
         .spyOn(h.directory, 'getUserNames')
         .mockResolvedValue(new Map([[HOLDER, 'Alexandra-Maximiliane Überlänge 日本語']]));
@@ -334,13 +336,13 @@ describe('ReaderUiService', () => {
       expectHostValid(en);
     });
 
-    it('session area names the holder only for managers or with the opt-in', async () => {
+    it('session area names the holder only for managers or viewers who may see who uses the machine', async () => {
       await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
       const text = async (userId: number) =>
         textOf(get(await slots({ userId }), 'resource.details.session')?.tree as ReaderUiNode)[0];
       expect(await text(MANAGER)).toBe('Reserved by user10 from 12:40');
       expect(await text(OTHER)).toBe('Reserved from 12:40');
-      await h.enable(1, { showNamesOnReaders: true });
+      h.allowAttribution(OTHER, 1);
       expect(await text(OTHER)).toBe('Reserved by user10 from 12:40');
     });
 

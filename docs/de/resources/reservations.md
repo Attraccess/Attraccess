@@ -142,7 +142,7 @@ Zeiten. Welche Regel gilt, legt die Einstellung
   Nutzung erlauben oder erfordern, bei der Einstellung „Nur eingewiesene Personen“), und Personen, die die Aktivität
   der Maschine gar nicht sehen dürfen.
 - **Wo das gilt:** der Hinweis auf der Ressourcenseite, die Ablehnung beim Drücken von Start (in der Web-Oberfläche,
-  über die API und am Reader), die Verfügbarkeitsansicht in der Buchungskarte und die Kalender-Feeds. Notizen, Gründe und Entscheidungen einer Buchung
+  über die API und am Reader), die Verfügbarkeitsansicht in der Buchungskarte, die Kalender-Feeds und Attractap-Reader nach dem Auflegen einer Karte (siehe [Attractap-Reader](#attractap-reader)). Notizen, Gründe und Entscheidungen einer Buchung
   sehen weiterhin nur die buchende Person und die Verwaltenden. Verwaltende erhalten immer die Override-Bestätigung,
   die die buchende Person nennt.
 - Ein Kalender-Feed wird beim Abruf geprüft, mit den Berechtigungen der Feed-Besitzerin oder des Feed-Besitzers zu
@@ -159,7 +159,7 @@ kurzen Wochentag („Di 09:00“). Gezeigt werden nur bestätigte Buchungen. Der
 Benutzung“, Wartung und so weiter) hat immer Vorrang vor dem Hinweis des Plugins.
 
 **Vor dem Auflegen einer Karte.** Ein Reader, an dem niemand angemeldet ist, zeigt nur Zeiten und Zustände, nie Namen
-oder andere personenbezogene Daten, egal bei welcher Einstellung:
+oder andere personenbezogene Daten, auch nicht für Personen, die sonst Namen sehen dürfen:
 
 | Situation                                                                                | Ressourcenliste        | Ressourcendetails                             |
 | ---------------------------------------------------------------------------------------- | ---------------------- | --------------------------------------------- |
@@ -175,10 +175,9 @@ Kartensitzung, kehrt der Reader zu den Texten oben zurück.
 
 - **Die eigene Buchung** (laufend oder beginnt im Fenster für frühes Einchecken): Die Liste zeigt „Deine Buchung bis
   16:00“, die Details „Deine Buchung 14:00-16:00“, solange der Check-in noch offen ist mit „Check-in bis 14:15“.
-- **Verwaltende der Ressource** sehen in den Details auch, wer eine Buchung hat („Reserviert von Alex
-  14:00-16:00“).
-- **Alle anderen** sehen die Texte oben, es sei denn, die Ressource schaltet **Namen auf Readern anzeigen** ein; dann
-  nennen auch für sie die Details die buchende Person.
+- **Wer den Namen der buchenden Person sehen darf** (Verwaltende der Ressource und alle anderen, die sehen dürfen, wer
+  die Maschine nutzt, siehe [Wer den Namen der buchenden Person sieht](#wer-den-namen-der-buchenden-person-sieht)),
+  sieht ihn auch in den Details („Reserviert von Alex 14:00-16:00“). Alle anderen sehen die Texte oben.
 - **Während Sie die Ressource nutzen** und die Buchung einer anderen Person im Bestätigungsfenster beginnt, zeigt der
   Sitzungsbereich „Reserviert ab 14:00“ mit einem Countdown (mit Namen nach den Regeln oben).
 - Die **Liste zeigt nie Namen**, weder angemeldet noch abgemeldet. Lange Namen werden gekürzt.
@@ -193,12 +192,6 @@ Kartensitzung, kehrt der Reader zu den Texten oben zurück.
 | Sie beenden eine Sitzung innerhalb Ihrer eigenen laufenden Buchung            | Fragt „Behalten oder den Rest freigeben?“. **Rest freigeben** beendet die Buchung vorzeitig. Ohne Antwort innerhalb von 15 Sekunden bleibt die Buchung bestehen.                           |
 
 Eine Buchung ohne Sitzung freizugeben ist nur in der Weboberfläche möglich. Buchen selbst ist am Reader nicht möglich.
-
-**Namen auf Readern anzeigen** (Ressourceneinstellung, standardmäßig aus). Sie ändert nur, was eine Person sieht,
-die **nach dem Auflegen einer Karte** weder die Buchung hält noch die Ressource verwaltet: Namen in den Ressourcendetails und in
-den Bestätigungs- und Ablehnungstexten des Readers. Ein abgemeldeter Reader ist nie betroffen. Der Hilfetext des
-Schalters lautet: „Namen erscheinen erst, nachdem jemand eine Karte aufgelegt hat.“ Beim Speichern aktualisieren
-sich die Reader sofort.
 
 **Reader ohne Bildschirm.** Attractap-Lite-Reader, Touch-Reader mit älterer Firmware und Reader, deren
 Plugin-Hinweise nach Abstürzen pausiert sind, können nichts davon anzeigen:
@@ -301,25 +294,24 @@ Benachrichtigungen in der App und per Push weiterhin.
 **Ressourcen verwalten** angezeigt (die API erlaubt es auch den Wartenden der Ressource). Reservierungen sind
 standardmäßig **deaktiviert**.
 
-| Einstellung                       | Standard    | Erlaubte Werte / Bedeutung                                                                                                                                   |
-| --------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Reservierungen aktiviert          | aus         | Schaltet die Funktion für diese Ressource ein.                                                                                                               |
-| Genehmigung erforderlich          | aus         | Neue Buchungen sind ausstehend, bis eine verwaltende Person entscheidet. Gilt auch für Buchungen von Verwaltenden.                                           |
-| Zeitraster (Minuten)              | 15          | 5 bis 240, muss 1440 teilen. Beginn und Dauer rasten auf dieses Raster ein.                                                                                  |
-| Mindestdauer (Minuten)            | 15          | 1 bis 1440, ein Vielfaches des Zeitrasters.                                                                                                                  |
-| Höchstdauer (Minuten)             | 240         | 1 bis 10080, ein Vielfaches des Zeitrasters, nicht unter der Mindestdauer.                                                                                   |
-| Maximaler Vorlauf (Tage)          | 30          | 1 bis 730. Wie weit im Voraus gebucht werden kann.                                                                                                           |
-| Mindestvorlauf (Minuten)          | 0           | 0 bis 10080. Der späteste Zeitpunkt vor dem Beginn, zu dem noch gebucht werden kann. 0 heißt bis zum Beginn (nie in der Vergangenheit).                      |
-| Puffer vorher / nachher (Minuten) | 0 / 0       | je 0 bis 1440. Bleibt um eine Buchung frei und zählt bei Überschneidungen.                                                                                   |
-| Aktive Buchungen pro Person       | 3           | 0 bis 100 (ausstehend und bestätigt mit künftigem Ende). 0 heißt unbegrenzt.                                                                                 |
-| Wer buchen darf                   | `can-start` | `can-start`, `managers-only` oder `any-user`.                                                                                                                |
-| Bestätigungsfenster (Minuten)     | 60          | 0 bis 1440. Ein Start so kurz vor der Buchung einer anderen Person verlangt eine Bestätigung. 0 heißt nie fragen.                                            |
-| Check-in aktiviert                | an          | Buchungen brauchen einen Sitzungsstart, um nicht als „Nicht erschienen“ zu enden.                                                                            |
-| Check-in-Karenz (Minuten)         | 15          | 1 bis 240. Zeit nach dem Beginn, bis eine Buchung ohne Check-in zu „Nicht erschienen“ wird.                                                                  |
-| Frühes Einchecken (Minuten)       | 15          | 0 bis 240. Wie lange vor dem Beginn ein Check-in zählt.                                                                                                      |
-| Übergabe-Erinnerung (Minuten)     | 15          | 0 bis 1440. Benachrichtigt Personen mit laufender Sitzung so lange vor Beginn einer Reservierung.                                                            |
-| Namen auf Readern anzeigen        | aus         | Angemeldete Kartennutzende, die weder buchende noch verwaltende Person sind, sehen Namen auf Attractap-Readern, siehe [Attractap-Reader](#attractap-reader). |
-| Buchbare Zeiten                   | leer (24/7) | Pro Wochentag null oder mehr Bereiche `HH:mm-HH:mm`.                                                                                                         |
+| Einstellung                       | Standard    | Erlaubte Werte / Bedeutung                                                                                                              |
+| --------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Reservierungen aktiviert          | aus         | Schaltet die Funktion für diese Ressource ein.                                                                                          |
+| Genehmigung erforderlich          | aus         | Neue Buchungen sind ausstehend, bis eine verwaltende Person entscheidet. Gilt auch für Buchungen von Verwaltenden.                      |
+| Zeitraster (Minuten)              | 15          | 5 bis 240, muss 1440 teilen. Beginn und Dauer rasten auf dieses Raster ein.                                                             |
+| Mindestdauer (Minuten)            | 15          | 1 bis 1440, ein Vielfaches des Zeitrasters.                                                                                             |
+| Höchstdauer (Minuten)             | 240         | 1 bis 10080, ein Vielfaches des Zeitrasters, nicht unter der Mindestdauer.                                                              |
+| Maximaler Vorlauf (Tage)          | 30          | 1 bis 730. Wie weit im Voraus gebucht werden kann.                                                                                      |
+| Mindestvorlauf (Minuten)          | 0           | 0 bis 10080. Der späteste Zeitpunkt vor dem Beginn, zu dem noch gebucht werden kann. 0 heißt bis zum Beginn (nie in der Vergangenheit). |
+| Puffer vorher / nachher (Minuten) | 0 / 0       | je 0 bis 1440. Bleibt um eine Buchung frei und zählt bei Überschneidungen.                                                              |
+| Aktive Buchungen pro Person       | 3           | 0 bis 100 (ausstehend und bestätigt mit künftigem Ende). 0 heißt unbegrenzt.                                                            |
+| Wer buchen darf                   | `can-start` | `can-start`, `managers-only` oder `any-user`.                                                                                           |
+| Bestätigungsfenster (Minuten)     | 60          | 0 bis 1440. Ein Start so kurz vor der Buchung einer anderen Person verlangt eine Bestätigung. 0 heißt nie fragen.                       |
+| Check-in aktiviert                | an          | Buchungen brauchen einen Sitzungsstart, um nicht als „Nicht erschienen“ zu enden.                                                       |
+| Check-in-Karenz (Minuten)         | 15          | 1 bis 240. Zeit nach dem Beginn, bis eine Buchung ohne Check-in zu „Nicht erschienen“ wird.                                             |
+| Frühes Einchecken (Minuten)       | 15          | 0 bis 240. Wie lange vor dem Beginn ein Check-in zählt.                                                                                 |
+| Übergabe-Erinnerung (Minuten)     | 15          | 0 bis 1440. Benachrichtigt Personen mit laufender Sitzung so lange vor Beginn einer Reservierung.                                       |
+| Buchbare Zeiten                   | leer (24/7) | Pro Wochentag null oder mehr Bereiche `HH:mm-HH:mm`.                                                                                    |
 
 Änderungen betreffen nur **neue** Buchungen; bestehende bleiben erhalten. Bestätigungsfenster und Check-in-Regeln
 verwenden immer die aktuellen Werte.

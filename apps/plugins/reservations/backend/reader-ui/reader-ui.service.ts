@@ -25,9 +25,9 @@ const SLOT = READER_UI_SLOTS;
  * Reservation state on Attractap readers (resource list row, details header/body, session area).
  *
  * Privacy: with no `ctx.userId` (a signed-out reader) the output has no holder name and no personal
- * data, whatever the settings, and no user or permission lookup runs. Names appear only for a card user
- * who is a manager of the resource, or for any card user when the resource opted in
- * (`showNamesOnReaders`). List rows never carry names.
+ * data, and no user or permission lookup runs. Names appear only for a card user who is a manager of the
+ * resource or may see who uses the machine (core's usage attribution rule, the same as on the web). List
+ * rows never carry names.
  *
  * Hot path (runs on every reader sync): disabled resources are answered from the settings cache without
  * touching the database; enabled ones cost one indexed booking query. Every contribution expires at the
@@ -71,7 +71,7 @@ export class ReaderUiService {
     const subject = own ?? running ?? upcoming[0];
     if (!subject) return [];
 
-    const nameOf = this.nameResolver(ctx, settings);
+    const nameOf = this.nameResolver(ctx);
     const holder = own ? undefined : await nameOf(subject);
     const state = this.describe(subject, running === subject, settings, clock, holder, own !== undefined);
     // The next start changes the state even when the details are about another booking (your own one in
@@ -151,19 +151,20 @@ export class ReaderUiService {
 
   /**
    * Resolves holder names for this viewer: undefined for a signed-out reader (no lookup at all), for the
-   * viewer's own booking, and for viewers who may not see names. The manager check is only paid when the
-   * resource did not opt in (names show either way then) and runs once per evaluation; each holder's
-   * name is looked up at most once.
+   * viewer's own booking, and for viewers who may not see names. Names go to managers of the resource and to
+   * viewers who may see who uses the machine (core's usage attribution rule, as on the web). The permission
+   * check runs once per evaluation and only when another user's booking is shown; each holder's name is looked
+   * up at most once.
    */
-  private nameResolver(
-    ctx: ReaderUiContext,
-    settings: ResourceSettings,
-  ): (booking: ReservationEntity) => Promise<string | undefined> {
+  private nameResolver(ctx: ReaderUiContext): (booking: ReservationEntity) => Promise<string | undefined> {
     const userId = ctx.userId;
     if (userId === undefined) return async () => undefined;
+    const { resourceId } = ctx;
     let allowed: Promise<boolean> | undefined;
     const mayShow = () =>
-      (allowed ??= settings.showNamesOnReaders ? Promise.resolve(true) : this.access.isManager(userId, ctx.resourceId));
+      (allowed ??= (async () =>
+        (await this.access.isManager(userId, resourceId)) ||
+        (await this.access.attributionResourceIds(userId, [resourceId])).has(resourceId))());
     const names = new Map<number, Promise<string | undefined>>();
     const lookup = async (holderId: number) => {
       const name = (await this.directory.getUserNames([holderId])).get(holderId);

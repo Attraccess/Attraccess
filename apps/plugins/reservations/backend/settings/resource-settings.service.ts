@@ -39,7 +39,6 @@ function fromEntity(row: ResourceSettingsEntity): ResourceSettings {
     checkInGraceMinutes: row.checkInGraceMinutes,
     earlyCheckInMinutes: row.earlyCheckInMinutes,
     handoverReminderMinutes: row.handoverReminderMinutes,
-    showNamesOnReaders: Boolean(row.showNamesOnReaders),
     bookableHours,
   };
 }
