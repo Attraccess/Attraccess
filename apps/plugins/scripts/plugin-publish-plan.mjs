@@ -6,6 +6,12 @@ import { pathToFileURL } from 'node:url';
 // Release channels: nightlies own `next`, Attraccess releases own `latest`. `alpha` is frozen legacy.
 export const CHANNELS = { next: { nightly: true }, latest: { nightly: false } };
 
+export function assertChannel(channel) {
+  if (!Object.hasOwn(CHANNELS, channel))
+    throw new Error(`--channel must be one of ${Object.keys(CHANNELS).join(', ')}`);
+  return channel;
+}
+
 export function isNightlyVersion(version) {
   return /-nightly\./.test(version ?? '');
 }
@@ -42,6 +48,7 @@ export function planPublish({ projects, head, readState, git, affectedSince }) {
 
     if (!state) return decide(true, 'package is not on npm yet');
     const g = state.commit;
+    if (state.neverReleased) return decide(true, `${state.version} is a nightly build, so nothing was released yet`);
     if (!g) return decide(true, `${state.version} has no recorded commit`);
     if (!git.hasCommit(g)) return decide(true, `recorded commit ${g.slice(0, 7)} is not in local history`);
     if (g === head) return decide(false, 'already published for this commit');
@@ -81,9 +88,10 @@ const npmView = (spec, field) => {
 
 /** Reads what npm has on a dist-tag. A nightly on the release channel counts as "never released". */
 export function readChannelState(name, channel, view = npmView) {
+  assertChannel(channel);
   const version = view(name, `dist-tags.${channel}`);
   if (!version) return null;
-  if (!CHANNELS[channel].nightly && isNightlyVersion(version)) return { version, commit: null };
+  if (!CHANNELS[channel].nightly && isNightlyVersion(version)) return { version, commit: null, neverReleased: true };
   const manifest = view(`${name}@${version}`, 'gitHead') ?? view(`${name}@${version}`, 'attraccess.publishedCommit');
   return { version, commit: typeof manifest === 'string' ? manifest : null };
 }
@@ -141,7 +149,7 @@ function affectedSince(base, head) {
 function main(argv) {
   const arg = (flag) => argv.find((a) => a.startsWith(`--${flag}=`))?.slice(flag.length + 3);
   const channel = arg('channel') ?? 'next';
-  if (!CHANNELS[channel]) throw new Error(`--channel must be one of ${Object.keys(CHANNELS).join(', ')}`);
+  assertChannel(channel);
   const dryRun = argv.includes('--dry-run');
   refreshHistory();
   const head = arg('head') ?? run('git', ['rev-parse', 'HEAD']).trim();

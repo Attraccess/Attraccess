@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { revisionFromImageConfig, shouldMoveNightlyLatest } from './promote-nightly-image.mjs';
+import { isMissingTagError, revisionFromImageConfig, shouldMoveNightlyLatest } from './promote-nightly-image.mjs';
 
 const LABEL = 'org.opencontainers.image.revision';
 // History: older -> head -> newer, and `stray` is not an ancestor of either.
@@ -33,4 +33,12 @@ test('reads the revision label from single-image and multi-platform inspect outp
   assert.equal(revisionFromImageConfig({ 'linux/amd64': config }), 'abc');
   assert.equal(revisionFromImageConfig({ config: { Labels: {} } }), null);
   assert.equal(revisionFromImageConfig({ config: {} }), null);
+});
+
+test('only a missing tag counts as "no nightly-latest yet"', () => {
+  assert.equal(isMissingTagError({ stderr: 'ERROR: ghcr.io/a/b:nightly-latest: not found\n' }), true);
+  assert.equal(isMissingTagError({ message: 'manifest unknown' }), true);
+  assert.equal(isMissingTagError({ stderr: 'ERROR: denied: permission_denied' }), false);
+  assert.equal(isMissingTagError({ stderr: 'dial tcp: i/o timeout' }), false);
+  assert.equal(isMissingTagError(new Error('boom')), false);
 });

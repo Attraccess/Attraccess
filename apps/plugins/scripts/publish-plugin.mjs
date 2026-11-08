@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { isNewerPublished, localGit, readChannelState, refreshHistory } from './plugin-publish-plan.mjs';
+import { CHANNELS, isNewerPublished, localGit, readChannelState, refreshHistory } from './plugin-publish-plan.mjs';
 
 const packageDir = process.argv[2];
 const distDir = process.argv[3];
@@ -13,6 +13,8 @@ const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf8'));
 const nightly = process.env.NPM_NIGHTLY === 'true';
 // Nightlies own `next`, releases own `latest`; no CI path publishes any other tag.
 const tag = process.env.NPM_DIST_TAG ?? (nightly ? 'next' : 'latest');
+if (!Object.hasOwn(CHANNELS, tag))
+  throw new Error(`NPM_DIST_TAG must be one of ${Object.keys(CHANNELS).join(', ')}, got "${tag}".`);
 const commit = process.env.GITHUB_SHA ?? execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 
 // An older run finishing late must not move the channel backwards.

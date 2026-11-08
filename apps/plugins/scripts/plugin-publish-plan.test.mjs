@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { after, before, test } from 'node:test';
 
-import { isNewerPublished, planPublish, readChannelState } from './plugin-publish-plan.mjs';
+import { assertChannel, isNewerPublished, planPublish, readChannelState } from './plugin-publish-plan.mjs';
 
 let repo;
 const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
@@ -126,7 +126,7 @@ test('skips when the published commit is HEAD (rerun)', () => {
   const head = git('rev-parse', 'HEAD');
   const result = plan(head, { '@x/plugin-a': { version: '1', commit: head } });
   assert.equal(result['plugin-a'].publish, false);
-  assert.match(result['plugin-a'].reason, /already published/);
+  assert.equal(result['plugin-a'].reason, 'already published for this commit');
 });
 
 test('publishes when the recorded commit is not in local history', () => {
@@ -153,10 +153,24 @@ test('release channel treats a nightly latest as never released', () => {
     if (field === 'dist-tags.latest') return '0.1.0-nightly.925.2';
     throw new Error(`unexpected npm view ${spec} ${field}`);
   };
-  assert.deepEqual(readChannelState('@x/plugin-a', 'latest', view), { version: '0.1.0-nightly.925.2', commit: null });
+  assert.deepEqual(readChannelState('@x/plugin-a', 'latest', view), {
+    version: '0.1.0-nightly.925.2',
+    commit: null,
+    neverReleased: true,
+  });
   const head = git('rev-parse', 'HEAD');
   const result = plan(head, { '@x/plugin-a': readChannelState('@x/plugin-a', 'latest', view) });
   assert.equal(result['plugin-a'].publish, true);
+  assert.match(result['plugin-a'].reason, /nightly build, so nothing was released yet/);
+});
+
+test('only the next and latest channels exist; alpha is retired', () => {
+  assert.equal(assertChannel('next'), 'next');
+  assert.equal(assertChannel('latest'), 'latest');
+  for (const retired of ['alpha', 'foo', 'constructor', undefined]) {
+    assert.throws(() => assertChannel(retired), /--channel must be one of next, latest/);
+  }
+  assert.throws(() => readChannelState('p', 'alpha', () => null), /--channel must be one of/);
 });
 
 test('reads the recorded commit from gitHead, then attraccess.publishedCommit', () => {

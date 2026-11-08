@@ -19,13 +19,20 @@ export function shouldMoveNightlyLatest({ head, currentRevision, git }) {
   return !isNewerPublished({ head, commit: currentRevision, git });
 }
 
-const imagetools = (...args) => execFileSync('docker', ['buildx', 'imagetools', ...args], { encoding: 'utf8' });
+const imagetools = (...args) =>
+  execFileSync('docker', ['buildx', 'imagetools', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+/** Only a missing tag means "no nightly-latest yet"; an auth or network failure must not look like one. */
+export function isMissingTagError(error) {
+  return /not found|manifest unknown|404/i.test(`${error?.stderr ?? ''}${error?.message ?? ''}`);
+}
 
 function currentRevision(ref) {
   try {
     return revisionFromImageConfig(imagetools('inspect', ref, '--format', '{{json .Image}}'));
-  } catch {
-    return null; // no nightly-latest yet
+  } catch (error) {
+    if (isMissingTagError(error)) return null;
+    throw error;
   }
 }
 
