@@ -17,6 +17,12 @@ project-local ESP-IDF v6.0.2 toolchain at `.tools/esp-idf`. The completion
 marker is created only after setup succeeds. If bootstrap fails, rerun that
 script from the new worktree before reporting a missing dependency.
 
+Worktrees created another way (for example by T3 Code) skip this bootstrap. If
+`.worktree-bootstrap-complete` is missing at the worktree root, run
+`./scripts/setup-dev-dependencies.sh --workspace-only` there before building or
+testing, then `touch .worktree-bootstrap-complete`. Missing tools such as `nx`
+mean the worktree is not bootstrapped; do not work around them.
+
 ## Dev servers — always use `pnpm serve`
 
 `pnpm serve` is safe to run in parallel from multiple worktrees. It auto-resolves free ports for API and frontend, printing them in a banner at startup:
