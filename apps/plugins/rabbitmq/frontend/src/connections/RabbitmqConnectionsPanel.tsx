@@ -75,10 +75,10 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
       <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
         <div className="rmq:flex rmq:items-center rmq:gap-2">
           <PlugZapIcon className="rmq:w-5 rmq:h-5 rmq:text-accent-soft-foreground" />
-          <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">{t('connections.title')}</p>
+          <h3 className="rmq:text-base rmq:font-semibold rmq:text-default-700">{t('connections.title')}</h3>
           {data && (
             <Chip size="sm" variant="soft">
-              {data.total}
+              {format.number(data.total)}
             </Chip>
           )}
         </div>
@@ -103,7 +103,12 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
         {!data && !error && <TableDataLoadingIndicator />}
         {data && data.connections.length === 0 && <EmptyState message={t('connections.empty')} />}
         {data && data.truncated && (
-          <StatusAlert status="warning">{t('connections.truncated', { total: data.total })}</StatusAlert>
+          <StatusAlert status="warning">
+            {t('connections.truncated', {
+              shown: format.number(data.connections.length),
+              total: format.number(data.total),
+            })}
+          </StatusAlert>
         )}
         {data && data.connections.length > 0 && (
           <Table data-cy="rabbitmq-connections-table">

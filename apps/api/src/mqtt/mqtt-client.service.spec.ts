@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { inheritTestScope } from './../test-utils/inherit-test-scope';
 import { MqttClientService } from './mqtt-client.service';
 import { resetTestFixture } from './mqtt-client.service.setup.test-fixture';
+import { MqttServerChangedEvent } from './mqtt-server-changed.event';
 import { MqttClientServicePrivate } from './mqtt-client.service.spec.mqtt-client-service-private';
 
 // Interface to access private members for testing
@@ -653,6 +654,15 @@ describe('MqttClientService', () => {
       });
       expect(internal.clients.get(1)).toBe(current);
       expect(refreshConnectionScope.mockEventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('tells the other connections of the server (the message explorer) to close', async () => {
+      refreshConnectionScope.useRealConnections();
+      await refreshConnectionScope.service.refreshConnection(1);
+      expect(refreshConnectionScope.mockEventEmitter.emit).toHaveBeenCalledWith(
+        MqttServerChangedEvent.EVENT_NAME,
+        new MqttServerChangedEvent(1),
+      );
     });
 
     it('keeps reconnecting after refresh times out and restores existing subscriptions when the broker recovers', async () => {

@@ -1,9 +1,8 @@
 // The two permission tiers of the RabbitMQ plugin.
 //
 // Plugins cannot declare their own permission keys yet (planned in ATT-1003), so
-// both tiers reuse existing core keys. Every route and live topic references
-// these constants, so switching to plugin-declared keys later is a one-file
-// change.
+// both tiers reuse existing core keys. Every route references these constants,
+// so switching to plugin-declared keys later is a one-file change.
 
 // View tier — same level as the host MQTT server page: detection/status, user
 // list, connections list and broker stats.

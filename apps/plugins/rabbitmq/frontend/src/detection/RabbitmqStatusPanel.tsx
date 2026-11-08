@@ -47,7 +47,7 @@ export function RabbitmqStatusPanel({ mqttServerId }: { mqttServerId: number }) 
       <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
         <div className="rmq:flex rmq:items-center rmq:gap-2">
           <RabbitIcon className="rmq:w-5 rmq:h-5 rmq:text-accent-soft-foreground" />
-          <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">RabbitMQ</p>
+          <h3 className="rmq:text-base rmq:font-semibold rmq:text-default-700">RabbitMQ</h3>
           <Chip color="accent" variant="soft" size="sm">
             {t('status.detected')}
           </Chip>

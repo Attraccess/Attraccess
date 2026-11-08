@@ -12,7 +12,7 @@ export interface MqttConnectionSettings {
 export function buildMqttConnectionSettings(
   server: MqttServer,
   password: string | null,
-  overrides: Pick<mqtt.IClientOptions, 'clientId' | 'clean' | 'reconnectPeriod'>,
+  overrides: Pick<mqtt.IClientOptions, 'clientId' | 'clean' | 'reconnectPeriod' | 'resubscribe'>,
 ): MqttConnectionSettings {
   const url = `${server.useTls ? 'mqtts' : 'mqtt'}://${server.host}:${server.port}`;
   const options: mqtt.IClientOptions = { ...overrides };

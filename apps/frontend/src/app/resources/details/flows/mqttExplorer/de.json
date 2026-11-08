@@ -1,5 +1,6 @@
 {
   "title": "MQTT-Explorer",
   "close": "MQTT-Explorer schließen",
-  "server": "MQTT-Server"
+  "server": "MQTT-Server",
+  "loading": "MQTT-Server werden geladen …"
 }

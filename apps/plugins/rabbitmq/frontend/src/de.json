@@ -74,7 +74,7 @@
     "reload": "Verbindungen neu laden",
     "loadError": "Verbindungen konnten nicht geladen werden.",
     "empty": "Es sind keine Clients verbunden.",
-    "truncated": "Die ersten 1000 von {{total}} Verbindungen werden angezeigt.",
+    "truncated": "Die ersten {{shown}} von {{total}} Verbindungen werden angezeigt.",
     "client": "Client",
     "user": "Benutzer",
     "peer": "Gegenstelle",
@@ -121,6 +121,6 @@
     "queueName": "Name",
     "vhost": "Vhost",
     "type": "Typ",
-    "queuesTruncated": "Die ersten 1000 von {{total}} Queues werden angezeigt."
+    "queuesTruncated": "Die ersten {{shown}} von {{total}} Queues werden angezeigt."
   }
 }

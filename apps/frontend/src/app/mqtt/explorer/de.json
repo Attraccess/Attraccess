@@ -1,6 +1,6 @@
 {
   "title": "Nachrichten-Explorer",
-  "filter": "Topic-Filter (Platzhalter + und #)",
+  "filter": "Themen-Filter (Platzhalter + und #)",
   "subscribe": "Abonnieren",
   "resubscribe": "Filter anwenden",
   "unsubscribe": "Abonnement beenden",
@@ -8,27 +8,28 @@
   "resume": "Fortsetzen",
   "clear": "Leeren",
   "waiting": "Warte auf Nachrichten für {{filter}} …",
+  "log": "Empfangene Nachrichten",
   "size": "{{size}} B",
   "binary": "binär (Hex)",
   "truncated": "gekürzt",
   "unavailable": "Der Live-Stream ist nicht verfügbar. Prüfe die Verbindung zum MQTT-Server.",
   "dropped": {
-    "one": "{{count}} Nachricht wurde verworfen, weil zu viele eintrafen.",
-    "many": "{{count}} Nachrichten wurden verworfen, weil zu viele eintrafen."
+    "one": "{{formattedCount}} Nachricht wurde verworfen, weil zu viele eintrafen.",
+    "many": "{{formattedCount}} Nachrichten wurden verworfen, weil zu viele eintrafen."
   },
   "pausedNotice": "Pausiert – der Live-Stream ist bis zum Fortsetzen angehalten; Nachrichten aus dieser Zeit werden nicht angezeigt.",
   "publishTitle": "Nachricht veröffentlichen",
   "publishHint": "Veröffentlichte Nachrichten erreichen den Broker wie beim Flow-Knoten „MQTT-Nachricht senden“ und können Flows auslösen.",
-  "topic": "Topic",
-  "filterInvalid": "Gib einen gültigen MQTT-Topic-Filter ein: + und # müssen eine ganze Ebene ausfüllen, # nur am Ende, kein Präfix $share/ oder $queue/ (max. 256 Bytes).",
-  "topicInvalid": "Gib ein Topic ohne die Platzhalter + oder # ein.",
-  "payload": "Payload",
-  "payloadTooLarge": "Die Payload ist zu groß (max. 256 KiB).",
+  "topic": "Thema",
+  "filterInvalid": "Gib einen gültigen MQTT-Themen-Filter ein: + und # müssen eine ganze Ebene ausfüllen, # nur am Ende, keine Steuerzeichen und kein Präfix $share/, $queue/ oder $exclusive/ (max. 256 Bytes).",
+  "topicInvalid": "Gib ein Thema ohne die Platzhalter + oder # ein.",
+  "payload": "Nutzlast",
+  "payloadTooLarge": "Die Nutzlast ist zu groß (max. 256 KiB).",
   "qos": "QoS",
   "qosOption": "QoS {{qos}}",
-  "retain": "Retain",
+  "retain": "Nachricht behalten (retain)",
   "publish": "Veröffentlichen",
   "published": "Nachricht veröffentlicht.",
   "publishError": "Die Nachricht konnte nicht veröffentlicht werden.",
-  "suggestions": "Topics aus diesem Flow"
+  "suggestions": "Themen aus diesem Flow"
 }

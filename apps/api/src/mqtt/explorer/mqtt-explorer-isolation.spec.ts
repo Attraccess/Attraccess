@@ -41,7 +41,8 @@ describe('MQTT explorer isolation from flows', () => {
 
     const events: unknown[] = [];
     const stream = await service.subscribe({ id: 1 } as never, 1, '#');
-    const viewer = stream.subscribe((event) => events.push(event));
+    // Batches with messages only, not the empty one announcing the subscription.
+    const viewer = stream.subscribe((event) => event.data.messages.length > 0 && events.push(event));
     await new Promise((resolve) => setImmediate(resolve));
     explorerClient.emit('connect');
     await new Promise((resolve) => setImmediate(resolve));
@@ -49,6 +50,9 @@ describe('MQTT explorer isolation from flows', () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     expect(events).toHaveLength(1);
+    // Its own connection, never the flow connection's identity.
+    expect(mqtt.connect).toHaveBeenCalledTimes(1);
+    expect((mqtt.connect as jest.Mock).mock.calls[0][1].clientId).toMatch(/^attraccess-x-[0-9a-f]{10}$/);
     expect(emit).not.toHaveBeenCalledWith(MqttMessageEvent.EVENT_NAME, expect.anything());
     expect(emit).not.toHaveBeenCalled();
     expect(sharedSubscribe).not.toHaveBeenCalled();

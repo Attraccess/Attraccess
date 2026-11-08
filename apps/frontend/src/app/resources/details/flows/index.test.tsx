@@ -55,7 +55,7 @@ vi.mock('../../../../hooks/useAuth', () => ({
   useAuth: () => ({ hasPermission: (permission: string) => state.permissions.includes(permission) }),
 }));
 vi.mock('./mqttExplorer', () => ({
-  FlowMqttExplorer: (props: { isOpen: boolean; onClose: () => void; nodes: Node[] }) => {
+  FlowMqttExplorer: (props: { isOpen: boolean; onClose: () => void; mqttNodes: unknown[] }) => {
     state.explorer(props);
     return props.isOpen ? (
       <aside data-testid="mqtt-explorer">
@@ -427,14 +427,71 @@ it('toggles the MQTT explorer from the toolbar, beside the unchanged flow', () =
   fireEvent.click(explorerButton() as HTMLElement);
   expect(screen.getByTestId('mqtt-explorer')).toBeTruthy();
   expect(explorerButton()).toHaveAttribute('aria-pressed', 'true');
-  // The explorer is handed the editor's nodes, and opening it does not touch the flow.
-  expect(state.explorer).toHaveBeenLastCalledWith(expect.objectContaining({ nodes: state.nodes }));
+  // Opening the explorer does not touch the flow.
   expect(saveButton()).toBeDisabled();
   expect(state.save).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByText('Close explorer'));
   expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
   expect(explorerButton()).toHaveAttribute('aria-pressed', 'false');
+});
+
+it("hands the explorer only the MQTT nodes' server and topic, stable across canvas changes", () => {
+  state.original?.nodes.push({
+    id: 'mqtt',
+    type: 'output.mqtt.sendMessage',
+    position: { x: 0, y: 400 },
+    data: { serverId: 1, topic: 'lamp/set' },
+  });
+  show();
+  fireEvent.click(explorerButton() as HTMLElement);
+  const first = state.explorer.mock.lastCall?.[0] as { mqttNodes: unknown[]; onClose: () => void };
+  expect(first.mqttNodes).toEqual([{ serverId: 1, topic: 'lamp/set' }]);
+
+  // Dragging a node hands out new nodes, but the explorer's props keep their identity.
+  act(() =>
+    state.setNodes((previous) => previous.map((node) => ({ ...node, position: { x: node.position.x + 5, y: 0 } }))),
+  );
+  const moved = state.explorer.mock.lastCall?.[0] as typeof first;
+  expect(moved.mqttNodes).toBe(first.mqttNodes);
+  expect(moved.onClose).toBe(first.onClose);
+
+  act(() =>
+    state.setNodes((previous) =>
+      previous.map((node) => (node.id === 'mqtt' ? { ...node, data: { serverId: 1, topic: 'lamp/state' } } : node)),
+    ),
+  );
+  const retopiced = state.explorer.mock.lastCall?.[0] as typeof first;
+  expect(retopiced.mqttNodes).toEqual([{ serverId: 1, topic: 'lamp/state' }]);
+});
+
+it('looks like its toolbar neighbours while closed and stands out while open', () => {
+  show();
+  const importButton = screen.getByRole('button', { name: 'actions.import' });
+  expect(explorerButton()?.className).toBe(importButton.className);
+  fireEvent.click(explorerButton() as HTMLElement);
+  expect(explorerButton()?.className).not.toBe(importButton.className);
+});
+
+it('still toggles the explorer when browser storage is unavailable', () => {
+  const getItem = vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
+    throw new Error('SecurityError');
+  });
+  const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+    throw new Error('QuotaExceededError');
+  });
+  try {
+    show();
+    expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+    fireEvent.click(explorerButton() as HTMLElement);
+    expect(screen.getByTestId('mqtt-explorer')).toBeTruthy();
+    fireEvent.click(explorerButton() as HTMLElement);
+    expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+    expect(setItem).toHaveBeenCalled();
+  } finally {
+    getItem.mockRestore();
+    setItem.mockRestore();
+  }
 });
 
 it('remembers the explorer panel per browser', () => {

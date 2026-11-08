@@ -381,7 +381,11 @@
     "state": "Zustand",
     "kind": "Alarmart",
     "setting": "Einstellung",
-    "tappedUserId": "ID der Person, die die Karte aufgelegt hat"
+    "tappedUserId": "ID der Person, die die Karte aufgelegt hat",
+    "topic": "Thema",
+    "size": "Größe (Bytes)",
+    "qos": "QoS",
+    "retain": "Nachricht behalten (retain)"
   },
   "eventType": "Ereignistyp",
   "pluginId": "Integrations-ID",

@@ -60,6 +60,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
+  // Restores spies such as document.hidden even when a test fails before its own restore.
+  vi.restoreAllMocks();
   useTranslationState.setState({ language: 'en' });
 });
 
@@ -149,6 +151,14 @@ it('queues a reload requested while a load is in flight instead of dropping it',
   await waitFor(() => expect(result.current.data).toBe('after'));
   expect(result.current.loading).toBe(false);
   expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it('formats the connection total and the truncation notice for the language', async () => {
+  useTranslationState.setState({ language: 'de' });
+  request.mockResolvedValue({ mqttServerId: 7, total: 1234, truncated: true, connections: [connection] });
+  render(<RabbitmqConnectionsPanel mqttServerId={7} canManage={false} />);
+  expect(await screen.findByText('Die ersten 1 von 1.234 Verbindungen werden angezeigt.')).toBeTruthy();
+  expect(screen.getByText('1.234')).toBeTruthy();
 });
 
 it('polls connections while visible, pauses while hidden and stops on unmount', async () => {
@@ -245,6 +255,22 @@ it('renders overview, nodes and queues and tolerates missing fields', async () =
   expect(await screen.findByText('1,5 /s')).toBeTruthy();
   expect(screen.getByText('1,0 MiB / 4,0 MiB')).toBeTruthy();
   expect(screen.getByText('Alarm aktiv')).toBeTruthy();
+});
+
+it('formats the queue truncation notice for the language', async () => {
+  useTranslationState.setState({ language: 'de' });
+  request.mockResolvedValue({
+    mqttServerId: 8,
+    overview: {},
+    nodes: [],
+    queues: [
+      { vhost: '/', name: 'q', type: null, state: null, messagesReady: 0, messagesUnacknowledged: 0, consumers: 0 },
+    ],
+    totalQueues: 2500,
+  });
+  render(<RabbitmqStatsPanel mqttServerId={8} />);
+  expect(await screen.findByText('Die ersten 1 von 2.500 Queues werden angezeigt.')).toBeTruthy();
+  expect(screen.getByRole('heading', { level: 4, name: 'Knoten' })).toBeTruthy();
 });
 
 it('polls stats every 15 s and stops on unmount', async () => {

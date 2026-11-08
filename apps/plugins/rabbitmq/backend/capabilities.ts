@@ -8,7 +8,7 @@ export interface RabbitmqCapabilities {
 }
 
 // Tells the UI which manage-tier actions to offer. Purely cosmetic: every
-// manage route and live topic enforces the permission server-side regardless.
+// manage route enforces the permission server-side regardless.
 @Controller('rabbitmq')
 export class RabbitmqCapabilitiesController {
   @Auth(RABBITMQ_VIEW_PERMISSION)

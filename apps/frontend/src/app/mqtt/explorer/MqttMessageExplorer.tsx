@@ -11,10 +11,10 @@ import {
   useNumberFormatter,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
-import { Checkbox, Chip, FieldError, Input, Label, ListBox, Select, TextArea, TextField } from '@heroui/react';
+import { Checkbox, FieldError, Input, Label, ListBox, Select, TextArea, TextField } from '@heroui/react';
 import { useMqttServiceMqttExplorerPublish } from '@attraccess/react-query-client';
 import { MessagesSquareIcon, PauseIcon, PlayIcon, SendIcon, Trash2Icon } from 'lucide-react';
-import { memo, useCallback, useRef, useState, useSyncExternalStore } from 'react';
+import { memo, useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useLiveUpdates } from '../../../utils/live-updates';
 import type { MqttExplorerLiveEvent, MqttExplorerLiveMessage } from '../../../utils/live-updates/types';
 import { decodePayload, type DecodedPayload } from './payload';
@@ -26,6 +26,9 @@ import en from './en.json';
 export const MESSAGE_LOG_CAP = 500;
 
 const TIME_ONLY = { showDate: false, showSeconds: true };
+// Shared empty lists keep the memoised children's props stable.
+const NO_TOPICS: string[] = [];
+const QOS_LEVELS = ['0', '1', '2'] as const;
 
 export interface MqttMessageExplorerProps {
   mqttServerId: number;
@@ -61,12 +64,15 @@ const MessageRow = memo(function MessageRow({ entry }: { entry: LogEntry }) {
   const formatNumber = useNumberFormatter();
   const formatTime = useDateTimeFormatter(TIME_ONLY);
   return (
-    <li className="flex flex-col gap-1 border-b border-default-200 py-2" data-cy="mqtt-explorer-message-row">
-      <div className="flex flex-wrap items-center gap-2 text-xs text-default-500">
+    // content-visibility skips layout and paint of the rows scrolled out of view.
+    <li
+      className="flex flex-col gap-1 border-b border-separator py-2 [content-visibility:auto] [contain-intrinsic-size:auto_4rem]"
+      data-cy="mqtt-explorer-message-row"
+    >
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
         <span>{String(formatTime(entry.receivedAt, ''))}</span>
-        <Chip size="sm" variant="soft">
-          {entry.topic}
-        </Chip>
+        {/* Plain text, not a chip: a long topic must wrap inside the narrow panel. */}
+        <span className="max-w-full break-all font-medium text-foreground">{entry.topic}</span>
         <span>{t('size', { size: formatNumber(entry.size) })}</span>
         {entry.decoded.kind === 'binary' && <span>{t('binary')}</span>}
         {(entry.truncated || entry.decoded.clipped) && <span>{t('truncated')}</span>}
@@ -109,11 +115,17 @@ function LiveSubscription({
   return null;
 }
 
-function SuggestionChips({ values, onPick }: { values: string[]; onPick: (value: string) => void }) {
+const SuggestionChips = memo(function SuggestionChips({
+  values,
+  onPick,
+}: {
+  values: string[];
+  onPick: (value: string) => void;
+}) {
   const { t } = useTranslations({ en, de }, { escapeValues: false });
   if (values.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-1" aria-label={t('suggestions')}>
+    <div className="flex flex-wrap items-center gap-1" role="group" aria-label={t('suggestions')}>
       {values.map((value) => (
         <Button key={value} size="sm" variant="secondary" onPress={() => onPick(value)}>
           {value}
@@ -121,9 +133,15 @@ function SuggestionChips({ values, onPick }: { values: string[]; onPick: (value:
       ))}
     </div>
   );
-}
+});
 
-function PublishForm({ mqttServerId, suggestions }: { mqttServerId: number; suggestions: string[] }) {
+const PublishForm = memo(function PublishForm({
+  mqttServerId,
+  suggestions,
+}: {
+  mqttServerId: number;
+  suggestions: string[];
+}) {
   const { t } = useTranslations({ en, de }, { escapeValues: false });
   const [topic, setTopic] = useState('');
   const [payload, setPayload] = useState('');
@@ -131,6 +149,16 @@ function PublishForm({ mqttServerId, suggestions }: { mqttServerId: number; sugg
   const [retain, setRetain] = useState(false);
   const [publishResult, setPublishResult] = useState<{ ok: boolean; message: string } | null>(null);
   const publishMessage = useMqttServiceMqttExplorerPublish();
+  const qosItems = useMemo(
+    () =>
+      QOS_LEVELS.map((value) => (
+        <ListBox.Item key={value} id={value} textValue={t('qosOption', { qos: value })}>
+          {t('qosOption', { qos: value })}
+          <ListBox.ItemIndicator />
+        </ListBox.Item>
+      )),
+    [t],
+  );
 
   const payloadTooLarge = !isPublishablePayload(payload);
   const publishable = isPublishableTopic(topic) && !payloadTooLarge;
@@ -148,9 +176,9 @@ function PublishForm({ mqttServerId, suggestions }: { mqttServerId: number; sugg
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-default-200 p-3">
-      <p className="text-sm font-semibold text-default-700">{t('publishTitle')}</p>
-      <p className="text-xs text-default-500">{t('publishHint')}</p>
+    <div className="flex flex-col gap-3 rounded-lg border border-border p-3">
+      <h4 className="text-sm font-semibold">{t('publishTitle')}</h4>
+      <p className="text-xs text-muted">{t('publishHint')}</p>
       <TextField
         value={topic}
         onChange={(value) => {
@@ -198,14 +226,7 @@ function PublishForm({ mqttServerId, suggestions }: { mqttServerId: number; sugg
             <Select.Indicator />
           </Select.Trigger>
           <Select.Popover>
-            <ListBox>
-              {['0', '1', '2'].map((value) => (
-                <ListBox.Item key={value} id={value} textValue={t('qosOption', { qos: value })}>
-                  {t('qosOption', { qos: value })}
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-              ))}
-            </ListBox>
+            <ListBox>{qosItems}</ListBox>
           </Select.Popover>
         </Select>
         <Checkbox isSelected={retain} onChange={setRetain} data-cy="mqtt-explorer-publish-retain-checkbox">
@@ -227,17 +248,32 @@ function PublishForm({ mqttServerId, suggestions }: { mqttServerId: number; sugg
           {t('publish')}
         </Button>
       </div>
-      {publishResult && (
-        <StatusAlert status={publishResult.ok ? 'success' : 'danger'} data-cy="mqtt-explorer-publish-result">
-          {publishResult.message}
-        </StatusAlert>
-      )}
+      {/* Live regions stay mounted so screen readers announce the result when it appears. */}
+      <div role="status">
+        {publishResult?.ok && (
+          <StatusAlert status="success" data-cy="mqtt-explorer-publish-result">
+            {publishResult.message}
+          </StatusAlert>
+        )}
+      </div>
+      <div role="alert">
+        {publishResult && !publishResult.ok && (
+          <StatusAlert status="danger" data-cy="mqtt-explorer-publish-result">
+            {publishResult.message}
+          </StatusAlert>
+        )}
+      </div>
     </div>
   );
-}
+});
 
-export function MqttMessageExplorer({ mqttServerId, topicSuggestions, compact = false }: MqttMessageExplorerProps) {
+export const MqttMessageExplorer = memo(function MqttMessageExplorer({
+  mqttServerId,
+  topicSuggestions,
+  compact = false,
+}: MqttMessageExplorerProps) {
   const { t } = useTranslations({ en, de }, { escapeValues: false });
+  const formatNumber = useNumberFormatter();
   const visible = usePageVisible();
 
   const [filter, setFilter] = useState(topicSuggestions?.filters[0] ?? '#');
@@ -299,7 +335,7 @@ export function MqttMessageExplorer({ mqttServerId, topicSuggestions, compact = 
       )}
       <div className="flex flex-row items-center gap-2">
         <MessagesSquareIcon className="w-5 h-5 text-accent-soft-foreground" />
-        <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">{t('title')}</h3>
+        <h3 className="text-sm uppercase tracking-wide font-semibold">{t('title')}</h3>
       </div>
       <div className="flex flex-col gap-4">
         <div className="flex flex-row flex-wrap items-end gap-2">
@@ -343,25 +379,53 @@ export function MqttMessageExplorer({ mqttServerId, topicSuggestions, compact = 
             </>
           )}
         </div>
-        <SuggestionChips values={topicSuggestions?.filters ?? []} onPick={setFilter} />
+        <SuggestionChips values={topicSuggestions?.filters ?? NO_TOPICS} onPick={setFilter} />
 
-        {unavailable && <StatusAlert status="warning">{t('unavailable')}</StatusAlert>}
-        {dropped > 0 && <StatusAlert status="warning">{t('dropped', { count: dropped })}</StatusAlert>}
-        {paused && <StatusAlert status="default">{t('pausedNotice')}</StatusAlert>}
+        {unavailable && (
+          <div role="status">
+            <StatusAlert status="warning">{t('unavailable')}</StatusAlert>
+          </div>
+        )}
+        {dropped > 0 && (
+          <div role="status">
+            <StatusAlert status="warning">
+              {t('dropped', { count: dropped, formattedCount: formatNumber(dropped) })}
+            </StatusAlert>
+          </div>
+        )}
+        {paused && (
+          <div role="status">
+            <StatusAlert status="default">{t('pausedNotice')}</StatusAlert>
+          </div>
+        )}
 
         {subscribedFilter !== null &&
           (entries.length === 0 ? (
-            <EmptyState message={t('waiting', { filter: subscribedFilter })} />
+            <div role="status">
+              <EmptyState message={t('waiting', { filter: subscribedFilter })} />
+            </div>
           ) : (
-            <ul className={compact ? 'max-h-72 overflow-auto' : 'max-h-96 overflow-auto'} data-cy="mqtt-explorer-log">
-              {entries.map((entry) => (
-                <MessageRow key={entry.id} entry={entry} />
-              ))}
-            </ul>
+            // A log, but not a live one: announcing every message would drown a screen reader.
+            <div
+              role="log"
+              aria-live="off"
+              aria-label={t('log')}
+              className={compact ? 'max-h-72 overflow-auto' : 'max-h-96 overflow-auto'}
+            >
+              <ul data-cy="mqtt-explorer-log">
+                {entries.map((entry) => (
+                  <MessageRow key={entry.id} entry={entry} />
+                ))}
+              </ul>
+            </div>
           ))}
 
-        <PublishForm key={mqttServerId} mqttServerId={mqttServerId} suggestions={topicSuggestions?.topics ?? []} />
+        <PublishForm
+          key={mqttServerId}
+          mqttServerId={mqttServerId}
+          suggestions={topicSuggestions?.topics ?? NO_TOPICS}
+        />
       </div>
     </section>
   );
-}
+});

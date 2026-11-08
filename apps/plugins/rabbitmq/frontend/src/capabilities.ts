@@ -2,7 +2,7 @@
 //
 // The backend computes this from the plugin's permission constants, so the UI
 // never re-implements permission logic. It only hides controls: every manage
-// route and live topic still enforces the permission server-side.
+// route still enforces the permission server-side.
 import { createPluginApiClient } from '@attraccess/plugins-frontend-sdk';
 import { useEffect, useState } from 'react';
 

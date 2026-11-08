@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { isPublishableTopic, isValidTopicFilter, type TopicSuggestions } from '../../../../mqtt/explorer/topics';
 
 // The nodes that talk to an MQTT server; each carries `data.serverId` and `data.topic`.
@@ -12,7 +13,7 @@ interface EditorNode {
   data?: unknown;
 }
 
-interface MqttNodeUse {
+export interface MqttNodeUse {
   serverId: number;
   topic: string;
 }
@@ -32,6 +33,17 @@ export function readMqttNodes(nodes: readonly EditorNode[]): MqttNodeUse[] {
 }
 
 /**
+ * The MQTT uses of the editor's nodes, as an array that keeps its identity until a node's type, server or
+ * topic changes. The editor hands out new nodes on every drag frame; the explorer only cares about these.
+ */
+export function useMqttNodeUses(nodes: readonly EditorNode[]): readonly MqttNodeUse[] {
+  const uses = readMqttNodes(nodes);
+  const signature = JSON.stringify(uses);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the signature covers every field of the uses.
+  return useMemo(() => uses, [signature]);
+}
+
+/**
  * Whether the editor holds the flow's nodes. The editor copies them out of the loaded flow in an effect, so
  * the first render after the load still has none; a failed load never gets any, so it counts as settled.
  */
@@ -46,12 +58,12 @@ export function editorHoldsFlowNodes(flow: {
 
 /** The server most used by the flow's MQTT nodes among the existing servers, else the first by name. */
 export function pickDefaultServerId(
-  nodes: readonly EditorNode[],
+  uses: readonly MqttNodeUse[],
   servers: readonly { id: number; name: string }[],
 ): number | null {
   if (servers.length === 0) return null;
   const counts = new Map<number, number>();
-  for (const use of readMqttNodes(nodes)) counts.set(use.serverId, (counts.get(use.serverId) ?? 0) + 1);
+  for (const use of uses) counts.set(use.serverId, (counts.get(use.serverId) ?? 0) + 1);
   let best: number | null = null;
   for (const server of servers) {
     const count = counts.get(server.id) ?? 0;
@@ -62,8 +74,8 @@ export function pickDefaultServerId(
 }
 
 /** Concrete topics of this server's nodes, as filters to watch and as topics to publish to. */
-export function suggestTopics(nodes: readonly EditorNode[], serverId: number): TopicSuggestions {
-  const topics = readMqttNodes(nodes)
+export function suggestTopics(uses: readonly MqttNodeUse[], serverId: number): TopicSuggestions {
+  const topics = uses
     .filter((use) => use.serverId === serverId && use.topic !== '' && !isTemplated(use.topic))
     .map((use) => use.topic);
   return {

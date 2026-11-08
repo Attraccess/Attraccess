@@ -7,16 +7,16 @@ const user = (...permissions: string[]) => ({ id: 7, effectivePermissions: new S
 const subscription = (mqttServerId = 1, filter = '#') => ({ topic: 'mqtt-messages' as const, mqttServerId, filter });
 
 describe('MqttExplorerLiveTopicsProvider', () => {
-  const findServer = jest.fn();
+  const existingServerIds = jest.fn();
   const subscribe = jest.fn();
   let registry: LiveTopicsService;
   let provider: MqttExplorerLiveTopicsProvider;
 
   beforeEach(() => {
     jest.resetAllMocks();
-    findServer.mockResolvedValue({ id: 1 });
+    existingServerIds.mockImplementation(async (ids: number[]) => new Set(ids.filter((id) => id < 9)));
     registry = new LiveTopicsService();
-    provider = new MqttExplorerLiveTopicsProvider(registry, { findServer, subscribe } as never);
+    provider = new MqttExplorerLiveTopicsProvider(registry, { existingServerIds, subscribe } as never);
     provider.onModuleInit();
   });
 
@@ -32,6 +32,9 @@ describe('MqttExplorerLiveTopicsProvider', () => {
     it('accepts a filter of exactly the byte limit and refuses one byte more', () => {
       expect(() => registry.parse(subscription(1, 'x'.repeat(MAX_FILTER_BYTES)))).not.toThrow();
       expect(() => registry.parse(subscription(1, 'x'.repeat(MAX_FILTER_BYTES + 1)))).toThrow();
+      // 129 × 2 bytes: the limit counts UTF-8 bytes, not characters.
+      expect(() => registry.parse(subscription(1, 'ä'.repeat(MAX_FILTER_BYTES / 2)))).not.toThrow();
+      expect(() => registry.parse(subscription(1, 'ä'.repeat(MAX_FILTER_BYTES / 2 + 1)))).toThrow();
     });
 
     it.each([
@@ -66,15 +69,26 @@ describe('MqttExplorerLiveTopicsProvider', () => {
       expect((await registry.authorize([subscription()], user('resources.read'))).size).toBe(1);
       expect((await registry.authorize([subscription()], user())).size).toBe(1);
       expect((await registry.authorize([subscription()], { id: 7 } as never)).size).toBe(1);
-      expect(findServer).not.toHaveBeenCalled();
+      expect(existingServerIds).not.toHaveBeenCalled();
     });
 
-    it('rejects an invalid filter and an unknown server', async () => {
+    it('rejects invalid filters and unknown servers, looking every server up in one query', async () => {
       const editor = user(MQTT_EXPLORER_PERMISSION);
-      const rejected = await registry.authorize([subscription(1, '$share/g/#'), subscription(1, 'a/#/b')], editor);
-      expect(rejected.size).toBe(2);
-      findServer.mockResolvedValue(null);
-      expect((await registry.authorize([subscription(9)], editor)).size).toBe(1);
+      const invalid = [
+        subscription(1, '$share/g/#'),
+        subscription(1, '$exclusive/a'),
+        subscription(1, 'a/#/b'),
+        subscription(1, 'a\tb'),
+        subscription(9, 'a/#/b'),
+      ];
+      const valid = [subscription(1, 'a'), subscription(1, 'b'), subscription(2, '#'), subscription(9, '#')];
+      const rejected = await registry.authorize([...invalid, ...valid], editor);
+      expect([...rejected.entries()]).toEqual([
+        ...invalid.map((value) => [liveSubscriptionKey(value), 'Invalid topic filter']),
+        [liveSubscriptionKey(subscription(9, '#')), 'Not found'],
+      ]);
+      expect(existingServerIds).toHaveBeenCalledTimes(1);
+      expect(existingServerIds).toHaveBeenCalledWith([1, 1, 2, 9]);
     });
   });
 

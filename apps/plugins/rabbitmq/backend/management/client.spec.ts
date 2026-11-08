@@ -35,3 +35,21 @@ describe('RabbitmqManagementClient error mapping', () => {
     expect((await failure()).message).toContain('lacks management privileges');
   });
 });
+
+describe('RabbitmqManagementClient request', () => {
+  const client = new RabbitmqManagementClient();
+  const config = { id: 1, host: 'localhost', port: 1883, useTls: false, username: 'u', password: 'p' } as never;
+
+  it('passes the request headers (X-Reason) on to the transport', async () => {
+    (managementRequest as jest.Mock).mockResolvedValue(new Response(null, { status: 204 }));
+    await client.request(config, 'DELETE', '/connections/c1', undefined, { 'X-Reason': 'Closed by an admin' });
+    expect(managementRequest).toHaveBeenCalledWith(
+      config,
+      'http://localhost:15672/api/connections/c1',
+      'DELETE',
+      undefined,
+      expect.any(Number),
+      { 'X-Reason': 'Closed by an admin' },
+    );
+  });
+});

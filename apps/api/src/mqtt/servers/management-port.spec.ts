@@ -70,6 +70,7 @@ describe('MQTT managementPort migration, persistence and service', () => {
       repository,
       encryption as unknown as EncryptionService,
       metrics as unknown as MetricsService,
+      { emit: jest.fn() } as never,
     );
   });
 

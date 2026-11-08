@@ -66,7 +66,7 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
       <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
         <div className="rmq:flex rmq:items-center rmq:gap-2">
           <BarChart3Icon className="rmq:w-5 rmq:h-5 rmq:text-accent-soft-foreground" />
-          <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">{t('stats.title')}</p>
+          <h3 className="rmq:text-base rmq:font-semibold rmq:text-default-700">{t('stats.title')}</h3>
         </div>
         <Button
           isIconOnly
@@ -103,7 +103,7 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
               <Stat label={t('stats.deliverRate')} value={format.rate(overview.deliverRate, '/s')} />
             </div>
 
-            <p className="rmq:text-sm rmq:font-semibold rmq:text-default-700">{t('stats.nodes')}</p>
+            <h4 className="rmq:text-sm rmq:font-semibold rmq:text-default-700">{t('stats.nodes')}</h4>
             {data.nodes.length === 0 ? (
               <EmptyState message={t('stats.noNodes')} />
             ) : (
@@ -149,7 +149,7 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
               </Table>
             )}
 
-            <p className="rmq:text-sm rmq:font-semibold rmq:text-default-700">{t('stats.queueList')}</p>
+            <h4 className="rmq:text-sm rmq:font-semibold rmq:text-default-700">{t('stats.queueList')}</h4>
             {data.queues.length === 0 ? (
               <EmptyState message={t('stats.noQueues')} />
             ) : (
@@ -186,7 +186,12 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
               </Table>
             )}
             {data.totalQueues > data.queues.length && (
-              <StatusAlert status="warning">{t('stats.queuesTruncated', { total: data.totalQueues })}</StatusAlert>
+              <StatusAlert status="warning">
+                {t('stats.queuesTruncated', {
+                  shown: format.number(data.queues.length),
+                  total: format.number(data.totalQueues),
+                })}
+              </StatusAlert>
             )}
           </>
         )}

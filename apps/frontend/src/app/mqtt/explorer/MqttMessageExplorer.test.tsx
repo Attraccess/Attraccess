@@ -1,8 +1,8 @@
-import { act, cleanup, configure, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { MESSAGE_LOG_CAP, MqttMessageExplorer } from './MqttMessageExplorer';
-import { decodePayload, MAX_DISPLAY_CHARS } from './payload';
+import { decodePayload, MAX_DISPLAY_CHARS, reindentJson } from './payload';
 import { isPublishableTopic, isValidTopicFilter } from './topics';
 
 // Coverage instrumentation plus parallel nx tasks make renders slow.
@@ -87,6 +87,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   useTranslationState.setState({ language: 'en' });
 });
 
@@ -115,6 +116,41 @@ describe('payload decoding', () => {
       text: '{"a":1}',
       clipped: false,
     });
+  });
+
+  it('pretty-prints JSON without changing any value', () => {
+    const encode = (text: string) => b64(new TextEncoder().encode(text));
+    // A parse/stringify round trip would show 12345678901234567000 and 1.1 and drop the first "a".
+    expect(decodePayload(encode('{"id":12345678901234567890,"v":1.10,"a":1,"a":2}'))).toEqual({
+      kind: 'json',
+      text: '{\n  "id": 12345678901234567890,\n  "v": 1.10,\n  "a": 1,\n  "a": 2\n}',
+      clipped: false,
+    });
+    // Braces, commas, colons and escaped quotes inside strings stay as they are.
+    expect(decodePayload(encode(' { "s" : "a{b}[c],d:\\"e\\"\\\\" , "n":[ 1 ,{ } ,[ ]] } ')).text).toBe(
+      '{\n  "s": "a{b}[c],d:\\"e\\"\\\\",\n  "n": [\n    1,\n    {},\n    []\n  ]\n}',
+    );
+    expect(decodePayload(encode('[]'))).toEqual({ kind: 'json', text: '[]', clipped: false });
+    // Invalid JSON is shown as sent.
+    expect(decodePayload(encode('{"a":1,}'))).toEqual({ kind: 'text', text: '{"a":1,}', clipped: false });
+  });
+
+  it('lays out JSON like JSON.stringify does', () => {
+    const value = { a: [1, { b: 'x', c: [] }, {}], d: { e: null, f: true }, g: 'q"uote' };
+    expect(reindentJson(JSON.stringify(value))).toBe(JSON.stringify(value, null, 2));
+  });
+
+  it('shows text with control characters as hex and marks a cut hex preview', () => {
+    expect(decodePayload(b64(new TextEncoder().encode('ab\u0001c')))).toEqual({
+      kind: 'binary',
+      text: '61 62 01 63',
+      clipped: false,
+    });
+    const long = decodePayload(b64(new Uint8Array(300).fill(0xff)));
+    expect(long.kind).toBe('binary');
+    expect(long.text.endsWith('ff …')).toBe(true);
+    expect(long.text.split(' ')).toHaveLength(256 + 1);
+    expect(decodePayload(b64(new Uint8Array(256).fill(0xff))).text.endsWith('ff')).toBe(true);
   });
 
   it('clips very long text for display', () => {
@@ -250,6 +286,58 @@ describe('message explorer', () => {
     expect(decodePayload).toHaveBeenCalledTimes(MESSAGE_LOG_CAP);
   }, 30_000);
 
+  it('keeps the cap across batches and adds up the dropped counts', () => {
+    render(<MqttMessageExplorer mqttServerId={17} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
+    emit(
+      batch(
+        Array.from({ length: 300 }, (_, i) => message(`b1/${i}`, 'x')),
+        2,
+      ),
+    );
+    emit(
+      batch(
+        Array.from({ length: 300 }, (_, i) => message(`b2/${i}`, 'x')),
+        5,
+      ),
+    );
+    expect(screen.getAllByText('1 B')).toHaveLength(MESSAGE_LOG_CAP);
+    // All of the second batch and the newest 200 of the first.
+    expect(screen.getByText('b2/0')).toBeTruthy();
+    expect(screen.getByText('b1/100')).toBeTruthy();
+    expect(screen.queryByText('b1/99')).toBeNull();
+    expect(screen.getByText('7 messages were dropped because too many arrived.')).toBeTruthy();
+  }, 30_000);
+
+  it('formats the dropped count for the language', () => {
+    useTranslationState.setState({ language: 'de' });
+    render(<MqttMessageExplorer mqttServerId={18} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Abonnieren' }));
+    emit(batch([], 1234));
+    expect(screen.getByText('1.234 Nachrichten wurden verworfen, weil zu viele eintrafen.')).toBeTruthy();
+    // The same terms as the flow's "MQTT-Nachricht senden" node.
+    expect(screen.getByLabelText('Thema')).toBeTruthy();
+    expect(screen.getByLabelText('Nutzlast')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'Nachricht behalten (retain)' })).toBeTruthy();
+  });
+
+  it('exposes the log, notices and suggestions to assistive technology', () => {
+    render(<MqttMessageExplorer mqttServerId={19} topicSuggestions={{ filters: ['a/b'], topics: ['a/b'] }} />);
+    expect(screen.getAllByRole('group', { name: 'Topics used by this flow' })).toHaveLength(2);
+    expect(screen.getByRole('heading', { level: 4, name: 'Publish a message' })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
+    expect(screen.getAllByRole('status').some((node) => node.textContent?.includes('Waiting for messages'))).toBe(true);
+    emit(batch([message('a/b', 'x')], 1));
+    const log = screen.getByRole('log', { name: 'Received messages' });
+    // Not announced message by message.
+    expect(log.getAttribute('aria-live')).toBe('off');
+    expect(within(log).getByText('a/b')).toBeTruthy();
+    expect(screen.getAllByRole('status').some((node) => node.textContent?.includes('was dropped'))).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+    expect(screen.getAllByRole('status').some((node) => node.textContent?.includes('Paused'))).toBe(true);
+  });
+
   it('decodes each message once, not on every render', () => {
     render(<MqttMessageExplorer mqttServerId={15} />);
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
@@ -294,6 +382,7 @@ describe('publish form', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Retain' }));
     fireEvent.click(publishButton());
     expect(await screen.findByText('Message published.')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('Message published.');
     expect(publish).toHaveBeenCalledWith({
       id: 11,
       requestBody: { topic: 'a/b', payload: 'hi', qos: 0, retain: true },
@@ -307,7 +396,23 @@ describe('publish form', () => {
     publish.mockRejectedValueOnce(new Error('The broker did not accept the message'));
     fireEvent.click(publishButton());
     await waitFor(() => expect(screen.getByText('Publishing the message failed.')).toBeTruthy());
+    expect(screen.getByRole('alert').textContent).toContain('Publishing the message failed.');
     expect(screen.queryByText('The broker did not accept the message')).toBeNull();
+  });
+
+  it('publishes with the chosen QoS', async () => {
+    publish.mockResolvedValue(undefined);
+    render(<MqttMessageExplorer mqttServerId={11} />);
+    fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'a/b' } });
+    fireEvent.click(screen.getByRole('button', { name: /QoS 0/ }));
+    fireEvent.click(await screen.findByRole('option', { name: 'QoS 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    await waitFor(() =>
+      expect(publish).toHaveBeenCalledWith({
+        id: 11,
+        requestBody: { topic: 'a/b', payload: '', qos: 2, retain: false },
+      }),
+    );
   });
 
   it('refuses a payload over 256 KiB before it is sent', () => {

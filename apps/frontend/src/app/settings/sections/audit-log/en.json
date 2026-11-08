@@ -381,7 +381,11 @@
     "state": "State",
     "kind": "Alert type",
     "setting": "Setting",
-    "tappedUserId": "ID of the user who tapped"
+    "tappedUserId": "ID of the user who tapped",
+    "topic": "Topic",
+    "size": "Size (bytes)",
+    "qos": "QoS",
+    "retain": "Retain"
   },
   "eventType": "Event type",
   "pluginId": "Integration ID",

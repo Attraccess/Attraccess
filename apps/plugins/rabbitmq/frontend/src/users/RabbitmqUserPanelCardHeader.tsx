@@ -19,7 +19,7 @@ export function RabbitmqUserPanelCardHeader({
     <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
       <div className="rmq:flex rmq:items-center rmq:gap-2">
         <UsersIcon className="rmq:w-5 rmq:h-5 rmq:text-accent-soft-foreground" />
-        <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">{t('users.title')}</p>
+        <h3 className="rmq:text-base rmq:font-semibold rmq:text-default-700">{t('users.title')}</h3>
       </div>
       <div className="rmq:flex rmq:items-center rmq:gap-2">
         <Button

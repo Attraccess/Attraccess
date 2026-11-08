@@ -31,12 +31,20 @@ export class MqttExplorerLiveTopicsProvider implements LiveTopicProvider, OnModu
   /** Re-checked on every renewal: identity always comes from the session. */
   async authorize(subscriptions: readonly LiveSubscription[], user: AuthenticatedUser) {
     const rejected = new Map<string, string>();
-    const allowed = user.effectivePermissions?.has(MQTT_EXPLORER_PERMISSION) === true;
-    for (const subscription of subscriptions as readonly ExplorerSubscription[]) {
-      const key = liveSubscriptionKey(subscription);
-      if (!allowed) rejected.set(key, 'Forbidden');
-      else if (!validateTopicFilter(subscription.filter)) rejected.set(key, 'Invalid topic filter');
-      else if (!(await this.explorer.findServer(subscription.mqttServerId))) rejected.set(key, 'Not found');
+    const explorerSubscriptions = subscriptions as readonly ExplorerSubscription[];
+    if (user.effectivePermissions?.has(MQTT_EXPLORER_PERMISSION) !== true) {
+      for (const subscription of explorerSubscriptions) rejected.set(liveSubscriptionKey(subscription), 'Forbidden');
+      return rejected;
+    }
+    const valid = explorerSubscriptions.filter((subscription) => {
+      if (validateTopicFilter(subscription.filter)) return true;
+      rejected.set(liveSubscriptionKey(subscription), 'Invalid topic filter');
+      return false;
+    });
+    // One query for the whole set, however many filters it watches.
+    const existing = await this.explorer.existingServerIds(valid.map((subscription) => subscription.mqttServerId));
+    for (const subscription of valid) {
+      if (!existing.has(subscription.mqttServerId)) rejected.set(liveSubscriptionKey(subscription), 'Not found');
     }
     return rejected;
   }

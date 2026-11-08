@@ -3,6 +3,7 @@ import { TlsSection } from './TlsSection';
 import { Select } from '../../../components/select/index';
 import { PluginSlot } from '../../plugins/PluginSlot';
 import { MqttMessageExplorer } from '../explorer/MqttMessageExplorer';
+import { MQTT_EXPLORER_PERMISSION } from '../explorer/permission';
 import { useAuth } from '../../../hooks/useAuth';
 import { MQTT_SERVER_DETAIL_SLOT, MqttServerSlotContext } from '../mqtt.slots';
 import { Button, LabeledSwitch, PageHeader, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -230,7 +231,6 @@ export function EditMqttServerPage() {
     handleSubmit,
     handleCancel,
   } = useEditMqttServerPageState();
-  // Watching and publishing messages is open to everyone who can edit resources.
   const { hasPermission } = useAuth();
 
   if (isLoadingServer) {
@@ -376,7 +376,7 @@ export function EditMqttServerPage() {
         </div>
       </Form>
 
-      {hasPermission('resources.update') && <MqttMessageExplorer mqttServerId={server.id} />}
+      {hasPermission(MQTT_EXPLORER_PERMISSION) && <MqttMessageExplorer mqttServerId={server.id} />}
 
       <PluginSlot<MqttServerSlotContext> slotId={MQTT_SERVER_DETAIL_SLOT} context={{ mqttServerId: server.id }} />
     </div>

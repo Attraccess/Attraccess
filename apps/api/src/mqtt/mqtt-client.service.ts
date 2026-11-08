@@ -22,6 +22,8 @@ import { buildMqttConnectionSettings } from './mqtt-connection-options';
 
 import { MqttMessageEvent } from './mqtt-message.event';
 
+import { MqttServerChangedEvent } from './mqtt-server-changed.event';
+
 export type SubscriptionQos = 0 | 1 | 2;
 
 export interface TopicSubscription {
@@ -74,6 +76,8 @@ export class MqttClientService implements OnModuleDestroy {
    * retained and replayed on the new connection. Late old-client events are inert.
    */
   async refreshConnection(serverId: number): Promise<void> {
+    // Other connections to this server (the message explorer's) reconnect too.
+    this.eventEmitter.emit(MqttServerChangedEvent.EVENT_NAME, new MqttServerChangedEvent(serverId));
     this.connectionVersions.set(serverId, (this.connectionVersions.get(serverId) ?? 0) + 1);
     if (!this.connectionCancellations.has(serverId)) this.clients.get(serverId)?.end(true);
     this.connectionCancellations.get(serverId)?.forEach((cancel) => cancel());
