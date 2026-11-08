@@ -251,8 +251,13 @@ describe('Parallel sessions on one machine', () => {
       await setLimit(3);
       const users = await addUsers(2);
       const parked = parkFlows();
-      const starts = Promise.allSettled(users.map((user) => scope.usage.startSession(1, user, {})));
+      // Start the second person only once the first is parked: two simultaneous starts join the machine's queue in
+      // whatever order their reads of the session limit finish, so either one could be the interrupted start.
+      const interrupted = scope.usage.startSession(1, users[0], {});
       await parked.entered;
+      const queued = scope.usage.startSession(1, users[1], {});
+      const starts = Promise.allSettled([interrupted, queued]);
+      await settle();
       expect(await count('resource_usage_lifecycle_attempt')).toBe(1);
       expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(1);
       // The API process restarts: nothing of the old process is running any more.
