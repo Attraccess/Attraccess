@@ -103,7 +103,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.SAML, parsedProviderId);
-    this.assertProvisioningAuthorized(provider, request);
+    await this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
     await this.usersService.deleteOne(user.id);
@@ -148,7 +148,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.OIDC, parsedProviderId);
-    this.assertProvisioningAuthorized(provider, request);
+    await this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
     const changes = await this.applyProvisioningPermissions(user.id, provider, body);
@@ -193,7 +193,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.SAML, parsedProviderId);
-    this.assertProvisioningAuthorized(provider, request);
+    await this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
     const changes = await this.applyProvisioningPermissions(user.id, provider, body);
@@ -238,7 +238,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.OIDC, parsedProviderId);
-    this.assertProvisioningAuthorized(provider, request);
+    await this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
     await this.sessionService.revokeAllUserSessions(user.id);
@@ -283,7 +283,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.SAML, parsedProviderId);
-    this.assertProvisioningAuthorized(provider, request);
+    await this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
     await this.sessionService.revokeAllUserSessions(user.id);
@@ -328,7 +328,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.OIDC, parsedProviderId);
-    this.assertProvisioningAuthorized(provider, request);
+    await this.assertProvisioningAuthorized(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
     await this.usersService.deleteOne(user.id);

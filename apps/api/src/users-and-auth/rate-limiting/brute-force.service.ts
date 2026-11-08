@@ -7,7 +7,13 @@ import { SettingsService } from '../../settings/settings.service';
 import { recordFailure as recordFailureImplementation } from './brute-force-failure';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
 export type RateLimitScope =
-  'login' | 'register' | 'password_reset_request' | 'password_reset_complete' | 'delete_account_confirm';
+  | 'login'
+  | 'register'
+  | 'password_reset_request'
+  | 'password_reset_complete'
+  | 'delete_account_confirm'
+  | 'sso_link_account'
+  | 'sso_provisioning';
 
 export interface CounterEntry extends WindowCounterEntry {
   lockoutUntil: number;

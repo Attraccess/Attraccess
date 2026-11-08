@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   link: vi.fn(),
   callbackUrl: vi.fn(),
   apiError: vi.fn(),
+  toastError: vi.fn(),
   callbacks: undefined as undefined | { onSuccess: () => void; onError: (error: Error) => void },
 }));
 vi.mock('@attraccess/react-query-client', () => ({
@@ -26,7 +27,9 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: state.link, isPending: false };
   },
 }));
-vi.mock('../../components/toastProvider', () => ({ useToastMessage: () => ({ apiError: state.apiError }) }));
+vi.mock('../../components/toastProvider', () => ({
+  useToastMessage: () => ({ apiError: state.apiError, error: state.toastError }),
+}));
 vi.mock('./use-sso-callback-url', () => ({
   useCallbackURL: (...args: unknown[]) => {
     state.callbackUrl(...args);
@@ -124,10 +127,29 @@ it('decodes an account-link token, submits its password and redirects only on su
   fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-password' } });
   fireEvent.click(screen.getByRole('button', { name: 'Link account' }));
   expect(state.link).toHaveBeenCalledWith({ requestBody: { linkToken: token, password: 'test-password' } });
-  const error = new Error('Wrong password');
-  act(() => state.callbacks?.onError(error));
-  expect(state.apiError).toHaveBeenCalledWith(
-    expect.objectContaining({ error, baseTranslationKey: 'errors', fallbackKey: 'unknown' }),
+  act(() => state.callbacks?.onError(Object.assign(new Error('Unauthorized'), { body: { message: 'Unauthorized' } })));
+  expect(state.toastError).toHaveBeenLastCalledWith({ title: 'Invalid password. Please try again.' });
+  act(() => state.callbacks?.onError(Object.assign(new Error('x'), { body: { message: 'LINK_TOKEN_EXHAUSTED' } })));
+  expect(state.toastError).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      description: 'This link is no longer valid. Please sign in with your company account again.',
+    }),
+  );
+  act(() =>
+    state.callbacks?.onError(
+      Object.assign(new Error('x'), { body: { message: 'TooManyAuthAttempts', retryAfterSeconds: 42 } }),
+    ),
+  );
+  expect(state.toastError).toHaveBeenLastCalledWith(
+    expect.objectContaining({ description: expect.stringContaining('42') }),
+  );
+  act(() =>
+    state.callbacks?.onError(
+      Object.assign(new Error('x'), { body: { message: 'AccountLocked', retryAfterSeconds: 60 } }),
+    ),
+  );
+  expect(state.toastError).toHaveBeenLastCalledWith(
+    expect.objectContaining({ title: 'Account temporarily locked', description: expect.stringContaining('60') }),
   );
   expect(screen.getByRole('dialog')).toBeTruthy();
   act(() => state.callbacks?.onSuccess());

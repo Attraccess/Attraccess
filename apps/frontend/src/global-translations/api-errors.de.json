@@ -198,5 +198,25 @@
   "CARD_NOT_FOUND": {
     "title": "Karte nicht gefunden",
     "description": "Die Karte existiert nicht mehr. Laden Sie die Seite neu."
+  },
+  "AccountLocked": {
+    "title": "Konto vorübergehend gesperrt",
+    "description": "Zu viele fehlgeschlagene Versuche. Bitte warte {{retryAfterSeconds}} Sekunden, bevor du es erneut versuchst."
+  },
+  "LINK_TOKEN_USED": {
+    "title": "Link nicht mehr gültig",
+    "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
+  },
+  "LINK_TOKEN_EXHAUSTED": {
+    "title": "Link nicht mehr gültig",
+    "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
+  },
+  "LINK_TOKEN_EXPIRED": {
+    "title": "Link nicht mehr gültig",
+    "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
+  },
+  "INVALID_LINK_TOKEN": {
+    "title": "Link nicht mehr gültig",
+    "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
   }
 }

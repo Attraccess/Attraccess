@@ -1,11 +1,20 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SSOProviderType, Setting } from '@attraccess/database-entities';
 import { EncryptionService } from '../../../encryption/encryption.service';
+import { SESSION_STORE, SessionStore } from '../session-store/session-store';
+
+/** Wrong passwords a single link token tolerates before it is dead. */
+export const MAX_LINK_TOKEN_PASSWORD_ATTEMPTS = 3;
+
+const usedKey = (jti: string) => `sso-link-used:${jti}`;
+const failuresKey = (jti: string) => `sso-link-failures:${jti}`;
 
 export interface SSOLinkTokenPayload {
+  /** Random token id; keys the single-use and failure state. */
+  jti: string;
   email: string;
   providerId: number;
   providerType: SSOProviderType;
@@ -28,15 +37,14 @@ export class SSOLinkTokenService {
     @InjectRepository(Setting)
     private readonly settingRepository: Repository<Setting>,
     private readonly encryptionService: EncryptionService,
+    @Inject(SESSION_STORE) private readonly sessionStore: SessionStore,
   ) {}
 
-  async issue(
-    payload: Pick<SSOLinkTokenPayload, 'email' | 'providerId' | 'providerType' | 'ssoSubject'>,
-    ttlMs = this.defaultTtlMs,
-  ): Promise<string> {
+  async issue(payload: Omit<SSOLinkTokenPayload, 'jti' | 'iat' | 'exp'>, ttlMs = this.defaultTtlMs): Promise<string> {
     const now = Date.now();
     const tokenPayload: SSOLinkTokenPayload = {
       ...payload,
+      jti: randomBytes(16).toString('base64url'),
       iat: now,
       exp: now + ttlMs,
     };
@@ -71,11 +79,37 @@ export class SSOLinkTokenService {
       throw new BadRequestException('INVALID_LINK_TOKEN');
     }
 
+    if (typeof payload.jti !== 'string' || payload.jti.length === 0) {
+      throw new UnauthorizedException('INVALID_LINK_TOKEN');
+    }
+
     if (payload.exp < Date.now()) {
       throw new UnauthorizedException('LINK_TOKEN_EXPIRED');
     }
 
     return payload;
+  }
+
+  /** Rejects a token that was already used for linking or that had too many wrong passwords. */
+  async assertUsable(payload: SSOLinkTokenPayload): Promise<void> {
+    if ((await this.sessionStore.getEphemeralState(usedKey(payload.jti))) !== null) {
+      throw new UnauthorizedException('LINK_TOKEN_USED');
+    }
+    const failures = Number((await this.sessionStore.getEphemeralState(failuresKey(payload.jti))) ?? 0);
+    if (failures >= MAX_LINK_TOKEN_PASSWORD_ATTEMPTS) {
+      throw new UnauthorizedException('LINK_TOKEN_EXHAUSTED');
+    }
+  }
+
+  async recordFailedPassword(payload: SSOLinkTokenPayload): Promise<void> {
+    await this.sessionStore.incrementEphemeralCounter(failuresKey(payload.jti), payload.exp);
+  }
+
+  /** Marks the token used; insert-if-absent, so of concurrent requests only one wins. */
+  async consume(payload: SSOLinkTokenPayload): Promise<void> {
+    if (!(await this.sessionStore.putEphemeralState(usedKey(payload.jti), '1', payload.exp))) {
+      throw new UnauthorizedException('LINK_TOKEN_USED');
+    }
   }
 
   private async sign(encodedPayload: string): Promise<string> {

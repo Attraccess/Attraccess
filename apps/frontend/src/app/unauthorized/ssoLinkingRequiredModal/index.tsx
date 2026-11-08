@@ -24,6 +24,9 @@ import {
 
 import de from './de.json';
 import en from './en.json';
+import API_ERROR_TRANSLATIONS_DE from '../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../global-translations/api-errors.en.json';
+import { getApiErrorMessage, getTranslationKeyForApiError } from '../../../utils/apiError';
 import { useCallback, useMemo, useState } from 'react';
 import { useCallbackURL } from '../use-sso-callback-url';
 
@@ -35,8 +38,8 @@ export function SSOLinkingRequiredModal(props: Props) {
   const { show } = props;
 
   const { t, tExists } = useTranslations({
-    de,
-    en,
+    de: { ...de, api: API_ERROR_TRANSLATIONS_DE },
+    en: { ...en, api: API_ERROR_TRANSLATIONS_EN },
   });
   const toast = useToastMessage();
 
@@ -92,7 +95,28 @@ export function SSOLinkingRequiredModal(props: Props) {
       window.location.href = callbackURL;
     },
     onError: (err: unknown) => {
-      toast.apiError({ error: err as ApiError, t, tExists, baseTranslationKey: 'errors', fallbackKey: 'unknown' });
+      const error = err as ApiError;
+      const message = getApiErrorMessage(error);
+      if (message === 'Unauthorized') {
+        toast.error({ title: t('errors.invalidPassword') });
+        return;
+      }
+
+      const { key } = getTranslationKeyForApiError({
+        error,
+        t,
+        tExists,
+        baseTranslationKey: 'api',
+        fallbackKey: 'generic',
+      });
+      const retryAfterSeconds = Number((error.body as { retryAfterSeconds?: unknown } | undefined)?.retryAfterSeconds);
+      toast.error({
+        title: t(key + '.title'),
+        description: t(key + '.description', {
+          error: message,
+          retryAfterSeconds: Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds : '',
+        }),
+      });
     },
   });
 

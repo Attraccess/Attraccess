@@ -88,6 +88,8 @@ function scopeToAuditType(scope: RateLimitScope): AuthAuditType {
   if (scope === 'register') return 'register';
   if (scope === 'password_reset_request') return 'password_reset_request';
   if (scope === 'password_reset_complete') return 'password_reset_complete';
+  if (scope === 'sso_link_account') return 'sso_link_account';
+  if (scope === 'sso_provisioning') return 'sso_provisioning';
   return 'delete_account_confirm';
 }
 

@@ -177,6 +177,28 @@ export class SqliteSessionStore implements SessionStore {
     return rows[0]?.expiresAt > Date.now() ? rows[0].value : null;
   }
 
+  async putEphemeralState(key: string, value: string, expiresAt: number): Promise<boolean> {
+    return this.putLogoutState(key, value, expiresAt);
+  }
+
+  async getEphemeralState(key: string): Promise<string | null> {
+    const rows = (await this.sessionRepository.query(
+      'SELECT "value" FROM "sso_logout_state" WHERE "key" = ? AND "expiresAt" > ?',
+      [key, Date.now()],
+    )) as { value: string }[];
+    return rows[0]?.value ?? null;
+  }
+
+  async incrementEphemeralCounter(key: string, expiresAt: number): Promise<number> {
+    await this.sessionRepository.query('delete FROM "sso_logout_state" WHERE "expiresAt" <= ?', [Date.now()]);
+    const rows = (await this.sessionRepository.query(
+      'insert INTO "sso_logout_state" ("key", "value", "expiresAt") VALUES (?, \'1\', ?) ' +
+        'ON CONFLICT("key") DO UPDATE SET "value" = CAST("value" AS INTEGER) + 1 RETURNING "value"',
+      [key, expiresAt],
+    )) as { value: string | number }[];
+    return Number(rows[0].value);
+  }
+
   async revokeAllUserSessions(userId: number): Promise<number> {
     const rows = (await this.sessionRepository.query('delete FROM "session" WHERE "userId" = ? RETURNING "expiresAt"', [
       userId,

@@ -198,5 +198,25 @@
   "CARD_NOT_FOUND": {
     "title": "Card not found",
     "description": "The card no longer exists. Reload the page."
+  },
+  "AccountLocked": {
+    "title": "Account temporarily locked",
+    "description": "Too many failed attempts. Please wait {{retryAfterSeconds}} seconds before trying again."
+  },
+  "LINK_TOKEN_USED": {
+    "title": "Link no longer valid",
+    "description": "This link is no longer valid. Please sign in with your company account again."
+  },
+  "LINK_TOKEN_EXHAUSTED": {
+    "title": "Link no longer valid",
+    "description": "This link is no longer valid. Please sign in with your company account again."
+  },
+  "LINK_TOKEN_EXPIRED": {
+    "title": "Link no longer valid",
+    "description": "This link is no longer valid. Please sign in with your company account again."
+  },
+  "INVALID_LINK_TOKEN": {
+    "title": "Link no longer valid",
+    "description": "This link is no longer valid. Please sign in with your company account again."
   }
 }
