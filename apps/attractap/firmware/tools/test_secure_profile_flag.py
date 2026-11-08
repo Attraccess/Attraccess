@@ -118,8 +118,9 @@ class ReleaseBuildRunsTheSecureGate(unittest.TestCase):
                 for name in ("bootloader.bin", "partition-table.bin"):
                     with open(os.path.join(build_dir, name), "wb") as f:
                         f.write(name.encode())
-                with open(os.path.join(build_dir, "sdkconfig"), "w") as f:
-                    f.write("CONFIG_BOOTLOADER_APP_SECURE_VERSION=1\n")
+                os.makedirs(os.path.join(build_dir, "config"), exist_ok=True)
+                with open(os.path.join(build_dir, "config", "sdkconfig.json"), "w") as f:
+                    json.dump({"BOOTLOADER_APP_SECURE_VERSION": 1}, f)
                 with open(os.path.join(build_dir, "flasher_args.json"), "w") as f:
                     json.dump({"app": {"file": "app.bin"}, "bootloader": {"file": "bootloader.bin"},
                                "partition-table": {"file": "partition-table.bin"}}, f)
