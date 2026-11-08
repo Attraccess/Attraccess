@@ -232,7 +232,7 @@ export function DiagnosticsContent({ controllerId, onConfigure }: { controllerId
                 <p key={`${ref.flowId != null ? `flow-${ref.flowId}` : ref.resourceId}-${ref.nodeId}`}>
                   <a href={ref.href}>
                     {ref.flowId != null
-                      ? t('diagnostics.globalReference', { flow: ref.flowId, node: ref.nodeId })
+                      ? t('diagnostics.globalReference', { flow: ref.flowName ?? `#${ref.flowId}`, node: ref.nodeId })
                       : t('diagnostics.reference', { resource: ref.resourceId, node: ref.nodeId })}
                   </a>
                   : {ref.channelId} ({t(ref.control ? 'diagnostics.control' : 'diagnostics.readEvent')})

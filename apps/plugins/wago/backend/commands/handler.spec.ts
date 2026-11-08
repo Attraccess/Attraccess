@@ -20,6 +20,8 @@ describe('WAGO command form', () => {
   });
   const query = {
     select: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     getMany: jest.fn().mockResolvedValue([{ resourceId: 7, id: 'other-node' }]),
@@ -173,6 +175,15 @@ describe('WAGO command form', () => {
       expect(query.andWhere).toHaveBeenCalledWith('(node.resourceId IS NULL OR node.resourceId <> :resourceId)', {
         resourceId: 2,
       });
+    });
+
+    it('names the global flow that also controls the channel', async () => {
+      query.getMany.mockResolvedValue([
+        { resourceId: null, flowId: 5, flow: { id: 5, name: 'Power off all' }, id: 'global-node' },
+      ]);
+      expect(await description(2, false, null)).toContain('global flow "Power off all" / node global-node');
+      expect(query.leftJoin).toHaveBeenCalledWith('node.flow', 'flow');
+      expect(query.addSelect).toHaveBeenCalledWith(['flow.id', 'flow.name']);
     });
 
     it('treats a global flow as its own owner and excludes only its own nodes', async () => {

@@ -75,6 +75,8 @@ export function diagnosticReferences(
     id: string;
     resourceId: number | null;
     flowId?: number | null;
+    /** The joined global flow, for its name. */
+    flow?: { name: string } | null;
     type: string;
     data: Record<string, unknown>;
   }>,
@@ -104,6 +106,7 @@ export function diagnosticReferences(
       nodeId: node.id,
       resourceId: node.resourceId ?? null,
       flowId,
+      flowName: flowId !== null ? (node.flow?.name ?? null) : null,
       channelId,
       control,
       href:
@@ -160,6 +163,8 @@ export class WagoDiagnosticsService {
       this.context.dataSource
         .getRepository(ResourceFlowNode)
         .createQueryBuilder('node')
+        .leftJoin('node.flow', 'flow')
+        .addSelect(['flow.id', 'flow.name'])
         .where('node.type LIKE :type', { type: 'plugin.wago.%' })
         .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
         .take(1001)
@@ -350,6 +355,8 @@ export class WagoDiagnosticsService {
         ? this.context.dataSource
             .getRepository(ResourceFlowNode)
             .createQueryBuilder('node')
+            .leftJoin('node.flow', 'flow')
+            .addSelect(['flow.id', 'flow.name'])
             .where("node.data ->> 'controllerId' IN (:...controllerIds)", { controllerIds: controllerIdsForQuery })
             .andWhere("node.data ->> 'channelId' IN (:...channelIds)", { channelIds: localChannelIds })
             .andWhere('node.type = :type', { type: 'plugin.wago.command' })
@@ -387,6 +394,10 @@ export class WagoDiagnosticsService {
           .getMany()
       : [];
     const resourceNames = new Map(conflictResources.map((resource) => [resource.id, resource.name]));
+    const flowNames = new Map<number, string>();
+    for (const node of conflictNodes) {
+      if (node.flowId != null && node.flow?.name) flowNames.set(node.flowId, node.flow.name);
+    }
     const controllersResult = selectedControllerIds.map((controllerId) => {
       const controller = controllersById.get(controllerId);
       if (!controller)
@@ -416,7 +427,8 @@ export class WagoDiagnosticsService {
               id,
               name: resourceNames.get(id) ?? `Resource ${id}`,
             })),
-            conflictFlows: reference.conflictFlowIds.map((id) => ({ id, name: `Global flow ${id}` })),
+            // The frontend names a flow without a loaded name by its id, in the user's language.
+            conflictFlows: reference.conflictFlowIds.map((id) => ({ id, name: flowNames.get(id) ?? null })),
           }));
         return {
           controllerId,

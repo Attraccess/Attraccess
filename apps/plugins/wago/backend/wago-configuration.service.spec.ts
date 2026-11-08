@@ -106,7 +106,9 @@ describe('configuration editor service boundaries', () => {
     expect((await service.reviewDraft(1)).impacts).toEqual([
       expect.objectContaining({
         channelId: 'output',
-        references: [{ nodeId: 'command-1', resourceId: 2, flowId: null, nodeType: 'plugin.wago.command' }],
+        references: [
+          { nodeId: 'command-1', resourceId: 2, flowId: null, flowName: null, nodeType: 'plugin.wago.command' },
+        ],
       }),
     ]);
     await expect(service.publishDraft(1)).rejects.toThrow('acknowledge');

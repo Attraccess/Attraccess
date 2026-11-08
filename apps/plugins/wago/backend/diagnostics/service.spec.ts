@@ -52,6 +52,15 @@ describe('diagnostic references', () => {
       const [reference] = diagnosticReferences([globalNode('a b', 3)], ['relay'], 2);
       expect(reference).toMatchObject({ resourceId: null, flowId: 3, href: '/devices/flows/3?node=a%20b' });
     });
+    it('names the global flow of a reference', () => {
+      const [named, resource] = diagnosticReferences(
+        [{ ...globalNode('a', 3), flow: { name: 'Power off all' } }, node('r', 4)],
+        ['relay'],
+        2,
+      );
+      expect(named).toMatchObject({ flowId: 3, flowName: 'Power off all' });
+      expect(resource).toMatchObject({ flowId: null, flowName: null });
+    });
     it('conflicts a global flow with resource flows and other global flows but not with itself', () => {
       const refs = diagnosticReferences(
         [globalNode('g1', 1), globalNode('g1b', 1), globalNode('g2', 2), node('r', 4)],
@@ -85,6 +94,8 @@ describe('controller diagnostics', () => {
       const query = (result: unknown[]) => {
         const builder = {
           select: jest.fn(),
+          leftJoin: jest.fn(),
+          addSelect: jest.fn(),
           distinctOn: jest.fn(),
           where: jest.fn(),
           andWhere: jest.fn(),
@@ -93,7 +104,17 @@ describe('controller diagnostics', () => {
           take: jest.fn(),
           getMany: jest.fn().mockResolvedValue(result),
         };
-        for (const method of ['select', 'distinctOn', 'where', 'andWhere', 'orderBy', 'addOrderBy', 'take'] as const)
+        for (const method of [
+          'select',
+          'leftJoin',
+          'addSelect',
+          'distinctOn',
+          'where',
+          'andWhere',
+          'orderBy',
+          'addOrderBy',
+          'take',
+        ] as const)
           builder[method].mockReturnValue(builder);
         return builder;
       };
@@ -346,6 +367,8 @@ describe('controller diagnostics', () => {
     };
     const revision = { revision: 2, state: 'applied', snapshot: JSON.stringify(snapshot), contentHash: 'a'.repeat(64) };
     const query = {
+      leftJoin: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       take: jest.fn().mockReturnThis(),

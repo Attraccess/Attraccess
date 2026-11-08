@@ -29,6 +29,8 @@ describe('configuration flow impacts', () => {
   };
   const query = {
     select: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     getMany: jest.fn().mockResolvedValue([
@@ -55,7 +57,9 @@ describe('configuration flow impacts', () => {
       expect.objectContaining({ channelId: 'contact', references: [] }),
       expect.objectContaining({
         channelId: 'lock',
-        references: [{ resourceId: 4, flowId: null, nodeId: 'guarded-command', nodeType: 'plugin.wago.command' }],
+        references: [
+          { resourceId: 4, flowId: null, flowName: null, nodeId: 'guarded-command', nodeType: 'plugin.wago.command' },
+        ],
       }),
     ]);
     expect(query.andWhere).toHaveBeenCalledWith("node.data ->> 'controllerId' = :controllerId", { controllerId: 1 });
@@ -67,7 +71,9 @@ describe('configuration flow impacts', () => {
       expect.objectContaining({
         channelId: 'lock',
         message: expect.stringContaining('Reopen and save'),
-        references: [{ resourceId: 4, flowId: null, nodeId: 'guarded-command', nodeType: 'plugin.wago.command' }],
+        references: [
+          { resourceId: 4, flowId: null, flowName: null, nodeId: 'guarded-command', nodeType: 'plugin.wago.command' },
+        ],
       }),
     ]);
     expect(query.getMany).toHaveBeenCalledTimes(1);
@@ -79,14 +85,22 @@ describe('configuration flow impacts', () => {
         id: 'global-command',
         resourceId: null,
         flowId: 9,
+        flow: { id: 9, name: 'Power off all' },
         type: 'plugin.wago.command',
         data: { controllerId: 1, channelId: 'lock' },
       },
     ]);
     const impacts = await configurationFlowImpacts(context, 1, previous, previous);
     expect(impacts[0].references).toEqual([
-      { resourceId: null, flowId: 9, nodeId: 'global-command', nodeType: 'plugin.wago.command' },
+      {
+        resourceId: null,
+        flowId: 9,
+        flowName: 'Power off all',
+        nodeId: 'global-command',
+        nodeType: 'plugin.wago.command',
+      },
     ]);
     expect(query.select).toHaveBeenCalledWith(expect.arrayContaining(['node.flowId']));
+    expect(query.leftJoin).toHaveBeenCalledWith('node.flow', 'flow');
   });
 });

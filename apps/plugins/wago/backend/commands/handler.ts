@@ -204,6 +204,8 @@ export class WagoCommandHandler {
       .getRepository(ResourceFlowNode)
       .createQueryBuilder('node')
       .select(['node.id', 'node.resourceId', 'node.flowId'])
+      .leftJoin('node.flow', 'flow')
+      .addSelect(['flow.id', 'flow.name'])
       .where('node.type = :type', { type: 'plugin.wago.command' })
       .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
       .andWhere("node.data ->> 'channelId' = :channelId", { channelId });
@@ -213,9 +215,10 @@ export class WagoCommandHandler {
       query.andWhere('(node.resourceId IS NULL OR node.resourceId <> :resourceId)', { resourceId });
     }
     const nodes = await query.getMany();
+    // A global flow is named for the reader; the id is only the fallback.
     return nodes.map((node) =>
       node.flowId !== null && node.flowId !== undefined
-        ? `global flow ${node.flowId} / node ${node.id}`
+        ? `global flow ${node.flow?.name ? JSON.stringify(node.flow.name) : node.flowId} / node ${node.id}`
         : `resource ${node.resourceId} / node ${node.id}`,
     );
   }

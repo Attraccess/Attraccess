@@ -25,6 +25,8 @@ export async function configurationFlowImpacts(
     .getRepository(ResourceFlowNode)
     .createQueryBuilder('node')
     .select(['node.id', 'node.resourceId', 'node.flowId', 'node.type', 'node.data'])
+    .leftJoin('node.flow', 'flow')
+    .addSelect(['flow.id', 'flow.name'])
     .where('node.type LIKE :type', { type: 'plugin.wago.%' })
     .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
     .getMany();
@@ -46,6 +48,7 @@ export async function configurationFlowImpacts(
       .map((node) => ({
         resourceId: node.resourceId ?? null,
         flowId: node.flowId ?? null,
+        flowName: node.flowId != null ? (node.flow?.name ?? null) : null,
         nodeId: node.id,
         nodeType: node.type,
       })),

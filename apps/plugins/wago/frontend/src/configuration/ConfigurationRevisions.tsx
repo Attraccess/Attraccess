@@ -36,7 +36,7 @@ export function ImpactWarning({
                   <p key={reference.nodeId}>
                     {reference.flowId != null
                       ? t('revisions.globalReference', {
-                          flow: reference.flowId,
+                          flow: reference.flowName ?? `#${reference.flowId}`,
                           node: reference.nodeId,
                           type: reference.nodeType,
                         })
