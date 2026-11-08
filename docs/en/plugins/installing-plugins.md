@@ -15,6 +15,21 @@ Updates and downgrades cannot break the dependency graph. If a required plugin i
 
 If a dependency fails to load, its dependants stay inactive. Open the failure details in **Settings → Plugins**, repair or retry the failed dependency, then restart.
 
+## Release channels
+
+Official plugins are published to npm under these dist-tags:
+
+| Tag      | Moved by               | Contents                                                                                                          |
+| -------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `latest` | Attraccess releases    | The plugin version published with an Attraccess release. **The marketplace shows and installs this version.**     |
+| `next`   | Nightly builds of main | `<version>-nightly.<run>.<attempt>` from green, hardware-gated main builds. Opt in by requesting the spec `next`. |
+| `alpha`  | Nobody (legacy)        | Frozen builds from before release channels existed.                                                               |
+
+Stable hosts therefore never receive untested nightly plugins. Two transitional facts:
+
+- The WAGO, Shelly and RabbitMQ `latest` versions stay at a nightly build (`0.1.0-nightly.925.2`, for hosts `^1.9.0`) until the next Attraccess release publishes them as stable versions. Current plugin code needs a newer host, so that is the right version for older hosts.
+- npm sets `latest` automatically on a package's first publish. A plugin first published by a nightly (like Matter) therefore has a nightly `latest` until its first release. The release treats a nightly `latest` as never released and publishes the plugin.
+
 ## Uploading a Plugin
 
 1. Open **Settings** in the sidebar and select the **Plugins** section

@@ -94,7 +94,8 @@ test('every main pipeline tests all deliverables and bundles artifacts built in 
     for (const deliverable of ['build-companion', 'build-attractap-firmware', 'build-attractap-desktop']) {
       assert.ok(jobs[deliverable].uses, `${name}: ${deliverable} must always run`);
       assert.equal(jobs[deliverable].if, undefined);
-      assert.ok(jobs.containerize.needs.includes(deliverable) || jobs['precommit-check']?.needs.includes(deliverable));
+      const consumer = name === 'docker-nightly-latest' ? jobs['publish-gate'] : jobs.containerize;
+      assert.ok(consumer.needs.includes(deliverable) || jobs['precommit-check']?.needs.includes(deliverable));
     }
     assert.ok(jobs.test.steps.some((step) => step.run === 'node scripts/ci-test-projects.mjs --group=core'));
     assert.ok(jobs.plugins.steps.some((step) => step.run === 'node scripts/ci-test-projects.mjs --group=plugins'));
@@ -107,6 +108,56 @@ test('every main pipeline tests all deliverables and bundles artifacts built in 
   const { jobs } = workflow('release');
   assert.ok(jobs.balena.needs.includes('build-attractap-firmware'));
   assert.ok(jobs.balena.steps.some((step) => step.uses === './.github/actions/download-attractap-firmware'));
+});
+
+test('nightly publishes plugins and the image from one gate and never moves nightly-latest backwards', () => {
+  const nightly = workflow('docker-nightly-latest');
+  const { jobs } = nightly;
+  assert.equal(nightly.concurrency, undefined, 'a concurrency group would cancel queued runs');
+  assert.ok(!fs.readFileSync('.github/workflows/docker-nightly-latest.yml', 'utf8').includes('github.event.before'));
+  assert.ok(!jobs.plugins.steps.some((step) => /publish/.test(step.run ?? '')), 'pack/test job must not publish');
+
+  assert.deepEqual(jobs['publish-plugins'].needs, ['publish-gate']);
+  assert.deepEqual(jobs.containerize.needs, ['publish-gate']);
+  assert.equal(jobs['publish-plugins'].if, undefined);
+  assert.equal(jobs.containerize.if, undefined);
+  for (const job of [
+    'lint',
+    'typecheck',
+    'test',
+    'build',
+    'plugins',
+    'build-companion',
+    'build-attractap-firmware',
+    'build-attractap-desktop',
+    'attractap-lab-hil',
+  ]) {
+    assert.ok(jobs['publish-gate'].needs.includes(job), `publish-gate must need ${job}`);
+  }
+  // failed or cancelled blocks, skipped (HIL variable off) does not
+  assert.match(jobs['publish-gate'].if, /always\(\)/);
+  assert.match(jobs['publish-gate'].if, /!contains\(needs\.\*\.result, 'failure'\)/);
+  assert.match(jobs['publish-gate'].if, /!contains\(needs\.\*\.result, 'cancelled'\)/);
+
+  const publish = jobs['publish-plugins'].steps.find((step) => /plugin-publish-plan\.mjs/.test(step.run ?? ''));
+  assert.match(publish.run, /--channel=next/);
+  assert.equal(publish.env.NPM_NIGHTLY, 'true');
+
+  const build = jobs.containerize.steps.find((step) => step.uses === './.github/actions/docker-build-push');
+  assert.ok(!/nightly-latest/.test(build.with.tags), 'nightly-latest only moves after the revision check');
+  assert.match(build.with.labels, /org\.opencontainers\.image\.revision=\$\{\{ github\.sha \}\}/);
+  const steps = jobs.containerize.steps;
+  assert.ok(steps.indexOf(build) < steps.findIndex((step) => /promote-nightly-image\.mjs/.test(step.run ?? '')));
+});
+
+test('release publishes plugins on latest and nothing publishes to alpha', () => {
+  const step = workflow('release').jobs.plugins.steps.find((s) => /plugin-publish-plan\.mjs/.test(s.run ?? ''));
+  assert.match(step.run, /--channel=latest/);
+  assert.equal(step.env.NPM_NIGHTLY, undefined);
+  assert.equal(step.env.NPM_DIST_TAG, undefined);
+  for (const file of fs.readdirSync('.github/workflows')) {
+    assert.ok(!/NPM_DIST_TAG:\s*alpha/.test(fs.readFileSync(`.github/workflows/${file}`, 'utf8')), file);
+  }
 });
 
 test('deliverable workflows avoid overlapping automatic PR builds and require downloaded artifacts', () => {

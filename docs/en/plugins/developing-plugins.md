@@ -1053,10 +1053,21 @@ so they share the workspace toolchain, caching and CI.
    pnpm nx run-many --target=zip --projects=tag:type:plugin
   ```
 
-- **CI:** pull requests test and pack affected plugin apps. Every main-branch
-  build publishes every plugin app tagged `type:plugin` as a unique
-  `-nightly.<run>` version under npm's `next` tag. Release CI publishes changed
-  tagged plugin apps with a new version under `latest`.
+- **CI:** pull requests test and pack affected plugin apps. Publishing is decided from what npm has, not
+  from the pushed commits (`apps/plugins/scripts/plugin-publish-plan.mjs`). Every published manifest records the
+  commit it was built from in `gitHead` (plus `attraccess.publishedCommit` as a fallback). For each plugin the plan
+  reads the commit on the channel's dist-tag and publishes only if the plugin's inputs (its own files, the plugin
+  SDK libraries, other Nx inputs) changed since then. A plugin that was never published, or has no recorded commit,
+  is always published. Changes merged in a failed run are therefore picked up by the next green one, and an older
+  run finishing late never moves a tag backwards.
+  - **Nightly** (main, after all build, test and hardware gates pass) publishes
+    `<version>-nightly.<run>.<attempt>` under `next`, in the same gated outcome as the `nightly-<sha>` image.
+  - **Release** publishes the `package.json` version without its prerelease suffix (`0.2.0-alpha.0` becomes
+    `0.2.0`) under `latest`. If that version already exists, bump the plugin's version first.
+  - Nothing publishes to `alpha` any more; existing `alpha` tags are frozen. See
+    [Release channels](plugins/installing-plugins.md#release-channels).
+  - Preview the plan locally against the real registry with
+    `node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next --dry-run` (or `--channel=latest`).
 
 ## See Also
 
