@@ -8,8 +8,8 @@ const CYCLES_PER_MACHINE = 10;
 const ADMIN_EVENTS = 25;
 /** Well below the 5 s busy timeout, so waiting writers must outlast it rather than give up. */
 const HOLD_MS = 400;
-/** The load normally finishes in about two seconds, but a full parallel test run can slow it several times over. */
-const WORK_DEADLINE_MS = 30_000;
+/** The load normally finishes in about two seconds; a coverage-instrumented CI run under full parallel load took 36 s. */
+const WORK_DEADLINE_MS = 90_000;
 
 /**
  * Acceptance gate for ATT-1212: the real usage-session service (start, end and take-over, each writing its audit
