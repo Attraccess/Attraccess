@@ -85,7 +85,14 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
     find: jest.fn(async ({ where, take }: any) => {
       // `where` may be a list of alternatives (resource flow nodes or nodes of enabled global flows).
       const clauses = Array.isArray(where) ? where : [where || {}];
-      const matches = (node: ResourceFlowNode, clause: any) => {
+      type Clause = {
+        resourceId?: number;
+        type?: string;
+        id?: { _value: string };
+        flowId?: unknown;
+        flow?: { enabled: boolean };
+      };
+      const matches = (node: ResourceFlowNode, clause: Clause) => {
         const { resourceId, type, id, flowId, flow } = clause;
         if (type !== undefined && node.type !== type) return false;
         if (resourceId !== undefined && node.resourceId !== resourceId) return false;
@@ -96,7 +103,7 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
         }
         return true;
       };
-      const nodes = scope.initialNodes.filter((node) => clauses.some((clause: any) => matches(node, clause)));
+      const nodes = scope.initialNodes.filter((node) => clauses.some((clause: Clause) => matches(node, clause)));
       return take === undefined ? nodes : nodes.slice(0, take);
     }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

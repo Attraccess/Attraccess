@@ -202,7 +202,8 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         const clauses = Array.isArray(where) ? where : [where || {}];
         return initialNodes.filter((n) =>
           clauses.some(
-            ({ resourceId, type }: any) => (resourceId ? n.resourceId === resourceId : true) && n.type === type,
+            ({ resourceId, type }: { resourceId?: number; type?: string }) =>
+              (resourceId ? n.resourceId === resourceId : true) && n.type === type,
           ),
         );
       }),
