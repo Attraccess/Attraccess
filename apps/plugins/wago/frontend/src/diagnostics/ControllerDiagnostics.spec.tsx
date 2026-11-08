@@ -251,6 +251,59 @@ describe('diagnostics isolation', () => {
       vi.useRealTimers();
     }
   });
+  it.each([
+    ['en', 'Resource 7, node n1', 'Global flow "Power off all", node n2'],
+    ['de', 'Ressource 7, Knoten n1', 'Globaler Ablauf „Power off all“, Knoten n2'],
+  ] as const)(
+    'links resource-flow and global-flow references to their own editor (%s)',
+    (language, resourceLabel, flowLabel) => {
+      useTranslationState.getState().setLanguage(language);
+      const base = {
+        channelId: 'out',
+        control: true,
+        invalid: false,
+        conflict: false,
+        conflictResourceIds: [],
+        conflictFlowIds: [],
+      };
+      vi.mocked(useWagoDiagnostics, { partial: true }).mockReturnValue({
+        isError: false,
+        isPending: false,
+        data: {
+          ...fixture(),
+          references: [
+            { ...base, nodeId: 'n1', resourceId: 7, flowId: null, href: '/resources/7/flows' },
+            {
+              ...base,
+              nodeId: 'n2',
+              resourceId: null,
+              flowId: 3,
+              flowName: 'Power off all',
+              href: '/devices/flows/3?node=n2',
+              conflict: true,
+            },
+            {
+              ...base,
+              nodeId: 'n2',
+              resourceId: 8,
+              flowId: null,
+              href: '/resources/8/flows',
+              control: false,
+              invalid: true,
+            },
+          ],
+        },
+        dataUpdatedAt: Date.now(),
+        refetch: vi.fn(),
+      });
+      render(<ControllerDiagnostics controllerId={1} />);
+
+      expect(screen.getByText(resourceLabel).getAttribute('href')).toBe('/resources/7/flows');
+      expect(screen.getByText(flowLabel).getAttribute('href')).toBe('/devices/flows/3?node=n2');
+      // A global node and a resource node may share a node id without sharing a list key.
+      expect(screen.getAllByRole('link')).toHaveLength(3);
+    },
+  );
   it('accepts polling failure from an embedding host and suppresses the cached status', () => {
     render(<WagoStatus diagnostics={fixture()} pollingFailed />);
     expect(screen.queryByText('Controller: online')).toBeNull();

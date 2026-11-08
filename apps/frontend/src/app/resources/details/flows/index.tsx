@@ -1,5 +1,8 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
 import { useParams } from 'react-router-dom';
+import { useMemo } from 'react';
+import type { FlowOwner } from './flowOwner';
+import { flowOwnerKey } from './flowOwner';
 import { Background, BackgroundVariant, Controls, ReactFlow, Panel, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ButtonGroup, Spinner } from '@heroui/react';
@@ -31,7 +34,7 @@ function FlowsPageInner() {
       <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-border">
         <NodeCatalogPanel
           ref={model.nodeCatalogRef}
-          resourceId={Number(model.resourceId)}
+          owner={model.owner}
           onSelect={model.addStartNode}
           tNodeTranslations={model.tNodeTranslations}
         />
@@ -74,7 +77,7 @@ function FlowsPageInner() {
             edgeTypes={model.edgeTypes}
           >
             <Controls />
-            <FlowNodeQuerySelection key={model.resourceId} nodes={model.nodes} setNodes={model.setNodes} />
+            <FlowNodeQuerySelection key={flowOwnerKey(model.owner)} nodes={model.nodes} setNodes={model.setNodes} />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
@@ -124,7 +127,6 @@ function FlowsPageInner() {
                 <DownloadIcon />
               </Button>
               <LogViewer
-                resourceId={Number(model.resourceId)}
                 confettiEnabled={model.confettiEnabled}
                 onConfettiEnabledChange={model.setConfettiEnabled}
               >
@@ -135,13 +137,16 @@ function FlowsPageInner() {
                 )}
               </LogViewer>
 
-              <VariablesModal resourceId={Number(model.resourceId)}>
-                {(open) => (
-                  <Button isIconOnly onPress={open} aria-label={model.t('actions.variables')}>
-                    <BracesIcon />
-                  </Button>
-                )}
-              </VariablesModal>
+              {/* Variables are managed through a resource; a global flow has none to open them for. */}
+              {model.owner.kind === 'resource' && (
+                <VariablesModal resourceId={model.owner.resourceId}>
+                  {(open) => (
+                    <Button isIconOnly onPress={open} aria-label={model.t('actions.variables')}>
+                      <BracesIcon />
+                    </Button>
+                  )}
+                </VariablesModal>
+              )}
 
               <Button isIconOnly onPress={model.layout} isDisabled={model.isFlowLoading}>
                 <LayoutGridIcon />
@@ -179,12 +184,22 @@ function FlowsPageInner() {
   );
 }
 
-export default function FlowsPage() {
-  const { id: resourceId } = useParams();
+/** The flow editor for any owner: a resource's own flow or a global flow. */
+export function FlowEditor({ owner }: { owner: FlowOwner }) {
+  const ownerIdentity = flowOwnerKey(owner);
+  // Memoised on the identity: children key their queries and effects on the owner object.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the identity string covers every field of the owner.
+  const stableOwner = useMemo(() => owner, [ownerIdentity]);
 
   return (
-    <FlowProvider key={resourceId} resourceId={Number(resourceId)}>
+    <FlowProvider key={ownerIdentity} owner={stableOwner}>
       <FlowsPageInner />
     </FlowProvider>
   );
+}
+
+export default function FlowsPage() {
+  const { id: resourceId } = useParams();
+
+  return <FlowEditor owner={{ kind: 'resource', resourceId: Number(resourceId) }} />;
 }

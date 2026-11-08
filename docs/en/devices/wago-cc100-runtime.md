@@ -528,6 +528,8 @@ Event, read, and wait nodes put their result in `wago`, preserving the incoming 
 
 State events are reports, including periodic snapshots; they are not limited to value changes. Use the event node's minimum interval to limit how frequently it starts a flow, and minimum change to filter measurements. An event can report unavailable data, so check `wago.available` when freshness matters.
 
+All four WAGO nodes also work in [global flows](flows/global-flows.md). A global flow is a distinct channel owner (`global flow <id>`) in conflict checks and flow references, and links to its nodes point to `/devices/flows/:flowId?node=<nodeId>`. In a global flow there is no fixed resource, so use the channel's controller and name only.
+
 For example, connect **WAGO event received → WAGO read state → a condition** to react to a contact while inspecting another channel. Use **WAGO command → WAGO wait for state** when the flow should continue only after an input reports the expected state.
 
 ## Recovery

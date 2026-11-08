@@ -1,6 +1,17 @@
-import { Entity, Column, CreateDateColumn, ManyToOne, JoinColumn, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Check,
+  Entity,
+  Index,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  JoinColumn,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { Resource } from './resource.entity';
+import { Flow } from './flow.entity';
 import { ResourceFlowNodeType } from './resource-flow-node/node-type';
 
 export { ResourceFlowNodeType } from './resource-flow-node/node-type';
@@ -72,6 +83,10 @@ export class ResourceFlowNodePosition {
 }
 
 @Entity()
+@Index('IDX_resource_flow_node_type_flow', ['type', 'flowId'])
+@Index('IDX_resource_flow_node_flow', ['flowId'])
+// Exactly one owner: a resource flow or a global flow.
+@Check('CHK_resource_flow_node_owner', '("resourceId" IS NULL) <> ("flowId" IS NULL)')
 export class ResourceFlowNode {
   @PrimaryColumn({ type: 'text' })
   @ApiProperty({
@@ -126,12 +141,27 @@ export class ResourceFlowNode {
   })
   updatedAt!: Date;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'integer', nullable: true })
   @ApiProperty({
-    description: 'The id of the resource that this node belongs to',
+    description: 'The id of the resource that this node belongs to; null for global-flow nodes',
     example: 1,
+    nullable: true,
+    type: Number,
   })
-  resourceId!: number;
+  resourceId!: number | null;
+
+  @Column({ type: 'integer', nullable: true })
+  @ApiProperty({
+    description: 'The id of the global flow that this node belongs to; null for resource-flow nodes',
+    example: 1,
+    nullable: true,
+    type: Number,
+  })
+  flowId!: number | null;
+
+  @ManyToOne(() => Flow, (flow) => flow.nodes, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'flowId', foreignKeyConstraintName: 'FK_resource_flow_node_flow' })
+  flow!: Flow | null;
 
   @ManyToOne(() => Resource, (resource) => resource.flowNodes, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'resourceId' })
@@ -140,5 +170,5 @@ export class ResourceFlowNode {
     type: () => Resource,
     required: false,
   })
-  resource!: Resource;
+  resource!: Resource | null;
 }

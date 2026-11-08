@@ -5,12 +5,15 @@ import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { resolveTriggeringUsage } from './triggering-usage';
+import { requireRunMachineId } from './flow.utils';
 
 export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const { notes, target, userId } = ResourceUsageEndSessionNodeDataSchema.parse(node.data ?? {}) ?? {};
+
+    const resourceId = await requireRunMachineId(node, ctx);
 
     let finalNotes = '';
     if (typeof notes === 'string' && notes.length > 0) {
@@ -25,7 +28,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
       if (ctx.lifecycleAttemptId) {
         await this.resourceUsageService.deferSessionEnds(
           ctx.lifecycleAttemptId,
-          node.resourceId,
+          resourceId,
           sessionTarget,
           finalNotes,
           ctx.transactionManager,
@@ -33,7 +36,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
         );
       } else {
         await this.resourceUsageService.endSessionsOfTarget(
-          node.resourceId,
+          resourceId,
           sessionTarget,
           finalNotes,
           ctx.transactionManager,
@@ -48,7 +51,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
       if (ctx.lifecycleCandidateCancellation) return { payload: input };
       await this.resourceUsageService.endLifecycleCandidate(
         ctx.lifecycleAttemptId,
-        node.resourceId,
+        resourceId,
         finalNotes,
         ctx.actorUserId,
       );
@@ -58,7 +61,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
     // End the session that triggered this run; never somebody else's when that one is already gone.
     const { session: activeUsage } = await resolveTriggeringUsage(
       this.resourceUsageService,
-      node.resourceId,
+      resourceId,
       input,
       ctx.transactionManager,
     );
@@ -72,7 +75,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
     }
 
     await this.resourceUsageService.endSession(
-      node.resourceId,
+      resourceId,
       activeUsage.user,
       { notes: finalNotes, usageId: activeUsage.id },
       {

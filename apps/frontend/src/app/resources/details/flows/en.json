@@ -33,7 +33,14 @@
     "errors": {
       "invalidJson": "The file isn't valid JSON.",
       "invalidStructure": "The file doesn't contain a valid flow export.",
+      "unsupportedNodes": "The flow contains nodes that are not available here and was not imported: {{nodes}}",
       "unknown": "The file couldn't be imported."
+    }
+  },
+  "global": {
+    "saveUnsupportedNodes": {
+      "title": "Flow not saved",
+      "description": "These nodes are not available in global flows: {{nodes}}"
     }
   }
 }

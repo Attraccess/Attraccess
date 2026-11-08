@@ -47,7 +47,8 @@
         "description": "Wie viele Personen diese Maschine gleichzeitig nutzen können, jede mit eigener Sitzung (1–1000). Bei 1 (Standard) kann die Maschine nur von einer Person gleichzeitig genutzt werden.",
         "belowActiveHint": "Aktuell sind {{count}} Sitzungen aktiv, mehr als dieses Limit. Sie laufen weiter; neue Sitzungen können erst gestartet werden, wenn weniger Sitzungen als das Limit aktiv sind.",
         "flowsWarningTitle": "Flows prüfen die Sitzungsanzahl nicht",
-        "flowsWarning": "Einige Flows dieser Maschine laufen bei jedem Sitzungsstart und -ende, auch wenn andere noch arbeiten, und prüfen nicht, wie viele Sitzungen aktiv sind. Ein Ausschalt-Flow kann den Strom zu früh abschalten.",
+        "flowsWarning": "Einige Flows, die für diese Maschine laufen (ihr eigener Flow oder globale Flows), reagieren auf jeden Sitzungsstart und jedes Sitzungsende, auch wenn andere noch arbeiten, ohne zu prüfen, wie viele Sitzungen aktiv sind. Ein Ausschalt-Flow kann den Strom zu früh abschalten.",
+        "flowsWarningOwnFlow": "Flow dieser Maschine",
         "flowsWarningOpen": "Flows prüfen"
       }
     },

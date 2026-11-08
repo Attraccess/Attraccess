@@ -51,8 +51,20 @@ export class FlowExecutionContext {
     return context;
   }
 
+  /** The resource of a run: the node's own, else the triggering resource. Null when there is none. */
+  resolveRunResourceId(
+    node: { resourceId: number | null },
+    options: Pick<FlowExecutionOptions, 'triggeringResourceId'> = {},
+  ): number | null {
+    return node.resourceId ?? options.triggeringResourceId ?? null;
+  }
+
+  /**
+   * Adds the run's resource (when it has one) to the payload and loads the template variables. Runs without a
+   * resource keep their payload as it is: there is no `resource` object.
+   */
   async withResourceContext(
-    resourceId: number,
+    resourceId: number | null,
     payload: unknown,
     transactionManager?: EntityManager,
     cache?: Map<number, FlowResourceContext>,
@@ -61,9 +73,15 @@ export class FlowExecutionContext {
       return payload;
     }
 
+    const payloadRecord = payload as Record<string, unknown>;
+    if (resourceId === null) {
+      const result = { ...payloadRecord };
+      this.templateVariables.set(result, await this.variablesService.getAll(null));
+      return result;
+    }
+
     const context = await this.getResourceContext(resourceId, transactionManager, cache);
     const variables = await this.variablesService.getAll(resourceId);
-    const payloadRecord = payload as Record<string, unknown>;
     const existingResource = payloadRecord.resource;
 
     let result: Record<string, unknown>;
@@ -94,9 +112,13 @@ export class FlowExecutionContext {
     flowRunId: string,
     transactionManager?: EntityManager,
     options: FlowExecutionOptions = {},
+    resourceId: number | null = options.triggeringResourceId ?? null,
   ): NodeExecutionContext {
     return {
       flowRunId,
+      resourceId,
+      getResourceType: async () =>
+        resourceId === null ? undefined : (await this.getResourceContext(resourceId, transactionManager)).type,
       actorUserId: options.actorUserId,
       lifecycleAttemptId: options.lifecycleAttemptId,
       lifecycleCandidateCancellation: options.lifecycleCandidateCancellation,

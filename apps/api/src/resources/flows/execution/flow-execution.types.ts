@@ -7,6 +7,11 @@ export interface FlowExecutionOptions {
   lifecycleAttemptId?: string;
   lifecycleCandidateCancellation?: boolean;
   metering?: MeteringRunContext;
+  /**
+   * The resource whose event started this run. Nodes of global flows have no resource of their own; they act on
+   * this one. Resource-flow nodes always use their own resource. Unset for runs without a triggering resource.
+   */
+  triggeringResourceId?: number | null;
 }
 
 export interface UsageEventData {

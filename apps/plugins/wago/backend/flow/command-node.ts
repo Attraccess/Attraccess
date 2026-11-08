@@ -13,8 +13,14 @@ export function createWagoCommandNode(service: () => WagoService): PluginFlowExe
     inputs: ['input'],
     outputs: ['output', 'failure'],
     isOutput: true,
+    flowScopes: ['resource', 'global'],
     resolveConfigSchema: (config, schemaContext) =>
-      service().commandSchema(config, schemaContext.resourceId, schemaContext.purpose === 'preview'),
+      service().commandSchema(
+        config,
+        schemaContext.flowScope === 'global' ? null : schemaContext.resourceId,
+        schemaContext.purpose === 'preview',
+        schemaContext.flowScope === 'global' ? schemaContext.flowId : null,
+      ),
     validateConfig: (config, validationContext) => service().validateCommandConfig(config, validationContext),
     getFailureBehavior: (config) => service().commandFailureBehavior(config),
     getFailureKind: (error) => service().commandFailureKind(error),

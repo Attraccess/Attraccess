@@ -63,6 +63,10 @@ vi.mock('@attraccess/react-query-client', () => ({
     state.options = options;
     return { mutate: state.save };
   },
+  useResourceFlowsServiceGetNodeSchemas: () => ({ data: undefined }),
+  useGlobalFlowsServiceGetGlobalFlowCanvas: () => ({ data: undefined, isFetching: false, isError: false }),
+  useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
+  useGlobalFlowsServiceSaveGlobalFlowCanvas: () => ({ mutate: vi.fn() }),
 }));
 vi.mock('js-confetti', () => ({
   default: class {
@@ -109,6 +113,7 @@ vi.mock('./context/index', () => ({
       removeLiveLogReceiver: state.remove,
       setValidationErrors: state.validation,
       flowNodeTypes: {},
+      owner: { kind: 'resource', resourceId: 7 },
     };
   },
 }));

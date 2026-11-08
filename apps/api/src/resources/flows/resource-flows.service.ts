@@ -5,15 +5,17 @@ import {
   ResourceFlowNodeType,
   getNodeDataSchema,
   ResourceMeter,
+  Flow,
+  FlowScope,
 } from '@attraccess/database-entities';
 
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 
@@ -30,6 +32,8 @@ import { findFlowsWithoutSessionCountCheck, SharedMachineFlowWarning } from './s
 import { getCoreNodeSchemas } from './schemas/core-node-schemas';
 
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
+
+import { getNodeFlowScopes } from './schemas/node-flow-scopes';
 
 export interface ValidationError {
   nodeId: string;
@@ -56,6 +60,8 @@ export class ResourceFlowsService {
     protected readonly resourceRepository: Repository<Resource>,
     protected readonly mqttClientService: MqttClientService,
     protected readonly eventEmitter: EventEmitter2,
+    @InjectRepository(Flow)
+    protected readonly flowRepository: Repository<Flow>,
   ) {}
 
   protected readonly logger = new Logger(ResourceFlowsService.name);
@@ -103,7 +109,112 @@ export class ResourceFlowsService {
       this.flowNodeRepository.find({ where: { resourceId } }),
       this.flowEdgeRepository.find({ where: { resource: { id: resourceId } } }),
     ]);
-    return findFlowsWithoutSessionCountCheck(nodes, edges);
+    const warnings = findFlowsWithoutSessionCountCheck(nodes, edges);
+
+    // Enabled global flows run for this machine's starts and stops too.
+    const globalFlows = await this.flowRepository.find({
+      where: { enabled: true, scope: 'global' },
+      order: { id: 'ASC' },
+    });
+    if (globalFlows.length === 0) return warnings;
+    const flowIds = globalFlows.map((flow) => flow.id);
+    const [flowNodes, flowEdges] = await Promise.all([
+      this.flowNodeRepository.find({ where: { flowId: In(flowIds) } }),
+      this.flowEdgeRepository.find({ where: { flowId: In(flowIds) } }),
+    ]);
+    for (const flow of globalFlows) {
+      warnings.push(
+        ...findFlowsWithoutSessionCountCheck(
+          flowNodes.filter((node) => node.flowId === flow.id),
+          flowEdges.filter((edge) => edge.flowId === flow.id),
+          flow,
+        ),
+      );
+    }
+    return warnings;
+  }
+
+  /**
+   * Node and edge ids are global. Call after deleting the saving flow's own rows: any id still present belongs to
+   * another resource or global flow, and saving it would move it out of its owner.
+   */
+  public async assertCanvasIdsNotOwnedElsewhere(
+    manager: EntityManager,
+    canvas: { nodes: { id: string }[]; edges: { id: string }[] },
+  ): Promise<void> {
+    const nodeIds = canvas.nodes.map((node) => node.id);
+    const edgeIds = canvas.edges.map((edge) => edge.id);
+    const [nodes, edges] = await Promise.all([
+      nodeIds.length > 0
+        ? manager.find(ResourceFlowNode, { where: { id: In(nodeIds) }, select: { id: true } })
+        : Promise.resolve([]),
+      edgeIds.length > 0
+        ? manager.find(ResourceFlowEdge, { where: { id: In(edgeIds) }, select: { id: true } })
+        : Promise.resolve([]),
+    ]);
+    if (nodes.length === 0 && edges.length === 0) return;
+    throw new BadRequestException({
+      message: [
+        ...nodes.map((node) => `Node id ${node.id} is already used by another flow`),
+        ...edges.map((edge) => `Edge id ${edge.id} is already used by another flow`),
+      ],
+      error: 'Bad Request',
+      statusCode: 400,
+      nodeIds: nodes.map((node) => node.id),
+      edgeIds: edges.map((edge) => edge.id),
+    });
+  }
+
+  /** Rejects a canvas that contains a node the flow's scope cannot use; the error names every such node. */
+  public assertNodesSupportScope(nodes: { id: string; type: string }[], scope: FlowScope): void {
+    const unsupported = nodes.filter((node) => {
+      const scopes = getNodeFlowScopes(node.type);
+      // Unknown types are reported by the regular node validation.
+      return scopes !== undefined && !scopes.includes(scope);
+    });
+    if (unsupported.length > 0) {
+      throw new BadRequestException({
+        message: unsupported.map(
+          (node) =>
+            `Node ${node.id} (${node.type}) cannot be used in ${scope === 'global' ? 'global' : 'resource'} flows`,
+        ),
+        error: 'Bad Request',
+        statusCode: 400,
+        nodes: unsupported.map((node) => ({ nodeId: node.id, nodeType: node.type })),
+      });
+    }
+  }
+
+  /** Subscribes to the topics of MQTT nodes that are new or changed compared to the stored ones. */
+  public subscribeToChangedMqttNodes(
+    oldNodes: { id: string; type: string; data: Record<string, unknown> }[],
+    newNodes: { id: string; type: string; data: Record<string, unknown> }[],
+  ): void {
+    for (const node of newNodes) {
+      if (
+        node.type !== ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED &&
+        node.type !== ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE
+      ) {
+        continue;
+      }
+      const existing = oldNodes.find((old) => old.id === node.id);
+      if (existing && existing.data.topic === node.data.topic && existing.data.serverId === node.data.serverId) {
+        continue;
+      }
+      this.subscribeToNodeTopic(node.data);
+    }
+  }
+
+  public subscribeToNodeTopic(data: Record<string, unknown>): void {
+    if (!data.serverId || !data.topic) {
+      this.logger.warn(
+        `Skipping subscription to topic ${data.topic} for server ID ${data.serverId} because it is missing`,
+      );
+      return;
+    }
+    this.mqttClientService.subscribe(data.serverId as number, data.topic as string).catch((error) => {
+      this.logger.error(`Failed to subscribe to topic ${data.topic} for server ID ${data.serverId}`, error.stack);
+    });
   }
 
   public async getNodes(resourceId: number, type: ResourceFlowNodeType): Promise<ResourceFlowNode[]> {
@@ -137,6 +248,8 @@ export class ResourceFlowsService {
     if (!resource) {
       throw new ResourceNotFoundException(resourceId);
     }
+
+    this.assertNodesSupportScope(flowData.nodes, 'resource');
 
     // Collect validation errors from all nodes
     const allValidationErrors: ValidationError[] = [];
@@ -189,6 +302,7 @@ export class ResourceFlowsService {
       // Delete existing nodes and edges (cascading will handle relationships)
       await transactionalEntityManager.delete(ResourceFlowNode, { resource: { id: resourceId } });
       await transactionalEntityManager.delete(ResourceFlowEdge, { resource: { id: resourceId } });
+      await this.assertCanvasIdsNotOwnedElsewhere(transactionalEntityManager, flowData);
 
       // Create new nodes
       const newNodes = flowData.nodes.map((nodeData) => {
@@ -285,13 +399,26 @@ export class ResourceFlowsService {
       throw new ResourceNotFoundException(resourceId);
     }
 
+    return this.resolvePluginNodeSchema(nodeType, config, { flowScope: 'resource', resourceId, flowId: null }, purpose);
+  }
+
+  /** Builds a plugin node's schema for the given flow; shared by resource and global flows. */
+  public async resolvePluginNodeSchema(
+    nodeType: string,
+    config: Record<string, unknown>,
+    flow: { flowScope: FlowScope; resourceId: number | null; flowId: number | null },
+    purpose: 'editor' | 'preview' = 'editor',
+  ): Promise<ResourceFlowNodeSchemaDto> {
     const definition = getPluginFlowNode(nodeType);
     if (!definition) {
       throw new NotFoundException(`Plugin flow node type "${nodeType}" was not found.`);
     }
+    if (!(getNodeFlowScopes(nodeType) ?? []).includes(flow.flowScope)) {
+      throw new BadRequestException(`Plugin flow node type "${nodeType}" cannot be used in ${flow.flowScope} flows.`);
+    }
 
     const configSchema = definition.resolveConfigSchema
-      ? await definition.resolveConfigSchema(config, purpose === 'preview' ? { resourceId, purpose } : { resourceId })
+      ? await definition.resolveConfigSchema(config, purpose === 'preview' ? { ...flow, purpose } : flow)
       : definition.configSchema;
     if (!configSchema) {
       throw new Error(`Plugin flow node type "${nodeType}" does not provide a configuration schema.`);
@@ -305,7 +432,7 @@ export class ResourceFlowsService {
     );
   }
 
-  protected async validateNodeData(
+  public async validateNodeData(
     nodeData: { id: string; type: string; data: unknown },
     validationContext = new Map<string, unknown>(),
   ): Promise<ValidationError[]> {
@@ -396,16 +523,21 @@ export class ResourceFlowsService {
     return meterIds;
   }
 
-  public async getNodeSchemas(resourceId: number): Promise<ResourceFlowNodeSchemaDto[]> {
-    const resource = await this.resourceRepository.findOne({
-      where: { id: resourceId },
-    });
+  /** Pass the resource id for a resource flow; global flows have no resource and get every node, marked by scope. */
+  public async getNodeSchemas(resourceId?: number): Promise<ResourceFlowNodeSchemaDto[]> {
+    let resourceType: Resource['type'] | undefined;
+    if (resourceId !== undefined) {
+      const resource = await this.resourceRepository.findOne({
+        where: { id: resourceId },
+      });
 
-    if (!resource) {
-      throw new ResourceNotFoundException(resourceId);
+      if (!resource) {
+        throw new ResourceNotFoundException(resourceId);
+      }
+      resourceType = resource.type;
     }
 
-    const coreSchemas = getCoreNodeSchemas(resource.type);
+    const coreSchemas = getCoreNodeSchemas(resourceType);
 
     // Append plugin-contributed node schemas.
     const pluginSchemas = getRegisteredPluginFlowNodes().map((definition) => {
@@ -420,7 +552,7 @@ export class ResourceFlowsService {
     return [...coreSchemas, ...pluginSchemas];
   }
 
-  protected pluginNodeSchema(
+  public pluginNodeSchema(
     definition: NonNullable<ReturnType<typeof getPluginFlowNode>>,
     configSchema: Record<string, unknown>,
   ): ResourceFlowNodeSchemaDto {
@@ -432,6 +564,7 @@ export class ResourceFlowsService {
       inputs: [...definition.inputs],
       outputs: [...definition.outputs],
       supportedByResource: definition.supportedByAllResources !== false,
+      supportedFlowScopes: getNodeFlowScopes(definition.type) ?? [],
       isOutput: definition.isOutput ?? false,
       isInput: definition.isInput ?? false,
     };

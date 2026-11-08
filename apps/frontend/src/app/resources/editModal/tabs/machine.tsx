@@ -117,16 +117,32 @@ export function MachineTab(props: EditorTabProps) {
             {!!flowWarnings?.length && (
               <ul className="list-disc pl-4 text-sm">
                 {flowWarnings.map((warning) => (
-                  <li key={warning.triggerNodeId}>
+                  <li key={`${warning.flowId ?? 'resource'}:${warning.triggerNodeId}`}>
+                    {/* Every entry names its flow; a global flow's name opens that flow's editor. */}
+                    {warning.flowId !== null ? (
+                      <Link
+                        href={`/devices/flows/${warning.flowId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-cy="resource-edit-modal-max-parallel-sessions-global-flow-link"
+                      >
+                        {warning.flowName ?? `#${warning.flowId}`}
+                      </Link>
+                    ) : (
+                      t('inputs.machine.maxParallelSessions.flowsWarningOwnFlow')
+                    )}
+                    {': '}
                     {nodeTitle(warning.triggerType)} →{' '}
                     {warning.effectNodes.map((effect) => nodeTitle(effect.nodeType)).join(', ')}
                   </li>
                 ))}
               </ul>
             )}
-            <Link href={`/resources/${resource?.id}/flows`} target="_blank" rel="noopener noreferrer">
-              {t('inputs.machine.maxParallelSessions.flowsWarningOpen')}
-            </Link>
+            {(flowWarningsFailed || flowWarnings?.some((warning) => warning.flowId === null)) && (
+              <Link href={`/resources/${resource?.id}/flows`} target="_blank" rel="noopener noreferrer">
+                {t('inputs.machine.maxParallelSessions.flowsWarningOpen')}
+              </Link>
+            )}
           </AlertContent>
         </Alert>
       )}

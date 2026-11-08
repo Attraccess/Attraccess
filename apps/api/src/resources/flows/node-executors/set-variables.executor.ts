@@ -1,5 +1,6 @@
 import { ResourceFlowNode, SetVariablesNodeDataSchema, ResourceFlowVariableScope } from '@attraccess/database-entities';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
+import { runResourceId, requireRunResourceId } from './flow.utils';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 
 export class SetVariablesExecutor implements NodeExecutor {
@@ -17,8 +18,15 @@ export class SetVariablesExecutor implements NodeExecutor {
         // leave as raw string
       }
       const scope = item.scope as ResourceFlowVariableScope;
-      const ownerId = scope === ResourceFlowVariableScope.RESOURCE ? node.resourceId : null;
-      await this.variablesService.set(scope, ownerId, renderedKey, parsed, node.resourceId);
+      const ownerId = scope === ResourceFlowVariableScope.RESOURCE ? requireRunResourceId(node, ctx) : null;
+      await this.variablesService.set(
+        scope,
+        ownerId,
+        renderedKey,
+        parsed,
+        runResourceId(node, ctx),
+        ...(node.flowId == null ? [] : [node.flowId]),
+      );
     }
     return { payload: input };
   }

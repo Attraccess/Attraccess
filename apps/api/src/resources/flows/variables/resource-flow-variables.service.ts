@@ -79,6 +79,7 @@ export class ResourceFlowVariablesService {
     key: string,
     value: unknown,
     sourceResourceId: number | null,
+    sourceFlowId: number | null = null,
   ): Promise<void> {
     const ownerId = this.resolveResourceId(scope, resourceId);
     const existing = await this.repository.findOne({
@@ -110,6 +111,7 @@ export class ResourceFlowVariablesService {
         value,
         row.updatedAt ?? new Date(),
         sourceResourceId,
+        sourceFlowId,
       ),
     );
   }
