@@ -130,7 +130,7 @@ export function RabbitmqMessagesPanel({ mqttServerId }: { mqttServerId: number }
       data-cy={`rabbitmq-messages-panel-${mqttServerId}`}
       className="rmq:w-full rmq:border rmq:border-default-200 rmq:dark:border-default-100"
     >
-      <Card.Header className="rmq:flex rmq:items-center rmq:gap-2">
+      <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:gap-2">
         <MessagesSquareIcon className="rmq:w-5 rmq:h-5 rmq:text-accent-soft-foreground" />
         <p className="rmq:text-base rmq:font-semibold rmq:text-default-700">{t('messages.title')}</p>
       </Card.Header>
