@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   clients: [] as {
     callbacks: Set<(data: unknown) => void>;
     subscriptions: { onUpdate: (data: unknown) => void; onReconnect: () => void; onUnavailable: () => void }[];
+    topics: unknown[];
     dispose: ReturnType<typeof vi.fn>;
   }[],
 }));
@@ -17,11 +18,13 @@ vi.mock('./client', () => ({
   LiveUpdateClient: class {
     callbacks = new Set<(data: unknown) => void>();
     subscriptions: { onUpdate: (data: unknown) => void; onReconnect: () => void; onUnavailable: () => void }[] = [];
+    topics: unknown[] = [];
     dispose = vi.fn(() => this.callbacks.clear());
     constructor() {
       state.clients.push(this);
     }
-    subscribe(_topic: unknown, callback: (data: unknown) => void, onReconnect: () => void, onUnavailable: () => void) {
+    subscribe(topic: unknown, callback: (data: unknown) => void, onReconnect: () => void, onUnavailable: () => void) {
+      this.topics.push(topic);
       this.callbacks.add(callback);
       this.subscriptions.push({ onUpdate: callback, onReconnect, onUnavailable });
       return () => this.callbacks.delete(callback);
@@ -32,6 +35,56 @@ beforeEach(() => resumeLiveUpdates());
 afterEach(() => {
   act(() => stopLiveUpdates());
   state.clients.length = 0;
+});
+
+describe('MQTT message topic', () => {
+  const queryClient = new QueryClient();
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <LiveUpdatesProvider userId={1}>{children}</LiveUpdatesProvider>
+    </QueryClientProvider>
+  );
+
+  it('subscribes with the typed server and filter, and resubscribes when either changes', () => {
+    const onUpdate = vi.fn();
+    const hook = renderHook(
+      ({ mqttServerId, filter, enabled }) =>
+        useLiveUpdates({ topic: 'mqtt-messages', mqttServerId, filter, enabled, onUpdate }),
+      { initialProps: { mqttServerId: 1, filter: 'a/#', enabled: true }, wrapper },
+    );
+    const client = state.clients[0];
+    expect(client.topics).toEqual([{ topic: 'mqtt-messages', mqttServerId: 1, filter: 'a/#' }]);
+
+    hook.rerender({ mqttServerId: 1, filter: 'b/+', enabled: true });
+    hook.rerender({ mqttServerId: 2, filter: 'b/+', enabled: true });
+    expect(client.topics).toEqual([
+      { topic: 'mqtt-messages', mqttServerId: 1, filter: 'a/#' },
+      { topic: 'mqtt-messages', mqttServerId: 1, filter: 'b/+' },
+      { topic: 'mqtt-messages', mqttServerId: 2, filter: 'b/+' },
+    ]);
+  });
+
+  it('stops delivering to the previous server or filter', () => {
+    const onUpdate = vi.fn();
+    const hook = renderHook(
+      ({ filter }) => useLiveUpdates({ topic: 'mqtt-messages', mqttServerId: 1, filter, onUpdate }),
+      { initialProps: { filter: 'a/#' }, wrapper },
+    );
+    const old = state.clients[0].subscriptions[0];
+    act(() => old.onUpdate({ eventType: 'messages', messages: [], dropped: 1 }));
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    hook.rerender({ filter: 'b/#' });
+    act(() => old.onUpdate({ eventType: 'messages', messages: [], dropped: 2 }));
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not subscribe while disabled', () => {
+    renderHook(
+      () => useLiveUpdates({ topic: 'mqtt-messages', mqttServerId: 1, filter: '#', enabled: false, onUpdate: vi.fn() }),
+      { wrapper },
+    );
+    expect(state.clients[0].topics).toEqual([]);
+  });
 });
 
 describe('live topic React lifecycle', () => {

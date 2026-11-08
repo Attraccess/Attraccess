@@ -114,13 +114,12 @@ Mit dem installierten **RabbitMQ-Plugin** zeigt ein MQTT-Server, den Attraccess 
 | **Verbindungen** | Aktive Client-Verbindungen (Aktualisierung alle 10 s) | `monitoring` | `resources.update` |
 | **Verbindungen** (schließen) | Verbindung zwangsweise trennen, optional mit Grund | `administrator` | `system.settings.manage` |
 | **Broker-Statistiken** | Überblick, Knoten und Queues (Aktualisierung alle 15 s) | `monitoring` | `resources.update` |
-| **Nachrichten-Explorer** | Topic-Filter (`+`, `#`; bis 85 Byte, keine Shared Subscriptions mit `$share/` oder `$queue/`) abonnieren, Live-Log pausieren/leeren, Testnachrichten senden | keines (nutzt die MQTT-Verbindung) | `system.settings.manage` |
 
 Hinweise:
 
 - Der am MQTT-Server konfigurierte Benutzer benötigt das Tag aus der Tabelle (`administrator` deckt alles ab, was `monitoring` kann). Fehlt es, zeigen die Bereiche eine Fehlermeldung, die die fehlende Berechtigung nennt.
-- Benutzer ohne `system.settings.manage` sehen nur die lesenden Bereiche; Schreibaktionen und der Nachrichten-Explorer sind ausgeblendet und werden auch vom Server abgelehnt.
-- Der Nachrichten-Explorer abonniert über die eigene MQTT-Verbindung von Attraccess zum Broker. Auf einem stark ausgelasteten Broker sorgt ein breiter Filter wie `#` dafür, dass Attraccess jede Nachricht empfängt und verarbeitet; verwenden Sie daher möglichst einen engen Filter (zum Beispiel `devices/+/status`). Payloads über 64 KiB werden gekürzt; bei sehr aktiven Topics werden Nachrichten verworfen und die Anzahl angezeigt. Veröffentlichen und Abonnieren werden im Audit-Log protokolliert (nur Topic und Größe, nie die Payload). Veröffentlichen kann echte Geräte auslösen – bitte mit Vorsicht verwenden.
+- Benutzer ohne `system.settings.manage` sehen nur die lesenden Bereiche; Schreibaktionen sind ausgeblendet und werden auch vom Server abgelehnt.
+- Live-MQTT-Nachrichten beobachten und senden gehört nicht zum RabbitMQ-Plugin. Das geht für jeden MQTT-Server und braucht nur `resources.update` -- siehe [MQTT-Nachrichten-Explorer](mqtt/message-explorer.md).
 
 ## Fehlerbehebung
 
@@ -134,6 +133,7 @@ Hinweise:
 ## Siehe auch
 
 - [Ueberblick](mqtt/overview.md) -- Was ist MQTT?
+- [Nachrichten-Explorer](mqtt/message-explorer.md) -- MQTT-Nachrichten live beobachten und senden
 - [Beispiele](mqtt/examples.md) -- Praktische MQTT-Integrationsbeispiele
 - [Flows & Automatisierung](flows/overview.md) -- Automatisierungs-Workflows erstellen
 - [Umgebungsvariablen](installation/environment-variables.md) -- Serverkonfiguration

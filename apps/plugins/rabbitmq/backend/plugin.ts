@@ -18,8 +18,6 @@ import { RabbitmqCredentialProvisioningProvider } from './credentials/provider';
 import { RabbitmqCapabilitiesController } from './capabilities';
 import { RabbitmqConnectionsController, RabbitmqConnectionsService } from './connections/service';
 import { RabbitmqStatsController, RabbitmqStatsService } from './stats/service';
-import { RabbitmqMessagesController, RabbitmqMessagesService } from './messages/service';
-import { RABBITMQ_AUDIT_DOMAIN } from './messages/audit';
 import { RABBITMQ_VIEW_PERMISSION } from './permissions';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
@@ -59,7 +57,6 @@ class RabbitmqController {
 class RabbitmqPluginModule {}
 
 const plugin: PluginBackendModule = {
-  auditDomains: [RABBITMQ_AUDIT_DOMAIN],
   credentialProvisioningProvider(context: PluginContext): RabbitmqCredentialProvisioningProvider {
     return new RabbitmqCredentialProvisioningProvider(context);
   },
@@ -73,7 +70,6 @@ const plugin: PluginBackendModule = {
         RabbitmqUsersController,
         RabbitmqConnectionsController,
         RabbitmqStatsController,
-        RabbitmqMessagesController,
       ],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
@@ -83,7 +79,6 @@ const plugin: PluginBackendModule = {
         RabbitmqUsersService,
         RabbitmqConnectionsService,
         RabbitmqStatsService,
-        RabbitmqMessagesService,
       ],
     };
   },

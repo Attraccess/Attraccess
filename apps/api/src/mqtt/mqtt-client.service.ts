@@ -18,6 +18,8 @@ import { ExternalCallTimer } from '../metrics/instrumentation/external/external.
 
 import { MetricsService } from '../metrics/metrics.service';
 
+import { buildMqttConnectionSettings } from './mqtt-connection-options';
+
 import { MqttMessageEvent } from './mqtt-message.event';
 
 export type SubscriptionQos = 0 | 1 | 2;
@@ -334,35 +336,15 @@ export class MqttClientService implements OnModuleDestroy {
       throw new Error('MQTT connection was replaced');
 
     return new Promise((resolve, reject) => {
-      const url = `${server.useTls ? 'mqtts' : 'mqtt'}://${server.host}:${server.port}`;
-
-      const options: mqtt.IClientOptions = {
+      const { url, options, tlsVerificationDisabled } = buildMqttConnectionSettings(server, password, {
         clientId: server.clientId || `attraccess-client`,
         clean: true,
         reconnectPeriod: 5000,
-      };
-
-      if (server.username) {
-        options.username = server.username;
-      }
-
-      if (password) {
-        options.password = password;
-      }
-
-      if (server.useTls) {
-        if (server.caCert) {
-          options.ca = server.caCert;
-        }
-        if (server.tlsServername) {
-          options.servername = server.tlsServername;
-        }
-        if (server.tlsInsecure) {
-          options.rejectUnauthorized = false;
-          this.logger.warn(
-            `TLS certificate verification is disabled for MQTT server ${server.name} (${url}) - connection is not protected against man-in-the-middle attacks`,
-          );
-        }
+      });
+      if (tlsVerificationDisabled) {
+        this.logger.warn(
+          `TLS certificate verification is disabled for MQTT server ${server.name} (${url}) - connection is not protected against man-in-the-middle attacks`,
+        );
       }
 
       const client = mqtt.connect(url, options);
@@ -482,7 +464,7 @@ export class MqttClientService implements OnModuleDestroy {
     this.metricsService.mqttServersHealthy.set(healthyCount);
   }
 
-  protected async resolveServerPassword(server: MqttServer): Promise<string | null> {
+  async resolveServerPassword(server: MqttServer): Promise<string | null> {
     if (!server.password) {
       return null;
     }

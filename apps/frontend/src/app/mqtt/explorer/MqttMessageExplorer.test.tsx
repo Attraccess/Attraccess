@@ -1,55 +1,57 @@
 import { act, cleanup, configure, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
-import { MESSAGE_LOG_CAP, RabbitmqMessagesPanel } from './RabbitmqMessagesPanel';
+import { MESSAGE_LOG_CAP, MqttMessageExplorer } from './MqttMessageExplorer';
 import { decodePayload, MAX_DISPLAY_CHARS } from './payload';
-import { isValidTopicFilter, liveIdentifier } from './messages-api';
+import { isPublishableTopic, isValidTopicFilter } from './topics';
 
 // Coverage instrumentation plus parallel nx tasks make renders slow.
 configure({ asyncUtilTimeout: 10_000 });
 
 interface LiveOptions {
-  identifier?: string;
+  mqttServerId: number;
+  filter: string;
   enabled?: boolean;
   onUpdate: (event: unknown) => void;
   onUnavailable?: () => void;
 }
 interface ActiveSubscription {
-  identifier?: string;
+  key: string;
   options: { current: LiveOptions };
 }
 
-const request = vi.hoisted(() => vi.fn());
-// Tracks subscriptions like the host does: one per (identifier, enabled)
-// effect run, released in its cleanup.
+const publish = vi.hoisted(() => vi.fn());
+// Tracks subscriptions like the live-updates client does: one per
+// (server, filter, enabled) effect run, released in its cleanup.
 const live = vi.hoisted(() => ({
   active: new Set<ActiveSubscription>(),
-  opened: [] as (string | undefined)[],
+  opened: [] as string[],
   released: 0,
 }));
-vi.mock('@attraccess/plugins-frontend-sdk', async () => {
+vi.mock('../../../utils/live-updates', async () => {
   const { useEffect, useRef } = await import('react');
   return {
-    createPluginApiClient: (base: string) => ({
-      request: (path: string, options: unknown) => request(base + path, options),
-    }),
-    usePluginLiveUpdates: (options: LiveOptions) => {
+    useLiveUpdates: (options: LiveOptions) => {
       const latest = useRef(options);
       latest.current = options;
-      const { identifier, enabled = true } = options;
+      const { mqttServerId, filter, enabled = true } = options;
       useEffect(() => {
         if (!enabled) return undefined;
-        const subscription = { identifier, options: latest };
+        const subscription = { key: `${mqttServerId}:${filter}`, options: latest };
         live.active.add(subscription);
-        live.opened.push(identifier);
+        live.opened.push(subscription.key);
         return () => {
           live.active.delete(subscription);
           live.released += 1;
         };
-      }, [identifier, enabled]);
+      }, [mqttServerId, filter, enabled]);
+      return { abort: () => undefined, owner: null };
     },
   };
 });
+vi.mock('@attraccess/react-query-client', () => ({
+  useMqttServiceMqttExplorerPublish: () => ({ mutateAsync: publish, isPending: false }),
+}));
 vi.mock('./payload', async (importOriginal) => {
   const original = await importOriginal<typeof import('./payload')>();
   return { ...original, decodePayload: vi.fn(original.decodePayload) };
@@ -63,7 +65,7 @@ const failStream = () =>
   act(() => {
     for (const subscription of live.active) subscription.options.current.onUnavailable?.();
   });
-const activeIdentifiers = () => [...live.active].map((subscription) => subscription.identifier);
+const activeKeys = () => [...live.active].map((subscription) => subscription.key);
 
 const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 const message = (topic: string, text: string, truncated = false) => ({
@@ -77,7 +79,7 @@ const batch = (messages: ReturnType<typeof message>[], dropped = 0) => ({ eventT
 const isDisabled = (element: HTMLElement) => element.hasAttribute('disabled');
 
 beforeEach(() => {
-  request.mockReset();
+  publish.mockReset();
   live.active.clear();
   live.opened = [];
   live.released = 0;
@@ -124,7 +126,7 @@ describe('payload decoding', () => {
 
 describe('topic filters', () => {
   it('validates filters like the backend', () => {
-    for (const valid of ['#', '+', 'a/b', 'a/+/b', 'a/#', '+/#', 'ä/ö', '$SYS/#', 'x'.repeat(85)])
+    for (const valid of ['#', '+', 'a/b', 'a/+/b', 'a/#', '+/#', 'ä/ö', '$SYS/#', 'x'.repeat(256)])
       expect(isValidTopicFilter(valid)).toBe(true);
     for (const invalid of [
       '',
@@ -133,27 +135,19 @@ describe('topic filters', () => {
       '+a',
       'a+',
       'a/\0',
-      'x'.repeat(86),
-      // 43 × 2 bytes: the limit counts UTF-8 bytes, not characters.
-      'ä'.repeat(43),
+      'x'.repeat(257),
+      // 129 × 2 bytes: the limit counts UTF-8 bytes, not characters.
+      'ä'.repeat(129),
       '$share/group/a',
       '$queue/a',
     ])
       expect(isValidTopicFilter(invalid)).toBe(false);
   });
 
-  it('encodes live identifiers within the host limit', () => {
-    expect(liveIdentifier(3, 'a/+/b/#')).toBe(
-      `3.${btoa('a/+/b/#').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`,
-    );
-    expect(liveIdentifier(1, 'ä')).toMatch(/^1\.[A-Za-z0-9_-]+$/);
-    expect(liveIdentifier(2_147_483_647, 'x'.repeat(85)).length).toBeLessThanOrEqual(128);
-  });
-
   it('blocks invalid subscriptions in the panel', () => {
-    render(<RabbitmqMessagesPanel mqttServerId={11} />);
+    render(<MqttMessageExplorer mqttServerId={11} />);
     const input = screen.getByRole('textbox', { name: /Topic filter/ });
-    for (const value of ['a/#/b', '$share/group/#', 'x'.repeat(86)]) {
+    for (const value of ['a/#/b', '$share/group/#', 'x'.repeat(257)]) {
       fireEvent.change(input, { target: { value } });
       expect(screen.getByText(/Use a valid MQTT topic filter/)).toBeTruthy();
       expect(isDisabled(screen.getByRole('button', { name: 'Subscribe' }))).toBe(true);
@@ -165,10 +159,10 @@ describe('topic filters', () => {
 
 describe('message explorer', () => {
   it('subscribes, shows newest first, clears and releases on unsubscribe and unmount', () => {
-    const { unmount } = render(<RabbitmqMessagesPanel mqttServerId={9} />);
+    const { unmount } = render(<MqttMessageExplorer mqttServerId={9} />);
     expect(live.active.size).toBe(0);
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
-    expect(activeIdentifiers()).toEqual([liveIdentifier(9, '#')]);
+    expect(activeKeys()).toEqual(['9:' + '#']);
 
     emit(batch([message('a/first', 'one'), message('a/second', '{"x":1}')], 3));
     const rows = screen.getAllByText(/a\/(first|second)/);
@@ -192,7 +186,7 @@ describe('message explorer', () => {
   });
 
   it('releases the subscription while paused and subscribes again on resume', () => {
-    render(<RabbitmqMessagesPanel mqttServerId={12} />);
+    render(<MqttMessageExplorer mqttServerId={12} />);
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
     emit(batch([message('a/first', 'one')]));
 
@@ -203,14 +197,14 @@ describe('message explorer', () => {
     expect(screen.getByText('a/first')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
-    expect(activeIdentifiers()).toEqual([liveIdentifier(12, '#')]);
+    expect(activeKeys()).toEqual(['12:' + '#']);
     expect(live.opened).toHaveLength(2);
     emit(batch([message('a/second', 'two')]));
     expect(screen.getByText('a/second')).toBeTruthy();
   });
 
   it('opens a new subscription when the same filter is applied after the stream became unavailable', () => {
-    render(<RabbitmqMessagesPanel mqttServerId={13} />);
+    render(<MqttMessageExplorer mqttServerId={13} />);
     fireEvent.change(screen.getByRole('textbox', { name: /Topic filter/ }), { target: { value: 'a/+' } });
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
     failStream();
@@ -218,14 +212,14 @@ describe('message explorer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply filter' }));
     expect(screen.queryByText(/live stream is unavailable/)).toBeNull();
-    expect(live.opened).toEqual([liveIdentifier(13, 'a/+'), liveIdentifier(13, 'a/+')]);
+    expect(live.opened).toEqual(['13:' + 'a/+', '13:' + 'a/+']);
     expect(live.released).toBe(1);
     expect(live.active.size).toBe(1);
   });
 
   it('releases the subscription while the tab is hidden', () => {
     const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
-    render(<RabbitmqMessagesPanel mqttServerId={14} />);
+    render(<MqttMessageExplorer mqttServerId={14} />);
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
     expect(live.active.size).toBe(1);
 
@@ -239,12 +233,12 @@ describe('message explorer', () => {
     act(() => {
       document.dispatchEvent(new Event('visibilitychange'));
     });
-    expect(activeIdentifiers()).toEqual([liveIdentifier(14, '#')]);
+    expect(activeKeys()).toEqual(['14:' + '#']);
     visibility.mockRestore();
   });
 
   it('keeps only the newest messages', () => {
-    render(<RabbitmqMessagesPanel mqttServerId={10} />);
+    render(<MqttMessageExplorer mqttServerId={10} />);
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
     emit(batch(Array.from({ length: MESSAGE_LOG_CAP + 20 }, (_, i) => message(`t/${i}`, 'x'))));
     expect(screen.getAllByText('1 B')).toHaveLength(MESSAGE_LOG_CAP);
@@ -257,7 +251,7 @@ describe('message explorer', () => {
   }, 30_000);
 
   it('decodes each message once, not on every render', () => {
-    render(<RabbitmqMessagesPanel mqttServerId={15} />);
+    render(<MqttMessageExplorer mqttServerId={15} />);
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
     emit(batch([message('a/one', '{"x":1}'), message('a/two', 'two')]));
     expect(decodePayload).toHaveBeenCalledTimes(2);
@@ -270,7 +264,7 @@ describe('message explorer', () => {
   });
 
   it('shows a truncated payload that was cut inside a character as text', () => {
-    render(<RabbitmqMessagesPanel mqttServerId={16} />);
+    render(<MqttMessageExplorer mqttServerId={16} />);
     fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
     const cut = new TextEncoder().encode('grüße €').subarray(0, 10);
     emit(batch([{ topic: 'a/cut', payload: b64(cut), size: 70_000, truncated: true, receivedAt: 1700000000000 }]));
@@ -282,8 +276,8 @@ describe('message explorer', () => {
 
 describe('publish form', () => {
   it('enables publishing only for a topic without wildcards and reports success and failure', async () => {
-    request.mockResolvedValue(undefined);
-    render(<RabbitmqMessagesPanel mqttServerId={11} />);
+    publish.mockResolvedValue(undefined);
+    render(<MqttMessageExplorer mqttServerId={11} />);
     const publishButton = () => screen.getByRole('button', { name: 'Publish' });
     expect(isDisabled(publishButton())).toBe(true);
 
@@ -291,7 +285,7 @@ describe('publish form', () => {
     expect(isDisabled(publishButton())).toBe(true);
     expect(screen.getByText('Enter a topic without the wildcards + or #.')).toBeTruthy();
     fireEvent.click(publishButton());
-    expect(request).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'a/b' } });
     expect(isDisabled(publishButton())).toBe(false);
@@ -300,17 +294,63 @@ describe('publish form', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Retain' }));
     fireEvent.click(publishButton());
     expect(await screen.findByText('Message published.')).toBeTruthy();
-    expect(request).toHaveBeenCalledWith('/api/rabbitmq/messages/11/publish', {
-      method: 'POST',
-      body: { topic: 'a/b', payload: 'hi', qos: 0, retain: true },
+    expect(publish).toHaveBeenCalledWith({
+      id: 11,
+      requestBody: { topic: 'a/b', payload: 'hi', qos: 0, retain: true },
     });
 
     // Editing the message clears the previous result.
     fireEvent.change(screen.getByLabelText('Payload'), { target: { value: 'hi again' } });
     expect(screen.queryByText('Message published.')).toBeNull();
 
-    request.mockRejectedValueOnce(new Error('Broker refused the message'));
+    publish.mockRejectedValueOnce(new Error('Broker refused the message'));
     fireEvent.click(publishButton());
     await waitFor(() => expect(screen.getByText('Broker refused the message')).toBeTruthy());
+  });
+});
+
+describe('another server and topic suggestions', () => {
+  it('restarts a running subscription and clears the log when the server changes', () => {
+    const { rerender } = render(<MqttMessageExplorer mqttServerId={1} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
+    emit(batch([message('a/first', 'one')], 2));
+    expect(screen.getByText('a/first')).toBeTruthy();
+
+    rerender(<MqttMessageExplorer mqttServerId={2} />);
+    expect(screen.queryByText('a/first')).toBeNull();
+    expect(screen.queryByText(/were dropped/)).toBeNull();
+    expect(activeKeys()).toEqual(['2:#']);
+    expect(live.released).toBe(1);
+  });
+
+  it('does not subscribe on its own after the server changes', () => {
+    const { rerender } = render(<MqttMessageExplorer mqttServerId={1} />);
+    rerender(<MqttMessageExplorer mqttServerId={2} />);
+    expect(live.opened).toEqual([]);
+  });
+
+  it('offers suggested topics: filters fill the filter field, topics the publish field', () => {
+    render(
+      <MqttMessageExplorer
+        mqttServerId={3}
+        topicSuggestions={{ filters: ['door/+/state', 'lamp/set'], topics: ['lamp/set'] }}
+      />,
+    );
+    // The first filter is preselected.
+    expect((screen.getByRole('textbox', { name: /Topic filter/ }) as HTMLInputElement).value).toBe('door/+/state');
+
+    // 'lamp/set' is offered twice: once for the filter field, once for the publish field.
+    const chips = screen.getAllByRole('button', { name: 'lamp/set' });
+    expect(chips).toHaveLength(2);
+    fireEvent.click(chips[0]);
+    expect((screen.getByRole('textbox', { name: /Topic filter/ }) as HTMLInputElement).value).toBe('lamp/set');
+    fireEvent.click(chips[1]);
+    expect((screen.getByLabelText('Topic') as HTMLInputElement).value).toBe('lamp/set');
+    expect(isDisabled(screen.getByRole('button', { name: 'Publish' }))).toBe(false);
+  });
+
+  it('checks publish topics', () => {
+    expect(isPublishableTopic('a/b')).toBe(true);
+    for (const invalid of ['', 'a/+', 'a/#', 'a\0', 'x'.repeat(1025)]) expect(isPublishableTopic(invalid)).toBe(false);
   });
 });

@@ -80,6 +80,10 @@ Node colors indicate their current state:
 
 <!-- TODO: Screenshot of execution logs with color indicators -->
 
+## Testing MQTT Flows
+
+For flows with MQTT nodes, click the **MQTT explorer** button in the toolbar to open a panel next to the canvas. It shows live messages and lets you publish test messages while you edit the flow. See [MQTT Message Explorer](devices/mqtt/message-explorer.md).
+
 ## Saving Your Flow
 
 Click **Save** in the toolbar to save your changes. The flow will be active immediately and will trigger whenever its input conditions are met.
@@ -87,4 +91,5 @@ Click **Save** in the toolbar to save your changes. The flow will be active imme
 ## See Also
 
 - [Node Types](flows/node-types.md) -- All available nodes and their settings
+- [MQTT Message Explorer](devices/mqtt/message-explorer.md) -- Watch and publish MQTT messages next to your flow
 - [Flows Overview](flows/overview.md) -- What flows are and how they work

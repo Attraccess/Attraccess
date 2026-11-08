@@ -4,7 +4,6 @@ import { Reflector } from '@nestjs/core';
 import { RabbitmqCapabilitiesController } from './capabilities';
 import { RabbitmqConnectionsController } from './connections/service';
 import { RabbitmqDetectionController } from './detection/service';
-import { RabbitmqMessagesController } from './messages/service';
 import { RABBITMQ_MANAGE_PERMISSION, RABBITMQ_VIEW_PERMISSION } from './permissions';
 import plugin from './plugin';
 import { RabbitmqStatsController } from './stats/service';
@@ -36,7 +35,6 @@ const ROUTES: [Type, string, string][] = [
   [RabbitmqConnectionsController, 'list', VIEW],
   [RabbitmqConnectionsController, 'close', MANAGE],
   [RabbitmqStatsController, 'get', VIEW],
-  [RabbitmqMessagesController, 'publish', MANAGE],
 ];
 
 function check(controller: Type, method: string, granted: string[]): boolean {

@@ -41,12 +41,28 @@ const state = vi.hoisted(() => ({
     onDrop: (e: unknown) => void;
   },
   live: undefined as undefined | ((log: { type: string }) => void),
+  permissions: ['resources.update'] as string[],
+  mqttServers: [{ id: 1, name: 'Broker' }] as { id: number; name: string }[],
+  explorer: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
     useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
   }))()),
+}));
+vi.mock('../../../../hooks/useAuth', () => ({
+  useAuth: () => ({ hasPermission: (permission: string) => state.permissions.includes(permission) }),
+}));
+vi.mock('./mqttExplorer', () => ({
+  FlowMqttExplorer: (props: { isOpen: boolean; onClose: () => void; nodes: Node[] }) => {
+    state.explorer(props);
+    return props.isOpen ? (
+      <aside data-testid="mqtt-explorer">
+        <button onClick={props.onClose}>Close explorer</button>
+      </aside>
+    ) : null;
+  },
 }));
 vi.mock('@attraccess/ui', () => ({ useAppTheme: () => ({ resolvedTheme: 'light' }) }));
 vi.mock('../../../../stores/ptr.store', () => ({ usePtrStore: () => ({ setPullToRefreshIsEnabled: state.refresh }) }));
@@ -64,6 +80,9 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: state.save };
   },
   useResourceFlowsServiceGetNodeSchemas: () => ({ data: undefined }),
+  useMqttServiceMqttServersGetAll: (_key: unknown, options?: { enabled?: boolean }) => ({
+    data: options?.enabled === false ? undefined : state.mqttServers,
+  }),
   useGlobalFlowsServiceGetGlobalFlowCanvas: () => ({ data: undefined, isFetching: false, isError: false }),
   useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
   useGlobalFlowsServiceSaveGlobalFlowCanvas: () => ({ mutate: vi.fn() }),
@@ -175,6 +194,9 @@ beforeEach(() => {
   };
   state.fetching = false;
   state.failed = false;
+  state.permissions = ['resources.update'];
+  state.mqttServers = [{ id: 1, name: 'Broker' }];
+  window.localStorage.clear();
   state.receive.mockImplementation((listener: typeof state.live) => {
     state.live = listener;
   });
@@ -393,4 +415,45 @@ it('shows loading and errors and routes import/export actions', () => {
   const error = new Error('Denied');
   act(() => state.options.onError(error));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ error }));
+});
+
+const explorerButton = () => screen.queryByRole('button', { name: 'actions.mqttExplorer' });
+
+it('toggles the MQTT explorer from the toolbar, beside the unchanged flow', () => {
+  show();
+  expect(explorerButton()).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+
+  fireEvent.click(explorerButton() as HTMLElement);
+  expect(screen.getByTestId('mqtt-explorer')).toBeTruthy();
+  expect(explorerButton()).toHaveAttribute('aria-pressed', 'true');
+  // The explorer is handed the editor's nodes, and opening it does not touch the flow.
+  expect(state.explorer).toHaveBeenLastCalledWith(expect.objectContaining({ nodes: state.nodes }));
+  expect(saveButton()).toBeDisabled();
+  expect(state.save).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByText('Close explorer'));
+  expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+  expect(explorerButton()).toHaveAttribute('aria-pressed', 'false');
+});
+
+it('remembers the explorer panel per browser', () => {
+  const first = show();
+  fireEvent.click(explorerButton() as HTMLElement);
+  first.unmount();
+  show();
+  expect(screen.getByTestId('mqtt-explorer')).toBeTruthy();
+});
+
+it('hides the MQTT explorer without the permission to edit resources', () => {
+  state.permissions = [];
+  show();
+  expect(explorerButton()).toBeNull();
+  expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+});
+
+it('hides the MQTT explorer while no MQTT server exists', () => {
+  state.mqttServers = [];
+  show();
+  expect(explorerButton()).toBeNull();
 });

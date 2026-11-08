@@ -26,6 +26,22 @@ export interface SupervisionLiveEvent {
   request: SupervisionRequestDto | null;
 }
 
+export interface MqttExplorerLiveMessage {
+  topic: string;
+  /** Base64 of the (possibly truncated) payload. */
+  payload: string;
+  size: number;
+  truncated: boolean;
+  receivedAt: number;
+}
+
+/** A failed broker subscription reaches the client as a rejected frame (onUnavailable). */
+export interface MqttExplorerLiveEvent {
+  eventType: 'messages';
+  messages: MqttExplorerLiveMessage[];
+  dropped: number;
+}
+
 export interface LivePayloads {
   resource: {
     resourceId?: number;
@@ -41,4 +57,5 @@ export interface LivePayloads {
   notifications: SystemNotificationLiveEvent;
   supervision: SupervisionLiveEvent;
   'mass-introduction': MassIntroductionLiveEventDto;
+  'mqtt-messages': MqttExplorerLiveEvent;
 }

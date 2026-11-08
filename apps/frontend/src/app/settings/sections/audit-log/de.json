@@ -200,6 +200,8 @@
     "mqtt_server.created": "MQTT-Server erstellt",
     "mqtt_server.updated": "MQTT-Server geändert",
     "mqtt_server.deleted": "MQTT-Server gelöscht",
+    "mqtt_server.message_subscribe": "MQTT-Nachrichten abonniert",
+    "mqtt_server.message_publish": "MQTT-Nachricht veröffentlicht",
     "plugin.registry_added": "Plugin-Registry hinzugefügt",
     "plugin.registry_removed": "Plugin-Registry entfernt",
     "plugin.registry_tested": "Plugin-Registry geprüft",

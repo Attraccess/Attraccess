@@ -10,7 +10,8 @@
     "variables": "Variables",
     "logs": "Flow logs",
     "modePan": "Pan canvas",
-    "modeSelect": "Select"
+    "modeSelect": "Select",
+    "mqttExplorer": "MQTT explorer"
   },
   "export": {
     "success": {

@@ -27,8 +27,6 @@ vi.mock('@attraccess/plugins-frontend-sdk', () => ({
   createPluginApiClient: (base: string) => ({
     request: (path: string, options: unknown) => request(base + path, options),
   }),
-  // The explorer's live stream is covered in messages/messages.test.tsx.
-  usePluginLiveUpdates: () => ({ abort: () => undefined }),
 }));
 
 // Lets every pending promise (including rejections) settle.
@@ -352,12 +350,13 @@ it('composes the detail slot per detection result and permission tier', async ()
   render(<RabbitmqDetailSlot mqttServerId={22} />);
   expect(await screen.findByText('Connections')).toBeTruthy();
   expect(screen.getByText('Broker statistics')).toBeTruthy();
-  expect(screen.queryByText('Message explorer')).toBeNull();
   cleanup();
 
+  // The message explorer is a core feature, not part of the plugin, for every tier.
   request.mockImplementation(slotRequest({ isRabbitMQ: true, authOk: true, canManage: true }));
   render(<RabbitmqDetailSlot mqttServerId={23} />);
-  expect(await screen.findByText('Message explorer')).toBeTruthy();
+  expect(await screen.findByText('Connections')).toBeTruthy();
+  expect(screen.queryByText('Message explorer')).toBeNull();
 });
 
 it('remounts the panels when the slot switches servers', async () => {

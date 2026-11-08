@@ -122,36 +122,5 @@
     "vhost": "Vhost",
     "type": "Type",
     "queuesTruncated": "Showing the first 1000 of {{total}} queues."
-  },
-  "messages": {
-    "title": "Message explorer",
-    "filter": "Topic filter (+ and # wildcards)",
-    "subscribe": "Subscribe",
-    "resubscribe": "Apply filter",
-    "unsubscribe": "Unsubscribe",
-    "pause": "Pause",
-    "resume": "Resume",
-    "clear": "Clear",
-    "waiting": "Waiting for messages on {{filter}} …",
-    "size": "{{size}} B",
-    "binary": "binary (hex)",
-    "truncated": "truncated",
-    "unavailable": "The live stream is unavailable. Check the MQTT server connection.",
-    "dropped": {
-      "one": "{{count}} message was dropped because too many arrived.",
-      "many": "{{count}} messages were dropped because too many arrived."
-    },
-    "pausedNotice": "Paused — the live stream is stopped until you resume; messages sent meanwhile are not shown.",
-    "publishTitle": "Publish a message",
-    "topic": "Topic",
-    "filterInvalid": "Use a valid MQTT topic filter: + and # must fill a whole level, # only at the end, no $share/ or $queue/ prefix (max. 85 bytes).",
-    "topicInvalid": "Enter a topic without the wildcards + or #.",
-    "payload": "Payload",
-    "qos": "QoS",
-    "qosOption": "QoS {{qos}}",
-    "retain": "Retain",
-    "publish": "Publish",
-    "published": "Message published.",
-    "publishError": "Publishing the message failed."
   }
 }

@@ -114,13 +114,12 @@ With the **RabbitMQ plugin** installed, an MQTT server that Attraccess detects a
 | **Connections** | Live client connections (refreshes every 10 s) | `monitoring` | `resources.update` |
 | **Connections** (close) | Force-close a connection, with an optional reason | `administrator` | `system.settings.manage` |
 | **Broker statistics** | Overview, nodes and queues (refreshes every 15 s) | `monitoring` | `resources.update` |
-| **Message explorer** | Subscribe to a topic filter (`+`, `#`; up to 85 bytes, no `$share/` or `$queue/` shared subscriptions), pause/clear the live log, publish test messages | none (uses the MQTT connection) | `system.settings.manage` |
 
 Notes:
 
 - The user configured on the MQTT server needs the RabbitMQ tag from the table (`administrator` also covers everything `monitoring` can do). Without it the panels show an error that names the missing privilege.
-- Users without `system.settings.manage` only see the read-only panels; write actions and the message explorer are hidden and are also refused by the server.
-- The message explorer subscribes over Attraccess's own MQTT connection to the broker. On a busy broker a broad filter such as `#` makes Attraccess receive and process every message, so prefer a narrow filter (for example `devices/+/status`). Payloads over 64 KiB are shortened, and when a topic is very busy messages are dropped and the explorer tells you how many. Publishing and subscribing are written to the audit log (topic and size only, never the payload). Publishing can trigger real devices, so use it with care.
+- Users without `system.settings.manage` only see the read-only panels; write actions are hidden and are also refused by the server.
+- Watching and publishing live MQTT messages is not part of the RabbitMQ plugin. It is available for every MQTT server and needs only `resources.update` -- see [MQTT Message Explorer](devices/mqtt/message-explorer.md).
 
 ## Troubleshooting
 
@@ -134,6 +133,7 @@ Notes:
 ## See Also
 
 - [Overview](devices/mqtt/overview.md) -- What is MQTT?
+- [Message Explorer](devices/mqtt/message-explorer.md) -- Watch and publish live MQTT messages
 - [Examples](devices/mqtt/examples.md) -- Practical MQTT integration examples
 - [Flows & Automation](flows/overview.md) -- Create automation workflows
 - [Environment Variables](installation/environment-variables.md) -- Server configuration

@@ -14,6 +14,7 @@ import {
   LayoutGridIcon,
   LogsIcon,
   PlusIcon,
+  RadioTowerIcon,
   SaveIcon,
   UploadIcon,
 } from 'lucide-react';
@@ -23,11 +24,21 @@ import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
 import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
 import { useFlowEditor } from './canvas/useFlowEditor';
+import { FlowMqttExplorer } from './mqttExplorer';
+import { useRememberedOpen } from './mqttExplorer/useRememberedOpen';
+import { useAuth } from '../../../../hooks/useAuth';
+import { useMqttServiceMqttServersGetAll } from '@attraccess/react-query-client';
 
 // Efficient comparison functions to replace expensive JSON.stringify operations
 
 function FlowsPageInner() {
   const model = useFlowEditor();
+  const { hasPermission } = useAuth();
+  // Same permission as the MQTT server pages and the flow editor itself.
+  const canUseMqttExplorer = hasPermission('resources.update');
+  const { data: mqttServers } = useMqttServiceMqttServersGetAll(undefined, { enabled: canUseMqttExplorer });
+  const [mqttExplorerOpen, setMqttExplorerOpen] = useRememberedOpen();
+  const showMqttExplorer = canUseMqttExplorer && (mqttServers?.length ?? 0) > 0;
 
   return (
     <div className="h-full w-full flex flex-col">
@@ -126,10 +137,7 @@ function FlowsPageInner() {
               >
                 <DownloadIcon />
               </Button>
-              <LogViewer
-                confettiEnabled={model.confettiEnabled}
-                onConfettiEnabledChange={model.setConfettiEnabled}
-              >
+              <LogViewer confettiEnabled={model.confettiEnabled} onConfettiEnabledChange={model.setConfettiEnabled}>
                 {(open) => (
                   <Button isIconOnly onPress={open} aria-label={model.t('actions.logs')}>
                     <LogsIcon />
@@ -146,6 +154,19 @@ function FlowsPageInner() {
                     </Button>
                   )}
                 </VariablesModal>
+              )}
+
+              {showMqttExplorer && (
+                <Button
+                  isIconOnly
+                  variant={mqttExplorerOpen ? 'primary' : 'secondary'}
+                  onPress={() => setMqttExplorerOpen(!mqttExplorerOpen)}
+                  aria-label={model.t('actions.mqttExplorer')}
+                  aria-pressed={mqttExplorerOpen}
+                  data-cy="flow-mqtt-explorer-toggle"
+                >
+                  <RadioTowerIcon />
+                </Button>
               )}
 
               <Button isIconOnly onPress={model.layout} isDisabled={model.isFlowLoading}>
@@ -179,6 +200,9 @@ function FlowsPageInner() {
             </div>
           )}
         </div>
+        {showMqttExplorer && (
+          <FlowMqttExplorer isOpen={mqttExplorerOpen} onClose={() => setMqttExplorerOpen(false)} nodes={model.nodes} />
+        )}
       </div>
     </div>
   );

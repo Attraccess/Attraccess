@@ -9,7 +9,7 @@
 // list, connections list and broker stats.
 export const RABBITMQ_VIEW_PERMISSION = 'resources.update' as const;
 
-// Manage tier — everything that changes the broker or exposes message payloads:
-// user create/update/delete, permissions, closing connections, the live message
-// viewer and publishing.
+// Manage tier — everything that changes the broker: user create/update/delete,
+// permissions and closing connections. The live MQTT message explorer is not
+// part of the plugin: it is a core feature for every broker.
 export const RABBITMQ_MANAGE_PERMISSION = 'system.settings.manage' as const;
