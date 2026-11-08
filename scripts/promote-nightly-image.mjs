@@ -1,22 +1,30 @@
 import { execFileSync } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-import { isNewerPublished, localGit, refreshHistory } from '../apps/plugins/scripts/plugin-publish-plan.mjs';
+// The ancestry helpers live with the plugin publish plan; npm channels and nightly-latest follow the same rule.
+import { asCommit, isNewerPublished, localGit, refreshHistory } from '../apps/plugins/scripts/plugin-publish-plan.mjs';
 
 /** Reads `org.opencontainers.image.revision` from `docker buildx imagetools inspect --format '{{json .Image}}'`. */
 export function revisionFromImageConfig(inspectJson) {
   const image = typeof inspectJson === 'string' ? JSON.parse(inspectJson) : inspectJson;
   // A multi-platform index prints one config per platform; a single image prints the config itself.
   const config = image?.config ? image : Object.values(image ?? {}).find((entry) => entry?.config);
-  return config?.config?.Labels?.['org.opencontainers.image.revision'] ?? null;
+  return asCommit(config?.config?.Labels?.['org.opencontainers.image.revision']);
 }
 
 /**
  * `nightly-latest` only moves forward: keep it when it already carries a descendant of `head`.
  * A missing label (legacy image) or an unknown commit counts as older.
  */
-export function shouldMoveNightlyLatest({ head, currentRevision, git }) {
-  return !isNewerPublished({ head, commit: currentRevision, git });
+export function shouldMoveNightlyLatest({ head, currentRevision, git, historyFetched = true }) {
+  return !isNewerPublished({ head, commit: currentRevision, git, historyFetched });
+}
+
+/** The `imagetools create` calls that point nightly-latest at this run's image, by digest when known. */
+export function promotionCommands({ images, head, digest }) {
+  const source = (image) => (digest ? `${image}@${digest}` : `${image}:nightly-${head.slice(0, 7)}`);
+  return images.map((image) => ['create', '--tag', `${image}:nightly-latest`, source(image)]);
 }
 
 const imagetools = (...args) =>
@@ -36,6 +44,11 @@ function currentRevision(ref) {
   }
 }
 
+function report(message) {
+  console.log(message);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+}
+
 function main() {
   const head = process.env.GITHUB_SHA;
   const images = [
@@ -44,17 +57,18 @@ function main() {
   ].filter(Boolean);
   if (!head || images.length === 0)
     throw new Error('GITHUB_SHA and GHCR_IMAGE_NAME/DOCKERHUB_IMAGE_NAME are required.');
-  const sourceTag = `nightly-${head.slice(0, 7)}`;
 
-  refreshHistory();
+  const historyFetched = refreshHistory();
   const revision = currentRevision(`${images[0]}:nightly-latest`);
-  if (!shouldMoveNightlyLatest({ head, currentRevision: revision, git: localGit })) {
-    console.log(`Keeping nightly-latest: it already carries newer commit ${revision} (this run is ${head}).`);
+  if (!shouldMoveNightlyLatest({ head, currentRevision: revision, git: localGit, historyFetched })) {
+    report(
+      `Kept nightly-latest: it already carries newer commit ${revision.slice(0, 7)} (this run is ${head.slice(0, 7)}).`,
+    );
     return;
   }
-  for (const image of images) {
-    imagetools('create', '--tag', `${image}:nightly-latest`, `${image}:${sourceTag}`);
-    console.log(`Moved ${image}:nightly-latest to ${sourceTag} (previous revision: ${revision ?? 'none'}).`);
+  for (const args of promotionCommands({ images, head, digest: process.env.IMAGE_DIGEST })) {
+    imagetools(...args);
+    report(`Moved ${args[2]} to ${args[3]} (previous revision: ${revision?.slice(0, 7) ?? 'none'}).`);
   }
 }
 

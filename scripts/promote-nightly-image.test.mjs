@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { isMissingTagError, revisionFromImageConfig, shouldMoveNightlyLatest } from './promote-nightly-image.mjs';
+import {
+  isMissingTagError,
+  promotionCommands,
+  revisionFromImageConfig,
+  shouldMoveNightlyLatest,
+} from './promote-nightly-image.mjs';
 
 const LABEL = 'org.opencontainers.image.revision';
 // History: older -> head -> newer, and `stray` is not an ancestor of either.
@@ -28,11 +33,34 @@ test('moves nightly-latest for legacy images without the label or an unknown com
 });
 
 test('reads the revision label from single-image and multi-platform inspect output', () => {
-  const config = { config: { Labels: { [LABEL]: 'abc' } } };
-  assert.equal(revisionFromImageConfig(JSON.stringify(config)), 'abc');
-  assert.equal(revisionFromImageConfig({ 'linux/amd64': config }), 'abc');
+  const sha = 'a'.repeat(40);
+  const config = { config: { Labels: { [LABEL]: sha } } };
+  assert.equal(revisionFromImageConfig(JSON.stringify(config)), sha);
+  assert.equal(revisionFromImageConfig({ 'linux/amd64': config }), sha);
   assert.equal(revisionFromImageConfig({ config: { Labels: {} } }), null);
   assert.equal(revisionFromImageConfig({ config: {} }), null);
+  assert.equal(revisionFromImageConfig({ config: { Labels: { [LABEL]: 'HEAD' } } }), null, 'only full SHAs count');
+});
+
+test('refuses to decide when history could not be fetched and the current revision is unknown', () => {
+  const unknown = 'f'.repeat(40);
+  assert.throws(
+    () => shouldMoveNightlyLatest({ head: 'head', currentRevision: unknown, git, historyFetched: false }),
+    /refusing to move the tag/,
+  );
+  assert.equal(shouldMoveNightlyLatest({ head: 'head', currentRevision: null, git, historyFetched: false }), true);
+});
+
+test("points nightly-latest on every registry at this run's digest", () => {
+  const images = ['ghcr.io/a/b', 'a/b'];
+  const head = '1234567'.padEnd(40, '0');
+  assert.deepEqual(promotionCommands({ images, head, digest: 'sha256:d' }), [
+    ['create', '--tag', 'ghcr.io/a/b:nightly-latest', 'ghcr.io/a/b@sha256:d'],
+    ['create', '--tag', 'a/b:nightly-latest', 'a/b@sha256:d'],
+  ]);
+  assert.deepEqual(promotionCommands({ images: ['a/b'], head, digest: '' }), [
+    ['create', '--tag', 'a/b:nightly-latest', 'a/b:nightly-1234567'],
+  ]);
 });
 
 test('only a missing tag counts as "no nightly-latest yet"', () => {

@@ -110,7 +110,10 @@ jobs:
 
   publish-plugins:
     needs: [publish-gate]
+    # Without an explicit condition a skipped job further up (HIL variable off) would skip this job too.
+    if: ${{ !cancelled() && needs.publish-gate.result == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -119,12 +122,14 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
+      # Build before the npm token is in the environment; the publish step then reuses the local Nx cache.
+      - name: Build official plugin packages
+        run: pnpm nx run-many --target=build --projects=tag:type:plugin
       # Publishes what npm lacks: every plugin whose inputs changed since the commit recorded on its `next`
       # version, including changes merged in earlier runs that failed. Never moves `next` backwards.
       - name: Publish nightly official plugin packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_NIGHTLY: 'true'
         run: node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next
 
   build-companion:
@@ -147,6 +152,8 @@ jobs:
 
   containerize:
     needs: [publish-gate]
+    # Same condition as publish-plugins, so both publish or both skip.
+    if: ${{ !cancelled() && needs.publish-gate.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -163,6 +170,7 @@ jobs:
         run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
+        id: image
         uses: ./.github/actions/docker-build-push
         with:
           tags: |
@@ -176,4 +184,6 @@ jobs:
 
       # An older run finishing late must not move nightly-latest backwards; its nightly-<sha7> image stays.
       - name: Move nightly-latest unless a newer commit already owns it
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
         run: node scripts/promote-nightly-image.mjs

@@ -19,15 +19,17 @@ If a dependency fails to load, its dependants stay inactive. Open the failure de
 
 Official plugins are published to npm under these dist-tags:
 
-| Tag      | Moved by               | Contents                                                                                                          |
-| -------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `latest` | Attraccess releases    | The plugin version published with an Attraccess release. **The marketplace shows and installs this version.**     |
-| `next`   | Nightly builds of main | `<version>-nightly.<run>.<attempt>` from green, hardware-gated main builds. Opt in by requesting the spec `next`. |
-| `alpha`  | Nobody (legacy)        | Frozen builds from before release channels existed.                                                               |
+| Tag      | Moved by               | Contents                                                                                                                                    |
+| -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `latest` | Attraccess releases    | The plugin version published with an Attraccess release. **The marketplace shows and installs this version.**                               |
+| `next`   | Nightly builds of main | Builds from green, hardware-gated main builds, versioned like `0.2.0-nightly.1180.1` (the plugin version, then `-nightly.<run>.<attempt>`). |
+| `alpha`  | Nobody (legacy)        | Frozen builds from before release channels existed.                                                                                         |
 
-Stable hosts therefore never receive untested nightly plugins. Two transitional facts:
+To try a nightly, open **Settings → Plugins**, choose **Manage version** on the installed plugin and enter `next` (or a specific nightly version) as **Requested version or channel**. Nightly versions are prereleases, so they are never installed automatically.
 
-- The WAGO, Shelly and RabbitMQ `latest` versions stay at a nightly build (`0.1.0-nightly.925.2`, for hosts `^1.9.0`) until the next Attraccess release publishes them as stable versions. Current plugin code needs a newer host, so that is the right version for older hosts.
+Once a plugin has had a release, the marketplace offers only released versions. Until then:
+
+- The WAGO, Shelly and RabbitMQ `latest` versions stay at a nightly build (`0.1.0-nightly.925.2`, for hosts `^1.9.0`) until Attraccess 1.11.0 publishes them as stable versions. Current plugin code requires Attraccess 1.11 or newer, so `0.1.0-nightly.925.2` stays the version for older hosts.
 - npm sets `latest` automatically on a package's first publish. A plugin first published by a nightly (like Matter) therefore has a nightly `latest` until its first release. The release treats a nightly `latest` as never released and publishes the plugin.
 
 ## Uploading a Plugin
