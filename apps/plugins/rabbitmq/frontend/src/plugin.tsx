@@ -59,8 +59,10 @@ export function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
     return null;
   }
 
+  // Keyed by server: switching servers remounts every panel, so none of them
+  // ever shows the previous server's data or explorer log.
   return (
-    <div className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
+    <div key={mqttServerId} className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
       <RabbitmqStatusPanel mqttServerId={mqttServerId} />
       <RabbitmqUserPanel mqttServerId={mqttServerId} canManage={canManage} />
       {result.authOk && <RabbitmqDataPanels mqttServerId={mqttServerId} canManage={canManage} />}

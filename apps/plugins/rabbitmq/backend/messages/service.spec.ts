@@ -3,6 +3,9 @@ import { Observable, Subject } from 'rxjs';
 import {
   decodeLiveIdentifier,
   encodeLiveIdentifier,
+  MAX_BATCH,
+  MAX_BATCH_PAYLOAD_CHARS,
+  MAX_FILTER_BYTES,
   MAX_PAYLOAD_BYTES,
   RabbitmqMessagesService,
   validateTopicFilter,
@@ -14,11 +17,31 @@ const user = (...permissions: string[]) =>
   ({ id: 7, authenticationMethod: 'session', effectivePermissions: new Set(permissions) }) as never;
 
 describe('topic filters and live identifiers', () => {
-  it.each(['#', '+', 'a/b', 'a/+/c', 'a/#', '$SYS/#'])('accepts %s', (filter) => {
+  it.each(['#', '+', 'a/b', 'a/+/c', 'a/#', '$SYS/#', 'x'.repeat(MAX_FILTER_BYTES)])('accepts %s', (filter) => {
     expect(validateTopicFilter(filter)).toBe(true);
   });
-  it.each(['', 'a#', 'a/#/b', 'a+/b', 'a\0b', 'x'.repeat(257)])('rejects %j', (filter) => {
+  it.each([
+    '',
+    'a#',
+    'a/#/b',
+    'a+/b',
+    'a\0b',
+    'x'.repeat(MAX_FILTER_BYTES + 1),
+    // Multi-byte characters count in bytes.
+    'ä'.repeat(43),
+    '$share/group/#',
+    '$share/g/a/b',
+    '$queue/a/b',
+  ])('rejects %j', (filter) => {
     expect(validateTopicFilter(filter)).toBe(false);
+  });
+  it('keeps the longest identifier within the host limit of 128 characters', () => {
+    const identifier = encodeLiveIdentifier(9_999_999_999, 'x'.repeat(MAX_FILTER_BYTES));
+    expect(identifier.length).toBeLessThanOrEqual(128);
+    expect(decodeLiveIdentifier(identifier)).toEqual({
+      mqttServerId: 9_999_999_999,
+      filter: 'x'.repeat(MAX_FILTER_BYTES),
+    });
   });
   it('round-trips filters with / + #', () => {
     const identifier = encodeLiveIdentifier(3, 'a/+/b/#');
@@ -30,6 +53,12 @@ describe('topic filters and live identifiers', () => {
     expect(decodeLiveIdentifier('0.abc')).toBeNull();
     expect(decodeLiveIdentifier('3.not base64!')).toBeNull();
     expect(decodeLiveIdentifier(`3.${Buffer.from('a#b').toString('base64url')}`)).toBeNull();
+    expect(decodeLiveIdentifier(encodeLiveIdentifier(3, '$share/g/#'))).toBeNull();
+  });
+  it('rejects identifiers for filters over the byte limit or over 128 characters', () => {
+    expect(decodeLiveIdentifier(encodeLiveIdentifier(3, 'x'.repeat(MAX_FILTER_BYTES + 1)))).toBeNull();
+    expect(decodeLiveIdentifier(`3.${'A'.repeat(115)}`)).toBeNull();
+    expect(decodeLiveIdentifier(`3.${'A'.repeat(200)}`)).toBeNull();
   });
 });
 
@@ -74,6 +103,14 @@ describe('RabbitmqMessagesService', () => {
       await expect(topic.authorize(subscription, user(RABBITMQ_MANAGE_PERMISSION))).resolves.toBeUndefined();
     });
 
+    it('denies a user without permissions or without effective permissions', async () => {
+      await expect(topic.authorize(subscription, user())).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        topic.authorize(subscription, { id: 7, authenticationMethod: 'session' } as never),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(getMqttServerConfig).not.toHaveBeenCalled();
+    });
+
     it('rejects bad identifiers and unknown servers', async () => {
       const manager = user(RABBITMQ_MANAGE_PERMISSION);
       await expect(topic.authorize({ identifier: 'nope' }, manager)).rejects.toBeInstanceOf(NotFoundException);
@@ -81,29 +118,71 @@ describe('RabbitmqMessagesService', () => {
       await expect(topic.authorize(subscription, manager)).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it('batches, truncates and counts dropped messages', async () => {
+    const streams = () => (service as unknown as { streams: Map<string, unknown> }).streams;
+
+    const capture = () => {
       let handler!: (m: { topic: string; payload: Buffer }) => void;
       subscribe.mockImplementation(async (_id, _filter, h) => {
         handler = h;
         return { unsubscribe: jest.fn() };
       });
-      const events: { data: RabbitmqLiveEvent }[] = [];
-      const sub = topic.source(subscription, user(RABBITMQ_MANAGE_PERMISSION)).subscribe((e) => events.push(e));
+      const events: RabbitmqLiveEvent[] = [];
+      const sub = topic.source(subscription, user(RABBITMQ_MANAGE_PERMISSION)).subscribe((e) => events.push(e.data));
+      return { send: (m: { topic: string; payload: Buffer }) => handler(m), events, sub };
+    };
+
+    it('batches, truncates and counts dropped messages', async () => {
+      const { send, events, sub } = capture();
       await Promise.resolve();
-      handler({ topic: 'a/b', payload: Buffer.from('hi') });
-      handler({ topic: 'big', payload: Buffer.alloc(MAX_PAYLOAD_BYTES + 10) });
-      for (let i = 0; i < 300; i += 1) handler({ topic: 'flood', payload: Buffer.from('x') });
+      send({ topic: 'a/b', payload: Buffer.from('hi') });
+      send({ topic: 'big', payload: Buffer.alloc(MAX_PAYLOAD_BYTES + 10) });
+      for (let i = 0; i < 300; i += 1) send({ topic: 'flood', payload: Buffer.from('x') });
       jest.advanceTimersByTime(250);
       expect(events).toHaveLength(1);
-      const { messages, dropped, eventType } = events[0].data as Extract<RabbitmqLiveEvent, { eventType: 'messages' }>;
+      const { messages, dropped, eventType } = events[0];
       expect(eventType).toBe('messages');
-      expect(messages).toHaveLength(50);
-      // 302 sent, 200 kept pending, 150 of those over the batch cap.
-      expect(dropped).toBe(102 + 150);
+      expect(messages).toHaveLength(MAX_BATCH);
+      // 302 sent, MAX_BATCH kept, the rest dropped before encoding.
+      expect(dropped).toBe(302 - MAX_BATCH);
       expect(messages[0]).toMatchObject({ topic: 'a/b', size: 2, truncated: false });
       expect(Buffer.from(messages[0].payload, 'base64').toString()).toBe('hi');
       expect(messages[1]).toMatchObject({ size: MAX_PAYLOAD_BYTES + 10, truncated: true });
       expect(Buffer.from(messages[1].payload, 'base64')).toHaveLength(MAX_PAYLOAD_BYTES);
+
+      // The next flush starts with an empty batch and a reset dropped count.
+      send({ topic: 'later', payload: Buffer.from('y') });
+      jest.advanceTimersByTime(250);
+      expect(events[1]).toEqual({
+        eventType: 'messages',
+        messages: [expect.objectContaining({ topic: 'later' })],
+        dropped: 0,
+      });
+      // Nothing pending and nothing dropped: no empty frame.
+      jest.advanceTimersByTime(250);
+      expect(events).toHaveLength(2);
+      sub.unsubscribe();
+    });
+
+    it('caps the base64 payload per flush and counts the overflow as dropped', async () => {
+      const { send, events, sub } = capture();
+      await Promise.resolve();
+      // Each full-size payload encodes to 87384 characters; 6 fit in 512 KiB.
+      const perMessage = Math.ceil(MAX_PAYLOAD_BYTES / 3) * 4;
+      const fitting = Math.floor(MAX_BATCH_PAYLOAD_CHARS / perMessage);
+      for (let i = 0; i < 10; i += 1) send({ topic: 'big', payload: Buffer.alloc(MAX_PAYLOAD_BYTES) });
+      // A small message still fits in the remaining budget.
+      send({ topic: 'small', payload: Buffer.from('s') });
+      jest.advanceTimersByTime(250);
+      const { messages, dropped } = events[0];
+      expect(messages).toHaveLength(fitting + 1);
+      expect(dropped).toBe(10 - fitting);
+      expect(messages.reduce((total, m) => total + m.payload.length, 0)).toBeLessThanOrEqual(MAX_BATCH_PAYLOAD_CHARS);
+      expect(messages[fitting].topic).toBe('small');
+
+      // The budget resets with each flush.
+      send({ topic: 'big', payload: Buffer.alloc(MAX_PAYLOAD_BYTES) });
+      jest.advanceTimersByTime(250);
+      expect(events[1]).toMatchObject({ dropped: 0, messages: [expect.objectContaining({ topic: 'big' })] });
       sub.unsubscribe();
     });
 
@@ -119,10 +198,14 @@ describe('RabbitmqMessagesService', () => {
       expect(unsubscribe).not.toHaveBeenCalled();
       second.unsubscribe();
       expect(unsubscribe).toHaveBeenCalledTimes(1);
+      expect(streams().size).toBe(0);
+      expect(jest.getTimerCount()).toBe(0);
       // A later viewer opens a fresh subscription.
       topic.source(subscription, manager).subscribe().unsubscribe();
       await Promise.resolve();
       expect(subscribe).toHaveBeenCalledTimes(2);
+      expect(streams().size).toBe(0);
+      expect(jest.getTimerCount()).toBe(0);
     });
 
     it('releases a subscription acknowledged after the viewer left', async () => {
@@ -133,19 +216,56 @@ describe('RabbitmqMessagesService', () => {
       );
       const sub = topic.source(subscription, user(RABBITMQ_MANAGE_PERMISSION)).subscribe();
       sub.unsubscribe();
+      expect(streams().size).toBe(0);
+      expect(jest.getTimerCount()).toBe(0);
       acknowledge.next();
       await Promise.resolve();
       await Promise.resolve();
       expect(unsubscribe).toHaveBeenCalledTimes(1);
     });
 
-    it('signals unavailable when the broker subscription fails and audits topic only', async () => {
-      subscribe.mockRejectedValue(new Error('secret broker detail'));
-      const events: { data: RabbitmqLiveEvent }[] = [];
-      topic.source(subscription, user(RABBITMQ_MANAGE_PERMISSION)).subscribe((e) => events.push(e));
+    it('errors the shared stream when the broker subscription fails, so the next viewer retries', async () => {
+      subscribe.mockRejectedValueOnce(new Error('secret broker detail'));
+      const manager = user(RABBITMQ_MANAGE_PERMISSION);
+      const errors: unknown[] = [];
+      const events: unknown[] = [];
+      topic.source(subscription, manager).subscribe({ next: (e) => events.push(e), error: (e) => errors.push(e) });
+      // A second viewer joins the same stream before the broker answers.
+      topic.source(subscription, manager).subscribe({ error: (e) => errors.push(e) });
+      expect(subscribe).toHaveBeenCalledTimes(1);
       await Promise.resolve();
       await Promise.resolve();
-      expect(events).toEqual([{ data: { eventType: 'unavailable' } }]);
+      expect(events).toEqual([]);
+      expect(errors).toHaveLength(2);
+      expect(String((errors[0] as Error).message)).not.toContain('secret');
+      expect(streams().size).toBe(0);
+      expect(jest.getTimerCount()).toBe(0);
+
+      const unsubscribe = jest.fn();
+      subscribe.mockResolvedValue({ unsubscribe });
+      const later = topic.source(subscription, manager).subscribe();
+      expect(subscribe).toHaveBeenCalledTimes(2);
+      await Promise.resolve();
+      later.unsubscribe();
+      expect(unsubscribe).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not error a stream whose viewers already left when the subscription fails', async () => {
+      let reject!: (error: Error) => void;
+      subscribe.mockImplementation(() => new Promise((_resolve, r) => (reject = r)));
+      const error = jest.fn();
+      const sub = topic.source(subscription, user(RABBITMQ_MANAGE_PERMISSION)).subscribe({ error });
+      sub.unsubscribe();
+      reject(new Error('late'));
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(error).not.toHaveBeenCalled();
+      expect(streams().size).toBe(0);
+    });
+
+    it('audits the subscribed topic only', async () => {
+      subscribe.mockResolvedValue({ unsubscribe: jest.fn() });
+      topic.source(subscription, user(RABBITMQ_MANAGE_PERMISSION)).subscribe().unsubscribe();
       expect(record).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'rabbitmq.message_subscribe',

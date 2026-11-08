@@ -10,12 +10,13 @@ export interface PolledResource<T> {
 
 // Loads a resource on mount and then every `intervalMs`. Polling pauses while
 // the tab is hidden (and reloads as soon as it is visible again) and stops for
-// good on unmount, so a closed panel never keeps hitting the broker.
+// good on unmount, so a closed panel never keeps hitting the broker. A reload
+// requested while a load is in flight runs once that load finishes, so a
+// refresh after a change never returns the list from before it.
 export function usePolledResource<T>(
   fetcher: () => Promise<T>,
   intervalMs: number,
   fallbackError: string,
-  enabled = true,
 ): PolledResource<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -24,34 +25,46 @@ export function usePolledResource<T>(
   latest.current = { fetcher, fallbackError };
   const mounted = useRef(true);
   const inFlight = useRef(false);
+  const again = useRef(false);
 
-  const reload = useCallback(async () => {
-    if (inFlight.current) return;
+  // A poll that finds a load in flight is skipped; an explicit reload is queued.
+  const load = useCallback(async (queueIfBusy: boolean) => {
+    if (inFlight.current) {
+      if (queueIfBusy) again.current = true;
+      return;
+    }
     inFlight.current = true;
     setLoading(true);
     try {
-      const result = await latest.current.fetcher();
-      if (mounted.current) {
-        setData(result);
-        setError(null);
-      }
-    } catch (err) {
-      if (mounted.current) setError(err instanceof Error && err.message ? err.message : latest.current.fallbackError);
+      do {
+        again.current = false;
+        try {
+          const result = await latest.current.fetcher();
+          if (mounted.current) {
+            setData(result);
+            setError(null);
+          }
+        } catch (err) {
+          if (mounted.current)
+            setError(err instanceof Error && err.message ? err.message : latest.current.fallbackError);
+        }
+      } while (again.current && mounted.current);
     } finally {
       inFlight.current = false;
+      again.current = false;
       if (mounted.current) setLoading(false);
     }
   }, []);
+  const reload = useCallback(() => load(true), [load]);
 
   useEffect(() => {
     mounted.current = true;
-    if (!enabled) return;
-    void reload();
+    void load(false);
     const timer = setInterval(() => {
-      if (!document.hidden) void reload();
+      if (!document.hidden) void load(false);
     }, intervalMs);
     const onVisible = () => {
-      if (!document.hidden) void reload();
+      if (!document.hidden) void load(false);
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
@@ -59,7 +72,7 @@ export function usePolledResource<T>(
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [enabled, intervalMs, reload]);
+  }, [intervalMs, load]);
 
   return { data, error, loading, reload };
 }

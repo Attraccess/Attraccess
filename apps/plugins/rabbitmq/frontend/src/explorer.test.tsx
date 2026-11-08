@@ -1,13 +1,21 @@
-import { configure, act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  configure,
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RabbitmqConnectionsPanel } from './connections/RabbitmqConnectionsPanel';
-import { RabbitmqStatsPanel } from './stats/RabbitmqStatsPanel';
-import { MESSAGE_LOG_CAP, RabbitmqMessagesPanel } from './messages/RabbitmqMessagesPanel';
+import { RabbitmqStatsPanel, STATS_POLL_INTERVAL_MS } from './stats/RabbitmqStatsPanel';
 import { RabbitmqUserPanel } from './users/RabbitmqUserPanel';
-import { decodePayload } from './messages/payload';
-import { isValidTopicFilter, liveIdentifier } from './messages/messages-api';
 import { useCapabilities } from './capabilities';
-import { renderHook } from '@testing-library/react';
+import { useDetection } from './detection/detection';
+import { usePolledResource } from './usePolledResource';
 import { RabbitmqDetailSlot } from './plugin';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 
@@ -15,24 +23,20 @@ import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 configure({ asyncUtilTimeout: 10_000 });
 
 const request = vi.hoisted(() => vi.fn());
-const live = vi.hoisted(() => ({
-  options: null as null | {
-    identifier?: string;
-    enabled?: boolean;
-    onUpdate: (event: unknown) => void;
-    onUnavailable?: () => void;
-  },
-  enabledHistory: [] as boolean[],
-}));
 vi.mock('@attraccess/plugins-frontend-sdk', () => ({
   createPluginApiClient: (base: string) => ({
     request: (path: string, options: unknown) => request(base + path, options),
   }),
-  usePluginLiveUpdates: (options: NonNullable<typeof live.options>) => {
-    live.options = options;
-    live.enabledHistory.push(options.enabled ?? true);
-  },
+  // The explorer's live stream is covered in messages/messages.test.tsx.
+  usePluginLiveUpdates: () => ({ abort: () => undefined }),
 }));
+
+// Lets every pending promise (including rejections) settle.
+const settle = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+const isGet = (options?: { method?: string }) => options?.method === undefined;
 
 const connection = {
   name: '10.0.0.2:5000 -> 10.0.0.1:1883',
@@ -54,8 +58,6 @@ const connection = {
 
 beforeEach(() => {
   request.mockReset();
-  live.options = null;
-  live.enabledHistory = [];
 });
 afterEach(() => {
   cleanup();
@@ -86,18 +88,20 @@ it('hides force-close for view-only users', async () => {
   expect(screen.queryByRole('button', { name: /Close connection/ })).toBeNull();
 });
 
-it('confirms before closing a connection, sends the reason and refreshes the list', async () => {
-  request.mockImplementation(async (_path: string, options?: { method?: string }) =>
-    options?.method === 'DELETE'
-      ? undefined
-      : { mqttServerId: 3, total: 1, truncated: false, connections: [connection] },
-  );
+it('confirms before closing a connection, sends the reason and refreshes the list afterwards', async () => {
+  let closed = false;
+  request.mockImplementation(async (_path: string, options?: { method?: string }) => {
+    if (options?.method === 'DELETE') {
+      closed = true;
+      return undefined;
+    }
+    return { mqttServerId: 3, total: 1, truncated: false, connections: closed ? [] : [connection] };
+  });
   render(<RabbitmqConnectionsPanel mqttServerId={3} canManage />);
   fireEvent.click(await screen.findByRole('button', { name: 'Close connection sensor-1' }));
   const dialog = await screen.findByRole('alertdialog');
   expect(request.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false);
   fireEvent.change(within(dialog).getByLabelText('Reason (optional)'), { target: { value: 'maintenance' } });
-  const loads = request.mock.calls.length;
   fireEvent.click(within(dialog).getByRole('button', { name: 'Close connection' }));
   await waitFor(() =>
     expect(request).toHaveBeenCalledWith('/api/rabbitmq/connections/3', {
@@ -106,7 +110,11 @@ it('confirms before closing a connection, sends the reason and refreshes the lis
     }),
   );
   await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
-  await waitFor(() => expect(request.mock.calls.length).toBeGreaterThan(loads + 1));
+  // The list is loaded again after the close and shows the broker's new state.
+  expect(await screen.findByText('No clients are connected.')).toBeTruthy();
+  const calls = request.mock.calls.map(([, options]) => options);
+  const deleteAt = calls.findIndex((options) => options?.method === 'DELETE');
+  expect(calls.slice(deleteAt + 1).some(isGet)).toBe(true);
 });
 
 it('keeps the close dialog open and shows the error when closing fails', async () => {
@@ -117,15 +125,32 @@ it('keeps the close dialog open and shows the error when closing fails', async (
   render(<RabbitmqConnectionsPanel mqttServerId={4} canManage />);
   fireEvent.click(await screen.findByRole('button', { name: 'Close connection sensor-1' }));
   const dialog = await screen.findByRole('alertdialog');
-  const loadsBefore = request.mock.calls.filter(([, options]) => options?.method !== 'DELETE').length;
   fireEvent.click(within(dialog).getByRole('button', { name: 'Close connection' }));
   expect(await within(dialog).findByText('Broker refused')).toBeTruthy();
-  // The client may already be gone: the list behind the dialog is refreshed too.
-  await waitFor(() =>
-    expect(request.mock.calls.filter(([, options]) => options?.method !== 'DELETE').length).toBeGreaterThan(
-      loadsBefore,
-    ),
-  );
+  // The client may already be gone: the list behind the dialog is loaded again after the failed close.
+  await waitFor(() => {
+    const calls = request.mock.calls.map(([, options]) => options);
+    const deleteAt = calls.findIndex((options) => options?.method === 'DELETE');
+    expect(deleteAt).toBeGreaterThan(-1);
+    expect(calls.slice(deleteAt + 1).some(isGet)).toBe(true);
+  });
+});
+
+it('queues a reload requested while a load is in flight instead of dropping it', async () => {
+  const pending: ((value: string) => void)[] = [];
+  const fetcher = vi.fn(() => new Promise<string>((resolve) => pending.push(resolve)));
+  const { result } = renderHook(() => usePolledResource(fetcher, 60_000, 'failed'));
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  // Two reloads during the first load collapse into one follow-up load.
+  void result.current.reload();
+  void result.current.reload();
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  await act(async () => pending[0]('before'));
+  await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+  await act(async () => pending[1]('after'));
+  await waitFor(() => expect(result.current.data).toBe('after'));
+  expect(result.current.loading).toBe(false);
+  expect(fetcher).toHaveBeenCalledTimes(2);
 });
 
 it('polls connections while visible, pauses while hidden and stops on unmount', async () => {
@@ -211,8 +236,43 @@ it('renders overview, nodes and queues and tolerates missing fields', async () =
   expect(await screen.findByText('3.13.0')).toBeTruthy();
   expect(screen.getByText('1.5 /s')).toBeTruthy();
   expect(screen.getByText('1.0 MiB / 4.0 MiB')).toBeTruthy();
-  expect(screen.getByText('1d 1h')).toBeTruthy();
+  expect(screen.getByText('Alarm active')).toBeTruthy();
+  expect(screen.getByText('1d 1h 0m')).toBeTruthy();
   expect(screen.getByText('mqtt-subscription-a')).toBeTruthy();
+  expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+
+  cleanup();
+  useTranslationState.setState({ language: 'de' });
+  render(<RabbitmqStatsPanel mqttServerId={6} />);
+  expect(await screen.findByText('1,5 /s')).toBeTruthy();
+  expect(screen.getByText('1,0 MiB / 4,0 MiB')).toBeTruthy();
+  expect(screen.getByText('Alarm aktiv')).toBeTruthy();
+});
+
+it('polls stats every 15 s and stops on unmount', async () => {
+  vi.useFakeTimers();
+  request.mockResolvedValue({ mqttServerId: 30, overview: {}, nodes: [], queues: [], totalQueues: 0 });
+  const { unmount } = render(<RabbitmqStatsPanel mqttServerId={30} />);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(STATS_POLL_INTERVAL_MS).toBe(15_000);
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(request).toHaveBeenLastCalledWith('/api/rabbitmq/stats/30', undefined);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(14_999);
+  });
+  expect(request).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1);
+  });
+  expect(request).toHaveBeenCalledTimes(2);
+
+  unmount();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60_000);
+  });
+  expect(request).toHaveBeenCalledTimes(2);
 });
 
 it('shows a stats error with the broker message', async () => {
@@ -228,9 +288,9 @@ it('fetches capabilities and fails closed', async () => {
   expect(request).toHaveBeenCalledWith('/api/rabbitmq/capabilities', undefined);
   request.mockRejectedValueOnce(new Error('403'));
   const denied = renderHook(() => useCapabilities());
-  await act(async () => {
-    await Promise.resolve();
-  });
+  await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+  // Let the rejected request settle before checking that the hook stayed closed.
+  await settle();
   expect(denied.result.current.canManage).toBe(false);
 });
 
@@ -262,109 +322,6 @@ it('hides the user write actions without the manage tier', async () => {
   expect(screen.queryByRole('button', { name: 'Edit permissions of sensor' })).toBeNull();
 });
 
-it('encodes live identifiers and decodes payloads', () => {
-  expect(liveIdentifier(3, 'a/+/b/#')).toBe(
-    `3.${btoa('a/+/b/#').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`,
-  );
-  expect(liveIdentifier(1, 'ä')).toMatch(/^1\.[A-Za-z0-9_-]+$/);
-  const b64 = (text: string) => btoa(text);
-  expect(decodePayload(b64('{"a":1}'))).toEqual({ kind: 'json', text: '{\n  "a": 1\n}' });
-  expect(decodePayload(b64('hello'))).toEqual({ kind: 'text', text: 'hello' });
-  expect(decodePayload(b64('123'))).toEqual({ kind: 'text', text: '123' });
-  expect(decodePayload(btoa(String.fromCharCode(0, 255, 16)))).toEqual({ kind: 'binary', text: '00 ff 10' });
-});
-
-const message = (topic: string, text: string) => ({
-  topic,
-  payload: btoa(text),
-  size: text.length,
-  truncated: false,
-  receivedAt: 1700000000000,
-});
-
-it('subscribes, shows newest first, pauses, clears and releases on unsubscribe and unmount', async () => {
-  const { unmount } = render(<RabbitmqMessagesPanel mqttServerId={9} />);
-  expect(live.options?.enabled).toBe(false);
-  fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
-  expect(live.options?.enabled).toBe(true);
-  expect(live.options?.identifier).toBe(liveIdentifier(9, '#'));
-
-  act(() =>
-    live.options?.onUpdate({
-      eventType: 'messages',
-      dropped: 3,
-      messages: [message('a/first', 'one'), message('a/second', '{"x":1}')],
-    }),
-  );
-  const rows = screen.getAllByText(/a\/(first|second)/);
-  expect(rows[0].textContent).toBe('a/second');
-  expect(screen.getByText('3 messages were dropped to keep up.')).toBeTruthy();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
-  act(() => live.options?.onUpdate({ eventType: 'messages', dropped: 0, messages: [message('a/third', 'x')] }));
-  expect(screen.queryByText('a/third')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Resume' }));
-  act(() => live.options?.onUpdate({ eventType: 'messages', dropped: 0, messages: [message('a/third', 'x')] }));
-  expect(screen.getByText('a/third')).toBeTruthy();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
-  expect(screen.queryByText('a/third')).toBeNull();
-
-  act(() => live.options?.onUnavailable?.());
-  expect(screen.getByText(/live stream is unavailable/)).toBeTruthy();
-
-  fireEvent.click(screen.getByRole('button', { name: 'Unsubscribe' }));
-  expect(live.options?.enabled).toBe(false);
-  fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
-  expect(live.options?.enabled).toBe(true);
-  unmount();
-});
-
-it('validates topic filters like the backend and blocks invalid subscriptions', () => {
-  for (const valid of ['#', '+', 'a/b', 'a/+/b', 'a/#', '+/#', 'ä/ö']) expect(isValidTopicFilter(valid)).toBe(true);
-  for (const invalid of ['', 'a/#/b', 'a/b#', '+a', 'a+', 'a/\0', 'x'.repeat(257)])
-    expect(isValidTopicFilter(invalid)).toBe(false);
-
-  render(<RabbitmqMessagesPanel mqttServerId={11} />);
-  fireEvent.change(screen.getByRole('textbox', { name: /Topic filter/ }), { target: { value: 'a/#/b' } });
-  expect(screen.getByText(/Use a valid MQTT topic filter/)).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
-  expect(live.options?.enabled).toBe(false);
-});
-
-it('caps the log', () => {
-  render(<RabbitmqMessagesPanel mqttServerId={10} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Subscribe' }));
-  const batch = Array.from({ length: MESSAGE_LOG_CAP + 20 }, (_, i) => message(`t/${i}`, 'x'));
-  act(() => live.options?.onUpdate({ eventType: 'messages', dropped: 0, messages: batch }));
-  expect(screen.getAllByText('1 B')).toHaveLength(MESSAGE_LOG_CAP);
-}, 30_000);
-
-it('validates the publish topic and reports success and failure', async () => {
-  request.mockResolvedValue(undefined);
-  render(<RabbitmqMessagesPanel mqttServerId={11} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
-  expect(await screen.findByText('Enter a topic without the wildcards + or #.')).toBeTruthy();
-  expect(request).not.toHaveBeenCalled();
-
-  fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'a/#' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
-  expect(request).not.toHaveBeenCalled();
-
-  fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'a/b' } });
-  fireEvent.change(screen.getByLabelText('Payload'), { target: { value: 'hi' } });
-  fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
-  expect(await screen.findByText('Message published.')).toBeTruthy();
-  expect(request).toHaveBeenCalledWith('/api/rabbitmq/messages/11/publish', {
-    method: 'POST',
-    body: { topic: 'a/b', payload: 'hi', qos: 0, retain: false },
-  });
-
-  request.mockRejectedValueOnce(new Error('Publishing the message failed.'));
-  fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
-  await waitFor(() => expect(screen.getByText('Publishing the message failed.')).toBeTruthy());
-});
-
 const slotRequest = (options: { isRabbitMQ: boolean; authOk: boolean; canManage: boolean }) => async (path: string) => {
   if (path.includes('/detection/'))
     return { mqttServerId: 20, reachable: true, error: null, checkedAt: 'x', ...options };
@@ -377,8 +334,12 @@ const slotRequest = (options: { isRabbitMQ: boolean; authOk: boolean; canManage:
 it('composes the detail slot per detection result and permission tier', async () => {
   request.mockImplementation(slotRequest({ isRabbitMQ: false, authOk: false, canManage: true }));
   const none = render(<RabbitmqDetailSlot mqttServerId={20} />);
-  await waitFor(() => expect(request).toHaveBeenCalled());
+  // Wait for detection to resolve (to "not RabbitMQ") before checking the slot stays empty.
+  const detection = renderHook(() => useDetection(20));
+  await waitFor(() => expect(detection.result.current.result?.isRabbitMQ).toBe(false));
+  await settle();
   expect(none.container.textContent).toBe('');
+  expect(request.mock.calls.some(([path]) => String(path).includes('/capabilities'))).toBe(false);
   cleanup();
 
   request.mockImplementation(slotRequest({ isRabbitMQ: true, authOk: false, canManage: true }));
@@ -397,4 +358,26 @@ it('composes the detail slot per detection result and permission tier', async ()
   request.mockImplementation(slotRequest({ isRabbitMQ: true, authOk: true, canManage: true }));
   render(<RabbitmqDetailSlot mqttServerId={23} />);
   expect(await screen.findByText('Message explorer')).toBeTruthy();
+});
+
+it('remounts the panels when the slot switches servers', async () => {
+  request.mockImplementation(async (path: string) => {
+    const id = Number(path.split('/').pop());
+    if (path.includes('/detection/')) return { mqttServerId: id, isRabbitMQ: true, reachable: true, authOk: true };
+    if (path.includes('/capabilities')) return { canManage: false };
+    if (path.includes('/connections/')) return { mqttServerId: id, total: 0, truncated: false, connections: [] };
+    if (path.includes('/stats/')) {
+      // The second server's stats never arrive: nothing of the first may linger meanwhile.
+      if (id === 25) return new Promise(() => undefined);
+      return { mqttServerId: id, overview: { clusterName: 'cluster-24' }, nodes: [], queues: [], totalQueues: 0 };
+    }
+    return { mqttServerId: id, users: [], vhosts: [] };
+  });
+  // Both detections are cached before the switch, so the slot never renders empty in between.
+  const second = renderHook(() => useDetection(25));
+  await waitFor(() => expect(second.result.current.result?.isRabbitMQ).toBe(true));
+  const { rerender } = render(<RabbitmqDetailSlot mqttServerId={24} />);
+  expect(await screen.findByText('cluster-24')).toBeTruthy();
+  rerender(<RabbitmqDetailSlot mqttServerId={25} />);
+  expect(screen.queryByText('cluster-24')).toBeNull();
 });

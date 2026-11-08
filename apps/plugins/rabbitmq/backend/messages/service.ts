@@ -33,13 +33,18 @@ export const MESSAGES_LIVE_TOPIC = 'messages';
 export const MAX_PAYLOAD_BYTES = 64 * 1024;
 const MAX_PUBLISH_PAYLOAD_BYTES = 256 * 1024;
 const MAX_TOPIC_BYTES = 1024;
-const MAX_FILTER_BYTES = 256;
-// Messages are batched and flushed on this interval. At most MAX_BATCH go out
-// per flush and at most MAX_PENDING wait for it; the rest is dropped and
-// reported, so a `#` filter on a busy broker cannot flood the browser.
+// The host caps live identifiers at 128 characters. `<serverId>.<base64url>`
+// with a 10-digit server id leaves room for 114 base64url characters, which
+// encode 85 bytes. Mirrored on the frontend.
+export const MAX_FILTER_BYTES = 85;
+const MAX_LIVE_IDENTIFIER_LENGTH = 128;
+// Messages are batched and flushed on this interval. Each flush carries at most
+// MAX_BATCH messages and MAX_BATCH_PAYLOAD_CHARS of base64 payload; anything
+// beyond that is dropped before it is encoded and reported as `dropped`, so a
+// `#` filter on a busy broker cannot flood the browser.
 const FLUSH_INTERVAL_MS = 250;
-const MAX_BATCH = 50;
-const MAX_PENDING = 200;
+export const MAX_BATCH = 50;
+export const MAX_BATCH_PAYLOAD_CHARS = 512 * 1024;
 
 // Mirrored on the frontend in frontend/src/messages/messages-api.ts.
 export interface RabbitmqLiveMessage {
@@ -53,9 +58,13 @@ export interface RabbitmqLiveMessage {
   readonly receivedAt: number;
 }
 
-export type RabbitmqLiveEvent =
-  | { readonly eventType: 'messages'; readonly messages: RabbitmqLiveMessage[]; readonly dropped: number }
-  | { readonly eventType: 'unavailable' };
+// A failed broker subscription errors the stream; the host turns that into a
+// rejected subscription, which the client sees as unavailable.
+export type RabbitmqLiveEvent = {
+  readonly eventType: 'messages';
+  readonly messages: RabbitmqLiveMessage[];
+  readonly dropped: number;
+};
 
 export interface PublishRabbitmqMessageDto {
   topic: string;
@@ -71,21 +80,29 @@ export function encodeLiveIdentifier(mqttServerId: number, filter: string): stri
 }
 
 export function decodeLiveIdentifier(identifier: string | undefined): { mqttServerId: number; filter: string } | null {
-  const match = /^([1-9]\d{0,9})\.([A-Za-z0-9_-]{1,512})$/.exec(identifier ?? '');
+  if (!identifier || identifier.length > MAX_LIVE_IDENTIFIER_LENGTH) return null;
+  const match = /^([1-9]\d{0,9})\.([A-Za-z0-9_-]{1,114})$/.exec(identifier);
   if (!match) return null;
   const filter = Buffer.from(match[2], 'base64url').toString('utf8');
   return validateTopicFilter(filter) ? { mqttServerId: Number(match[1]), filter } : null;
 }
 
 // MQTT 3.1.1 §4.7: `+` and `#` must occupy a whole level, `#` only the last.
+// Shared-subscription filters (`$share/...`, `$queue/...`) are refused: they
+// would join a consumer group and take messages away from real consumers.
 export function validateTopicFilter(filter: string): boolean {
   if (filter.length === 0 || Buffer.byteLength(filter) > MAX_FILTER_BYTES || filter.includes('\0')) return false;
+  if (filter.startsWith('$share/') || filter.startsWith('$queue/')) return false;
   const levels = filter.split('/');
   return levels.every((level, index) => {
     if (level === '#') return index === levels.length - 1;
     if (level === '+') return true;
     return !level.includes('#') && !level.includes('+');
   });
+}
+
+function base64Length(bytes: number): number {
+  return Math.ceil(bytes / 3) * 4;
 }
 
 @Injectable()
@@ -170,13 +187,14 @@ export class RabbitmqMessagesService implements OnModuleInit {
       let released = false;
       let handle: PluginMqttSubscription | undefined;
       let pending: RabbitmqLiveMessage[] = [];
+      let pendingChars = 0;
       let dropped = 0;
 
       const flush = () => {
         if (pending.length === 0 && dropped === 0) return;
-        const messages = pending.slice(0, MAX_BATCH);
-        dropped += pending.length - messages.length;
+        const messages = pending;
         pending = [];
+        pendingChars = 0;
         subscriber.next({ data: { eventType: 'messages', messages, dropped } });
         dropped = 0;
       };
@@ -184,13 +202,16 @@ export class RabbitmqMessagesService implements OnModuleInit {
 
       this.context.mqtt
         .subscribe(mqttServerId, filter, (message) => {
-          if (pending.length >= MAX_PENDING) {
+          const kept = message.payload.subarray(0, MAX_PAYLOAD_BYTES);
+          const chars = base64Length(kept.length);
+          if (pending.length >= MAX_BATCH || pendingChars + chars > MAX_BATCH_PAYLOAD_CHARS) {
             dropped += 1;
             return;
           }
+          pendingChars += chars;
           pending.push({
             topic: message.topic,
-            payload: message.payload.subarray(0, MAX_PAYLOAD_BYTES).toString('base64'),
+            payload: kept.toString('base64'),
             size: message.payload.length,
             truncated: message.payload.length > MAX_PAYLOAD_BYTES,
             receivedAt: Date.now(),
@@ -201,7 +222,12 @@ export class RabbitmqMessagesService implements OnModuleInit {
           if (released) subscription.unsubscribe();
           else handle = subscription;
         })
-        .catch(() => subscriber.next({ data: { eventType: 'unavailable' } }));
+        .catch(() => {
+          // Error the shared stream so every viewer is told and the next one
+          // starts a fresh broker subscription. Broker error text may carry
+          // connection details; keep it out.
+          if (!released) subscriber.error(new Error('The broker subscription failed.'));
+        });
 
       return () => {
         released = true;
@@ -209,7 +235,9 @@ export class RabbitmqMessagesService implements OnModuleInit {
         handle?.unsubscribe();
       };
     }).pipe(
-      finalize(() => this.streams.delete(key)),
+      finalize(() => {
+        if (this.streams.get(key) === shared) this.streams.delete(key);
+      }),
       share(),
     );
     this.streams.set(key, shared);

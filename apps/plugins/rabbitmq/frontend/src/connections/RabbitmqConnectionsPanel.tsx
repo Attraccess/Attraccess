@@ -22,9 +22,9 @@ import {
   TableScrollContainer,
   TextField,
 } from '@heroui/react';
-import { PlugZapIcon, RefreshCwIcon, XIcon } from 'lucide-react';
+import { PlugZapIcon, RefreshCwIcon, UnplugIcon } from 'lucide-react';
 import { useState } from 'react';
-import { formatBytes, formatNumber, formatRate, formatTimestamp } from '../format';
+import { MISSING_VALUE, useRabbitmqFormatters } from '../format';
 import { useRabbitmqTranslations } from '../i18n';
 import { usePolledResource } from '../usePolledResource';
 import { closeConnection, fetchConnections, type RabbitmqConnection } from './connections-api';
@@ -32,7 +32,8 @@ import { closeConnection, fetchConnections, type RabbitmqConnection } from './co
 export const CONNECTIONS_POLL_INTERVAL_MS = 10_000;
 
 export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServerId: number; canManage: boolean }) {
-  const { t, language } = useRabbitmqTranslations();
+  const { t } = useRabbitmqTranslations();
+  const format = useRabbitmqFormatters();
   const { data, error, loading, reload } = usePolledResource(
     () => fetchConnections(mqttServerId),
     CONNECTIONS_POLL_INTERVAL_MS,
@@ -113,31 +114,34 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
                   <TableColumn>{t('connections.user')}</TableColumn>
                   <TableColumn>{t('connections.peer')}</TableColumn>
                   <TableColumn>{t('connections.protocol')}</TableColumn>
-                  <TableColumn>{t('connections.state')}</TableColumn>
+                  <TableColumn>{t('common.state')}</TableColumn>
                   <TableColumn>{t('connections.connectedSince')}</TableColumn>
                   <TableColumn>{t('connections.channels')}</TableColumn>
                   <TableColumn>{t('connections.traffic')}</TableColumn>
-                  {canManage && <TableColumn>{t('users.actions')}</TableColumn>}
+                  {canManage && <TableColumn>{t('common.actions')}</TableColumn>}
                 </TableHeader>
                 <TableBody items={data.connections}>
                   {(connection) => (
                     <TableRow key={connection.name} id={connection.name}>
-                      <TableCell className="rmq:font-medium rmq:whitespace-nowrap" title={connection.name}>
-                        {connection.clientId ?? connection.name}
+                      <TableCell className="rmq:font-medium rmq:whitespace-nowrap">
+                        <span title={connection.name}>{connection.clientId ?? connection.name}</span>
                       </TableCell>
-                      <TableCell>{connection.user ?? '–'}</TableCell>
+                      <TableCell>{connection.user ?? MISSING_VALUE}</TableCell>
                       <TableCell className="rmq:whitespace-nowrap">
-                        {connection.peerHost ? `${connection.peerHost}:${connection.peerPort ?? ''}` : '–'}
+                        {connection.peerHost ? `${connection.peerHost}:${connection.peerPort ?? ''}` : MISSING_VALUE}
                       </TableCell>
-                      <TableCell className="rmq:whitespace-nowrap">{connection.protocol ?? '–'}</TableCell>
-                      <TableCell>{connection.state ?? '–'}</TableCell>
-                      <TableCell className="rmq:whitespace-nowrap">
-                        {formatTimestamp(connection.connectedAt, language)}
-                      </TableCell>
-                      <TableCell>{formatNumber(connection.channels, language)}</TableCell>
+                      <TableCell className="rmq:whitespace-nowrap">{connection.protocol ?? MISSING_VALUE}</TableCell>
+                      <TableCell>{connection.state ?? MISSING_VALUE}</TableCell>
+                      <TableCell className="rmq:whitespace-nowrap">{format.dateTime(connection.connectedAt)}</TableCell>
+                      <TableCell>{format.number(connection.channels)}</TableCell>
                       <TableCell className="rmq:whitespace-nowrap rmq:text-xs">
-                        ↓ {formatBytes(connection.recvBytes)} ({formatRate(connection.recvRate, 'B/s')})
-                        <br />↑ {formatBytes(connection.sendBytes)} ({formatRate(connection.sendRate, 'B/s')})
+                        <span aria-hidden>↓ </span>
+                        <span className="rmq:sr-only">{t('connections.received')}: </span>
+                        {format.bytes(connection.recvBytes)} ({format.rate(connection.recvRate, 'B/s')})
+                        <br />
+                        <span aria-hidden>↑ </span>
+                        <span className="rmq:sr-only">{t('connections.sent')}: </span>
+                        {format.bytes(connection.sendBytes)} ({format.rate(connection.sendRate, 'B/s')})
                       </TableCell>
                       {canManage && (
                         <TableCell>
@@ -149,7 +153,7 @@ export function RabbitmqConnectionsPanel({ mqttServerId, canManage }: { mqttServ
                             onPress={() => setTarget(connection)}
                             data-cy="rabbitmq-connection-close-button"
                           >
-                            <XIcon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
+                            <UnplugIcon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
                           </Button>
                         </TableCell>
                       )}

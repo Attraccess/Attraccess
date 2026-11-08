@@ -7,6 +7,23 @@ import { RABBITMQ_VIEW_PERMISSION } from '../permissions';
 
 const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 const MAX_QUEUES = 1000;
+// Only the fields the node mapper reads; a full node object carries large
+// `_details` and runtime blocks.
+const NODE_COLUMNS = [
+  'name',
+  'running',
+  'mem_used',
+  'mem_limit',
+  'mem_alarm',
+  'disk_free',
+  'disk_free_limit',
+  'disk_free_alarm',
+  'fd_used',
+  'fd_total',
+  'sockets_used',
+  'sockets_total',
+  'uptime',
+].join(',');
 
 // Mirrored on the frontend in frontend/src/stats/stats-api.ts. Every number is
 // nullable: older RabbitMQ versions omit fields.
@@ -72,7 +89,7 @@ export class RabbitmqStatsService {
     const config = await requireMqttServerConfig(this.context, mqttServerId);
     const [rawOverview, rawNodes, rawQueues] = await Promise.all([
       this.client.request<unknown>(config, 'GET', '/overview'),
-      this.client.request<unknown>(config, 'GET', '/nodes'),
+      this.client.request<unknown>(config, 'GET', `/nodes?columns=${NODE_COLUMNS}`),
       this.client.request<unknown>(
         config,
         'GET',

@@ -11,8 +11,12 @@ export interface RabbitmqLiveMessage {
   receivedAt: number;
 }
 
-export type RabbitmqLiveEvent =
-  { eventType: 'messages'; messages: RabbitmqLiveMessage[]; dropped: number } | { eventType: 'unavailable' };
+// A failed broker subscription reaches the client as a host 'rejected' frame (onUnavailable).
+export interface RabbitmqLiveEvent {
+  eventType: 'messages';
+  messages: RabbitmqLiveMessage[];
+  dropped: number;
+}
 
 export interface PublishBody {
   topic: string;
@@ -40,10 +44,17 @@ export function isPublishableTopic(topic: string): boolean {
   return topic.length > 0 && !/[+#]/.test(topic);
 }
 
+// Longest topic filter in UTF-8 bytes. The host caps live identifiers at 128
+// characters, and `<serverId>.<base64url(filter)>` must fit. Mirrors the backend.
+export const MAX_FILTER_BYTES = 85;
+
 // Mirrors the backend's topic-filter rules (MQTT 3.1.1 §4.7): `+` and `#` must
-// occupy a whole level, `#` only the last one, and the filter stays within 256 bytes.
+// occupy a whole level, `#` only the last one, the filter stays within
+// MAX_FILTER_BYTES, and shared-subscription filters (`$share/`, `$queue/`) are refused.
 export function isValidTopicFilter(filter: string): boolean {
-  if (filter.length === 0 || new TextEncoder().encode(filter).length > 256 || filter.includes('\0')) return false;
+  if (filter.length === 0 || new TextEncoder().encode(filter).length > MAX_FILTER_BYTES || filter.includes('\0'))
+    return false;
+  if (filter.startsWith('$share/') || filter.startsWith('$queue/')) return false;
   const levels = filter.split('/');
   return levels.every((level, index) => {
     if (level === '#') return index === levels.length - 1;

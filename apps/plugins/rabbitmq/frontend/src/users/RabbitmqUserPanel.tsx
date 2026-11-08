@@ -104,7 +104,7 @@ export function RabbitmqUserPanel({ mqttServerId, canManage = false }: { mqttSer
                   <TableColumn isRowHeader>{model.t('users.username')}</TableColumn>
                   <TableColumn>{model.t('users.tags')}</TableColumn>
                   <TableColumn>{model.t('users.access')}</TableColumn>
-                  {canManage && <TableColumn>{model.t('users.actions')}</TableColumn>}
+                  {canManage && <TableColumn>{model.t('common.actions')}</TableColumn>}
                 </TableHeader>
                 <TableBody items={model.data.users} dependencies={[model.language]}>
                   {(user) => (

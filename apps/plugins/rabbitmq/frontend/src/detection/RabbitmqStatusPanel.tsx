@@ -10,6 +10,7 @@ import { CheckCircle2Icon, RabbitIcon, RefreshCwIcon, XCircleIcon } from 'lucide
 import type { ReactNode } from 'react';
 import { useDetection } from './detection';
 import { useRabbitmqTranslations } from '../i18n';
+import { MISSING_VALUE } from '../format';
 
 function StatusRow({ ok, label, value }: { ok: boolean; label: string; value: ReactNode }) {
   return (
@@ -67,7 +68,7 @@ export function RabbitmqStatusPanel({ mqttServerId }: { mqttServerId: number }) 
         <StatusRow
           ok={result.reachable}
           label={t('status.reachable')}
-          value={t(result.reachable ? 'status.yes' : 'status.no')}
+          value={t(result.reachable ? 'common.yes' : 'common.no')}
         />
         <StatusRow
           ok={result.authOk}
@@ -76,15 +77,19 @@ export function RabbitmqStatusPanel({ mqttServerId }: { mqttServerId: number }) 
         />
         <div className="rmq:flex rmq:items-center rmq:justify-between rmq:gap-3 rmq:py-1.5">
           <span className="rmq:text-sm rmq:text-default-600">{t('status.managementVersion')}</span>
-          <span className="rmq:text-sm rmq:font-medium rmq:text-default-700">{result.managementVersion ?? '—'}</span>
+          <span className="rmq:text-sm rmq:font-medium rmq:text-default-700">
+            {result.managementVersion ?? MISSING_VALUE}
+          </span>
         </div>
         <div className="rmq:flex rmq:items-center rmq:justify-between rmq:gap-3 rmq:py-1.5">
           <span className="rmq:text-sm rmq:text-default-600">{t('status.version')}</span>
-          <span className="rmq:text-sm rmq:font-medium rmq:text-default-700">{result.rabbitmqVersion ?? '—'}</span>
+          <span className="rmq:text-sm rmq:font-medium rmq:text-default-700">
+            {result.rabbitmqVersion ?? MISSING_VALUE}
+          </span>
         </div>
         <div className="rmq:flex rmq:items-center rmq:justify-between rmq:gap-3 rmq:py-1.5">
           <span className="rmq:text-sm rmq:text-default-600">{t('status.api')}</span>
-          <code className="rmq:text-xs rmq:text-default-500">{result.managementApi || '—'}</code>
+          <code className="rmq:text-xs rmq:text-default-500">{result.managementApi || MISSING_VALUE}</code>
         </div>
 
         {result.error && (

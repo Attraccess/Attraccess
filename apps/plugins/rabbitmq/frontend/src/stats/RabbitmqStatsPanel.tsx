@@ -13,9 +13,9 @@ import {
   TableRow,
   TableScrollContainer,
 } from '@heroui/react';
-import { BarChart3Icon, RefreshCwIcon } from 'lucide-react';
+import { BarChart3Icon, RefreshCwIcon, TriangleAlertIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { formatBytes, formatDuration, formatNumber, formatRate } from '../format';
+import { Duration, MISSING_VALUE, useRabbitmqFormatters } from '../format';
 import { useRabbitmqTranslations } from '../i18n';
 import { usePolledResource } from '../usePolledResource';
 import { fetchStats, type RabbitmqNode } from './stats-api';
@@ -37,20 +37,20 @@ function Alarm({ alarm, children }: { alarm: boolean | null; children: ReactNode
     <span className="rmq:flex rmq:items-center rmq:gap-1 rmq:whitespace-nowrap">
       {children}
       {alarm === true && (
-        <Chip size="sm" color="danger" variant="soft" title={t('stats.alarm')} aria-label={t('stats.alarm')}>
-          !
+        <Chip size="sm" color="danger" variant="soft">
+          <TriangleAlertIcon className="rmq:w-3 rmq:h-3" aria-hidden />
+          {t('stats.alarm')}
         </Chip>
       )}
     </span>
   );
 }
 
-function ratio(used: number | null, total: number | null, locale: string): string {
-  return used === null ? '–' : `${formatNumber(used, locale)} / ${formatNumber(total, locale)}`;
-}
-
 export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
-  const { t, language } = useRabbitmqTranslations();
+  const { t } = useRabbitmqTranslations();
+  const format = useRabbitmqFormatters();
+  const ratio = (used: number | null, total: number | null) =>
+    used === null ? MISSING_VALUE : `${format.number(used)} / ${format.number(total)}`;
   const { data, error, loading, reload } = usePolledResource(
     () => fetchStats(mqttServerId),
     STATS_POLL_INTERVAL_MS,
@@ -89,18 +89,18 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
         {!data && !error && <TableDataLoadingIndicator />}
         {overview && (
           <>
-            <div className="rmq:grid rmq:grid-cols-2 md:rmq:grid-cols-4 rmq:gap-3" data-cy="rabbitmq-stats-overview">
-              <Stat label={t('stats.version')} value={overview.rabbitmqVersion ?? '–'} />
-              <Stat label={t('stats.erlang')} value={overview.erlangVersion ?? '–'} />
-              <Stat label={t('stats.cluster')} value={overview.clusterName ?? '–'} />
-              <Stat label={t('stats.connections')} value={formatNumber(overview.connections, language)} />
-              <Stat label={t('stats.channels')} value={formatNumber(overview.channels, language)} />
-              <Stat label={t('stats.queues')} value={formatNumber(overview.queues, language)} />
-              <Stat label={t('stats.consumers')} value={formatNumber(overview.consumers, language)} />
-              <Stat label={t('stats.ready')} value={formatNumber(overview.messagesReady, language)} />
-              <Stat label={t('stats.unacked')} value={formatNumber(overview.messagesUnacknowledged, language)} />
-              <Stat label={t('stats.publishRate')} value={formatRate(overview.publishRate, '/s')} />
-              <Stat label={t('stats.deliverRate')} value={formatRate(overview.deliverRate, '/s')} />
+            <div className="rmq:grid rmq:grid-cols-2 rmq:md:grid-cols-4 rmq:gap-3" data-cy="rabbitmq-stats-overview">
+              <Stat label={t('stats.version')} value={overview.rabbitmqVersion ?? MISSING_VALUE} />
+              <Stat label={t('stats.erlang')} value={overview.erlangVersion ?? MISSING_VALUE} />
+              <Stat label={t('stats.cluster')} value={overview.clusterName ?? MISSING_VALUE} />
+              <Stat label={t('stats.connections')} value={format.number(overview.connections)} />
+              <Stat label={t('stats.channels')} value={format.number(overview.channels)} />
+              <Stat label={t('stats.queues')} value={format.number(overview.queues)} />
+              <Stat label={t('stats.consumers')} value={format.number(overview.consumers)} />
+              <Stat label={t('stats.ready')} value={format.number(overview.messagesReady)} />
+              <Stat label={t('stats.unacked')} value={format.number(overview.messagesUnacknowledged)} />
+              <Stat label={t('stats.publishRate')} value={format.rate(overview.publishRate, '/s')} />
+              <Stat label={t('stats.deliverRate')} value={format.rate(overview.deliverRate, '/s')} />
             </div>
 
             <p className="rmq:text-sm rmq:font-semibold rmq:text-default-700">{t('stats.nodes')}</p>
@@ -124,21 +124,23 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
                         <TableRow key={node.name} id={node.name}>
                           <TableCell className="rmq:font-medium">{node.name}</TableCell>
                           <TableCell>
-                            {node.running === null ? '–' : node.running ? t('status.yes') : t('status.no')}
+                            {node.running === null ? MISSING_VALUE : node.running ? t('common.yes') : t('common.no')}
                           </TableCell>
                           <TableCell>
                             <Alarm alarm={node.memAlarm}>
-                              {formatBytes(node.memUsed)} / {formatBytes(node.memLimit)}
+                              {format.bytes(node.memUsed)} / {format.bytes(node.memLimit)}
                             </Alarm>
                           </TableCell>
                           <TableCell>
                             <Alarm alarm={node.diskFreeAlarm}>
-                              {formatBytes(node.diskFree)} / {formatBytes(node.diskFreeLimit)}
+                              {format.bytes(node.diskFree)} / {format.bytes(node.diskFreeLimit)}
                             </Alarm>
                           </TableCell>
-                          <TableCell>{ratio(node.fdUsed, node.fdTotal, language)}</TableCell>
-                          <TableCell>{ratio(node.socketsUsed, node.socketsTotal, language)}</TableCell>
-                          <TableCell className="rmq:whitespace-nowrap">{formatDuration(node.uptime)}</TableCell>
+                          <TableCell>{ratio(node.fdUsed, node.fdTotal)}</TableCell>
+                          <TableCell>{ratio(node.socketsUsed, node.socketsTotal)}</TableCell>
+                          <TableCell className="rmq:whitespace-nowrap">
+                            <Duration ms={node.uptime} />
+                          </TableCell>
                         </TableRow>
                       )}
                     </TableBody>
@@ -161,18 +163,21 @@ export function RabbitmqStatsPanel({ mqttServerId }: { mqttServerId: number }) {
                       <TableColumn>{t('stats.ready')}</TableColumn>
                       <TableColumn>{t('stats.unacked')}</TableColumn>
                       <TableColumn>{t('stats.consumers')}</TableColumn>
-                      <TableColumn>{t('connections.state')}</TableColumn>
+                      <TableColumn>{t('common.state')}</TableColumn>
                     </TableHeader>
                     <TableBody items={data.queues}>
                       {(queue) => (
-                        <TableRow key={`${queue.vhost}/${queue.name}`} id={`${queue.vhost}/${queue.name}`}>
+                        <TableRow
+                          key={JSON.stringify([queue.vhost, queue.name])}
+                          id={JSON.stringify([queue.vhost, queue.name])}
+                        >
                           <TableCell className="rmq:font-medium">{queue.name}</TableCell>
                           <TableCell>{queue.vhost}</TableCell>
-                          <TableCell>{queue.type ?? '–'}</TableCell>
-                          <TableCell>{formatNumber(queue.messagesReady, language)}</TableCell>
-                          <TableCell>{formatNumber(queue.messagesUnacknowledged, language)}</TableCell>
-                          <TableCell>{formatNumber(queue.consumers, language)}</TableCell>
-                          <TableCell>{queue.state ?? '–'}</TableCell>
+                          <TableCell>{queue.type ?? MISSING_VALUE}</TableCell>
+                          <TableCell>{format.number(queue.messagesReady)}</TableCell>
+                          <TableCell>{format.number(queue.messagesUnacknowledged)}</TableCell>
+                          <TableCell>{format.number(queue.consumers)}</TableCell>
+                          <TableCell>{queue.state ?? MISSING_VALUE}</TableCell>
                         </TableRow>
                       )}
                     </TableBody>

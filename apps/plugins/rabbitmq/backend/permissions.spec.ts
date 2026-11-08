@@ -6,15 +6,26 @@ import { RabbitmqConnectionsController } from './connections/service';
 import { RabbitmqDetectionController } from './detection/service';
 import { RabbitmqMessagesController } from './messages/service';
 import { RABBITMQ_MANAGE_PERMISSION, RABBITMQ_VIEW_PERMISSION } from './permissions';
+import plugin from './plugin';
 import { RabbitmqStatsController } from './stats/service';
 import { RabbitmqUsersController } from './users/service';
 
 const VIEW = RABBITMQ_VIEW_PERMISSION;
 const MANAGE = RABBITMQ_MANAGE_PERMISSION;
 
+// The controllers the plugin actually mounts, so an unlisted controller cannot
+// slip past the coverage test below.
+const REGISTERED = (plugin.register({} as never).controllers ?? []) as Type[];
+const registered = (name: string): Type => {
+  const controller = REGISTERED.find((candidate) => candidate.name === name);
+  if (!controller) throw new Error(`${name} is not registered`);
+  return controller;
+};
+
 // Every HTTP route of the plugin and the permission it must demand. The
 // coverage test below fails when a route is added without an entry here.
 const ROUTES: [Type, string, string][] = [
+  [registered('RabbitmqController'), 'status', VIEW],
   [RabbitmqCapabilitiesController, 'capabilities', VIEW],
   [RabbitmqDetectionController, 'detect', VIEW],
   [RabbitmqUsersController, 'list', VIEW],
@@ -58,10 +69,12 @@ describe('RabbitMQ plugin permission tiers', () => {
     expect(check(controller, method, [other])).toBe(false);
   });
 
-  it('declares a permission for every route handler', () => {
+  it('declares a permission for every registered controller and route handler', () => {
     const covered = new Set(ROUTES.map(([controller, method]) => `${controller.name}.${method}`));
-    const controllers = new Set(ROUTES.map(([controller]) => controller));
-    for (const controller of controllers) {
+    const listed = new Set(ROUTES.map(([controller]) => controller));
+    expect(REGISTERED.length).toBeGreaterThan(0);
+    for (const controller of REGISTERED) {
+      expect(listed).toContain(controller);
       const handlers = Object.getOwnPropertyNames(controller.prototype).filter(
         (name) => name !== 'constructor' && Reflect.getMetadata('path', controller.prototype[name]) !== undefined,
       );
