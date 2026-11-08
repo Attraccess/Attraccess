@@ -1,0 +1,86 @@
+{
+  "title": "Reader security",
+  "description": "Keys for securing Attractap readers over the air. Secured readers only accept updates signed by these keys.",
+  "warning": "The signing key is lost if you lose the database or AUTH_SESSION_SECRET and also every signing key backup. If the recovery key is lost as well, secured readers can never be updated again. Keep the recovery file and a signing key backup somewhere safe, apart from each other, together with their passphrases.",
+  "error": "That did not work",
+  "loading": "Loading key status…",
+  "loadFailed": "The key status could not be loaded.",
+  "notLicensed": "Reader security is not included in this instance's license.",
+  "retry": "Try again",
+  "cancel": "Cancel",
+  "status": {
+    "label": "Status",
+    "none": "No keys",
+    "recovery-check-pending": "Keys created, recovery check pending",
+    "restoredPending": "Restored, recovery check pending",
+    "ready": "Ready",
+    "verifiedAt": "Recovery key checked on {{date}}"
+  },
+  "fingerprints": {
+    "signing": "Signing key fingerprint",
+    "recovery": "Recovery key fingerprint"
+  },
+  "actions": {
+    "create": "Create keys",
+    "downloadRecovery": "Download recovery key",
+    "checkRecovery": "Check recovery key",
+    "downloadBackup": "Download signing key backup",
+    "restore": "Restore",
+    "regenerate": "Regenerate keys"
+  },
+  "locked": "{{count}} reader(s) have Secure Boot digests burned in, so the keys cannot be regenerated.",
+  "passphrase": {
+    "label": "Passphrase",
+    "repeat": "Repeat passphrase",
+    "minLength": "At least {{min}} characters.",
+    "mismatch": "The passphrases differ."
+  },
+  "file": {
+    "label": "Key file"
+  },
+  "recovery": {
+    "title": "Download recovery key",
+    "description": "The file is encrypted with a passphrase you choose. Neither the file nor the passphrase is stored here. You can download it again until you have checked it.",
+    "submit": "Download"
+  },
+  "check": {
+    "title": "Check recovery key",
+    "description": "Upload the recovery file you downloaded and enter its passphrase. If it matches, the server deletes its copy of the recovery key and readers can be secured.",
+    "submit": "Check"
+  },
+  "restore": {
+    "title": "Restore keys",
+    "description": "Upload a signing key backup or the recovery file with its passphrase. After restoring from the recovery file, a fresh recovery key is created that you must check again.",
+    "replaces": "This replaces the current signing key, so earlier backups of it no longer match. Restoring the recovery file also replaces the recovery key with a new one.",
+    "submit": "Restore",
+    "sourceLabel": "What are you restoring from?",
+    "source": {
+      "signing-backup": "Signing key backup",
+      "recovery-file": "Recovery file"
+    }
+  },
+  "regenerate": {
+    "title": "Regenerate keys?",
+    "description": "This replaces both keys. Downloaded recovery files and backups of the old keys stop being useful. It is only possible while no reader has this installation's keys burned in.",
+    "confirm": "Regenerate"
+  },
+  "toast": {
+    "created": "Keys created",
+    "recoveryDownloaded": "Recovery key downloaded",
+    "backupDownloaded": "Signing key backup downloaded",
+    "recoveryVerified": "Recovery key checked",
+    "restored": "Keys restored"
+  },
+  "whatToBackup": {
+    "title": "What to back up",
+    "secret": "AUTH_SESSION_SECRET: without it the stored keys cannot be decrypted.",
+    "database": "The database, which holds the encrypted signing key and the reader records.",
+    "recovery": "The recovery key file and its passphrase.",
+    "signingBackup": "A signing key backup and its passphrase."
+  },
+  "backup": {
+    "title": "Download signing key backup",
+    "description": "The backup is encrypted with a passphrase you choose and can be read with openssl. Decrypt a temporary copy before using it with espsecure. Neither the file nor the passphrase is stored here.",
+    "submit": "Download"
+  }
+}

@@ -144,6 +144,11 @@ const REVIEWED_PUBLIC_ROUTES: Record<string, ReviewedPublicRoute> = {
     credential: 'shared-secret',
     rateLimit: true,
   },
+  'IcalPublicController.feed': {
+    reason: 'calendar subscription (reservations plugin); revocable per-feed token',
+    credential: 'random-token',
+    rateLimit: true,
+  },
   'SSOController.oidcUpdatePermissions': {
     reason: 'identity-provider provisioning, verified by the provider client secret',
     credential: 'shared-secret',
@@ -188,14 +193,41 @@ const RATE_LIMIT_INTERCEPTOR = 'AuthRateLimitInterceptor';
 const RATE_LIMIT_DECORATOR = 'AuthRateLimit';
 /** The limiter call that in-handler throttling goes through. */
 const LIMITER_CALL = 'assertIpAllowed';
+/**
+ * Plugins cannot reach the core limiter; they throttle with their own in-process `RateLimiter`. A `this.<field>.hit()`
+ * call counts only when `<field>` is a property of the class created with `new RateLimiter(...)`.
+ */
+const PLUGIN_LIMITER_CLASS = 'RateLimiter';
+const PLUGIN_LIMITER_CALL = 'hit';
+
+/** Names of the class's own properties that hold a plugin `RateLimiter`. */
+function pluginLimiterFields(declaration: ClassDeclaration): Set<string> {
+  return new Set(
+    declaration
+      .getProperties()
+      .filter((property) => {
+        const initializer = property.getInitializer();
+        return (
+          initializer !== undefined &&
+          Node.isNewExpression(initializer) &&
+          initializer.getExpression().getText() === PLUGIN_LIMITER_CLASS
+        );
+      })
+      .map((property) => property.getName()),
+  );
+}
 
 const decoratorArguments = (decorators: ReturnType<ClassDeclaration['getDecorators']>, name: string) =>
   decorators.filter((decorator) => decorator.getName() === name).flatMap((decorator) => decorator.getArguments());
 
-/** True when the body makes a real `x.assertIpAllowed(...)` call, directly or through a `this.helper()` of the class. */
+/**
+ * True when the body makes a real `x.assertIpAllowed(...)` call or a `this.<limiter field>.hit(...)` call,
+ * directly or through a `this.helper()` of the class.
+ */
 function callsLimiter(
   method: MethodDeclaration,
   methods: Map<string, MethodDeclaration>,
+  limiterFields: Set<string>,
   visited = new Set<MethodDeclaration>(),
 ): boolean {
   if (visited.has(method)) return false;
@@ -204,9 +236,17 @@ function callsLimiter(
     const callee = call.getExpression();
     if (!Node.isPropertyAccessExpression(callee)) return false;
     if (callee.getName() === LIMITER_CALL) return true;
-    const helper =
-      callee.getExpression().getKind() === SyntaxKind.ThisKeyword ? methods.get(callee.getName()) : undefined;
-    return helper !== undefined && callsLimiter(helper, methods, visited);
+    const target = callee.getExpression();
+    if (
+      callee.getName() === PLUGIN_LIMITER_CALL &&
+      Node.isPropertyAccessExpression(target) &&
+      target.getExpression().getKind() === SyntaxKind.ThisKeyword &&
+      limiterFields.has(target.getName())
+    ) {
+      return true;
+    }
+    const helper = target.getKind() === SyntaxKind.ThisKeyword ? methods.get(callee.getName()) : undefined;
+    return helper !== undefined && callsLimiter(helper, methods, limiterFields, visited);
   });
 }
 
@@ -234,7 +274,7 @@ function hasDetectableRateLimit(
   ) {
     return true;
   }
-  return callsLimiter(method, methods);
+  return callsLimiter(method, methods, pluginLimiterFields(declaration));
 }
 
 interface ScannedRoute {
@@ -445,6 +485,30 @@ describe('route sign-in inventory (ATT-1149)', () => {
         helper: true,
         deep: true,
         unrelated: false,
+      });
+    });
+
+    it("recognises a plugin's own RateLimiter field, but no other .hit() call", () => {
+      const routes = fake(`
+        @Controller('fake')
+        class FakeController {
+          private readonly perIp = new RateLimiter(240, 60_000);
+          private readonly cache = new LruCache(100);
+          private readonly stub = { hit: () => 0 };
+          @Get('limited') feed() { if (this.perIp.hit(ip, now) > 0) throw new Error(); }
+          @Get('viaHelper') helper() { this.throttle(); }
+          @Get('cache') cached() { this.cache.hit(key); }
+          @Get('stub') stubbed() { this.stub.hit(); }
+          @Get('foreign') foreign() { other.perIp.hit(ip, now); }
+          private throttle() { this.perIp.hit(ip, now); }
+        }
+      `);
+      expect(Object.fromEntries(routes.map((route) => [route.id.split('.')[1], route.rateLimited]))).toEqual({
+        feed: true,
+        helper: true,
+        cached: false,
+        stubbed: false,
+        foreign: false,
       });
     });
 

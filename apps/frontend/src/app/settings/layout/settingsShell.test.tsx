@@ -64,6 +64,19 @@ describe('SettingsIndexPage', () => {
     expect(screen.getByText('general page')).toBeInTheDocument();
   });
 
+  it('gives every section row an icon', () => {
+    mockPermissions(['system.settings.manage']);
+    mockViewport(true);
+
+    const { container } = renderIndex();
+
+    const links = Array.from(container.querySelectorAll('a[href^="/settings/"]'));
+    expect(links.length).toBeGreaterThan(0);
+    expect(
+      links.filter((link) => !link.querySelector('span.text-accent > svg')).map((link) => link.getAttribute('href')),
+    ).toEqual([]);
+  });
+
   it('lists and filters the sections on a phone', () => {
     mockPermissions(['system.settings.manage']);
     mockViewport(false);

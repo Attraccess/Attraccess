@@ -1,5 +1,28 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+export class AttractapSecureImage {
+  @ApiProperty({ description: 'Unsigned secure-profile app image (never offered to the web flasher or plain OTA)' })
+  appFilename: string;
+
+  @ApiProperty({ description: 'Unsigned secure-profile bootloader image' })
+  bootloaderFilename: string;
+
+  @ApiProperty({ description: 'Anti-rollback SECURE_VERSION of the secure app', example: 1 })
+  secureVersion: number;
+
+  @ApiProperty({ description: 'Profile marker the secure app carries', example: 'attractap-secure-profile-v1' })
+  profileMarker: string;
+
+  @ApiProperty({ description: 'SHA-256 (hex) of the unsigned secure app' })
+  appSha256: string;
+
+  @ApiProperty({ description: 'SHA-256 (hex) of the unsigned secure bootloader' })
+  bootloaderSha256: string;
+
+  @ApiProperty({ description: 'SHA-256 (hex) of the partition table the secure build expects' })
+  partitionTableSha256: string;
+}
+
 export class AttractapFirmware {
   @ApiProperty({
     description: 'The name of the firmware',
@@ -72,11 +95,20 @@ export class AttractapFirmware {
   chip: string;
 
   @ApiProperty({
-    description: 'Whether the secure firmware profile has been verified on real hardware for this variant. Missing means false; always false for demo variants.',
+    description:
+      'Whether the secure firmware profile has been verified on real hardware for this variant. Missing means false; always false for demo variants.',
     example: false,
     required: false,
   })
   secureProfileHardwareTested?: boolean;
+
+  @ApiProperty({
+    description:
+      'Unsigned secure-profile images for the "Secure this reader" conversion. Only present for variants built with the secure profile; the server signs them per installation.',
+    type: () => AttractapSecureImage,
+    required: false,
+  })
+  secureImage?: AttractapSecureImage;
 
   @ApiProperty({
     description: 'The flash mode for programming (qio, qout, dio, dout)',

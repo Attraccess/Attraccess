@@ -16,6 +16,8 @@ import {
   DropdownPopover,
   DropdownTrigger,
   Spinner,
+  Skeleton,
+  Chip,
 } from '@heroui/react';
 import { ArrowLeft, Braces, Languages, RotateCcw } from 'lucide-react';
 import { buttonVariants } from '@heroui/styles';
@@ -122,6 +124,13 @@ export function useEditEmailTemplatePageState() {
   }, [resetTemplate, templateType, seedEditor, toast, t]);
 
   const variables = template.data?.variables ?? [];
+  // Core templates are named by the app's translations, a plugin's template by the label the plugin declared.
+  // Plugin keys (`plugin.<plugin>.<id>`) have no app translation, so their title waits for the loaded label.
+  const pluginInfo = template.data?.plugin;
+  const isPluginTemplate = templateType?.startsWith('plugin.') ?? false;
+  let templateTitle: string | null = null;
+  if (pluginInfo) templateTitle = pluginInfo.label[language === 'de' ? 'de' : 'en'];
+  else if (!isPluginTemplate) templateTitle = t('templateType.' + templateType);
   const copyVariable = useCallback(
     (name: string) => {
       const token = `{{${name}}}`;
@@ -160,6 +169,8 @@ export function useEditEmailTemplatePageState() {
     resetTemplate,
     onResetConfirm,
     variables,
+    templateTitle,
+    pluginInfo,
     copyVariable,
     translationsOpen,
     setTranslationsOpen,
@@ -187,6 +198,8 @@ export function EditEmailTemplatePage() {
     resetTemplate,
     onResetConfirm,
     variables,
+    templateTitle,
+    pluginInfo,
     copyVariable,
     translationsOpen,
     setTranslationsOpen,
@@ -207,7 +220,17 @@ export function EditEmailTemplatePage() {
         >
           <ArrowLeft size={18} />
         </Button>
-        <h1 className="text-base font-semibold whitespace-nowrap">{t('templateType.' + templateType)}</h1>
+        {/* Plugin labels can be long; let the title wrap instead of pushing the page wider than a phone screen. */}
+        {templateTitle === null ? (
+          <Skeleton className="h-5 w-48 rounded-md" data-cy="edit-email-template-title-skeleton" />
+        ) : (
+          <h1 className="text-base font-semibold min-w-0 break-words">{templateTitle}</h1>
+        )}
+        {pluginInfo && (
+          <Chip size="sm" variant="soft" data-cy="edit-email-template-plugin-chip">
+            {t('pluginChip', { plugin: pluginInfo.name })}
+          </Chip>
+        )}
 
         {/* Subject is edited (and translated) in the translations drawer; it still round-trips through save via `subject` state. */}
         <div className="flex items-center gap-2 ml-auto">

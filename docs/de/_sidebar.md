@@ -36,6 +36,7 @@
   - [Dokumentation](resources/documentation.md)
   - [Einweisungen](resources/introductions.md)
   - [Wartung](resources/maintenance.md)
+  - [Reservierungen](resources/reservations.md)
   - [Nutzungsverfolgung](resources/usage-tracking.md)
   - [CSV-Export](resources/csv-export.md)
 
@@ -64,6 +65,7 @@
   - [Reader koppeln](attractap/pairing.md)
   - [RFID-Karten](attractap/rfid-cards.md)
   - [Firmware-Updates](attractap/firmware-updates.md)
+  - [Reader-Sicherheit](attractap/reader-security.md)
   - [Reader-Anzeige](attractap/reader-ui.md)
 
 - **MQTT & IoT**

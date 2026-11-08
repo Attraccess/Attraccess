@@ -78,6 +78,10 @@ vi.mock('@attraccess/react-query-client', async () => ({
     isLoading: loading.canControl,
   }),
   useResourcesServiceResourceUsageCanControlKey: 'canControl',
+  UseResourcesServiceResourceUsageStartBlockedKeyFn: ({ resourceId }: { resourceId: number }) => [
+    'startBlocked',
+    { resourceId },
+  ],
   useAccessControlServiceResourceIntroducersGetNames: () => ({ data: [], isLoading: loading.introducers }),
   useResourcesServiceResourceUsageGetActiveSession: () => ({
     data: parallel.value ?? { usage: activeSession.value },
@@ -132,6 +136,15 @@ describe('ResourceUsageSession routing', () => {
 
     expect(screen.getByTestId('start-controls')).toBeInTheDocument();
     expect(screen.getByTestId('introduction-required')).toBeInTheDocument();
+  });
+
+  it('asks only the start-blocked query of this resource again when a plugin reports that its answer changed', () => {
+    renderSession(SupervisionMode.SUPERVISION_ALLOWED);
+
+    liveUpdate.onUpdate?.({ eventType: 'resource.start_blocked_changed', inUse: false });
+
+    expect(invalidateQueries).toHaveBeenCalledOnce();
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['startBlocked', { resourceId: 7 }] });
   });
 
   it('still shows the introduction gate on introduction_required', () => {
@@ -220,7 +233,8 @@ describe('ResourceUsageSession routing', () => {
       renderSession(SupervisionMode.INTRODUCTION_REQUIRED);
 
       liveUpdate.onUpdate?.({ eventType: 'resource.usage.session_ended', inUse: true, activeSessionCount: 1 });
-      expect(invalidateQueries).toHaveBeenCalledTimes(2);
+      expect(invalidateQueries).toHaveBeenCalledTimes(3);
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['startBlocked', { resourceId: 7 }] });
 
       invalidateQueries.mockClear();
       liveUpdate.onUpdate?.({ eventType: 'resource.health_changed', activeSessionCount: 1 });

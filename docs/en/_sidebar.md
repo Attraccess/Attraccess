@@ -36,6 +36,7 @@
   - [Documentation](resources/documentation.md)
   - [Introductions](resources/introductions.md)
   - [Maintenance](resources/maintenance.md)
+  - [Reservations](resources/reservations.md)
   - [Usage Tracking](resources/usage-tracking.md)
   - [CSV Export](resources/csv-export.md)
 
@@ -64,6 +65,7 @@
   - [Reader Pairing](attractap/pairing.md)
   - [RFID Cards](attractap/rfid-cards.md)
   - [Firmware Updates](attractap/firmware-updates.md)
+  - [Reader Security](attractap/reader-security.md)
   - [Reader Display](attractap/reader-ui.md)
   - [LED Guide (Lite)](attractap/led-guide.md)
 

@@ -54,6 +54,42 @@ export function validateAttractap(directory) {
     artifact(directory, entry.filename);
     artifact(directory, entry.filenameOTA);
     if (entry.elfFilename) artifact(directory, entry.elfFilename);
+    if (entry.secureImage) validateSecureImage(directory, entry);
+  }
+}
+
+const sha256Hex = /^[0-9a-f]{64}$/;
+
+function validateSecureImage(directory, entry) {
+  const image = entry.secureImage;
+  const app = artifact(directory, image.appFilename);
+  const bootloader = artifact(directory, image.bootloaderFilename);
+  const plain = [entry.filename, entry.filenameOTA, entry.elfFilename];
+  for (const name of [image.appFilename, image.bootloaderFilename]) {
+    if (plain.includes(name)) throw new Error(`Secure image must not reuse a plain firmware file: ${name}`);
+  }
+  if (image.appFilename === image.bootloaderFilename) {
+    throw new Error(`Secure app and bootloader must be separate files: ${image.appFilename}`);
+  }
+  if (!Number.isInteger(image.secureVersion) || image.secureVersion < 1) {
+    throw new Error(`Invalid secureVersion for ${image.appFilename}`);
+  }
+  if (typeof image.profileMarker !== 'string' || !image.profileMarker) {
+    throw new Error(`Missing profile marker for ${image.appFilename}`);
+  }
+  if (!fs.readFileSync(app).includes(image.profileMarker)) {
+    throw new Error(`Secure app does not carry its profile marker: ${image.appFilename}`);
+  }
+  for (const [file, hash] of [
+    [app, image.appSha256],
+    [bootloader, image.bootloaderSha256],
+  ]) {
+    if (createHash('sha256').update(fs.readFileSync(file)).digest('hex') !== hash) {
+      throw new Error(`Secure image checksum mismatch: ${path.basename(file)}`);
+    }
+  }
+  if (!sha256Hex.test(image.partitionTableSha256 ?? '')) {
+    throw new Error(`Invalid partition table hash for ${image.appFilename}`);
   }
 }
 

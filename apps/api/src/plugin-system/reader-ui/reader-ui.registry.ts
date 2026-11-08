@@ -1,12 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import type { PreStartHook, ReaderUiProvider, SessionEndHook } from '@attraccess/plugins-backend-sdk';
+import type {
+  PreStartHook,
+  ReaderUiProvider,
+  SessionEndHook,
+  StartBlockedQuery,
+} from '@attraccess/plugins-backend-sdk';
 import { ReaderUiAlertsService } from './reader-ui-alerts.service';
 
 export interface ReaderUiPluginEntry {
   readerUi?: ReaderUiProvider;
   preStartHook?: PreStartHook;
   sessionEndHook?: SessionEndHook;
+  startBlockedQuery?: StartBlockedQuery;
 }
 
 export interface ReaderUiInvalidation {
@@ -74,6 +80,13 @@ export class ReaderUiRegistry {
     return [...this.entries]
       .filter(([, entry]) => entry.sessionEndHook)
       .map(([plugin, entry]) => ({ plugin, hook: entry.sessionEndHook as SessionEndHook }))
+      .sort((a, b) => a.plugin.localeCompare(b.plugin));
+  }
+
+  startBlockedQueries(): { plugin: string; query: StartBlockedQuery }[] {
+    return [...this.entries]
+      .filter(([, entry]) => entry.startBlockedQuery)
+      .map(([plugin, entry]) => ({ plugin, query: entry.startBlockedQuery as StartBlockedQuery }))
       .sort((a, b) => a.plugin.localeCompare(b.plugin));
   }
 }

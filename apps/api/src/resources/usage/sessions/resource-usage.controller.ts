@@ -2,22 +2,13 @@ import { ResourceUsage } from '@attraccess/database-entities';
 
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
-import {
-  Controller,
-  ForbiddenException,
-  Get,
-  Param,
-  ParseIntPipe,
-  Post,
-  Query,
-  Req,
-  Body,
-  Put,
-} from '@nestjs/common';
+import { Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, Body, Put } from '@nestjs/common';
 
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { CanControlResponseDto } from '../dtos/canControl.response.dto';
+
+import { StartBlockedResponseDto } from '../dtos/startBlocked.response.dto';
 
 import { GetResourceHistoryQueryDto } from '../dtos/getResourceHistoryQuery.dto';
 
@@ -196,6 +187,26 @@ export class ResourceUsageController {
     return {
       canControl: await this.resourceUsageService.canControllResource(resourceId, req.user),
     } as CanControlResponseDto;
+  }
+
+  @Get('start-blocked')
+  @Auth()
+  @ApiOperation({
+    summary: 'Ask whether a plugin currently blocks the start for the current user',
+    description:
+      'Informational counterpart of the pre-start gate, for showing the reason in place of the start button. ' +
+      'A start is still checked when it is requested.',
+    operationId: 'resourceUsageStartBlocked',
+  })
+  @ApiResponse({ status: 200, description: 'The start-blocked state', type: StartBlockedResponseDto })
+  async startBlocked(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<StartBlockedResponseDto> {
+    const view = await this.preStart.queryStartBlocked(resourceId, req.user);
+    return view
+      ? { blocked: true, reason: view.reason, ...(view.until ? { until: view.until } : {}), plugin: view.plugin }
+      : { blocked: false };
   }
 
   @Post('start')

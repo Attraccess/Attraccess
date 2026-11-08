@@ -13,6 +13,7 @@ sys.path.insert(0, FIRMWARE_DIR)
 sys.path.insert(0, os.path.join(FIRMWARE_DIR, "tools"))
 import secure_lab_reader  # noqa: E402,F401  (patched below)
 import build_firmwares as b  # noqa: E402
+import secure_packaging  # noqa: E402
 
 FLAG = 'set(ATTRACTAP_SECURE_PROFILE_HARDWARE_TESTED "%s")\n'
 DEMO = 'set(ATTRACTAP_FIRMWARE_VARIANT "demo")\n'
@@ -111,6 +112,18 @@ class ReleaseBuildRunsTheSecureGate(unittest.TestCase):
             build_dir = os.path.join(build_root, variant + ("-secure" if secure else ""))
             os.makedirs(build_dir, exist_ok=True)
             open(os.path.join(build_dir, "app.bin"), "wb").close()
+            if secure:
+                with open(os.path.join(build_dir, "app.bin"), "wb") as f:
+                    f.write(secure_packaging.SECURE_PROFILE_MARKER.encode())
+                for name in ("bootloader.bin", "partition-table.bin"):
+                    with open(os.path.join(build_dir, name), "wb") as f:
+                        f.write(name.encode())
+                os.makedirs(os.path.join(build_dir, "config"), exist_ok=True)
+                with open(os.path.join(build_dir, "config", "sdkconfig.json"), "w") as f:
+                    json.dump({"BOOTLOADER_APP_SECURE_VERSION": 1}, f)
+                with open(os.path.join(build_dir, "flasher_args.json"), "w") as f:
+                    json.dump({"app": {"file": "app.bin"}, "bootloader": {"file": "bootloader.bin"},
+                               "partition-table": {"file": "partition-table.bin"}}, f)
             return build_dir, [], {"app": {"file": "app.bin"}}
 
         gate_runs = []
@@ -140,7 +153,16 @@ class ReleaseBuildRunsTheSecureGate(unittest.TestCase):
             manifest = json.load(f)["firmwares"]
         self.assertEqual(len(manifest), len(b.RELEASE_VARIANTS))
         self.assertTrue(all(fw["secureProfileHardwareTested"] is False for fw in manifest))
-        self.assertFalse(any("secure" in name for name in os.listdir(out)))
+        # The unsigned secure images ship next to the plain ones, only described by `secureImage`.
+        secure_entries = [fw for fw in manifest if "secureImage" in fw]
+        self.assertEqual(len(secure_entries), 1)
+        image = secure_entries[0]["secureImage"]
+        self.assertEqual(image["secureVersion"], 1)
+        for name in (image["appFilename"], image["bootloaderFilename"]):
+            self.assertTrue(os.path.exists(os.path.join(out, name)))
+        for fw in manifest:
+            self.assertNotIn("secure", fw["filename"])
+            self.assertNotIn("secure", fw["filenameOTA"])
 
     def test_failing_gate_fails_the_build(self):
         with self.assertRaises(SystemExit) as exit_:

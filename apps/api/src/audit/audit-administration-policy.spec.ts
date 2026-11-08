@@ -139,4 +139,24 @@ describe('administration audit policy', () => {
       expect(safeRequestedSpec(spec)).toBe('custom-source');
     for (const spec of ['latest', '^1.2.3', '1.2.3-beta.1', '>=1 <2']) expect(safeRequestedSpec(spec)).toBe(spec);
   });
+
+  it('accepts core and plugin email template keys, and nothing else', () => {
+    const templateEvent = (templateType: string) =>
+      projectAdministrationAuditEvent({
+        ...event,
+        action: 'email_template.updated',
+        subjectType: 'email-template',
+        details: { templateType },
+      });
+    for (const accepted of ['verify-email', 'plugin.reservations.confirmed', 'plugin.@acme/booking.reminder_24h'])
+      expect(templateEvent(accepted)?.details).toEqual({ templateType: accepted });
+    for (const rejected of [
+      'unknown',
+      'plugin.reservations',
+      'plugin.reservations.Bad',
+      'plugin.a b.c',
+      'x'.repeat(300),
+    ])
+      expect(templateEvent(rejected)).toBeNull();
+  });
 });

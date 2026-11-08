@@ -14,6 +14,11 @@ export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet
   'reader.replaced': new Set(['mode']),
   'reader.token_rejected': new Set(['reason']),
   'reader.handshake_rejected': new Set(['reason', 'count']),
+  'reader.secure_keys_created': new Set(['signingFingerprint', 'recoveryFingerprint']),
+  'reader.recovery_key_downloaded': new Set(['recoveryFingerprint']),
+  'reader.recovery_key_verified': new Set(['recoveryFingerprint']),
+  'reader.signing_key_backup_downloaded': new Set(['signingFingerprint']),
+  'reader.secure_keys_restored': new Set(['signingFingerprint', 'recoveryFingerprint', 'source']),
   'ui.hook_decision': new Set([
     'plugin',
     'readerId',
@@ -115,8 +120,21 @@ export const attractapResetReasons = new Set([
 ]);
 type DetailValue = string | number | boolean;
 
+function isSha256Hex(value: DetailValue): boolean {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+}
+
 const detailValidators: Record<string, (value: DetailValue) => boolean> = {
-  source: oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'reader-reset'),
+  source: oneOf(
+    'reader-websocket',
+    'admin-api',
+    'reader-enrollment',
+    'reader-reset',
+    'signing-backup',
+    'recovery-file',
+  ),
+  signingFingerprint: isSha256Hex,
+  recoveryFingerprint: isSha256Hex,
   resetReason: (value) => attractapResetReasons.has(value as string),
   hasCoredump: (value) => typeof value === 'boolean',
   readerId: positive,
@@ -170,7 +188,7 @@ export function projectAttractapAuditEvent(input: AttractapAuditEvent): Attracta
   if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
   if (
     input.subjectType !== undefined &&
-    !oneOf('attractap.reader', 'resource', 'attractap.ui-alert')(input.subjectType)
+    !oneOf('attractap.reader', 'attractap.installation', 'resource', 'attractap.ui-alert')(input.subjectType)
   )
     return null;
   return { ...input, details: details as Record<string, string | number | boolean> };
@@ -190,6 +208,11 @@ export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.reader.replaced',
   'attractap.reader.token_rejected',
   'attractap.reader.handshake_rejected',
+  'attractap.reader.secure_keys_created',
+  'attractap.reader.recovery_key_downloaded',
+  'attractap.reader.recovery_key_verified',
+  'attractap.reader.signing_key_backup_downloaded',
+  'attractap.reader.secure_keys_restored',
   'attractap.ui.hook_decision',
   'attractap.ui.step_issued',
   'attractap.ui.step_answered',

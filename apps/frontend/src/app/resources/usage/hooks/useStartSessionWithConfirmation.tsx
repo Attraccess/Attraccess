@@ -1,7 +1,9 @@
 import { useCallback, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ApiError,
   StartUsageSessionDto,
+  useResourcesServiceResourceUsageStartBlockedKey,
   useResourcesServiceResourceUsageStartSession,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../../components/toastProvider';
@@ -32,6 +34,7 @@ const isPluginStartError = (error: unknown) =>
  */
 export function useStartSessionWithConfirmation(resourceId: number, options: Options) {
   const toast = useToastMessage();
+  const queryClient = useQueryClient();
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const { mutate, isPending } = useResourcesServiceResourceUsageStartSession({
@@ -64,6 +67,8 @@ export function useStartSessionWithConfirmation(resourceId: number, options: Opt
             const blocked = getStartBlockedReason(error);
             if (blocked) {
               toast.error({ title: blocked.title, description: blocked.body });
+              // The page did not know about the block yet: show the notice now instead of with the next poll.
+              void queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageStartBlockedKey] });
               optionsRef.current.onPluginNotice?.();
               return;
             }
@@ -72,7 +77,7 @@ export function useStartSessionWithConfirmation(resourceId: number, options: Opt
         },
       );
     },
-    [handleStartError, mutate, resourceId, toast],
+    [handleStartError, mutate, queryClient, resourceId, toast],
   );
   startRef.current = start;
 

@@ -77,6 +77,7 @@ import {
   ResourceUsageNoteAddedEvent,
   ResourceUsageSessionEndedEvent,
 } from '../events/resource-usage.events';
+import { emitPluginSessionEnded } from '../events/plugin-usage-events';
 
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
@@ -437,6 +438,7 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
       .catch(() => undefined);
 
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
+    if (updatedUsage) emitPluginSessionEnded(this.pluginEvents, this.logger, updatedUsage, updatedUsage.endTime, 'ended');
 
     // Emitted after the transaction committed so listeners observe DB state. Every end fires it exactly once
     // (live feed, reader resource lists, maintenance evaluation); the notification listener skips self-ends.

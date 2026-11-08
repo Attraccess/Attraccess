@@ -63,6 +63,7 @@ it('still reports success when the start control unmounts before the reply', asy
 
 it('still reports a generic error after unmount, but never a plugin confirmation or block', async () => {
   const { result, unmount, options } = setup();
+  const invalidate = vi.spyOn(client, 'invalidateQueries');
   act(() => result.current.start({}));
   await waitFor(() => expect(client.isMutating()).toBe(1));
   await act(async () =>
@@ -78,6 +79,7 @@ it('still reports a generic error after unmount, but never a plugin confirmation
   );
   await waitFor(() => expect(state.toastError).toHaveBeenCalledWith({ title: 'T', description: 'B' }));
   expect(options.onError).not.toHaveBeenCalled();
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['ResourcesServiceResourceUsageStartBlocked'] });
 
   act(() => result.current.start({}));
   await waitFor(() => expect(client.isMutating()).toBe(1));

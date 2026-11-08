@@ -33,6 +33,11 @@ import subprocess
 
 import sys
 
+# The packager lives next to this script; put its directory on the path so the script also loads
+# when it is imported from elsewhere (CI tests, tooling) and not only when run from this directory.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from secure_packaging import package_secure_images  # noqa: E402
+
 CHIP = "esp32s3"
 
 BOARD_FAMILY = "ESP32-S3"
@@ -101,15 +106,16 @@ def secure_profile_hardware_tested(variant, content):
 
 def build_secure_profile(variant, variant_path, python_cmd):
     """Build the secure profile of a non-demo variant and run its build gates
-    (tools/check_secure_profile.py). The images are not packaged yet: they are
-    unsigned and must never be offered to the web flasher; the API will sign
-    them per installation (ATT-1166)."""
+    (tools/check_secure_profile.py). Returns the build directory; the caller
+    packages the unsigned images (secure_packaging.py). They must never be
+    offered to the web flasher: the API signs them per installation (ATT-1205)."""
     build_dir, _, _ = build_variant(variant, variant_path, "ERROR", secure=True)
     gate = os.path.join(FIRMWARE_DIR, "tools", "check_secure_profile.py")
     if subprocess.run([python_cmd, "-I", gate, build_dir]).returncode != 0:
         print(f"Error: Secure profile gate failed for variant '{variant}'", file=sys.stderr)
         sys.exit(1)
     print(f"Secure profile gate passed for {variant}")
+    return build_dir
 
 
 def extract_build_id(firmware_bin_path, esptool_cmd):
@@ -510,7 +516,10 @@ def main(argv=None):
 
         if secure_build_by_variant[variant]:
             print(f"\n=== Building secure profile: {variant} ===")
-            build_secure_profile(variant, variant_path, python_cmd)
+            secure_dir = build_secure_profile(variant, variant_path, python_cmd)
+            secure_image = package_secure_images(secure_dir, output_dir, firmware_name, firmware_variant)
+            if secure_image:
+                firmware_info[-1]["secureImage"] = secure_image
 
     with open(os.path.join(output_dir, "firmwares.json"), "w") as f:
         json.dump({"firmwares": firmware_info}, f, indent=2)

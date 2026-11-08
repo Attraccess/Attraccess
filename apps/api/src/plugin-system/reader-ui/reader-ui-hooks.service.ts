@@ -3,12 +3,14 @@ import { ConfigService } from '@nestjs/config';
 import {
   READER_UI_LIMITS,
   READER_UI_TIMING,
+  type PluginAccessPrincipal,
   type PluginBlockReason,
   type PluginChoice,
   type PluginConfirmation,
   type PreStartOrigin,
   type PreStartResult,
   type SessionEndResult,
+  type StartBlockedState,
 } from '@attraccess/plugins-backend-sdk';
 import { AuditService } from '../../audit/audit.service';
 import type { AppConfigType } from '../../config/app.config';
@@ -26,6 +28,8 @@ import { ReaderUiRegistry } from './reader-ui.registry';
 export interface PreStartRun {
   resourceId: number;
   userId: number;
+  /** Handed to the hooks: carries the request's permissions (API-token scope) for web and API starts. */
+  principal: PluginAccessPrincipal;
   action: 'start' | 'takeover';
   projectId?: number;
   origin: PreStartOrigin;
@@ -57,6 +61,23 @@ export interface SessionEndQuestion {
 
 /** `auditCode` overrides the audited reason code; it never leaves this service. */
 type NormalizedOutcome = PreStartOutcome & { auditCode?: string };
+
+export interface StartBlockedRun {
+  resourceId: number;
+  userId: number;
+  principal: PluginAccessPrincipal;
+  language: ReaderUiLanguage;
+}
+
+/** A start refused right now, as shown in place of the start button. `until` is an ISO time. */
+export interface StartBlockedView {
+  plugin: string;
+  reason: PluginBlockReason;
+  until?: string;
+}
+
+/** The start-blocked query is informational, so its failures must never open the pre-start breaker. */
+const startBlockedKey = (plugin: string) => `${plugin}#start-blocked`;
 
 /** Session-end hooks are advisory, so their failures must never open the pre-start breaker. */
 const sessionEndKey = (plugin: string) => `${plugin}#session-end`;
@@ -106,6 +127,7 @@ export class ReaderUiHooksService {
           hook({
             resourceId: run.resourceId,
             userId: run.userId,
+            principal: run.principal,
             action: run.action,
             projectId: run.projectId,
             origin: run.origin,
@@ -131,6 +153,28 @@ export class ReaderUiHooksService {
       if (outcome.decision === 'confirm') firstConfirm ??= outcome;
     }
     return firstConfirm ?? { decision: 'allow' };
+  }
+
+  /**
+   * The query-side counterpart of {@link runPreStart}: the first plugin that reports a block. Informational only,
+   * so a failing, slow or invalid query counts as "not blocked" (the pre-start gate still decides at start).
+   */
+  async queryStartBlocked(run: StartBlockedRun): Promise<StartBlockedView | null> {
+    for (const { plugin, query } of this.registry.startBlockedQueries()) {
+      const { result, error } = await this.runner.run(
+        startBlockedKey(plugin),
+        () => query({ ...run, now: new Date() }),
+        (raw) => normalizeStartBlocked(raw),
+      );
+      if (result.kind === 'failure') {
+        this.logger.debug(
+          `Start-blocked query of plugin ${plugin} failed (${result.code}): ${(error as Error)?.message}`,
+        );
+        continue;
+      }
+      if (result.value.state) return { plugin, ...result.value.state };
+    }
+    return null;
   }
 
   /**
@@ -165,6 +209,7 @@ export class ReaderUiHooksService {
   private resetBreakers(plugin: string): void {
     this.runner.reset(plugin);
     this.runner.reset(sessionEndKey(plugin));
+    this.runner.reset(startBlockedKey(plugin));
   }
 
   /** The plugin's answer callback, at most once, with the hook timeout, never rejecting. */
@@ -278,6 +323,22 @@ function validBlockReason(reason: PluginBlockReason | undefined): PluginBlockRea
   const body = cleanPluginText(reason?.body, READER_UI_LIMITS.maxTextChars * 2);
   if (!code || !title.ok || !body.ok) return null;
   return { code: reason.code, title: title.value, body: body.value };
+}
+
+/**
+ * null = invalid. Every valid answer, including "not blocked" (`state: null`), counts as a breaker success, so
+ * an opened start-blocked breaker closes again once the plugin answers.
+ */
+function normalizeStartBlocked(
+  raw: StartBlockedState | null | undefined,
+): { state: { reason: PluginBlockReason; until?: string } | null } | null {
+  if (raw === null || raw === undefined) return { state: null };
+  if (typeof raw !== 'object') return null;
+  const reason = validBlockReason(raw.reason);
+  if (!reason) return null;
+  const untilMs = raw.until === undefined ? undefined : new Date(raw.until).getTime();
+  if (untilMs !== undefined && !Number.isFinite(untilMs)) return null;
+  return { state: { reason, ...(untilMs === undefined ? {} : { until: new Date(untilMs).toISOString() }) } };
 }
 
 function normalizeSessionEnd(raw: SessionEndResult): PluginChoice | 'none' | null {

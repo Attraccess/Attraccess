@@ -80,6 +80,7 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
     state.callbacks.contact = options;
     return { mutate: state.contact, isPending: false };
   },
+  useResourcesServiceResourceUsageStartBlockedKey: 'start-blocked',
   UseResourcesServiceResourceUsageGetActiveSessionKeyFn: (params: unknown) => ['active', params],
   UseResourcesServiceResourceUsageGetHistoryKeyFn: (params: unknown) => ['history', params],
 }));

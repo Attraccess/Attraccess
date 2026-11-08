@@ -14,21 +14,40 @@ describe('collectReaderUiContributions', () => {
     expect(() => collectReaderUiContributions('p', [], { readerUi: provider }, ctx)).toThrow(PluginPermissionError);
   });
 
-  it.each(['preStartHook', 'sessionEndHook'] as const)('rejects %s without ACCESS_HOOKS', (field) => {
-    expect(() =>
-      collectReaderUiContributions('p', [PluginPermission.READER_UI], { [field]: hook }, ctx),
-    ).toThrow(PluginPermissionError);
-  });
+  it.each(['preStartHook', 'sessionEndHook', 'startBlockedQuery'] as const)(
+    'rejects %s without ACCESS_HOOKS',
+    (field) => {
+      expect(() => collectReaderUiContributions('p', [PluginPermission.READER_UI], { [field]: hook }, ctx)).toThrow(
+        PluginPermissionError,
+      );
+    },
+  );
 
   it('collects provider factories and hooks when permitted', () => {
     const out = collectReaderUiContributions(
       'p',
       [PluginPermission.READER_UI, PluginPermission.ACCESS_HOOKS],
-      { readerUi: () => provider, preStartHook: hook, sessionEndHook: () => ({ decision: 'none' }) },
+      {
+        readerUi: () => provider,
+        preStartHook: hook,
+        sessionEndHook: () => ({ decision: 'none' }),
+        startBlockedQuery: () => null,
+      },
       ctx,
     );
     expect(out?.readerUi).toBe(provider);
     expect(out?.preStartHook).toBe(hook);
     expect(out?.sessionEndHook).toBeDefined();
+    expect(out?.startBlockedQuery).toBeDefined();
+  });
+
+  it('counts a start-blocked query alone as a contribution', () => {
+    const out = collectReaderUiContributions(
+      'p',
+      [PluginPermission.ACCESS_HOOKS],
+      { startBlockedQuery: () => null },
+      ctx,
+    );
+    expect(out?.startBlockedQuery).toBeDefined();
   });
 });

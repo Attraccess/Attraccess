@@ -13,7 +13,11 @@ const confirmOutcome = {
 };
 
 function setup(outcome: any = { decision: 'allow' }, precheck: jest.Mock = jest.fn().mockResolvedValue(undefined)) {
-  const hooks = { hasPreStartHooks: () => true, runPreStart: jest.fn().mockResolvedValue(outcome) };
+  const hooks = {
+    hasPreStartHooks: () => true,
+    runPreStart: jest.fn().mockResolvedValue(outcome),
+    queryStartBlocked: jest.fn().mockResolvedValue(null),
+  };
   const usage = { precheckStart: precheck };
   const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
   const store = new WebStartStepStore(audit as never);
@@ -54,6 +58,45 @@ describe('PreStartService', () => {
     expect(hooks.runPreStart.mock.calls.at(-1)?.[0].language).toBe('de');
     await service.gateHttp(3, { id: 7, locale: 'fr' } as any, {}, web);
     expect(hooks.runPreStart.mock.calls.at(-1)?.[0].language).toBe('en');
+  });
+
+  it('asks the hooks whether the start is blocked, for this user in their resolved language, and returns the answer', async () => {
+    const { service, hooks, settings } = setup();
+    const view = {
+      plugin: 'reservations',
+      reason: { code: 'RESERVED', title: 'Reserved', body: 'Anna booked until 14:00' },
+      until: '2026-06-02T12:00:00.000Z',
+    };
+    hooks.queryStartBlocked.mockResolvedValue(view);
+    settings.resolveLanguage.mockResolvedValueOnce('de');
+
+    await expect(service.queryStartBlocked(3, { id: 7, locale: 'de-AT' } as any)).resolves.toBe(view);
+    expect(settings.resolveLanguage).toHaveBeenCalledWith('de-AT');
+    expect(hooks.queryStartBlocked).toHaveBeenCalledWith({ resourceId: 3, userId: 7, principal: 7, language: 'de' });
+  });
+
+  it('answers null when no plugin blocks the start', async () => {
+    const { service, hooks } = setup();
+    await expect(service.queryStartBlocked(3, { id: 7, locale: null } as any)).resolves.toBeNull();
+    expect(hooks.queryStartBlocked).toHaveBeenCalledWith({ resourceId: 3, userId: 7, principal: 7, language: 'en' });
+  });
+
+  it('hands the hooks a request user with its permissions (an API token scope), a loaded user as the plain id', async () => {
+    const { service, hooks } = setup({ decision: 'allow' });
+    const scoped = new Set(['resources.read']);
+    const tokenUser = { id: 7, locale: 'en', effectivePermissions: scoped } as any;
+    await service.gateHttp(3, tokenUser, {}, { origin: 'api', apiTokenId: 4 });
+    const principal = hooks.runPreStart.mock.calls.at(-1)?.[0].principal;
+    expect(principal).toEqual({ id: 7, effectivePermissions: ['resources.read'] });
+    // A copy: the plugin cannot change the request's permissions.
+    expect(principal.effectivePermissions).not.toBe(scoped);
+    await service.queryStartBlocked(3, tokenUser);
+    expect(hooks.queryStartBlocked.mock.calls.at(-1)?.[0].principal).toEqual({
+      id: 7,
+      effectivePermissions: ['resources.read'],
+    });
+    await service.evaluate({ resourceId: 3, user: { id: 8 } as any, origin: 'reader', language: 'en' });
+    expect(hooks.runPreStart.mock.calls.at(-1)?.[0].principal).toBe(8);
   });
 
   it('allows', async () => {

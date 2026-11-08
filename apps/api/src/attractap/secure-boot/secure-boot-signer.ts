@@ -128,7 +128,8 @@ const LAB_SECURE_BOOT_MODULUS_DIGESTS: ReadonlySet<string> = new Set([
   '520d9e203032ac50a7d2cf422af834348cc8221cbf83ec1f1e647cf196971843', // lab recovery key
 ]);
 
-function isLabKey(key: KeyObject): boolean {
+/** True for the public device-lab keys and any key sharing their modulus; they must never sign or be restored. */
+export function isLabSecureBootKey(key: KeyObject): boolean {
   const modulus = Buffer.from(toPublicKey(key).export({ format: 'jwk' }).n as string, 'base64url');
   return (
     LAB_SECURE_BOOT_KEY_DIGESTS.has(secureBootKeyDigest(key)) ||
@@ -144,7 +145,7 @@ function isLabKey(key: KeyObject): boolean {
 export function signSecureBootImage(image: Buffer, privateKeyPem: string | KeyObject): Buffer {
   const privateKey = typeof privateKeyPem === 'string' ? createPrivateKey(privateKeyPem) : privateKeyPem;
   const publicKey = extractPublicKey(privateKey);
-  if (isLabKey(privateKey)) {
+  if (isLabSecureBootKey(privateKey)) {
     throw new Error('Refusing to sign with a public device-lab Secure Boot key');
   }
   if (hasSignatureSector(image)) {

@@ -26,6 +26,11 @@ import { LiveTopicsModule } from './../live-updates/live-topics.module';
 import { MqttModule } from './../mqtt/mqtt.module';
 import { MqttCredentialProvisioningService } from './../mqtt/mqtt-credential-provisioning.service';
 import * as readerUiWiring from './runtime/reader-ui-wiring';
+import { PluginSystemEventsBridge } from './plugin-system-events.bridge';
+import {
+  listPluginNotificationCategories,
+  unregisterPluginNotificationCategories,
+} from '../notifications/plugin-notification-categories';
 
 describe('PluginModule', () => {
   const fixture = registerPluginModuleFixture();
@@ -69,6 +74,7 @@ describe('PluginModule', () => {
         NpmPluginService,
         PluginClassificationService,
         PluginLiveUpdatesService,
+        PluginSystemEventsBridge,
       ]);
       expect(module.exports).toEqual([PluginEventsService]);
       expect(module.controllers).toEqual([PluginController]);
@@ -173,7 +179,8 @@ describe('PluginModule', () => {
       const queue = jest.spyOn(readerUiWiring, 'queueReaderUiContributions').mockImplementation(() => undefined);
       jest.spyOn(readerUiWiring, 'queueReaderUiLoadFailure').mockImplementation(() => undefined);
       PluginModule.forRoot();
-      if (queued) expect(queue).toHaveBeenCalledWith('hooked', expect.objectContaining({ preStartHook: expect.any(Function) }));
+      if (queued)
+        expect(queue).toHaveBeenCalledWith('hooked', expect.objectContaining({ preStartHook: expect.any(Function) }));
       else expect(queue).not.toHaveBeenCalled();
     });
 
@@ -378,6 +385,120 @@ describe('PluginModule', () => {
       expect(triggerPluginFlows).toHaveBeenCalledWith('ctx-plugin', 'plugin.test.trigger', expect.any(Function), {
         event: 'x',
       });
+    });
+  });
+
+  describe('runSerialized', () => {
+    it('runs the callback in a transaction of the host connection', async () => {
+      const transaction = jest.fn(async (work: (manager: unknown) => Promise<unknown>) => work('tx-manager'));
+      const host = {
+        manager: { connection: { options: { type: 'postgres' } }, transaction },
+      } as unknown as DataSource;
+      new PluginModule(host, new EventEmitter2(), { get: jest.fn() } as unknown as ModuleRef);
+      const context = (
+        PluginModule as unknown as {
+          createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+        }
+      ).createPluginContext(fixture.manifest({ permissions: [PluginPermission.DATABASE_ACCESS] }));
+
+      await expect(context.runSerialized(async (manager) => `ran:${String(manager)}`)).resolves.toBe('ran:tx-manager');
+      expect(transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('is denied without DATABASE_ACCESS', () => {
+      const context = (
+        PluginModule as unknown as {
+          createPluginContext(m: LoadedPluginManifest): import('@attraccess/plugins-backend-sdk').PluginContext;
+        }
+      ).createPluginContext(fixture.manifest({ permissions: [] }));
+      expect(() => context.runSerialized(async () => 1)).toThrow(PluginPermissionError);
+    });
+  });
+
+  describe('notification categories', () => {
+    function writePlugin(name: string, permissions: PluginPermission[], body: string): void {
+      mkdirSync(join(fixture.root, name, 'dist'), { recursive: true });
+      writeFileSync(
+        join(fixture.root, name, 'plugin.json'),
+        JSON.stringify({
+          name,
+          version: '1.0.0',
+          main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
+          permissions,
+          attraccessVersion: { min: '1.0.0' },
+        }),
+      );
+      writeFileSync(join(fixture.root, name, 'dist', 'index.js'), `module.exports = { default: { ${body} } };`);
+    }
+    const categories = "notificationCategories: [{ id: 'reminder', label: { en: 'Reminder', de: 'Erinnerung' } }]";
+
+    it('registers declared categories namespaced under the plugin name', () => {
+      writePlugin(
+        'booking',
+        [PluginPermission.SEND_NOTIFICATIONS],
+        `${categories}, register: () => ({ module: class M {} })`,
+      );
+      PluginModule.forRoot();
+      expect(listPluginNotificationCategories()).toEqual([
+        expect.objectContaining({ key: 'plugin.booking.reminder', pluginName: 'booking', id: 'reminder' }),
+      ]);
+    });
+
+    it('registers the categories again when the application that closed before the real one started', () => {
+      writePlugin(
+        'rebooted',
+        [PluginPermission.SEND_NOTIFICATIONS],
+        `${categories}, register: () => ({ module: class M {} })`,
+      );
+      const [pluginImport] = PluginModule.forRoot().imports.slice(3) as Array<{
+        providers: Array<{ provide: string; useFactory: () => { onModuleInit: () => void } }>;
+      }>;
+      const cleanup = pluginImport.providers.find((provider) =>
+        String(provider.provide).startsWith('plugin-mqtt-cleanup:'),
+      );
+      // What closing the throwaway configuration app does to the process-wide registry.
+      unregisterPluginNotificationCategories('rebooted');
+      expect(listPluginNotificationCategories().some((category) => category.pluginName === 'rebooted')).toBe(false);
+
+      cleanup.useFactory().onModuleInit();
+
+      expect(listPluginNotificationCategories().filter((category) => category.pluginName === 'rebooted')).toEqual([
+        expect.objectContaining({ key: 'plugin.rebooted.reminder', id: 'reminder' }),
+      ]);
+    });
+
+    it('quarantines a plugin declaring categories without SEND_NOTIFICATIONS', () => {
+      writePlugin('sneaky', [], `${categories}, register: () => ({ module: class M {} })`);
+      const module = PluginModule.forRoot();
+      expect(module.imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(listPluginNotificationCategories().some((category) => category.pluginName === 'sneaky')).toBe(false);
+    });
+
+    it('leaves no category behind when register() throws', () => {
+      writePlugin(
+        'broken-cats',
+        [PluginPermission.SEND_NOTIFICATIONS],
+        `${categories}, register: () => { throw new Error('boom'); }`,
+      );
+      PluginModule.forRoot();
+      expect(listPluginNotificationCategories().some((category) => category.pluginName === 'broken-cats')).toBe(false);
+    });
+
+    it('quarantines a plugin with a malformed email template before queueing hooks or registering categories', () => {
+      const brokenTemplate =
+        "emailTemplates: [{ id: 'confirmed', label: { en: 'C', de: 'B' }, variables: [], subject: '{{t \"s\" \"Hi\"}}'," +
+        " body: '<mj-text>x</mj-text>', translations: { de: {} } }]";
+      writePlugin(
+        'broken-mail',
+        [PluginPermission.SEND_NOTIFICATIONS, PluginPermission.ACCESS_HOOKS],
+        `${categories}, ${brokenTemplate}, preStartHook: () => ({ decision: 'allow' }), register: () => ({ module: class M {} })`,
+      );
+      const queue = jest.spyOn(readerUiWiring, 'queueReaderUiContributions').mockImplementation(() => undefined);
+      jest.spyOn(readerUiWiring, 'queueReaderUiLoadFailure').mockImplementation(() => undefined);
+
+      expect(PluginModule.forRoot().imports).toEqual([SettingsModule, MqttModule, LiveTopicsModule]);
+      expect(queue).not.toHaveBeenCalled();
+      expect(listPluginNotificationCategories().some((category) => category.pluginName === 'broken-mail')).toBe(false);
     });
   });
 

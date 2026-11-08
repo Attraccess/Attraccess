@@ -91,6 +91,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     canMaintain: jest.fn().mockResolvedValue(false),
     isIntroducer: jest.fn().mockResolvedValue(false),
   };
+  scope.pluginEvents = { emit: jest.fn() };
   scope.usage = new ResourceUsageService(
     scope.source.getRepository(Resource),
     scope.source.getRepository(ResourceUsage),
@@ -130,7 +131,7 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
       resourceUsageDurationSeconds: { observe: jest.fn() },
     } as never,
     scope.health as never,
-    { emit: jest.fn() } as never,
+    scope.pluginEvents as never,
     { getEffectivePermissions: jest.fn(async () => new Set<string>()) } as never,
     { recordResource: jest.fn().mockResolvedValue(undefined) } as never,
     null,
