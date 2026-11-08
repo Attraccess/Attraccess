@@ -23,6 +23,7 @@
   "filterInvalid": "Gib einen gültigen MQTT-Topic-Filter ein: + und # müssen eine ganze Ebene ausfüllen, # nur am Ende, kein Präfix $share/ oder $queue/ (max. 256 Bytes).",
   "topicInvalid": "Gib ein Topic ohne die Platzhalter + oder # ein.",
   "payload": "Payload",
+  "payloadTooLarge": "Die Payload ist zu groß (max. 256 KiB).",
   "qos": "QoS",
   "qosOption": "QoS {{qos}}",
   "retain": "Retain",

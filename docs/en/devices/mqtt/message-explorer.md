@@ -39,7 +39,8 @@ Payloads are shown as formatted JSON, as text, or as a hex preview if they are b
 | Limit | Value |
 |-------|-------|
 | Topic filter | `+` and `#` wildcards, each filling a whole level (`#` only at the end), up to 256 bytes. Shared subscriptions (`$share/...`, `$queue/...`) are not allowed |
-| Payload | Payloads over 64 KiB are shortened (marked **truncated**) |
+| Payload (watching) | Payloads over 64 KiB are shortened (marked **truncated**) |
+| Payload (publishing) | Up to 256 KiB |
 | Busy topics | At most 50 messages (and about 512 KiB) are delivered every quarter second. Further messages are dropped and the explorer shows how many |
 
 Prefer a narrow filter such as `devices/+/status` on busy brokers.

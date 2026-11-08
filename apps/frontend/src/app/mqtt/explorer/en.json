@@ -23,6 +23,7 @@
   "filterInvalid": "Use a valid MQTT topic filter: + and # must fill a whole level, # only at the end, no $share/ or $queue/ prefix (max. 256 bytes).",
   "topicInvalid": "Enter a topic without the wildcards + or #.",
   "payload": "Payload",
+  "payloadTooLarge": "The payload is too large (max. 256 KiB).",
   "qos": "QoS",
   "qosOption": "QoS {{qos}}",
   "retain": "Retain",

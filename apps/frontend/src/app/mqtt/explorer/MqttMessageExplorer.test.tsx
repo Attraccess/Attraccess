@@ -303,9 +303,26 @@ describe('publish form', () => {
     fireEvent.change(screen.getByLabelText('Payload'), { target: { value: 'hi again' } });
     expect(screen.queryByText('Message published.')).toBeNull();
 
-    publish.mockRejectedValueOnce(new Error('Broker refused the message'));
+    // The API's error text is English and generic, so the translated message is shown instead.
+    publish.mockRejectedValueOnce(new Error('The broker did not accept the message'));
     fireEvent.click(publishButton());
-    await waitFor(() => expect(screen.getByText('Broker refused the message')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('Publishing the message failed.')).toBeTruthy());
+    expect(screen.queryByText('The broker did not accept the message')).toBeNull();
+  });
+
+  it('refuses a payload over 256 KiB before it is sent', () => {
+    render(<MqttMessageExplorer mqttServerId={11} />);
+    const publishButton = () => screen.getByRole('button', { name: 'Publish' });
+    fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'a/b' } });
+
+    // 128k two-byte characters are 256 KiB exactly; one more byte is too many.
+    fireEvent.change(screen.getByLabelText('Payload'), { target: { value: 'ä'.repeat(128 * 1024) } });
+    expect(isDisabled(publishButton())).toBe(false);
+    fireEvent.change(screen.getByLabelText('Payload'), { target: { value: 'ä'.repeat(128 * 1024) + 'x' } });
+    expect(isDisabled(publishButton())).toBe(true);
+    expect(screen.getByText('The payload is too large (max. 256 KiB).')).toBeTruthy();
+    fireEvent.click(publishButton());
+    expect(publish).not.toHaveBeenCalled();
   });
 });
 

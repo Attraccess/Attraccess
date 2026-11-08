@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickDefaultServerId, readMqttNodes, suggestTopics } from './mqttNodes';
+import { editorHoldsFlowNodes, pickDefaultServerId, readMqttNodes, suggestTopics } from './mqttNodes';
 
 const mqtt = (type: string, serverId: unknown, topic?: unknown) => ({ type, data: { serverId, topic } });
 const servers = [
@@ -71,5 +71,18 @@ describe('suggestTopics', () => {
     });
     expect(suggestTopics(nodes, 2)).toEqual({ filters: ['other/server'], topics: ['other/server'] });
     expect(suggestTopics(nodes, 3)).toEqual({ filters: [], topics: [] });
+  });
+});
+
+describe('editorHoldsFlowNodes', () => {
+  it('is not ready while the flow loads or before the editor has copied its nodes', () => {
+    expect(editorHoldsFlowNodes({ isError: false, loaded: undefined, editorNodeCount: 0 })).toBe(false);
+    expect(editorHoldsFlowNodes({ isError: false, loaded: { nodes: [{}, {}] }, editorNodeCount: 0 })).toBe(false);
+  });
+
+  it('is ready once the editor holds the nodes, for an empty flow, and after a failed load', () => {
+    expect(editorHoldsFlowNodes({ isError: false, loaded: { nodes: [{}, {}] }, editorNodeCount: 2 })).toBe(true);
+    expect(editorHoldsFlowNodes({ isError: false, loaded: { nodes: [] }, editorNodeCount: 0 })).toBe(true);
+    expect(editorHoldsFlowNodes({ isError: true, loaded: undefined, editorNodeCount: 0 })).toBe(true);
   });
 });

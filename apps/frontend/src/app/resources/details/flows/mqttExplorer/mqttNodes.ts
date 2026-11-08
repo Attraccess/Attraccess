@@ -31,6 +31,19 @@ export function readMqttNodes(nodes: readonly EditorNode[]): MqttNodeUse[] {
   return uses;
 }
 
+/**
+ * Whether the editor holds the flow's nodes. The editor copies them out of the loaded flow in an effect, so
+ * the first render after the load still has none; a failed load never gets any, so it counts as settled.
+ */
+export function editorHoldsFlowNodes(flow: {
+  isError: boolean;
+  loaded: { nodes: readonly unknown[] } | undefined;
+  editorNodeCount: number;
+}): boolean {
+  if (flow.loaded) return flow.editorNodeCount > 0 || flow.loaded.nodes.length === 0;
+  return flow.isError;
+}
+
 /** The server most used by the flow's MQTT nodes among the existing servers, else the first by name. */
 export function pickDefaultServerId(
   nodes: readonly EditorNode[],

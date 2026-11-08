@@ -18,7 +18,7 @@ import { memo, useCallback, useRef, useState, useSyncExternalStore } from 'react
 import { useLiveUpdates } from '../../../utils/live-updates';
 import type { MqttExplorerLiveEvent, MqttExplorerLiveMessage } from '../../../utils/live-updates/types';
 import { decodePayload, type DecodedPayload } from './payload';
-import { isPublishableTopic, isValidTopicFilter, type TopicSuggestions } from './topics';
+import { isPublishablePayload, isPublishableTopic, isValidTopicFilter, type TopicSuggestions } from './topics';
 import de from './de.json';
 import en from './en.json';
 
@@ -132,19 +132,18 @@ function PublishForm({ mqttServerId, suggestions }: { mqttServerId: number; sugg
   const [publishResult, setPublishResult] = useState<{ ok: boolean; message: string } | null>(null);
   const publishMessage = useMqttServiceMqttExplorerPublish();
 
-  const publishable = isPublishableTopic(topic);
-  const topicInvalid = topic.length > 0 && !publishable;
+  const payloadTooLarge = !isPublishablePayload(payload);
+  const publishable = isPublishableTopic(topic) && !payloadTooLarge;
+  const topicInvalid = topic.length > 0 && !isPublishableTopic(topic);
 
   const publish = async () => {
     setPublishResult(null);
     try {
       await publishMessage.mutateAsync({ id: mqttServerId, requestBody: { topic, payload, qos, retain } });
       setPublishResult({ ok: true, message: t('published') });
-    } catch (err) {
-      setPublishResult({
-        ok: false,
-        message: err instanceof Error && err.message ? err.message : t('publishError'),
-      });
+    } catch {
+      // The API's own error text is English and generic; show the translated one.
+      setPublishResult({ ok: false, message: t('publishError') });
     }
   };
 
@@ -178,10 +177,12 @@ function PublishForm({ mqttServerId, suggestions }: { mqttServerId: number; sugg
           setPayload(value);
           setPublishResult(null);
         }}
+        isInvalid={payloadTooLarge}
         className="w-full"
       >
         <Label>{t('payload')}</Label>
         <TextArea rows={3} data-cy="mqtt-explorer-publish-payload-input" />
+        <FieldError>{t('payloadTooLarge')}</FieldError>
       </TextField>
       <div className="flex flex-row flex-wrap items-end gap-3">
         <Select

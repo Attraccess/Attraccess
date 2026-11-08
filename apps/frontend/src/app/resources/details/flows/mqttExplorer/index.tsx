@@ -19,15 +19,20 @@ interface Props {
   onClose: () => void;
   /** The editor's current nodes, unsaved changes included. */
   nodes: readonly { type?: string; data?: unknown }[];
+  /** False while the flow is still loading: its nodes are not there yet to pick the server from. */
+  nodesReady: boolean;
 }
 
-function ExplorerContent({ nodes }: Pick<Props, 'nodes'>) {
+function ExplorerContent({ nodes, nodesReady }: Pick<Props, 'nodes' | 'nodesReady'>) {
   const { t } = useTranslations({ en, de });
   const { data: servers = [], isLoading } = useMqttServiceMqttServersGetAll();
   const [pickedServerId, setPickedServerId] = useState<number | null>(null);
-  // Fixed when the panel opens, so editing nodes does not swap the server under a running subscription.
+  // Fixed when the panel opens (once the flow is loaded, as a reload can reopen the panel before its nodes
+  // arrive), so editing nodes does not swap the server under a running subscription.
   const [initialServerId, setInitialServerId] = useState<number | null>(null);
-  if (initialServerId === null && servers.length > 0) setInitialServerId(pickDefaultServerId(nodes, servers));
+  if (initialServerId === null && nodesReady && servers.length > 0) {
+    setInitialServerId(pickDefaultServerId(nodes, servers));
+  }
 
   const serverId = pickedServerId ?? initialServerId;
   if (isLoading || serverId === null) {
@@ -52,7 +57,7 @@ function ExplorerContent({ nodes }: Pick<Props, 'nodes'>) {
   );
 }
 
-export function FlowMqttExplorer({ isOpen, onClose, nodes }: Props) {
+export function FlowMqttExplorer({ isOpen, onClose, nodes, nodesReady }: Props) {
   const { t } = useTranslations({ en, de });
   const desktop = useMdUp();
   if (!isOpen) return null;
@@ -73,7 +78,7 @@ export function FlowMqttExplorer({ isOpen, onClose, nodes }: Props) {
           </Button>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto p-3">
-          <ExplorerContent nodes={nodes} />
+          <ExplorerContent nodes={nodes} nodesReady={nodesReady} />
         </div>
       </aside>
     );
@@ -91,7 +96,7 @@ export function FlowMqttExplorer({ isOpen, onClose, nodes }: Props) {
         <DrawerHeading className="text-lg font-semibold">{t('title')}</DrawerHeading>
       </DrawerHeader>
       <DrawerBody>
-        <ExplorerContent nodes={nodes} />
+        <ExplorerContent nodes={nodes} nodesReady={nodesReady} />
       </DrawerBody>
     </StandardDrawer>
   );

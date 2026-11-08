@@ -39,7 +39,8 @@ Payloads werden als formatiertes JSON, als Text oder – bei Binärdaten – als
 | Grenze | Wert |
 |--------|------|
 | Topic-Filter | Platzhalter `+` und `#`, jeweils für eine ganze Ebene (`#` nur am Ende), bis 256 Byte. Shared Subscriptions (`$share/...`, `$queue/...`) sind nicht erlaubt |
-| Payload | Payloads über 64 KiB werden gekürzt (Hinweis **gekürzt**) |
+| Payload (beim Beobachten) | Payloads über 64 KiB werden gekürzt (Hinweis **gekürzt**) |
+| Payload (beim Veröffentlichen) | Bis zu 256 KiB |
 | Aktive Topics | Pro Viertelsekunde werden höchstens 50 Nachrichten (und etwa 512 KiB) ausgeliefert. Weitere Nachrichten werden verworfen, der Explorer zeigt die Anzahl |
 
 Verwenden Sie auf stark ausgelasteten Brokern einen engen Filter wie `devices/+/status`.

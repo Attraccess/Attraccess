@@ -3,6 +3,8 @@
 // Longest topic filter in UTF-8 bytes.
 export const MAX_FILTER_BYTES = 256;
 const MAX_TOPIC_BYTES = 1024;
+// Longest payload to publish in UTF-8 bytes.
+export const MAX_PUBLISH_PAYLOAD_BYTES = 256 * 1024;
 
 const byteLength = (value: string) => new TextEncoder().encode(value).length;
 
@@ -23,6 +25,12 @@ export function isValidTopicFilter(filter: string): boolean {
 // A topic to publish to is non-empty and wildcard-free.
 export function isPublishableTopic(topic: string): boolean {
   return topic.length > 0 && !/[+#\0]/.test(topic) && byteLength(topic) <= MAX_TOPIC_BYTES;
+}
+
+// A payload the API accepts: at most MAX_PUBLISH_PAYLOAD_BYTES.
+export function isPublishablePayload(payload: string): boolean {
+  // A UTF-16 unit is at most three UTF-8 bytes, so short strings need no encoding.
+  return payload.length <= MAX_PUBLISH_PAYLOAD_BYTES / 3 || byteLength(payload) <= MAX_PUBLISH_PAYLOAD_BYTES;
 }
 
 // Topics a flow's MQTT nodes use, offered as one-press suggestions. Templated

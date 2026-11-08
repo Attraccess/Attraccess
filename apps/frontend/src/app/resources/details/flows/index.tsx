@@ -25,6 +25,7 @@ import { VariablesModal } from './variablesModal';
 import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
 import { useFlowEditor } from './canvas/useFlowEditor';
 import { FlowMqttExplorer } from './mqttExplorer';
+import { editorHoldsFlowNodes } from './mqttExplorer/mqttNodes';
 import { useRememberedOpen } from './mqttExplorer/useRememberedOpen';
 import { useAuth } from '../../../../hooks/useAuth';
 import { useMqttServiceMqttServersGetAll } from '@attraccess/react-query-client';
@@ -201,7 +202,16 @@ function FlowsPageInner() {
           )}
         </div>
         {showMqttExplorer && (
-          <FlowMqttExplorer isOpen={mqttExplorerOpen} onClose={() => setMqttExplorerOpen(false)} nodes={model.nodes} />
+          <FlowMqttExplorer
+            isOpen={mqttExplorerOpen}
+            onClose={() => setMqttExplorerOpen(false)}
+            nodes={model.nodes}
+            nodesReady={editorHoldsFlowNodes({
+              isError: model.isFlowError,
+              loaded: model.originalFlowData,
+              editorNodeCount: model.nodes.length,
+            })}
+          />
         )}
       </div>
     </div>

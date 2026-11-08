@@ -72,12 +72,12 @@ afterEach(cleanup);
 
 describe('FlowMqttExplorer', () => {
   it('renders nothing while closed', () => {
-    const { container } = render(<FlowMqttExplorer isOpen={false} onClose={vi.fn()} nodes={nodes} />);
+    const { container } = render(<FlowMqttExplorer isOpen={false} onClose={vi.fn()} nodes={nodes} nodesReady />);
     expect(container.innerHTML).toBe('');
   });
 
   it('docks beside the canvas on desktop instead of opening a modal', () => {
-    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} />);
+    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} nodesReady />);
     const panel = screen.getByRole('region', { name: 'title' });
     expect(panel.tagName).toBe('ASIDE');
     // Not a dialog: the canvas next to it stays interactive.
@@ -86,7 +86,7 @@ describe('FlowMqttExplorer', () => {
   });
 
   it("defaults to the server the flow uses most and suggests that flow's topics", () => {
-    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} />);
+    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} nodesReady />);
     expect(screen.getByTestId('explorer').textContent).toBe('1');
     expect(state.explorer).toHaveBeenLastCalledWith({
       mqttServerId: 1,
@@ -96,40 +96,47 @@ describe('FlowMqttExplorer', () => {
   });
 
   it('falls back to the first server by name for a flow without MQTT nodes', () => {
-    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={[]} />);
+    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={[]} nodesReady />);
     expect(screen.getByTestId('explorer').textContent).toBe('2');
   });
 
+  it('waits for the flow to load before picking the default server, as a reload reopens the panel first', () => {
+    const { rerender } = render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={[]} nodesReady={false} />);
+    expect(screen.queryByTestId('explorer')).toBeNull();
+    rerender(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} nodesReady />);
+    expect(screen.getByTestId('explorer').textContent).toBe('1');
+  });
+
   it('switches server on request', () => {
-    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} />);
+    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} nodesReady />);
     fireEvent.change(screen.getByLabelText('server'), { target: { value: '2' } });
     expect(screen.getByTestId('explorer').textContent).toBe('2');
   });
 
   it('does not swap the server when the nodes change while the panel is open', () => {
-    const { rerender } = render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={[]} />);
+    const { rerender } = render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={[]} nodesReady />);
     expect(screen.getByTestId('explorer').textContent).toBe('2');
-    rerender(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} />);
+    rerender(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} nodesReady />);
     expect(screen.getByTestId('explorer').textContent).toBe('2');
   });
 
   it('closes through the close button and releases the explorer, so reopening starts fresh', () => {
     const onClose = vi.fn();
-    const { rerender } = render(<FlowMqttExplorer isOpen onClose={onClose} nodes={nodes} />);
+    const { rerender } = render(<FlowMqttExplorer isOpen onClose={onClose} nodes={nodes} nodesReady />);
     fireEvent.click(screen.getByRole('button', { name: 'close' }));
     expect(onClose).toHaveBeenCalledOnce();
 
-    rerender(<FlowMqttExplorer isOpen={false} onClose={onClose} nodes={nodes} />);
+    rerender(<FlowMqttExplorer isOpen={false} onClose={onClose} nodes={nodes} nodesReady />);
     expect(state.unmounted).toBe(1);
     expect(screen.queryByTestId('explorer')).toBeNull();
 
-    rerender(<FlowMqttExplorer isOpen onClose={onClose} nodes={nodes} />);
+    rerender(<FlowMqttExplorer isOpen onClose={onClose} nodes={nodes} nodesReady />);
     expect(state.mounted).toBe(2);
   });
 
   it('uses a drawer on narrow screens', () => {
     state.desktop = false;
-    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} />);
+    render(<FlowMqttExplorer isOpen onClose={vi.fn()} nodes={nodes} nodesReady />);
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(screen.getByTestId('explorer')).toBeTruthy();
   });
