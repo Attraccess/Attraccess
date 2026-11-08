@@ -58,10 +58,31 @@ export const SQLITE_BUSY_TIMEOUT_MS = 5000;
 /** Writes without a caller transaction queue on the audit connection; beyond this they are dropped as `queue_full`. */
 export const MAX_PENDING_AUDIT_WRITES = 1000;
 
+/**
+ * Shutdown waits this long for queued writes; whatever is still queued afterwards is dropped as `shutting_down`.
+ * Plus one write already waiting on the lock (up to SQLITE_BUSY_TIMEOUT_MS), this stays inside Docker's default
+ * 10 s stop grace period, so the process is not killed before it has logged and counted the rest.
+ */
+export const AUDIT_SHUTDOWN_DRAIN_MS = 4000;
+
+/** One name is enough: audit savepoints on one connection never overlap (see insertInTransaction). */
+const AUDIT_SAVEPOINT = 'attraccess_audit_record';
+
 class SettingsUnavailableError extends Error {}
 
+/**
+ * The caller's transaction no longer exists: SQLite rolled all of it back (e.g. SQLITE_FULL or SQLITE_IOERR),
+ * so the savepoint could not be rolled back. Thrown so the caller aborts instead of continuing in autocommit.
+ */
+export class AuditTransactionAbortedError extends Error {
+  constructor(readonly code: string | undefined) {
+    super(`The caller's transaction was rolled back by SQLite while writing an audit record (${code ?? 'unknown'})`);
+    this.name = 'AuditTransactionAbortedError';
+  }
+}
+
 /** Only the SQLite result code is safe to log; the driver message may contain SQL parameters. */
-function sqliteErrorCode(error: unknown): string | undefined {
+export function sqliteErrorCode(error: unknown): string | undefined {
   const candidates = [
     (error as { code?: unknown })?.code,
     (error as { driverError?: { code?: unknown } })?.driverError?.code,
@@ -80,6 +101,9 @@ export interface BillingTransactionAuditEvent {
 }
 
 export abstract class AuditStorage {
+  /** Tail of the in-transaction audit writes per connection; see insertInTransaction. */
+  private readonly savepointQueues = new WeakMap<DataSource, Promise<unknown>>();
+
   /** Current audit filter vocabulary: core values plus contributions from loaded plugins. */
   meta(): AuditMetaDto {
     return {
@@ -189,6 +213,7 @@ export abstract class AuditStorage {
     transaction?: EntityManager,
   ): Promise<PluginAuditReceipt> {
     const snapshot = this.project(() => projectPluginAuditEvent(event));
+    // The domain is unknown here: projection failed before the plugin's declaration was resolved.
     if (!snapshot) return this.drop(undefined, 'invalid_event');
     return this.recordSnapshot(
       {
@@ -224,6 +249,8 @@ export abstract class AuditStorage {
    * savepoint of that transaction: it commits or rolls back with the caller's change, and a failed insert
    * only rolls back the savepoint. Without one it is written on the separate audit connection.
    * Every write that is not stored (other than disabled audit or domain) is logged and counted.
+   * The one exception to "never rejects": AuditTransactionAbortedError, when SQLite already discarded the caller's
+   * whole transaction, so the caller must not continue as if it were still open.
    */
   protected async recordSnapshot(
     event: Omit<AuditLog, 'id' | 'at'>,
@@ -234,7 +261,7 @@ export abstract class AuditStorage {
       const callerTransaction = transaction?.queryRunner?.isTransactionActive ? transaction : undefined;
       if (callerTransaction) {
         // Runs on the caller's connection: no audit queue, no pending cap, no other connection to wait for.
-        if (!(await this.auditEnabled(event, finalSettingsChange))) return { status: 'unavailable' };
+        if (!(await this.auditEnabled(event, finalSettingsChange, callerTransaction))) return { status: 'unavailable' };
         return await this.insertInTransaction(callerTransaction, event);
       }
       if (this.stopping) return this.drop(domain, 'shutting_down', action);
@@ -247,6 +274,7 @@ export abstract class AuditStorage {
         this.pending--;
       }
     } catch (error) {
+      if (error instanceof AuditTransactionAbortedError) throw error;
       return this.drop(
         domain,
         error instanceof SettingsUnavailableError ? 'settings_unavailable' : 'storage_error',
@@ -256,26 +284,68 @@ export abstract class AuditStorage {
     }
   }
 
-  /** False when audit or the event's domain is switched off (not a drop). Throws SettingsUnavailableError if unreadable. */
-  private async auditEnabled(event: Omit<AuditLog, 'id' | 'at'>, finalSettingsChange: boolean): Promise<boolean> {
+  /**
+   * False when audit or the event's domain is switched off (not a drop). Throws SettingsUnavailableError if unreadable.
+   * Inside a caller transaction, uncached settings are read through it, so the transaction never waits on another connection.
+   */
+  private async auditEnabled(
+    event: Omit<AuditLog, 'id' | 'at'>,
+    finalSettingsChange: boolean,
+    transaction?: EntityManager,
+  ): Promise<boolean> {
     let config: AuditSettings;
     try {
-      config = await readAuditSettings(this.settings);
+      config = await readAuditSettings(this.settings, transaction);
     } catch {
       throw new SettingsUnavailableError();
     }
     return finalSettingsChange || (config.enabled && this.domainEnabled(config, event.domain));
   }
 
-  private async insertInTransaction(
+  /**
+   * Audit savepoints on one connection run one at a time. If two overlapped, SQLite's ROLLBACK TO for a failed
+   * insert would also undo the other write's row after that write was reported as recorded.
+   */
+  private insertInTransaction(
     transaction: EntityManager,
     event: Omit<AuditLog, 'id' | 'at'>,
   ): Promise<PluginAuditReceipt> {
+    const connection = transaction.connection;
+    const previous = this.savepointQueues.get(connection) ?? Promise.resolve();
+    const insert = previous.then(() => this.insertInSavepoint(transaction, event));
+    this.savepointQueues.set(
+      connection,
+      insert.catch(() => undefined),
+    );
+    return insert;
+  }
+
+  private async insertInSavepoint(
+    transaction: EntityManager,
+    event: Omit<AuditLog, 'id' | 'at'>,
+  ): Promise<PluginAuditReceipt> {
+    // Explicit SQL savepoint instead of a nested TypeORM transaction: it leaves TypeORM's transaction depth and
+    // transaction events alone, and it lets us tell a failed insert from a transaction SQLite discarded entirely.
     try {
-      // A nested TypeORM transaction is a SAVEPOINT on the caller's query runner.
-      await transaction.transaction((savepoint) => savepoint.insert(AuditLog, { at: new Date(), ...event }));
+      await transaction.query(`SAVEPOINT ${AUDIT_SAVEPOINT}`);
+    } catch (error) {
+      return this.drop(event.domain, 'storage_error', event.action, error);
+    }
+    try {
+      await transaction.insert(AuditLog, { at: new Date(), ...event });
+      await transaction.query(`RELEASE SAVEPOINT ${AUDIT_SAVEPOINT}`);
       return { status: 'recorded' };
     } catch (error) {
+      try {
+        await transaction.query(`ROLLBACK TO SAVEPOINT ${AUDIT_SAVEPOINT}`);
+        await transaction.query(`RELEASE SAVEPOINT ${AUDIT_SAVEPOINT}`);
+      } catch {
+        this.drop(event.domain, 'storage_error', event.action, error);
+        // TypeORM still believes the transaction is open. An empty transaction lets its rollback succeed and
+        // reset that state, so the connection stays usable. Fails harmlessly if a transaction is somehow still open.
+        await transaction.query('BEGIN').catch(() => undefined);
+        throw new AuditTransactionAbortedError(sqliteErrorCode(error));
+      }
       return this.drop(event.domain, 'storage_error', event.action, error);
     }
   }
@@ -283,7 +353,8 @@ export abstract class AuditStorage {
   private async insertOnAuditConnection(event: Omit<AuditLog, 'id' | 'at'>): Promise<PluginAuditReceipt> {
     return this.serializeStorageWrite<PluginAuditReceipt>(async () => {
       const storage = this.storage;
-      if (this.stopping) return this.drop(event.domain, 'shutting_down', event.action);
+      // Writes admitted before shutdown still run; only a drain that ran out of time drops the rest.
+      if (this.drainExpired) return this.drop(event.domain, 'shutting_down', event.action);
       if (!storage?.isInitialized) return this.drop(event.domain, 'storage_unavailable', event.action);
       try {
         await storage.getRepository(AuditLog).insert({ at: new Date(), ...event });
@@ -303,9 +374,11 @@ export abstract class AuditStorage {
   ): PluginAuditReceipt {
     const domainLabel = domain ?? 'unknown';
     const code = sqliteErrorCode(error);
+    // Without a SQLite code, the error class name (never its message) still tells a driver error from a bug.
+    const errorType = !code && error instanceof Error ? error.constructor.name : undefined;
     const message = `Audit record dropped: domain=${domainLabel}${action ? ` action=${action}` : ''} reason=${reason}${
       code ? ` code=${code}` : ''
-    }`;
+    }${errorType ? ` error=${errorType}` : ''}`;
     // Never log the event, SQLite parameters, or exception message (may contain secrets).
     if (reason === 'storage_error') this.logger.error(message);
     else this.logger.warn(message);
@@ -390,7 +463,7 @@ export abstract class AuditStorage {
   async recordResource(event: Omit<ResourceAuditEvent, 'operationId'>, transaction?: EntityManager): Promise<boolean> {
     const snapshot = this.project(() => projectResourceAuditEvent({ ...event, operationId: randomUUID() }));
     if (!snapshot) {
-      this.drop(undefined, 'invalid_event');
+      this.drop('resource', 'invalid_event');
       return false;
     }
     const receipt = await this.recordSnapshot(
@@ -426,7 +499,7 @@ export abstract class AuditStorage {
     transaction?: EntityManager,
   ): Promise<PluginAuditReceipt> {
     const snapshot = this.project(() => projectAdministrationAuditEvent(event));
-    if (!snapshot) return this.drop(undefined, 'invalid_event');
+    if (!snapshot) return this.drop('administration', 'invalid_event');
     // A successful change that turns recording off is its own final event. The exception
     // is restricted to audit settings and the caller's previously enabled administration policy.
     const finalSettingsChange =
@@ -457,7 +530,7 @@ export abstract class AuditStorage {
   async recordProject(event: Omit<ProjectAuditEvent, 'operationId'>, transaction?: EntityManager): Promise<void> {
     const snapshot = this.project(() => projectProjectAuditEvent({ ...event, operationId: randomUUID() }));
     if (!snapshot) {
-      this.drop(undefined, 'invalid_event');
+      this.drop('project', 'invalid_event');
       return;
     }
     await this.recordSnapshot(
@@ -487,6 +560,8 @@ export abstract class AuditStorage {
   protected abstract storage?: DataSource;
 
   protected abstract stopping: boolean;
+
+  protected abstract drainExpired: boolean;
 
   protected abstract pending: number;
 

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Setting } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { EncryptionService } from '../encryption/encryption.service';
 import { APP_PARENT, SETTINGS_CACHE_TTL_MS } from './constants';
 
@@ -26,14 +26,20 @@ export class SettingsStoreService {
     return this.getPlainSetting(APP_PARENT, key);
   }
 
-  async getPlainSetting(
-    parent: string,
-    key: string,
-  ): Promise<string | null> {
+  /**
+   * With a transaction, a cache miss reads through it (no wait on another connection) and is not cached,
+   * because the transaction may still roll back.
+   */
+  async getPlainSetting(parent: string, key: string, transaction?: EntityManager): Promise<string | null> {
     const cacheKey = this.getCacheKey(parent, key);
     const cached = this.getCached(cacheKey);
     if (cached) {
       return cached.value;
+    }
+
+    if (transaction) {
+      const row = await transaction.getRepository(Setting).findOneBy({ parent, key });
+      return row?.value ?? null;
     }
 
     const existing = await this.settingRepository.findOneBy({ parent, key });
@@ -124,13 +130,16 @@ export class SettingsStoreService {
     return trimmed.length > 0 ? trimmed : null;
   }
 
+  /**
+   * Single-statement writes: save() would wrap the change in a deferred read-then-write transaction, which SQLite
+   * fails with SQLITE_BUSY at once (no busy wait) when another connection holds the write lock.
+   */
   private async upsertSetting(parent: string, key: string, value: string): Promise<void> {
     const existing = await this.settingRepository.findOneBy({ parent, key });
     if (existing) {
-      existing.value = value;
-      await this.settingRepository.save(existing);
+      await this.settingRepository.update(existing.id, { value });
     } else {
-      await this.settingRepository.save(this.settingRepository.create({ parent, key, value }));
+      await this.settingRepository.insert({ parent, key, value });
     }
   }
 

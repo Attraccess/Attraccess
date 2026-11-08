@@ -176,9 +176,6 @@ export function setupAuditDatabase() {
     set service(value: typeof service) {
       service = value;
     },
-    set metrics(value: AuditMetrics) {
-      metrics = value;
-    },
     set store(value: typeof store) {
       store = value;
     },

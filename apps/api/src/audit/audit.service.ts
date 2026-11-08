@@ -19,7 +19,11 @@ import {
   SsoAuditEvent,
 } from './audit-policy';
 
-import { SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
+import { AUDIT_SHUTDOWN_DRAIN_MS, SQLITE_BUSY_TIMEOUT_MS, sqliteErrorCode } from './persistence/audit-storage';
+
+import { getRegisteredPluginAuditDomains } from '../plugin-system/audit/audit-registry';
+
+import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
 
 import { AuditMetrics } from '../metrics/definitions/audit.metrics';
 
@@ -47,6 +51,11 @@ export class AuditService extends AuditStorage implements PluginAuditHostProvide
 
   protected stopping = false;
 
+  /** Set when the shutdown drain timed out: queued writes are then dropped as `shutting_down`. */
+  protected drainExpired = false;
+
+  protected shutdownDrainMs = AUDIT_SHUTDOWN_DRAIN_MS;
+
   protected activeReads = 0;
 
   protected storage?: DataSource;
@@ -58,6 +67,9 @@ export class AuditService extends AuditStorage implements PluginAuditHostProvide
   protected writeTail: Promise<void> = Promise.resolve();
 
   async onModuleInit(): Promise<void> {
+    // Plugin domains are registered while modules are built, before this runs. Zero series let the alert see a first drop.
+    for (const { domain } of getRegisteredPluginAuditDomains())
+      for (const reason of AUDIT_DROP_REASONS) this.metrics.recordsDropped.inc({ domain, reason }, 0);
     if (this.storage?.isInitialized || this.stopping) return;
     // A separate connection guarantees that a write without a caller transaction follows autocommit,
     // never a savepoint in another request's shared SQLite transaction. No schema sync.
@@ -81,17 +93,24 @@ export class AuditService extends AuditStorage implements PluginAuditHostProvide
       this.storage = storage;
       await this.cleanup();
     } catch (error) {
-      // Only the error name: the driver message may contain the database path.
+      // Only the SQLite code or error name: the driver message may contain the database path.
       this.logger.error(
-        `Audit storage initialization failed: ${error instanceof Error ? error.name : 'unknown error'}`,
+        `Audit storage initialization failed: ${
+          sqliteErrorCode(error) ?? (error instanceof Error ? error.name : 'unknown error')
+        }`,
       );
       if (storage.isInitialized) await storage.destroy().catch(() => undefined);
     }
   }
 
   async onModuleDestroy(): Promise<void> {
+    // New writes are refused from here on; writes already queued are stored, within a time limit.
     this.stopping = true;
-    while (this.pending || this.cleaning || this.activeReads) await new Promise((resolve) => setTimeout(resolve, 5));
+    const drainDeadline = Date.now() + this.shutdownDrainMs;
+    while (this.pending || this.cleaning || this.activeReads) {
+      if (!this.drainExpired && Date.now() >= drainDeadline) this.drainExpired = true;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
     const storage = this.storage;
     this.storage = undefined;
     if (storage?.isInitialized) await storage.destroy().catch(() => undefined);
@@ -99,7 +118,7 @@ export class AuditService extends AuditStorage implements PluginAuditHostProvide
 
   async recordSso(event: SsoAuditEvent, transaction?: EntityManager): Promise<PluginAuditReceipt> {
     const snapshot = this.project(() => projectSsoAuditEvent(event));
-    if (!snapshot) return this.drop(undefined, 'invalid_event');
+    if (!snapshot) return this.drop('sso', 'invalid_event');
     return this.recordSnapshot(
       {
         domain: 'sso',
@@ -122,7 +141,7 @@ export class AuditService extends AuditStorage implements PluginAuditHostProvide
 
   async recordIdentity(event: IdentityAuditEvent, transaction?: EntityManager): Promise<PluginAuditReceipt> {
     const snapshot = this.project(() => projectIdentityAuditEvent(event));
-    if (!snapshot) return this.drop(undefined, 'invalid_event');
+    if (!snapshot) return this.drop('identity', 'invalid_event');
     return this.recordSnapshot(
       {
         domain: 'identity',
@@ -146,7 +165,7 @@ export class AuditService extends AuditStorage implements PluginAuditHostProvide
   async recordAttractap(event: AttractapAuditEvent, transaction?: EntityManager): Promise<void> {
     const snapshot = this.project(() => projectAttractapAuditEvent(event));
     if (!snapshot) {
-      this.drop(undefined, 'invalid_event');
+      this.drop('attractap', 'invalid_event');
       return;
     }
     await this.recordSnapshot(

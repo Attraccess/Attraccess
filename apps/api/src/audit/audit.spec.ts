@@ -16,7 +16,12 @@ import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
 import { closeResourceTransactionConnection, runSerializedTransaction } from '../database/run-serialized-transaction';
-import { MAX_PENDING_AUDIT_WRITES, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
+import {
+  AuditTransactionAbortedError,
+  MAX_PENDING_AUDIT_WRITES,
+  SQLITE_BUSY_TIMEOUT_MS,
+} from './persistence/audit-storage';
+import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
 import { createTestAuditMetrics, droppedRecords, setupAuditDatabase } from './audit.test-fixture';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
@@ -269,6 +274,82 @@ describe('durable audit SQLite', () => {
           expect(line).not.toContain('secret-detail');
         } finally {
           error.mockRestore();
+        }
+      });
+
+      it('keeps a concurrent audit row when an overlapping audit insert in the same transaction fails', async () => {
+        await fixture.source.query(
+          'CREATE TRIGGER fail_audit_insert BEFORE INSERT ON audit_log WHEN NEW."subjectId" = 8 BEGIN SELECT RAISE(ABORT, \'x\'); END',
+        );
+        const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+        try {
+          const receipts = await run((manager) =>
+            Promise.all([
+              fixture.service.recordBillingTransaction(billing(8), manager),
+              fixture.service.recordBillingTransaction(billing(9), manager),
+            ]),
+          );
+          expect(receipts).toEqual([{ status: 'unavailable' }, { status: 'recorded' }]);
+          expect(await auditedSubjects()).toEqual([9]);
+          expect(await droppedRecords(fixture.metrics)).toEqual({ 'billing:storage_error': 1 });
+        } finally {
+          error.mockRestore();
+        }
+      });
+
+      it('aborts the caller when SQLite discards the whole transaction, and the connection stays usable', async () => {
+        const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+        try {
+          let receipts = 0;
+          await expect(
+            run(async (manager) => {
+              await manager.query('INSERT INTO business_change VALUES (1)');
+              // SQLITE_FULL rolls back the whole transaction, so the savepoint cannot be rolled back.
+              const [{ page_count }] = await manager.query('PRAGMA page_count');
+              await manager.query(`PRAGMA max_page_count = ${page_count}`);
+              while (
+                (await fixture.service.recordBillingTransaction(billing(++receipts), manager)).status === 'recorded'
+              );
+              await manager.query('INSERT INTO business_change VALUES (2)');
+            }),
+          ).rejects.toBeInstanceOf(AuditTransactionAbortedError);
+          await fixture.source.query('PRAGMA max_page_count = 1073741823');
+          expect(await fixture.source.query('SELECT * FROM business_change')).toEqual([]);
+          expect(await auditedSubjects()).toEqual([]);
+          expect(await droppedRecords(fixture.metrics)).toEqual({ 'billing:storage_error': 1 });
+          expect(String(error.mock.calls[0][0])).toContain('code=SQLITE_FULL');
+          // A later transaction on the same connection starts at depth 1 (BEGIN, not a stale savepoint) and commits.
+          await run(async (manager) => {
+            await manager.query('PRAGMA max_page_count = 1073741823');
+            expect((manager.queryRunner as unknown as { transactionDepth: number }).transactionDepth).toBe(1);
+            await manager.query('INSERT INTO business_change VALUES (3)');
+            expect(await fixture.service.recordBillingTransaction(billing(99), manager)).toEqual({
+              status: 'recorded',
+            });
+          });
+          expect(await fixture.source.query('SELECT id FROM business_change')).toEqual([{ id: 3 }]);
+          expect(await auditedSubjects()).toEqual([99]);
+        } finally {
+          error.mockRestore();
+        }
+      });
+
+      it('reads uncached audit settings through the caller transaction, not another connection', async () => {
+        const store = fixture.store as unknown as { cache: Map<string, unknown> };
+        const mainRead = jest.spyOn(fixture.store['settingRepository'], 'findOneBy');
+        try {
+          await run(async (manager) => {
+            store.cache.clear();
+            expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({
+              status: 'recorded',
+            });
+          });
+          expect(mainRead).not.toHaveBeenCalled();
+          // Values read inside a transaction are not cached: that transaction could still roll back.
+          expect(store.cache.size).toBe(0);
+          expect(await auditedSubjects()).toEqual([8]);
+        } finally {
+          mainRead.mockRestore();
         }
       });
     });
@@ -634,15 +715,30 @@ describe('durable audit SQLite', () => {
   it('counts invalid events of every domain as invalid_event without storing them', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
-      expect(await fixture.service.recordResource({ action: 'nope' } as never)).toBe(false);
-      await fixture.service.recordProject({ action: 'nope' } as never);
+      const invalid = { action: 'nope' } as never;
+      expect(await fixture.service.record({ ...fixture.event(), action: 'nope' })).toEqual({ status: 'unavailable' });
+      expect(await fixture.service.recordResource(invalid)).toBe(false);
+      await fixture.service.recordProject(invalid);
+      await fixture.service.recordAttractap(invalid);
+      expect(await fixture.service.recordSso(invalid)).toEqual({ status: 'unavailable' });
+      expect(await fixture.service.recordIdentity(invalid)).toEqual({ status: 'unavailable' });
+      expect(await fixture.service.recordAdministration(invalid)).toEqual({ status: 'unavailable' });
       expect(await fixture.service.recordBillingTransaction({ transactionId: -1 } as never)).toEqual({
         status: 'unavailable',
       });
+      // Core methods know their domain; only an unprojectable plugin event is `unknown`.
       expect(await droppedRecords(fixture.metrics)).toEqual({
-        'unknown:invalid_event': 2,
+        'unknown:invalid_event': 1,
+        'resource:invalid_event': 1,
+        'project:invalid_event': 1,
+        'attractap:invalid_event': 1,
+        'sso:invalid_event': 1,
+        'identity:invalid_event': 1,
+        'administration:invalid_event': 1,
         'billing:invalid_event': 1,
       });
+      expect(warn).toHaveBeenCalledTimes(8);
+      for (const [line] of warn.mock.calls) expect(String(line)).toMatch(/reason=invalid_event$/);
       expect(await fixture.source.getRepository(AuditLog).count()).toBe(0);
     } finally {
       warn.mockRestore();
@@ -672,10 +768,59 @@ describe('durable audit SQLite', () => {
     });
     const writes = Array.from({ length: 8 }, () => fixture.service.record(fixture.event()));
     const shutdown = fixture.service.onModuleDestroy();
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
-    expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:shutting_down': 1 });
-    await Promise.all([...writes, shutdown]);
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+      // Writes queued before shutdown are stored; only the one arriving afterwards is dropped.
+      expect(await Promise.all(writes)).toEqual(Array(8).fill({ status: 'recorded' }));
+      await shutdown;
+      expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:shutting_down': 1 });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('reason=shutting_down'));
+    } finally {
+      warn.mockRestore();
+    }
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(9);
     await expect(fixture.service.list({ limit: 1 })).rejects.toThrow('Audit storage unavailable');
+  });
+
+  it('drops writes still queued when the shutdown drain runs out of time', async () => {
+    const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      await lock.query('BEGIN IMMEDIATE');
+      const writes = Array.from({ length: 3 }, () => fixture.service.record(fixture.event()));
+      (fixture.service as unknown as { shutdownDrainMs: number }).shutdownDrainMs = 50;
+      const shutdown = fixture.service.onModuleDestroy();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await lock.query('ROLLBACK');
+      // The write that was already waiting for the lock finishes; the two behind it are dropped.
+      expect((await Promise.all(writes)).map((receipt) => receipt.status)).toEqual([
+        'recorded',
+        'unavailable',
+        'unavailable',
+      ]);
+      await shutdown;
+      expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:shutting_down': 2 });
+    } finally {
+      warn.mockRestore();
+      await lock.destroy();
+    }
+  }, 15_000);
+
+  it('creates zero series for registered plugin domains at startup', async () => {
+    const metrics = createTestAuditMetrics();
+    const sink = new AuditService(new DataSource({ type: 'sqlite', database: ':memory:' }), fixture.store, metrics);
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      await sink.onModuleInit();
+      const { values } = await metrics.recordsDropped.get();
+      const demo = values.filter((value) => value.labels.domain === 'demo');
+      expect(demo.map((value) => value.labels.reason).sort()).toEqual([...AUDIT_DROP_REASONS].sort());
+      expect(demo.every((value) => value.value === 0)).toBe(true);
+    } finally {
+      warn.mockRestore();
+      await sink.onModuleDestroy();
+    }
   });
 });
 it('upgrades the full registered schema, reverts the audit migration, and reapplies it', async () => {

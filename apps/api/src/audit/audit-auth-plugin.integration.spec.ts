@@ -237,6 +237,7 @@ describe('durable audit SQLite', () => {
         .useMocker((token) => {
           if (token === DataSource) return fixture.source;
           if (token === EventEmitter2) return new EventEmitter2();
+          if (token === AUDIT_METRICS) return fixture.metrics;
           return {};
         })
         .compile();
