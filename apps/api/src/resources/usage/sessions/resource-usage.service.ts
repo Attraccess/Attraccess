@@ -80,7 +80,6 @@ import {
 
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
-
 import { UsageSessions } from './usage-sessions';
 
 export { EndSessionOptions, StartSessionOptions } from '../lifecycle/usage-lifecycle';

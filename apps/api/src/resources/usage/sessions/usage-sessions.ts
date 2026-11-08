@@ -256,7 +256,6 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
     const auditOrigin = options.auditOrigin ?? { actorId: user.id, authenticationMethod: 'session' as const };
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
-    let endedUsageIdToEmit: number | null = null;
     let startedUsageIdToEmit: number | null = null;
     let takeoverEndedUser: User | null = null;
 
@@ -324,7 +323,6 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
           await this.persistAttributedOperatingDuration(endedSession, manager);
           await this.metering?.settleInTransaction(manager, endedSession.id, outgoingFinal);
           chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
-          endedUsageIdToEmit = endedSession.id;
         } else {
           startedUsageIdToEmit = createdSession.id;
         }
@@ -377,7 +375,6 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
       supervisorUserId,
       prepared,
       newSession,
-      endedUsageIdToEmit,
       startedUsageIdToEmit,
       takeoverEndedUser,
     );

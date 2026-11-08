@@ -23,7 +23,6 @@ export abstract class UsageSessionStartNotifications extends UsageSessionChanges
     supervisorUserId: number | null,
     prepared: Awaited<ReturnType<ResourceUsageService['prepareSessionStart']>>,
     newSession: ResourceUsage,
-    endedUsageIdToEmit: number | null,
     startedUsageIdToEmit: number | null,
     takeoverEndedUser: User | null,
   ): Promise<void> {
