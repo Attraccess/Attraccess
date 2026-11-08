@@ -29,7 +29,8 @@ else if (process.argv.includes('ps')) console.log('fixture status');
       // Resolving the compose file must not depend on the caller's cwd.
       cwd: fixture,
       encoding: 'utf8',
-      timeout: 10000,
+      // Each run starts several Node processes; on a loaded machine that alone can take over 10 s.
+      timeout: 60000,
       env: { ...process.env, PATH: fixture + path.delimiter + process.env.PATH, SERVICES_TEST_LOG: log, ...extra },
     });
     assert.ifError(result.error);
