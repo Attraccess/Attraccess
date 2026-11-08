@@ -17,6 +17,26 @@ project-local ESP-IDF v6.0.2 toolchain at `.tools/esp-idf`. The completion
 marker is created only after setup succeeds. If bootstrap fails, rerun that
 script from the new worktree before reporting a missing dependency.
 
+## Committing
+
+The Husky pre-commit hook runs `pnpm precommit` (lint, typecheck, build, test,
+e2e and CRAP score for affected projects). On a busy machine it takes many
+minutes.
+
+- Git runs the hooks only after `pnpm install` has created `.husky/_`. In a
+  checkout without `node_modules`, commits skip every check.
+- Stage every related change first. The CRAP check refuses unstaged or
+  untracked JS/TS files and analysis configuration (see
+  `scripts/crap-score/README.md`). Set unrelated work aside with
+  `git stash push --keep-index --include-untracked` and pop it after the commit.
+- `husky - pre-commit script failed (code 130)` does not mean the run was
+  interrupted: `--nxBail` stops the other tasks after the first failure. The
+  cause is listed under `Failed tasks:`.
+- Run one commit at a time per worktree. Parallel runs share `coverage/` and
+  break each other.
+- `--no-verify` is for emergencies only (see `CONTRIBUTING.md`). Fix the
+  failure instead.
+
 ## Dev servers — always use `pnpm serve`
 
 `pnpm serve` is safe to run in parallel from multiple worktrees. It auto-resolves free ports for API and frontend, printing them in a banner at startup:
