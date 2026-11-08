@@ -151,8 +151,14 @@ personal data, whoever may otherwise see names:
 | -------------------------------------------------------------------------------- | ---------------------- | ------------------------------------------ |
 | Nothing running, nothing starts within 24 hours                                  | nothing                | nothing                                    |
 | The next booking starts within 24 hours, none is running                         | "Free until 14:00"     | "Free until 14:00", "Reserved 14:00-16:00" |
-| A booking is running, check-in is required and not done yet, before the deadline | "Check in by 14:15"    | "Reserved 14:00-16:00 - check in by 14:15" |
+| A booking is running, check-in is required and not done yet, before the deadline | "Res., check-in 14:15" | "Reserved 14:00-16:00 (check in by 14:15)" |
 | A booking is running and checked in (or check-in is turned off)                  | "Reserved until 16:00" | "Reserved 14:00-16:00"                     |
+
+The list row holds 24 characters. For the open check-in it shows the longest text that fits: "Reserved by Alex (check in
+by 14:15)" (only after a card tap, for people who may see names), then "Reserved (check in by 14:15)", then the short
+"Res., check-in 14:15". With the times in use all of them but the short one are longer than 24 characters, so the
+list shows the short form; the details always have the full text ("Reserved (check in by 14:15)" wording with the
+booking's times). A time on another day keeps the short form ("Res., check-in Tue 00:05").
 
 The times are the booking's start and end without buffers. Texts follow the installation's default language.
 
@@ -160,13 +166,14 @@ The times are the booking's start and end without buffers. Texts follow the inst
 returns to the texts above.
 
 - **Your own booking** (running, or starting within the early check-in window): the list shows "Your booking until
-  16:00", the details "Your booking 14:00-16:00", with "check in by 14:15" while the check-in is still open.
+  16:00", the details "Your booking 14:00-16:00", with "(check in by 14:15)" while the check-in is still open.
 - **Who may see the holder's name** (managers of the resource and everybody else who may see who uses the machine,
   see [Who sees the holder's name](#who-sees-the-holders-name)) also sees it on the details ("Reserved by Alex
-  14:00-16:00"). Everybody else sees the texts above.
+  14:00-16:00", "Reserved by Alex 14:00-16:00 (check in by 14:15)"). Everybody else sees the texts above.
 - **While you are using the resource** and somebody else's booking starts within the confirmation window, the
   session area shows "Reserved from 14:00" with a countdown (with the name under the rules above).
-- The **list never shows names**, signed in or not. Long names are shortened.
+- The **list shows a name only if the text fits 24 characters**, which no list text does in practice. Long names are
+  shortened.
 
 **Starting on the reader.**
 

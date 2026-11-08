@@ -95,8 +95,21 @@ export const readerTexts = {
   /** List row, ≤ 24 characters (a long weekday form falls back to the short wording). */
   rowFreeUntil: (start: Date, c: ReaderClock) =>
     fit(pick(c.lang, `Free until ${readerTime(start, c)}`, `Frei bis ${readerTime(start, c)}`), ROW_MAX),
-  rowCheckInBy: (deadline: Date, c: ReaderClock) =>
-    fit(pick(c.lang, `Check in by ${readerTime(deadline, c)}`, `Check-in bis ${readerTime(deadline, c)}`), ROW_MAX),
+  /**
+   * Running booking that still awaits its check-in. The longest variant that fits wins: with the holder
+   * (only when the viewer may see names), "Reserved (check in by …)", then the short "Res., check-in …".
+   */
+  rowCheckInBy: (deadline: Date, c: ReaderClock, holder?: string) => {
+    const at = readerTime(deadline, c);
+    const variants = [
+      ...(holder
+        ? [pick(c.lang, `Reserved by ${holder} (check in by ${at})`, `Reserviert von ${holder} (Check-in bis ${at})`)]
+        : []),
+      pick(c.lang, `Reserved (check in by ${at})`, `Reserviert (Check-in bis ${at})`),
+      pick(c.lang, `Res., check-in ${at}`, `Res., Check-in ${at}`),
+    ];
+    return variants.find((text) => text.length <= ROW_MAX) ?? fit(variants[variants.length - 1], ROW_MAX);
+  },
   rowReservedUntil: (end: Date, c: ReaderClock) =>
     fit(pick(c.lang, `Reserved until ${readerTime(end, c)}`, `Reserviert bis ${readerTime(end, c)}`), ROW_MAX),
   rowOwnUntil: (end: Date, c: ReaderClock) => {
@@ -119,7 +132,7 @@ export const readerTexts = {
   own: (start: Date, end: Date, c: ReaderClock) =>
     pick(c.lang, `Your booking ${range(start, end, c)}`, `Deine Buchung ${range(start, end, c)}`),
   checkInSuffix: (deadline: Date, c: ReaderClock) =>
-    pick(c.lang, ` - check in by ${readerTime(deadline, c)}`, ` - Check-in bis ${readerTime(deadline, c)}`),
+    pick(c.lang, ` (check in by ${readerTime(deadline, c)})`, ` (Check-in bis ${readerTime(deadline, c)})`),
   /** Session area: another user's booking starts soon (a countdown node follows). */
   sessionReservedFrom: (start: Date, c: ReaderClock, holder?: string) =>
     holder

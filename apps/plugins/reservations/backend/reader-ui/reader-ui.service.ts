@@ -212,7 +212,9 @@ export class ReaderUiService {
       };
     }
     return {
-      row: awaitingCheckIn ? readerTexts.rowCheckInBy(deadline, clock) : readerTexts.rowReservedUntil(endTime, clock),
+      row: awaitingCheckIn
+        ? readerTexts.rowCheckInBy(deadline, clock, holder)
+        : readerTexts.rowReservedUntil(endTime, clock),
       body: readerTexts.reserved(startTime, endTime, clock, holder) + checkIn,
       tone: 'warning',
       boundary,
