@@ -90,7 +90,7 @@ Changing the secret makes the stored card keys and reader pairing keys unreadabl
 
 ## Auth Rate Limiting and Account Lockout
 
-Failed authentication attempts on login, registration, password reset, SSO account linking, and SSO provisioning endpoints are throttled per IP. Repeated login failures additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
+Failed authentication attempts on login, registration, password reset, SSO account linking, and SSO provisioning endpoints are throttled per IP. Repeated login failures and wrong SSO account-link passwords additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -103,15 +103,15 @@ Failed authentication attempts on login, registration, password reset, SSO accou
 Rate limit triggers:
 
 - **`429 Too Many Requests`** with a `Retry-After` header is returned when an IP exceeds the threshold.
-- **`423 Locked`** with a `Retry-After` header is returned for a locked account on subsequent login attempts.
+- **`423 Locked`** with a `Retry-After` header is returned for a locked account on subsequent login and SSO account-link attempts.
 
-A successful login or admin unlock clears the lockout. Admin unlock is available via the user management UI.
+A successful login, a successful SSO account link, or an admin unlock clears the lockout. Admin unlock is available via the user management UI.
 
 ### SSO account linking and provisioning
 
 - **SSO account linking** (the password prompt that appears when an SSO sign-in matches an existing local account) is throttled per IP and target account. Wrong passwords count toward the same account lockout as failed logins, so switching between the two cannot gain extra guesses. A successful link clears the counters.
 - **Link tokens are single-use.** A link token stops working after a successful link and after 3 wrong passwords; the user then has to sign in with SSO again.
-- **SSO provisioning endpoints** (IdP-initiated logout, user deletion and permission updates) are throttled per IP and provider. Only a missing or wrong provisioning secret counts as a failure. Errors such as an unknown user do not, so a normal IdP is never locked out by them. An IdP configured with a wrong secret receives `429` with a `Retry-After` header instead of `401` after `maxAttempts` failures.
+- **SSO provisioning endpoints** (IdP-initiated logout, user deletion and permission updates) are throttled per IP and provider. Only a missing or wrong provisioning secret counts as a failure. Errors such as an unknown user do not, so a normal IdP is never locked out by them. An IdP configured with a wrong secret receives `429` with a `Retry-After` header instead of `401` after `maxAttempts` failures. Cloud identity providers often send these requests from shared outbound IPs; the throttle then applies to that shared IP for this provider.
 
 ### Reverse proxies and the real client IP
 
@@ -221,6 +221,9 @@ bantime  = 900
 ```
 
 The shipped Docker Compose stack already wires both files for you behind the `fail2ban` profile — see [Docker Compose installation](installation/docker-compose.md#brute-force-ip-banning-with-fail2ban).
+
+> [!NOTE]
+> Every rejected SSO link-token request and every wrong provisioning secret writes an `auth.failed` line. With `maxretry = 5`, fail2ban can ban an IP before Attraccess itself answers `429`. This includes a misconfigured identity provider, which is then also blocked from back-channel logout. If you don't want that, remove `sso_provisioning` from the `failregex`.
 
 ## fail2ban Administration
 

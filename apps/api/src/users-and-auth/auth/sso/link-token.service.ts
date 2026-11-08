@@ -90,25 +90,43 @@ export class SSOLinkTokenService {
     return payload;
   }
 
-  /** Rejects a token that was already used for linking or that had too many wrong passwords. */
+  /** Rejects a token that expired, was already used for linking or had too many password attempts. */
   async assertUsable(payload: SSOLinkTokenPayload): Promise<void> {
+    this.assertNotExpired(payload);
     if ((await this.sessionStore.getEphemeralState(usedKey(payload.jti))) !== null) {
       throw new UnauthorizedException('LINK_TOKEN_USED');
     }
-    const failures = Number((await this.sessionStore.getEphemeralState(failuresKey(payload.jti))) ?? 0);
-    if (failures >= MAX_LINK_TOKEN_PASSWORD_ATTEMPTS) {
+    const attempts = Number((await this.sessionStore.getEphemeralState(failuresKey(payload.jti))) ?? 0);
+    if (attempts >= MAX_LINK_TOKEN_PASSWORD_ATTEMPTS) {
       throw new UnauthorizedException('LINK_TOKEN_EXHAUSTED');
     }
   }
 
-  async recordFailedPassword(payload: SSOLinkTokenPayload): Promise<void> {
-    await this.sessionStore.incrementEphemeralCounter(failuresKey(payload.jti), payload.exp);
+  /**
+   * Claims one password attempt before the password is checked. The increment is atomic in the shared store, so API
+   * instances racing on the same token cannot check more than MAX_LINK_TOKEN_PASSWORD_ATTEMPTS passwords between them.
+   * A correct password also uses an attempt; it normally spends the token right after.
+   */
+  async reservePasswordAttempt(payload: SSOLinkTokenPayload): Promise<void> {
+    this.assertNotExpired(payload);
+    const attempts = await this.sessionStore.incrementEphemeralCounter(failuresKey(payload.jti), payload.exp);
+    if (attempts > MAX_LINK_TOKEN_PASSWORD_ATTEMPTS) {
+      throw new UnauthorizedException('LINK_TOKEN_EXHAUSTED');
+    }
   }
 
   /** Marks the token used; insert-if-absent, so of concurrent requests only one wins. */
   async consume(payload: SSOLinkTokenPayload): Promise<void> {
+    this.assertNotExpired(payload);
     if (!(await this.sessionStore.putEphemeralState(usedKey(payload.jti), '1', payload.exp))) {
       throw new UnauthorizedException('LINK_TOKEN_USED');
+    }
+  }
+
+  /** A request can outlive the token while it waits in the account queue or on the password hash. */
+  private assertNotExpired(payload: SSOLinkTokenPayload): void {
+    if (payload.exp <= Date.now()) {
+      throw new UnauthorizedException('LINK_TOKEN_EXPIRED');
     }
   }
 

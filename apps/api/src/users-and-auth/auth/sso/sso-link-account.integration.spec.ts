@@ -13,6 +13,7 @@ import { MetricsService } from '../../../metrics/metrics.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
 import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
+import { AccountLockedException } from '../../rate-limiting/exceptions';
 import { RbacService } from '../../rbac/rbac.service';
 import { UsersService } from '../../users/users.service';
 import { AuthService } from '../auth.service';
@@ -61,6 +62,8 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
   let users: Record<string, jest.Mock>;
   let audit: { log: jest.Mock };
   let bruteForce: BruteForceProtectionService;
+  let store: ReturnType<typeof memoryStore>;
+  const instances: NestExpressApplication[] = [];
 
   const userRepository = { update: jest.fn().mockResolvedValue(undefined) };
   const makeUser = (id: number, email: string) => ({
@@ -72,8 +75,8 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
 
   const issue = (email = 'alice@example.com', ssoSubject = 'sub-1') =>
     tokens.issue({ email, providerId: 1, providerType: SSOProviderType.OIDC, ssoSubject });
-  const post = (linkToken: string, password: string) =>
-    request(app.getHttpServer()).post('/auth/sso/link-account').send({ linkToken, password });
+  const post = (linkToken: string, password: string, instance: NestExpressApplication = app) =>
+    request(instance.getHttpServer()).post('/auth/sso/link-account').send({ linkToken, password });
 
   beforeEach(async () => {
     auth = {
@@ -96,13 +99,22 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
     };
     audit = { log: jest.fn() };
 
+    userRepository.update.mockClear();
+    store = memoryStore();
+    app = await startInstance(store);
+    tokens = app.get(SSOLinkTokenService);
+    bruteForce = app.get(BruteForceProtectionService);
+  });
+
+  /** One API instance: its own in-memory limiter and account queue, sharing `sharedStore` with any other instance. */
+  async function startInstance(sharedStore: ReturnType<typeof memoryStore>): Promise<NestExpressApplication> {
     const moduleRef = await Test.createTestingModule({
       controllers: [SSOController],
       providers: [
         SSOLinkTokenService,
         BruteForceProtectionService,
         SSOOIDCGuard,
-        { provide: SESSION_STORE, useValue: memoryStore() },
+        { provide: SESSION_STORE, useValue: sharedStore },
         { provide: AuthAuditLogger, useValue: audit },
         { provide: AuthService, useValue: auth },
         { provide: UsersService, useValue: users },
@@ -136,14 +148,14 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
       ],
     }).compile();
 
-    app = moduleRef.createNestApplication<NestExpressApplication>();
-    await app.listen(0, '127.0.0.1');
-    tokens = app.get(SSOLinkTokenService);
-    bruteForce = app.get(BruteForceProtectionService);
-  });
+    const instance = moduleRef.createNestApplication<NestExpressApplication>();
+    await instance.listen(0, '127.0.0.1');
+    instances.push(instance);
+    return instance;
+  }
 
   afterEach(async () => {
-    await app?.close();
+    await Promise.all(instances.splice(0).map((instance) => instance.close()));
   });
 
   it('links once and rejects a replay of the same token', async () => {
@@ -159,13 +171,37 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
     expect(auth.addAuthenticationDetails).toHaveBeenCalledTimes(1);
   });
 
-  it('links at most once for concurrent requests with the same token', async () => {
+  it('links at most once for simultaneous requests with the same token on one instance', async () => {
     const token = await issue();
 
+    // One instance queues attempts per account, so this proves the queue plus the used-marker re-check.
     const responses = await Promise.all([post(token, 'right'), post(token, 'right'), post(token, 'right')]);
 
     expect(responses.filter((response) => response.status === 201)).toHaveLength(1);
     expect(auth.addAuthenticationDetails).toHaveBeenCalledTimes(1);
+  });
+
+  it('links at most once when two instances sharing the store race on the same token', async () => {
+    const other = await startInstance(store);
+    const token = await issue();
+
+    const responses = await Promise.all([post(token, 'right'), post(token, 'right', other)]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([201, 401]);
+    expect(auth.addAuthenticationDetails).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks at most the allowed passwords per token across instances', async () => {
+    const other = await startInstance(store);
+    // A slow hash keeps both instances' first attempts in flight together, as bcrypt does in production.
+    auth.validateAuthenticationDetails.mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(false), 50)),
+    );
+    const token = await issue();
+
+    await Promise.all([app, other, app, other, app, other].map((instance) => post(token, 'wrong', instance)));
+
+    expect(auth.validateAuthenticationDetails).toHaveBeenCalledTimes(MAX_LINK_TOKEN_PASSWORD_ATTEMPTS);
   });
 
   it('kills a token after the allowed wrong passwords, even when the next password is right', async () => {
@@ -197,6 +233,30 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'sso_link_account', outcome: 'rate_limited', reason: 'ip_throttled' }),
     );
+  });
+
+  it('counts wrong link passwords toward the account lockout shared with login', async () => {
+    for (let i = 0; i < policy.maxAttempts; i += 1) {
+      expect((await post(await issue(), 'wrong')).status).toBe(401);
+    }
+
+    await expect(bruteForce.assertAccountAllowed({ id: 1, lockedUntil: null } as User)).rejects.toBeInstanceOf(
+      AccountLockedException,
+    );
+    expect(userRepository.update).toHaveBeenCalledWith(
+      { id: 1 },
+      expect.objectContaining({ lockedUntil: expect.any(Date) }),
+    );
+  });
+
+  it('clears the IP and account counters after a successful link', async () => {
+    for (let i = 0; i < policy.maxAttempts - 1; i += 1) await post(await issue(), 'wrong');
+    expect((await post(await issue(), 'right')).status).toBe(201);
+
+    const statuses: number[] = [];
+    for (let i = 0; i < policy.maxAttempts - 1; i += 1) statuses.push((await post(await issue(), 'wrong')).status);
+
+    expect(statuses).toEqual(Array(policy.maxAttempts - 1).fill(401));
   });
 
   it('does not let failures against one account throttle linking another account from the same IP', async () => {

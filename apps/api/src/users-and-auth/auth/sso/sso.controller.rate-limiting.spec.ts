@@ -101,10 +101,34 @@ describe('SsoController rate limiting (ATT-1223)', () => {
 
         await expect(link()).rejects.toThrow('INVALID_LINK_TOKEN');
 
-        expect(fixture.bruteForce.recordFailure).toHaveBeenCalledWith('sso_link_account', '203.0.113.9', null, 'invalid-link-token');
+        expect(fixture.bruteForce.recordIpFailure).toHaveBeenCalledWith('sso_link_account', '203.0.113.9');
+        expect(fixture.bruteForce.recordFailure).not.toHaveBeenCalled();
         expect(fixture.authAudit.log).toHaveBeenCalledWith(
           expect.objectContaining({ outcome: 'invalid_token', reason: 'INVALID_LINK_TOKEN' }),
         );
+      });
+
+      it('passes a store outage through without counting it as a bad token', async () => {
+        setupLinkMocks();
+        (fixture.linkTokenService.assertUsable as jest.Mock).mockRejectedValue(new Error('valkey down'));
+
+        await expect(link()).rejects.toThrow('valkey down');
+
+        expect(fixture.bruteForce.recordIpFailure).not.toHaveBeenCalled();
+        expect(fixture.authAudit.log).not.toHaveBeenCalledWith(expect.objectContaining({ outcome: 'invalid_token' }));
+      });
+
+      it('claims a token attempt before the password check and stops when none is left', async () => {
+        const { authService } = setupLinkMocks();
+        (fixture.linkTokenService.reservePasswordAttempt as jest.Mock).mockRejectedValue(
+          new UnauthorizedException('LINK_TOKEN_EXHAUSTED'),
+        );
+
+        await expect(link()).rejects.toThrow('LINK_TOKEN_EXHAUSTED');
+
+        expect(authService.validateAuthenticationDetails).not.toHaveBeenCalled();
+        expect(fixture.bruteForce.recordIpFailure).toHaveBeenCalledWith('sso_link_account', '203.0.113.9');
+        expect(fixture.bruteForce.recordFailure).not.toHaveBeenCalled();
       });
 
       it.each(['LINK_TOKEN_USED', 'LINK_TOKEN_EXHAUSTED'])(
@@ -116,7 +140,7 @@ describe('SsoController rate limiting (ATT-1223)', () => {
           await expect(link()).rejects.toThrow(code);
 
           expect(authService.validateAuthenticationDetails).not.toHaveBeenCalled();
-          expect(fixture.bruteForce.recordFailure).toHaveBeenCalledWith('sso_link_account', '203.0.113.9', null, 'invalid-link-token');
+          expect(fixture.bruteForce.recordIpFailure).toHaveBeenCalledWith('sso_link_account', '203.0.113.9');
         },
       );
 
@@ -145,7 +169,7 @@ describe('SsoController rate limiting (ATT-1223)', () => {
         expect(fixture.authAudit.log).toHaveBeenCalledWith(expect.objectContaining({ outcome: 'account_locked' }));
       });
 
-      it('records a wrong password against IP, account and token', async () => {
+      it('records a wrong password against IP and account after claiming a token attempt', async () => {
         setupLinkMocks({ passwordOk: false });
 
         await expect(link()).rejects.toThrow(UnauthorizedException);
@@ -156,7 +180,7 @@ describe('SsoController rate limiting (ATT-1223)', () => {
           42,
           'user@example.com',
         );
-        expect(fixture.linkTokenService.recordFailedPassword).toHaveBeenCalledWith(linkPayload);
+        expect(fixture.linkTokenService.reservePasswordAttempt).toHaveBeenCalledWith(linkPayload);
         expect(fixture.authAudit.log).toHaveBeenCalledWith(
           expect.objectContaining({ type: 'sso_link_account', outcome: 'invalid_credentials', userId: 42 }),
         );

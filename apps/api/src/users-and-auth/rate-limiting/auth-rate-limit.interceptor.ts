@@ -55,42 +55,49 @@ export class AuthRateLimitInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       mergeMap((value) => {
-          if (clearFailuresOnSuccess) {
-            this.bruteForce
-              .recordSuccess(scope, ip, userId)
-              .catch((err) => this.logger.error(`recordSuccess failed for scope=${scope}`, err as Error));
-          }
-          return from(Promise.resolve(this.audit.log({ type: auditType, outcome: 'success', ip, userId }))).pipe(
-            mergeMap(() => [value]),
-          );
+        if (clearFailuresOnSuccess) {
+          this.bruteForce
+            .recordSuccess(scope, ip, userId)
+            .catch((err) => this.logger.error(`recordSuccess failed for scope=${scope}`, err as Error));
+        }
+        return from(Promise.resolve(this.audit.log({ type: auditType, outcome: 'success', ip, userId }))).pipe(
+          mergeMap(() => [value]),
+        );
       }),
       catchError((err: unknown) => {
-          this.bruteForce
-            .recordFailure(scope, ip, userId)
-            .catch((recErr) => this.logger.error(`recordFailure failed for scope=${scope}`, recErr as Error));
-          setRetryAfter(response, err);
-          return from(Promise.resolve(this.audit.log({
-            type: auditType,
-            outcome: classifyOutcome(err),
-            ip,
-            userId,
-            reason: errorName(err),
-          }))).pipe(
-            mergeMap(() => throwError(() => err)),
-          );
+        this.bruteForce
+          .recordFailure(scope, ip, userId)
+          .catch((recErr) => this.logger.error(`recordFailure failed for scope=${scope}`, recErr as Error));
+        setRetryAfter(response, err);
+        return from(
+          Promise.resolve(
+            this.audit.log({
+              type: auditType,
+              outcome: classifyOutcome(err),
+              ip,
+              userId,
+              reason: errorName(err),
+            }),
+          ),
+        ).pipe(mergeMap(() => throwError(() => err)));
       }),
     );
   }
 }
 
+// A Record, so adding a scope without an audit type fails to compile instead of falling through to a wrong label.
+const SCOPE_AUDIT_TYPES: Record<RateLimitScope, AuthAuditType> = {
+  login: 'login',
+  register: 'register',
+  password_reset_request: 'password_reset_request',
+  password_reset_complete: 'password_reset_complete',
+  delete_account_confirm: 'delete_account_confirm',
+  sso_link_account: 'sso_link_account',
+  sso_provisioning: 'sso_provisioning',
+};
+
 function scopeToAuditType(scope: RateLimitScope): AuthAuditType {
-  if (scope === 'login') return 'login';
-  if (scope === 'register') return 'register';
-  if (scope === 'password_reset_request') return 'password_reset_request';
-  if (scope === 'password_reset_complete') return 'password_reset_complete';
-  if (scope === 'sso_link_account') return 'sso_link_account';
-  if (scope === 'sso_provisioning') return 'sso_provisioning';
-  return 'delete_account_confirm';
+  return SCOPE_AUDIT_TYPES[scope];
 }
 
 function extractUserIdFromRequest(request: Request, scope: RateLimitScope): number | null {

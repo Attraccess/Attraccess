@@ -41,6 +41,7 @@ export function registerSsoControllerFixture() {
     assertAccountAllowed: jest.fn(),
     runAccountAttempt: jest.fn((_userId: number | null, attempt: () => Promise<unknown>) => attempt()),
     recordFailure: jest.fn(),
+    recordIpFailure: jest.fn(),
     recordSuccess: jest.fn(),
   };
 
@@ -189,7 +190,7 @@ export function registerSsoControllerFixture() {
             verify: jest.fn(),
             issue: jest.fn(),
             assertUsable: jest.fn(),
-            recordFailedPassword: jest.fn(),
+            reservePasswordAttempt: jest.fn(),
             consume: jest.fn(),
           },
         },

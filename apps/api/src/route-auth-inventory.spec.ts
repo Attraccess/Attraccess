@@ -390,7 +390,8 @@ describe('route sign-in inventory (ATT-1149)', () => {
       `);
       expect(limited(routes, 'login')).toBe(false);
       const table = { 'FakeController.login': { reason: 'sign-in', credential: 'password' as const } };
-      expect(credentialProblems(table, () => false)).toEqual([
+      // The rule runs on the scanner's verdict, so the scan and the rule are proven together.
+      expect(credentialProblems(table, (id) => limited(routes, id.split('.')[1]) === true)).toEqual([
         'FakeController.login checks a password but has no detectable rate limit or exemption',
       ]);
     });

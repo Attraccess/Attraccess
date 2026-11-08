@@ -90,7 +90,7 @@ Wird das Secret geändert, sind die gespeicherten Kartenschlüssel und Kopplungs
 
 ## Drosselung und Kontosperre
 
-Fehlgeschlagene Anmeldungen, Registrierungen, Passwort-Zuruecksetzungen, SSO-Kontoverknuepfungen und SSO-Provisionierungsaufrufe werden pro IP gedrosselt. Wiederholte Login-Fehlversuche sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
+Fehlgeschlagene Anmeldungen, Registrierungen, Passwort-Zuruecksetzungen, SSO-Kontoverknuepfungen und SSO-Provisionierungsaufrufe werden pro IP gedrosselt. Wiederholte Login-Fehlversuche und falsche Passwoerter bei der SSO-Kontoverknuepfung sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
 
 | Einstellung | Standard | Beschreibung |
 |-------------|----------|-------------|
@@ -103,15 +103,15 @@ Fehlgeschlagene Anmeldungen, Registrierungen, Passwort-Zuruecksetzungen, SSO-Kon
 Antworten bei Ausloesung:
 
 - **`429 Too Many Requests`** mit `Retry-After`-Header, wenn eine IP die Schwelle ueberschreitet.
-- **`423 Locked`** mit `Retry-After`-Header bei einem gesperrten Konto.
+- **`423 Locked`** mit `Retry-After`-Header bei einem gesperrten Konto, sowohl beim Login als auch bei der SSO-Kontoverknuepfung.
 
-Erfolgreicher Login oder Admin-Unlock entsperrt das Konto. Admin-Unlock erfolgt ueber die Benutzerverwaltung.
+Erfolgreicher Login, erfolgreiche SSO-Kontoverknuepfung oder Admin-Unlock entsperrt das Konto. Admin-Unlock erfolgt ueber die Benutzerverwaltung.
 
 ### SSO-Kontoverknuepfung und Provisionierung
 
 - **SSO-Kontoverknuepfung** (die Passwortabfrage, wenn eine SSO-Anmeldung zu einem bestehenden lokalen Konto passt) wird pro IP und Zielkonto gedrosselt. Falsche Passwoerter zaehlen zur selben Kontosperre wie fehlgeschlagene Logins, ein Wechsel zwischen beiden bringt also keine zusaetzlichen Versuche. Eine erfolgreiche Verknuepfung setzt die Zaehler zurueck.
 - **Verknuepfungs-Token sind einmalig verwendbar.** Ein Token wird nach erfolgreicher Verknuepfung und nach 3 falschen Passwoertern ungueltig; der Benutzer muss sich dann erneut per SSO anmelden.
-- **SSO-Provisionierungsendpunkte** (vom IdP ausgeloeste Abmeldung, Benutzerloeschung und Berechtigungsaktualisierung) werden pro IP und Provider gedrosselt. Nur ein fehlendes oder falsches Provisionierungs-Secret zaehlt als Fehlversuch. Andere Fehler, etwa ein unbekannter Benutzer, zaehlen nicht, ein normaler IdP sperrt sich dadurch also nicht aus. Ein IdP mit falschem Secret erhaelt nach `maxAttempts` Fehlversuchen `429` mit `Retry-After`-Header statt `401`.
+- **SSO-Provisionierungsendpunkte** (vom IdP ausgeloeste Abmeldung, Benutzerloeschung und Berechtigungsaktualisierung) werden pro IP und Provider gedrosselt. Nur ein fehlendes oder falsches Provisionierungs-Secret zaehlt als Fehlversuch. Andere Fehler, etwa ein unbekannter Benutzer, zaehlen nicht, ein normaler IdP sperrt sich dadurch also nicht aus. Ein IdP mit falschem Secret erhaelt nach `maxAttempts` Fehlversuchen `429` mit `Retry-After`-Header statt `401`. Cloud-IdPs senden diese Aufrufe oft von gemeinsam genutzten ausgehenden IPs; die Drosselung gilt dann fuer diese gemeinsame IP bei diesem Provider.
 
 ### Reverse Proxies und die echte Client-IP
 
@@ -208,6 +208,9 @@ ignoreregex =
 ```
 
 Der mitgelieferte Docker-Compose-Stack verdrahtet beide Dateien hinter dem Profil `fail2ban` automatisch — siehe [Docker-Compose-Installation](installation/docker-compose.md#brute-force-ip-sperre-mit-fail2ban).
+
+> [!NOTE]
+> Jede abgelehnte Anfrage mit einem SSO-Verknuepfungs-Token und jedes falsche Provisionierungs-Secret schreibt eine `auth.failed`-Zeile. Mit `maxretry = 5` kann fail2ban eine IP sperren, bevor Attraccess selbst mit `429` antwortet. Das betrifft auch einen falsch konfigurierten Identity Provider, der dann auch keine Back-Channel-Abmeldung mehr senden kann. Wer das nicht will, entfernt `sso_provisioning` aus dem `failregex`.
 
 ## fail2ban-Administration
 

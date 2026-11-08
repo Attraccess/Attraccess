@@ -444,9 +444,9 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       expect([...counts].sort()).toEqual([1, 2, 3]);
       expect(await store.getEphemeralState('count')).toBe('3');
 
-      await store.incrementEphemeralCounter('short', Date.now() + 150);
+      await store.incrementEphemeralCounter('short', Date.now() + 1000);
       expect(await store.getEphemeralState('short')).toBe('1');
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await new Promise((resolve) => setTimeout(resolve, 1200));
       expect(await store.getEphemeralState('short')).toBeNull();
       expect(await store.incrementEphemeralCounter('short', Date.now() + 60000)).toBe(1);
     });

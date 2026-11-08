@@ -231,15 +231,34 @@ describe('SSOLinkTokenService', () => {
       await expect(service.assertUsable(payload)).resolves.toBeUndefined();
     });
 
-    it('counts failures until the token expires', async () => {
+    it('claims password attempts atomically until the token expires', async () => {
       const { service, payload } = await issued();
+      sessionStore.incrementEphemeralCounter.mockResolvedValue(MAX_LINK_TOKEN_PASSWORD_ATTEMPTS);
 
-      await service.recordFailedPassword(payload);
+      await expect(service.reservePasswordAttempt(payload)).resolves.toBeUndefined();
 
       expect(sessionStore.incrementEphemeralCounter).toHaveBeenCalledWith(
         `sso-link-failures:${payload.jti}`,
         payload.exp,
       );
+    });
+
+    it('refuses an attempt beyond the limit, e.g. one that lost a race on another instance', async () => {
+      const { service, payload } = await issued();
+      sessionStore.incrementEphemeralCounter.mockResolvedValue(MAX_LINK_TOKEN_PASSWORD_ATTEMPTS + 1);
+
+      await expect(service.reservePasswordAttempt(payload)).rejects.toThrow('LINK_TOKEN_EXHAUSTED');
+    });
+
+    it('reports a token that expired while the request waited as expired, not used', async () => {
+      const { service, payload } = await issued();
+      const expired = { ...payload, exp: Date.now() - 1 };
+
+      await expect(service.assertUsable(expired)).rejects.toThrow('LINK_TOKEN_EXPIRED');
+      await expect(service.reservePasswordAttempt(expired)).rejects.toThrow('LINK_TOKEN_EXPIRED');
+      await expect(service.consume(expired)).rejects.toThrow('LINK_TOKEN_EXPIRED');
+      expect(sessionStore.incrementEphemeralCounter).not.toHaveBeenCalled();
+      expect(sessionStore.putEphemeralState).not.toHaveBeenCalled();
     });
 
     it('consumes insert-if-absent until the token expires and rejects a second use', async () => {

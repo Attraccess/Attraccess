@@ -96,6 +96,8 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
       },
     },
   })
+  @ApiResponse({ status: 401, description: 'Missing or wrong provisioning secret, or no secret configured' })
+  @ApiResponse({ status: 429, description: 'Too many failed secret checks from this IP for this provider' })
   async samlDeleteUser(
     @Param('providerId') providerId: string,
     @Req() request: Request,
@@ -141,6 +143,8 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
       },
     },
   })
+  @ApiResponse({ status: 401, description: 'Missing or wrong provisioning secret, or no secret configured' })
+  @ApiResponse({ status: 429, description: 'Too many failed secret checks from this IP for this provider' })
   async oidcUpdatePermissions(
     @Param('providerId') providerId: string,
     @Req() request: Request,
@@ -186,6 +190,8 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
       },
     },
   })
+  @ApiResponse({ status: 401, description: 'Missing or wrong provisioning secret, or no secret configured' })
+  @ApiResponse({ status: 429, description: 'Too many failed secret checks from this IP for this provider' })
   async samlUpdatePermissions(
     @Param('providerId') providerId: string,
     @Req() request: Request,
@@ -231,6 +237,8 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
       },
     },
   })
+  @ApiResponse({ status: 401, description: 'Missing or wrong provisioning secret, or no secret configured' })
+  @ApiResponse({ status: 429, description: 'Too many failed secret checks from this IP for this provider' })
   async oidcLogout(
     @Param('providerId') providerId: string,
     @Req() request: Request,
@@ -276,6 +284,8 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
       },
     },
   })
+  @ApiResponse({ status: 401, description: 'Missing or wrong provisioning secret, or no secret configured' })
+  @ApiResponse({ status: 429, description: 'Too many failed secret checks from this IP for this provider' })
   async samlLogout(
     @Param('providerId') providerId: string,
     @Req() request: Request,
@@ -321,6 +331,8 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
       },
     },
   })
+  @ApiResponse({ status: 401, description: 'Missing or wrong provisioning secret, or no secret configured' })
+  @ApiResponse({ status: 429, description: 'Too many failed secret checks from this IP for this provider' })
   async oidcDeleteUser(
     @Param('providerId') providerId: string,
     @Req() request: Request,

@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Unauthorized } from './unauthorized';
 import { SSOLogin } from './ssoLogin';
 import type { LoginForm } from './loginForm';
@@ -129,12 +129,6 @@ it('decodes an account-link token, submits its password and redirects only on su
   expect(state.link).toHaveBeenCalledWith({ requestBody: { linkToken: token, password: 'test-password' } });
   act(() => state.callbacks?.onError(Object.assign(new Error('Unauthorized'), { body: { message: 'Unauthorized' } })));
   expect(state.toastError).toHaveBeenLastCalledWith({ title: 'Invalid password. Please try again.' });
-  act(() => state.callbacks?.onError(Object.assign(new Error('x'), { body: { message: 'LINK_TOKEN_EXHAUSTED' } })));
-  expect(state.toastError).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      description: 'This link is no longer valid. Please sign in with your company account again.',
-    }),
-  );
   act(() =>
     state.callbacks?.onError(
       Object.assign(new Error('x'), { body: { message: 'TooManyAuthAttempts', retryAfterSeconds: 42 } }),
@@ -176,10 +170,70 @@ it('survives malformed tokens, favors an explicit email, and refuses a missing t
   expect(state.callbackUrl).toHaveBeenCalledWith(-1, 'OIDC', expect.any(String));
   view.unmount();
   view = mount('/?accountLinking=required', true);
-  fireEvent.click(await screen.findByRole('button', { name: 'Link account' }));
+  const linkButton = await screen.findByRole('button', { name: 'Link account' });
+  expect(linkButton).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'test-password' } });
+  fireEvent.click(linkButton);
   expect(state.link).not.toHaveBeenCalled();
+  expect(screen.queryByRole('button', { name: 'Sign in with SSO again' })).toBeNull();
+  act(() => state.callbacks?.onError(Object.assign(new Error('x'), { body: { message: 'INVALID_LINK_TOKEN' } })));
+  expect(screen.queryByRole('button', { name: 'Link account' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Sign in with SSO again' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Back to sign in' })).toBeTruthy();
   view.unmount();
   state.providers = undefined;
   mount('/', true);
   expect(screen.queryByRole('link')).toBeNull();
+});
+
+describe('account-link modal errors and exits', () => {
+  const token =
+    btoa(JSON.stringify({ email: 'alex@example.test', providerId: 7, providerType: 'OIDC' })).replace(/=/g, '') +
+    '.signature';
+  const mountLinking = async () => {
+    state.providers = [{ id: 7, name: 'Company', type: 'OIDC' }];
+    window.history.replaceState({}, '', `/?accountLinking=required&ssoLinkToken=${encodeURIComponent(token)}`);
+    mount(`/?accountLinking=required&ssoLinkToken=${encodeURIComponent(token)}`, true);
+    await screen.findByRole('dialog');
+  };
+  const fail = (body: Record<string, unknown>) =>
+    act(() => state.callbacks?.onError(Object.assign(new Error('x'), { body })));
+
+  it.each(['LINK_TOKEN_USED', 'LINK_TOKEN_EXHAUSTED', 'LINK_TOKEN_EXPIRED', 'INVALID_LINK_TOKEN'])(
+    'offers a fresh SSO sign-in once the server rejects the link token with %s',
+    async (code) => {
+      await mountLinking();
+      expect(screen.queryByRole('button', { name: 'Sign in with SSO again' })).toBeNull();
+      fail({ message: code });
+      expect(state.toastError).toHaveBeenLastCalledWith({
+        title: 'Link no longer valid',
+        description: 'This link is no longer valid. Please sign in with your company account again.',
+      });
+      expect(screen.queryByRole('button', { name: 'Link account' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in with SSO again' }));
+      await waitFor(() => expect(window.location.href).toBe('http://localhost/linked'));
+    },
+  );
+
+  it.each([
+    ['SSO_ALREADY_LINKED', 'This account is already linked to SSO.'],
+    [
+      'PASSWORD_REQUIRED',
+      'This account has no password yet. Use “Forgot password?” on the sign-in page to set one, then try again.',
+    ],
+    ['SSO_SUBJECT_ALREADY_LINKED', 'This SSO identity is already linked to another account.'],
+  ])('explains %s with the modal text and keeps the link form', async (code, title) => {
+    await mountLinking();
+    fail({ message: code });
+    expect(state.toastError).toHaveBeenLastCalledWith({ title });
+    expect(screen.getByRole('button', { name: 'Link account' })).toBeTruthy();
+  });
+
+  it('returns to the clean sign-in page without the link parameters', async () => {
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => undefined);
+    await mountLinking();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to sign in' }));
+    expect(replace).toHaveBeenCalledWith('http://localhost/');
+    replace.mockRestore();
+  });
 });

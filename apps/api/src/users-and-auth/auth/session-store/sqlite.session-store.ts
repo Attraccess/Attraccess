@@ -190,6 +190,7 @@ export class SqliteSessionStore implements SessionStore {
   }
 
   async incrementEphemeralCounter(key: string, expiresAt: number): Promise<number> {
+    if (expiresAt <= Date.now()) throw new Error('Ephemeral counter expiry must be in the future');
     await this.sessionRepository.query('delete FROM "sso_logout_state" WHERE "expiresAt" <= ?', [Date.now()]);
     const rows = (await this.sessionRepository.query(
       'insert INTO "sso_logout_state" ("key", "value", "expiresAt") VALUES (?, \'1\', ?) ' +

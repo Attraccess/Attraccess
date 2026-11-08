@@ -4,7 +4,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FixedWindowCounterStore, WindowCounterEntry } from '../../common/rate-limiting/fixed-window-counter';
 import { SettingsService } from '../../settings/settings.service';
-import { recordFailure as recordFailureImplementation } from './brute-force-failure';
+import {
+  recordFailure as recordFailureImplementation,
+  recordIpFailure as recordIpFailureImplementation,
+} from './brute-force-failure';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
 export type RateLimitScope =
   | 'login'
@@ -123,23 +126,28 @@ export class BruteForceProtectionService {
     userId: number | null,
     username: string | null = null,
   ): Promise<void> {
-    const getContextOwner = () => this;
-    return recordFailureImplementation(
-      {
-        settingsService: getContextOwner().settingsService,
-        nowFn: getContextOwner().nowFn,
-        evictStale: getContextOwner().evictStale.bind(getContextOwner()),
-        upsertCounter: getContextOwner().upsertCounter.bind(getContextOwner()),
-        ipCounters: getContextOwner().ipCounters,
-        ipCoarseCounters: getContextOwner().ipCoarseCounters,
-        accountCounters: getContextOwner().accountCounters,
-        userRepository: getContextOwner().userRepository,
-      },
-      scope,
-      ip,
-      userId,
-      username,
-    );
+    return recordFailureImplementation(this.failureContext(), scope, ip, userId, username);
+  }
+
+  /**
+   * Records a failure that names no account, e.g. a forged or spent token. Only the coarse per-IP counter moves, so
+   * other accounts behind the same IP keep their own maxAttempts budget.
+   */
+  async recordIpFailure(scope: RateLimitScope, ip: string): Promise<void> {
+    return recordIpFailureImplementation(this.failureContext(), scope, ip);
+  }
+
+  private failureContext() {
+    return {
+      settingsService: this.settingsService,
+      nowFn: this.nowFn,
+      evictStale: this.evictStale.bind(this),
+      upsertCounter: this.upsertCounter.bind(this),
+      ipCounters: this.ipCounters,
+      ipCoarseCounters: this.ipCoarseCounters,
+      accountCounters: this.accountCounters,
+      userRepository: this.userRepository,
+    };
   }
 
   async recordSuccess(

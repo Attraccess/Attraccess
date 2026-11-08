@@ -65,13 +65,6 @@ import { SSOLinkTokenPayload, SSOLinkTokenService } from '../link-token.service'
 import { SSOService } from '../sso.service';
 import { discoveryPathSegment, discoveryUrl, requestDiscoveryJson } from './discovery-client';
 
-/**
- * Token-level failures carry no account. They are recorded under this bucket so they only feed the coarse per-IP
- * counter: a null username would share the empty-username key, which trips at maxAttempts and blocks every account
- * behind the same IP.
- */
-const INVALID_LINK_TOKEN_BUCKET = 'invalid-link-token';
-
 /** Null, undefined and an empty list all mean "defaults"; returns the list only when custom paths are set. */
 function customRolePaths(value: string[] | null | undefined): string[] | null {
   return value && value.length > 0 ? value : null;
@@ -158,6 +151,12 @@ export abstract class SsoProviderRoutes {
         throw new BadRequestException('PASSWORD_REQUIRED');
       }
 
+      try {
+        await this.linkTokenService.reservePasswordAttempt(linkPayload);
+      } catch (error) {
+        await this.rejectLinkToken(error, ip);
+      }
+
       const isAuthenticated = await this.authService.validateAuthenticationDetails(user.id, {
         type: AuthenticationType.LOCAL_PASSWORD,
         details: {
@@ -167,7 +166,6 @@ export abstract class SsoProviderRoutes {
 
       if (!isAuthenticated) {
         await this.bruteForce.recordFailure('sso_link_account', ip, user.id, email);
-        await this.linkTokenService.recordFailedPassword(linkPayload);
         await this.authAudit.log({
           type: 'sso_link_account',
           outcome: 'invalid_credentials',
@@ -237,14 +235,20 @@ export abstract class SsoProviderRoutes {
     }
   }
 
+  /**
+   * A rejected token names no account, so it only feeds the coarse per-IP counter; other accounts behind the same IP
+   * keep their own budget. Store or settings outages are not the caller's fault and pass through uncounted.
+   */
   private async rejectLinkToken(error: unknown, ip: string): Promise<never> {
-    await this.bruteForce.recordFailure('sso_link_account', ip, null, INVALID_LINK_TOKEN_BUCKET);
-    await this.authAudit.log({
-      type: 'sso_link_account',
-      outcome: 'invalid_token',
-      ip,
-      reason: error instanceof Error ? error.message : 'INVALID_LINK_TOKEN',
-    });
+    if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+      await this.bruteForce.recordIpFailure('sso_link_account', ip);
+      await this.authAudit.log({
+        type: 'sso_link_account',
+        outcome: 'invalid_token',
+        ip,
+        reason: error.message,
+      });
+    }
     throw error;
   }
 
