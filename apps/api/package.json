@@ -16,7 +16,7 @@
     "@nestjs/schematics": "^11.0.5",
     "@nestjs/serve-static": "^5.0.3",
     "@nestjs/swagger": "^11.2.0",
-    "@nestjs/typeorm": "^11.0.0",
+    "@nestjs/typeorm": "^12.0.0",
     "@nestjs/websockets": "^11.1.0",
     "axios": "^1.13.5",
     "ioredis": "^5.6.1",
