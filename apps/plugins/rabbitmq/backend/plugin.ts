@@ -15,6 +15,12 @@ import { RabbitmqManagementClient } from './management/client';
 import { RabbitmqUsersController } from './users/service';
 import { RabbitmqUsersService } from './users/service';
 import { RabbitmqCredentialProvisioningProvider } from './credentials/provider';
+import { RabbitmqCapabilitiesController } from './capabilities';
+import { RabbitmqConnectionsController, RabbitmqConnectionsService } from './connections/service';
+import { RabbitmqStatsController, RabbitmqStatsService } from './stats/service';
+import { RabbitmqMessagesController, RabbitmqMessagesService } from './messages/service';
+import { RABBITMQ_AUDIT_DOMAIN } from './messages/audit';
+import { RABBITMQ_VIEW_PERMISSION } from './permissions';
 
 // The host hands each plugin its PluginContext under this token. Recreate it
 // locally (do not import the value) so the artifact has no runtime dependency on
@@ -37,7 +43,7 @@ class RabbitmqService implements OnModuleInit {
 
 // Mounts `GET /rabbitmq/status` into the host API. Same access level as the
 // host MQTT servers controller.
-@Auth('resources.update')
+@Auth(RABBITMQ_VIEW_PERMISSION)
 @Controller('rabbitmq')
 class RabbitmqController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor
@@ -53,19 +59,31 @@ class RabbitmqController {
 class RabbitmqPluginModule {}
 
 const plugin: PluginBackendModule = {
+  auditDomains: [RABBITMQ_AUDIT_DOMAIN],
   credentialProvisioningProvider(context: PluginContext): RabbitmqCredentialProvisioningProvider {
     return new RabbitmqCredentialProvisioningProvider(context);
   },
   register(context: PluginContext): DynamicModule {
     return {
       module: RabbitmqPluginModule,
-      controllers: [RabbitmqController, RabbitmqDetectionController, RabbitmqUsersController],
+      controllers: [
+        RabbitmqController,
+        RabbitmqCapabilitiesController,
+        RabbitmqDetectionController,
+        RabbitmqUsersController,
+        RabbitmqConnectionsController,
+        RabbitmqStatsController,
+        RabbitmqMessagesController,
+      ],
       providers: [
         { provide: PLUGIN_CONTEXT, useValue: context },
         RabbitmqService,
         RabbitmqDetectionService,
         RabbitmqManagementClient,
         RabbitmqUsersService,
+        RabbitmqConnectionsService,
+        RabbitmqStatsService,
+        RabbitmqMessagesService,
       ],
     };
   },

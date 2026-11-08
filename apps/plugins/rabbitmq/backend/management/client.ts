@@ -36,11 +36,12 @@ export class RabbitmqManagementClient {
     method: 'GET' | 'PUT' | 'DELETE',
     path: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
   ): Promise<T> {
     const base = this.managementApiBase(config);
     let response: Response;
     try {
-      response = await managementRequest(config, `${base}/api${path}`, method, body, REQUEST_TIMEOUT_MS);
+      response = await managementRequest(config, `${base}/api${path}`, method, body, REQUEST_TIMEOUT_MS, headers);
     } catch (error) {
       throw new HttpException(
         `Cannot reach the RabbitMQ management API at ${base}: ${describeManagementError(error, REQUEST_TIMEOUT_MS)}`,
@@ -72,7 +73,7 @@ export class RabbitmqManagementClient {
 
     if (response.status === 403 || /not.?authori[sz]ed/i.test(reason)) {
       return new HttpException(
-        'The configured MQTT server user lacks management privileges on RabbitMQ. User management requires a user with the "administrator" tag.',
+        'The configured MQTT server user lacks management privileges on RabbitMQ. Viewing requires the "monitoring" tag; managing users and closing connections requires "administrator".',
         HttpStatus.BAD_GATEWAY,
       );
     }

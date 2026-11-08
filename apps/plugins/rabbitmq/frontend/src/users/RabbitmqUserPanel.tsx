@@ -54,7 +54,7 @@ function errorTitle(error: string | TranslationMessage, title: string) {
   return typeof error === 'string' ? title : undefined;
 }
 
-export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
+export function RabbitmqUserPanel({ mqttServerId, canManage = false }: { mqttServerId: number; canManage?: boolean }) {
   const model = useRabbitmqUserPanelState({ mqttServerId });
 
   // Render nothing unless the server is positively detected as RabbitMQ with
@@ -76,6 +76,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
           mqttServerId,
           setFormUser: model.setFormUser,
           setFormOpen: model.setFormOpen,
+          canManage,
         }}
       />
       <Card.Content className="rmq:flex rmq:flex-col rmq:gap-3">
@@ -103,7 +104,7 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                   <TableColumn isRowHeader>{model.t('users.username')}</TableColumn>
                   <TableColumn>{model.t('users.tags')}</TableColumn>
                   <TableColumn>{model.t('users.access')}</TableColumn>
-                  <TableColumn>{model.t('users.actions')}</TableColumn>
+                  {canManage && <TableColumn>{model.t('users.actions')}</TableColumn>}
                 </TableHeader>
                 <TableBody items={model.data.users} dependencies={[model.language]}>
                   {(user) => (
@@ -125,46 +126,48 @@ export function RabbitmqUserPanel({ mqttServerId }: { mqttServerId: number }) {
                       <TableCell>
                         <PermissionChips user={user} />
                       </TableCell>
-                      <TableCell>
-                        <div className="rmq:flex rmq:flex-row rmq:gap-1">
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="ghost"
-                            aria-label={model.t('users.edit', { name: user.name })}
-                            onPress={() => {
-                              model.setFormUser(user);
-                              model.setFormOpen(true);
-                            }}
-                            data-cy={`rabbitmq-user-edit-button-${user.name}`}
-                          >
-                            <PencilIcon className="rmq:w-4 rmq:h-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="ghost"
-                            aria-label={model.t('users.permissions', { name: user.name })}
-                            onPress={() => model.setPermissionsUser(user)}
-                            data-cy={`rabbitmq-user-permissions-button-${user.name}`}
-                          >
-                            <KeyRoundIcon className="rmq:w-4 rmq:h-4" />
-                          </Button>
-                          <Button
-                            isIconOnly
-                            size="sm"
-                            variant="ghost"
-                            aria-label={model.t('users.delete', { name: user.name })}
-                            onPress={() => {
-                              model.setDeleteError(null);
-                              model.setUserToDelete(user);
-                            }}
-                            data-cy={`rabbitmq-user-delete-button-${user.name}`}
-                          >
-                            <Trash2Icon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {canManage && (
+                        <TableCell>
+                          <div className="rmq:flex rmq:flex-row rmq:gap-1">
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="ghost"
+                              aria-label={model.t('users.edit', { name: user.name })}
+                              onPress={() => {
+                                model.setFormUser(user);
+                                model.setFormOpen(true);
+                              }}
+                              data-cy={`rabbitmq-user-edit-button-${user.name}`}
+                            >
+                              <PencilIcon className="rmq:w-4 rmq:h-4" />
+                            </Button>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="ghost"
+                              aria-label={model.t('users.permissions', { name: user.name })}
+                              onPress={() => model.setPermissionsUser(user)}
+                              data-cy={`rabbitmq-user-permissions-button-${user.name}`}
+                            >
+                              <KeyRoundIcon className="rmq:w-4 rmq:h-4" />
+                            </Button>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="ghost"
+                              aria-label={model.t('users.delete', { name: user.name })}
+                              onPress={() => {
+                                model.setDeleteError(null);
+                                model.setUserToDelete(user);
+                              }}
+                              data-cy={`rabbitmq-user-delete-button-${user.name}`}
+                            >
+                              <Trash2Icon className="rmq:w-4 rmq:h-4 rmq:text-danger" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   )}
                 </TableBody>

@@ -5,8 +5,16 @@ import { useRabbitmqUserPanelState } from './useRabbitmqUserPanelState';
 type Props = Pick<
   ReturnType<typeof useRabbitmqUserPanelState>,
   't' | 'reload' | 'loading' | 'mqttServerId' | 'setFormUser' | 'setFormOpen'
->;
-export function RabbitmqUserPanelCardHeader({ t, reload, loading, mqttServerId, setFormUser, setFormOpen }: Props) {
+> & { canManage: boolean };
+export function RabbitmqUserPanelCardHeader({
+  t,
+  reload,
+  loading,
+  mqttServerId,
+  setFormUser,
+  setFormOpen,
+  canManage,
+}: Props) {
   return (
     <Card.Header className="rmq:flex rmq:flex-row rmq:items-center rmq:justify-between rmq:gap-2">
       <div className="rmq:flex rmq:items-center rmq:gap-2">
@@ -25,18 +33,20 @@ export function RabbitmqUserPanelCardHeader({ t, reload, loading, mqttServerId, 
         >
           <RefreshCwIcon className="rmq:w-4 rmq:h-4" />
         </Button>
-        <Button
-          size="sm"
-          variant="primary"
-          onPress={() => {
-            setFormUser(null);
-            setFormOpen(true);
-          }}
-          data-cy={`rabbitmq-user-panel-create-button-${mqttServerId}`}
-        >
-          <PlusIcon className="rmq:w-4 rmq:h-4" />
-          {t('users.add')}
-        </Button>
+        {canManage && (
+          <Button
+            size="sm"
+            variant="primary"
+            onPress={() => {
+              setFormUser(null);
+              setFormOpen(true);
+            }}
+            data-cy={`rabbitmq-user-panel-create-button-${mqttServerId}`}
+          >
+            <PlusIcon className="rmq:w-4 rmq:h-4" />
+            {t('users.add')}
+          </Button>
+        )}
       </div>
     </Card.Header>
   );

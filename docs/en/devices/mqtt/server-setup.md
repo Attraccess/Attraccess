@@ -102,6 +102,26 @@ The Servers page shows the current connection status for each broker:
 | **Connecting** | Attraccess is attempting to connect |
 | **Error** | Connection failed -- see error details for more information |
 
+## Managing RabbitMQ from Attraccess
+
+With the **RabbitMQ plugin** installed, an MQTT server that Attraccess detects as a RabbitMQ broker shows extra panels when you edit it (Settings → MQTT). Attraccess talks to the RabbitMQ management API (port `15672`, or `15671` with TLS, unless you configured a management port) using the MQTT server's username and password.
+
+| Panel | What it offers | RabbitMQ user tag | Attraccess permission |
+|-------|----------------|-------------------|-----------------------|
+| **Status** | Reachability, credentials check, versions | `monitoring` | `resources.update` |
+| **Users** | List users and their vhost permissions | `administrator` | `resources.update` |
+| **Users** (change) | Create, edit, delete users; set or clear permissions | `administrator` | `system.settings.manage` |
+| **Connections** | Live client connections (refreshes every 10 s) | `monitoring` | `resources.update` |
+| **Connections** (close) | Force-close a connection, with an optional reason | `administrator` | `system.settings.manage` |
+| **Broker statistics** | Overview, nodes and queues (refreshes every 15 s) | `monitoring` | `resources.update` |
+| **Message explorer** | Subscribe to a topic filter (`+`, `#`), pause/clear the live log, publish test messages | none (uses the MQTT connection) | `system.settings.manage` |
+
+Notes:
+
+- The user configured on the MQTT server needs the RabbitMQ tag from the table (`administrator` also covers everything `monitoring` can do). Without it the panels show the error RabbitMQ returned.
+- Users without `system.settings.manage` only see the read-only panels; write actions and the message explorer are hidden and are also refused by the server.
+- The message explorer uses the shared MQTT connection of Attraccess. Payloads over 64 KiB are shortened, and when a topic is very busy messages are dropped and the explorer tells you how many. Publishing and subscribing are written to the audit log (topic and size only, never the payload). Publishing can trigger real devices, so use it with care.
+
 ## Troubleshooting
 
 | Problem | Solution |

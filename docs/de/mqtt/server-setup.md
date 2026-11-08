@@ -102,6 +102,26 @@ Die Server-Seite zeigt den aktuellen Verbindungsstatus fuer jeden Broker:
 | **Verbindungsaufbau** | Attraccess versucht, eine Verbindung herzustellen |
 | **Fehler** | Verbindung fehlgeschlagen -- siehe Fehlerdetails fuer weitere Informationen |
 
+## RabbitMQ aus Attraccess verwalten
+
+Mit dem installierten **RabbitMQ-Plugin** zeigt ein MQTT-Server, den Attraccess als RabbitMQ-Broker erkennt, beim Bearbeiten (Einstellungen → MQTT) zusätzliche Bereiche. Attraccess nutzt dafür die RabbitMQ-Management-API (Port `15672`, mit TLS `15671`, sofern kein Management-Port konfiguriert ist) mit Benutzername und Passwort des MQTT-Servers.
+
+| Bereich | Funktion | RabbitMQ-Benutzer-Tag | Attraccess-Berechtigung |
+|---------|----------|-----------------------|-------------------------|
+| **Status** | Erreichbarkeit, Prüfung der Zugangsdaten, Versionen | `monitoring` | `resources.update` |
+| **Benutzer** | Benutzer und ihre Vhost-Berechtigungen anzeigen | `administrator` | `resources.update` |
+| **Benutzer** (ändern) | Benutzer anlegen, bearbeiten, löschen; Berechtigungen setzen oder entfernen | `administrator` | `system.settings.manage` |
+| **Verbindungen** | Aktive Client-Verbindungen (Aktualisierung alle 10 s) | `monitoring` | `resources.update` |
+| **Verbindungen** (schließen) | Verbindung erzwungen schließen, optional mit Grund | `administrator` | `system.settings.manage` |
+| **Broker-Statistiken** | Überblick, Knoten und Queues (Aktualisierung alle 15 s) | `monitoring` | `resources.update` |
+| **Nachrichten-Explorer** | Topic-Filter (`+`, `#`) abonnieren, Live-Log pausieren/leeren, Testnachrichten senden | keines (nutzt die MQTT-Verbindung) | `system.settings.manage` |
+
+Hinweise:
+
+- Der am MQTT-Server konfigurierte Benutzer benötigt das Tag aus der Tabelle (`administrator` deckt alles ab, was `monitoring` kann). Fehlt es, zeigen die Bereiche die Fehlermeldung von RabbitMQ.
+- Benutzer ohne `system.settings.manage` sehen nur die lesenden Bereiche; Schreibaktionen und der Nachrichten-Explorer sind ausgeblendet und werden auch vom Server abgelehnt.
+- Der Nachrichten-Explorer nutzt die gemeinsame MQTT-Verbindung von Attraccess. Payloads über 64 KiB werden gekürzt; bei sehr aktiven Topics werden Nachrichten verworfen und die Anzahl angezeigt. Veröffentlichen und Abonnieren werden im Audit-Log protokolliert (nur Topic und Größe, nie die Payload). Veröffentlichen kann echte Geräte auslösen – bitte mit Vorsicht verwenden.
+
 ## Fehlerbehebung
 
 | Problem | Loesung |

@@ -1,4 +1,14 @@
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
+import {
+  configure,
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RabbitmqStatusPanel } from './detection/RabbitmqStatusPanel';
 import { RabbitmqUserPanel } from './users/RabbitmqUserPanel';
@@ -7,6 +17,9 @@ import { RabbitmqPermissionsModal } from './users/permissions/RabbitmqPermission
 import { useDetection, type RabbitmqDetectionResult } from './detection/detection';
 import { DEFAULT_MQTT_PERMISSIONS } from './users/users-api';
 import { useTranslationState } from '@attraccess/plugins-frontend-ui';
+
+// Coverage instrumentation plus parallel nx tasks make renders slow.
+configure({ asyncUtilTimeout: 10_000 });
 
 const request = vi.hoisted(() => vi.fn());
 vi.mock('@attraccess/plugins-frontend-sdk', () => ({
@@ -179,7 +192,7 @@ it('loads users and requires confirmation before deletion, then refreshes the li
     if (options?.method === 'DELETE') return undefined;
     return { mqttServerId: 104, users: [user], vhosts: ['/'] };
   });
-  render(<RabbitmqUserPanel mqttServerId={104} />);
+  render(<RabbitmqUserPanel mqttServerId={104} canManage />);
   expect(await screen.findByRole('row', { name: /sensor/ })).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Delete user sensor' }));
   const dialog = await screen.findByRole('alertdialog');
@@ -196,7 +209,7 @@ it('keeps the delete dialog open on failure and names a generic failure only onc
     if (options?.method === 'DELETE') throw 'unreadable';
     return { mqttServerId: 107, users: [user], vhosts: ['/'] };
   });
-  render(<RabbitmqUserPanel mqttServerId={107} />);
+  render(<RabbitmqUserPanel mqttServerId={107} canManage />);
   fireEvent.click(await screen.findByRole('button', { name: 'Delete user sensor' }));
   const dialog = await screen.findByRole('alertdialog');
   fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
@@ -229,7 +242,7 @@ it('refreshes cached row translations without reloading users or changing their 
     if (path.includes('/detection/')) return detected;
     return { mqttServerId: 106, users: [{ ...user, tags: [] }], vhosts: ['/'] };
   });
-  render(<RabbitmqUserPanel mqttServerId={106} />);
+  render(<RabbitmqUserPanel mqttServerId={106} canManage />);
   await screen.findByRole('button', { name: 'Edit user sensor' });
   const calls = request.mock.calls.length;
   act(() => useTranslationState.setState({ language: 'de' }));

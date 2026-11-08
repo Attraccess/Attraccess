@@ -15,6 +15,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { RabbitmqManagementClient } from '../management/client';
+import { RABBITMQ_MANAGE_PERMISSION, RABBITMQ_VIEW_PERMISSION } from '../permissions';
 
 export const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 
@@ -283,18 +284,19 @@ export class RabbitmqUsersService {
   }
 }
 
-@Auth('resources.update')
 @Controller('rabbitmq')
 export class RabbitmqUsersController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor
   // types for injection — always inject by an explicit token.
   constructor(@Inject(RabbitmqUsersService) private readonly users: RabbitmqUsersService) {}
 
+  @Auth(RABBITMQ_VIEW_PERMISSION)
   @Get('users/:mqttServerId')
   list(@Param('mqttServerId', ParseIntPipe) mqttServerId: number): Promise<RabbitmqUserList> {
     return this.users.listUsers(mqttServerId);
   }
 
+  @Auth(RABBITMQ_MANAGE_PERMISSION)
   @Put('users/:mqttServerId/:username')
   upsert(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
@@ -304,6 +306,7 @@ export class RabbitmqUsersController {
     return this.users.upsertUser(mqttServerId, username, dto ?? {});
   }
 
+  @Auth(RABBITMQ_MANAGE_PERMISSION)
   @Delete('users/:mqttServerId/:username')
   remove(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
@@ -312,6 +315,7 @@ export class RabbitmqUsersController {
     return this.users.deleteUser(mqttServerId, username);
   }
 
+  @Auth(RABBITMQ_MANAGE_PERMISSION)
   @Put('users/:mqttServerId/:username/permissions')
   setPermissions(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
@@ -324,6 +328,7 @@ export class RabbitmqUsersController {
     return this.users.setPermissions(mqttServerId, username, dto);
   }
 
+  @Auth(RABBITMQ_MANAGE_PERMISSION)
   @Delete('users/:mqttServerId/:username/permissions')
   clearPermissions(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
