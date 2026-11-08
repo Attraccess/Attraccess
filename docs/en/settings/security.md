@@ -204,7 +204,7 @@ auth.success type=login outcome=success ip=1.2.3.4 user_id=42 username=alice ts=
 A minimal `failregex` for `/etc/fail2ban/filter.d/attraccess-auth.conf`:
 
 ```
-failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete|sso_link_account|sso_provisioning) outcome=\S+ ip=<HOST> .*$
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete|sso_link_account) outcome=\S+ ip=<HOST> .*$
 ignoreregex =
 ```
 
@@ -223,7 +223,7 @@ bantime  = 900
 The shipped Docker Compose stack already wires both files for you behind the `fail2ban` profile — see [Docker Compose installation](installation/docker-compose.md#brute-force-ip-banning-with-fail2ban).
 
 > [!NOTE]
-> Every rejected SSO link-token request and every wrong provisioning secret writes an `auth.failed` line. With `maxretry = 5`, fail2ban can ban an IP before Attraccess itself answers `429`. This includes a misconfigured identity provider, which is then also blocked from back-channel logout. If you don't want that, remove `sso_provisioning` from the `failregex`.
+> Failed SSO provisioning requests (a wrong Bearer or `x-api-key` secret) are logged as `auth.failed type=sso_provisioning`, but the shipped filter does not match them. Banning an identity provider's IP would also block its back-channel logout, and Attraccess already throttles these requests itself (`429`). If you want firewall bans for them anyway, add `sso_provisioning` to the `failregex`.
 
 ## fail2ban Administration
 

@@ -203,14 +203,14 @@ Passwoerter, Tokens oder andere Secrets werden nie geloggt.
 Minimaler `failregex` fuer `/etc/fail2ban/filter.d/attraccess-auth.conf`:
 
 ```
-failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete|sso_link_account|sso_provisioning) outcome=\S+ ip=<HOST> .*$
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete|sso_link_account) outcome=\S+ ip=<HOST> .*$
 ignoreregex =
 ```
 
 Der mitgelieferte Docker-Compose-Stack verdrahtet beide Dateien hinter dem Profil `fail2ban` automatisch — siehe [Docker-Compose-Installation](installation/docker-compose.md#brute-force-ip-sperre-mit-fail2ban).
 
 > [!NOTE]
-> Jede abgelehnte Anfrage mit einem SSO-Verknuepfungs-Token und jedes falsche Provisionierungs-Secret schreibt eine `auth.failed`-Zeile. Mit `maxretry = 5` kann fail2ban eine IP sperren, bevor Attraccess selbst mit `429` antwortet. Das betrifft auch einen falsch konfigurierten Identity Provider, der dann auch keine Back-Channel-Abmeldung mehr senden kann. Wer das nicht will, entfernt `sso_provisioning` aus dem `failregex`.
+> Fehlgeschlagene SSO-Provisionierungsanfragen (falsches Bearer- oder `x-api-key`-Secret) werden als `auth.failed type=sso_provisioning` geloggt, vom mitgelieferten Filter aber nicht erfasst. Wuerde die IP eines Identity Providers gesperrt, bliebe auch dessen Back-Channel-Abmeldung aus, und Attraccess drosselt diese Anfragen bereits selbst (`429`). Wer trotzdem Firewall-Sperren dafuer will, ergaenzt `sso_provisioning` im `failregex`.
 
 ## fail2ban-Administration
 
