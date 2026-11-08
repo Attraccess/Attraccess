@@ -61,7 +61,7 @@ describe('hook runtime', () => {
     setTimeout(
       () =>
         publishHookServices({
-          preStart: { evaluate: async () => ({ decision: 'allow' }) },
+          preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
           sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
           readerUi: { getSlotContributions },
         }),

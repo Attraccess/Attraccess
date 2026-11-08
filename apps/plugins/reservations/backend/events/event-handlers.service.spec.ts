@@ -63,6 +63,7 @@ describe('ReservationEventHandlers', () => {
         await p.preStart.evaluate({
           resourceId: 1,
           userId: 10,
+          principal: 10,
           action: 'start',
           origin: 'reader',
           confirmedStepKeys: [],

@@ -507,6 +507,7 @@ describe('PreStartService', () => {
         const state = await p.preStart.evaluateStartBlocked({
           resourceId: 1,
           userId: 10,
+          principal: 10,
           language: 'en',
           now: h.clock(),
         });
