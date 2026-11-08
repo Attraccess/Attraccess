@@ -24,9 +24,9 @@ export function createAuditMetrics(registry: Registry): AuditMetrics {
     labelNames: ['domain', 'reason'],
     registers: [registry],
   });
-  // Create the series up front so increase() sees the first drop.
+  // Create the series up front so increase() sees the first drop. labels() alone does not create a series.
   for (const domain of [...CORE_AUDIT_DOMAINS, 'unknown']) {
-    for (const reason of AUDIT_DROP_REASONS) recordsDropped.labels(domain, reason);
+    for (const reason of AUDIT_DROP_REASONS) recordsDropped.inc({ domain, reason }, 0);
   }
   return { recordsDropped };
 }
