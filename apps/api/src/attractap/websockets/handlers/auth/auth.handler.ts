@@ -84,15 +84,13 @@ export class AttractapAuthHandler {
     if (reader.pairingState !== 'unpaired') {
       this.logger.warn(`Token sign-in rejected for ${reader.pairingState} reader ${reader.id}`);
       if (this.shouldAuditTokenRejection(reader.id))
-        await this.audit
-          .recordAttractap({
-            action: 'reader.token_rejected',
-            actorId: null,
-            authenticationMethod: null,
-            subjectId: reader.id,
-            details: { reason: reader.pairingState },
-          })
-          .catch(() => undefined);
+        await this.audit.recordAttractap({
+          action: 'reader.token_rejected',
+          actorId: null,
+          authenticationMethod: null,
+          subjectId: reader.id,
+          details: { reason: reader.pairingState },
+        });
       return await socket.sendMessage(
         new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, { message: 'PAIRING_REQUIRED' }),
       );

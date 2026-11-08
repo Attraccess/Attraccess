@@ -281,17 +281,20 @@ export class ProjectsService extends ProjectInvitations {
       await manager.getRepository(ResourceUsage).update({ projectId: id }, { projectId: null });
       const result = await manager.getRepository(Project).delete(id);
       if (result.affected !== 1) throw new NotFoundException('Project not found');
+      await this.audit.recordProject(
+        {
+          action: 'project.deleted',
+          actorId: ownerUserId,
+          authenticationMethod,
+          apiTokenId,
+          subjectType: 'project',
+          subjectId: id,
+          details,
+        },
+        manager,
+      );
     });
     this.metricsService.projectsTotal.dec();
-    await this.audit.recordProject({
-      action: 'project.deleted',
-      actorId: ownerUserId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project',
-      subjectId: id,
-      details,
-    });
   }
 
   public async updateOne(

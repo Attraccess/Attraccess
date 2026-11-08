@@ -242,14 +242,17 @@ export class MaintenanceScheduleService {
       await manager.getRepository(ResourceMaintenanceScheduleUsageCountConfig).delete({ scheduleId });
       await manager.getRepository(ResourceMaintenanceScheduleTimeIntervalConfig).delete({ scheduleId });
       await manager.getRepository(ResourceMaintenanceSchedule).remove(schedule);
-    });
-    await this.audit.recordResource({
-      action: 'maintenance_schedule.deleted',
-      actorId,
-      authenticationMethod,
-      apiTokenId,
-      subjectId: resourceId,
-      details,
+      await this.audit.recordResource(
+        {
+          action: 'maintenance_schedule.deleted',
+          actorId,
+          authenticationMethod,
+          apiTokenId,
+          subjectId: resourceId,
+          details,
+        },
+        manager,
+      );
     });
   }
 

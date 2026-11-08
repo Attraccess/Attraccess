@@ -33,6 +33,7 @@ import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
 import { AuditModule } from './audit.module';
 import { AuditService } from './audit.service';
+import { AUDIT_METRICS } from '../metrics/definitions/tokens';
 import { demoDomain, setupAuditDatabase } from './audit.test-fixture';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
@@ -236,6 +237,7 @@ describe('durable audit SQLite', () => {
         .useMocker((token) => {
           if (token === DataSource) return fixture.source;
           if (token === EventEmitter2) return new EventEmitter2();
+          if (token === AUDIT_METRICS) return fixture.metrics;
           return {};
         })
         .compile();
@@ -266,7 +268,9 @@ describe('durable audit SQLite', () => {
     const module = await Test.createTestingModule({ imports: [AuditModule] })
       .overrideModule(SettingsModule)
       .useModule(FixtureSettingsModule)
-      .useMocker((token) => (token === DataSource ? fixture.source : undefined))
+      .useMocker((token) =>
+        token === DataSource ? fixture.source : token === AUDIT_METRICS ? fixture.metrics : undefined,
+      )
       .compile();
     await module.init();
     const sink = module.get<AuditService>(PLUGIN_AUDIT_HOST_PROVIDER);

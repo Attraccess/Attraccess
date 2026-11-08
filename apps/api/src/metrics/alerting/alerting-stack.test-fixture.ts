@@ -7,6 +7,7 @@ import { GenericContainer, Network, StartedNetwork, StartedTestContainer, Wait }
 import { AttractapCrashReport } from '@attraccess/database-entities';
 import { MetricsService } from '../metrics.service';
 import { ResetReportMetricsCollector } from '../reset-report-metrics.collector';
+import { AuditMetrics, createAuditMetrics } from '../definitions/audit.metrics';
 
 const MONITORING = join(__dirname, '..', '..', '..', '..', '..', 'monitoring');
 const PROVISIONING = join(MONITORING, 'grafana', 'provisioning');
@@ -65,6 +66,7 @@ class MetricsServer {
     readonly port: number,
     private readonly server: Server,
     private readonly source: DataSource,
+    readonly audit: AuditMetrics,
   ) {}
 
   static async start(file: string): Promise<MetricsServer> {
@@ -72,6 +74,7 @@ class MetricsServer {
     const service = new MetricsService(...(Array(7).fill({}) as ConstructorParameters<typeof MetricsService>));
     const collector = new ResetReportMetricsCollector(service, source.getRepository(AttractapCrashReport));
     collector.onModuleInit();
+    const audit = createAuditMetrics(service.registry);
     const server = createServer((req, res) => {
       service
         .getMetrics()
@@ -80,7 +83,7 @@ class MetricsServer {
     });
     await new Promise<void>((resolve) => server.listen(0, '0.0.0.0', resolve));
     const address = server.address();
-    return new MetricsServer(typeof address === 'object' && address ? address.port : 0, server, source);
+    return new MetricsServer(typeof address === 'object' && address ? address.port : 0, server, source, audit);
   }
 
   async stop(): Promise<void> {
@@ -245,6 +248,11 @@ policies:
         );
       }
     });
+  }
+
+  /** Counts dropped audit records on the first metrics server, as the API does when a write is lost. */
+  dropAuditRecords(domain: string, reason: string, count = 1): void {
+    this.servers[0].audit.recordsDropped.inc({ domain, reason }, count);
   }
 
   /** Makes every count query fail, as a broken database would; both metrics servers then answer 500. */

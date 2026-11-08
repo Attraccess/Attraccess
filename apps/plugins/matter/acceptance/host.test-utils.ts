@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AuditService } from '../../../api/src/audit/audit.service';
+import { createTestAuditMetrics } from '../../../api/src/audit/audit.test-fixture';
 import * as coreMigrations from '../../../api/src/database/migrations';
 import { EncryptionService } from '../../../api/src/encryption/encryption.service';
 import {
@@ -87,7 +88,11 @@ export async function bootHost(
     synchronize: false,
   }).initialize();
   await db.runMigrations();
-  const audit = new AuditService(db, new SettingsStoreService(db.getRepository(Setting), null));
+  const audit = new AuditService(
+    db,
+    new SettingsStoreService(db.getRepository(Setting), null),
+    createTestAuditMetrics(),
+  );
   await audit.onModuleInit();
   const encryption = new EncryptionService(
     new ConfigService({ app: { AUTH_SESSION_SECRET: 'matter-acceptance-encryption-key' } }),

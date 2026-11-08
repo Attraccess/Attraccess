@@ -88,7 +88,7 @@ export async function resetTestFixture(scope: BillingServiceTestScope) {
       },
       {
         provide: AuditService,
-        useValue: { recordBillingTransaction: jest.fn(), recordBillingTransactionAfterCommit: jest.fn() },
+        useValue: { recordBillingTransaction: jest.fn() },
       },
     ],
   }).compile();

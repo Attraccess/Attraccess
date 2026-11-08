@@ -34,6 +34,7 @@ import {
 import { CORE_AUDIT_DOMAINS } from './policies/domains';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
+import { createTestAuditMetrics } from './audit.test-fixture';
 
 describe('audit domains through migrated storage and the admin HTTP API', () => {
   let directory: string;
@@ -79,7 +80,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     }).initialize();
     await source.runMigrations();
     store = new SettingsStoreService(source.getRepository(Setting), null);
-    audit = new AuditService(source, store);
+    audit = new AuditService(source, store, createTestAuditMetrics());
     settings = new SettingsService(null, store, { getSettings: async () => ({}) } as never, null, events);
     const module = await Test.createTestingModule({
       controllers: [AuditController, SettingsController],

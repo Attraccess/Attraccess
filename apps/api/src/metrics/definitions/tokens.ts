@@ -8,3 +8,4 @@ export const EXTERNAL_METRICS = Symbol('EXTERNAL_METRICS');
 export const SSE_METRICS = Symbol('SSE_METRICS');
 export const FLOW_METRICS = Symbol('FLOW_METRICS');
 export const OPERATING_METRICS = Symbol('OPERATING_METRICS');
+export const AUDIT_METRICS = Symbol('AUDIT_METRICS');

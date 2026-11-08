@@ -81,7 +81,7 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
       },
     ),
   };
-  scope.audit = { recordBillingTransactionAfterCommit: jest.fn(), recordResource: jest.fn() };
+  scope.audit = { recordBillingTransaction: jest.fn(), recordResource: jest.fn() };
   scope.liveNotifications = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
   await scope.source
     .getRepository(ResourceMeter)
