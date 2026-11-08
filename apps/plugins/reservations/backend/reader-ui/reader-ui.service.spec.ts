@@ -10,7 +10,7 @@ import {
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
-import { readerName, readerTexts, readerTime } from './texts';
+import { nextLocalMidnight, readerName, readerTexts, readerTime } from './texts';
 
 // Harness zone is Europe/Berlin (UTC+2 in June): 12:00Z is 14:00 local.
 const HOLDER = 10;
@@ -164,45 +164,49 @@ describe('ReaderUiService', () => {
       await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
       h.setNow('2026-06-01T08:05:00Z'); // 10:05 local, started 10:00
       const en = await slots();
-      expect(row(en)).toBe('Res., check-in 10:15');
+      expect(row(en)).toBe('Res., check in by 10:15');
       expect(body(en)).toBe('Reserved 10:00-16:00 (check in by 10:15)');
       expect(header(en)).toBeUndefined();
       const de = await slots({ language: 'de' });
-      expect(row(de)).toBe('Res., Check-in 10:15');
+      expect(row(de)).toBe('Res., Check-in bis 10:15');
       expect(body(de)).toBe('Reserviert 10:00-16:00 (Check-in bis 10:15)');
       expectHostValid(en);
       expectHostValid(de);
     });
 
-    it('check-in row: the longest variant that fits 24 characters, never a name for a signed-out reader', async () => {
+    it('check-in row never carries a name; the name only goes into the details', async () => {
       await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
       h.setNow('2026-06-01T08:05:00Z');
-      // Signed out: no names, and neither the named nor "Reserved (check in by …)" form fits, so the short one.
       const out = await slots();
-      expect(row(out)).toBe('Res., check-in 10:15');
+      expect(row(out)).toBe('Res., check in by 10:15');
       expect(body(out)).toBe('Reserved 10:00-16:00 (check in by 10:15)');
-      // A manager may see the name; it goes into the details, the row falls back to the short form.
+      // A manager may see the name: the details carry it, the row stays the same.
       const manager = await slots({ userId: MANAGER });
-      expect(row(manager)).toBe('Res., check-in 10:15');
+      expect(row(manager)).toBe('Res., check in by 10:15');
       expect(body(manager)).toBe('Reserved by user10 10:00-16:00 (check in by 10:15)');
-      expect(body(await slots({ userId: MANAGER, language: 'de' }))).toBe(
-        'Reserviert von user10 10:00-16:00 (Check-in bis 10:15)',
-      );
-      // Somebody who may not see names gets the unnamed form.
+      const managerDe = await slots({ userId: MANAGER, language: 'de' });
+      expect(row(managerDe)).toBe('Res., Check-in bis 10:15');
+      expect(body(managerDe)).toBe('Reserviert von user10 10:00-16:00 (Check-in bis 10:15)');
+      // Somebody who may not see names gets the unnamed form; with core's attribution rule they see the name.
       expect(body(await slots({ userId: OTHER }))).toBe('Reserved 10:00-16:00 (check in by 10:15)');
-      for (const slot of [out, manager]) expectHostValid(slot);
+      h.allowAttribution(OTHER, 1);
+      const attributed = await slots({ userId: OTHER });
+      expect(row(attributed)).toBe('Res., check in by 10:15');
+      expect(body(attributed)).toBe('Reserved by user10 10:00-16:00 (check in by 10:15)');
+      for (const slot of [out, manager, managerDe, attributed]) expectHostValid(slot);
     });
 
-    it('check-in row variants by length, en and de', () => {
+    it('check-in row: "check in by" while it fits 24 characters, without "by" for a weekday time', () => {
       const clock = (lang: 'en' | 'de') => ({ lang, timeZone: 'Europe/Berlin', now: new Date('2026-06-01T08:05:00Z') });
-      const at = new Date('2026-06-01T08:15:00Z');
-      expect(readerTexts.rowCheckInBy(at, clock('en'))).toBe('Res., check-in 10:15');
-      expect(readerTexts.rowCheckInBy(at, clock('de'))).toBe('Res., Check-in 10:15');
-      expect(readerTexts.rowCheckInBy(at, clock('en'), 'Al')).toBe('Res., check-in 10:15');
-      // Only a time-less stub of the longer forms would fit 24 characters; they are tried first when they do.
-      const short = new Date('2026-06-01T08:15:00Z');
+      const today = new Date('2026-06-01T08:15:00Z');
+      expect(readerTexts.rowCheckInBy(today, clock('en'))).toBe('Res., check in by 10:15');
+      expect(readerTexts.rowCheckInBy(today, clock('de'))).toBe('Res., Check-in bis 10:15');
+      const wednesday = new Date('2026-06-03T08:15:00Z');
+      expect(readerTexts.rowCheckInBy(wednesday, clock('en'))).toBe('Res., check-in Wed 10:15');
+      expect(readerTexts.rowCheckInBy(wednesday, clock('de'))).toBe('Res., Check-in Mi 10:15');
       for (const lang of ['en', 'de'] as const) {
-        expect(readerTexts.rowCheckInBy(short, clock(lang)).length).toBeLessThanOrEqual(24);
+        for (const at of [today, wednesday])
+          expect(readerTexts.rowCheckInBy(at, clock(lang)).length).toBeLessThanOrEqual(24);
       }
     });
 
@@ -416,6 +420,13 @@ describe('ReaderUiService', () => {
     });
 
     it('running, checked in: the end of the booking', async () => {
+      const booking = await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      await h.reservations.markCheckedIn(booking.id, 5, h.clock());
+      expect(expiry(await slots())).toEqual(['2026-06-01T14:00:00.000Z']);
+    });
+
+    it('running, check-in turned off: the end of the booking', async () => {
       await h.enable(1, { checkInEnabled: false });
       await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
       h.setNow('2026-06-01T08:05:00Z');
@@ -431,6 +442,16 @@ describe('ReaderUiService', () => {
     it('signed in: also when the confirm window opens', async () => {
       await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00'); // confirm window opens 11:00Z
       expect(expiry(await slots({ userId: OTHER }))).toEqual(['2026-06-01T11:00:00.000Z']);
+    });
+
+    it.each([
+      ['Europe/Berlin', '2026-03-28T12:00:00Z', '2026-03-28T23:00:00.000Z'], // ordinary day before the spring change
+      ['Europe/Berlin', '2026-03-29T10:00:00Z', '2026-03-29T22:00:00.000Z'], // 23-hour day
+      ['Europe/Berlin', '2026-10-25T10:00:00Z', '2026-10-25T23:00:00.000Z'], // 25-hour day
+      ['Asia/Kathmandu', '2026-06-01T12:00:00Z', '2026-06-01T18:15:00.000Z'], // UTC+5:45
+      ['America/Santiago', '2026-09-05T16:00:00Z', '2026-09-06T04:00:00.000Z'], // midnight skipped: day starts 01:00
+    ])('next local midnight in %s after %s', (timeZone, now, expected) => {
+      expect(nextLocalMidnight(new Date(now), timeZone).toISOString()).toBe(expected);
     });
 
     it('local midnight, when the weekday of a time changes', async () => {

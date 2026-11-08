@@ -179,7 +179,7 @@ export class PreStartService {
     if (!unconfirmed) return null;
     const until = await this.timeText(ctx, unconfirmed.endTime, now);
     if (!isManager) {
-      const found = await this.holderNameFor(subjectOfPrincipal(ctx.principal), unconfirmed);
+      const found = await this.holderNameFor(starter, unconfirmed);
       const holder = found && ctx.origin === 'reader' ? readerName(found) : found;
       return { decision: 'block', reason: reservedReason(lang, until, holder) };
     }

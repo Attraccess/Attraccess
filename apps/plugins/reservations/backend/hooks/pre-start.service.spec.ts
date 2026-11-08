@@ -436,7 +436,9 @@ describe('PreStartService', () => {
       });
 
       it('asks to confirm without a name, with the no-screen policy block', async () => {
+        const names = jest.spyOn(h.directory, 'getUserNames');
         const result = await p.preStart.evaluate(reader(10));
+        expect(names).not.toHaveBeenCalled();
         expect(result).toMatchObject({
           decision: 'confirm',
           confirmation: {
@@ -487,7 +489,9 @@ describe('PreStartService', () => {
       });
 
       it('refuses a non-manager without a name', async () => {
+        const names = jest.spyOn(h.directory, 'getUserNames');
         const result = await p.preStart.evaluate(reader(10));
+        expect(names).not.toHaveBeenCalled();
         expect(result).toEqual({
           decision: 'block',
           reason: { code: 'RESERVED', title: 'Reserved', body: 'Reserved by another user until 16:00.' },

@@ -682,6 +682,13 @@ describe('ReservationService', () => {
       await h.admin.update(manager, 1, { enabled: true });
       expect(readers()).toHaveLength(3);
       expect(readers().every((scope) => scope.resourceId === 1)).toBe(true);
+      await book(alice, [8, 9]);
+      h.invalidateReaderUi.mockClear();
+      expect(await h.admin.update(manager, 1, { enabled: false, cancelFutureBookings: true })).toMatchObject({
+        cancelledBookings: 1,
+      });
+      // The cancellation and the settings change each refresh the readers.
+      expect(readers()).toEqual([{ resourceId: 1 }, { resourceId: 1 }]);
       await h.enable(1);
       h.invalidateReaderUi.mockClear();
       await h.admin.setTimezone(manager, 'UTC');

@@ -140,5 +140,18 @@ describe('SessionEndService', () => {
     it('offers nothing to a user without a running booking of their own', async () => {
       expect(await p.sessionEnd.evaluate(ctx(11, { origin: 'reader' }))).toEqual({ decision: 'none' });
     });
+
+    it('writes an end on another local day with its weekday on a reader only', async () => {
+      await p.book(12, 1, '2026-06-01T21:00:00', '2026-06-01T23:00:00'); // Mon 23:00 to Tue 01:00 local
+      h.setNow('2026-06-01T21:30:00Z');
+      const body = async (patch: Partial<SessionEndContext>) => {
+        const result = await p.sessionEnd.evaluate(ctx(12, { now: h.clock(), ...patch }));
+        if (result.decision !== 'choose') throw new Error('expected a choice');
+        return result.choice.body;
+      };
+      expect(await body({ origin: 'reader' })).toBe('Your booking runs until Tue 01:00. Keep it or free the rest?');
+      expect(await body({ origin: 'reader', language: 'de' })).toContain('bis Di 01:00');
+      expect(await body({ origin: 'web' })).toBe('Your booking runs until 01:00. Keep it or free the rest?');
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { READER_UI_LIMITS } from '@attraccess/plugins-backend-sdk';
 import type { Lang } from '../notifications/host-info.service';
-import { dayKey, formatTime, LOCALES, pick } from '../notifications/format';
+import { cachedFormat, dayKey, formatTime, LOCALES, pick } from '../notifications/format';
 
 /** Longest holder name on a reader: the longest text around it (confirm body) still fits 80 characters. */
 export const READER_NAME_MAX = 16;
@@ -58,7 +58,7 @@ export interface ReaderClock {
 export function readerTime(date: Date, clock: ReaderClock): string {
   const time = formatTime(date, clock);
   if (dayKey(date, clock.timeZone) === dayKey(clock.now, clock.timeZone)) return time;
-  const weekday = new Intl.DateTimeFormat(LOCALES[clock.lang], { timeZone: clock.timeZone, weekday: 'short' })
+  const weekday = cachedFormat(LOCALES[clock.lang], { timeZone: clock.timeZone, weekday: 'short' })
     .format(date)
     .replace(/\.$/, '');
   return `${weekday} ${time}`;
@@ -72,7 +72,7 @@ const QUARTER_HOUR_MS = 15 * 60_000;
  * of 15 minutes), which covers days of 23 or 25 hours at a daylight saving change.
  */
 export function nextLocalMidnight(now: Date, timeZone: string): Date {
-  const parts = new Intl.DateTimeFormat('en-GB', {
+  const parts = cachedFormat('en-GB', {
     timeZone,
     hour: '2-digit',
     minute: '2-digit',
@@ -92,23 +92,17 @@ const range = (start: Date, end: Date, clock: ReaderClock) => `${readerTime(star
 
 /** Slot texts. Every function returns the final string; callers only enforce the host limits. */
 export const readerTexts = {
-  /** List row, ≤ 24 characters (a long weekday form falls back to the short wording). */
+  /** List rows, ≤ 24 characters. They never carry a name. */
   rowFreeUntil: (start: Date, c: ReaderClock) =>
     fit(pick(c.lang, `Free until ${readerTime(start, c)}`, `Frei bis ${readerTime(start, c)}`), ROW_MAX),
   /**
-   * Running booking that still awaits its check-in. The longest variant that fits wins: with the holder
-   * (only when the viewer may see names), "Reserved (check in by …)", then the short "Res., check-in …".
+   * Running booking that still awaits its check-in. "Reserved (check in by …)" never fits 24 characters, so
+   * the row says "Res., check in by 14:15"; a time with a weekday drops the "by" ("Res., check-in Tue 00:05").
    */
-  rowCheckInBy: (deadline: Date, c: ReaderClock, holder?: string) => {
+  rowCheckInBy: (deadline: Date, c: ReaderClock) => {
     const at = readerTime(deadline, c);
-    const variants = [
-      ...(holder
-        ? [pick(c.lang, `Reserved by ${holder} (check in by ${at})`, `Reserviert von ${holder} (Check-in bis ${at})`)]
-        : []),
-      pick(c.lang, `Reserved (check in by ${at})`, `Reserviert (Check-in bis ${at})`),
-      pick(c.lang, `Res., check-in ${at}`, `Res., Check-in ${at}`),
-    ];
-    return variants.find((text) => text.length <= ROW_MAX) ?? fit(variants[variants.length - 1], ROW_MAX);
+    const long = pick(c.lang, `Res., check in by ${at}`, `Res., Check-in bis ${at}`);
+    return long.length <= ROW_MAX ? long : fit(pick(c.lang, `Res., check-in ${at}`, `Res., Check-in ${at}`), ROW_MAX);
   },
   rowReservedUntil: (end: Date, c: ReaderClock) =>
     fit(pick(c.lang, `Reserved until ${readerTime(end, c)}`, `Reserviert bis ${readerTime(end, c)}`), ROW_MAX),
