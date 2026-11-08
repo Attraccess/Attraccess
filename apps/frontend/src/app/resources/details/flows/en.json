@@ -38,10 +38,6 @@
     }
   },
   "global": {
-    "noticeTitle": "Global flow",
-    "notice": "Runs for every resource; a failing or slow global flow affects starts and stops on all machines.",
-    "enabled": "Enabled",
-    "back": "All flows",
     "saveUnsupportedNodes": {
       "title": "Flow not saved",
       "description": "These nodes are not available in global flows: {{nodes}}"

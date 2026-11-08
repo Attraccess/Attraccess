@@ -84,6 +84,24 @@ describe('GlobalFlowsListPage', () => {
     expect(state.update).toHaveBeenCalledWith({ flowId: 2, requestBody: { enabled: true } });
   });
 
+  it('names each switch by the state it shows', () => {
+    renderPage();
+
+    expect(screen.getByRole('switch', { name: 'Power off all enabled' })).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Notify enabled' })).not.toBeChecked();
+  });
+
+  it('locks only the switch of the flow being saved', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    // The mocked mutation never settles, so the first flow stays in its saving state.
+    await user.click(screen.getByRole('switch', { name: 'Power off all enabled' }));
+
+    expect(screen.getByRole('switch', { name: 'Power off all enabled' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'Notify enabled' })).toBeEnabled();
+  });
+
   it('opens the editor from the edit action', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -121,6 +139,17 @@ describe('GlobalFlowsListPage', () => {
 
     expect(state.create).toHaveBeenCalledWith({ requestBody: { name: 'Lights', description: 'Turn lights off' } });
     expect(state.navigate).toHaveBeenCalledWith('/devices/flows/42');
+  });
+
+  it('creates a flow when Enter is pressed in the name field', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'New flow' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Lights{Enter}');
+
+    expect(state.create).toHaveBeenCalledWith({ requestBody: { name: 'Lights', description: undefined } });
   });
 
   it('starts every opening of the create modal empty, even after a cancelled attempt', async () => {

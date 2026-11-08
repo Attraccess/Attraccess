@@ -2,7 +2,9 @@
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
+import type { ResourceFlowNodeDto, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { useFlowImportExport } from './flowImportExport';
+import { findUnsupportedNodeTypes, type FlowOwner } from './flowOwner';
 
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
@@ -11,23 +13,34 @@ vi.mock('../../../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: toastSuccess, error: toastError }),
 }));
 
-function Harness({ onResult }: { onResult: (r: { nodes: unknown[]; edges: unknown[] }) => void }) {
+const t = (key: string, options?: Record<string, unknown>) => (options ? `${key} ${JSON.stringify(options)}` : key);
+
+function Harness({
+  onResult,
+  findUnsupportedNodes,
+}: {
+  onResult: (r: { nodes: unknown[]; edges: unknown[] }) => void;
+  findUnsupportedNodes?: (nodes: ResourceFlowNodeDto[]) => string[];
+}) {
   const { handleImportClick } = useFlowImportExport({
     nodes: [],
     edges: [],
     setNodes: (n) => onResult({ nodes: n as unknown[], edges: [] }),
     setEdges: (e) => onResult({ nodes: [], edges: e as unknown[] }),
     resourceId: 1,
-    t: (k: string) => k,
+    findUnsupportedNodes,
+    t,
   });
   return <button onClick={handleImportClick}>import</button>;
 }
 
-async function runImport(json: string) {
-  const results: { nodes: unknown[]; edges: unknown[] } = { nodes: [], edges: [] };
+async function runImport(json: string, findUnsupportedNodes?: (nodes: ResourceFlowNodeDto[]) => string[]) {
+  const results: { nodes: unknown[]; edges: unknown[]; setCalls: number } = { nodes: [], edges: [], setCalls: 0 };
   const { getByText } = render(
     <Harness
+      findUnsupportedNodes={findUnsupportedNodes}
       onResult={(r) => {
+        results.setCalls += 1;
         if (r.nodes.length) results.nodes = r.nodes;
         if (r.edges.length) results.edges = r.edges;
       }}
@@ -102,5 +115,66 @@ describe('useFlowImportExport - import', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
 
     Object.defineProperty(globalThis.crypto, 'randomUUID', { value: original, configurable: true });
+  });
+
+  describe('unsupported nodes', () => {
+    const schema = (type: string, supportedByResource: boolean, scopes: Array<'resource' | 'global'>) =>
+      ({ type, supportedByResource, supportedFlowScopes: scopes }) as unknown as ResourceFlowNodeSchemaDto;
+    const schemas = [
+      schema('input.button', true, ['resource']),
+      schema('processing.if', true, ['resource', 'global']),
+      schema('output.plugin.door', false, ['resource', 'global']),
+    ];
+    const titles: Record<string, string> = { 'input.button': 'Button', 'output.plugin.door': 'Door' };
+    // Mirrors the editor: the catalogue rules, mapped to display names.
+    const finderFor = (owner: FlowOwner) => (nodes: ResourceFlowNodeDto[]) =>
+      findUnsupportedNodeTypes(nodes, schemas, owner).map((type) => titles[type] ?? type);
+
+    it('rejects a node the global scope does not support, names it and loads nothing', async () => {
+      const json = JSON.stringify({
+        version: 1,
+        nodes: [NODE('a', 'input.button'), NODE('b', 'processing.if'), NODE('c', 'input.button')],
+        edges: [{ id: 'e1', source: 'a', target: 'b' }],
+      });
+
+      const { results } = await runImport(json, finderFor({ kind: 'global', flowId: 3 }));
+
+      await waitFor(() => expect(toastError).toHaveBeenCalled());
+      expect(toastError).toHaveBeenCalledWith({
+        title: 'import.error.title',
+        description: `import.errors.unsupportedNodes ${JSON.stringify({ nodes: 'Button' })}`,
+      });
+      expect(toastSuccess).not.toHaveBeenCalled();
+      expect(results.setCalls).toBe(0);
+    });
+
+    it('rejects a node the resource does not support, like the catalogue does', async () => {
+      const json = JSON.stringify({ version: 1, nodes: [NODE('a', 'output.plugin.door')], edges: [] });
+
+      const { results } = await runImport(json, finderFor({ kind: 'resource', resourceId: 1 }));
+
+      await waitFor(() => expect(toastError).toHaveBeenCalled());
+      expect(toastError.mock.calls[0][0].description).toContain('Door');
+      expect(results.setCalls).toBe(0);
+    });
+
+    it('rejects a node type without a schema', async () => {
+      const json = JSON.stringify({ version: 1, nodes: [NODE('a', 'input.unknown')], edges: [] });
+
+      const { results } = await runImport(json, finderFor({ kind: 'global', flowId: 3 }));
+
+      await waitFor(() => expect(toastError).toHaveBeenCalled());
+      expect(toastError.mock.calls[0][0].description).toContain('input.unknown');
+      expect(results.setCalls).toBe(0);
+    });
+
+    it('loads a flow whose nodes are all supported', async () => {
+      const json = JSON.stringify({ version: 1, nodes: [NODE('a', 'output.plugin.door')], edges: [] });
+
+      const { results } = await runImport(json, finderFor({ kind: 'global', flowId: 3 }));
+
+      await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+      expect(results.nodes).toHaveLength(1);
+    });
   });
 });

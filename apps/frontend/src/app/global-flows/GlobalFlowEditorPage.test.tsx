@@ -37,7 +37,12 @@ describe('GlobalFlowEditorPage', () => {
     expect(screen.getByText(/Runs for every resource; a failing or slow global flow/)).toBeInTheDocument();
     expect(state.owner).toEqual({ kind: 'global', flowId: 9 });
 
-    await userEvent.setup().click(screen.getByRole('switch'));
+    // The switch sits in the page header, next to the name.
+    const header = screen.getByRole('heading', { name: 'Power off all' }).closest('.justify-between') as HTMLElement;
+    const toggle = within(header).getByRole('switch', { name: 'Enabled' });
+    expect(toggle).toBeChecked();
+
+    await userEvent.setup().click(toggle);
     expect(state.update).toHaveBeenCalledWith({ flowId: 9, requestBody: { enabled: false } });
   });
 

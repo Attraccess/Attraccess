@@ -10,12 +10,7 @@ import { useAppTheme } from '@attraccess/ui';
 import { usePtrStore } from '../../../../../stores/ptr.store';
 import { NodeCatalogHandle } from '../nodeCatalog/index';
 import { useFlowContext } from '../context/index';
-import {
-  flowScopeOf,
-  useFlowCanvasQuery,
-  useFlowNodeSchemasQuery,
-  useSaveFlowCanvas,
-} from '../flowOwner';
+import { findUnsupportedNodeTypes, useFlowCanvasQuery, useFlowNodeSchemasQuery, useSaveFlowCanvas } from '../flowOwner';
 import { useFlowImportExport } from '../flowImportExport';
 import { useQueryClient } from '@tanstack/react-query';
 import de from '../de.json';
@@ -69,11 +64,7 @@ export function useFlowsPageInnerStateInputs() {
     };
   }, [setPullToRefreshIsEnabled]);
 
-  const {
-    data: originalFlowData,
-    isFetching: isFlowFetching,
-    isError: isFlowError,
-  } = useFlowCanvasQuery(owner);
+  const { data: originalFlowData, isFetching: isFlowFetching, isError: isFlowError } = useFlowCanvasQuery(owner);
   const isFlowLoading = !originalFlowData && isFlowFetching;
   const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
   const nodeTitle = useCallback(
@@ -134,14 +125,11 @@ export function useFlowsPageInnerStateInputs() {
     pasteNodes,
   } = useFlowContext();
 
-  // Checked against the node schemas of this owner's scope, so an import never loads a node the flow cannot save.
+  // Same rules as the catalogue, so an import never loads a node the flow cannot save.
   const findUnsupportedNodes = useCallback(
     (importedNodes: ResourceFlowNodeDto[]) => {
       if (!nodeSchemas) return [];
-      const scope = flowScopeOf(owner);
-      return importedNodes
-        .filter((node) => !nodeSchemas.find((schema) => schema.type === node.type)?.supportedFlowScopes?.includes(scope))
-        .map((node) => nodeTitle(node.type));
+      return findUnsupportedNodeTypes(importedNodes, nodeSchemas, owner).map((type) => nodeTitle(type));
     },
     [nodeSchemas, owner, nodeTitle],
   );
@@ -209,17 +197,7 @@ export function useFlowsPageInnerStateInputs() {
 }
 
 export function useFlowsPageInnerStateNodesHaveChanged(model: ReturnType<typeof useFlowsPageInnerStateInputs>) {
-  const {
-    originalFlowData,
-    nodes,
-    edges,
-    saveFlow,
-    getInternalNode,
-    setNodes,
-    setEdges,
-    fitView,
-    addNode,
-  } = model;
+  const { originalFlowData, nodes, edges, saveFlow, getInternalNode, setNodes, setEdges, fitView, addNode } = model;
   const nodesHaveChanged = useMemo(() => {
     const originalNodes = originalFlowData?.nodes ?? [];
 

@@ -54,6 +54,20 @@ export function schemaSupportsOwner(schema: ResourceFlowNodeSchemaDto, owner: Fl
   return owner.kind === 'global' || schema.supportedByResource;
 }
 
+/** Types of the given nodes this owner's flow cannot hold; a node without a schema counts as unsupported. */
+export function findUnsupportedNodeTypes(
+  nodes: ReadonlyArray<{ type: string }>,
+  schemas: ResourceFlowNodeSchemaDto[],
+  owner: FlowOwner,
+): string[] {
+  return nodes
+    .filter((node) => {
+      const schema = schemas.find((candidate) => candidate.type === node.type);
+      return !schema || !schemaSupportsOwner(schema, owner);
+    })
+    .map((node) => node.type);
+}
+
 // The generated hooks are one set per controller. Both sets are always called, the one that does not
 // match the owner is disabled; an owner never changes during the lifetime of a mounted component.
 const ID_FALLBACK = 0;
@@ -156,8 +170,7 @@ export function useFlowLogRecording(owner: FlowOwner, opts: { isOpen: boolean })
     refetchInterval,
   });
   const recording = (owner.kind === 'resource' ? resourceStatus.data : globalStatus.data) as
-    | FlowLogRecordingDto
-    | undefined;
+    FlowLogRecordingDto | undefined;
   const isRecording = recording?.isRecording ?? false;
   const logsEnabled = opts.isOpen && isRecording;
 

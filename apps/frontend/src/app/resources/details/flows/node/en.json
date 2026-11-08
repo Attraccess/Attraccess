@@ -15,6 +15,7 @@
       "title": "Flow"
     },
     "unsupportedForResourceType": "not supported by this resource",
+    "unsupportedInGlobalFlow": "not available in global flows",
     "genericConfig": {
       "overridableByInput": "Overridable by input: {{fieldName}}",
       "createMqttServer": "Create MQTT server"

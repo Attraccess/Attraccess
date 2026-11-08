@@ -128,6 +128,8 @@ describe('plugin sidebar placement', () => {
   });
 
   it('shows Flows in Devices for operators who only have resources.update', async () => {
+    // No plugin entries, so Flows alone has to make the Devices group appear.
+    state.items = [];
     const user = userEvent.setup();
     renderSidebar();
 
@@ -137,19 +139,23 @@ describe('plugin sidebar placement', () => {
     const devices = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
     if (!devices) throw new Error('Devices panel is missing');
     expect(within(devices).getByRole('link', { name: 'Flows' })).toHaveAttribute('href', '/devices/flows');
-    // Gated on system.settings.manage, which this operator lacks.
-    expect(within(devices).queryByRole('link', { name: 'MQTT Servers' })).not.toBeInTheDocument();
+    expect(
+      within(devices)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/devices/flows']);
   });
 
   it('includes Flows in the collapsed Devices menu', async () => {
+    state.items = [];
     const user = userEvent.setup();
     renderSidebar(true);
 
     await user.click(screen.getByRole('button', { name: 'Devices' }));
 
-    expect(
-      within(screen.getByRole('menu', { name: 'Devices' })).getByRole('menuitem', { name: 'Flows' }),
-    ).toBeVisible();
+    const menu = screen.getByRole('menu', { name: 'Devices' });
+    expect(within(menu).getByRole('menuitem', { name: 'Flows' })).toBeVisible();
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(1);
   });
 
   it('hides WAGO and the empty Devices group without the route permission', () => {

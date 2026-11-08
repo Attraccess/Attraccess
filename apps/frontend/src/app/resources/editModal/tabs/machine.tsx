@@ -118,20 +118,20 @@ export function MachineTab(props: EditorTabProps) {
               <ul className="list-disc pl-4 text-sm">
                 {flowWarnings.map((warning) => (
                   <li key={`${warning.flowId ?? 'resource'}:${warning.triggerNodeId}`}>
-                    {/* Entries of an enabled global flow are labelled with it and open its own editor. */}
-                    {warning.flowId !== null && warning.flowName !== null && (
-                      <>
-                        <Link
-                          href={`/devices/flows/${warning.flowId}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          data-cy="resource-edit-modal-max-parallel-sessions-global-flow-link"
-                        >
-                          {warning.flowName}
-                        </Link>
-                        {': '}
-                      </>
+                    {/* Every entry names its flow; a global flow's name opens that flow's editor. */}
+                    {warning.flowId !== null ? (
+                      <Link
+                        href={`/devices/flows/${warning.flowId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-cy="resource-edit-modal-max-parallel-sessions-global-flow-link"
+                      >
+                        {warning.flowName ?? `#${warning.flowId}`}
+                      </Link>
+                    ) : (
+                      t('inputs.machine.maxParallelSessions.flowsWarningOwnFlow')
                     )}
+                    {': '}
                     {nodeTitle(warning.triggerType)} →{' '}
                     {warning.effectNodes.map((effect) => nodeTitle(effect.nodeType)).join(', ')}
                   </li>

@@ -15,8 +15,9 @@ const flowContext = vi.hoisted(() => ({
   addLiveLogReceiver: vi.fn<(receiver: (log: ResourceFlowLog) => void) => void>(),
   removeLiveLogReceiver: vi.fn(),
   removeNode: vi.fn(),
-  owner: { kind: 'resource', resourceId: 1 },
-  resourceId: 1,
+  owner: { kind: 'resource', resourceId: 1 } as
+    { kind: 'resource'; resourceId: number } | { kind: 'global'; flowId: number },
+  resourceId: 1 as number | undefined,
 }));
 
 vi.mock('../context/index', () => ({
@@ -75,7 +76,27 @@ const selectedNode: NodeProps = {
 };
 
 describe('AttraccessNode', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    flowContext.owner = { kind: 'resource', resourceId: 1 };
+    flowContext.resourceId = 1;
+  });
+
+  it('names the reason a node is unsupported by the kind of flow', () => {
+    const resourceOnly = { ...schema, supportedFlowScopes: ['resource'] } as ResourceFlowNodeSchemaDto;
+    flowContext.owner = { kind: 'global', flowId: 3 };
+    flowContext.resourceId = undefined;
+    const { rerender } = render(<AttraccessNode schema={resourceOnly} tNodeTranslations={tStub} />);
+
+    expect(screen.getByText('nodes.unsupportedInGlobalFlow')).toBeInTheDocument();
+    expect(screen.queryByText('nodes.unsupportedForResourceType')).not.toBeInTheDocument();
+
+    flowContext.owner = { kind: 'resource', resourceId: 1 };
+    flowContext.resourceId = 1;
+    rerender(<AttraccessNode schema={{ ...schema, supportedByResource: false }} tNodeTranslations={tStub} />);
+
+    expect(screen.getByText('nodes.unsupportedForResourceType')).toBeInTheDocument();
+  });
 
   it('shows the description on nodes without configuration', () => {
     render(<AttraccessNode schema={schema} tNodeTranslations={tStub} tNodeExists={() => true} />);

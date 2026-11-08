@@ -46,6 +46,8 @@ export function useAttraccessNodeState(props: Props) {
 
   const { addLiveLogReceiver, removeLiveLogReceiver, removeNode, resourceId, owner } = useFlowContext();
   const supportedByOwner = schemaSupportsOwner(schema, owner);
+  const unsupportedMessageKey =
+    owner.kind === 'global' ? 'nodes.unsupportedInGlobalFlow' : 'nodes.unsupportedForResourceType';
 
   useEffect(() => {
     if (!nodeId || previewMode) {
@@ -164,6 +166,7 @@ export function useAttraccessNodeState(props: Props) {
     isEditable,
     previewRows,
     supportedByOwner,
+    unsupportedMessageKey,
     nodeTitle,
     nodeDescription,
   } as const;
@@ -207,6 +210,7 @@ export function AttraccessNode(props: Props) {
     isEditable,
     previewRows,
     supportedByOwner,
+    unsupportedMessageKey,
     nodeTitle,
     nodeDescription,
   } = useAttraccessNodeState(props);
@@ -361,7 +365,7 @@ export function AttraccessNode(props: Props) {
 
           {!previewMode && !supportedByOwner && (
             <div className="text-xs text-warning mt-1 px-1 flex flex-row items-center gap-1">
-              <TriangleAlertIcon size={12} /> {t('nodes.unsupportedForResourceType')}
+              <TriangleAlertIcon size={12} /> {t(unsupportedMessageKey)}
             </div>
           )}
           {!previewMode && validationError && (
