@@ -63,13 +63,20 @@ describe('StartBlockedGate', () => {
     expect(notice?.textContent).toBe('Reserved' + reason.body);
   });
 
-  it('shows the start controls straight away when the question fails, without retrying first', () => {
+  it('shows the start controls straight away when the question fails with no answer yet, without retrying first', () => {
+    query.error = true;
+    renderGate();
+    expect(screen.getByTestId('start')).toBeInTheDocument();
+    expect(document.querySelector('[data-cy="start-blocked-notice"]')).toBeNull();
+    expect(query.options).toMatchObject({ retry: false });
+  });
+
+  it('keeps showing the last blocked answer when a later refresh fails', () => {
     query.error = true;
     query.data = { blocked: true, reason };
     renderGate();
-    expect(screen.getByTestId('start')).toBeInTheDocument();
-    expect(screen.queryByTestId('start-blocked-notice')).not.toBeInTheDocument();
-    expect(query.options).toMatchObject({ retry: false });
+    expect(screen.getByText('Reserved').closest('[data-cy="start-blocked-notice"]')).toBeInTheDocument();
+    expect(screen.queryByTestId('start')).not.toBeInTheDocument();
   });
 
   it('polls as a safety net next to the live events', () => {

@@ -66,7 +66,12 @@ export class ReservationDto {
   @ApiProperty({ type: Number, nullable: true, description: 'null unless holder or manager' })
   userId!: number | null;
 
-  @ApiProperty({ type: String, nullable: true, description: 'null unless holder or manager' })
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'The holder’s name for the holder, managers and everyone who may see who uses the resource (the same rule core uses for the current user of a machine); null for everyone else',
+  })
   userName!: string | null;
 
   @ApiProperty({ type: String, nullable: true })

@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EmailTemplateService } from './email-template.service';
 import { EmailTemplateType, EmailTemplateTranslation } from '@attraccess/database-entities';
 import { MjmlService } from './mjml.service';
+import { readDefaultTemplateBody } from './email-defaults';
 
 jest.mock('./email-defaults', () => ({
   EMAIL_TEMPLATE_DEFAULTS: { 'verify-email': { subject: 'Default subject', variables: [] } },
@@ -156,6 +157,23 @@ describe('EmailTemplateService — translation CRUD', () => {
         { templateType: 'verify-email', locale: 'de', key: 'greeting', value: 'Hallo {name},' },
       ]);
     });
+  });
+
+  describe('resetToDefault with a key that is not a core template type', () => {
+    it.each(['../../etc/passwd', '..%2f..%2fsecret', 'verify-email/../layout', 'unknown-type'])(
+      'never reads a bundled file for %s',
+      async (key) => {
+        const { service, emailTemplateRepo } = setup();
+        // Even a stored row (the path parameter is user input) must not make the key a file name.
+        emailTemplateRepo.findOneBy.mockResolvedValue({ type: key });
+        (readDefaultTemplateBody as jest.Mock).mockClear();
+
+        await expect(service.resetToDefault(key as never)).rejects.toBeInstanceOf(NotFoundException);
+
+        expect(readDefaultTemplateBody).not.toHaveBeenCalled();
+        expect(emailTemplateRepo.update).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('deleteTranslations', () => {

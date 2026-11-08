@@ -139,12 +139,15 @@ export class EmailTemplateService implements OnApplicationBootstrap {
         translations: shippedPluginTranslations(declared),
       };
     }
-    const defaults = EMAIL_TEMPLATE_DEFAULTS[type];
+    // Only a known core type may name a bundled file: the key comes from the URL and must never reach a path.
+    const coreType = Object.values(EmailTemplateType).find((known) => known === type);
+    if (!coreType) throw new NotFoundException(`Email template "${type}" not found`);
+    const defaults = EMAIL_TEMPLATE_DEFAULTS[coreType];
     return {
       subject: defaults.subject,
-      body: readDefaultTemplateBody(type),
+      body: readDefaultTemplateBody(coreType),
       variables: defaults.variables,
-      translations: SHIPPED_TRANSLATIONS.filter((t) => t.templateType === type),
+      translations: SHIPPED_TRANSLATIONS.filter((t) => t.templateType === coreType),
     };
   }
 
