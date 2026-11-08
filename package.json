@@ -291,8 +291,8 @@
       "ts-api-utils>typescript": "npm:@typescript/typescript6@^6.0.0",
       "@typescript-eslint/typescript-estree>typescript": "npm:@typescript/typescript6@^6.0.0",
       "@internationalized/date": "3.12.4",
-      "react": "19.2.8",
-      "react-dom": "19.2.8"
+      "react": "19.3.1",
+      "react-dom": "19.3.1"
     },
     "onlyBuiltDependencies": [
       "@balena/compose-parser",
