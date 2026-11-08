@@ -131,3 +131,40 @@ it('allows retry after connection or flashing failure without reporting completi
   expect(completed).not.toHaveBeenCalled();
   expect(state.success).not.toHaveBeenCalled();
 });
+it('flashes only the plain image of a firmware that also ships unsigned secure-profile images', async () => {
+  // The secure images are unsigned and only meant for the server to sign per installation; the web
+  // flasher must never request or write them.
+  const secure: AttractapFirmware = {
+    ...firmware,
+    secureImage: {
+      appFilename: 'reader.secure-app.bin',
+      bootloaderFilename: 'reader.secure-bootloader.bin',
+      secureVersion: 1,
+      profileMarker: 'attractap-secure-v1',
+      appSha256: 'a'.repeat(64),
+      bootloaderSha256: 'b'.repeat(64),
+      partitionTableSha256: 'c'.repeat(64),
+    } as AttractapFirmware['secureImage'],
+  };
+  const select = vi.fn();
+  state.firmwares = [secure];
+  const view = render(
+    <MemoryRouter>
+      <FirmwareSelector onSelect={select} />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: /Production reader/ }));
+  const selected = select.mock.lastCall?.[0] as AttractapFirmware;
+  view.unmount();
+
+  render(<FirmwareFlasher firmware={selected} onCompleted={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Install Now' }));
+  await waitFor(() => expect(state.flash).toHaveBeenCalledOnce());
+
+  expect(state.query).toHaveBeenCalled();
+  for (const [params] of state.query.mock.calls) {
+    expect(params).toEqual({ firmwareName: 'reader', variantName: 'standard', filename: 'reader.bin' });
+  }
+  expect(state.flash).toHaveBeenCalledWith(expect.objectContaining({ firmware: state.binary }));
+  expect(JSON.stringify([state.query.mock.calls, state.flash.mock.calls])).not.toMatch(/secure-(app|bootloader)/);
+});

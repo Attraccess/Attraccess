@@ -45,8 +45,17 @@ describe('AttractapFirmwareService secure images', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('serves plain readers only the plain OTA image, never the secure ones', () => {
-    expect(service.getOtaFile('attractap', 'wifi').filename).toBe('plain_ota.bin');
+  const read = async (stream: NodeJS.ReadableStream) => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(Buffer.from(chunk as Buffer));
+    return Buffer.concat(chunks).toString();
+  };
+
+  it('serves plain readers and the web flasher only the plain images, never the secure ones', async () => {
+    const ota = service.getOtaFile('attractap', 'wifi');
+    expect(ota.filename).toBe('plain_ota.bin');
+    expect(await read(ota.stream)).toBe('plain_ota.bin');
+    expect(await read(service.getFirmwareBinaryStream('attractap', 'wifi'))).toBe('plain.bin');
     expect(service.getFirmwareBinarySize('attractap', 'wifi')).toBe('plain.bin'.length);
   });
 

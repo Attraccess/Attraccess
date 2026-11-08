@@ -151,6 +151,13 @@ export class Attractap {
   @ApiProperty({ description: 'Secure Boot digest burned to KEY1 (recovery key), hex', nullable: true })
   secureBootDigest1!: string | null;
 
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: "Secure Boot digest of the key the server signs this reader's images with, hex",
+    nullable: true,
+  })
+  secureBootSignerDigest!: string | null;
+
   @Column({ type: 'datetime', nullable: true })
   @ApiProperty({ description: 'When the reader was paired', nullable: true })
   pairedAt!: Date | null;

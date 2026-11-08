@@ -10,7 +10,6 @@ per installation and key. They never appear in `filename` (web flasher) or
 import hashlib
 import json
 import os
-import re
 import shutil
 
 # Embedded in the secure app; the server checks it before signing and the reader before burning.
@@ -23,12 +22,16 @@ def sha256_file(path):
 
 
 def secure_version(build_dir):
-    """CONFIG_BOOTLOADER_APP_SECURE_VERSION the secure build resolved."""
-    with open(os.path.join(build_dir, "sdkconfig")) as f:
-        match = re.search(r"^CONFIG_BOOTLOADER_APP_SECURE_VERSION=(\d+)$", f.read(), re.MULTILINE)
-    if not match:
-        raise ValueError(f"{build_dir}/sdkconfig does not set CONFIG_BOOTLOADER_APP_SECURE_VERSION")
-    return int(match.group(1))
+    """CONFIG_BOOTLOADER_APP_SECURE_VERSION the images were built with.
+
+    Reads config/sdkconfig.json, not <build>/sdkconfig, which can be stale when
+    -DSDKCONFIG pointed elsewhere (see tools/secure_lab_reader.py)."""
+    path = os.path.join(build_dir, "config", "sdkconfig.json")
+    with open(path) as f:
+        version = json.load(f).get("BOOTLOADER_APP_SECURE_VERSION")
+    if not isinstance(version, int) or isinstance(version, bool):
+        raise ValueError(f"{path} does not set BOOTLOADER_APP_SECURE_VERSION")
+    return version
 
 
 def package_secure_images(build_dir, output_dir, firmware_name, firmware_variant):

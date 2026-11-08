@@ -32,8 +32,8 @@
       "description": "Anmeldedrosselung, Passwortrichtlinie, 2FA und Registrierungs-Domains"
     },
     "readerSecurity": {
-      "label": "Lesegerätesicherheit",
-      "description": "Secure-Boot-Schlüssel und Backups für abgesicherte Lesegeräte"
+      "label": "Reader-Sicherheit",
+      "description": "Secure-Boot-Schlüssel und Backups für abgesicherte Reader"
     },
     "roles": {
       "label": "Rollen",

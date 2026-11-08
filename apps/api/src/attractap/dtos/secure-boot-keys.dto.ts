@@ -1,8 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsString, MaxLength, MinLength } from 'class-validator';
+import { MAX_PASSPHRASE_BYTES, MIN_PASSPHRASE_LENGTH } from '../secure-boot/secure-boot-key.service';
 
 const MAX_PEM_LENGTH = 16 * 1024;
-const MAX_PASSPHRASE_LENGTH = 1024;
 
 export class SecureBootKeyInfoDto {
   @ApiProperty({ description: 'Secure Boot v2 digest as burned into an eFuse key block (hex)' })
@@ -49,13 +49,22 @@ export class SecureBootKeyFingerprintsDto {
 }
 
 export class PassphraseDto {
-  @ApiProperty({ description: 'Protects the downloaded key file; at least 12 characters, never stored' })
+  @ApiProperty({
+    description: `Protects the downloaded key file; at least ${MIN_PASSPHRASE_LENGTH} characters and at most ${MAX_PASSPHRASE_BYTES} bytes, never stored`,
+    minLength: MIN_PASSPHRASE_LENGTH,
+  })
   @IsString()
-  @MaxLength(MAX_PASSPHRASE_LENGTH)
+  @MinLength(MIN_PASSPHRASE_LENGTH)
+  @MaxLength(MAX_PASSPHRASE_BYTES)
   passphrase!: string;
 }
 
-export class KeyFileDto extends PassphraseDto {
+export class KeyFileDto {
+  @ApiProperty({ description: 'The passphrase the key file is protected with; never stored' })
+  @IsString()
+  @MaxLength(MAX_PASSPHRASE_BYTES)
+  passphrase!: string;
+
   @ApiProperty({ description: 'The encrypted PKCS#8 PEM file contents' })
   @IsString()
   @MaxLength(MAX_PEM_LENGTH)

@@ -1,8 +1,8 @@
-import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
-import { Input, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
+import { Button, PasswordInput, StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useState } from 'react';
 import { apiErrorMessage } from '../../../attractap/pairing/pairingUtils';
-import { MIN_PASSPHRASE_LENGTH } from './saveKeyFile';
+import { MIN_PASSPHRASE_LENGTH } from './constants';
 import de from './de.json';
 import en from './en.json';
 
@@ -23,6 +23,7 @@ export function PassphraseDialog({ isOpen, kind, isPending, error, onClose, onSu
   const [repeat, setRepeat] = useState('');
   const tooShort = passphrase.length < MIN_PASSPHRASE_LENGTH;
   const mismatch = passphrase !== repeat;
+  const showMismatch = repeat !== '' && mismatch;
 
   return (
     <StandardModal
@@ -43,22 +44,31 @@ export function PassphraseDialog({ isOpen, kind, isPending, error, onClose, onSu
           </ModalHeader>
           <ModalBody className="flex flex-col gap-3">
             <p className="text-sm text-muted">{t(`${kind}.description`)}</p>
-            <TextField type="password" value={passphrase} onChange={setPassphrase}>
-              <Label>{t('passphrase.label')}</Label>
-              <Input autoComplete="new-password" data-cy="reader-security-passphrase" />
-            </TextField>
-            <TextField type="password" value={repeat} onChange={setRepeat}>
-              <Label>{t('passphrase.repeat')}</Label>
-              <Input autoComplete="new-password" data-cy="reader-security-passphrase-repeat" />
-            </TextField>
-            {passphrase && tooShort ? (
-              <p className="text-sm text-danger">{t('passphrase.tooShort', { min: MIN_PASSPHRASE_LENGTH })}</p>
+            <PasswordInput
+              label={t('passphrase.label')}
+              description={t('passphrase.minLength', { min: MIN_PASSPHRASE_LENGTH })}
+              value={passphrase}
+              onChange={setPassphrase}
+              autoComplete="new-password"
+              data-cy="reader-security-passphrase"
+            />
+            <PasswordInput
+              label={t('passphrase.repeat')}
+              value={repeat}
+              onChange={setRepeat}
+              isInvalid={showMismatch}
+              errorMessage={showMismatch ? t('passphrase.mismatch') : undefined}
+              autoComplete="new-password"
+              data-cy="reader-security-passphrase-repeat"
+            />
+            {error ? (
+              <StatusAlert status="danger" data-cy="reader-security-dialog-error">
+                {apiErrorMessage(error) ?? t('error')}
+              </StatusAlert>
             ) : null}
-            {repeat && mismatch ? <p className="text-sm text-danger">{t('passphrase.mismatch')}</p> : null}
-            {error ? <p className="text-sm text-danger">{apiErrorMessage(error) ?? t('error')}</p> : null}
           </ModalBody>
           <ModalFooter>
-            <Button variant="secondary" onPress={close}>
+            <Button variant="secondary" onPress={close} isDisabled={isPending}>
               {t('cancel')}
             </Button>
             <Button

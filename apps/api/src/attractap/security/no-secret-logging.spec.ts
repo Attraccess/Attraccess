@@ -7,7 +7,7 @@ import { join, relative } from 'path';
  * modules, including calls that span several lines and values passed as extra arguments.
  */
 const SECRET =
-  /token|nonce|ticket|secret|password|privatekey|private_key|\bkey\b|keystring|\bcode\b|payload|plaintext|decrypted|pem\b/i;
+  /token|nonce|ticket|secret|password|privatekey|private_key|\bkey\b|keystring|\bcode\b|payload|plaintext|decrypted|pem\b|passphrase/i;
 /** Extra arguments that are whole message objects carry payloads. */
 const WHOLE_MESSAGE = /^(data|message|event|eventdata|payload|body|frame|request|req)(\.data)?(\.payload)?$/i;
 

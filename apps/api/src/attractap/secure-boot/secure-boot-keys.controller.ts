@@ -3,6 +3,7 @@ import {
   ClassSerializerInterceptor,
   Controller,
   Get,
+  Header,
   HttpCode,
   Inject,
   Post,
@@ -85,6 +86,7 @@ export class AttractapSecureBootKeysController {
     operationId: 'downloadRecoveryKey',
   })
   @ApiResponse({ status: 200, type: KeyFileDownloadDto })
+  @Header('Cache-Control', 'no-store')
   async downloadRecoveryKey(
     @Body() body: PassphraseDto,
     @Req() req: AuthenticatedRequest,
@@ -116,6 +118,7 @@ export class AttractapSecureBootKeysController {
     operationId: 'downloadSigningKeyBackup',
   })
   @ApiResponse({ status: 200, type: KeyFileDownloadDto })
+  @Header('Cache-Control', 'no-store')
   async downloadSigningKeyBackup(
     @Body() body: PassphraseDto,
     @Req() req: AuthenticatedRequest,

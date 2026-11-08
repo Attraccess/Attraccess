@@ -163,4 +163,6 @@ test('secure images need their marker, checksums and a valid secureVersion', () 
   assert.throws(() => validateAttractap(root), /partition table hash/);
   firmwareWithSecureImage({ appFilename: 'touch-ota.bin' });
   assert.throws(() => validateAttractap(root), /must not reuse/);
+  firmwareWithSecureImage({ bootloaderFilename: 'touch.bin' });
+  assert.throws(() => validateAttractap(root), /must not reuse/);
 });

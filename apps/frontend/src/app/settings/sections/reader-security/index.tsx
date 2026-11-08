@@ -1,5 +1,11 @@
 import { Chip, Spinner } from '@heroui/react';
-import { Button, StatusDialog, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import {
+  Button,
+  StatusAlert,
+  StatusDialog,
+  useDateTimeFormatter,
+  useTranslations,
+} from '@attraccess/plugins-frontend-ui';
 import {
   useAttractapServiceCheckRecoveryKey,
   useAttractapServiceCreateSecureBootKeys,
@@ -8,16 +14,17 @@ import {
   useAttractapServiceGetSecureBootKeys,
   useAttractapServiceGetSecureBootKeysKey,
   useAttractapServiceRestoreSecureBootKeys,
+  useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useToastMessage } from '../../../../components/toastProvider';
+import { triggerDownload } from '../../../../utils/download';
 import { apiErrorMessage } from '../../../attractap/pairing/pairingUtils';
 import { SettingsSection } from '../../components/SettingsSection';
 import { SettingsRow } from '../../components/SettingsRow';
 import { KeyFileDialog } from './KeyFileDialog';
 import { PassphraseDialog } from './PassphraseDialog';
-import { saveTextFile } from './saveKeyFile';
 import { useSingleFlight } from './useSingleFlight';
 import de from './de.json';
 import en from './en.json';
@@ -36,6 +43,7 @@ export function ReaderSecuritySection() {
   const toast = useToastMessage();
   const queryClient = useQueryClient();
   const formatDateTime = useDateTimeFormatter();
+  const { data: license } = useLicenseServiceGetLicenseInformation();
   const { data: keys, isLoading, isError, refetch } = useAttractapServiceGetSecureBootKeys();
   const [dialog, setDialog] = useState<Dialog>(null);
   const once = useSingleFlight();
@@ -53,13 +61,13 @@ export function ReaderSecuritySection() {
   });
   const downloadRecovery = useAttractapServiceDownloadRecoveryKey({
     onSuccess: (file) => {
-      saveTextFile('attraccess-recovery-key.pem', file.pem);
+      triggerDownload(file.pem, 'attraccess-recovery-key.pem', 'application/x-pem-file');
       done(t('toast.recoveryDownloaded'));
     },
   });
   const downloadBackup = useAttractapServiceDownloadSigningKeyBackup({
     onSuccess: (file) => {
-      saveTextFile('attraccess-signing-key-backup.pem', file.pem);
+      triggerDownload(file.pem, 'attraccess-signing-key-backup.pem', 'application/x-pem-file');
       done(t('toast.backupDownloaded'));
     },
   });
@@ -74,14 +82,25 @@ export function ReaderSecuritySection() {
     restore.reset();
     setDialog(next);
   };
-  const createKeys = () => once((settle) => create.mutate(undefined, { onSettled: settle }));
+  const createKeys = () => once(() => create.mutateAsync(undefined));
 
+  // Every key endpoint is licensed; without the module each call fails and the page would only offer a
+  // retry that can never succeed.
+  if (license && !license.modules.includes('attractap')) {
+    return (
+      <SettingsSection title={t('title')} description={t('description')}>
+        <p className="text-sm text-muted" data-cy="reader-security-not-licensed">
+          {t('notLicensed')}
+        </p>
+      </SettingsSection>
+    );
+  }
   if (!keys && isError) {
     return (
       <SettingsSection title={t('title')} description={t('description')}>
-        <p className="text-sm text-danger" data-cy="reader-security-load-error">
+        <StatusAlert status="danger" data-cy="reader-security-load-error">
           {t('loadFailed')}
-        </p>
+        </StatusAlert>
         <div>
           <Button variant="secondary" onPress={() => void refetch()} data-cy="reader-security-retry">
             {t('retry')}
@@ -90,7 +109,14 @@ export function ReaderSecuritySection() {
       </SettingsSection>
     );
   }
-  if (isLoading || !keys) return <Spinner />;
+  if (isLoading || !keys) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted">
+        <Spinner />
+        {t('loading')}
+      </div>
+    );
+  }
 
   const hasKeys = keys.status !== 'none';
   const verifiedAt = keys.recoveryKey?.verifiedAt;
@@ -101,29 +127,31 @@ export function ReaderSecuritySection() {
 
   return (
     <SettingsSection title={t('title')} description={t('description')}>
-      <p className="rounded-lg bg-surface-secondary p-3 text-sm" data-cy="reader-security-warning">
+      <StatusAlert status="warning" data-cy="reader-security-warning">
         {t('warning')}
-      </p>
+      </StatusAlert>
 
-      <SettingsRow
-        label={t('status.label')}
-        hint={verifiedAt ? t('status.verifiedAt', { date: String(formatDateTime(verifiedAt)) }) : undefined}
-      >
-        <Chip color={STATUS_COLOR[keys.status]} data-cy="reader-security-status">
-          {statusLabel}
-        </Chip>
-      </SettingsRow>
+      <div className="flex flex-col">
+        <SettingsRow
+          label={t('status.label')}
+          hint={verifiedAt ? t('status.verifiedAt', { date: String(formatDateTime(verifiedAt)) }) : undefined}
+        >
+          <Chip color={STATUS_COLOR[keys.status]} data-cy="reader-security-status">
+            {statusLabel}
+          </Chip>
+        </SettingsRow>
 
-      {keys.signingKey ? (
-        <SettingsRow label={t('fingerprints.signing')} stacked>
-          <code className="break-all text-xs">{keys.signingKey.fingerprint}</code>
-        </SettingsRow>
-      ) : null}
-      {keys.recoveryKey ? (
-        <SettingsRow label={t('fingerprints.recovery')} stacked>
-          <code className="break-all text-xs">{keys.recoveryKey.fingerprint}</code>
-        </SettingsRow>
-      ) : null}
+        {keys.signingKey ? (
+          <SettingsRow label={t('fingerprints.signing')} stacked>
+            <code className="break-all text-xs">{keys.signingKey.fingerprint}</code>
+          </SettingsRow>
+        ) : null}
+        {keys.recoveryKey ? (
+          <SettingsRow label={t('fingerprints.recovery')} stacked>
+            <code className="break-all text-xs">{keys.recoveryKey.fingerprint}</code>
+          </SettingsRow>
+        ) : null}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {!hasKeys ? (
@@ -167,6 +195,7 @@ export function ReaderSecuritySection() {
           <li>{t('whatToBackup.secret')}</li>
           <li>{t('whatToBackup.database')}</li>
           <li>{t('whatToBackup.recovery')}</li>
+          <li>{t('whatToBackup.signingBackup')}</li>
         </ul>
       </div>
 
@@ -177,9 +206,7 @@ export function ReaderSecuritySection() {
         isPending={downloadRecovery.isPending}
         error={downloadRecovery.error}
         onClose={() => setDialog(null)}
-        onSubmit={(passphrase) =>
-          once((settle) => downloadRecovery.mutate({ requestBody: { passphrase } }, { onSettled: settle }))
-        }
+        onSubmit={(passphrase) => once(() => downloadRecovery.mutateAsync({ requestBody: { passphrase } }))}
       />
       <PassphraseDialog
         key={`backup-${dialog === 'backup'}`}
@@ -188,9 +215,7 @@ export function ReaderSecuritySection() {
         isPending={downloadBackup.isPending}
         error={downloadBackup.error}
         onClose={() => setDialog(null)}
-        onSubmit={(passphrase) =>
-          once((settle) => downloadBackup.mutate({ requestBody: { passphrase } }, { onSettled: settle }))
-        }
+        onSubmit={(passphrase) => once(() => downloadBackup.mutateAsync({ requestBody: { passphrase } }))}
       />
       <KeyFileDialog
         key={`check-${dialog === 'check'}`}
@@ -199,18 +224,17 @@ export function ReaderSecuritySection() {
         isPending={check.isPending}
         error={check.error}
         onClose={() => setDialog(null)}
-        onSubmit={({ pem, passphrase }) =>
-          once((settle) => check.mutate({ requestBody: { pem, passphrase } }, { onSettled: settle }))
-        }
+        onSubmit={({ pem, passphrase }) => once(() => check.mutateAsync({ requestBody: { pem, passphrase } }))}
       />
       <KeyFileDialog
         key={`restore-${dialog === 'restore'}`}
         isOpen={dialog === 'restore'}
         kind="restore"
+        replacesKeys={hasKeys}
         isPending={restore.isPending}
         error={restore.error}
         onClose={() => setDialog(null)}
-        onSubmit={(requestBody) => once((settle) => restore.mutate({ requestBody }, { onSettled: settle }))}
+        onSubmit={(requestBody) => once(() => restore.mutateAsync({ requestBody }))}
       />
       <StatusDialog
         isOpen={dialog === 'regenerate'}

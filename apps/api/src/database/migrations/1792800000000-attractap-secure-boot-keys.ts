@@ -1,11 +1,14 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
+/** Per reader: the digests burned to KEY0/KEY1 and the key the server signs its images with. */
+const SECURE_BOOT_READER_COLUMNS = ['secureBootDigest0', 'secureBootDigest1', 'secureBootSignerDigest'];
+
 export class AttractapSecureBootKeys1792800000000 implements MigrationInterface {
   name = 'AttractapSecureBootKeys1792800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `CREATE TABLE "attractap_secure_boot_key" (
+      `CREATE TABLE IF NOT EXISTS "attractap_secure_boot_key" (
         "id" integer PRIMARY KEY AUTOINCREMENT NOT NULL,
         "role" text NOT NULL,
         "publicKeyPem" text NOT NULL,
@@ -18,10 +21,10 @@ export class AttractapSecureBootKeys1792800000000 implements MigrationInterface 
       )`,
     );
     await queryRunner.query(
-      `CREATE UNIQUE INDEX "IDX_attractap_secure_boot_key_digest" ON "attractap_secure_boot_key" ("digest")`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_attractap_secure_boot_key_digest" ON "attractap_secure_boot_key" ("digest")`,
     );
     const columns = (await queryRunner.query(`PRAGMA table_info("attractap")`)) as { name: string }[];
-    for (const column of ['secureBootDigest0', 'secureBootDigest1']) {
+    for (const column of SECURE_BOOT_READER_COLUMNS) {
       if (!columns.some((c) => c.name === column)) {
         await queryRunner.query(`ALTER TABLE "attractap" ADD COLUMN "${column}" text`);
       }
@@ -29,9 +32,13 @@ export class AttractapSecureBootKeys1792800000000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "IDX_attractap_secure_boot_key_digest"`);
-    await queryRunner.query(`DROP TABLE "attractap_secure_boot_key"`);
-    await queryRunner.query(`ALTER TABLE "attractap" DROP COLUMN "secureBootDigest1"`);
-    await queryRunner.query(`ALTER TABLE "attractap" DROP COLUMN "secureBootDigest0"`);
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_attractap_secure_boot_key_digest"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "attractap_secure_boot_key"`);
+    const columns = (await queryRunner.query(`PRAGMA table_info("attractap")`)) as { name: string }[];
+    for (const column of [...SECURE_BOOT_READER_COLUMNS].reverse()) {
+      if (columns.some((c) => c.name === column)) {
+        await queryRunner.query(`ALTER TABLE "attractap" DROP COLUMN "${column}"`);
+      }
+    }
   }
 }

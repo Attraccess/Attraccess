@@ -174,7 +174,7 @@
     "attractap.reader.handshake_rejected": "Reader connections rejected",
     "attractap.reader.secure_keys_created": "Secure Boot keys created",
     "attractap.reader.recovery_key_downloaded": "Recovery key downloaded",
-    "attractap.reader.recovery_key_verified": "Recovery key verified",
+    "attractap.reader.recovery_key_verified": "Recovery key checked",
     "attractap.reader.signing_key_backup_downloaded": "Signing key backup downloaded",
     "attractap.reader.secure_keys_restored": "Secure Boot keys restored",
     "attractap.ui.hook_decision": "Plugin start check decided",

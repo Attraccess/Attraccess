@@ -1,10 +1,12 @@
 {
-  "title": "Lesegerätesicherheit",
-  "description": "Schlüssel, um Attractap-Lesegeräte über das Netzwerk abzusichern. Abgesicherte Lesegeräte akzeptieren nur Updates, die mit diesen Schlüsseln signiert sind.",
-  "warning": "Gehen Signaturschlüssel und Wiederherstellungsschlüssel beide verloren, können abgesicherte Lesegeräte nie wieder aktualisiert werden. Bewahre die Wiederherstellungsdatei und das Backup des Signaturschlüssels sicher und getrennt voneinander auf.",
+  "title": "Reader-Sicherheit",
+  "description": "Schlüssel, um Attractap-Reader über das Netzwerk abzusichern. Abgesicherte Reader akzeptieren nur Updates, die mit diesen Schlüsseln signiert sind.",
+  "warning": "Der Signaturschlüssel geht verloren, wenn die Datenbank oder AUTH_SESSION_SECRET und zugleich jedes Backup des Signaturschlüssels verloren gehen. Geht dann auch der Wiederherstellungsschlüssel verloren, können abgesicherte Reader nie wieder aktualisiert werden. Bewahre die Wiederherstellungsdatei und ein Backup des Signaturschlüssels samt ihrer Passphrasen sicher und getrennt voneinander auf.",
   "loadFailed": "Der Schlüsselstatus konnte nicht geladen werden.",
+  "notLicensed": "Reader-Sicherheit ist in der Lizenz dieser Instanz nicht enthalten.",
   "retry": "Erneut versuchen",
   "error": "Das hat nicht geklappt",
+  "loading": "Schlüsselstatus wird geladen…",
   "cancel": "Abbrechen",
   "status": {
     "label": "Status",
@@ -26,17 +28,18 @@
     "restore": "Wiederherstellen",
     "regenerate": "Schlüssel neu erzeugen"
   },
-  "locked": "Bei {{count}} Lesegerät(en) sind die Schlüssel dieser Installation eingebrannt. Die Schlüssel können nicht neu erzeugt werden.",
+  "locked": "Bei {{count}} Reader(n) sind Secure-Boot-Digests eingebrannt, deshalb können die Schlüssel nicht neu erzeugt werden.",
   "whatToBackup": {
     "title": "Was gesichert werden muss",
     "secret": "AUTH_SESSION_SECRET: ohne ihn lassen sich die gespeicherten Schlüssel nicht entschlüsseln.",
-    "database": "Die Datenbank mit dem verschlüsselten Signaturschlüssel und den Lesegeräte-Einträgen.",
-    "recovery": "Die Wiederherstellungsdatei samt Passphrase sowie ein Backup des Signaturschlüssels."
+    "database": "Die Datenbank mit dem verschlüsselten Signaturschlüssel und den Reader-Einträgen.",
+    "recovery": "Die Wiederherstellungsdatei und ihre Passphrase.",
+    "signingBackup": "Ein Backup des Signaturschlüssels und seine Passphrase."
   },
   "passphrase": {
     "label": "Passphrase",
     "repeat": "Passphrase wiederholen",
-    "tooShort": "Mindestens {{min}} Zeichen.",
+    "minLength": "Mindestens {{min}} Zeichen.",
     "mismatch": "Die Passphrasen stimmen nicht überein."
   },
   "file": {
@@ -54,13 +57,15 @@
   },
   "check": {
     "title": "Wiederherstellungsschlüssel prüfen",
-    "description": "Lade die heruntergeladene Wiederherstellungsdatei hoch und gib ihre Passphrase ein. Passt sie, löscht der Server seine Kopie des Wiederherstellungsschlüssels und Lesegeräte können abgesichert werden.",
+    "description": "Lade die heruntergeladene Wiederherstellungsdatei hoch und gib ihre Passphrase ein. Passt sie, löscht der Server seine Kopie des Wiederherstellungsschlüssels und Reader können abgesichert werden.",
     "submit": "Prüfen"
   },
   "restore": {
     "title": "Schlüssel wiederherstellen",
     "description": "Lade ein Backup des Signaturschlüssels oder die Wiederherstellungsdatei mit ihrer Passphrase hoch. Nach einer Wiederherstellung aus der Wiederherstellungsdatei wird ein neuer Wiederherstellungsschlüssel erzeugt, den du erneut prüfen musst.",
+    "replaces": "Das ersetzt den aktuellen Signaturschlüssel, frühere Backups davon passen danach nicht mehr. Eine Wiederherstellung aus der Wiederherstellungsdatei ersetzt außerdem den Wiederherstellungsschlüssel durch einen neuen.",
     "submit": "Wiederherstellen",
+    "sourceLabel": "Woraus stellst du wieder her?",
     "source": {
       "signing-backup": "Backup des Signaturschlüssels",
       "recovery-file": "Wiederherstellungsdatei"
@@ -68,7 +73,7 @@
   },
   "regenerate": {
     "title": "Schlüssel neu erzeugen?",
-    "description": "Das ersetzt beide Schlüssel. Heruntergeladene Wiederherstellungsdateien und Backups der alten Schlüssel nützen dann nichts mehr. Das geht nur, solange bei keinem Lesegerät die Schlüssel dieser Installation eingebrannt sind.",
+    "description": "Das ersetzt beide Schlüssel. Heruntergeladene Wiederherstellungsdateien und Backups der alten Schlüssel nützen dann nichts mehr. Das geht nur, solange bei keinem Reader die Schlüssel dieser Installation eingebrannt sind.",
     "confirm": "Neu erzeugen"
   },
   "toast": {

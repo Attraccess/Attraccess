@@ -64,8 +64,12 @@ function validateSecureImage(directory, entry) {
   const image = entry.secureImage;
   const app = artifact(directory, image.appFilename);
   const bootloader = artifact(directory, image.bootloaderFilename);
-  if (image.appFilename === entry.filename || image.appFilename === entry.filenameOTA) {
-    throw new Error(`Secure image must not reuse a plain firmware file: ${image.appFilename}`);
+  const plain = [entry.filename, entry.filenameOTA, entry.elfFilename];
+  for (const name of [image.appFilename, image.bootloaderFilename]) {
+    if (plain.includes(name)) throw new Error(`Secure image must not reuse a plain firmware file: ${name}`);
+  }
+  if (image.appFilename === image.bootloaderFilename) {
+    throw new Error(`Secure app and bootloader must be separate files: ${image.appFilename}`);
   }
   if (!Number.isInteger(image.secureVersion) || image.secureVersion < 1) {
     throw new Error(`Invalid secureVersion for ${image.appFilename}`);

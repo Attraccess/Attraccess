@@ -1,13 +1,21 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Attractap, AttractapSecureBootKey, type SecureBootKeyRole } from '@attraccess/database-entities';
+import { Mutex } from 'async-mutex';
 import { createPrivateKey, createPublicKey, generateKeyPair, KeyObject } from 'crypto';
-import { IsNull, Not, Repository } from 'typeorm';
+import { EntityManager, IsNull, Not, Raw, Repository } from 'typeorm';
 import { promisify } from 'util';
 import { EncryptionService } from '../../encryption/encryption.service';
-import { publicKeyFingerprint, SECURE_BOOT_RSA_KEY_BITS, secureBootKeyDigest } from './secure-boot-signer';
+import {
+  isLabSecureBootKey,
+  publicKeyFingerprint,
+  SECURE_BOOT_RSA_KEY_BITS,
+  secureBootKeyDigest,
+} from './secure-boot-signer';
 
 export const MIN_PASSPHRASE_LENGTH = 12;
+/** OpenSSL reads PEM passphrases into a 1 KiB buffer; a longer one would produce a file nothing can open. */
+export const MAX_PASSPHRASE_BYTES = 1023;
 
 export type SecureBootKeysStatus = 'none' | 'recovery-check-pending' | 'ready';
 
@@ -25,13 +33,19 @@ export interface SecureBootKeysState {
   recoveryKey: (SecureBootKeyInfo & { verifiedAt: Date | null }) | null;
   /** Readers with digests burned: regeneration and some restores are blocked while this is above 0. */
   readersWithBurnedDigests: number;
-  /** A restore is allowed with no signing key, or while no reader is secured with the current one. */
+  /**
+   * A restore is allowed when the server holds no usable signing key (none, or one that can no longer
+   * be decrypted), or while no reader has the current signing key's digest burned.
+   */
   restoreAllowed: boolean;
 }
 
 export type RestoreSource = 'signing-backup' | 'recovery-file';
 
 const generateRsaKeyPair = promisify(generateKeyPair);
+
+/** Encrypted PKCS#8 (what this server writes) or legacy encrypted PKCS#1; a plain PEM proves no passphrase. */
+const ENCRYPTED_PEM = /-----BEGIN ENCRYPTED PRIVATE KEY-----|Proc-Type:\s*4,ENCRYPTED/;
 
 function info(key: AttractapSecureBootKey): SecureBootKeyInfo {
   return { digest: key.digest, fingerprint: key.fingerprint, restoredAt: key.restoredAt };
@@ -48,23 +62,34 @@ export class SecureBootKeyService {
   /**
    * Key changes check the current rows, then replace them, with slow key generation in between. Two
    * of them at once (a double press, a second tab) would each pass the check and leave two key pairs
-   * behind, so they run one at a time.
+   * behind, so they run one at a time. The swap itself runs in a transaction, so a failure never
+   * leaves the installation without its keys.
    */
-  private queue: Promise<unknown> = Promise.resolve();
-  private exclusive<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.queue.then(task, task);
-    this.queue = run.catch(() => undefined);
-    return run;
-  }
+  private readonly mutex = new Mutex();
 
   private async latest(role: SecureBootKeyRole): Promise<AttractapSecureBootKey | null> {
     return await this.keys.findOne({ where: { role }, order: { id: 'DESC' } });
   }
 
-  private async burnedReaderCount(): Promise<number> {
-    return await this.readers.count({
-      where: [{ secureBootDigest0: Not(IsNull()) }, { secureBootDigest1: Not(IsNull()) }],
-    });
+  /** Readers with any digest burned, or with the given one (eFuse reports may spell hex in upper case). */
+  private async burnedReaderCount(digest?: string): Promise<number> {
+    const value = digest
+      ? Raw((column) => `LOWER(${column}) = :digest`, { digest: digest.toLowerCase() })
+      : Not(IsNull());
+    return await this.readers.count({ where: [{ secureBootDigest0: value }, { secureBootDigest1: value }] });
+  }
+
+  private holdsPrivateKey(row: AttractapSecureBootKey): boolean {
+    try {
+      this.privateKeyOf(row);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async isRestoreAllowed(signing: AttractapSecureBootKey | null): Promise<boolean> {
+    return !signing || !this.holdsPrivateKey(signing) || (await this.burnedReaderCount(signing.digest)) === 0;
   }
 
   async getState(): Promise<SecureBootKeysState> {
@@ -81,7 +106,7 @@ export class SecureBootKeyService {
       signingKey: signing ? info(signing) : null,
       recoveryKey: recovery ? { ...info(recovery), verifiedAt: recovery.verifiedAt } : null,
       readersWithBurnedDigests: burned,
-      restoreAllowed: !signing || burned === 0,
+      restoreAllowed: await this.isRestoreAllowed(signing),
     };
   }
 
@@ -93,19 +118,20 @@ export class SecureBootKeyService {
   }
 
   createKeys(): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
-    return this.exclusive(() => this.replaceKeys());
+    return this.mutex.runExclusive(() => this.replaceKeys());
   }
 
   private async replaceKeys(): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
-    if ((await this.keys.count()) > 0) {
-      if ((await this.burnedReaderCount()) > 0) {
-        throw new ConflictException('Keys cannot be regenerated while readers have digests burned with them');
-      }
-      await this.keys.clear();
+    if ((await this.keys.count()) > 0 && (await this.burnedReaderCount()) > 0) {
+      throw new ConflictException('Keys cannot be regenerated while readers have digests burned with them');
     }
-    const signing = await this.store('signing', await this.generate(), null);
-    const recovery = await this.store('recovery', await this.generate(), null);
-    return { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
+    const [signingKey, recoveryKey] = await Promise.all([this.generate(), this.generate()]);
+    return await this.keys.manager.transaction(async (manager) => {
+      await manager.getRepository(AttractapSecureBootKey).clear();
+      const signing = await this.store(manager, 'signing', signingKey, null);
+      const recovery = await this.store(manager, 'recovery', recoveryKey, null);
+      return { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
+    });
   }
 
   private async generate(): Promise<KeyObject> {
@@ -113,10 +139,11 @@ export class SecureBootKeyService {
     return privateKey;
   }
 
-  private async store(role: SecureBootKeyRole, privateKey: KeyObject, restoredAt: Date | null) {
+  private async store(manager: EntityManager, role: SecureBootKeyRole, privateKey: KeyObject, restoredAt: Date | null) {
     const publicKey = createPublicKey(privateKey);
-    return await this.keys.save(
-      this.keys.create({
+    const repository = manager.getRepository(AttractapSecureBootKey);
+    return await repository.save(
+      repository.create({
         role,
         publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }) as string,
         digest: secureBootKeyDigest(publicKey),
@@ -147,6 +174,9 @@ export class SecureBootKeyService {
     if (typeof passphrase !== 'string' || passphrase.length < MIN_PASSPHRASE_LENGTH) {
       throw new BadRequestException(`The passphrase needs at least ${MIN_PASSPHRASE_LENGTH} characters`);
     }
+    if (Buffer.byteLength(passphrase, 'utf8') > MAX_PASSPHRASE_BYTES) {
+      throw new BadRequestException(`The passphrase may have at most ${MAX_PASSPHRASE_BYTES} bytes`);
+    }
   }
 
   /** Repeatable until the check passes; afterwards the private key is gone. */
@@ -164,6 +194,9 @@ export class SecureBootKeyService {
     if (typeof pem !== 'string' || typeof passphrase !== 'string' || !pem.trim()) {
       throw new BadRequestException('A key file and its passphrase are required');
     }
+    if (!ENCRYPTED_PEM.test(pem)) {
+      throw new BadRequestException('The key file must be passphrase-protected, as downloaded from this page');
+    }
     let key: KeyObject;
     try {
       key = createPrivateKey({ key: pem, format: 'pem', passphrase });
@@ -175,11 +208,14 @@ export class SecureBootKeyService {
     } catch {
       throw new BadRequestException(`The key must be an RSA-${SECURE_BOOT_RSA_KEY_BITS} private key`);
     }
+    if (isLabSecureBootKey(key)) {
+      throw new BadRequestException('The public device-lab keys cannot be used by an installation');
+    }
     return key;
   }
 
   checkRecoveryKey(pem: string, passphrase: string): Promise<{ fingerprint: string }> {
-    return this.exclusive(() => this.verifyRecoveryKey(pem, passphrase));
+    return this.mutex.runExclusive(() => this.verifyRecoveryKey(pem, passphrase));
   }
 
   private async verifyRecoveryKey(pem: string, passphrase: string): Promise<{ fingerprint: string }> {
@@ -210,7 +246,7 @@ export class SecureBootKeyService {
     pem: string,
     passphrase: string,
   ): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
-    return this.exclusive(() => this.restoreKeys(source, pem, passphrase));
+    return this.mutex.runExclusive(() => this.restoreKeys(source, pem, passphrase));
   }
 
   private async restoreKeys(
@@ -218,40 +254,60 @@ export class SecureBootKeyService {
     pem: string,
     passphrase: string,
   ): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
-    const state = await this.getState();
-    if (!state.restoreAllowed) {
+    const current = await this.latest('signing');
+    if (!(await this.isRestoreAllowed(current))) {
       throw new ConflictException('Keys cannot be restored while readers are secured with the current signing key');
     }
     const key = this.importKey(pem, passphrase);
     const digest = secureBootKeyDigest(key);
-    if (state.signingKey?.digest === digest || (await this.keys.findOne({ where: { digest, role: 'signing' } }))) {
+    // Readers rely on the current key, which only AUTH_SESSION_SECRET can no longer open: replace it
+    // only with a key those readers trust, so a wrong file cannot drop a key a fixed secret would bring back.
+    if (current && (await this.burnedReaderCount(current.digest)) > 0 && !(await this.burnedReaderCount(digest))) {
+      throw new ConflictException('Readers are secured with the current signing key; restore a key they trust');
+    }
+    const existing = await this.keys.findOne({ where: { digest } });
+    if (existing?.role === 'signing' && this.holdsPrivateKey(existing)) {
       throw new ConflictException('This key is already the signing key of this installation');
     }
-    const restoredAt = new Date();
-    let recovery = await this.latest('recovery');
-    if (source === 'recovery-file') {
-      // The file is the former recovery key: it signs now, and a fresh recovery key must pass the check.
-      await this.keys.clear();
-      recovery = null;
-    } else {
-      await this.keys.delete({ role: 'signing' });
+    if (existing?.role === 'recovery' && source === 'signing-backup') {
+      throw new ConflictException(
+        'This file is the recovery key of this installation; restore it as the recovery file',
+      );
     }
-    const signing = await this.store('signing', key, restoredAt);
-    recovery ??= await this.store('recovery', await this.generate(), restoredAt);
-    return { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
+    const restoredAt = new Date();
+    // The recovery file is the former recovery key: it signs now, and a fresh recovery key must pass the
+    // check. A signing backup keeps the current recovery key, or gets a fresh one on an empty installation.
+    const latestRecovery = source === 'signing-backup' ? await this.latest('recovery') : null;
+    // An unchecked recovery key the server can no longer open could never pass the check: replace it.
+    const kept =
+      latestRecovery && (latestRecovery.verifiedAt || this.holdsPrivateKey(latestRecovery)) ? latestRecovery : null;
+    const recoveryKey = kept ?? (await this.generate());
+    return await this.keys.manager.transaction(async (manager) => {
+      const repository = manager.getRepository(AttractapSecureBootKey);
+      const fresh = recoveryKey instanceof KeyObject;
+      await (fresh ? repository.clear() : repository.delete({ role: 'signing' }));
+      const signing = await this.store(manager, 'signing', key, restoredAt);
+      const recovery = fresh ? await this.store(manager, 'recovery', recoveryKey, restoredAt) : recoveryKey;
+      return { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
+    });
   }
 
   /**
-   * The key to sign a reader's images with: any held private key whose digest the reader has burned.
-   * Null shows as "No signing key for this reader".
+   * The key to sign a reader's images with: the one recorded for the reader if the server still holds
+   * it, otherwise any held private key whose digest the reader has burned. Null shows as "No signing
+   * key for this reader".
    */
   async signingKeyForReader(
-    reader: Pick<Attractap, 'secureBootDigest0' | 'secureBootDigest1'>,
+    reader: Pick<Attractap, 'secureBootDigest0' | 'secureBootDigest1' | 'secureBootSignerDigest'>,
   ): Promise<KeyObject | null> {
-    const digests = [reader.secureBootDigest0, reader.secureBootDigest1].filter((d): d is string => Boolean(d));
+    const digests = [reader.secureBootDigest0, reader.secureBootDigest1]
+      .filter((d): d is string => Boolean(d))
+      .map((d) => d.toLowerCase());
     if (!digests.length) return null;
+    const preferred = reader.secureBootSignerDigest?.toLowerCase();
     const candidates = await this.keys.find({ where: { privateKeyEncrypted: Not(IsNull()) }, order: { id: 'DESC' } });
-    const match = candidates.find((row) => digests.includes(row.digest));
+    const burned = candidates.filter((row) => digests.includes(row.digest));
+    const match = burned.find((row) => row.digest === preferred) ?? burned[0];
     return match ? this.privateKeyOf(match) : null;
   }
 }

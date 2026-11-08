@@ -1,15 +1,5 @@
-import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  Input,
-  Label,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  ModalHeading,
-  Radio,
-  RadioGroup,
-  TextField,
-} from '@heroui/react';
+import { Button, PasswordInput, StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, Radio, RadioGroup } from '@heroui/react';
 import { useState } from 'react';
 import { apiErrorMessage } from '../../../attractap/pairing/pairingUtils';
 import de from './de.json';
@@ -22,6 +12,8 @@ interface Props {
   isOpen: boolean;
   /** 'check' proves the recovery file; 'restore' brings back keys from a backup or the recovery file. */
   kind: 'check' | 'restore';
+  /** Restore only: keys exist already, so restoring replaces the current signing key. */
+  replacesKeys?: boolean;
   isPending: boolean;
   error?: unknown;
   onClose: () => void;
@@ -29,7 +21,7 @@ interface Props {
 }
 
 /** Upload a key file and give its passphrase. The file never leaves the browser except in the request. */
-export function KeyFileDialog({ isOpen, kind, isPending, error, onClose, onSubmit }: Readonly<Props>) {
+export function KeyFileDialog({ isOpen, kind, replacesKeys, isPending, error, onClose, onSubmit }: Readonly<Props>) {
   const { t } = useTranslations({ en, de });
   const [pem, setPem] = useState('');
   const [passphrase, setPassphrase] = useState('');
@@ -56,13 +48,18 @@ export function KeyFileDialog({ isOpen, kind, isPending, error, onClose, onSubmi
           </ModalHeader>
           <ModalBody className="flex flex-col gap-3">
             <p className="text-sm text-muted">{t(`${kind}.description`)}</p>
+            {kind === 'restore' && replacesKeys ? (
+              <StatusAlert status="warning" data-cy="reader-security-restore-replaces">
+                {t('restore.replaces')}
+              </StatusAlert>
+            ) : null}
             {kind === 'restore' ? (
               <RadioGroup
                 value={source}
                 onChange={(value) => setSource(value as Source)}
                 data-cy="reader-security-source"
               >
-                <Label className="sr-only">{t('restore.title')}</Label>
+                <Label>{t('restore.sourceLabel')}</Label>
                 {SOURCES.map((value) => (
                   <Radio key={value} value={value} data-cy={`reader-security-source-${value}`}>
                     <Radio.Content>
@@ -85,14 +82,21 @@ export function KeyFileDialog({ isOpen, kind, isPending, error, onClose, onSubmi
                 data-cy="reader-security-key-file"
               />
             </label>
-            <TextField type="password" value={passphrase} onChange={setPassphrase}>
-              <Label>{t('passphrase.label')}</Label>
-              <Input autoComplete="off" data-cy="reader-security-file-passphrase" />
-            </TextField>
-            {error ? <p className="text-sm text-danger">{apiErrorMessage(error) ?? t('error')}</p> : null}
+            <PasswordInput
+              label={t('passphrase.label')}
+              value={passphrase}
+              onChange={setPassphrase}
+              autoComplete="off"
+              data-cy="reader-security-file-passphrase"
+            />
+            {error ? (
+              <StatusAlert status="danger" data-cy="reader-security-dialog-error">
+                {apiErrorMessage(error) ?? t('error')}
+              </StatusAlert>
+            ) : null}
           </ModalBody>
           <ModalFooter>
-            <Button variant="secondary" onPress={close}>
+            <Button variant="secondary" onPress={close} isDisabled={isPending}>
               {t('cancel')}
             </Button>
             <Button

@@ -1,3 +1,4 @@
+import { HEADERS_METADATA } from '@nestjs/common/constants';
 import { projectAttractapAuditEvent } from '../../audit/audit-policy';
 import { AttractapSecureBootKeysController } from './secure-boot-keys.controller';
 
@@ -49,5 +50,32 @@ describe('AttractapSecureBootKeysController', () => {
       details: { signingFingerprint: 'not-a-hash', recoveryFingerprint: FP },
     };
     expect(projectAttractapAuditEvent(event)).toBeNull();
+    const restored = {
+      ...event,
+      action: 'reader.secure_keys_restored' as const,
+      details: { signingFingerprint: FP, recoveryFingerprint: FP, source: 'recovery-file', pem: 'PEM' },
+    };
+    // a stray field (here key material) rejects the whole event rather than being stored
+    expect(projectAttractapAuditEvent(restored)).toBeNull();
+    const whitelisted = { signingFingerprint: FP, recoveryFingerprint: FP, source: 'recovery-file' };
+    expect(projectAttractapAuditEvent({ ...restored, details: whitelisted })?.details).toEqual(whitelisted);
+    expect(projectAttractapAuditEvent({ ...restored, details: { ...whitelisted, source: 'bogus' } })).toBeNull();
+  });
+
+  it('records nothing when the key operation fails', async () => {
+    keys.checkRecoveryKey.mockRejectedValueOnce(new Error('wrong passphrase'));
+    await expect(controller.checkRecoveryKey({ pem: 'PEM-IN', passphrase: 'wrong' }, request)).rejects.toThrow();
+    expect(events).toEqual([]);
+  });
+
+  it('keeps downloaded key files out of HTTP caches', () => {
+    for (const method of ['downloadRecoveryKey', 'downloadSigningKeyBackup'] as const) {
+      expect(Reflect.getMetadata(HEADERS_METADATA, AttractapSecureBootKeysController.prototype[method])).toContainEqual(
+        {
+          name: 'Cache-Control',
+          value: 'no-store',
+        },
+      );
+    }
   });
 });

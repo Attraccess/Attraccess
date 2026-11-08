@@ -9,7 +9,7 @@ sys.path.insert(0, FIRMWARE_DIR)
 import secure_packaging as p  # noqa: E402
 
 
-def make_build(root, app=b"app " + p.SECURE_PROFILE_MARKER.encode(), version="2"):
+def make_build(root, app=b"app " + p.SECURE_PROFILE_MARKER.encode(), version=2):
     files = {"app.bin": app, "bootloader/bootloader.bin": b"boot", "partition_table/partition-table.bin": b"table"}
     for name, data in files.items():
         os.makedirs(os.path.dirname(os.path.join(root, name)), exist_ok=True)
@@ -18,8 +18,11 @@ def make_build(root, app=b"app " + p.SECURE_PROFILE_MARKER.encode(), version="2"
     with open(os.path.join(root, "flasher_args.json"), "w") as f:
         json.dump({"app": {"file": "app.bin"}, "bootloader": {"file": "bootloader/bootloader.bin"},
                    "partition-table": {"file": "partition_table/partition-table.bin"}}, f)
-    with open(os.path.join(root, "sdkconfig"), "w") as f:
-        f.write(f"CONFIG_X=1\nCONFIG_BOOTLOADER_APP_SECURE_VERSION={version}\n")
+    os.makedirs(os.path.join(root, "config"), exist_ok=True)
+    with open(os.path.join(root, "config", "sdkconfig.json"), "w") as f:
+        json.dump({"X": True, "BOOTLOADER_APP_SECURE_VERSION": version}, f)
+    with open(os.path.join(root, "sdkconfig"), "w") as f:  # stale: must not win
+        f.write("CONFIG_BOOTLOADER_APP_SECURE_VERSION=99\n")
 
 
 class SecurePackaging(unittest.TestCase):
@@ -44,8 +47,8 @@ class SecurePackaging(unittest.TestCase):
     def test_missing_secure_version_is_an_error(self):
         with tempfile.TemporaryDirectory() as build:
             make_build(build)
-            with open(os.path.join(build, "sdkconfig"), "w") as f:
-                f.write("CONFIG_X=1\n")
+            with open(os.path.join(build, "config", "sdkconfig.json"), "w") as f:
+                json.dump({"X": True}, f)
             with self.assertRaises(ValueError):
                 p.secure_version(build)
 
