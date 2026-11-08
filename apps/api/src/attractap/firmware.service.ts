@@ -4,7 +4,7 @@ import { createReadStream, existsSync, readFileSync, statSync, copyFileSync, mkd
 
 import { join } from 'path';
 
-import { AttractapFirmware } from './dtos/firmware.dto';
+import { AttractapFirmware, AttractapSecureImage } from './dtos/firmware.dto';
 
 export interface FirmwareSymbolEntry {
   firmware: AttractapFirmware;
@@ -99,6 +99,22 @@ export class AttractapFirmwareService {
     }
 
     return firmware;
+  }
+
+  /** Unsigned secure-profile images of a variant, or undefined when the build did not package any. */
+  public getSecureImageSource(
+    firmwareName: string,
+    variantName: string,
+  ):
+    | { firmware: AttractapFirmware; secureImage: AttractapSecureImage; appPath: string; bootloaderPath: string }
+    | undefined {
+    const firmware = this.getFirmwareDefinition(firmwareName, variantName);
+    const image = firmware?.secureImage;
+    if (!image) return undefined;
+    const appPath = join(this.firmwareAssetsDirectory, image.appFilename);
+    const bootloaderPath = join(this.firmwareAssetsDirectory, image.bootloaderFilename);
+    if (!existsSync(appPath) || !existsSync(bootloaderPath)) return undefined;
+    return { firmware, secureImage: image, appPath, bootloaderPath };
   }
 
   public getFirmwareBinaryStream(firmwareName: string, variantName: string): NodeJS.ReadableStream {

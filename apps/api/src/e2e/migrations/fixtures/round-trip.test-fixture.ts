@@ -9,6 +9,7 @@ import { migrationIdentityNotificationSeeds } from './seeds/identity-notificatio
 import { migrationMaintenanceSeeds } from './seeds/maintenance.test-fixture';
 import { migrationMembershipFormSeeds } from './seeds/membership-form.test-fixture';
 import { migrationReaderSeeds } from './seeds/reader.test-fixture';
+import { migrationSecureBootSeeds } from './seeds/secure-boot.test-fixture';
 import { migrationResourceSeeds } from './seeds/resource.test-fixture';
 import { ensureUsers } from './seed-storage.test-fixture';
 import { migrationSsoSeeds } from './seeds/sso.test-fixture';
@@ -43,6 +44,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   );
   await migrationIdentityNotificationSeeds(dataSource, seedTag, primaryUser);
   await migrationCsvExportSeeds(dataSource, seedTag);
+  await migrationSecureBootSeeds(dataSource, seedTag);
 };
 
 const assertAllEntitiesHaveRows = async (dataSource: DataSource) => {

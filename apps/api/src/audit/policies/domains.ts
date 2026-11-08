@@ -20,6 +20,7 @@ export type CoreAuditDomain = (typeof CORE_AUDIT_DOMAINS)[number];
 /** Subject types recorded by core domains. Plugin subject types come from the plugin audit registry. */
 export const CORE_SUBJECT_TYPES = [
   'attractap.reader',
+  'attractap.installation',
   'attractap.card',
   'attractap.ui-alert',
   'setting',
