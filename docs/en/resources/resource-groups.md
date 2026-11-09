@@ -1,4 +1,5 @@
 # Resource Groups
+<!-- llms-description: How resource groups combine several resources so introductions can be managed at the group level. -->
 
 Groups allow you to combine multiple resources and manage introductions at the group level.
 

@@ -1,4 +1,5 @@
 # WAGO recovery runbooks
+<!-- llms-description: Six runbooks for operating the WAGO CC100 integration, such as credential compromise, broker outage and controller replacement. -->
 
 Six scenarios for operating the WAGO CC100 integration. They link the existing procedures instead of repeating
 them. The last column of every step names the automated test that exercises it, or says **not covered**. A test

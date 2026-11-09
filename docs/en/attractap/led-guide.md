@@ -1,4 +1,5 @@
 # Attractap Lite LED Guide
+<!-- llms-description: Explains the LED ring animations and one-time feedback signals of the display-less Attractap Lite reader. -->
 
 The Attractap Lite is a compact RFID reader without a display. It uses a circular ring of 24 WS2812 LEDs to communicate device status and feedback. This guide explains what each LED pattern means so you can interpret the device state at a glance.
 

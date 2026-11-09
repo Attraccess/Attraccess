@@ -1,4 +1,5 @@
 # Plugins
+<!-- llms-description: Stellt das Plugin-System vor, das Attraccess um Frontend-Seiten und Backend-Endpunkte erweitert, mit Verwaltung und SDKs. -->
 
 Das Plugin-System ermoeglicht es Ihnen, Attraccess um zusaetzliche Funktionen zu erweitern. Plugins koennen neue Seiten im Frontend, neue API-Endpunkte im Backend oder beides hinzufuegen.
 

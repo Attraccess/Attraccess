@@ -1,4 +1,5 @@
 # Resources
+<!-- llms-description: Introduces resources, the core of Attraccess: machines, tools and equipment whose access and usage you manage, and their types. -->
 
 Resources are the core of Attraccess. A resource is anything whose access and usage you manage at your site – production machines, lab equipment, tools, shared workstations or doors.
 

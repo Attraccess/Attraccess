@@ -1,4 +1,5 @@
 # RFID Cards
+<!-- llms-description: How RFID cards link to user accounts, how to manage cards, supported card types and which readers may enroll or reset cards. -->
 
 RFID cards are the physical keys that let users access machines and doors via Attractap readers. Each card is linked to a user account in Attraccess.
 

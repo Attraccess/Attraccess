@@ -1,4 +1,5 @@
 # Mobile Nutzung (PWA)
+<!-- llms-description: Wie Sie Attraccess als Progressive Web App auf iOS und Android installieren, inklusive Updates und Offline-Unterstützung. -->
 
 Attraccess ist eine Progressive Web App (PWA). Das bedeutet, Sie können es auf Ihrem Handy oder Tablet installieren und wie eine native App nutzen – kein App Store erforderlich.
 

@@ -83,6 +83,42 @@ window.$docsify = {
 };
 
 // ===== Language Switching =====
+// Returns true when the language changes (the page then reloads after delayMs).
+function setLanguage(lang, delayMs) {
+  if (['de', 'en'].indexOf(lang) === -1 || lang === currentLang) return false;
+  localStorage.setItem('attraccess-docs-lang', lang);
+  window.setTimeout(function () {
+    window.location.reload();
+  }, delayMs || 0);
+  return true;
+}
+
+// Opens a docs page by its language-prefixed path (e.g. "en/getting-started/overview.md") and returns
+// { reloading }. Other-language pages get the "#/<lang>/..." hash handled at load, then a reload after
+// delayMs. pushState does not fire hashchange, so Docsify never tries the route under the old language.
+function navigateDocs(path, delayMs) {
+  var parts = /^(de|en)\/((?:[A-Za-z0-9][A-Za-z0-9._-]*\/)*[A-Za-z0-9][A-Za-z0-9_-]*)\.md$/.exec(path);
+  if (!parts) throw new Error('Not a documentation page path: ' + path);
+  var route = parts[2] === 'home' ? '' : parts[2];
+  if (parts[1] === currentLang) {
+    window.location.hash = '#/' + route;
+    return { reloading: false };
+  }
+  window.history.pushState(null, '', window.location.pathname + '#/' + parts[1] + '/' + route);
+  setLanguage(parts[1], delayMs);
+  return { reloading: true };
+}
+
+// Small API for scripts such as webmcp.js
+window.AttraccessDocs = {
+  docsBase: docsBase,
+  getLanguage: function () {
+    return currentLang;
+  },
+  setLanguage: setLanguage,
+  navigate: navigateDocs,
+};
+
 function updateLangSwitcher() {
   var links = document.querySelectorAll('.lang-switcher a');
   links.forEach(function (link) {
@@ -95,9 +131,8 @@ document.getElementById('langSwitcher').addEventListener('click', function (e) {
   e.preventDefault();
   var langEl = e.target.closest ? e.target.closest('a[data-lang]') : e.target;
   var lang = langEl ? langEl.getAttribute('data-lang') : null;
-  if (!lang || lang === currentLang) return;
-  localStorage.setItem('attraccess-docs-lang', lang);
-  window.location.reload();
+  if (!lang) return;
+  setLanguage(lang, 0);
 });
 
 // ===== Theme Toggle — set on html element =====

@@ -1,4 +1,5 @@
 # MQTT Server Setup
+<!-- llms-description: How to add and test an MQTT broker connection in Attraccess, including common brokers, multiple servers and connection status. -->
 
 This guide explains how to connect Attraccess to an MQTT broker so you can use MQTT in your automation flows.
 

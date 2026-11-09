@@ -1,4 +1,5 @@
 # Entwickler-Überblick
+<!-- llms-description: Einstieg für Entwickler: Technologie-Stack, Voraussetzungen, erste Schritte, Entwicklungsablauf, Projektstruktur und nützliche Befehle. -->
 
 Diese Anleitung hilft Ihnen beim Einstieg in die Attraccess-Entwicklung. Attraccess ist eine Webanwendung mit öffentlich einsehbarem Quellcode (source-available) für Maschinenzugang und Ressourcenverwaltung in Industrie, Forschung und Hochschulen.
 

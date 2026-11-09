@@ -1,4 +1,5 @@
 # Ressourcen erstellen
+<!-- llms-description: So legen Sie eine Ressource an, bearbeiten und löschen sie; erfordert die Berechtigung Ressourcen verwalten. -->
 
 Sie benötigen die Berechtigung **Ressourcen verwalten**, um neue Ressourcen anzulegen.
 

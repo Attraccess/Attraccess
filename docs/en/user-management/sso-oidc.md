@@ -1,4 +1,5 @@
 # OIDC Setup
+<!-- llms-description: How to create and configure an OpenID Connect SSO provider, including the callback URL and testing the login. -->
 
 OpenID Connect (OIDC) is the recommended SSO protocol for most use cases.
 

@@ -1,4 +1,5 @@
 # Reader Security (Secure Boot keys)
+<!-- llms-description: How to secure Attractap Touch V2 readers so they only accept firmware signed with your own Secure Boot keys, including backup and restore. -->
 
 Attractap Touch V2 readers can be **secured**: afterwards they only accept firmware signed by _your_
 installation, their flash is encrypted and their server identity is locked to the chip. This page

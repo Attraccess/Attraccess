@@ -1,4 +1,5 @@
 # CSV-Export
+<!-- llms-description: Nutzungs- und Abrechnungsdaten als CSV exportieren: Berechtigungen, Spalten, Vorlagen, verfügbare Felder und Dateiformat. -->
 
 Exportieren Sie Nutzungs- und Abrechnungsdaten als CSV-Datei zur Analyse, für Berichte, die Buchhaltung oder den Upload in andere Systeme. Sie legen fest, welche Spalten die Datei enthält, wie ihre Überschriften heißen und in welcher Reihenfolge sie stehen. Gespeicherte **Vorlagen** machen dieselbe Konfiguration wiederverwendbar.
 

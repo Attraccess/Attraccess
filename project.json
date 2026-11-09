@@ -4,6 +4,7 @@
   "targets": {
     "lint": {
       "executor": "@nx/eslint:lint",
+      "dependsOn": ["check-llms-txt"],
       "options": {
         "lintFilePatterns": ["*.{js,ts}", "docs/**/*.md"]
       }
@@ -43,6 +44,27 @@
           "vitest run --config scripts/vitest.config.mts"
         ],
         "parallel": false
+      }
+    },
+    "check-llms-txt": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/docs/**/*.md",
+        "{workspaceRoot}/docs/llms.txt",
+        "{workspaceRoot}/docs/CNAME",
+        "{workspaceRoot}/scripts/generate-llms-txt.mjs",
+        "{workspaceRoot}/docs/assets/webmcp.js"
+      ],
+      "options": {
+        "command": "node scripts/generate-llms-txt.mjs --check"
+      }
+    },
+    "generate-llms-txt": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node scripts/generate-llms-txt.mjs"
       }
     },
     "lint-files": {

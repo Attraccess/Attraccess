@@ -1,4 +1,5 @@
 # Email Templates
+<!-- llms-description: Manage and customize the email templates Attraccess sends, including available templates, plugin templates and placeholders. -->
 
 Attraccess uses email templates for automated messages such as registration confirmations and password resets. You can customize these templates for your organization.
 

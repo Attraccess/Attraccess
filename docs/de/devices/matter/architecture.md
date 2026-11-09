@@ -1,4 +1,5 @@
 # Matter: Architektur
+<!-- llms-description: Architektur der Matter-Integration: Plugin plus Sidecar, versionierter REST- und WebSocket-Vertrag, Fehler und Events. -->
 
 > **Nur Konnektivität.** Dieses Release legt das Fundament für Matter-Unterstützung: einen versionierten Vertrag (Contract), einen eigenständigen Sidecar mit Health-, Versions- und Event-Stream-Endpunkten und ein Plugin, das sich sicher mit ihm verbindet. Es kann Geräte **nicht** in Betrieb nehmen (Commissioning), nicht auflisten, keine Befehle senden, Thread nicht verwalten und keine Firmware-Updates einspielen. Planen Sie keine Gerätesteuerung damit. Diese Funktionen folgen in späteren Tickets (siehe [Wie es weitergeht](#wie-es-weitergeht)).
 

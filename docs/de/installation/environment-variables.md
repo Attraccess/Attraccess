@@ -1,4 +1,5 @@
 # Umgebungsvariablen
+<!-- llms-description: Referenz aller Umgebungsvariablen zur Konfiguration von Attraccess: Pflichteinstellungen, Anwendung, Logs, Speicher, SMTP und TLS. -->
 
 Alle Konfigurationsoptionen für Attraccess, die über Umgebungsvariablen gesetzt werden können.
 

@@ -1,4 +1,5 @@
 # Branding
+<!-- llms-description: Customize the application URL, logo and name, color mode and email layout to match your organization. -->
 
 Attraccess can be customized to match your organization's appearance.
 

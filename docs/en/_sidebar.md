@@ -110,6 +110,7 @@
   - [Architecture](developer/architecture.md)
   - [API Log Destinations](developer/logging.md)
   - [API Reference](developer/api-reference.md)
+  - [AI Agents (llms.txt & WebMCP)](developer/ai-agents.md)
   - [Contributing](developer/contributing.md)
 
 - **End User Guide**

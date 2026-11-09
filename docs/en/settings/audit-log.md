@@ -1,4 +1,5 @@
 # Audit log
+<!-- llms-description: How to browse, filter, inspect and export the audit log of recorded activity and control recording and retention. -->
 
 Open **Settings → Audit log** to inspect recorded activity. The **Activity** tab shows the newest events first; **Logging settings** controls future capture and retention.
 

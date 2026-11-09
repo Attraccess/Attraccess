@@ -1,4 +1,5 @@
 # Projekte
+<!-- llms-description: Stellt Projekte vor, die Nutzungssitzungen über Ressourcen hinweg unter einem gemeinsamen Zweck bündeln und Teams zusammenbringen. -->
 
 Projekte helfen Ihnen, Arbeit über mehrere Ressourcen hinweg zu organisieren. Sie ermöglichen es, Nutzungssitzungen unter einem gemeinsamen Zweck zu gruppieren und Teams von Personen zu verwalten, die an gemeinsamen Aufgaben zusammenarbeiten.
 

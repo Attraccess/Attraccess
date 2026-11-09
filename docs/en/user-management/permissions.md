@@ -1,4 +1,5 @@
 # Permissions
+<!-- llms-description: Explains the role-based permission model, default roles, permission keys, assigning roles and SSO-managed roles. -->
 
 Attraccess uses a **role-based access control (RBAC)** model. Permissions are not assigned to users directly — instead, users are assigned **roles**, and each role grants a set of granular permissions.
 

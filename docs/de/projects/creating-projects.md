@@ -1,4 +1,5 @@
 # Projekte erstellen
+<!-- llms-description: So kann jeder angemeldete Benutzer ein Projekt erstellen, bearbeiten und löschen. -->
 
 Jeder angemeldete Benutzer kann Projekte erstellen.
 

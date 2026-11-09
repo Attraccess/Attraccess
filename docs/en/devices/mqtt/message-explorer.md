@@ -1,4 +1,5 @@
 # MQTT Message Explorer
+<!-- llms-description: How to watch live MQTT messages and publish test messages for any configured MQTT server, who may use the explorer and where to find it. -->
 
 The message explorer lets you watch live MQTT messages and publish test messages for any MQTT server configured in Attraccess. It works with every broker (Mosquitto, RabbitMQ, EMQX, ...). Use it to test and debug flows that use MQTT nodes.
 

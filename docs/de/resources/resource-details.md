@@ -1,4 +1,5 @@
 # Detailseite
+<!-- llms-description: Beschreibt die Detailseite einer Ressource, die alle Informationen und Verwaltungsfunktionen an einem Ort bündelt. -->
 
 Die Detailseite einer Ressource zeigt alle Informationen und Verwaltungsfunktionen an einem Ort.
 

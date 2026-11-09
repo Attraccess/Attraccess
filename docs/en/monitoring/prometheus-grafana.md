@@ -1,4 +1,5 @@
 # Prometheus & Grafana Setup
+<!-- llms-description: Set up Prometheus and Grafana with Attraccess's bundled dashboards on Coolify or manual Docker Compose, including bearer token and provisioning. -->
 
 This guide covers how to set up Prometheus and Grafana to collect and visualize Attraccess metrics. Attraccess ships with pre-configured dashboards, datasource provisioning, and a Prometheus scrape config bundled inside the `attraccess` image at `/app/share/monitoring/` — so no repo checkout is required to deploy the stack.
 

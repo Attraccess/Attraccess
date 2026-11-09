@@ -1,4 +1,5 @@
 # System Requirements
+<!-- llms-description: Lists the server, network, client and optional component requirements for running Attraccess as a Docker container. -->
 
 ## Server Requirements
 

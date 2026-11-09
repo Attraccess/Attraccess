@@ -1,4 +1,5 @@
 # Metrics Reference
+<!-- llms-description: Reference of all metrics at the /api/metrics endpoint: HTTP, authentication, user, resource and Attractap device metrics. -->
 
 This page lists all metrics exposed by Attraccess at the `/api/metrics` endpoint. Metrics use the [Prometheus exposition format](https://prometheus.io/docs/instrumenting/exposition_formats/).
 

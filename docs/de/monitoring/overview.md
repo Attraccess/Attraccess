@@ -1,4 +1,5 @@
 # Monitoring & Metriken
+<!-- llms-description: Überblick über integrierte Prometheus-Metriken und Grafana-Dashboards zur Überwachung von Attraccess, inklusive Sicherheitshinweisen. -->
 
 Attraccess bietet integrierte Monitoring-Unterstützung mit **Prometheus** zur Metrik-Erfassung und **Grafana** zur Visualisierung. IT- und Betriebsteams können Ressourcennutzung, Anwendungszustand und betriebliche Leistung gemeinsam mit ihrer bestehenden Infrastruktur überwachen.
 

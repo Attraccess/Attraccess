@@ -1,4 +1,5 @@
 # SAML einrichten
+<!-- llms-description: So legen Sie einen SAML-SSO-Anbieter an und konfigurieren ihn, inklusive Service-Provider-Metadaten und Test der Anmeldung. -->
 
 SAML (Security Assertion Markup Language) wird häufig in Unternehmens- und Bildungsumgebungen eingesetzt.
 

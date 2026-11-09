@@ -1,4 +1,5 @@
 # System Settings
+<!-- llms-description: Administrator overview of System Settings: application settings, resource activity visibility, email and additional settings. -->
 
 The System Settings page lets administrators configure core application behavior. Access it from **Settings** in the sidebar.
 

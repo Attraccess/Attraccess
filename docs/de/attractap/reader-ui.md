@@ -1,4 +1,5 @@
 # Reader-Anzeige
+<!-- llms-description: Wie Plugins Hinweise und Abfragen auf Attractap-Bildschirmen anzeigen, welche Leser das können, sowie Admin-Einstellungen und Alarme. -->
 
 Plugins, zum Beispiel ein Reservierungs-Plugin, können kurze Hinweise auf dem Bildschirm von Attractap-Readern
 anzeigen, Mitglieder vor dem Start einer Maschine um eine Bestätigung bitten, einen Start mit Begründung ablehnen

@@ -1,4 +1,5 @@
 # Using Resources
+<!-- llms-description: How to find resources, get introduced, start supervised sessions and start and end usage sessions. -->
 
 Resources are the machines, tools and equipment managed in Attraccess. This page explains how to find, access and use them.
 

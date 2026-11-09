@@ -1,4 +1,5 @@
 # Backup & Restore
+<!-- llms-description: Explains what Attraccess data to back up, how to create a backup and how to restore it. -->
 
 Attraccess stores all data in a single directory, making backups straightforward.
 

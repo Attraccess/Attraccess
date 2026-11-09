@@ -1,4 +1,5 @@
 # Matter: Architecture
+<!-- llms-description: Architecture of the Matter integration: a plugin plus a sidecar, versioned REST and WebSocket contract, errors and events. -->
 
 > **Connectivity only.** This release provides the foundation for Matter support: a versioned contract, a standalone sidecar with health, version and event-stream endpoints, and a plugin that connects to it securely. It does **not** commission devices, list devices, send commands, manage Thread or install firmware updates. Do not plan equipment control around it. Those features follow in later tickets (see [What comes later](#what-comes-later)).
 

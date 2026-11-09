@@ -1,4 +1,5 @@
 # Quick Start
+<!-- llms-description: Step-by-step guide to get Attraccess running in minutes with Docker Compose and complete the first-time setup. -->
 
 This guide gets Attraccess running in just a few minutes.
 

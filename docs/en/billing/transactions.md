@@ -1,4 +1,5 @@
 # Billing Transactions
+<!-- llms-description: How to view, filter and inspect credit transactions in the billing dashboard and which permission is required. -->
 
 The Billing dashboard shows all credit transactions across the system. Use it to track charges, monitor resource usage costs and review individual user activity.
 

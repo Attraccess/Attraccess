@@ -1,4 +1,5 @@
 # Ressourcen
+<!-- llms-description: Stellt Ressourcen als Kern von Attraccess vor: Maschinen, Geräte und Werkzeuge, deren Zugang und Nutzung Sie verwalten, und ihre Typen. -->
 
 Ressourcen sind das Herzstück von Attraccess. Eine Ressource ist alles, dessen Zugang und Nutzung Sie an Ihrem Standort verwalten – Produktionsmaschinen, Laborgeräte, Werkzeuge, gemeinsam genutzte Arbeitsplätze oder Türen.
 

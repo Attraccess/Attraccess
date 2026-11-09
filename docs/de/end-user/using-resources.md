@@ -1,4 +1,5 @@
 # Ressourcen nutzen
+<!-- llms-description: Wie Sie Ressourcen finden, eingewiesen werden, beaufsichtigte Sitzungen starten sowie Nutzungssitzungen starten und beenden. -->
 
 Ressourcen sind die Maschinen, Werkzeuge und Geräte, die in Attraccess verwaltet werden. Diese Seite erklärt, wie Sie diese finden, darauf zugreifen und sie nutzen können.
 

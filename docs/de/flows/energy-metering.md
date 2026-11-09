@@ -1,4 +1,5 @@
 # Zähler und verbrauchsbasierte Abrechnung
+<!-- llms-description: Benannte Zähler pro Ressource für Strom, Wasser oder beliebige Werte, mit Sitzungsgrenzen, kumulativen Zählern und optionaler Abrechnung. -->
 
 Jede Ressource kann mehrere benannte Zähler haben. Ein Zähler kann beliebige Werte erfassen: Strom, Wasser, Material, Herzschläge oder andere Messwerte. Attraccess speichert keine Einheit und rechnet neue Messwerte nicht um.
 

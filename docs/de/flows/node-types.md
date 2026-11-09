@@ -1,4 +1,5 @@
 # Knotentypen
+<!-- llms-description: Referenz aller eingebauten Flow-Knoten, gegliedert in Eingabe-Trigger, Verarbeitungs-Knoten und Ausgabe-Aktionen. -->
 
 Diese Referenz beschreibt alle eingebauten Flow-Knoten. Der Editor gruppiert sie nach Zweck, etwa Abrechnung, Nachrichten und Flow-Steuerung, und zeigt die vom Ressourcentyp unterstützten Knoten. Nutzungs-, Aktivitäts- und Abrechnungsknoten sind für **Maschinen**; Tür-Trigger für **Türen**. Plugins können weitere Knoten mit eigenen Einstellungen ergänzen.
 

@@ -1,4 +1,5 @@
 # Reservierungen
+<!-- llms-description: Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; behandelt Nutzung, Administration und API. -->
 
 Mit dem Plugin **Reservierungen** buchen Mitglieder eine Ressource im Voraus für ein bestimmtes Zeitfenster. Solange
 eine Buchung aktiv ist, kann niemand sonst die Ressource starten. Wer kurz vor der Buchung einer anderen Person

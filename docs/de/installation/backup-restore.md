@@ -1,4 +1,5 @@
 # Backup & Wiederherstellung
+<!-- llms-description: Erklärt, welche Attraccess-Daten gesichert werden, wie Sie ein Backup erstellen und wiederherstellen. -->
 
 Attraccess speichert alle Daten in einem einzigen Verzeichnis, was Backups einfach macht.
 

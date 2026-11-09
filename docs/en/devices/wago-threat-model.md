@@ -1,4 +1,5 @@
 # WAGO integration threat model and pen-test brief
+<!-- llms-description: Threat model and pen-test brief for the WAGO CC100 integration, covering actors, trust boundaries and attack surfaces. -->
 
 This page is the production-assurance threat model for the WAGO CC100 integration (ATT-988). It lists what the
 integration protects, where trust changes, what can go wrong, which code stops it today, and which gaps remain.

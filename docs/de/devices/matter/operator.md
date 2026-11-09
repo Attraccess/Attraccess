@@ -1,4 +1,5 @@
 # Matter: Betriebsanleitung
+<!-- llms-description: Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation. -->
 
 > **Nur Konnektivität.** Der Sidecar lässt sich bauen, starten, absichern und mit Attraccess verbinden, steuert aber noch keine Geräte. Lesen Sie zuerst die [Architektur](devices/matter/architecture.md).
 

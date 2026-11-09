@@ -1,4 +1,5 @@
 # Einweisungen
+<!-- llms-description: Erklärt Einweisungen (Sicherheitsunterweisungen für den Zugang zu einer Ressource), ihre Rollen sowie Erteilen, Entziehen und Verwalten. -->
 
 Eine Einweisung ist eine Sicherheitsunterweisung, die einem Benutzer den Zugang zu einer Ressource gewährt. Bevor ein Benutzer eine Nutzungssitzung starten kann, muss er für die Ressource (oder eine Gruppe, die die Ressource enthält) eingewiesen sein.
 
