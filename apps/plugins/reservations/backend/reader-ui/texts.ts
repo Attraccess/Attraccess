@@ -90,6 +90,18 @@ export function nextLocalMidnight(now: Date, timeZone: string): Date {
 
 const range = (start: Date, end: Date, clock: ReaderClock) => `${readerTime(start, clock)}-${readerTime(end, clock)}`;
 
+/**
+ * Characters of reader text that safely fit one line: the details body (18 px, 422 px wide) and the session text
+ * beside its countdown (14 px, about 340 px). Measured with the reader fonts at about 9.6 and 8 px per character.
+ */
+export const READER_LINE_CHARS = 42;
+
+/** A clause with a holder name and its times: one line when it fits, otherwise the times go on a line of their own. */
+const named = (subject: string, times: string): string[] => {
+  const whole = `${subject} ${times}`;
+  return whole.length <= READER_LINE_CHARS ? [whole] : [subject, times];
+};
+
 /** Slot texts. Every function returns the final string; callers only enforce the host limits. */
 export const readerTexts = {
   /** List rows, ≤ 24 characters. They never carry a name. */
@@ -112,46 +124,34 @@ export const readerTexts = {
     return long.length <= ROW_MAX ? long : fit(pick(c.lang, `Yours until ${until}`, `Für dich bis ${until}`), ROW_MAX);
   },
 
-  /** Details lines (≤ 80 characters; the holder name is already truncated). */
   /**
-   * Nothing runs and a booking is next: one fact (the free window and that booking) in two lines. The reader
-   * wraps only at spaces, so each line is a clause that stays together: "Free until 14:00," and
-   * "then reserved by bea until 14:30". The booking's start is the end of the free window, so it is written once.
+   * Details lines (≤ 80 characters; the holder name is already truncated). Each returned string is one text node,
+   * a clause the reader keeps on one line. The reader wraps at spaces, commas and hyphens, so a clause too long for
+   * its line would leave a time ("14:25") or half a range alone on the next one.
    */
-  freeThenReserved: (start: Date, end: Date, c: ReaderClock, holder?: string): string[] =>
-    holder
-      ? [
-          pick(c.lang, `Free until ${readerTime(start, c)},`, `Frei bis ${readerTime(start, c)},`),
-          pick(
-            c.lang,
-            `then reserved by ${holder} until ${readerTime(end, c)}`,
-            `dann reserviert von ${holder} bis ${readerTime(end, c)}`,
-          ),
-        ]
-      : [
-          pick(c.lang, `Free until ${readerTime(start, c)},`, `Frei bis ${readerTime(start, c)},`),
-          pick(c.lang, `then reserved until ${readerTime(end, c)}`, `dann reserviert bis ${readerTime(end, c)}`),
-        ],
-  reserved: (start: Date, end: Date, c: ReaderClock, holder?: string) =>
-    holder
-      ? pick(
-          c.lang,
-          `Reserved by ${holder} ${range(start, end, c)}`,
-          `Reserviert von ${holder} ${range(start, end, c)}`,
+  /**
+   * Nothing runs and a booking is next: one fact (the free window and that booking) as clauses: "Free until 14:00,"
+   * and "then reserved by bea until 14:30". The booking's start is the end of the free window, so it is written once.
+   */
+  freeThenReserved: (start: Date, end: Date, c: ReaderClock, holder?: string): string[] => [
+    pick(c.lang, `Free until ${readerTime(start, c)},`, `Frei bis ${readerTime(start, c)},`),
+    ...(holder
+      ? named(
+          pick(c.lang, `then reserved by ${holder}`, `dann reserviert von ${holder}`),
+          pick(c.lang, `until ${readerTime(end, c)}`, `bis ${readerTime(end, c)}`),
         )
-      : pick(c.lang, `Reserved ${range(start, end, c)}`, `Reserviert ${range(start, end, c)}`),
+      : [pick(c.lang, `then reserved until ${readerTime(end, c)}`, `dann reserviert bis ${readerTime(end, c)}`)]),
+  ],
+  reserved: (start: Date, end: Date, c: ReaderClock, holder?: string): string[] =>
+    holder
+      ? named(pick(c.lang, `Reserved by ${holder}`, `Reserviert von ${holder}`), range(start, end, c))
+      : [pick(c.lang, `Reserved ${range(start, end, c)}`, `Reserviert ${range(start, end, c)}`)],
   own: (start: Date, end: Date, c: ReaderClock) =>
     pick(c.lang, `Your booking ${range(start, end, c)}`, `Deine Buchung ${range(start, end, c)}`),
   /** Its own line under the booking, so the parenthesis never starts a wrapped line by itself. */
   checkInLine: (deadline: Date, c: ReaderClock) =>
     pick(c.lang, `(check in by ${readerTime(deadline, c)})`, `(Check-in bis ${readerTime(deadline, c)})`),
   /** Session area: another user's booking starts soon, with its full range (a countdown node follows). */
-  sessionReserved: (start: Date, end: Date, c: ReaderClock, holder?: string) =>
-    holder
-      ? pick(
-          c.lang,
-          `Reserved by ${holder} ${range(start, end, c)}`,
-          `Reserviert von ${holder} ${range(start, end, c)}`,
-        )
-      : pick(c.lang, `Reserved ${range(start, end, c)}`, `Reserviert ${range(start, end, c)}`),
+  sessionReserved: (start: Date, end: Date, c: ReaderClock, holder?: string): string[] =>
+    readerTexts.reserved(start, end, c, holder),
 };

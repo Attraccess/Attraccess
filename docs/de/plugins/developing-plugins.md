@@ -304,15 +304,17 @@ Prüfen Sie Ihre Texte vorab mit denselben Regeln, damit sie auch nach der Trans
 
 ### Zeilenumbrüche
 
-Der Reader bricht Text an Leerzeichen, Kommas und Bindestrichen um, nie nach `:` oder `)`. Eine Uhrzeit („14:25“)
-wird also nie getrennt, und eine schließende Klammer beginnt keine Zeile. Ein Bindestrich ist eine Umbruchstelle,
-sodass ein langer Name mit Bindestrich dort statt mitten im Wort umbricht; halten Sie einen Zeitraum
-(„13:55-14:25“) in einer Teilaussage, die in eine Zeile passt. Ein Wort, das länger als die Zeile ist, wird
-weiterhin getrennt. Der Reader gleicht Zeilen nicht aus, und ein Zeilenumbruch
-im Text wird durch ein Leerzeichen ersetzt. Was zusammengehört, schreiben Sie als eigenen `text`-Knoten in einer
-`col` (eine Teilaussage pro Knoten, zum Beispiel „Frei bis 13:55,“ und „dann reserviert von bea bis 14:25“),
-damit keine einzelne Uhrzeit oder Notiz allein in einer Zeile steht. Bei 18 px passen etwa 48 Zeichen in eine
-Zeile, bei 14 px etwa 62.
+Der Reader bricht Text an Leerzeichen und Satzzeichen wie `,`, `-`, `.` und `_` um, aber nie nach `:` oder `)`. Eine
+Uhrzeit („14:25“) wird also nie getrennt, und eine schließende Klammer beginnt keine Zeile. Ein Bindestrich ist eine
+Umbruchstelle: Ein langer Name mit Bindestrich bricht dort statt mitten im Wort um, ebenso ein Zeitraum
+(„13:55-“ / „14:25“), der nicht in seine Zeile passt. Ein Wort, das länger als die Zeile ist, wird weiterhin
+getrennt. Der Reader gleicht Zeilen nicht aus, und ein Zeilenumbruch im Text wird durch ein Leerzeichen ersetzt.
+
+Schreiben Sie jede Teilaussage als eigenen `text`-Knoten in einer `col`, zum Beispiel „Frei bis 13:55,“ und „dann
+reserviert von bea bis 14:25“, damit keine einzelne Uhrzeit oder Notiz allein in einer Zeile steht. Etwa 42 Zeichen
+passen in eine Zeile des Detailbereichs (18 px) und eines kleinen Texts (14 px) neben einem Countdown. Teilen Sie
+eine längere Teilaussage selbst, zum Beispiel zwischen einem Namen und seinen Zeiten: „Reserviert von Wolfgang
+Mohrman“ über „13:55-14:25“.
 
 ### Datenschutz und Sprache
 

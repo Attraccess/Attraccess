@@ -10,7 +10,7 @@ import {
 import { ReservationEntity } from '../entities/reservation.entity';
 import { Harness, createHarness } from '../testing/harness.test-utils';
 import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
-import { nextLocalMidnight, readerName, readerTexts, readerTime } from './texts';
+import { READER_LINE_CHARS, nextLocalMidnight, readerName, readerTexts, readerTime } from './texts';
 
 // Harness zone is Europe/Berlin (UTC+2 in June): 12:00Z is 14:00 local.
 const HOLDER = 10;
@@ -465,19 +465,21 @@ describe('ReaderUiService', () => {
   });
 
   describe('line breaks on the reader', () => {
-    // The reader wraps each text node at spaces only (a 408 px slot fits about 48 characters of the 18 px font).
-    // One node per clause keeps a time, a range and the check-in note together; nothing may rely on the wrap point.
-    const ONE_LINE = 48;
+    // The reader wraps at spaces, commas, hyphens and dots, so one text node per clause keeps a time, a range and the
+    // check-in note together. READER_LINE_CHARS fits one line of the details body and of the session text.
+    const LONG_NAME = 'Wolfgang Mohrman'; // READER_NAME_MAX characters
     const lines = (list: ReaderSlotContribution[], slot = 'resource.details.body') =>
       textOf(get(list, slot)?.tree as ReaderUiNode);
 
-    const expectKeptTogether = (list: ReaderSlotContribution[]) => {
-      for (const text of lines(list)) {
-        expect(text.length).toBeLessThanOrEqual(ONE_LINE);
+    const expectKeptTogether = (list: ReaderSlotContribution[], slot = 'resource.details.body') => {
+      expect(lines(list, slot).length).toBeGreaterThan(0);
+      for (const text of lines(list, slot)) {
+        expect(text.length).toBeLessThanOrEqual(READER_LINE_CHARS);
         // No clause ends or starts on a separator, and a range is never cut: it has no space around its hyphen.
         expect(text).not.toMatch(/[:-]$|^[:-]|\s-|-\s/);
       }
     };
+    const longName = () => jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map([[HOLDER, LONG_NAME]]));
 
     it('splits the idle text into two clauses, each on one line', async () => {
       await book(HOLDER, '2026-06-01T11:55:00', '2026-06-01T12:25:00');
@@ -505,9 +507,72 @@ describe('ReaderUiService', () => {
       }
     });
 
-    it('keeps the longest names and weekday times on one line each', async () => {
+    it('gives the times of a long holder name a line of their own, also with weekdays', async () => {
+      longName();
       await book(HOLDER, '2026-06-01T22:05:00', '2026-06-01T23:00:00'); // 00:05 tomorrow: weekday prefix
-      for (const language of ['en', 'de'] as const) expectKeptTogether(await slots({ userId: MANAGER, language }));
+      const idle = await slots({ userId: MANAGER, language: 'de' });
+      expect(lines(idle)).toEqual(['Frei bis Di 00:05,', `dann reserviert von ${LONG_NAME}`, 'bis Di 01:00']);
+      expect(get(idle, 'resource.details.body')?.tree).toMatchObject({ t: 'col', gap: 0 });
+      expect(get(idle, 'resource.details.body')?.fallback?.text).toBe(
+        `Frei bis Di 00:05, dann reserviert von ${LONG_NAME} bis Di 01:00`,
+      );
+      expectKeptTogether(idle);
+      expectKeptTogether(await slots({ userId: MANAGER }));
+      expectHostValid(idle);
+    });
+
+    it('splits a running booking with a long holder name between the name and its range', async () => {
+      longName();
+      await book(HOLDER, '2026-06-01T21:30:00', '2026-06-01T23:00:00'); // 23:30 to 01:00 tomorrow
+      h.setNow('2026-06-01T21:35:00Z'); // check-in open
+      for (const language of ['en', 'de'] as const) {
+        const running = await slots({ userId: MANAGER, language });
+        expect(lines(running)).toEqual(
+          language === 'en'
+            ? [`Reserved by ${LONG_NAME}`, '23:30-Tue 01:00', '(check in by 23:45)']
+            : [`Reserviert von ${LONG_NAME}`, '23:30-Di 01:00', '(Check-in bis 23:45)'],
+        );
+        expectKeptTogether(running);
+        expectHostValid(running);
+      }
+    });
+
+    it('keeps a clause whole while it fits one line', async () => {
+      jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map([[HOLDER, 'Anna Mueller']]));
+      await book(HOLDER, '2026-06-01T11:55:00', '2026-06-01T12:25:00');
+      expect(lines(await slots({ userId: MANAGER, language: 'de' }))).toEqual([
+        'Frei bis 13:55,',
+        'dann reserviert von Anna Mueller bis 14:25',
+      ]);
+    });
+
+    it('splits the session text the same way, beside its countdown', async () => {
+      longName();
+      await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
+      const list = await slots({ userId: MANAGER, language: 'de', sessionActive: true });
+      const session = get(list, 'resource.details.session');
+      expect(session?.tree).toEqual({
+        t: 'row',
+        c: [
+          {
+            t: 'col',
+            gap: 0,
+            fill: true,
+            c: [
+              { t: 'text', text: `Reserviert von ${LONG_NAME}`, style: 'small', fill: true },
+              { t: 'text', text: '12:40-14:00', style: 'small', fill: true },
+            ],
+          },
+          { t: 'countdown', to: new Date('2026-06-01T10:40:00Z'), tone: 'warning' },
+        ],
+      });
+      expect(session?.fallback?.text).toBe(`Reserviert von ${LONG_NAME} 12:40-14:00`);
+      // 40 characters in English: one line.
+      expect(lines(await slots({ userId: MANAGER, sessionActive: true }), 'resource.details.session')).toEqual([
+        `Reserved by ${LONG_NAME} 12:40-14:00`,
+      ]);
+      expectKeptTogether(list, 'resource.details.session');
+      expectHostValid(list);
     });
   });
 

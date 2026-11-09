@@ -105,11 +105,11 @@
  *   TEXT WRAPPING
  *===================*/
 
-/*Wrap at spaces, commas and hyphens. LVGL also breaks after ':' and ')' by default, which splits times
- *("14:" / "25") and a closing parenthesis in plugin texts (ATT-1188). A hyphen stays a break so long
- *hyphenated names wrap there instead of mid-word; the plugins keep each time range in a clause that fits one
- *line. Words longer than a line still break by force.*/
-#define LV_TXT_BREAK_CHARS " ,-"
+/*LVGL's default break characters without ':' and ')': those split times ("14:" / "25") and put a closing
+ *parenthesis on a line of its own in plugin texts (ATT-1188). Hyphens, dots and underscores stay breaks, so
+ *hyphenated names, "first.last" user names and host names wrap there instead of mid-word; the plugins keep
+ *each time range in a clause that fits one line. Words longer than a line still break by force.*/
+#define LV_TXT_BREAK_CHARS " ,.;-_]}"
 
 /*==================
  *   FONT USAGE

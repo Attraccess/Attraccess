@@ -141,18 +141,19 @@ export class ReaderUiService {
     if (sessionBooking) {
       const next = sessionBooking;
       const sessionHolder = next === subject ? holder : await nameOf(next);
-      const text = readerTexts.sessionReserved(next.startTime, next.endTime, clock, sessionHolder);
+      const texts = readerTexts.sessionReserved(next.startTime, next.endTime, clock, sessionHolder);
+      const lines = texts.map((text): ReaderUiNode => ({ t: 'text', text, style: 'small', fill: true }));
       add(
         SLOT.RESOURCE_DETAILS_SESSION,
         'reserved-soon',
         {
           t: 'row',
           c: [
-            { t: 'text', text, style: 'small', fill: true },
+            lines.length === 1 ? lines[0] : { t: 'col', gap: 0, fill: true, c: lines },
             { t: 'countdown', to: next.startTime, tone: 'warning' },
           ],
         },
-        text,
+        texts.join(' '),
         'warning',
       );
       boundaries.push(next.startTime.getTime());
@@ -242,7 +243,7 @@ export class ReaderUiService {
     }
     return {
       row: awaitingCheckIn ? readerTexts.rowCheckInBy(deadline, clock) : readerTexts.rowReservedUntil(endTime, clock),
-      body: [readerTexts.reserved(startTime, endTime, clock, holder), ...(checkIn ? [checkIn] : [])],
+      body: [...readerTexts.reserved(startTime, endTime, clock, holder), ...(checkIn ? [checkIn] : [])],
       tone: 'warning',
       boundary,
     };

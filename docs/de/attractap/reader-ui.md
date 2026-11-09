@@ -45,9 +45,10 @@ technischen Vertrag für Plugin-Entwickler finden Sie unter
 - **Reader offline:** Solange ein Reader keine Verbindung zum Server hat, startet nichts, und Plugin-Hinweise
   verschwinden.
 
-Lange Texte werden an Leerzeichen, Kommas und Bindestrichen umgebrochen, nie innerhalb einer Uhrzeit wie „14:25“.
-Plugins halten einen Zeitraum wie „13:55-14:25“ in einer Teilaussage, die in eine Zeile passt, und setzen Zusammengehöriges in eine eigene Zeile, zum Beispiel „Frei bis 13:55,“
-über „dann reserviert von bea bis 14:25“ oder den Check-in-Hinweis „(Check-in bis 14:10)“ unter die Buchung.
+Auf einem Attractap Touch mit aktueller Firmware wird eine Uhrzeit wie „14:25“ nie auf zwei Zeilen verteilt. Jede
+Zeile enthält einen Teil eines Hinweises, zum Beispiel „Frei bis 13:55,“ über „dann reserviert von bea bis 14:25“
+und den Check-in-Hinweis „(Check-in bis 14:10)“ unter der Buchung. Bei einem langen Namen stehen die Zeiten in einer
+eigenen Zeile.
 
 ## Uhrzeit und Zeitzone
 

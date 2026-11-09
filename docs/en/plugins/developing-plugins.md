@@ -647,13 +647,16 @@ so they fit the limits after transliteration.
 
 ### Line breaks
 
-The reader wraps text at spaces, commas and hyphens, never after `:` or `)`, so a time ("14:25") is never split
-and a closing parenthesis never starts a line. A hyphen is a break, so a long hyphenated name wraps there instead of
-mid-word; keep a time range ("13:55-14:25") in a clause that fits one line. A word longer than the line is still
-cut. The reader does not balance lines, though, and a newline in a text is replaced by a space. Write what
-belongs together as its own `text` node in a `col` (one clause per node, for example "Free until 13:55," and
-"then reserved by bea until 14:25"), so no single time or note is left alone on a line. At 18 px a text fits
-about 48 characters per line, at 14 px about 62.
+The reader wraps text at spaces and punctuation such as `,`, `-`, `.` and `_`, but never after `:` or `)`, so a
+time ("14:25") is never split and a closing parenthesis never starts a line. A hyphen is a break, so a long
+hyphenated name wraps there instead of mid-word, and so can a time range ("13:55-" / "14:25") that does not fit its
+line. A word longer than the line is still cut. The reader does not balance lines, and a newline in a text is
+replaced by a space.
+
+Write each clause as its own `text` node in a `col`, for example "Free until 13:55," and "then reserved by bea
+until 14:25", so no single time or note is left alone on a line. About 42 characters fit one line of the details
+body (18 px) and of a small (14 px) text beside a countdown. Split a longer clause yourself, for example between a
+name and its times: "Reserved by Wolfgang Mohrman" above "13:55-14:25".
 
 ### Privacy and language
 
