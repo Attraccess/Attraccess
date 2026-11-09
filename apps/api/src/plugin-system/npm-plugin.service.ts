@@ -208,7 +208,7 @@ export class NpmPluginService extends NpmInstallation implements OnModuleInit, O
   listInstalled(): InstalledNpmPlugin[] {
     return readInstalledNpmPlugins().map(({ pendingAudit, ...plugin }) => {
       void pendingAudit;
-      const classification = this.classification.classify(plugin.name, plugin.registryUrl, plugin.publisher);
+      const classification = this.classification.classify(plugin.name, plugin.registryUrl);
       return { ...plugin, classification: classification.kind, classificationReason: classification.reason };
     });
   }

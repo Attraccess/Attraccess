@@ -148,7 +148,7 @@ describe('NpmPluginService', () => {
     ]);
   });
 
-  it('classifies an installation using the selected version publisher', async () => {
+  it('classifies an official-scope npm installation as official and records its trusted publisher', async () => {
     const name = '@attraccess/plugin-example';
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
@@ -160,7 +160,7 @@ describe('NpmPluginService', () => {
       versions: {
         '1.2.3': {
           version: '1.2.3',
-          _npmUser: { name: 'someone-else' },
+          _npmUser: { name: 'GitHub Actions', email: 'npm-oidc-no-reply@github.com' },
           dist: { tarball: 'plugin', shasum: createHash('sha1').update(tarball).digest('hex') },
         },
       },
@@ -168,8 +168,8 @@ describe('NpmPluginService', () => {
     jest.spyOn(internals, 'download').mockResolvedValue(tarball);
 
     await expect(service.install(name, '1.2.3')).resolves.toMatchObject({
-      classification: 'community',
-      publisher: 'someone-else',
+      classification: 'official',
+      publisher: 'GitHub Actions',
     });
   });
 

@@ -122,14 +122,12 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      # Build before the npm token is in the environment; the publish step then reuses the local Nx cache.
+      # Build in its own step; the publish step then reuses the local Nx cache.
       - name: Build official plugin packages
         run: pnpm nx run-many --target=build --projects=tag:type:plugin,plugins-backend-sdk
       # Publishes what npm lacks: every plugin whose inputs changed since the commit recorded on its `next`
       # version, including changes merged in earlier runs that failed. Never moves `next` backwards.
       - name: Publish nightly official plugin packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next
 
   build-companion:
