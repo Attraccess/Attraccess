@@ -11,6 +11,36 @@ interface BruteForceProtectionServiceBruteForceFailureContext {
   accountCounters: BruteForceProtectionService['accountCounters'];
   userRepository: BruteForceProtectionService['userRepository'];
 }
+type FailureContext = BruteForceProtectionServiceBruteForceFailureContext;
+type Policy = Awaited<ReturnType<FailureContext['settingsService']['getRateLimitPolicy']>>;
+
+function bumpCoarseIpCounter(
+  context: FailureContext,
+  policy: Policy,
+  scope: RateLimitScope,
+  ip: string,
+  now: number,
+  windowMs: number,
+): void {
+  const coarseEntry = context.upsertCounter(context.ipCoarseCounters, ipCoarseKey(scope, ip), now, windowMs);
+  if (coarseEntry.count >= policy.maxAttempts * COARSE_IP_MULTIPLIER) {
+    const durationMs = computeLockoutMs(policy, coarseEntry.lockoutCount);
+    coarseEntry.lockoutUntil = now + durationMs;
+    coarseEntry.lockoutCount += 1;
+    coarseEntry.count = 0;
+    coarseEntry.firstAt = now;
+  }
+}
+
+/** A failure that names no account or username: only the coarse per-IP counter (maxAttempts × 10) moves. */
+export async function recordIpFailure(context: FailureContext, scope: RateLimitScope, ip: string): Promise<void> {
+  const policy = await context.settingsService.getRateLimitPolicy();
+  const windowMs = policy.windowSeconds * 1000;
+  const now = context.nowFn();
+  context.evictStale(now, windowMs);
+  bumpCoarseIpCounter(context, policy, scope, ip, now, windowMs);
+}
+
 export async function recordFailure(
   context: BruteForceProtectionServiceBruteForceFailureContext,
   scope: RateLimitScope,
@@ -33,14 +63,7 @@ export async function recordFailure(
     ipEntry.firstAt = now;
   }
 
-  const coarseEntry = context.upsertCounter(context.ipCoarseCounters, ipCoarseKey(scope, ip), now, windowMs);
-  if (coarseEntry.count >= policy.maxAttempts * COARSE_IP_MULTIPLIER) {
-    const durationMs = computeLockoutMs(policy, coarseEntry.lockoutCount);
-    coarseEntry.lockoutUntil = now + durationMs;
-    coarseEntry.lockoutCount += 1;
-    coarseEntry.count = 0;
-    coarseEntry.firstAt = now;
-  }
+  bumpCoarseIpCounter(context, policy, scope, ip, now, windowMs);
 
   if (userId == null) {
     return;

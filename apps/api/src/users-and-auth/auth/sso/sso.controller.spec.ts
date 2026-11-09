@@ -276,7 +276,9 @@ describe('SsoController', () => {
   });
 
   describe('linkUserToExternalAccount', () => {
+    const linkRequest = { ip: '203.0.113.9', res: { setHeader: jest.fn() } } as unknown as Request;
     const linkPayload = {
+      jti: 'jti-1',
       email: 'user@example.com',
       providerId: 1,
       providerType: SSOProviderType.OIDC,
@@ -330,7 +332,10 @@ describe('SsoController', () => {
       it('links when password is valid and removes local password', async () => {
         const { authService, usersService } = setupLinkMocks();
 
-        const result = await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        const result = await fixture.controller.linkUserToExternalAccount(
+          { linkToken: 'token', password: 'secret' },
+          linkRequest,
+        );
 
         expect(result).toEqual({ OK: true });
         expect(authService.addAuthenticationDetails).toHaveBeenCalledWith(baseUser.id, {
@@ -345,7 +350,7 @@ describe('SsoController', () => {
       it('verifies link token', async () => {
         setupLinkMocks();
 
-        await fixture.controller.linkUserToExternalAccount({ linkToken: 'my-token', password: 'secret' });
+        await fixture.controller.linkUserToExternalAccount({ linkToken: 'my-token', password: 'secret' }, linkRequest);
 
         expect(fixture.linkTokenService.verify).toHaveBeenCalledWith('my-token');
       });
@@ -353,7 +358,7 @@ describe('SsoController', () => {
       it('looks up user by email from link payload', async () => {
         const { usersService } = setupLinkMocks();
 
-        await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest);
 
         expect(usersService.findOne).toHaveBeenCalledWith({ email: 'user@example.com' }, ['authenticationDetails']);
       });
@@ -372,7 +377,10 @@ describe('SsoController', () => {
       it('updates ssoSubject when re-linking to the same provider', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
 
-        const result = await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        const result = await fixture.controller.linkUserToExternalAccount(
+          { linkToken: 'token', password: 'secret' },
+          linkRequest,
+        );
 
         expect(result).toEqual({ OK: true });
         expect(authService.updateSSOSubject).toHaveBeenCalledWith(20, 'sub-123');
@@ -386,7 +394,7 @@ describe('SsoController', () => {
         });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'wrong' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'wrong' }, linkRequest),
         ).rejects.toThrow(UnauthorizedException);
 
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
@@ -395,7 +403,7 @@ describe('SsoController', () => {
       it('removes local password after re-linking', async () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
 
-        await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest);
 
         expect(authService.removeAuthenticationDetails).toHaveBeenCalledWith(10);
       });
@@ -403,7 +411,7 @@ describe('SsoController', () => {
       it('clears externalIdentifier after re-linking', async () => {
         const { usersService } = setupLinkMocks({ existingSSODetail: existingSSODetailSameProvider });
 
-        await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' });
+        await fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest);
 
         expect(usersService.updateOne).toHaveBeenCalledWith(42, { externalIdentifier: null });
       });
@@ -415,7 +423,7 @@ describe('SsoController', () => {
         });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow(BadRequestException);
 
         expect(authService.updateSSOSubject).not.toHaveBeenCalled();
@@ -436,7 +444,7 @@ describe('SsoController', () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow(BadRequestException);
 
         expect(authService.addAuthenticationDetails).not.toHaveBeenCalled();
@@ -447,7 +455,7 @@ describe('SsoController', () => {
         setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow('SSO_ALREADY_LINKED');
       });
 
@@ -455,7 +463,7 @@ describe('SsoController', () => {
         const { authService } = setupLinkMocks({ existingSSODetail: existingSSODetailDifferentProvider });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow(BadRequestException);
 
         expect(authService.validateAuthenticationDetails).not.toHaveBeenCalled();
@@ -467,7 +475,7 @@ describe('SsoController', () => {
         setupLinkMocks({ userExists: false });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow(UnauthorizedException);
       });
 
@@ -475,7 +483,7 @@ describe('SsoController', () => {
         setupLinkMocks({ hasLocalPassword: false });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow(BadRequestException);
       });
 
@@ -483,7 +491,7 @@ describe('SsoController', () => {
         setupLinkMocks({ hasLocalPassword: false });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow('PASSWORD_REQUIRED');
       });
 
@@ -491,7 +499,7 @@ describe('SsoController', () => {
         setupLinkMocks({ passwordOk: false });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow(UnauthorizedException);
       });
 
@@ -499,7 +507,7 @@ describe('SsoController', () => {
         setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow(BadRequestException);
       });
 
@@ -507,7 +515,7 @@ describe('SsoController', () => {
         setupLinkMocks({ ssoSubjectExistsForOtherUser: true });
 
         await expect(
-          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }),
+          fixture.controller.linkUserToExternalAccount({ linkToken: 'token', password: 'secret' }, linkRequest),
         ).rejects.toThrow('SSO_SUBJECT_ALREADY_LINKED');
       });
     });

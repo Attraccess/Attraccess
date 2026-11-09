@@ -91,7 +91,7 @@ Wird das Secret geändert, sind die gespeicherten Kartenschlüssel und Kopplungs
 
 ## Drosselung und Kontosperre
 
-Fehlgeschlagene Anmeldungen, Registrierungen und Passwort-Zuruecksetzungen werden pro IP gedrosselt. Wiederholte Login-Fehlversuche sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
+Fehlgeschlagene Anmeldungen, Registrierungen, Passwort-Zuruecksetzungen, SSO-Kontoverknuepfungen und SSO-Provisionierungsaufrufe werden pro IP gedrosselt. Wiederholte Login-Fehlversuche und falsche Passwoerter bei der SSO-Kontoverknuepfung sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
 
 | Einstellung | Standard | Beschreibung |
 |-------------|----------|-------------|
@@ -104,9 +104,15 @@ Fehlgeschlagene Anmeldungen, Registrierungen und Passwort-Zuruecksetzungen werde
 Antworten bei Ausloesung:
 
 - **`429 Too Many Requests`** mit `Retry-After`-Header, wenn eine IP die Schwelle ueberschreitet.
-- **`423 Locked`** mit `Retry-After`-Header bei einem gesperrten Konto.
+- **`423 Locked`** mit `Retry-After`-Header bei einem gesperrten Konto, sowohl beim Login als auch bei der SSO-Kontoverknuepfung.
 
-Erfolgreicher Login oder Admin-Unlock entsperrt das Konto. Admin-Unlock erfolgt ueber die Benutzerverwaltung.
+Erfolgreicher Login, erfolgreiche SSO-Kontoverknuepfung oder Admin-Unlock entsperrt das Konto. Admin-Unlock erfolgt ueber die Benutzerverwaltung.
+
+### SSO-Kontoverknuepfung und Provisionierung
+
+- **SSO-Kontoverknuepfung** (die Passwortabfrage, wenn eine SSO-Anmeldung zu einem bestehenden lokalen Konto passt) wird pro IP und Zielkonto gedrosselt. Falsche Passwoerter zaehlen zur selben Kontosperre wie fehlgeschlagene Logins, ein Wechsel zwischen beiden bringt also keine zusaetzlichen Versuche. Eine erfolgreiche Verknuepfung setzt die Zaehler zurueck.
+- **Verknuepfungs-Token sind einmalig verwendbar.** Ein Token wird nach erfolgreicher Verknuepfung und nach 3 falschen Passwoertern ungueltig; der Benutzer muss sich dann erneut per SSO anmelden.
+- **SSO-Provisionierungsendpunkte** (vom IdP ausgeloeste Abmeldung, Benutzerloeschung und Berechtigungsaktualisierung) werden pro IP und Provider gedrosselt. Nur ein fehlendes oder falsches Provisionierungs-Secret zaehlt als Fehlversuch. Andere Fehler, etwa ein unbekannter Benutzer, zaehlen nicht, ein normaler IdP sperrt sich dadurch also nicht aus. Ein IdP mit falschem Secret erhaelt nach `maxAttempts` Fehlversuchen `429` mit `Retry-After`-Header statt `401`. Cloud-IdPs senden diese Aufrufe oft von gemeinsam genutzten ausgehenden IPs; die Drosselung gilt dann fuer diese gemeinsame IP bei diesem Provider.
 
 ### Reverse Proxies und die echte Client-IP
 
@@ -183,7 +189,7 @@ auth.failed type=login outcome=invalid_credentials ip=1.2.3.4 user_id=42 usernam
 | Feld | Beschreibung |
 |------|-------------|
 | `prefix` | `auth.success` bei Erfolg, sonst `auth.failed`. |
-| `type` | `login`, `register`, `password_reset_request`, `password_reset_complete`. |
+| `type` | `login`, `register`, `password_reset_request`, `password_reset_complete`, `sso_link_account`, `sso_provisioning`. |
 | `outcome` | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
 | `ip` | Client-IP, sonst `unknown`. |
 | `user_id` | Numerische User-ID, sonst `-`. |
@@ -198,11 +204,14 @@ Passwoerter, Tokens oder andere Secrets werden nie geloggt.
 Minimaler `failregex` fuer `/etc/fail2ban/filter.d/attraccess-auth.conf`:
 
 ```
-failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete) outcome=\S+ ip=<HOST> .*$
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete|sso_link_account) outcome=\S+ ip=<HOST> .*$
 ignoreregex =
 ```
 
 Der mitgelieferte Docker-Compose-Stack verdrahtet beide Dateien hinter dem Profil `fail2ban` automatisch — siehe [Docker-Compose-Installation](installation/docker-compose.md#brute-force-ip-sperre-mit-fail2ban).
+
+> [!NOTE]
+> Fehlgeschlagene SSO-Provisionierungsanfragen (falsches Bearer- oder `x-api-key`-Secret) werden als `auth.failed type=sso_provisioning` geloggt, vom mitgelieferten Filter aber nicht erfasst. Wuerde die IP eines Identity Providers gesperrt, bliebe auch dessen Back-Channel-Abmeldung aus, und Attraccess drosselt diese Anfragen bereits selbst (`429`). Wer trotzdem Firewall-Sperren dafuer will, ergaenzt `sso_provisioning` im `failregex`.
 
 ## fail2ban-Administration
 
