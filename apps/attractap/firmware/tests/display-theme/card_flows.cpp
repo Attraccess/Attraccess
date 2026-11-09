@@ -55,6 +55,50 @@ void testCard(Renderer &renderer, const std::string &name, const char *writing, 
     expect(lv_bar_get_value(bar) == 0, name + ": expired countdown clamps to zero");
 }
 
+// A very long name is capped at three lines with dots and stays clear of the
+// timeout bar and the chrome. Same case as the desktop layouts test.
+template <typename CardScreen>
+void testCardLongName(const std::string &name)
+{
+    constexpr char longName[] = "Maximiliane-Charlotte von Hohenzollern-Sigmaringen-Wittgenstein-Berleburg-Hohenlohe";
+    CardScreen card;
+    card.setUserName(longName);
+    if constexpr (std::is_same_v<CardScreen, EnrollmentScreen>) card.setEnrollmentTimeoutTime(Fixtures::nowMs + 30000);
+    else card.setTimeoutTime(Fixtures::nowMs + 30000);
+    card.init();
+    ScreenGuard screen(card.getScreen(), &card);
+    lv_obj_update_layout(screen.root);
+
+    lv_obj_t *nameLabel = nullptr;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(screen.root) && !nameLabel; ++i) {
+        std::vector<lv_obj_t *> stack{lv_obj_get_child(screen.root, i)};
+        while (!stack.empty() && !nameLabel) {
+            auto *obj = stack.back();
+            stack.pop_back();
+            if (lv_obj_check_type(obj, &lv_label_class) &&
+                lv_obj_get_style_text_font(obj, LV_PART_MAIN) == &attractap_font_montserrat_latin1_36 &&
+                std::strncmp(lv_label_get_text(obj), "Maximiliane", 11) == 0)
+                nameLabel = obj;
+            for (uint32_t c = 0; c < lv_obj_get_child_count(obj); ++c) stack.push_back(lv_obj_get_child(obj, c));
+        }
+    }
+    expect(nameLabel != nullptr, name + ": long name label exists");
+    const auto lineHeight = lv_font_get_line_height(&attractap_font_montserrat_latin1_36);
+    expect(lv_obj_get_height(nameLabel) <= 3 * lineHeight, name + ": long name capped at three lines");
+    expect(lv_obj_get_height(nameLabel) > 2 * lineHeight, name + ": long name uses the three lines");
+    const std::string shown = lv_label_get_text(nameLabel);
+    expect(shown.size() > 3 && shown.compare(shown.size() - 3, 3, "...") == 0, name + ": capped name ends with dots");
+
+    lv_area_t nameArea, barArea;
+    lv_obj_get_coords(nameLabel, &nameArea);
+    lv_obj_get_coords(requireObject(screen.root, &lv_bar_class), &barArea);
+    expect(nameArea.y2 < barArea.y1 || nameArea.y1 > barArea.y2, name + ": long name does not overlap the timeout bar");
+    expect(nameArea.x1 >= 0 && nameArea.x2 < Renderer::width, name + ": long name stays on screen");
+    expect(nameArea.y1 > barArea.y2, name + ": long name starts below the timeout bar");
+    // The network badge and footer sit in the chrome rows; the name must not reach the screen edges.
+    expect(nameArea.y2 < Renderer::height - 40, name + ": long name stays above the footer");
+}
+
 void testSupervision(Renderer &renderer)
 {
     SupervisionScreen supervision;
@@ -421,3 +465,5 @@ void testFirmwareUpdateLocales(Renderer &renderer)
 
 template void testCard<EnrollmentScreen>(Renderer &, const std::string &, const char *, const char *);
 template void testCard<ResetScreen>(Renderer &, const std::string &, const char *, const char *);
+template void testCardLongName<EnrollmentScreen>(const std::string &);
+template void testCardLongName<ResetScreen>(const std::string &);

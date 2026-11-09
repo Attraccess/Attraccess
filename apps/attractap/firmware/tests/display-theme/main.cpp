@@ -224,6 +224,8 @@ int main(int argc, char **argv)
         test("screen/wall-clock", [&] { testWallClock(renderer); });
         test("screen/boot", [&] { testBoot(renderer); });
         test("screen/init", [&] { testInit(renderer); });
+        test("screen/enrollment-long-name", [&] { testCardLongName<EnrollmentScreen>("enrollment"); });
+        test("screen/reset-long-name", [&] { testCardLongName<ResetScreen>("reset"); });
         test("screen/enrollment", [&] { testCard<EnrollmentScreen>(renderer, "enrollment", "Karte wird beschrieben...\nbitte nicht bewegen", "Karte registriert!"); });
         test("i18n/enrollment-locale-transition", [&] {
             EnrollmentScreen card;
