@@ -199,6 +199,7 @@ void Lockscreen::loop()
         FirmwareI18n::setLabel(this->signInPromptLabel, FirmwareI18n::Message::TapYourNfcCardTagToSignIn);
         // This screen remains alive across authentication transitions. Refresh
         // its status as well as the prompt when the active locale changes.
+        this->pluginStamp = 0; // rebuild the plugin status too
         this->updateUsageInfo();
     }
     this->updateWallClock();
@@ -223,7 +224,7 @@ void Lockscreen::setResourceName(const char *resourceName)
     this->updateUsageInfo();
 }
 
-void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance)
+void Lockscreen::storeUsage(bool hasActiveUsage, const char *username, bool isUnderMaintenance, bool isHealthy)
 {
     if (hasActiveUsage)
     {
@@ -232,6 +233,12 @@ void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username, bool is
     }
     this->hasActiveUsage = hasActiveUsage;
     this->isUnderMaintenance = isUnderMaintenance;
+    this->isHealthy = isHealthy;
+}
+
+void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance, bool isHealthy)
+{
+    this->storeUsage(hasActiveUsage, username, isUnderMaintenance, isHealthy);
     this->multiSession = false;
 
     this->updateUsageInfo();
@@ -242,15 +249,17 @@ void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username, bool is
 
 void Lockscreen::setUsageInfo(const API::ResourceBrief &resource)
 {
+    if (resource.id != this->resourceId) this->pluginStamp = 0;
     this->resourceId = resource.id;
-    this->setUsageInfo(resource.hasActiveUsage, resource.activeUser, resource.isUnderMaintenance);
-    if (resource.isMultiSession())
+    this->storeUsage(resource.hasActiveUsage, resource.activeUser, resource.isUnderMaintenance, resource.isHealthy);
+    this->multiSession = resource.isMultiSession();
+    if (this->multiSession)
     {
-        this->multiSession = true;
         this->occupancyActiveCount = resource.activeSessionCount;
         this->occupancyLimit = resource.maxParallelSessions;
-        this->updateUsageInfo();
     }
+    this->updateUsageInfo();
+    this->updateWallClock();
 }
 
 void Lockscreen::updateUsageInfo()
@@ -287,14 +296,20 @@ void Lockscreen::updateUsageInfo()
         FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Message::UnderMaintenance);
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
+    else if (!this->isHealthy)
+    {
+        // As on the resource list row.
+        FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Message::Unavailable);
+        lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::warning(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
     else
     {
         FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Message::Available);
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
-    // Core status always wins: a plugin only replaces "Available".
-    this->coreStatusShown = !occupancyText.empty() || (!this->multiSession && this->hasActiveUsage) || this->isUnderMaintenance;
-    this->pluginStamp = 0;
+    // Core status always wins: a plugin only replaces "Available". An unchanged plugin status stays as built.
+    this->coreStatusShown = !occupancyText.empty() || (!this->multiSession && this->hasActiveUsage) ||
+                            this->isUnderMaintenance || !this->isHealthy;
     this->patchPluginStatus();
 }
 
@@ -305,10 +320,11 @@ void Lockscreen::patchPluginStatus()
     if (!this->usageInfoLabel) return;
     lv_obj_t *built = nullptr;
     uint32_t stamp = 0;
-    if (!this->coreStatusShown && this->resourceId != 0)
+    bool expired = false;
+    if (!this->coreStatusShown && !this->pluginStatusHeld && this->resourceId != 0)
     {
         const uint32_t now = millis();
-        ui::slotCache().expire(now);
+        expired = ui::slotCache().expire(now) > 0;
         ui::slotCache().forEach(this->resourceId, ui::SlotId::ListRowStatus, [&](const ui::SlotRecord &rec) {
             if (built) return; // one text or badge
             stamp = rec.stamp;
@@ -316,11 +332,16 @@ void Lockscreen::patchPluginStatus()
             built = ui::buildRecord(lv_obj_get_parent(this->usageInfoLabel), rec, now, false);
         });
     }
-    if (built && built == this->pluginStatus) return;
-    if (this->pluginStatus) lv_obj_delete(this->pluginStatus);
-    this->pluginStatus = built;
-    this->pluginStamp = stamp;
-    lv_obj_set_flag(this->usageInfoLabel, LV_OBJ_FLAG_HIDDEN, built != nullptr);
+    if (!built || built != this->pluginStatus)
+    {
+        if (this->pluginStatus) lv_obj_delete(this->pluginStatus);
+        this->pluginStatus = built;
+        this->pluginStamp = stamp;
+        lv_obj_set_flag(this->usageInfoLabel, LV_OBJ_FLAG_HIDDEN, built != nullptr);
+    }
+    // An expiry found here is gone for the shared 1 Hz timer: pass it on, so the other screens rebuild as well.
+    // Their refresh calls this again, which then finds nothing left to expire.
+    if (expired) ui::notifySlotsExpired();
 }
 
 void Lockscreen::onScreenLeave()

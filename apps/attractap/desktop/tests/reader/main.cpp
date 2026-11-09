@@ -6,8 +6,14 @@ namespace
 // when the reader does not know the time yet.
 void runJourney(ReaderWorkflow &workflow, bool timeKnown)
 {
+    // With the clock, the reader also carries a name as long as pairing allows (64 characters): every capture's
+    // layout check then sees it end with dots before the clock. The localization journey renames the reader.
+    const auto longReaderName = [&] {
+        if (timeKnown) Display::setDeviceName("Werkstatt Nord, Lasercutter-Arbeitsplatz am Fenster in Halle 3EG");
+    };
     workflow.testListAndAuthentication();
     if (timeKnown) WallClock::onServerTime(static_cast<int64_t>(time(nullptr)) * 1000, 120);
+    longReaderName();
     workflow.testSessionStart();
     workflow.testUsageStats();
     workflow.testProjectSearch();
@@ -17,6 +23,7 @@ void runJourney(ReaderWorkflow &workflow, bool timeKnown)
     workflow.testCardRelay();
     workflow.testIdentityAndPendingAuthentication();
     workflow.testLocalization();
+    longReaderName();
     workflow.testSessionSummary();
     workflow.testScreenOwnedUi();
     workflow.testButtonErrors();

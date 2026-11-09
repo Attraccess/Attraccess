@@ -413,22 +413,115 @@ void ReaderWorkflow::testFooterClockAndLockscreenStatus()
     }
     std::cout << "PASS the footer clock shows on signed-in screens, centred, and never next to the big clock" << std::endl;
 
-    // A confirm step over the details keeps the footer clock visible, above the dimmed overlay.
+    // A reader name as long as pairing allows (64 characters) ends with dots before the clock.
+    const std::string longName = "Werkstatt Nord, Lasercutter-Arbeitsplatz am Fenster in Halle 3EG";
+    assert(longName.size() == 64);
+    Display::setDeviceName(longName); pump();
+    lv_obj_t *nameLabel = lv_obj_get_child(deviceFooter, 0);
+    const std::string shownName = lv_label_get_text(nameLabel);
+    assert(shownName.size() < longName.size() && shownName.compare(shownName.size() - 3, 3, "...") == 0);
+    lv_obj_update_layout(deviceFooter);
+    lv_obj_get_coords(footerPart("footer clock"), &clockBox);
+    assert(LayoutCheck::textBox(nameLabel).box.x2 + 8 <= clockBox.x1);
+    expectClockPainted("footer-clock-02b-long-name"); // the layout check: nothing in the footer runs into anything
+    Display::setDeviceName("Test reader"); pump();
+    assert(std::string(lv_label_get_text(nameLabel)) == "Test reader");
+
+    // A confirm step over the details keeps the footer clock visible: the step lies directly below the footer on the
+    // top layer, over the network badge and the drawer grabber, and under the drawer, which dims the footer.
     auto startRequestId = [&] { return server.last("START_RESOURCE_USAGE_SESSION")["data"]["payload"]["requestId"].as<uint32_t>(); };
+    lv_obj_t *topLayer = lv_layer_top();
+    lv_obj_t *drawerPanel = lv_obj_get_parent(requireLabel(topLayer, FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage())));
+    const auto expectStepUnderFooter = [&] {
+        lv_obj_t *step = Display::stepModal.root();
+        assert(step && lv_obj_get_parent(step) == topLayer);
+        assert(lv_obj_get_index(step) + 1 == lv_obj_get_index(deviceFooter));
+        assert(lv_obj_get_index(footerPart("network badge")) < lv_obj_get_index(step));
+        assert(lv_obj_get_index(footerPart("drawer grabber")) < lv_obj_get_index(step));
+        assert(lv_obj_get_index(drawerPanel) > lv_obj_get_index(deviceFooter));
+    };
     click("Ressource verwenden");
     server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), STEP_A, "confirm", 1, 60000, "Reserviert bis 14:15"));
     pump();
-    assert(label(lv_layer_top(), "Reserviert bis 14:15") && footerClock() == nowClock());
-    expectClockPainted("footer-clock-03-step");
-    lv_obj_t *topLayer = lv_layer_top();
-    assert(lv_obj_get_child(topLayer, lv_obj_get_child_count(topLayer) - 1) == lv_obj_get_parent(footerPart("footer clock")));
+    assert(label(topLayer, "Reserviert bis 14:15") && footerClock() == nowClock());
+    expectStepUnderFooter();
+    expectClockPainted("footer-clock-03-step"); // also the layout check of the step's content
     server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), STEP_B, "confirm", 1, 60000, "Zweite Frage"));
     pump();
-    assert(label(lv_layer_top(), "Zweite Frage") && footerClock() == nowClock());
-    lv_obj_t *overlayParent = lv_obj_get_parent(footerPart("footer clock"));
-    assert(lv_obj_get_child(topLayer, lv_obj_get_child_count(topLayer) - 1) == overlayParent);
+    assert(label(topLayer, "Zweite Frage") && footerClock() == nowClock());
+    expectStepUnderFooter();
     click(LV_SYMBOL_CLOSE, true);
     clearStatus(); pump();
+    // StepModal::show places the step itself: no frame waits for the next display loop.
+    {
+        ui::StepRequest direct;
+        direct.stepId = "direct";
+        direct.kind = ui::StepKind::Info;
+        direct.title = "Direkt";
+        Display::stepModal.show(direct, millis());
+        expectStepUnderFooter();
+        Display::stepModal.hide();
+    }
+    // After a step, the open drawer still dims the footer and its clock.
+    list(); // the reader refreshes the resource after the cancelled start
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    const auto footerPixels = [&] {
+        redraw();
+        lv_area_t box;
+        lv_obj_get_coords(deviceFooter, &box);
+        std::vector<uint16_t> out;
+        for (int y = box.y1; y <= std::min<int>(box.y2, 479); ++y)
+            for (int x = box.x1; x <= box.x2; ++x) out.push_back(display.pixels[y * 480 + x]);
+        return out;
+    };
+    const auto undimmed = footerPixels();
+    openDrawer();
+    assert(drawerOpen() && footerPixels() != undimmed);
+    lv_obj_send_event(lv_obj_get_child(topLayer, lv_obj_get_index(drawerPanel) - 1), LV_EVENT_CLICKED, nullptr); // the backdrop
+    pump();
+    assert(!drawerOpen() && footerPixels() == undimmed);
+
+    // The clock shows on every other screen a signed-in user meets: the plugin's refusal, a manager's override
+    // question, a blocking step with a countdown, a usage form and the project list.
+    click("Ressource verwenden");
+    server.push("START_RESOURCE_USAGE_SESSION", "{\"error\":\"START_BLOCKED\",\"requestId\":" + std::to_string(startRequestId()) +
+        R"(,"reason":{"code":"RESERVED","title":"Reserviert","body":"Bis 16:00 reserviert"}})");
+    pump();
+    assert(label(lv_screen_active(), "Bis 16:00 reserviert") && footerClock() == nowClock());
+    expectClockPainted("footer-clock-04-refusal");
+    clearStatus(); list();
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    click("Ressource verwenden");
+    server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), "llllllllllllllllllllll", "confirm", 1, 60000, "Reservierung übergehen?",
+        R"(,"tone":"warning","actions":[{"role":"confirm","label":"Trotzdem starten"}])"));
+    pump();
+    assert(label(topLayer, "Trotzdem starten") && footerClock() == nowClock());
+    expectStepUnderFooter();
+    expectClockPainted("footer-clock-05-override");
+    click(LV_SYMBOL_CLOSE, true); list();
+    click("Ressource verwenden");
+    server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), "mmmmmmmmmmmmmmmmmmmmmm", "info", 1, 60000, "Gleich reserviert",
+        R"(,"tone":"danger","countdownToMs":1300000)"));
+    pump();
+    assert(label(topLayer, "Gleich reserviert") && (labelStartsWith(topLayer, "4:5") || label(topLayer, "5:00")));
+    assert(footerClock() == nowClock());
+    expectStepUnderFooter();
+    expectClockPainted("footer-clock-06-countdown");
+    click(LV_SYMBOL_CLOSE, true); list();
+    click("Ressource verwenden");
+    server.push("RESOURCE_USAGE_FORM_REQUEST", R"({"resourceId":1,"action":"start","forms":[{"id":8,"name":"Check","fieldCount":1}]})");
+    pump();
+    server.push("RESOURCE_USAGE_FORM_FIELDS", R"({"resourceId":1,"action":"start","formId":8,"offset":0,"totalFieldCount":1,"fields":[{"id":9,"name":"Sichtprüfung","type":"text","isRequired":true,"value":"OK"}]})");
+    pump();
+    assert(lv_screen_active() == Display::formsScreen.getScreen() && footerClock() == nowClock());
+    expectClockPainted("footer-clock-07-form");
+    click("Abbrechen"); list();
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    click("Projekt wählen");
+    assert(lv_screen_active() == Display::projectSelectScreen.getScreen() && footerClock() == nowClock());
+    expectClockPainted("footer-clock-08-projects");
+    click(LV_SYMBOL_LEFT);
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
 
     // The clock moves with the time, once a minute, and sends nothing: no slot traffic comes from it.
     const auto messagesBefore = server.sent.size();
@@ -511,7 +604,9 @@ void ReaderWorkflow::testFooterClockAndLockscreenStatus()
     assert(label(lv_screen_active(), "Nur kurz frei"));
     hostAdvanceMillis(6000); pump(1100);
     assert(!label(lv_screen_active(), "Nur kurz frei") && label(lv_screen_active(), "Verfügbar"));
+    // The lock screen took the expiry from the shared timer: the cached list rebuilt its row too.
     closeLockscreen();
+    assert(!label(lv_screen_active(), "Nur kurz frei"));
 
     // Privacy: a card holder's own row never reaches the lock screen after signing out.
     cardSessionId = "cs-23"; list(); login(); pump();
@@ -535,5 +630,147 @@ void ReaderWorkflow::testFooterClockAndLockscreenStatus()
     openLockscreen();
     assert(label(lv_screen_active(), "Frei bis 14:00"));
     display.capture(output, "ui-lockscreen-status");
+    // A resource update that changes nothing keeps the plugin status as built.
+    lv_obj_add_flag(label(lv_screen_active(), "Frei bis 14:00"), LV_OBJ_FLAG_USER_1);
+    list(false); pump();
+    assert(lv_obj_has_flag(label(lv_screen_active(), "Frei bis 14:00"), LV_OBJ_FLAG_USER_1));
+    closeLockscreen();
     std::cout << "PASS the lock screen shows the public status, core statuses win and sign-out drops the own row" << std::endl;
+
+    unsigned revision = 10;
+    const auto pushRow = [&](int resource, const char *tree, const char *key = "pub") {
+        server.push("UI_SLOT_UPDATE", slotPayload(resource, "resourceList.row.status", ++revision, tree, key));
+        pump();
+    };
+    const auto lockscreenShows = [](const char *text) {
+        lv_obj_t *found = label(Display::lockscreen.getScreen(), text);
+        return found && !lv_obj_has_flag(found, LV_OBJ_FLAG_HIDDEN);
+    };
+    // Only the selected resource's status: the row of another resource never shows here.
+    pushRow(2, R"({"t":"text","text":"Fremde Buchung"})", "pub2");
+    openLockscreen();
+    assert(lockscreenShows("Frei bis 14:00") && !label(lv_screen_active(), "Fremde Buchung"));
+    closeLockscreen();
+    // A plugin's fallback (plain text, no tone) shows like any status.
+    pushRow(1, R"({"t":"text","text":"Reserviert - einfach"})");
+    openLockscreen();
+    assert(lockscreenShows("Reserviert - einfach") && !lockscreenShows("Verfügbar"));
+    closeLockscreen();
+    pushRow(1, R"({"t":"badge","text":"Frei bis 14:00","tone":"success"})");
+    // Unavailable (unhealthy) wins like on the list row.
+    healthy = false; list(false);
+    openLockscreen();
+    assert(lockscreenShows("Nicht betriebsbereit") && !label(lv_screen_active(), "Frei bis 14:00"));
+    closeLockscreen();
+    assert(label(lv_screen_active(), "Nicht betriebsbereit") && !label(lv_screen_active(), "Frei bis 14:00"));
+    healthy = true; list(false);
+    // Several parallel sessions: "Voll" and "In Verwendung k/N" win, a free machine shows the plugin status.
+    parallelLimit = 2; parallelActive = 2; active = true; list(false);
+    openLockscreen();
+    assert(lockscreenShows("Voll") && !label(lv_screen_active(), "Frei bis 14:00"));
+    closeLockscreen();
+    parallelActive = 1; list(false);
+    openLockscreen();
+    assert(lockscreenShows("In Verwendung 1/2") && !label(lv_screen_active(), "Frei bis 14:00"));
+    closeLockscreen();
+    parallelActive = 0; active = false; list(false);
+    openLockscreen();
+    assert(lockscreenShows("Frei bis 14:00"));
+    closeLockscreen();
+    parallelLimit = 1;
+    list(false);
+    std::cout << "PASS the lock screen shows only its resource's status, the fallback, and loses to unavailable and full" << std::endl;
+
+    // Privacy while a card is checked: what the server sends meanwhile may be the card holder's own row. The lock
+    // screen shows the core text until the next sign-out, also in its cached tree while someone is signed in.
+    openLockscreen();
+    assert(lockscreenShows("Frei bis 14:00"));
+    cardSessionId = "cs-25";
+    tapCard();
+    assert(lv_screen_active() == Display::lockscreen.getScreen());
+    pushRow(1, R"({"t":"text","text":"Deine Buchung bis 16:00"})");
+    pump(600); // past the lock screen's own poll
+    assert(!label(Display::lockscreen.getScreen(), "Deine Buchung bis 16:00") && !label(Display::lockscreen.getScreen(), "Frei bis 14:00"));
+    assert(lockscreenShows("Verfügbar"));
+    server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","language":"de","cardSessionId":"cs-25","hasIntroduction":true,"requiresSupervisor":false})");
+    pump(250); nfc.setPresent(0, false); list();
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+    pushRow(1, R"({"t":"text","text":"Deine Buchung bis 16:30"})");
+    pump(600);
+    assert(!label(Display::lockscreen.getScreen(), "Deine Buchung bis 16:30") && lockscreenShows("Verfügbar"));
+    click(LV_SYMBOL_LEFT);
+    click("Abmelden");
+    list(false);
+    assert(!label(lv_screen_active(), "Deine Buchung bis 16:30"));
+    openLockscreen();
+    assert(!label(lv_screen_active(), "Deine Buchung bis 16:30") && lockscreenShows("Verfügbar"));
+    // The signed-out status shows again once the server sends it.
+    pushRow(1, R"({"t":"text","text":"Frei bis 14:00"})");
+    assert(lockscreenShows("Frei bis 14:00"));
+
+    // A sign-in that times out ends the login on the server: the own row the server sent meanwhile goes, and so
+    // does the card session of a verified card the reader no longer waits for.
+    tapCard();
+    pushRow(1, R"({"t":"text","text":"Deine Buchung bis 17:00"})");
+    const auto readerEnds = server.count("READER_SESSION_ENDED");
+    hostAdvanceMillis(31000); pump();
+    assert(server.count("READER_SESSION_ENDED") == readerEnds + 1);
+    assert(!label(Display::lockscreen.getScreen(), "Deine Buchung bis 17:00"));
+    clearStatus(); pump(600);
+    assert(!label(lv_screen_active(), "Deine Buchung bis 17:00") && !label(Display::lockscreen.getScreen(), "Deine Buchung bis 17:00"));
+    server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","language":"de","cardSessionId":"cs-late","hasIntroduction":true,"requiresSupervisor":false})");
+    pump();
+    assert(!State::getApiState().userAuthenticated && lv_screen_active() != Display::resourceDetailsScreen.getScreen());
+    assert(server.count("READER_SESSION_ENDED") == readerEnds + 2);
+    assert(server.last("CARD_SESSION_ENDED")["data"]["payload"]["cardSessionId"] == "cs-late");
+    nfc.setPresent(0, false); pump();
+    if (lv_screen_active() == Display::lockscreen.getScreen()) closeLockscreen();
+    // The late answer is judged on the LVGL task, not where it arrives: a tap that lands between the two is seen
+    // there, and no READER_SESSION_ENDED follows its CARD_DETECTED (that would abort its verification).
+    {
+        const auto endsBefore = server.count("READER_SESSION_ENDED");
+        const auto tapsBefore = server.count("CARD_DETECTED");
+        server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","language":"de","cardSessionId":"cs-race","hasIntroduction":true,"requiresSupervisor":false})");
+        api.loop(); // dispatched: the decision is queued for the LVGL task, which has not run yet
+        nfc.setPresent(0, true);
+        for (int i = 0; i < 20 && server.count("CARD_DETECTED") == tapsBefore; ++i) application.loop(); // the tap, no LVGL tick
+        assert(server.count("CARD_DETECTED") == tapsBefore + 1);
+        pump(); // now the queued decision runs: a card is being checked, so the login stays
+        assert(server.count("READER_SESSION_ENDED") == endsBefore);
+        server.push("CARD_AUTHENTICATION_DATA", R"({"username":"Alex","language":"de","cardSessionId":"cs-b","hasIntroduction":true,"requiresSupervisor":false})");
+        pump(250); nfc.setPresent(0, false); list();
+        assert(State::getApiState().userAuthenticated && server.count("READER_SESSION_ENDED") == endsBefore);
+        click("Abmelden");
+        assert(server.last("CARD_SESSION_ENDED")["data"]["payload"]["cardSessionId"] == "cs-b");
+        list(false);
+    }
+    std::cout << "PASS a card being checked keeps the own row off the lock screen, a timed-out sign-in ends the login" << std::endl;
+
+    // A web-started enrollment or card reset signs the user out properly first: the own row goes and the server
+    // hears the login ended, so the lock screen never shows it afterwards.
+    for (const char *flow : {"ENROLL_NEW_CARD_GET_AVAILABLE_KEY_NO", "RESET_NFC_CARD"}) {
+        const bool reset = std::strcmp(flow, "RESET_NFC_CARD") == 0;
+        cardSessionId = reset ? "cs-27" : "cs-26";
+        list(); login();
+        pushRow(1, R"({"t":"text","text":"Deine Buchung bis 18:00"})");
+        click("Lasercutter");
+        assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen());
+        const auto ends = server.count("READER_SESSION_ENDED");
+        server.push(flow, R"({"username":"Bea"})");
+        pump();
+        assert(lv_screen_active() == (reset ? Display::resetScreen.getScreen() : Display::enrollmentScreen.getScreen()));
+        assert(server.count("READER_SESSION_ENDED") == ends + 1);
+        assert(server.last("CARD_SESSION_ENDED")["data"]["payload"]["cardSessionId"] == cardSessionId);
+        assert(!State::getApiState().userAuthenticated);
+        assert(!label(Display::lockscreen.getScreen(), "Deine Buchung bis 18:00"));
+        click("Abbrechen");
+        assert(server.count(reset ? "RESET_NFC_CARD_CANCEL" : "ENROLL_NEW_CARD_CANCEL") > 0);
+        pump(300); list(false);
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+        assert(!label(lv_screen_active(), "Deine Buchung bis 18:00"));
+        openLockscreen();
+        assert(!label(lv_screen_active(), "Deine Buchung bis 18:00") && lockscreenShows("Verfügbar"));
+        closeLockscreen();
+    }
+    std::cout << "PASS a web-started enrollment or reset signs out first and the own row never reaches the lock screen" << std::endl;
 }

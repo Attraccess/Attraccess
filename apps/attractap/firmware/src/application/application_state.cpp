@@ -369,6 +369,9 @@ bool Application::processAuthenticationState()
   // This must run before the AUTHENTICATE_CARD early return (no server verdict
   // for the tapped card). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
+    // The server may have verified the card meanwhile and sent that user's rows: end its login like a sign-out
+    // before the lock screen may show plugin statuses again.
+    this->endReaderLogin();
     this->finishCardAuthentication(false);
     this->beeper.errorBeep();
     this->showSignInFailed(FirmwareI18n::Message::PleaseTapTheNfcCardAgain);

@@ -167,6 +167,9 @@ void Display::initDrawer()
     lv_obj_set_style_bg_opa(grabber, 60, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_remove_flag(grabber, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(grabber, LV_OBJ_FLAG_SCROLLABLE);
+    // At the bottom of the top layer, below the device footer: a plugin step covers it (see initDeviceOverlay). The
+    // open drawer panel covers it anyway.
+    lv_obj_move_to_index(grabber, 0);
 }
 
 void Display::openDrawer()

@@ -38,6 +38,9 @@ struct ReaderWorkflow
     bool userLanguageFallback = false;
 
     bool active = false, supervised = false;
+    // The Lasercutter's health and parallel sessions (limit 1: one session at a time).
+    bool healthy = true;
+    unsigned parallelLimit = 1, parallelActive = 0;
     uint32_t activeUsageId = 99;
     // Who holds the Lasercutter's active session (empty: the signed-in user), whether others may
     // take it over, and its flow buttons ({id, label}).
@@ -119,7 +122,8 @@ struct ReaderWorkflow
             r["name"] = id == 1 ? "Lasercutter" : id == 2 ? "CNC Fräse" : "Werkstatttür";
             if (id == 1) r["description"] = longDescription;
             r["type"] = id == 3 ? "door" : "machine";
-            r["isHealthy"] = true;
+            r["isHealthy"] = id != 1 || healthy;
+            if (id == 1 && parallelLimit > 1) { r["maxParallelSessions"] = parallelLimit; r["activeSessionCount"] = parallelActive; }
             if (signedIn) { r["hasIntroduction"] = id != 2; r["requiresSupervisor"] = id == 1 && supervised; }
             if (id == 1) r["allowTakeOver"] = allowTakeOver;
             if (id == 1 && active) {

@@ -1,6 +1,7 @@
 #include "render_harness.hpp"
 
 #include "display/ui/ui_slots.hpp"
+#include "platform.hpp"
 #include <cmath>
 
 namespace
@@ -102,7 +103,8 @@ void testWallClock(Renderer &renderer)
             const uint32_t rgb = lv_color_to_u32(c);
             return 0.2126 * channel((rgb >> 16) & 0xFF) + 0.7152 * channel((rgb >> 8) & 0xFF) + 0.0722 * channel(rgb & 0xFF);
         };
-        const auto putStatus = [](uint32_t revision, const char *text, ui::NodeType type, ui::Tone tone) {
+        const auto putStatus = [](uint32_t revision, const char *text, ui::NodeType type, ui::Tone tone,
+                                  bool expired = false) {
             auto *rec = ui::allocRecord();
             expect(rec != nullptr, "Allocates a status record");
             std::memset(rec, 0, sizeof(ui::SlotRecord));
@@ -118,11 +120,18 @@ void testWallClock(Renderer &renderer)
             rec->nodes[0].textLen = static_cast<uint16_t>(std::strlen(text));
             std::strcpy(rec->pool, text);
             rec->poolUsed = static_cast<uint16_t>(std::strlen(text) + 1);
-            expect(ui::slotCache().apply(*rec, 0) == ui::ApplyResult::Applied, "Applies the status");
+            if (expired)
+            {
+                // Valid for one second, received five seconds ago.
+                rec->serverNowMs = 1000;
+                rec->expiresAtMs = 2000;
+            }
+            expect(ui::slotCache().apply(*rec, expired ? millis() - 5000 : 0) == ui::ApplyResult::Applied, "Applies the status");
             ui::freeRecord(rec);
         };
         API::ResourceBrief brief{};
         brief.id = 7;
+        brief.isHealthy = true;
         std::strcpy(brief.name, "CNC Fräse");
         lock.setUsageInfo(brief);
         struct Case { const char *de, *en; ui::NodeType type; ui::Tone tone; };
@@ -145,18 +154,57 @@ void testWallClock(Renderer &renderer)
                 expect(lv_obj_is_visible(status), std::string("Lock screen shows ") + shown);
                 expect(!lv_obj_is_visible(requireObject(guard.root, &lv_label_class, std::strcmp(language, "de") == 0 ? "Verfügbar" : "Available")),
                        "The plugin status replaces Available");
-                const auto bounds = lv_obj_get_style_text_color(status, LV_PART_MAIN);
-                const double ratio = (luminance(bounds) + 0.05) / (luminance(DisplayTheme::background()) + 0.05);
+                // A badge's text sits on the badge's own fill; plain text on the lock screen background.
+                const lv_color_t ink = lv_obj_get_style_text_color(status, LV_PART_MAIN);
+                const lv_color_t ground = c.type == ui::NodeType::Badge
+                                              ? lv_obj_get_style_bg_color(lv_obj_get_parent(status), LV_PART_MAIN)
+                                              : DisplayTheme::background();
+                if (c.type == ui::NodeType::Badge)
+                    expect(lv_obj_get_style_bg_opa(lv_obj_get_parent(status), LV_PART_MAIN) == LV_OPA_COVER, "The badge fill is opaque");
+                const double ratio = (luminance(ink) + 0.05) / (luminance(ground) + 0.05);
                 expect(std::max(ratio, 1 / ratio) >= 3.0, std::string("Readable on the lock screen: ") + shown);
                 renderer.capture(std::string("wall-clock-lockscreen-status-") + language + "-" + std::to_string(revision));
             }
         }
-        // In use wins over the plugin status.
+        // In use wins over the plugin status: the status is gone, not just covered.
         lock.setUsageInfo(true, "Müller", false);
         Fixtures::activeLanguage = "de";
         FirmwareI18n::refreshTree(guard.root, "de");
         expect(lv_obj_is_visible(requireObject(guard.root, &lv_label_class, "In Verwendung: Müller")),
                "In use wins over the plugin status");
+        expect(!findObject(guard.root, &lv_label_class, "Reserved until 16:00"), "In use removes the plugin status");
+        const auto shows = [&](const char *text) {
+            lv_obj_update_layout(guard.root);
+            lv_obj_t *found = findObject(guard.root, &lv_label_class, text);
+            return found && lv_obj_is_visible(found);
+        };
+        // So does an unhealthy machine ("Nicht betriebsbereit", as on the list row).
+        brief.isHealthy = false;
+        lock.setUsageInfo(brief);
+        expect(shows("Nicht betriebsbereit"), "Unavailable wins over the plugin status");
+        expect(!findObject(guard.root, &lv_label_class, "Reserved until 16:00"), "Unavailable removes the plugin status");
+        brief.isHealthy = true;
+        lock.setUsageInfo(brief);
+        expect(shows("Reserved until 16:00"), "The status returns");
+        // While a card is checked (and until the next sign-out) the lock screen shows the core text only.
+        lock.holdPluginStatus(true);
+        expect(!findObject(guard.root, &lv_label_class, "Reserved until 16:00") && shows("Verfügbar"),
+               "A held lock screen shows no plugin status");
+        lock.holdPluginStatus(false);
+        expect(shows("Reserved until 16:00"), "Released, the status returns");
+        // An expiry the lock screen finds itself is passed on, so the other screens rebuild too: the shared 1 Hz
+        // timer finds nothing left to expire afterwards.
+        static unsigned expiredNotices;
+        expiredNotices = 0;
+        ui::setSlotsExpiredCallback([] { ++expiredNotices; });
+        putStatus(revision++, "Gleich vorbei", ui::NodeType::Text, ui::Tone::Warning, true);
+        lock.refreshUiSlots();
+        expect(expiredNotices == 1, "The lock screen passes its expiry on");
+        expect(!findObject(guard.root, &lv_label_class, "Gleich vorbei") && shows("Verfügbar"),
+               "An expired status falls back to the core text");
+        lock.refreshUiSlots();
+        expect(expiredNotices == 1, "Nothing left to expire: no second notice");
+        ui::setSlotsExpiredCallback(nullptr);
         ui::slotCache().clear();
         lock.setUsageInfo(false, "", false);
         Fixtures::activeLanguage = "de";

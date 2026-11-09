@@ -186,6 +186,9 @@ void Application::setupNfcCallbacks()
       for (uint16_t i = 0; i < this->resourceList.count; ++i) this->resourceList.items[i].accessKnown = false;
       this->resourceListUpdated = true;
       this->selectedResourceChanged = true;
+      // What the server sends from now on may be this card holder's own rows: none of it on the lock screen
+      // until the next sign-out (or a refused card).
+      Display::lockscreen.holdPluginStatus(true);
       if (this->resourceIsSelected) Display::lockscreen.showActionProgress();
       else Display::resourceListScreen.showActionProgress(FirmwareI18n::Message::CheckingCard, FirmwareI18n::Message::OneMoment);
       lv_unlock();
