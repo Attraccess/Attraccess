@@ -11,7 +11,7 @@ import {
 import { useCallback, useRef, useState } from 'react';
 import { ESPTools, ESPToolsErrorType } from '../../../../utils/esp-tools';
 import { Terminal } from '../../../../components/Terminal';
-import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
@@ -66,7 +66,7 @@ export function WebSerialConsole({ children }: Props) {
     <>
       {children(open)}
 
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="lg">
+      <StandardModalV2 isOpen={isOpen} onOpenChange={setOpen} size="lg">
         {() => (
           <>
             <ModalHeader>
@@ -100,7 +100,7 @@ export function WebSerialConsole({ children }: Props) {
             </ModalBody>
           </>
         )}
-      </StandardModal>
+      </StandardModalV2>
     </>
   );
 }

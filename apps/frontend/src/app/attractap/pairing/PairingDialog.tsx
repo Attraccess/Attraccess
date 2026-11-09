@@ -1,5 +1,5 @@
 import { Button, Form, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
-import { StandardModal, StatusAlert } from '@attraccess/plugins-frontend-ui';
+import { StandardModalV2, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { FindStep, PairingResult, ReaderStep, errorText } from './PairingSteps';
 import { PairingFlow, PairingFlowProps, usePairingFlow } from './usePairingFlow';
 
@@ -16,9 +16,9 @@ export interface PairingDialogProps extends PairingFlowProps {
 export function PairingDialog(props: Readonly<PairingDialogProps>) {
   const { isOpen, onClose } = props;
   return (
-    <StandardModal isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="md">
+    <StandardModalV2 isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="md">
       {() => <PairingDialogContent {...props} />}
-    </StandardModal>
+    </StandardModalV2>
   );
 }
 

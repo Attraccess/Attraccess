@@ -28,7 +28,7 @@ import {
   PageAction,
   PageHeader,
   StandardDrawer,
-  StandardModal,
+  StandardModalV2,
   useTranslations,
 } from '@attraccess/plugins-frontend-ui';
 import {
@@ -175,7 +175,7 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
   }, [props.cardId, resetNfcCard, readerId]);
 
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={props.show}
       onOpenChange={(open) => {
         if (!open) props.close();
@@ -216,7 +216,7 @@ export const NfcCardDeleteModal = (props: DeleteModalProps) => {
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 };
 
