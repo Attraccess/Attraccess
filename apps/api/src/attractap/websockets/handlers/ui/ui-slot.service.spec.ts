@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { ResourceUsageAction } from '@attraccess/database-entities';
 import { READER_UI_SLOTS } from '@attraccess/plugins-backend-sdk';
 import { CardSessionService } from './card-session.service';
 import { AttractapUiHandler } from './ui.handler';
@@ -721,38 +722,85 @@ describe('UiSlotService', () => {
       expect(updates(t.socket).map((u: any) => u.payload.slot)).toEqual(['resource.details.session']);
     });
 
-    it.each([
-      ['started', () => new ResourceSessionStartedEvent({ resourceId: 12 } as never), 'resource.details.session'],
-      ['ended', () => new ResourceUsageSessionEndedEvent({ resourceId: 12 } as never, null), 'resource.details.body'],
+    const usage = (resourceId: number, usageAction = ResourceUsageAction.Usage) =>
+      ({ resourceId, usageAction }) as never;
+    const usageEvents = (resourceId: number) =>
       [
-        'taken over',
-        () => new ResourceUsageSessionTakenOverEvent({ id: 12, name: 'x' }, new Date(), {} as never, null),
-        'resource.details.session',
-      ],
-    ])('a usage %s re-evaluates that resource and moves the text', async (kind, event, slot) => {
-      const t = setup(bodyOrSession);
-      if (kind === 'ended') t.activeUsages.add(12);
+        ['started', () => new ResourceSessionStartedEvent(usage(resourceId))],
+        ['ended', () => new ResourceUsageSessionEndedEvent(usage(resourceId), null)],
+        [
+          'taken over',
+          () => new ResourceUsageSessionTakenOverEvent({ id: resourceId, name: 'x' }, new Date(), {} as never, null),
+        ],
+      ] as const;
+    const emit = (service: UiSlotService, e: unknown) => {
+      if (e instanceof ResourceSessionStartedEvent) service.onUsageStarted(e);
+      else if (e instanceof ResourceUsageSessionEndedEvent) service.onUsageEnded(e);
+      else service.onUsageTakenOver(e as ResourceUsageSessionTakenOverEvent);
+    };
+
+    it('decides per resource, so an idle machine next to a busy one keeps its text in the body', async () => {
+      const t = setup(() => [], { resources: [12, 13] });
+      t.activeUsages.add(12);
       await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
-      const call = t.providers[0].provider.getSlotContributions as jest.Mock;
-      const before = call.mock.calls.length;
-      if (kind === 'ended') t.activeUsages.delete(12);
-      else t.activeUsages.add(12);
-      jest.advanceTimersByTime(2100); // the per-slot rate limit of the first send
-      const e = event();
-      if (e instanceof ResourceSessionStartedEvent) t.service.onUsageStarted(e);
-      else if (e instanceof ResourceUsageSessionEndedEvent) t.service.onUsageEnded(e);
-      else t.service.onUsageTakenOver(e as ResourceUsageSessionTakenOverEvent);
-      await jest.advanceTimersByTimeAsync(UI_INVALIDATE_DEBOUNCE_MS + 1);
-      expect(call.mock.calls.length - before).toBe(1);
-      expect(updates(t.socket).at(-1).payload).toMatchObject({ slot, tree: expect.anything() });
+      const calls = (t.providers[0].provider.getSlotContributions as jest.Mock).mock.calls.map(([ctx]) => ctx);
+      expect(calls.map(({ resourceId, sessionActive }) => [resourceId, sessionActive])).toEqual([
+        [12, true],
+        [13, false],
+      ]);
     });
 
-    it('ignores usage events of resources no reader shows', async () => {
+    it.each(usageEvents(12).map(([kind, event]) => [kind, event] as const))(
+      'a usage %s re-evaluates that resource and moves the text: the old block goes, the new one comes',
+      async (kind, event) => {
+        const t = setup(bodyOrSession);
+        const ends = kind === 'ended';
+        if (ends) t.activeUsages.add(12);
+        t.cardSessions.issue(t.socket, 7, 'en');
+        await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
+        const call = t.providers[0].provider.getSlotContributions as jest.Mock;
+        const calls = call.mock.calls.length;
+        const sent = updates(t.socket).length;
+        if (ends) t.activeUsages.delete(12);
+        else t.activeUsages.add(12);
+        jest.advanceTimersByTime(2100); // the per-slot rate limit of the first send
+        emit(t.service, event());
+        await jest.advanceTimersByTimeAsync(UI_INVALIDATE_DEBOUNCE_MS + 1);
+        expect(call.mock.calls.length - calls).toBe(1);
+        const [from, to] = ends
+          ? ['resource.details.session', 'resource.details.body']
+          : ['resource.details.body', 'resource.details.session'];
+        expect(
+          updates(t.socket)
+            .slice(sent)
+            .map((u: any) => [u.payload.slot, u.payload.tree !== null]),
+        ).toEqual([
+          [from, false],
+          [to, true],
+        ]);
+      },
+    );
+
+    it.each(usageEvents(99).map(([kind, event]) => [kind, event] as const))(
+      'ignores a usage %s on a resource no reader shows',
+      async (_kind, event) => {
+        const t = setup(bodyOrSession);
+        await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
+        const call = t.providers[0].provider.getSlotContributions as jest.Mock;
+        const before = call.mock.calls.length;
+        emit(t.service, event());
+        await jest.advanceTimersByTimeAsync(UI_INVALIDATE_DEBOUNCE_MS + 1);
+        expect(call.mock.calls.length).toBe(before);
+      },
+    );
+
+    it('ignores door actions: they are stored already ended and never make a usage active', async () => {
       const t = setup(bodyOrSession);
       await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
       const call = t.providers[0].provider.getSlotContributions as jest.Mock;
       const before = call.mock.calls.length;
-      t.service.onUsageStarted(new ResourceSessionStartedEvent({ resourceId: 99 } as never));
+      t.service.onUsageStarted(new ResourceSessionStartedEvent(usage(12, ResourceUsageAction.DoorUnlock)));
+      t.service.onUsageStarted(new ResourceSessionStartedEvent(null as never));
       await jest.advanceTimersByTimeAsync(UI_INVALIDATE_DEBOUNCE_MS + 1);
       expect(call.mock.calls.length).toBe(before);
     });

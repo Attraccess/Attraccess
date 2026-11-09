@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { ResourceUsageAction } from '@attraccess/database-entities';
 import { READER_UI_SLOTS, READER_UI_TIMING, type ReaderUiCapabilities } from '@attraccess/plugins-backend-sdk';
 import { AttractapService } from '../../../attractap.service';
 import { ReaderUpdatedEvent } from '../../../events';
@@ -136,6 +137,8 @@ export class UiSlotService {
    */
   @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
   onUsageStarted(event: ResourceSessionStartedEvent): void {
+    // Door actions fire this event too, stored already ended: they never make a usage active.
+    if (event.usage?.usageAction !== ResourceUsageAction.Usage) return;
     this.onInvalidate({ scope: { resourceId: event.usage.resourceId } } as ReaderUiInvalidation);
   }
 

@@ -32,6 +32,7 @@ import {
   NFCCard,
   NFCCardPendingChange,
   Resource,
+  ResourceUsage,
   User,
 } from '@attraccess/database-entities';
 import { AttractapPairingController } from './pairing.controller';
@@ -97,6 +98,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
       NFCCard,
       NFCCardPendingChange,
       Resource,
+      ResourceUsage,
       User,
     ]),
     UsersAndAuthModule,

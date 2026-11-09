@@ -376,9 +376,12 @@ describe('ReaderUiService', () => {
       expect(detailTexts(session)).toEqual(['resource.details.session: Reserved by user10 12:40-14:00']);
       expect(get(session, 'resource.details.header')).toBeUndefined();
       expect(get(session, 'resource.details.body')).toBeUndefined();
-      // Signed out, the body carries it, once.
+      // Signed out, the body carries it, once; also while somebody's usage runs (no session slot without a card).
       const out = await slots();
       expect(detailTexts(out)).toEqual(['resource.details.body: Free until 12:40, then reserved until 14:00']);
+      expect(detailTexts(await slots({ sessionActive: true }))).toEqual([
+        'resource.details.body: Free until 12:40, then reserved until 14:00',
+      ]);
       // Idle after a card tap (the reader shows no session slot): the body carries it, once, named per the rule.
       const idle = await slots({ userId: MANAGER, sessionActive: false });
       expect(detailTexts(idle)).toEqual([
@@ -396,6 +399,23 @@ describe('ReaderUiService', () => {
       ]);
       expect(detailTexts(await slots({ userId: MANAGER }))).toEqual([
         'resource.details.body: Your booking 12:10-12:30 (check in by 12:25)',
+      ]);
+    });
+
+    it('a running booking and the next one of somebody else are two facts, one block each, named per the rule', async () => {
+      await book(OTHER, '2026-06-01T09:30:00', '2026-06-01T10:20:00'); // running, 11:30-12:20 local
+      await book(HOLDER, '2026-06-01T10:30:00', '2026-06-01T11:00:00'); // 12:30 local, inside the confirm window
+      const detailTexts = async (userId: number) =>
+        (await slots({ userId, sessionActive: true }))
+          .filter((c) => c.slotId.startsWith('resource.details.'))
+          .map((c) => `${c.slotId}: ${textOf(c.tree).join(' | ')}`);
+      expect(await detailTexts(MANAGER)).toEqual([
+        'resource.details.body: Reserved by user11 11:30-12:20',
+        'resource.details.session: Reserved by user10 12:30-13:00',
+      ]);
+      expect(await detailTexts(12)).toEqual([
+        'resource.details.body: Reserved 11:30-12:20',
+        'resource.details.session: Reserved 12:30-13:00',
       ]);
     });
 
