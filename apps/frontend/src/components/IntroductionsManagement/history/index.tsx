@@ -1,4 +1,4 @@
-import { DateTimeDisplay, EmptyState, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DateTimeDisplay, EmptyState, StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Button,
   ModalBody,
@@ -51,7 +51,7 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
   }, [orderedHistory, page, rowsPerPage]);
 
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={isOpen}
       onOpenChange={(o) => {
         if (!o) onClose();
@@ -96,6 +96,6 @@ export function IntroductionHistoryModal(props: Readonly<Props>) {
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

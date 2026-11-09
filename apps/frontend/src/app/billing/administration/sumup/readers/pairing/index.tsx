@@ -1,6 +1,6 @@
 import en from './en.json';
 import de from './de.json';
-import { Button, PasswordInput, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PasswordInput, StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   Form,
   TextField,
@@ -79,7 +79,7 @@ export function SumUpReadersPairing(props: Props) {
     <>
       {children(open)}
 
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="md">
+      <StandardModalV2 isOpen={isOpen} onOpenChange={setOpen} size="md">
         {({ close }) => (
           <>
             <ModalHeader>
@@ -117,7 +117,7 @@ export function SumUpReadersPairing(props: Props) {
             </ModalFooter>
           </>
         )}
-      </StandardModal>
+      </StandardModalV2>
     </>
   );
 }

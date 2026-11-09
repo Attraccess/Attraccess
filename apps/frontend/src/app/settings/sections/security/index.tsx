@@ -1,4 +1,4 @@
-import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, StandardModalV2 } from '@attraccess/plugins-frontend-ui';
 import {
   NumberField,
   NumberFieldDecrementButton,
@@ -43,7 +43,7 @@ export function SecuritySectionStandardModal({
   commit,
 }: Props) {
   return (
-    <StandardModal isOpen={isConfirmOpen} onOpenChange={(open) => !open && setIsConfirmOpen(false)} size="lg">
+    <StandardModalV2 isOpen={isConfirmOpen} onOpenChange={(open) => !open && setIsConfirmOpen(false)} size="lg">
       {({ close }) => (
         <>
           <ModalHeader className="flex flex-col gap-1">
@@ -86,7 +86,7 @@ export function SecuritySectionStandardModal({
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }
 

@@ -1,4 +1,4 @@
-import { Button, StandardModal, StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2, StatusAlert, StatusDialog } from '@attraccess/plugins-frontend-ui';
 import {
   Label,
   ModalBody,
@@ -115,7 +115,7 @@ export function BookingModal(props: Readonly<Props>) {
 
   return (
     <>
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="md" data-cy="reservations-booking-modal">
+      <StandardModalV2 isOpen={isOpen} onOpenChange={setOpen} size="md" data-cy="reservations-booking-modal">
         <ModalCloseTrigger aria-label={t('common.close')} />
         <ModalHeader>
           <ModalHeading>
@@ -189,7 +189,7 @@ export function BookingModal(props: Readonly<Props>) {
             {rules.approvalRequired ? t('booking.requestSubmit') : t('booking.submit')}
           </Button>
         </ModalFooter>
-      </StandardModal>
+      </StandardModalV2>
       <StatusDialog
         isOpen={error !== null}
         onClose={() => setError(null)}

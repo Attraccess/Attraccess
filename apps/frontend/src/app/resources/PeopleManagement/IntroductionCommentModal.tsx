@@ -1,5 +1,5 @@
 import { Form, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextArea, TextField } from '@heroui/react';
-import { Button, StandardModal, TFunction } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2, TFunction } from '@attraccess/plugins-frontend-ui';
 
 interface IntroductionCommentModalProps {
   t: TFunction;
@@ -15,7 +15,7 @@ export function IntroductionCommentModal(props: Readonly<IntroductionCommentModa
   const { t, isOpen, comment, isPending, onCommentChange, onSubmit, onClose } = props;
 
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={isOpen}
       onOpenChange={(o) => {
         if (!o) onClose();
@@ -51,6 +51,6 @@ export function IntroductionCommentModal(props: Readonly<IntroductionCommentModa
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

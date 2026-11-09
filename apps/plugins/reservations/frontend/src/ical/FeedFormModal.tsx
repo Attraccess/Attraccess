@@ -1,4 +1,4 @@
-import { Button, LabeledSwitch, ResourceSelector, StandardModal, StatusDialog } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, ResourceSelector, StandardModalV2, StatusDialog } from '@attraccess/plugins-frontend-ui';
 import { Description, Fieldset, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
@@ -66,7 +66,7 @@ export function FeedFormModal({ isOpen, feed, onOpenChange, onSaved }: Readonly<
 
   return (
     <>
-      <StandardModal isOpen={isOpen} onOpenChange={onOpenChange} size="md" data-cy="reservations-feed-form">
+      <StandardModalV2 isOpen={isOpen} onOpenChange={onOpenChange} size="md" data-cy="reservations-feed-form">
         <ModalHeader>
           <ModalHeading>{feed ? t('feeds.form.editTitle') : t('feeds.form.createTitle')}</ModalHeading>
         </ModalHeader>
@@ -129,7 +129,7 @@ export function FeedFormModal({ isOpen, feed, onOpenChange, onSaved }: Readonly<
             {feed ? t('common.save') : t('feeds.form.create')}
           </Button>
         </ModalFooter>
-      </StandardModal>
+      </StandardModalV2>
       <StatusDialog isOpen={error !== null} onClose={() => setError(null)} status="error" title={t('feeds.failed')}>
         {error ?? ''}
       </StatusDialog>

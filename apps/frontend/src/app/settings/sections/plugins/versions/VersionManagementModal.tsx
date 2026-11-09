@@ -1,4 +1,4 @@
-import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, StandardModalV2 } from '@attraccess/plugins-frontend-ui';
 import { Input, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
 import { Select } from '../../../../../components/select/index';
 import { dependencyError, DependencyPlanDetails } from '../dependencies/DependencyPlan';
@@ -62,7 +62,7 @@ export function VersionManagementModal({
   replaceVersion,
 }: Props) {
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={versionPlugin !== null}
       onOpenChange={(open) => !open && !isReplacing && setVersionPlugin(null)}
       data-cy="plugins-list-version-management-modal"
@@ -172,6 +172,6 @@ export function VersionManagementModal({
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

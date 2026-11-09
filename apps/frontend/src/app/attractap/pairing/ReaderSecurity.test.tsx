@@ -36,7 +36,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   useTranslations: () => ({ t: (key: string) => key }),
   useDateTimeFormatter: () => (value: string) => `at ${value}`,
   AttraccessUser: ({ user }: { user: { username: string } }) => <span>{user.username}</span>,
-  StandardModal: ({
+  StandardModalV2: ({
     children,
     isOpen,
   }: {

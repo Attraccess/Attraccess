@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, Description, ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner } from '@heroui/react';
-import { AttraccessUser, Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, Button, StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { SupervisionRequestDto, User, useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import en from './translations/en.json';
 import de from './translations/de.json';
@@ -52,7 +52,7 @@ export function SupervisorApprovalModal({
   const isBusy = isApproving || isRejecting;
 
   return (
-    <StandardModal isOpen={true} size="md">
+    <StandardModalV2 isOpen={true} size="md">
       {() => (
         <>
           <ModalHeader>
@@ -109,6 +109,6 @@ export function SupervisorApprovalModal({
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

@@ -1,4 +1,4 @@
-import { Button, EmptyState, StandardModal, type TranslationMessage } from '@attraccess/plugins-frontend-ui';
+import { Button, EmptyState, StandardModalV2, type TranslationMessage } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -197,7 +197,7 @@ export function RabbitmqPermissionsModal({
   const unusedVhosts = vhosts.filter((vhost) => !rows.some((row) => row.vhost === vhost));
 
   return (
-    <StandardModal
+    <StandardModalV2
       size="lg"
       isOpen={isOpen}
       onOpenChange={(open) => {
@@ -260,6 +260,6 @@ export function RabbitmqPermissionsModal({
           </Button>
         </ModalFooter>
       </>
-    </StandardModal>
+    </StandardModalV2>
   );
 }

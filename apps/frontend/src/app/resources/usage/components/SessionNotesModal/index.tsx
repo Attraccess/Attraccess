@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { Button } from '@heroui/react';
 import { TextArea } from '@heroui/react';
-import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import en from './translations/en';
 import de from './translations/de';
 
@@ -38,7 +38,7 @@ export const SessionNotesModal = ({
   };
 
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose();
@@ -78,6 +78,6 @@ export const SessionNotesModal = ({
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 };

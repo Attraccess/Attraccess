@@ -11,7 +11,7 @@ import {
   AlertStatusIcon,
   Button,
   PasswordInput,
-  StandardModal,
+  StandardModalV2,
   useTranslations,
   useUrlQuery,
 } from '@attraccess/plugins-frontend-ui';
@@ -110,7 +110,7 @@ export function SSOLinkingRequiredModal(props: Props) {
   }, [linkToken, linkMutation, password]);
 
   return (
-    <StandardModal isOpen={show} size="md" backdropProps={{ isDismissable: false }}>
+    <StandardModalV2 isOpen={show} size="md" backdropProps={{ isDismissable: false }}>
       {() => (
         <>
           <ModalHeader>
@@ -141,6 +141,6 @@ export function SSOLinkingRequiredModal(props: Props) {
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

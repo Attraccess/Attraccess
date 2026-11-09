@@ -1,4 +1,4 @@
-import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, StandardModalV2 } from '@attraccess/plugins-frontend-ui';
 import {
   ModalBody,
   ModalFooter,
@@ -144,7 +144,7 @@ export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }:
   });
 
   return (
-    <StandardModal isOpen={role !== null} onOpenChange={(open) => !open && onClose()} size="lg">
+    <StandardModalV2 isOpen={role !== null} onOpenChange={(open) => !open && onClose()} size="lg">
       <ModalHeader className="flex flex-col gap-1">
         <ModalHeading>{t('overrides.modal.title', { role: role ? t(`overrides.roles.${role}`) : '' })}</ModalHeading>
         <span className="text-sm font-normal text-muted">{t('overrides.modal.subtitle')}</span>
@@ -244,6 +244,6 @@ export function RoleOverridesModal({ role, existing, globalPolicy, t, onClose }:
           {t('overrides.save')}
         </Button>
       </ModalFooter>
-    </StandardModal>
+    </StandardModalV2>
   );
 }

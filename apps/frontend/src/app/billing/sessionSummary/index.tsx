@@ -6,7 +6,7 @@ import {
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetBillingTransaction,
 } from '@attraccess/react-query-client';
-import { StandardModal, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModalV2, useNumberFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLiveTransactionUpdates } from '../dashboard/summary/live-updates';
@@ -66,7 +66,7 @@ export function SessionBillingSummary() {
   const dismiss = () => setTransactions((previous) => previous.slice(1));
 
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={!!transaction}
       onOpenChange={(open) => {
         if (!open) dismiss();
@@ -108,6 +108,6 @@ export function SessionBillingSummary() {
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

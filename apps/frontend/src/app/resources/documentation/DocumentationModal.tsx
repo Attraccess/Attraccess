@@ -1,6 +1,6 @@
 import { memo, useCallback, useState, useEffect } from 'react';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading, Spinner, useOverlayState } from '@heroui/react';
-import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Edit, ExternalLink, Maximize, Minimize, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
@@ -107,7 +107,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
     <>
       {children(open)}
 
-      <StandardModal
+      <StandardModalV2
         isOpen={isOpen}
         onOpenChange={setOpen}
         data-cy="documentation-modal"
@@ -180,7 +180,7 @@ function DocumentationModalComponent({ resourceId, children }: Readonly<Document
             </ModalFooter>
           </>
         )}
-      </StandardModal>
+      </StandardModalV2>
     </>
   );
 }

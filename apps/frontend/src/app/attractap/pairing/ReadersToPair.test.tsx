@@ -47,7 +47,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
       <p>{subtitle}</p>
     </div>
   ),
-  StandardModal: ({
+  StandardModalV2: ({
     children,
     isOpen,
   }: {

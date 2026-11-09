@@ -9,7 +9,7 @@ import {
   useOverlayState,
 } from '@heroui/react';
 import { OpenIDConfiguration } from '../OpenIDC.data';
-import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import de from './de.json';
@@ -76,7 +76,7 @@ export function AuthentikDiscoveryDialog(props: Props) {
   return (
     <>
       {activator(open)}
-      <StandardModal
+      <StandardModalV2
         isOpen={isOpen}
         onOpenChange={(o) => {
           if (!o) close();
@@ -105,7 +105,7 @@ export function AuthentikDiscoveryDialog(props: Props) {
             </ModalFooter>
           </>
         )}
-      </StandardModal>
+      </StandardModalV2>
     </>
   );
 }

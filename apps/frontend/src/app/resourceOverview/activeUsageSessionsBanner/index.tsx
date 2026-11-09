@@ -11,7 +11,7 @@ import {
 import { Check, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useResourcesServiceGetAllResources,
   useResourcesServiceResourceUsageEndSession,
@@ -281,7 +281,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
         </AlertContent>
       </Alert>
 
-      <StandardModal
+      <StandardModalV2
         dialogProps={{ 'aria-label': allCompleted ? t('modal.completedTitle') : t('modal.title') }}
         isOpen={isModalOpen}
         onOpenChange={(open) => {
@@ -366,7 +366,7 @@ export function ActiveUsageSessionsBanner({ onShowMySessions }: ActiveUsageSessi
             )}
           </>
         )}
-      </StandardModal>
+      </StandardModalV2>
     </div>
   );
 }

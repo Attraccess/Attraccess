@@ -1,4 +1,4 @@
-import { Button, LabeledSwitch, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, StandardModalV2 } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -49,7 +49,7 @@ export function RemovePluginModal({
   removalPlan,
 }: Props) {
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={pluginToDelete !== null}
       onOpenChange={(open) => !open && setPluginToDelete(null)}
       data-cy="plugins-list-delete-confirmation-modal"
@@ -117,6 +117,6 @@ export function RemovePluginModal({
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

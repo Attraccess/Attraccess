@@ -3,7 +3,7 @@ import { useOverlayState } from '@heroui/react';
 import { useToastMessage } from '../../../../components/toastProvider';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import de from './de.json';
 import en from './en.json';
@@ -85,14 +85,14 @@ export function ResourceScanner(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardModal
+      <StandardModalV2
         isOpen={isOpen}
         onOpenChange={setOpen}
         size="md"
         dialogProps={{ 'aria-label': props.title ?? t('title') }}
       >
         {() => <Scanner onScan={onScan} onError={onError} components={{ tracker: boundingBox }} />}
-      </StandardModal>
+      </StandardModalV2>
     </>
   );
 }

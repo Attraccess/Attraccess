@@ -1,4 +1,4 @@
-import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2 } from '@attraccess/plugins-frontend-ui';
 import { ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { InstallPlan } from './InstallPlan';
 import { usePluginsSectionState } from '../state/usePluginSettings';
@@ -38,7 +38,7 @@ export function InstallPluginModal({
   installMarketplacePlugin,
 }: Props) {
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={pluginToInstall !== null}
       onOpenChange={(open) => {
         if (!open && !isInstalling) {
@@ -94,6 +94,6 @@ export function InstallPluginModal({
           {t('marketplace.confirmInstall')}
         </Button>
       </ModalFooter>
-    </StandardModal>
+    </StandardModalV2>
   );
 }

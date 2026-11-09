@@ -21,7 +21,7 @@ import { CreateMqttServerForm } from '../../../../../../mqtt/servers/CreateMqttS
 import { Select } from '../../../../../../../components/select/index';
 import { getNumberFieldMinimum } from './number-field-minimum';
 import { ResourceFlowNodeDto } from '@attraccess/react-query-client';
-import { LabeledSwitch, StandardModal, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
+import { LabeledSwitch, StandardModalV2, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 
 export interface Property<TValue> {
   type: 'string' | 'integer' | 'number' | 'object' | 'boolean' | 'array';
@@ -285,7 +285,7 @@ export function MqttPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
         </Button>
       </div>
 
-      <StandardModal isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen} size="md">
+      <StandardModalV2 isOpen={isCreateServerOpen} onOpenChange={setIsCreateServerOpen} size="md">
         {({ close }) => (
           <>
             <ModalHeader>
@@ -305,7 +305,7 @@ export function MqttPropertyInput<TValue>(props: PropertyViewProps<TValue>) {
             </ModalBody>
           </>
         )}
-      </StandardModal>
+      </StandardModalV2>
     </>
   );
 }

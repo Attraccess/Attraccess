@@ -12,7 +12,7 @@ import {
   TextArea,
   TextField,
 } from '@heroui/react';
-import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2 } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   useGlobalFlowsServiceCreateGlobalFlow,
@@ -88,7 +88,7 @@ export function GlobalFlowDetailsModal({
   };
 
   return (
-    <StandardModal isOpen={isOpen} onOpenChange={onOpenChange} data-cy="global-flows-details-modal">
+    <StandardModalV2 isOpen={isOpen} onOpenChange={onOpenChange} data-cy="global-flows-details-modal">
       {({ close }) => (
         <Form onSubmit={submit} className="contents" data-cy="global-flows-details-form">
           <ModalHeader>
@@ -132,6 +132,6 @@ export function GlobalFlowDetailsModal({
           </ModalFooter>
         </Form>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

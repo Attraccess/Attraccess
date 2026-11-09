@@ -30,7 +30,7 @@ import {
 import { VariableEditor, EditorMode, VariableFormValues, ValueType } from './editor';
 import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, StandardModal, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2, useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
 import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
@@ -213,7 +213,7 @@ export function VariablesModal(props: Props) {
   return (
     <>
       {props.children(open)}
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="lg">
+      <StandardModalV2 isOpen={isOpen} onOpenChange={setOpen} size="lg">
         <ModalHeader className="flex flex-col gap-1">
           <ModalHeading>{t('title')}</ModalHeading>
           <span className="text-sm font-normal text-default-500">{t('subtitle')}</span>
@@ -338,7 +338,7 @@ export function VariablesModal(props: Props) {
             {t('actions.close')}
           </Button>
         </ModalFooter>
-      </StandardModal>
+      </StandardModalV2>
     </>
   );
 }

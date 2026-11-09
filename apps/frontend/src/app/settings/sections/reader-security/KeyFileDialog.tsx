@@ -1,4 +1,4 @@
-import { Button, PasswordInput, StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PasswordInput, StandardModalV2, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, Radio, RadioGroup } from '@heroui/react';
 import { useState } from 'react';
 import { apiErrorMessage } from '../../../attractap/pairing/pairingUtils';
@@ -30,7 +30,7 @@ export function KeyFileDialog({ isOpen, kind, replacesKeys, isPending, error, on
   const readFile = async (file: File | undefined) => setPem(file ? await file.text() : '');
 
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={isOpen}
       onOpenChange={(open) => !open && onClose()}
       data-cy={`reader-security-${kind}-dialog`}
@@ -110,6 +110,6 @@ export function KeyFileDialog({ isOpen, kind, replacesKeys, isPending, error, on
           </ModalFooter>
         </form>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

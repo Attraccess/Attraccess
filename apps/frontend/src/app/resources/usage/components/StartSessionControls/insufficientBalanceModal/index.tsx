@@ -1,4 +1,4 @@
-import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 
 import en from './en.json';
 import de from './de.json';
@@ -16,7 +16,7 @@ export function InsufficientBalanceModal(props: Props) {
   const { t } = useTranslations({ en, de });
 
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose();
@@ -32,6 +32,6 @@ export function InsufficientBalanceModal(props: Props) {
           onProcessingComplete={onClose}
         />
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

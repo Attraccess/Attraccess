@@ -1,4 +1,4 @@
-import { Button, PasswordInput, StandardModal, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, PasswordInput, StandardModalV2, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { useState } from 'react';
 import { apiErrorMessage } from '../../../attractap/pairing/pairingUtils';
@@ -26,7 +26,7 @@ export function PassphraseDialog({ isOpen, kind, isPending, error, onClose, onSu
   const showMismatch = repeat !== '' && mismatch;
 
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={isOpen}
       onOpenChange={(open) => !open && onClose()}
       data-cy={`reader-security-${kind}-dialog`}
@@ -82,6 +82,6 @@ export function PassphraseDialog({ isOpen, kind, isPending, error, onClose, onSu
           </ModalFooter>
         </form>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

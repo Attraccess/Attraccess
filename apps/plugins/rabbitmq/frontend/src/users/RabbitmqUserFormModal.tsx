@@ -1,4 +1,4 @@
-import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2 } from '@attraccess/plugins-frontend-ui';
 import {
   Alert,
   AlertContent,
@@ -67,7 +67,7 @@ export function RabbitmqUserFormModal({
   });
 
   return (
-    <StandardModal
+    <StandardModalV2
       size="md"
       isOpen={isOpen}
       onOpenChange={(open) => {
@@ -161,7 +161,7 @@ export function RabbitmqUserFormModal({
           </ModalFooter>
         </Form>
       </>
-    </StandardModal>
+    </StandardModalV2>
   );
 }
 

@@ -20,7 +20,7 @@ import type { Key } from '@heroui/react';
 import { Languages, Trash2, Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { buttonVariants } from '@heroui/styles';
-import { Button, StandardModal, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useToastMessage } from '../../../components/toastProvider';
 import { extractTranslationKeys } from '@attraccess/shared';
 import { useTemplateTranslations } from './useTemplateTranslations';
@@ -317,7 +317,7 @@ export function TranslationsSectionStandardModal({
   setCustomLocale,
 }: Props) {
   return (
-    <StandardModal isOpen={customLocaleOpen} onOpenChange={setCustomLocaleOpen} size="sm">
+    <StandardModalV2 isOpen={customLocaleOpen} onOpenChange={setCustomLocaleOpen} size="sm">
       {({ close }) => {
         const trimmed = customLocale.trim();
         const isValid = LOCALE_PATTERN.test(trimmed);
@@ -367,7 +367,7 @@ export function TranslationsSectionStandardModal({
           </>
         );
       }}
-    </StandardModal>
+    </StandardModalV2>
   );
 }
 

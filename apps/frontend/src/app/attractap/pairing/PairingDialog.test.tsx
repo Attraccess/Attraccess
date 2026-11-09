@@ -83,7 +83,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
     useTranslations: () => ({ t }),
     useDateTimeFormatter: () => (value: string) => `at ${value}`,
     AlertStatusIcon: () => null,
-    StandardModal: ({ children, isOpen }: { children: () => React.ReactNode; isOpen: boolean }) =>
+    StandardModalV2: ({ children, isOpen }: { children: () => React.ReactNode; isOpen: boolean }) =>
       isOpen ? <div>{children()}</div> : null,
   };
 });

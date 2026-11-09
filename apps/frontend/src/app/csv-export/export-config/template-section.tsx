@@ -12,7 +12,7 @@ import {
   ModalHeading,
   TextField,
 } from '@heroui/react';
-import { Button, StandardModal, StatusAlert, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2, StatusAlert, StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   CsvExportTemplate,
@@ -292,7 +292,7 @@ export function TemplateSection(props: Props) {
         )}
       </div>
 
-      <StandardModal isOpen={saveAsOpen} onOpenChange={setSaveAsOpen} size="sm">
+      <StandardModalV2 isOpen={saveAsOpen} onOpenChange={setSaveAsOpen} size="sm">
         {({ close }) => (
           <Form onSubmit={submitSaveAs} className="contents" data-cy="csv-export-template-save-as-form">
             <ModalHeader>
@@ -331,7 +331,7 @@ export function TemplateSection(props: Props) {
             </ModalFooter>
           </Form>
         )}
-      </StandardModal>
+      </StandardModalV2>
 
       <StatusDialog
         isOpen={deleteOpen}

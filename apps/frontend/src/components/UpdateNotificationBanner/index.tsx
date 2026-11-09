@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
-import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { ArrowUpCircle, ExternalLink, X } from 'lucide-react';
 import { useSystemServiceGetUpdateStatus } from '@attraccess/react-query-client';
 import { UPDATE_CHECK_CACHE_TTL_MS } from '@attraccess/shared';
@@ -95,7 +95,7 @@ export function UpdateNotificationBanner() {
         </div>
       </div>
 
-      <StandardModal isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen} size="md">
+      <StandardModalV2 isOpen={isReleaseNotesOpen} onOpenChange={setIsReleaseNotesOpen} size="md">
         {({ close }) => (
           <>
             <ModalHeader>
@@ -121,7 +121,7 @@ export function UpdateNotificationBanner() {
             </ModalFooter>
           </>
         )}
-      </StandardModal>
+      </StandardModalV2>
     </>
   );
 }

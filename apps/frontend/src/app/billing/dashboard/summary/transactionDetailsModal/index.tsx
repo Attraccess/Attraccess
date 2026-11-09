@@ -15,7 +15,7 @@ import {
   TableRow,
   useOverlayState,
 } from '@heroui/react';
-import { AttraccessUser, DateTimeDisplay, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { AttraccessUser, DateTimeDisplay, StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RefundModal } from './refund/index';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal/index';
 import { toExactCredits } from '@attraccess/shared';
@@ -227,7 +227,7 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
   return (
     <>
       {children && children(open)}
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="lg" dialogProps={{ className: 'max-w-4xl' }}>
+      <StandardModalV2 isOpen={isOpen} onOpenChange={setOpen} size="lg" dialogProps={{ className: 'max-w-4xl' }}>
         {() => (
           <>
             <ModalHeader>
@@ -343,7 +343,7 @@ export function TransactionDetailsModal(props: TransactionDetailsModalProps) {
             </ModalBody>
           </>
         )}
-      </StandardModal>
+      </StandardModalV2>
       {isOpen && isUsageOpen && transaction?.resourceUsage && (
         <UsageNotesModal
           isOpen

@@ -13,7 +13,7 @@ import { QrCodeIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { QRCode } from 'react-qrcode-logo';
 import { Select } from '../../../../components/select';
-import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { QrCodeAction } from './action';
 
 import de from './de.json';
@@ -68,7 +68,7 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
         </Button>
       )}
 
-      <StandardModal isOpen={isOpen} onOpenChange={setOpen} size="sm">
+      <StandardModalV2 isOpen={isOpen} onOpenChange={setOpen} size="sm">
         {() => (
           <>
             <ModalHeader>
@@ -110,7 +110,7 @@ export function ResourceQrCode(props: Props & Omit<ButtonProps, 'children' | 'st
             </ModalFooter>
           </>
         )}
-      </StandardModal>
+      </StandardModalV2>
     </>
   );
 }

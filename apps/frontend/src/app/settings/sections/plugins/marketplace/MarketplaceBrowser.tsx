@@ -1,4 +1,4 @@
-import { Button, StandardModal } from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModalV2 } from '@attraccess/plugins-frontend-ui';
 import { ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@heroui/react';
 import { dependencyError } from '../dependencies/DependencyPlan';
 import { MarketplaceSearchResults } from './MarketplaceSearchResults';
@@ -80,7 +80,7 @@ export function MarketplaceBrowser({
   removeRegistry,
 }: Props) {
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={isMarketplaceOpen}
       onOpenChange={(open) => {
         setIsMarketplaceOpen(open);
@@ -169,6 +169,6 @@ export function MarketplaceBrowser({
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }

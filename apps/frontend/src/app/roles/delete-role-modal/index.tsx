@@ -11,7 +11,7 @@ import {
   RadioGroup,
 } from '@heroui/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StandardModalV2, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ApiError,
   RoleWithUsageDto,
@@ -80,7 +80,7 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
   };
 
   return (
-    <StandardModal
+    <StandardModalV2
       isOpen={isOpen}
       onOpenChange={(open) => {
         if (!open) onClose();
@@ -158,6 +158,6 @@ export function DeleteRoleModal({ isOpen, onClose, role, allRoles }: Props) {
           </ModalFooter>
         </>
       )}
-    </StandardModal>
+    </StandardModalV2>
   );
 }
