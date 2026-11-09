@@ -129,17 +129,30 @@ jobs:
 
   wago-runtime-version:
     runs-on: ubuntu-latest
+    # The gate may install and build PR dependencies at the merge-base and at HEAD, so it gets no write token and no
+    # Nx remote cache credentials.
+    permissions:
+      contents: read
+    env:
+      NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ''
+      NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ''
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v6
+          persist-credentials: false
+      # pnpm and Node are only used when the gate has to build the runtime at the merge-base and at HEAD; it installs
+      # each checkout itself, so no workspace install happens here. No `cache: pnpm`: without an install on the fast
+      # path the store never exists, and setup-node then fails its post step ("Path Validation Error").
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - name: Test CC100 runtime version check
         run: node --test scripts/wago-runtime-version-check.test.mjs
       - name: Ensure CC100 runtime version was increased
-        run: node scripts/check-wago-runtime-version.mjs "${{ env.NX_AFFECTED_BASE }}"
+        run: node scripts/check-wago-runtime-version.mjs "$NX_AFFECTED_BASE"
 
   lint-and-typecheck:
     runs-on: ubuntu-latest
