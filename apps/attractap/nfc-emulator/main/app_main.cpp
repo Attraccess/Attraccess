@@ -17,6 +17,14 @@
 namespace nfc_emulator {
 namespace {
 constexpr char tag[] = "nfc-emulator";
+// How long the target waits for the reader's next command before it gives the card up.
+// A real card keeps its session while the field is on, and the reader holds it through
+// server-driven exchanges (CardRelay allows 20 s), so after an answer the wait has to cover
+// a server round trip; Touch V1 readers took up to 3 s. A command left unanswered (a
+// scripted timeout) makes the reader re-poll, so it keeps the short limit.
+constexpr uint32_t answered_idle_limit_ms = 5000;
+constexpr uint32_t unanswered_idle_limit_ms = 1000;
+constexpr uint32_t receive_poll_ms = 250;
 
 void emulator_task(void *argument) {
   auto &state = *static_cast<EmulatorState *>(argument);
@@ -26,6 +34,7 @@ void emulator_task(void *argument) {
     vTaskDelete(nullptr);
     return;
   }
+  uint64_t command_deadline_ms = 0;
   for (;;) {
     std::array<uint8_t, 4> uid{};
     bool stop_target = false;
@@ -85,6 +94,7 @@ void emulator_task(void *argument) {
         state.engine.reset_session(); state.changed.notify_all();
         continue;
       }
+      command_deadline_ms = esp_timer_get_time() / 1000 + unanswered_idle_limit_ms;
       std::lock_guard<std::mutex> lock(state.mutex);
       state.target_armed = false; state.rf_active = true; state.changed.notify_all();
     }
@@ -97,7 +107,15 @@ void emulator_task(void *argument) {
       }
     }
     Bytes command;
-    if (!target.receive(command, 1000)) {
+    // Poll in slices so a removal requested meanwhile takes effect at the top of the loop.
+    Pn532Target::Receive received = target.poll_command(command, receive_poll_ms);
+    if (received == Pn532Target::Receive::Pending &&
+        esp_timer_get_time() / 1000 < command_deadline_ms) continue;
+    if (received != Pn532Target::Receive::Command) {
+      if (received == Pn532Target::Receive::Pending) {
+        ESP_LOGI(tag, "no command from the reader, releasing the card");
+        target.deactivate();
+      }
       std::lock_guard<std::mutex> lock(state.mutex);
       state.target_armed = false; state.rf_active = false;
       state.engine.reset_session(); state.changed.notify_all();
@@ -167,6 +185,8 @@ void emulator_task(void *argument) {
       state.target_armed = false; state.rf_active = false;
       state.engine.reset_session(); state.changed.notify_all();
     }
+    command_deadline_ms = esp_timer_get_time() / 1000 +
+        (result.outcome == Outcome::Response ? answered_idle_limit_ms : unanswered_idle_limit_ms);
     bool remove_target = false;
     {
       std::lock_guard<std::mutex> lock(state.mutex);

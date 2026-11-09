@@ -131,6 +131,11 @@ Mutating commands reply only after the requested control state is visible.
 `TgInitAsTarget`; it does not report RF activation before a reader is present.
 `status` exposes `presentRequested`, `targetArmed`, and `rfActive`.
 
+Once activated, the target waits for the reader's next command like a real card
+does: up to 5 s after it answered one (the reader relays server-driven exchanges
+over the network) and 1 s after a command it left unanswered. After that it
+leaves target mode and arms again. `remove` still ends the presentation at once.
+
 | Command                            | Arguments   | Purpose                                                  |
 | ---------------------------------- | ----------- | -------------------------------------------------------- |
 | `help`                             |             | List commands                                            |
