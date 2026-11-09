@@ -562,8 +562,8 @@ See `examples/plugin-reader-ui` for a working example.
 `ctx.sessionActive` (optional boolean) tells you whether the resource has an active usage visible on this reader.
 The reader shows `resource.details.session` only while that is `true`, so put a fact in that slot when it is `true`
 and in `resource.details.body` otherwise, and never in both: a booking or free window should appear in one block per
-screen. The host calls your provider again when a usage starts, ends or is taken over (within the 2 s update limit).
-A host that does not send the field leaves it unset; treat that as `false`.
+screen. The host calls your provider again when a usage starts, ends or is taken over; the update limit of once per
+2 s per reader and slot still applies. A host that does not send the field leaves it unset; treat that as `false`.
 
 Components: `col`, `row`, `text`, `badge`, `icon` (`ok`, `warning`, `bell`, `lock`, `clock`), `progress`,
 `countdown`, `spacer`. Slot trees must not contain `button`. Tones are `primary`, `success`, `warning`, `danger`;

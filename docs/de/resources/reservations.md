@@ -199,11 +199,11 @@ Kartensitzung, kehrt der Reader zu den Texten oben zurück.
   Zeile, „Frei bis 14:00, dann reserviert von Alex bis 16:00“ (Name nach den Regeln oben, sonst „Frei bis 14:00, dann
   reserviert bis 16:00“). Das gilt auch, wenn diese Buchung im Bestätigungsfenster beginnt; solange nichts läuft,
   zeigt der Reader keinen Sitzungsbereich, der Detailtext ist also der eine Ort dafür.
-- **Während Sie die Ressource nutzen** und die Buchung einer anderen Person im Bestätigungsfenster beginnt, zeigt der
-  Sitzungsbereich diese Buchung einmal, „Reserviert von Alex 14:00-16:00“, mit einem Countdown (Name nach den Regeln
-  oben, sonst „Reserviert 14:00-16:00“). Der Detailtext zeigt dann nichts zu dieser Buchung: keine „Frei
-  bis“-Zeile und keinen zweiten Text. Beginnt oder endet die Nutzung, verschiebt der Reader den Text innerhalb
-  weniger Sekunden zwischen den beiden Orten.
+- **Solange eine Nutzung läuft** (Ihre oder die einer anderen Person), Sie angemeldet sind und die Buchung einer
+  anderen Person im Bestätigungsfenster beginnt, zeigt der Sitzungsbereich diese Buchung einmal, „Reserviert von Alex
+  14:00-16:00“, mit einem Countdown (Name nach den Regeln oben, sonst „Reserviert 14:00-16:00“). Der Detailtext zeigt
+  dann nichts zu dieser Buchung: keine „Frei bis“-Zeile und keinen zweiten Text. Beginnt, endet oder wechselt eine
+  Nutzung, verschiebt der Reader den Text innerhalb weniger Sekunden zwischen den beiden Orten.
 - Die **Liste zeigt nie Namen**, weder angemeldet noch abgemeldet. Lange Namen werden in den Details gekürzt.
 
 **Am Reader starten.**

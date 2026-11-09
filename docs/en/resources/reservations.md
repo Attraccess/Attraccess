@@ -182,11 +182,11 @@ returns to the texts above.
   line, "Free until 14:00, then reserved by Alex until 16:00" (the name under the rules above, otherwise "Free
   until 14:00, then reserved until 16:00"). This also holds when that booking starts within the confirmation
   window; the reader shows no session area while nothing is running, so the body is the one place for it.
-- **While you are using the resource** and somebody else's booking starts within the confirmation window, the
-  session area shows that booking once, "Reserved by Alex 14:00-16:00" with a countdown (the name under the rules
-  above, otherwise "Reserved 14:00-16:00"). The details body then shows nothing about that booking: no "Free
-  until" line and no second text. When the usage starts or ends, the reader moves the text between the two places
-  within a couple of seconds.
+- **While a usage is running** (yours or somebody else's) and you are signed in, and another person's booking
+  starts within the confirmation window, the session area shows that booking once, "Reserved by Alex 14:00-16:00"
+  with a countdown (the name under the rules above, otherwise "Reserved 14:00-16:00"). The details body then shows
+  nothing about that booking: no "Free until" line and no second text. When a usage starts, ends or is taken over,
+  the reader moves the text between the two places within a few seconds.
 - The **list never shows names**, signed in or not. Long names are shortened in the details.
 
 **Starting on the reader.**

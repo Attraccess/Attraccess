@@ -212,12 +212,12 @@ unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](resources/r
 | `resource.details.body`    | Hauptbereich der Ressourcendetails                                          | 8 Knoten                                                                                                                                                                                                                                                                                       |
 | `resource.details.session` | nur solange eine Nutzung aktiv ist (`ctx.sessionActive`); nur Kartensitzung | 6 Knoten                                                                                                                                                                                                                                                                                       |
 
-`ctx.sessionActive` (optionaler Boolean) sagt dir, ob die Ressource eine aktive Nutzung hat, die auf diesem Reader
-sichtbar ist. Der Reader zeigt `resource.details.session` nur, solange das `true` ist. Lege einen Sachverhalt daher in
-diesem Slot ab, wenn es `true` ist, und sonst in `resource.details.body`, nie in beiden: Eine Buchung oder ein freies
-Zeitfenster soll pro Bildschirm in einem Block stehen. Der Host ruft deinen Provider erneut auf, wenn eine Nutzung
-beginnt, endet oder übernommen wird (innerhalb des 2-s-Update-Limits). Sendet ein Host das Feld nicht, bleibt es
-ungesetzt; behandle das als `false`.
+`ctx.sessionActive` (optionaler Boolean) sagt Ihnen, ob die Ressource eine aktive Nutzung hat, die auf diesem Reader
+sichtbar ist. Der Reader zeigt `resource.details.session` nur, solange das `true` ist. Legen Sie einen Sachverhalt
+daher in diesem Slot ab, wenn es `true` ist, und sonst in `resource.details.body`, nie in beiden: Eine Buchung oder
+ein freies Zeitfenster soll pro Bildschirm in einem Block stehen. Der Host ruft Ihren Provider erneut auf, wenn eine
+Nutzung beginnt, endet oder übernommen wird; das Update-Limit von einmal pro 2 s je Reader und Slot gilt weiterhin.
+Sendet ein Host das Feld nicht, bleibt es ungesetzt; behandeln Sie das als `false`.
 
 Komponenten: `col`, `row`, `text`, `badge`, `icon` (`ok`, `warning`, `bell`, `lock`, `clock`), `progress`,
 `countdown`, `spacer`. Slot-Bäume dürfen kein `button` enthalten. Töne: `primary`, `success`, `warning`, `danger`;
