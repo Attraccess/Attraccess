@@ -37,6 +37,21 @@ export function isValidTimeZone(zone: unknown): zone is string {
   }
 }
 
+const canonicalZones = new Map<string, string>();
+
+/**
+ * The canonical name of a valid zone, so spellings of one zone compare equal: `europe/berlin` is `Europe/Berlin`,
+ * and links such as `Europe/Kyiv` and `Europe/Kiev` become the same name.
+ */
+export function canonicalTimeZone(zone: string): string {
+  let canonical = canonicalZones.get(zone);
+  if (canonical === undefined) {
+    canonical = formatterFor(zone).resolvedOptions().timeZone;
+    canonicalZones.set(zone, canonical);
+  }
+  return canonical;
+}
+
 /** Minutes east of UTC that `zone` observes at `at`. DST-correct, because it is computed per instant. */
 export function zoneOffsetMinutes(zone: string, at: Date): number {
   const parts: Record<string, number> = {};

@@ -27,6 +27,17 @@ import {
 } from './dtos/reader-ui-settings.dto';
 import { UiSlotService } from './websockets/handlers/ui/ui-slot.service';
 
+/**
+ * Who may clear an alert. Plugin alerts reset the plugin globally (plugin managers); reader alerts belong to the
+ * reader editor (resources.update). A time zone conflict is a reader's alert that shows on the plugins page too.
+ */
+const CLEAR_PERMISSIONS: Record<string, SystemPermission[]> = {
+  'breaker-open': ['system.plugins.manage'],
+  'load-failure': ['system.plugins.manage'],
+  'crash-loop': ['resources.update'],
+  'time-zone-conflict': ['resources.update', 'system.plugins.manage'],
+};
+
 /** Admin side of the reader UI: settings, contribution status and alerts (ATT-1187 phase A). */
 @ApiTags('Attractap')
 @Controller()
@@ -129,7 +140,8 @@ export class ReaderUiAdminController {
   @ApiOperation({
     summary:
       'Clear a reader UI alert. Plugin alerts (open breaker, load failure) reset the plugin globally and need ' +
-      'system.plugins.manage; a reader crash-loop alert needs resources.update.',
+      'system.plugins.manage; a reader crash-loop alert needs resources.update; a reader time-zone-conflict ' +
+      'alert needs either.',
     operationId: 'clearReaderUiAlert',
   })
   @ApiResponse({ status: 200, type: ReaderUiAlertDto })
@@ -140,8 +152,10 @@ export class ReaderUiAdminController {
   ): Promise<ReaderUiAlertDto> {
     const alert = await this.alerts.findOpen(alertId);
     if (!alert) throw new NotFoundException('Alert not found or already cleared');
-    const needed: SystemPermission = alert.kind === 'crash-loop' ? 'resources.update' : 'system.plugins.manage';
-    if (!req.user.effectivePermissions?.has(needed)) throw new ForbiddenException('Insufficient permissions');
+    const allowed = CLEAR_PERMISSIONS[alert.kind] ?? ['system.plugins.manage'];
+    if (!allowed.some((permission) => req.user.effectivePermissions?.has(permission))) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
     const cleared = await this.alerts.clear(alertId, req.user);
     if (!cleared) throw new NotFoundException('Alert not found or already cleared');
     return cleared;

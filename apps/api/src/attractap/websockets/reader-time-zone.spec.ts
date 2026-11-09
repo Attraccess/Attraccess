@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { isValidTimeZone, readerOffsetMinutes, zoneOffsetMinutes } from './reader-time-zone';
+import { canonicalTimeZone, isValidTimeZone, readerOffsetMinutes, zoneOffsetMinutes } from './reader-time-zone';
 
 describe('reader time zone maths', () => {
   it('computes DST-correct offsets per instant', () => {
@@ -22,6 +22,12 @@ describe('reader time zone maths', () => {
     expect(isValidTimeZone('Mars/Olympus')).toBe(false);
     expect(isValidTimeZone('')).toBe(false);
     expect(isValidTimeZone(42)).toBe(false);
+  });
+
+  it('gives spellings and links of one zone the same canonical name', () => {
+    expect(canonicalTimeZone('europe/berlin')).toBe(canonicalTimeZone('Europe/Berlin'));
+    expect(canonicalTimeZone('Europe/Kyiv')).toBe(canonicalTimeZone('Europe/Kiev'));
+    expect(canonicalTimeZone('Asia/Kolkata')).toBe(canonicalTimeZone('Asia/Calcutta'));
   });
 
   it('accepts IANA zones with unusual offsets and rejects offset-style names', () => {

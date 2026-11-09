@@ -176,6 +176,15 @@ describe('AttractapAuthHandler', () => {
       );
     });
 
+    it('drops the previous reader zone state when reauthentication revokes the identity', async () => {
+      const forgetUnlessInUse = jest.fn();
+      (handler as any).readerTimeZone = { ...readerTimeZoneStub(), forgetUnlessInUse };
+      mockSocket.readerId = 99;
+      mockAttractapService.findReaderById.mockResolvedValueOnce(null);
+      await handler.handleAuthentication(mockSocket as any, data);
+      expect(forgetUnlessInUse).toHaveBeenCalledWith(99, mockSocket.id);
+    });
+
     it('keeps another authenticated connection marked online when revoking the old identity', async () => {
       mockSocket.readerId = 99;
       (handler as any).websocketService.sockets.set('other', { id: 'other', readerId: 99 });
@@ -335,6 +344,146 @@ describe('AttractapAuthHandler', () => {
 
       expect(mockSocket.readerId).toBeNull();
       expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+    });
+
+    describe('reader time zone', () => {
+      const serverTime = { epochMs: Date.parse('2026-07-15T12:00:00Z'), utcOffsetMinutes: 540 };
+      let zones: {
+        resolve: jest.Mock;
+        serverTimeFor: jest.Mock;
+        resourceGeneration: jest.Mock;
+        forgetUnlessInUse: jest.Mock;
+      };
+
+      beforeEach(() => {
+        zones = {
+          resolve: jest.fn().mockResolvedValue('Asia/Tokyo'),
+          serverTimeFor: jest.fn(() => serverTime),
+          resourceGeneration: jest.fn(() => 3),
+          forgetUnlessInUse: jest.fn(),
+        };
+        (handler as any).readerTimeZone = { ...readerTimeZoneStub(), ...zones };
+        mockVerifyToken.mockResolvedValue(true);
+      });
+
+      const authenticated = () =>
+        mockSocket.sendMessage.mock.calls
+          .map(([message]) => message.data)
+          .filter((event) => event.type === AttractapEventType.READER_AUTHENTICATED);
+
+      it('sends the offset of the reader zone on a token sign-in, resolved with the reader resources', async () => {
+        mockAttractapService.findReaderById.mockResolvedValue({
+          id: 42,
+          name: 'Reader A',
+          apiTokenHash: 'hashed',
+          pairingState: 'unpaired',
+          resources: [{ id: 3 }, { id: 1 }],
+        });
+
+        await handler.handleAuthentication(mockSocket as any, data);
+
+        // The generation is read before the lookup, so a reader update after it wins over the lookup's ids.
+        expect(zones.resourceGeneration.mock.invocationCallOrder[0]).toBeLessThan(
+          mockAttractapService.findReaderById.mock.invocationCallOrder[0],
+        );
+        expect(zones.resolve).toHaveBeenCalledWith(42, [3, 1], 3);
+        expect(zones.serverTimeFor).toHaveBeenCalledWith(42);
+        expect(authenticated()).toEqual([
+          expect.objectContaining({ payload: expect.objectContaining({ serverTime }) }),
+        ]);
+        // The sign-in lookup is the only one.
+        expect(mockAttractapService.findReaderById).toHaveBeenCalledTimes(1);
+        expect(mockSocket.state.signingIn).toBeUndefined();
+      });
+
+      it('sends the offset of the reader zone on a certificate sign-in, resolved with the reader resources', async () => {
+        mockAttractapService.findReaderById.mockResolvedValue({
+          id: 42,
+          name: 'Reader A',
+          pairingState: 'paired',
+          resources: [{ id: 5 }],
+        });
+
+        await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(true);
+
+        expect(zones.resolve).toHaveBeenCalledWith(42, [5], 3);
+        expect(authenticated()).toEqual([
+          expect.objectContaining({ payload: expect.objectContaining({ serverTime }) }),
+        ]);
+      });
+
+      it.each(['token', 'certificate'])(
+        'counts as signing in as the reader while the zone resolves (%s)',
+        async (path) => {
+          mockAttractapService.findReaderById.mockResolvedValue({
+            id: 42,
+            name: 'Reader A',
+            apiTokenHash: 'hashed',
+            pairingState: path === 'token' ? 'unpaired' : 'paired',
+            resources: [],
+          });
+          let during: unknown;
+          zones.resolve.mockImplementationOnce(async () => {
+            during = mockSocket.state.signingIn;
+            return null;
+          });
+
+          if (path === 'token') await handler.handleAuthentication(mockSocket as any, data);
+          else await handler.authenticateSessionReader(mockSocket as any, 42);
+
+          expect(during).toEqual({ readerId: 42, attempt: expect.any(Symbol) });
+          expect(mockSocket.state.signingIn).toBeUndefined();
+          expect(mockSocket.readerId).toBe(42);
+        },
+      );
+
+      it.each(['token', 'certificate'])(
+        'does not sign in by %s when the socket closes while the zone resolves, and lets go of the reader',
+        async (path) => {
+          mockAttractapService.findReaderById.mockResolvedValue({
+            id: 42,
+            name: 'Reader A',
+            apiTokenHash: 'hashed',
+            pairingState: path === 'token' ? 'unpaired' : 'paired',
+            resources: [],
+          });
+          zones.resolve.mockImplementationOnce(async () => {
+            mockSocket.readyState = WebSocket.CLOSED;
+            return 'Asia/Tokyo';
+          });
+
+          if (path === 'token') await handler.handleAuthentication(mockSocket as any, data);
+          else await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(false);
+
+          expect(mockSocket.readerId).toBeNull();
+          expect(mockSocket.state.signingIn).toBeUndefined();
+          expect(zones.forgetUnlessInUse).toHaveBeenCalledWith(42);
+          expect(zones.serverTimeFor).not.toHaveBeenCalled();
+          expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+          expect(mockMetricsService.attractapReaderConnected.set).not.toHaveBeenCalled();
+          expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+        },
+      );
+
+      it('lets a newer attempt win over one still resolving the zone', async () => {
+        mockAttractapService.findReaderById.mockResolvedValue({
+          id: 42,
+          name: 'Reader A',
+          pairingState: 'paired',
+          resources: [],
+        });
+        let finishResolve: (value: string) => void = () => undefined;
+        zones.resolve.mockImplementationOnce(() => new Promise((resolve) => (finishResolve = resolve)));
+        const older = handler.authenticateSessionReader(mockSocket as any, 42);
+        await new Promise((resolve) => setImmediate(resolve));
+        mockAttractapService.findReaderById.mockResolvedValue(null);
+        await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(false);
+        finishResolve('Asia/Tokyo');
+
+        await expect(older).resolves.toBe(false);
+        expect(mockSocket.readerId).toBeNull();
+        expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+      });
     });
 
     it('does not send the unauthorized response on the happy path', async () => {

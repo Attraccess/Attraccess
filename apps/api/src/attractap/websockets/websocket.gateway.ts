@@ -362,6 +362,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     } catch (error) {
       this.logger.error(`Failed to send heartbeat ack to client ${socket.id}: ${(error as Error).message}`);
     }
+    // A zone that could not be resolved in time (e.g. right after an API restart) is asked for again.
+    this.readerTimeZone.onHeartbeat(socket.readerId);
     // A blocked reader whose pairing failed is back on its token and sends little else, so its
     // heartbeats ask it again once the per-reader limit allows. Not before its update check: a reader
     // that needs the update gets that first.
@@ -555,8 +557,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           { reader_id: String(readerId), reader_name: readerName ?? '' },
           0,
         );
-        this.readerTimeZone.forget(readerId);
       }
+      // A socket still signing in as this reader (a reconnect) keeps the reader's time zone.
+      this.readerTimeZone.forgetUnlessInUse(readerId, socket.id);
     } else {
       this.logger.log('An unidentified client disconnected.');
     }

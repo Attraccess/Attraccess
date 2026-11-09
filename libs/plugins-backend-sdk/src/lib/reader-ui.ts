@@ -194,11 +194,13 @@ export interface ReaderSlotContribution {
 export interface ReaderUiProvider {
   getSlotContributions(ctx: ReaderUiContext): ReaderSlotContribution[] | Promise<ReaderSlotContribution[]>;
   /**
-   * The IANA time zone (e.g. `Europe/Berlin`) this plugin writes times in on readers for the resource, or
-   * `undefined` for no opinion. The host sends one zone per reader, so the reader's clock and the plugin's texts
-   * agree: the first valid zone in plugin order wins, otherwise the server's `TZ` applies. An invalid name is
-   * ignored; two different zones for one reader raise an admin alert. Called with the slot timeout; an error or
-   * timeout counts as no opinion. Call `readerUi.invalidate` when the zone changes.
+   * The IANA time zone (e.g. `Europe/Berlin`) this plugin writes times in on readers for the resource, or `undefined`
+   * for no opinion. The host sends one zone per reader, so the reader's clock and the plugin's texts agree: the first
+   * valid zone in host order wins (the reader's resources by id, and for each resource the plugins in host order,
+   * alphabetically by plugin name; a slower plugin that answers within the time limit still wins over a faster one
+   * ranked lower), otherwise the server's `TZ` applies. An invalid name is ignored; two different zones for one reader
+   * raise an admin alert. Called with the slot timeout; an error or timeout counts as no opinion. Call
+   * `readerUi.invalidate` when the zone changes.
    */
   getTimeZone?(ctx: { readerId: number; resourceId: number }): string | undefined | Promise<string | undefined>;
 }

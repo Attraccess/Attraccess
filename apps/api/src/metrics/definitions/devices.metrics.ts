@@ -51,7 +51,7 @@ export function createDevicesMetrics(registry: Registry) {
 
   const readerUiOpenAlerts = new Gauge({
     name: 'attraccess_reader_ui_open_alerts',
-    help: 'Open reader UI admin alerts by kind (breaker-open, load-failure, crash-loop, time-zone-conflict). Plugin contributions are degraded while an alert is open.',
+    help: 'Open reader UI admin alerts by kind (breaker-open, load-failure, crash-loop, time-zone-conflict). Plugin start checks or widgets are degraded while a breaker-open, load-failure or crash-loop alert is open; a time-zone-conflict alert only reports that the reader ignores a plugin zone.',
     labelNames: ['kind'],
     registers: [registry],
   });

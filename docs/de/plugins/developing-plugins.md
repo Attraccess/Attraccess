@@ -272,16 +272,20 @@ const readerUi: ReaderUiProvider = {
 };
 ```
 
-Der Host fragt die Plugins der Ressourcen eines Readers (mit demselben Timeout von 1,5 s wie bei Slots; ein Fehler
-zählt als keine Meinung), nimmt die **erste gültige Zone** für diesen Reader (der Host fragt die Ressourcen des Readers nacheinander und je
-Ressource die Plugins in Host-Reihenfolge; das erste Plugin, das antwortet, gewinnt) und sendet ihm
-den UTC-Offset der Zone, Sommerzeit eingeschlossen. Ein ungültiger Name wird ignoriert. Liefern zwei Plugins für
-einen Reader verschiedene Zonen, gewinnt die erste, und Admins erhalten einen Alarm. Ohne Antwort folgt der Reader
-dem `TZ` des Servers. Rufen Sie `context.readerUi.invalidate(...)` auf, wenn sich Ihre Zone ändert; der Host löst
-sie dann neu auf und schickt den neuen Offset sofort an die betroffenen Reader. Schreiben Sie nicht die aktuelle
-Uhrzeit in Ihre Texte: Die Fußleiste des Readers zeigt sie auf jedem Bildschirm außer Sperrbildschirm, Liste ohne
-Anmeldung und Sitzungszusammenfassung (diese hat keine Fußleiste, solange keine Plugin-Frage darüber offen ist), so
-lässt sich „Check-in bis 14:15“ auf jetzt beziehen.
+Der Host fragt die Plugins der Ressourcen eines Readers (mit demselben Timeout von 1,5 s wie bei Slots; ein Fehler zählt
+als keine Meinung) und nimmt die **erste gültige Zone in Host-Reihenfolge**: die Ressourcen des Readers nach ID und je
+Ressource die Plugins in Host-Reihenfolge (alphabetisch nach Plugin-Namen); ein langsameres Plugin, das innerhalb der
+Zeitgrenze antwortet, gewinnt trotzdem gegen ein schnelleres, das nach ihm kommt. Er sendet dem Reader den UTC-Offset
+der Zone, Sommerzeit eingeschlossen. Ein ungültiger Name wird ignoriert, Namen werden kanonisch verglichen
+(`europe/berlin` ist `Europe/Berlin`). Weichen die Antworten für einen Reader voneinander ab, gewinnt die erste, und
+Admins erhalten einen Alarm. Ohne Antwort folgt der Reader dem `TZ` des Servers. Läuft ein Plugin in den Timeout, das
+die Zone entscheiden könnte, behält der Host die aktuelle Zone des Readers; hat er noch keine, nutzt er vorerst die
+nächste gültige Antwort. In beiden Fällen fragt er bei einem späteren Heartbeat des Readers erneut, zuerst nach 5 s,
+dann seltener, höchstens alle 5 Minuten. Rufen Sie `context.readerUi.invalidate(...)` auf, wenn sich Ihre Zone ändert;
+der Host löst sie dann neu auf und schickt den neuen Offset und die Startzeiten der Sitzungen in der Ressourcenliste
+sofort an die betroffenen Reader. Schreiben Sie nicht die aktuelle Uhrzeit in Ihre Texte: Die Fußleiste des Readers
+zeigt sie auf jedem Bildschirm außer Sperrbildschirm, Liste ohne Anmeldung und Sitzungszusammenfassung (diese hat keine
+Fußleiste, solange keine Plugin-Frage darüber offen ist), so lässt sich „Check-in bis 14:15“ auf jetzt beziehen.
 
 ### Nur Latin-1
 

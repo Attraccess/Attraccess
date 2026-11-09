@@ -1,5 +1,6 @@
 import { SettingsService } from '../../../../settings/settings.service';
 import { WebSocket } from 'ws';
+import type { Attractap } from '@attraccess/database-entities';
 import { WebsocketService } from '../../websocket.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../../attractap.service';
@@ -9,6 +10,9 @@ import { MetricsService } from '../../../../metrics/metrics.service';
 import { AuditService } from '../../../../audit/audit.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { ReaderTimeZoneService } from '../../reader-time-zone.service';
+
+/** The reader's resource ids from the sign-in lookup, so the zone resolve needs no second one. */
+const resourceIdsOf = (reader: Attractap): number[] | undefined => reader.resources?.map((resource) => resource.id);
 
 @Injectable()
 export class AttractapAuthHandler {
@@ -75,7 +79,11 @@ export class AttractapAuthHandler {
         0,
       );
     }
+    // The previous reader's zone state goes with its identity unless another socket still is that reader.
+    if (previousReaderId) this.readerTimeZone.forgetUnlessInUse(previousReaderId, socket.id);
     this.logger.debug('Checking if reader exists');
+    // Read before the lookup: a reader update after it makes the lookup's resource ids stale.
+    const resourceGeneration = this.readerTimeZone.resourceGeneration(data.payload.id);
     const reader = await this.attractapService.findReaderById(data.payload.id);
     if (!isCurrentAttempt()) return;
     if (!reader) {
@@ -109,7 +117,8 @@ export class AttractapAuthHandler {
 
     const storedLanguage = await this.settingsService.getDefaultLanguage();
     if (!isCurrentAttempt()) return;
-    // A broadcast during the read supersedes its snapshot, even before this
+    if (!(await this.resolveTimeZone(socket, reader, resourceGeneration, attempt, isCurrentAttempt))) return;
+    // A broadcast during the reads supersedes its snapshot, even before this
     // socket becomes eligible for language broadcasts.
     const language = this.websocketService.readerLanguage ?? storedLanguage;
     socket.readerId = reader.id;
@@ -123,9 +132,32 @@ export class AttractapAuthHandler {
     const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
       name: reader.name,
       language,
-      serverTime: await this.readerTimeZone.resolvedServerTimeFor(reader.id),
+      serverTime: this.readerTimeZone.serverTimeFor(reader.id),
     });
     await socket.sendMessage(authenticatedResponse);
+  }
+
+  /**
+   * Resolves the reader's time zone before the socket becomes the reader's, so a superseded attempt claims and
+   * sends nothing. Meanwhile the socket counts as signing in as the reader: a closing sibling socket (a reconnect)
+   * does not drop the zone. A superseded attempt leaves nothing behind unless another socket uses the reader.
+   */
+  private async resolveTimeZone(
+    socket: AuthenticatedWebSocket,
+    reader: Attractap,
+    resourceGeneration: number,
+    attempt: symbol,
+    isCurrentAttempt: () => boolean,
+  ): Promise<boolean> {
+    socket.state.signingIn = { readerId: reader.id, attempt };
+    try {
+      await this.readerTimeZone.resolve(reader.id, resourceIdsOf(reader), resourceGeneration);
+    } finally {
+      if (socket.state.signingIn?.attempt === attempt) delete socket.state.signingIn;
+    }
+    if (isCurrentAttempt()) return true;
+    this.readerTimeZone.forgetUnlessInUse(reader.id);
+    return false;
   }
 
   private shouldAuditTokenRejection(readerId: number): boolean {
@@ -146,11 +178,13 @@ export class AttractapAuthHandler {
     const isCurrentAttempt = () =>
       socket.state.readerAuthenticationAttempt === attempt && socket.readyState === WebSocket.OPEN;
 
+    const resourceGeneration = this.readerTimeZone.resourceGeneration(readerId);
     const reader = await this.attractapService.findReaderById(readerId);
     if (!reader || reader.pairingState !== 'paired' || !isCurrentAttempt()) return false;
 
     const storedLanguage = await this.settingsService.getDefaultLanguage();
     if (!isCurrentAttempt()) return false;
+    if (!(await this.resolveTimeZone(socket, reader, resourceGeneration, attempt, isCurrentAttempt))) return false;
     const language = this.websocketService.readerLanguage ?? storedLanguage;
     socket.readerId = reader.id;
     socket.readerName = reader.name;
@@ -161,7 +195,7 @@ export class AttractapAuthHandler {
       new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
         name: reader.name,
         language,
-        serverTime: await this.readerTimeZone.resolvedServerTimeFor(reader.id),
+        serverTime: this.readerTimeZone.serverTimeFor(reader.id),
       }),
     );
     if (!isCurrentAttempt()) return false;

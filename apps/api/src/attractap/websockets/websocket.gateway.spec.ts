@@ -181,16 +181,32 @@ describe('AttractapGateway', () => {
       );
     });
 
-    it('forgets the reader time zone once its last socket is gone', async () => {
-      const forget = jest.spyOn(fixture.gateway['readerTimeZone'], 'forget');
+    it('forgets the reader time zone once its last socket, or one signing in as it, is gone', async () => {
+      const zones = new ReaderTimeZoneService(
+        { providers: () => [] } as never,
+        {} as never,
+        {} as never,
+        fixture.websocketService as never,
+        { emit: jest.fn() } as never,
+      );
+      (fixture.gateway as unknown as { readerTimeZone: unknown }).readerTimeZone = zones;
+      const forget = jest.spyOn(zones, 'forget');
       const first = fixture.createMockSocket({ id: 'tz-1', readerId: 42 });
       const second = fixture.createMockSocket({ id: 'tz-2', readerId: 42 });
+      // A reconnect: this socket is still resolving the zone before it becomes reader 42.
+      const signingIn = fixture.createMockSocket({ id: 'tz-3', readerId: null });
+      signingIn.state.signingIn = { readerId: 42, attempt: Symbol('sign-in') };
       fixture.websocketService.sockets.set('tz-1', first);
       fixture.websocketService.sockets.set('tz-2', second);
+      fixture.websocketService.sockets.set('tz-3', signingIn);
 
       await fixture.gateway.handleDisconnect(first);
-      expect(forget).not.toHaveBeenCalled();
       await fixture.gateway.handleDisconnect(second);
+      expect(forget).not.toHaveBeenCalled();
+      // The reconnect became reader 42; when it closes, nobody uses the reader any more.
+      delete signingIn.state.signingIn;
+      signingIn.readerId = 42;
+      await fixture.gateway.handleDisconnect(signingIn);
       expect(forget).toHaveBeenCalledWith(42);
     });
 
@@ -264,6 +280,7 @@ describe('AttractapGateway', () => {
           {} as never,
           { findReaderById: async () => ({ id: 7, resources: [{ id: 1 }] }) } as never,
           { sockets: new Map() } as never,
+          { emit: jest.fn() } as never,
         );
         await zones.resolve(7);
         (fixture.gateway as unknown as { readerTimeZone: unknown }).readerTimeZone = zones;
@@ -276,6 +293,15 @@ describe('AttractapGateway', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+
+    it('lets the reader time zone retry a resolve that timed out', async () => {
+      const onHeartbeat = jest.spyOn(fixture.gateway['readerTimeZone'], 'onHeartbeat');
+      const socket = fixture.createMockSocket({ id: 'hb-retry', readerId: 7 });
+
+      await fixture.gateway.onHeartbeat(socket);
+
+      expect(onHeartbeat).toHaveBeenCalledWith(7);
     });
 
     it('returns public clock metadata without authenticating the reader or granting resource access', async () => {

@@ -62,7 +62,7 @@ export interface FirmwareUpdateResponse {
   bytes_received_before_timeout?: number;
 }
 
-/** Build the heartbeat reply with the same clock sample as authentication. */
-export function readerHeartbeat(serverTime: ReaderServerTimePayload = readerServerTime()): string {
+/** Build the heartbeat reply with the same clock sample as authentication, in the reader's time zone. */
+export function readerHeartbeat(serverTime: ReaderServerTimePayload): string {
   return JSON.stringify({ event: 'HEARTBEAT', serverTime });
 }

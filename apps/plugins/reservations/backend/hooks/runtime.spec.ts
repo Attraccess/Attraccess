@@ -71,6 +71,22 @@ describe('hook runtime', () => {
     expect(getSlotContributions).toHaveBeenCalledWith({ resourceId: 1 }, expect.any(Number));
   });
 
+  it('hands the reader time zone over to the reader UI service with the shared deadline', async () => {
+    const getTimeZone = jest.fn(async () => 'Europe/Berlin');
+    const pending = readerUiProvider.getTimeZone?.({ readerId: 1, resourceId: 1 });
+    setTimeout(
+      () =>
+        publishHookServices({
+          preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
+          sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
+          readerUi: { getSlotContributions: async () => [], getTimeZone },
+        }),
+      10,
+    );
+    await expect(pending).resolves.toBe('Europe/Berlin');
+    expect(getTimeZone).toHaveBeenCalledWith({ readerId: 1, resourceId: 1 }, expect.any(Number));
+  });
+
   it('withdraws the services on shutdown', async () => {
     publishHookServices({
       preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },

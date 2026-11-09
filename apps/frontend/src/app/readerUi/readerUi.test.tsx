@@ -110,7 +110,7 @@ describe('reader UI admin', () => {
     expect(api.clear).toHaveBeenCalledWith(1, expect.any(Object));
   });
 
-  it('names the reader and the ignored plugin of a time zone conflict, and promises no zones the page does not show', () => {
+  it('names the reader and the plugin whose zone is ignored, and promises nothing the page does not show', () => {
     api.alerts = [
       { id: 4, kind: 'time-zone-conflict', message: 'a vs b', plugin: 'tz-plugin', readerId: 7, createdAt: '' },
     ];
@@ -122,6 +122,13 @@ describe('reader UI admin', () => {
       file.alerts.description['time-zone-conflict'];
     expect(text(en)).not.toMatch(/alert text/i);
     expect(text(de)).not.toMatch(/Text des Alarms/);
+    // The record names neither the kept plugin nor the zones, and one plugin can conflict with itself.
+    expect(text(en)).not.toMatch(/first plugin|both plugins|two plugins/i);
+    expect(text(de)).not.toMatch(/ersten Plugins|beiden Plugins|zwei Plugins/i);
+    expect([text(en), text(de)]).toEqual([
+      expect.stringMatching(/\{\{reader\}\}.*\{\{plugin\}\}/),
+      expect.stringMatching(/\{\{reader\}\}.*\{\{plugin\}\}/),
+    ]);
     expect(Object.keys(en.alerts.description)).toEqual(Object.keys(de.alerts.description));
   });
 

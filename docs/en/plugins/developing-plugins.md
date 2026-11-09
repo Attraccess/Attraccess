@@ -601,15 +601,18 @@ const readerUi: ReaderUiProvider = {
 };
 ```
 
-The host asks the plugins of a reader's resources (with the same 1.5 s timeout as slots; an error counts as no
-opinion), uses the **first valid zone** for that reader (the host asks the reader's resources in order and, for each
-resource, the plugins in host order; the first plugin that answers wins) and sends the zone's UTC offset to it,
-daylight saving included. An invalid name is ignored. If two plugins return different zones for one reader, the
-first wins and admins get an alert. Without any answer the reader follows the server's `TZ`. Call
-`context.readerUi.invalidate(...)` when your zone changes; the host then re-resolves it and pushes the new offset
-to the affected readers at once. Do not write the current time into your texts: the reader's footer shows it on
-every screen except the lock screen, the signed-out list and the session summary (which has no footer unless a
-plugin question is open over it), so "check in by 14:15" can be related to now.
+The host asks the plugins of a reader's resources (with the same 1.5 s timeout as slots; an error counts as no opinion)
+and uses the **first valid zone in host order**: the reader's resources by id, and for each resource the plugins in host
+order (alphabetically by plugin name); a slower plugin that answers within the time limit still wins over a faster one
+ranked lower. It sends the zone's UTC offset to the reader, daylight saving included. An invalid name is ignored, and
+names are compared canonically (`europe/berlin` is `Europe/Berlin`). If the answers differ for one reader, the first
+wins and admins get an alert. Without any answer the reader follows the server's `TZ`. If a plugin that could decide the
+zone times out, the host keeps the reader's current zone; without one yet it uses the next valid answer for now. Either
+way it asks again on a later heartbeat of the reader, after 5 s and then less often, up to every 5 minutes. Call
+`context.readerUi.invalidate(...)` when your zone changes; the host then re-resolves it and pushes the new offset, and
+the session start times of the resource list, to the affected readers at once. Do not write the current time into your
+texts: the reader's footer shows it on every screen except the lock screen, the signed-out list and the session summary
+(which has no footer unless a plugin question is open over it), so "check in by 14:15" can be related to now.
 
 ### Limits
 

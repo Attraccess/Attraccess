@@ -38,7 +38,10 @@ export class ReaderUiReaderSettings {
 
 export type ReaderUiAlertKind = 'breaker-open' | 'load-failure' | 'crash-loop' | 'time-zone-conflict';
 
-/** Host-owned admin alert: open circuit breaker, ACCESS_HOOKS load failure or reader crash-loop suspension. */
+/**
+ * Host-owned admin alert: open circuit breaker, ACCESS_HOOKS load failure, reader crash-loop suspension or plugins
+ * disagreeing on a reader's time zone.
+ */
 @Entity('reader_ui_alert')
 export class ReaderUiAlert {
   @PrimaryGeneratedColumn()
