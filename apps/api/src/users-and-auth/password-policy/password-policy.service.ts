@@ -13,7 +13,6 @@ import {
   Injectable,
   Logger,
   OnModuleInit,
-  Optional,
   BadRequestException,
   ConflictException,
   NotFoundException,
@@ -103,7 +102,7 @@ export class PasswordPolicyService implements OnModuleInit {
     protected readonly hibp: HibpClient,
     protected readonly zxcvbn: ZxcvbnService,
     protected readonly rbacService: RbacService,
-    @Optional() protected readonly identityAudit?: IdentityAuditService,
+    protected readonly identityAudit: IdentityAuditService,
   ) {}
 
   protected readonly logger = new Logger(PasswordPolicyService.name);
@@ -130,7 +129,7 @@ export class PasswordPolicyService implements OnModuleInit {
     if (input.before) details.before = JSON.stringify(input.before);
     if (input.after) details.after = JSON.stringify(input.after);
     if (input.changedFields.length === 1) details.field = input.changedFields[0];
-    await this.identityAudit?.record(
+    await this.identityAudit.record(
       {
         action,
         operationId: randomUUID(),

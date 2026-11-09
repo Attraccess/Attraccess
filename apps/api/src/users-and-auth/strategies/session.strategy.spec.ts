@@ -26,7 +26,7 @@ describe('SessionStrategy', () => {
     email: 'test@example.com',
   } as User;
 
-  const buildModule = async (withSync: boolean) => {
+  const buildModule = async () => {
     const mockSessionService = {
       authenticateSession: jest.fn(),
     };
@@ -57,7 +57,7 @@ describe('SessionStrategy', () => {
           provide: AuthAuditLogger,
           useValue: { log: jest.fn() },
         },
-        ...(withSync ? [{ provide: SessionPermissionSync, useValue: ssoPermissionSync }] : []),
+        { provide: SessionPermissionSync, useValue: ssoPermissionSync },
       ],
     }).compile();
 
@@ -75,7 +75,7 @@ describe('SessionStrategy', () => {
 
   beforeEach(async () => {
     ssoPermissionSync = { syncIfDue: jest.fn().mockResolvedValue('skipped') };
-    await buildModule(true);
+    await buildModule();
   });
 
   describe('validate', () => {
@@ -302,7 +302,9 @@ describe('SessionStrategy', () => {
       it('rejects revoked sessions before computing effective permissions', async () => {
         ssoPermissionSync.syncIfDue.mockResolvedValue('revoked');
 
-        await expect(strategy.validate(sessionRequest())).rejects.toThrow(UnauthorizedException);
+        await expect(strategy.validate(sessionRequest())).rejects.toThrow(
+          new UnauthorizedException('Session was ended by the identity provider'),
+        );
         expect(rbacService.getEffectivePermissions).not.toHaveBeenCalled();
         expect(twoFactorService.getStatus).not.toHaveBeenCalled();
       });
@@ -319,13 +321,11 @@ describe('SessionStrategy', () => {
         },
       );
 
-      it('still validates when no SessionPermissionSync is provided', async () => {
-        await buildModule(false);
-        sessionService.authenticateSession.mockResolvedValue({ user: mockUser, session } as never);
+      it('does not authenticate the request when the sync breaks its contract and throws', async () => {
+        ssoPermissionSync.syncIfDue.mockRejectedValue(new Error('sync exploded'));
 
-        const result = await strategy.validate(sessionRequest());
-
-        expect(result).toEqual(mockUser);
+        await expect(strategy.validate(sessionRequest())).rejects.toThrow('sync exploded');
+        expect(rbacService.getEffectivePermissions).not.toHaveBeenCalled();
       });
     });
   });

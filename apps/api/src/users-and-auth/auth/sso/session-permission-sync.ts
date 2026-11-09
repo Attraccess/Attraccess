@@ -9,6 +9,18 @@ export type RoleDelta = { added: string[]; removed: string[]; updated: string[] 
 /**
  * Injection token for session-time SSO permission re-sync. Kept free of IdP client imports
  * (jose, axios) so SessionStrategy stays loadable by plugin test hosts that compose it.
+ *
+ * It is a required dependency of SessionStrategy and AuthController: a module without a provider
+ * fails at startup instead of silently turning session-time revocation off.
+ *
+ * Failure behaviour of `syncIfDue`:
+ * - Temporary IdP or network error (the resyncer throws anything but SessionRejectedError): outcome
+ *   `failed`. The session and current roles are kept, a 60 s retry backoff is stored in
+ *   `ssoSyncRetryAt` and the request continues.
+ * - The IdP rejects the session (SessionRejectedError): outcome `revoked`. The session is revoked and
+ *   the caller rejects the request, even if removing the stored session fails (fails closed).
+ * - Implementations must never throw. If one does anyway, callers do not catch it: the error
+ *   propagates and the request is not authenticated (fails closed at the caller).
  */
 export abstract class SessionPermissionSync {
   abstract syncIfDue(

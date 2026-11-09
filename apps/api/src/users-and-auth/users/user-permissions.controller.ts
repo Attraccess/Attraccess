@@ -5,7 +5,6 @@ import {
   ForbiddenException,
   Get,
   Logger,
-  Optional,
   Param,
   ParseIntPipe,
   Post,
@@ -32,7 +31,7 @@ export class UserPermissionsController {
     private readonly rbacService: RbacService,
     private readonly permissionsService: UserPermissionsService,
     private readonly usersService: UsersService,
-    @Optional() private readonly identityAudit?: IdentityAuditService,
+    private readonly identityAudit: IdentityAuditService,
   ) {}
 
   private readonly logger = new Logger(UserPermissionsController.name);
@@ -91,7 +90,6 @@ export class UserPermissionsController {
     roleId: number,
     request: AuthenticatedRequest,
   ): Promise<void> {
-    if (!this.identityAudit) return;
     let roleKey: string | null;
     try {
       roleKey = await this.rbacService.getRoleKey(roleId);

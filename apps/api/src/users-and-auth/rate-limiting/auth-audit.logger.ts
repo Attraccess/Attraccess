@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 
@@ -33,7 +33,7 @@ export interface AuthAuditFields {
 export class AuthAuditLogger {
   private readonly logger = new Logger('AuthAudit');
 
-  constructor(@Optional() private readonly identityAudit?: IdentityAuditService) {}
+  constructor(private readonly identityAudit: IdentityAuditService) {}
 
   async log(fields: AuthAuditFields): Promise<void> {
     const line = formatLine(fields);
@@ -46,7 +46,7 @@ export class AuthAuditLogger {
     const action = actionFor(fields.type);
     if (!action) return;
     const reason = fields.outcome === 'success' ? undefined : fields.outcome;
-    await this.identityAudit?.record({
+    await this.identityAudit.record({
       action,
       operationId: randomUUID(),
       outcome: fields.outcome === 'success' ? 'succeeded' : 'failed',

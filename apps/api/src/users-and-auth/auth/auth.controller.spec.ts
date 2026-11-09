@@ -1,5 +1,6 @@
 import { approvedOriginsFor, registerAuthControllerFixture } from './auth.controller.auth-controller.test-fixture';
 import { SsoLogoutService } from './sso/sso-logout.service';
+import { SessionPermissionSync } from './sso/session-permission-sync';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { AuthController } from './auth.controller';
 import { Response } from 'express';
@@ -305,7 +306,7 @@ describe('AuthController', () => {
         },
         returnURL: async () => 'https://app.example/',
       } as unknown as SsoLogoutService,
-      undefined,
+      fixture.ssoPermissionSync as unknown as SessionPermissionSync,
       approvedOriginsFor('https://app.example'),
     );
     const request = {
@@ -408,6 +409,13 @@ describe('AuthController', () => {
       await expect(fixture.authController.refreshSession(refreshRequest(), noStore())).rejects.toThrow(
         UnauthorizedException,
       );
+      expect(fixture.sessionService.refreshSession).not.toHaveBeenCalled();
+    });
+
+    it('does not rotate the session when the sync breaks its contract and throws', async () => {
+      syncIfDue.mockRejectedValue(new Error('sync exploded'));
+
+      await expect(fixture.authController.refreshSession(refreshRequest(), noStore())).rejects.toThrow('sync exploded');
       expect(fixture.sessionService.refreshSession).not.toHaveBeenCalled();
     });
 

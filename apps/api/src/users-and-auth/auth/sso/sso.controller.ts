@@ -2,7 +2,6 @@ import { AllowCrossSiteWrite } from '../../../common/security/cross-site-write.g
 import {
   Controller,
   Logger,
-  Optional,
   BadRequestException,
   ForbiddenException,
   NotFoundException,
@@ -99,8 +98,8 @@ export class SSOController extends SsoUserProvisioning {
     protected readonly settingsService: SettingsService,
     protected readonly metricsService: MetricsService,
     protected readonly rbacService: RbacService,
-    @Optional() protected readonly identityAudit?: IdentityAuditService,
-    @Optional() protected readonly ssoAudit?: SsoAuditService,
+    protected readonly identityAudit: IdentityAuditService,
+    protected readonly ssoAudit: SsoAuditService,
   ) {
     super();
   }
@@ -159,7 +158,7 @@ export class SSOController extends SsoUserProvisioning {
 
   protected async recordSso(event: Parameters<SsoAuditService['record']>[0]): Promise<void> {
     try {
-      await this.ssoAudit?.record(event);
+      await this.ssoAudit.record(event);
     } catch {
       // Auditing must not roll back an already-completed SSO operation.
     }

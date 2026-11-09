@@ -35,6 +35,7 @@ import { AuditModule } from './audit.module';
 import { AuditService } from './audit.service';
 import { AUDIT_METRICS } from '../metrics/definitions/tokens';
 import { demoDomain, setupAuditDatabase } from './audit.test-fixture';
+import { SessionPermissionSync } from '../users-and-auth/auth/sso/session-permission-sync';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
   it('enforces HTTP session permissions, token ceilings, query validation and persisted settings updates', async () => {
@@ -44,6 +45,7 @@ describe('durable audit SQLite', () => {
       controllers: [AuditController, SettingsController],
       providers: [
         SessionStrategy,
+        { provide: SessionPermissionSync, useValue: { syncIfDue: async () => 'skipped' } },
         { provide: AuditService, useValue: fixture.service },
         { provide: SettingsService, useValue: settings },
         {

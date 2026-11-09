@@ -74,6 +74,15 @@ module.exports = [
       '@nx/enforce-module-boundaries': 'off',
     },
   },
+  // ATT-1222: security and audit collaborators must be required; every remaining
+  // @Optional() in the auth code needs an `// optional: <reason>` comment.
+  {
+    files: ['apps/api/src/users-and-auth/**/*.ts', 'apps/api/src/common/security/**/*.ts'],
+    ignores: ['**/*.spec.ts', '**/*.test.ts', '**/*test-fixture*', '**/*.test-utils.ts'],
+    rules: {
+      '@nx/workspace-optional-injection-justification': 'error',
+    },
+  },
   // ATT-294 / ATT-834: the "no form fields inside a Card" guard is not an ESLint rule.
   // Every regression so far put the Card and the field in different files, which a
   // per-file rule cannot see, and nx's flat/react config declares no-restricted-syntax

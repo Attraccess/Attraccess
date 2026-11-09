@@ -9,7 +9,6 @@ import {
   ForbiddenException,
   Get,
   Logger,
-  Optional,
   Param,
   ParseIntPipe,
   Query,
@@ -56,7 +55,7 @@ export class UsersAdminController {
   constructor(
     protected readonly usersService: UsersService,
     protected readonly passwordService: UserPasswordService,
-    @Optional() protected readonly identityAudit?: IdentityAuditService,
+    protected readonly identityAudit: IdentityAuditService,
   ) {}
 
   protected readonly logger = new Logger(UsersAdminController.name);
@@ -266,7 +265,7 @@ export class UsersAdminController {
     field?: 'username' | 'email' | 'password' | 'billingFactor',
   ): Promise<void> {
     return Promise.resolve(
-      this.identityAudit?.record({
+      this.identityAudit.record({
         action,
         operationId: randomUUID(),
         outcome: 'succeeded',

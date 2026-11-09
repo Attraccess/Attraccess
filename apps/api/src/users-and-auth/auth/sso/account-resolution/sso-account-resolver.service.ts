@@ -60,6 +60,7 @@ export class SsoAccountResolver {
     private readonly usersService: UsersService,
     private readonly authService: AuthService,
     private readonly dataSource: DataSource,
+    // optional: extension point with a safe built-in default (defaultSsoProvisioningHook), not a security control
     @Optional()
     @Inject(SSO_PROVISIONING_HOOK)
     private readonly provisioningHook: SsoProvisioningHook = defaultSsoProvisioningHook,

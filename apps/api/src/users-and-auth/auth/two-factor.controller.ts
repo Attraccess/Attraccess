@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Optional, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
 import { TwoFactorService } from './two-factor.service';
@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 export class TwoFactorController {
   constructor(
     private readonly twoFactorService: TwoFactorService,
-    @Optional() private readonly identityAudit?: IdentityAuditService,
+    private readonly identityAudit: IdentityAuditService,
   ) {}
 
   @SessionAuth()
@@ -96,7 +96,7 @@ export class TwoFactorController {
     action: 'two_factor_setup_started' | 'two_factor_enabled' | 'two_factor_disabled',
     request: AuthenticatedRequest,
   ): Promise<void> {
-    return Promise.resolve(this.identityAudit?.record({
+    return Promise.resolve(this.identityAudit.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',

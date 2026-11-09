@@ -35,6 +35,7 @@ import { CORE_AUDIT_DOMAINS } from './policies/domains';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
 import { createTestAuditMetrics } from './audit.test-fixture';
+import { SessionPermissionSync } from '../users-and-auth/auth/sso/session-permission-sync';
 
 describe('audit domains through migrated storage and the admin HTTP API', () => {
   let directory: string;
@@ -86,6 +87,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       controllers: [AuditController, SettingsController],
       providers: [
         SessionStrategy,
+        { provide: SessionPermissionSync, useValue: { syncIfDue: async () => 'skipped' } },
         { provide: AuditService, useValue: audit },
         {
           provide: SettingsService,
