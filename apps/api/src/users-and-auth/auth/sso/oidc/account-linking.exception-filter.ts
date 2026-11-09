@@ -16,9 +16,9 @@ export class AccountLinkingExceptionFilter implements ExceptionFilter {
   constructor(
     private readonly linkTokenService: SSOLinkTokenService,
     private readonly metricsService: MetricsService,
-    // optional: fails closed; without approved origins and settings redirect candidates are ignored (no redirect)
+    // optional: only vets SAML redirect candidates; without it they are ignored and the configured URL or JSON is used
     @Optional() private readonly approvedOrigins?: ApprovedOriginsService,
-    // optional: fails closed; see approvedOrigins above
+    // optional: only supplies the SAML fallback URL; without it a SAML callback with no approved redirect gets JSON
     @Optional() private readonly settingsService?: SettingsService,
   ) {}
 

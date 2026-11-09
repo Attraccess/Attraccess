@@ -406,9 +406,9 @@ describe('AuthController', () => {
     it('rejects revoked sessions without rotating them', async () => {
       syncIfDue.mockResolvedValue('revoked');
 
-      await expect(fixture.authController.refreshSession(refreshRequest(), noStore())).rejects.toThrow(
-        UnauthorizedException,
-      );
+      const refresh = fixture.authController.refreshSession(refreshRequest(), noStore());
+      await expect(refresh).rejects.toThrow(UnauthorizedException);
+      await expect(refresh).rejects.toThrow('Session was ended by the identity provider');
       expect(fixture.sessionService.refreshSession).not.toHaveBeenCalled();
     });
 
