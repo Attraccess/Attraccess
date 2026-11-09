@@ -173,11 +173,13 @@ lautet „Res., Check-in Di 00:05“. Die Details haben immer den vollen Text. D
 dieselbe öffentliche Zeile wie die Listenzeile, anstelle von „Verfügbar“ (nicht, solange die Ressource in Benutzung
 oder in Wartung ist).
 
-**Die aktuelle Uhrzeit.** Jeder Reader-Bildschirm zeigt die aktuelle Zeit in der Fußleiste (der Sperrbildschirm und
-die Liste ohne Anmeldung haben stattdessen eine große Uhr), so lässt sich „Check-in bis 14:15“ auf jetzt beziehen.
+**Die aktuelle Uhrzeit.** Reader-Bildschirme zeigen die aktuelle Zeit in der Fußleiste (der Sperrbildschirm und
+die Liste ohne Anmeldung haben stattdessen eine große Uhr, und die Sitzungszusammenfassung nach einem Stopp zeigt
+keine Fußleiste, außer solange die Frage „behalten oder freigeben“ offen ist), so lässt sich „Check-in bis 14:15“ auf jetzt beziehen.
 Das Plugin schreibt die Uhrzeit nicht in seine Texte. Der Reader nutzt für diese Uhr die [Zeitzone](#zeitzone) des
 Plugins, daher stimmen Uhr und Reservierungszeiten immer überein, auch wenn der Server in einer anderen Zone läuft;
-ändert sich die Zeitzone, wechseln die Reader sofort. Siehe
+ändert sich die Zeitzone, wechseln die Reader sofort. Das Plugin schlägt seine Zeitzone nur für Ressourcen vor, bei
+denen Reservierungen aktiviert sind; für andere Ressourcen gilt die Zeitzone des Servers. Siehe
 [Uhrzeit und Zeitzone](attractap/reader-ui.md#uhrzeit-und-zeitzone).
 
 Die Zeiten sind Beginn und Ende der Buchung ohne Puffer. Die Texte folgen der Standardsprache der Installation.
@@ -187,7 +189,7 @@ Kartensitzung, kehrt der Reader zu den Texten oben zurück.
 
 - **Die eigene Buchung** (laufend oder beginnt im Fenster für frühes Einchecken): Die Liste zeigt „Deine Buchung bis
   16:00“ („Für dich bis Mi 16:00“, wenn sie an einem anderen Tag endet), die Details „Deine Buchung 14:00-16:00“,
-  solange der Check-in noch offen ist mit „(Check-in bis 14:15)“.
+  bei noch offenem Check-in mit dem Zusatz „(Check-in bis 14:15)“.
 - **Wer den Namen der buchenden Person sehen darf** (Verwaltende der Ressource und alle anderen, die sehen dürfen, wer
   die Maschine nutzt, siehe [Wer den Namen der buchenden Person sieht](#wer-den-namen-der-buchenden-person-sieht)),
   sieht ihn auch in den Details („Reserviert von Alex 14:00-16:00“, „Reserviert von Alex 14:00-16:00 (Check-in bis

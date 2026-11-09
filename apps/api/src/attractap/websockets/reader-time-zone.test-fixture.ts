@@ -7,6 +7,7 @@ export function readerTimeZoneStub() {
     cachedZone: () => null,
     readerUtcOffsetMinutes: (_readerId: number | undefined, at: Date = new Date()) => processOffsetMinutes(at),
     serverTimeFor: (_readerId: number | undefined, now: Date = new Date()) => readerServerTime(now),
+    forget: () => undefined,
     resolvedServerTimeFor: async (_readerId: number, now: Date = new Date()) => readerServerTime(now),
   };
 }

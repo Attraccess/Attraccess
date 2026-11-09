@@ -26,9 +26,9 @@ function formatterFor(zone: string): Intl.DateTimeFormat {
   return formatter;
 }
 
-/** True for a name `Intl` knows as an IANA zone. */
+/** True for a name `Intl` knows as an IANA zone. Node also takes offsets such as `+23:59`; those are no zones. */
 export function isValidTimeZone(zone: unknown): zone is string {
-  if (typeof zone !== 'string' || zone.trim() === '' || zone.length > 64) return false;
+  if (typeof zone !== 'string' || zone.trim() === '' || zone.length > 64 || /^[+-]/.test(zone)) return false;
   try {
     formatterFor(zone);
     return true;

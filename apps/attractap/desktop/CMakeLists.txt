@@ -250,11 +250,12 @@ target_link_libraries(attractap-reader-workflow-tests PRIVATE attractap-desktop-
 target_compile_options(attractap-reader-workflow-tests PRIVATE -Wall -Wextra -Wpedantic -UNDEBUG)
 add_test(NAME attractap-reader-workflow-tests COMMAND attractap-reader-workflow-tests)
 add_test(NAME attractap-reader-ui-tests COMMAND attractap-reader-workflow-tests --ui)
+add_test(NAME attractap-reader-clock-journey-tests COMMAND attractap-reader-workflow-tests --with-clock)
 add_test(NAME attractap-ota-interrupt-enrollment COMMAND attractap-reader-workflow-tests --ota-enrollment)
 add_test(NAME attractap-ota-interrupt-reset COMMAND attractap-reader-workflow-tests --ota-reset)
 set_tests_properties(attractap-ota-interrupt-enrollment attractap-ota-interrupt-reset PROPERTIES TIMEOUT 20)
 # About 160 s on a developer machine; leave room for loaded CI runners.
-set_tests_properties(attractap-reader-workflow-tests PROPERTIES TIMEOUT 300)
+set_tests_properties(attractap-reader-workflow-tests attractap-reader-clock-journey-tests PROPERTIES TIMEOUT 300)
 
 # A reader without credentials: pairing channel, pending screen with and without QR, approval.
 add_executable(attractap-reader-pairing-tests tests/pairing/main.cpp)
@@ -273,6 +274,7 @@ set_property(TEST
     attractap-demo-protocol-tests
     attractap-desktop-display-tests
     attractap-reader-workflow-tests
+    attractap-reader-clock-journey-tests
     attractap-ota-interrupt-enrollment
     attractap-ota-interrupt-reset
     attractap-reader-timeout-tests

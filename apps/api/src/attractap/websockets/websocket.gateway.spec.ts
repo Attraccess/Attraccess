@@ -5,6 +5,7 @@ import { PAIRING_SUBPROTOCOL } from '../security/session-framing';
 import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
 import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
+import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
 describe('AttractapGateway', () => {
@@ -180,6 +181,19 @@ describe('AttractapGateway', () => {
       );
     });
 
+    it('forgets the reader time zone once its last socket is gone', async () => {
+      const forget = jest.spyOn(fixture.gateway['readerTimeZone'], 'forget');
+      const first = fixture.createMockSocket({ id: 'tz-1', readerId: 42 });
+      const second = fixture.createMockSocket({ id: 'tz-2', readerId: 42 });
+      fixture.websocketService.sockets.set('tz-1', first);
+      fixture.websocketService.sockets.set('tz-2', second);
+
+      await fixture.gateway.handleDisconnect(first);
+      expect(forget).not.toHaveBeenCalled();
+      await fixture.gateway.handleDisconnect(second);
+      expect(forget).toHaveBeenCalledWith(42);
+    });
+
     it('closes OTA file descriptor on disconnect if present', async () => {
       const socket = fixture.createMockSocket({
         id: 'disc-ota',
@@ -237,6 +251,28 @@ describe('AttractapGateway', () => {
           // JSON represents a UTC offset of -0 as 0.
           utcOffsetMinutes: -new Date('2026-10-10T12:32:00Z').getTimezoneOffset() || 0,
         });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('answers with the offset of the reader time zone', async () => {
+      jest.useFakeTimers({ now: new Date('2026-07-15T12:00:00Z'), doNotFake: ['nextTick', 'setImmediate'] });
+      try {
+        const zones = new ReaderTimeZoneService(
+          { providers: () => [{ plugin: 'p', provider: { getTimeZone: () => 'Asia/Tokyo' } }] } as never,
+          {} as never,
+          { findReaderById: async () => ({ id: 7, resources: [{ id: 1 }] }) } as never,
+          { sockets: new Map() } as never,
+        );
+        await zones.resolve(7);
+        (fixture.gateway as unknown as { readerTimeZone: unknown }).readerTimeZone = zones;
+        const socket = fixture.createMockSocket({ id: 'hb-zone', readerId: 7 });
+
+        await fixture.gateway.onHeartbeat(socket);
+
+        const reply = JSON.parse((socket as unknown as { send: jest.Mock }).send.mock.calls[0][0]);
+        expect(reply).toMatchObject({ event: 'HEARTBEAT', serverTime: { utcOffsetMinutes: 540 } });
       } finally {
         jest.useRealTimers();
       }

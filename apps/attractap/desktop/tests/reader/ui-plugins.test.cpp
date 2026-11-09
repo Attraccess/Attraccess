@@ -1,6 +1,7 @@
 #include "workflow.hpp"
 
 #include <set>
+#include "display/shared/screenChrome.hpp"
 #include "display/shared/wallClockText.hpp"
 #include "../controlled-clock.hpp"
 
@@ -351,6 +352,35 @@ void ReaderWorkflow::testFooterClockAndLockscreenStatus()
     };
     const auto footerVisible = [&] { return lv_obj_is_visible(footerPart("device footer")); };
     const auto nowClock = [] { return WallClockText::clock(WallClock::now()); };
+    // The clock lies inside the footer bar that clips it, within the band the screens keep free, and paints
+    // pixels there: a label sticking out of its bar is cut off and draws nothing. The pixels are what the frame
+    // gains from the clock (the background is textured). The capture is also the layout check, so the clock must
+    // not run into hint lines, keyboards or buttons either.
+    const auto redraw = [&] {
+        lv_obj_invalidate(lv_screen_active());
+        lv_obj_invalidate(lv_layer_top());
+        lv_refr_now(nullptr);
+    };
+    const auto expectClockPainted = [&](const char *name) {
+        display.capture(output, name);
+        lv_obj_t *clock = footerPart("footer clock");
+        lv_area_t box, bar;
+        lv_obj_get_coords(clock, &box);
+        lv_obj_get_coords(footerPart("device footer"), &bar);
+        assert(box.x1 >= bar.x1 && box.x2 <= bar.x2);
+        assert(box.y1 >= bar.y1 && box.y2 <= bar.y2);
+        assert(box.y1 >= 480 - ScreenChrome::Bottom);
+        const auto withClock = display.pixels;
+        lv_obj_add_flag(clock, LV_OBJ_FLAG_HIDDEN);
+        redraw();
+        const auto withoutClock = display.pixels;
+        lv_obj_remove_flag(clock, LV_OBJ_FLAG_HIDDEN);
+        redraw();
+        unsigned painted = 0;
+        for (int y = box.y1; y <= box.y2; ++y)
+            for (int x = box.x1; x <= box.x2; ++x) painted += withClock[y * 480 + x] != withoutClock[y * 480 + x];
+        assert(painted > 20);
+    };
 
     // Signed out, the list header already shows the big clock: no second clock in the footer.
     cardSessionId = "cs-20"; active = false; list(); login();
@@ -363,8 +393,10 @@ void ReaderWorkflow::testFooterClockAndLockscreenStatus()
     cardSessionId = "cs-20b"; list(); login(); pump();
     assert(lv_screen_active() == Display::resourceListScreen.getScreen());
     assert(footerClock() == nowClock() && footerClock().size() == 5 && footerClock()[2] == ':');
+    expectClockPainted("footer-clock-01-list");
     click("Lasercutter");
     assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen() && footerClock() == nowClock());
+    expectClockPainted("footer-clock-02-details");
     // Centred in the bar, and not on top of the device name or the firmware version.
     lv_area_t clockBox, bar;
     lv_obj_update_layout(footerPart("device footer"));
@@ -387,6 +419,7 @@ void ReaderWorkflow::testFooterClockAndLockscreenStatus()
     server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), STEP_A, "confirm", 1, 60000, "Reserviert bis 14:15"));
     pump();
     assert(label(lv_layer_top(), "Reserviert bis 14:15") && footerClock() == nowClock());
+    expectClockPainted("footer-clock-03-step");
     lv_obj_t *topLayer = lv_layer_top();
     assert(lv_obj_get_child(topLayer, lv_obj_get_child_count(topLayer) - 1) == lv_obj_get_parent(footerPart("footer clock")));
     server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), STEP_B, "confirm", 1, 60000, "Zweite Frage"));
@@ -399,11 +432,19 @@ void ReaderWorkflow::testFooterClockAndLockscreenStatus()
 
     // The clock moves with the time, once a minute, and sends nothing: no slot traffic comes from it.
     const auto messagesBefore = server.sent.size();
+    const auto minuteBefore = footerClock();
     TestClock::set(time(nullptr) + 120);
     pump(1200);
-    assert(footerClock() == nowClock());
-    assert(server.sent.size() == messagesBefore || server.count("UI_SLOT_UPDATE") == 0);
-    // Unknown time hides it.
+    assert(footerClock() == nowClock() && footerClock() != minuteBefore);
+    assert(server.sent.size() == messagesBefore);
+    // Unknown time hides it, and it returns with the time.
+    const auto knownUtc = time(nullptr);
+    TestClock::set(1700000000); // 2023: before any plausible network time
+    pump(1200);
+    assert(!WallClock::now().valid && footerClock().empty() && footerVisible());
+    TestClock::set(knownUtc);
+    pump(1200);
+    assert(WallClock::now().valid && footerClock() == nowClock());
     std::cout << "PASS a step over a screen keeps the footer clock visible and the clock sends nothing" << std::endl;
 
     // The keep/free question over the session summary shows the footer and its clock; the summary alone does not.
@@ -477,7 +518,11 @@ void ReaderWorkflow::testFooterClockAndLockscreenStatus()
     server.push("UI_SLOT_UPDATE", slotPayload(1, "resourceList.row.status", 3, R"({"t":"text","text":"Deine Buchung bis 16:00"})", "pub"), 43);
     pump();
     assert(label(lv_screen_active(), "Deine Buchung bis 16:00"));
+    // Signing out wipes the row statuses and tells the server, which sends the signed-out ones again. The server
+    // answers every READER_SESSION_ENDED, also when its own card-session timer ended the session first.
+    const auto sessionEndsBefore = server.count("READER_SESSION_ENDED");
     click("Abmelden");
+    assert(server.count("READER_SESSION_ENDED") == sessionEndsBefore + 1);
     list(false); pump();
     openLockscreen();
     assert(!label(lv_screen_active(), "Deine Buchung bis 16:00") && label(lv_screen_active(), "Verfügbar"));

@@ -4,6 +4,7 @@
 #include "theme.hpp"
 #include "shared/wallClockText.hpp"
 
+#include <algorithm>
 #include <new>
 #include <string>
 #include <utility>
@@ -17,6 +18,13 @@ void Display::initDeviceOverlay()
     lv_obj_remove_flag(top, LV_OBJ_FLAG_SCROLLABLE);
     // Keep the top layer passive; don't assign a layout directly
     lv_obj_add_flag(top, LV_OBJ_FLAG_IGNORE_LAYOUT);
+
+    // The clock's line is taller than the two outer labels. The bar clips its children, so it grows upwards by what
+    // sticks out above the row (the bottom padding takes what sticks out below): nothing of the clock is cut off,
+    // and it stays inside the bottom band the screens keep free (ScreenChrome::Bottom).
+    const int32_t rowHeight = std::max(lv_font_get_line_height(&attractap_font_montserrat_latin1_10),
+                                       lv_font_get_line_height(&lv_font_montserrat_10));
+    const int32_t clockOverhang = (lv_font_get_line_height(&attractap_font_montserrat_latin1_14) - rowHeight + 1) / 2;
 
     lv_obj_t *deviceInfoContainer = lv_obj_create(top);
     lv_obj_remove_style_all(deviceInfoContainer);
@@ -32,7 +40,7 @@ void Display::initDeviceOverlay()
     lv_obj_remove_flag(deviceInfoContainer, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_pad_left(deviceInfoContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_right(deviceInfoContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_pad_top(deviceInfoContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_pad_top(deviceInfoContainer, clockOverhang, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_pad_bottom(deviceInfoContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     Display::deviceNameLabel = lv_label_create(deviceInfoContainer);
@@ -54,7 +62,9 @@ void Display::initDeviceOverlay()
     lv_obj_add_flag(Display::footerClockLabel, LV_OBJ_FLAG_HIDDEN);
     lv_obj_set_width(Display::footerClockLabel, LV_SIZE_CONTENT);
     lv_obj_set_height(Display::footerClockLabel, LV_SIZE_CONTENT);
-    lv_obj_align(Display::footerClockLabel, LV_ALIGN_BOTTOM_MID, 0, -8);
+    // Centred on the row of the device name and the firmware version: the clock's line is taller than theirs and
+    // sticks out by the same amount above and below the row.
+    lv_obj_align(Display::footerClockLabel, LV_ALIGN_BOTTOM_MID, 0, clockOverhang);
     FirmwareI18n::setDynamicLabel(Display::footerClockLabel, "00:00") /* i18n-data: Numeric wall-clock time placeholder. */;
     lv_obj_set_style_text_color(Display::footerClockLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(Display::footerClockLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -114,12 +124,12 @@ void Display::updateFooter()
     lv_obj_t *footer = lv_obj_get_parent(Display::deviceNameLabel);
     const bool stepOpen = Display::stepModal.isOpen();
     lv_obj_set_flag(footer, LV_OBJ_FLAG_HIDDEN, Display::activeScreen == &Display::sessionSummaryScreen && !stepOpen);
-    // The step overlay is created on the same layer after the footer: bring the footer back on top of it.
+    // The step overlay is created on the same layer after the footer: bring the footer back on top of it. Judged by
+    // the order on the layer, so a new overlay that reuses the address of the previous one is not missed.
     lv_obj_t *overlay = stepOpen ? Display::stepModal.root() : nullptr;
-    if (overlay != Display::footerRaisedFor)
+    if (overlay && lv_obj_get_index(overlay) > lv_obj_get_index(footer))
     {
-        Display::footerRaisedFor = overlay;
-        if (overlay) lv_obj_move_foreground(footer);
+        lv_obj_move_foreground(footer);
     }
 
     const auto now = WallClock::now();

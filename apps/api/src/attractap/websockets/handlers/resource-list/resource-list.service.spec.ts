@@ -294,14 +294,14 @@ describe('ResourceListService', () => {
                     id: 99,
                     user: { username: 'active-user' },
                     startTime: startTime.toISOString(),
-                    startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset(),
+                    startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset() || 0,
                   },
                   activeUsageSessions: [
                     {
                       id: 99,
                       user: { username: 'active-user' },
                       startTime: startTime.toISOString(),
-                      startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset(),
+                      startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset() || 0,
                     },
                   ],
                   flowButtons: [{ id: 'node-1', label: 'Start' }],
@@ -395,8 +395,8 @@ describe('ResourceListService', () => {
 
       const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
       const session = (sent.data.payload as any).resources[0].activeUsageSession;
-      // Offset is the inverse of getTimezoneOffset() for that exact instant (DST-correct).
-      expect(session.startTimeUtcOffsetMinutes).toBe(-summer.getTimezoneOffset());
+      // Offset is the inverse of getTimezoneOffset() for that exact instant (DST-correct); `|| 0` drops -0 at UTC.
+      expect(session.startTimeUtcOffsetMinutes).toBe(-summer.getTimezoneOffset() || 0);
     });
 
     it("uses the reader's time zone for the session start, whatever the API process zone is", async () => {

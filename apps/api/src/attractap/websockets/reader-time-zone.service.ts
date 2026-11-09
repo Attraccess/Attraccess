@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
-import { ReaderUpdatedEvent } from '../events';
+import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
 import { AttractapService } from '../attractap.service';
 import { ReaderUiAlertsService } from '../../plugin-system/reader-ui/reader-ui-alerts.service';
 import {
@@ -28,8 +28,11 @@ export class ReaderTimeZoneService {
   private readonly zones = new Map<number, string | null>();
   /** Offset last sent to the reader, so a change is pushed at once and only once. */
   private readonly sentOffsets = new Map<number, number>();
-  /** `readerId|zoneA|zoneB` conflicts already reported. */
+  /** `readerId|zoneA|zoneB` conflicts already reported; a reader's keys go when its plugins agree again. */
   private readonly reportedConflicts = new Set<string>();
+  /** Newest resolve per reader, so a slow older answer cannot overwrite a newer one. */
+  private readonly latestResolve = new Map<number, number>();
+  private resolveCounter = 0;
 
   constructor(
     private readonly registry: ReaderUiRegistry,
@@ -64,10 +67,25 @@ export class ReaderTimeZoneService {
   /**
    * Asks the plugins of the reader's resources. The first valid zone in host order wins; invalid names are
    * ignored; a timeout or error is no opinion, and when nothing answered in time the cached zone stays.
+   * Never throws: authentication waits for this, so a failure falls back to the cached zone.
    */
   async resolve(readerId: number, resourceIds?: number[]): Promise<string | null> {
+    try {
+      return await this.resolveZone(readerId, resourceIds);
+    } catch (error) {
+      this.logger.warn(`Could not resolve the time zone of reader ${readerId}: ${(error as Error).message}`);
+      return this.cachedZone(readerId);
+    }
+  }
+
+  private async resolveZone(readerId: number, resourceIds?: number[]): Promise<string | null> {
+    const ticket = ++this.resolveCounter;
+    this.latestResolve.set(readerId, ticket);
     const providers = this.registry.providers().filter(({ provider }) => typeof provider.getTimeZone === 'function');
-    if (providers.length === 0) return this.store(readerId, null);
+    if (providers.length === 0) {
+      this.clearConflicts(readerId);
+      return this.store(readerId, null);
+    }
     const ids =
       resourceIds ?? (await this.attractapService.findReaderById(readerId))?.resources?.map((r) => r.id) ?? [];
     const calls = ids.flatMap((resourceId) =>
@@ -91,17 +109,26 @@ export class ReaderTimeZoneService {
         }
       }),
     );
+    // A newer resolve started while this one waited: its answer decides, this one is dropped.
+    if (this.latestResolve.get(readerId) !== ticket) return this.cachedZone(readerId);
     const zones = answers.flatMap(({ plugin, answer }) =>
       answer.kind === 'zone' ? [{ plugin, zone: answer.zone }] : [],
     );
+    const timedOut = answers.some(({ answer }) => answer.kind === 'timeout');
     if (zones.length === 0) {
-      return answers.some(({ answer }) => answer.kind === 'timeout')
-        ? this.cachedZone(readerId)
-        : this.store(readerId, null);
+      if (timedOut) return this.cachedZone(readerId);
+      this.clearConflicts(readerId);
+      return this.store(readerId, null);
     }
+    // A higher-ranked provider that timed out may hold the real zone: keep what is cached instead of
+    // flipping to a lower-ranked answer.
+    const firstZone = answers.findIndex(({ answer }) => answer.kind === 'zone');
+    const cached = this.cachedZone(readerId);
+    if (cached !== null && answers.slice(0, firstZone).some(({ answer }) => answer.kind === 'timeout')) return cached;
     const winner = zones[0];
     const other = zones.find(({ zone }) => zone !== winner.zone);
     if (other) this.reportConflict(readerId, winner, other);
+    else if (!timedOut) this.clearConflicts(readerId);
     return this.store(readerId, winner.zone);
   }
 
@@ -124,9 +151,18 @@ export class ReaderTimeZoneService {
     );
   }
 
-  /** Drops what is remembered about a reader that went away. */
+  /** A deleted reader leaves nothing behind. */
+  @OnEvent(ReaderDeletedEvent.EVENT_NAME)
+  onReaderDeleted(event: ReaderDeletedEvent): void {
+    this.forget(event.readerId);
+  }
+
+  /** Drops what is remembered about a reader that went away; a resolve still in flight is dropped too. */
   forget(readerId: number): void {
+    this.zones.delete(readerId);
     this.sentOffsets.delete(readerId);
+    this.latestResolve.delete(readerId);
+    this.clearConflicts(readerId);
   }
 
   private async readerHasResource(readerId: number, resourceId: number): Promise<boolean> {
@@ -153,6 +189,11 @@ export class ReaderTimeZoneService {
   private store(readerId: number, zone: string | null): string | null {
     this.zones.set(readerId, zone);
     return zone;
+  }
+
+  private clearConflicts(readerId: number): void {
+    const prefix = `${readerId}|`;
+    for (const key of this.reportedConflicts) if (key.startsWith(prefix)) this.reportedConflicts.delete(key);
   }
 
   private reportConflict(

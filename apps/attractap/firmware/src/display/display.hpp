@@ -179,7 +179,6 @@ private:
     static void updateFooter();
     static lv_obj_t *footerClockLabel;
     static int64_t footerClockMinute;
-    static lv_obj_t *footerRaisedFor;
     static lv_obj_t *deviceNameLabel;
     static FirmwareI18n::Text deviceNameInitValue;
     static void setDeviceNameText(const FirmwareI18n::Text &deviceName);

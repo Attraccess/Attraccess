@@ -41,7 +41,7 @@ function AlertRow({ alert, readerName }: Readonly<{ alert: ReaderUiAlert; reader
   );
 }
 
-/** Open circuit-breaker, load-failure and crash-loop alerts; `readerId` narrows the list to one reader. */
+/** Open circuit-breaker, load-failure, crash-loop and time-zone-conflict alerts; `readerId` narrows the list to one reader. */
 export function ReaderUiAlerts({ readerId }: Readonly<{ readerId?: number }>) {
   const { t } = useTranslations({ en, de });
   const { data } = useReaderUiAlerts();

@@ -555,6 +555,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           { reader_id: String(readerId), reader_name: readerName ?? '' },
           0,
         );
+        this.readerTimeZone.forget(readerId);
       }
     } else {
       this.logger.log('An unidentified client disconnected.');

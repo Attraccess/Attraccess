@@ -55,7 +55,6 @@ FirmwareI18n::Text Display::deviceNameInitValue = FirmwareI18n::Text::literal("A
 lv_obj_t *Display::deviceNameLabel = NULL;
 lv_obj_t *Display::footerClockLabel = NULL;
 int64_t Display::footerClockMinute = -2;
-lv_obj_t *Display::footerRaisedFor = NULL;
 lv_obj_t *Display::networkQualityContainer = NULL;
 lv_obj_t *Display::networkQualityLabel = NULL;
 State::NetworkQuality Display::networkQualityOverlayValue = State::NETWORK_QUALITY_GOOD;

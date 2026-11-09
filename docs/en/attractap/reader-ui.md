@@ -19,8 +19,9 @@ all of this is called **Reader display**. Plugin developers find the technical c
   they sign out.
 - **The time:** a clock in the footer bar, between the device name and the firmware version, shows the current
   time as HH:MM on every screen except those that already show the big clock (the lock screen and the signed-out
-  list). It lets members relate "check in by 21:20" to now. A reader that does not know the time yet shows no
-  clock.
+  list). The session summary after a stop shows no footer, and so no clock, except while a plugin's question
+  (for example keep or free) is open over it. It lets members relate "check in by 21:20" to now. A reader that
+  does not know the time yet shows no clock.
 - **Confirmation before a start:** the reader shows the plugin's question, for example "This machine is reserved
   at 14:00. Start anyway?", with **Cancel** and **Start**. Cancelling, or waiting until the question disappears
   (after about a minute), starts nothing; the reader returns to the resource. On the web app the same question
@@ -40,10 +41,11 @@ all of this is called **Reader display**. Plugin developers find the technical c
 
 Readers show local time in 24-hour format. Each reader uses **one** time zone: the time zone of the plugin that
 writes times on its screen (the Reservations plugin's **Timezone** setting) when a plugin sets one, otherwise the
-server's own (`TZ`). So the clock and a text like "check in by 14:15" always agree, and so do the start times of
+server's own (`TZ`). The Reservations plugin proposes its zone only for resources that have reservations turned on;
+for all others the server's zone applies. So the clock and a text like "check in by 14:15" always agree, and so do the start times of
 sessions. If an admin changes the plugin's timezone, the readers switch at once; the offset also follows daylight
-saving time by itself. If two plugins ask for different zones on one reader, the reader uses the first plugin's
-and an alert **Plugins disagree on the reader time zone** tells admins (see [Alerts](#alerts)). Readers without a
+saving time by itself. If two plugins ask for different zones on one reader, the reader uses the first zone that was answered (the host
+asks for the reader's resources one after the other and, for each, the plugins in their order) and an alert **Plugins disagree on the reader time zone** tells admins (see [Alerts](#alerts)). Readers without a
 screen show no time.
 
 ## Which readers can show what
@@ -100,7 +102,7 @@ Reader display tab. Each alert says what is affected and what to do:
 | Plugin check keeps failing               | The plugin failed to check several starts in a row and is no longer asked. Starts follow "If the plugin's check fails" of each resource. | The plugin is asked again after 60 seconds; **Clear** asks it right away. If it keeps failing, check the plugin's log or disable the plugin. | when the plugin answers again          |
 | Plugin failed to load                    | The plugin could not be loaded. Its checks and confirmations are not applied; starts go ahead without them.                              | Check the plugin's error on the plugins page, then reload or reinstall it.                                                                   | when the plugin loads again            |
 | Reader keeps crashing                    | The reader restarted repeatedly. Plugin notes are paused on it and confirmations follow "Readers without a screen".                      | Wait, or **Clear** to turn notes back on right away. If it keeps crashing, update the reader's firmware or report the crash.                 | after 30 minutes without another crash |
-| Plugins disagree on the reader time zone | Two plugins want different time zones on one reader. It shows the first plugin's zone and ignores the other. The alert names both zones. | Set the same time zone in both plugins.                                                                                                      | when you clear it                      |
+| Plugins disagree on the reader time zone | Two plugins want different time zones on one reader. It shows the first answered zone and ignores the other.                             | Set the same time zone in both plugins.                                                                                                      | when you clear it                      |
 
 Clearing a plugin alert needs the permission to manage plugins, clearing a reader alert the permission to manage
 readers. Raising and clearing alerts is written to the audit log.

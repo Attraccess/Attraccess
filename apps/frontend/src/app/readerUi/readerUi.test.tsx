@@ -6,6 +6,8 @@ import { ReaderUiAlerts } from './ReaderUiAlerts';
 import { ReaderUiReaderPanel } from './ReaderUiReaderPanel';
 import { ResourceReaderUiSettings } from './ResourceReaderUiSettings';
 import { reasonLabel } from './readerUiLabels';
+import en from './en.json';
+import de from './de.json';
 
 const api = vi.hoisted(() => ({
   clear: vi.fn(),
@@ -106,6 +108,21 @@ describe('reader UI admin', () => {
     expect(screen.getByText(/alerts.description.crash-loop .*"reader":"Laser reader"/)).toBeInTheDocument();
     await userEvent.click(screen.getAllByText('alerts.clear')[0]);
     expect(api.clear).toHaveBeenCalledWith(1, expect.any(Object));
+  });
+
+  it('names the reader and the ignored plugin of a time zone conflict, and promises no zones the page does not show', () => {
+    api.alerts = [
+      { id: 4, kind: 'time-zone-conflict', message: 'a vs b', plugin: 'tz-plugin', readerId: 7, createdAt: '' },
+    ];
+    render(<ReaderUiAlerts />);
+    expect(
+      screen.getByText(/alerts.description.time-zone-conflict .*"plugin":"tz-plugin","reader":"Laser reader"/),
+    ).toBeInTheDocument();
+    const text = (file: { alerts: { description: Record<string, string> } }) =>
+      file.alerts.description['time-zone-conflict'];
+    expect(text(en)).not.toMatch(/alert text/i);
+    expect(text(de)).not.toMatch(/Text des Alarms/);
+    expect(Object.keys(en.alerts.description)).toEqual(Object.keys(de.alerts.description));
   });
 
   it('shows an error toast when clearing fails', async () => {

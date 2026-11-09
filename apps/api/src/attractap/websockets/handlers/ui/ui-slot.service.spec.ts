@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { READER_UI_SLOTS } from '@attraccess/plugins-backend-sdk';
 import { CardSessionService } from './card-session.service';
+import { AttractapUiHandler } from './ui.handler';
 import { isUiMessageSuperseded, UI_INVALIDATE_DEBOUNCE_MS, UiSlotService } from './ui-slot.service';
 import { lastSent, makeSocket } from './ui-test-helpers.test-fixture';
 
@@ -615,6 +616,35 @@ describe('UiSlotService', () => {
       'row@3:null',
       'row@4:Reserved until 16:00',
     ]);
+  });
+
+  it('sends the public row status again when the reader signs out after the server timer ended the card session', async () => {
+    const row = (text: string) => ({
+      slotId: READER_UI_SLOTS.RESOURCE_LIST_ROW_STATUS,
+      key: 'row',
+      tree: { t: 'text', text },
+    });
+    const { service, socket, cardSessions } = setup((ctx: any) => [
+      row(ctx.userId ? 'Your booking until 16:00' : 'Reserved until 16:00'),
+    ]);
+    await service.onFirmwareInfo(socket, TOUCH_UI);
+    jest.advanceTimersByTime(2100);
+    cardSessions.issue(socket, 7, 'en');
+    await jest.advanceTimersByTimeAsync(0);
+    // The server timer ends the card session first and the public row goes out.
+    cardSessions.end(socket, socket.state.cardSession.id, 'expired');
+    await jest.advanceTimersByTimeAsync(0);
+    expect(shapes(socket)).toEqual([
+      'row@1:Reserved until 16:00',
+      'row@2:Your booking until 16:00',
+      'row@3:null',
+      'row@4:Reserved until 16:00',
+    ]);
+    // Later the reader signs out and wipes its rows; no live card session is left, yet the rows come again.
+    Object.assign(new AttractapUiHandler(), { slots: service, cardSessions }).endCardSession(socket);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(shapes(socket).slice(4)).toEqual(['row@5:Reserved until 16:00']);
+    expect(socket.state.cardSession).toBeNull();
   });
 
   describe('UI_RENDER_REPORT', () => {

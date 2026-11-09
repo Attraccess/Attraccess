@@ -54,10 +54,7 @@ export class UiSlotService {
     private readonly settingsService: SettingsService,
   ) {
     cardSessions.onStarted((socket) => this.privacySync(socket));
-    cardSessions.onEnded((socket) => {
-      this.forgetSessionSlot(socket);
-      this.privacySync(socket);
-    });
+    cardSessions.onEnded((socket) => this.readerSignedOut(socket));
     alerts.onCleared((alert) => {
       if (alert.kind === 'crash-loop') this.syncReader(alert.readerId ?? undefined);
     });
@@ -167,6 +164,15 @@ export class UiSlotService {
     } finally {
       state.syncing = false;
     }
+  }
+
+  /**
+   * The reader signed out. Also called when no card session was live any more (the server timer ended it and
+   * already sent the public rows): the reader still wipes its row statuses on sign-out, so they go out again.
+   */
+  readerSignedOut(socket: AuthenticatedWebSocket): void {
+    this.forgetSessionSlot(socket);
+    this.privacySync(socket);
   }
 
   private privacySync(socket: AuthenticatedWebSocket): void {

@@ -5,7 +5,12 @@ import { makeSocket } from './ui-test-helpers.test-fixture';
 
 function setup() {
   const handler = new AttractapUiHandler() as any;
-  const slots = { onFirmwareInfo: jest.fn().mockResolvedValue(undefined), cleanup: jest.fn(), renderReport: jest.fn() };
+  const slots = {
+    onFirmwareInfo: jest.fn().mockResolvedValue(undefined),
+    cleanup: jest.fn(),
+    renderReport: jest.fn(),
+    readerSignedOut: jest.fn(),
+  };
   const steps = { discardAll: jest.fn(), handleResult: jest.fn() };
   const alerts = { touchCrash: jest.fn(), raise: jest.fn().mockResolvedValue({}) };
   const cardSessions = new CardSessionService();
@@ -88,6 +93,23 @@ describe('AttractapUiHandler crash-loop protection', () => {
     cardSessions.issue(socket, 7, 'en');
     handler.endCardSession(socket);
     expect(cardSessions.current(socket)).toBeNull();
+  });
+
+  it('resends the cleared rows when the reader signs out after the server timer expired its card session', () => {
+    jest.useFakeTimers();
+    try {
+      const { handler, slots, cardSessions } = setup();
+      const socket = makeSocket();
+      const session = cardSessions.issue(socket, 7, 'en');
+      jest.advanceTimersByTime(36_000);
+      expect(cardSessions.current(socket)).toBeNull();
+      handler.endCardSession(socket);
+      expect(slots.readerSignedOut).toHaveBeenCalledWith(socket);
+      // The reader ended it: the expired session cannot come back.
+      expect(cardSessions.resume(socket, session.id, 7)).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('discards steps and the card session on close', () => {
