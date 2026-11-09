@@ -535,10 +535,8 @@ export abstract class UsageLifecycle {
     user: User,
     dto: StartUsageSessionDto,
     supervisorUserId: number | null,
-    auditOrigin: NonNullable<StartSessionOptions['auditOrigin']>,
     prepared: Awaited<ReturnType<ResourceUsageService['prepareSessionStart']>>,
     newSession: ResourceUsage,
-    endedUsageIdToEmit: number | null,
     startedUsageIdToEmit: number | null,
     takeoverEndedUser: User | null,
   ): Promise<void>;
@@ -557,12 +555,10 @@ export abstract class UsageLifecycle {
     resourceId: number,
     user: User,
     dto: EndUsageSessionDto,
-    auditOrigin: NonNullable<EndSessionOptions['auditOrigin']>,
     updatedUsage: ResourceUsage,
     endedUsageIdToEmit: number | null,
     activeSession: ResourceUsage | null,
     skipNoteNotification: boolean,
-    triggeredByUserId?: number,
   ): Promise<void>;
 
   protected abstract handleDoorAction(

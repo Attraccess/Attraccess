@@ -21,14 +21,12 @@ export async function recordPairingEvent(
   details: Record<string, string | number>,
 ): Promise<void> {
   if (!readerId) return;
-  await audit
-    .recordAttractap({
-      action,
-      actorId: actor ? actor.userId : null,
-      authenticationMethod: actor ? actor.authenticationMethod : null,
-      apiTokenId: actor?.authenticationMethod === 'api-token' ? actor.apiTokenId : undefined,
-      subjectId: readerId,
-      details,
-    })
-    .catch(() => undefined);
+  await audit.recordAttractap({
+    action,
+    actorId: actor ? actor.userId : null,
+    authenticationMethod: actor ? actor.authenticationMethod : null,
+    apiTokenId: actor?.authenticationMethod === 'api-token' ? actor.apiTokenId : undefined,
+    subjectId: readerId,
+    details,
+  });
 }

@@ -71,6 +71,7 @@
 - **MQTT & IoT**
   - [Überblick](mqtt/overview.md)
   - [Server einrichten](mqtt/server-setup.md)
+  - [Nachrichten-Explorer](mqtt/message-explorer.md)
   - [Beispiele](mqtt/examples.md)
 
 - **Geräte**

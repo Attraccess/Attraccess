@@ -170,16 +170,14 @@ export class CardOperationsService {
     // (e.g. after a reset). Records for other UIDs stay; their key may be on another card.
     await this.pendingRepository.delete(pending.id);
     await this.pendingRepository.delete({ uid, kind: 'enroll' });
-    await this.audit
-      .recordAttractap({
-        action: 'card.linked',
-        actorId: auditPrincipal?.userId ?? pending.actorId ?? user.id,
-        authenticationMethod: auditPrincipal?.authenticationMethod ?? 'session',
-        ...(auditPrincipal?.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
-        subjectId: card.id,
-        details: { source },
-      })
-      .catch(() => undefined);
+    await this.audit.recordAttractap({
+      action: 'card.linked',
+      actorId: auditPrincipal?.userId ?? pending.actorId ?? user.id,
+      authenticationMethod: auditPrincipal?.authenticationMethod ?? 'session',
+      ...(auditPrincipal?.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
+      subjectId: card.id,
+      details: { source },
+    });
     card.key = keyHex;
     return card;
   }
@@ -328,16 +326,14 @@ export class CardOperationsService {
     // A reset card must not come back as someone's card from an older interrupted enrollment.
     await this.pendingRepository.delete({ uid, kind: 'enroll' });
     if (deleted.affected && auditPrincipal) {
-      await this.audit
-        .recordAttractap({
-          action: 'card.unlinked',
-          actorId: auditPrincipal.userId,
-          authenticationMethod: auditPrincipal.authenticationMethod,
-          ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
-          subjectId: cardId,
-          details: { readerId, source },
-        })
-        .catch(() => undefined);
+      await this.audit.recordAttractap({
+        action: 'card.unlinked',
+        actorId: auditPrincipal.userId,
+        authenticationMethod: auditPrincipal.authenticationMethod,
+        ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
+        subjectId: cardId,
+        details: { readerId, source },
+      });
     }
   }
 }

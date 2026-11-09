@@ -81,8 +81,6 @@ import { emitPluginSessionEnded } from '../events/plugin-usage-events';
 
 import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
 
-import { EndSessionOptions } from '../lifecycle/usage-lifecycle';
-
 import { UsageSessions } from './usage-sessions';
 
 export { EndSessionOptions, StartSessionOptions } from '../lifecycle/usage-lifecycle';
@@ -417,26 +415,11 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     resourceId: number,
     user: User,
     dto: EndUsageSessionDto,
-    auditOrigin: NonNullable<EndSessionOptions['auditOrigin']>,
     updatedUsage: ResourceUsage,
     endedUsageIdToEmit: number | null,
     activeSession: ResourceUsage | null,
     skipNoteNotification: boolean,
-    triggeredByUserId?: number,
   ): Promise<void> {
-    await this.audit
-      .recordResource({
-        action: 'usage_session.ended',
-        ...auditOrigin,
-        subjectId: resourceId,
-        details: {
-          usageId: updatedUsage.id,
-          usageUserId: updatedUsage.userId,
-          ...(triggeredByUserId === undefined ? {} : { triggeredByUserId }),
-        },
-      })
-      .catch(() => undefined);
-
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
     if (updatedUsage) emitPluginSessionEnded(this.pluginEvents, this.logger, updatedUsage, updatedUsage.endTime, 'ended');
 

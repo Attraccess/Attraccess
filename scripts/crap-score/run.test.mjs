@@ -507,3 +507,21 @@ test('every crap-score dependency is a same-project test target with its own cov
     }
   }
 });
+
+test('coverage restored from another checkout by the shared Nx cache is re-anchored at this workspace', () => {
+  const dir = mkdtempSync(path.join(workspace, '.crap-rebase-'));
+  try {
+    const file = path.relative(workspace, path.join(dir, 'a.ts'));
+    const absolute = path.resolve(workspace, file);
+    writeFileSync(absolute, 'export const a = (x: number) => (x > 1 ? 1 : 2);\n');
+    const measured = structuredClone(completeCoverage([file], [])[absolute].toJSON());
+    measured.f[Object.keys(measured.f)[0]] = 4;
+    const foreign = path.join(path.sep, 'elsewhere', 'checkout', file);
+    const result = completeCoverage([file], [{ [foreign]: { ...measured, path: foreign } }]);
+    assert.deepEqual(Object.keys(result), [absolute]);
+    assert.equal(result[absolute].path, absolute);
+    assert.deepEqual(Object.values(result[absolute].f), [4]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

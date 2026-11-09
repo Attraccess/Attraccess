@@ -14,7 +14,7 @@ Attraccess includes built-in monitoring support using **Prometheus** for metrics
 | **Maintenance** | Maintenance events, overdue maintenance alerts |
 | **Attractap Devices** | Connected RFID readers, tap events, firmware updates |
 | **Billing** | Transaction counts and amounts |
-| **Infrastructure** | MQTT server health, WebSocket connections, email delivery, plugin status |
+| **Infrastructure** | MQTT server health, WebSocket connections, email delivery, plugin status, dropped audit records |
 | **Node.js Runtime** | CPU usage, memory (heap/RSS), event loop lag |
 
 ## How It Works

@@ -202,9 +202,26 @@ export function repairStatementLocations(measured, original) {
 
 const { createCoverageMap } = istanbulCoverage;
 
+// Nx's cache is shared between checkouts and worktrees, and a cache hit restores
+// coverage written there: its file keys are absolute paths of the checkout that
+// ran the tests. Re-anchor each one at this workspace, or the scorer would see
+// no coverage for any of the project's files.
+export function rebaseCoverage(report, files) {
+  const sources = files.map((file) => file.split(path.sep).join('/')).sort((a, b) => b.length - a.length);
+  const rebased = {};
+  for (const [key, entry] of Object.entries(report.toJSON?.() ?? report)) {
+    const data = entry.toJSON?.() ?? entry;
+    const normalized = key.split(path.sep).join('/');
+    const relative = sources.find((source) => normalized === source || normalized.endsWith(`/${source}`));
+    const target = relative === undefined ? key : path.resolve(workspace, relative);
+    rebased[target] = data.path === undefined ? data : { ...data, path: target };
+  }
+  return rebased;
+}
+
 export function completeCoverage(files, reports) {
   const coverage = createCoverageMap({});
-  for (const report of reports) coverage.merge(report);
+  for (const report of reports) coverage.merge(rebaseCoverage(report, files));
   const wanted = new Set(files.map((file) => path.resolve(workspace, file)));
   coverage.filter((file) => wanted.has(file));
   for (const file of wanted) {

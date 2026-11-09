@@ -23,7 +23,11 @@ exactly their coverage directories, fails if one wrote none, and writes
 `coverage/crap/<project>/crap-report.json`, `summary.json` and `html/index.html`
 (the root project's directory is `@attraccess__source`). Nx hashes the
 dependencies' coverage files (`dependentTasksOutputFiles`) together with the
-scorer, so a changed test result, scorer or limit reruns the analysis. Every
+scorer, so a changed test result, scorer or limit reruns the analysis.
+Istanbul keys coverage by absolute path, and Nx's cache is shared between checkouts
+and worktrees, so a cache hit can restore coverage another checkout wrote. The adapter
+re-anchors those paths at the current workspace before scoring; without that, every
+cached file would read as 0% covered. Every
 function has an inclusive maximum score of **30**: exactly 30 passes, anything
 above fails the target and reports the project, source path, function, line,
 score, complexity and statement coverage. Reports are written before enforcement,

@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
+import { auditLabel } from './components/AuditLogPanels';
+import de from './de.json';
+import en from './en.json';
 
 // Allow query notifications to settle when the shared CI/dev host is busy.
 configure({ asyncUtilTimeout: 10000 });
@@ -425,4 +428,21 @@ it('reports an export failure and allows retry without downloading partial data'
   await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
   expect(await screen.findByText('Export failed. Please try again.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Export CSV' })).not.toBeDisabled();
+});
+
+it('labels the recorded details of MQTT explorer events in both languages', () => {
+  const translate = (strings: typeof en) => (key: string) =>
+    strings.fields[JSON.parse(key.slice('fields['.length, -1)) as keyof typeof strings.fields];
+  expect(['topic', 'size', 'qos', 'retain'].map((field) => auditLabel('fields', field, translate(en)))).toEqual([
+    'Topic',
+    'Size (bytes)',
+    'QoS',
+    'Retain',
+  ]);
+  expect(['topic', 'size', 'qos', 'retain'].map((field) => auditLabel('fields', field, translate(de)))).toEqual([
+    'Thema',
+    'Größe (Bytes)',
+    'QoS',
+    'Nachricht behalten (retain)',
+  ]);
 });

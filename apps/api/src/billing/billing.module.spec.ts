@@ -58,7 +58,7 @@ describe('BillingModule', () => {
           { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
           {
             provide: AuditService,
-            useValue: { recordBillingTransaction: jest.fn(), recordBillingTransactionAfterCommit: jest.fn() },
+            useValue: { recordBillingTransaction: jest.fn() },
           },
           { provide: EventEmitter2, useValue: { emit: jest.fn() } },
           { provide: SumUpService, useValue: {} },

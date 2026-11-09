@@ -15,6 +15,9 @@ import { useDetection } from './detection/detection';
 import { RabbitmqListBadge } from './users/RabbitmqListBadge';
 import { RabbitmqStatusPanel } from './detection/RabbitmqStatusPanel';
 import { RabbitmqUserPanel } from './users/RabbitmqUserPanel';
+import { RabbitmqConnectionsPanel } from './connections/RabbitmqConnectionsPanel';
+import { RabbitmqStatsPanel } from './stats/RabbitmqStatsPanel';
+import { useCapabilities } from './capabilities';
 
 // Host slot ids exposed by the MQTT UI. The SDK is vendor-agnostic and does not
 // export them, and the host owns them in apps/frontend (which a plugin cannot
@@ -29,21 +32,37 @@ interface MqttServerSlotContext {
   [key: string]: unknown;
 }
 
+// Data panels behind working management credentials. The live message explorer
+// is a core MQTT feature and lives outside this slot.
+function RabbitmqDataPanels({ mqttServerId, canManage }: { mqttServerId: number; canManage: boolean }) {
+  return (
+    <>
+      <RabbitmqConnectionsPanel mqttServerId={mqttServerId} canManage={canManage} />
+      <RabbitmqStatsPanel mqttServerId={mqttServerId} />
+    </>
+  );
+}
+
 // Everything the plugin contributes to the MQTT server detail view: the
-// connection-status panel (ATT-521) plus the user-management panel (ATT-522).
+// connection-status panel (ATT-521), users (ATT-522), connections (ATT-523),
+// and broker stats (ATT-524).
 // Returns null (no wrapper element) for non-RabbitMQ servers so the host
 // layout is unchanged unless a RabbitMQ broker is positively detected.
-function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
+export function RabbitmqDetailSlot({ mqttServerId }: { mqttServerId: number }) {
   const { result } = useDetection(mqttServerId);
+  const { canManage } = useCapabilities(result?.isRabbitMQ === true);
 
   if (!result?.isRabbitMQ) {
     return null;
   }
 
+  // Keyed by server: switching servers remounts every panel, so none of them
+  // ever shows the previous server's data.
   return (
-    <div className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
+    <div key={mqttServerId} className="rmq:flex rmq:flex-col rmq:gap-4 rmq:w-full">
       <RabbitmqStatusPanel mqttServerId={mqttServerId} />
-      <RabbitmqUserPanel mqttServerId={mqttServerId} />
+      <RabbitmqUserPanel mqttServerId={mqttServerId} canManage={canManage} />
+      {result.authOk && <RabbitmqDataPanels mqttServerId={mqttServerId} canManage={canManage} />}
     </div>
   );
 }

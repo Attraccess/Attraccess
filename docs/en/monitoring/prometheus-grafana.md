@@ -272,6 +272,19 @@ Things to know:
 - **Long reader lists** are capped at about 200 characters (`; +N more`) so the Pushover message stays under Pushover's 1,024-character limit and keeps its Silence and View links. Reader names are shortened to 40 characters and `<` and `>` are removed, because Pushover renders the message as HTML.
 - **Upgrades:** the former single `AttractapReaderCrashes` rule keeps its UID and is replaced in place, so the old wording does not survive. An existing Grafana silence on `AttractapReaderCrashes` therefore also mutes the new crash warning until it expires.
 
+## Audit alert
+
+`AuditRecordsDropped` is a critical Grafana alert. It fires as soon as `attraccess_audit_records_dropped_total` increased in the last 5 minutes, which means at least one audit record could not be stored, and clears about 5 minutes after the last drop. The change the record described still went through. The API log has one `Audit record dropped` line per drop with the domain, action, reason and the SQLite error code (never event details). The `reason` label tells you why:
+
+- `storage_error`: the insert failed; the SQLite code says why (for example `SQLITE_BUSY` when the database stayed locked for 5 seconds).
+- `queue_full`: more than 1,000 audit writes were waiting.
+- `storage_unavailable`: audit storage not available (startup failed or in-memory database).
+- `shutting_down`: the record arrived while the API was shutting down; expected during a restart.
+- `settings_unavailable`: the audit settings could not be read.
+- `invalid_event`: the event was rejected as invalid, which points to a bug.
+
+Under database contention, an audit write without a caller transaction can wait up to 5 seconds instead of losing the record, so logins, reader authentication and card linking can briefly slow down.
+
 ## Exposing Prometheus Externally (Optional)
 
 By default, Prometheus is only exposed internally (no `ports` mapping). If you need direct access for debugging:

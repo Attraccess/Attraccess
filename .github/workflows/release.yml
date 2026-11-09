@@ -92,12 +92,13 @@ jobs:
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
 
+      # Releases own the `latest` dist-tag (what the marketplace shows and installs). The base is the commit
+      # recorded on `latest`; a nightly `latest` counts as never released. The published version is the plugin's
+      # package.json version without its prerelease suffix.
       - name: Publish changed official plugin packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          git diff --name-only "$(git describe --tags --abbrev=0 "${RELEASE_VERSION}^" 2>/dev/null || git rev-list --max-parents=0 HEAD)" "$GITHUB_SHA" -- . ':(exclude).github/workflows/**' |
-            pnpm nx affected --target=publish --parallel=3 --stdin --exclude='*,!tag:type:plugin'
+        run: node apps/plugins/scripts/plugin-publish-plan.mjs --channel=latest
 
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml

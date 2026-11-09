@@ -41,12 +41,28 @@ const state = vi.hoisted(() => ({
     onDrop: (e: unknown) => void;
   },
   live: undefined as undefined | ((log: { type: string }) => void),
+  permissions: ['resources.update'] as string[],
+  mqttServers: [{ id: 1, name: 'Broker' }] as { id: number; name: string }[],
+  explorer: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
     useTranslations: () => ({ t: (key: string) => key, tExists: () => true }),
   }))()),
+}));
+vi.mock('../../../../hooks/useAuth', () => ({
+  useAuth: () => ({ hasPermission: (permission: string) => state.permissions.includes(permission) }),
+}));
+vi.mock('./mqttExplorer', () => ({
+  FlowMqttExplorer: (props: { isOpen: boolean; onClose: () => void; mqttNodes: unknown[] }) => {
+    state.explorer(props);
+    return props.isOpen ? (
+      <aside data-testid="mqtt-explorer">
+        <button onClick={props.onClose}>Close explorer</button>
+      </aside>
+    ) : null;
+  },
 }));
 vi.mock('@attraccess/ui', () => ({ useAppTheme: () => ({ resolvedTheme: 'light' }) }));
 vi.mock('../../../../stores/ptr.store', () => ({ usePtrStore: () => ({ setPullToRefreshIsEnabled: state.refresh }) }));
@@ -64,6 +80,9 @@ vi.mock('@attraccess/react-query-client', () => ({
     return { mutate: state.save };
   },
   useResourceFlowsServiceGetNodeSchemas: () => ({ data: undefined }),
+  useMqttServiceMqttServersGetAll: (_key: unknown, options?: { enabled?: boolean }) => ({
+    data: options?.enabled === false ? undefined : state.mqttServers,
+  }),
   useGlobalFlowsServiceGetGlobalFlowCanvas: () => ({ data: undefined, isFetching: false, isError: false }),
   useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
   useGlobalFlowsServiceSaveGlobalFlowCanvas: () => ({ mutate: vi.fn() }),
@@ -175,6 +194,9 @@ beforeEach(() => {
   };
   state.fetching = false;
   state.failed = false;
+  state.permissions = ['resources.update'];
+  state.mqttServers = [{ id: 1, name: 'Broker' }];
+  window.localStorage.clear();
   state.receive.mockImplementation((listener: typeof state.live) => {
     state.live = listener;
   });
@@ -393,4 +415,102 @@ it('shows loading and errors and routes import/export actions', () => {
   const error = new Error('Denied');
   act(() => state.options.onError(error));
   expect(state.error).toHaveBeenCalledWith(expect.objectContaining({ error }));
+});
+
+const explorerButton = () => screen.queryByRole('button', { name: 'actions.mqttExplorer' });
+
+it('toggles the MQTT explorer from the toolbar, beside the unchanged flow', () => {
+  show();
+  expect(explorerButton()).toHaveAttribute('aria-pressed', 'false');
+  expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+
+  fireEvent.click(explorerButton() as HTMLElement);
+  expect(screen.getByTestId('mqtt-explorer')).toBeTruthy();
+  expect(explorerButton()).toHaveAttribute('aria-pressed', 'true');
+  // Opening the explorer does not touch the flow.
+  expect(saveButton()).toBeDisabled();
+  expect(state.save).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByText('Close explorer'));
+  expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+  expect(explorerButton()).toHaveAttribute('aria-pressed', 'false');
+});
+
+it("hands the explorer only the MQTT nodes' server and topic, stable across canvas changes", () => {
+  state.original?.nodes.push({
+    id: 'mqtt',
+    type: 'output.mqtt.sendMessage',
+    position: { x: 0, y: 400 },
+    data: { serverId: 1, topic: 'lamp/set' },
+  });
+  show();
+  fireEvent.click(explorerButton() as HTMLElement);
+  const first = state.explorer.mock.lastCall?.[0] as { mqttNodes: unknown[]; onClose: () => void };
+  expect(first.mqttNodes).toEqual([{ serverId: 1, topic: 'lamp/set' }]);
+
+  // Dragging a node hands out new nodes, but the explorer's props keep their identity.
+  act(() =>
+    state.setNodes((previous) => previous.map((node) => ({ ...node, position: { x: node.position.x + 5, y: 0 } }))),
+  );
+  const moved = state.explorer.mock.lastCall?.[0] as typeof first;
+  expect(moved.mqttNodes).toBe(first.mqttNodes);
+  expect(moved.onClose).toBe(first.onClose);
+
+  act(() =>
+    state.setNodes((previous) =>
+      previous.map((node) => (node.id === 'mqtt' ? { ...node, data: { serverId: 1, topic: 'lamp/state' } } : node)),
+    ),
+  );
+  const retopiced = state.explorer.mock.lastCall?.[0] as typeof first;
+  expect(retopiced.mqttNodes).toEqual([{ serverId: 1, topic: 'lamp/state' }]);
+});
+
+it('looks like its toolbar neighbours while closed and stands out while open', () => {
+  show();
+  const importButton = screen.getByRole('button', { name: 'actions.import' });
+  expect(explorerButton()?.className).toBe(importButton.className);
+  fireEvent.click(explorerButton() as HTMLElement);
+  expect(explorerButton()?.className).not.toBe(importButton.className);
+});
+
+it('still toggles the explorer when browser storage is unavailable', () => {
+  const getItem = vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
+    throw new Error('SecurityError');
+  });
+  const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+    throw new Error('QuotaExceededError');
+  });
+  try {
+    show();
+    expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+    fireEvent.click(explorerButton() as HTMLElement);
+    expect(screen.getByTestId('mqtt-explorer')).toBeTruthy();
+    fireEvent.click(explorerButton() as HTMLElement);
+    expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+    expect(setItem).toHaveBeenCalled();
+  } finally {
+    getItem.mockRestore();
+    setItem.mockRestore();
+  }
+});
+
+it('remembers the explorer panel per browser', () => {
+  const first = show();
+  fireEvent.click(explorerButton() as HTMLElement);
+  first.unmount();
+  show();
+  expect(screen.getByTestId('mqtt-explorer')).toBeTruthy();
+});
+
+it('hides the MQTT explorer without the permission to edit resources', () => {
+  state.permissions = [];
+  show();
+  expect(explorerButton()).toBeNull();
+  expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+});
+
+it('hides the MQTT explorer while no MQTT server exists', () => {
+  state.mqttServers = [];
+  show();
+  expect(explorerButton()).toBeNull();
 });

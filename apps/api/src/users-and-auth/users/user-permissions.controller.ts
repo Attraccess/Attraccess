@@ -4,6 +4,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Logger,
   Optional,
   Param,
   ParseIntPipe,
@@ -33,6 +34,8 @@ export class UserPermissionsController {
     private readonly usersService: UsersService,
     @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
+
+  private readonly logger = new Logger(UserPermissionsController.name);
 
   @Get(':id/roles')
   @Auth('users.roles.manage')
@@ -82,29 +85,32 @@ export class UserPermissionsController {
     await this.record('user_role_removed', id, roleId, request);
   }
 
-  private record(
+  private async record(
     action: 'user_role_assigned' | 'user_role_removed',
     userId: number,
     roleId: number,
     request: AuthenticatedRequest,
   ): Promise<void> {
-    if (!this.identityAudit) return Promise.resolve();
-    return this.rbacService
-      .getRoleKey(roleId)
-      .then(async (roleKey) => {
-        if (!roleKey) return;
-        await this.identityAudit.record({
-          action,
-          operationId: randomUUID(),
-          outcome: 'succeeded',
-          actorId: request.user.id,
-          authenticationMethod: request.user.authenticationMethod ?? 'session',
-          apiTokenId: request.user.apiTokenId,
-          subjectId: userId,
-          details: { role: roleKey },
-          request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-        });
-      })
-      .catch(() => undefined);
+    if (!this.identityAudit) return;
+    let roleKey: string | null;
+    try {
+      roleKey = await this.rbacService.getRoleKey(roleId);
+    } catch {
+      // The role change is already applied; a failed label lookup must not turn it into an error response.
+      this.logger.warn(`Audit record not written: role lookup failed for action=${action}`);
+      return;
+    }
+    if (!roleKey) return;
+    await this.identityAudit.record({
+      action,
+      operationId: randomUUID(),
+      outcome: 'succeeded',
+      actorId: request.user.id,
+      authenticationMethod: request.user.authenticationMethod ?? 'session',
+      apiTokenId: request.user.apiTokenId,
+      subjectId: userId,
+      details: { role: roleKey },
+      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
+    });
   }
 }

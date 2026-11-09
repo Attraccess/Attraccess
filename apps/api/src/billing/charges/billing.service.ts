@@ -103,7 +103,7 @@ export class BillingService extends BillingLedger {
       amount: 0,
       status: BillingTransactionStatus.Pending,
     });
-    void this.auditService.recordBillingTransactionAfterCommit(
+    await this.auditService.recordBillingTransaction(
       {
         transactionId: transaction.id,
         userId: transaction.userId,
@@ -209,7 +209,7 @@ export class BillingService extends BillingLedger {
 
         transaction.amount = -totalCredits;
         transaction.status = BillingTransactionStatus.Completed;
-        void this.auditService.recordBillingTransactionAfterCommit(
+        await this.auditService.recordBillingTransaction(
           {
             transactionId: transaction.id,
             userId: transaction.userId,
@@ -227,7 +227,7 @@ export class BillingService extends BillingLedger {
           amount: -totalCredits,
           status: BillingTransactionStatus.Completed,
         } as Partial<BillingTransaction>);
-        void this.auditService.recordBillingTransactionAfterCommit(
+        await this.auditService.recordBillingTransaction(
           {
             transactionId: transaction.id,
             userId: transaction.userId,

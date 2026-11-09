@@ -2,6 +2,7 @@ import type { MqttServerConnectionConfig, PluginContext } from '@attraccess/plug
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { Controller, Get, Inject, Injectable, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import { RABBITMQ_VIEW_PERMISSION } from '../permissions';
 import { describeManagementError, managementApiBase, managementRequest } from '../management/transport';
 
 // Shared types for RabbitMQ detection (ATT-521).
@@ -213,7 +214,7 @@ export class RabbitmqDetectionService {
   }
 }
 
-@Auth('resources.update')
+@Auth(RABBITMQ_VIEW_PERMISSION)
 @Controller('rabbitmq')
 export class RabbitmqDetectionController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor

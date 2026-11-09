@@ -1,6 +1,8 @@
 import {
   BillingTransaction,
   BillingTransactionItem,
+  ResourceFlowEdge,
+  ResourceFlowNode,
   ResourceMeteringSession,
   User,
 } from '@attraccess/database-entities';
@@ -33,7 +35,7 @@ export function createFlowDefinedMeteringFixture() {
 
   let flows: { runFlow: jest.Mock; trackResourceActivity: jest.Mock };
 
-  let audit: { recordBillingTransactionAfterCommit: jest.Mock; recordResource: jest.Mock };
+  let audit: { recordBillingTransaction: jest.Mock; recordResource: jest.Mock };
 
   let liveNotifications: { notifyTransactionUpdate: jest.Mock };
 
@@ -54,6 +56,35 @@ export function createFlowDefinedMeteringFixture() {
   };
 
   const sessionOf = (usageId: number) => source.getRepository(ResourceMeteringSession).findOneByOrFail({ usageId });
+
+  async function seedMeter(startData: object = {}, collectData: object = { finalRetryDelaySeconds: 0 }) {
+    const nodes = source.getRepository(ResourceFlowNode);
+    await nodes.save([
+      { id: 'start', type: T.INPUT_METERING_START, resourceId: 1, data: { meterId: 1, ...startData } },
+      { id: 'ready', type: T.OUTPUT_METERING_READY, resourceId: 1, data: { meterId: 1 } },
+      { id: 'collect', type: T.INPUT_METERING_COLLECT, resourceId: 1, data: { meterId: 1, ...collectData } },
+      {
+        id: 'report',
+        type: T.OUTPUT_METERING_REPORT,
+        resourceId: 1,
+        data: { meterId: 1, value: '1' },
+      },
+    ]);
+    await source.getRepository(ResourceFlowEdge).save([
+      { id: 'e1', source: 'start', sourceHandle: 'output', target: 'ready', targetHandle: 'input', resourceId: 1 },
+      { id: 'e2', source: 'collect', sourceHandle: 'output', target: 'report', targetHandle: 'input', resourceId: 1 },
+    ]);
+  }
+
+  async function items(usageId: number) {
+    const transaction = await source.getRepository(BillingTransaction).findOneByOrFail({ resourceUsageId: usageId });
+    return {
+      transaction,
+      items: await source
+        .getRepository(BillingTransactionItem)
+        .find({ where: { billingTransactionId: transaction.id } }),
+    };
+  }
 
   const scope = {
     get directory() {
@@ -139,6 +170,12 @@ export function createFlowDefinedMeteringFixture() {
     },
     get sessionOf() {
       return sessionOf;
+    },
+    get seedMeter() {
+      return seedMeter;
+    },
+    get items() {
+      return items;
     },
     get schemas() {
       return schemas;

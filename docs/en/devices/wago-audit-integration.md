@@ -28,17 +28,25 @@ API-token IDs, plugin identity, operation UUID, outcome, subject and safe detail
 Historical identifiers have no cascading foreign keys: deleting a controller,
 principal, token or plugin does not delete its history. A database trigger rejects
 row updates; retention is the intentional deletion path. The host bridge
-overrides any caller-supplied plugin ID. It returns `unavailable` on missing
-providers, storage exceptions or a one-second provider deadline; it never serializes errors as fallback records.
-WAGO emits only the fixed warning `WAGO audit storage unavailable` in this case.
-Timed-out calls are not retried; a late provider response cannot change the domain result.
-Domain operations continue; this is explicitly best-effort capture, not a durable
-outbox or transactional audit guarantee. Calls during an active host transaction
-return `unavailable` rather than falsely acknowledging a savepoint that might roll
-back. Call at the committed operation boundary when transaction-scoped capture is
-required. The provider bounds outstanding writes and does not enqueue or retry
-rejected work. `:memory:` sources cannot support a separate durable connection and
-remain unavailable; persistence tests use isolated on-disk SQLite fixtures.
+overrides any caller-supplied plugin ID.
+
+Plugin calls carry no host transaction, so the row is not committed or rolled
+back together with the plugin's own change. Each call is written on the
+separate audit connection: writes are serialized, up to 1,000 can be queued,
+and each one waits up to 5 seconds for a busy SQLite lock instead of giving up.
+A write that is not stored returns `unavailable`, logs one
+`Audit record dropped` line in the API log and increments
+`attraccess_audit_records_dropped_total` (see the
+[audit alert](monitoring/prometheus-grafana.md#audit-alert)). Reasons are a
+storage error, a full queue, audit storage that is not available (startup failed
+or `:memory:` database), shutdown, unreadable audit settings or an invalid
+event. Writes already queued when shutdown starts are still stored, for up to 4 seconds. The bridge
+also returns `unavailable` when no provider is registered or the provider
+throws; it never serializes errors as fallback records. Disabled audit or a
+disabled plugin domain also returns `unavailable`, but is not counted as a drop.
+WAGO emits only the fixed warning `WAGO audit storage unavailable` for any `unavailable` receipt.
+Rejected writes are not retried and the receipt cannot change the domain result:
+domain operations continue. Persistence tests use isolated on-disk SQLite fixtures.
 Upgrade the host SDK before deploying a
 plugin expecting this bridge. Older contexts without `audit` remain supported.
 

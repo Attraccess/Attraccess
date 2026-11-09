@@ -16,6 +16,23 @@ Updates und Downgrades dürfen keine Abhängigkeiten verletzen. Beim Entfernen e
 
 Wenn eine Abhängigkeit nicht geladen werden kann, bleiben ihre abhängigen Plugins inaktiv. Öffne die Fehlerdetails unter **Einstellungen → Plugins**, repariere die Abhängigkeit oder versuche sie erneut zu laden und starte neu.
 
+## Release-Kanäle
+
+Offizielle Plugins werden auf npm unter diesen Dist-Tags veröffentlicht:
+
+| Tag      | Gesetzt von               | Inhalt                                                                                                                                      |
+| -------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `latest` | Attraccess-Releases       | Die mit einem Attraccess-Release veröffentlichte Plugin-Version. **Der Marktplatz zeigt und installiert diese Version.**                    |
+| `next`   | Nightly-Builds von `main` | Builds aus erfolgreichen, hardwaregeprüften `main`-Builds, z. B. `0.2.0-nightly.1180.1` (Plugin-Version, dann `-nightly.<Lauf>.<Versuch>`). |
+| `alpha`  | Niemand (veraltet)        | Eingefrorene Builds aus der Zeit vor den Release-Kanälen.                                                                                   |
+
+Um ein Nightly zu testen, öffne **Einstellungen → Plugins**, wähle beim installierten Plugin **Version verwalten** und trage `next` (oder eine bestimmte Nightly-Version) unter **Gewünschte Version oder Kanal** ein. Nightly-Versionen sind Vorabversionen und werden nie automatisch installiert.
+
+Sobald ein Plugin einmal released wurde, bietet der Marktplatz nur noch released Versionen an. Bis dahin gilt:
+
+- Bei WAGO, Shelly und RabbitMQ bleibt `latest` auf einem Nightly-Build (`0.1.0-nightly.925.2`, für Hosts `^1.9.0`), bis Attraccess 1.11.0 stabile Versionen veröffentlicht. Der aktuelle Plugin-Code benötigt Attraccess 1.11 oder neuer, daher bleibt `0.1.0-nightly.925.2` die Version für ältere Hosts.
+- npm setzt `latest` bei der ersten Veröffentlichung eines Pakets automatisch. Ein Plugin, das zuerst von einem Nightly veröffentlicht wird (wie Matter), hat deshalb bis zu seinem ersten Release ein Nightly als `latest`. Das Release behandelt ein Nightly-`latest` als „noch nie released" und veröffentlicht das Plugin.
+
 ## Plugin hochladen
 
 1. Oeffnen Sie **Einstellungen** in der Seitenleiste und waehlen Sie den Bereich **Plugins**

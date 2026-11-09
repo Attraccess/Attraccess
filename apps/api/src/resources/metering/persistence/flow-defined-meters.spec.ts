@@ -1,6 +1,4 @@
 import {
-  BillingTransaction,
-  BillingTransactionItem,
   BillingTransactionStatus,
   ResourceFlowEdge,
   ResourceFlowNode,
@@ -13,6 +11,8 @@ import {
 } from '@attraccess/database-entities';
 
 import { BadRequestException } from '@nestjs/common';
+
+import { EntityManager } from 'typeorm';
 
 import { rm } from 'node:fs/promises';
 
@@ -36,8 +36,6 @@ import { createUsageLifecycleFixture } from './fixtures/usage-lifecycle.test-fix
 
 import type { Handler } from './fixtures/report-handler.test-fixture';
 
-import { T } from './fixtures/node-types.test-fixture';
-
 // This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
 jest.setTimeout(30_000);
 
@@ -48,38 +46,7 @@ export type GenericMetersTestScope = ReturnType<typeof createGenericMetersFixtur
 export type UsageLifecycleTestScope = ReturnType<typeof createUsageLifecycleFixture>;
 
 describe('Flow-defined metering', () => {
-  async function seedMeter(startData: object = {}, collectData: object = { finalRetryDelaySeconds: 0 }) {
-    const nodes = scope.source.getRepository(ResourceFlowNode);
-    await nodes.save([
-      { id: 'start', type: T.INPUT_METERING_START, resourceId: 1, data: { meterId: 1, ...startData } },
-      { id: 'ready', type: T.OUTPUT_METERING_READY, resourceId: 1, data: { meterId: 1 } },
-      { id: 'collect', type: T.INPUT_METERING_COLLECT, resourceId: 1, data: { meterId: 1, ...collectData } },
-      {
-        id: 'report',
-        type: T.OUTPUT_METERING_REPORT,
-        resourceId: 1,
-        data: { meterId: 1, value: '1' },
-      },
-    ]);
-    await scope.source.getRepository(ResourceFlowEdge).save([
-      { id: 'e1', source: 'start', sourceHandle: 'output', target: 'ready', targetHandle: 'input', resourceId: 1 },
-      { id: 'e2', source: 'collect', sourceHandle: 'output', target: 'report', targetHandle: 'input', resourceId: 1 },
-    ]);
-  }
-
-  async function items(usageId: number) {
-    const transaction = await scope.source
-      .getRepository(BillingTransaction)
-      .findOneByOrFail({ resourceUsageId: usageId });
-    return {
-      transaction,
-      items: await scope.source
-        .getRepository(BillingTransactionItem)
-        .find({ where: { billingTransactionId: transaction.id } }),
-    };
-  }
-
-  const scope = Object.assign(createFlowDefinedMeteringFixture(), { seedMeter, items });
+  const scope = createFlowDefinedMeteringFixture();
 
   beforeEach(async () => {
     await resetTestFixture(scope);
@@ -776,7 +743,7 @@ describe('Flow-defined metering', () => {
           expect(reconciliationScope.parentScope.onCollect).not.toHaveBeenCalled();
           expect((await reconciliationScope.parentScope.correctionsOf(ended.id)).corrections).toEqual([]);
           expect(await reconciliationScope.parentScope.items(ended.id)).toEqual(before);
-          expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+          expect(reconciliationScope.parentScope.audit.recordBillingTransaction).not.toHaveBeenCalled();
           expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
         },
       );
@@ -809,7 +776,7 @@ describe('Flow-defined metering', () => {
         ]);
         expect(await reconciliationScope.parentScope.items(ended.id)).toEqual(before);
         expect((await reconciliationScope.parentScope.correctionsOf(ended.id)).corrections).toEqual([]);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).not.toHaveBeenCalled();
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
       });
 
@@ -841,8 +808,36 @@ describe('Flow-defined metering', () => {
         const ended = await reconciliationScope.endWithMissingFinal();
         const session = await reconciliationScope.parentScope.sessionOf(ended.id);
         const before = await reconciliationScope.parentScope.items(ended.id);
+        // Every manager a real transaction hands to its callback, on the main or the resource-lifecycle connection.
+        const transactionManagers: EntityManager[] = [];
+        const auditedInOpenTransaction: boolean[] = [];
+        const startTransaction = EntityManager.prototype.transaction;
+        const transactionSpy = jest.spyOn(EntityManager.prototype, 'transaction').mockImplementation(function (
+          this: EntityManager,
+          ...args: unknown[]
+        ) {
+          // The callback is the first or second argument (after an optional isolation level).
+          const wrapped = args.map((arg) =>
+            typeof arg === 'function'
+              ? (manager: EntityManager) => {
+                  transactionManagers.push(manager);
+                  return (arg as (manager: EntityManager) => Promise<unknown>)(manager);
+                }
+              : arg,
+          );
+          return (startTransaction as (...a: unknown[]) => Promise<unknown>).apply(this, wrapped);
+        } as never);
+        reconciliationScope.parentScope.audit.recordBillingTransaction.mockImplementation(
+          async (_event: unknown, manager?: EntityManager) => {
+            auditedInOpenTransaction.push(manager?.queryRunner?.isTransactionActive === true);
+          },
+        );
 
-        await reconciliationScope.parentScope.metering.retrySettlement(1, session.id, 1);
+        try {
+          await reconciliationScope.parentScope.metering.retrySettlement(1, session.id, 1);
+        } finally {
+          transactionSpy.mockRestore();
+        }
         expect(await reconciliationScope.parentScope.items(ended.id)).toEqual(before);
         const {
           original,
@@ -853,8 +848,8 @@ describe('Flow-defined metering', () => {
           expect.objectContaining({ amount: -45, status: 'completed', initiatorId: 1, resourceUsageId: null }),
         ]);
         expect(corrections[0].userId).toBe(original.userId);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).toHaveBeenCalledTimes(1);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).toHaveBeenCalledWith(
+        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).toHaveBeenCalledTimes(1);
+        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).toHaveBeenCalledWith(
           expect.objectContaining({
             transactionId: corrections[0].id,
             userId: original.userId,
@@ -864,6 +859,12 @@ describe('Flow-defined metering', () => {
           }),
           expect.anything(),
         );
+        // Written with the settlement transaction's own manager while that transaction is still open.
+
+        expect(transactionManagers).toContain(
+          reconciliationScope.parentScope.audit.recordBillingTransaction.mock.calls[0][1],
+        );
+        expect(auditedInOpenTransaction).toEqual([true]);
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).toHaveBeenCalledWith(
           corrections[0].id,
         );
@@ -950,7 +951,7 @@ describe('Flow-defined metering', () => {
         );
         expect((await reconciliationScope.parentScope.items(ended.id)).transaction.amount).toBe(0);
         expect((await reconciliationScope.parentScope.correctionsOf(ended.id)).corrections).toEqual([]);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransactionAfterCommit).not.toHaveBeenCalled();
+        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).not.toHaveBeenCalled();
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
       });
 
@@ -980,7 +981,4 @@ describe('Flow-defined metering', () => {
   });
 });
 
-export type FlowDefinedMeteringTestScope = ReturnType<typeof createFlowDefinedMeteringFixture> & {
-  seedMeter(startData?: object, collectData?: object): Promise<void>;
-  items(usageId: number): Promise<{ transaction: BillingTransaction; items: BillingTransactionItem[] }>;
-};
+export type FlowDefinedMeteringTestScope = ReturnType<typeof createFlowDefinedMeteringFixture>;

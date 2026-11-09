@@ -91,18 +91,16 @@ export class ResourceHealthService {
     }
 
     if (previousStatus !== input.status) {
-      await this.audit
-        .recordResource({
-          action: 'health.transition',
-          ...(input.auditOrigin ?? { actorId: null }),
-          subjectId: input.resourceId,
-          details: {
-            previousStatus: previousStatus ?? 'none',
-            status: input.status,
-            healthSource: input.source,
-          },
-        })
-        .catch(() => undefined);
+      await this.audit.recordResource({
+        action: 'health.transition',
+        ...(input.auditOrigin ?? { actorId: null }),
+        subjectId: input.resourceId,
+        details: {
+          previousStatus: previousStatus ?? 'none',
+          status: input.status,
+          healthSource: input.source,
+        },
+      });
       this.logger.log(
         `Resource ${input.resourceId} health changed (identifier="${identifier}"): ${
           previousStatus ?? 'none'

@@ -24,17 +24,15 @@ export class UiAuditService {
   constructor(private readonly audit: AuditService) {}
 
   record(action: UiAction, details: UiAuditDetails): Promise<void> {
-    return this.audit
-      .recordAttractap({
-        action,
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: details.readerId,
-        details: Object.fromEntries(Object.entries(details).filter(([, v]) => v !== undefined)) as Record<
-          string,
-          string | number | boolean
-        >,
-      })
-      .catch(() => undefined);
+    return this.audit.recordAttractap({
+      action,
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: details.readerId,
+      details: Object.fromEntries(Object.entries(details).filter(([, v]) => v !== undefined)) as Record<
+        string,
+        string | number | boolean
+      >,
+    });
   }
 }

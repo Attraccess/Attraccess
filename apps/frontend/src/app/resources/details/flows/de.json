@@ -10,7 +10,8 @@
     "variables": "Variablen",
     "logs": "Flow-Logs",
     "modePan": "Canvas verschieben",
-    "modeSelect": "Auswählen"
+    "modeSelect": "Auswählen",
+    "mqttExplorer": "MQTT-Explorer"
   },
   "export": {
     "success": {
