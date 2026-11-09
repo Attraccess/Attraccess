@@ -27,6 +27,8 @@ import { SqliteSessionStore } from './sqlite.session-store';
 import { ValkeySessionStore } from './valkey.session-store';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SSOService } from '../sso/sso.service';
+import { SessionPermissionSync } from '../sso/session-permission-sync';
+import { IdentityAuditService } from '../../../audit/identity-audit.service';
 
 jest.setTimeout(90000);
 const hash = { hashToken: (token: string) => `hashed:${token}` } as TokenHashService;
@@ -206,7 +208,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
             getCookieName: () => 'auth-session',
             clearAuthCookie: async () => undefined,
           } as unknown as CookieConfigService,
-          undefined,
+          { record: jest.fn() } as unknown as IdentityAuditService,
           {
             returnURL: async () => 'https://app.example/',
             prepare: async () => {
@@ -216,7 +218,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
               return { kind: 'redirect', redirectUrl: 'https://idp.example/logout' };
             },
           } as unknown as SsoLogoutService,
-          undefined,
+          { syncIfDue: async () => 'skipped' } as SessionPermissionSync,
           approvedOrigins,
         );
         const request = {
@@ -279,6 +281,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
           } as unknown as RbacService,
           { authenticate: async () => null } as unknown as ApiTokenService,
           {} as AuthAuditLogger,
+          { syncIfDue: async () => 'skipped' } as SessionPermissionSync,
         );
         const request = {
           headers: { authorization: 'Bearer original', origin: 'https://app.example' },
@@ -301,12 +304,12 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
             getCookieName: () => 'auth-session',
             clearAuthCookie: async () => undefined,
           } as unknown as CookieConfigService,
-          undefined,
+          { record: jest.fn() } as unknown as IdentityAuditService,
           {
             returnURL: async () => 'https://app.example/',
             prepare: async () => ({ kind: 'local_only' }),
           } as unknown as SsoLogoutService,
-          undefined,
+          { syncIfDue: async () => 'skipped' } as SessionPermissionSync,
           approvedOrigins,
         );
         if (kind === 'local') await controller.endSession(request, {} as Response);

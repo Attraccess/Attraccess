@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Optional, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Permission, Role } from '@attraccess/database-entities';
 import { Auth, AuthAny, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 export class RbacController {
   constructor(
     private readonly rbacService: RbacService,
-    @Optional() private readonly identityAudit?: IdentityAuditService,
+    private readonly identityAudit: IdentityAuditService,
   ) {}
 
   @Get('roles')
@@ -88,7 +88,7 @@ export class RbacController {
     role: Role,
     request: AuthenticatedRequest,
   ): Promise<void> {
-    return Promise.resolve(this.identityAudit?.record({
+    return Promise.resolve(this.identityAudit.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',

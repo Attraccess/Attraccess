@@ -33,6 +33,7 @@ export class SsoLogoutService {
     private readonly encryption: EncryptionService,
     private readonly oidc: OidcTokenVerifier,
     private readonly moduleRef: ModuleRef,
+    // optional: only picks a preferred frontend URL; falls back to settings.getUrl(), not a protection control
     @Optional() private readonly appConfig?: ConfigService,
   ) {}
 

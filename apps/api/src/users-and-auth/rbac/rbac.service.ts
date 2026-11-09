@@ -50,6 +50,7 @@ export class RbacService {
     @InjectRepository(RolePermission)
     protected readonly rolePermissionRepository: Repository<RolePermission>,
     protected readonly eventEmitter: EventEmitter2,
+    // optional: Valkey is an optional deployment component; the service works without a cache
     @Optional() @Inject(VALKEY_CLIENT) protected readonly valkeyClient: Redis | null,
   ) {}
 

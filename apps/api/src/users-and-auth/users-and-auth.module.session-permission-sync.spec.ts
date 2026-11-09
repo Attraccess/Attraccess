@@ -17,8 +17,8 @@ const findProvider = (token: unknown): ProviderDefinition | undefined =>
   );
 
 describe('UsersAndAuthModule SessionPermissionSync wiring', () => {
-  // SessionStrategy and AuthController inject SessionPermissionSync with @Optional(),
-  // so a missing or empty binding would silently disable session-time SSO re-sync.
+  // SessionStrategy and AuthController require SessionPermissionSync (no @Optional()),
+  // so a missing binding fails at startup instead of disabling session-time SSO re-sync.
   it('binds SessionPermissionSync to the generic re-sync service', () => {
     expect(findProvider(SessionPermissionSync)?.useExisting).toBe(SsoSessionPermissionSyncService);
   });

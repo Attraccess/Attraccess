@@ -519,7 +519,7 @@ export abstract class SsoProviderRoutes {
 
   protected abstract readonly cookieConfigService: CookieConfigService;
 
-  protected abstract readonly identityAudit?: IdentityAuditService;
+  protected abstract readonly identityAudit: IdentityAuditService;
 
   protected abstract readonly logger: Logger;
 
@@ -533,5 +533,5 @@ export abstract class SsoProviderRoutes {
 
   protected abstract recordSso(event: Parameters<SsoAuditService['record']>[0]): Promise<void>;
 
-  protected abstract readonly ssoAudit?: SsoAuditService;
+  protected abstract readonly ssoAudit: SsoAuditService;
 }

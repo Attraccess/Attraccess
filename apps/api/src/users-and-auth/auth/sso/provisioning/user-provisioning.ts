@@ -33,7 +33,7 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
 
     await this.cookieConfigService.setAuthCookie(response, sessionToken);
     if (providerId) {
-      await this.identityAudit?.record({
+      await this.identityAudit.record({
         action: 'sso_login',
         operationId: randomUUID(),
         outcome: 'succeeded',

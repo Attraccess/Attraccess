@@ -23,6 +23,7 @@ import { RbacService } from '../rbac/rbac.service';
 import { PasswordPolicyViolationException } from './password-policy.errors';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
 
 const policyRow = (overrides: Partial<PasswordPolicy> = {}): PasswordPolicy => ({
   id: 1,
@@ -64,6 +65,7 @@ describe('Register flow + password policy (integration)', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         UserRegistrationService,
         SignupDomainService,
         PasswordPolicyService,
@@ -173,6 +175,7 @@ describe('Register flow + password policy (integration)', () => {
     hibpCheck = jest.fn(async () => ({ pwned: true, count: 7, available: true }));
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         UserRegistrationService,
         SignupDomainService,
         PasswordPolicyService,

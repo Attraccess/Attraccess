@@ -17,6 +17,7 @@ describe('passkey ceremony origin', () => {
       {} as never,
       bruteForce as never,
       {} as never,
+      { record: jest.fn() } as never,
     );
     const result = await controller.authenticationOptions({ headers, ip: '127.0.0.1' } as Request);
     expect(result).toEqual({ options: { challenge: 'challenge' } });

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Optional, Param, ParseIntPipe, Patch, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Req, Res } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-sdk';
@@ -29,7 +29,7 @@ export class PasskeyController {
     private readonly cookieConfigService: CookieConfigService,
     private readonly bruteForce: BruteForceProtectionService,
     private readonly audit: AuthAuditLogger,
-    @Optional() private readonly identityAudit?: IdentityAuditService,
+    private readonly identityAudit: IdentityAuditService,
   ) {}
 
   @SessionAuth()
@@ -157,7 +157,7 @@ export class PasskeyController {
     action: 'passkey_created' | 'passkey_renamed' | 'passkey_deleted',
     request: AuthenticatedRequest,
   ): Promise<void> {
-    return Promise.resolve(this.identityAudit?.record({
+    return Promise.resolve(this.identityAudit.record({
       action,
       operationId: randomUUID(),
       outcome: 'succeeded',

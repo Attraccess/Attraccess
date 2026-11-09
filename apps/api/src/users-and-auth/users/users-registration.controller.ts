@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Optional, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
@@ -26,7 +26,7 @@ export class UsersRegistrationController {
     private readonly signupDomainService: SignupDomainService,
     private readonly registrationService: UserRegistrationService,
     private readonly passwordService: UserPasswordService,
-    @Optional() private readonly identityAudit?: IdentityAuditService,
+    private readonly identityAudit: IdentityAuditService,
   ) {}
 
   @Get('local-signup-domain-whitelist')
@@ -80,7 +80,7 @@ export class UsersRegistrationController {
     const acceptLanguage = req.headers['accept-language'];
     const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim() || undefined;
     const user = await this.registrationService.createOne(body, locale);
-    await this.identityAudit?.record({
+    await this.identityAudit.record({
       action: 'user_created',
       operationId: randomUUID(),
       outcome: 'succeeded',

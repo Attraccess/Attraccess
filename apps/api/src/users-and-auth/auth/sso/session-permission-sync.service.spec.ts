@@ -219,6 +219,26 @@ describe('SsoSessionPermissionSyncService', () => {
     expect(await service.syncIfDue(session(), 7)).toBe('revoked');
   });
 
+  it('keeps a role change when writing its audit record fails', async () => {
+    resyncer.resync.mockResolvedValue({ added: ['resource-manager'], removed: [], updated: [] });
+    audit.record.mockRejectedValue(new Error('audit store down'));
+    const current = session();
+
+    expect(await service.syncIfDue(current, 7)).toBe('updated');
+    expect(audit.record).toHaveBeenCalled();
+    expect(current.ssoContext).toEqual({ ...context(), lastSsoSyncAt: now });
+    expect(sessionService.revokeLogoutSession).not.toHaveBeenCalled();
+  });
+
+  it('still revokes an IdP-rejected session when writing its audit record fails', async () => {
+    resyncer.resync.mockRejectedValue(new SessionRejectedError('invalid_grant'));
+    audit.record.mockRejectedValue(new Error('audit store down'));
+
+    expect(await service.syncIfDue(session(), 7)).toBe('revoked');
+    expect(sessionService.revokeLogoutSession).toHaveBeenCalledWith('11');
+    expect(audit.record).toHaveBeenCalled();
+  });
+
   it('keeps the session and retries after a short backoff on a transient failure', async () => {
     resyncer.resync.mockRejectedValue(new Error('ECONNRESET'));
     const current = session();

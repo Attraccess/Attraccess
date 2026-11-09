@@ -8,7 +8,6 @@ import {
   Delete,
   Get,
   HttpCode,
-  Optional,
   Post,
   Req,
   Res,
@@ -33,10 +32,10 @@ export class AuthController {
   constructor(
     private readonly sessionService: SessionService,
     private readonly cookieConfigService: CookieConfigService,
-    @Optional() private readonly identityAudit?: IdentityAuditService,
-    @Optional() private readonly ssoLogout?: SsoLogoutService,
-    @Optional() private readonly ssoPermissionSync?: SessionPermissionSync,
-    @Optional() private readonly approvedOrigins?: ApprovedOriginsService,
+    private readonly identityAudit: IdentityAuditService,
+    private readonly ssoLogout: SsoLogoutService,
+    private readonly ssoPermissionSync: SessionPermissionSync,
+    private readonly approvedOrigins: ApprovedOriginsService,
   ) {}
 
   @Post('/session/local')
@@ -116,7 +115,7 @@ export class AuthController {
     const authSession = (request as SessionAuthenticatedRequest).authSession;
     if (
       authSession &&
-      (await this.ssoPermissionSync?.syncIfDue(authSession, request.user.id, { force: true })) === 'revoked'
+      (await this.ssoPermissionSync.syncIfDue(authSession, request.user.id, { force: true })) === 'revoked'
     ) {
       throw new UnauthorizedException('Session was ended by the identity provider');
     }
@@ -226,7 +225,7 @@ export class AuthController {
     };
     const logout = request.logout as unknown as (callback: (error?: Error) => void) => void;
     await new Promise<void>((resolve, reject) => logout.call(request, (error) => (error ? reject(error) : resolve())));
-    await this.identityAudit?.record({
+    await this.identityAudit.record({
       action: 'logout',
       operationId: randomUUID(),
       outcome: 'succeeded',

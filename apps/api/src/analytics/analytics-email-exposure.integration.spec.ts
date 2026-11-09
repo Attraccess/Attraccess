@@ -13,6 +13,7 @@ import { UsersService } from '../users-and-auth/users/users.service';
 import { UserPasswordService } from '../users-and-auth/users/user-password.service';
 import { BruteForceProtectionService } from '../users-and-auth/rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../users-and-auth/rate-limiting/auth-audit.logger';
+import { IdentityAuditService } from '../audit/identity-audit.service';
 
 // `User.email` is @Exclude()d globally. The analytics export responses expose it through explicit flat
 // fields only; this proves that, and that a regular user endpoint still never serializes it.
@@ -47,6 +48,7 @@ describe('email exposure (HTTP integration, with the global ClassSerializerInter
       controllers: [AnalyticsController, UsersAdminController],
       providers: [
         AnalyticsService,
+        { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         { provide: getRepositoryToken(ResourceUsage), useValue: { findAndCount: async () => [[usage], 1] } },
         { provide: getRepositoryToken(BillingTransaction), useValue: { findAndCount: async () => [[transaction], 1] } },
         { provide: ResourceOperatingAttributionService, useValue: {} },

@@ -7,6 +7,7 @@ import { BruteForceProtectionService } from '../rate-limiting/brute-force.servic
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { IdentityAuditService } from '../../audit/identity-audit.service';
 
 describe('UsersAdminController', () => {
   let controller: UsersAdminController;
@@ -16,6 +17,7 @@ describe('UsersAdminController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersAdminController],
       providers: [
+        { provide: IdentityAuditService, useValue: { record: jest.fn() } },
         {
           provide: UsersService,
           useValue: {
