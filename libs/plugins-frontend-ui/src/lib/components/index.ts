@@ -11,7 +11,7 @@ export * from './LabeledSwitch';
 export * from './loading-indicator';
 export * from './StandardDrawer';
 export * from './StatusAlert';
-export * from './StandardModal';
+export { StandardModal as StandardModalV2 } from './StandardModal';
 export * from './button';
 export * from './delete-confirmation-modal';
 export * from './page-header';
