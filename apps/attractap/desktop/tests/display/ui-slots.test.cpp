@@ -11,6 +11,7 @@
 #include "display/ui/ui_record.hpp"
 #include "display/ui/ui_slot_cache.hpp"
 #include "display/ui/ui_step_modal.hpp"
+#include "src/misc/lv_text_private.h"
 
 // ATT-1187: the reservation fixtures render readable on the production theme. The same JSON files drive the
 // server validator (Jest) and the firmware parser (host test), so what is drawn here is what plugins send.
@@ -117,6 +118,49 @@ void testReaderUiFixtures(SdlDisplay &display, const std::filesystem::path &scre
         lv_obj_delete(screen);
     }
     std::cout << "PASS reader UI fixtures render with readable contrast" << std::endl;
+}
+
+// ATT-1188: a plugin time or range ("14:25", "13:55-14:25") must never be cut across two lines. LVGL breaks after
+// ':' '-' ')' by default; lv_conf.h limits the break characters to spaces and commas. This walks LVGL's own line
+// breaking over the longest reservation texts, English and German, at the widths the slots can have.
+void testReaderUiTextWrapping()
+{
+    const char *texts[] = {
+        "Free until 13:55, then reserved by bea until 14:25",
+        "Frei bis 13:55, dann reserviert von Lukasz Simek bis Di 14:25",
+        "Reserved by bea 13:55-14:25 (check in by 14:10)",
+        "Reserviert von Lukasz Simek 13:55-14:25 (Check-in bis 14:10)",
+        "Deine Buchung Di 13:55-Di 14:25 (Check-in bis Di 14:10)",
+        "Reserved by Anna Mueller Tue 13:55-Tue 14:25",
+    };
+    const lv_font_t *fonts[] = {&attractap_font_montserrat_latin1_14, &attractap_font_montserrat_latin1_18};
+    for (const lv_font_t *font : fonts)
+        for (int32_t width = 200; width <= 440; width += 10)
+            for (const char *text : texts)
+            {
+                const uint32_t total = std::strlen(text);
+                uint32_t offset = 0;
+                while (offset < total)
+                {
+                    int32_t used = 0;
+                    const uint32_t line = lv_text_get_next_line(text + offset, total - offset, font, 0, width, &used, LV_TEXT_FLAG_NONE);
+                    assert(line > 0);
+                    const uint32_t end = offset + line;
+                    if (end < total)
+                    {
+                        // The break falls on a space, never inside a time or range, and never right before ')'.
+                        const char last = text[end - 1], next = text[end];
+                        const bool atSpace = last == ' ' || next == ' ';
+                        if (!atSpace) std::cerr << "mid-word break in '" << text << "' at " << end << " width " << width << "\n";
+                        assert(atSpace);
+                        assert(next != ')' && last != ':' && last != '-' && next != '-');
+                    }
+                    offset = end;
+                }
+            }
+    assert(!lv_text_is_break_char(':') && !lv_text_is_break_char('-') && !lv_text_is_break_char(')'));
+    assert(lv_text_is_break_char(' '));
+    std::cout << "PASS reader UI texts wrap at spaces, never inside a time or range" << std::endl;
 }
 
 void testReaderUiStepModal(SdlDisplay &display, const std::filesystem::path &screenshots)

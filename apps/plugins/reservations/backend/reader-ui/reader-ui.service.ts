@@ -129,7 +129,14 @@ export class ReaderUiService {
     // the most specific, so when it shows the subject booking the body stays silent; idle, the body carries it
     // (there is no header at all).
     if (subject !== sessionBooking) {
-      add(SLOT.RESOURCE_DETAILS_BODY, 'body', { t: 'text', text: state.body, style: 'body' }, state.body);
+      // One text node per clause: the reader wraps each on its own, so a time or the check-in note never dangles.
+      const lines = state.body.map((text): ReaderUiNode => ({ t: 'text', text, style: 'body' }));
+      add(
+        SLOT.RESOURCE_DETAILS_BODY,
+        'body',
+        lines.length === 1 ? lines[0] : { t: 'col', gap: 0, c: lines },
+        state.body.join(' '),
+      );
     }
     if (sessionBooking) {
       const next = sessionBooking;
@@ -208,19 +215,19 @@ export class ReaderUiService {
     clock: ReaderClock,
     holder: string | undefined,
     isOwn: boolean,
-  ): { row: string; body: string; tone: ReaderUiTone; boundary: number } {
+  ): { row: string; body: string[]; tone: ReaderUiTone; boundary: number } {
     const { startTime, endTime } = booking;
     const deadline = new Date(
       Math.min(startTime.getTime() + settings.checkInGraceMinutes * MINUTE_MS, endTime.getTime()),
     );
     const awaitingCheckIn = settings.checkInEnabled && !booking.checkedInAt && clock.now.getTime() < deadline.getTime();
-    const checkIn = awaitingCheckIn ? readerTexts.checkInSuffix(deadline, clock) : '';
+    const checkIn = awaitingCheckIn ? readerTexts.checkInLine(deadline, clock) : undefined;
     const boundary = awaitingCheckIn ? deadline.getTime() : isRunning ? endTime.getTime() : startTime.getTime();
 
     if (isOwn) {
       return {
         row: readerTexts.rowOwnUntil(endTime, clock),
-        body: readerTexts.own(startTime, endTime, clock) + checkIn,
+        body: [readerTexts.own(startTime, endTime, clock), ...(checkIn ? [checkIn] : [])],
         tone: 'primary',
         boundary,
       };
@@ -235,7 +242,7 @@ export class ReaderUiService {
     }
     return {
       row: awaitingCheckIn ? readerTexts.rowCheckInBy(deadline, clock) : readerTexts.rowReservedUntil(endTime, clock),
-      body: readerTexts.reserved(startTime, endTime, clock, holder) + checkIn,
+      body: [readerTexts.reserved(startTime, endTime, clock, holder), ...(checkIn ? [checkIn] : [])],
       tone: 'warning',
       boundary,
     };

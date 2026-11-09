@@ -1,4 +1,5 @@
 # Developing Plugins
+
 <!-- llms-description: Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration. -->
 
 Attraccess plugins extend the platform with new API endpoints, background
@@ -643,6 +644,15 @@ Reader fonts cover Latin-1. The host transliterates **before** counting bytes (`
 become `'` and `"`, dashes U+2010-2015 become `-`, `…` becomes `...`, thin and narrow spaces become a space,
 anything else becomes `?`). Dates from `Intl.DateTimeFormat` are covered. Preview your texts with the same rules
 so they fit the limits after transliteration.
+
+### Line breaks
+
+The reader wraps text only at spaces and commas, never after `:`, `-` or `)`, so a time ("14:25"), a range
+("13:55-14:25") and a closing parenthesis are never split across lines. A word longer than the line is still
+cut. The reader does not balance lines, though, and a newline in a text is replaced by a space. Write what
+belongs together as its own `text` node in a `col` (one clause per node, for example "Free until 13:55," and
+"then reserved by bea until 14:25"), so no single time or note is left alone on a line. At 18 px a text fits
+about 48 characters per line, at 14 px about 62.
 
 ### Privacy and language
 

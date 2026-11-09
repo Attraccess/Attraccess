@@ -1,4 +1,5 @@
 # Plugins entwickeln
+
 <!-- llms-description: Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks. -->
 
 Attraccess stellt SDKs für die Entwicklung eigener Plugins bereit. Sie können Frontend-Erweiterungen, Backend-Erweiterungen oder beides erstellen.
@@ -300,6 +301,16 @@ Die Reader-Schriften decken Latin-1 ab. Der Host transliteriert **vor** dem Zäh
 typografische Anführungszeichen werden `'` und `"`, Striche U+2010-2015 werden `-`, `…` wird `...`, schmale
 Leerzeichen werden ein Leerzeichen, alles andere wird `?`). Ausgaben von `Intl.DateTimeFormat` sind abgedeckt.
 Prüfen Sie Ihre Texte vorab mit denselben Regeln, damit sie auch nach der Transliteration in die Grenzen passen.
+
+### Zeilenumbrüche
+
+Der Reader bricht Text nur an Leerzeichen und Kommas um, nie nach `:`, `-` oder `)`. Eine Uhrzeit („14:25“),
+ein Zeitraum („13:55-14:25“) und eine schließende Klammer werden also nie auf zwei Zeilen verteilt. Ein Wort,
+das länger als die Zeile ist, wird weiterhin getrennt. Der Reader gleicht Zeilen nicht aus, und ein Zeilenumbruch
+im Text wird durch ein Leerzeichen ersetzt. Was zusammengehört, schreibst du als eigenen `text`-Knoten in einer
+`col` (eine Teilaussage pro Knoten, zum Beispiel „Frei bis 13:55,“ und „dann reserviert von bea bis 14:25“),
+damit keine einzelne Uhrzeit oder Notiz allein in einer Zeile steht. Bei 18 px passen etwa 48 Zeichen in eine
+Zeile, bei 14 px etwa 62.
 
 ### Datenschutz und Sprache
 

@@ -1,4 +1,5 @@
 # Reader display
+
 <!-- llms-description: How plugins show notes and prompts on Attractap reader screens, which readers support them, and the related admin settings and alerts. -->
 
 Plugins, for example a reservation plugin, can show short notes on the screen of Attractap readers, ask members
@@ -39,6 +40,10 @@ all of this is called **Reader display**. Plugin developers find the technical c
   Try again in a minute or ask the team. "Confirmation not possible" means the reader could not show the
   question at that moment; tap the card again.
 - **Reader offline:** while a reader has no connection to the server, nothing starts and plugin notes disappear.
+
+Long texts wrap at spaces only: a time such as "14:25" or a range such as "13:55-14:25" always stays on one line.
+Plugins put what belongs together on its own line, for example "Free until 13:55," above "then reserved by bea
+until 14:25", or the check-in note "(check in by 14:10)" under the booking.
 
 ## Time and time zone
 

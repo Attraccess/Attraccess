@@ -1,4 +1,5 @@
 # Reader-Anzeige
+
 <!-- llms-description: Wie Plugins Hinweise und Abfragen auf Attractap-Bildschirmen anzeigen, welche Leser das können, sowie Admin-Einstellungen und Alarme. -->
 
 Plugins, zum Beispiel ein Reservierungs-Plugin, können kurze Hinweise auf dem Bildschirm von Attractap-Readern
@@ -43,6 +44,10 @@ technischen Vertrag für Plugin-Entwickler finden Sie unter
   der Reader die Frage in diesem Moment nicht anzeigen konnte; halten Sie die Karte erneut an.
 - **Reader offline:** Solange ein Reader keine Verbindung zum Server hat, startet nichts, und Plugin-Hinweise
   verschwinden.
+
+Lange Texte werden nur an Leerzeichen umgebrochen: Eine Uhrzeit wie „14:25“ oder ein Zeitraum wie „13:55-14:25“
+bleibt immer in einer Zeile. Plugins setzen Zusammengehöriges in eine eigene Zeile, zum Beispiel „Frei bis 13:55,“
+über „dann reserviert von bea bis 14:25“ oder den Check-in-Hinweis „(Check-in bis 14:10)“ unter die Buchung.
 
 ## Uhrzeit und Zeitzone
 

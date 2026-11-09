@@ -37,7 +37,9 @@ describe('ReaderUiService', () => {
         : [];
   const get = (list: ReaderSlotContribution[], slotId: string) => list.find((c) => c.slotId === slotId);
   const row = (list: ReaderSlotContribution[]) => textOf(get(list, 'resourceList.row.status')?.tree as ReaderUiNode)[0];
-  const body = (list: ReaderSlotContribution[]) => textOf(get(list, 'resource.details.body')?.tree as ReaderUiNode)[0];
+  const bodyLines = (list: ReaderSlotContribution[]) =>
+    textOf(get(list, 'resource.details.body')?.tree as ReaderUiNode);
+  const body = (list: ReaderSlotContribution[]) => bodyLines(list).join(' ');
 
   /** Same rules as the host validator (apps/api reader-ui.validation), which a plugin cannot import. */
   const expectHostValid = (list: ReaderSlotContribution[]) => {
@@ -378,27 +380,27 @@ describe('ReaderUiService', () => {
       expect(get(session, 'resource.details.body')).toBeUndefined();
       // Signed out, the body carries it, once; also while somebody's usage runs (no session slot without a card).
       const out = await slots();
-      expect(detailTexts(out)).toEqual(['resource.details.body: Free until 12:40, then reserved until 14:00']);
+      expect(detailTexts(out)).toEqual(['resource.details.body: Free until 12:40, | then reserved until 14:00']);
       expect(detailTexts(await slots({ sessionActive: true }))).toEqual([
-        'resource.details.body: Free until 12:40, then reserved until 14:00',
+        'resource.details.body: Free until 12:40, | then reserved until 14:00',
       ]);
       // Idle after a card tap (the reader shows no session slot): the body carries it, once, named per the rule.
       const idle = await slots({ userId: MANAGER, sessionActive: false });
       expect(detailTexts(idle)).toEqual([
-        'resource.details.body: Free until 12:40, then reserved by user10 until 14:00',
+        'resource.details.body: Free until 12:40, | then reserved by user10 until 14:00',
       ]);
       expect(detailTexts(await slots({ userId: OTHER }))).toEqual([
-        'resource.details.body: Free until 12:40, then reserved until 14:00',
+        'resource.details.body: Free until 12:40, | then reserved until 14:00',
       ]);
       // Your own booking is the body; the other booking in the session slot is a different fact.
       await book(MANAGER, '2026-06-01T10:10:00', '2026-06-01T10:30:00'); // 12:10-12:30 local, your early window
       const own = await slots({ userId: MANAGER, sessionActive: true });
       expect(detailTexts(own)).toEqual([
-        'resource.details.body: Your booking 12:10-12:30 (check in by 12:25)',
+        'resource.details.body: Your booking 12:10-12:30 | (check in by 12:25)',
         'resource.details.session: Reserved by user10 12:40-14:00',
       ]);
       expect(detailTexts(await slots({ userId: MANAGER }))).toEqual([
-        'resource.details.body: Your booking 12:10-12:30 (check in by 12:25)',
+        'resource.details.body: Your booking 12:10-12:30 | (check in by 12:25)',
       ]);
     });
 
@@ -459,6 +461,53 @@ describe('ReaderUiService', () => {
       // Idle (no active usage) or a host that does not tell: the reader would not show the slot anyway.
       expect(get(await slots({ userId: OTHER }), 'resource.details.session')).toBeUndefined();
       expect(get(await slots({ userId: OTHER, sessionActive: false }), 'resource.details.session')).toBeUndefined();
+    });
+  });
+
+  describe('line breaks on the reader', () => {
+    // The reader wraps each text node at spaces only (a 408 px slot fits about 48 characters of the 18 px font).
+    // One node per clause keeps a time, a range and the check-in note together; nothing may rely on the wrap point.
+    const ONE_LINE = 48;
+    const lines = (list: ReaderSlotContribution[], slot = 'resource.details.body') =>
+      textOf(get(list, slot)?.tree as ReaderUiNode);
+
+    const expectKeptTogether = (list: ReaderSlotContribution[]) => {
+      for (const text of lines(list)) {
+        expect(text.length).toBeLessThanOrEqual(ONE_LINE);
+        // No clause ends or starts on a separator, and a range is never cut: it has no space around its hyphen.
+        expect(text).not.toMatch(/[:-]$|^[:-]|\s-|-\s/);
+      }
+    };
+
+    it('splits the idle text into two clauses, each on one line', async () => {
+      await book(HOLDER, '2026-06-01T11:55:00', '2026-06-01T12:25:00');
+      for (const language of ['en', 'de'] as const) {
+        const list = await slots({ userId: MANAGER, language });
+        expect(lines(list)).toHaveLength(2);
+        expect(lines(list)[0]).toMatch(/,$/);
+        expectKeptTogether(list);
+      }
+      expect(lines(await slots({ userId: MANAGER }))).toEqual([
+        'Free until 13:55,',
+        'then reserved by user10 until 14:25',
+      ]);
+    });
+
+    it('puts the check-in note on its own line, the booking range stays whole', async () => {
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      for (const language of ['en', 'de'] as const) {
+        const list = await slots({ userId: MANAGER, language });
+        const [booking, checkIn] = lines(list);
+        expect(booking).toMatch(/10:00-16:00$/);
+        expect(checkIn).toMatch(/^\(.*10:15\)$/);
+        expectKeptTogether(list);
+      }
+    });
+
+    it('keeps the longest names and weekday times on one line each', async () => {
+      await book(HOLDER, '2026-06-01T22:05:00', '2026-06-01T23:00:00'); // 00:05 tomorrow: weekday prefix
+      for (const language of ['en', 'de'] as const) expectKeptTogether(await slots({ userId: MANAGER, language }));
     });
   });
 

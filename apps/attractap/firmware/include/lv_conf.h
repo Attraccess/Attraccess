@@ -102,6 +102,15 @@
 #endif
 
 /*==================
+ *   TEXT WRAPPING
+ *===================*/
+
+/*Wrap only at spaces and commas. LVGL also breaks after ':' '-' ')' by default, which splits times and
+ *ranges ("14:" / "25", "13:55-" / "14:25") in plugin texts (ATT-1188). Words longer than a line still
+ *break by force.*/
+#define LV_TXT_BREAK_CHARS " ,"
+
+/*==================
  *   FONT USAGE
  *===================*/
 
