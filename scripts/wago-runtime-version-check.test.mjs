@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import { fixtureGitEnv } from './test-utils/git-env.mjs';
 import {
   checkRuntimeVersion,
+  failureTail,
   hashShippedRuntime,
   isBuildCandidate,
   isRuntimeSource,
@@ -144,6 +145,18 @@ const bundle = (modulePath = 'node_modules/.pnpm/mqtt@5.16.0/node_modules/mqtt/i
 test('normalizes esbuild module path comments only', () => {
   assert.equal(normalizeBundle(bundle()), 'run();\n// a comment with spaces stays\n');
   assert.equal(normalizeBundle('  // indented/path\nx();'), '  // indented/path\nx();');
+});
+
+test('keeps the actual error in a failed command tail, without colour codes, blanks and vite config warnings', () => {
+  const warning = [
+    "\x1b[33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`:",
+    '  - `__dirname` (vite.config.ts:24:9). Use `import.meta.dirname` instead',
+    'Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\x1b[39m',
+    '',
+  ].join('\n');
+  const output = `${warning.repeat(30)}\n\x1b[1m\x1b[31m NX \x1b[39m\x1b[22m ts.createProgram is not a function\n\n  Run duration: 3s\n`;
+  assert.equal(failureTail(output), ' NX  ts.createProgram is not a function\n  Run duration: 3s');
+  assert.equal(failureTail('a\nb\nc\nd', 2), 'c\nd');
 });
 
 const shipped = ({ main = bundle(), version = '0.2.0', extra = {}, dockerfile = 'FROM node' } = {}) => {

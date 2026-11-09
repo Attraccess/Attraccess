@@ -107,6 +107,20 @@ export function hashShippedRuntime(shipped) {
   return hash.digest('hex');
 }
 
+// Last lines of a failed command, without colour codes, blank lines and the noise Nx 24 plugins print while loading
+// vite configs, which would otherwise push the actual error out of the tail.
+const noise =
+  /Your Vite config uses features|VITE_CONFIG_NATIVE_IGNORE_WARNING|^\s+- .*\(\S+\.(?:ts|mjs|cjs):\d+:\d+\)/;
+
+export function failureTail(output, lines = 20) {
+  return output
+    .replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '')
+    .split('\n')
+    .filter((line) => line.trim() && !noise.test(line))
+    .slice(-lines)
+    .join('\n');
+}
+
 function run(command, args, cwd) {
   try {
     return execFileSync(command, args, {
@@ -117,7 +131,7 @@ function run(command, args, cwd) {
       env: { ...process.env, NX_NO_CLOUD: 'true', NX_DAEMON: 'false', CI: 'true' },
     });
   } catch (error) {
-    const output = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim().split('\n').slice(-20).join('\n');
+    const output = failureTail(`${error.stdout ?? ''}${error.stderr ?? ''}`);
     throw new Error(`${command} ${args.join(' ')} failed${output ? `:\n${output}` : `: ${error.message}`}`);
   }
 }
@@ -132,7 +146,18 @@ export function buildRuntimeAt(rev) {
     const manifest = JSON.parse(readFileSync(manifestFile, 'utf8'));
     writeFileSync(manifestFile, `${JSON.stringify({ ...manifest, runtimeVersion: placeholderVersion }, null, 2)}\n`);
     run('pnpm', ['install', '--frozen-lockfile'], checkout);
-    run('pnpm', ['nx', 'run', 'plugin-wago:build-cc100-runtime', '--skip-nx-cache'], checkout);
+    run(
+      'pnpm',
+      [
+        'nx',
+        'run',
+        'plugin-wago:build-cc100-runtime',
+        '--skip-nx-cache',
+        // Inline the failed task's log; the default only points at a cache file that does not exist in CI.
+        '--output-style=static',
+      ],
+      checkout,
+    );
     return readShippedRuntime(checkout);
   } finally {
     try {
