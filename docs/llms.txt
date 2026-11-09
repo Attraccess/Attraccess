@@ -79,6 +79,7 @@ The documentation pages are plain Markdown files. English pages live under https
 ## English: Devices
 - [MQTT](https://docs.attraccess.org/en/devices/mqtt/overview.md): Introduces MQTT and IoT: why use MQTT with Attraccess, how it works and how it integrates with flows.
 - [MQTT Server Setup](https://docs.attraccess.org/en/devices/mqtt/server-setup.md): How to add and test an MQTT broker connection in Attraccess, including common brokers, multiple servers and connection status.
+- [MQTT Message Explorer](https://docs.attraccess.org/en/devices/mqtt/message-explorer.md): How to watch live MQTT messages and publish test messages for any configured MQTT server, who may use the explorer and where to find it.
 - [MQTT Examples](https://docs.attraccess.org/en/devices/mqtt/examples.md): Practical MQTT examples: relay power control, receiving sensor data and using MQTT in flows for resource usage events.
 - [Guided WAGO CC100 Commissioning](https://docs.attraccess.org/en/devices/wago-cc100-commissioning.md): Guide to commission a WAGO CC100 controller in an on-premises, air-gapped installation, including MQTT claim and recovery.
 - [WAGO CC100 Docker Runtime](https://docs.attraccess.org/en/devices/wago-cc100-runtime.md): Configure the WAGO CC100 Docker runtime: terminals and live controls, MQTT server or SSH address changes, and deployment paths.
@@ -204,6 +205,7 @@ The documentation pages are plain Markdown files. English pages live under https
 ## Deutsch: MQTT & IoT
 - [Überblick](https://docs.attraccess.org/de/mqtt/overview.md): Stellt MQTT und IoT vor: Nutzen mit Attraccess, Funktionsweise und Integration in Flows.
 - [Server einrichten](https://docs.attraccess.org/de/mqtt/server-setup.md): So verbinden Sie Attraccess mit einem MQTT-Broker und testen die Verbindung, inklusive gängiger Broker und mehrerer Server.
+- [Nachrichten-Explorer](https://docs.attraccess.org/de/mqtt/message-explorer.md): Wie Sie MQTT-Nachrichten live ansehen und Testnachrichten für jeden eingerichteten MQTT-Server senden, wer den Explorer nutzen darf und wo Sie ihn finden.
 - [Beispiele](https://docs.attraccess.org/de/mqtt/examples.md): Praktische MQTT-Beispiele: Maschinensteuerung über Relais, Sensordaten empfangen und MQTT in Flows für Nutzungsereignisse.
 
 ## Deutsch: Geräte

@@ -1,4 +1,5 @@
 # MQTT-Nachrichten-Explorer
+<!-- llms-description: Wie Sie MQTT-Nachrichten live ansehen und Testnachrichten für jeden eingerichteten MQTT-Server senden, wer den Explorer nutzen darf und wo Sie ihn finden. -->
 
 Mit dem Nachrichten-Explorer sehen Sie MQTT-Nachrichten live und senden Testnachrichten für jeden in Attraccess eingerichteten MQTT-Server. Er funktioniert mit jedem Broker (Mosquitto, RabbitMQ, EMQX, ...). Nutzen Sie ihn, um Flows mit MQTT-Knoten zu testen und zu debuggen.
 

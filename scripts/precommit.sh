@@ -15,4 +15,6 @@ if [ ! -x /bin/bash ] || [ ! -x /usr/bin/tr ] || [ ! -x /usr/bin/awk ]; then
     exclude="$exclude,tag:host:fhs"
 fi
 
-pnpm nx affected --uncommitted --nxBail --targets=lint,typecheck,test,crap-score --exclude="$exclude"
+# Tests create temporary repositories; an inherited GIT_INDEX_FILE would make their git
+# commands overwrite this repository's real index. The staged checks above already ran.
+env -u GIT_INDEX_FILE pnpm nx affected --uncommitted --nxBail --targets=lint,typecheck,test,crap-score --exclude="$exclude"
