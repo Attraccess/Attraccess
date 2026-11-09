@@ -45,8 +45,8 @@ technischen Vertrag für Plugin-Entwickler finden Sie unter
 - **Reader offline:** Solange ein Reader keine Verbindung zum Server hat, startet nichts, und Plugin-Hinweise
   verschwinden.
 
-Lange Texte werden nur an Leerzeichen umgebrochen: Eine Uhrzeit wie „14:25“ oder ein Zeitraum wie „13:55-14:25“
-bleibt immer in einer Zeile. Plugins setzen Zusammengehöriges in eine eigene Zeile, zum Beispiel „Frei bis 13:55,“
+Lange Texte werden an Leerzeichen, Kommas und Bindestrichen umgebrochen, nie innerhalb einer Uhrzeit wie „14:25“.
+Plugins halten einen Zeitraum wie „13:55-14:25“ in einer Teilaussage, die in eine Zeile passt, und setzen Zusammengehöriges in eine eigene Zeile, zum Beispiel „Frei bis 13:55,“
 über „dann reserviert von bea bis 14:25“ oder den Check-in-Hinweis „(Check-in bis 14:10)“ unter die Buchung.
 
 ## Uhrzeit und Zeitzone

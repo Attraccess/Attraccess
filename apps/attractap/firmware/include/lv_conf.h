@@ -105,10 +105,11 @@
  *   TEXT WRAPPING
  *===================*/
 
-/*Wrap only at spaces and commas. LVGL also breaks after ':' '-' ')' by default, which splits times and
- *ranges ("14:" / "25", "13:55-" / "14:25") in plugin texts (ATT-1188). Words longer than a line still
- *break by force.*/
-#define LV_TXT_BREAK_CHARS " ,"
+/*Wrap at spaces, commas and hyphens. LVGL also breaks after ':' and ')' by default, which splits times
+ *("14:" / "25") and a closing parenthesis in plugin texts (ATT-1188). A hyphen stays a break so long
+ *hyphenated names wrap there instead of mid-word; the plugins keep each time range in a clause that fits one
+ *line. Words longer than a line still break by force.*/
+#define LV_TXT_BREAK_CHARS " ,-"
 
 /*==================
  *   FONT USAGE

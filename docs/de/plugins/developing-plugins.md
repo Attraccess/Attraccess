@@ -304,10 +304,12 @@ Prüfen Sie Ihre Texte vorab mit denselben Regeln, damit sie auch nach der Trans
 
 ### Zeilenumbrüche
 
-Der Reader bricht Text nur an Leerzeichen und Kommas um, nie nach `:`, `-` oder `)`. Eine Uhrzeit („14:25“),
-ein Zeitraum („13:55-14:25“) und eine schließende Klammer werden also nie auf zwei Zeilen verteilt. Ein Wort,
-das länger als die Zeile ist, wird weiterhin getrennt. Der Reader gleicht Zeilen nicht aus, und ein Zeilenumbruch
-im Text wird durch ein Leerzeichen ersetzt. Was zusammengehört, schreibst du als eigenen `text`-Knoten in einer
+Der Reader bricht Text an Leerzeichen, Kommas und Bindestrichen um, nie nach `:` oder `)`. Eine Uhrzeit („14:25“)
+wird also nie getrennt, und eine schließende Klammer beginnt keine Zeile. Ein Bindestrich ist eine Umbruchstelle,
+sodass ein langer Name mit Bindestrich dort statt mitten im Wort umbricht; halten Sie einen Zeitraum
+(„13:55-14:25“) in einer Teilaussage, die in eine Zeile passt. Ein Wort, das länger als die Zeile ist, wird
+weiterhin getrennt. Der Reader gleicht Zeilen nicht aus, und ein Zeilenumbruch
+im Text wird durch ein Leerzeichen ersetzt. Was zusammengehört, schreiben Sie als eigenen `text`-Knoten in einer
 `col` (eine Teilaussage pro Knoten, zum Beispiel „Frei bis 13:55,“ und „dann reserviert von bea bis 14:25“),
 damit keine einzelne Uhrzeit oder Notiz allein in einer Zeile steht. Bei 18 px passen etwa 48 Zeichen in eine
 Zeile, bei 14 px etwa 62.

@@ -41,8 +41,8 @@ all of this is called **Reader display**. Plugin developers find the technical c
   question at that moment; tap the card again.
 - **Reader offline:** while a reader has no connection to the server, nothing starts and plugin notes disappear.
 
-Long texts wrap at spaces only: a time such as "14:25" or a range such as "13:55-14:25" always stays on one line.
-Plugins put what belongs together on its own line, for example "Free until 13:55," above "then reserved by bea
+Long texts wrap at spaces, commas and hyphens, never inside a time such as "14:25". Plugins keep a range such as
+"13:55-14:25" in a clause that fits one line and put what belongs together on its own line, for example "Free until 13:55," above "then reserved by bea
 until 14:25", or the check-in note "(check in by 14:10)" under the booking.
 
 ## Time and time zone

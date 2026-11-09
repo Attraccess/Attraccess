@@ -647,8 +647,9 @@ so they fit the limits after transliteration.
 
 ### Line breaks
 
-The reader wraps text only at spaces and commas, never after `:`, `-` or `)`, so a time ("14:25"), a range
-("13:55-14:25") and a closing parenthesis are never split across lines. A word longer than the line is still
+The reader wraps text at spaces, commas and hyphens, never after `:` or `)`, so a time ("14:25") is never split
+and a closing parenthesis never starts a line. A hyphen is a break, so a long hyphenated name wraps there instead of
+mid-word; keep a time range ("13:55-14:25") in a clause that fits one line. A word longer than the line is still
 cut. The reader does not balance lines, though, and a newline in a text is replaced by a space. Write what
 belongs together as its own `text` node in a `col` (one clause per node, for example "Free until 13:55," and
 "then reserved by bea until 14:25"), so no single time or note is left alone on a line. At 18 px a text fits
