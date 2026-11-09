@@ -59,11 +59,23 @@ jobs:
           git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
           git config user.email "${{ steps.bot-user.outputs.id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
 
-      - name: Lint and typecheck publishable libraries
-        run: pnpm nx run-many -t lint,typecheck --exclude=tag:scope:hardware
+      - name: Lint publishable libraries
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs lint)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many -t lint --exclude="$exclude"
+
+      - name: Typecheck publishable libraries
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs typecheck)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many -t typecheck --exclude="$exclude"
 
       - name: Build publishable libraries
-        run: pnpm nx run-many -t build --exclude=tag:scope:companion,tag:scope:hardware
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs build)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many -t build --exclude="$exclude"
 
       - name: Run NX Release (dry run)
         if: inputs.dry-run

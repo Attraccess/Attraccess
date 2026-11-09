@@ -30,7 +30,10 @@ jobs:
         with:
           esp-idf: 'false'
       - name: Lint all projects
-        run: pnpm nx run-many --target=lint --parallel=5 --exclude=tag:scope:hardware
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs lint)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many --target=lint --parallel=5 --exclude="$exclude"
 
   typecheck:
     runs-on: ubuntu-latest
@@ -43,7 +46,10 @@ jobs:
         with:
           esp-idf: 'false'
       - name: Typecheck all projects
-        run: pnpm nx run-many --target=typecheck --parallel=5 --exclude=tag:scope:hardware
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs typecheck)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many --target=typecheck --parallel=5 --exclude="$exclude"
 
   test:
     runs-on: ubuntu-latest
@@ -69,7 +75,10 @@ jobs:
       - name: Build all projects
         env:
           NODE_ENV: production
-        run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs build)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many --target=build --parallel=5 --exclude="$exclude"
 
   plugins:
     needs: [lint, typecheck, test, build]

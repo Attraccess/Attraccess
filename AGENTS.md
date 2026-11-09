@@ -20,9 +20,11 @@ script from the new worktree before reporting a missing dependency.
 
 ## Committing
 
-The Husky pre-commit hook runs `pnpm precommit` (lint, typecheck, build, test,
-e2e and CRAP score for affected projects). On a busy machine it takes many
-minutes.
+The Husky pre-commit hook runs `pnpm precommit` (lint, typecheck, test and CRAP
+score for affected projects). On a busy machine it takes many minutes. PR and
+merge-queue CI also typecheck and build every project, so a change can fail
+there in a project it does not touch; `scripts/ci-nx-exclude.mjs` shows the
+commands.
 
 - Git runs the hooks only after `pnpm install` has created `.husky/_`. In a
   checkout without `node_modules`, commits skip every check.

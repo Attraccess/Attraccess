@@ -54,17 +54,18 @@ jobs:
     #
     # Everything in `needs` is gated, so adding a job here is the whole change.
     # Only `lint-and-typecheck` is a required check in its own right; the rest
-    # would otherwise be able to fail without blocking a merge. `plugins` is the
-    # sharpest of those — lint/typecheck/test all `--exclude=tag:type:plugin`,
-    # so it is the only job in this workflow that compiles the plugin apps.
+    # would otherwise be able to fail without blocking a merge. `build-all` is
+    # one of those: it is the full Nx build of every project the shared exclude
+    # list (scripts/ci-nx-exclude.mjs) does not skip, so a change can no longer
+    # break a project it does not touch. `plugins` builds and packs the plugin
+    # apps that `build-all` skips.
     #
     # Deliberately NOT gated:
     #   `commitlint`   — `if: github.event_name == 'pull_request'`, so it reports
     #                    `skipped` in the merge queue and would deadlock it. It
     #                    is a required check already.
     #   `containerize` — required already, and its Docker build would serialize
-    #                    a 3-second gate behind ~45 minutes. It covers `pnpm
-    #                    precommit`'s `build` step. Note it is
+    #                    a 3-second gate behind ~45 minutes. Note it is
     #                    deliverable/test dependencies + `if: ... && !failure()`,
     #                    so upstream failures *skip* it and it reports Success
     #                    — which is why those jobs are gated here too.
@@ -75,6 +76,7 @@ jobs:
     needs:
       [
         lint-and-typecheck,
+        build-all,
         test,
         browser-e2e,
         crap-score,
@@ -92,9 +94,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Gate on every upstream job
+        env:
+          NEEDS: ${{ toJSON(needs) }}
         run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
           results='${{ join(needs.*.result, ' ') }}'
-          echo "$results"
           for result in $results; do [[ "$result" == "success" ]] || exit 1; done
 
   commitlint:
@@ -166,10 +170,44 @@ jobs:
           esp-idf: 'false'
       - name: Enforce file size limits
         run: pnpm lint:files
+      # Every project, not just the affected ones: a change can break a project it
+      # does not touch (e.g. plugins-frontend-sdk re-exports plugins-frontend-ui
+      # through an edge `implicitDependencies` hides from the project graph).
+      # Runs before lint so no earlier step has generated code a missing
+      # `dependsOn` would otherwise hide (#2023).
+      - name: Typecheck all projects
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs typecheck)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many --target=typecheck --parallel=5 --exclude="$exclude"
       - name: Lint affected projects
-        run: pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
-      - name: Typecheck affected projects
-        run: pnpm nx affected --target=typecheck --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs lint)"
+          echo "Excluding: $exclude"
+          pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude="$exclude"
+
+  build-all:
+    # A fresh job on purpose: typecheck and build in one job would share a warm
+    # workspace and hide missing `dependsOn` edges that only fail on a clean checkout.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Build all projects
+        env:
+          NODE_ENV: production
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs build)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many --target=build --parallel=5 --exclude="$exclude"
 
   test:
     runs-on: ubuntu-latest
@@ -244,9 +282,7 @@ jobs:
           pnpm exec vitest run --config apps/plugins/scripts/vitest.config.mts
           node --test apps/plugins/scripts/*.test.mjs
 
-      # Lint the affected set, but test and pack every plugin on every CI run.
-      - name: Lint affected plugin apps
-        run: pnpm nx affected --target=lint --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
+      # Plugin lint runs in `lint-and-typecheck`; test and pack every plugin on every CI run.
       - uses: ./.github/actions/setup-browser-tests
       - name: Test and pack all plugin apps
         run: node scripts/ci-test-projects.mjs --group=plugins
