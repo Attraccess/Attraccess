@@ -30,12 +30,22 @@ Migration retains the previous broker association for credential cleanup. When t
 
 `apps/plugins/wago/cc100-runtime/manifest.json` is the manually maintained
 runtime version file. Increase `runtimeVersion` when changing
-runtime source, shared runtime contracts, image dependencies or deployment code.
+runtime source, shared runtime contracts, the runtime Dockerfile, the manifest or
+host-side deployment code (installer, supervisor, update shell, hardware deployment).
 Discovery, permanent heartbeats and packaged assets all use this version. The
-required `wago-runtime-version` CI job rejects runtime changes without a strictly
+required `wago-runtime-version` CI job rejects such changes without a strictly
 higher stable `major.minor.patch` version. Documentation, tests and simulator-only
-changes do not require a bump. Dependency/lockfile changes are checked conservatively
-because they can change the bundled runtime or its build tools.
+changes do not require a bump.
+
+Dependency and tooling changes (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+patches, `tsconfig.base.json`, `nx.json`, Node/pnpm versions, CI workflows) require a
+bump only when the shipped runtime changes. The job builds
+`plugin-wago:build-cc100-runtime` at the merge-base and at HEAD (separate checkouts,
+Nx cache bypassed) and compares a hash of the built `dist/apps/wago-cc100-runtime`
+bundle, the runtime Dockerfile and the manifest without `runtimeVersion`. esbuild's
+module path comments are ignored. If the hashes differ, the job names the changed
+files and requires a bump; if they match, no bump is needed. Run it locally with
+`node scripts/check-wago-runtime-version.mjs origin/main`.
 
 Managed updates keep an installed runtime of the same version, even if rebuilding
 the Docker image changes its config digest. They still refresh the signed management
