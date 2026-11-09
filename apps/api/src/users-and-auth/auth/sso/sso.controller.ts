@@ -84,6 +84,12 @@ import { SSOSamlGuard } from './saml/saml.guard';
 
 import { SsoUserProvisioning } from './provisioning/user-provisioning';
 
+import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
+
+import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
+
+import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.guard';
+
 @ApiTags('Authentication')
 @Controller('auth/sso')
 @RequiresLicense(LicenseModuleType.SSO)
@@ -98,6 +104,8 @@ export class SSOController extends SsoUserProvisioning {
     protected readonly settingsService: SettingsService,
     protected readonly metricsService: MetricsService,
     protected readonly rbacService: RbacService,
+    protected readonly bruteForce: BruteForceProtectionService,
+    protected readonly authAudit: AuthAuditLogger,
     protected readonly identityAudit: IdentityAuditService,
     protected readonly ssoAudit: SsoAuditService,
   ) {
@@ -250,7 +258,57 @@ export class SSOController extends SsoUserProvisioning {
     return null;
   }
 
-  protected assertProvisioningAuthorized(provider: SSOProvider, request: Request): void {
+  protected async assertLinkAccountIpAllowed(request: Request, ip: string, email: string | null): Promise<void> {
+    try {
+      await this.bruteForce.assertIpAllowed('sso_link_account', ip, email);
+    } catch (error) {
+      setRetryAfter(request.res as Response, error);
+      await this.authAudit.log({
+        type: 'sso_link_account',
+        outcome: 'rate_limited',
+        ip,
+        username: email,
+        reason: 'ip_throttled',
+      });
+      throw error;
+    }
+  }
+
+  /** Throttled per IP and provider; only a failed secret check counts, never what the call does afterwards. */
+  protected async assertProvisioningAuthorized(provider: SSOProvider, request: Request): Promise<void> {
+    const ip = resolveIp(request);
+    const username = `provider:${provider.type}:${provider.id}`;
+    try {
+      await this.bruteForce.assertIpAllowed('sso_provisioning', ip, username);
+    } catch (error) {
+      setRetryAfter(request.res as Response, error);
+      await this.authAudit.log({
+        type: 'sso_provisioning',
+        outcome: 'rate_limited',
+        ip,
+        username,
+        reason: 'ip_throttled',
+      });
+      throw error;
+    }
+
+    try {
+      this.verifyProvisioningSecret(provider, request);
+    } catch (error) {
+      await this.bruteForce.recordFailure('sso_provisioning', ip, null, username);
+      await this.authAudit.log({
+        type: 'sso_provisioning',
+        outcome: 'invalid_credentials',
+        ip,
+        username,
+        reason: error instanceof Error ? error.message : undefined,
+      });
+      throw error;
+    }
+    await this.bruteForce.recordSuccess('sso_provisioning', ip, null, username);
+  }
+
+  private verifyProvisioningSecret(provider: SSOProvider, request: Request): void {
     const secret =
       provider.type === SSOProviderType.SAML
         ? provider.samlConfiguration?.provisioningSecret
@@ -517,6 +575,7 @@ installInheritedMethods(SSOController, [
   'parseProviderId',
   'extractProvisioningToken',
   'assertProvisioningAuthorized',
+  'assertLinkAccountIpAllowed',
   'loadProvisioningProvider',
   'resolveProvisioningUser',
   'assertPermissionMappingCeiling',

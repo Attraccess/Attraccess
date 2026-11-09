@@ -91,7 +91,7 @@ Changing the secret makes the stored card keys and reader pairing keys unreadabl
 
 ## Auth Rate Limiting and Account Lockout
 
-Failed authentication attempts on login, registration, and password reset endpoints are throttled per IP. Repeated login failures additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
+Failed authentication attempts on login, registration, password reset, SSO account linking, and SSO provisioning endpoints are throttled per IP. Repeated login failures and wrong SSO account-link passwords additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -104,9 +104,15 @@ Failed authentication attempts on login, registration, and password reset endpoi
 Rate limit triggers:
 
 - **`429 Too Many Requests`** with a `Retry-After` header is returned when an IP exceeds the threshold.
-- **`423 Locked`** with a `Retry-After` header is returned for a locked account on subsequent login attempts.
+- **`423 Locked`** with a `Retry-After` header is returned for a locked account on subsequent login and SSO account-link attempts.
 
-A successful login or admin unlock clears the lockout. Admin unlock is available via the user management UI.
+A successful login, a successful SSO account link, or an admin unlock clears the lockout. Admin unlock is available via the user management UI.
+
+### SSO account linking and provisioning
+
+- **SSO account linking** (the password prompt that appears when an SSO sign-in matches an existing local account) is throttled per IP and target account. Wrong passwords count toward the same account lockout as failed logins, so switching between the two cannot gain extra guesses. A successful link clears the counters.
+- **Link tokens are single-use.** A link token stops working after a successful link and after 3 wrong passwords; the user then has to sign in with SSO again.
+- **SSO provisioning endpoints** (IdP-initiated logout, user deletion and permission updates) are throttled per IP and provider. Only a missing or wrong provisioning secret counts as a failure. Errors such as an unknown user do not, so a normal IdP is never locked out by them. An IdP configured with a wrong secret receives `429` with a `Retry-After` header instead of `401` after `maxAttempts` failures. Cloud identity providers often send these requests from shared outbound IPs; the throttle then applies to that shared IP for this provider.
 
 ### Reverse proxies and the real client IP
 
@@ -184,7 +190,7 @@ auth.success type=login outcome=success ip=1.2.3.4 user_id=42 username=alice ts=
 | Field | Description |
 |-------|-------------|
 | `prefix` | `auth.success` for successes, `auth.failed` otherwise. |
-| `type` | One of `login`, `register`, `password_reset_request`, `password_reset_complete`. |
+| `type` | One of `login`, `register`, `password_reset_request`, `password_reset_complete`, `sso_link_account`, `sso_provisioning`. |
 | `outcome` | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
 | `ip` | Client IP. Falls back to `unknown` when not resolvable. |
 | `user_id` | Numeric user id when known, `-` otherwise. |
@@ -199,7 +205,7 @@ auth.success type=login outcome=success ip=1.2.3.4 user_id=42 username=alice ts=
 A minimal `failregex` for `/etc/fail2ban/filter.d/attraccess-auth.conf`:
 
 ```
-failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete) outcome=\S+ ip=<HOST> .*$
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete|sso_link_account) outcome=\S+ ip=<HOST> .*$
 ignoreregex =
 ```
 
@@ -216,6 +222,9 @@ bantime  = 900
 ```
 
 The shipped Docker Compose stack already wires both files for you behind the `fail2ban` profile — see [Docker Compose installation](installation/docker-compose.md#brute-force-ip-banning-with-fail2ban).
+
+> [!NOTE]
+> Failed SSO provisioning requests (a wrong Bearer or `x-api-key` secret) are logged as `auth.failed type=sso_provisioning`, but the shipped filter does not match them. Banning an identity provider's IP would also block its back-channel logout, and Attraccess already throttles these requests itself (`429`). If you want firewall bans for them anyway, add `sso_provisioning` to the `failregex`.
 
 ## fail2ban Administration
 

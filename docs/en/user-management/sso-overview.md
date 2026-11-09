@@ -47,7 +47,7 @@ Example: The OIDC role `attraccess_admin` is mapped to the **Manage Users** perm
 
 If a user already has a local account and logs in via SSO for the first time, the existing account can be linked to the SSO provider. The user's email address and local password are requested for verification.
 
-An existing account with the same email address is never linked automatically. This applies to every SSO login without a binding for that provider, for both OIDC and SAML, and whatever the existing account looks like. The user always has to confirm the link with the account's local password. Each user can be linked to at most one SSO provider. OIDC email addresses that the identity provider marks as unverified (`email_verified=false`) are never used for linking; if such an address already belongs to an account, the login is rejected (see [OIDC](user-management/sso-oidc.md)).
+An existing account with the same email address is never linked automatically. This applies to every SSO login without a binding for that provider, for both OIDC and SAML, and whatever the existing account looks like. The user always has to confirm the link with the account's local password. The linking prompt allows 3 password attempts, and each linking request can be used only once; afterwards, or after 10 minutes, the user signs in with SSO again to get a new one. Repeated wrong passwords also count toward the normal account lockout. Each user can be linked to at most one SSO provider. OIDC email addresses that the identity provider marks as unverified (`email_verified=false`) are never used for linking; if such an address already belongs to an account, the login is rejected (see [OIDC](user-management/sso-oidc.md)).
 
 ## Multiple Providers
 

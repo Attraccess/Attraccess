@@ -96,8 +96,6 @@ jobs:
       # recorded on `latest`; a nightly `latest` counts as never released. The published version is the plugin's
       # package.json version without its prerelease suffix.
       - name: Publish changed official plugin packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: node apps/plugins/scripts/plugin-publish-plan.mjs --channel=latest
 
   build-companion:

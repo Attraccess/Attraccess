@@ -8,6 +8,8 @@ import { LicenseService } from '../../../license/license.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { RbacService } from '../../rbac/rbac.service';
+import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
+import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
 import { UsersService } from '../../users/users.service';
 import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
@@ -33,6 +35,17 @@ export function registerSsoControllerFixture() {
   let linkTokenService: SSOLinkTokenService;
 
   const identityAudit = { record: jest.fn() };
+
+  const bruteForce = {
+    assertIpAllowed: jest.fn(),
+    assertAccountAllowed: jest.fn(),
+    runAccountAttempt: jest.fn((_userId: number | null, attempt: () => Promise<unknown>) => attempt()),
+    recordFailure: jest.fn(),
+    recordIpFailure: jest.fn(),
+    recordSuccess: jest.fn(),
+  };
+
+  const authAudit = { log: jest.fn() };
 
   const ssoAudit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 
@@ -176,6 +189,9 @@ export function registerSsoControllerFixture() {
           useValue: {
             verify: jest.fn(),
             issue: jest.fn(),
+            assertUsable: jest.fn(),
+            reservePasswordAttempt: jest.fn(),
+            consume: jest.fn(),
           },
         },
         {
@@ -188,6 +204,8 @@ export function registerSsoControllerFixture() {
         },
         { provide: IdentityAuditService, useValue: identityAudit },
         { provide: SsoAuditService, useValue: ssoAudit },
+        { provide: BruteForceProtectionService, useValue: bruteForce },
+        { provide: AuthAuditLogger, useValue: authAudit },
         SSOOIDCGuard,
       ],
       controllers: [SSOController],
@@ -199,6 +217,8 @@ export function registerSsoControllerFixture() {
     linkTokenService = module.get<SSOLinkTokenService>(SSOLinkTokenService);
     identityAudit.record.mockReset();
     ssoAudit.record.mockReset().mockResolvedValue({ status: 'recorded' });
+    for (const mock of [...Object.values(bruteForce), authAudit.log]) mock.mockClear();
+    bruteForce.runAccountAttempt.mockImplementation((_userId, attempt) => attempt());
   });
   return {
     get controller() {
@@ -218,6 +238,12 @@ export function registerSsoControllerFixture() {
     },
     get identityAudit() {
       return identityAudit;
+    },
+    get bruteForce() {
+      return bruteForce;
+    },
+    get authAudit() {
+      return authAudit;
     },
     get ssoAudit() {
       return ssoAudit;

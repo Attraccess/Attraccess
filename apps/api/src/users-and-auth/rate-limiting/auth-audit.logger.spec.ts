@@ -55,6 +55,35 @@ describe('AuthAuditLogger', () => {
     },
   );
 
+  it('records SSO account-link failures as identity audit and keeps them in the Fail2ban feed', () => {
+    logger.log({ type: 'sso_link_account', outcome: 'invalid_credentials', ip: '1.2.3.4', userId: 7 });
+
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'sso_account_link',
+        outcome: 'failed',
+        details: { reason: 'invalid_credentials' },
+      }),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^auth\.failed type=sso_link_account outcome=invalid_credentials ip=1\.2\.3\.4 user_id=7 /),
+    );
+  });
+
+  it('logs SSO provisioning failures without an identity audit entry', () => {
+    logger.log({
+      type: 'sso_provisioning',
+      outcome: 'invalid_credentials',
+      ip: '1.2.3.4',
+      username: 'provider:OIDC:1',
+    });
+
+    expect(record).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^auth\.failed type=sso_provisioning outcome=invalid_credentials ip=1\.2\.3\.4 /),
+    );
+  });
+
   it('does not persist unsupported legacy event types', () => {
     logger.log({ type: 'api_token', outcome: 'success', ip: '2.2.2.2', userId: 42 });
     expect(record).not.toHaveBeenCalled();

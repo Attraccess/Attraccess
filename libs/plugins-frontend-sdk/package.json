@@ -1,6 +1,11 @@
 {
   "name": "@attraccess/plugins-frontend-sdk",
   "version": "1.10.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "libs/plugins-frontend-sdk"
+  },
   "type": "module",
   "main": "./index.js",
   "types": "./index.d.ts",

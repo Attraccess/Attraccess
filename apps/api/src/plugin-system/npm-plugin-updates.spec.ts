@@ -76,7 +76,7 @@ describe('NpmPluginService', () => {
     expect(service.packageMetadata).toHaveBeenCalledWith('@attraccess/plugin', 'private');
   });
 
-  it('classifies each version using its own publisher metadata', async () => {
+  it('classifies official-scope versions on npm regardless of their publisher', async () => {
     const service = new NpmPluginService({} as never);
     writeFileSync(
       join(fixture.root, '.npm-plugin-state.json'),
@@ -100,7 +100,7 @@ describe('NpmPluginService', () => {
         '1.1.0': {
           name: '@attraccess/plugin-example',
           version: '1.1.0',
-          _npmUser: { name: 'unapproved-publisher' },
+          _npmUser: { name: 'GitHub Actions', email: 'npm-oidc-no-reply@github.com' },
           keywords: ['attraccess-plugin'],
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
           attraccess: {
@@ -118,8 +118,8 @@ describe('NpmPluginService', () => {
     await expect(service.installedVersionCandidates('@attraccess/plugin-example')).resolves.toEqual([
       expect.objectContaining({
         version: '1.1.0',
-        classification: 'community',
-        classificationReason: 'Not published by Attraccess on npm',
+        classification: 'official',
+        classificationReason: 'Published by Attraccess on npm',
       }),
     ]);
   });

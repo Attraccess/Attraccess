@@ -97,7 +97,7 @@ export abstract class NpmInstallationPlan extends NpmPackageCatalog {
     publisher: string | null,
     pkg: NpmPluginPackage | null,
   ): InstalledNpmPluginVersion {
-    const classification = this.classification.classify(installed.name, installed.registryUrl, publisher);
+    const classification = this.classification.classify(installed.name, installed.registryUrl);
     return {
       dependencies: pkg?.attraccess.dependencies ?? [],
       version,

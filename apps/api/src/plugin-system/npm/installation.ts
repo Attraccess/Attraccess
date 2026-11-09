@@ -261,7 +261,7 @@ export abstract class NpmInstallation extends NpmInstallationPlan {
       }
 
       const publisher = registryPublisher(packageVersion) ?? registryPublisher(metadata);
-      const classification = this.classification.classify(name, registry.url, publisher);
+      const classification = this.classification.classify(name, registry.url);
       if (audit) audit.classification = classification.kind;
       const installed: InstalledNpmPlugin = {
         dependencies: manifest.dependencies ?? [],

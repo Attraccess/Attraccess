@@ -432,6 +432,28 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       expect(await store.takeLogoutState('expired')).toBeNull();
     });
 
+    it('keeps ephemeral state: insert-if-absent, readable without consuming, counters that expire', async () => {
+      const expiresAt = Date.now() + 60000;
+      expect(await store.getEphemeralState('eph')).toBeNull();
+      const puts = await Promise.all([
+        store.putEphemeralState('eph', 'x', expiresAt),
+        store.putEphemeralState('eph', 'y', expiresAt),
+      ]);
+      expect(puts.filter(Boolean)).toHaveLength(1);
+      expect(['x', 'y']).toContain(await store.getEphemeralState('eph'));
+      expect(await store.getEphemeralState('eph')).not.toBeNull();
+
+      const counts = await Promise.all([1, 2, 3].map(() => store.incrementEphemeralCounter('count', expiresAt)));
+      expect([...counts].sort()).toEqual([1, 2, 3]);
+      expect(await store.getEphemeralState('count')).toBe('3');
+
+      await store.incrementEphemeralCounter('short', Date.now() + 1000);
+      expect(await store.getEphemeralState('short')).toBe('1');
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      expect(await store.getEphemeralState('short')).toBeNull();
+      expect(await store.incrementEphemeralCounter('short', Date.now() + 60000)).toBe(1);
+    });
+
     it('atomically records a logout receipt with revocation and protects new sessions from replay', async () => {
       await create('live', oidc);
       const selector = { protocol: 'OIDC' as const, providerId: 1, issuer: oidc.issuer, sid: oidc.sid };

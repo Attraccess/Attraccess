@@ -265,16 +265,16 @@ describe('NpmPluginService', () => {
     });
   });
 
-  it('does not trust a package-declared official flag or a mismatched registry publisher', async () => {
+  it('does not trust a package-declared official flag or publisher outside the official scope', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     const internals = service as unknown as ServiceInternals;
     jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
     jest.spyOn(service, 'packageMetadata').mockResolvedValue({
-      publisher: { username: 'someone-else' },
+      publisher: { username: 'attraccess' },
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
-          name: '@attraccess/plugin-example',
+          name: '@example/plugin-example',
           version: '1.2.3',
           keywords: ['attraccess-plugin'],
           peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
@@ -290,7 +290,7 @@ describe('NpmPluginService', () => {
       },
     });
 
-    await expect(service.marketplacePackage('@attraccess/plugin-example')).resolves.toMatchObject({
+    await expect(service.marketplacePackage('@example/plugin-example')).resolves.toMatchObject({
       classification: 'community',
       classificationReason: 'Not published by Attraccess on npm',
     });

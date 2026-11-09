@@ -141,9 +141,11 @@ test('nightly publishes plugins and the image from one gate and never moves nigh
   const steps = jobs['publish-plugins'].steps;
   const publish = steps.find((step) => /plugin-publish-plan\.mjs/.test(step.run ?? ''));
   assert.equal(publish.run, 'node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next');
-  assert.deepEqual(Object.keys(publish.env), ['NODE_AUTH_TOKEN'], 'the plan sets the dist-tag itself');
+  // npm trusted publishing authenticates through OIDC; the plan sets the dist-tag itself.
+  assert.equal(publish.env, undefined);
+  assert.equal(nightly.permissions['id-token'], 'write');
   const build = steps.find((step) => /--target=build/.test(step.run ?? ''));
-  assert.ok(steps.indexOf(build) < steps.indexOf(publish), 'plugins build before the npm token is present');
+  assert.ok(steps.indexOf(build) < steps.indexOf(publish), 'plugins build before they publish');
   assert.equal(build.env, undefined);
 
   const image = jobs.containerize.steps.find((step) => step.uses === './.github/actions/docker-build-push');
@@ -160,10 +162,13 @@ test('nightly publishes plugins and the image from one gate and never moves nigh
 });
 
 test('release publishes plugins on latest; no workflow publishes from the pushed range or to alpha', () => {
-  const { plugins } = workflow('release').jobs;
+  const release = workflow('release');
+  const { plugins } = release.jobs;
   const step = plugins.steps.find((s) => /plugin-publish-plan\.mjs/.test(s.run ?? ''));
   assert.equal(step.run, 'node apps/plugins/scripts/plugin-publish-plan.mjs --channel=latest');
-  assert.deepEqual(Object.keys(step.env), ['NODE_AUTH_TOKEN'], 'the plan sets the dist-tag itself');
+  // npm trusted publishing authenticates through OIDC; the plan sets the dist-tag itself.
+  assert.equal(step.env, undefined);
+  assert.equal(release.permissions['id-token'], 'write');
   assert.ok(plugins.steps.some((s) => s.uses?.startsWith('actions/checkout') && s.with?.['fetch-depth'] === 0));
   for (const file of fs.readdirSync('.github/workflows')) {
     const text = fs.readFileSync(`.github/workflows/${file}`, 'utf8');
@@ -172,6 +177,7 @@ test('release publishes plugins on latest; no workflow publishes from the pushed
       `${file} must leave the dist-tag to the plan`,
     );
     assert.ok(!/--target=publish(\s|$)/.test(text), `${file} must publish through plugin-publish-plan.mjs`);
+    assert.ok(!text.includes('NPM_TOKEN'), `${file} must publish through npm trusted publishing, not a token`);
     if (/plugin-publish-plan/.test(text)) assert.ok(!text.includes('github.event.before'), file);
   }
 });

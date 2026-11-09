@@ -3,7 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { IdentityAuditService } from '../../audit/identity-audit.service';
 
 export type AuthAuditType =
-  'login' | 'register' | 'password_reset_request' | 'password_reset_complete' | 'delete_account_confirm' | 'api_token';
+  | 'login'
+  | 'register'
+  | 'password_reset_request'
+  | 'password_reset_complete'
+  | 'delete_account_confirm'
+  | 'api_token'
+  | 'sso_link_account'
+  | 'sso_provisioning';
 
 export type AuthAuditOutcome =
   | 'success'
@@ -63,6 +70,7 @@ function actionFor(type: AuthAuditType) {
   if (type === 'register') return 'registration' as const;
   if (type === 'password_reset_request') return 'password_reset_requested' as const;
   if (type === 'password_reset_complete') return 'password_reset_completed' as const;
+  if (type === 'sso_link_account') return 'sso_account_link' as const;
   return null;
 }
 
