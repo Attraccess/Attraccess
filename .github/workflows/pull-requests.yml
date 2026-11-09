@@ -54,9 +54,11 @@ jobs:
     #
     # Everything in `needs` is gated, so adding a job here is the whole change.
     # Only `lint-and-typecheck` is a required check in its own right; the rest
-    # would otherwise be able to fail without blocking a merge. `plugins` is the
-    # sharpest of those — lint/typecheck/test all `--exclude=tag:type:plugin`,
-    # so it is the only job in this workflow that compiles the plugin apps.
+    # would otherwise be able to fail without blocking a merge. `build-all` is
+    # one of those: it is the full Nx build of every project the shared exclude
+    # list (scripts/ci-nx-exclude.mjs) does not skip, so a change can no longer
+    # break a project it does not touch. `plugins` builds and packs the plugin
+    # apps that `build-all` skips.
     #
     # Deliberately NOT gated:
     #   `commitlint`   — `if: github.event_name == 'pull_request'`, so it reports
@@ -75,6 +77,7 @@ jobs:
     needs:
       [
         lint-and-typecheck,
+        build-all,
         test,
         browser-e2e,
         crap-score,
@@ -154,9 +157,29 @@ jobs:
       - name: Enforce file size limits
         run: pnpm lint:files
       - name: Lint affected projects
-        run: pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
-      - name: Typecheck affected projects
-        run: pnpm nx affected --target=typecheck --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
+        run: pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude="$(node scripts/ci-nx-exclude.mjs lint)"
+      # Every project, not just the affected ones: a change can break a project it
+      # does not touch (e.g. plugins-frontend-sdk re-exports plugins-frontend-ui
+      # through an edge `implicitDependencies` hides from the project graph).
+      - name: Typecheck all projects
+        run: pnpm nx run-many --target=typecheck --parallel=5 --exclude="$(node scripts/ci-nx-exclude.mjs typecheck)"
+
+  build-all:
+    # A fresh job on purpose: typecheck and build in one job would share a warm
+    # workspace and hide missing `dependsOn` edges that only fail on a clean checkout.
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Build all projects
+        env:
+          NODE_ENV: production
+        run: pnpm nx run-many --target=build --parallel=5 --exclude="$(node scripts/ci-nx-exclude.mjs build)"
 
   test:
     runs-on: ubuntu-latest
@@ -231,9 +254,7 @@ jobs:
           pnpm exec vitest run --config apps/plugins/scripts/vitest.config.mts
           node --test apps/plugins/scripts/*.test.mjs
 
-      # Lint the affected set, but test and pack every plugin on every CI run.
-      - name: Lint affected plugin apps
-        run: pnpm nx affected --target=lint --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
+      # Plugin lint runs in `lint-and-typecheck`; test and pack every plugin on every CI run.
       - uses: ./.github/actions/setup-browser-tests
       - name: Test and pack all plugin apps
         run: node scripts/ci-test-projects.mjs --group=plugins
