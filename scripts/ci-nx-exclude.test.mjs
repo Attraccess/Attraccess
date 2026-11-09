@@ -8,7 +8,7 @@ import { TARGETS, excludesFor } from './ci-nx-exclude.mjs';
 
 const script = fileURLToPath(new URL('./ci-nx-exclude.mjs', import.meta.url));
 const root = fileURLToPath(new URL('../', import.meta.url));
-const cli = (...args) => spawnSync('node', [script, ...args], { encoding: 'utf8' });
+const cli = (...args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
 
 test('lint and typecheck only skip hardware projects', () => {
   assert.equal(excludesFor('lint'), 'tag:scope:hardware');
