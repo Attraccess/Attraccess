@@ -176,6 +176,13 @@ export interface ReaderUiContext {
   resourceId: number;
   /** Set whenever a card session is live; never for a signed-out reader. */
   userId?: number;
+  /**
+   * The resource has an active usage visible on this reader. The reader shows `resource.details.session` only
+   * while this is true, so a provider that wants a fact in one block puts it in the session slot when this is true
+   * and in the details body otherwise. The host re-evaluates the provider when a usage starts, ends or is taken
+   * over. Optional for compatibility: when unset, treat it as `false`.
+   */
+  sessionActive?: boolean;
   capabilities: ReaderUiCapabilities;
   language: 'en' | 'de';
 }

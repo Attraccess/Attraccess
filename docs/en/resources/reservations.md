@@ -98,7 +98,7 @@ When someone starts a resource, the plugin checks the bookings of **other** user
 
 - **Someone else's booking is running:** the start is refused with "Reserved by another user until 16:00", or
   "Reserved by Alex Example until 16:00" if you may see who is using the machine (see
-  [Who sees the holder's name](#who-sees-the-holders-name)).
+  [Who sees the holder's name](#who-sees-the-name-of-the-holder)).
 - **Someone else's booking starts soon:** if it starts within the resource's confirmation window (60 minutes by
   default), you are asked to confirm: "Reserved from 14:00, you have 40 min. Start anyway?". On a reader without a
   screen the start is refused by default. If several bookings start within the window, you confirm each of them.
@@ -117,7 +117,7 @@ shows the plugin's title and reason, and the reason names the time the block end
 press Start anyway, the start is still refused with the same message. Managers and maintainers do not see the notice;
 they start through the override confirmation above.
 
-### Who sees the holder's name
+### Who sees the name of the holder
 
 The holder's name follows the rule Attraccess already uses for **who is currently using a machine**: whoever may see the
 name of the current user of a resource may also see who holds a booking on it. Everyone else gets the anonymous text
@@ -147,12 +147,12 @@ bookings are shown. The reader's own status ("In use", maintenance and so on) al
 **Before a card is tapped.** A reader nobody is signed in to shows times and states only, never names or other
 personal data, whoever may otherwise see names:
 
-| Situation                                                                        | Resource list             | Resource details                              |
-| -------------------------------------------------------------------------------- | ------------------------- | --------------------------------------------- |
-| Nothing running, nothing starts within 24 hours                                  | nothing                   | nothing                                       |
-| The next booking starts within 24 hours, none is running                         | "Free until 14:00"        | "Free until 14:00, then reserved until 16:00" |
-| A booking is running, check-in is required and not done yet, before the deadline | "Res., check in by 14:15" | "Reserved 14:00-16:00 (check in by 14:15)"    |
-| A booking is running and checked in (or check-in is turned off)                  | "Reserved until 16:00"    | "Reserved 14:00-16:00"                        |
+| Situation                                                                                                                          | Resource list             | Resource details                              |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | --------------------------------------------- |
+| Nothing running, nothing starts within 24 hours                                                                                    | nothing                   | nothing                                       |
+| The next booking starts within 24 hours, none is running                                                                           | "Free until 14:00"        | "Free until 14:00, then reserved until 16:00" |
+| A booking is running, check-in is required and not done yet, before the deadline                                                   | "Res., check in by 14:15" | "Reserved 14:00-16:00 (check in by 14:15)"    |
+| A booking is running and checked in, check-in is turned off, or the check-in deadline passed without a check-in (not released yet) | "Reserved until 16:00"    | "Reserved 14:00-16:00"                        |
 
 Each booking appears in one text on a screen, never twice: the details carry one line for the free time and the
 booking that ends it. The list row holds 24 characters, so the open check-in is shortened there; a deadline on another day reads
@@ -176,12 +176,17 @@ returns to the texts above.
   16:00" ("Yours until Wed 16:00" when it ends on another day), the details "Your booking 14:00-16:00", with "(check
   in by 14:15)" while the check-in is still open.
 - **Who may see the holder's name** (managers of the resource and everybody else who may see who uses the machine,
-  see [Who sees the holder's name](#who-sees-the-holders-name)) also sees it on the details ("Free until 14:00, then
+  see [Who sees the holder's name](#who-sees-the-name-of-the-holder)) also sees it on the details ("Free until 14:00, then
   reserved by Alex until 16:00", "Reserved by Alex 14:00-16:00 (check in by 14:15)"). Everybody else sees the texts above.
+- **Idle** (nobody is using the resource): the details body carries the free time and the next booking in one
+  line, "Free until 14:00, then reserved by Alex until 16:00" (the name under the rules above, otherwise "Free
+  until 14:00, then reserved until 16:00"). This also holds when that booking starts within the confirmation
+  window; the reader shows no session area while nothing is running, so the body is the one place for it.
 - **While you are using the resource** and somebody else's booking starts within the confirmation window, the
   session area shows that booking once, "Reserved by Alex 14:00-16:00" with a countdown (the name under the rules
-  above, otherwise "Reserved 14:00-16:00"). The details then show nothing else about that booking: no "Free until"
-  line and no second text.
+  above, otherwise "Reserved 14:00-16:00"). The details body then shows nothing about that booking: no "Free
+  until" line and no second text. When the usage starts or ends, the reader moves the text between the two places
+  within a couple of seconds.
 - The **list never shows names**, signed in or not. Long names are shortened in the details.
 
 **Starting on the reader.**
@@ -255,7 +260,7 @@ On your account page, the section **Calendar feeds (iCal)** lets you subscribe t
 - Confirmed bookings appear as events, pending bookings as **tentative** events. Cancelled bookings disappear. The
   feed covers the last 30 days up to the booking horizon of each resource.
 - The title is "Resource – Name" for your own bookings, for resources you manage and for resources where you may see
-  who is using the machine ([rule](#who-sees-the-holders-name)); otherwise it is "Resource – Reserved".
+  who is using the machine ([rule](#who-sees-the-name-of-the-holder)); otherwise it is "Resource – Reserved".
 
 > [!WARNING]
 > The feed URL is a secret: anybody who has it can read the feed without signing in. It is shown **only once**, when

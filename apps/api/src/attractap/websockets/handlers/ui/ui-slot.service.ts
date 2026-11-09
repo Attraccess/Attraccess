@@ -12,8 +12,14 @@ import {
   type ReaderUiInvalidation,
 } from '../../../../plugin-system/reader-ui/reader-ui.registry';
 import { SettingsService } from '../../../../settings/settings.service';
+import {
+  ResourceSessionStartedEvent,
+  ResourceUsageSessionEndedEvent,
+  ResourceUsageSessionTakenOverEvent,
+} from '../../../../resources/usage/events/resource-usage.events';
 import { AttractapEvent, AttractapEventType, type AuthenticatedWebSocket } from '../../websocket.types';
 import { WebsocketService } from '../../websocket.service';
+import { ReaderActiveUsageService } from '../../reader-active-usage.service';
 import { CardSessionService } from './card-session.service';
 import { UiSlotRateLimiter } from './ui-rate-limiter';
 import { collectContributions, pendingKey, skipProvider, type Collected, type Desired } from './ui-slot-contributions';
@@ -52,6 +58,7 @@ export class UiSlotService {
     private readonly websocketService: WebsocketService,
     private readonly cardSessions: CardSessionService,
     private readonly settingsService: SettingsService,
+    private readonly activeUsage: ReaderActiveUsageService,
   ) {
     cardSessions.onStarted((socket) => this.privacySync(socket));
     cardSessions.onEnded((socket) => this.readerSignedOut(socket));
@@ -120,6 +127,26 @@ export class UiSlotService {
       }, UI_INVALIDATE_DEBOUNCE_MS);
       state.invalidateTimer.unref?.();
     }
+  }
+
+  /**
+   * A usage starting, ending or being taken over changes `sessionActive`, and with it where a plugin puts its
+   * details text (the reader shows the session slot only while a usage is active). Re-evaluated per resource;
+   * the per-slot rate limit still applies.
+   */
+  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
+  onUsageStarted(event: ResourceSessionStartedEvent): void {
+    this.onInvalidate({ scope: { resourceId: event.usage.resourceId } } as ReaderUiInvalidation);
+  }
+
+  @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
+  onUsageEnded(event: ResourceUsageSessionEndedEvent): void {
+    this.onInvalidate({ scope: { resourceId: event.usage.resourceId } } as ReaderUiInvalidation);
+  }
+
+  @OnEvent(ResourceUsageSessionTakenOverEvent.EVENT_NAME)
+  onUsageTakenOver(event: ResourceUsageSessionTakenOverEvent): void {
+    this.onInvalidate({ scope: { resourceId: event.resource.id } } as ReaderUiInvalidation);
   }
 
   /** Attaching or detaching resources changes which rows the reader shows, so its slot content must follow. */
@@ -269,12 +296,14 @@ export class UiSlotService {
     }
     const widgets = await this.settings.widgetToggles(readerId, resourceIds);
     const card = this.cardSessions.current(socket);
+    const active = await this.activeUsage.activeResourceIds(resourceIds);
     return collectContributions({
       caps,
       readerId,
       resourceIds,
       providers,
       userId: card?.userId,
+      sessionActive: (resourceId) => active.has(resourceId),
       language: card?.language ?? (await this.publicLanguage()),
       enabled: (resourceId, plugin) => widgets.readerEnabled && !widgets.disabled.has(`${resourceId}|${plugin}`),
       pending: state.pendingProviders,

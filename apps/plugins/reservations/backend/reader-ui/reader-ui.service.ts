@@ -111,9 +111,10 @@ export class ReaderUiService {
       state.tone,
     );
 
-    // Session area (card session only): another user's booking starts within the confirm window.
+    // Session area (card session while a usage runs): another user's booking starts within the confirm window.
+    // The reader shows that slot only while a usage is active, so an idle resource keeps the text in the body.
     let sessionBooking: ReservationEntity | undefined;
-    if (userId !== undefined && settings.confirmWindowMinutes > 0) {
+    if (ctx.sessionActive === true && userId !== undefined && settings.confirmWindowMinutes > 0) {
       const window = settings.confirmWindowMinutes * MINUTE_MS;
       const next = upcoming.find((r) => r.userId !== userId && r.startTime.getTime() - nowMs <= window);
       if (next) sessionBooking = next;
@@ -124,8 +125,9 @@ export class ReaderUiService {
       }
     }
 
-    // One fact, one block: a booking appears in exactly one details slot. The session slot is the most
-    // specific, so when it shows the subject booking the body stays silent (there is no header at all).
+    // One fact, one block: a booking appears in exactly one details slot. While a usage runs the session slot is
+    // the most specific, so when it shows the subject booking the body stays silent; idle, the body carries it
+    // (there is no header at all).
     if (subject !== sessionBooking) {
       add(SLOT.RESOURCE_DETAILS_BODY, 'body', { t: 'text', text: state.body, style: 'body' }, state.body);
     }

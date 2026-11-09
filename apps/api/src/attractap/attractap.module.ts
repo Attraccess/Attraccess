@@ -80,6 +80,7 @@ import { AttractapUiHandler } from './websockets/handlers/ui/ui.handler';
 import { CardSessionService } from './websockets/handlers/ui/card-session.service';
 import { UiAuditService } from './websockets/handlers/ui/ui-audit.service';
 import { UiSlotService } from './websockets/handlers/ui/ui-slot.service';
+import { ReaderActiveUsageService } from './websockets/reader-active-usage.service';
 import { UiStepService } from './websockets/handlers/ui/ui-step.service';
 import { ReaderStartGate } from './websockets/handlers/session/reader-start-gate.service';
 import { ReaderUiAdminController } from './reader-ui-admin.controller';
@@ -159,6 +160,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     UiAuditService,
     UiStepService,
     UiSlotService,
+    ReaderActiveUsageService,
     AttractapUiHandler,
     ReaderStartGate,
   ],

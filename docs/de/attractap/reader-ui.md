@@ -11,9 +11,13 @@ technischen Vertrag für Plugin-Entwickler finden Sie unter
 ## Was Mitglieder sehen
 
 - **Hinweise auf dem Bildschirm (Widgets):** ein kurzer Status neben einer Ressource in der Liste oder auf ihrer
-  Detailseite, zum Beispiel „Reserviert 14:00–16:00“. Der eigene Status des Readers (in Benutzung, Wartung, nicht
+  Detailseite, zum Beispiel „Reserviert 14:00-16:00“. Der eigene Status des Readers (in Benutzung, Wartung, nicht
   verfügbar, Einweisung erforderlich) kommt immer zuerst; ein Plugin-Hinweis erscheint nur, wenn keiner davon
   zutrifft. Ein Reader, an dem niemand angemeldet ist, zeigt nie persönliche Daten oder Namen anderer Personen.
+  Ein Sachverhalt steht nur in einem Hinweis: Ein Plugin, das etwas zu einer Buchung zu sagen hat, legt es an
+  einer Stelle der Detailseite ab, im Sitzungsbereich, solange jemand die Ressource nutzt (nur dann zeigt der
+  Reader diesen Bereich), sonst im Detailtext. Der Server sagt dem Plugin, welcher Fall gilt, und aktualisiert den
+  Bildschirm, wenn eine Nutzung beginnt oder endet.
 - **Status auf dem Sperrbildschirm:** Der Bildschirm einer Ressource, an der niemand angemeldet ist, zeigt
   denselben öffentlichen Status wie die Liste, zum Beispiel „Reserviert bis 16:00“, anstelle von „Verfügbar“. „In
   Benutzung“, Wartung und die anderen Reader-Status haben Vorrang und blenden ihn aus. Er zeigt nie einen Namen,

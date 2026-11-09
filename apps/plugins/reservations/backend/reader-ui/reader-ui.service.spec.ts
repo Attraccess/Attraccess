@@ -371,26 +371,37 @@ describe('ReaderUiService', () => {
         list
           .filter((c) => c.slotId.startsWith('resource.details.'))
           .map((c) => `${c.slotId}: ${textOf(c.tree).join(' | ')}`);
-      // In a session the booking is in the session slot (with the countdown); body and header stay silent.
-      const session = await slots({ userId: MANAGER });
+      // While a usage runs the booking is in the session slot (with the countdown); body and header stay silent.
+      const session = await slots({ userId: MANAGER, sessionActive: true });
       expect(detailTexts(session)).toEqual(['resource.details.session: Reserved by user10 12:40-14:00']);
       expect(get(session, 'resource.details.header')).toBeUndefined();
       expect(get(session, 'resource.details.body')).toBeUndefined();
-      // Outside the confirm window (or signed out) the body carries it, once.
+      // Signed out, the body carries it, once.
       const out = await slots();
       expect(detailTexts(out)).toEqual(['resource.details.body: Free until 12:40, then reserved until 14:00']);
+      // Idle after a card tap (the reader shows no session slot): the body carries it, once, named per the rule.
+      const idle = await slots({ userId: MANAGER, sessionActive: false });
+      expect(detailTexts(idle)).toEqual([
+        'resource.details.body: Free until 12:40, then reserved by user10 until 14:00',
+      ]);
+      expect(detailTexts(await slots({ userId: OTHER }))).toEqual([
+        'resource.details.body: Free until 12:40, then reserved until 14:00',
+      ]);
       // Your own booking is the body; the other booking in the session slot is a different fact.
       await book(MANAGER, '2026-06-01T10:10:00', '2026-06-01T10:30:00'); // 12:10-12:30 local, your early window
-      const own = await slots({ userId: MANAGER });
+      const own = await slots({ userId: MANAGER, sessionActive: true });
       expect(detailTexts(own)).toEqual([
         'resource.details.body: Your booking 12:10-12:30 (check in by 12:25)',
         'resource.details.session: Reserved by user10 12:40-14:00',
+      ]);
+      expect(detailTexts(await slots({ userId: MANAGER }))).toEqual([
+        'resource.details.body: Your booking 12:10-12:30 (check in by 12:25)',
       ]);
     });
 
     it("session area: another user's booking within the confirm window, with a countdown", async () => {
       await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00'); // 12:40 local, 40 min away
-      const en = await slots({ userId: OTHER });
+      const en = await slots({ userId: OTHER, sessionActive: true });
       const session = get(en, 'resource.details.session');
       expect(session?.tree).toEqual({
         t: 'row',
@@ -401,7 +412,10 @@ describe('ReaderUiService', () => {
       });
       expect(session?.fallback?.text).toBe('Reserved 12:40-14:00');
       expect(
-        textOf(get(await slots({ userId: OTHER, language: 'de' }), 'resource.details.session')?.tree as ReaderUiNode),
+        textOf(
+          get(await slots({ userId: OTHER, language: 'de', sessionActive: true }), 'resource.details.session')
+            ?.tree as ReaderUiNode,
+        ),
       ).toEqual(['Reserviert 12:40-14:00']);
       expectHostValid(en);
     });
@@ -409,19 +423,22 @@ describe('ReaderUiService', () => {
     it('session area names the holder only for managers or viewers who may see who uses the machine', async () => {
       await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
       const text = async (userId: number) =>
-        textOf(get(await slots({ userId }), 'resource.details.session')?.tree as ReaderUiNode)[0];
+        textOf(get(await slots({ userId, sessionActive: true }), 'resource.details.session')?.tree as ReaderUiNode)[0];
       expect(await text(MANAGER)).toBe('Reserved by user10 12:40-14:00');
       expect(await text(OTHER)).toBe('Reserved 12:40-14:00');
       h.allowAttribution(OTHER, 1);
       expect(await text(OTHER)).toBe('Reserved by user10 12:40-14:00');
     });
 
-    it('no session slot outside the confirm window, for the holder, or when signed out', async () => {
+    it('no session slot outside the confirm window, for the holder, when signed out, or while idle', async () => {
       await book(HOLDER, '2026-06-01T11:30:00', '2026-06-01T12:30:00'); // 90 min away
-      expect(get(await slots({ userId: OTHER }), 'resource.details.session')).toBeUndefined();
+      expect(get(await slots({ userId: OTHER, sessionActive: true }), 'resource.details.session')).toBeUndefined();
       h.setNow('2026-06-01T10:40:00Z');
-      expect(get(await slots({ userId: HOLDER }), 'resource.details.session')).toBeUndefined();
-      expect(get(await slots(), 'resource.details.session')).toBeUndefined();
+      expect(get(await slots({ userId: HOLDER, sessionActive: true }), 'resource.details.session')).toBeUndefined();
+      expect(get(await slots({ sessionActive: true }), 'resource.details.session')).toBeUndefined();
+      // Idle (no active usage) or a host that does not tell: the reader would not show the slot anyway.
+      expect(get(await slots({ userId: OTHER }), 'resource.details.session')).toBeUndefined();
+      expect(get(await slots({ userId: OTHER, sessionActive: false }), 'resource.details.session')).toBeUndefined();
     });
   });
 
@@ -461,7 +478,7 @@ describe('ReaderUiService', () => {
 
     it('signed in: also when the confirm window opens', async () => {
       await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00'); // confirm window opens 11:00Z
-      expect(expiry(await slots({ userId: OTHER }))).toEqual(['2026-06-01T11:00:00.000Z']);
+      expect(expiry(await slots({ userId: OTHER, sessionActive: true }))).toEqual(['2026-06-01T11:00:00.000Z']);
     });
 
     it.each([
@@ -501,7 +518,7 @@ describe('ReaderUiService', () => {
   it("looks a holder's name up once, even when the same booking's details come from the session area", async () => {
     await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
     const names = jest.spyOn(h.directory, 'getUserNames');
-    const list = await slots({ userId: MANAGER });
+    const list = await slots({ userId: MANAGER, sessionActive: true });
     expect(textOf(get(list, 'resource.details.session')?.tree as ReaderUiNode)[0]).toBe(
       'Reserved by user10 12:40-14:00',
     );

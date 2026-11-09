@@ -161,12 +161,12 @@ Benutzung“, Wartung und so weiter) hat immer Vorrang vor dem Hinweis des Plugi
 **Vor dem Auflegen einer Karte.** Ein Reader, an dem niemand angemeldet ist, zeigt nur Zeiten und Zustände, nie Namen
 oder andere personenbezogene Daten, auch nicht für Personen, die sonst Namen sehen dürfen:
 
-| Situation                                                                                | Ressourcenliste            | Ressourcendetails                             |
-| ---------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------- |
-| Nichts läuft, nichts beginnt innerhalb von 24 Stunden                                    | nichts                     | nichts                                        |
-| Die nächste Buchung beginnt innerhalb von 24 Stunden, keine läuft                        | „Frei bis 14:00“           | „Frei bis 14:00, dann reserviert bis 16:00“   |
-| Eine Buchung läuft, Check-in ist verlangt, aber noch nicht erfolgt, vor Ablauf der Frist | „Res., Check-in bis 14:15“ | „Reserviert 14:00-16:00 (Check-in bis 14:15)“ |
-| Eine Buchung läuft und ist eingecheckt (oder Check-in ist ausgeschaltet)                 | „Reserviert bis 16:00“     | „Reserviert 14:00-16:00“                      |
+| Situation                                                                                                                                         | Ressourcenliste            | Ressourcendetails                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------- |
+| Nichts läuft, nichts beginnt innerhalb von 24 Stunden                                                                                             | nichts                     | nichts                                        |
+| Die nächste Buchung beginnt innerhalb von 24 Stunden, keine läuft                                                                                 | „Frei bis 14:00“           | „Frei bis 14:00, dann reserviert bis 16:00“   |
+| Eine Buchung läuft, Check-in ist verlangt, aber noch nicht erfolgt, vor Ablauf der Frist                                                          | „Res., Check-in bis 14:15“ | „Reserviert 14:00-16:00 (Check-in bis 14:15)“ |
+| Eine Buchung läuft und ist eingecheckt, Check-in ist ausgeschaltet, oder die Check-in-Frist ist ohne Check-in abgelaufen (noch nicht freigegeben) | „Reserviert bis 16:00“     | „Reserviert 14:00-16:00“                      |
 
 Jede Buchung steht pro Bildschirm in genau einem Text, nie doppelt: Die Details haben eine Zeile für die freie Zeit
 und die Buchung, die sie beendet. Die Listenzeile fasst 24 Zeichen, deshalb ist der offene Check-in dort gekürzt; eine Frist an einem anderen Tag
@@ -195,10 +195,15 @@ Kartensitzung, kehrt der Reader zu den Texten oben zurück.
   die Maschine nutzt, siehe [Wer den Namen der buchenden Person sieht](#wer-den-namen-der-buchenden-person-sieht)),
   sieht ihn auch in den Details („Frei bis 14:00, dann reserviert von Alex bis 16:00“, „Reserviert von Alex 14:00-16:00 (Check-in bis
   14:15)“). Alle anderen sehen die Texte oben.
+- **Im Leerlauf** (niemand nutzt die Ressource): Der Detailtext trägt die freie Zeit und die nächste Buchung in einer
+  Zeile, „Frei bis 14:00, dann reserviert von Alex bis 16:00“ (Name nach den Regeln oben, sonst „Frei bis 14:00, dann
+  reserviert bis 16:00“). Das gilt auch, wenn diese Buchung im Bestätigungsfenster beginnt; solange nichts läuft,
+  zeigt der Reader keinen Sitzungsbereich, der Detailtext ist also der eine Ort dafür.
 - **Während Sie die Ressource nutzen** und die Buchung einer anderen Person im Bestätigungsfenster beginnt, zeigt der
   Sitzungsbereich diese Buchung einmal, „Reserviert von Alex 14:00-16:00“, mit einem Countdown (Name nach den Regeln
-  oben, sonst „Reserviert 14:00-16:00“). Die Details zeigen dann nichts weiter zu dieser Buchung: keine „Frei
-  bis“-Zeile und keinen zweiten Text.
+  oben, sonst „Reserviert 14:00-16:00“). Der Detailtext zeigt dann nichts zu dieser Buchung: keine „Frei
+  bis“-Zeile und keinen zweiten Text. Beginnt oder endet die Nutzung, verschiebt der Reader den Text innerhalb
+  weniger Sekunden zwischen den beiden Orten.
 - Die **Liste zeigt nie Namen**, weder angemeldet noch abgemeldet. Lange Namen werden in den Details gekürzt.
 
 **Am Reader starten.**

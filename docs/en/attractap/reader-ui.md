@@ -10,9 +10,12 @@ all of this is called **Reader display**. Plugin developers find the technical c
 ## What members see
 
 - **Notes on the screen (widgets):** a short status next to a resource in the list or on its details page, for
-  example "Reserved 14:00–16:00". The reader's own status (in use, maintenance, unavailable, introduction
+  example "Reserved 14:00-16:00". The reader's own status (in use, maintenance, unavailable, introduction
   required) always comes first; a plugin note only appears when none of those applies. A reader nobody is signed
-  in to never shows personal information or other people's names.
+  in to never shows personal information or other people's names. A fact appears in one note only: a plugin
+  that has something to say about a booking puts it in one place on the details page, the session area while
+  someone is using the resource (the reader shows that area only then) and the details body otherwise. The
+  server tells the plugin which of the two applies and updates the screen when a usage starts or ends.
 - **Status on the lock screen:** the screen of a resource nobody is signed in to shows the same public status as
   the list, for example "Reserved until 16:00", in place of "Available". In use, maintenance and the other core
   statuses win and hide it. It never shows a name, and what a card holder saw while signed in is gone as soon as
