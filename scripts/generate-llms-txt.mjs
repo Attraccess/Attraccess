@@ -12,7 +12,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const require = createRequire(import.meta.url);
 const defaultRoot = fileURLToPath(new URL('../', import.meta.url));
 // The same sidebar parser the browser uses, so llms.txt and the WebMCP tools cannot disagree.
-const { parseSidebar, findDescriptions, withoutCode } = require(path.join(defaultRoot, 'docs/assets/webmcp.js'));
+const { parseSidebar, findDescriptions, withoutCode, isPagePath } = require(
+  path.join(defaultRoot, 'docs/assets/webmcp.js'),
+);
 
 export const MIN_DESCRIPTION_LENGTH = 20;
 export const MAX_DESCRIPTION_LENGTH = 200;
@@ -66,6 +68,12 @@ function descriptionProblem(markdown, language) {
 function readPage(docsDir, language, entry, problems) {
   const relative = `docs/${language.code}/${entry.href}`;
   const file = path.join(docsDir, language.code, entry.href);
+  if (!isPagePath(`${language.code}/${entry.href}`)) {
+    problems.push(
+      `${relative}: linked from docs/${language.code}/_sidebar.md with an unsupported path. Use folders and a file name of letters, digits, "_" and "-", e.g. guides/my-page.md`,
+    );
+    return null;
+  }
   if (!fs.existsSync(file)) {
     problems.push(`${relative}: linked from docs/${language.code}/_sidebar.md but the file does not exist`);
     return null;

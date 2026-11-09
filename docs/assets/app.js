@@ -97,7 +97,7 @@ function setLanguage(lang, delayMs) {
 // { reloading }. Other-language pages get the "#/<lang>/..." hash handled at load, then a reload after
 // delayMs. pushState does not fire hashchange, so Docsify never tries the route under the old language.
 function navigateDocs(path, delayMs) {
-  var parts = /^(de|en)\/((?:[A-Za-z0-9][A-Za-z0-9._-]*\/)*[A-Za-z0-9][A-Za-z0-9._-]*)\.md$/.exec(path);
+  var parts = /^(de|en)\/((?:[A-Za-z0-9][A-Za-z0-9._-]*\/)*[A-Za-z0-9][A-Za-z0-9_-]*)\.md$/.exec(path);
   if (!parts) throw new Error('Not a documentation page path: ' + path);
   var route = parts[2] === 'home' ? '' : parts[2];
   if (parts[1] === currentLang) {

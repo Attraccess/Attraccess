@@ -130,7 +130,16 @@ test('navigate opens same-language pages by hash and other-language pages with a
   app.api.navigate('de/home.md', 150);
   assert.equal(app.calls.pushState[1], '/docs/#/de/');
 
-  for (const path of ['xx/a.md', 'en/a', 'en/../a.md', 'en/api/me:x.md', 'en/_sidebar.md', 'en//a.md', undefined]) {
+  for (const path of [
+    'en/a.html.md',
+    'xx/a.md',
+    'en/a',
+    'en/../a.md',
+    'en/api/me:x.md',
+    'en/_sidebar.md',
+    'en//a.md',
+    undefined,
+  ]) {
     assert.throws(() => app.api.navigate(path), /Not a documentation page path/, String(path));
   }
 });

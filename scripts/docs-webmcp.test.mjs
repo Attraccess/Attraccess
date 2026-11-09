@@ -339,6 +339,8 @@ test('get_page rejects paths outside the documentation pages', async () => {
       'en/\t/x.md',
       'en/a\u0000.md',
       'en/%252e%252e/de/home.md',
+      'en/home.html.md',
+      'en/home.md.md',
     ];
     if (docsBase === '/docs/') rejected.push(`${ORIGIN}/en/home.md`);
     for (const path of rejected) {
@@ -727,9 +729,11 @@ test('slugToPath and flattenSearchIndex map Docsify slugs to page paths', () => 
 });
 
 test('isPagePath accepts only language-prefixed .md page paths', () => {
-  for (const path of ['en/home.md', 'de/a/b-c_d.e.md', 'en/2024/x.md'])
+  for (const path of ['en/home.md', 'de/a.b/c-d_e.md', 'en/2024/x.md'])
     assert.equal(webmcp.isPagePath(path), true, path);
   for (const path of [
+    'en/a.html.md',
+    'en/a.md.md',
     'fr/a.md',
     'en/_a.md',
     'en/.a.md',
@@ -740,4 +744,22 @@ test('isPagePath accepts only language-prefixed .md page paths', () => {
     'en//a.md',
   ])
     assert.equal(webmcp.isPagePath(path), false, path);
+});
+
+test('pageTitle returns the first H1 outside code', () => {
+  assert.equal(webmcp.pageTitle('```sh\n# comment\n```\n# Backup & Restore ##\n## Later'), 'Backup & Restore');
+  assert.equal(webmcp.pageTitle('No heading'), '');
+});
+
+test('fetch-based search titles results with the page H1, like the Docsify index', async () => {
+  const env = makeEnv();
+  const bodies = { '_sidebar.md': '- [Overview](um.md)\n- [Untitled](u.md)\n', 'um.md': '# User Management\nRoles.\n' };
+  env.fetch = async (url) => ({ ok: true, text: async () => bodies[url.split('/').pop()] ?? 'Just roles.\n' });
+  const result = await run(env, 'search_docs', { query: 'roles' });
+  assert.deepEqual(
+    result.results.map((entry) => entry.title),
+    ['User Management', 'Untitled'],
+  );
+  const titled = await run(env, 'search_docs', { query: 'user management' });
+  assert.equal(titled.results[0].title, 'User Management');
 });

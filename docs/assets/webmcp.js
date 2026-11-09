@@ -17,10 +17,10 @@
   // Optional Docsify link title or options: [Title](page.md "tip") or [Title](page.md ':target=_blank')
   var SIDEBAR_LINK = new RegExp(BULLET + '\\[([^\\]]+)\\]\\(([^)\\s]+)(?:\\s+(?:"[^"]*"|\'[^\']*\'))?\\)\\s*$');
   var SIDEBAR_GROUP = new RegExp(BULLET + '\\*\\*(.+?)\\*\\*\\s*$');
-  // Allow list for page paths: "<lang>/<segments>.md", segments of letters, digits, ".", "_" and "-" that
-  // start with a letter or digit. Rules out "..", "_sidebar.md", "%" escapes and ":" (Docsify treats
-  // routes containing ":" as absolute URLs).
-  var PAGE_PATH = /^(de|en)\/(?:[A-Za-z0-9][A-Za-z0-9._-]*\/)*[A-Za-z0-9][A-Za-z0-9._-]*\.md$/;
+  // Allow list for page paths: "<lang>/<folders>/<name>.md". Folders hold letters, digits, ".", "_" and "-"
+  // and start with a letter or digit; the file name has no "." (Docsify would load "a.html.md" as "a.html").
+  // Rules out "..", "_sidebar.md", "%" escapes and ":" (Docsify treats routes with ":" as absolute URLs).
+  var PAGE_PATH = /^(de|en)\/(?:[A-Za-z0-9][A-Za-z0-9._-]*\/)*[A-Za-z0-9][A-Za-z0-9_-]*\.md$/;
   // A fenced code block, an inline code span, or a description comment (group 4). Code is matched first,
   // so comments shown as examples inside code are never treated as descriptions.
   var CODE_OR_DESCRIPTION =
@@ -98,6 +98,12 @@
 
   function isPagePath(path) {
     return PAGE_PATH.test(path);
+  }
+
+  // The first H1 of a page, the title Docsify's search index uses too.
+  function pageTitle(markdown) {
+    var heading = /^#[ \t]+(.+?)[ \t#]*$/m.exec(withoutCode(markdown));
+    return heading ? heading[1] : '';
   }
 
   function collapse(text) {
@@ -245,9 +251,7 @@
     }
 
     function invalidPath(raw) {
-      return new Error(
-        'Invalid path (no "..", "//", backslashes, control characters or bad %-encoding allowed): ' + raw,
-      );
+      return new Error('Invalid path (no "..", "//", backslashes, control characters or bad %-encoding): ' + raw);
     }
 
     // Rejects inputs whose text could mean something other than what the URL parser resolves.
@@ -308,11 +312,9 @@
         return cachedText(pages[index].url, 'page not found')
           .then(
             function (text) {
-              results[index] = { title: pages[index].title, path: pages[index].path, body: text };
+              results[index] = { title: pageTitle(text) || pages[index].title, path: pages[index].path, body: text };
             },
-            function () {
-              results[index] = null;
-            },
+            function () {}, // an unreadable page is left out
           )
           .then(worker);
       }
@@ -574,6 +576,7 @@
     findDescriptions: findDescriptions,
     stripDescriptions: stripDescriptions,
     isPagePath: isPagePath,
+    pageTitle: pageTitle,
     searchItems: searchItems,
     makeSnippet: makeSnippet,
     slugToPath: slugToPath,

@@ -121,6 +121,16 @@ test('reports a sidebar link to a missing file', () => {
   assert.match(check(root).join('\n'), /docs\/en\/guides\/setup\.md: .*does not exist/);
 });
 
+test('reports sidebar links whose path the WebMCP tools would reject', () => {
+  const root = makeFixtureWithLlms({
+    'docs/en/_sidebar.md': '- [Home](home.md)\n- [Space](my%20page.md)\n- [Up](../x.md)\n- [Dotted](a.html.md)\n',
+  });
+  const problems = check(root).join('\n');
+  for (const file of ['docs/en/my%20page.md', 'docs/en/../x.md', 'docs/en/a.html.md']) {
+    assert.ok(problems.includes(`${file}: linked from docs/en/_sidebar.md with an unsupported path`), file);
+  }
+});
+
 test('reports a page without a description', () => {
   const root = makeFixtureWithLlms();
   fs.writeFileSync(path.join(root, 'docs/de/guides/setup.md'), '# Einrichtung\n\nText\n');
