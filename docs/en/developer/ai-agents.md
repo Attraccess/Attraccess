@@ -21,15 +21,15 @@ The file is generated from the two sidebars (`docs/en/_sidebar.md` and `docs/de/
 
 In browsers that support [WebMCP](https://webmachinelearning.github.io/webmcp/), the documentation site registers five tools for the browser's AI agent. Nothing happens in other browsers.
 
-| Tool           | Input                                                    | What it does                                                                                          |
-| -------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `list_pages`   | `language` (optional: `de` or `en`)                      | Lists all pages from the sidebar with title, section, path and URL.                                   |
-| `get_page`     | `path` (for example `en/getting-started/overview.md`)    | Returns the raw Markdown of one page. Paths outside the documentation are rejected.                   |
-| `search_docs`  | `query`, `language` (optional), `limit` (optional, 1-20) | Full-text search; all words must match and title matches rank first. Returns titles, paths, snippets. |
-| `navigate_to`  | `path`                                                   | Opens a page in the browser. A page in the other language switches the language and reloads.          |
-| `set_language` | `language` (`de` or `en`)                                | Switches the site language. The page reloads and the tools are registered again.                      |
+| Tool           | Input                                                                | What it does                                                                                              |
+| -------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `list_pages`   | `language` (optional: `de` or `en`, default: the language shown)     | Lists all pages from the sidebar with title, section, path and URL.                                       |
+| `get_page`     | `path` (for example `en/getting-started/overview.md`)                | Returns the raw Markdown of one page. Paths outside the documentation are rejected.                       |
+| `search_docs`  | `query`, `language` (optional), `limit` (optional, 1-20, default 10) | Full-text search; all words must match and title matches rank first. Returns titles, paths, snippets.     |
+| `navigate_to`  | `path`                                                               | Opens a page in the browser. A page in the other language switches the language and reloads.              |
+| `set_language` | `language` (`de` or `en`)                                            | Switches the site language. If the language changes, the page reloads and the tools are registered again. |
 
-`list_pages`, `get_page` and `search_docs` only read. `navigate_to` and `set_language` change what the browser shows, nothing else.
+`list_pages`, `get_page` and `search_docs` only read. `navigate_to` and `set_language` only change what the browser shows and the stored language choice.
 
 ## Try it in Chrome
 

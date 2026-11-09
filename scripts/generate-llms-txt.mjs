@@ -12,14 +12,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const require = createRequire(import.meta.url);
 const defaultRoot = fileURLToPath(new URL('../', import.meta.url));
 // The same sidebar parser the browser uses, so llms.txt and the WebMCP tools cannot disagree.
-const { parseSidebar, findDescriptions } = require(path.join(defaultRoot, 'docs/assets/webmcp.js'));
+const { parseSidebar, findDescriptions, withoutCode } = require(path.join(defaultRoot, 'docs/assets/webmcp.js'));
 
+export const MIN_DESCRIPTION_LENGTH = 20;
 export const MAX_DESCRIPTION_LENGTH = 200;
 export const FIX_COMMAND = 'node scripts/generate-llms-txt.mjs';
 
 const LANGUAGES = [
-  { code: 'en', label: 'English', home: 'Home' },
-  { code: 'de', label: 'Deutsch', home: 'Startseite' },
+  { code: 'en', label: 'English', name: 'English' },
+  { code: 'de', label: 'Deutsch', name: 'German' },
 ];
 
 const SUMMARY =
@@ -30,33 +31,49 @@ const INTRO = (baseUrl) =>
   `The documentation pages are plain Markdown files. English pages live under ${baseUrl}/en/, German pages under ${baseUrl}/de/. ` +
   `The documentation site is ${baseUrl}/.`;
 
-function descriptionProblem(markdown) {
-  const found = findDescriptions(markdown);
-  if (found.length !== 1) {
-    return `has ${found.length} llms-description comments (exactly one is required, directly below the H1)`;
-  }
-  const [text] = found;
-  if (!text) return 'has an empty llms-description';
-  if (/[\r\n]/.test(text)) return 'has a multi-line llms-description (keep it on one line)';
-  if (text.length > MAX_DESCRIPTION_LENGTH) {
-    return `has an llms-description of ${text.length} characters (maximum ${MAX_DESCRIPTION_LENGTH})`;
+// True when the first non-blank line after the first H1 is the description comment.
+function isBelowTitle(markdown) {
+  const lines = withoutCode(markdown).split(/\r?\n/);
+  const title = lines.findIndex((line) => /^#\s/.test(line));
+  const next = title < 0 ? undefined : lines.slice(title + 1).find((line) => line.trim());
+  return /^<!--\s*llms-description:/.test(next?.trim() ?? '');
+}
+
+function lengthProblem(text) {
+  if (text.length < MIN_DESCRIPTION_LENGTH || text.length > MAX_DESCRIPTION_LENGTH) {
+    return `has an llms-description of ${text.length} characters. Write ${MIN_DESCRIPTION_LENGTH}-${MAX_DESCRIPTION_LENGTH} characters`;
   }
   return null;
 }
 
+function descriptionProblem(markdown, language) {
+  const found = findDescriptions(markdown);
+  if (!found.length) {
+    return `has no llms-description comment. Add \`<!-- llms-description: <one sentence in ${language.name}> -->\` directly below the first H1`;
+  }
+  if (found.length > 1) {
+    return `has ${found.length} llms-description comments. Keep exactly one, directly below the first H1`;
+  }
+  const [text] = found;
+  if (!text) return 'has an empty llms-description. Write one sentence that describes the page';
+  if (/[\r\n]/.test(text)) return 'has a multi-line llms-description. Put the sentence on one line';
+  return (
+    lengthProblem(text) ??
+    (isBelowTitle(markdown) ? null : 'has its llms-description in the wrong place. Move it directly below the first H1')
+  );
+}
+
 function readPage(docsDir, language, entry, problems) {
-  const relative = `docs/${language}/${entry.href}`;
-  const file = path.join(docsDir, language, entry.href);
+  const relative = `docs/${language.code}/${entry.href}`;
+  const file = path.join(docsDir, language.code, entry.href);
   if (!fs.existsSync(file)) {
-    problems.push(`${relative}: linked from docs/${language}/_sidebar.md but the file does not exist`);
+    problems.push(`${relative}: linked from docs/${language.code}/_sidebar.md but the file does not exist`);
     return null;
   }
   const markdown = fs.readFileSync(file, 'utf8');
-  const problem = descriptionProblem(markdown);
+  const problem = descriptionProblem(markdown, language);
   if (problem) {
-    problems.push(
-      `${relative}: ${problem}. Add \`<!-- llms-description: <one sentence in ${language === 'de' ? 'German' : 'English'}> -->\` below the first H1.`,
-    );
+    problems.push(`${relative}: ${problem}.`);
     return null;
   }
   return findDescriptions(markdown)[0];
@@ -68,12 +85,13 @@ function renderLanguage(docsDir, baseUrl, language, problems) {
   const sections = [];
   for (const entry of entries) {
     const heading = entry.section ? `${language.label}: ${entry.section}` : language.label;
-    let section = sections.find((candidate) => candidate.heading === heading);
-    if (!section) {
+    // A new heading starts a new section, so the output keeps the sidebar order.
+    let section = sections.at(-1);
+    if (section?.heading !== heading) {
       section = { heading, lines: [] };
       sections.push(section);
     }
-    const description = readPage(docsDir, language.code, entry, problems);
+    const description = readPage(docsDir, language, entry, problems);
     const url = `${baseUrl}/${language.code}/${entry.href}`;
     section.lines.push(`- [${entry.title}](${url}): ${description ?? ''}`);
   }
@@ -92,14 +110,14 @@ export function generate(root = defaultRoot) {
 }
 
 /** Returns the list of problems that make `--check` fail (empty when everything is fine). */
+export const STALE_PROBLEM = `docs/llms.txt is missing or out of date. Run \`${FIX_COMMAND}\` and commit docs/llms.txt`;
+
 export function check(root = defaultRoot) {
   const { output, problems } = generate(root);
   if (problems.length) return problems;
   const file = path.join(root, 'docs/llms.txt');
   const current = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
-  return current === output
-    ? []
-    : ['docs/llms.txt is missing or out of date with the docs sidebars and page descriptions'];
+  return current === output ? [] : [STALE_PROBLEM];
 }
 
 function main(rawArgs) {
@@ -118,7 +136,9 @@ function main(rawArgs) {
       return 0;
     }
     console.error(`llms.txt check failed:\n${problems.map((problem) => `  - ${problem}`).join('\n')}`);
-    console.error(`\nFix the pages above, then run \`${FIX_COMMAND}\` and commit docs/llms.txt.`);
+    if (problems[0] !== STALE_PROBLEM) {
+      console.error(`\nFix the pages above, then run \`${FIX_COMMAND}\` and commit docs/llms.txt.`);
+    }
     return 1;
   }
   const { output, problems } = generate(root);

@@ -6,6 +6,8 @@ const require = createRequire(import.meta.url);
 const webmcp = require('../docs/assets/webmcp.js');
 
 const ORIGIN = 'https://docs.example.org';
+const PATH_DESCRIPTION =
+  'Docs page path such as "en/getting-started/overview.md" (language prefix "en/" or "de/", .md file)';
 const EN_SIDEBAR =
   '- [Home](home.md)\n\n- **Guides**\n  - [Setup Guide](guides/setup.md)\n  - [Docs](https://example.org/a.md)\n';
 const DE_SIDEBAR = '- [Startseite](home.md)\n\n- **Anleitungen**\n  - [Einrichtung](guides/setup.md)\n';
@@ -33,7 +35,10 @@ function makeEnv({ docsBase = '/', language = 'en', storage = {}, modelContext, 
           calls.setLanguage.push([lang, delay]);
           return lang !== language;
         },
-        navigate: (path) => calls.navigate.push(path),
+        navigate: (path, delay) => {
+          calls.navigate.push([path, delay]);
+          return { reloading: !path.startsWith(`${language}/`) };
+        },
       },
     },
     document: modelContext ? { modelContext } : {},
@@ -111,12 +116,34 @@ test('registers all five tools with one shared signal via document.modelContext.
     assert.equal(typeof tool.execute, 'function');
     assert.equal(tool.annotations.consequentialHint, undefined);
   }
-  const byName = Object.fromEntries(registered.map((entry) => [entry.tool.name, entry.tool.inputSchema]));
-  assert.deepEqual(byName.get_page.required, ['path']);
-  assert.deepEqual(byName.search_docs.required, ['query']);
-  assert.deepEqual(byName.set_language.required, ['language']);
-  assert.deepEqual(byName.list_pages.properties.language.enum, ['de', 'en']);
-  assert.deepEqual([byName.search_docs.properties.limit.minimum, byName.search_docs.properties.limit.maximum], [1, 20]);
+  const optionalLanguage = { type: 'string', enum: ['de', 'en'], description: 'Default: the language shown now' };
+  const path = { type: 'string', description: PATH_DESCRIPTION };
+  const object = (properties, required) => ({
+    type: 'object',
+    properties,
+    ...(required ? { required } : {}),
+    additionalProperties: false,
+  });
+  assert.deepEqual(Object.fromEntries(registered.map(({ tool }) => [tool.name, [tool.title, tool.inputSchema]])), {
+    list_pages: ['List documentation pages', object({ language: optionalLanguage })],
+    get_page: ['Read a documentation page', object({ path }, ['path'])],
+    search_docs: [
+      'Search the documentation',
+      object(
+        {
+          query: { type: 'string', minLength: 1, maxLength: 200, description: 'Words that must all appear' },
+          language: optionalLanguage,
+          limit: { type: 'integer', minimum: 1, maximum: 20, default: 10, description: 'Maximum results' },
+        },
+        ['query'],
+      ),
+    ],
+    navigate_to: ['Open a documentation page', object({ path }, ['path'])],
+    set_language: [
+      'Switch the site language',
+      object({ language: { type: 'string', enum: ['de', 'en'] } }, ['language']),
+    ],
+  });
 });
 
 test('falls back to navigator.modelContext.provideContext once with all tools', () => {
@@ -194,6 +221,30 @@ for (const docsBase of ['/', '/docs/']) {
   });
 }
 
+test('list_pages retries a sidebar that failed to load', async () => {
+  const env = makeEnv();
+  const originalFetch = env.fetch;
+  let failures = 1;
+  env.fetch = (url) => (failures-- > 0 ? Promise.reject(new Error('offline')) : originalFetch(url));
+  const tools = toolsOf(env);
+  await assert.rejects(() => tools.list_pages.execute({}), /Could not load the sidebar/);
+  const result = JSON.parse((await tools.list_pages.execute({})).content[0].text);
+  assert.equal(result.pages.length, 2);
+  assert.deepEqual(env.calls.fetched, [`${ORIGIN}/en/_sidebar.md`]);
+});
+
+test('list_pages leaves out sidebar links that are not documentation page paths', async () => {
+  const env = makeEnv();
+  env.fetch = async () => ({
+    ok: true,
+    text: async () => '- [Good](good.md)\n- [Up](../../api/x.md)\n- [Colon](api/me:x.md)\n- [Hidden](_x.md)\n',
+  });
+  assert.deepEqual(
+    (await run(env, 'list_pages')).pages.map((page) => page.path),
+    ['en/good.md'],
+  );
+});
+
 test('list_pages validates language, reports failed fetches and caches the sidebar', async () => {
   const env = makeEnv();
   await assert.rejects(() => toolsOf(env).list_pages.execute({ language: 'fr' }), /language must be one of: de, en/);
@@ -235,11 +286,12 @@ for (const docsBase of ['/', '/docs/']) {
       `${ORIGIN}${docsBase}en/home.md`,
       ` en/home.md `,
     ];
-    for (const form of forms) {
+    for (const form of [...forms, 'en/home.md?x=1#top', `${ORIGIN}${docsBase}en/home.md?x=1`]) {
       const result = await tool.execute({ path: form });
       assert.deepEqual(Object.keys(result), ['content']);
       assert.equal(result.content[0].type, 'text');
       assert.equal(result.content[0].text, PAGES['en/home.md'], form);
+      assert.equal(env.calls.fetched.at(-1), `${ORIGIN}${docsBase}en/home.md`, form);
     }
   });
 }
@@ -275,6 +327,18 @@ test('get_page rejects paths outside the documentation pages', async () => {
       `${ORIGIN}/other/en/home.md`,
       '/etc/passwd.md',
       '/_media/logo.md',
+      'en/home?.md',
+      'EN/home.md',
+      'en/home.MD',
+      'en/%2fhome.md',
+      'en/%5Fsidebar.md',
+      'en/a%20b.md',
+      'en/api/users/me:x.md',
+      'en/.\t./de/home.md',
+      'en/\n../de/home.md',
+      'en/\t/x.md',
+      'en/a\u0000.md',
+      'en/%252e%252e/de/home.md',
     ];
     if (docsBase === '/docs/') rejected.push(`${ORIGIN}/en/home.md`);
     for (const path of rejected) {
@@ -284,13 +348,17 @@ test('get_page rejects paths outside the documentation pages', async () => {
         `${docsBase}: ${String(path)}`,
       );
     }
-    await assert.rejects(() => tool.execute(undefined), /path must be/);
+    await assert.rejects(() => tool.execute(undefined), /path must be a non-empty string of at most 500 characters/);
+    assert.deepEqual(env.calls.fetched, [], 'no rejected path is fetched');
   }
 });
 
 test('get_page reports a missing page and network failures as "Page not found"', async () => {
   const env = makeEnv();
-  await assert.rejects(() => toolsOf(env).get_page.execute({ path: 'en/nope.md' }), /Page not found: en\/nope\.md/);
+  await assert.rejects(
+    () => toolsOf(env).get_page.execute({ path: 'en/nope.md' }),
+    /Page not found: en\/nope\.md\. Use list_pages/,
+  );
   env.fetch = async () => {
     throw new Error('offline');
   };
@@ -312,20 +380,29 @@ const indexValue = JSON.stringify({
   '/': { '#/': { slug: '#/', title: 'Home Page', body: '<!-- llms-description: Leaky. --> Wizard overview' } },
 });
 
-test('search_docs uses the Docsify search index for the current language', async () => {
-  const env = makeEnv({ storage: { [INDEX_KEY]: indexValue } });
-  const result = await run(env, 'search_docs', { query: 'wizard' });
-  assert.equal(result.language, 'en');
-  assert.deepEqual(
-    result.results.map((entry) => [entry.title, entry.path, entry.url]),
-    [
-      ['Wizard', 'en/guides/setup.md', `${ORIGIN}/en/guides/setup.md`],
-      ['Home Page', 'en/home.md', `${ORIGIN}/en/home.md`],
-    ],
-  );
-  assert.ok(!result.results[1].snippet.includes('llms-description'));
-  assert.equal(env.calls.fetched.length, 0, 'no page fetched when the index exists');
-});
+for (const docsBase of ['/', '/docs/']) {
+  test(`search_docs uses the Docsify search index for the current language (docsBase ${docsBase})`, async () => {
+    const env = makeEnv({ docsBase, storage: { [INDEX_KEY]: indexValue } });
+    const result = await run(env, 'search_docs', { query: 'wizard' });
+    assert.equal(result.language, 'en');
+    assert.deepEqual(
+      result.results.map((entry) => [entry.title, entry.path, entry.url]),
+      [
+        ['Setup Guide', 'en/guides/setup.md', `${ORIGIN}${docsBase}en/guides/setup.md`],
+        ['Home Page', 'en/home.md', `${ORIGIN}${docsBase}en/home.md`],
+      ],
+    );
+    assert.equal(result.results[1].snippet, 'Wizard overview');
+    // Words from different sections of one page match together, as in the fetch-based search.
+    const across = await run(env, 'search_docs', { query: 'reader quickly' });
+    assert.deepEqual(
+      across.results.map((entry) => entry.path),
+      ['en/guides/setup.md'],
+    );
+    assert.deepEqual((await run(env, 'search_docs', { query: 'leaky' })).results, []);
+    assert.equal(env.calls.fetched.length, 0, 'no page fetched when the index exists');
+  });
+}
 
 test('search_docs falls back to fetching pages without an index, for another language or a broken index', async () => {
   for (const env of [
@@ -348,6 +425,24 @@ test('search_docs falls back to fetching pages without an index, for another lan
     german.results.map((entry) => entry.path),
     ['de/guides/setup.md'],
   );
+});
+
+test('search_docs never matches the hidden description and fails when no page can be loaded', async () => {
+  assert.deepEqual((await run(makeEnv(), 'search_docs', { query: 'landing' })).results, []);
+  const env = makeEnv();
+  const originalFetch = env.fetch;
+  env.fetch = (url) => (url.endsWith('_sidebar.md') ? originalFetch(url) : Promise.reject(new Error('offline')));
+  await assert.rejects(
+    () => toolsOf(env).search_docs.execute({ query: 'setup' }),
+    /Could not load any documentation page/,
+  );
+});
+
+test('search_docs returns at most ten results by default', async () => {
+  const env = makeEnv();
+  const links = Array.from({ length: 12 }, (_, index) => `- [Page ${index}](p${index}.md)`).join('\n');
+  env.fetch = async (url) => ({ ok: true, text: async () => (url.endsWith('_sidebar.md') ? links : 'needle') });
+  assert.equal((await run(env, 'search_docs', { query: 'needle' })).results.length, 10);
 });
 
 test('search_docs under /docs/ builds URLs from the docs base and skips unreadable pages', async () => {
@@ -400,41 +495,140 @@ test('search_docs fetches at most six pages in parallel', async () => {
 
 // ----- navigate_to / set_language -----
 
-test('navigate_to opens same-language pages without reload and other-language pages with reload', async () => {
+for (const docsBase of ['/', '/docs/']) {
+  test(`navigate_to opens same-language pages without reload and others with reload (docsBase ${docsBase})`, async () => {
+    const env = makeEnv({ docsBase });
+    assert.deepEqual(await run(env, 'navigate_to', { path: 'en/guides/setup.md' }), {
+      path: 'en/guides/setup.md',
+      language: 'en',
+      reloading: false,
+    });
+    assert.deepEqual(await run(env, 'navigate_to', { path: `${docsBase}de/home.md` }), {
+      path: 'de/home.md',
+      language: 'de',
+      reloading: true,
+    });
+    assert.deepEqual(env.calls.navigate, [
+      ['en/guides/setup.md', 150],
+      ['de/home.md', 150],
+    ]);
+    for (const path of ['https://evil.example/en/home.md', 'en/api/me:x.md']) {
+      await assert.rejects(() => toolsOf(env).navigate_to.execute({ path }), /Invalid path|outside/);
+    }
+    await assert.rejects(() => toolsOf(env).navigate_to.execute(undefined), /path must be/);
+    assert.equal(env.calls.navigate.length, 2);
+  });
+
+  test(`set_language reports changes and unchanged languages (docsBase ${docsBase})`, async () => {
+    const env = makeEnv({ docsBase });
+    assert.deepEqual(await run(env, 'set_language', { language: 'de' }), {
+      language: 'de',
+      changed: true,
+      reloading: true,
+    });
+    assert.deepEqual(await run(env, 'set_language', { language: 'en' }), { language: 'en', changed: false });
+    assert.deepEqual(env.calls.setLanguage, [
+      ['de', 150],
+      ['en', 150],
+    ]);
+    await assert.rejects(() => toolsOf(env).set_language.execute({ language: 'fr' }), /language must be one of/);
+    await assert.rejects(() => toolsOf(env).set_language.execute(undefined), /language must be one of/);
+  });
+}
+
+test('navigate_to reports no reload when the site API returns nothing', async () => {
   const env = makeEnv();
-  assert.deepEqual(await run(env, 'navigate_to', { path: 'en/guides/setup.md' }), {
-    path: 'en/guides/setup.md',
-    language: 'en',
-    reloading: false,
-  });
-  assert.deepEqual(await run(env, 'navigate_to', { path: '/de/home.md' }), {
-    path: 'de/home.md',
-    language: 'de',
-    reloading: true,
-  });
-  assert.deepEqual(env.calls.navigate, ['en/guides/setup.md', 'de/home.md']);
-  await assert.rejects(
-    () => toolsOf(env).navigate_to.execute({ path: 'https://evil.example/en/home.md' }),
-    /Invalid path|outside/,
-  );
-  await assert.rejects(() => toolsOf(env).navigate_to.execute(undefined), /path must be/);
-  assert.equal(env.calls.navigate.length, 2);
+  env.window.AttraccessDocs.navigate = () => undefined;
+  assert.equal((await run(env, 'navigate_to', { path: 'de/home.md' })).reloading, false);
 });
 
-test('set_language reports changes and unchanged languages', async () => {
-  const env = makeEnv();
-  assert.deepEqual(await run(env, 'set_language', { language: 'de' }), {
-    language: 'de',
-    changed: true,
-    reloading: true,
-  });
-  assert.deepEqual(await run(env, 'set_language', { language: 'en' }), { language: 'en', changed: false });
-  assert.deepEqual(env.calls.setLanguage, [
-    ['de', 150],
-    ['en', 150],
-  ]);
-  await assert.rejects(() => toolsOf(env).set_language.execute({ language: 'fr' }), /language must be one of/);
-  await assert.rejects(() => toolsOf(env).set_language.execute(undefined), /language must be one of/);
+// ----- browser start-up and the search filter -----
+
+function docsifyStub() {
+  const calls = [];
+  const get = function (...args) {
+    calls.push(args);
+    return {
+      then: (onSuccess, onError) => {
+        if (args[0] === 'fail') onError('nope');
+        else onSuccess(PAGES['en/home.md'] + '```md\n<!-- llms-description: example -->\n```\n', { url: args[0] });
+      },
+      abort: () => 'aborted',
+    };
+  };
+  return { calls, docsify: { get } };
+}
+
+test('installSearchFilter hands the search plugin page text without description comments', () => {
+  const { calls, docsify } = docsifyStub();
+  const win = { Docsify: docsify };
+  assert.equal(webmcp.installSearchFilter(win), true);
+  assert.equal(webmcp.installSearchFilter(win), false, 'installed once');
+  const received = [];
+  const request = win.Docsify.get('en/home.md', true);
+  request.then((...args) => received.push(args));
+  assert.deepEqual(calls, [['en/home.md', true]]);
+  assert.equal(received[0][0], '# Home\n\nWelcome to the docs.\n```md\n<!-- llms-description: example -->\n```\n');
+  assert.deepEqual(received[0][1], { url: 'en/home.md' }, 'extra callback arguments are passed on');
+  assert.equal(request.abort(), 'aborted');
+  const errors = [];
+  win.Docsify.get('fail').then(assert.fail, (error) => errors.push(error));
+  assert.deepEqual(errors, ['nope']);
+  assert.equal(webmcp.installSearchFilter({}), false);
+  assert.equal(webmcp.installSearchFilter({ Docsify: {} }), false);
+});
+
+function browserWindow({ modelContext, docsify } = {}) {
+  const env = makeEnv({ modelContext });
+  return {
+    ...env.window,
+    $docsify: docsify,
+    document: env.document,
+    navigator: {},
+    location: env.location,
+    localStorage: env.localStorage,
+    fetch: env.fetch,
+    AbortController,
+    Docsify: docsifyStub().docsify,
+  };
+}
+
+test('start registers the tools and adds the search filter as a Docsify plugin', () => {
+  const modelContext = recorder();
+  const existing = () => {};
+  const win = browserWindow({ modelContext, docsify: { plugins: [existing] } });
+  assert.equal(webmcp.start(win), true);
+  assert.equal(modelContext.registered.length, 5);
+  assert.equal(win.$docsify.plugins.length, 2);
+  assert.equal(win.$docsify.plugins[0], existing);
+  win.$docsify.plugins[1]();
+  assert.equal(win.Docsify.get.withoutDescriptions, true);
+  const bare = browserWindow({ docsify: {} });
+  assert.equal(webmcp.start(bare), false);
+  assert.equal(bare.$docsify.plugins.length, 1);
+  assert.equal(webmcp.start(browserWindow()), false);
+});
+
+test('loading the script in a browser registers the tools and never throws', () => {
+  const modulePath = require.resolve('../docs/assets/webmcp.js');
+  const load = (win) => {
+    globalThis.window = win;
+    globalThis.document = win.document;
+    delete require.cache[modulePath];
+    try {
+      require(modulePath);
+    } finally {
+      delete globalThis.window;
+      delete globalThis.document;
+      delete require.cache[modulePath];
+    }
+  };
+  const modelContext = recorder();
+  load(browserWindow({ modelContext, docsify: {} }));
+  assert.equal(modelContext.registered.length, 5);
+  const broken = browserWindow({ modelContext: recorder() });
+  broken.fetch = undefined;
+  assert.doesNotThrow(() => load(broken));
 });
 
 // ----- pure helpers -----
@@ -449,6 +643,11 @@ test('parseSidebar handles groups, ungrouped links, anchors and non-page links',
     '  - [Image](a/img.png)',
     '  - [Anchor](#local)',
     '  - [Proto](//cdn.example.org/y.md)',
+    '  - [Titled](a/titled.md "Tip")',
+    "  - [Options](a/options.md ':target=_blank')",
+    '  - **Nested**',
+    '    1. [Deep](a/deep.md)',
+    '  - [Three](a/three.md)',
     '- [Back to top level](other.md)',
     '',
     'not a list item',
@@ -458,6 +657,10 @@ test('parseSidebar handles groups, ungrouped links, anchors and non-page links',
     { title: 'Top', section: '', href: 'top.md' },
     { title: 'One', section: 'Group A', href: 'a/one.md' },
     { title: 'Two', section: 'Group A', href: 'a/two.md' },
+    { title: 'Titled', section: 'Group A', href: 'a/titled.md' },
+    { title: 'Options', section: 'Group A', href: 'a/options.md' },
+    { title: 'Deep', section: 'Nested', href: 'a/deep.md' },
+    { title: 'Three', section: 'Group A', href: 'a/three.md' },
     { title: 'Back to top level', section: '', href: 'other.md' },
   ]);
 });
@@ -467,7 +670,18 @@ test('description helpers find, ignore code samples and strip comments', () => {
     '# T\n<!-- llms-description:  Hello world. -->\n\nText `<!-- llms-description: inline -->`\n\n   ```md\n<!-- llms-description: sample -->\n   ```\n';
   assert.deepEqual(webmcp.findDescriptions(page), ['Hello world.']);
   assert.deepEqual(webmcp.findDescriptions('# T\n<!-- llms-description: a\nb -->'), ['a\nb']);
+  const examples = [
+    '`` <!-- llms-description: double --> ``',
+    '````md\n```\n<!-- llms-description: inner -->\n```\n````',
+    '~~~\n<!-- llms-description: tilde -->\n~~~',
+  ].join('\n\n');
+  assert.deepEqual(webmcp.findDescriptions(`# T\n<!-- llms-description: Real. -->\n${examples}\n`), ['Real.']);
   assert.equal(webmcp.stripDescriptions('# T\n<!-- llms-description: x -->\nBody'), '# T\nBody');
+  assert.equal(webmcp.stripDescriptions(`# T\n${examples}`), `# T\n${examples}`, 'code examples stay');
+  assert.equal(
+    webmcp.withoutCode('A `b` C\n```\nx\n```\n<!-- llms-description: d -->'),
+    'A  C\n\n<!-- llms-description: d -->',
+  );
 });
 
 test('searchItems ranks title matches first, requires all terms and builds snippets', () => {
@@ -495,7 +709,35 @@ test('slugToPath and flattenSearchIndex map Docsify slugs to page paths', () => 
   assert.equal(webmcp.slugToPath('#/', 'de'), 'de/home.md');
   assert.equal(webmcp.slugToPath('#/a/b?id=x', 'en'), 'en/a/b.md');
   assert.equal(webmcp.slugToPath('/a/b/', 'en'), 'en/a/b.md');
-  const items = webmcp.flattenSearchIndex(JSON.stringify({ '/a': { k: { title: 'T', body: 'B' } } }), 'en');
-  assert.deepEqual(items, [{ title: 'T', body: 'B', path: 'en/k.md' }]);
+  const items = webmcp.flattenSearchIndex(
+    JSON.stringify({
+      '/a': { k: { title: 'T', body: 'B' }, 'k?id=s': { slug: '#/k?id=s', title: 'Section' } },
+      '/empty': {},
+      '/bad': { '#/api/me:x': { title: 'Bad', body: 'x' } },
+      '/untitled': { '#/u': { body: 'U' } },
+    }),
+    'en',
+  );
+  assert.deepEqual(items, [
+    { title: 'T', body: 'B\nSection\n', path: 'en/k.md' },
+    { title: '', body: 'U', path: 'en/u.md' },
+  ]);
   assert.deepEqual(webmcp.flattenSearchIndex('null', 'en'), []);
+  assert.deepEqual(webmcp.flattenSearchIndex(JSON.stringify({ '/n': null }), 'en'), []);
+});
+
+test('isPagePath accepts only language-prefixed .md page paths', () => {
+  for (const path of ['en/home.md', 'de/a/b-c_d.e.md', 'en/2024/x.md'])
+    assert.equal(webmcp.isPagePath(path), true, path);
+  for (const path of [
+    'fr/a.md',
+    'en/_a.md',
+    'en/.a.md',
+    'en/a/../b.md',
+    'en/a:b.md',
+    'en/a%2fb.md',
+    'en/a.MD',
+    'en//a.md',
+  ])
+    assert.equal(webmcp.isPagePath(path), false, path);
 });

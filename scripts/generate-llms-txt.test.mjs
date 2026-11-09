@@ -3,8 +3,15 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { test } from 'node:test';
-import { check, generate } from './generate-llms-txt.mjs';
+import { after, test } from 'node:test';
+import {
+  FIX_COMMAND,
+  MAX_DESCRIPTION_LENGTH,
+  MIN_DESCRIPTION_LENGTH,
+  STALE_PROBLEM,
+  check,
+  generate,
+} from './generate-llms-txt.mjs';
 
 const script = 'scripts/generate-llms-txt.mjs';
 const DESCRIPTION = 'Explains how the fixture page works and what it contains.';
@@ -13,9 +20,13 @@ function page(title, description = DESCRIPTION) {
   return `# ${title}\n<!-- llms-description: ${description} -->\n\nBody\n`;
 }
 
+const fixtures = [];
+after(() => fixtures.forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
+
 // Minimal docs tree: one ungrouped and one grouped page per language.
 function makeFixture(overrides = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'llms-txt-'));
+  fixtures.push(root);
   const files = {
     'docs/CNAME': 'docs.example.org\n',
     'docs/en/_sidebar.md':
@@ -61,9 +72,9 @@ test('generates llmstxt.org output: English before German, groups in sidebar ord
     [
       '# Attraccess',
       '',
-      output.split('\n')[2],
+      '> Attraccess is source-available machine access control and resource management software for industry, R&D and universities. It is self-hosted and combines Attractap RFID readers, flows, billing and plugins.',
       '',
-      output.split('\n')[4],
+      'The documentation pages are plain Markdown files. English pages live under https://docs.example.org/en/, German pages under https://docs.example.org/de/. The documentation site is https://docs.example.org/.',
       '',
       '## English',
       `- [Home](https://docs.example.org/en/home.md): ${DESCRIPTION}`,
@@ -79,7 +90,25 @@ test('generates llmstxt.org output: English before German, groups in sidebar ord
       '',
     ].join('\n'),
   );
-  assert.match(output.split('\n')[2], /^> /);
+});
+
+test('keeps the sidebar order when a heading comes back, and uses the innermost group', () => {
+  const root = makeFixture({
+    'docs/en/_sidebar.md':
+      '- [Home](home.md)\n- **Guides**\n  - [Setup](guides/setup.md)\n  - **Deep**\n    - [More](more.md)\n- [Last](last.md)\n',
+    'docs/en/more.md': page('More'),
+    'docs/en/last.md': page('Last'),
+  });
+  const { output, problems } = generate(root);
+  assert.deepEqual(problems, []);
+  const english = output.slice(output.indexOf('## English'), output.indexOf('## Deutsch'));
+  assert.deepEqual(
+    english
+      .split('\n')
+      .filter((line) => line.startsWith('## ') || line.startsWith('- ['))
+      .map((line) => line.split('](')[0]),
+    ['## English', '- [Home', '## English: Guides', '- [Setup', '## English: Deep', '- [More', '## English', '- [Last'],
+  );
 });
 
 test('--check passes for a fresh fixture', () => {
@@ -96,19 +125,21 @@ test('reports a page without a description', () => {
   const root = makeFixtureWithLlms();
   fs.writeFileSync(path.join(root, 'docs/de/guides/setup.md'), '# Einrichtung\n\nText\n');
   const problems = check(root).join('\n');
-  assert.match(problems, /docs\/de\/guides\/setup\.md: has 0 llms-description comments/);
-  assert.match(problems, /German/);
+  assert.match(
+    problems,
+    /docs\/de\/guides\/setup\.md: has no llms-description comment\. Add `<!-- llms-description: <one sentence in German> -->` directly below the first H1/,
+  );
 });
 
 test('reports a page with two descriptions', () => {
   const root = makeFixtureWithLlms();
   fs.appendFileSync(path.join(root, 'docs/en/home.md'), `<!-- llms-description: ${DESCRIPTION} -->\n`);
-  assert.match(check(root).join('\n'), /docs\/en\/home\.md: has 2 llms-description comments/);
+  assert.match(check(root).join('\n'), /docs\/en\/home\.md: has 2 llms-description comments\. Keep exactly one/);
 });
 
 test('ignores description comments shown inside code examples', () => {
   const example =
-    '\n```md\n<!-- llms-description: Example only. -->\n```\n\nUse `<!-- llms-description: inline -->` too.\n';
+    '\n```md\n<!-- llms-description: Example only. -->\n```\n\nUse `<!-- llms-description: inline -->` or `` <!-- llms-description: double --> `` too.\n';
   const root = makeFixtureWithLlms({ 'docs/en/home.md': page('Home') + example });
   assert.deepEqual(check(root), []);
 });
@@ -120,19 +151,57 @@ test('reports empty, multi-line and too long descriptions', () => {
     path.join(root, 'docs/en/guides/setup.md'),
     '# Setup\n<!-- llms-description: first line\nsecond line -->\n',
   );
-  fs.writeFileSync(path.join(root, 'docs/de/home.md'), page('Startseite', 'x'.repeat(201)));
+  fs.writeFileSync(path.join(root, 'docs/de/home.md'), page('Startseite', 'x'.repeat(MAX_DESCRIPTION_LENGTH + 1)));
+  fs.writeFileSync(
+    path.join(root, 'docs/de/guides/setup.md'),
+    page('Einrichtung', 'x'.repeat(MIN_DESCRIPTION_LENGTH - 1)),
+  );
   const problems = check(root).join('\n');
-  assert.match(problems, /docs\/en\/home\.md: has an empty llms-description/);
-  assert.match(problems, /docs\/en\/guides\/setup\.md: has a multi-line llms-description/);
-  assert.match(problems, /docs\/de\/home\.md: has an llms-description of 201 characters \(maximum 200\)/);
+  assert.match(problems, /docs\/en\/home\.md: has an empty llms-description\. Write one sentence/);
+  assert.match(
+    problems,
+    /docs\/en\/guides\/setup\.md: has a multi-line llms-description\. Put the sentence on one line/,
+  );
+  assert.match(problems, /docs\/de\/home\.md: has an llms-description of 201 characters\. Write 20-200 characters/);
+  assert.match(problems, /docs\/de\/guides\/setup\.md: has an llms-description of 19 characters/);
+});
+
+test('accepts descriptions of exactly 20 and 200 characters', () => {
+  const root = makeFixtureWithLlms({
+    'docs/en/home.md': page('Home', 'x'.repeat(MIN_DESCRIPTION_LENGTH)),
+    'docs/de/home.md': page('Startseite', 'x'.repeat(MAX_DESCRIPTION_LENGTH)),
+  });
+  assert.deepEqual(check(root), []);
+});
+
+test('requires the description directly below the first H1, allowing one blank line', () => {
+  const comment = `<!-- llms-description: ${DESCRIPTION} -->`;
+  const root = makeFixtureWithLlms({
+    'docs/en/home.md': `# Home\n\n${comment}\n\nBody\n`,
+    'docs/de/home.md': `\`\`\`sh\n# not a heading\n\`\`\`\n# Startseite\n${comment}\n`,
+  });
+  assert.deepEqual(check(root), []);
+  for (const [file, content] of [
+    ['docs/en/home.md', `# Home\n\nIntro first.\n\n${comment}\n`],
+    ['docs/en/home.md', `${comment}\n# Home\n`],
+    ['docs/en/home.md', `No heading at all.\n${comment}\n`],
+  ]) {
+    fs.writeFileSync(path.join(root, file), content);
+    assert.match(
+      check(root).join('\n'),
+      /docs\/en\/home\.md: has its llms-description in the wrong place\. Move it directly below the first H1/,
+      content,
+    );
+  }
 });
 
 test('reports a missing or stale llms.txt', () => {
   const root = makeFixtureWithLlms();
   fs.writeFileSync(path.join(root, 'docs/en/home.md'), page('Home', 'A changed description for the home page.'));
-  assert.match(check(root).join('\n'), /docs\/llms\.txt is missing or out of date/);
+  assert.deepEqual(check(root), [STALE_PROBLEM]);
+  assert.match(STALE_PROBLEM, /docs\/llms\.txt is missing or out of date\. Run `node scripts\/generate-llms-txt\.mjs`/);
   fs.rmSync(path.join(root, 'docs/llms.txt'));
-  assert.match(check(root).join('\n'), /docs\/llms\.txt is missing or out of date/);
+  assert.deepEqual(check(root), [STALE_PROBLEM]);
 });
 
 test('the CLI fails with the files and the fix command, then regenerates llms.txt', () => {
@@ -141,12 +210,19 @@ test('the CLI fails with the files and the fix command, then regenerates llms.tx
   const failing = spawnSync(process.execPath, [script, '--check', `--root=${root}`], { encoding: 'utf8' });
   assert.equal(failing.status, 1);
   assert.match(failing.stderr, /docs\/en\/home\.md/);
-  assert.match(failing.stderr, /node scripts\/generate-llms-txt\.mjs/);
-  assert.equal(spawnSync(process.execPath, [script, `--root=${root}`], { encoding: 'utf8' }).status, 1);
+  assert.ok(failing.stderr.includes(`Fix the pages above, then run \`${FIX_COMMAND}\``));
+  const llms = fs.readFileSync(path.join(root, 'docs/llms.txt'), 'utf8');
+  const refused = spawnSync(process.execPath, [script, `--root=${root}`], { encoding: 'utf8' });
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /Cannot generate llms\.txt:\n {2}- docs\/en\/home\.md: has no llms-description comment/);
+  assert.equal(fs.readFileSync(path.join(root, 'docs/llms.txt'), 'utf8'), llms, 'llms.txt is left alone');
 
   fs.writeFileSync(path.join(root, 'docs/en/home.md'), page('Home'));
   fs.writeFileSync(path.join(root, 'docs/llms.txt'), 'stale\n');
-  assert.equal(spawnSync(process.execPath, [script, '--check', `--root=${root}`], { encoding: 'utf8' }).status, 1);
+  const stale = spawnSync(process.execPath, [script, '--check', `--root=${root}`], { encoding: 'utf8' });
+  assert.equal(stale.status, 1);
+  assert.ok(stale.stderr.includes(STALE_PROBLEM));
+  assert.ok(!stale.stderr.includes('Fix the pages above'), 'no pages to fix when only llms.txt is stale');
   const written = spawnSync(process.execPath, [script, `--root=${root}`], { encoding: 'utf8' });
   assert.equal(written.status, 0, written.stderr);
   assert.equal(spawnSync(process.execPath, [script, '--check', `--root=${root}`], { encoding: 'utf8' }).status, 0);

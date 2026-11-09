@@ -1,8 +1,9 @@
 // ===== WebMCP: read-only docs tools for in-browser AI agents (experimental) =====
-// Classic script, no dependencies. Does nothing unless the browser exposes WebMCP
+// Classic script, no dependencies. Registers tools only when the browser exposes WebMCP
 // (document.modelContext, or navigator.modelContext in older drafts). Never throws, never logs.
+// It also keeps the hidden llms-description comments out of the Docsify search index.
 // The pure helpers are exported via module.exports so Node (tests, scripts/generate-llms-txt.mjs)
-// parses sidebars exactly like the browser does.
+// parses sidebars and description comments exactly like the browser does.
 (function () {
   'use strict';
 
@@ -11,9 +12,19 @@
   var FETCH_CONCURRENCY = 6;
   var SNIPPET_LENGTH = 200;
   var RELOAD_DELAY_MS = 150;
-  var SIDEBAR_LINK = /^\s*[-*+]\s+\[([^\]]+)\]\(([^)\s]+)\)\s*$/;
-  var SIDEBAR_GROUP = /^\s*[-*+]\s+\*\*(.+?)\*\*\s*$/;
-  var DESCRIPTION_COMMENT = /<!--\s*llms-description:([\s\S]*?)-->[ \t]*\r?\n?/g;
+  var MAX_PATH_LENGTH = 500;
+  var BULLET = '^(\\s*)(?:[-*+]|\\d+[.)])\\s+';
+  // Optional Docsify link title or options: [Title](page.md "tip") or [Title](page.md ':target=_blank')
+  var SIDEBAR_LINK = new RegExp(BULLET + '\\[([^\\]]+)\\]\\(([^)\\s]+)(?:\\s+(?:"[^"]*"|\'[^\']*\'))?\\)\\s*$');
+  var SIDEBAR_GROUP = new RegExp(BULLET + '\\*\\*(.+?)\\*\\*\\s*$');
+  // Allow list for page paths: "<lang>/<segments>.md", segments of letters, digits, ".", "_" and "-" that
+  // start with a letter or digit. Rules out "..", "_sidebar.md", "%" escapes and ":" (Docsify treats
+  // routes containing ":" as absolute URLs).
+  var PAGE_PATH = /^(de|en)\/(?:[A-Za-z0-9][A-Za-z0-9._-]*\/)*[A-Za-z0-9][A-Za-z0-9._-]*\.md$/;
+  // A fenced code block, an inline code span, or a description comment (group 4). Code is matched first,
+  // so comments shown as examples inside code are never treated as descriptions.
+  var CODE_OR_DESCRIPTION =
+    /^[ \t]*(`{3,})[^\n]*\n[\s\S]*?^[ \t]*\1`*[ \t]*\r?$|^[ \t]*(~{3,})[^\n]*\n[\s\S]*?^[ \t]*\2~*[ \t]*\r?$|(`+)[^\n]*?\3|<!--\s*llms-description:([\s\S]*?)-->[ \t]*\r?\n?/gm;
 
   // ----- Pure helpers -----
 
@@ -29,45 +40,64 @@
       .replace(/^\.?\//, '');
   }
 
-  // Docsify sidebar markdown -> [{ title, section, href }]. Bold-only list items start a section;
-  // unindented links reset to the plain (empty) section. External, non-.md and anchor links are skipped.
+  // Docsify sidebar markdown -> [{ title, section, href }]. Bold-only list items start a section that
+  // holds the more deeply indented links below it; external, non-.md and anchor links are skipped.
   function parseSidebar(markdown) {
-    var section = '';
+    var groups = [];
     var entries = [];
+    function closeGroups(indent) {
+      while (groups.length && groups[groups.length - 1].indent >= indent) groups.pop();
+    }
     String(markdown)
       .split(/\r?\n/)
       .forEach(function (line) {
         var group = SIDEBAR_GROUP.exec(line);
         var link = SIDEBAR_LINK.exec(line);
         if (group) {
-          section = group[1].trim();
-        } else if (link && isPageLink(link[2])) {
-          if (!/^\s/.test(line)) section = '';
-          entries.push({ title: link[1].trim(), section: section, href: normalizeHref(link[2]) });
+          closeGroups(group[1].length);
+          groups.push({ indent: group[1].length, name: group[2].trim() });
+        } else if (link && isPageLink(link[3])) {
+          closeGroups(link[1].length);
+          var section = groups.length ? groups[groups.length - 1].name : '';
+          entries.push({ title: link[2].trim(), section: section, href: normalizeHref(link[3]) });
         }
       });
     return entries;
   }
 
-  // Comment texts shown as examples in code blocks or code spans are not descriptions.
+  // Rewrites code and description comments: keep(match, description) gets description undefined for code.
+  function mapCodeAndDescriptions(markdown, keep) {
+    return String(markdown).replace(CODE_OR_DESCRIPTION, function (match, fence, tildes, ticks, text) {
+      return keep(match, text);
+    });
+  }
+
+  // The page without code blocks and code spans (description comments stay).
   function withoutCode(markdown) {
-    return String(markdown)
-      .replace(/^[ \t]*(```|~~~)[\s\S]*?^[ \t]*\1/gm, '')
-      .replace(/`[^`\n]*`/g, '');
+    return mapCodeAndDescriptions(markdown, function (match, description) {
+      return description === undefined ? '' : match;
+    });
   }
 
   // All llms-description comment texts (trimmed) found in a page, ignoring code examples.
   function findDescriptions(markdown) {
     var found = [];
-    var match;
-    var pattern = new RegExp(DESCRIPTION_COMMENT.source, 'g');
-    var text = withoutCode(markdown);
-    while ((match = pattern.exec(text))) found.push(match[1].trim());
+    mapCodeAndDescriptions(markdown, function (match, description) {
+      if (description !== undefined) found.push(description.trim());
+      return match;
+    });
     return found;
   }
 
+  // The page without its description comments; examples inside code stay.
   function stripDescriptions(markdown) {
-    return String(markdown).replace(DESCRIPTION_COMMENT, '');
+    return mapCodeAndDescriptions(markdown, function (match, description) {
+      return description === undefined ? match : '';
+    });
+  }
+
+  function isPagePath(path) {
+    return PAGE_PATH.test(path);
   }
 
   function collapse(text) {
@@ -77,14 +107,11 @@
   function makeSnippet(body, terms) {
     var text = collapse(body);
     var lower = text.toLowerCase();
-    var positions = terms
-      .map(function (term) {
-        return lower.indexOf(term);
-      })
-      .filter(function (index) {
-        return index >= 0;
-      });
-    var start = positions.length ? Math.max(0, Math.min.apply(null, positions) - 60) : 0;
+    var first = Infinity;
+    terms.forEach(function (term) {
+      if (lower.indexOf(term) >= 0) first = Math.min(first, lower.indexOf(term));
+    });
+    var start = first === Infinity ? 0 : Math.max(0, first - 60);
     var end = start + SNIPPET_LENGTH;
     return (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '');
   }
@@ -102,14 +129,15 @@
     return titleHits ? 100 + titleHits : 1;
   }
 
-  // items: [{ title, path, url, body }] -> best matches first (title matches above body matches),
-  // one result per path, ties keep input order.
+  // items: [{ title, path, body }] -> best matches first (title matches above body matches),
+  // one result per path, ties keep input order. Hidden description comments are never searched.
   function searchItems(items, query, limit) {
     var terms = collapse(query).toLowerCase().split(' ');
     var seen = {};
     return items
       .map(function (item, index) {
-        return { item: item, index: index, score: scoreItem(item, terms) };
+        var visible = { title: item.title, path: item.path, body: stripDescriptions(item.body || '') };
+        return { item: visible, index: index, score: scoreItem(visible, terms) };
       })
       .filter(function (entry) {
         return entry.score > 0;
@@ -125,8 +153,7 @@
       .slice(0, limit)
       .map(function (entry) {
         var item = entry.item;
-        var body = stripDescriptions(item.body || '');
-        return { title: item.title, path: item.path, url: item.url, snippet: makeSnippet(body || item.title, terms) };
+        return { title: item.title, path: item.path, snippet: makeSnippet(item.body || item.title, terms) };
       });
   }
 
@@ -139,15 +166,24 @@
     return language + '/' + (route || 'home') + '.md';
   }
 
-  // Flattens the localStorage value of the Docsify search plugin ({ page: { slug: { slug, title, body } } }).
+  // Turns the localStorage value of the Docsify search plugin ({ page: { slug: { slug, title, body } } },
+  // one entry per heading) into one item per page, so results match the fetch-based search: the page
+  // title comes from its first entry (the H1) and the body joins all sections.
   function flattenSearchIndex(raw, language) {
     var index = JSON.parse(raw);
     var items = [];
     Object.keys(index || {}).forEach(function (page) {
-      Object.keys(index[page]).forEach(function (key) {
-        var entry = index[page][key];
-        items.push({ title: entry.title, body: entry.body, path: slugToPath(entry.slug || key, language) });
+      var entries = Object.keys(index[page] || {}).map(function (key) {
+        return Object.assign({ slug: key }, index[page][key]);
       });
+      if (!entries.length) return;
+      var path = slugToPath(entries[0].slug, language);
+      var body = entries
+        .map(function (entry, position) {
+          return (position ? (entry.title || '') + '\n' : '') + (entry.body || '');
+        })
+        .join('\n');
+      if (isPagePath(path)) items.push({ title: entries[0].title || '', body: body, path: path });
     });
     return items;
   }
@@ -174,7 +210,7 @@
 
     function docs() {
       var api = win.AttraccessDocs;
-      if (!api) throw new Error('The docs site is not ready yet');
+      if (!api) throw new Error('The docs site is not ready yet; try again in a moment');
       return api;
     }
 
@@ -208,37 +244,43 @@
       return loc.origin + docs().docsBase + path;
     }
 
-    // Accepts "en/x.md", "/en/x.md" or a same-origin URL under the docs base. Returns { language, path, url }.
-    function resolvePath(input) {
-      if (typeof input !== 'string' || !input.trim() || input.length > 500)
-        throw new Error('path must be a non-empty string');
-      var base = docs().docsBase;
-      var raw = input.trim();
-      var decoded = raw;
+    function invalidPath(raw) {
+      return new Error(
+        'Invalid path (no "..", "//", backslashes, control characters or bad %-encoding allowed): ' + raw,
+      );
+    }
+
+    // Rejects inputs whose text could mean something other than what the URL parser resolves.
+    function checkPathText(raw) {
+      var decoded;
       try {
         decoded = decodeURIComponent(raw);
       } catch (e) {
-        throw new Error('Invalid path: ' + raw);
+        throw invalidPath(raw);
       }
       var withoutScheme = decoded.replace(/^https?:\/\//i, '');
-      if (/\\/.test(decoded) || withoutScheme.indexOf('//') >= 0 || /(^|\/)\.\.(\/|$)/.test(withoutScheme)) {
-        throw new Error('Invalid path: ' + raw);
-      }
+      var unsafe =
+        /[\u0000-\u001f\u007f\\]/.test(decoded) ||
+        withoutScheme.indexOf('//') >= 0 ||
+        /(^|\/)\.\.(\/|$)/.test(withoutScheme);
+      if (unsafe) throw invalidPath(raw);
+    }
+
+    // Accepts "en/x.md", "/en/x.md" or a same-origin URL under the docs base. Returns { language, path, url }.
+    function resolvePath(input) {
+      if (typeof input !== 'string' || !input.trim() || input.length > MAX_PATH_LENGTH)
+        throw new Error('path must be a non-empty string of at most ' + MAX_PATH_LENGTH + ' characters');
+      var base = docs().docsBase;
+      var raw = input.trim();
+      checkPathText(raw);
       var relative = /^\/(?!\/)/.test(raw) && raw.indexOf(base) !== 0 ? raw.slice(1) : raw;
       var url = new URL(relative, loc.origin + base);
       var rest = url.pathname.slice(base.length);
-      var language = rest.split('/')[0];
-      var invalid =
-        url.origin !== loc.origin ||
-        url.pathname.indexOf(base) !== 0 ||
-        LANGUAGES.indexOf(language) === -1 ||
-        !/\.md$/.test(rest) ||
-        /(^|\/)_/.test(rest);
-      if (invalid)
+      if (url.origin !== loc.origin || url.pathname.indexOf(base) !== 0 || !isPagePath(rest))
         throw new Error(
           'Path is outside the documentation pages (expected e.g. en/getting-started/overview.md): ' + raw,
         );
-      return { language: language, path: rest, url: loc.origin + url.pathname };
+      return { language: rest.split('/')[0], path: rest, url: loc.origin + url.pathname };
     }
 
     function loadSidebar(language) {
@@ -246,10 +288,14 @@
         absoluteUrl(language + '/_sidebar.md'),
         'Could not load the sidebar for language ' + language,
       ).then(function (markdown) {
-        return parseSidebar(markdown).map(function (entry) {
-          var path = language + '/' + entry.href;
-          return { title: entry.title, section: entry.section, path: path, url: absoluteUrl(path) };
-        });
+        return parseSidebar(markdown)
+          .map(function (entry) {
+            var path = language + '/' + entry.href;
+            return { title: entry.title, section: entry.section, path: path, url: absoluteUrl(path) };
+          })
+          .filter(function (page) {
+            return isPagePath(page.path);
+          });
       });
     }
 
@@ -262,12 +308,7 @@
         return cachedText(pages[index].url, 'page not found')
           .then(
             function (text) {
-              results[index] = {
-                title: pages[index].title,
-                path: pages[index].path,
-                url: pages[index].url,
-                body: text,
-              };
+              results[index] = { title: pages[index].title, path: pages[index].path, body: text };
             },
             function () {
               results[index] = null;
@@ -278,7 +319,9 @@
       var workers = [];
       for (var i = 0; i < Math.min(FETCH_CONCURRENCY, pages.length); i++) workers.push(worker());
       return Promise.all(workers).then(function () {
-        return results.filter(Boolean);
+        var loaded = results.filter(Boolean);
+        if (pages.length && !loaded.length) throw new Error('Could not load any documentation page');
+        return loaded;
       });
     }
 
@@ -314,7 +357,9 @@
 
     function getPage(input) {
       var target = resolvePath((input || {}).path);
-      return fetchText(target.url, 'Page not found: ' + target.path).then(textResult);
+      return fetchText(target.url, 'Page not found: ' + target.path + '. Use list_pages to get valid paths.').then(
+        textResult,
+      );
     }
 
     function validateQuery(input) {
@@ -337,8 +382,8 @@
 
     function navigateTo(input) {
       var target = resolvePath((input || {}).path);
-      var reloading = target.language !== docs().getLanguage();
-      docs().navigate(target.path);
+      var result = docs().navigate(target.path, RELOAD_DELAY_MS);
+      var reloading = Boolean(result && result.reloading);
       return Promise.resolve(jsonResult({ path: target.path, language: target.language, reloading: reloading }));
     }
 
@@ -362,6 +407,7 @@
     }
 
     var languageProperty = { type: 'string', enum: LANGUAGES };
+    var optionalLanguageProperty = { type: 'string', enum: LANGUAGES, description: 'Default: the language shown now' };
     var pathProperty = {
       type: 'string',
       description: 'Docs page path such as "en/getting-started/overview.md" (language prefix "en/" or "de/", .md file)',
@@ -376,10 +422,7 @@
         inputSchema: {
           type: 'object',
           properties: {
-            language: Object.assign(
-              { description: 'Defaults to the language currently shown on the site' },
-              languageProperty,
-            ),
+            language: optionalLanguageProperty,
           },
           additionalProperties: false,
         },
@@ -407,12 +450,9 @@
         inputSchema: {
           type: 'object',
           properties: {
-            query: { type: 'string', minLength: 1, maxLength: 200 },
-            language: Object.assign(
-              { description: 'Defaults to the language currently shown on the site' },
-              languageProperty,
-            ),
-            limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+            query: { type: 'string', minLength: 1, maxLength: 200, description: 'Words that must all appear' },
+            language: optionalLanguageProperty,
+            limit: { type: 'integer', minimum: 1, maximum: 20, default: 10, description: 'Maximum results' },
           },
           required: ['query'],
           additionalProperties: false,
@@ -424,7 +464,7 @@
         name: 'navigate_to',
         title: 'Open a documentation page',
         description:
-          'Shows a documentation page in the browser. Switches the site language (and reloads) when the page is in the other language.',
+          'Shows a documentation page in the browser. Paths come from list_pages or search_docs. A page in the other language switches the site language and reloads the page shortly after this result (reloading: true); the tools are then registered again.',
         inputSchema: {
           type: 'object',
           properties: { path: pathProperty },
@@ -438,7 +478,7 @@
         name: 'set_language',
         title: 'Switch the site language',
         description:
-          'Switches the docs site between German (de) and English (en). The page reloads, so tools are registered again afterwards.',
+          'Switches the docs site between German (de) and English (en). If the language changes, the page reloads shortly after this result and the tools are registered again; wait before calling another tool.',
         inputSchema: {
           type: 'object',
           properties: { language: languageProperty },
@@ -482,33 +522,72 @@
       return false;
     }
 
-    return { tools: tools, register: register, resolvePath: resolvePath };
+    return { tools: tools, register: register };
+  }
+
+  // Docsify's search plugin loads pages through window.Docsify.get and indexes their raw text, which
+  // would include the hidden description comments. Wraps get so the plugin receives the text without them.
+  function installSearchFilter(win) {
+    var docsify = win.Docsify;
+    if (!docsify || typeof docsify.get !== 'function' || docsify.get.withoutDescriptions) return false;
+    var originalGet = docsify.get;
+    function get() {
+      var request = originalGet.apply(this, arguments);
+      return {
+        then: function (onSuccess, onError) {
+          return request.then(function (text) {
+            var args = Array.prototype.slice.call(arguments);
+            if (typeof text === 'string') args[0] = stripDescriptions(text);
+            return onSuccess.apply(this, args);
+          }, onError);
+        },
+        abort: request.abort,
+      };
+    }
+    get.withoutDescriptions = true;
+    docsify.get = get;
+    return true;
+  }
+
+  // Runs in the browser: adds the search filter as a Docsify plugin and registers the WebMCP tools.
+  function start(win) {
+    var config = win.$docsify;
+    if (config) {
+      config.plugins = (config.plugins || []).concat(function () {
+        installSearchFilter(win);
+      });
+    }
+    return createWebMcp({
+      window: win,
+      document: win.document,
+      navigator: win.navigator,
+      location: win.location,
+      localStorage: win.localStorage,
+      fetch: win.fetch.bind(win),
+      AbortController: win.AbortController,
+    }).register();
   }
 
   var api = {
     parseSidebar: parseSidebar,
+    withoutCode: withoutCode,
     findDescriptions: findDescriptions,
     stripDescriptions: stripDescriptions,
+    isPagePath: isPagePath,
     searchItems: searchItems,
     makeSnippet: makeSnippet,
     slugToPath: slugToPath,
     flattenSearchIndex: flattenSearchIndex,
     createWebMcp: createWebMcp,
+    installSearchFilter: installSearchFilter,
+    start: start,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     try {
-      createWebMcp({
-        window: window,
-        document: document,
-        navigator: window.navigator,
-        location: window.location,
-        localStorage: window.localStorage,
-        fetch: window.fetch.bind(window),
-        AbortController: window.AbortController,
-      }).register();
+      start(window);
     } catch (e) {
       // WebMCP is optional; stay silent
     }

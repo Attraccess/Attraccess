@@ -75,29 +75,12 @@ window.$docsify = {
   routerMode: 'hash',
   plugins: [
     function (hook, vm) {
-      hideDescriptionsFromSearch();
       hook.doneEach(function () {
         updateLangSwitcher();
       });
     },
   ],
 };
-
-// The search plugin indexes raw page text, including the hidden llms.txt description comments.
-// Strip them from the text it fetches so they never show up in results or snippets.
-function hideDescriptionsFromSearch() {
-  var originalGet = window.Docsify.get;
-  window.Docsify.get = function () {
-    var request = originalGet.apply(this, arguments);
-    return {
-      then: function (onSuccess, onError) {
-        return request.then(function (text) {
-          return onSuccess(String(text).replace(/<!--\s*llms-description:[\s\S]*?-->\s*\n?/g, ''));
-        }, onError);
-      },
-    };
-  };
-}
 
 // ===== Language Switching =====
 // Returns true when the language changes (the page then reloads after delayMs).
@@ -110,15 +93,20 @@ function setLanguage(lang, delayMs) {
   return true;
 }
 
-// Opens a docs page by its language-prefixed path (e.g. "en/getting-started/overview.md").
-// Other-language pages use the "#/<lang>/..." hash handled at load, followed by a reload.
-function navigateDocs(path) {
-  var parts = /^(de|en)\/(.*?)(\.md)?$/.exec(path);
-  if (!parts) return false;
-  var sameLang = parts[1] === currentLang;
-  window.location.hash = '#/' + (sameLang ? '' : parts[1] + '/') + (parts[2] === 'home' ? '' : parts[2]);
-  if (!sameLang) setLanguage(parts[1], 150);
-  return !sameLang;
+// Opens a docs page by its language-prefixed path (e.g. "en/getting-started/overview.md") and returns
+// { reloading }. Other-language pages get the "#/<lang>/..." hash handled at load, then a reload after
+// delayMs. pushState does not fire hashchange, so Docsify never tries the route under the old language.
+function navigateDocs(path, delayMs) {
+  var parts = /^(de|en)\/((?:[A-Za-z0-9][A-Za-z0-9._-]*\/)*[A-Za-z0-9][A-Za-z0-9._-]*)\.md$/.exec(path);
+  if (!parts) throw new Error('Not a documentation page path: ' + path);
+  var route = parts[2] === 'home' ? '' : parts[2];
+  if (parts[1] === currentLang) {
+    window.location.hash = '#/' + route;
+    return { reloading: false };
+  }
+  window.history.pushState(null, '', window.location.pathname + '#/' + parts[1] + '/' + route);
+  setLanguage(parts[1], delayMs);
+  return { reloading: true };
 }
 
 // Small API for scripts such as webmcp.js
