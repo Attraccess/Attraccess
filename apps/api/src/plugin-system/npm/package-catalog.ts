@@ -193,7 +193,7 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
     const fallback = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
     const name = resolvedName ?? packageName(fallback) ?? 'Unknown package';
     const version = typeof fallback.version === 'string' ? fallback.version : null;
-    const classified = this.classification.classify(name, registry.url, publisher);
+    const classified = this.classification.classify(name, registry.url);
     try {
       const { pkg } = parseNpmPluginPackage(value, this.hostVersion());
       return {

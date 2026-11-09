@@ -7,9 +7,9 @@ installed through the admin [Plugins](plugins/installing-plugins.md) page.
 
 ## Official plugin classification
 
-Plugin packages are Community by default. Attraccess marks a package Official only when its exact npm package name and registry source are listed in the core-owned allowlist at `apps/api/src/plugin-system/plugin-classification.service.ts`. Package metadata cannot grant this label.
+Plugin packages are Community by default. Attraccess marks a package Official only when it is installed from the public npm registry (`https://registry.npmjs.org`) and its name starts with `@attraccess/plugin-`. npm only lets members of the `attraccess` npm organization publish to the `@attraccess` scope, so the scope is what proves the package comes from Attraccess. Package metadata (such as an `official` flag) cannot grant this label, and the same name served by any other registry or mirror stays Community. The rule lives in `apps/api/src/plugin-system/plugin-classification.service.ts`.
 
-To add or remove an Official package, update that allowlist in a normal pull request. The review must confirm the exact registry host, package identity, and expected registry publisher when that metadata is available. Include tests for the approved source and for the same name from another registry. Official means maintained or approved by Attraccess; it does not imply a security sandbox or guarantee of safety. Installers must still review the source and requested permissions.
+Official packages are published from this repository's GitHub Actions workflows through npm trusted publishing, so each version carries a provenance attestation that links it to the commit and workflow that built it. Official means maintained by Attraccess; it does not imply a security sandbox or guarantee of safety. Installers must still review the source and requested permissions.
 
 This guide is a complete walkthrough. It follows a working example —
 **`plugin-hello-world`** — that exercises every core capability: a backend

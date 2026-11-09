@@ -1,6 +1,11 @@
 {
   "name": "@attraccess/api-client",
   "version": "1.10.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Attraccess/Attraccess.git",
+    "directory": "libs/api-client"
+  },
   "type": "commonjs",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
