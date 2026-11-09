@@ -23,7 +23,8 @@ import { fixtureGitEnv } from '../../../scripts/test-utils/git-env.mjs';
 
 // Each test gets its own repository with one root commit, so tests don't depend on each other's order.
 let repo;
-// pre-commit exports GIT_INDEX_FILE; without fixtureGitEnv `git add` here would overwrite the real index.
+// Git hooks export repository variables (GIT_INDEX_FILE, GIT_DIR); fixture repos must not inherit them,
+// or `git add` here would overwrite the real index.
 const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', env: fixtureGitEnv() }).trim();
 const commit = (file, message) => {
   mkdirSync(dirname(join(repo, file)), { recursive: true });
@@ -238,7 +239,7 @@ test('affectedSince sends changed files to nx on stdin, without workflow files o
   const head = commit('apps/b/other.ts', 'move file out of plugin a');
   const calls = [];
   const exec = (cmd, args, options = {}) => {
-    if (cmd === 'git') return execFileSync('git', args, { cwd: repo, encoding: 'utf8' });
+    if (cmd === 'git') return execFileSync('git', args, { cwd: repo, encoding: 'utf8', env: fixtureGitEnv() });
     calls.push({ args, input: options.input });
     return JSON.stringify(['from-nx']);
   };

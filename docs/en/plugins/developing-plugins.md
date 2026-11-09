@@ -1241,9 +1241,9 @@ so they share the workspace toolchain, caching and CI.
   same anatomy as any plugin (`package.json`, `backend/plugin.ts`,
   `frontend/src/plugin.tsx`, …).
 - **nx tag:** every plugin app is tagged **`type:plugin`** in its `project.json`.
-  CI targets the set with `--projects=tag:type:plugin` (test + pack the plugins),
-  so the generic full build skips it. Lint and typecheck still cover plugin apps.
-  The exclusions for lint, typecheck and build live in one place,
+  CI's `plugins` job tests and packs every plugin app (selected by that tag), so
+  the generic full build skips them. Lint and typecheck no longer exclude plugin
+  apps. The exclusions for lint, typecheck and build live in one place,
   `scripts/ci-nx-exclude.mjs`. List the plugin apps any time with:
 
   ```bash
@@ -1292,7 +1292,7 @@ so they share the workspace toolchain, caching and CI.
    pnpm nx run-many --target=zip --projects=tag:type:plugin
   ```
 
-- **CI:** pull requests test and pack affected plugin apps. Publishing is decided from what npm has, not
+- **CI:** pull requests test and pack every plugin app. Publishing is decided from what npm has, not
   from the pushed commits (`apps/plugins/scripts/plugin-publish-plan.mjs`). Every published manifest records the
   commit it was built from in `gitHead` (plus `attraccess.publishedCommit` as a fallback). For each plugin the plan
   reads the commit on the channel's dist-tag and publishes only if the plugin's inputs (its own files, the plugin
