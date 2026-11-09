@@ -15,7 +15,7 @@ export function stableVersion(value, description) {
  * change count as source, otherwise `message` (if given) replaces the default "no changes" result.
  */
 export function checkReleaseVersion({ base, versionFile, isSource, readVersion, label, inspectChanges }) {
-  // Large files exceed execFileSync's 1 MiB default, which would make `git show` fail.
+  // Large diffs and files can exceed execFileSync's 1 MiB default output limit.
   const git = (...args) =>
     execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 });
   const ancestor = git('merge-base', base, 'HEAD').trim();
@@ -23,7 +23,10 @@ export function checkReleaseVersion({ base, versionFile, isSource, readVersion, 
   // `--full-tree` keeps paths relative to the repository root, like `rev:path`, even when run from a subdirectory.
   const show = (rev, path) =>
     git('ls-tree', '--full-tree', '--name-only', rev, '--', path).trim() ? git('show', `${rev}:${path}`) : null;
-  const paths = git('diff', '--name-only', '-z', `${ancestor}...HEAD`, '--').split('\0').filter(Boolean);
+  // `--no-renames` lists both sides of a rename, so moving a source file away still counts as a source change.
+  const paths = git('diff', '--name-only', '--no-renames', '-z', `${ancestor}...HEAD`, '--')
+    .split('\0')
+    .filter(Boolean);
   const changed = paths.filter(isSource);
   let unchangedMessage;
   if (!changed.length && inspectChanges) {

@@ -30,21 +30,28 @@ Migration retains the previous broker association for credential cleanup. When t
 
 `apps/plugins/wago/cc100-runtime/manifest.json` is the manually maintained
 runtime version file. Increase `runtimeVersion` when changing
-runtime source, shared runtime contracts, the runtime Dockerfile, the manifest or
-host-side deployment code (installer, supervisor, update shell, hardware deployment).
+runtime source, shared runtime contracts, the runtime Dockerfile, the manifest,
+host-side deployment code (installer, supervisor, update shell, hardware deployment)
+or the runtime build and packaging scripts and the plugin `project.json`.
 Discovery, permanent heartbeats and packaged assets all use this version. The
 required `wago-runtime-version` CI job rejects such changes without a strictly
-higher stable `major.minor.patch` version. Documentation, tests and simulator-only
-changes do not require a bump.
+higher stable `major.minor.patch` version. Documentation, spec files and simulator-only
+changes do not require a bump (simulator files still go through the build comparison
+below).
 
-Dependency and tooling changes (`package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
-patches, `tsconfig.base.json`, `nx.json`, Node/pnpm versions, CI workflows) require a
-bump only when the shipped runtime changes. The job builds
-`plugin-wago:build-cc100-runtime` at the merge-base and at HEAD (separate checkouts,
-Nx cache bypassed) and compares a hash of the built `dist/apps/wago-cc100-runtime`
-bundle, the runtime Dockerfile and the manifest without `runtimeVersion`. esbuild's
-module path comments are ignored. If the hashes differ, the job names the changed
-files and requires a bump; if they match, no bump is needed. Run it locally with
+Dependency and build-configuration changes (`package.json` including `packageManager`,
+`pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, `.pnpmfile.*`, `patches/`,
+`tsconfig.base.json`, `nx.json`, and other files under `apps/plugins/wago/`) require a
+bump only when the shipped runtime changes. For these, the job builds
+`plugin-wago:build-cc100-runtime` at the merge-base and at HEAD in separate checkouts
+without the Nx cache, and compares the built `dist/apps/wago-cc100-runtime` bundle, the
+runtime Dockerfile and the manifest without `runtimeVersion`. Bundled module paths are
+ignored, so a new pnpm store path with identical code does not count. If anything else
+differs, the job lists the changed files and requires a bump. `.nvmrc` and CI workflow
+or action changes never require a bump.
+
+The comparison takes several minutes and checks committed changes only. A
+`runtimeVersion` increase always skips it. Run it locally with
 `node scripts/check-wago-runtime-version.mjs origin/main`.
 
 Managed updates keep an installed runtime of the same version, even if rebuilding
