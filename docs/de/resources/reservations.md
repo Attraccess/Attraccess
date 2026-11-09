@@ -169,7 +169,16 @@ oder andere personenbezogene Daten, auch nicht für Personen, die sonst Namen se
 | Eine Buchung läuft und ist eingecheckt (oder Check-in ist ausgeschaltet)                 | „Reserviert bis 16:00“     | „Reserviert 14:00-16:00“                      |
 
 Die Listenzeile fasst 24 Zeichen, deshalb ist der offene Check-in dort gekürzt; eine Frist an einem anderen Tag
-lautet „Res., Check-in Di 00:05“. Die Details haben immer den vollen Text.
+lautet „Res., Check-in Di 00:05“. Die Details haben immer den vollen Text. Der Sperrbildschirm der Ressource zeigt
+dieselbe öffentliche Zeile wie die Listenzeile, anstelle von „Verfügbar“ (nicht, solange die Ressource in Benutzung
+oder in Wartung ist).
+
+**Die aktuelle Uhrzeit.** Jeder Reader-Bildschirm zeigt die aktuelle Zeit in der Fußleiste (der Sperrbildschirm und
+die Liste ohne Anmeldung haben stattdessen eine große Uhr), so lässt sich „Check-in bis 14:15“ auf jetzt beziehen.
+Das Plugin schreibt die Uhrzeit nicht in seine Texte. Der Reader nutzt für diese Uhr die [Zeitzone](#zeitzone) des
+Plugins, daher stimmen Uhr und Reservierungszeiten immer überein, auch wenn der Server in einer anderen Zone läuft;
+ändert sich die Zeitzone, wechseln die Reader sofort. Siehe
+[Uhrzeit und Zeitzone](attractap/reader-ui.md#uhrzeit-und-zeitzone).
 
 Die Zeiten sind Beginn und Ende der Buchung ohne Puffer. Die Texte folgen der Standardsprache der Installation.
 

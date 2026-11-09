@@ -206,5 +206,6 @@ struct ReaderWorkflow
     void testWallClock();
     void testTimeouts();
     void testUiPlugins();
+    void testFooterClockAndLockscreenStatus();
     void testFirmwareUpdate(bool reset);
 };

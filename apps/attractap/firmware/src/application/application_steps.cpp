@@ -22,12 +22,14 @@ void Application::setupUiCallbacks()
       queued = false; // updates that land from now on queue a new refresh
       Display::resourceDetailsScreen.refreshUiSlots();
       Display::resourceListScreen.refreshUiSlots();
+      Display::lockscreen.refreshUiSlots();
     }, nullptr);
   });
 
   ui::setSlotsExpiredCallback([] {
     Display::resourceDetailsScreen.refreshUiSlots();
     Display::resourceListScreen.refreshUiSlots();
+    Display::lockscreen.refreshUiSlots();
   });
 
   this->api.setUiStepRequestCallback([this](const ui::StepRequest &step) {

@@ -13,6 +13,14 @@ all of this is called **Reader display**. Plugin developers find the technical c
   example "Reserved 14:00–16:00". The reader's own status (in use, maintenance, unavailable, introduction
   required) always comes first; a plugin note only appears when none of those applies. A reader nobody is signed
   in to never shows personal information or other people's names.
+- **Status on the lock screen:** the screen of a resource nobody is signed in to shows the same public status as
+  the list, for example "Reserved until 16:00", in place of "Available". In use, maintenance and the other core
+  statuses win and hide it. It never shows a name, and what a card holder saw while signed in is gone as soon as
+  they sign out.
+- **The time:** a clock in the footer bar, between the device name and the firmware version, shows the current
+  time as HH:MM on every screen except those that already show the big clock (the lock screen and the signed-out
+  list). It lets members relate "check in by 21:20" to now. A reader that does not know the time yet shows no
+  clock.
 - **Confirmation before a start:** the reader shows the plugin's question, for example "This machine is reserved
   at 14:00. Start anyway?", with **Cancel** and **Start**. Cancelling, or waiting until the question disappears
   (after about a minute), starts nothing; the reader returns to the resource. On the web app the same question
@@ -28,13 +36,26 @@ all of this is called **Reader display**. Plugin developers find the technical c
   question at that moment; tap the card again.
 - **Reader offline:** while a reader has no connection to the server, nothing starts and plugin notes disappear.
 
+## Time and time zone
+
+Readers show local time in 24-hour format. Each reader uses **one** time zone: the time zone of the plugin that
+writes times on its screen (the Reservations plugin's **Timezone** setting) when a plugin sets one, otherwise the
+server's own (`TZ`). So the clock and a text like "check in by 14:15" always agree, and so do the start times of
+sessions. If an admin changes the plugin's timezone, the readers switch at once; the offset also follows daylight
+saving time by itself. If two plugins ask for different zones on one reader, the reader uses the first plugin's
+and an alert **Plugins disagree on the reader time zone** tells admins (see [Alerts](#alerts)). Readers without a
+screen show no time.
+
 ## Which readers can show what
 
-| Reader                            | Notes on screen | Confirmation before a start             | Refused start    | Question after a stop |
-| --------------------------------- | --------------- | --------------------------------------- | ---------------- | --------------------- |
-| Attractap Touch, current firmware | yes             | on screen                               | reason on screen | yes                   |
-| Attractap Lite (LEDs only)        | no              | second card tap, if allowed (see below) | red flash        | no (default answer)   |
-| Attractap Touch, older firmware   | no              | no (see below)                          | generic error    | no (default answer)   |
+| Reader                            | Notes on screen | Clock and lock-screen status | Confirmation before a start             | Refused start    | Question after a stop |
+| --------------------------------- | --------------- | ---------------------------- | --------------------------------------- | ---------------- | --------------------- |
+| Attractap Touch, current firmware | yes             | yes                          | on screen                               | reason on screen | yes                   |
+| Attractap Lite (LEDs only)        | no              | no                           | second card tap, if allowed (see below) | red flash        | no (default answer)   |
+| Attractap Touch, older firmware   | no              | no                           | no (see below)                          | generic error    | no (default answer)   |
+
+The footer clock and the lock-screen status need an Attractap Touch with current firmware. Lite has no screen, and
+older firmware shows neither.
 
 Lite readers answer with their LEDs: an amber half ring followed by a red flash means the start was refused. An
 amber ring that slowly drains, with one beep, means "tap your card again to confirm". The warning pattern means
@@ -74,11 +95,12 @@ cannot control LEDs or sounds directly.
 **Reader display alerts** appear at the bottom of the plugin settings and, for one reader, in the reader editor's
 Reader display tab. Each alert says what is affected and what to do:
 
-| Alert                      | What it means                                                                                                                            | What to do                                                                                                                                   | Ends by itself                         |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| Plugin check keeps failing | The plugin failed to check several starts in a row and is no longer asked. Starts follow "If the plugin's check fails" of each resource. | The plugin is asked again after 60 seconds; **Clear** asks it right away. If it keeps failing, check the plugin's log or disable the plugin. | when the plugin answers again          |
-| Plugin failed to load      | The plugin could not be loaded. Its checks and confirmations are not applied; starts go ahead without them.                              | Check the plugin's error on the plugins page, then reload or reinstall it.                                                                   | when the plugin loads again            |
-| Reader keeps crashing      | The reader restarted repeatedly. Plugin notes are paused on it and confirmations follow "Readers without a screen".                      | Wait, or **Clear** to turn notes back on right away. If it keeps crashing, update the reader's firmware or report the crash.                 | after 30 minutes without another crash |
+| Alert                                    | What it means                                                                                                                            | What to do                                                                                                                                   | Ends by itself                         |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Plugin check keeps failing               | The plugin failed to check several starts in a row and is no longer asked. Starts follow "If the plugin's check fails" of each resource. | The plugin is asked again after 60 seconds; **Clear** asks it right away. If it keeps failing, check the plugin's log or disable the plugin. | when the plugin answers again          |
+| Plugin failed to load                    | The plugin could not be loaded. Its checks and confirmations are not applied; starts go ahead without them.                              | Check the plugin's error on the plugins page, then reload or reinstall it.                                                                   | when the plugin loads again            |
+| Reader keeps crashing                    | The reader restarted repeatedly. Plugin notes are paused on it and confirmations follow "Readers without a screen".                      | Wait, or **Clear** to turn notes back on right away. If it keeps crashing, update the reader's firmware or report the crash.                 | after 30 minutes without another crash |
+| Plugins disagree on the reader time zone | Two plugins want different time zones on one reader. It shows the first plugin's zone and ignores the other. The alert names both zones. | Set the same time zone in both plugins.                                                                                                      | when you clear it                      |
 
 Clearing a plugin alert needs the permission to manage plugins, clearing a reader alert the permission to manage
 readers. Raising and clearing alerts is written to the audit log.

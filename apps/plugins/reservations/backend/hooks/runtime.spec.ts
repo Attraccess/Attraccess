@@ -47,7 +47,7 @@ describe('hook runtime', () => {
         publishHookServices({
           preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
           sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
-          readerUi: { getSlotContributions: async () => [] },
+          readerUi: { getSlotContributions: async () => [], getTimeZone: async () => undefined },
         }),
       10,
     );
@@ -63,7 +63,7 @@ describe('hook runtime', () => {
         publishHookServices({
           preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
           sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
-          readerUi: { getSlotContributions },
+          readerUi: { getSlotContributions, getTimeZone: async () => undefined },
         }),
       10,
     );
@@ -75,7 +75,7 @@ describe('hook runtime', () => {
     publishHookServices({
       preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
       sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
-      readerUi: { getSlotContributions: async () => [] },
+      readerUi: { getSlotContributions: async () => [], getTimeZone: async () => undefined },
     });
     publishHookServices(null);
     await expect(resolveHookServices(Date.now() + 10)).rejects.toThrow();

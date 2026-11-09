@@ -51,7 +51,7 @@ export function createDevicesMetrics(registry: Registry) {
 
   const readerUiOpenAlerts = new Gauge({
     name: 'attraccess_reader_ui_open_alerts',
-    help: 'Open reader UI admin alerts by kind (breaker-open, load-failure, crash-loop). Plugin contributions are degraded while an alert is open.',
+    help: 'Open reader UI admin alerts by kind (breaker-open, load-failure, crash-loop, time-zone-conflict). Plugin contributions are degraded while an alert is open.',
     labelNames: ['kind'],
     registers: [registry],
   });

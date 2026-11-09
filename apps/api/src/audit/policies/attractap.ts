@@ -156,7 +156,7 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   origin: oneOf('web', 'api', 'reader', 'supervision'),
   policy: oneOf('block', 'card-confirm', 'allow-with-warning'),
   state: oneOf('open', 'closed', 'reset', 'probe', 'created', 'cleared', 'half-open'),
-  kind: oneOf('breaker-open', 'load-failure', 'crash-loop'),
+  kind: oneOf('breaker-open', 'load-failure', 'crash-loop', 'time-zone-conflict'),
   setting: oneOf('noScreenPolicy', 'widgetsEnabled', 'hookFailurePolicy', 'readerWidgetsEnabled'),
   value: (value) => typeof value === 'string' || typeof value === 'boolean',
   reason: (value) => typeof value === 'string' && /^[a-z0-9-]{1,40}$/.test(value),

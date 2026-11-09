@@ -232,6 +232,14 @@ void Application::dismissSessionSummary() {
 
 void Application::logoutReader() {
   this->closeUiStep();
+  // Row statuses received during this card session (the card holder's own booking) must not reach the lock
+  // screen or the signed-out list. The server sends the signed-out ones again as soon as it hears the session ended.
+  if (ui::slotCache().clearSlot(ui::SlotId::ListRowStatus) > 0) {
+    Display::asyncCall([](void *) {
+      Display::lockscreen.refreshUiSlots();
+      Display::resourceListScreen.refreshUiSlots();
+    }, nullptr);
+  }
   // The server keeps the verified user for this connection until told otherwise.
   this->api.sendReaderSessionEnded();
   // The card session is over: tell the server, and drop what only the signed-in user may see.

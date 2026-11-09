@@ -6,6 +6,7 @@ int main(int argc, char **argv)
     if (argc > 1 && std::string(argv[1]) == "--ui") {
         ReaderWorkflow workflow("");
         workflow.testUiPlugins();
+        workflow.testFooterClockAndLockscreenStatus();
         std::filesystem::remove_all(workflow.storage);
         std::cout << "PASS ATT-1187 plugin UI journeys\n";
         return 0;

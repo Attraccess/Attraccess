@@ -1,3 +1,5 @@
+import { ReaderTimeZoneService } from './reader-time-zone.service';
+import { readerTimeZoneStub } from './reader-time-zone.test-fixture';
 import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Provider } from '@nestjs/common';
@@ -113,6 +115,7 @@ export function gatewayProviders(
 ): Provider[] {
   return [
     AttractapGateway,
+    { provide: ReaderTimeZoneService, useValue: readerTimeZoneStub() },
     WebsocketService,
     { provide: AttractapService, useValue: attractapService },
     { provide: UsersService, useValue: {} },

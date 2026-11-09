@@ -7,6 +7,7 @@
 #include "../../../api/api.hpp"
 #include "../../shared/actionOverlay.hpp"
 #include <functional>
+#include "../../ui/ui_record.hpp"
 
 class Lockscreen : public IScreen
 {
@@ -30,6 +31,8 @@ public:
     void setUsageInfo(bool hasActiveUsage, const char *username, bool isUnderMaintenance);
     // Machines with several parallel sessions show "In use k/N" or "Full" instead of one name.
     void setUsageInfo(const API::ResourceBrief &resource);
+    // Re-reads the plugin status line now (slot updates, expiry); the loop does it twice a second.
+    void refreshUiSlots() { this->patchPluginStatus(); }
 
 private:
     ActionOverlay overlay;
@@ -55,6 +58,15 @@ private:
     bool multiSession = false;
     uint16_t occupancyActiveCount = 0;
     uint16_t occupancyLimit = 1;
+
+    // The reservation (or other plugin) status of the resource, shown in place of "Available". Only ever a
+    // contribution built without a card session: the firmware drops row contributions when a card session ends.
+    uint32_t resourceId = 0;
+    lv_obj_t *pluginStatus = nullptr;
+    uint32_t pluginStamp = 0;
+    uint32_t pluginPolledAt = 0;
+    bool coreStatusShown = true;
+    void patchPluginStatus();
 
     void updateUsageInfo();
     void initWallClock();

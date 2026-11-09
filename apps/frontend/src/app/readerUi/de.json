@@ -67,14 +67,16 @@
     "kind": {
       "breaker-open": "Plugin-Prüfung schlägt wiederholt fehl",
       "load-failure": "Plugin konnte nicht geladen werden",
-      "crash-loop": "Reader stürzt wiederholt ab"
+      "crash-loop": "Reader stürzt wiederholt ab",
+      "time-zone-conflict": "Plugins sind sich bei der Reader-Zeitzone uneinig"
     },
     "clearError": "Der Alarm konnte nicht aufgehoben werden",
     "readerFallback": "Reader #{{id}}",
     "description": {
       "breaker-open": "{{plugin}} konnte mehrere Starts hintereinander nicht prüfen und wird deshalb nicht mehr gefragt. Bis es wieder antwortet, folgen Starts der Einstellung „Wenn die Prüfung des Plugins fehlschlägt“ der jeweiligen Ressource. Nach 60 Sekunden wird das Plugin automatisch erneut gefragt; „Aufheben“ fragt es sofort. Passiert das wiederholt, prüfen Sie das Log des Plugins oder deaktivieren Sie das Plugin.",
       "load-failure": "{{plugin}} konnte nicht geladen werden. Seine Startprüfungen und Bestätigungen werden daher nicht angewendet, Starts laufen ohne sie. Prüfen Sie den Fehler des Plugins auf dieser Seite und laden oder installieren Sie es neu. Der Alarm endet, sobald das Plugin wieder lädt.",
-      "crash-loop": "{{reader}} ist wiederholt abgestürzt. Plugin-Widgets sind auf ihm pausiert, Bestätigungen folgen dort der Einstellung „Reader ohne Bildschirm“ der Ressource. Die Widgets kehren nach 30 Minuten ohne weiteren Absturz zurück oder sofort mit „Aufheben“. Stürzt der Reader weiter ab, aktualisieren Sie seine Firmware oder melden Sie den Absturz."
+      "crash-loop": "{{reader}} ist wiederholt abgestürzt. Plugin-Widgets sind auf ihm pausiert, Bestätigungen folgen dort der Einstellung „Reader ohne Bildschirm“ der Ressource. Die Widgets kehren nach 30 Minuten ohne weiteren Absturz zurück oder sofort mit „Aufheben“. Stürzt der Reader weiter ab, aktualisieren Sie seine Firmware oder melden Sie den Absturz.",
+      "time-zone-conflict": "Zwei Plugins wollen auf {{reader}} unterschiedliche Zeitzonen. Der Reader zeigt die Zeitzone des ersten Plugins und ignoriert {{plugin}}. Beide Zonen stehen im Text des Alarms; stellen Sie in beiden Plugins dieselbe Zeitzone ein. Der Alarm endet mit „Aufheben“."
     }
   }
 }

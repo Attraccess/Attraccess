@@ -19,6 +19,8 @@ public:
     void destroy() override;
     void setResourceList(const API::ResourceList &resources);
     void setAuthenticatedUser(const std::string &username);
+    // The signed-out header shows the wall clock (once the time is known): no second clock elsewhere.
+    bool showsClockHeader() const { return clockHeader && username.empty(); }
     void setResourceSelectionCallback(std::function<void(const API::ResourceBrief &)> callback) { selectionCallback = std::move(callback); }
     void setActionCallback(std::function<void(const API::ResourceBrief &, ResourceListAction)> callback) { actionCallback = std::move(callback); }
     void setLogoutCallback(std::function<void()> callback) { logoutCallback = std::move(callback); }

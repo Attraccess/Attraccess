@@ -17,7 +17,10 @@ export interface HookServices {
     evaluateStartBlocked(ctx: StartBlockedContext, deadline?: number): Promise<StartBlockedState | null>;
   };
   sessionEnd: { evaluate(ctx: SessionEndContext, deadline?: number): Promise<SessionEndResult> };
-  readerUi: { getSlotContributions(ctx: ReaderUiContext, deadline?: number): Promise<ReaderSlotContribution[]> };
+  readerUi: {
+    getSlotContributions(ctx: ReaderUiContext, deadline?: number): Promise<ReaderSlotContribution[]>;
+    getTimeZone(ctx: { readerId: number; resourceId: number }, deadline?: number): Promise<string | undefined>;
+  };
 }
 
 /**
@@ -107,5 +110,9 @@ export const readerUiProvider: ReaderUiProvider = {
   async getSlotContributions(ctx: ReaderUiContext): Promise<ReaderSlotContribution[]> {
     const deadline = hookDeadline();
     return (await resolveHookServices(deadline)).readerUi.getSlotContributions(ctx, deadline);
+  },
+  async getTimeZone(ctx: { readerId: number; resourceId: number }): Promise<string | undefined> {
+    const deadline = hookDeadline();
+    return (await resolveHookServices(deadline)).readerUi.getTimeZone(ctx, deadline);
   },
 };

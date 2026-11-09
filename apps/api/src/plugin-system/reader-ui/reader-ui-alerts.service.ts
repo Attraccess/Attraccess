@@ -7,7 +7,7 @@ import { auditActorFields, type AuditActor } from './audit-actor';
 import { MetricsService } from '../../metrics/metrics.service';
 import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
 
-const KINDS: ReaderUiAlertKind[] = ['breaker-open', 'load-failure', 'crash-loop'];
+const KINDS: ReaderUiAlertKind[] = ['breaker-open', 'load-failure', 'crash-loop', 'time-zone-conflict'];
 
 /** Host-owned admin alerts for the reader UI (ATT-1187 D9). */
 @Injectable()
@@ -118,7 +118,10 @@ export class ReaderUiAlertsService implements OnModuleInit {
     this.suspendedReaders.set(readerId, since);
     const previous = this.suspendTimers.get(readerId);
     if (previous) clearTimeout(previous);
-    const timer = setTimeout(() => this.isReaderSuspended(readerId), READER_UI_TIMING.crashLoopSuspendMs - (Date.now() - since) + 1000);
+    const timer = setTimeout(
+      () => this.isReaderSuspended(readerId),
+      READER_UI_TIMING.crashLoopSuspendMs - (Date.now() - since) + 1000,
+    );
     timer.unref?.();
     this.suspendTimers.set(readerId, timer);
   }

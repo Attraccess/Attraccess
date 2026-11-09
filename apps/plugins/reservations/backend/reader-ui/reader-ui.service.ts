@@ -44,6 +44,21 @@ export class ReaderUiService {
     @Inject(RESERVATION_CLOCK) private readonly clock: Clock,
   ) {}
 
+  /**
+   * The zone reader times are written in, so the reader's clock agrees with the texts. Only for resources that
+   * have reservations enabled; the host uses the server zone otherwise.
+   */
+  async getTimeZone(
+    ctx: { readerId: number; resourceId: number },
+    deadline = hookDeadline(),
+  ): Promise<string | undefined> {
+    if (!this.settings.isWarm) {
+      await waitUntil(this.settings.whenReady(), deadline, 'Reservation settings are not loaded yet');
+    }
+    if (!this.settings.getCachedSettings(ctx.resourceId).enabled) return undefined;
+    return this.globalSettings.getTimezone();
+  }
+
   async getSlotContributions(ctx: ReaderUiContext, deadline = hookDeadline()): Promise<ReaderSlotContribution[]> {
     if (!this.settings.isWarm) {
       await waitUntil(this.settings.whenReady(), deadline, 'Reservation settings are not loaded yet');

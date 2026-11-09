@@ -176,10 +176,18 @@ export class UiSlotService {
     void this.sync(socket);
   }
 
-  /** The reader clears its session slot on sign-out; whatever it should show there afterwards is sent again. */
+  /**
+   * The reader clears its session slot and its list row statuses on sign-out (a row received during the card
+   * session may be the holder's own and must not show on the lock screen); whatever it should show there
+   * afterwards is sent again.
+   */
   private forgetSessionSlot(socket: AuthenticatedWebSocket): void {
     for (const record of socket.state?.uiSlots?.contributions.values() ?? []) {
-      if (record.slot === READER_UI_SLOTS.RESOURCE_DETAILS_SESSION) record.hash = FORGOTTEN;
+      if (
+        record.slot === READER_UI_SLOTS.RESOURCE_DETAILS_SESSION ||
+        record.slot === READER_UI_SLOTS.RESOURCE_LIST_ROW_STATUS
+      )
+        record.hash = FORGOTTEN;
     }
   }
 

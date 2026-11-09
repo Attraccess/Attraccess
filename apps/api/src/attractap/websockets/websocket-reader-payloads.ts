@@ -1,7 +1,9 @@
+import { readerOffsetMinutes } from './reader-time-zone';
+
 /**
  * Server clock sample for the reader's wall clock. The reader keeps SNTP as its
  * primary UTC source and only falls back to epochMs until SNTP has synced.
- * The offset matches startTimeUtcOffsetMinutes (minutes east of UTC).
+ * The offset (minutes east of UTC) is the reader's one time zone and matches startTimeUtcOffsetMinutes.
  * Readers accept UTC in [2025-01-01, 2100-01-01) and offsets in [-840, 840].
  * Samples outside that range leave the reader's UTC and offset unchanged.
  */
@@ -10,8 +12,9 @@ export interface ReaderServerTimePayload {
   utcOffsetMinutes: number;
 }
 
-export function readerServerTime(now = new Date()): ReaderServerTimePayload {
-  return { epochMs: now.getTime(), utcOffsetMinutes: -now.getTimezoneOffset() };
+/** `zone` is the reader's resolved IANA zone; without one the API process zone applies. */
+export function readerServerTime(now = new Date(), zone?: string | null): ReaderServerTimePayload {
+  return { epochMs: now.getTime(), utcOffsetMinutes: readerOffsetMinutes(zone, now) };
 }
 
 export interface ReaderCrashReportPayload {
@@ -60,6 +63,6 @@ export interface FirmwareUpdateResponse {
 }
 
 /** Build the heartbeat reply with the same clock sample as authentication. */
-export function readerHeartbeat(): string {
-  return JSON.stringify({ event: 'HEARTBEAT', serverTime: readerServerTime() });
+export function readerHeartbeat(serverTime: ReaderServerTimePayload = readerServerTime()): string {
+  return JSON.stringify({ event: 'HEARTBEAT', serverTime });
 }

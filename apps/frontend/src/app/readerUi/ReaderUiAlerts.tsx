@@ -12,6 +12,7 @@ const ALERT_STATUS: Record<string, 'warning' | 'danger'> = {
   // The plugin's start hooks are not enforced at all while it is not loaded.
   'load-failure': 'danger',
   'crash-loop': 'warning',
+  'time-zone-conflict': 'warning',
 };
 
 /** One alert with its own Clear action, so clearing one alert doesn't mark the others as pending. */

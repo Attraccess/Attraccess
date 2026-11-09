@@ -8,7 +8,7 @@ import { ResourceListService } from '../resource-list/resource-list.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { AuditService } from '../../../../audit/audit.service';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
-import { readerServerTime } from '../../websocket-reader-payloads';
+import { ReaderTimeZoneService } from '../../reader-time-zone.service';
 
 @Injectable()
 export class AttractapAuthHandler {
@@ -27,6 +27,9 @@ export class AttractapAuthHandler {
 
   @Inject(AuditService)
   private audit: AuditService;
+
+  @Inject(ReaderTimeZoneService)
+  private readerTimeZone: ReaderTimeZoneService;
 
   @Inject(SettingsService)
   private settingsService: SettingsService;
@@ -120,7 +123,7 @@ export class AttractapAuthHandler {
     const authenticatedResponse = new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
       name: reader.name,
       language,
-      serverTime: readerServerTime(),
+      serverTime: await this.readerTimeZone.resolvedServerTimeFor(reader.id),
     });
     await socket.sendMessage(authenticatedResponse);
   }
@@ -158,7 +161,7 @@ export class AttractapAuthHandler {
       new AttractapEvent(AttractapEventType.READER_AUTHENTICATED, {
         name: reader.name,
         language,
-        serverTime: readerServerTime(),
+        serverTime: await this.readerTimeZone.resolvedServerTimeFor(reader.id),
       }),
     );
     if (!isCurrentAttempt()) return false;

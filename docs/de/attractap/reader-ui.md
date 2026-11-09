@@ -14,6 +14,14 @@ technischen Vertrag für Plugin-Entwickler finden Sie unter
   Detailseite, zum Beispiel „Reserviert 14:00–16:00“. Der eigene Status des Readers (in Benutzung, Wartung, nicht
   verfügbar, Einweisung erforderlich) kommt immer zuerst; ein Plugin-Hinweis erscheint nur, wenn keiner davon
   zutrifft. Ein Reader, an dem niemand angemeldet ist, zeigt nie persönliche Daten oder Namen anderer Personen.
+- **Status auf dem Sperrbildschirm:** Der Bildschirm einer Ressource, an der niemand angemeldet ist, zeigt
+  denselben öffentlichen Status wie die Liste, zum Beispiel „Reserviert bis 16:00“, anstelle von „Verfügbar“. „In
+  Benutzung“, Wartung und die anderen Reader-Status haben Vorrang und blenden ihn aus. Er zeigt nie einen Namen,
+  und was eine angemeldete Person gesehen hat, ist nach dem Abmelden sofort weg.
+- **Die Uhrzeit:** Eine Uhr in der Fußleiste, zwischen Gerätename und Firmware-Version, zeigt auf jedem Bildschirm
+  die aktuelle Zeit als HH:MM, außer auf Bildschirmen, die schon die große Uhr zeigen (Sperrbildschirm und die
+  Liste ohne Anmeldung). So lässt sich „Check-in bis 21:20“ auf jetzt beziehen. Kennt der Reader die Zeit noch
+  nicht, zeigt er keine Uhr.
 - **Bestätigung vor dem Start:** Der Reader zeigt die Frage des Plugins, zum Beispiel „Diese Maschine ist um 14:00
   reserviert. Trotzdem starten?“, mit **Abbrechen** und **Start**. Abbrechen oder Warten, bis die Frage
   verschwindet (nach etwa einer Minute), startet nichts; der Reader kehrt zur Ressource zurück. In der Web-App
@@ -31,6 +39,16 @@ technischen Vertrag für Plugin-Entwickler finden Sie unter
 - **Reader offline:** Solange ein Reader keine Verbindung zum Server hat, startet nichts, und Plugin-Hinweise
   verschwinden.
 
+## Uhrzeit und Zeitzone
+
+Reader zeigen die Ortszeit im 24-Stunden-Format. Jeder Reader verwendet **eine** Zeitzone: die des Plugins, das
+Zeiten auf seinem Bildschirm schreibt (die Einstellung **Zeitzone** des Reservierungs-Plugins), sofern ein Plugin
+eine festlegt, sonst die des Servers (`TZ`). So passen Uhr und Texte wie „Check-in bis 14:15“ immer zusammen, ebenso
+die Startzeiten von Sitzungen. Ändern Admins die Zeitzone des Plugins, wechseln die Reader sofort; die
+Sommerzeit wird automatisch berücksichtigt. Wollen zwei Plugins auf einem Reader unterschiedliche Zeitzonen, nutzt
+der Reader die des ersten Plugins, und der Alarm **Plugins sind sich bei der Reader-Zeitzone uneinig** weist
+Admins darauf hin (siehe [Alarme](#alarme)). Reader ohne Bildschirm zeigen keine Zeit.
+
 ## Welche Reader was anzeigen können
 
 | Reader                             | Hinweise auf dem Bildschirm | Bestätigung vor dem Start                 | Abgelehnter Start             | Frage nach dem Stopp   |
@@ -38,6 +56,9 @@ technischen Vertrag für Plugin-Entwickler finden Sie unter
 | Attractap Touch, aktuelle Firmware | ja                          | auf dem Bildschirm                        | Begründung auf dem Bildschirm | ja                     |
 | Attractap Lite (nur LEDs)          | nein                        | zweites Auflegen der Karte, falls erlaubt | rotes Blinken                 | nein (Standardantwort) |
 | Attractap Touch, ältere Firmware   | nein                        | nein (siehe unten)                        | allgemeiner Fehler            | nein (Standardantwort) |
+
+Uhr und Status auf dem Sperrbildschirm zeigt nur der Attractap Touch mit aktueller Firmware; Lite hat keinen
+Bildschirm, und ältere Firmware zeigt beides nicht.
 
 Lite-Reader antworten mit ihren LEDs: Ein bernsteinfarbener Halbring gefolgt von rotem Blinken bedeutet, dass der
 Start abgelehnt wurde. Ein bernsteinfarbener Ring, der sich langsam leert, mit einem Piepton bedeutet „Karte zum
@@ -81,11 +102,12 @@ Plugins können LEDs und Töne nicht direkt steuern.
 **Alarme der Reader-Anzeige** stehen unten in den Plugin-Einstellungen und, für einen Reader, im Tab
 „Reader-Anzeige“ des Reader-Editors. Jeder Alarm sagt, was betroffen ist und was zu tun ist:
 
-| Alarm                                  | Bedeutung                                                                                                                                                         | Was zu tun ist                                                                                                                                                  | Endet von selbst                      |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| Plugin-Prüfung schlägt wiederholt fehl | Das Plugin konnte mehrere Starts hintereinander nicht prüfen und wird nicht mehr gefragt. Starts folgen „Wenn die Prüfung des Plugins fehlschlägt“ der Ressource. | Nach 60 Sekunden wird das Plugin erneut gefragt; **Aufheben** fragt es sofort. Schlägt es weiter fehl, prüfen Sie das Log des Plugins oder deaktivieren Sie es. | wenn das Plugin wieder antwortet      |
-| Plugin konnte nicht geladen werden     | Das Plugin wurde nicht geladen. Seine Prüfungen und Bestätigungen werden nicht angewendet; Starts laufen ohne sie.                                                | Prüfen Sie den Fehler des Plugins auf der Plugin-Seite und laden oder installieren Sie es neu.                                                                  | wenn das Plugin wieder lädt           |
-| Reader stürzt wiederholt ab            | Der Reader ist wiederholt neu gestartet. Plugin-Hinweise sind auf ihm pausiert, Bestätigungen folgen „Reader ohne Bildschirm“.                                    | Warten oder mit **Aufheben** die Hinweise sofort wieder einschalten. Stürzt er weiter ab, aktualisieren Sie seine Firmware oder melden Sie den Absturz.         | nach 30 Minuten ohne weiteren Absturz |
+| Alarm                                             | Bedeutung                                                                                                                                                         | Was zu tun ist                                                                                                                                                  | Endet von selbst                      |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| Plugin-Prüfung schlägt wiederholt fehl            | Das Plugin konnte mehrere Starts hintereinander nicht prüfen und wird nicht mehr gefragt. Starts folgen „Wenn die Prüfung des Plugins fehlschlägt“ der Ressource. | Nach 60 Sekunden wird das Plugin erneut gefragt; **Aufheben** fragt es sofort. Schlägt es weiter fehl, prüfen Sie das Log des Plugins oder deaktivieren Sie es. | wenn das Plugin wieder antwortet      |
+| Plugin konnte nicht geladen werden                | Das Plugin wurde nicht geladen. Seine Prüfungen und Bestätigungen werden nicht angewendet; Starts laufen ohne sie.                                                | Prüfen Sie den Fehler des Plugins auf der Plugin-Seite und laden oder installieren Sie es neu.                                                                  | wenn das Plugin wieder lädt           |
+| Reader stürzt wiederholt ab                       | Der Reader ist wiederholt neu gestartet. Plugin-Hinweise sind auf ihm pausiert, Bestätigungen folgen „Reader ohne Bildschirm“.                                    | Warten oder mit **Aufheben** die Hinweise sofort wieder einschalten. Stürzt er weiter ab, aktualisieren Sie seine Firmware oder melden Sie den Absturz.         | nach 30 Minuten ohne weiteren Absturz |
+| Plugins sind sich bei der Reader-Zeitzone uneinig | Zwei Plugins wollen auf einem Reader unterschiedliche Zeitzonen. Er zeigt die des ersten Plugins und ignoriert die andere. Der Alarm nennt beide Zonen.           | Stellen Sie in beiden Plugins dieselbe Zeitzone ein.                                                                                                            | wenn Sie ihn aufheben                 |
 
 Zum Aufheben eines Plugin-Alarms ist die Berechtigung zum Verwalten von Plugins nötig, für einen Reader-Alarm die
 Berechtigung zum Verwalten von Readern. Das Auslösen und Aufheben von Alarmen wird im Audit-Log festgehalten.

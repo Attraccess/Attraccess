@@ -209,7 +209,7 @@ unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](resources/r
 
 | Slot-ID                    | Ort                                                | Knotenbudget                                                                                                                                            |
 | -------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `resourceList.row.status`  | Statuszeile einer Ressourcenzeile                  | 1 `text` oder `badge`, höchstens 24 Zeichen. Nur sichtbar, wenn kein Kernstatus (in Benutzung, Wartung, nicht verfügbar, Einweisung erforderlich) gilt. |
+| `resourceList.row.status`  | Statuszeile einer Ressourcenzeile und des Sperrbildschirms | 1 `text` oder `badge`, höchstens 24 Zeichen. Nur sichtbar, wenn kein Kernstatus (in Benutzung, Wartung, nicht verfügbar, Einweisung erforderlich) gilt. Der Sperrbildschirm erscheint, solange niemand angemeldet ist; dort erscheint daher nur, was Sie ohne Kartensitzung beigetragen haben. |
 | `resource.details.header`  | unter der Beschreibung in den Ressourcendetails    | 6 Knoten                                                                                                                                                |
 | `resource.details.body`    | Hauptbereich der Ressourcendetails                 | 8 Knoten                                                                                                                                                |
 | `resource.details.session` | solange der Block der aktiven Sitzung sichtbar ist | 6 Knoten                                                                                                                                                |
@@ -256,6 +256,30 @@ const readerUi: ReaderUiProvider = {
 Ungültige Beiträge lehnt der Host ab und protokolliert sie mit dem Plugin-Namen; sie erreichen den Reader nie. Der
 Reader-Editor zeigt sie als **Übersprungen** mit „ungültiger Inhalt“. Texte, die einem Kernstatus entsprechen
 („Wartung“, „Zugriff gewährt“, ...), werden abgelehnt, damit Plugins keine Host-Meldungen nachahmen.
+
+### Zeitzone auf Readern
+
+Reader zeigen eine Uhr, und Ihre Texte müssen dazu passen. Schreibt Ihr Plugin Zeiten auf Reader-Bildschirme (zum
+Beispiel „Frei bis 14:00“), implementieren Sie `getTimeZone` am Provider und geben Sie die IANA-Zone zurück, in der
+Ihre Texte stehen:
+
+```ts
+const readerUi: ReaderUiProvider = {
+  getSlotContributions(ctx) { /* ... */ },
+  getTimeZone({ resourceId }) {
+    return resourceHasMyFeature(resourceId) ? 'Europe/Berlin' : undefined; // undefined = keine Meinung
+  },
+};
+```
+
+Der Host fragt die Plugins der Ressourcen eines Readers (mit demselben Timeout von 1,5 s wie bei Slots; ein Fehler
+zählt als keine Meinung), nimmt die **erste gültige Zone in Plugin-Reihenfolge** für diesen Reader und sendet ihm
+den UTC-Offset der Zone, Sommerzeit eingeschlossen. Ein ungültiger Name wird ignoriert. Liefern zwei Plugins für
+einen Reader verschiedene Zonen, gewinnt die erste, und Admins erhalten einen Alarm. Ohne Antwort folgt der Reader
+dem `TZ` des Servers. Rufen Sie `context.readerUi.invalidate(...)` auf, wenn sich Ihre Zone ändert; der Host löst
+sie dann neu auf und schickt den neuen Offset sofort an die betroffenen Reader. Schreiben Sie nicht die aktuelle
+Uhrzeit in Ihre Texte: Die Fußleiste des Readers zeigt sie auf jedem Bildschirm, so lässt sich „Check-in bis
+14:15“ auf jetzt beziehen.
 
 ### Nur Latin-1
 

@@ -2,6 +2,7 @@
 #include "display.hpp"
 #include "fonts/attractap_fonts.hpp"
 #include "theme.hpp"
+#include "shared/wallClockText.hpp"
 
 #include <new>
 #include <string>
@@ -46,6 +47,20 @@ void Display::initDeviceOverlay()
     lv_obj_set_style_text_opa(Display::deviceNameLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(Display::deviceNameLabel, &attractap_font_montserrat_latin1_10, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    // The current time, centred between the device name and the firmware version. Out of the flex row, so the
+    // two outer labels keep their places; hidden until the time is known (see updateFooter).
+    Display::footerClockLabel = lv_label_create(deviceInfoContainer);
+    lv_obj_add_flag(Display::footerClockLabel, LV_OBJ_FLAG_IGNORE_LAYOUT);
+    lv_obj_add_flag(Display::footerClockLabel, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_width(Display::footerClockLabel, LV_SIZE_CONTENT);
+    lv_obj_set_height(Display::footerClockLabel, LV_SIZE_CONTENT);
+    lv_obj_align(Display::footerClockLabel, LV_ALIGN_BOTTOM_MID, 0, -8);
+    FirmwareI18n::setDynamicLabel(Display::footerClockLabel, "00:00") /* i18n-data: Numeric wall-clock time placeholder. */;
+    lv_obj_set_style_text_color(Display::footerClockLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(Display::footerClockLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(Display::footerClockLabel, &attractap_font_montserrat_latin1_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    Display::footerClockMinute = -2;
+
     lv_obj_t *firmwareLabel = lv_label_create(deviceInfoContainer);
     lv_obj_set_width(firmwareLabel, LV_SIZE_CONTENT);
     lv_obj_set_height(firmwareLabel, LV_SIZE_CONTENT);
@@ -82,9 +97,49 @@ std::vector<Display::ChromePart> Display::chromeParts()
 {
     return {{"drawer grabber", Display::drawerGrabber},
             {"network badge", Display::networkQualityContainer},
-            {"device footer", Display::deviceNameLabel ? lv_obj_get_parent(Display::deviceNameLabel) : nullptr}};
+            {"device footer", Display::deviceNameLabel ? lv_obj_get_parent(Display::deviceNameLabel) : nullptr},
+            {"footer clock", Display::footerClockLabel}};
 }
 #endif
+
+// The footer is hidden on the session summary, except while a plugin step (the keep/free question) is open over it.
+// The clock shows once the time is known and never next to a bigger clock: the lock screen and the signed-out
+// resource list already show one. It changes once a minute and sends nothing to the server.
+void Display::updateFooter()
+{
+    if (!Display::deviceNameLabel || !Display::footerClockLabel)
+    {
+        return;
+    }
+    lv_obj_t *footer = lv_obj_get_parent(Display::deviceNameLabel);
+    const bool stepOpen = Display::stepModal.isOpen();
+    lv_obj_set_flag(footer, LV_OBJ_FLAG_HIDDEN, Display::activeScreen == &Display::sessionSummaryScreen && !stepOpen);
+    // The step overlay is created on the same layer after the footer: bring the footer back on top of it.
+    lv_obj_t *overlay = stepOpen ? Display::stepModal.root() : nullptr;
+    if (overlay != Display::footerRaisedFor)
+    {
+        Display::footerRaisedFor = overlay;
+        if (overlay) lv_obj_move_foreground(footer);
+    }
+
+    const auto now = WallClock::now();
+    const bool bigClockShown = Display::activeScreen == &Display::lockscreen ||
+        (Display::activeScreen == &Display::resourceListScreen && Display::resourceListScreen.showsClockHeader());
+    const bool show = now.valid && !bigClockShown;
+    lv_obj_set_flag(Display::footerClockLabel, LV_OBJ_FLAG_HIDDEN, !show);
+    if (!show)
+    {
+        Display::footerClockMinute = -2;
+        return;
+    }
+    const auto minute = WallClockText::minuteKey(now);
+    if (minute == Display::footerClockMinute)
+    {
+        return;
+    }
+    Display::footerClockMinute = minute;
+    FirmwareI18n::setDynamicLabel(Display::footerClockLabel, WallClockText::clock(now).c_str()) /* i18n-data: Numeric wall-clock time. */;
+}
 
 void Display::refreshChromeLanguage(const std::string &language)
 {

@@ -593,6 +593,30 @@ describe('UiSlotService', () => {
     });
   });
 
+  it('sends the public list row status again after sign-out, because the reader drops rows of the card session', async () => {
+    const row = (text: string) => ({
+      slotId: READER_UI_SLOTS.RESOURCE_LIST_ROW_STATUS,
+      key: 'row',
+      tree: { t: 'text', text },
+    });
+    const { service, socket, cardSessions } = setup((ctx: any) => [
+      row(ctx.userId ? 'Your booking until 16:00' : 'Reserved until 16:00'),
+    ]);
+    await service.onFirmwareInfo(socket, TOUCH_UI);
+    jest.advanceTimersByTime(2100);
+    cardSessions.issue(socket, 7, 'en');
+    await jest.advanceTimersByTimeAsync(0);
+    cardSessions.end(socket, socket.state.cardSession.id, 'reader');
+    await jest.advanceTimersByTimeAsync(0);
+    // The own row is removed and the public one sent at once, without waiting for the 2 s limit.
+    expect(shapes(socket)).toEqual([
+      'row@1:Reserved until 16:00',
+      'row@2:Your booking until 16:00',
+      'row@3:null',
+      'row@4:Reserved until 16:00',
+    ]);
+  });
+
   describe('UI_RENDER_REPORT', () => {
     const report = (extra: Record<string, unknown> = {}) => ({
       resourceId: 12,

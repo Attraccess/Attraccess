@@ -23,6 +23,7 @@ namespace ui
         void show(const StepRequest &step, uint32_t nowMillis);
         void hide();
         bool isOpen() const { return overlay_ != nullptr; }
+        lv_obj_t *root() const { return overlay_; }
         const std::string &stepId() const { return stepId_; }
 
     private:

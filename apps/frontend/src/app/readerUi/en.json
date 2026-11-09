@@ -67,14 +67,16 @@
     "kind": {
       "breaker-open": "Plugin check keeps failing",
       "load-failure": "Plugin failed to load",
-      "crash-loop": "Reader keeps crashing"
+      "crash-loop": "Reader keeps crashing",
+      "time-zone-conflict": "Plugins disagree on the reader time zone"
     },
     "clearError": "Could not clear the alert",
     "readerFallback": "Reader #{{id}}",
     "description": {
       "breaker-open": "{{plugin}} failed to check several starts in a row, so it is no longer asked. Until it answers again, starts follow the \"If the plugin's check fails\" setting of each resource. The plugin is asked again automatically after 60 seconds; Clear asks it right away. If this keeps happening, check the plugin's log or disable the plugin.",
       "load-failure": "{{plugin}} could not be loaded, so its start checks and confirmations are not applied and starts go ahead without them. Check the plugin's error on this page and reload or reinstall it. The alert ends when the plugin loads again.",
-      "crash-loop": "{{reader}} crashed repeatedly, so plugin widgets are paused on it and confirmations there follow the resource's \"Readers without a screen\" setting. Widgets return after 30 minutes without another crash, or right away with Clear. If it keeps crashing, update the reader's firmware or report the crash."
+      "crash-loop": "{{reader}} crashed repeatedly, so plugin widgets are paused on it and confirmations there follow the resource's \"Readers without a screen\" setting. Widgets return after 30 minutes without another crash, or right away with Clear. If it keeps crashing, update the reader's firmware or report the crash.",
+      "time-zone-conflict": "Two plugins want different time zones on {{reader}}. The reader shows the zone of the first plugin and ignores {{plugin}}. See the alert text for both zones, and set the same time zone in both plugins. The alert ends when you clear it."
     }
   }
 }

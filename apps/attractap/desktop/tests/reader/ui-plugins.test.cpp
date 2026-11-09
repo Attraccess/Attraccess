@@ -1,6 +1,8 @@
 #include "workflow.hpp"
 
 #include <set>
+#include "display/shared/wallClockText.hpp"
+#include "../controlled-clock.hpp"
 
 // ATT-1187: plugin slots, host-owned steps, block reasons and the post-stop question on a touch reader.
 // Runs on the test clock (hostFreezeMillis): millis() and LVGL ticks only move with pump() and hostAdvanceMillis().
@@ -329,4 +331,164 @@ void ReaderWorkflow::testUiPlugins()
     assert(resultDoc["data"]["payload"]["stepId"] == "kkkkkkkkkkkkkkkkkkkkkk" && resultDoc["data"]["payload"]["action"] == "cancel");
     clearStatus(); pump();
     std::cout << "PASS an unusable step is cancelled at once" << std::endl;
+}
+
+// ATT-1225: the clock in the footer bar and the plugin status on the lock screen.
+void ReaderWorkflow::testFooterClockAndLockscreenStatus()
+{
+    hostFreezeMillis();
+    WallClock::onServerTime(static_cast<int64_t>(time(nullptr)) * 1000, 120);
+    assert(WallClock::now().valid);
+    const auto footerPart = [](const char *name) -> lv_obj_t * {
+        for (const auto &part : Display::chromeParts())
+            if (std::strcmp(part.name, name) == 0) return part.object;
+        return nullptr;
+    };
+    // The visible HH:MM of the footer, or "" while it is hidden.
+    const auto footerClock = [&]() -> std::string {
+        lv_obj_t *clock = footerPart("footer clock");
+        return clock && lv_obj_is_visible(clock) ? lv_label_get_text(clock) : "";
+    };
+    const auto footerVisible = [&] { return lv_obj_is_visible(footerPart("device footer")); };
+    const auto nowClock = [] { return WallClockText::clock(WallClock::now()); };
+
+    // Signed out, the list header already shows the big clock: no second clock in the footer.
+    cardSessionId = "cs-20"; active = false; list(); login();
+    click("Abmelden");
+    list(false); pump();
+    assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+    assert(Display::resourceListScreen.showsClockHeader() && footerClock().empty());
+
+    // Signed in, the footer shows HH:MM (24 h) between the device name and the firmware version.
+    cardSessionId = "cs-20b"; list(); login(); pump();
+    assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+    assert(footerClock() == nowClock() && footerClock().size() == 5 && footerClock()[2] == ':');
+    click("Lasercutter");
+    assert(lv_screen_active() == Display::resourceDetailsScreen.getScreen() && footerClock() == nowClock());
+    // Centred in the bar, and not on top of the device name or the firmware version.
+    lv_area_t clockBox, bar;
+    lv_obj_update_layout(footerPart("device footer"));
+    lv_obj_get_coords(footerPart("footer clock"), &clockBox);
+    lv_obj_get_coords(footerPart("device footer"), &bar);
+    assert(std::abs((clockBox.x1 + clockBox.x2) / 2 - (bar.x1 + bar.x2) / 2) <= 1);
+    lv_obj_t *deviceFooter = footerPart("device footer");
+    for (uint32_t i = 0; i < lv_obj_get_child_count(deviceFooter); ++i) {
+        lv_obj_t *child = lv_obj_get_child(deviceFooter, i);
+        if (child == footerPart("footer clock") || lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN)) continue;
+        lv_area_t other;
+        lv_obj_get_coords(child, &other);
+        assert(other.x2 < clockBox.x1 || other.x1 > clockBox.x2);
+    }
+    std::cout << "PASS the footer clock shows on signed-in screens, centred, and never next to the big clock" << std::endl;
+
+    // A confirm step over the details keeps the footer clock visible, above the dimmed overlay.
+    auto startRequestId = [&] { return server.last("START_RESOURCE_USAGE_SESSION")["data"]["payload"]["requestId"].as<uint32_t>(); };
+    click("Ressource verwenden");
+    server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), STEP_A, "confirm", 1, 60000, "Reserviert bis 14:15"));
+    pump();
+    assert(label(lv_layer_top(), "Reserviert bis 14:15") && footerClock() == nowClock());
+    lv_obj_t *topLayer = lv_layer_top();
+    assert(lv_obj_get_child(topLayer, lv_obj_get_child_count(topLayer) - 1) == lv_obj_get_parent(footerPart("footer clock")));
+    server.push("UI_STEP_REQUEST", stepPayload(startRequestId(), STEP_B, "confirm", 1, 60000, "Zweite Frage"));
+    pump();
+    assert(label(lv_layer_top(), "Zweite Frage") && footerClock() == nowClock());
+    lv_obj_t *overlayParent = lv_obj_get_parent(footerPart("footer clock"));
+    assert(lv_obj_get_child(topLayer, lv_obj_get_child_count(topLayer) - 1) == overlayParent);
+    click(LV_SYMBOL_CLOSE, true);
+    clearStatus(); pump();
+
+    // The clock moves with the time, once a minute, and sends nothing: no slot traffic comes from it.
+    const auto messagesBefore = server.sent.size();
+    TestClock::set(time(nullptr) + 120);
+    pump(1200);
+    assert(footerClock() == nowClock());
+    assert(server.sent.size() == messagesBefore || server.count("UI_SLOT_UPDATE") == 0);
+    // Unknown time hides it.
+    std::cout << "PASS a step over a screen keeps the footer clock visible and the clock sends nothing" << std::endl;
+
+    // The keep/free question over the session summary shows the footer and its clock; the summary alone does not.
+    active = true; cardSessionId = "cs-21"; list(); login();
+    click("Lasercutter"); click("Sitzung beenden");
+    server.push("STOP_RESOURCE_USAGE_SESSION", R"({"success":true,"durationSeconds":60,"endedOwnSession":true})"); pump();
+    assert(lv_screen_active() == Display::sessionSummaryScreen.getScreen());
+    assert(!footerVisible() && footerClock().empty());
+    server.push("UI_STEP_REQUEST", stepPayload(0, STEP_C, "choose", 1, 15000, "Noch etwas?",
+        R"(,"choices":[{"id":"keep","label":"Behalten"},{"id":"free","label":"Freigeben"}])"));
+    pump();
+    assert(label(lv_layer_top(), "Noch etwas?") && footerVisible() && footerClock() == nowClock());
+    hostAdvanceMillis(15100); pump(300);
+    assert(!label(lv_layer_top(), "Noch etwas?") && !footerVisible());
+    hostAdvanceMillis(3600); pump(300);
+    std::cout << "PASS the keep/free question shows the footer clock over the session summary" << std::endl;
+
+    // --- Lock screen: the public status, core statuses win, and nothing personal survives a sign-out ----
+    active = false; cardSessionId = "cs-22"; list(false); pump();
+    server.push("UI_SLOT_UPDATE", slotPayload(1, "resourceList.row.status", 1, R"({"t":"badge","text":"Reserviert bis 16:00","tone":"warning"})", "pub"), 41);
+    pump();
+    const auto openLockscreen = [&] {
+        auto *resourceButton = lv_obj_get_parent(label(lv_screen_active(), "Lasercutter"));
+        assert(!lv_obj_has_state(resourceButton, LV_STATE_DISABLED));
+        lv_obj_send_event(resourceButton, LV_EVENT_CLICKED, nullptr);
+        application.loop();
+        lv_timer_handler();
+        pump();
+        if (lv_screen_active() != Display::lockscreen.getScreen()) std::cerr << "ACTIVE " << Display::activeScreenName() << std::endl;
+        assert(lv_screen_active() == Display::lockscreen.getScreen());
+    };
+    const auto closeLockscreen = [&] {
+        auto *back = lv_obj_get_parent(label(lv_screen_active(), LV_SYMBOL_LEFT));
+        lv_obj_send_event(back, LV_EVENT_CLICKED, nullptr);
+        application.loop();
+        lv_timer_handler();
+        pump(400);
+        assert(lv_screen_active() == Display::resourceListScreen.getScreen());
+    };
+    openLockscreen();
+    assert(label(lv_screen_active(), "Reserviert bis 16:00"));
+    assert(footerClock().empty()); // the lock screen has its big clock
+    // The same line sits on the list row, and the back button returns to the list as before.
+    closeLockscreen();
+    assert(label(lv_screen_active(), "Reserviert bis 16:00"));
+
+    // Core status wins: in use hides the plugin line on the lock screen, and it returns when the machine is free.
+    openLockscreen();
+    Display::lockscreen.setUsageInfo(true, "Max", false);
+    pump();
+    assert(!label(lv_screen_active(), "Reserviert bis 16:00") && label(lv_screen_active(), "In Verwendung: Max"));
+    Display::lockscreen.setUsageInfo(false, "", true);
+    pump();
+    assert(!label(lv_screen_active(), "Reserviert bis 16:00") && label(lv_screen_active(), "In Wartung"));
+    Display::lockscreen.setUsageInfo(false, "", false);
+    pump();
+    assert(label(lv_screen_active(), "Reserviert bis 16:00"));
+    closeLockscreen();
+
+    // An expired contribution falls back to the core text at once.
+    server.push("UI_SLOT_UPDATE", slotPayload(1, "resourceList.row.status", 2, R"({"t":"text","text":"Nur kurz frei"})", "pub", ",\"expiresAtMs\":1005000"), 42);
+    pump();
+    openLockscreen();
+    assert(label(lv_screen_active(), "Nur kurz frei"));
+    hostAdvanceMillis(6000); pump(1100);
+    assert(!label(lv_screen_active(), "Nur kurz frei") && label(lv_screen_active(), "Verfügbar"));
+    closeLockscreen();
+
+    // Privacy: a card holder's own row never reaches the lock screen after signing out.
+    cardSessionId = "cs-23"; list(); login(); pump();
+    server.push("UI_SLOT_UPDATE", slotPayload(1, "resourceList.row.status", 3, R"({"t":"text","text":"Deine Buchung bis 16:00"})", "pub"), 43);
+    pump();
+    assert(label(lv_screen_active(), "Deine Buchung bis 16:00"));
+    click("Abmelden");
+    list(false); pump();
+    openLockscreen();
+    assert(!label(lv_screen_active(), "Deine Buchung bis 16:00") && label(lv_screen_active(), "Verfügbar"));
+    closeLockscreen();
+    assert(!label(lv_screen_active(), "Deine Buchung bis 16:00"));
+    // The server then sends the signed-out status again and it shows.
+    server.push("UI_SLOT_UPDATE", slotPayload(1, "resourceList.row.status", 4, R"({"t":"text","text":"Frei bis 14:00"})", "pub"), 44);
+    pump();
+    assert(label(lv_screen_active(), "Frei bis 14:00"));
+    openLockscreen();
+    assert(label(lv_screen_active(), "Frei bis 14:00"));
+    display.capture(output, "ui-lockscreen-status");
+    std::cout << "PASS the lock screen shows the public status, core statuses win and sign-out drops the own row" << std::endl;
 }

@@ -12,6 +12,7 @@ import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
 import { ResourceListService } from './websockets/handlers/resource-list/resource-list.service';
 import { ResourceActionGuard } from './websockets/handlers/resource-action.guard';
+import { ReaderTimeZoneService } from './websockets/reader-time-zone.service';
 import { AttractapAuthHandler } from './websockets/handlers/auth/auth.handler';
 import { AttractapFirmwareHandler } from './websockets/handlers/firmware/firmware.handler';
 import { AttractapCrashReportHandler } from './websockets/handlers/crash-report/crash-report.handler';
@@ -144,6 +145,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     ResourceListService,
     ResourceActionGuard,
     AttractapAuthHandler,
+    ReaderTimeZoneService,
     AttractapFirmwareHandler,
     AttractapCrashReportHandler,
     AttractapCardHandler,

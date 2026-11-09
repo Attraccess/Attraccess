@@ -1,3 +1,4 @@
+import { readerTimeZoneStub } from '../../reader-time-zone.test-fixture';
 import { AttractapGateway } from '../../websocket.gateway';
 import { WebsocketService } from '../../websocket.service';
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -67,6 +68,7 @@ describe('AttractapAuthHandler', () => {
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).metricsService = mockMetricsService;
     (handler as any).audit = mockAudit;
+    (handler as any).readerTimeZone = readerTimeZoneStub();
     (handler as any).settingsService = { getDefaultLanguage: jest.fn().mockResolvedValue('de') };
     (handler as any).websocketService = new WebsocketService();
   });

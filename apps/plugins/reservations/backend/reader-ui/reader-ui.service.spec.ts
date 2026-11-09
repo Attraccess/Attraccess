@@ -507,6 +507,25 @@ describe('ReaderUiService', () => {
     expect(readerTime(new Date('2026-06-01T12:00:00Z'), { lang: 'en', timeZone: 'UTC', now: h.clock() })).toBe('12:00');
   });
 
+  describe('reader time zone', () => {
+    it('declares the plugin timezone for a resource with reservations', async () => {
+      expect(await p.readerUi.getTimeZone({ readerId: 1, resourceId: 1 })).toBe('Europe/Berlin');
+      await h.globalSettings.setTimezone('America/New_York');
+      expect(await p.readerUi.getTimeZone({ readerId: 1, resourceId: 1 })).toBe('America/New_York');
+    });
+
+    it('has no opinion for a resource without reservations', async () => {
+      expect(await p.readerUi.getTimeZone({ readerId: 1, resourceId: 2 })).toBeUndefined();
+    });
+
+    it('never puts the current time into reader texts', async () => {
+      await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      const texts = (await slots()).flatMap((c) => [...textOf(c.tree), c.fallback?.text ?? '']);
+      expect(texts.join(' ')).not.toMatch(/\b(now|jetzt)\b/i);
+      expect(texts.join(' ')).not.toContain('12:00'); // the harness clock is 12:00 local
+    });
+  });
+
   describe('weekday rule', () => {
     const berlin = (now: string) => ({ lang: 'en' as const, timeZone: 'Europe/Berlin', now: new Date(now) });
 

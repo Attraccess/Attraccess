@@ -56,7 +56,7 @@ export class ReaderReaderUiSettingsDto {
 
 export class ReaderUiAlertDto {
   @ApiProperty() id!: number;
-  @ApiProperty({ enum: ['breaker-open', 'load-failure', 'crash-loop'] }) kind!: string;
+  @ApiProperty({ enum: ['breaker-open', 'load-failure', 'crash-loop', 'time-zone-conflict'] }) kind!: string;
   @ApiProperty({ nullable: true, type: String }) plugin!: string | null;
   @ApiProperty({ nullable: true, type: Number }) readerId!: number | null;
   @ApiProperty() message!: string;

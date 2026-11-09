@@ -7,6 +7,9 @@
 #include "../../shared/wallClockText.hpp"
 #include "../../shared/sessionOccupancy.hpp"
 #include "../../images/lockscreen_background_image.hpp"
+#include "../../ui/ui_builder.hpp"
+#include "../../ui/ui_slots.hpp"
+#include "../../../platform.hpp"
 #include <string>
 
 #include <cstring>
@@ -199,6 +202,12 @@ void Lockscreen::loop()
         this->updateUsageInfo();
     }
     this->updateWallClock();
+    const uint32_t now = millis();
+    if (now - this->pluginPolledAt >= 500)
+    {
+        this->pluginPolledAt = now;
+        this->patchPluginStatus();
+    }
 }
 
 std::string Lockscreen::getName()
@@ -233,6 +242,7 @@ void Lockscreen::setUsageInfo(bool hasActiveUsage, const char *username, bool is
 
 void Lockscreen::setUsageInfo(const API::ResourceBrief &resource)
 {
+    this->resourceId = resource.id;
     this->setUsageInfo(resource.hasActiveUsage, resource.activeUser, resource.isUnderMaintenance);
     if (resource.isMultiSession())
     {
@@ -282,6 +292,35 @@ void Lockscreen::updateUsageInfo()
         FirmwareI18n::setLabel(this->usageInfoLabel, FirmwareI18n::Message::Available);
         lv_obj_set_style_text_color(this->usageInfoLabel, DisplayTheme::success(), LV_PART_MAIN | LV_STATE_DEFAULT);
     }
+    // Core status always wins: a plugin only replaces "Available".
+    this->coreStatusShown = !occupancyText.empty() || (!this->multiSession && this->hasActiveUsage) || this->isUnderMaintenance;
+    this->pluginStamp = 0;
+    this->patchPluginStatus();
+}
+
+// Same rule as the resource list row: one text or badge from the plugin replaces the core line "Available"; it
+// falls back to the core text as soon as the contribution is gone or expired.
+void Lockscreen::patchPluginStatus()
+{
+    if (!this->usageInfoLabel) return;
+    lv_obj_t *built = nullptr;
+    uint32_t stamp = 0;
+    if (!this->coreStatusShown && this->resourceId != 0)
+    {
+        const uint32_t now = millis();
+        ui::slotCache().expire(now);
+        ui::slotCache().forEach(this->resourceId, ui::SlotId::ListRowStatus, [&](const ui::SlotRecord &rec) {
+            if (built) return; // one text or badge
+            stamp = rec.stamp;
+            if (this->pluginStatus && stamp == this->pluginStamp) { built = this->pluginStatus; return; }
+            built = ui::buildRecord(lv_obj_get_parent(this->usageInfoLabel), rec, now, false);
+        });
+    }
+    if (built && built == this->pluginStatus) return;
+    if (this->pluginStatus) lv_obj_delete(this->pluginStatus);
+    this->pluginStatus = built;
+    this->pluginStamp = stamp;
+    lv_obj_set_flag(this->usageInfoLabel, LV_OBJ_FLAG_HIDDEN, built != nullptr);
 }
 
 void Lockscreen::onScreenLeave()
@@ -305,4 +344,6 @@ void Lockscreen::destroy()
     this->clockTimeLabel = nullptr;
     this->clockDateLabel = nullptr;
     this->cardPrompt = nullptr;
+    this->pluginStatus = nullptr;
+    this->pluginStamp = 0;
 }

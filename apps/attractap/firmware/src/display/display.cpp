@@ -53,6 +53,9 @@ lv_indev_t *Display::indev = NULL;
 FirmwareI18n::Text Display::deviceNameInitValue = FirmwareI18n::Text::literal("Attractap") /* i18n-data: Product name before reader authentication. */;
 
 lv_obj_t *Display::deviceNameLabel = NULL;
+lv_obj_t *Display::footerClockLabel = NULL;
+int64_t Display::footerClockMinute = -2;
+lv_obj_t *Display::footerRaisedFor = NULL;
 lv_obj_t *Display::networkQualityContainer = NULL;
 lv_obj_t *Display::networkQualityLabel = NULL;
 State::NetworkQuality Display::networkQualityOverlayValue = State::NETWORK_QUALITY_GOOD;
@@ -248,6 +251,7 @@ void Display::loop()
     Display::updateTouchWarning();
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
+    Display::updateFooter();
     refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
     return;
@@ -260,6 +264,7 @@ void Display::loop()
     Display::updateTouchWarning();
     Display::updateDrawerAvailability();
     Display::updateNetworkQualityOverlay();
+    Display::updateFooter();
     refreshVisibleTextForLanguageChange();
     Display::advanceScreenRouter();
 

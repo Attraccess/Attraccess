@@ -554,7 +554,7 @@ See `examples/plugin-reader-ui` for a working example.
 
 | Slot id                    | Where                                     | Node budget                                                                                                                                   |
 | -------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `resourceList.row.status`  | status line of a resource list row        | 1 `text` or `badge`, at most 24 characters. Shown only when no core status (in use, maintenance, unavailable, introduction required) applies. |
+| `resourceList.row.status`  | status line of a resource list row and of the lock screen | 1 `text` or `badge`, at most 24 characters. Shown only when no core status (in use, maintenance, unavailable, introduction required) applies. The lock screen shows while nobody is signed in, so only what you contributed without a card session ever appears there. |
 | `resource.details.header`  | below the description on resource details | 6 nodes                                                                                                                                       |
 | `resource.details.body`    | resource details body                     | 8 nodes                                                                                                                                       |
 | `resource.details.session` | while the active-session block is shown   | 6 nodes                                                                                                                                       |
@@ -584,6 +584,28 @@ const readerUi: ReaderUiProvider = {
   },
 };
 ```
+
+### Time zone on readers
+
+Readers show one clock, and your texts must agree with it. If your plugin writes times on reader screens (for
+example "Free until 14:00"), implement `getTimeZone` on the provider and return the IANA zone your texts use:
+
+```ts
+const readerUi: ReaderUiProvider = {
+  getSlotContributions(ctx) { /* ... */ },
+  getTimeZone({ resourceId }) {
+    return resourceHasMyFeature(resourceId) ? 'Europe/Berlin' : undefined; // undefined = no opinion
+  },
+};
+```
+
+The host asks the plugins of a reader's resources (with the same 1.5 s timeout as slots; an error counts as no
+opinion), uses the **first valid zone in plugin order** for that reader and sends the zone's UTC offset to it,
+daylight saving included. An invalid name is ignored. If two plugins return different zones for one reader, the
+first wins and admins get an alert. Without any answer the reader follows the server's `TZ`. Call
+`context.readerUi.invalidate(...)` when your zone changes; the host then re-resolves it and pushes the new offset
+to the affected readers at once. Do not write the current time into your texts: the reader's footer shows it on
+every screen, so "check in by 14:15" can be related to now.
 
 ### Limits
 

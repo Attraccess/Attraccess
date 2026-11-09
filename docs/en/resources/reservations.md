@@ -155,7 +155,14 @@ personal data, whoever may otherwise see names:
 | A booking is running and checked in (or check-in is turned off)                  | "Reserved until 16:00"    | "Reserved 14:00-16:00"                     |
 
 The list row holds 24 characters, so the open check-in is shortened there; a deadline on another day reads
-"Res., check-in Tue 00:05". The details always have the full text.
+"Res., check-in Tue 00:05". The details always have the full text. The lock screen of the resource shows the same
+public line as the list row, in place of "Available" (not while the resource is in use or under maintenance).
+
+**The current time.** Every reader screen shows the current time in the footer bar (the lock screen and the
+signed-out list have a big clock instead), so "check in by 14:15" can be related to now. The plugin does not write
+the time into its texts. The reader uses the plugin's [timezone](#timezone) for this clock, so the clock and the
+reservation times always agree, even when the server runs in another zone; changing the timezone switches the
+readers at once. See [Time and time zone](attractap/reader-ui.md#time-and-time-zone).
 
 The times are the booking's start and end without buffers. Texts follow the installation's default language.
 

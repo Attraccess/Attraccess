@@ -19,20 +19,21 @@ interface ResourceListServiceResourceListPayloadContext {
   resourceFlowsService: ResourceListService['resourceFlowsService'];
   buildHealthReason: ResourceListService['buildHealthReason'];
   usersService: ResourceListService['usersService'];
+  readerTimeZone: ResourceListService['readerTimeZone'];
   rbacService: ResourceListService['rbacService'];
   logger: ResourceListService['logger'];
 }
-function toReaderSession(session: ResourceUsage) {
+function toReaderSession(session: ResourceUsage, offsetMinutes: (at: Date) => number) {
   return {
     id: session.id,
     user: {
       username: session.user.username,
     },
     startTime: session.startTime.toISOString(),
-    // Offset (minutes east of UTC) of the API's effective timezone for this
+    // Offset (minutes east of UTC) of the reader's time zone for this
     // specific instant, so the reader can render local wall-clock time without
     // a tz database. Computed per-timestamp, so it stays DST-correct.
-    startTimeUtcOffsetMinutes: -session.startTime.getTimezoneOffset(),
+    startTimeUtcOffsetMinutes: offsetMinutes(session.startTime),
     ...(session.supervisorUser ? { supervisorUsername: session.supervisorUser.username } : {}),
   };
 }
@@ -43,9 +44,13 @@ type ReaderSession = ReturnType<typeof toReaderSession>;
 export const MAX_LISTED_READER_SESSIONS = 16;
 
 /** The card holder's own session first, then the others earliest first, capped for the reader's memory. */
-function listedReaderSessions(sessions: ResourceUsage[], own?: ResourceUsage): ReaderSession[] {
+function listedReaderSessions(
+  sessions: ResourceUsage[],
+  offsetMinutes: (at: Date) => number,
+  own?: ResourceUsage,
+): ReaderSession[] {
   const ordered = own ? [own, ...sessions.filter((session) => session !== own)] : sessions;
-  return ordered.slice(0, MAX_LISTED_READER_SESSIONS).map(toReaderSession);
+  return ordered.slice(0, MAX_LISTED_READER_SESSIONS).map((session) => toReaderSession(session, offsetMinutes));
 }
 
 export async function sendResourceListToSockets(
@@ -54,6 +59,8 @@ export async function sendResourceListToSockets(
   onlyIfResourceMatches?: { resourceIds?: Set<number>; requestId?: number },
 ) {
   const revision = ++context.resourceListRevision;
+  const readerId = sockets[0].readerId;
+  const offsetMinutes = (at: Date) => context.readerTimeZone.readerUtcOffsetMinutes(readerId, at);
   const reader = await context.attractapService.findReaderById(sockets[0].readerId);
   if (!reader) {
     throw new Error(`Reader not found: ${sockets[0].readerId}`);
@@ -111,9 +118,9 @@ export async function sendResourceListToSockets(
         activeSessionCount: capacity.activeSessionCount,
         // Personalised per card: free slot and no session of one's own.
         canStart: !capacity.isFull,
-        activeUsageSession: activeUsageSession ? toReaderSession(activeUsageSession) : null,
+        activeUsageSession: activeUsageSession ? toReaderSession(activeUsageSession, offsetMinutes) : null,
         ownUsageSession: null as ReaderSession | null,
-        activeUsageSessions: listedReaderSessions(activeSessions),
+        activeUsageSessions: listedReaderSessions(activeSessions, offsetMinutes),
         flowButtons: flowNodes.map((node) => ({ id: node.id, label: node.data.label || node.id })),
       };
     }),
@@ -136,14 +143,16 @@ export async function sendResourceListToSockets(
         const base = resourceListPayload.resources[index];
         const activeSessions = activeSessionMap.get(resource.id) ?? [];
         const own = activeSessions.find((session) => session.userId === userId);
-        const ownUsageSession = own ? toReaderSession(own) : null;
+        const ownUsageSession = own ? toReaderSession(own, offsetMinutes) : null;
         const canManageResource = permissions.has('resources.update');
         return {
           ...base,
           // At limit 1 this is today's single session; with several sessions the caller's own comes first.
           activeUsageSession: ownUsageSession ?? base.activeUsageSession,
           ownUsageSession,
-          activeUsageSessions: own ? listedReaderSessions(activeSessions, own) : base.activeUsageSessions,
+          activeUsageSessions: own
+            ? listedReaderSessions(activeSessions, offsetMinutes, own)
+            : base.activeUsageSessions,
           canStart: base.canStart && !own,
           hasIntroduction,
           canManageMaintenance: maintenanceManagedResourceIds.has(resource.id),
