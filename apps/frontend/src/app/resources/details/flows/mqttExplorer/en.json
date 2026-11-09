@@ -1,0 +1,6 @@
+{
+  "title": "MQTT explorer",
+  "close": "Close MQTT explorer",
+  "server": "MQTT server",
+  "loading": "Loading MQTT servers …"
+}

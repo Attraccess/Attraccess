@@ -1,6 +1,6 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
 import { useParams } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import type { FlowOwner } from './flowOwner';
 import { flowOwnerKey } from './flowOwner';
 import { Background, BackgroundVariant, Controls, ReactFlow, Panel, SelectionMode } from '@xyflow/react';
@@ -14,6 +14,7 @@ import {
   LayoutGridIcon,
   LogsIcon,
   PlusIcon,
+  RadioTowerIcon,
   SaveIcon,
   UploadIcon,
 } from 'lucide-react';
@@ -23,11 +24,26 @@ import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
 import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
 import { useFlowEditor } from './canvas/useFlowEditor';
+import { FlowMqttExplorer } from './mqttExplorer';
+import { editorHoldsFlowNodes, useMqttNodeUses } from './mqttExplorer/mqttNodes';
+import { useRememberedOpen } from './mqttExplorer/useRememberedOpen';
+import { useAuth } from '../../../../hooks/useAuth';
+import { MQTT_EXPLORER_PERMISSION } from '../../../mqtt/explorer/permission';
+import { useMqttServiceMqttServersGetAll } from '@attraccess/react-query-client';
 
 // Efficient comparison functions to replace expensive JSON.stringify operations
 
 function FlowsPageInner() {
   const model = useFlowEditor();
+  const { hasPermission } = useAuth();
+  const canUseMqttExplorer = hasPermission(MQTT_EXPLORER_PERMISSION);
+  const { data: mqttServers } = useMqttServiceMqttServersGetAll(undefined, { enabled: canUseMqttExplorer });
+  const [mqttExplorerOpen, setMqttExplorerOpen] = useRememberedOpen();
+  const showMqttExplorer = canUseMqttExplorer && (mqttServers?.length ?? 0) > 0;
+  // Stable props, so the explorer panel does not re-render on every canvas change (e.g. each drag frame).
+  const mqttExplorerToggleRef = useRef<HTMLButtonElement>(null);
+  const closeMqttExplorer = useCallback(() => setMqttExplorerOpen(false), [setMqttExplorerOpen]);
+  const mqttNodes = useMqttNodeUses(model.nodes);
 
   return (
     <div className="h-full w-full flex flex-col">
@@ -126,10 +142,7 @@ function FlowsPageInner() {
               >
                 <DownloadIcon />
               </Button>
-              <LogViewer
-                confettiEnabled={model.confettiEnabled}
-                onConfettiEnabledChange={model.setConfettiEnabled}
-              >
+              <LogViewer confettiEnabled={model.confettiEnabled} onConfettiEnabledChange={model.setConfettiEnabled}>
                 {(open) => (
                   <Button isIconOnly onPress={open} aria-label={model.t('actions.logs')}>
                     <LogsIcon />
@@ -146,6 +159,21 @@ function FlowsPageInner() {
                     </Button>
                   )}
                 </VariablesModal>
+              )}
+
+              {showMqttExplorer && (
+                <Button
+                  ref={mqttExplorerToggleRef}
+                  isIconOnly
+                  // Closed it looks like its neighbours; open it stands out as switched on.
+                  variant={mqttExplorerOpen ? 'outline' : undefined}
+                  onPress={() => setMqttExplorerOpen(!mqttExplorerOpen)}
+                  aria-label={model.t('actions.mqttExplorer')}
+                  aria-pressed={mqttExplorerOpen}
+                  data-cy="flow-mqtt-explorer-toggle"
+                >
+                  <RadioTowerIcon />
+                </Button>
               )}
 
               <Button isIconOnly onPress={model.layout} isDisabled={model.isFlowLoading}>
@@ -179,6 +207,19 @@ function FlowsPageInner() {
             </div>
           )}
         </div>
+        {showMqttExplorer && (
+          <FlowMqttExplorer
+            isOpen={mqttExplorerOpen}
+            onClose={closeMqttExplorer}
+            mqttNodes={mqttNodes}
+            returnFocusRef={mqttExplorerToggleRef}
+            nodesReady={editorHoldsFlowNodes({
+              isError: model.isFlowError,
+              loaded: model.originalFlowData,
+              editorNodeCount: model.nodes.length,
+            })}
+          />
+        )}
       </div>
     </div>
   );

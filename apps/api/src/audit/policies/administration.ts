@@ -203,6 +203,18 @@ rules['email_template.translations_set'] = {
 rules['email_template.translations_deleted'] = { subject: 'email-template', fields: { ...template, locale } };
 for (const action of ['created', 'updated', 'deleted'])
   rules[`mqtt_server.${action}`] = { subject: 'mqtt-server', fields: mqtt };
+// The payload is never recorded, only the topic and its size.
+rules['mqtt_server.message_subscribe'] = { subject: 'mqtt-server', fields: { serverName: text, topic: text } };
+rules['mqtt_server.message_publish'] = {
+  subject: 'mqtt-server',
+  fields: {
+    serverName: text,
+    topic: text,
+    size: count,
+    qos: (v: unknown) => v === 0 || v === 1 || v === 2,
+    retain: flag,
+  },
+};
 for (const action of ['added', 'removed', 'tested'])
   rules[`plugin.registry_${action}`] = { subject: 'plugin-registry', fields: registry };
 for (const action of [

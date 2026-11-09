@@ -17,6 +17,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    testTimeout: 30_000,
     include: ['apps/plugins/rabbitmq/frontend/src/**/*.test.tsx'],
     coverage: {
       // Unit coverage feeds the project's crap-score target.

@@ -23,6 +23,8 @@ export interface RabbitmqUserFormModalProps {
   user: RabbitmqUser | null;
   // Known vhosts, used as a hint for the default-permissions vhost field.
   vhosts: string[];
+  // Names that already exist: creating over one would silently replace its password and tags.
+  existingUsernames?: string[];
   onClose: () => void;
   // Called after a successful save so the panel can reload the list.
   onSaved: () => void;
@@ -33,6 +35,7 @@ export function RabbitmqUserFormModal({
   isOpen,
   user,
   vhosts,
+  existingUsernames,
   onClose,
   onSaved,
 }: RabbitmqUserFormModalProps) {
@@ -53,7 +56,15 @@ export function RabbitmqUserFormModal({
     saving,
     error,
     handleSubmit,
-  } = useRabbitmqUserFormModalState({ mqttServerId, isOpen, user, vhosts, onClose, onSaved });
+  } = useRabbitmqUserFormModalState({
+    mqttServerId,
+    isOpen,
+    user,
+    vhosts,
+    existingUsernames,
+    onClose,
+    onSaved,
+  });
 
   return (
     <StandardModal

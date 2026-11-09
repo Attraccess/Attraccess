@@ -9,6 +9,7 @@ export function useRabbitmqUserFormModalState({
   isOpen,
   user,
   vhosts,
+  existingUsernames = [],
   onClose,
   onSaved,
 }: RabbitmqUserFormModalProps) {
@@ -42,6 +43,10 @@ export function useRabbitmqUserFormModalState({
     const name = username.trim();
     if (name.length === 0) {
       setError({ key: 'form.usernameRequired' });
+      return;
+    }
+    if (!isEdit && existingUsernames.includes(name)) {
+      setError({ key: 'form.usernameTaken' });
       return;
     }
     if (!isEdit && password.length === 0) {

@@ -102,6 +102,25 @@ The Servers page shows the current connection status for each broker:
 | **Connecting** | Attraccess is attempting to connect |
 | **Error** | Connection failed -- see error details for more information |
 
+## Managing RabbitMQ from Attraccess
+
+With the **RabbitMQ plugin** installed, an MQTT server that Attraccess detects as a RabbitMQ broker shows extra panels on its detail page (sidebar **Devices → MQTT Servers**, then select the server). Attraccess talks to the RabbitMQ management API (port `15672`, or `15671` with TLS, unless you configured a management port) using the MQTT server's username and password.
+
+| Panel | What it offers | RabbitMQ user tag | Attraccess permission |
+|-------|----------------|-------------------|-----------------------|
+| **RabbitMQ** (status) | Reachability, credentials check, versions | `monitoring` | `resources.update` |
+| **RabbitMQ users** | List users and their vhost permissions | `administrator` | `resources.update` |
+| **RabbitMQ users** (change) | Create, edit, delete users; set or clear permissions | `administrator` | `system.settings.manage` |
+| **Connections** | Live client connections (refreshes every 10 s) | `monitoring` | `resources.update` |
+| **Connections** (close) | Force-close a connection, with an optional reason | `administrator` | `system.settings.manage` |
+| **Broker statistics** | Overview, nodes and queues (refreshes every 15 s) | `monitoring` | `resources.update` |
+
+Notes:
+
+- The user configured on the MQTT server needs the RabbitMQ tag from the table (`administrator` also covers everything `monitoring` can do). Without it the panels show an error that names the missing privilege.
+- Users without `system.settings.manage` only see the read-only panels; write actions are hidden and are also refused by the server.
+- Watching and publishing live MQTT messages is not part of the RabbitMQ plugin. It is available for every MQTT server and needs only `resources.update` -- see [MQTT Message Explorer](devices/mqtt/message-explorer.md).
+
 ## Troubleshooting
 
 | Problem | Solution |
@@ -114,6 +133,7 @@ The Servers page shows the current connection status for each broker:
 ## See Also
 
 - [Overview](devices/mqtt/overview.md) -- What is MQTT?
+- [Message Explorer](devices/mqtt/message-explorer.md) -- Watch and publish live MQTT messages
 - [Examples](devices/mqtt/examples.md) -- Practical MQTT integration examples
 - [Flows & Automation](flows/overview.md) -- Create automation workflows
 - [Environment Variables](installation/environment-variables.md) -- Server configuration
