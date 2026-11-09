@@ -15,6 +15,8 @@ on:
 
 permissions:
   contents: read
+  # npm trusted publishing (OIDC) — no long-lived npm token.
+  id-token: write
 
 env:
   # Nx remote cache — writable only when dispatched on main; a dispatch against
@@ -67,12 +69,10 @@ jobs:
         if: inputs.dry-run
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm nx release ${{ inputs.specifier }} --dry-run --yes
 
       - name: Run NX Release
         if: ${{ !inputs.dry-run }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm nx release ${{ inputs.specifier }} --yes
