@@ -303,9 +303,10 @@ Prüfen Sie Ihre Texte vorab mit denselben Regeln, damit sie auch nach der Trans
 
 ### Datenschutz und Sprache
 
-Öffentliche Slots (Reader ohne angemeldete Person) zeigen keine Namen anderer Personen. Personenbezogene Inhalte
-gehören in benutzerbezogene Slots (`resource.details.session`) und Schritte; der Host entfernt sie, wenn die
-Kartensitzung endet. Bevorzugen Sie „Reserviert“ statt Namen, sonst Vorname und Initial.
+Öffentliche Slots (Reader ohne angemeldete Person) zeigen keine Namen anderer Personen. Alles, was ein Provider
+während einer Kartensitzung liefert, ist benutzerbezogen, in jedem Slot, ebenso Schritte: Der Host entfernt es, wenn
+die Kartensitzung endet. In welchen Slot eine Angabe gehört, richtet sich nach `ctx.sessionActive`, nicht nach dem
+Datenschutz. Bevorzugen Sie „Reserviert“ statt Namen, sonst Vorname und Initial.
 
 Jeder Kontext enthält `ctx.language` (`'en'` oder `'de'`). Für Slot-Provider ist das die Reader-Sprache oder,
 solange eine Kartensitzung läuft, die Sprache der Kartenperson. In `PreStartContext` und `SessionEndContext` ist es

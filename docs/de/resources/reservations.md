@@ -195,7 +195,7 @@ Kartensitzung, kehrt der Reader zu den Texten oben zurück.
   die Maschine nutzt, siehe [Wer den Namen der buchenden Person sieht](#wer-den-namen-der-buchenden-person-sieht)),
   sieht ihn auch in den Details („Frei bis 14:00, dann reserviert von Alex bis 16:00“, „Reserviert von Alex 14:00-16:00 (Check-in bis
   14:15)“). Alle anderen sehen die Texte oben.
-- **Im Leerlauf** (niemand nutzt die Ressource): Der Detailtext trägt die freie Zeit und die nächste Buchung in einer
+- **Im Leerlauf** (niemand nutzt die Ressource und keine Buchung läuft): Der Detailtext trägt die freie Zeit und die nächste Buchung in einer
   Zeile, „Frei bis 14:00, dann reserviert von Alex bis 16:00“ (Name nach den Regeln oben, sonst „Frei bis 14:00, dann
   reserviert bis 16:00“). Das gilt auch, wenn diese Buchung im Bestätigungsfenster beginnt; solange nichts läuft,
   zeigt der Reader keinen Sitzungsbereich, der Detailtext ist also der eine Ort dafür.

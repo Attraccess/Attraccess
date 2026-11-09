@@ -98,7 +98,7 @@ When someone starts a resource, the plugin checks the bookings of **other** user
 
 - **Someone else's booking is running:** the start is refused with "Reserved by another user until 16:00", or
   "Reserved by Alex Example until 16:00" if you may see who is using the machine (see
-  [Who sees the holder's name](#who-sees-the-name-of-the-holder)).
+  [Who sees the name of the holder](#who-sees-the-name-of-the-holder)).
 - **Someone else's booking starts soon:** if it starts within the resource's confirmation window (60 minutes by
   default), you are asked to confirm: "Reserved from 14:00, you have 40 min. Start anyway?". On a reader without a
   screen the start is refused by default. If several bookings start within the window, you confirm each of them.
@@ -176,9 +176,9 @@ returns to the texts above.
   16:00" ("Yours until Wed 16:00" when it ends on another day), the details "Your booking 14:00-16:00", with "(check
   in by 14:15)" while the check-in is still open.
 - **Who may see the holder's name** (managers of the resource and everybody else who may see who uses the machine,
-  see [Who sees the holder's name](#who-sees-the-name-of-the-holder)) also sees it on the details ("Free until 14:00, then
+  see [Who sees the name of the holder](#who-sees-the-name-of-the-holder)) also sees it on the details ("Free until 14:00, then
   reserved by Alex until 16:00", "Reserved by Alex 14:00-16:00 (check in by 14:15)"). Everybody else sees the texts above.
-- **Idle** (nobody is using the resource): the details body carries the free time and the next booking in one
+- **Idle** (nobody is using the resource and no booking is running): the details body carries the free time and the next booking in one
   line, "Free until 14:00, then reserved by Alex until 16:00" (the name under the rules above, otherwise "Free
   until 14:00, then reserved until 16:00"). This also holds when that booking starts within the confirmation
   window; the reader shows no session area while nothing is running, so the body is the one place for it.

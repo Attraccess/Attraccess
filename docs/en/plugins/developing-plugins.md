@@ -646,9 +646,10 @@ so they fit the limits after transliteration.
 
 ### Privacy and language
 
-Public slots (signed-out reader) must not show names of other people. User-specific content belongs in
-user-scoped slots (`resource.details.session`) and steps; the host clears them when the card session ends. Prefer
-"Reserved" over names, and first name plus initial when a name is needed.
+Public slots (signed-out reader) must not show names of other people. Everything a provider returns during a card
+session is user-scoped, in every slot, and so are steps: the host removes it when the card session ends. Which slot
+holds a fact follows `ctx.sessionActive`, not privacy. Prefer "Reserved" over names, and first name plus initial
+when a name is needed.
 
 Every context carries `ctx.language` (`'en'` or `'de'`). For slot providers it is the reader language, or the card
 user's language while a card session is live. For `PreStartContext` and `SessionEndContext` it is the card user's
