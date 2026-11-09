@@ -38,10 +38,6 @@ describe('ReaderUiService', () => {
   const get = (list: ReaderSlotContribution[], slotId: string) => list.find((c) => c.slotId === slotId);
   const row = (list: ReaderSlotContribution[]) => textOf(get(list, 'resourceList.row.status')?.tree as ReaderUiNode)[0];
   const body = (list: ReaderSlotContribution[]) => textOf(get(list, 'resource.details.body')?.tree as ReaderUiNode)[0];
-  const header = (list: ReaderSlotContribution[]) => {
-    const tree = get(list, 'resource.details.header')?.tree;
-    return tree ? textOf(tree)[0] : undefined;
-  };
 
   /** Same rules as the host validator (apps/api reader-ui.validation), which a plugin cannot import. */
   const expectHostValid = (list: ReaderSlotContribution[]) => {
@@ -138,13 +134,11 @@ describe('ReaderUiService', () => {
       await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
       const en = await slots();
       expect(row(en)).toBe('Free until 14:00');
-      expect(header(en)).toBe('Free until 14:00');
-      expect(body(en)).toBe('Reserved 14:00-16:00');
+      expect(body(en)).toBe('Free until 14:00, then reserved until 16:00');
       expect(get(en, 'resource.details.session')).toBeUndefined();
       const de = await slots({ language: 'de' });
       expect(row(de)).toBe('Frei bis 14:00');
-      expect(header(de)).toBe('Frei bis 14:00');
-      expect(body(de)).toBe('Reserviert 14:00-16:00');
+      expect(body(de)).toBe('Frei bis 14:00, dann reserviert bis 16:00');
       expectHostValid(en);
       expectHostValid(de);
     });
@@ -153,7 +147,7 @@ describe('ReaderUiService', () => {
       await book(HOLDER, '2026-06-02T06:00:00', '2026-06-02T08:30:00'); // Tue 08:00-10:30 local
       const en = await slots();
       expect(row(en)).toBe('Free until Tue 08:00');
-      expect(body(en)).toBe('Reserved Tue 08:00-Tue 10:30');
+      expect(body(en)).toBe('Free until Tue 08:00, then reserved until Tue 10:30');
       const de = await slots({ language: 'de' });
       expect(row(de)).toBe('Frei bis Di 08:00');
       expectHostValid(en);
@@ -166,7 +160,6 @@ describe('ReaderUiService', () => {
       const en = await slots();
       expect(row(en)).toBe('Res., check in by 10:15');
       expect(body(en)).toBe('Reserved 10:00-16:00 (check in by 10:15)');
-      expect(header(en)).toBeUndefined();
       const de = await slots({ language: 'de' });
       expect(row(de)).toBe('Res., Check-in bis 10:15');
       expect(body(de)).toBe('Reserviert 10:00-16:00 (Check-in bis 10:15)');
@@ -328,24 +321,28 @@ describe('ReaderUiService', () => {
     it('a manager sees the holder name on the details, never on the list row', async () => {
       await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
       const en = await slots({ userId: MANAGER });
-      expect(body(en)).toBe('Reserved by user10 14:00-16:00');
+      expect(body(en)).toBe('Free until 14:00, then reserved by user10 until 16:00');
       expect(row(en)).toBe('Free until 14:00');
       expect(textOf(get(en, 'resourceList.row.status')?.tree as ReaderUiNode).join()).not.toContain('user10');
-      expect(body(await slots({ userId: MANAGER, language: 'de' }))).toBe('Reserviert von user10 14:00-16:00');
+      expect(body(await slots({ userId: MANAGER, language: 'de' }))).toBe(
+        'Frei bis 14:00, dann reserviert von user10 bis 16:00',
+      );
       expectHostValid(en);
     });
 
     it("other users see the public texts unless they may see who uses the machine (core's rule)", async () => {
       await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
       const names = jest.spyOn(h.directory, 'getUserNames');
-      expect(body(await slots({ userId: OTHER }))).toBe('Reserved 14:00-16:00');
+      expect(body(await slots({ userId: OTHER }))).toBe('Free until 14:00, then reserved until 16:00');
       expect(names).not.toHaveBeenCalled();
 
       h.allowAttribution(OTHER, 1);
       const en = await slots({ userId: OTHER });
-      expect(body(en)).toBe('Reserved by user10 14:00-16:00');
+      expect(body(en)).toBe('Free until 14:00, then reserved by user10 until 16:00');
       expect(row(en)).toBe('Free until 14:00');
-      expect(body(await slots({ userId: OTHER, language: 'de' }))).toBe('Reserviert von user10 14:00-16:00');
+      expect(body(await slots({ userId: OTHER, language: 'de' }))).toBe(
+        'Frei bis 14:00, dann reserviert von user10 bis 16:00',
+      );
       expectHostValid(en);
     });
 
@@ -368,6 +365,29 @@ describe('ReaderUiService', () => {
       expect(readerName('Zoë\u0308')).toBe('Zoë');
     });
 
+    it('one fact, one block: a booking is in exactly one details slot, and never in a header', async () => {
+      await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00'); // 12:40 local, 40 min away
+      const detailTexts = (list: ReaderSlotContribution[]) =>
+        list
+          .filter((c) => c.slotId.startsWith('resource.details.'))
+          .map((c) => `${c.slotId}: ${textOf(c.tree).join(' | ')}`);
+      // In a session the booking is in the session slot (with the countdown); body and header stay silent.
+      const session = await slots({ userId: MANAGER });
+      expect(detailTexts(session)).toEqual(['resource.details.session: Reserved by user10 12:40-14:00']);
+      expect(get(session, 'resource.details.header')).toBeUndefined();
+      expect(get(session, 'resource.details.body')).toBeUndefined();
+      // Outside the confirm window (or signed out) the body carries it, once.
+      const out = await slots();
+      expect(detailTexts(out)).toEqual(['resource.details.body: Free until 12:40, then reserved until 14:00']);
+      // Your own booking is the body; the other booking in the session slot is a different fact.
+      await book(MANAGER, '2026-06-01T10:10:00', '2026-06-01T10:30:00'); // 12:10-12:30 local, your early window
+      const own = await slots({ userId: MANAGER });
+      expect(detailTexts(own)).toEqual([
+        'resource.details.body: Your booking 12:10-12:30 (check in by 12:25)',
+        'resource.details.session: Reserved by user10 12:40-14:00',
+      ]);
+    });
+
     it("session area: another user's booking within the confirm window, with a countdown", async () => {
       await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00'); // 12:40 local, 40 min away
       const en = await slots({ userId: OTHER });
@@ -375,14 +395,14 @@ describe('ReaderUiService', () => {
       expect(session?.tree).toEqual({
         t: 'row',
         c: [
-          { t: 'text', text: 'Reserved from 12:40', style: 'small', fill: true },
+          { t: 'text', text: 'Reserved 12:40-14:00', style: 'small', fill: true },
           { t: 'countdown', to: new Date('2026-06-01T10:40:00Z'), tone: 'warning' },
         ],
       });
-      expect(session?.fallback?.text).toBe('Reserved from 12:40');
+      expect(session?.fallback?.text).toBe('Reserved 12:40-14:00');
       expect(
         textOf(get(await slots({ userId: OTHER, language: 'de' }), 'resource.details.session')?.tree as ReaderUiNode),
-      ).toEqual(['Reserviert ab 12:40']);
+      ).toEqual(['Reserviert 12:40-14:00']);
       expectHostValid(en);
     });
 
@@ -390,10 +410,10 @@ describe('ReaderUiService', () => {
       await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
       const text = async (userId: number) =>
         textOf(get(await slots({ userId }), 'resource.details.session')?.tree as ReaderUiNode)[0];
-      expect(await text(MANAGER)).toBe('Reserved by user10 from 12:40');
-      expect(await text(OTHER)).toBe('Reserved from 12:40');
+      expect(await text(MANAGER)).toBe('Reserved by user10 12:40-14:00');
+      expect(await text(OTHER)).toBe('Reserved 12:40-14:00');
       h.allowAttribution(OTHER, 1);
-      expect(await text(OTHER)).toBe('Reserved by user10 from 12:40');
+      expect(await text(OTHER)).toBe('Reserved by user10 12:40-14:00');
     });
 
     it('no session slot outside the confirm window, for the holder, or when signed out', async () => {
@@ -478,13 +498,12 @@ describe('ReaderUiService', () => {
     });
   });
 
-  it("looks a holder's name up once, even when the details and the session area both name them", async () => {
+  it("looks a holder's name up once, even when the same booking's details come from the session area", async () => {
     await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
     const names = jest.spyOn(h.directory, 'getUserNames');
     const list = await slots({ userId: MANAGER });
-    expect(body(list)).toBe('Reserved by user10 12:40-14:00');
     expect(textOf(get(list, 'resource.details.session')?.tree as ReaderUiNode)[0]).toBe(
-      'Reserved by user10 from 12:40',
+      'Reserved by user10 12:40-14:00',
     );
     expect(names).toHaveBeenCalledTimes(1);
   });

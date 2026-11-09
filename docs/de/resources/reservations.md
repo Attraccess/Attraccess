@@ -164,11 +164,12 @@ oder andere personenbezogene Daten, auch nicht für Personen, die sonst Namen se
 | Situation                                                                                | Ressourcenliste            | Ressourcendetails                             |
 | ---------------------------------------------------------------------------------------- | -------------------------- | --------------------------------------------- |
 | Nichts läuft, nichts beginnt innerhalb von 24 Stunden                                    | nichts                     | nichts                                        |
-| Die nächste Buchung beginnt innerhalb von 24 Stunden, keine läuft                        | „Frei bis 14:00“           | „Frei bis 14:00“, „Reserviert 14:00-16:00“    |
+| Die nächste Buchung beginnt innerhalb von 24 Stunden, keine läuft                        | „Frei bis 14:00“           | „Frei bis 14:00, dann reserviert bis 16:00“   |
 | Eine Buchung läuft, Check-in ist verlangt, aber noch nicht erfolgt, vor Ablauf der Frist | „Res., Check-in bis 14:15“ | „Reserviert 14:00-16:00 (Check-in bis 14:15)“ |
 | Eine Buchung läuft und ist eingecheckt (oder Check-in ist ausgeschaltet)                 | „Reserviert bis 16:00“     | „Reserviert 14:00-16:00“                      |
 
-Die Listenzeile fasst 24 Zeichen, deshalb ist der offene Check-in dort gekürzt; eine Frist an einem anderen Tag
+Jede Buchung steht pro Bildschirm in genau einem Text, nie doppelt: Die Details haben eine Zeile für die freie Zeit
+und die Buchung, die sie beendet. Die Listenzeile fasst 24 Zeichen, deshalb ist der offene Check-in dort gekürzt; eine Frist an einem anderen Tag
 lautet „Res., Check-in Di 00:05“. Die Details haben immer den vollen Text. Der Sperrbildschirm der Ressource zeigt
 dieselbe öffentliche Zeile wie die Listenzeile, anstelle von „Verfügbar“ (nicht, solange die Ressource in Benutzung
 oder in Wartung ist).
@@ -192,10 +193,12 @@ Kartensitzung, kehrt der Reader zu den Texten oben zurück.
   bei noch offenem Check-in mit dem Zusatz „(Check-in bis 14:15)“.
 - **Wer den Namen der buchenden Person sehen darf** (Verwaltende der Ressource und alle anderen, die sehen dürfen, wer
   die Maschine nutzt, siehe [Wer den Namen der buchenden Person sieht](#wer-den-namen-der-buchenden-person-sieht)),
-  sieht ihn auch in den Details („Reserviert von Alex 14:00-16:00“, „Reserviert von Alex 14:00-16:00 (Check-in bis
+  sieht ihn auch in den Details („Frei bis 14:00, dann reserviert von Alex bis 16:00“, „Reserviert von Alex 14:00-16:00 (Check-in bis
   14:15)“). Alle anderen sehen die Texte oben.
 - **Während Sie die Ressource nutzen** und die Buchung einer anderen Person im Bestätigungsfenster beginnt, zeigt der
-  Sitzungsbereich „Reserviert ab 14:00“ mit einem Countdown (mit Namen nach den Regeln oben).
+  Sitzungsbereich diese Buchung einmal, „Reserviert von Alex 14:00-16:00“, mit einem Countdown (Name nach den Regeln
+  oben, sonst „Reserviert 14:00-16:00“). Die Details zeigen dann nichts weiter zu dieser Buchung: keine „Frei
+  bis“-Zeile und keinen zweiten Text.
 - Die **Liste zeigt nie Namen**, weder angemeldet noch abgemeldet. Lange Namen werden in den Details gekürzt.
 
 **Am Reader starten.**

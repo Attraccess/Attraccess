@@ -113,8 +113,22 @@ export const readerTexts = {
   },
 
   /** Details lines (≤ 80 characters; the holder name is already truncated). */
-  headerFreeUntil: (start: Date, c: ReaderClock) =>
-    pick(c.lang, `Free until ${readerTime(start, c)}`, `Frei bis ${readerTime(start, c)}`),
+  /**
+   * Nothing runs and a booking is next: one text for the free window and that booking (the booking's start is
+   * the end of the free window, so it is written once).
+   */
+  freeThenReserved: (start: Date, end: Date, c: ReaderClock, holder?: string) =>
+    holder
+      ? pick(
+          c.lang,
+          `Free until ${readerTime(start, c)}, then reserved by ${holder} until ${readerTime(end, c)}`,
+          `Frei bis ${readerTime(start, c)}, dann reserviert von ${holder} bis ${readerTime(end, c)}`,
+        )
+      : pick(
+          c.lang,
+          `Free until ${readerTime(start, c)}, then reserved until ${readerTime(end, c)}`,
+          `Frei bis ${readerTime(start, c)}, dann reserviert bis ${readerTime(end, c)}`,
+        ),
   reserved: (start: Date, end: Date, c: ReaderClock, holder?: string) =>
     holder
       ? pick(
@@ -127,13 +141,13 @@ export const readerTexts = {
     pick(c.lang, `Your booking ${range(start, end, c)}`, `Deine Buchung ${range(start, end, c)}`),
   checkInSuffix: (deadline: Date, c: ReaderClock) =>
     pick(c.lang, ` (check in by ${readerTime(deadline, c)})`, ` (Check-in bis ${readerTime(deadline, c)})`),
-  /** Session area: another user's booking starts soon (a countdown node follows). */
-  sessionReservedFrom: (start: Date, c: ReaderClock, holder?: string) =>
+  /** Session area: another user's booking starts soon, with its full range (a countdown node follows). */
+  sessionReserved: (start: Date, end: Date, c: ReaderClock, holder?: string) =>
     holder
       ? pick(
           c.lang,
-          `Reserved by ${holder} from ${readerTime(start, c)}`,
-          `Reserviert von ${holder} ab ${readerTime(start, c)}`,
+          `Reserved by ${holder} ${range(start, end, c)}`,
+          `Reserviert von ${holder} ${range(start, end, c)}`,
         )
-      : pick(c.lang, `Reserved from ${readerTime(start, c)}`, `Reserviert ab ${readerTime(start, c)}`),
+      : pick(c.lang, `Reserved ${range(start, end, c)}`, `Reserviert ${range(start, end, c)}`),
 };

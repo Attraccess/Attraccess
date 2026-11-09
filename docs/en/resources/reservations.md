@@ -147,14 +147,15 @@ bookings are shown. The reader's own status ("In use", maintenance and so on) al
 **Before a card is tapped.** A reader nobody is signed in to shows times and states only, never names or other
 personal data, whoever may otherwise see names:
 
-| Situation                                                                        | Resource list             | Resource details                           |
-| -------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------ |
-| Nothing running, nothing starts within 24 hours                                  | nothing                   | nothing                                    |
-| The next booking starts within 24 hours, none is running                         | "Free until 14:00"        | "Free until 14:00", "Reserved 14:00-16:00" |
-| A booking is running, check-in is required and not done yet, before the deadline | "Res., check in by 14:15" | "Reserved 14:00-16:00 (check in by 14:15)" |
-| A booking is running and checked in (or check-in is turned off)                  | "Reserved until 16:00"    | "Reserved 14:00-16:00"                     |
+| Situation                                                                        | Resource list             | Resource details                              |
+| -------------------------------------------------------------------------------- | ------------------------- | --------------------------------------------- |
+| Nothing running, nothing starts within 24 hours                                  | nothing                   | nothing                                       |
+| The next booking starts within 24 hours, none is running                         | "Free until 14:00"        | "Free until 14:00, then reserved until 16:00" |
+| A booking is running, check-in is required and not done yet, before the deadline | "Res., check in by 14:15" | "Reserved 14:00-16:00 (check in by 14:15)"    |
+| A booking is running and checked in (or check-in is turned off)                  | "Reserved until 16:00"    | "Reserved 14:00-16:00"                        |
 
-The list row holds 24 characters, so the open check-in is shortened there; a deadline on another day reads
+Each booking appears in one text on a screen, never twice: the details carry one line for the free time and the
+booking that ends it. The list row holds 24 characters, so the open check-in is shortened there; a deadline on another day reads
 "Res., check-in Tue 00:05". The details always have the full text. The lock screen of the resource shows the same
 public line as the list row, in place of "Available" (not while the resource is in use or under maintenance).
 
@@ -175,10 +176,12 @@ returns to the texts above.
   16:00" ("Yours until Wed 16:00" when it ends on another day), the details "Your booking 14:00-16:00", with "(check
   in by 14:15)" while the check-in is still open.
 - **Who may see the holder's name** (managers of the resource and everybody else who may see who uses the machine,
-  see [Who sees the holder's name](#who-sees-the-holders-name)) also sees it on the details ("Reserved by Alex
-  14:00-16:00", "Reserved by Alex 14:00-16:00 (check in by 14:15)"). Everybody else sees the texts above.
+  see [Who sees the holder's name](#who-sees-the-holders-name)) also sees it on the details ("Free until 14:00, then
+  reserved by Alex until 16:00", "Reserved by Alex 14:00-16:00 (check in by 14:15)"). Everybody else sees the texts above.
 - **While you are using the resource** and somebody else's booking starts within the confirmation window, the
-  session area shows "Reserved from 14:00" with a countdown (with the name under the rules above).
+  session area shows that booking once, "Reserved by Alex 14:00-16:00" with a countdown (the name under the rules
+  above, otherwise "Reserved 14:00-16:00"). The details then show nothing else about that booking: no "Free until"
+  line and no second text.
 - The **list never shows names**, signed in or not. Long names are shortened in the details.
 
 **Starting on the reader.**

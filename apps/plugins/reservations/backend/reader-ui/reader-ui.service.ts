@@ -22,7 +22,7 @@ const MINUTE_MS = 60_000;
 const SLOT = READER_UI_SLOTS;
 
 /**
- * Reservation state on Attractap readers (resource list row, details header/body, session area).
+ * Reservation state on Attractap readers (resource list row, details body, session area).
  *
  * Privacy: with no `ctx.userId` (a signed-out reader) the output has no holder name and no personal
  * data, and no user or permission lookup runs. Names appear only for a card user who is a manager of the
@@ -110,37 +110,43 @@ export class ReaderUiService {
       state.row,
       state.tone,
     );
-    if (state.header) {
-      add(SLOT.RESOURCE_DETAILS_HEADER, 'header', { t: 'text', text: state.header, style: 'title' }, state.header);
-    }
-    add(SLOT.RESOURCE_DETAILS_BODY, 'body', { t: 'text', text: state.body, style: 'body' }, state.body);
 
     // Session area (card session only): another user's booking starts within the confirm window.
+    let sessionBooking: ReservationEntity | undefined;
     if (userId !== undefined && settings.confirmWindowMinutes > 0) {
       const window = settings.confirmWindowMinutes * MINUTE_MS;
       const next = upcoming.find((r) => r.userId !== userId && r.startTime.getTime() - nowMs <= window);
-      if (next) {
-        const sessionHolder = await nameOf(next);
-        const text = readerTexts.sessionReservedFrom(next.startTime, clock, sessionHolder);
-        add(
-          SLOT.RESOURCE_DETAILS_SESSION,
-          'reserved-soon',
-          {
-            t: 'row',
-            c: [
-              { t: 'text', text, style: 'small', fill: true },
-              { t: 'countdown', to: next.startTime, tone: 'warning' },
-            ],
-          },
-          text,
-          'warning',
-        );
-        boundaries.push(next.startTime.getTime());
-      } else {
+      if (next) sessionBooking = next;
+      else {
         // The confirm window opens later: re-evaluate then.
         const opens = upcoming.find((r) => r.userId !== userId);
         if (opens) boundaries.push(opens.startTime.getTime() - window);
       }
+    }
+
+    // One fact, one block: a booking appears in exactly one details slot. The session slot is the most
+    // specific, so when it shows the subject booking the body stays silent (there is no header at all).
+    if (subject !== sessionBooking) {
+      add(SLOT.RESOURCE_DETAILS_BODY, 'body', { t: 'text', text: state.body, style: 'body' }, state.body);
+    }
+    if (sessionBooking) {
+      const next = sessionBooking;
+      const sessionHolder = next === subject ? holder : await nameOf(next);
+      const text = readerTexts.sessionReserved(next.startTime, next.endTime, clock, sessionHolder);
+      add(
+        SLOT.RESOURCE_DETAILS_SESSION,
+        'reserved-soon',
+        {
+          t: 'row',
+          c: [
+            { t: 'text', text, style: 'small', fill: true },
+            { t: 'countdown', to: next.startTime, tone: 'warning' },
+          ],
+        },
+        text,
+        'warning',
+      );
+      boundaries.push(next.startTime.getTime());
     }
     if (userId !== undefined && upcoming.length > 0 && !own) {
       // Your early check-in window may open before the next booking starts.
@@ -200,7 +206,7 @@ export class ReaderUiService {
     clock: ReaderClock,
     holder: string | undefined,
     isOwn: boolean,
-  ): { row: string; header?: string; body: string; tone: ReaderUiTone; boundary: number } {
+  ): { row: string; body: string; tone: ReaderUiTone; boundary: number } {
     const { startTime, endTime } = booking;
     const deadline = new Date(
       Math.min(startTime.getTime() + settings.checkInGraceMinutes * MINUTE_MS, endTime.getTime()),
@@ -220,8 +226,7 @@ export class ReaderUiService {
     if (!isRunning) {
       return {
         row: readerTexts.rowFreeUntil(startTime, clock),
-        header: readerTexts.headerFreeUntil(startTime, clock),
-        body: readerTexts.reserved(startTime, endTime, clock, holder),
+        body: readerTexts.freeThenReserved(startTime, endTime, clock, holder),
         tone: 'success',
         boundary: startTime.getTime(),
       };
