@@ -1,4 +1,5 @@
 # Projects
+<!-- llms-description: Introduces projects that group usage sessions across resources under a common purpose and for collaborating teams. -->
 
 Projects help you organize work across multiple resources. They let you group usage sessions under a common purpose and manage teams of people who collaborate on shared tasks.
 

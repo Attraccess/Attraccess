@@ -1,4 +1,5 @@
 # Meters and consumption billing
+<!-- llms-description: Named meters per resource for electricity, water or any value, with cumulative counters, session boundaries and optional billing. -->
 
 Each resource can have several named meters. A meter can count anything: electricity, water, material, heartbeats or other values. Attraccess does not store a unit or convert new readings.
 

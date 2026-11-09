@@ -1,4 +1,5 @@
 # Monitoring einrichten
+<!-- llms-description: So aktivieren Sie den Metriken-Endpunkt und erzeugen den API-Schlüssel, mit dem Prometheus Attraccess abruft. -->
 
 Diese Anleitung erklärt, wie Sie den Metriken-Endpunkt in Attraccess aktivieren und den API-Schlüssel generieren, den Prometheus zum Abrufen der Metriken verwendet.
 

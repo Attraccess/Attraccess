@@ -1,4 +1,5 @@
 # Abrechnungstransaktionen
+<!-- llms-description: Credit-Transaktionen im Abrechnungs-Dashboard ansehen, filtern und prüfen, inklusive erforderlicher Berechtigung. -->
 
 Das Abrechnungs-Dashboard zeigt alle Credit-Transaktionen im gesamten System. Verwenden Sie es, um Belastungen zu verfolgen, Nutzungskosten von Ressourcen zu ueberwachen und die Aktivitaet einzelner Benutzer zu ueberpruefen.
 

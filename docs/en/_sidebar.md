@@ -72,6 +72,7 @@
 - **Devices**
   - [MQTT](devices/mqtt/overview.md)
   - [MQTT Server Setup](devices/mqtt/server-setup.md)
+  - [MQTT Message Explorer](devices/mqtt/message-explorer.md)
   - [MQTT Examples](devices/mqtt/examples.md)
   - [Guided WAGO CC100 Commissioning](devices/wago-cc100-commissioning.md)
   - [WAGO CC100 Docker Runtime](devices/wago-cc100-runtime.md)
@@ -109,6 +110,7 @@
   - [Architecture](developer/architecture.md)
   - [API Log Destinations](developer/logging.md)
   - [API Reference](developer/api-reference.md)
+  - [AI Agents (llms.txt & WebMCP)](developer/ai-agents.md)
   - [Contributing](developer/contributing.md)
 
 - **End User Guide**

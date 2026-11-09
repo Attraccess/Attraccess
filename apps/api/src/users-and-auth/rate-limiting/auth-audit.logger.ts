@@ -53,17 +53,15 @@ export class AuthAuditLogger {
     const action = actionFor(fields.type);
     if (!action) return;
     const reason = fields.outcome === 'success' ? undefined : fields.outcome;
-    await this.identityAudit
-      ?.record({
-        action,
-        operationId: randomUUID(),
-        outcome: fields.outcome === 'success' ? 'succeeded' : 'failed',
-        actorId: fields.userId ?? undefined,
-        subjectId: fields.userId ?? undefined,
-        details: reason ? { reason } : {},
-        request: { ipAddress: fields.ip },
-      })
-      .catch(() => undefined);
+    await this.identityAudit?.record({
+      action,
+      operationId: randomUUID(),
+      outcome: fields.outcome === 'success' ? 'succeeded' : 'failed',
+      actorId: fields.userId ?? undefined,
+      subjectId: fields.userId ?? undefined,
+      details: reason ? { reason } : {},
+      request: { ipAddress: fields.ip },
+    });
   }
 }
 

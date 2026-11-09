@@ -1,4 +1,5 @@
 # Monitoring Setup
+<!-- llms-description: How to enable the metrics endpoint and generate the API key Prometheus uses to scrape Attraccess. -->
 
 This guide explains how to enable the metrics endpoint in Attraccess and generate the API key that Prometheus uses to scrape metrics.
 

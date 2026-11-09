@@ -1,4 +1,5 @@
 # Monitoring & Metrics
+<!-- llms-description: Overview of built-in Prometheus metrics and Grafana dashboards for monitoring Attraccess, with security notes. -->
 
 Attraccess includes built-in monitoring support using **Prometheus** for metrics collection and **Grafana** for visualization. IT and operations teams can monitor resource usage, application health and operational performance alongside their existing infrastructure.
 
@@ -13,7 +14,7 @@ Attraccess includes built-in monitoring support using **Prometheus** for metrics
 | **Maintenance** | Maintenance events, overdue maintenance alerts |
 | **Attractap Devices** | Connected RFID readers, tap events, firmware updates |
 | **Billing** | Transaction counts and amounts |
-| **Infrastructure** | MQTT server health, WebSocket connections, email delivery, plugin status |
+| **Infrastructure** | MQTT server health, WebSocket connections, email delivery, plugin status, dropped audit records |
 | **Node.js Runtime** | CPU usage, memory (heap/RSS), event loop lag |
 
 ## How It Works

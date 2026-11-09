@@ -35,19 +35,17 @@ export class AttractapCrashReportHandler {
 
     try {
       const report = await this.attractapService.createCrashReport(socket.readerId, payload);
-      await this.audit
-        .recordAttractap({
-          action: 'reader.crash_reported',
-          actorId: null,
-          authenticationMethod: null,
-          subjectId: socket.readerId,
-          details: {
-            source: 'reader-websocket',
-            resetReason: this.normalizeResetReason(report.resetReason),
-            hasCoredump: !!report.coredumpSize,
-          },
-        })
-        .catch(() => undefined);
+      await this.audit.recordAttractap({
+        action: 'reader.crash_reported',
+        actorId: null,
+        authenticationMethod: null,
+        subjectId: socket.readerId,
+        details: {
+          source: 'reader-websocket',
+          resetReason: this.normalizeResetReason(report.resetReason),
+          hasCoredump: !!report.coredumpSize,
+        },
+      });
       this.logger.warn(
         `Stored crash report ${report.id} for reader ${socket.readerId}: reason=${report.resetReason} ` +
           `rebootReason=${report.rebootReason ?? 'n/a'} ` +

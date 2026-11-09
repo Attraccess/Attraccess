@@ -1,4 +1,5 @@
 # Einrichtungsassistent
+<!-- llms-description: Führt durch den Einrichtungsassistenten beim ersten Start: Anwendungs- und E-Mail-Einstellungen, Administrator-Konto und E-Mail-Bestätigung. -->
 
 Wenn Sie Attraccess zum ersten Mal starten und noch kein Benutzerkonto existiert, werden Sie automatisch zum Einrichtungsassistenten weitergeleitet. Dieser führt Sie durch die Grundkonfiguration in vier Schritten.
 

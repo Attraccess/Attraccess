@@ -1,4 +1,5 @@
 # Prometheus & Grafana Setup
+<!-- llms-description: Set up Prometheus and Grafana with Attraccess's bundled dashboards on Coolify or manual Docker Compose, including bearer token and provisioning. -->
 
 This guide covers how to set up Prometheus and Grafana to collect and visualize Attraccess metrics. Attraccess ships with pre-configured dashboards, datasource provisioning, and a Prometheus scrape config bundled inside the `attraccess` image at `/app/share/monitoring/` — so no repo checkout is required to deploy the stack.
 
@@ -270,6 +271,19 @@ Things to know:
 - **One installation:** replicas must share one database. Combining independent installations in one Grafana instance is unsupported.
 - **Long reader lists** are capped at about 200 characters (`; +N more`) so the Pushover message stays under Pushover's 1,024-character limit and keeps its Silence and View links. Reader names are shortened to 40 characters and `<` and `>` are removed, because Pushover renders the message as HTML.
 - **Upgrades:** the former single `AttractapReaderCrashes` rule keeps its UID and is replaced in place, so the old wording does not survive. An existing Grafana silence on `AttractapReaderCrashes` therefore also mutes the new crash warning until it expires.
+
+## Audit alert
+
+`AuditRecordsDropped` is a critical Grafana alert. It fires as soon as `attraccess_audit_records_dropped_total` increased in the last 5 minutes, which means at least one audit record could not be stored, and clears about 5 minutes after the last drop. The change the record described still went through. The API log has one `Audit record dropped` line per drop with the domain, action, reason and the SQLite error code (never event details). The `reason` label tells you why:
+
+- `storage_error`: the insert failed; the SQLite code says why (for example `SQLITE_BUSY` when the database stayed locked for 5 seconds).
+- `queue_full`: more than 1,000 audit writes were waiting.
+- `storage_unavailable`: audit storage not available (startup failed or in-memory database).
+- `shutting_down`: the record arrived while the API was shutting down; expected during a restart.
+- `settings_unavailable`: the audit settings could not be read.
+- `invalid_event`: the event was rejected as invalid, which points to a bug.
+
+Under database contention, an audit write without a caller transaction can wait up to 5 seconds instead of losing the record, so logins, reader authentication and card linking can briefly slow down.
 
 ## Exposing Prometheus Externally (Optional)
 

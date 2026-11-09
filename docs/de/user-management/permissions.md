@@ -1,4 +1,5 @@
 # Berechtigungen
+<!-- llms-description: Erklärt die vier Systemberechtigungen, wie Administratoren sie vergeben, SSO-verwaltete Berechtigungen und Zugriff auf fremde RFID-Karten. -->
 
 Attraccess verwendet ein Berechtigungssystem mit vier Systemberechtigungen, die Administratoren einzelnen Benutzern zuweisen können.
 

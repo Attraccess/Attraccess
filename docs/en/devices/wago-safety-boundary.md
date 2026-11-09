@@ -1,4 +1,5 @@
 # WAGO safety boundary and wording checklist
+<!-- llms-description: States that the WAGO integration is for operational control, not a safety function, with a wording checklist for reviewers. -->
 
 The WAGO integration controls outputs for **operational** purposes. It is not a safety function, and no part of it
 has been qualified on physical hardware. This page is the single reference for that boundary. Reviewers use the

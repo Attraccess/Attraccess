@@ -1,4 +1,5 @@
 # Flows & Automatisierung
+<!-- llms-description: Stellt Flows als visuelle Automatisierungen vor, mit Anwendungsfällen, Ressourcen- und globalen Flows und dem ersten Flow. -->
 
 Flows sind visuelle Automatisierungs-Workflows, die Sie an eine Ressource anheften oder als [globalen Flow](flows/global-flows.md) für alle Ressourcen ausführen können. Sie ermöglichen es, Aktionen auszulösen, wenn etwas passiert -- zum Beispiel eine MQTT-Nachricht senden, wenn eine Maschine eingeschaltet wird, oder die Abrechnung starten, wenn eine Sitzung endet.
 

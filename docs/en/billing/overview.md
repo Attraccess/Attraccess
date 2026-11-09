@@ -1,4 +1,5 @@
 # Billing
+<!-- llms-description: Introduces billing: how credits are deducted for resource usage, the credit system, payment integration and required permission. -->
 
 Attraccess includes a billing system that lets you charge users for resource usage. Credits are deducted from user accounts when they use resources.
 

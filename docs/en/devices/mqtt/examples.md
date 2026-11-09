@@ -1,4 +1,5 @@
 # MQTT Examples
+<!-- llms-description: Practical MQTT examples: relay power control, receiving sensor data and using MQTT in flows for resource usage events. -->
 
 This page shows practical examples of how to use MQTT with Attraccess to control machines, receive sensor data and automate equipment in production and lab environments.
 

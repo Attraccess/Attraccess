@@ -1,4 +1,5 @@
 # Schnellstart
+<!-- llms-description: Anleitung, um Attraccess in wenigen Minuten mit Docker Compose zu starten und die Ersteinrichtung abzuschließen. -->
 
 Diese Anleitung bringt Attraccess in wenigen Minuten zum Laufen.
 

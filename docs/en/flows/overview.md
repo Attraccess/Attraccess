@@ -1,4 +1,5 @@
 # Flows & Automation
+<!-- llms-description: Introduces flows, visual automations for resources, with use cases, resource versus global flows and creating a first flow. -->
 
 Flows are visual automation workflows that you can attach to a resource, or run for all resources as a [global flow](flows/global-flows.md). They let you automate actions when something happens -- for example, sending an MQTT message when a machine is turned on, or triggering billing when a session ends.
 

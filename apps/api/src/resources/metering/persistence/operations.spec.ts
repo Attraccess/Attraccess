@@ -1,7 +1,4 @@
 import {
-  BillingTransaction,
-  BillingTransactionItem,
-  ResourceFlowEdge,
   ResourceFlowNode,
   ResourceMeter,
   ResourceMeteringOperation,
@@ -22,8 +19,6 @@ import { createGenericMetersFixture } from './fixtures/generic-meters.test-fixtu
 
 import { createUsageLifecycleFixture } from './fixtures/usage-lifecycle.test-fixture';
 
-import { T } from './fixtures/node-types.test-fixture';
-
 // This SQLite suite runs multiple settlements per case; coverage on CI exceeds Jest's five-second default.
 jest.setTimeout(30_000);
 
@@ -34,38 +29,7 @@ export type GenericMetersTestScope = ReturnType<typeof createGenericMetersFixtur
 export type UsageLifecycleTestScope = ReturnType<typeof createUsageLifecycleFixture>;
 
 describe('Flow-defined metering', () => {
-  async function seedMeter(startData: object = {}, collectData: object = { finalRetryDelaySeconds: 0 }) {
-    const nodes = scope.source.getRepository(ResourceFlowNode);
-    await nodes.save([
-      { id: 'start', type: T.INPUT_METERING_START, resourceId: 1, data: { meterId: 1, ...startData } },
-      { id: 'ready', type: T.OUTPUT_METERING_READY, resourceId: 1, data: { meterId: 1 } },
-      { id: 'collect', type: T.INPUT_METERING_COLLECT, resourceId: 1, data: { meterId: 1, ...collectData } },
-      {
-        id: 'report',
-        type: T.OUTPUT_METERING_REPORT,
-        resourceId: 1,
-        data: { meterId: 1, value: '1' },
-      },
-    ]);
-    await scope.source.getRepository(ResourceFlowEdge).save([
-      { id: 'e1', source: 'start', sourceHandle: 'output', target: 'ready', targetHandle: 'input', resourceId: 1 },
-      { id: 'e2', source: 'collect', sourceHandle: 'output', target: 'report', targetHandle: 'input', resourceId: 1 },
-    ]);
-  }
-
-  async function items(usageId: number) {
-    const transaction = await scope.source
-      .getRepository(BillingTransaction)
-      .findOneByOrFail({ resourceUsageId: usageId });
-    return {
-      transaction,
-      items: await scope.source
-        .getRepository(BillingTransactionItem)
-        .find({ where: { billingTransactionId: transaction.id } }),
-    };
-  }
-
-  const scope = Object.assign(createFlowDefinedMeteringFixture(), { seedMeter, items });
+  const scope = createFlowDefinedMeteringFixture();
 
   beforeEach(async () => {
     await resetTestFixture(scope);

@@ -1,4 +1,5 @@
 # Firmware-Updates
+<!-- llms-description: Wie Attractap-Leser Over-the-Air-Firmware-Updates vom Attraccess-Backend erhalten, inklusive Firmware-Varianten und Fehlerbehebung. -->
 
 Attractap-Leser unterstuetzen OTA-Firmware-Updates (Over-The-Air). Das bedeutet, dass die Leser-Firmware ueber das Attraccess-Backend aus der Ferne aktualisiert wird, ohne physisch auf das Geraet zugreifen zu muessen.
 

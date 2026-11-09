@@ -1,4 +1,5 @@
 # Creating Resources
+<!-- llms-description: How to create, edit and delete a resource, which requires the Manage Resources permission. -->
 
 You need the **Manage Resources** permission to create new resources.
 

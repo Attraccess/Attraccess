@@ -1,4 +1,5 @@
 # Audit-Protokoll
+<!-- llms-description: Wie Sie das Audit-Protokoll durchsuchen, filtern, prüfen und exportieren sowie Aufzeichnung und Aufbewahrung steuern. -->
 
 Unter **Einstellungen → Auditprotokoll** können Sie erfasste Aktivitäten nachvollziehen. Der Reiter **Aktivitäten** zeigt die neuesten Ereignisse zuerst. Unter **Protokollierung** legen Sie Erfassung und Aufbewahrung fest.
 

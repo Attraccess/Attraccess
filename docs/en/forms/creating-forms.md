@@ -1,4 +1,5 @@
 # Creating Forms
+<!-- llms-description: How to create, edit and delete forms and their fields for a resource, which requires the Manage Resources permission. -->
 
 You need the **Manage Resources** permission to create and edit forms.
 

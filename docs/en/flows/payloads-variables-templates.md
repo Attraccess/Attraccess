@@ -1,4 +1,5 @@
 # Payloads, Variables & Templates
+<!-- llms-description: Explains flow payloads, trigger data, templates, arithmetic and unit conversion, and persistent flow variables. -->
 
 Each flow node receives data from the previous node and produces data for the next one. This data is called the **payload**. Templates read that payload to build messages, URLs or other settings. **Flow variables** store values that must survive a flow run.
 

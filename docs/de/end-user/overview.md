@@ -1,4 +1,5 @@
 # Anleitung für Endbenutzer
+<!-- llms-description: Startseite des Endbenutzer-Leitfadens für Maschinenbediener, Mitarbeitende, Forschende und Studierende, die Attraccess nutzen. -->
 
 Willkommen bei Attraccess! Diese Anleitung richtet sich an Bedienpersonal, Mitarbeitende, Forschende und Studierende, die mit Attraccess auf Maschinen, Werkzeuge, Arbeitsplätze und andere Ressourcen ihrer Organisation zugreifen.
 

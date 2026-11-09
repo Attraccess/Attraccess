@@ -1,4 +1,5 @@
 # Monitoring & Metriken
+<!-- llms-description: Überblick über integrierte Prometheus-Metriken und Grafana-Dashboards zur Überwachung von Attraccess, inklusive Sicherheitshinweisen. -->
 
 Attraccess bietet integrierte Monitoring-Unterstützung mit **Prometheus** zur Metrik-Erfassung und **Grafana** zur Visualisierung. IT- und Betriebsteams können Ressourcennutzung, Anwendungszustand und betriebliche Leistung gemeinsam mit ihrer bestehenden Infrastruktur überwachen.
 
@@ -13,7 +14,7 @@ Attraccess bietet integrierte Monitoring-Unterstützung mit **Prometheus** zur M
 | **Wartung** | Wartungsereignisse, überfällige Wartungswarnungen |
 | **Attractap-Geräte** | Verbundene RFID-Leser, Tap-Ereignisse, Firmware-Updates |
 | **Abrechnung** | Transaktionsanzahl und -beträge |
-| **Infrastruktur** | MQTT-Server-Status, WebSocket-Verbindungen, E-Mail-Zustellung, Plugin-Status |
+| **Infrastruktur** | MQTT-Server-Status, WebSocket-Verbindungen, E-Mail-Zustellung, Plugin-Status, verworfene Audit-Einträge |
 | **Node.js-Laufzeit** | CPU-Nutzung, Speicher (Heap/RSS), Event-Loop-Verzögerung |
 
 ## Funktionsweise

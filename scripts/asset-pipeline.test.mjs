@@ -94,7 +94,8 @@ test('every main pipeline tests all deliverables and bundles artifacts built in 
     for (const deliverable of ['build-companion', 'build-attractap-firmware', 'build-attractap-desktop']) {
       assert.ok(jobs[deliverable].uses, `${name}: ${deliverable} must always run`);
       assert.equal(jobs[deliverable].if, undefined);
-      assert.ok(jobs.containerize.needs.includes(deliverable) || jobs['precommit-check']?.needs.includes(deliverable));
+      const consumer = name === 'docker-nightly-latest' ? jobs['publish-gate'] : jobs.containerize;
+      assert.ok(consumer.needs.includes(deliverable) || jobs['precommit-check']?.needs.includes(deliverable));
     }
     assert.ok(jobs.test.steps.some((step) => step.run === 'node scripts/ci-test-projects.mjs --group=core'));
     assert.ok(jobs.plugins.steps.some((step) => step.run === 'node scripts/ci-test-projects.mjs --group=plugins'));
@@ -107,6 +108,72 @@ test('every main pipeline tests all deliverables and bundles artifacts built in 
   const { jobs } = workflow('release');
   assert.ok(jobs.balena.needs.includes('build-attractap-firmware'));
   assert.ok(jobs.balena.steps.some((step) => step.uses === './.github/actions/download-attractap-firmware'));
+});
+
+test('nightly publishes plugins and the image from one gate and never moves nightly-latest backwards', () => {
+  const nightly = workflow('docker-nightly-latest');
+  const { jobs } = nightly;
+  assert.equal(nightly.concurrency, undefined, 'a concurrency group would cancel queued runs');
+  for (const [name, job] of Object.entries(jobs)) assert.equal(job.concurrency, undefined, name);
+  assert.ok(!jobs.plugins.steps.some((step) => /publish/.test(step.run ?? '')), 'pack/test job must not publish');
+
+  const publishers = ['publish-plugins', 'containerize'];
+  const onlyIfGatePassed = "${{ !cancelled() && needs.publish-gate.result == 'success' }}";
+  for (const name of publishers) {
+    assert.deepEqual(jobs[name].needs, ['publish-gate'], name);
+    // Without it, a skipped job further up (HIL variable off) would skip the publisher too.
+    assert.equal(jobs[name].if, onlyIfGatePassed, name);
+    assert.ok(
+      jobs[name].steps.some((step) => step.uses?.startsWith('actions/checkout') && step.with?.['fetch-depth'] === 0),
+      `${name} needs full history for the ancestry checks`,
+    );
+  }
+  // The gate needs every other job, so a new build or test job can't bypass it.
+  const gated = Object.keys(jobs).filter((name) => name !== 'publish-gate' && !publishers.includes(name));
+  assert.deepEqual([...jobs['publish-gate'].needs].sort(), gated.sort());
+  assert.ok(gated.includes('attractap-lab-hil'));
+  // failed or cancelled blocks, skipped (HIL variable off) does not
+  assert.equal(
+    jobs['publish-gate'].if,
+    "always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')",
+  );
+
+  const steps = jobs['publish-plugins'].steps;
+  const publish = steps.find((step) => /plugin-publish-plan\.mjs/.test(step.run ?? ''));
+  assert.equal(publish.run, 'node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next');
+  assert.deepEqual(Object.keys(publish.env), ['NODE_AUTH_TOKEN'], 'the plan sets the dist-tag itself');
+  const build = steps.find((step) => /--target=build/.test(step.run ?? ''));
+  assert.ok(steps.indexOf(build) < steps.indexOf(publish), 'plugins build before the npm token is present');
+  assert.equal(build.env, undefined);
+
+  const image = jobs.containerize.steps.find((step) => step.uses === './.github/actions/docker-build-push');
+  for (const registry of ['ghcr.io/${{ env.GHCR_IMAGE_NAME }}', '${{ env.DOCKERHUB_IMAGE_NAME }}']) {
+    assert.ok(image.with.tags.includes(`${registry}:nightly-\${{ steps.vars.outputs.SHORT_SHA }}`), registry);
+  }
+  assert.match(image.with.labels, /org\.opencontainers\.image\.revision=\$\{\{ github\.sha \}\}/);
+  const promoteIndex = jobs.containerize.steps.findIndex((step) => /promote-nightly-image\.mjs/.test(step.run ?? ''));
+  assert.ok(jobs.containerize.steps.indexOf(image) < promoteIndex);
+  for (const step of jobs.containerize.steps.slice(0, promoteIndex)) {
+    assert.ok(!JSON.stringify(step).includes('nightly-latest'), 'nightly-latest only moves after the revision check');
+  }
+  assert.equal(jobs.containerize.steps[promoteIndex].env.IMAGE_DIGEST, `\${{ steps.${image.id}.outputs.digest }}`);
+});
+
+test('release publishes plugins on latest; no workflow publishes from the pushed range or to alpha', () => {
+  const { plugins } = workflow('release').jobs;
+  const step = plugins.steps.find((s) => /plugin-publish-plan\.mjs/.test(s.run ?? ''));
+  assert.equal(step.run, 'node apps/plugins/scripts/plugin-publish-plan.mjs --channel=latest');
+  assert.deepEqual(Object.keys(step.env), ['NODE_AUTH_TOKEN'], 'the plan sets the dist-tag itself');
+  assert.ok(plugins.steps.some((s) => s.uses?.startsWith('actions/checkout') && s.with?.['fetch-depth'] === 0));
+  for (const file of fs.readdirSync('.github/workflows')) {
+    const text = fs.readFileSync(`.github/workflows/${file}`, 'utf8');
+    assert.ok(
+      !/NPM_DIST_TAG|NPM_NIGHTLY|--tag[ =]['"]?alpha/.test(text),
+      `${file} must leave the dist-tag to the plan`,
+    );
+    assert.ok(!/--target=publish(\s|$)/.test(text), `${file} must publish through plugin-publish-plan.mjs`);
+    if (/plugin-publish-plan/.test(text)) assert.ok(!text.includes('github.event.before'), file);
+  }
 });
 
 test('deliverable workflows avoid overlapping automatic PR builds and require downloaded artifacts', () => {

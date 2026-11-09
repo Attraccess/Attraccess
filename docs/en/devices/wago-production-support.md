@@ -1,4 +1,5 @@
 # WAGO production support and compatibility
+<!-- llms-description: States tested WAGO CC100 compatibility, broker settings, enforced and measured limits, runbooks and what is not promised. -->
 
 > **Physical use is unqualified until [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies).**
 > Nothing on this page is a safety claim or a hardware qualification. Read the

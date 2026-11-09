@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
 import { AuditService } from './audit.service';
 import { SsoAuditEvent } from './audit-policy';
 
@@ -7,7 +8,7 @@ import { SsoAuditEvent } from './audit-policy';
 export class SsoAuditService {
   constructor(private readonly audit: AuditService) {}
 
-  record(event: SsoAuditEvent) {
-    return this.audit.recordSso(event);
+  record(event: SsoAuditEvent, transaction?: EntityManager) {
+    return this.audit.recordSso(event, transaction);
   }
 }

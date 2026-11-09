@@ -1,4 +1,5 @@
 # Metriken-Referenz
+<!-- llms-description: Referenz aller Metriken am Endpunkt /api/metrics: HTTP, Authentifizierung, Benutzer, Ressourcen und Attractap-Geräte. -->
 
 Diese Seite listet alle Metriken auf, die Attraccess am `/api/metrics`-Endpunkt bereitstellt. Die Metriken verwenden das [Prometheus-Exposition-Format](https://prometheus.io/docs/instrumenting/exposition_formats/).
 
@@ -150,6 +151,7 @@ sum(
 | `attraccess_mqtt_servers_healthy` | Gauge | -- | Anzahl gesunder MQTT-Server |
 | `attraccess_plugins_loaded` | Gauge | -- | Anzahl geladener Plugins |
 | `attraccess_email_sent_total` | Counter | `status` | Gesendete E-Mails nach Zustellstatus |
+| `attraccess_audit_records_dropped_total` | Counter | `domain`, `reason` | Audit-Einträge, die nicht gespeichert wurden. `domain` ist der Aktivitätsbereich (Audit-Domäne), aus dem Kern oder von einem Plugin registriert (`unknown` nur, wenn ein Plugin-Ereignis nicht in einen Audit-Eintrag umgewandelt werden konnte). `reason` ist `storage_error` (Einfügen fehlgeschlagen, z. B. SQLite-Busy-Timeout oder Constraint), `queue_full` (mehr als 1.000 wartende Schreibvorgänge), `storage_unavailable` (Audit-Speicher nicht verfügbar: Start fehlgeschlagen oder In-Memory-Datenbank), `shutting_down` (Eintrag kam während des Herunterfahrens an), `settings_unavailable` (Audit-Einstellungen nicht lesbar) oder `invalid_event` (Ereignis abgelehnt; deutet auf einen Programmfehler hin). Die Zeitreihen beginnen für jeden Bereich aus dem Kern und jeden registrierten Plugin-Bereich bei 0. Deaktiviertes Audit oder ein deaktivierter Bereich ist kein Verlust. Alarm: [`AuditRecordsDropped`](monitoring/prometheus-grafana.md#audit-alarm) |
 | `attraccess_websocket_connections_active` | Gauge | -- | Aktive WebSocket-Verbindungen |
 
 ## WebSocket-Timing

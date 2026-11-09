@@ -576,15 +576,31 @@ describe('BillingService', () => {
         id: 999,
       } as BillingTransaction);
 
+      const manager = handleResourceSessionStartedEventScope.createMockManager();
+
       const transaction = await handleResourceSessionStartedEventScope.service.chargeForResourceUsage(
         usage as ResourceUsage,
-        handleResourceSessionStartedEventScope.createMockManager() as any,
+        manager as any,
       );
 
       expect(handleResourceSessionStartedEventScope.service.getResourceBillingConfiguration).toHaveBeenCalledWith(
         102,
         expect.any(Object),
       );
+      // The new completed charge is audited inside the caller's transaction.
+      const recordBillingTransaction = handleResourceSessionStartedEventScope.auditService.recordBillingTransaction;
+      expect(recordBillingTransaction).toHaveBeenCalledTimes(1);
+      expect(recordBillingTransaction).toHaveBeenCalledWith(
+        {
+          transactionId: 999,
+          userId: 10,
+          amount: -35,
+          status: BillingTransactionStatus.Completed,
+          source: 'resource-usage',
+        },
+        expect.anything(),
+      );
+      expect(recordBillingTransaction.mock.calls[0][1]).toBe(manager);
       // A caller-owned transaction returns the charge without publishing it before commit.
       expect(transaction).toEqual(expect.objectContaining({ id: 999, amount: -35, userId: 10, resourceUsageId: 13 }));
       expect(
@@ -593,6 +609,77 @@ describe('BillingService', () => {
       expect(
         handleResourceSessionStartedEventScope.emailService.sendResourceUsageBillingSummaryEmail,
       ).not.toHaveBeenCalled();
+    });
+
+    it('audits a charge made without a caller transaction inside the transaction it opens', async () => {
+      const usage = {
+        id: 19,
+        usageAction: ResourceUsageAction.Usage,
+        startTime: new Date('2026-09-20T09:08:00.000Z'),
+        endTime: new Date('2026-09-20T09:10:00.000Z'),
+        resource: { id: 106 },
+        userId: 30,
+        user: { id: 30, billingFactor: 100 } as User,
+      } as unknown as ResourceUsage;
+      jest
+        .spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 10, creditsPerUsage: 5 } as ResourceBillingConfiguration);
+      handleResourceSessionStartedEventScope.billingTransactionRepository.findOneBy.mockResolvedValue(null);
+      let transactionManager: unknown;
+      (scope.billingTransactionItemRepository.manager.transaction as jest.Mock).mockImplementationOnce(
+        async (work: (manager: unknown) => Promise<unknown>) => {
+          transactionManager = handleResourceSessionStartedEventScope.createMockManager();
+          return work(transactionManager);
+        },
+      );
+
+      await handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage);
+
+      const recordBillingTransaction = handleResourceSessionStartedEventScope.auditService.recordBillingTransaction;
+      expect(recordBillingTransaction).toHaveBeenCalledTimes(1);
+      expect(recordBillingTransaction).toHaveBeenCalledWith(
+        {
+          transactionId: 999,
+          userId: 30,
+          amount: -25,
+          status: BillingTransactionStatus.Completed,
+          source: 'resource-usage',
+        },
+        expect.anything(),
+      );
+      expect(transactionManager).toBeDefined();
+      expect(recordBillingTransaction.mock.calls[0][1]).toBe(transactionManager);
+    });
+
+    it('audits the pending start transaction inside the caller transaction', async () => {
+      const usage = { id: 31, userId: 32 } as ResourceUsage;
+      const user = { id: 32 } as User;
+      jest.spyOn(handleResourceSessionStartedEventScope.service, 'getResourceBillingConfiguration').mockResolvedValue({
+        creditsPerUsage: 0,
+        creditsPerMinute: 0,
+        creditsPerOperatingMinute: 0,
+      } as ResourceBillingConfiguration);
+      jest.spyOn(handleResourceSessionStartedEventScope.service, 'isBillingEnabled').mockResolvedValue(false);
+      const save = jest.fn(async (data: object) => ({ id: 56, ...data }));
+      const manager = { getRepository: jest.fn(() => ({ save })) };
+
+      await handleResourceSessionStartedEventScope.service.handleResourceUsageStart(205, usage, user, manager as never);
+
+      expect(manager.getRepository).toHaveBeenCalledWith(BillingTransaction);
+      expect(handleResourceSessionStartedEventScope.billingTransactionRepository.save).not.toHaveBeenCalled();
+      const recordBillingTransaction = handleResourceSessionStartedEventScope.auditService.recordBillingTransaction;
+      expect(recordBillingTransaction).toHaveBeenCalledTimes(1);
+      expect(recordBillingTransaction).toHaveBeenCalledWith(
+        {
+          transactionId: 56,
+          userId: 32,
+          amount: 0,
+          status: BillingTransactionStatus.Pending,
+          source: 'resource-usage',
+        },
+        expect.anything(),
+      );
+      expect(recordBillingTransaction.mock.calls[0][1]).toBe(manager);
     });
 
     it('applies billingFactor < 100% (discount) and creates BILLING_FACTOR item', async () => {
@@ -867,9 +954,7 @@ describe('BillingService', () => {
 
       expect(manager.update).toHaveBeenCalledWith(BillingTransaction, 77, expect.objectContaining({ amount: -24 }));
       expect(transaction).toEqual(expect.objectContaining({ id: 77, amount: -24 }));
-      expect(
-        handleResourceSessionStartedEventScope.auditService.recordBillingTransactionAfterCommit,
-      ).toHaveBeenCalledWith(
+      expect(handleResourceSessionStartedEventScope.auditService.recordBillingTransaction).toHaveBeenCalledWith(
         {
           transactionId: 77,
           userId: 24,
@@ -878,6 +963,9 @@ describe('BillingService', () => {
           previousStatus: BillingTransactionStatus.Pending,
           source: 'resource-usage',
         },
+        manager,
+      );
+      expect(handleResourceSessionStartedEventScope.auditService.recordBillingTransaction.mock.calls[0][1]).toBe(
         manager,
       );
 

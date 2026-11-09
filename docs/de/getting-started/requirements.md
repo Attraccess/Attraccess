@@ -1,4 +1,5 @@
 # Systemanforderungen
+<!-- llms-description: Listet die Server-, Netzwerk-, Client- und optionalen Anforderungen für den Betrieb von Attraccess als Docker-Container auf. -->
 
 ## Server-Anforderungen
 

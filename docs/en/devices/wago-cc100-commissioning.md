@@ -1,4 +1,5 @@
 # Guided WAGO CC100 Commissioning
+<!-- llms-description: Guide to commission a WAGO CC100 controller in an on-premises, air-gapped installation, including MQTT claim and recovery. -->
 
 > **Work in progress.** This is the operator walkthrough for the current guided commissioning implementation. It is not a hardware release procedure: [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies) remains the hardware-in-the-loop release gate. Keep the controller disconnected from production equipment until that evidence is complete.
 

@@ -1,4 +1,5 @@
 # Matter: Operator Guide
+<!-- llms-description: Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation. -->
 
 > **Connectivity only.** The sidecar can be built, started, secured and connected to Attraccess, but it controls no devices yet. Read the [architecture](devices/matter/architecture.md) first.
 

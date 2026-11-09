@@ -1,3 +1,4 @@
+import type { MqttExplorerEvent } from '@attraccess/shared';
 import type {
   BillingTransaction,
   MassIntroductionLiveEventDto,
@@ -26,6 +27,12 @@ export interface SupervisionLiveEvent {
   request: SupervisionRequestDto | null;
 }
 
+// Shared with the API (libs/shared/src/lib/mqtt-explorer.ts). A failed broker
+// subscription reaches the client as a rejected frame (onUnavailable).
+export type {
+  MqttExplorerEvent as MqttExplorerLiveEvent,
+  MqttExplorerMessage as MqttExplorerLiveMessage,
+} from '@attraccess/shared';
 export interface LivePayloads {
   resource: {
     resourceId?: number;
@@ -41,4 +48,5 @@ export interface LivePayloads {
   notifications: SystemNotificationLiveEvent;
   supervision: SupervisionLiveEvent;
   'mass-introduction': MassIntroductionLiveEventDto;
+  'mqtt-messages': MqttExplorerEvent;
 }

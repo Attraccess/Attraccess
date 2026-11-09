@@ -1,4 +1,5 @@
 # Glossary
+<!-- llms-description: Glossary of key terms used across the Attraccess documentation, covering general, hardware, protocol and web terms. -->
 
 This glossary explains key terms used throughout the Attraccess documentation.
 

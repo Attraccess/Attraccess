@@ -1,5 +1,5 @@
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,7 +15,9 @@ import { AuditQueryDto } from './dto/audit-query.dto';
 import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
-import { setupAuditDatabase } from './audit.test-fixture';
+import { MAX_PENDING_AUDIT_WRITES, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
+import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
+import { createTestAuditMetrics, droppedRecords, setupAuditDatabase } from './audit.test-fixture';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
   it('upgrades additively, survives connection restart and principal deletion, prevents updates, and reverts', async () => {
@@ -33,7 +35,7 @@ describe('durable audit SQLite', () => {
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
     fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
-    fixture.service = new AuditService(fixture.source, fixture.store);
+    fixture.service = new AuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect((await fixture.service.list(new AuditQueryDto())).items).toEqual([
       expect.objectContaining({ actorId: 42, details: { revision: 2 } }),
@@ -155,130 +157,17 @@ describe('durable audit SQLite', () => {
     );
   });
 
-  it('never acknowledges or persists an event in an originating transaction that rolls back', async () => {
+  it('records while an unrelated transaction is open on the main connection', async () => {
     const runner = fixture.source.createQueryRunner();
     await runner.startTransaction();
-    const receipt = fixture.service.record(fixture.event());
-    await runner.rollbackTransaction();
-    expect(await receipt).toEqual({ status: 'unavailable' });
-    expect((await fixture.service.list(new AuditQueryDto())).items).toHaveLength(0);
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
-  });
-
-  it('records a billing event only after its originating transaction commits', async () => {
-    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
-    let receipt: Promise<{ status: string }> | undefined;
-    await fixture.source.transaction(async (manager) => {
-      receipt = fixture.service.recordBillingTransactionAfterCommit(
-        {
-          transactionId: 8,
-          userId: 42,
-          amount: 0,
-          status: 'pending',
-          source: 'resource-usage',
-        },
-        manager,
-      );
-      expect((await fixture.service.list({ limit: 1 })).items).toHaveLength(0);
-    });
-    await expect(receipt).resolves.toEqual({ status: 'recorded' });
-    expect((await fixture.service.list({ limit: 1 })).items[0]).toMatchObject({ subjectId: 8, domain: 'billing' });
-  });
-
-  it('discards a billing event when its originating transaction rolls back', async () => {
-    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
-    let receipt: Promise<{ status: string }> | undefined;
-    await expect(
-      fixture.source.transaction(async (manager) => {
-        receipt = fixture.service.recordBillingTransactionAfterCommit(
-          {
-            transactionId: 8,
-            userId: 42,
-            amount: 0,
-            status: 'pending',
-            source: 'resource-usage',
-          },
-          manager,
-        );
-        throw new Error('rollback');
-      }),
-    ).rejects.toThrow('rollback');
-    await expect(receipt).resolves.toEqual({ status: 'unavailable' });
-    expect((await fixture.service.list({ limit: 1 })).items).toHaveLength(0);
-  });
-
-  it('retains outer billing events when a nested transaction rolls back', async () => {
-    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
-    let outerReceipt: Promise<{ status: string }> | undefined;
-    let nestedReceipt: Promise<{ status: string }> | undefined;
-    await fixture.source.transaction(async (manager) => {
-      outerReceipt = fixture.service.recordBillingTransactionAfterCommit(
-        {
-          transactionId: 8,
-          userId: 42,
-          amount: 0,
-          status: 'pending',
-          source: 'resource-usage',
-        },
-        manager,
-      );
-      await expect(
-        manager.transaction(async (nestedManager) => {
-          nestedReceipt = fixture.service.recordBillingTransactionAfterCommit(
-            {
-              transactionId: 9,
-              userId: 42,
-              amount: 0,
-              status: 'pending',
-              source: 'resource-usage',
-            },
-            nestedManager,
-          );
-          throw new Error('nested rollback');
-        }),
-      ).rejects.toThrow('nested rollback');
-    });
-    await expect(outerReceipt).resolves.toEqual({ status: 'recorded' });
-    await expect(nestedReceipt).resolves.toEqual({ status: 'unavailable' });
-    expect((await fixture.service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
-  });
-
-  it('retains billing events from a committed savepoint when a sibling savepoint rolls back', async () => {
-    await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
-    let committedReceipt: Promise<{ status: string }> | undefined;
-    let rolledBackReceipt: Promise<{ status: string }> | undefined;
-    await fixture.source.transaction(async (manager) => {
-      await manager.transaction(async (nestedManager) => {
-        committedReceipt = fixture.service.recordBillingTransactionAfterCommit(
-          {
-            transactionId: 8,
-            userId: 42,
-            amount: 0,
-            status: 'pending',
-            source: 'resource-usage',
-          },
-          nestedManager,
-        );
-      });
-      await expect(
-        manager.transaction(async (nestedManager) => {
-          rolledBackReceipt = fixture.service.recordBillingTransactionAfterCommit(
-            {
-              transactionId: 9,
-              userId: 42,
-              amount: 0,
-              status: 'pending',
-              source: 'resource-usage',
-            },
-            nestedManager,
-          );
-          throw new Error('nested rollback');
-        }),
-      ).rejects.toThrow('nested rollback');
-    });
-    await expect(committedReceipt).resolves.toEqual({ status: 'recorded' });
-    await expect(rolledBackReceipt).resolves.toEqual({ status: 'unavailable' });
-    expect((await fixture.service.list({ limit: 10 })).items.map((item) => item.subjectId)).toEqual([8]);
+    try {
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+    } finally {
+      await runner.rollbackTransaction();
+      await runner.release();
+    }
+    expect((await fixture.service.list(new AuditQueryDto())).items).toHaveLength(1);
+    expect(await droppedRecords(fixture.metrics)).toEqual({});
   });
 
   it('filters and paginates without duplication; hides expired rows and cleans them', async () => {
@@ -431,7 +320,7 @@ describe('durable audit SQLite', () => {
     ]) {
       for (const [key, value] of Object.entries(disabled))
         await fixture.store.setPlainSetting('audit', key, JSON.stringify(value));
-      const sink = new AuditService(fixture.source, fixture.store);
+      const sink = new AuditService(fixture.source, fixture.store, fixture.metrics);
       await sink.onModuleInit();
       expect(await sink.record(fixture.event())).toEqual({ status: 'unavailable' });
       await sink.onModuleDestroy();
@@ -446,11 +335,14 @@ describe('durable audit SQLite', () => {
       details: { 'after.name': 'Lathe', 'after.type': 'machine' },
     });
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(0);
+    expect(await droppedRecords(fixture.metrics)).toEqual({});
     expect(await fixture.service.record({ ...fixture.event(), details: { password: 'not-stored' } })).toEqual({
       status: 'unavailable',
     });
+    expect(await droppedRecords(fixture.metrics)).toEqual({ 'unknown:invalid_event': 1 });
     await fixture.source.query('DROP TABLE audit_log');
     expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    expect(await droppedRecords(fixture.metrics)).toEqual({ 'unknown:invalid_event': 1, 'demo:storage_error': 1 });
     await expect(fixture.service.cleanup()).resolves.toBeUndefined();
   });
 
@@ -462,11 +354,29 @@ describe('durable audit SQLite', () => {
     ).rejects.toThrow('CHECK constraint');
   });
 
-  it('bounds outstanding writes without an unbounded queue', async () => {
+  it('records every one of many concurrent writes', async () => {
     const receipts = await Promise.all(Array.from({ length: 40 }, () => fixture.service.record(fixture.event())));
-    expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(8);
-    expect(await fixture.source.getRepository(AuditLog).count()).toBe(8);
+    expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(40);
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(40);
+    expect(await droppedRecords(fixture.metrics)).toEqual({});
   });
+
+  it('rejects writes above the pending cap as queue_full and records the rest', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      const receipts = await Promise.all(
+        Array.from({ length: MAX_PENDING_AUDIT_WRITES + 25 }, () => fixture.service.record(fixture.event())),
+      );
+      expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(MAX_PENDING_AUDIT_WRITES);
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(MAX_PENDING_AUDIT_WRITES);
+      expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:queue_full': 25 });
+      expect(warn).toHaveBeenCalledTimes(25);
+      expect(String(warn.mock.calls[0][0])).toContain('reason=queue_full');
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+    } finally {
+      warn.mockRestore();
+    }
+  }, 60_000);
 
   it('persists validated settings across store and service restarts, and fails closed on read failure', async () => {
     expect(await readAuditSettings(fixture.store)).toEqual(fixture.config);
@@ -484,7 +394,7 @@ describe('durable audit SQLite', () => {
       plugin_domains_disabled: [],
       retention_days: 2,
     });
-    fixture.service = new AuditService(fixture.source, fixture.store);
+    fixture.service = new AuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
     await settings.updateAuditSettings({ enabled: true, domains: ['resource'] });
@@ -513,21 +423,24 @@ describe('durable audit SQLite', () => {
     }
   });
 
-  it('bounds admission before settings awaits and recovers after settings failure', async () => {
+  it('counts writes as settings_unavailable while settings cannot be read and recovers afterwards', async () => {
     let release: () => void;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     const read = jest.spyOn(fixture.store, 'getPlainSetting').mockImplementation(async () => {
       await gate;
       throw new Error('private');
     });
     const pending = Array.from({ length: 8 }, () => fixture.service.record(fixture.event()));
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
-    expect(read).toHaveBeenCalledTimes(32);
     release();
     expect((await Promise.all(pending)).every((receipt) => receipt.status === 'unavailable')).toBe(true);
+    expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:settings_unavailable': 8 });
+    expect(warn).toHaveBeenCalledTimes(8);
+    expect(String(warn.mock.calls[0][0])).not.toContain('private');
     read.mockRestore();
+    warn.mockRestore();
     expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
   });
 
@@ -557,21 +470,70 @@ describe('durable audit SQLite', () => {
     expect((await fixture.service.list({ limit: 10, to: new Date(0).toISOString() })).items).toHaveLength(0);
   });
 
-  it('declines writes under SQLite contention within a deadline and recovers', async () => {
-    await fixture.source.query('PRAGMA busy_timeout = 10');
+  it('waits for a held SQLite write lock instead of dropping the write', async () => {
+    expect(SQLITE_BUSY_TIMEOUT_MS).toBe(5000);
     const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
     try {
       await lock.query('BEGIN IMMEDIATE');
-      const start = Date.now();
-      const receipts = await Promise.all(Array.from({ length: 8 }, () => fixture.service.record(fixture.event())));
-      expect(receipts.every((receipt) => receipt.status === 'unavailable')).toBe(true);
-      expect(Date.now() - start).toBeLessThan(2500);
+      const receipts = Promise.all(Array.from({ length: 8 }, () => fixture.service.record(fixture.event())));
+      await new Promise((resolve) => setTimeout(resolve, 400));
       await lock.query('ROLLBACK');
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+      expect((await receipts).every((receipt) => receipt.status === 'recorded')).toBe(true);
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(8);
+      expect(await droppedRecords(fixture.metrics)).toEqual({});
     } finally {
       await lock.destroy();
     }
-  }, 10_000);
+  }, 15_000);
+
+  it('logs and counts storage_unavailable when the audit connection cannot exist', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const memory = new DataSource({ type: 'sqlite', database: ':memory:' });
+    const metrics = createTestAuditMetrics();
+    const sink = new AuditService(memory, fixture.store, metrics);
+    await sink.onModuleInit();
+    try {
+      expect(await sink.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(await droppedRecords(metrics)).toEqual({ 'demo:storage_unavailable': 1 });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('reason=storage_unavailable'));
+    } finally {
+      await sink.onModuleDestroy();
+      warn.mockRestore();
+    }
+  });
+
+  it('counts invalid events of every domain as invalid_event without storing them', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      const invalid = { action: 'nope' } as never;
+      expect(await fixture.service.record({ ...fixture.event(), action: 'nope' })).toEqual({ status: 'unavailable' });
+      expect(await fixture.service.recordResource(invalid)).toBe(false);
+      await fixture.service.recordProject(invalid);
+      await fixture.service.recordAttractap(invalid);
+      expect(await fixture.service.recordSso(invalid)).toEqual({ status: 'unavailable' });
+      expect(await fixture.service.recordIdentity(invalid)).toEqual({ status: 'unavailable' });
+      expect(await fixture.service.recordAdministration(invalid)).toEqual({ status: 'unavailable' });
+      expect(await fixture.service.recordBillingTransaction({ transactionId: -1 } as never)).toEqual({
+        status: 'unavailable',
+      });
+      // Core methods know their domain; only an unprojectable plugin event is `unknown`.
+      expect(await droppedRecords(fixture.metrics)).toEqual({
+        'unknown:invalid_event': 1,
+        'resource:invalid_event': 1,
+        'project:invalid_event': 1,
+        'attractap:invalid_event': 1,
+        'sso:invalid_event': 1,
+        'identity:invalid_event': 1,
+        'administration:invalid_event': 1,
+        'billing:invalid_event': 1,
+      });
+      expect(warn).toHaveBeenCalledTimes(8);
+      for (const [line] of warn.mock.calls) expect(String(line)).toMatch(/reason=invalid_event$/);
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(0);
+    } finally {
+      warn.mockRestore();
+    }
+  });
 
   it('uses one safe event snapshot before settings awaits and waits safely for shutdown', async () => {
     let release: () => void;
@@ -596,9 +558,59 @@ describe('durable audit SQLite', () => {
     });
     const writes = Array.from({ length: 8 }, () => fixture.service.record(fixture.event()));
     const shutdown = fixture.service.onModuleDestroy();
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
-    await Promise.all([...writes, shutdown]);
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+      // Writes queued before shutdown are stored; only the one arriving afterwards is dropped.
+      expect(await Promise.all(writes)).toEqual(Array(8).fill({ status: 'recorded' }));
+      await shutdown;
+      expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:shutting_down': 1 });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('reason=shutting_down'));
+    } finally {
+      warn.mockRestore();
+    }
+    expect(await fixture.source.getRepository(AuditLog).count()).toBe(9);
     await expect(fixture.service.list({ limit: 1 })).rejects.toThrow('Audit storage unavailable');
+  });
+
+  it('drops writes still queued when the shutdown drain runs out of time', async () => {
+    const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      await lock.query('BEGIN IMMEDIATE');
+      const writes = Array.from({ length: 3 }, () => fixture.service.record(fixture.event()));
+      (fixture.service as unknown as { shutdownDrainMs: number }).shutdownDrainMs = 50;
+      const shutdown = fixture.service.onModuleDestroy();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await lock.query('ROLLBACK');
+      // The write that was already waiting for the lock finishes; the two behind it are dropped.
+      expect((await Promise.all(writes)).map((receipt) => receipt.status)).toEqual([
+        'recorded',
+        'unavailable',
+        'unavailable',
+      ]);
+      await shutdown;
+      expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:shutting_down': 2 });
+    } finally {
+      warn.mockRestore();
+      await lock.destroy();
+    }
+  }, 15_000);
+
+  it('creates zero series for registered plugin domains at startup', async () => {
+    const metrics = createTestAuditMetrics();
+    const sink = new AuditService(new DataSource({ type: 'sqlite', database: ':memory:' }), fixture.store, metrics);
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    try {
+      await sink.onModuleInit();
+      const { values } = await metrics.recordsDropped.get();
+      const demo = values.filter((value) => value.labels.domain === 'demo');
+      expect(demo.map((value) => value.labels.reason).sort()).toEqual([...AUDIT_DROP_REASONS].sort());
+      expect(demo.every((value) => value.value === 0)).toBe(true);
+    } finally {
+      warn.mockRestore();
+      await sink.onModuleDestroy();
+    }
   });
 });
 it('upgrades the full registered schema, reverts the audit migration, and reapplies it', async () => {
@@ -668,7 +680,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
       },
     ]);
     const migratedStore = new SettingsStoreService(source.getRepository(Setting), null);
-    const migratedAudit = new AuditService(source, migratedStore);
+    const migratedAudit = new AuditService(source, migratedStore, createTestAuditMetrics());
     await migratedAudit.onModuleInit();
     const migratedList = await new AuditController(migratedAudit).list({ limit: 10 });
     const migratedOversizedEvent = migratedList.items.find((item) => item.details.legacyAuditId === 2);

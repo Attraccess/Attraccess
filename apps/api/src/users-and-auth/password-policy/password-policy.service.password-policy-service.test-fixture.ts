@@ -94,6 +94,8 @@ export function registerPasswordPolicyServiceFixture() {
 
   let dataSource: { transaction: jest.Mock };
 
+  let manager: { getRepository: (entity: unknown) => unknown };
+
   let rbacService: { getEffectivePermissions: jest.Mock };
 
   beforeEach(async () => {
@@ -137,6 +139,7 @@ export function registerPasswordPolicyServiceFixture() {
     const fakeManager = {
       getRepository: (entity: unknown) => repoByEntity.get(entity) ?? {},
     };
+    manager = fakeManager;
     dataSource = {
       transaction: jest.fn(async (cb: (mgr: typeof fakeManager) => Promise<unknown>) => cb(fakeManager)),
     };
@@ -170,6 +173,10 @@ export function registerPasswordPolicyServiceFixture() {
     },
     get identityAudit() {
       return identityAudit;
+    },
+    /** The manager the transaction mock hands its callback. */
+    get manager() {
+      return manager;
     },
     get audit() {
       return audit;

@@ -197,6 +197,19 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
         await this.metering?.settleInTransaction(manager, endedSession.id, final);
         chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+        await this.audit.recordResource(
+          {
+            action: 'usage_session.ended',
+            ...auditOrigin,
+            subjectId: resourceId,
+            details: {
+              usageId: endedSession.id,
+              usageUserId: endedSession.userId,
+              ...(options.triggeredByUserId === undefined ? {} : { triggeredByUserId: options.triggeredByUserId }),
+            },
+          },
+          manager,
+        );
         return endedSession;
       });
     } catch (error) {
@@ -209,12 +222,10 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
       resourceId,
       user,
       dto,
-      auditOrigin,
       updatedUsage,
       endedUsageIdToEmit,
       activeSession,
       skipNoteNotification,
-      options.triggeredByUserId,
     );
 
     return updatedUsage;
@@ -245,7 +256,6 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
     const auditOrigin = options.auditOrigin ?? { actorId: user.id, authenticationMethod: 'session' as const };
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
-    let endedUsageIdToEmit: number | null = null;
     let startedUsageIdToEmit: number | null = null;
     let takeoverEndedUser: User | null = null;
 
@@ -313,7 +323,6 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
           await this.persistAttributedOperatingDuration(endedSession, manager);
           await this.metering?.settleInTransaction(manager, endedSession.id, outgoingFinal);
           chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
-          endedUsageIdToEmit = endedSession.id;
         } else {
           startedUsageIdToEmit = createdSession.id;
         }
@@ -323,6 +332,31 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
         if (!existingActiveSession) await this.applyLifecycleDrafts(manager, currentAttempt);
         await manager.update(ResourceUsage, createdSession.id, { isFinalized: true, lifecyclePending: false });
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
+        // Audit rows commit or roll back with the session change they describe.
+        if (existingActiveSession) {
+          await this.audit.recordResource(
+            {
+              action: 'usage_session.ended',
+              ...auditOrigin,
+              subjectId: resourceId,
+              details: { usageId: existingActiveSession.id, usageUserId: existingActiveSession.user.id },
+            },
+            manager,
+          );
+        }
+        await this.audit.recordResource(
+          {
+            action: 'usage_session.started',
+            ...auditOrigin,
+            subjectId: resourceId,
+            details: {
+              usageId: createdSession.id,
+              usageUserId: createdSession.userId,
+              ...(supervisorUserId === null ? {} : { supervisorUserId }),
+            },
+          },
+          manager,
+        );
         return manager.findOneOrFail(ResourceUsage, {
           where: { id: createdSession.id },
           relations: ['resource', 'user', 'project'],
@@ -339,10 +373,8 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
       user,
       dto,
       supervisorUserId,
-      auditOrigin,
       prepared,
       newSession,
-      endedUsageIdToEmit,
       startedUsageIdToEmit,
       takeoverEndedUser,
     );

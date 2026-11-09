@@ -1,4 +1,5 @@
 # Häufige Probleme
+<!-- llms-description: Häufige Probleme und Lösungen, etwa SSO-Anmeldefehler, nicht versendete E-Mails, Ressourcenzugriff, RFID-Karten und Datenbankprobleme. -->
 
 Diese Seite listet häufig auftretende Probleme und deren Lösungen auf.
 

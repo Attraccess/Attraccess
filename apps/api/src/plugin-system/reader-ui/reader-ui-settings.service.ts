@@ -128,14 +128,12 @@ export class ReaderUiSettingsService {
     details: { setting: string; resourceId?: number; readerId?: number; plugin?: string; value: string | boolean },
   ) {
     const subjectId = details.resourceId ?? details.readerId ?? 0;
-    await this.audit
-      .recordAttractap({
-        action: 'ui.setting_changed',
-        subjectType: details.resourceId ? 'resource' : 'attractap.reader',
-        ...auditActorFields(actor),
-        subjectId,
-        details,
-      })
-      .catch(() => undefined);
+    await this.audit.recordAttractap({
+      action: 'ui.setting_changed',
+      subjectType: details.resourceId ? 'resource' : 'attractap.reader',
+      ...auditActorFields(actor),
+      subjectId,
+      details,
+    });
   }
 }

@@ -72,8 +72,7 @@ jobs:
         run: pnpm nx run-many --target=build --parallel=5 --exclude=tag:scope:hardware,tag:scope:companion,tag:type:plugin
 
   plugins:
-    needs: [lint, typecheck, test, build, attractap-lab-hil]
-    if: always() && !failure() && !cancelled() && needs.attractap-lab-hil.result != 'cancelled'
+    needs: [lint, typecheck, test, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -88,15 +87,50 @@ jobs:
         run: node scripts/ci-test-projects.mjs --group=plugins
       - name: Test packed Hello World fixture
         run: pnpm --dir examples/plugin-hello-world run pack-test
+
+  # The single publish gate: plugins and the server image publish from the same outcome.
+  # A failed or cancelled job blocks; a skipped one (HIL variable off) does not.
+  publish-gate:
+    needs:
+      [
+        lint,
+        typecheck,
+        test,
+        build,
+        plugins,
+        build-companion,
+        build-attractap-firmware,
+        build-attractap-desktop,
+        attractap-lab-hil,
+      ]
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All build, test and HIL jobs passed or were skipped"
+
+  publish-plugins:
+    needs: [publish-gate]
+    # Without an explicit condition a skipped job further up (HIL variable off) would skip this job too.
+    if: ${{ !cancelled() && needs.publish-gate.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      # Build before the npm token is in the environment; the publish step then reuses the local Nx cache.
+      - name: Build official plugin packages
+        run: pnpm nx run-many --target=build --projects=tag:type:plugin,plugins-backend-sdk
+      # Publishes what npm lacks: every plugin whose inputs changed since the commit recorded on its `next`
+      # version, including changes merged in earlier runs that failed. Never moves `next` backwards.
       - name: Publish nightly official plugin packages
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_DIST_TAG: next
-          NPM_NIGHTLY: 'true'
-        run: |
-          set -o pipefail
-          git diff --name-only "${{ github.event.before }}" "$GITHUB_SHA" -- . ':(exclude).github/workflows/**' |
-            pnpm nx affected --target=publish --parallel=3 --stdin --exclude='*,!tag:type:plugin'
+        run: node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next
 
   build-companion:
     uses: ./.github/workflows/build-companion-binaries.yml
@@ -117,12 +151,15 @@ jobs:
     secrets: inherit
 
   containerize:
-    needs: [build, plugins, build-companion, build-attractap-firmware, build-attractap-desktop, attractap-lab-hil]
-    if: always() && !failure() && !cancelled() && needs.attractap-lab-hil.result != 'cancelled'
+    needs: [publish-gate]
+    # Same condition as publish-plugins, so both publish or both skip.
+    if: ${{ !cancelled() && needs.publish-gate.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: ./.github/actions/download-attractap-firmware
 
@@ -133,13 +170,20 @@ jobs:
         run: echo "SHORT_SHA=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push Docker image
+        id: image
         uses: ./.github/actions/docker-build-push
         with:
           tags: |
-            ghcr.io/${{ env.GHCR_IMAGE_NAME }}:nightly-latest
             ghcr.io/${{ env.GHCR_IMAGE_NAME }}:nightly-${{ steps.vars.outputs.SHORT_SHA }}
-            ${{ env.DOCKERHUB_IMAGE_NAME }}:nightly-latest
             ${{ env.DOCKERHUB_IMAGE_NAME }}:nightly-${{ steps.vars.outputs.SHORT_SHA }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
           ghcr-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # An older run finishing late must not move nightly-latest backwards; its nightly-<sha7> image stays.
+      - name: Move nightly-latest unless a newer commit already owns it
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: node scripts/promote-nightly-image.mjs

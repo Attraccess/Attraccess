@@ -1,4 +1,5 @@
 # Abrechnungskonfiguration
+<!-- llms-description: So aktivieren Sie die Abrechnung pro Ressource, wählen Abrechnungsmodelle, rechnen Zählerverbrauch ab und verwalten Credit-Guthaben. -->
 
 Sie koennen die Abrechnung fuer jede Ressource einzeln aktivieren und konfigurieren. Die Abrechnungseinstellungen befinden sich auf der Detailseite der Ressource.
 

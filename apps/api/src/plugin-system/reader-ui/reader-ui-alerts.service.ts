@@ -138,19 +138,17 @@ export class ReaderUiAlertsService implements OnModuleInit {
   }
 
   private async record(alert: ReaderUiAlert, state: 'created' | 'cleared', actor: AuditActor | undefined) {
-    await this.audit
-      .recordAttractap({
-        action: 'ui.alert_changed',
-        subjectType: 'attractap.ui-alert',
-        ...(actor ? auditActorFields(actor) : { actorId: null, authenticationMethod: null }),
-        subjectId: alert.id,
-        details: {
-          kind: alert.kind,
-          state,
-          ...(alert.plugin ? { plugin: alert.plugin } : {}),
-          ...(alert.readerId ? { readerId: alert.readerId } : {}),
-        },
-      })
-      .catch(() => undefined);
+    await this.audit.recordAttractap({
+      action: 'ui.alert_changed',
+      subjectType: 'attractap.ui-alert',
+      ...(actor ? auditActorFields(actor) : { actorId: null, authenticationMethod: null }),
+      subjectId: alert.id,
+      details: {
+        kind: alert.kind,
+        state,
+        ...(alert.plugin ? { plugin: alert.plugin } : {}),
+        ...(alert.readerId ? { readerId: alert.readerId } : {}),
+      },
+    });
   }
 }

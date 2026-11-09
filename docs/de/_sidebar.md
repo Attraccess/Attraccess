@@ -71,6 +71,7 @@
 - **MQTT & IoT**
   - [Überblick](mqtt/overview.md)
   - [Server einrichten](mqtt/server-setup.md)
+  - [Nachrichten-Explorer](mqtt/message-explorer.md)
   - [Beispiele](mqtt/examples.md)
 
 - **Geräte**
@@ -103,6 +104,7 @@
   - [Architektur](developer/architecture.md)
   - [API-Log-Ziele](developer/logging.md)
   - [API-Referenz](developer/api-reference.md)
+  - [KI-Agenten (llms.txt & WebMCP)](developer/ai-agents.md)
   - [Mitwirken](developer/contributing.md)
 
 - **Für Endbenutzer**

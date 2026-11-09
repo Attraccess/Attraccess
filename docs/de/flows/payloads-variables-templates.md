@@ -1,4 +1,5 @@
 # Payloads, Variablen & Vorlagen
+<!-- llms-description: Erklärt Flow-Payloads, Trigger-Daten, Vorlagen, Arithmetik, Einheitenumrechnung und dauerhaft gespeicherte Flow-Variablen. -->
 
 Jeder Flow-Knoten erhält Daten vom vorherigen Knoten und gibt Daten an den nächsten weiter. Diese Daten heißen **Payload**. Vorlagen lesen die Payload, um Nachrichten, URLs oder andere Einstellungen zu erzeugen. **Flow-Variablen** speichern Werte, die einen Flow-Durchlauf überdauern sollen.
 

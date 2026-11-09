@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import * as migrations from '../database/migrations';
+import { createTestAuditMetrics } from './audit.test-fixture';
 import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AuditController } from './audit.controller';
@@ -39,7 +40,11 @@ describe('persisted audit names', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    service = new AuditService(source, new SettingsStoreService(source.getRepository(Setting), null));
+    service = new AuditService(
+      source,
+      new SettingsStoreService(source.getRepository(Setting), null),
+      createTestAuditMetrics(),
+    );
     await service.onModuleInit();
     controller = new AuditController(service);
     await source.getRepository(User).insert({

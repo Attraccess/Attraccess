@@ -1,4 +1,5 @@
 # Reader koppeln und verschlüsselte Verbindung
+<!-- llms-description: Wie ein Leser mit einer Admin-Freigabe in die Installation aufgenommen wird: Status, erneutes Koppeln und verschlüsselte Verbindung. -->
 
 Ein neuer Attractap-Reader kommt durch **eine einzige Freigabe eines Admins** in deine
 Installation. Der Reader zeigt einen kurzen Code, der alle 30 Sekunden wechselt (Touch-Reader auf

@@ -239,20 +239,18 @@ export class ReaderUiHooksService {
     } else {
       await this.alerts.clearWhere('breaker-open', { plugin }).catch(() => undefined);
     }
-    await this.audit
-      .recordAttractap({
-        action: 'ui.breaker_changed',
-        subjectType: 'resource',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: run.resourceId,
-        details: {
-          plugin,
-          state: transition,
-          reasonCode: transition === 'open' ? 'consecutive-failures' : 'recovered',
-        },
-      })
-      .catch(() => undefined);
+    await this.audit.recordAttractap({
+      action: 'ui.breaker_changed',
+      subjectType: 'resource',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: run.resourceId,
+      details: {
+        plugin,
+        state: transition,
+        reasonCode: transition === 'open' ? 'consecutive-failures' : 'recovered',
+      },
+    });
   }
 
   /**
@@ -288,25 +286,23 @@ export class ReaderUiHooksService {
     decision: 'allow' | 'confirm' | 'block',
     reasonCode: string,
   ) {
-    await this.audit
-      .recordAttractap({
-        action,
-        subjectType: run.readerId ? 'attractap.reader' : 'resource',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: run.readerId ?? run.resourceId,
-        details: {
-          plugin,
-          userId: run.userId,
-          resourceId: run.resourceId,
-          decision,
-          reasonCode,
-          origin: run.origin,
-          ...(run.readerId ? { readerId: run.readerId } : {}),
-          ...(run.cardSessionId ? { cardSessionId: run.cardSessionId } : {}),
-        },
-      })
-      .catch(() => undefined);
+    await this.audit.recordAttractap({
+      action,
+      subjectType: run.readerId ? 'attractap.reader' : 'resource',
+      actorId: null,
+      authenticationMethod: null,
+      subjectId: run.readerId ?? run.resourceId,
+      details: {
+        plugin,
+        userId: run.userId,
+        resourceId: run.resourceId,
+        decision,
+        reasonCode,
+        origin: run.origin,
+        ...(run.readerId ? { readerId: run.readerId } : {}),
+        ...(run.cardSessionId ? { cardSessionId: run.cardSessionId } : {}),
+      },
+    });
   }
 }
 

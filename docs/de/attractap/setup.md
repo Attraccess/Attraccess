@@ -1,4 +1,5 @@
 # Attractap Einrichtung
+<!-- llms-description: Anleitung, einen neuen Attractap-Leser mit dem Netzwerk zu verbinden, mit Attraccess zu koppeln und Ressourcen zuzuweisen. -->
 
 Diese Anleitung fuehrt Sie durch die Kopplung eines neuen Attractap-Lesers in Attraccess und die Zuweisung zu einer Ressource.
 

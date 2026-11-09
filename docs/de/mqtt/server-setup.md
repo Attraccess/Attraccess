@@ -1,4 +1,5 @@
 # MQTT-Server einrichten
+<!-- llms-description: So verbinden Sie Attraccess mit einem MQTT-Broker und testen die Verbindung, inklusive gängiger Broker und mehrerer Server. -->
 
 Diese Anleitung erklaert, wie Sie Attraccess mit einem MQTT-Broker verbinden, um MQTT in Ihren Automatisierungs-Flows nutzen zu koennen.
 
@@ -102,6 +103,25 @@ Die Server-Seite zeigt den aktuellen Verbindungsstatus fuer jeden Broker:
 | **Verbindungsaufbau** | Attraccess versucht, eine Verbindung herzustellen |
 | **Fehler** | Verbindung fehlgeschlagen -- siehe Fehlerdetails fuer weitere Informationen |
 
+## RabbitMQ aus Attraccess verwalten
+
+Mit dem installierten **RabbitMQ-Plugin** zeigt ein MQTT-Server, den Attraccess als RabbitMQ-Broker erkennt, auf seiner Detailseite (Seitenleiste **Geräte → MQTT-Server**, dann den Server auswählen) zusätzliche Bereiche. Attraccess nutzt dafür die RabbitMQ-Management-API (Port `15672`, mit TLS `15671`, sofern kein Management-Port konfiguriert ist) mit Benutzername und Passwort des MQTT-Servers.
+
+| Bereich | Funktion | RabbitMQ-Benutzer-Tag | Attraccess-Berechtigung |
+|---------|----------|-----------------------|-------------------------|
+| **RabbitMQ** (Status) | Erreichbarkeit, Prüfung der Zugangsdaten, Versionen | `monitoring` | `resources.update` |
+| **RabbitMQ-Benutzer** | Benutzer und ihre Vhost-Berechtigungen anzeigen | `administrator` | `resources.update` |
+| **RabbitMQ-Benutzer** (ändern) | Benutzer anlegen, bearbeiten, löschen; Berechtigungen setzen oder entfernen | `administrator` | `system.settings.manage` |
+| **Verbindungen** | Aktive Client-Verbindungen (Aktualisierung alle 10 s) | `monitoring` | `resources.update` |
+| **Verbindungen** (schließen) | Verbindung zwangsweise trennen, optional mit Grund | `administrator` | `system.settings.manage` |
+| **Broker-Statistiken** | Überblick, Knoten und Queues (Aktualisierung alle 15 s) | `monitoring` | `resources.update` |
+
+Hinweise:
+
+- Der am MQTT-Server konfigurierte Benutzer benötigt das Tag aus der Tabelle (`administrator` deckt alles ab, was `monitoring` kann). Fehlt es, zeigen die Bereiche eine Fehlermeldung, die die fehlende Berechtigung nennt.
+- Benutzer ohne `system.settings.manage` sehen nur die lesenden Bereiche; Schreibaktionen sind ausgeblendet und werden auch vom Server abgelehnt.
+- Live-MQTT-Nachrichten beobachten und senden gehört nicht zum RabbitMQ-Plugin. Das geht für jeden MQTT-Server und braucht nur `resources.update` -- siehe [MQTT-Nachrichten-Explorer](mqtt/message-explorer.md).
+
 ## Fehlerbehebung
 
 | Problem | Loesung |
@@ -114,6 +134,7 @@ Die Server-Seite zeigt den aktuellen Verbindungsstatus fuer jeden Broker:
 ## Siehe auch
 
 - [Ueberblick](mqtt/overview.md) -- Was ist MQTT?
+- [Nachrichten-Explorer](mqtt/message-explorer.md) -- MQTT-Nachrichten live beobachten und senden
 - [Beispiele](mqtt/examples.md) -- Praktische MQTT-Integrationsbeispiele
 - [Flows & Automatisierung](flows/overview.md) -- Automatisierungs-Workflows erstellen
 - [Umgebungsvariablen](installation/environment-variables.md) -- Serverkonfiguration

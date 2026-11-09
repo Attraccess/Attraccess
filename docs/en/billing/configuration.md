@@ -1,4 +1,5 @@
 # Billing Configuration
+<!-- llms-description: How to enable billing per resource, choose billing models, bill metered consumption and manage user credit balances. -->
 
 You can enable and configure billing individually for each resource. Billing settings are found on the resource detail page.
 

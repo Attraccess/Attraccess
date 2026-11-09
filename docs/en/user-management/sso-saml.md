@@ -1,4 +1,5 @@
 # SAML Setup
+<!-- llms-description: How to create and configure a SAML SSO provider, including service provider metadata and testing the login. -->
 
 SAML (Security Assertion Markup Language) is commonly used in enterprise and educational environments.
 

@@ -104,9 +104,10 @@ describe('MaintenanceScheduleService', () => {
       }),
     };
     scheduleRepository.findOne.mockResolvedValue(scheduleToDelete);
+    let transactionManager: { getRepository: (entity: unknown) => unknown } | undefined;
     scheduleRepository.manager.transaction.mockImplementation(
-      async (callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<void>) =>
-        callback({
+      async (callback: (manager: { getRepository: (entity: unknown) => unknown }) => Promise<void>) => {
+        transactionManager = {
           getRepository: (entity) =>
             entity === ResourceMaintenance
               ? maintenanceRepository
@@ -117,7 +118,9 @@ describe('MaintenanceScheduleService', () => {
                   : entity === ResourceMaintenanceScheduleUsageCountConfig
                     ? usageCountConfigRepository
                     : timeIntervalConfigRepository,
-        }),
+        };
+        return callback(transactionManager);
+      },
     );
 
     await service.delete(scheduleToDelete.resourceId, 10, 7);
@@ -137,7 +140,12 @@ describe('MaintenanceScheduleService', () => {
         subjectId: 1,
         details: expect.objectContaining({ scheduleId: 10, enabled: 1, usageThreshold: 12 }),
       }),
+      expect.anything(),
     );
+    // Written with the delete's transaction manager, so the row rolls back with the delete.
+    expect(transactionManager).toBeDefined();
+    expect(audit.recordResource).toHaveBeenCalledTimes(1);
+    expect(audit.recordResource.mock.calls[0][1]).toBe(transactionManager);
   });
 
   it('records the intended state when creating a schedule', async () => {

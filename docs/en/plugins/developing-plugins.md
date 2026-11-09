@@ -1,4 +1,5 @@
 # Developing Plugins
+<!-- llms-description: Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration. -->
 
 Attraccess plugins extend the platform with new API endpoints, background
 behaviour, and UI pages — without forking the core. A plugin can ship a
@@ -1292,10 +1293,26 @@ so they share the workspace toolchain, caching and CI.
    pnpm nx run-many --target=zip --projects=tag:type:plugin
   ```
 
-- **CI:** pull requests test and pack affected plugin apps. Every main-branch
-  build publishes every plugin app tagged `type:plugin` as a unique
-  `-nightly.<run>` version under npm's `next` tag. Release CI publishes changed
-  tagged plugin apps with a new version under `latest`.
+- **CI:** pull requests test and pack affected plugin apps. Publishing is decided from what npm has, not
+  from the pushed commits (`apps/plugins/scripts/plugin-publish-plan.mjs`). Every published manifest records the
+  commit it was built from in `gitHead` (plus `attraccess.publishedCommit` as a fallback). For each plugin the plan
+  reads the commit on the channel's dist-tag and publishes only if the plugin's inputs (its own files, the plugin
+  SDK libraries, other Nx inputs) changed since then. A plugin that was never published, or has no recorded commit,
+  is always published. Changes merged in a failed run are therefore picked up by the next green one, and an older
+  run finishing late never moves a tag backwards.
+  - **Nightly** (main, after all build, test and hardware gates pass) publishes the `package.json` version
+    without its prerelease suffix plus `-nightly.<run>.<attempt>` (e.g. `0.2.0-nightly.1180.1`) under `next`, in
+    the same gated outcome as the `nightly-<sha>` image.
+  - **Release** publishes the `package.json` version without its prerelease suffix (`0.2.0-alpha.0` becomes
+    `0.2.0`) under `latest`. The release checks every planned version before publishing any; if one already
+    exists, raise that plugin's major, minor or patch number (changing only the prerelease suffix is not
+    enough). After a release, bump the plugin to the next prerelease (e.g. `0.2.1-alpha.0`) so nightlies sort
+    above the released version.
+  - Nothing publishes to `alpha` any more; existing `alpha` tags are frozen. See
+    [Release channels](plugins/installing-plugins.md#release-channels).
+  - Preview the plan locally against the real registry with
+    `node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next --dry-run` (or `--channel=latest`); add
+    `--out=plan.json` for the machine-readable plan.
 
 ## See Also
 

@@ -1,4 +1,5 @@
 # Detail Page
+<!-- llms-description: Describes the resource detail page, which brings all information and management functions of a resource together. -->
 
 The resource detail page shows all information and management functions in one place.
 

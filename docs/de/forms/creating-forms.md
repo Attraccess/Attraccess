@@ -1,4 +1,5 @@
 # Formulare erstellen
+<!-- llms-description: So erstellen, bearbeiten und löschen Sie Formulare und Felder einer Ressource; erfordert die Berechtigung Ressourcen verwalten. -->
 
 Sie benötigen die Berechtigung **Ressourcen verwalten**, um Formulare zu erstellen und zu bearbeiten.
 

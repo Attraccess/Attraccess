@@ -1,4 +1,5 @@
 # E-Mail-Vorlagen
+<!-- llms-description: E-Mail-Vorlagen von Attraccess verwalten und anpassen, inklusive verfügbarer Vorlagen, Plugin-Vorlagen und Platzhalter. -->
 
 Attraccess verwendet E-Mail-Vorlagen für automatisierte Nachrichten wie Registrierungsbestätigungen und Passwort-Zurücksetzungen. Sie können diese Vorlagen an Ihre Organisation anpassen.
 

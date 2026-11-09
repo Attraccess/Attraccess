@@ -30,6 +30,14 @@ permissions:
   packages: write
   pull-requests: write
 
+# A push to a PR cancels that PR's previous run. A superseded run can never
+# count toward a merge, yet it holds its three macOS runners, which a few
+# busy PRs are enough to exhaust. Merge-queue runs each get their own group
+# (github.ref is the queue entry's branch) and are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   precommit-check:
     # Lint/typecheck/test/e2e already run as dedicated jobs below. This job is a

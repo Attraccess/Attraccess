@@ -1,4 +1,5 @@
 # Attractap RFID Reader
+<!-- llms-description: Introduces Attractap, the ESP32-based RFID reader for machine and door access, with features, workflow and hardware variants. -->
 
 Attractap is an ESP32-based RFID badge reader for machine and door access in production facilities, research labs and universities. It reads a user's card and checks permissions with the Attraccess backend. Machine access can be connected to PLCs or other equipment controls through Attraccess integrations and flows.
 

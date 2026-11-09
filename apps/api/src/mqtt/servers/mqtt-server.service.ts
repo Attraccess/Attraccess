@@ -1,10 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MqttServer } from '@attraccess/database-entities';
 import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { MqttServerChangedEvent } from '../mqtt-server-changed.event';
+
+/** What a connection to the server is opened with (password decrypted). */
+function connectionSettings(server: MqttServer): string {
+  const { host, port, username, password, useTls, caCert, tlsServername, tlsInsecure } = server;
+  return JSON.stringify([host, port, username, password, useTls, caCert, tlsServername, tlsInsecure]);
+}
 
 @Injectable()
 export class MqttServerService {
@@ -13,7 +21,8 @@ export class MqttServerService {
     private readonly mqttServerRepository: Repository<MqttServer>,
     private readonly encryptionService: EncryptionService,
     private readonly metricsService: MetricsService,
-  ) { }
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   /**
    * Get all MQTT servers
@@ -58,12 +67,17 @@ export class MqttServerService {
    */
   async update(id: number, updateMqttServerDto: UpdateMqttServerDto): Promise<MqttServer> {
     const server = await this.findOne(id);
+    const connectionBefore = connectionSettings(server);
 
     // Update the server with the new values
     Object.assign(server, updateMqttServerDto);
+    const connectionChanged = connectionSettings(server) !== connectionBefore;
     server.password = server.password ? this.encryptionService.encrypt(server.password) : null;
 
-    return this.mqttServerRepository.save(server);
+    const saved = await this.mqttServerRepository.save(server);
+    // A rename or new publish defaults leaves open connections valid.
+    if (connectionChanged) this.emitChanged(id);
+    return saved;
   }
 
   /**
@@ -73,6 +87,12 @@ export class MqttServerService {
     const server = await this.findOne(id);
     await this.mqttServerRepository.remove(server);
     this.metricsService.mqttServersTotal.dec();
+    this.emitChanged(id);
+  }
+
+  /** Connections opened with the old settings (the message explorer's) close. */
+  private emitChanged(id: number): void {
+    this.eventEmitter.emit(MqttServerChangedEvent.EVENT_NAME, new MqttServerChangedEvent(id));
   }
 
   /**

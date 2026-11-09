@@ -1,4 +1,5 @@
 # Globale Flows
+<!-- llms-description: Globale Flows laufen unabhängig von einer Ressource und reagieren auf jede Ressource, MQTT, Companion oder Variablen; mit Knoten und Triggern. -->
 
 Ein globaler Flow ist ein benannter Flow, der nicht an eine einzelne Ressource gebunden ist. Er reagiert auf Ereignisse **jeder** Ressource sowie auf andere Quellen wie MQTT, Companion, Variablen und Plugins. Verwenden Sie ihn für Regeln, die überall gelten sollen, statt denselben Flow an jeder Ressource neu aufzubauen -- zum Beispiel einen Webhook oder eine MQTT-Benachrichtigung senden, sobald eine beliebige Maschine startet, eine Tür entriegelt wird, eine Ressource nicht mehr gesund ist oder eine Wartungsanfrage eingeht.
 

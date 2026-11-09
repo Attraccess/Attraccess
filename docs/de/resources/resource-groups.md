@@ -1,4 +1,5 @@
 # Ressourcengruppen
+<!-- llms-description: Wie Ressourcengruppen mehrere Ressourcen zusammenfassen, damit Einweisungen auf Gruppenebene verwaltet werden können. -->
 
 Gruppen ermöglichen es, mehrere Ressourcen zusammenzufassen und Einweisungen auf Gruppenebene zu verwalten.
 
