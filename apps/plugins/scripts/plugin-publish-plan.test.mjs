@@ -19,10 +19,12 @@ import {
   versionExistsMessage,
   writeOutputs,
 } from './plugin-publish-plan.mjs';
+import { fixtureGitEnv } from '../../../scripts/test-utils/git-env.mjs';
 
 // Each test gets its own repository with one root commit, so tests don't depend on each other's order.
 let repo;
-const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+// pre-commit exports GIT_INDEX_FILE; without fixtureGitEnv `git add` here would overwrite the real index.
+const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', env: fixtureGitEnv() }).trim();
 const commit = (file, message) => {
   mkdirSync(dirname(join(repo, file)), { recursive: true });
   writeFileSync(join(repo, file), message);
