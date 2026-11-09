@@ -670,9 +670,10 @@ Plugins, die **innerhalb dieses Monorepos** gepflegt werden, sind vollwertige
 
 - **Ablageort:** ein Verzeichnis pro Plugin unter `apps/plugins/<name>/`.
 - **nx-Tag:** jede Plugin-App ist in ihrer `project.json` mit **`type:plugin`**
-  getaggt. CI baut und zippt die Menge mit `--projects=tag:type:plugin`; die
-  generischen Lint/Typecheck/Test/Build-Jobs schließen sie über
-  `--exclude=...,tag:type:plugin` aus — analog zu `scope:hardware`.
+  getaggt. CI baut und zippt die Menge mit `--projects=tag:type:plugin`; der
+  generische Full-Build überspringt sie deshalb. Lint und Typecheck prüfen
+  Plugin-Apps weiterhin. Die Ausschlüsse für Lint, Typecheck und Build stehen
+  zentral in `scripts/ci-nx-exclude.mjs`.
 - **Build-Rezept:** die esbuild/Vite/zip-Schritte sind über
   `apps/plugins/scripts/` geteilt und in nx-Targets verdrahtet
   (`build-backend`, `build-frontend`, `build`, `zip`, `pack`).

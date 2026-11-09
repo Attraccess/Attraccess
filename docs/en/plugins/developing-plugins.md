@@ -1241,10 +1241,10 @@ so they share the workspace toolchain, caching and CI.
   same anatomy as any plugin (`package.json`, `backend/plugin.ts`,
   `frontend/src/plugin.tsx`, …).
 - **nx tag:** every plugin app is tagged **`type:plugin`** in its `project.json`.
-  CI targets the set with `--projects=tag:type:plugin` (test + pack the plugins)
-  and the generic lint/typecheck/test/build jobs exclude it with
-  `--exclude=...,tag:type:plugin`, exactly mirroring how `scope:hardware` is
-  handled. List the plugin apps any time with:
+  CI targets the set with `--projects=tag:type:plugin` (test + pack the plugins),
+  so the generic full build skips it. Lint and typecheck still cover plugin apps.
+  The exclusions for lint, typecheck and build live in one place,
+  `scripts/ci-nx-exclude.mjs`. List the plugin apps any time with:
 
   ```bash
   pnpm nx show projects --projects=tag:type:plugin
