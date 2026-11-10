@@ -55,6 +55,13 @@ export const billingSources = new Set([
 /** Same wait as the resource-lifecycle connection: an audit write waits for the SQLite lock instead of being dropped. */
 export const SQLITE_BUSY_TIMEOUT_MS = 5000;
 
+/**
+ * Extra attempts for an audit insert that waited out the busy timeout (SQLITE_BUSY). The lock holder can stall for
+ * seconds under CPU starvation; the insert is a single statement that did not apply, so repeating it is safe.
+ * Not used once shutdown has started, which keeps the drain inside Docker's stop grace period.
+ */
+export const AUDIT_BUSY_RETRIES = 2;
+
 /** Writes without a caller transaction queue on the audit connection; beyond this they are dropped as `queue_full`. */
 export const MAX_PENDING_AUDIT_WRITES = 1000;
 
@@ -356,11 +363,14 @@ export abstract class AuditStorage {
       // Writes admitted before shutdown still run; only a drain that ran out of time drops the rest.
       if (this.drainExpired) return this.drop(event.domain, 'shutting_down', event.action);
       if (!storage?.isInitialized) return this.drop(event.domain, 'storage_unavailable', event.action);
-      try {
-        await storage.getRepository(AuditLog).insert({ at: new Date(), ...event });
-        return { status: 'recorded' };
-      } catch (error) {
-        return this.drop(event.domain, 'storage_error', event.action, error);
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await storage.getRepository(AuditLog).insert({ at: new Date(), ...event });
+          return { status: 'recorded' };
+        } catch (error) {
+          const retry = sqliteErrorCode(error) === 'SQLITE_BUSY' && attempt < AUDIT_BUSY_RETRIES && !this.stopping;
+          if (!retry) return this.drop(event.domain, 'storage_error', event.action, error);
+        }
       }
     });
   }
