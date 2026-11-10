@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import * as migrations from '../database/migrations';
 import { DurableAudit1783700000000 } from '../database/migrations/1783700000000-durable-audit';
 import { IdentityAudit1783800000000 } from '../database/migrations/1783800000000-identity-audit';
@@ -15,7 +15,7 @@ import { AuditQueryDto } from './dto/audit-query.dto';
 import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
-import { MAX_PENDING_AUDIT_WRITES, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
+import { AUDIT_BUSY_RETRIES, MAX_PENDING_AUDIT_WRITES, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
 import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
 import { createTestAuditMetrics, droppedRecords, setupAuditDatabase } from './audit.test-fixture';
 describe('durable audit SQLite', () => {
@@ -359,6 +359,61 @@ describe('durable audit SQLite', () => {
     expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(40);
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(40);
     expect(await droppedRecords(fixture.metrics)).toEqual({});
+  });
+
+  describe('when the database stays locked past the busy timeout', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    /** Makes the next `failures` audit inserts fail like SQLite does after waiting out the busy timeout. */
+    const lockAuditInserts = (failures: number) => {
+      const insert = Repository.prototype.insert;
+      let remaining = failures;
+      let attempts = 0;
+      jest.spyOn(Repository.prototype, 'insert').mockImplementation(function (this: Repository<object>, ...args) {
+        if (this.target !== AuditLog) return insert.apply(this, args);
+        attempts++;
+        if (remaining-- > 0)
+          return Promise.reject(Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' }));
+        return insert.apply(this, args);
+      });
+      return () => attempts;
+    };
+
+    it('repeats the insert instead of dropping the record', async () => {
+      const attempts = lockAuditInserts(AUDIT_BUSY_RETRIES);
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+      expect(attempts()).toBe(AUDIT_BUSY_RETRIES + 1);
+      expect(await droppedRecords(fixture.metrics)).toEqual({});
+      expect(await fixture.source.getRepository(AuditLog).count()).toBe(1);
+    });
+
+    it('drops the record as storage_error once the retries are used up', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+      const attempts = lockAuditInserts(AUDIT_BUSY_RETRIES + 1);
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(attempts()).toBe(AUDIT_BUSY_RETRIES + 1);
+      expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:storage_error': 1 });
+      expect(String(error.mock.calls[0][0])).toContain('code=SQLITE_BUSY');
+    });
+
+    it('does not repeat an insert that failed for another reason', async () => {
+      const attempts = lockAuditInserts(0);
+      await fixture.source.query('DROP TABLE audit_log');
+      jest.spyOn(Logger.prototype, 'error').mockImplementation();
+      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(attempts()).toBe(1);
+    });
+
+    it('does not repeat once shutdown has started', async () => {
+      const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+      const attempts = lockAuditInserts(1);
+      const write = fixture.service.record(fixture.event());
+      const shutdown = fixture.service.onModuleDestroy();
+      expect(await write).toEqual({ status: 'unavailable' });
+      await shutdown;
+      expect(attempts()).toBe(1);
+      expect(error).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('rejects writes above the pending cap as queue_full and records the rest', async () => {
