@@ -2,6 +2,7 @@
 
 #include "../fonts/attractap_fonts.hpp"
 #include "../i18n.hpp"
+#include "../shared/screenChrome.hpp"
 #include "../theme.hpp"
 #include "ui_builder.hpp"
 
@@ -9,6 +10,9 @@ namespace ui
 {
     namespace
     {
+        // The band the device footer (with the clock) takes at the bottom, as on every full-screen layout.
+        constexpr int FooterBandPx = ScreenChrome::Bottom;
+
         Tone toneOf(uint8_t t)
         {
             switch (t)
@@ -81,6 +85,9 @@ namespace ui
 
         lv_obj_t *overlay = lv_obj_create(lv_layer_top());
         overlay_ = overlay;
+        // Right away, not on the next display loop: no frame shows the step above the footer or the drawer.
+        if (anchor_ && lv_obj_get_parent(anchor_) == lv_layer_top())
+            lv_obj_move_to_index(overlay, lv_obj_get_index(anchor_));
         lv_obj_remove_style_all(overlay);
         lv_obj_remove_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_add_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
@@ -93,6 +100,8 @@ namespace ui
         lv_obj_set_size(panel, lv_pct(100), lv_pct(100));
         DisplayTheme::applySurface(panel);
         lv_obj_set_style_pad_all(panel, 16, LV_PART_MAIN);
+        // The device footer (with the clock) stays visible over the panel: leave its band free.
+        lv_obj_set_style_pad_bottom(panel, 16 + FooterBandPx, LV_PART_MAIN);
         lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
         lv_obj_remove_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
 

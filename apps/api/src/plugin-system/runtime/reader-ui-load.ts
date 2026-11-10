@@ -52,5 +52,8 @@ export function collectReaderUiContributions(
   if (out.readerUi && typeof out.readerUi.getSlotContributions !== 'function') {
     throw new Error(`Plugin ${pluginName}: readerUi.getSlotContributions must be a function`);
   }
+  if (out.readerUi && out.readerUi.getTimeZone !== undefined && typeof out.readerUi.getTimeZone !== 'function') {
+    throw new Error(`Plugin ${pluginName}: readerUi.getTimeZone must be a function`);
+  }
   return out.readerUi || out.preStartHook || out.sessionEndHook || out.startBlockedQuery ? out : null;
 }

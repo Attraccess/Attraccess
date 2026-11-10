@@ -2,6 +2,7 @@ import type { SessionEndContext, SessionEndResult } from '@attraccess/plugins-ba
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Clock, RESERVATION_CLOCK } from '../constants';
 import { formatTime, pick } from '../notifications/format';
+import { readerTime } from '../reader-ui/texts';
 import { ReservationAudit } from '../reservations/audit';
 import { ReservationError } from '../reservations/errors';
 import { ReservationService } from '../reservations/reservation.service';
@@ -43,7 +44,11 @@ export class SessionEndService {
 
     const { language: lang } = ctx;
     const timeZone = await this.globalSettings.getTimezone();
-    const until = formatTime(own.endTime, { lang, timeZone });
+    // A reader writes a time on another local day with its weekday, like the reader slots.
+    const until =
+      ctx.origin === 'reader'
+        ? readerTime(own.endTime, { lang, timeZone, now })
+        : formatTime(own.endTime, { lang, timeZone });
     const principal = ReservationAudit.systemPrincipal(ctx.userId);
     return {
       decision: 'choose',

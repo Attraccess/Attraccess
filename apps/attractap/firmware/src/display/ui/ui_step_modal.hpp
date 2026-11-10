@@ -20,9 +20,13 @@ namespace ui
         using ActionCallback = std::function<void(const std::string &stepId, const std::string &action, bool isChoice)>;
 
         void setActionCallback(ActionCallback cb) { callback_ = std::move(cb); }
+        // The overlay goes on the top layer directly below `anchor` (the device footer), so the anchor stays visible
+        // over the step while everything created above it (the drawer) stays above the step. Null: the very top.
+        void placeBelow(lv_obj_t *anchor) { anchor_ = anchor; }
         void show(const StepRequest &step, uint32_t nowMillis);
         void hide();
         bool isOpen() const { return overlay_ != nullptr; }
+        lv_obj_t *root() const { return overlay_; }
         const std::string &stepId() const { return stepId_; }
 
     private:
@@ -37,6 +41,7 @@ namespace ui
                             const std::string &label, int grow);
 
         lv_obj_t *overlay_ = nullptr;
+        lv_obj_t *anchor_ = nullptr;
         std::string stepId_;
         ActionCallback callback_;
         Binding bindings_[8];

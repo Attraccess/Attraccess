@@ -41,6 +41,7 @@ import { ReaderSessionService } from '../security/reader-session.service';
 import { PAIRING_SUBPROTOCOL, SESSION_SUBPROTOCOL } from '../security/session-framing';
 import { readerWebSocketOptions } from './websocket-transport-options';
 import { WebsocketService } from './websocket.service';
+import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerHeartbeat } from './websocket-reader-payloads';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 import { randomBytes } from 'crypto';
@@ -79,6 +80,9 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
   protected readonly logger = new Logger(AttractapGateway.name);
 
   protected readonly clientResponseAwaitersMutex = new Mutex();
+
+  @Inject(ReaderTimeZoneService)
+  private readerTimeZone: ReaderTimeZoneService;
 
   @Inject(WebsocketService)
   protected websocketService: WebsocketService;
@@ -352,10 +356,14 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     this.logger.debug(`Heartbeat from client ${socket.id}.`);
 
     try {
-      (socket as unknown as { send: (data: string) => void }).send(readerHeartbeat());
+      (socket as unknown as { send: (data: string) => void }).send(
+        readerHeartbeat(this.readerTimeZone.serverTimeFor(socket.readerId)),
+      );
     } catch (error) {
       this.logger.error(`Failed to send heartbeat ack to client ${socket.id}: ${(error as Error).message}`);
     }
+    // A zone that could not be resolved in time (e.g. right after an API restart) is asked for again.
+    this.readerTimeZone.onHeartbeat(socket.readerId);
     // A blocked reader whose pairing failed is back on its token and sends little else, so its
     // heartbeats ask it again once the per-reader limit allows. Not before its update check: a reader
     // that needs the update gets that first.
@@ -550,6 +558,8 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
           0,
         );
       }
+      // A socket still signing in as this reader (a reconnect) keeps the reader's time zone.
+      this.readerTimeZone.forgetUnlessInUse(readerId, socket.id);
     } else {
       this.logger.log('An unidentified client disconnected.');
     }

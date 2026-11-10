@@ -176,6 +176,13 @@ export interface ReaderUiContext {
   resourceId: number;
   /** Set whenever a card session is live; never for a signed-out reader. */
   userId?: number;
+  /**
+   * The resource has an active usage visible on this reader. The reader shows `resource.details.session` only
+   * while this is true, so a provider that wants a fact in one block puts it in the session slot when this is true
+   * and in the details body otherwise. The host re-evaluates the provider when a usage starts, ends or is taken
+   * over. Optional for compatibility: when unset, treat it as `false`.
+   */
+  sessionActive?: boolean;
   capabilities: ReaderUiCapabilities;
   language: 'en' | 'de';
 }
@@ -193,6 +200,16 @@ export interface ReaderSlotContribution {
 
 export interface ReaderUiProvider {
   getSlotContributions(ctx: ReaderUiContext): ReaderSlotContribution[] | Promise<ReaderSlotContribution[]>;
+  /**
+   * The IANA time zone (e.g. `Europe/Berlin`) this plugin writes times in on readers for the resource, or `undefined`
+   * for no opinion. The host sends one zone per reader, so the reader's clock and the plugin's texts agree: the first
+   * valid zone in host order wins (the reader's resources by id, and for each resource the plugins in host order,
+   * alphabetically by plugin name; a slower plugin that answers within the time limit still wins over a faster one
+   * ranked lower), otherwise the server's `TZ` applies. An invalid name is ignored; two different zones for one reader
+   * raise an admin alert. Called with the slot timeout; an error or timeout counts as no opinion. Call
+   * `readerUi.invalidate` when the zone changes.
+   */
+  getTimeZone?(ctx: { readerId: number; resourceId: number }): string | undefined | Promise<string | undefined>;
 }
 
 export type PreStartOrigin = 'web' | 'api' | 'reader' | 'supervision';

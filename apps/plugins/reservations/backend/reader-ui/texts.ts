@@ -1,0 +1,157 @@
+import { READER_UI_LIMITS } from '@attraccess/plugins-backend-sdk';
+import type { Lang } from '../notifications/host-info.service';
+import { cachedFormat, dayKey, formatTime, LOCALES, pick } from '../notifications/format';
+
+/** Longest holder name on a reader: the longest text around it (confirm body) still fits 80 characters. */
+export const READER_NAME_MAX = 16;
+
+const ROW_MAX = READER_UI_LIMITS.maxListRowChars;
+
+/** Hard cut to `max` characters (no room for an ellipsis on the reader). */
+export function fit(text: string, max: number): string {
+  return text.length <= max ? text : text.slice(0, max).trimEnd();
+}
+
+/** Punctuation and letters the host's reader sanitizer rewrites before its NFD step (same table). */
+const HOST_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/\u2018|\u2019|\u201A|\u2032/g, "'"],
+  [/\u201C|\u201D|\u201E|\u2033/g, '"'],
+  [/[\u2010-\u2015]/g, '-'],
+  [/[\u2009\u200A\u202F\u2002\u2003\u2007\u2008]/g, ' '],
+  [/\u0142/g, 'l'],
+  [/\u0141/g, 'L'],
+  [/\u0111/g, 'd'],
+  [/\u0110/g, 'D'],
+  [/\u2026/g, '...'],
+  [/\u2022/g, '-'],
+  [/\u2122/g, 'TM'],
+];
+
+/**
+ * A holder name as the reader may show it: Latin-1 only and at most READER_NAME_MAX characters. Letters
+ * outside Latin-1 lose their accents like the host's sanitizer does ("Łukasz Šimek" → "Lukasz Simek");
+ * anything else becomes "?". Doing it here keeps the length the plugin truncated to.
+ */
+export function readerName(name: string): string {
+  const replaced = HOST_REPLACEMENTS.reduce((text, [pattern, to]) => text.replace(pattern, to), name.normalize('NFC'));
+  const latin1 = Array.from(replaced)
+    .map((char) => {
+      if (/^[\u0020-\u007e\u00a0-\u00ff]$/.test(char)) return char;
+      if (/^\s$/.test(char)) return ' ';
+      const plain = char.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return /^[\u0020-\u007e]*$/.test(plain) ? plain : '?';
+    })
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return fit(latin1, READER_NAME_MAX);
+}
+
+/** What the reader needs to write a time: language, plugin timezone and "now" (for the weekday rule). */
+export interface ReaderClock {
+  lang: Lang;
+  timeZone: string;
+  now: Date;
+}
+
+/** `14:00`, or `Tue 09:00` / `Di 09:00` when the time is on another local day than now. */
+export function readerTime(date: Date, clock: ReaderClock): string {
+  const time = formatTime(date, clock);
+  if (dayKey(date, clock.timeZone) === dayKey(clock.now, clock.timeZone)) return time;
+  const weekday = cachedFormat(LOCALES[clock.lang], { timeZone: clock.timeZone, weekday: 'short' })
+    .format(date)
+    .replace(/\.$/, '');
+  return `${weekday} ${time}`;
+}
+
+const QUARTER_HOUR_MS = 15 * 60_000;
+
+/**
+ * The next local midnight after `now` in `timeZone`: the weekday rule of {@link readerTime} changes then.
+ * Starts from "24 h after today's midnight" and corrects in quarter hours (every UTC offset is a multiple
+ * of 15 minutes), which covers days of 23 or 25 hours at a daylight saving change.
+ */
+export function nextLocalMidnight(now: Date, timeZone: string): Date {
+  const parts = cachedFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const elapsed = ((part('hour') * 60 + part('minute')) * 60 + part('second')) * 1000 + now.getUTCMilliseconds();
+  const today = dayKey(now, timeZone);
+  let at = now.getTime() - elapsed + 24 * 60 * 60_000;
+  while (dayKey(new Date(at), timeZone) === today) at += QUARTER_HOUR_MS;
+  while (dayKey(new Date(at - QUARTER_HOUR_MS), timeZone) !== today) at -= QUARTER_HOUR_MS;
+  return new Date(at);
+}
+
+const range = (start: Date, end: Date, clock: ReaderClock) => `${readerTime(start, clock)}-${readerTime(end, clock)}`;
+
+/**
+ * Characters of reader text that safely fit one line: the details body (18 px, 422 px wide) and the session text
+ * beside its countdown (14 px, about 340 px). Measured with the reader fonts at about 9.6 and 8 px per character.
+ */
+export const READER_LINE_CHARS = 42;
+
+/** A clause with a holder name and its times: one line when it fits, otherwise the times go on a line of their own. */
+const named = (subject: string, times: string): string[] => {
+  const whole = `${subject} ${times}`;
+  return whole.length <= READER_LINE_CHARS ? [whole] : [subject, times];
+};
+
+/** Slot texts. Every function returns the final string; callers only enforce the host limits. */
+export const readerTexts = {
+  /** List rows, ≤ 24 characters. They never carry a name. */
+  rowFreeUntil: (start: Date, c: ReaderClock) =>
+    fit(pick(c.lang, `Free until ${readerTime(start, c)}`, `Frei bis ${readerTime(start, c)}`), ROW_MAX),
+  /**
+   * Running booking that still awaits its check-in. "Reserved (check in by …)" never fits 24 characters, so
+   * the row says "Res., check in by 14:15"; a time with a weekday drops the "by" ("Res., check-in Tue 00:05").
+   */
+  rowCheckInBy: (deadline: Date, c: ReaderClock) => {
+    const at = readerTime(deadline, c);
+    const long = pick(c.lang, `Res., check in by ${at}`, `Res., Check-in bis ${at}`);
+    return long.length <= ROW_MAX ? long : fit(pick(c.lang, `Res., check-in ${at}`, `Res., Check-in ${at}`), ROW_MAX);
+  },
+  rowReservedUntil: (end: Date, c: ReaderClock) =>
+    fit(pick(c.lang, `Reserved until ${readerTime(end, c)}`, `Reserviert bis ${readerTime(end, c)}`), ROW_MAX),
+  rowOwnUntil: (end: Date, c: ReaderClock) => {
+    const until = readerTime(end, c);
+    const long = pick(c.lang, `Your booking until ${until}`, `Deine Buchung bis ${until}`);
+    return long.length <= ROW_MAX ? long : fit(pick(c.lang, `Yours until ${until}`, `Für dich bis ${until}`), ROW_MAX);
+  },
+
+  /**
+   * Details lines (≤ 80 characters; the holder name is already truncated). Each returned string is one text node,
+   * a clause the reader keeps on one line. The reader wraps at spaces, commas and hyphens, so a clause too long for
+   * its line would leave a time ("14:25") or half a range alone on the next one.
+   */
+  /**
+   * Nothing runs and a booking is next: one fact (the free window and that booking) as clauses: "Free until 14:00,"
+   * and "then reserved by bea until 14:30". The booking's start is the end of the free window, so it is written once.
+   */
+  freeThenReserved: (start: Date, end: Date, c: ReaderClock, holder?: string): string[] => [
+    pick(c.lang, `Free until ${readerTime(start, c)},`, `Frei bis ${readerTime(start, c)},`),
+    ...(holder
+      ? named(
+          pick(c.lang, `then reserved by ${holder}`, `dann reserviert von ${holder}`),
+          pick(c.lang, `until ${readerTime(end, c)}`, `bis ${readerTime(end, c)}`),
+        )
+      : [pick(c.lang, `then reserved until ${readerTime(end, c)}`, `dann reserviert bis ${readerTime(end, c)}`)]),
+  ],
+  reserved: (start: Date, end: Date, c: ReaderClock, holder?: string): string[] =>
+    holder
+      ? named(pick(c.lang, `Reserved by ${holder}`, `Reserviert von ${holder}`), range(start, end, c))
+      : [pick(c.lang, `Reserved ${range(start, end, c)}`, `Reserviert ${range(start, end, c)}`)],
+  own: (start: Date, end: Date, c: ReaderClock) =>
+    pick(c.lang, `Your booking ${range(start, end, c)}`, `Deine Buchung ${range(start, end, c)}`),
+  /** Its own line under the booking, so the parenthesis never starts a wrapped line by itself. */
+  checkInLine: (deadline: Date, c: ReaderClock) =>
+    pick(c.lang, `(check in by ${readerTime(deadline, c)})`, `(Check-in bis ${readerTime(deadline, c)})`),
+  /** Session area: another user's booking starts soon, with its full range (a countdown node follows). */
+  sessionReserved: (start: Date, end: Date, c: ReaderClock, holder?: string): string[] =>
+    readerTexts.reserved(start, end, c, holder),
+};

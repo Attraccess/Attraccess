@@ -1,7 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { ResourceUsageAction } from '@attraccess/database-entities';
 import { READER_UI_SLOTS } from '@attraccess/plugins-backend-sdk';
 import { CardSessionService } from './card-session.service';
+import { AttractapUiHandler } from './ui.handler';
 import { isUiMessageSuperseded, UI_INVALIDATE_DEBOUNCE_MS, UiSlotService } from './ui-slot.service';
+import {
+  ResourceSessionStartedEvent,
+  ResourceUsageSessionEndedEvent,
+  ResourceUsageSessionTakenOverEvent,
+} from '../../../../resources/usage/events/resource-usage.events';
 import { lastSent, makeSocket } from './ui-test-helpers.test-fixture';
 
 const TOUCH_UI = {
@@ -42,6 +49,11 @@ function setup(contributions: (ctx: any) => any, opts: SetupOptions = {}) {
   const sockets = new Map<string, any>();
   const cardSessions = new CardSessionService();
   const settingsService = { getDefaultLanguage: jest.fn().mockResolvedValue('de') };
+  /** Resources with an active usage; tests add and remove ids. */
+  const activeUsages = new Set<number>();
+  const usageService = {
+    activeResourceIds: jest.fn(async (ids: number[]) => new Set(ids.filter((id) => activeUsages.has(id)))),
+  };
   const service = new UiSlotService(
     registry as never,
     settings as never,
@@ -50,10 +62,11 @@ function setup(contributions: (ctx: any) => any, opts: SetupOptions = {}) {
     { sockets } as never,
     cardSessions,
     settingsService as never,
+    usageService as never,
   );
   const socket = makeSocket();
   sockets.set(socket.id, socket);
-  return { service, socket, settings, cardSessions, registry, attractap, sockets, providers };
+  return { service, socket, settings, cardSessions, registry, attractap, sockets, providers, activeUsages };
 }
 
 const header = (text: string, extra: Record<string, unknown> = {}) => ({
@@ -593,6 +606,59 @@ describe('UiSlotService', () => {
     });
   });
 
+  it('sends the public list row status again after sign-out, because the reader drops rows of the card session', async () => {
+    const row = (text: string) => ({
+      slotId: READER_UI_SLOTS.RESOURCE_LIST_ROW_STATUS,
+      key: 'row',
+      tree: { t: 'text', text },
+    });
+    const { service, socket, cardSessions } = setup((ctx: any) => [
+      row(ctx.userId ? 'Your booking until 16:00' : 'Reserved until 16:00'),
+    ]);
+    await service.onFirmwareInfo(socket, TOUCH_UI);
+    jest.advanceTimersByTime(2100);
+    cardSessions.issue(socket, 7, 'en');
+    await jest.advanceTimersByTimeAsync(0);
+    cardSessions.end(socket, socket.state.cardSession.id, 'reader');
+    await jest.advanceTimersByTimeAsync(0);
+    // The own row is removed and the public one sent at once, without waiting for the 2 s limit.
+    expect(shapes(socket)).toEqual([
+      'row@1:Reserved until 16:00',
+      'row@2:Your booking until 16:00',
+      'row@3:null',
+      'row@4:Reserved until 16:00',
+    ]);
+  });
+
+  it('sends the public row status again when the reader signs out after the server timer ended the card session', async () => {
+    const row = (text: string) => ({
+      slotId: READER_UI_SLOTS.RESOURCE_LIST_ROW_STATUS,
+      key: 'row',
+      tree: { t: 'text', text },
+    });
+    const { service, socket, cardSessions } = setup((ctx: any) => [
+      row(ctx.userId ? 'Your booking until 16:00' : 'Reserved until 16:00'),
+    ]);
+    await service.onFirmwareInfo(socket, TOUCH_UI);
+    jest.advanceTimersByTime(2100);
+    cardSessions.issue(socket, 7, 'en');
+    await jest.advanceTimersByTimeAsync(0);
+    // The server timer ends the card session first and the public row goes out.
+    cardSessions.end(socket, socket.state.cardSession.id, 'expired');
+    await jest.advanceTimersByTimeAsync(0);
+    expect(shapes(socket)).toEqual([
+      'row@1:Reserved until 16:00',
+      'row@2:Your booking until 16:00',
+      'row@3:null',
+      'row@4:Reserved until 16:00',
+    ]);
+    // Later the reader signs out and wipes its rows; no live card session is left, yet the rows come again.
+    Object.assign(new AttractapUiHandler(), { slots: service, cardSessions }).endCardSession(socket);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(shapes(socket).slice(4)).toEqual(['row@5:Reserved until 16:00']);
+    expect(socket.state.cardSession).toBeNull();
+  });
+
   describe('UI_RENDER_REPORT', () => {
     const report = (extra: Record<string, unknown> = {}) => ({
       resourceId: 12,
@@ -620,6 +686,123 @@ describe('UiSlotService', () => {
       expect(service.contributionsOf(5)[0]).toMatchObject({ status: 'rendered' });
       service.renderReport(socket, report({ status: 'dropped', reason: 'Unknown Node!' }));
       expect(service.contributionsOf(5)[0]).toMatchObject({ status: 'skipped', reason: 'reader-UnknownNode' });
+    });
+  });
+
+  describe('sessionActive', () => {
+    const bodyOrSession = (ctx: any) => [
+      ctx.sessionActive
+        ? session('Reserved by bea 08:40-09:10')
+        : { ...header('Free until 08:40, then reserved'), slotId: READER_UI_SLOTS.RESOURCE_DETAILS_BODY },
+    ];
+
+    it('tells the provider whether the resource has an active usage', async () => {
+      const t = setup(() => []);
+      t.activeUsages.add(12);
+      await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
+      const call = t.providers[0].provider.getSlotContributions as jest.Mock;
+      expect(call.mock.calls[0][0]).toMatchObject({ resourceId: 12, sessionActive: true });
+      t.activeUsages.delete(12);
+      await t.service.sync(t.socket);
+      expect(call.mock.calls.at(-1)[0]).toMatchObject({ resourceId: 12, sessionActive: false });
+    });
+
+    it('idle with a card session: exactly one booking text, in the body and not in the session slot', async () => {
+      const t = setup(bodyOrSession);
+      t.cardSessions.issue(t.socket, 7, 'en');
+      await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
+      expect(updates(t.socket).map((u: any) => u.payload.slot)).toEqual(['resource.details.body']);
+    });
+
+    it('active session: exactly one booking text, in the session slot and not in the body', async () => {
+      const t = setup(bodyOrSession);
+      t.activeUsages.add(12);
+      t.cardSessions.issue(t.socket, 7, 'en');
+      await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
+      expect(updates(t.socket).map((u: any) => u.payload.slot)).toEqual(['resource.details.session']);
+    });
+
+    const usage = (resourceId: number, usageAction = ResourceUsageAction.Usage) =>
+      ({ resourceId, usageAction }) as never;
+    const usageEvents = (resourceId: number) =>
+      [
+        ['started', () => new ResourceSessionStartedEvent(usage(resourceId))],
+        ['ended', () => new ResourceUsageSessionEndedEvent(usage(resourceId), null)],
+        [
+          'taken over',
+          () => new ResourceUsageSessionTakenOverEvent({ id: resourceId, name: 'x' }, new Date(), {} as never, null),
+        ],
+      ] as const;
+    const emit = (service: UiSlotService, e: unknown) => {
+      if (e instanceof ResourceSessionStartedEvent) service.onUsageStarted(e);
+      else if (e instanceof ResourceUsageSessionEndedEvent) service.onUsageEnded(e);
+      else service.onUsageTakenOver(e as ResourceUsageSessionTakenOverEvent);
+    };
+
+    it('decides per resource, so an idle machine next to a busy one keeps its text in the body', async () => {
+      const t = setup(() => [], { resources: [12, 13] });
+      t.activeUsages.add(12);
+      await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
+      const calls = (t.providers[0].provider.getSlotContributions as jest.Mock).mock.calls.map(([ctx]) => ctx);
+      expect(calls.map(({ resourceId, sessionActive }) => [resourceId, sessionActive])).toEqual([
+        [12, true],
+        [13, false],
+      ]);
+    });
+
+    it.each(usageEvents(12).map(([kind, event]) => [kind, event] as const))(
+      'a usage %s re-evaluates that resource and moves the text: the old block goes, the new one comes',
+      async (kind, event) => {
+        const t = setup(bodyOrSession);
+        const ends = kind === 'ended';
+        if (ends) t.activeUsages.add(12);
+        t.cardSessions.issue(t.socket, 7, 'en');
+        await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
+        const call = t.providers[0].provider.getSlotContributions as jest.Mock;
+        const calls = call.mock.calls.length;
+        const sent = updates(t.socket).length;
+        if (ends) t.activeUsages.delete(12);
+        else t.activeUsages.add(12);
+        jest.advanceTimersByTime(2100); // the per-slot rate limit of the first send
+        emit(t.service, event());
+        await jest.advanceTimersByTimeAsync(UI_INVALIDATE_DEBOUNCE_MS + 1);
+        expect(call.mock.calls.length - calls).toBe(1);
+        const [from, to] = ends
+          ? ['resource.details.session', 'resource.details.body']
+          : ['resource.details.body', 'resource.details.session'];
+        expect(
+          updates(t.socket)
+            .slice(sent)
+            .map((u: any) => [u.payload.slot, u.payload.tree !== null]),
+        ).toEqual([
+          [from, false],
+          [to, true],
+        ]);
+      },
+    );
+
+    it.each(usageEvents(99).map(([kind, event]) => [kind, event] as const))(
+      'ignores a usage %s on a resource no reader shows',
+      async (_kind, event) => {
+        const t = setup(bodyOrSession);
+        await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
+        const call = t.providers[0].provider.getSlotContributions as jest.Mock;
+        const before = call.mock.calls.length;
+        emit(t.service, event());
+        await jest.advanceTimersByTimeAsync(UI_INVALIDATE_DEBOUNCE_MS + 1);
+        expect(call.mock.calls.length).toBe(before);
+      },
+    );
+
+    it('ignores door actions: they are stored already ended and never make a usage active', async () => {
+      const t = setup(bodyOrSession);
+      await t.service.onFirmwareInfo(t.socket, TOUCH_UI);
+      const call = t.providers[0].provider.getSlotContributions as jest.Mock;
+      const before = call.mock.calls.length;
+      t.service.onUsageStarted(new ResourceSessionStartedEvent(usage(12, ResourceUsageAction.DoorUnlock)));
+      t.service.onUsageStarted(new ResourceSessionStartedEvent(null as never));
+      await jest.advanceTimersByTimeAsync(UI_INVALIDATE_DEBOUNCE_MS + 1);
+      expect(call.mock.calls.length).toBe(before);
     });
   });
 });

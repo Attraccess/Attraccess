@@ -77,7 +77,7 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
     await h.settings.warmUp();
     h.makeManager(MANAGER, 1);
     const services = createBackgroundServices(h);
-    publishHookServices({ preStart: services.preStart, sessionEnd: services.sessionEnd });
+    publishHookServices({ preStart: services.preStart, sessionEnd: services.sessionEnd, readerUi: services.readerUi });
     // Booked ahead of time (the harness clock starts at 08:00), then the clock moves into the booking.
     await services.book(HOLDER, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
     h.setNow(NOW);

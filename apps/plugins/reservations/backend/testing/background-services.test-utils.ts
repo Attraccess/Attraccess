@@ -1,6 +1,7 @@
 import type { HostInfoService, Lang } from '../notifications/host-info.service';
 import { ReservationNotifications } from '../notifications/notifier.service';
 import { PendingDecisionStore } from '../hooks/pending-decisions';
+import { ReaderUiService } from '../reader-ui/reader-ui.service';
 import { PreStartService } from '../hooks/pre-start.service';
 import { SessionEndService } from '../hooks/session-end.service';
 import { ReservationEventHandlers } from '../events/event-handlers.service';
@@ -59,6 +60,7 @@ export function createBackgroundServices(h: Harness) {
     newEvents,
     preStart: new PreStartService(h.settings, h.globalSettings, h.store, h.access, h.directory, h.visibility, h.clock),
     sessionEnd: new SessionEndService(h.settings, h.globalSettings, h.store, h.reservations, decisions, h.clock),
+    readerUi: new ReaderUiService(h.settings, h.globalSettings, h.store, h.access, h.directory, h.clock),
     /** Creates a confirmed booking directly through the service. */
     async book(userId: number, resourceId: number, start: string, end: string) {
       return h.reservations.create(

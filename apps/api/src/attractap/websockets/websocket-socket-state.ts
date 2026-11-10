@@ -244,6 +244,8 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
   state: {
     /** Only the latest reader authentication attempt may restore its identity. */
     readerAuthenticationAttempt?: symbol;
+    /** Reader this socket signs in as while its time zone resolves, so a closing sibling keeps that zone. */
+    signingIn?: { readerId: number; attempt: symbol };
     /** The reader runs firmware that relays card APDUs (capabilities.cardRelay, 2.0.0+). Older readers get no card functions. */
     cardRelay?: boolean;
     /**

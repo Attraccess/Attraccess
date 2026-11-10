@@ -423,4 +423,154 @@ describe('PreStartService', () => {
       expect(find).not.toHaveBeenCalled();
     });
   });
+
+  describe('reader origin: names only after the card tap, to those who may see them', () => {
+    const reader = (userId: number, patch: Partial<PreStartContext> = {}) =>
+      ctx(userId, { origin: 'reader', ...patch });
+    const reservationOf = () => h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ userId: 11 });
+
+    describe('booking starts soon', () => {
+      beforeEach(async () => {
+        await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+        h.setNow('2026-06-01T11:20:00Z');
+      });
+
+      it('asks to confirm without a name, with the no-screen policy block', async () => {
+        const names = jest.spyOn(h.directory, 'getUserNames');
+        const result = await p.preStart.evaluate(reader(10));
+        expect(names).not.toHaveBeenCalled();
+        expect(result).toMatchObject({
+          decision: 'confirm',
+          confirmation: {
+            stepKey: `reservation-${(await reservationOf()).id}`,
+            body: 'Reserved from 14:00, you have 40 min. Start anyway?',
+            noScreenPolicy: 'block',
+          },
+        });
+        expect(JSON.stringify(result)).not.toContain('user11');
+        expect(await p.preStart.evaluate(reader(10, { language: 'de' }))).toMatchObject({
+          confirmation: { body: 'Reserviert ab 14:00, du hast 40 Min. Trotzdem starten?' },
+        });
+      });
+
+      it('names the holder to a manager starting on a reader', async () => {
+        expect(await p.preStart.evaluate(reader(99))).toMatchObject({
+          confirmation: { body: 'Reserved by user11 from 14:00, you have 40 min. Start anyway?' },
+        });
+        expect(await p.preStart.evaluate(reader(99, { language: 'de' }))).toMatchObject({
+          confirmation: { body: 'Reserviert von user11 ab 14:00, du hast 40 Min. Trotzdem starten?' },
+        });
+      });
+
+      it('names the holder to a viewer who may see who uses the machine, within the host text limit', async () => {
+        h.allowAttribution(10, 1);
+        expect(await p.preStart.evaluate(reader(10))).toMatchObject({
+          confirmation: { body: 'Reserved by user11 from 14:00, you have 40 min. Start anyway?' },
+        });
+        jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map([[11, 'An extremely long user name 日本']]));
+        const long = await p.preStart.evaluate(reader(10, { language: 'de' }));
+        if (long.decision !== 'confirm') throw new Error('expected a confirmation');
+        expect(long.confirmation.body.length).toBeLessThanOrEqual(READER_UI_LIMITS.maxTextChars);
+        expect(long.confirmation.body).toContain('An extremely lon');
+        expect(long.confirmation.body).not.toContain('日');
+      });
+
+      it('keeps the nameless ATT-881 question for web starts', async () => {
+        h.allowAttribution(10, 1);
+        expect(JSON.stringify(await p.preStart.evaluate(ctx(10)))).not.toContain('user11');
+        expect(JSON.stringify(await p.preStart.evaluate(ctx(99)))).not.toContain('user11');
+      });
+    });
+
+    describe('booking is running', () => {
+      beforeEach(async () => {
+        await p.book(11, 1, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+        h.setNow('2026-06-01T12:30:00Z');
+      });
+
+      it('refuses a non-manager without a name', async () => {
+        const names = jest.spyOn(h.directory, 'getUserNames');
+        const result = await p.preStart.evaluate(reader(10));
+        expect(names).not.toHaveBeenCalled();
+        expect(result).toEqual({
+          decision: 'block',
+          reason: { code: 'RESERVED', title: 'Reserved', body: 'Reserved by another user until 16:00.' },
+        });
+      });
+
+      it('names the holder in the refusal only to viewers who may see who uses the machine, like the web', async () => {
+        h.allowAttribution(10, 1);
+        expect(await p.preStart.evaluate(reader(10))).toMatchObject({
+          decision: 'block',
+          reason: { code: 'RESERVED', body: 'Reserved by user11 until 16:00.' },
+        });
+        expect(await p.preStart.evaluate(reader(10, { language: 'de' }))).toMatchObject({
+          reason: { body: 'Von user11 bis 16:00 reserviert.' },
+        });
+        // The web notice follows the same rule; only the reader shortens long names.
+        const state = await p.preStart.evaluateStartBlocked({
+          resourceId: 1,
+          userId: 10,
+          principal: 10,
+          language: 'en',
+          now: h.clock(),
+        });
+        expect(state?.reason.body).toBe('Reserved by user11 until 16:00.');
+        jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map([[11, 'Alexandra-Maximiliane Łukasz']]));
+        expect(await p.preStart.evaluate(reader(10))).toMatchObject({
+          reason: { body: 'Reserved by Alexandra-Maximi until 16:00.' },
+        });
+        expect(await p.preStart.evaluate(ctx(10, { now: h.clock() }))).toMatchObject({
+          reason: { body: 'Reserved by Alexandra-Maximiliane Łukasz until 16:00.' },
+        });
+      });
+
+      it('writes a time on another local day with its weekday on a reader only', async () => {
+        await h.enable(3, { maxDurationMinutes: 1440 });
+        await h.settings.warmUp();
+        h.setNow('2026-06-01T07:00:00Z');
+        await p.book(11, 3, '2026-06-01T12:00:00', '2026-06-02T06:00:00'); // ends Tue 08:00 local
+        h.setNow('2026-06-01T13:00:00Z');
+        expect(await p.preStart.evaluate(reader(10, { resourceId: 3 }))).toMatchObject({
+          reason: { body: 'Reserved by another user until Tue 08:00.' },
+        });
+        expect(await p.preStart.evaluate(reader(10, { resourceId: 3, language: 'de' }))).toMatchObject({
+          reason: { body: 'Von einer anderen Person bis Di 08:00 reserviert.' },
+        });
+        expect(await p.preStart.evaluate(ctx(10, { resourceId: 3, now: h.clock() }))).toMatchObject({
+          reason: { body: 'Reserved by another user until 08:00.' },
+        });
+      });
+
+      it('gives a manager the override confirmation, blocking without a screen', async () => {
+        expect(await p.preStart.evaluate(reader(99))).toMatchObject({
+          decision: 'confirm',
+          confirmation: {
+            stepKey: `override-${(await reservationOf()).id}`,
+            body: 'Reserved by user11 until 16:00. Start anyway?',
+            noScreenPolicy: 'block',
+          },
+        });
+      });
+
+      it('shortens the name for a reader only, and never the fallback for a missing holder', async () => {
+        const names = jest.spyOn(h.directory, 'getUserNames');
+        names.mockResolvedValue(new Map([[11, 'Alexandra-Maximiliane Łukasz']]));
+        expect(await p.preStart.evaluate(reader(99))).toMatchObject({
+          confirmation: { body: 'Reserved by Alexandra-Maximi until 16:00. Start anyway?' },
+        });
+        expect(await p.preStart.evaluate(ctx(99, { now: h.clock() }))).toMatchObject({
+          confirmation: { body: 'Reserved by Alexandra-Maximiliane Łukasz until 16:00. Start anyway?' },
+        });
+        names.mockResolvedValue(new Map());
+        expect(await p.preStart.evaluate(reader(99, { language: 'de' }))).toMatchObject({
+          confirmation: { body: 'Von einer anderen Person bis 16:00 reserviert. Trotzdem starten?' },
+        });
+        names.mockResolvedValue(new Map([[11, '   ']]));
+        expect(await p.preStart.evaluate(reader(99))).toMatchObject({
+          confirmation: { body: 'Reserved by another user until 16:00. Start anyway?' },
+        });
+      });
+    });
+  });
 });

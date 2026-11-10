@@ -1,14 +1,15 @@
 # Plugins entwickeln
+
 <!-- llms-description: Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks. -->
 
 Attraccess stellt SDKs für die Entwicklung eigener Plugins bereit. Sie können Frontend-Erweiterungen, Backend-Erweiterungen oder beides erstellen.
 
 ## Plugin-SDKs
 
-| SDK | Installationsbefehl | Verwendung |
-|-----|---------------------|-----------|
+| SDK                                | Installationsbefehl                            | Verwendung                       |
+| ---------------------------------- | ---------------------------------------------- | -------------------------------- |
 | `@attraccess/plugins-frontend-sdk` | `npm install @attraccess/plugins-frontend-sdk` | Frontend-Seiten und -Komponenten |
-| `@attraccess/plugins-backend-sdk` | `npm install @attraccess/plugins-backend-sdk` | Backend-API-Endpunkte |
+| `@attraccess/plugins-backend-sdk`  | `npm install @attraccess/plugins-backend-sdk`  | Backend-API-Endpunkte            |
 
 ## Frontend-Plugins
 
@@ -35,16 +36,16 @@ Neben eigenen Routen kann ein Frontend-Plugin über `getSlotContributions()` UI 
 Beitrag nennt eine `slotId`, eine `render(context)`-Funktion und optional `key` und `title`. Unbekannte Slot-IDs werden
 ignoriert, und jeder Beitrag läuft in einer Error Boundary. Verfügbare Slots:
 
-| Slot-ID                   | Ort                                                                                | Kontext                    |
-| ------------------------- | ---------------------------------------------------------------------------------- | -------------------------- |
-| `mqtt.server.detail`      | Detail-/Bearbeitungsansicht eines MQTT-Servers                                     | `{ mqttServerId }`         |
-| `mqtt.server.list.row`    | MQTT-Serverliste, Aktionsbereich pro Zeile                                         | `{ mqttServerId }`         |
-| `resource.overview`       | Hauptbereich der Ressourcen-Detailseite                                            | `{ resourceId }`           |
-| `resource.active-session` | Panel der aktiven Nutzung, direkt nach den Flow-Bedienelementen                    | `{ resourceId, usageId }`  |
-| `resource.list.row`       | Kompakter Statusbereich einer Ressourcenzeile                                      | `{ resourceId }`           |
-| `resource.settings`       | Einstellungsseite der Ressource, für Nutzende, die sie verwalten dürfen (`resources.update`) | `{ resourceId }` |
-| `user.account`            | Kontoseite der angemeldeten Person                                                 | `{ userId }`               |
-| `admin.settings`          | Übersicht der Systemeinstellungen, nur für Nutzende mit der Berechtigung `system.settings.manage` | `{}` |
+| Slot-ID                   | Ort                                                                                               | Kontext                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------- |
+| `mqtt.server.detail`      | Detail-/Bearbeitungsansicht eines MQTT-Servers                                                    | `{ mqttServerId }`        |
+| `mqtt.server.list.row`    | MQTT-Serverliste, Aktionsbereich pro Zeile                                                        | `{ mqttServerId }`        |
+| `resource.overview`       | Hauptbereich der Ressourcen-Detailseite                                                           | `{ resourceId }`          |
+| `resource.active-session` | Panel der aktiven Nutzung, direkt nach den Flow-Bedienelementen                                   | `{ resourceId, usageId }` |
+| `resource.list.row`       | Kompakter Statusbereich einer Ressourcenzeile                                                     | `{ resourceId }`          |
+| `resource.settings`       | Einstellungsseite der Ressource, für Nutzende, die sie verwalten dürfen (`resources.update`)      | `{ resourceId }`          |
+| `user.account`            | Kontoseite der angemeldeten Person                                                                | `{ userId }`              |
+| `admin.settings`          | Übersicht der Systemeinstellungen, nur für Nutzende mit der Berechtigung `system.settings.manage` | `{}`                      |
 
 `resource.settings`, `user.account` und `admin.settings` werden als **Abschnitte mit Titel** dargestellt: Setzen Sie
 `title` am Beitrag (sonst gilt ein allgemeiner Plugin-Titel). Die Konstanten `RESOURCE_OVERVIEW_SLOT`,
@@ -60,9 +61,7 @@ Deklariere Plugin-Abhängigkeiten in `package.json` unter `attraccess.dependenci
 ```json
 {
   "attraccess": {
-    "dependencies": [
-      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
-    ]
+    "dependencies": [{ "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }]
   }
 }
 ```
@@ -93,14 +92,14 @@ Ein Backend-Plugin kann:
 
 ### Backend-Plugins verpacken
 
-Ein Backend-Plugin läuft **innerhalb** des Attraccess-Serverprozesses und teilt sich die NestJS-Laufzeit, den Event-Bus und die Datenbankverbindung des Hosts. Damit das funktioniert, muss Ihr Build *dieselben* Kopien dieser Pakete verwenden, die der Host bereits geladen hat -- er darf keine eigenen mitbündeln.
+Ein Backend-Plugin läuft **innerhalb** des Attraccess-Serverprozesses und teilt sich die NestJS-Laufzeit, den Event-Bus und die Datenbankverbindung des Hosts. Damit das funktioniert, muss Ihr Build _dieselben_ Kopien dieser Pakete verwenden, die der Host bereits geladen hat -- er darf keine eigenen mitbündeln.
 
 Teilen Sie Ihre Abhängigkeiten in zwei Gruppen auf:
 
-| Abhängigkeit | Deklaration | Grund |
-|---------------|-------------|-------|
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebündelte Kopie gilt als *anderer* Typ und verbindet sich stillschweigend nicht. |
-| `@attraccess/plugins-backend-sdk` und Ihr eigener Code | Normal bündeln | Kann sicher in Ihr Artefakt aufgenommen werden. |
+| Abhängigkeit                                                                                                                                                         | Deklaration                                                       | Grund                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebündelte Kopie gilt als _anderer_ Typ und verbindet sich stillschweigend nicht. |
+| `@attraccess/plugins-backend-sdk` und Ihr eigener Code                                                                                                               | Normal bündeln                                                    | Kann sicher in Ihr Artefakt aufgenommen werden.                                                                                                                                                         |
 
 Liefern Sie einen **CommonJS**-Einstiegspunkt (`index.js`) aus, kein ES-Modul (`index.mjs`). Verweisen Sie im `plugin.json`-Manifest darauf:
 
@@ -147,19 +146,19 @@ nennt.
 }
 ```
 
-| Berechtigung | Gewährt Zugriff auf |
-|-----------|------------------|
-| `READ_USERS` | `context.getRepository(User)` -- Benutzerkonten lesen. |
-| `ACCESS_RESOURCES` | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben -- sowie die lesenden `context.resourceAccess`-Abfragen. Siehe [Ressourcen-Zugriff](#ressourcen-zugriff-abfragen). |
-| `READ_SETTINGS` | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen. |
-| `DATABASE_ACCESS` | `context.dataSource`, `context.getRepository(...)` für jede andere Entität und `context.runSerialized(...)`. |
-| `EMIT_EVENTS` | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden. |
-| `LISTEN_EVENTS` | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren. |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen. |
-| `ACCESS_MQTT_SERVERS` | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen. |
-| `READER_UI` | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
-| `ACCESS_HOOKS` | `preStartHook`, `sessionEndHook` und `startBlockedQuery` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
-| `SEND_NOTIFICATIONS` | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen). |
+| Berechtigung             | Gewährt Zugriff auf                                                                                                                                                                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.getRepository(User)` -- Benutzerkonten lesen.                                                                                                                                                                                         |
+| `ACCESS_RESOURCES`       | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben -- sowie die lesenden `context.resourceAccess`-Abfragen. Siehe [Ressourcen-Zugriff](#ressourcen-zugriff-abfragen).                                                         |
+| `READ_SETTINGS`          | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen.                                                                                                                                                                             |
+| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` für jede andere Entität und `context.runSerialized(...)`.                                                                                                                                   |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden.                                                                                                                              |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren.                                                                                                                                 |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen.                                                                                                                                                                   |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen.                                                                                                     |
+| `READER_UI`              | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).                                                                           |
+| `ACCESS_HOOKS`           | `preStartHook`, `sessionEndHook` und `startBlockedQuery` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).              |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen). |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
 keine Berechtigung. Dasselbe gilt für `context.hostVersion`: die Version des
@@ -194,25 +193,32 @@ einfügen. Ein Plugin beschreibt nur **Daten** (einen Knotenbaum nach „Reader 
 kein Plugin-Code; der Host prüft, bereinigt und rendert alles. Admins stellen das unter **Reader-Anzeige** ein,
 siehe [Reader-Anzeige](attractap/reader-ui.md).
 
-| Was                            | Deklaration                                               | Berechtigung   |
-| ------------------------------ | --------------------------------------------------------- | -------------- |
-| Slot-Widgets                   | `readerUi` (Provider oder `(context) => provider`)        | `READER_UI`    |
-| Pre-Start-Hook                 | `preStartHook`                                            | `ACCESS_HOOKS` |
-| Beratende Frage nach dem Stopp | `sessionEndHook`                                          | `ACCESS_HOOKS` |
+| Was                            | Deklaration                                                               | Berechtigung   |
+| ------------------------------ | ------------------------------------------------------------------------- | -------------- |
+| Slot-Widgets                   | `readerUi` (Provider oder `(context) => provider`)                        | `READER_UI`    |
+| Pre-Start-Hook                 | `preStartHook`                                                            | `ACCESS_HOOKS` |
+| Beratende Frage nach dem Stopp | `sessionEndHook`                                                          | `ACCESS_HOOKS` |
 | Start-blockiert-Zustand        | `startBlockedQuery` und `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS` |
-| Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })` | `READER_UI`    |
+| Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`    |
 
 Ein Plugin, das `readerUi` oder einen Hook ohne die passende Berechtigung deklariert, **wird nicht geladen** und
 unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](resources/reservations.md) nutzt beide Hooks in der Praxis: Sein Pre-Start-Hook blockiert oder bestätigt Starts rund um Buchungen, sein Session-End-Hook fragt die buchende Person, ob sie den Rest einer Buchung behalten oder freigeben möchte. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
 
 ### Slots
 
-| Slot-ID                    | Ort                                                | Knotenbudget                                                                                                                                            |
-| -------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `resourceList.row.status`  | Statuszeile einer Ressourcenzeile                  | 1 `text` oder `badge`, höchstens 24 Zeichen. Nur sichtbar, wenn kein Kernstatus (in Benutzung, Wartung, nicht verfügbar, Einweisung erforderlich) gilt. |
-| `resource.details.header`  | unter der Beschreibung in den Ressourcendetails    | 6 Knoten                                                                                                                                                |
-| `resource.details.body`    | Hauptbereich der Ressourcendetails                 | 8 Knoten                                                                                                                                                |
-| `resource.details.session` | solange der Block der aktiven Sitzung sichtbar ist | 6 Knoten                                                                                                                                                |
+| Slot-ID                    | Ort                                                                         | Knotenbudget                                                                                                                                                                                                                                                                                   |
+| -------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resourceList.row.status`  | Statuszeile einer Ressourcenzeile und des Sperrbildschirms                  | 1 `text` oder `badge`, höchstens 24 Zeichen. Nur sichtbar, wenn kein Kernstatus (in Benutzung, Wartung, nicht verfügbar, Einweisung erforderlich) gilt. Der Sperrbildschirm erscheint, solange niemand angemeldet ist; dort erscheint daher nur, was Sie ohne Kartensitzung beigetragen haben. |
+| `resource.details.header`  | unter der Beschreibung in den Ressourcendetails                             | 6 Knoten                                                                                                                                                                                                                                                                                       |
+| `resource.details.body`    | Hauptbereich der Ressourcendetails                                          | 8 Knoten                                                                                                                                                                                                                                                                                       |
+| `resource.details.session` | nur solange eine Nutzung aktiv ist (`ctx.sessionActive`); nur Kartensitzung | 6 Knoten                                                                                                                                                                                                                                                                                       |
+
+`ctx.sessionActive` (optionaler Boolean) sagt Ihnen, ob die Ressource eine aktive Nutzung hat, die auf diesem Reader
+sichtbar ist. Der Reader zeigt `resource.details.session` nur, solange das `true` ist. Legen Sie einen Sachverhalt
+daher in diesem Slot ab, wenn es `true` ist, und sonst in `resource.details.body`, nie in beiden: Eine Buchung oder
+ein freies Zeitfenster soll pro Bildschirm in einem Block stehen. Der Host ruft Ihren Provider erneut auf, wenn eine
+Nutzung beginnt, endet oder übernommen wird; das Update-Limit von einmal pro 2 s je Reader und Slot gilt weiterhin.
+Sendet ein Host das Feld nicht, bleibt es ungesetzt; behandeln Sie das als `false`.
 
 Komponenten: `col`, `row`, `text`, `badge`, `icon` (`ok`, `warning`, `bell`, `lock`, `clock`), `progress`,
 `countdown`, `spacer`. Slot-Bäume dürfen kein `button` enthalten. Töne: `primary`, `success`, `warning`, `danger`;
@@ -257,6 +263,38 @@ Ungültige Beiträge lehnt der Host ab und protokolliert sie mit dem Plugin-Name
 Reader-Editor zeigt sie als **Übersprungen** mit „ungültiger Inhalt“. Texte, die einem Kernstatus entsprechen
 („Wartung“, „Zugriff gewährt“, ...), werden abgelehnt, damit Plugins keine Host-Meldungen nachahmen.
 
+### Zeitzone auf Readern
+
+Reader zeigen eine Uhr, und Ihre Texte müssen dazu passen. Schreibt Ihr Plugin Zeiten auf Reader-Bildschirme (zum
+Beispiel „Frei bis 14:00“), implementieren Sie `getTimeZone` am Provider und geben Sie die IANA-Zone zurück, in der
+Ihre Texte stehen:
+
+```ts
+const readerUi: ReaderUiProvider = {
+  getSlotContributions(ctx) {
+    /* ... */
+  },
+  getTimeZone({ resourceId }) {
+    return resourceHasMyFeature(resourceId) ? 'Europe/Berlin' : undefined; // undefined = keine Meinung
+  },
+};
+```
+
+Der Host fragt die Plugins der Ressourcen eines Readers (mit demselben Timeout von 1,5 s wie bei Slots; ein Fehler zählt
+als keine Meinung) und nimmt die **erste gültige Zone in Host-Reihenfolge**: die Ressourcen des Readers nach ID und je
+Ressource die Plugins in Host-Reihenfolge (alphabetisch nach Plugin-Namen); ein langsameres Plugin, das innerhalb der
+Zeitgrenze antwortet, gewinnt trotzdem gegen ein schnelleres, das nach ihm kommt. Er sendet dem Reader den UTC-Offset
+der Zone, Sommerzeit eingeschlossen. Ein ungültiger Name wird ignoriert, Namen werden kanonisch verglichen
+(`europe/berlin` ist `Europe/Berlin`). Weichen die Antworten für einen Reader voneinander ab, gewinnt die erste, und
+Admins erhalten einen Alarm. Ohne Antwort folgt der Reader dem `TZ` des Servers. Läuft ein Plugin in den Timeout, das
+die Zone entscheiden könnte, behält der Host die aktuelle Zone des Readers; hat er noch keine, nutzt er vorerst die
+nächste gültige Antwort. In beiden Fällen fragt er bei einem späteren Heartbeat des Readers erneut, zuerst nach 5 s,
+dann seltener, höchstens alle 5 Minuten. Rufen Sie `context.readerUi.invalidate(...)` auf, wenn sich Ihre Zone ändert;
+der Host löst sie dann neu auf und schickt den neuen Offset und die Startzeiten der Sitzungen in der Ressourcenliste
+sofort an die betroffenen Reader. Schreiben Sie nicht die aktuelle Uhrzeit in Ihre Texte: Die Fußleiste des Readers
+zeigt sie auf jedem Bildschirm außer Sperrbildschirm, Liste ohne Anmeldung und Sitzungszusammenfassung (diese hat keine
+Fußleiste, solange keine Plugin-Frage darüber offen ist), so lässt sich „Check-in bis 14:15“ auf jetzt beziehen.
+
 ### Nur Latin-1
 
 Die Reader-Schriften decken Latin-1 ab. Der Host transliteriert **vor** dem Zählen der Bytes (`ł` wird `l`,
@@ -264,11 +302,26 @@ typografische Anführungszeichen werden `'` und `"`, Striche U+2010-2015 werden 
 Leerzeichen werden ein Leerzeichen, alles andere wird `?`). Ausgaben von `Intl.DateTimeFormat` sind abgedeckt.
 Prüfen Sie Ihre Texte vorab mit denselben Regeln, damit sie auch nach der Transliteration in die Grenzen passen.
 
+### Zeilenumbrüche
+
+Der Reader bricht Text an Leerzeichen und Satzzeichen wie `,`, `-`, `.` und `_` um, aber nie nach `:` oder `)`. Eine
+Uhrzeit („14:25“) wird also nie getrennt, und eine schließende Klammer beginnt keine Zeile. Ein Bindestrich ist eine
+Umbruchstelle: Ein langer Name mit Bindestrich bricht dort statt mitten im Wort um, ebenso ein Zeitraum
+(„13:55-“ / „14:25“), der nicht in seine Zeile passt. Ein Wort, das länger als die Zeile ist, wird weiterhin
+getrennt. Der Reader gleicht Zeilen nicht aus, und ein Zeilenumbruch im Text wird durch ein Leerzeichen ersetzt.
+
+Schreiben Sie jede Teilaussage als eigenen `text`-Knoten in einer `col`, zum Beispiel „Frei bis 13:55,“ und „dann
+reserviert von bea bis 14:25“, damit keine einzelne Uhrzeit oder Notiz allein in einer Zeile steht. Etwa 42 Zeichen
+passen in eine Zeile des Detailbereichs (18 px) und eines kleinen Texts (14 px) neben einem Countdown. Teilen Sie
+eine längere Teilaussage selbst, zum Beispiel zwischen einem Namen und seinen Zeiten: „Reserviert von Wolfgang
+Mohrman“ über „13:55-14:25“.
+
 ### Datenschutz und Sprache
 
-Öffentliche Slots (Reader ohne angemeldete Person) zeigen keine Namen anderer Personen. Personenbezogene Inhalte
-gehören in benutzerbezogene Slots (`resource.details.session`) und Schritte; der Host entfernt sie, wenn die
-Kartensitzung endet. Bevorzugen Sie „Reserviert“ statt Namen, sonst Vorname und Initial.
+Öffentliche Slots (Reader ohne angemeldete Person) zeigen keine Namen anderer Personen. Alles, was ein Provider
+während einer Kartensitzung liefert, ist benutzerbezogen, in jedem Slot, ebenso Schritte: Der Host entfernt es, wenn
+die Kartensitzung endet. In welchen Slot eine Angabe gehört, richtet sich nach `ctx.sessionActive`, nicht nach dem
+Datenschutz. Bevorzugen Sie „Reserviert“ statt Namen, sonst Vorname und Initial.
 
 Jeder Kontext enthält `ctx.language` (`'en'` oder `'de'`). Für Slot-Provider ist das die Reader-Sprache oder,
 solange eine Kartensitzung läuft, die Sprache der Kartenperson. In `PreStartContext` und `SessionEndContext` ist es
@@ -448,13 +501,13 @@ gesendet hat.
 Weitere Events für Plugins, die Wartung, Gesundheit und laufende Sitzungen verfolgen (alle benötigen
 `LISTEN_EVENTS`, Zeitangaben sind `Date`):
 
-| Event                                           | Payload                                                                                   | Wird gesendet                                                         |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Event                                           | Payload                                                                                           | Wird gesendet                                                                                                                                                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `SystemEvent.MAINTENANCE_CHANGED`               | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | Nachdem ein Wartungsfenster angelegt oder beendet wurde. Core sendet derzeit nur `created` und `finished`; `updated` ist für einen künftigen Bearbeitungspfad reserviert. `endTime` ist `null`, solange kein Ende gesetzt ist. |
-| `SystemEvent.RESOURCE_HEALTH_CHANGED`           | `{ resourceId, status, previousStatus, reason, identifier }`                              | Nur bei einem echten Statuswechsel eines Gesundheitseintrags.         |
-| `SystemEvent.RESOURCE_USAGE_SESSION_STARTED`    | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                            | Eine Person startet eine Sitzung auf einer freien Ressource (keine Übernahme). `supervisorUserId` ist bei beaufsichtigten Starts gesetzt. |
-| `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`             | Eine Person übernimmt eine laufende Sitzung. Gilt für die **neue** Person. |
-| `SystemEvent.RESOURCE_USAGE_SESSION_ENDED`      | `{ resourceId, usageId, userId, startTime, endTime, reason: 'ended' \| 'taken_over' }`    | Eine Sitzung endet, ausdrücklich oder durch Übernahme.                |
+| `SystemEvent.RESOURCE_HEALTH_CHANGED`           | `{ resourceId, status, previousStatus, reason, identifier }`                                      | Nur bei einem echten Statuswechsel eines Gesundheitseintrags.                                                                                                                                                                  |
+| `SystemEvent.RESOURCE_USAGE_SESSION_STARTED`    | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                                    | Eine Person startet eine Sitzung auf einer freien Ressource (keine Übernahme). `supervisorUserId` ist bei beaufsichtigten Starts gesetzt.                                                                                      |
+| `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`                     | Eine Person übernimmt eine laufende Sitzung. Gilt für die **neue** Person.                                                                                                                                                     |
+| `SystemEvent.RESOURCE_USAGE_SESSION_ENDED`      | `{ resourceId, usageId, userId, startTime, endTime, reason: 'ended' \| 'taken_over' }`            | Eine Sitzung endet, ausdrücklich oder durch Übernahme.                                                                                                                                                                         |
 
 ### Benachrichtigungen
 
@@ -582,16 +635,16 @@ Berechtigungen der Person), genau wie bei Kern-Routen. Rollen als Einweisende/Wa
 weiterhin. Eine reine Benutzer-ID löst die vollen RBAC-Berechtigungen auf; nutzen Sie sie für Hintergrundarbeit wie
 Scheduler. Unbekannte Personen und Ressourcen ergeben negative Antworten (`false`, alles `false`, `[]`) statt Fehlern.
 
-| Methode                                       | Liefert                                                                                                              |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `canStart(principal, resourceId)`             | `{ allowed, requiresSupervision, supervisionAllowed }`. Berücksichtigt Einweisungen, Nachschulungssperren, Einweisende/Wartende, `resources.update` und den Aufsichtsmodus. Aktuelle Wartung oder Gesundheit werden **nicht** berücksichtigt. |
-| `canMaintain(principal, resourceId)`          | Ob die Person die Wartung der Ressource verwalten darf (`resources.maintenance.manage`, Einweisende/Wartende der Ressource oder einer ihrer Gruppen). Dieselbe Prüfung wie die Wartungs-API des Kerns. |
+| Methode                                         | Liefert                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `canStart(principal, resourceId)`               | `{ allowed, requiresSupervision, supervisionAllowed }`. Berücksichtigt Einweisungen, Nachschulungssperren, Einweisende/Wartende, `resources.update` und den Aufsichtsmodus. Aktuelle Wartung oder Gesundheit werden **nicht** berücksichtigt.                                                                                                                                                                                                                                                                                                                    |
+| `canMaintain(principal, resourceId)`            | Ob die Person die Wartung der Ressource verwalten darf (`resources.maintenance.manage`, Einweisende/Wartende der Ressource oder einer ihrer Gruppen). Dieselbe Prüfung wie die Wartungs-API des Kerns.                                                                                                                                                                                                                                                                                                                                                           |
 | `canSeeUsageAttribution(principal, resourceId)` | Ob die Person sehen darf, **wer** die Ressource nutzt: die Regel des Kerns für den Namen der aktuellen Nutzerin oder des aktuellen Nutzers in Ressourcen-UI und -API (`resources.update`/`resources.access.manage`, in die Maschine eingewiesene Personen, alle, wenn die Instanz die Aktivität für alle zeigt). `false`, wo die Person nur frei/in Benutzung sieht (Maschinen mit beaufsichtigter Nutzung im Modus „eingewiesen“), wenn die Aktivität für sie verborgen ist und für unbekannte Ressourcen. Prüft weder verborgene Gruppen noch den Kontostatus. |
-| `hasPermission(principal, permission)`        | Ob die Person eine RBAC-Berechtigung wie `resources.update` besitzt, beschränkt auf den Bereich der Anfrage.          |
-| `listResourceIdsIntroduced(principal)`        | Ressourcen, in die die Person im Sinne von `canStart` eingewiesen ist (gültige Einweisung, Einweisende/Wartende, `resources.update`). |
-| `listResourceIdsMaintained(principal)`        | Ressourcen, deren Wartung die Person verwalten darf.                                                                 |
-| `getMaintenanceWindows(resourceId, from, to)` | Fenster, die `[from, to)` überschneiden, als `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Offene Wartung zählt bis zu ihrem Abschluss. |
-| `getActiveSessions(resourceId)`               | Laufende Sitzungen `{ usageId, userId, startTime }`, die früheste zuerst.                                            |
+| `hasPermission(principal, permission)`          | Ob die Person eine RBAC-Berechtigung wie `resources.update` besitzt, beschränkt auf den Bereich der Anfrage.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `listResourceIdsIntroduced(principal)`          | Ressourcen, in die die Person im Sinne von `canStart` eingewiesen ist (gültige Einweisung, Einweisende/Wartende, `resources.update`).                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `listResourceIdsMaintained(principal)`          | Ressourcen, deren Wartung die Person verwalten darf.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `getMaintenanceWindows(resourceId, from, to)`   | Fenster, die `[from, to)` überschneiden, als `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Offene Wartung zählt bis zu ihrem Abschluss.                                                                                                                                                                                                                                                                                                                                                                                           |
+| `getActiveSessions(resourceId)`                 | Laufende Sitzungen `{ usageId, userId, startTime }`, die früheste zuerst.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ### Serialisierte Transaktionen
 
@@ -601,7 +654,7 @@ wirft. Damit sind Prüfen-dann-Schreiben-Abläufe wie Überschneidungsprüfungen
 
 ```ts
 await context.runSerialized(async (manager) => {
-  const clash = await manager.getRepository(Booking).count({ where: { /* überschneidendes Fenster */ } });
+  const clash = await manager.getRepository(Booking).count({ where: {/* überschneidendes Fenster */} });
   if (clash > 0) throw new ConflictException('OVERLAP');
   await manager.getRepository(Booking).save(newBooking);
 });
@@ -711,6 +764,7 @@ die Plugin-Quellen nicht.
 - [Plugins installieren](plugins/installing-plugins.md) -- Plugins hochladen und verwalten
 - [Entwicklerhandbuch](developer/overview.md) -- Attraccess-Architektur und -Entwicklung
 - [API-Referenz](developer/api-reference.md) -- Attraccess-REST-API
+
 ## Übersetzungen und Sprachwechsel
 
 Verwende `useTranslations` aus `@attraccess/plugins-frontend-ui` mit eigenen

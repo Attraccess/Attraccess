@@ -1,4 +1,7 @@
 #include "render_harness.hpp"
+#include "display/ui/ui_builder.hpp"
+#include "src/misc/lv_text_private.h"
+#include <vector>
 
 void testUsageStatsExpiry(Renderer &renderer)
 {
@@ -107,4 +110,96 @@ void testIntroducerDetails(Renderer &renderer)
     settle();
     requireObject(guard.root, &lv_label_class, "Updated tutor");
     expect(!findObject(guard.root, &lv_label_class, expected.c_str()), "Refresh replaces old introducers");
+}
+
+// ATT-1188: the reservations plugin splits a clause with a long holder name (16 characters) between the name and
+// its times. Built by the production UI builder at the details content width, every clause stays on one line, so
+// no time or half of a range is left alone; the session lines also leave room for the countdown beside them.
+namespace
+{
+    struct TreeBuilder
+    {
+        ui::SlotRecord rec{};
+
+        uint8_t add(ui::NodeType type, uint8_t parent, const char *text = nullptr)
+        {
+            auto &node = rec.nodes[rec.nodeCount];
+            node.type = type;
+            node.parent = parent;
+            if (text) {
+                node.textOffset = rec.poolUsed;
+                node.textLen = static_cast<uint16_t>(std::strlen(text));
+                std::strcpy(rec.pool + rec.poolUsed, text);
+                rec.poolUsed = static_cast<uint16_t>(rec.poolUsed + node.textLen + 1);
+            }
+            return rec.nodeCount++;
+        }
+    };
+
+    void expectOneLinePerClause(const std::string &name, ui::SlotId slot, const std::vector<const char *> &clauses)
+    {
+        TreeBuilder tree;
+        tree.rec.slot = slot;
+        const bool session = slot == ui::SlotId::DetailsSession;
+        uint8_t parent = ui::NO_PARENT;
+        if (session) parent = tree.add(ui::NodeType::Row, ui::NO_PARENT);
+        const uint8_t col = tree.add(ui::NodeType::Col, parent);
+        tree.rec.nodes[col].fill = true;
+        for (const char *clause : clauses) {
+            const uint8_t text = tree.add(ui::NodeType::Text, col, clause);
+            tree.rec.nodes[text].style = session ? ui::TextStyle::Small : ui::TextStyle::Body;
+            tree.rec.nodes[text].fill = session;
+        }
+        if (session) tree.rec.nodes[tree.add(ui::NodeType::Countdown, parent)].toMs = 59 * 60 * 1000;
+
+        // The details screen content: 480 px less its 20 px padding on each side.
+        lv_obj_t *screen = lv_obj_create(nullptr);
+        ScreenGuard guard(screen);
+        lv_obj_t *content = lv_obj_create(screen);
+        lv_obj_remove_style_all(content);
+        lv_obj_set_size(content, Renderer::width - 40, LV_SIZE_CONTENT);
+        expect(ui::buildRecord(content, tree.rec, 0, true) != nullptr, name + ": builds");
+        lv_obj_update_layout(screen);
+
+        lv_area_t countdown{};
+        if (session) {
+            lv_obj_t *label = findObject(screen, &lv_label_class, "59:00");
+            expect(label != nullptr, name + ": countdown label");
+            if (label) lv_obj_get_coords(label, &countdown);
+        }
+        const lv_font_t *font = session ? &attractap_font_montserrat_latin1_14 : &attractap_font_montserrat_latin1_18;
+        for (const char *clause : clauses) {
+            lv_obj_t *label = requireObject(screen, &lv_label_class, clause);
+            expect(lv_obj_get_height(label) == lv_font_get_line_height(font),
+                   name + ": one line for '" + clause + "'");
+            lv_area_t area;
+            lv_obj_get_coords(label, &area);
+            if (session) expect(area.x2 < countdown.x1, name + ": '" + clause + "' stays left of the countdown");
+        }
+    }
+}
+
+void testReaderUiClauseLines()
+{
+    // The plugin's longest forms: a 16-character name and weekday times on both ends of a range.
+    expectOneLinePerClause("body/idle-de", ui::SlotId::DetailsBody,
+                           {"Frei bis Di 13:55,", "dann reserviert von Wolfgang Mohrman", "bis Di 14:25"});
+    expectOneLinePerClause("body/idle-en", ui::SlotId::DetailsBody,
+                           {"Free until Tue 13:55,", "then reserved by Wolfgang Mohrman", "until Tue 14:25"});
+    expectOneLinePerClause("body/running-de", ui::SlotId::DetailsBody,
+                           {"Reserviert von Wolfgang Mohrman", "Mo 13:55-Di 14:25", "(Check-in bis Mo 14:10)"});
+    expectOneLinePerClause("body/running-en", ui::SlotId::DetailsBody,
+                           {"Reserved by Wolfgang Mohrman", "Tue 13:55-Wed 14:25", "(check in by Tue 14:10)"});
+    // Up to 42 characters stay one clause (READER_LINE_CHARS in the plugin's texts.ts).
+    expectOneLinePerClause("body/short-name-de", ui::SlotId::DetailsBody,
+                           {"Frei bis 13:55,", "dann reserviert von Anna Mueller bis 14:25"});
+    expectOneLinePerClause("session/long-name-de", ui::SlotId::DetailsSession,
+                           {"Reserviert von Wolfgang Mohrman", "Mo 13:55-Di 14:25"});
+    expectOneLinePerClause("session/short-name-de", ui::SlotId::DetailsSession,
+                           {"Reserviert von Anna Mueller Mo 13:55-14:25"});
+
+    // ':' and ')' never end a line; names still wrap at hyphens, dots and underscores.
+    expect(!lv_text_is_break_char(':') && !lv_text_is_break_char(')'), "':' and ')' are not break characters");
+    for (const char c : {' ', ',', '-', '.', '_'})
+        expect(lv_text_is_break_char(c), std::string("'") + c + "' is a break character");
 }

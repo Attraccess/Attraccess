@@ -1,3 +1,4 @@
+import { zoneOffsetMinutes } from '../../reader-time-zone';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { registerResourceListServiceFixture } from './service.test-fixture';
@@ -293,14 +294,14 @@ describe('ResourceListService', () => {
                     id: 99,
                     user: { username: 'active-user' },
                     startTime: startTime.toISOString(),
-                    startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset(),
+                    startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset() || 0,
                   },
                   activeUsageSessions: [
                     {
                       id: 99,
                       user: { username: 'active-user' },
                       startTime: startTime.toISOString(),
-                      startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset(),
+                      startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset() || 0,
                     },
                   ],
                   flowButtons: [{ id: 'node-1', label: 'Start' }],
@@ -394,8 +395,25 @@ describe('ResourceListService', () => {
 
       const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
       const session = (sent.data.payload as any).resources[0].activeUsageSession;
-      // Offset is the inverse of getTimezoneOffset() for that exact instant (DST-correct).
-      expect(session.startTimeUtcOffsetMinutes).toBe(-summer.getTimezoneOffset());
+      // Offset is the inverse of getTimezoneOffset() for that exact instant (DST-correct); `|| 0` drops -0 at UTC.
+      expect(session.startTimeUtcOffsetMinutes).toBe(-summer.getTimezoneOffset() || 0);
+    });
+
+    it("uses the reader's time zone for the session start, whatever the API process zone is", async () => {
+      const summer = new Date('2026-07-01T10:00:00.000Z');
+      const winter = new Date('2026-01-15T10:00:00.000Z');
+      (fixture.service as any).readerTimeZone = {
+        readerUtcOffsetMinutes: (_readerId: number, at: Date) => zoneOffsetMinutes('Europe/Berlin', at),
+      };
+      fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
+      fixture.resourceUsageService.getActiveSessions.mockResolvedValue(
+        new Map([[10, [{ user: { username: 'u' }, startTime: summer }]]]),
+      );
+      const socket = fixture.createMockSocket();
+      await fixture.service.sendResourceListToSocket(socket);
+      const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+      expect((sent.data.payload as any).resources[0].activeUsageSession.startTimeUtcOffsetMinutes).toBe(120);
+      expect(zoneOffsetMinutes('Europe/Berlin', winter)).toBe(60);
     });
 
     it('lists all sessions with count and limit for a reader without a card holder', async () => {

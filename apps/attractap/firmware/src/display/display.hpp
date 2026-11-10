@@ -175,6 +175,10 @@ private:
     static void initDeviceOverlay();
     static void refreshChromeLanguage(const std::string &language);
     static void updateNetworkQualityOverlay();
+    // Footer bar (device name, clock, firmware version): visibility per screen and the HH:MM clock in the middle.
+    static void updateFooter();
+    static lv_obj_t *footerClockLabel;
+    static int64_t footerClockMinute;
     static lv_obj_t *deviceNameLabel;
     static FirmwareI18n::Text deviceNameInitValue;
     static void setDeviceNameText(const FirmwareI18n::Text &deviceName);

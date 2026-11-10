@@ -14,10 +14,22 @@ export const ROUTES = {
 
 export const pick = (lang: Lang, en: string, de: string): string => (lang === 'de' ? de : en);
 
-const LOCALES: Record<Lang, string> = { en: 'en-GB', de: 'de-DE' };
+export const LOCALES: Record<Lang, string> = { en: 'en-GB', de: 'de-DE' };
+
+/**
+ * Formatters are costly to build and these run on every reader sync, so each (kind, locale, timezone) is
+ * built once. Only the plugin timezone and two locales ever occur, so the cache stays tiny.
+ */
+const formatters = new Map<string, Intl.DateTimeFormat>();
+export function cachedFormat(locale: string, options: Intl.DateTimeFormatOptions & { timeZone: string }) {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let format = formatters.get(key);
+  if (!format) formatters.set(key, (format = new Intl.DateTimeFormat(locale, options)));
+  return format;
+}
 
 const dateTimeFormat = (lang: Lang, timeZone: string) =>
-  new Intl.DateTimeFormat(LOCALES[lang], {
+  cachedFormat(LOCALES[lang], {
     timeZone,
     weekday: 'short',
     day: 'numeric',
@@ -30,10 +42,11 @@ const dateTimeFormat = (lang: Lang, timeZone: string) =>
   });
 
 const timeFormat = (lang: Lang, timeZone: string) =>
-  new Intl.DateTimeFormat(LOCALES[lang], { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  cachedFormat(LOCALES[lang], { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 
-const dayKey = (date: Date, timeZone: string) =>
-  new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+/** `2026-06-01`: the local calendar day of `date` in `timeZone`. */
+export const dayKey = (date: Date, timeZone: string) =>
+  cachedFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 
 /** Where and how times are written: always the plugin timezone, in the recipient's language. */
 export interface TimeContext {

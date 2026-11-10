@@ -98,7 +98,7 @@ When someone starts a resource, the plugin checks the bookings of **other** user
 
 - **Someone else's booking is running:** the start is refused with "Reserved by another user until 16:00", or
   "Reserved by Alex Example until 16:00" if you may see who is using the machine (see
-  [Who sees the holder's name](#who-sees-the-holders-name)).
+  [Who sees the name of the holder](#who-sees-the-name-of-the-holder)).
 - **Someone else's booking starts soon:** if it starts within the resource's confirmation window (60 minutes by
   default), you are asked to confirm: "Reserved from 14:00, you have 40 min. Start anyway?". On a reader without a
   screen the start is refused by default. If several bookings start within the window, you confirm each of them.
@@ -117,7 +117,7 @@ shows the plugin's title and reason, and the reason names the time the block end
 press Start anyway, the start is still refused with the same message. Managers and maintainers do not see the notice;
 they start through the override confirmation above.
 
-### Who sees the holder's name
+### Who sees the name of the holder
 
 The holder's name follows the rule Attraccess already uses for **who is currently using a machine**: whoever may see the
 name of the current user of a resource may also see who holds a booking on it. Everyone else gets the anonymous text
@@ -131,9 +131,89 @@ name of the current user of a resource may also see who holds a booking on it. E
 - **Does not see the name:** people who may only see **Available** or **In Use** (supervised-use machines with the
   "introduced" setting), and people who may not see the machine's activity at all.
 - **Where it applies:** the notice on the resource page, the refusal when you press Start (in the web interface, the API
-  and on the reader), the availability view in the booking card and the calendar feeds. Notes, reasons and decisions of a booking stay visible to the holder and the
+  and on the reader), the availability view in the booking card, the calendar feeds and Attractap readers after a card tap (see [Attractap readers](#attractap-readers)). Notes, reasons and decisions of a booking stay visible to the holder and the
   managers only. Managers always get the override confirmation that names the holder.
 - A calendar feed is checked when it is requested, with the permissions of the feed's owner at that time.
+
+### Attractap readers
+
+On an Attractap Touch reader with current firmware the plugin adds reservation information to the screen, asks
+before a start that would collide with a booking, and treats a start on the reader as the check-in. The plugin
+needs the permission to show widgets on Attractap reader screens, which an administrator approves when
+installing or updating it (see [Reader display](attractap/reader-ui.md)). All times are in the plugin's
+[timezone](#timezone), as `HH:MM`; a time on another day gets a short weekday ("Tue 09:00"). Only confirmed
+bookings are shown. The reader's own status ("In use", maintenance and so on) always wins over the plugin's note.
+
+**Before a card is tapped.** A reader nobody is signed in to shows times and states only, never names or other
+personal data, whoever may otherwise see names:
+
+| Situation                                                                                                                          | Resource list             | Resource details                              |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | --------------------------------------------- |
+| Nothing running, nothing starts within 24 hours                                                                                    | nothing                   | nothing                                       |
+| The next booking starts within 24 hours, none is running                                                                           | "Free until 14:00"        | "Free until 14:00, then reserved until 16:00" |
+| A booking is running, check-in is required and not done yet, before the deadline                                                   | "Res., check in by 14:15" | "Reserved 14:00-16:00 (check in by 14:15)"    |
+| A booking is running and checked in, check-in is turned off, or the check-in deadline passed without a check-in (not released yet) | "Reserved until 16:00"    | "Reserved 14:00-16:00"                        |
+
+Each booking appears in one text on a screen, never twice: the details carry one line for the free time and the
+booking that ends it. The list row holds 24 characters, so the open check-in is shortened there; a deadline on another day reads
+"Res., check-in Tue 00:05". The details always have the full text. The lock screen of the resource shows the same
+public line as the list row, in place of "Available" (not while the resource is in use or under maintenance).
+
+**The current time.** Reader screens show the current time in the footer bar (the lock screen and the
+signed-out list have a big clock instead, and the session summary after a stop shows no footer except while the
+keep or free question is open), so "check in by 14:15" can be related to now. The plugin does not write
+the time into its texts. The reader uses the plugin's [timezone](#timezone) for this clock, so the clock and the
+reservation times always agree, even when the server runs in another zone; changing the timezone switches the
+readers at once. The plugin proposes its timezone only for resources that have reservations enabled; for other
+resources the server's timezone applies. See [Time and time zone](attractap/reader-ui.md#time-and-time-zone).
+
+The times are the booking's start and end without buffers. Texts follow the installation's default language.
+
+**After a card tap.** The texts follow the language of the person who tapped. When the card session ends, the reader
+returns to the texts above.
+
+- **Your own booking** (running, or starting within the early check-in window): the list shows "Your booking until
+  16:00" ("Yours until Wed 16:00" when it ends on another day), the details "Your booking 14:00-16:00", with "(check
+  in by 14:15)" while the check-in is still open.
+- **Who may see the holder's name** (managers of the resource and everybody else who may see who uses the machine,
+  see [Who sees the name of the holder](#who-sees-the-name-of-the-holder)) also sees it on the details ("Free until 14:00, then
+  reserved by Alex until 16:00", "Reserved by Alex 14:00-16:00 (check in by 14:15)"). Everybody else sees the texts above.
+- **Idle** (nobody is using the resource and no booking is running): the details body carries the free time and the next booking in one
+  line, "Free until 14:00, then reserved by Alex until 16:00" (the name under the rules above, otherwise "Free
+  until 14:00, then reserved until 16:00"). This also holds when that booking starts within the confirmation
+  window; the reader shows no session area while nothing is running, so the body is the one place for it.
+- **While a usage is running** (yours or somebody else's) and you are signed in, and another person's booking
+  starts within the confirmation window, the session area shows that booking once, "Reserved by Alex 14:00-16:00"
+  with a countdown (the name under the rules above, otherwise "Reserved 14:00-16:00"). The details body then shows
+  nothing about that booking: no "Free until" line and no second text. When a usage starts, ends or is taken over,
+  the reader moves the text between the two places within a few seconds.
+- The **list never shows names**, signed in or not. Long names are shortened in the details.
+
+**Starting on the reader.**
+
+| Situation                                                      | What the reader does                                                                                                                                            |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Another person's booking starts within the confirmation window | Asks "Reserved from 14:00, you have 40 min. Start anyway?" with a countdown. Cancel or no answer starts nothing. The holder is named only if you may see names. |
+| Another person's booking is running                            | Refuses: "Reserved by another user until 16:00" (with the name, if you may see names). Managers get the override question instead and the holder is named.      |
+| You start within your booking or its early check-in window     | No question. The start checks the booking in and the screen updates.                                                                                            |
+| You stop a session inside your own running booking             | Asks "Keep it or free the rest?". **Free rest** ends the booking early. No answer within 15 seconds keeps the booking.                                          |
+
+Freeing a booking without a session is only possible in the web UI. Booking itself is not possible on the reader.
+
+**Readers without a screen.** Attractap Lite readers, Touch readers with older firmware and readers whose plugin
+notes are paused after crashes cannot show anything of the above:
+
+| Reader                | Reservation texts | Booking starts soon                                                                       | Another booking is running                  | Question after stopping   |
+| --------------------- | ----------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------- |
+| Lite                  | none              | The plugin suggests blocking; the resource setting **Readers without a screen** decides.  | Refused (amber half ring, then a red flash) | none, the booking is kept |
+| Touch, older firmware | none              | The same setting; a block shows a generic error. A second card tap is a Lite-only option. | Generic error                               | none, the booking is kept |
+| Plugin notes paused   | none              | The same setting.                                                                         | Refused                                     | none, the booking is kept |
+
+**Readers without a screen** is described under [Reader display](attractap/reader-ui.md#readers-without-a-screen):
+**Plugin default** (the default; this plugin suggests blocking), **Block the start**, **Confirm with a second card tap**
+(Lite only) or **Start with a warning**. The same setting decides a manager's override of a running booking; for
+everybody else a running booking of another person is always refused. Check-in works on every reader type, as long as
+the start is made by the holder.
 
 ### Reminders and notifications
 
@@ -180,7 +260,7 @@ On your account page, the section **Calendar feeds (iCal)** lets you subscribe t
 - Confirmed bookings appear as events, pending bookings as **tentative** events. Cancelled bookings disappear. The
   feed covers the last 30 days up to the booking horizon of each resource.
 - The title is "Resource – Name" for your own bookings, for resources you manage and for resources where you may see
-  who is using the machine ([rule](#who-sees-the-holders-name)); otherwise it is "Resource – Reserved".
+  who is using the machine ([rule](#who-sees-the-name-of-the-holder)); otherwise it is "Resource – Reserved".
 
 > [!WARNING]
 > The feed URL is a secret: anybody who has it can read the feed without signing in. It is shown **only once**, when
@@ -288,17 +368,17 @@ Every email of the plugin is an **email template** that you edit like the system
 **Settings → Email → Templates**. The plugin's templates are listed after the system templates, marked "Plugin:
 reservations":
 
-| Template                                               | Sent when                                                   |
-| ------------------------------------------------------ | ----------------------------------------------------------- |
-| Booking request awaiting approval                      | A booking waits for approval (to the managers).             |
-| Booking confirmed                                      | A booking is confirmed or approved, with the check-in rules. |
-| Booking rejected / Booking request expired             | A request was rejected, or nobody decided before its start. |
-| Booking cancelled by a manager / Running booking ended early / Booking removed (reservations switched off) | A manager changed or removed a booking, or reservations were switched off. |
-| Not checked in, booking released                       | A booking was released as a no-show.                        |
-| Reminder 48 h before: still needed? / Reminder 24 h before | The reminders before a booking.                         |
-| Maintenance affects a booking / Resource has a problem / Resource works again | Maintenance or the health of the resource affects a booking. |
-| Reserved soon (to the current user) / Booking started, resource still in use / Booking started, please finish | Handover and overrun notices. |
-| Started during a booking (to the holder / to the managers) | A manager started during a booking.                     |
+| Template                                                                                                      | Sent when                                                                  |
+| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Booking request awaiting approval                                                                             | A booking waits for approval (to the managers).                            |
+| Booking confirmed                                                                                             | A booking is confirmed or approved, with the check-in rules.               |
+| Booking rejected / Booking request expired                                                                    | A request was rejected, or nobody decided before its start.                |
+| Booking cancelled by a manager / Running booking ended early / Booking removed (reservations switched off)    | A manager changed or removed a booking, or reservations were switched off. |
+| Not checked in, booking released                                                                              | A booking was released as a no-show.                                       |
+| Reminder 48 h before: still needed? / Reminder 24 h before                                                    | The reminders before a booking.                                            |
+| Maintenance affects a booking / Resource has a problem / Resource works again                                 | Maintenance or the health of the resource affects a booking.               |
+| Reserved soon (to the current user) / Booking started, resource still in use / Booking started, please finish | Handover and overrun notices.                                              |
+| Started during a booking (to the holder / to the managers)                                                    | A manager started during a booking.                                        |
 
 - Edit the subject and the body in the visual editor, and the German and English texts in the **Translations**
   dialog. **Variables** lists what you can use, for example `{{reservation.when}}` or `{{resource.name}}`.

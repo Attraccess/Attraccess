@@ -36,6 +36,7 @@ int main(int argc, char **argv)
     testPendingApproval(display, screenshots);
     testGallery(display, screenshots);
     testReaderUiFixtures(display, screenshots);
+    testReaderUiTextWrapping();
     testReaderUiStepModal(display, screenshots);
 
     TouchPoint touch{};

@@ -111,6 +111,18 @@ describe('ReaderUiAdminController', () => {
     },
   );
 
+  it.each([['resources.update'], ['system.plugins.manage']])(
+    'clears a reader time zone conflict with %s: it shows in the reader editor and on the plugins page',
+    async (permission) => {
+      const { controller, alerts, req } = setup();
+      alerts.findOpen.mockResolvedValue({ id: 9, kind: 'time-zone-conflict', plugin: 'p', readerId: 8 });
+      alerts.clear.mockResolvedValueOnce({ id: 9 });
+      const user = { user: { ...req.user, effectivePermissions: new Set([permission]) } } as any;
+      await expect(controller.clearAlert(9, user)).resolves.toEqual({ id: 9 });
+      expect(alerts.clear).toHaveBeenCalledWith(9, user.user);
+    },
+  );
+
   it('does not let plugin managers clear reader crash-loop alerts', async () => {
     const { controller, alerts, req } = setup();
     alerts.findOpen.mockResolvedValue({ id: 5, kind: 'crash-loop', readerId: 8 });

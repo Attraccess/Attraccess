@@ -103,6 +103,10 @@ private:
     void showReaderActionProgress(const FirmwareI18n::Text &title);
     void finishReaderAction(bool success);
     void logoutReader();
+    // Ends the reader login on the server (READER_SESSION_ENDED, CARD_SESSION_ENDED) and drops the row statuses
+    // received during it. Part of every sign-out; also for a card session nobody is signed in to (a sign-in that
+    // timed out, or a verified card the reader no longer waits for).
+    void endReaderLogin();
     void beginSessionSummary(const API::ActionResult &result);
     void dismissSessionSummary();
     // Full-screen result over the current screen. `resumeRouting`: leaving it lets the application

@@ -12,6 +12,7 @@ const ALERT_STATUS: Record<string, 'warning' | 'danger'> = {
   // The plugin's start hooks are not enforced at all while it is not loaded.
   'load-failure': 'danger',
   'crash-loop': 'warning',
+  'time-zone-conflict': 'warning',
 };
 
 /** One alert with its own Clear action, so clearing one alert doesn't mark the others as pending. */
@@ -40,7 +41,7 @@ function AlertRow({ alert, readerName }: Readonly<{ alert: ReaderUiAlert; reader
   );
 }
 
-/** Open circuit-breaker, load-failure and crash-loop alerts; `readerId` narrows the list to one reader. */
+/** Open circuit-breaker, load-failure, crash-loop and time-zone-conflict alerts; `readerId` narrows the list to one reader. */
 export function ReaderUiAlerts({ readerId }: Readonly<{ readerId?: number }>) {
   const { t } = useTranslations({ en, de });
   const { data } = useReaderUiAlerts();

@@ -55,6 +55,29 @@ describe('ReservationEventHandlers', () => {
       expect(await row(booking.id)).toMatchObject({ checkedInAt: expect.any(Date), checkedInUsageId: 55 });
     });
 
+    it('a start on a reader by the holder inside the early check-in window checks in and refreshes the slots', async () => {
+      const booking = await p.book(10, 1, '2026-06-01T08:30:00', '2026-06-01T10:00:00');
+      h.setNow('2026-06-01T08:20:00Z');
+      // The reader start passes the pre-start hook without a question for the holder...
+      expect(
+        await p.preStart.evaluate({
+          resourceId: 1,
+          userId: 10,
+          principal: 10,
+          action: 'start',
+          origin: 'reader',
+          confirmedStepKeys: [],
+          language: 'en',
+          now: h.clock(),
+        }),
+      ).toEqual({ decision: 'allow' });
+      h.invalidateReaderUi.mockClear();
+      // ...and the host's session event (a reader start emits the same event) records the check-in.
+      await h.emit(SystemEvent.RESOURCE_USAGE_SESSION_STARTED, started(10, 56));
+      expect(await row(booking.id)).toMatchObject({ checkedInAt: expect.any(Date), checkedInUsageId: 56 });
+      expect(h.invalidateReaderUi).toHaveBeenCalledWith({ resourceId: 1 });
+    });
+
     it('does not check in too early, for other users, or twice', async () => {
       const booking = await p.book(10, 1, '2026-06-01T08:30:00', '2026-06-01T10:00:00');
       h.setNow('2026-06-01T08:14:00Z');

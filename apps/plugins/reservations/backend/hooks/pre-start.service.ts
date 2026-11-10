@@ -10,6 +10,7 @@ import { Clock, RESERVATION_CLOCK } from '../constants';
 import type { ReservationEntity } from '../entities/reservation.entity';
 import { VisibilityService } from '../ical/visibility.service';
 import { formatTime, pick } from '../notifications/format';
+import { readerName, readerTime } from '../reader-ui/texts';
 import { AccessService } from '../reservations/access.service';
 import { type AccessSubject, subjectOfPrincipal } from '../reservations/actor';
 import { DirectoryService } from '../reservations/directory.service';
@@ -69,7 +70,7 @@ export class PreStartService {
     const nowMs = now.getTime();
     const active = others.filter((r) => r.startTime.getTime() <= nowMs);
     if (active.length > 0) {
-      const verdict = await this.whenActive(ctx, active);
+      const verdict = await this.whenActive(ctx, active, now);
       if (verdict) return verdict;
     }
 
@@ -78,20 +79,26 @@ export class PreStartService {
       (r) => r.startTime.getTime() > nowMs && !ctx.confirmedStepKeys.includes(reservationStepKey(r.id)),
     );
     if (!upcoming) return ALLOW;
-    const timeZone = await this.globalSettings.getTimezone();
     const { language: lang } = ctx;
     const minutes = Math.max(1, Math.ceil((upcoming.startTime.getTime() - nowMs) / MINUTE_MS));
-    const from = formatTime(upcoming.startTime, { lang, timeZone });
+    const from = await this.timeText(ctx, upcoming.startTime, now);
+    const holder = await this.holderForReader(ctx, upcoming);
     return {
       decision: 'confirm',
       confirmation: {
         stepKey: reservationStepKey(upcoming.id),
         title: pick(lang, 'Reserved soon', 'Bald reserviert'),
-        body: pick(
-          lang,
-          `Reserved from ${from}, you have ${minutes} min. Start anyway?`,
-          `Reserviert ab ${from}, du hast ${minutes} Min. Trotzdem starten?`,
-        ),
+        body: holder
+          ? pick(
+              lang,
+              `Reserved by ${holder} from ${from}, you have ${minutes} min. Start anyway?`,
+              `Reserviert von ${holder} ab ${from}, du hast ${minutes} Min. Trotzdem starten?`,
+            )
+          : pick(
+              lang,
+              `Reserved from ${from}, you have ${minutes} min. Start anyway?`,
+              `Reserviert ab ${from}, du hast ${minutes} Min. Trotzdem starten?`,
+            ),
         tone: 'warning',
         confirmLabel: pick(lang, 'Start anyway', 'Trotzdem starten'),
         cancelLabel: pick(lang, 'Cancel', 'Abbrechen'),
@@ -122,7 +129,8 @@ export class PreStartService {
     if ((await this.visibility.filterVisible(viewer, [ctx.resourceId])).length === 0) return null;
     const timeZone = await this.globalSettings.getTimezone();
     const holder = await this.holderNameFor(viewer, active);
-    return { reason: reservedReason(ctx.language, active.endTime, timeZone, holder), until: active.endTime };
+    const until = formatTime(active.endTime, { lang: ctx.language, timeZone });
+    return { reason: reservedReason(ctx.language, until, holder), until: active.endTime };
   }
 
   /**
@@ -134,8 +142,33 @@ export class PreStartService {
     return shorten((await this.directory.getUserNames([booking.userId])).get(booking.userId) ?? null);
   }
 
+  /**
+   * The holder's name in the "starts soon" question on a reader: for managers of the resource and for viewers who
+   * may see who uses the machine (core's usage attribution rule, as in {@link holderNameFor}), shortened for the
+   * reader. Starts are made by an identified user, so this is always "after the card tap". Web and API starts keep
+   * the nameless ATT-881 question (no lookup).
+   */
+  private async holderForReader(ctx: PreStartContext, booking: ReservationEntity): Promise<string | undefined> {
+    if (ctx.origin !== 'reader') return undefined;
+    const name = (await this.access.isManager(subjectOfPrincipal(ctx.principal), ctx.resourceId))
+      ? (await this.directory.getUserNames([booking.userId])).get(booking.userId)
+      : await this.holderNameFor(subjectOfPrincipal(ctx.principal), booking);
+    return name ? readerName(name) || undefined : undefined;
+  }
+
+  /** A time in a start text: readers follow the reader rule (weekday on another local day), web and API keep `HH:MM`. */
+  private async timeText(ctx: PreStartContext, date: Date, now: Date): Promise<string> {
+    const timeZone = await this.globalSettings.getTimezone();
+    const { language: lang } = ctx;
+    return ctx.origin === 'reader' ? readerTime(date, { lang, timeZone, now }) : formatTime(date, { lang, timeZone });
+  }
+
   /** Block for non-managers; for managers the next unconfirmed override, or null when all are confirmed. */
-  private async whenActive(ctx: PreStartContext, active: ReservationEntity[]): Promise<PreStartResult | null> {
+  private async whenActive(
+    ctx: PreStartContext,
+    active: ReservationEntity[],
+    now: Date,
+  ): Promise<PreStartResult | null> {
     const { language: lang } = ctx;
     // The starter's request scope applies: a token without `resources.update` gets no manager override.
     const starter = subjectOfPrincipal(ctx.principal);
@@ -144,15 +177,16 @@ export class PreStartService {
       ? active.find((r) => !ctx.confirmedStepKeys.includes(overrideStepKey(r.id)))
       : active[0];
     if (!unconfirmed) return null;
-    const timeZone = await this.globalSettings.getTimezone();
-    const until = formatTime(unconfirmed.endTime, { lang, timeZone });
+    const until = await this.timeText(ctx, unconfirmed.endTime, now);
     if (!isManager) {
-      const holder = await this.holderNameFor(starter, unconfirmed);
-      return { decision: 'block', reason: reservedReason(lang, unconfirmed.endTime, timeZone, holder) };
+      const found = await this.holderNameFor(starter, unconfirmed);
+      const holder = found && ctx.origin === 'reader' ? readerName(found) : found;
+      return { decision: 'block', reason: reservedReason(lang, until, holder) };
     }
-    const name =
-      shorten((await this.directory.getUserNames([unconfirmed.userId])).get(unconfirmed.userId) ?? null) ??
-      pick(lang, 'another user', 'einer anderen Person');
+    // Managers always see the holder; only a reader needs the short, Latin-1 form of the name.
+    const found = shorten((await this.directory.getUserNames([unconfirmed.userId])).get(unconfirmed.userId) ?? null);
+    const shown = found !== null && ctx.origin === 'reader' ? readerName(found) : found;
+    const name = shown || pick(lang, 'another user', 'einer anderen Person');
     return {
       decision: 'confirm',
       confirmation: {
@@ -181,8 +215,7 @@ function shorten(name: string | null): string | null {
  * Reason shown to a user who may not start during someone else's booking. The holder is named only when the viewer
  * may see who uses the machine (`holder` is then set), otherwise the text stays anonymous.
  */
-function reservedReason(lang: 'en' | 'de', endTime: Date, timeZone: string, holder: string | null): PluginBlockReason {
-  const until = formatTime(endTime, { lang, timeZone });
+function reservedReason(lang: 'en' | 'de', until: string, holder: string | null | undefined): PluginBlockReason {
   return {
     code: 'RESERVED',
     title: pick(lang, 'Reserved', 'Reserviert'),

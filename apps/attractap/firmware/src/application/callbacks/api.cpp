@@ -59,7 +59,26 @@ void Application::setupApiCallbacks()
   this->api.setCardAuthenticationDetailsResponseCallback(
       [this](API::CardAuthenticationDetailsResponse response) {
 #ifdef HAS_LVGL_DISPLAY
-        if (!this->cardAuthenticationPending || this->unlocked) return;
+        if (!this->cardAuthenticationPending || this->unlocked) {
+          // A verified card the reader no longer waits for (its sign-in timed out or was given up): nobody is
+          // signed in, but the server opened a card session and would keep sending that user's rows. End it like a
+          // sign-out, decided on the LVGL task: a new tap sets cardAuthenticationPending before it takes the LVGL
+          // lock and sends its CARD_DETECTED only after it, so the decision either sees that tap (and leaves its
+          // verification alone) or goes out before it. Not while another card flow (enrollment, reset, supervision,
+          // mass introduction) owns the reader: ending the login would abort that flow's card conversation.
+          if (!this->unlocked && response.error.empty() && !response.cardSessionId.empty()) {
+            Display::asyncCall(
+                [](void *data) {
+                  auto *self = static_cast<Application *>(data);
+                  const bool otherCardFlow = self->state == APPLICATION_STATE_ENROLLMENT || self->state == APPLICATION_STATE_RESET ||
+                                             self->state == APPLICATION_STATE_SUPERVISION ||
+                                             self->state == APPLICATION_STATE_MASS_INTRODUCTION;
+                  if (!self->cardAuthenticationPending && !self->unlocked && !otherCardFlow) self->endReaderLogin();
+                },
+                this);
+          }
+          return;
+        }
 #endif
         if (response.error.length() > 0) {
           // The server did not verify the card: never unlock, say why on the display.

@@ -1,3 +1,5 @@
+import { ReaderTimeZoneService } from './reader-time-zone.service';
+import { readerTimeZoneStub } from './reader-time-zone.test-fixture';
 import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Provider } from '@nestjs/common';
@@ -49,6 +51,7 @@ import { AttractapUiHandler } from './handlers/ui/ui.handler';
 import { CardSessionService } from './handlers/ui/card-session.service';
 import { UiAuditService } from './handlers/ui/ui-audit.service';
 import { UiSlotService } from './handlers/ui/ui-slot.service';
+import { ReaderActiveUsageService } from './reader-active-usage.service';
 import { UiStepService } from './handlers/ui/ui-step.service';
 import { ReaderStartGate } from './handlers/session/reader-start-gate.service';
 import { PreStartService } from '../../resources/usage/pre-start/pre-start.service';
@@ -113,6 +116,7 @@ export function gatewayProviders(
 ): Provider[] {
   return [
     AttractapGateway,
+    { provide: ReaderTimeZoneService, useValue: readerTimeZoneStub() },
     WebsocketService,
     { provide: AttractapService, useValue: attractapService },
     { provide: UsersService, useValue: {} },
@@ -168,6 +172,7 @@ export function gatewayProviders(
     UiAuditService,
     UiStepService,
     UiSlotService,
+    { provide: ReaderActiveUsageService, useValue: { activeResourceIds: jest.fn(async () => new Set<number>()) } },
     AttractapUiHandler,
     ReaderStartGate,
     ...security,

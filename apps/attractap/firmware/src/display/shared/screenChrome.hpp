@@ -4,10 +4,13 @@
 
 #include "../theme.hpp"
 
-// The chrome on the top layer stays visible on every screen except the session
-// summary: the drawer grabber and network badge (top right, y 12-42) above, the
-// device footer (y 458-470) below. Full-screen layouts keep their content inside
-// these insets.
+// The chrome on the top layer: the drawer grabber (top centre) and the network
+// badge (top right, y 12-42) above, the device footer below (bar y 455-479: device
+// name, the HH:MM clock once the time is known, firmware version). The session
+// summary hides the badge, the grabber and the footer; the footer returns over it
+// while a plugin step (the keep/free question) is open. A plugin step covers the
+// badge and the grabber but keeps the footer band (Bottom) free. Full-screen
+// layouts keep their content inside these insets.
 namespace ScreenChrome
 {
     constexpr int32_t Top = 48;

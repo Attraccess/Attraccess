@@ -1,11 +1,13 @@
 import type { PreStartContext, SessionEndContext } from '@attraccess/plugins-backend-sdk';
 import type { GlobalSettingsService } from '../settings/global-settings.service';
 import type { ResourceSettingsService } from '../settings/resource-settings.service';
+import { ReaderUiService } from '../reader-ui/reader-ui.service';
 import { PreStartService } from './pre-start.service';
 import {
   HOOK_BUDGET_MS,
   preStartHook,
   publishHookServices,
+  readerUiProvider,
   resolveHookServices,
   sessionEndHook,
   waitUntil,
@@ -24,6 +26,7 @@ function coldServices() {
   return {
     preStart: new PreStartService(settings, unused, unused, unused, unused, unused, () => new Date()),
     sessionEnd: new SessionEndService(settings, {} as GlobalSettingsService, unused, unused, unused, () => new Date()),
+    readerUi: new ReaderUiService(settings, {} as GlobalSettingsService, unused, unused, unused, () => new Date()),
   };
 }
 
@@ -44,6 +47,7 @@ describe('hook runtime', () => {
         publishHookServices({
           preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
           sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
+          readerUi: { getSlotContributions: async () => [], getTimeZone: async () => undefined },
         }),
       10,
     );
@@ -51,10 +55,43 @@ describe('hook runtime', () => {
     await expect(sessionEndHook({} as never)).resolves.toEqual({ decision: 'none' });
   });
 
+  it('the reader UI provider waits for the module, then delegates with the shared deadline', async () => {
+    const getSlotContributions = jest.fn(async () => []);
+    const pending = readerUiProvider.getSlotContributions({ resourceId: 1 } as never);
+    setTimeout(
+      () =>
+        publishHookServices({
+          preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
+          sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
+          readerUi: { getSlotContributions, getTimeZone: async () => undefined },
+        }),
+      10,
+    );
+    await expect(pending).resolves.toEqual([]);
+    expect(getSlotContributions).toHaveBeenCalledWith({ resourceId: 1 }, expect.any(Number));
+  });
+
+  it('hands the reader time zone over to the reader UI service with the shared deadline', async () => {
+    const getTimeZone = jest.fn(async () => 'Europe/Berlin');
+    const pending = readerUiProvider.getTimeZone?.({ readerId: 1, resourceId: 1 });
+    setTimeout(
+      () =>
+        publishHookServices({
+          preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
+          sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
+          readerUi: { getSlotContributions: async () => [], getTimeZone },
+        }),
+      10,
+    );
+    await expect(pending).resolves.toBe('Europe/Berlin');
+    expect(getTimeZone).toHaveBeenCalledWith({ readerId: 1, resourceId: 1 }, expect.any(Number));
+  });
+
   it('withdraws the services on shutdown', async () => {
     publishHookServices({
       preStart: { evaluate: async () => ({ decision: 'allow' }), evaluateStartBlocked: async () => null },
       sessionEnd: { evaluate: async () => ({ decision: 'none' }) },
+      readerUi: { getSlotContributions: async () => [], getTimeZone: async () => undefined },
     });
     publishHookServices(null);
     await expect(resolveHookServices(Date.now() + 10)).rejects.toThrow();

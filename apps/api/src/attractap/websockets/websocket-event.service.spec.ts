@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WebSocketEventService } from './websocket-event.service';
 import { AttractapGateway } from './websocket.gateway';
-import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
+import { ReaderDeletedEvent, ReaderTimeZoneChangedEvent, ReaderUpdatedEvent } from '../events';
 import {
   ResourceSessionStartedEvent,
   ResourceUsageSessionEndedEvent,
@@ -60,6 +60,18 @@ describe('WebSocketEventService', () => {
       const event = { reader: { id: 42 } } as ReaderUpdatedEvent;
       await service.onReaderUpdated(event);
       expect(gateway.sendResourceList).toHaveBeenCalledWith(42);
+    });
+  });
+
+  describe('onReaderTimeZoneChanged', () => {
+    it('resends the resource list of that reader, whose session start times follow the zone', async () => {
+      await service.onReaderTimeZoneChanged(new ReaderTimeZoneChangedEvent(42));
+      expect(gateway.sendResourceList).toHaveBeenCalledWith(42);
+    });
+
+    it('logs instead of failing when the resend fails', async () => {
+      gateway.sendResourceList.mockRejectedValueOnce(new Error('Reader not found: 42'));
+      await expect(service.onReaderTimeZoneChanged(new ReaderTimeZoneChangedEvent(42))).resolves.toBeUndefined();
     });
   });
 

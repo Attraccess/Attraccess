@@ -7,6 +7,7 @@ import { ResourceUsageService } from '../../../../resources/usage/sessions/resou
 import { RbacService } from '../../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../../users-and-auth/users/users.service';
 import { AttractapService } from '../../../attractap.service';
+import { ReaderTimeZoneService } from '../../reader-time-zone.service';
 import { WebsocketService } from '../../websocket.service';
 import { AuthenticatedWebSocket } from '../../websocket.types';
 import { sendResourceListToSockets as sendResourceListToSocketsImplementation } from './payload';
@@ -42,6 +43,9 @@ export class ResourceListService {
 
   @Inject(RbacService)
   private rbacService: RbacService;
+
+  @Inject(ReaderTimeZoneService)
+  private readerTimeZone: ReaderTimeZoneService;
 
   private resourceListRevision = 0;
 
@@ -127,6 +131,9 @@ export class ResourceListService {
         },
         set resourceIntroducersService(value: ResourceListService['resourceIntroducersService']) {
           getContextOwner().resourceIntroducersService = value;
+        },
+        get readerTimeZone() {
+          return getContextOwner().readerTimeZone;
         },
         get resourceHealthService() {
           return getContextOwner().resourceHealthService;

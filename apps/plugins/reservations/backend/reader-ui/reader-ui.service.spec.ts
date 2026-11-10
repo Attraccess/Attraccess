@@ -1,0 +1,722 @@
+import {
+  READER_UI_CAPABILITIES_NONE,
+  READER_UI_LIMITS,
+  READER_UI_RESERVED_STATUS_STRINGS,
+  READER_UI_SLOT_NODE_BUDGET,
+  type ReaderSlotContribution,
+  type ReaderUiContext,
+  type ReaderUiNode,
+} from '@attraccess/plugins-backend-sdk';
+import { ReservationEntity } from '../entities/reservation.entity';
+import { Harness, createHarness } from '../testing/harness.test-utils';
+import { BackgroundServices, createBackgroundServices } from '../testing/background-services.test-utils';
+import { READER_LINE_CHARS, nextLocalMidnight, readerName, readerTexts, readerTime } from './texts';
+
+// Harness zone is Europe/Berlin (UTC+2 in June): 12:00Z is 14:00 local.
+const HOLDER = 10;
+const OTHER = 11;
+const MANAGER = 99;
+
+describe('ReaderUiService', () => {
+  let h: Harness;
+  let p: BackgroundServices;
+
+  const ctx = (patch: Partial<ReaderUiContext> = {}): ReaderUiContext => ({
+    readerId: 1,
+    resourceId: 1,
+    capabilities: READER_UI_CAPABILITIES_NONE,
+    language: 'en',
+    ...patch,
+  });
+  const slots = async (patch: Partial<ReaderUiContext> = {}) => p.readerUi.getSlotContributions(ctx(patch));
+  const textOf = (tree: ReaderUiNode): string[] =>
+    tree.t === 'text' || tree.t === 'badge'
+      ? [tree.text]
+      : tree.t === 'col' || tree.t === 'row'
+        ? (tree.c ?? []).flatMap(textOf)
+        : [];
+  const get = (list: ReaderSlotContribution[], slotId: string) => list.find((c) => c.slotId === slotId);
+  const row = (list: ReaderSlotContribution[]) => textOf(get(list, 'resourceList.row.status')?.tree as ReaderUiNode)[0];
+  const bodyLines = (list: ReaderSlotContribution[]) =>
+    textOf(get(list, 'resource.details.body')?.tree as ReaderUiNode);
+  const body = (list: ReaderSlotContribution[]) => bodyLines(list).join(' ');
+
+  /** Same rules as the host validator (apps/api reader-ui.validation), which a plugin cannot import. */
+  const expectHostValid = (list: ReaderSlotContribution[]) => {
+    const latin1 = /^[\u0020-\u007e\u00a0-\u00ff]+$/;
+    const normalize = (text: string) =>
+      text
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
+    const nodes = (tree: ReaderUiNode): number =>
+      1 + (tree.t === 'col' || tree.t === 'row' ? (tree.c ?? []).reduce((sum, c) => sum + nodes(c), 0) : 0);
+    const keys = new Set<string>();
+    for (const c of list) {
+      expect(`${c.slotId}/${c.key}`).not.toEqual(expect.stringMatching(/^$/));
+      expect(keys.has(`${c.slotId}/${c.key}`)).toBe(false);
+      keys.add(`${c.slotId}/${c.key}`);
+      expect(c.key).toMatch(READER_UI_LIMITS.idPattern);
+      expect(nodes(c.tree)).toBeLessThanOrEqual(READER_UI_SLOT_NODE_BUDGET[c.slotId]);
+      const texts = [...textOf(c.tree), c.fallback?.text ?? ''];
+      for (const text of texts) {
+        expect(text).toMatch(latin1);
+        expect(text.length).toBeLessThanOrEqual(
+          c.slotId === 'resourceList.row.status' ? READER_UI_LIMITS.maxListRowChars : READER_UI_LIMITS.maxTextChars,
+        );
+        expect(READER_UI_RESERVED_STATUS_STRINGS).not.toContain(normalize(text));
+      }
+      expect(c.fallback?.text).toBeTruthy();
+      expect(c.expiresAt).toBeInstanceOf(Date);
+      if (c.slotId === 'resourceList.row.status') expect(['text', 'badge']).toContain(c.tree.t);
+    }
+  };
+
+  beforeEach(async () => {
+    h = await createHarness();
+    p = createBackgroundServices(h);
+    await h.enable(1, { maxDurationMinutes: 1440, timeStepMinutes: 5, minDurationMinutes: 5 });
+    await h.settings.warmUp();
+    h.makeManager(MANAGER, 1);
+    h.setNow('2026-06-01T10:00:00Z'); // 12:00 local
+  });
+  afterEach(() => h.close());
+
+  /** Books as if made earlier in the morning, so bookings that already started pass the rules. */
+  const book = async (user: number, start: string, end: string) => {
+    const now = h.clock();
+    h.setNow('2026-06-01T07:00:00Z');
+    try {
+      return await p.book(user, 1, start, end);
+    } finally {
+      h.setNow(now);
+    }
+  };
+
+  describe('nothing to show', () => {
+    it('contributes nothing and never touches the database when reservations are disabled', async () => {
+      const getRepository = jest.spyOn(h.dataSource, 'getRepository');
+      const query = jest.spyOn(h.store, 'findConfirmedOverlapping');
+      expect(await slots({ resourceId: 2 })).toEqual([]);
+      expect(await slots({ resourceId: 2, userId: MANAGER })).toEqual([]);
+      expect(getRepository).not.toHaveBeenCalled();
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it('contributes nothing without a booking, with one indexed query', async () => {
+      const query = jest.spyOn(h.store, 'findConfirmedOverlapping');
+      expect(await slots()).toEqual([]);
+      expect(query).toHaveBeenCalledTimes(1);
+    });
+
+    it('contributes nothing for a booking that starts later than 24 h from now', async () => {
+      await book(HOLDER, '2026-06-02T10:15:00', '2026-06-02T12:00:00');
+      expect(await slots()).toEqual([]);
+    });
+
+    it('ignores pending, cancelled, no-show, expired and ended-early bookings', async () => {
+      const rows = h.dataSource.getRepository(ReservationEntity);
+      await h.enable(1, { approvalRequired: true });
+      await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00'); // stays pending
+      await h.enable(1, { approvalRequired: false });
+      const cancelled = await book(HOLDER, '2026-06-01T17:00:00', '2026-06-01T18:00:00');
+      await h.reservations.cancel({ userId: HOLDER, authenticationMethod: 'session' }, cancelled.id);
+      expect(await slots()).toEqual([]);
+      for (const status of ['no_show', 'expired', 'completed'] as const) {
+        const booked = await book(HOLDER, '2026-06-01T15:00:00', '2026-06-01T16:00:00');
+        await rows.update({ id: booked.id }, { status });
+        expect(await slots()).toEqual([]);
+        await rows.delete({ id: booked.id });
+      }
+    });
+  });
+
+  describe('signed out (public)', () => {
+    it('free until the next booking (same day), en and de', async () => {
+      await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      const en = await slots();
+      expect(row(en)).toBe('Free until 14:00');
+      expect(body(en)).toBe('Free until 14:00, then reserved until 16:00');
+      expect(get(en, 'resource.details.session')).toBeUndefined();
+      const de = await slots({ language: 'de' });
+      expect(row(de)).toBe('Frei bis 14:00');
+      expect(body(de)).toBe('Frei bis 14:00, dann reserviert bis 16:00');
+      expectHostValid(en);
+      expectHostValid(de);
+    });
+
+    it('adds a short weekday for a time on another local day', async () => {
+      await book(HOLDER, '2026-06-02T06:00:00', '2026-06-02T08:30:00'); // Tue 08:00-10:30 local
+      const en = await slots();
+      expect(row(en)).toBe('Free until Tue 08:00');
+      expect(body(en)).toBe('Free until Tue 08:00, then reserved until Tue 10:30');
+      const de = await slots({ language: 'de' });
+      expect(row(de)).toBe('Frei bis Di 08:00');
+      expectHostValid(en);
+      expectHostValid(de);
+    });
+
+    it('running, not checked in: check in by the deadline', async () => {
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z'); // 10:05 local, started 10:00
+      const en = await slots();
+      expect(row(en)).toBe('Res., check in by 10:15');
+      expect(body(en)).toBe('Reserved 10:00-16:00 (check in by 10:15)');
+      const de = await slots({ language: 'de' });
+      expect(row(de)).toBe('Res., Check-in bis 10:15');
+      expect(body(de)).toBe('Reserviert 10:00-16:00 (Check-in bis 10:15)');
+      expectHostValid(en);
+      expectHostValid(de);
+    });
+
+    it('check-in row never carries a name; the name only goes into the details', async () => {
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      const out = await slots();
+      expect(row(out)).toBe('Res., check in by 10:15');
+      expect(body(out)).toBe('Reserved 10:00-16:00 (check in by 10:15)');
+      // A manager may see the name: the details carry it, the row stays the same.
+      const manager = await slots({ userId: MANAGER });
+      expect(row(manager)).toBe('Res., check in by 10:15');
+      expect(body(manager)).toBe('Reserved by user10 10:00-16:00 (check in by 10:15)');
+      const managerDe = await slots({ userId: MANAGER, language: 'de' });
+      expect(row(managerDe)).toBe('Res., Check-in bis 10:15');
+      expect(body(managerDe)).toBe('Reserviert von user10 10:00-16:00 (Check-in bis 10:15)');
+      // Somebody who may not see names gets the unnamed form; with core's attribution rule they see the name.
+      expect(body(await slots({ userId: OTHER }))).toBe('Reserved 10:00-16:00 (check in by 10:15)');
+      h.allowAttribution(OTHER, 1);
+      const attributed = await slots({ userId: OTHER });
+      expect(row(attributed)).toBe('Res., check in by 10:15');
+      expect(body(attributed)).toBe('Reserved by user10 10:00-16:00 (check in by 10:15)');
+      for (const slot of [out, manager, managerDe, attributed]) expectHostValid(slot);
+    });
+
+    it('check-in row: "check in by" while it fits 24 characters, without "by" for a weekday time', () => {
+      const clock = (lang: 'en' | 'de') => ({ lang, timeZone: 'Europe/Berlin', now: new Date('2026-06-01T08:05:00Z') });
+      const today = new Date('2026-06-01T08:15:00Z');
+      expect(readerTexts.rowCheckInBy(today, clock('en'))).toBe('Res., check in by 10:15');
+      expect(readerTexts.rowCheckInBy(today, clock('de'))).toBe('Res., Check-in bis 10:15');
+      const wednesday = new Date('2026-06-03T08:15:00Z');
+      expect(readerTexts.rowCheckInBy(wednesday, clock('en'))).toBe('Res., check-in Wed 10:15');
+      expect(readerTexts.rowCheckInBy(wednesday, clock('de'))).toBe('Res., Check-in Mi 10:15');
+      for (const lang of ['en', 'de'] as const) {
+        for (const at of [today, wednesday])
+          expect(readerTexts.rowCheckInBy(at, clock(lang)).length).toBeLessThanOrEqual(24);
+      }
+    });
+
+    it('check-in row with the weekday prefix when the deadline is on another day', async () => {
+      await book(HOLDER, '2026-06-01T21:50:00', '2026-06-02T02:00:00'); // 23:50 local Monday
+      h.setNow('2026-06-01T21:55:00Z'); // 23:55 local, deadline 00:05 Tuesday
+      const en = await slots();
+      expect(row(en)).toBe('Res., check-in Tue 00:05');
+      expect(row(en).length).toBeLessThanOrEqual(24);
+      expect(body(en)).toBe('Reserved 23:50-Tue 04:00 (check in by Tue 00:05)');
+      const de = await slots({ language: 'de' });
+      expect(row(de)).toBe('Res., Check-in Di 00:05');
+      expect(body(de)).toBe('Reserviert 23:50-Di 04:00 (Check-in bis Di 00:05)');
+      expectHostValid(en);
+      expectHostValid(de);
+    });
+
+    it('running and checked in: reserved until the end', async () => {
+      const booking = await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      await h.reservations.markCheckedIn(booking.id, 5, h.clock());
+      const en = await slots();
+      expect(row(en)).toBe('Reserved until 16:00');
+      expect(body(en)).toBe('Reserved 10:00-16:00');
+      expect(row(await slots({ language: 'de' }))).toBe('Reserviert bis 16:00');
+      expectHostValid(en);
+    });
+
+    it('running with check-in disabled: reserved until the end', async () => {
+      await h.enable(1, { checkInEnabled: false });
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      expect(row(await slots())).toBe('Reserved until 16:00');
+    });
+
+    it('after the check-in deadline (before the scheduler marks the no-show) it is plain "reserved"', async () => {
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:20:00Z');
+      expect(row(await slots())).toBe('Reserved until 16:00');
+    });
+
+    it('keeps the German weekday forms within the row limit', async () => {
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-02T08:00:00'); // ends Tue 10:00 local
+      h.setNow('2026-06-01T08:20:00Z');
+      for (const language of ['en', 'de'] as const) {
+        const list = await slots({ language });
+        expect(row(list).length).toBeLessThanOrEqual(24);
+        expectHostValid(list);
+      }
+      expect(row(await slots({ language: 'de' }))).toBe('Reserviert bis Di 10:00');
+    });
+
+    it('never contains names or user data, and does no user or permission lookups', async () => {
+      // Everybody may see who uses the machine here: a signed-out reader still shows no name.
+      h.allowAttribution(OTHER, 1);
+      h.allowAttribution(HOLDER, 1);
+      const names = jest.spyOn(h.directory, 'getUserNames');
+      const manager = jest.spyOn(h.access, 'isManager');
+      const attribution = jest.spyOn(h.access, 'attributionResourceIds');
+      const states: [string, string, string][] = [
+        ['2026-06-01T12:00:00', '2026-06-01T14:00:00', '2026-06-01T10:00:00Z'], // upcoming
+        ['2026-06-01T08:00:00', '2026-06-01T14:00:00', '2026-06-01T08:05:00Z'], // running, no check-in
+        ['2026-06-01T08:00:00', '2026-06-01T14:00:00', '2026-06-01T08:30:00Z'], // running
+      ];
+      for (const [start, end, now] of states) {
+        const booking = await book(HOLDER, start, end);
+        h.setNow(now);
+        for (const language of ['en', 'de'] as const) {
+          const list = await slots({ language });
+          expect(list.length).toBeGreaterThan(0);
+          const dump = JSON.stringify(list);
+          expect(dump).not.toContain(`user${HOLDER}`);
+          expect(dump).not.toContain('user');
+          expect(dump).not.toContain(String(HOLDER) + '"');
+        }
+        await h.dataSource.getRepository(ReservationEntity).delete({ id: booking.id });
+      }
+      expect(names).not.toHaveBeenCalled();
+      expect(manager).not.toHaveBeenCalled();
+      expect(attribution).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('signed in (card session)', () => {
+    it("the holder's own running booking", async () => {
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      const en = await slots({ userId: HOLDER });
+      expect(row(en)).toBe('Your booking until 16:00');
+      expect(body(en)).toBe('Your booking 10:00-16:00 (check in by 10:15)');
+      const de = await slots({ userId: HOLDER, language: 'de' });
+      expect(row(de)).toBe('Deine Buchung bis 16:00');
+      expect(body(de)).toBe('Deine Buchung 10:00-16:00 (Check-in bis 10:15)');
+      expectHostValid(en);
+      expectHostValid(de);
+    });
+
+    it('drops the check-in hint once checked in, and keeps the row short on another day', async () => {
+      const booking = await book(HOLDER, '2026-06-01T08:00:00', '2026-06-02T08:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      await h.reservations.markCheckedIn(booking.id, 5, h.clock());
+      for (const language of ['en', 'de'] as const) {
+        const list = await slots({ userId: HOLDER, language });
+        expect(body(list)).not.toMatch(/check/i);
+        expect(row(list).length).toBeLessThanOrEqual(24);
+        expectHostValid(list);
+      }
+      expect(row(await slots({ userId: HOLDER }))).toBe('Yours until Tue 10:00');
+    });
+
+    it("treats a booking that starts within the early check-in window as the holder's own", async () => {
+      await book(HOLDER, '2026-06-01T10:10:00', '2026-06-01T12:00:00'); // 12:10 local, 10 min away
+      const own = await slots({ userId: HOLDER });
+      expect(row(own)).toBe('Your booking until 14:00');
+      expect(body(own)).toBe('Your booking 12:10-14:00 (check in by 12:25)');
+      expect(row(await slots({ userId: OTHER }))).toBe('Free until 12:10');
+    });
+
+    it('a manager sees the holder name on the details, never on the list row', async () => {
+      await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      const en = await slots({ userId: MANAGER });
+      expect(body(en)).toBe('Free until 14:00, then reserved by user10 until 16:00');
+      expect(row(en)).toBe('Free until 14:00');
+      expect(textOf(get(en, 'resourceList.row.status')?.tree as ReaderUiNode).join()).not.toContain('user10');
+      expect(body(await slots({ userId: MANAGER, language: 'de' }))).toBe(
+        'Frei bis 14:00, dann reserviert von user10 bis 16:00',
+      );
+      expectHostValid(en);
+    });
+
+    it("other users see the public texts unless they may see who uses the machine (core's rule)", async () => {
+      await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      const names = jest.spyOn(h.directory, 'getUserNames');
+      expect(body(await slots({ userId: OTHER }))).toBe('Free until 14:00, then reserved until 16:00');
+      expect(names).not.toHaveBeenCalled();
+
+      h.allowAttribution(OTHER, 1);
+      const en = await slots({ userId: OTHER });
+      expect(body(en)).toBe('Free until 14:00, then reserved by user10 until 16:00');
+      expect(row(en)).toBe('Free until 14:00');
+      expect(body(await slots({ userId: OTHER, language: 'de' }))).toBe(
+        'Frei bis 14:00, dann reserviert von user10 bis 16:00',
+      );
+      expectHostValid(en);
+    });
+
+    it('names the running holder after check-in, truncated and Latin-1 safe', async () => {
+      h.allowAttribution(OTHER, 1);
+      jest
+        .spyOn(h.directory, 'getUserNames')
+        .mockResolvedValue(new Map([[HOLDER, 'Alexandra-Maximiliane Überlänge 日本語']]));
+      const booking = await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:30:00Z');
+      await h.reservations.markCheckedIn(booking.id, 5, h.clock());
+      const list = await slots({ userId: OTHER });
+      expect(body(list)).toBe('Reserved by Alexandra-Maximi 10:00-16:00');
+      expectHostValid(list);
+      expect(readerName('Zoë 日本')).toBe('Zoë ??');
+      // Letters outside Latin-1 lose their accents like the host sanitizer does, instead of turning into "?".
+      expect(readerName('Łukasz Šimek')).toBe('Lukasz Simek');
+      expect(readerName('Đorđe\tČ')).toBe('Dorde C');
+      expect(readerName('O\u2019Brien\u2013Ng')).toBe("O'Brien-Ng");
+      expect(readerName('Zoë\u0308')).toBe('Zoë');
+    });
+
+    it('one fact, one block: a booking is in exactly one details slot, and never in a header', async () => {
+      await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00'); // 12:40 local, 40 min away
+      const detailTexts = (list: ReaderSlotContribution[]) =>
+        list
+          .filter((c) => c.slotId.startsWith('resource.details.'))
+          .map((c) => `${c.slotId}: ${textOf(c.tree).join(' | ')}`);
+      // While a usage runs the booking is in the session slot (with the countdown); body and header stay silent.
+      const session = await slots({ userId: MANAGER, sessionActive: true });
+      expect(detailTexts(session)).toEqual(['resource.details.session: Reserved by user10 12:40-14:00']);
+      expect(get(session, 'resource.details.header')).toBeUndefined();
+      expect(get(session, 'resource.details.body')).toBeUndefined();
+      // Signed out, the body carries it, once; also while somebody's usage runs (no session slot without a card).
+      const out = await slots();
+      expect(detailTexts(out)).toEqual(['resource.details.body: Free until 12:40, | then reserved until 14:00']);
+      expect(detailTexts(await slots({ sessionActive: true }))).toEqual([
+        'resource.details.body: Free until 12:40, | then reserved until 14:00',
+      ]);
+      // Idle after a card tap (the reader shows no session slot): the body carries it, once, named per the rule.
+      const idle = await slots({ userId: MANAGER, sessionActive: false });
+      expect(detailTexts(idle)).toEqual([
+        'resource.details.body: Free until 12:40, | then reserved by user10 until 14:00',
+      ]);
+      expect(detailTexts(await slots({ userId: OTHER }))).toEqual([
+        'resource.details.body: Free until 12:40, | then reserved until 14:00',
+      ]);
+      // Your own booking is the body; the other booking in the session slot is a different fact.
+      await book(MANAGER, '2026-06-01T10:10:00', '2026-06-01T10:30:00'); // 12:10-12:30 local, your early window
+      const own = await slots({ userId: MANAGER, sessionActive: true });
+      expect(detailTexts(own)).toEqual([
+        'resource.details.body: Your booking 12:10-12:30 | (check in by 12:25)',
+        'resource.details.session: Reserved by user10 12:40-14:00',
+      ]);
+      expect(detailTexts(await slots({ userId: MANAGER }))).toEqual([
+        'resource.details.body: Your booking 12:10-12:30 | (check in by 12:25)',
+      ]);
+    });
+
+    it('a running booking and the next one of somebody else are two facts, one block each, named per the rule', async () => {
+      await book(OTHER, '2026-06-01T09:30:00', '2026-06-01T10:20:00'); // running, 11:30-12:20 local
+      await book(HOLDER, '2026-06-01T10:30:00', '2026-06-01T11:00:00'); // 12:30 local, inside the confirm window
+      const detailTexts = async (userId: number) =>
+        (await slots({ userId, sessionActive: true }))
+          .filter((c) => c.slotId.startsWith('resource.details.'))
+          .map((c) => `${c.slotId}: ${textOf(c.tree).join(' | ')}`);
+      expect(await detailTexts(MANAGER)).toEqual([
+        'resource.details.body: Reserved by user11 11:30-12:20',
+        'resource.details.session: Reserved by user10 12:30-13:00',
+      ]);
+      expect(await detailTexts(12)).toEqual([
+        'resource.details.body: Reserved 11:30-12:20',
+        'resource.details.session: Reserved 12:30-13:00',
+      ]);
+    });
+
+    it("session area: another user's booking within the confirm window, with a countdown", async () => {
+      await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00'); // 12:40 local, 40 min away
+      const en = await slots({ userId: OTHER, sessionActive: true });
+      const session = get(en, 'resource.details.session');
+      expect(session?.tree).toEqual({
+        t: 'row',
+        c: [
+          { t: 'text', text: 'Reserved 12:40-14:00', style: 'small', fill: true },
+          { t: 'countdown', to: new Date('2026-06-01T10:40:00Z'), tone: 'warning' },
+        ],
+      });
+      expect(session?.fallback?.text).toBe('Reserved 12:40-14:00');
+      expect(
+        textOf(
+          get(await slots({ userId: OTHER, language: 'de', sessionActive: true }), 'resource.details.session')
+            ?.tree as ReaderUiNode,
+        ),
+      ).toEqual(['Reserviert 12:40-14:00']);
+      expectHostValid(en);
+    });
+
+    it('session area names the holder only for managers or viewers who may see who uses the machine', async () => {
+      await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
+      const text = async (userId: number) =>
+        textOf(get(await slots({ userId, sessionActive: true }), 'resource.details.session')?.tree as ReaderUiNode)[0];
+      expect(await text(MANAGER)).toBe('Reserved by user10 12:40-14:00');
+      expect(await text(OTHER)).toBe('Reserved 12:40-14:00');
+      h.allowAttribution(OTHER, 1);
+      expect(await text(OTHER)).toBe('Reserved by user10 12:40-14:00');
+    });
+
+    it('no session slot outside the confirm window, for the holder, when signed out, or while idle', async () => {
+      await book(HOLDER, '2026-06-01T11:30:00', '2026-06-01T12:30:00'); // 90 min away
+      expect(get(await slots({ userId: OTHER, sessionActive: true }), 'resource.details.session')).toBeUndefined();
+      h.setNow('2026-06-01T10:40:00Z');
+      expect(get(await slots({ userId: HOLDER, sessionActive: true }), 'resource.details.session')).toBeUndefined();
+      expect(get(await slots({ sessionActive: true }), 'resource.details.session')).toBeUndefined();
+      // Idle (no active usage) or a host that does not tell: the reader would not show the slot anyway.
+      expect(get(await slots({ userId: OTHER }), 'resource.details.session')).toBeUndefined();
+      expect(get(await slots({ userId: OTHER, sessionActive: false }), 'resource.details.session')).toBeUndefined();
+    });
+  });
+
+  describe('line breaks on the reader', () => {
+    // The reader wraps at spaces, commas, hyphens and dots, so one text node per clause keeps a time, a range and the
+    // check-in note together. READER_LINE_CHARS fits one line of the details body and of the session text.
+    const LONG_NAME = 'Wolfgang Mohrman'; // READER_NAME_MAX characters
+    const lines = (list: ReaderSlotContribution[], slot = 'resource.details.body') =>
+      textOf(get(list, slot)?.tree as ReaderUiNode);
+
+    const expectKeptTogether = (list: ReaderSlotContribution[], slot = 'resource.details.body') => {
+      expect(lines(list, slot).length).toBeGreaterThan(0);
+      for (const text of lines(list, slot)) {
+        expect(text.length).toBeLessThanOrEqual(READER_LINE_CHARS);
+        // No clause ends or starts on a separator, and a range is never cut: it has no space around its hyphen.
+        expect(text).not.toMatch(/[:-]$|^[:-]|\s-|-\s/);
+      }
+    };
+    const longName = () => jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map([[HOLDER, LONG_NAME]]));
+
+    it('splits the idle text into two clauses, each on one line', async () => {
+      await book(HOLDER, '2026-06-01T11:55:00', '2026-06-01T12:25:00');
+      for (const language of ['en', 'de'] as const) {
+        const list = await slots({ userId: MANAGER, language });
+        expect(lines(list)).toHaveLength(2);
+        expect(lines(list)[0]).toMatch(/,$/);
+        expectKeptTogether(list);
+      }
+      expect(lines(await slots({ userId: MANAGER }))).toEqual([
+        'Free until 13:55,',
+        'then reserved by user10 until 14:25',
+      ]);
+    });
+
+    it('puts the check-in note on its own line, the booking range stays whole', async () => {
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      for (const language of ['en', 'de'] as const) {
+        const list = await slots({ userId: MANAGER, language });
+        const [booking, checkIn] = lines(list);
+        expect(booking).toMatch(/10:00-16:00$/);
+        expect(checkIn).toMatch(/^\(.*10:15\)$/);
+        expectKeptTogether(list);
+      }
+    });
+
+    it('gives the times of a long holder name a line of their own, also with weekdays', async () => {
+      longName();
+      await book(HOLDER, '2026-06-01T22:05:00', '2026-06-01T23:00:00'); // 00:05 tomorrow: weekday prefix
+      const idle = await slots({ userId: MANAGER, language: 'de' });
+      expect(lines(idle)).toEqual(['Frei bis Di 00:05,', `dann reserviert von ${LONG_NAME}`, 'bis Di 01:00']);
+      expect(get(idle, 'resource.details.body')?.tree).toMatchObject({ t: 'col', gap: 0 });
+      expect(get(idle, 'resource.details.body')?.fallback?.text).toBe(
+        `Frei bis Di 00:05, dann reserviert von ${LONG_NAME} bis Di 01:00`,
+      );
+      expectKeptTogether(idle);
+      expectKeptTogether(await slots({ userId: MANAGER }));
+      expectHostValid(idle);
+    });
+
+    it('splits a running booking with a long holder name between the name and its range', async () => {
+      longName();
+      await book(HOLDER, '2026-06-01T21:30:00', '2026-06-01T23:00:00'); // 23:30 to 01:00 tomorrow
+      h.setNow('2026-06-01T21:35:00Z'); // check-in open
+      for (const language of ['en', 'de'] as const) {
+        const running = await slots({ userId: MANAGER, language });
+        expect(lines(running)).toEqual(
+          language === 'en'
+            ? [`Reserved by ${LONG_NAME}`, '23:30-Tue 01:00', '(check in by 23:45)']
+            : [`Reserviert von ${LONG_NAME}`, '23:30-Di 01:00', '(Check-in bis 23:45)'],
+        );
+        expectKeptTogether(running);
+        expectHostValid(running);
+      }
+    });
+
+    it('keeps a clause whole while it fits one line', async () => {
+      jest.spyOn(h.directory, 'getUserNames').mockResolvedValue(new Map([[HOLDER, 'Anna Mueller']]));
+      await book(HOLDER, '2026-06-01T11:55:00', '2026-06-01T12:25:00');
+      expect(lines(await slots({ userId: MANAGER, language: 'de' }))).toEqual([
+        'Frei bis 13:55,',
+        'dann reserviert von Anna Mueller bis 14:25',
+      ]);
+    });
+
+    it('splits the session text the same way, beside its countdown', async () => {
+      longName();
+      await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
+      const list = await slots({ userId: MANAGER, language: 'de', sessionActive: true });
+      const session = get(list, 'resource.details.session');
+      expect(session?.tree).toEqual({
+        t: 'row',
+        c: [
+          {
+            t: 'col',
+            gap: 0,
+            fill: true,
+            c: [
+              { t: 'text', text: `Reserviert von ${LONG_NAME}`, style: 'small', fill: true },
+              { t: 'text', text: '12:40-14:00', style: 'small', fill: true },
+            ],
+          },
+          { t: 'countdown', to: new Date('2026-06-01T10:40:00Z'), tone: 'warning' },
+        ],
+      });
+      expect(session?.fallback?.text).toBe(`Reserviert von ${LONG_NAME} 12:40-14:00`);
+      // 40 characters in English: one line.
+      expect(lines(await slots({ userId: MANAGER, sessionActive: true }), 'resource.details.session')).toEqual([
+        `Reserved by ${LONG_NAME} 12:40-14:00`,
+      ]);
+      expectKeptTogether(list, 'resource.details.session');
+      expectHostValid(list);
+    });
+  });
+
+  describe('expiry at the next state boundary', () => {
+    const expiry = (list: ReaderSlotContribution[]) => [...new Set(list.map((c) => c.expiresAt?.toISOString()))];
+
+    it('upcoming: the start of the booking', async () => {
+      await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      expect(expiry(await slots())).toEqual(['2026-06-01T12:00:00.000Z']);
+    });
+
+    it('running, not checked in: the check-in deadline', async () => {
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      expect(expiry(await slots())).toEqual(['2026-06-01T08:15:00.000Z']);
+    });
+
+    it('running, checked in: the end of the booking', async () => {
+      const booking = await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      await h.reservations.markCheckedIn(booking.id, 5, h.clock());
+      expect(expiry(await slots())).toEqual(['2026-06-01T14:00:00.000Z']);
+    });
+
+    it('running, check-in turned off: the end of the booking', async () => {
+      await h.enable(1, { checkInEnabled: false });
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T14:00:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      expect(expiry(await slots())).toEqual(['2026-06-01T14:00:00.000Z']);
+    });
+
+    it('a short grace period is capped at the end', async () => {
+      await book(HOLDER, '2026-06-01T08:00:00', '2026-06-01T08:10:00');
+      h.setNow('2026-06-01T08:05:00Z');
+      expect(expiry(await slots())).toEqual(['2026-06-01T08:10:00.000Z']);
+    });
+
+    it('signed in: also when the confirm window opens', async () => {
+      await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00'); // confirm window opens 11:00Z
+      expect(expiry(await slots({ userId: OTHER, sessionActive: true }))).toEqual(['2026-06-01T11:00:00.000Z']);
+    });
+
+    it.each([
+      ['Europe/Berlin', '2026-03-28T12:00:00Z', '2026-03-28T23:00:00.000Z'], // ordinary day before the spring change
+      ['Europe/Berlin', '2026-03-29T10:00:00Z', '2026-03-29T22:00:00.000Z'], // 23-hour day
+      ['Europe/Berlin', '2026-10-25T10:00:00Z', '2026-10-25T23:00:00.000Z'], // 25-hour day
+      ['Asia/Kathmandu', '2026-06-01T12:00:00Z', '2026-06-01T18:15:00.000Z'], // UTC+5:45
+      ['America/Santiago', '2026-09-05T16:00:00Z', '2026-09-06T04:00:00.000Z'], // midnight skipped: day starts 01:00
+    ])('next local midnight in %s after %s', (timeZone, now, expected) => {
+      expect(nextLocalMidnight(new Date(now), timeZone).toISOString()).toBe(expected);
+    });
+
+    it('local midnight, when the weekday of a time changes', async () => {
+      await book(HOLDER, '2026-06-02T06:00:00', '2026-06-02T08:30:00'); // Tue 08:00 local
+      expect(row(await slots())).toBe('Free until Tue 08:00');
+      expect(expiry(await slots())).toEqual(['2026-06-01T22:00:00.000Z']); // Berlin midnight
+      h.setNow('2026-06-01T22:00:00Z');
+      expect(row(await slots())).toBe('Free until 08:00');
+    });
+
+    it("signed in holder: also when somebody else's earlier booking starts", async () => {
+      await h.enable(1, { confirmWindowMinutes: 0, earlyCheckInMinutes: 60 });
+      await book(OTHER, '2026-06-01T10:10:00', '2026-06-01T10:30:00');
+      await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
+      const list = await slots({ userId: HOLDER });
+      expect(row(list)).toBe('Your booking until 14:00');
+      expect(expiry(list)).toEqual(['2026-06-01T10:10:00.000Z']);
+    });
+
+    it('signed in holder: also when the early check-in window opens', async () => {
+      await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      await h.enable(1, { confirmWindowMinutes: 0 });
+      expect(expiry(await slots({ userId: HOLDER }))).toEqual(['2026-06-01T11:45:00.000Z']);
+    });
+  });
+
+  it("looks a holder's name up once, even when the same booking's details come from the session area", async () => {
+    await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
+    const names = jest.spyOn(h.directory, 'getUserNames');
+    const list = await slots({ userId: MANAGER, sessionActive: true });
+    expect(textOf(get(list, 'resource.details.session')?.tree as ReaderUiNode)[0]).toBe(
+      'Reserved by user10 12:40-14:00',
+    );
+    expect(names).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses at most one booking query per evaluation, signed in or not', async () => {
+    await book(HOLDER, '2026-06-01T10:40:00', '2026-06-01T12:00:00');
+    const query = jest.spyOn(h.store, 'findConfirmedOverlapping');
+    const active = jest.spyOn(h.store, 'findActiveForResource');
+    await slots();
+    await slots({ userId: MANAGER });
+    await slots({ userId: OTHER });
+    expect(query).toHaveBeenCalledTimes(3);
+    expect(active).not.toHaveBeenCalled();
+  });
+
+  it('writes times in the plugin timezone', async () => {
+    await h.globalSettings.setTimezone('America/New_York');
+    await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00'); // 08:00-10:00 local
+    expect(row(await slots())).toBe('Free until 08:00');
+    expect(readerTime(new Date('2026-06-01T12:00:00Z'), { lang: 'en', timeZone: 'UTC', now: h.clock() })).toBe('12:00');
+  });
+
+  describe('reader time zone', () => {
+    it('declares the plugin timezone for a resource with reservations', async () => {
+      expect(await p.readerUi.getTimeZone({ readerId: 1, resourceId: 1 })).toBe('Europe/Berlin');
+      await h.globalSettings.setTimezone('America/New_York');
+      expect(await p.readerUi.getTimeZone({ readerId: 1, resourceId: 1 })).toBe('America/New_York');
+    });
+
+    it('has no opinion for a resource without reservations', async () => {
+      expect(await p.readerUi.getTimeZone({ readerId: 1, resourceId: 2 })).toBeUndefined();
+    });
+
+    it('never puts the current time into reader texts', async () => {
+      await book(HOLDER, '2026-06-01T12:00:00', '2026-06-01T14:00:00');
+      const texts = (await slots()).flatMap((c) => [...textOf(c.tree), c.fallback?.text ?? '']);
+      expect(texts.join(' ')).not.toMatch(/\b(now|jetzt)\b/i);
+      expect(texts.join(' ')).not.toContain('12:00'); // the harness clock is 12:00 local
+    });
+  });
+
+  describe('weekday rule', () => {
+    const berlin = (now: string) => ({ lang: 'en' as const, timeZone: 'Europe/Berlin', now: new Date(now) });
+
+    it('decides "another local day" by the plugin timezone, not by UTC', () => {
+      // 22:30Z on 31 May is already 00:30 on 1 June in Berlin: the same local day runs until 22:00Z.
+      const clock = berlin('2026-05-31T22:30:00Z');
+      expect(readerTime(new Date('2026-05-31T23:00:00Z'), clock)).toBe('01:00');
+      expect(readerTime(new Date('2026-06-01T21:30:00Z'), clock)).toBe('23:30');
+      expect(readerTime(new Date('2026-06-01T22:30:00Z'), clock)).toBe('Tue 00:30');
+      expect(readerTime(new Date('2026-06-01T22:30:00Z'), { ...clock, lang: 'de' })).toBe('Di 00:30');
+    });
+
+    it('keeps local wall-clock times across the daylight saving changes', () => {
+      // Berlin 2026-03-29 02:00 -> 03:00 and 2026-10-25 03:00 -> 02:00.
+      const spring = berlin('2026-03-28T22:00:00Z');
+      expect(readerTime(new Date('2026-03-29T00:59:00Z'), spring)).toBe('Sun 01:59');
+      expect(readerTime(new Date('2026-03-29T01:00:00Z'), spring)).toBe('Sun 03:00');
+      const autumn = berlin('2026-10-24T12:00:00Z');
+      expect(readerTime(new Date('2026-10-25T00:30:00Z'), autumn)).toBe('Sun 02:30');
+      expect(readerTime(new Date('2026-10-25T01:30:00Z'), autumn)).toBe('Sun 02:30');
+      expect(readerTime(new Date('2026-10-25T23:30:00Z'), autumn)).toBe('Mon 00:30');
+    });
+  });
+});

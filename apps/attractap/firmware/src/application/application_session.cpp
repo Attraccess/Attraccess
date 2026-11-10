@@ -178,6 +178,7 @@ void Application::resetSessionOnDisconnect() {
   Display::resourceListScreen.hideActionProgress();
   Display::resourceListScreen.setAuthenticatedUser("");
   Display::lockscreen.hideActionProgress();
+  Display::lockscreen.holdPluginStatus(false); // the slot cache was cleared with the connection
   this->cardAuthenticationPending = false;
   this->api.cancelResourceAction();
   this->pendingUiAction.clear();

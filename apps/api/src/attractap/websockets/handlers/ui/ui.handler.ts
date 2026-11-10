@@ -76,9 +76,19 @@ export class AttractapUiHandler {
     );
   }
 
-  /** The reader's login ended (READER_SESSION_ENDED): its card session ends with it. */
+  /**
+   * The reader's login ended (READER_SESSION_ENDED): its card session ends with it. Without a live one (the
+   * server timer expired it first) the reader's cleared row statuses are still sent again, and the expired
+   * session can no longer be revived.
+   */
   public endCardSession(socket: AuthenticatedWebSocket) {
-    if (socket.state?.cardSession) this.cardSessions.end(socket, socket.state.cardSession.id, 'reader');
+    if (!socket.state) return;
+    if (socket.state.cardSession) {
+      this.cardSessions.end(socket, socket.state.cardSession.id, 'reader');
+      return;
+    }
+    this.cardSessions.end(socket, null, 'reader');
+    this.slots.readerSignedOut(socket);
   }
 
   /** Socket closed: steps are discarded and timers released. */

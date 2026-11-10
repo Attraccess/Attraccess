@@ -52,7 +52,9 @@ void ResetScreen::init()
    this->userNameLabel = lv_label_create(this->screen);
    lv_obj_set_width(this->userNameLabel, lv_pct(100));
    lv_obj_set_height(this->userNameLabel, LV_SIZE_CONTENT);
-   lv_label_set_long_mode(this->userNameLabel, LV_LABEL_LONG_WRAP);
+   // At most three lines: a very long name ends in dots instead of pushing the centred column into the chrome.
+   lv_obj_set_style_max_height(this->userNameLabel, 3 * lv_font_get_line_height(&attractap_font_montserrat_latin1_36), 0);
+   lv_label_set_long_mode(this->userNameLabel, LV_LABEL_LONG_DOT);
    const char *initialName = this->userNameCache.length() > 0 ? this->userNameCache.c_str() : "...";
    FirmwareI18n::setDynamicLabel(this->userNameLabel, initialName) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
    lv_obj_set_style_text_align(this->userNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);

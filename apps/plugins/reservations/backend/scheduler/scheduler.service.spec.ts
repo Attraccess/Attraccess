@@ -409,4 +409,33 @@ describe('ReservationScheduler', () => {
       expect(sent('overrun')).toHaveLength(2);
     });
   });
+
+  describe('reader horizon', () => {
+    it('tells the readers when a booking comes within 24 h, once', async () => {
+      await p.book(10, 1, '2026-06-02T12:00:00', '2026-06-02T13:00:00');
+      h.invalidateReaderUi.mockClear();
+      h.setNow('2026-06-01T11:00:00Z'); // 25 h before
+      await p.scheduler.tick();
+      expect(h.invalidateReaderUi).not.toHaveBeenCalled();
+      h.invalidateStartBlocked.mockClear();
+      h.setNow('2026-06-01T12:00:00Z'); // exactly 24 h before
+      await p.scheduler.tick();
+      expect(h.invalidateReaderUi.mock.calls).toEqual([[{ resourceId: 1 }]]);
+      expect(h.invalidateStartBlocked).not.toHaveBeenCalled(); // a booking 24 h away decides no start
+      h.setNow('2026-06-01T12:01:00Z');
+      await p.scheduler.tick();
+      expect(h.invalidateReaderUi).toHaveBeenCalledTimes(1);
+    });
+
+    it('stays quiet for resources with reservations disabled', async () => {
+      await p.book(10, 1, '2026-06-02T12:00:00', '2026-06-02T13:00:00');
+      await h.settings.update(1, { enabled: false });
+      h.invalidateReaderUi.mockClear();
+      h.setNow('2026-06-01T11:59:00Z');
+      await p.scheduler.tick();
+      h.setNow('2026-06-01T12:00:00Z');
+      await p.scheduler.tick();
+      expect(h.invalidateReaderUi).not.toHaveBeenCalled();
+    });
+  });
 });

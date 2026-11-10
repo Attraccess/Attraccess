@@ -50,7 +50,7 @@ describe('ReaderUiAlertsService', () => {
         details: { kind: 'breaker-open', state: 'created', plugin: 'p' },
       }),
     );
-    expect(gauge.set).toHaveBeenLastCalledWith({ kind: 'crash-loop' }, 0);
+    expect(gauge.set).toHaveBeenCalledWith({ kind: 'time-zone-conflict' }, 0);
     expect(gauge.set).toHaveBeenCalledWith({ kind: 'breaker-open' }, 1);
   });
 

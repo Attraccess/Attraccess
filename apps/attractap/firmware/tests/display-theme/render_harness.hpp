@@ -79,13 +79,21 @@ inline void setState(lv_obj_t *obj, lv_state_t state)
     settle();
 }
 
-inline lv_obj_t *findObject(lv_obj_t *root, const lv_obj_class_t *type, const char *text = nullptr)
+inline lv_obj_t *findObjectNoLayout(lv_obj_t *root, const lv_obj_class_t *type, const char *text)
 {
     if (lv_obj_check_type(root, type) && (!text || std::strcmp(lv_label_get_text(root), text) == 0))
         return root;
     for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i)
-        if (auto *found = findObject(lv_obj_get_child(root, i), type, text)) return found;
+        if (auto *found = findObjectNoLayout(lv_obj_get_child(root, i), type, text)) return found;
     return nullptr;
+}
+
+// Lay the tree out first, as the real display does before anything is drawn:
+// a label in LV_LABEL_LONG_DOT mode reports "..." until it has a size.
+inline lv_obj_t *findObject(lv_obj_t *root, const lv_obj_class_t *type, const char *text = nullptr)
+{
+    lv_obj_update_layout(root);
+    return findObjectNoLayout(root, type, text);
 }
 
 inline lv_obj_t *requireObject(lv_obj_t *root, const lv_obj_class_t *type, const char *text = nullptr)
@@ -234,6 +242,8 @@ void testBoot(Renderer &renderer);
 void testInit(Renderer &renderer);
 template <typename CardScreen>
 void testCard(Renderer &renderer, const std::string &name, const char *writing, const char *success);
+template <typename CardScreen>
+void testCardLongName(const std::string &name);
 void testSupervision(Renderer &renderer);
 void testMassIntroduction(Renderer &renderer);
 void testPin(Renderer &renderer);
@@ -242,6 +252,7 @@ void testWallClock(Renderer &renderer);
 void testAuthenticatedList(Renderer &renderer);
 void testUsageStatsExpiry(Renderer &renderer);
 void testIntroducerDetails(Renderer &renderer);
+void testReaderUiClauseLines();
 void testParallelSessionPolicy();
 void testParallelSessionList(Renderer &renderer);
 void testParallelSessionDetails(Renderer &renderer);

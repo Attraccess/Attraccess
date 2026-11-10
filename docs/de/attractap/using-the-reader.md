@@ -21,9 +21,9 @@ Sie können eine Ressource auch **vor der Anmeldung** auswählen. Tippen Sie auf
 
 ### Uhrzeit und Datum
 
-Solange niemand angemeldet ist, dient der Leser auch als Uhr. Die Kartenaufforderung zeigt die aktuelle Uhrzeit und das Datum in großer Schrift, darunter **RFID-Karte auflegen**. Die Ressourcenliste zeigt beides oben an. Der Leser verwendet die Zeitzone Ihres Attraccess-Servers. Nach einem Neustart erscheint die Uhr, sobald der Leser mit dem Server verbunden ist; bis dahin zeigt er den gewohnten Anmeldetext. Bricht die Verbindung später ab, läuft die Uhr intern weiter. Das Display zeigt jedoch bis zur erneuten Verbindung den Initialisierungsbildschirm.
+Solange niemand angemeldet ist, dient der Leser auch als Uhr. Die Kartenaufforderung zeigt die aktuelle Uhrzeit und das Datum in großer Schrift, darunter **RFID-Karte auflegen**. Die Ressourcenliste zeigt beides oben an. Der Leser zeigt die Zeit in seiner eigenen [Zeitzone](attractap/reader-ui.md#uhrzeit-und-zeitzone): der Zone eines Plugins wie Reservierungen, sofern eines sie festlegt, sonst der Ihres Attraccess-Servers. Solange Sie angemeldet sind, zeigt eine kleine Uhr in der Fußleiste die aktuelle Zeit. Nach einem Neustart erscheint die Uhr, sobald der Leser mit dem Server verbunden ist; bis dahin zeigt er den gewohnten Anmeldetext. Bricht die Verbindung später ab, läuft die Uhr intern weiter. Das Display zeigt jedoch bis zur erneuten Verbindung den Initialisierungsbildschirm.
 
-Während einer Unterbrechung läuft die UTC-Zeit mit dem zuletzt empfangenen Zeitzonenversatz des Servers weiter. Dieser Versatz bleibt unverändert: Sommerzeit- und Winterzeitwechsel oder eine Änderung der Serverzeitzone werden erst nach dem nächsten gültigen Zeitwert vom Server berücksichtigt.
+Während einer Unterbrechung läuft die UTC-Zeit mit dem zuletzt vom Server empfangenen Zeitzonenversatz weiter. Dieser Versatz bleibt unverändert: Sommerzeit- und Winterzeitwechsel oder eine Änderung der Zeitzone des Lesers werden erst nach dem nächsten gültigen Zeitwert vom Server berücksichtigt.
 
 Die Kartenaufforderung zeigt die Uhr auch dann, wenn die ausgewählte Ressource bereits verwendet wird und niemand am Leser angemeldet ist. Die Kopfzeile zeigt weiterhin den Namen der Person, die die Ressource verwendet. Nach der Anmeldung öffnen sich die gewohnten Ressourcendetails und Bedienelemente für die Sitzung.
 
@@ -140,13 +140,13 @@ Tippen Sie auf **Abbrechen**, wenn Sie nicht fortfahren möchten. Sie bleiben an
 
 Welche Aktion verfügbar ist, hängt von Ihren Berechtigungen und dem aktuellen Zustand der Ressource ab. Über den Ressourcennamen können Sie die Details auch dann öffnen, wenn Sie die Nutzung nicht starten können.
 
-| Anzeige        | Was Sie tun können                                                                                                                                                       |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Einweisung** | Sie benötigen eine Einweisung, bevor Sie diese Ressource nutzen können. Öffnen Sie die Details für weitere Hinweise und wenden Sie sich an einen berechtigten Einweiser. |
-| **Belegt**     | Eine andere Person nutzt die Maschine. Warten Sie, bis diese ihre Nutzung beendet hat.                                                                                   |
-| **Übernehmen** | Die Übernahme der laufenden Nutzung ist erlaubt. Tippen Sie auf die Schaltfläche, um die Details zu öffnen, und wählen Sie dort die Übernahme aus.                       |
-| **Gesperrt**   | Die Ressource ist wegen einer Wartung oder eines gemeldeten Problems für Sie nicht verfügbar. Wenden Sie sich an einen Wartenden oder Ressourcenverwalter für diese Ressource.                                      |
-| **Laden ...**  | Der Leser prüft, welche Aktionen für Sie verfügbar sind. Warten Sie, bis sich die Schaltfläche aktualisiert.                                                             |
+| Anzeige        | Was Sie tun können                                                                                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Einweisung** | Sie benötigen eine Einweisung, bevor Sie diese Ressource nutzen können. Öffnen Sie die Details für weitere Hinweise und wenden Sie sich an einen berechtigten Einweiser.       |
+| **Belegt**     | Eine andere Person nutzt die Maschine. Warten Sie, bis diese ihre Nutzung beendet hat.                                                                                         |
+| **Übernehmen** | Die Übernahme der laufenden Nutzung ist erlaubt. Tippen Sie auf die Schaltfläche, um die Details zu öffnen, und wählen Sie dort die Übernahme aus.                             |
+| **Gesperrt**   | Die Ressource ist wegen einer Wartung oder eines gemeldeten Problems für Sie nicht verfügbar. Wenden Sie sich an einen Wartenden oder Ressourcenverwalter für diese Ressource. |
+| **Laden ...**  | Der Leser prüft, welche Aktionen für Sie verfügbar sind. Warten Sie, bis sich die Schaltfläche aktualisiert.                                                                   |
 
 ## Zum Schluss abmelden
 
@@ -156,11 +156,11 @@ Nach der Abmeldung können Sie sich mit Ihrer Karte erneut anmelden. Eine laufen
 
 ## Wenn etwas nicht funktioniert
 
-| Was Sie sehen                              | Was Sie tun können                                                                                                                                                                                                |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Was Sie sehen                              | Was Sie tun können                                                                                                                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Die Anmeldung mit Ihrer Karte klappt nicht | Versuchen Sie es erneut und lassen Sie die Karte am Leser, bis die Anmeldung abgeschlossen ist. Falls es weiterhin nicht klappt, bitten Sie Ihre Administration zu prüfen, ob die Karte Ihrem Konto zugeordnet ist. |
-| Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an einen Wartenden oder Ressourcenverwalter für diese Ressource.                                               |
-| Der Leser verliert die Verbindung          | Warten Sie, bis die Verbindung wiederhergestellt ist, und melden Sie sich erneut an. Ein Verbindungsabbruch beendet keine laufende Maschinennutzung.                                                              |
+| Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an einen Wartenden oder Ressourcenverwalter für diese Ressource.      |
+| Der Leser verliert die Verbindung          | Warten Sie, bis die Verbindung wiederhergestellt ist, und melden Sie sich erneut an. Ein Verbindungsabbruch beendet keine laufende Maschinennutzung.                                                                |
 
 > [!NOTE]
 > Leser-Firmware und Server werden gemeinsam ausgeliefert. Der Server aktualisiert die Leser automatisch auf die mitgelieferte Firmware-Version (siehe [Firmware-Updates](attractap/firmware-updates.md)).

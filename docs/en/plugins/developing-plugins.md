@@ -1,4 +1,5 @@
 # Developing Plugins
+
 <!-- llms-description: Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration. -->
 
 Attraccess plugins extend the platform with new API endpoints, background
@@ -178,24 +179,24 @@ export default plugin;
 
 `register(context)` receives a `PluginContext` — your gateway to the host:
 
-| Member                                                    | Purpose                                                                        | Permission               |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
-| `context.manifest`                                        | Your plugin's name, version, id, directory.                                    | none                     |
+| Member                                                    | Purpose                                                                                                                                                           | Permission               |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `context.manifest`                                        | Your plugin's name, version, id, directory.                                                                                                                       | none                     |
 | `context.hostVersion`                                     | Version of the running Attraccess host (the one plugin compatibility is checked against). Optional: hosts older than 1.11.0 do not set it, so handle `undefined`. | none                     |
-| `context.logger`                                          | Logger prefixed with your plugin name.                                         | none                     |
-| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                 | per-entity (see below)   |
-| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                           | `DATABASE_ACCESS`        |
-| `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                            | `LISTEN_EVENTS`          |
-| `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                    | `EMIT_EVENTS`            |
-| `context.events`                                          | The raw shared event bus (restricted surface).                                 | per-method               |
-| `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                   | `RESOLVE_HOST_PROVIDERS` |
-| `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
-| `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS`    |
-| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                                          | `ACCESS_MQTT_SERVERS`    |
-| `context.notifications.dispatch(request)`                 | Notify users under a category your plugin declared. See [Notifications](#notifications).    | `SEND_NOTIFICATIONS`     |
-| `context.startBlocked.invalidate({ resourceId })`         | Tell open resource pages that your `startBlockedQuery` answer changed. See [Start-blocked state](#start-blocked-state). | `ACCESS_HOOKS` |
-| `context.resourceAccess`                                  | Read-only authorization, maintenance and session queries. See [Resource access](#resource-access-queries). | `ACCESS_RESOURCES` |
-| `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions). | `DATABASE_ACCESS` |
+| `context.logger`                                          | Logger prefixed with your plugin name.                                                                                                                            | none                     |
+| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                                                                                                    | per-entity (see below)   |
+| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                                                                                                              | `DATABASE_ACCESS`        |
+| `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                                                                                                               | `LISTEN_EVENTS`          |
+| `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                                                                                                       | `EMIT_EVENTS`            |
+| `context.events`                                          | The raw shared event bus (restricted surface).                                                                                                                    | per-method               |
+| `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                                                                                                      | `RESOLVE_HOST_PROVIDERS` |
+| `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials.                                                                                    | `ACCESS_MQTT_SERVERS`    |
+| `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement.                                                                       | `ACCESS_MQTT_SERVERS`    |
+| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                                                                                                                | `ACCESS_MQTT_SERVERS`    |
+| `context.notifications.dispatch(request)`                 | Notify users under a category your plugin declared. See [Notifications](#notifications).                                                                          | `SEND_NOTIFICATIONS`     |
+| `context.startBlocked.invalidate({ resourceId })`         | Tell open resource pages that your `startBlockedQuery` answer changed. See [Start-blocked state](#start-blocked-state).                                           | `ACCESS_HOOKS`           |
+| `context.resourceAccess`                                  | Read-only authorization, maintenance and session queries. See [Resource access](#resource-access-queries).                                                        | `ACCESS_RESOURCES`       |
+| `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions).                                                         | `DATABASE_ACCESS`        |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -210,19 +211,19 @@ array. At runtime the host hands your plugin a **guarded** `PluginContext`:
 accessing a capability whose permission you did not declare throws a clear error
 naming the missing permission.
 
-| Permission               | Grants access to                                                                                                                                                      |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                 |
-| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).  |
-| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                       |
-| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` for any other entity and `context.runSerialized(...)`.                                                             |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                           |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                               |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                      |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection. |
-| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).               |
-| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook` and `startBlockedQuery` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks).                               |
-| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).         |
+| Permission               | Grants access to                                                                                                                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                                              |
+| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                              |
+| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                                                    |
+| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` for any other entity and `context.runSerialized(...)`.                                                                                          |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                        |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                            |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                   |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                              |
+| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                            |
+| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook` and `startBlockedQuery` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks).   |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications). |
 
 ### MQTT subscriptions
 
@@ -293,13 +294,13 @@ the core flow that emitted the event.
 Further events for plugins that follow maintenance, health and live sessions
 (all require `LISTEN_EVENTS`, payloads are `Date`-typed as in the SDK):
 
-| Event                                        | Payload                                                                                   | Fires                                                                 |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `SystemEvent.MAINTENANCE_CHANGED`            | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | After a maintenance window was created or finished. Core currently emits `created` and `finished` only; `updated` is reserved for a future edit path. `endTime` is `null` while open-ended. |
-| `SystemEvent.RESOURCE_HEALTH_CHANGED`        | `{ resourceId, status, previousStatus, reason, identifier }`                              | Only on a real status transition of a health entry.                   |
-| `SystemEvent.RESOURCE_USAGE_SESSION_STARTED` | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                            | A user started a session on an idle resource (not a takeover). `supervisorUserId` is set for supervised starts. |
-| `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`          | A user took over a running session. Fires for the **new** user.       |
-| `SystemEvent.RESOURCE_USAGE_SESSION_ENDED`   | `{ resourceId, usageId, userId, startTime, endTime, reason: 'ended' \| 'taken_over' }`    | A session ended, explicitly or because it was taken over.             |
+| Event                                           | Payload                                                                                           | Fires                                                                                                                                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SystemEvent.MAINTENANCE_CHANGED`               | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | After a maintenance window was created or finished. Core currently emits `created` and `finished` only; `updated` is reserved for a future edit path. `endTime` is `null` while open-ended. |
+| `SystemEvent.RESOURCE_HEALTH_CHANGED`           | `{ resourceId, status, previousStatus, reason, identifier }`                                      | Only on a real status transition of a health entry.                                                                                                                                         |
+| `SystemEvent.RESOURCE_USAGE_SESSION_STARTED`    | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                                    | A user started a session on an idle resource (not a takeover). `supervisorUserId` is set for supervised starts.                                                                             |
+| `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`                     | A user took over a running session. Fires for the **new** user.                                                                                                                             |
+| `SystemEvent.RESOURCE_USAGE_SESSION_ENDED`      | `{ resourceId, usageId, userId, startTime, endTime, reason: 'ended' \| 'taken_over' }`            | A session ended, explicitly or because it was taken over.                                                                                                                                   |
 
 ### Notifications
 
@@ -425,16 +426,16 @@ introductions still count. A plain user id resolves the user's full RBAC
 permissions; use it for background work such as schedulers. Unknown users and
 resources yield negative answers (`false`, all-false, `[]`) rather than errors.
 
-| Method                                              | Returns                                                                                                              |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `canStart(principal, resourceId)`                   | `{ allowed, requiresSupervision, supervisionAllowed }`. Covers introductions, retraining blocks, introducers/maintainers, `resources.update` and the supervision mode. It does **not** consider live maintenance or health. |
-| `canMaintain(principal, resourceId)`                | Whether the user can manage maintenance of the resource (`resources.maintenance.manage`, introducer/maintainer of the resource or one of its groups). Same check as core's maintenance API. |
-| `canSeeUsageAttribution(principal, resourceId)`    | Whether the user may see **who** is using the resource: core's rule for the current user's name in the resource UI and API (`resources.update`/`resources.access.manage`, people introduced to the machine, everybody when the instance shows activity to all). `false` where the user sees only free/in use (supervised-use machines in "introduced" mode), when the activity is hidden from the user and for unknown resources. Does not check hidden groups or account state. |
-| `hasPermission(principal, permission)`              | Whether the user holds an RBAC permission such as `resources.update`, limited to the request's scope.                |
-| `listResourceIdsIntroduced(principal)`              | Resources the user is introduced to in the sense of `canStart` (valid introduction, introducer/maintainer, `resources.update`). |
-| `listResourceIdsMaintained(principal)`              | Resources whose maintenance the user can manage.                                                                     |
-| `getMaintenanceWindows(resourceId, from, to)`       | Windows overlapping `[from, to)` as `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Open-ended maintenance counts until it is finished. |
-| `getActiveSessions(resourceId)`                     | Running sessions `{ usageId, userId, startTime }`, earliest first.                                                    |
+| Method                                          | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `canStart(principal, resourceId)`               | `{ allowed, requiresSupervision, supervisionAllowed }`. Covers introductions, retraining blocks, introducers/maintainers, `resources.update` and the supervision mode. It does **not** consider live maintenance or health.                                                                                                                                                                                                                                                      |
+| `canMaintain(principal, resourceId)`            | Whether the user can manage maintenance of the resource (`resources.maintenance.manage`, introducer/maintainer of the resource or one of its groups). Same check as core's maintenance API.                                                                                                                                                                                                                                                                                      |
+| `canSeeUsageAttribution(principal, resourceId)` | Whether the user may see **who** is using the resource: core's rule for the current user's name in the resource UI and API (`resources.update`/`resources.access.manage`, people introduced to the machine, everybody when the instance shows activity to all). `false` where the user sees only free/in use (supervised-use machines in "introduced" mode), when the activity is hidden from the user and for unknown resources. Does not check hidden groups or account state. |
+| `hasPermission(principal, permission)`          | Whether the user holds an RBAC permission such as `resources.update`, limited to the request's scope.                                                                                                                                                                                                                                                                                                                                                                            |
+| `listResourceIdsIntroduced(principal)`          | Resources the user is introduced to in the sense of `canStart` (valid introduction, introducer/maintainer, `resources.update`).                                                                                                                                                                                                                                                                                                                                                  |
+| `listResourceIdsMaintained(principal)`          | Resources whose maintenance the user can manage.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `getMaintenanceWindows(resourceId, from, to)`   | Windows overlapping `[from, to)` as `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Open-ended maintenance counts until it is finished.                                                                                                                                                                                                                                                                                                             |
+| `getActiveSessions(resourceId)`                 | Running sessions `{ usageId, userId, startTime }`, earliest first.                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 ### Serialized transactions
 
@@ -445,7 +446,7 @@ check-then-write sequences such as overlap checks race-free:
 
 ```ts
 await context.runSerialized(async (manager) => {
-  const clash = await manager.getRepository(Booking).count({ where: { /* overlapping window */ } });
+  const clash = await manager.getRepository(Booking).count({ where: {/* overlapping window */} });
   if (clash > 0) throw new ConflictException('OVERLAP');
   await manager.getRepository(Booking).save(newBooking);
 });
@@ -538,13 +539,13 @@ A plugin only describes **data** (a "Reader UI schema v1" node tree). No plugin 
 host validates, sanitizes and renders it. Admins configure this under **Reader display**, see
 [Reader display](attractap/reader-ui.md).
 
-| What                | Declared as                                               | Permission     |
-| ------------------- | --------------------------------------------------------- | -------------- |
-| Slot widgets        | `readerUi` (provider or `(context) => provider`)          | `READER_UI`    |
-| Pre-start hook      | `preStartHook`                                            | `ACCESS_HOOKS` |
-| Advisory after-stop | `sessionEndHook`                                          | `ACCESS_HOOKS` |
+| What                | Declared as                                                               | Permission     |
+| ------------------- | ------------------------------------------------------------------------- | -------------- |
+| Slot widgets        | `readerUi` (provider or `(context) => provider`)                          | `READER_UI`    |
+| Pre-start hook      | `preStartHook`                                                            | `ACCESS_HOOKS` |
+| Advisory after-stop | `sessionEndHook`                                                          | `ACCESS_HOOKS` |
 | Start-blocked state | `startBlockedQuery` and `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS` |
-| Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })` | `READER_UI`    |
+| Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`    |
 
 A plugin that declares `readerUi` or a hook without the matching permission **fails to load** and is quarantined.
 The first-party [Reservations](resources/reservations.md) plugin is a real-world user of both hooks: its pre-start hook blocks or confirms starts around bookings, and its session-end hook asks the holder to keep or free the rest of a booking.
@@ -552,12 +553,18 @@ See `examples/plugin-reader-ui` for a working example.
 
 ### Slots
 
-| Slot id                    | Where                                     | Node budget                                                                                                                                   |
-| -------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `resourceList.row.status`  | status line of a resource list row        | 1 `text` or `badge`, at most 24 characters. Shown only when no core status (in use, maintenance, unavailable, introduction required) applies. |
-| `resource.details.header`  | below the description on resource details | 6 nodes                                                                                                                                       |
-| `resource.details.body`    | resource details body                     | 8 nodes                                                                                                                                       |
-| `resource.details.session` | while the active-session block is shown   | 6 nodes                                                                                                                                       |
+| Slot id                    | Where                                                                 | Node budget                                                                                                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resourceList.row.status`  | status line of a resource list row and of the lock screen             | 1 `text` or `badge`, at most 24 characters. Shown only when no core status (in use, maintenance, unavailable, introduction required) applies. The lock screen shows while nobody is signed in, so only what you contributed without a card session ever appears there. |
+| `resource.details.header`  | below the description on resource details                             | 6 nodes                                                                                                                                                                                                                                                                |
+| `resource.details.body`    | resource details body                                                 | 8 nodes                                                                                                                                                                                                                                                                |
+| `resource.details.session` | only while a usage is active (`ctx.sessionActive`); card session only | 6 nodes                                                                                                                                                                                                                                                                |
+
+`ctx.sessionActive` (optional boolean) tells you whether the resource has an active usage visible on this reader.
+The reader shows `resource.details.session` only while that is `true`, so put a fact in that slot when it is `true`
+and in `resource.details.body` otherwise, and never in both: a booking or free window should appear in one block per
+screen. The host calls your provider again when a usage starts, ends or is taken over; the update limit of once per
+2 s per reader and slot still applies. A host that does not send the field leaves it unset; treat that as `false`.
 
 Components: `col`, `row`, `text`, `badge`, `icon` (`ok`, `warning`, `bell`, `lock`, `clock`), `progress`,
 `countdown`, `spacer`. Slot trees must not contain `button`. Tones are `primary`, `success`, `warning`, `danger`;
@@ -585,6 +592,35 @@ const readerUi: ReaderUiProvider = {
 };
 ```
 
+### Time zone on readers
+
+Readers show one clock, and your texts must agree with it. If your plugin writes times on reader screens (for
+example "Free until 14:00"), implement `getTimeZone` on the provider and return the IANA zone your texts use:
+
+```ts
+const readerUi: ReaderUiProvider = {
+  getSlotContributions(ctx) {
+    /* ... */
+  },
+  getTimeZone({ resourceId }) {
+    return resourceHasMyFeature(resourceId) ? 'Europe/Berlin' : undefined; // undefined = no opinion
+  },
+};
+```
+
+The host asks the plugins of a reader's resources (with the same 1.5 s timeout as slots; an error counts as no opinion)
+and uses the **first valid zone in host order**: the reader's resources by id, and for each resource the plugins in host
+order (alphabetically by plugin name); a slower plugin that answers within the time limit still wins over a faster one
+ranked lower. It sends the zone's UTC offset to the reader, daylight saving included. An invalid name is ignored, and
+names are compared canonically (`europe/berlin` is `Europe/Berlin`). If the answers differ for one reader, the first
+wins and admins get an alert. Without any answer the reader follows the server's `TZ`. If a plugin that could decide the
+zone times out, the host keeps the reader's current zone; without one yet it uses the next valid answer for now. Either
+way it asks again on a later heartbeat of the reader, after 5 s and then less often, up to every 5 minutes. Call
+`context.readerUi.invalidate(...)` when your zone changes; the host then re-resolves it and pushes the new offset, and
+the session start times of the resource list, to the affected readers at once. Do not write the current time into your
+texts: the reader's footer shows it on every screen except the lock screen, the signed-out list and the session summary
+(which has no footer unless a plugin question is open over it), so "check in by 14:15" can be related to now.
+
 ### Limits
 
 | Limit                       | Value                                                                    |
@@ -609,11 +645,25 @@ become `'` and `"`, dashes U+2010-2015 become `-`, `…` becomes `...`, thin and
 anything else becomes `?`). Dates from `Intl.DateTimeFormat` are covered. Preview your texts with the same rules
 so they fit the limits after transliteration.
 
+### Line breaks
+
+The reader wraps text at spaces and punctuation such as `,`, `-`, `.` and `_`, but never after `:` or `)`, so a
+time ("14:25") is never split and a closing parenthesis never starts a line. A hyphen is a break, so a long
+hyphenated name wraps there instead of mid-word, and so can a time range ("13:55-" / "14:25") that does not fit its
+line. A word longer than the line is still cut. The reader does not balance lines, and a newline in a text is
+replaced by a space.
+
+Write each clause as its own `text` node in a `col`, for example "Free until 13:55," and "then reserved by bea
+until 14:25", so no single time or note is left alone on a line. About 42 characters fit one line of the details
+body (18 px) and of a small (14 px) text beside a countdown. Split a longer clause yourself, for example between a
+name and its times: "Reserved by Wolfgang Mohrman" above "13:55-14:25".
+
 ### Privacy and language
 
-Public slots (signed-out reader) must not show names of other people. User-specific content belongs in
-user-scoped slots (`resource.details.session`) and steps; the host clears them when the card session ends. Prefer
-"Reserved" over names, and first name plus initial when a name is needed.
+Public slots (signed-out reader) must not show names of other people. Everything a provider returns during a card
+session is user-scoped, in every slot, and so are steps: the host removes it when the card session ends. Which slot
+holds a fact follows `ctx.sessionActive`, not privacy. Prefer "Reserved" over names, and first name plus initial
+when a name is needed.
 
 Every context carries `ctx.language` (`'en'` or `'de'`). For slot providers it is the reader language, or the card
 user's language while a card session is live. For `PreStartContext` and `SessionEndContext` it is the card user's
@@ -994,16 +1044,16 @@ getSlotContributions(): PluginSlotContribution[] {
 The slot contract is intentionally generic — the SDK carries no domain
 knowledge. Host slot ids available today:
 
-| Slot id                | Where it renders                                  | Context            |
-| ---------------------- | ------------------------------------------------- | ------------------ |
-| `mqtt.server.detail`   | MQTT server detail/edit view (extensions section) | `{ mqttServerId }` |
-| `mqtt.server.list.row` | MQTT server list, per-row action area             | `{ mqttServerId }` |
-| `resource.overview`        | Resource detail overview body (resource-level status or controls)                       | `{ resourceId }` |
-| `resource.active-session`  | Active-usage panel, directly after the host flow controls                               | `{ resourceId, usageId }` |
-| `resource.list.row`        | Resource list row, compact status area                                                  | `{ resourceId }` |
-| `resource.settings`        | Resource settings page, shown to users who may manage the resource (`resources.update`) | `{ resourceId }` |
-| `user.account`             | The signed-in user's own account page                                                   | `{ userId }` |
-| `admin.settings`           | System settings index, only for users with the `system.settings.manage` permission      | `{}` |
+| Slot id                   | Where it renders                                                                        | Context                   |
+| ------------------------- | --------------------------------------------------------------------------------------- | ------------------------- |
+| `mqtt.server.detail`      | MQTT server detail/edit view (extensions section)                                       | `{ mqttServerId }`        |
+| `mqtt.server.list.row`    | MQTT server list, per-row action area                                                   | `{ mqttServerId }`        |
+| `resource.overview`       | Resource detail overview body (resource-level status or controls)                       | `{ resourceId }`          |
+| `resource.active-session` | Active-usage panel, directly after the host flow controls                               | `{ resourceId, usageId }` |
+| `resource.list.row`       | Resource list row, compact status area                                                  | `{ resourceId }`          |
+| `resource.settings`       | Resource settings page, shown to users who may manage the resource (`resources.update`) | `{ resourceId }`          |
+| `user.account`            | The signed-in user's own account page                                                   | `{ userId }`              |
+| `admin.settings`          | System settings index, only for users with the `system.settings.manage` permission      | `{}`                      |
 
 The slots `resource.settings`, `user.account` and `admin.settings` are rendered as
 **titled sections**: set `title` on the contribution (falls back to a generic

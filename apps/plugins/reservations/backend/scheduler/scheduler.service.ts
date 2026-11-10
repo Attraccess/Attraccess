@@ -1,6 +1,6 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
+import { Clock, PLUGIN_CONTEXT, READER_HORIZON_MS, RESERVATION_CLOCK } from '../constants';
 import type { ReservationEntity } from '../entities/reservation.entity';
 import { ReservationNotifications } from '../notifications/notifier.service';
 import { ReservationService } from '../reservations/reservation.service';
@@ -51,6 +51,8 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
   private inflight: Promise<void> | null = null;
   /** Bookings that started up to here were already announced to the resource pages. */
   private startsAnnouncedUntil: Date | null = null;
+  /** Bookings that start up to here (now + the reader horizon) were already announced to the readers. */
+  private readerHorizonAnnouncedUntil: Date | null = null;
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
@@ -100,6 +102,7 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
       ['expire pending', (at) => this.expirePending(at)],
       ['no-show', (at) => this.markNoShows(at)],
       ['announce starts', (at) => this.announceStarts(at)],
+      ['announce reader horizon', (at) => this.announceReaderHorizon(at)],
       ['complete', (at) => this.completeEnded(at)],
       ['still needed', (at) => this.stillNeeded(at)],
       ['24h reminder', (at) => this.reminder24h(at)],
@@ -139,7 +142,23 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     const started = await this.store.findUpcomingConfirmed(from, now);
     this.startsAnnouncedUntil = now;
     for (const resourceId of new Set(started.map((r) => r.resourceId))) {
-      this.reservations.invalidateStartBlocked(resourceId);
+      this.reservations.invalidateViews(resourceId);
+    }
+  }
+
+  /**
+   * A reader shows "Free until" for a booking that starts within 24 h. A booking that just came inside that
+   * horizon changes nothing the host knows about (the readers showed nothing), so tell them here.
+   */
+  private async announceReaderHorizon(now: Date): Promise<void> {
+    const horizon = new Date(now.getTime() + READER_HORIZON_MS);
+    const from = this.readerHorizonAnnouncedUntil ?? new Date(horizon.getTime() - 2 * TICK_INTERVAL_MS);
+    const entering = await this.store.findUpcomingConfirmed(from, horizon);
+    this.readerHorizonAnnouncedUntil = horizon;
+    for (const resourceId of new Set(entering.map((r) => r.resourceId))) {
+      if (this.settings.getCachedSettings(resourceId).enabled) {
+        this.reservations.invalidateViews(resourceId, { startBlocked: false });
+      }
     }
   }
 

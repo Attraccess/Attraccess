@@ -1,3 +1,4 @@
+import { readerTimeZoneStub } from '../../attractap/websockets/reader-time-zone.test-fixture';
 import {
   entities,
   ResourceType,
@@ -121,6 +122,7 @@ describe('persisted resource introducer aggregation', () => {
       },
       usersService: { findOne: async () => source.getRepository(User).findOneByOrFail({ id: 99 }) },
       rbacService: { getEffectivePermissions: async () => new Set() },
+      readerTimeZone: readerTimeZoneStub(),
     });
     const sendMessage = jest.fn().mockResolvedValue(undefined);
     const socket = {

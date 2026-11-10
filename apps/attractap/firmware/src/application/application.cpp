@@ -230,13 +230,24 @@ void Application::dismissSessionSummary() {
   this->logoutReader();
 }
 
-void Application::logoutReader() {
-  this->closeUiStep();
+void Application::endReaderLogin() {
+  // Row statuses received during this card session (the card holder's own booking) must not reach the lock
+  // screen or the signed-out list. The server sends the signed-out ones again as soon as it hears the session ended.
+  if (ui::slotCache().clearSlot(ui::SlotId::ListRowStatus) > 0) {
+    Display::asyncCall([](void *) {
+      Display::lockscreen.refreshUiSlots();
+      Display::resourceListScreen.refreshUiSlots();
+    }, nullptr);
+  }
   // The server keeps the verified user for this connection until told otherwise.
   this->api.sendReaderSessionEnded();
-  // The card session is over: tell the server, and drop what only the signed-in user may see.
-  this->api.endCardSession();
-  ui::slotCache().clearSlot(ui::SlotId::DetailsSession);
+  this->api.endCardSession(); // the card session is over: tell the server
+}
+
+void Application::logoutReader() {
+  this->closeUiStep();
+  this->endReaderLogin();
+  ui::slotCache().clearSlot(ui::SlotId::DetailsSession); // only the signed-in user may see it
   State::setUserLanguage(false);
   this->sessionSummaryActive = false;
   this->sessionSummaryVisible = false;
@@ -269,6 +280,7 @@ void Application::finishCardAuthentication(bool success) {
   this->cardAuthenticationPending = false;
   Display::resourceListScreen.hideActionProgress();
   Display::lockscreen.hideActionProgress();
+  if (!success) Display::lockscreen.holdPluginStatus(false); // refused or signed out: public status again
   if (success) {
     this->restartSessionTimeout();
     this->selectedResourceChanged = true;
@@ -309,6 +321,8 @@ void Application::pollUsageStats() {
 
 #ifdef HAS_LVGL_DISPLAY
 void Application::beginEnrollment() {
+  // Sign out whoever is signed in or checking a card: their rows leave the cache and the server ends the session.
+  if (this->unlocked || this->cardAuthenticationPending) this->logoutReader();
   this->unlocked = false;
   State::setUserLanguage(false);
   // WAIT_FOR_CARD rides the normal card-detection loop, which re-arms the
@@ -458,6 +472,7 @@ void Application::processEnrollment() {
 #ifdef HAS_LVGL_DISPLAY
 
 void Application::beginReset() {
+  if (this->unlocked || this->cardAuthenticationPending) this->logoutReader(); // as in beginEnrollment()
   this->unlocked = false;
   State::setUserLanguage(false);
   // Mirrors beginEnrollment(): WAIT_FOR_CARD rides the normal card-detection

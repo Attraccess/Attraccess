@@ -299,26 +299,54 @@ namespace LayoutCheck
         return root;
     }
 
-    // Problems found on the active screen; empty when the layout is clean.
+    // The child of the top layer that holds `object` (its place in the top layer's drawing order).
+    inline lv_obj_t *topLevel(lv_obj_t *object)
+    {
+        while (object && lv_obj_get_parent(object) && lv_obj_get_parent(object) != lv_layer_top()) object = lv_obj_get_parent(object);
+        return object;
+    }
+
+    // Problems found on the active screen, or on the plugin step that covers it; empty when the layout is clean.
     inline std::vector<std::string> problems(lv_obj_t *screen = lv_screen_active())
     {
         lv_obj_update_layout(screen);
         lv_obj_update_layout(lv_layer_top());
         std::vector<std::string> out;
         std::vector<Item> items;
-        lv_obj_t *root = effectiveRoot(screen);
+        // An open plugin step lies on the top layer over the whole screen: its content is what shows.
+        lv_obj_t *step = Display::stepModal.isOpen() ? Display::stepModal.root() : nullptr;
+        lv_obj_t *root = step ? step : effectiveRoot(screen);
         if (root == screen)
             collect(screen, items, out);
         else
             for (uint32_t i = 0; i < lv_obj_get_child_count(root); ++i) collect(lv_obj_get_child(root, i), items, out);
-        // The chrome the firmware keeps on the top layer (the session summary hides it).
+        // The chrome the firmware keeps on the top layer (the session summary hides it). Chrome below the step is
+        // covered by it.
         for (const auto &part : Display::chromeParts())
         {
             if (!part.object || lv_obj_has_flag(part.object, LV_OBJ_FLAG_HIDDEN)) continue;
+            if (step && lv_obj_get_index(topLevel(part.object)) < lv_obj_get_index(step)) continue;
             lv_area_t box;
             lv_obj_get_coords(part.object, &box);
             for (const auto &item : items)
                 if (intersects(item.visible, box)) out.push_back(item.name + at(item.visible) + " overlaps the " + part.name + at(box));
+        }
+        // Inside the device footer, the device name, the clock and the firmware version stay apart.
+        for (const auto &part : Display::chromeParts())
+        {
+            if (std::strcmp(part.name, "device footer") != 0 || !part.object || lv_obj_has_flag(part.object, LV_OBJ_FLAG_HIDDEN)) continue;
+            std::vector<Item> footer;
+            for (uint32_t i = 0; i < lv_obj_get_child_count(part.object); ++i)
+            {
+                lv_obj_t *child = lv_obj_get_child(part.object, i);
+                if (lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN) || !lv_obj_check_type(child, &lv_label_class) || !lv_label_get_text(child)[0]) continue;
+                const lv_area_t box = textBox(child).box;
+                footer.push_back({child, box, box, true, describe(child)});
+            }
+            for (size_t a = 0; a < footer.size(); ++a)
+                for (size_t b = a + 1; b < footer.size(); ++b)
+                    if (intersects(footer[a].box, footer[b].box))
+                        out.push_back(footer[a].name + at(footer[a].box) + " runs into " + footer[b].name + at(footer[b].box) + " in the device footer");
         }
         for (size_t a = 0; a < items.size(); ++a)
             for (size_t b = a + 1; b < items.size(); ++b)

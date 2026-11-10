@@ -12,6 +12,7 @@ import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
 import { ResourceListService } from './websockets/handlers/resource-list/resource-list.service';
 import { ResourceActionGuard } from './websockets/handlers/resource-action.guard';
+import { ReaderTimeZoneService } from './websockets/reader-time-zone.service';
 import { AttractapAuthHandler } from './websockets/handlers/auth/auth.handler';
 import { AttractapFirmwareHandler } from './websockets/handlers/firmware/firmware.handler';
 import { AttractapCrashReportHandler } from './websockets/handlers/crash-report/crash-report.handler';
@@ -31,6 +32,7 @@ import {
   NFCCard,
   NFCCardPendingChange,
   Resource,
+  ResourceUsage,
   User,
 } from '@attraccess/database-entities';
 import { AttractapPairingController } from './pairing.controller';
@@ -79,6 +81,7 @@ import { AttractapUiHandler } from './websockets/handlers/ui/ui.handler';
 import { CardSessionService } from './websockets/handlers/ui/card-session.service';
 import { UiAuditService } from './websockets/handlers/ui/ui-audit.service';
 import { UiSlotService } from './websockets/handlers/ui/ui-slot.service';
+import { ReaderActiveUsageService } from './websockets/reader-active-usage.service';
 import { UiStepService } from './websockets/handlers/ui/ui-step.service';
 import { ReaderStartGate } from './websockets/handlers/session/reader-start-gate.service';
 import { ReaderUiAdminController } from './reader-ui-admin.controller';
@@ -95,6 +98,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
       NFCCard,
       NFCCardPendingChange,
       Resource,
+      ResourceUsage,
       User,
     ]),
     UsersAndAuthModule,
@@ -144,6 +148,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     ResourceListService,
     ResourceActionGuard,
     AttractapAuthHandler,
+    ReaderTimeZoneService,
     AttractapFirmwareHandler,
     AttractapCrashReportHandler,
     AttractapCardHandler,
@@ -157,6 +162,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     UiAuditService,
     UiStepService,
     UiSlotService,
+    ReaderActiveUsageService,
     AttractapUiHandler,
     ReaderStartGate,
   ],

@@ -6,11 +6,13 @@
 #include <functional>
 #include <iostream>
 #include <sstream>
+#include <vector>
 
 #include "display/ui/ui_builder.hpp"
 #include "display/ui/ui_record.hpp"
 #include "display/ui/ui_slot_cache.hpp"
 #include "display/ui/ui_step_modal.hpp"
+#include "src/misc/lv_text_private.h"
 
 // ATT-1187: the reservation fixtures render readable on the production theme. The same JSON files drive the
 // server validator (Jest) and the firmware parser (host test), so what is drawn here is what plugins send.
@@ -117,6 +119,99 @@ void testReaderUiFixtures(SdlDisplay &display, const std::filesystem::path &scre
         lv_obj_delete(screen);
     }
     std::cout << "PASS reader UI fixtures render with readable contrast" << std::endl;
+}
+
+// ATT-1188: a plugin time ("14:25") must never be cut across two lines and a time range must stay on one line.
+// LVGL breaks after ':' and ')' by default; lv_conf.h drops those two from its break characters. Hyphens, dots and
+// underscores stay breaks so long names wrap there. This walks LVGL's own line breaking over the reservation texts.
+namespace
+{
+    // Offsets where LVGL ends a line (all but the last), at `width` px.
+    std::vector<uint32_t> lineEnds(const char *text, const lv_font_t *font, int32_t width)
+    {
+        std::vector<uint32_t> ends;
+        const uint32_t total = std::strlen(text);
+        uint32_t offset = 0;
+        while (offset < total)
+        {
+            int32_t used = 0;
+            const uint32_t line = lv_text_get_next_line(text + offset, total - offset, font, 0, width, &used, LV_TEXT_FLAG_NONE);
+            assert(line > 0);
+            offset += line;
+            if (offset < total) ends.push_back(offset);
+        }
+        return ends;
+    }
+}
+
+void testReaderUiTextWrapping()
+{
+    const lv_font_t *fonts[] = {&attractap_font_montserrat_latin1_14, &attractap_font_montserrat_latin1_18};
+
+    // The plugin's real clauses with a 12-character name, the longest weekday forms, and a 16-character name split
+    // from its times (READER_LINE_CHARS). Each is one line at the framed 18 px body width (422 px; 400 for margin),
+    // so the '-' inside a range is never a wrap point.
+    const char *clauses[] = {
+        "Free until 13:55,",
+        "Frei bis Di 13:55,",
+        "then reserved by Anna Mueller until 14:25",
+        "dann reserviert von Anna Mueller bis 14:25",
+        "Reserved by Anna Mueller 13:55-14:25",
+        "Reserviert von Anna Mueller 13:55-14:25",
+        "Your booking Tue 13:55-Tue 14:25",
+        "Deine Buchung Di 13:55-Di 14:25",
+        "(check in by 14:10)",
+        "(Check-in bis Di 14:10)",
+        "dann reserviert von Wolfgang Mohrman",
+        "bis Di 14:25",
+        "Reserviert von Wolfgang Mohrman",
+        "Mo 13:55-Di 14:25",
+    };
+    for (const char *clause : clauses)
+    {
+        const std::vector<uint32_t> ends = lineEnds(clause, &attractap_font_montserrat_latin1_18, 400);
+        if (!ends.empty()) std::cerr << "clause wraps at 400 px: '" << clause << "'\n";
+        assert(ends.empty());
+    }
+
+    // A time is never split, whatever the width.
+    const char *texts[] = {
+        "Free until 13:55, then reserved by bea until 14:25",
+        "Frei bis 13:55, dann reserviert von Lukasz Simek bis Di 14:25",
+        "Reserved by bea 13:55-14:25 (check in by 14:10)",
+        "Reserviert von Lukasz Simek 13:55-14:25 (Check-in bis 14:10)",
+        "Deine Buchung Di 13:55-Di 14:25 (Check-in bis Di 14:10)",
+        "Reserved by Anna Mueller Tue 13:55-Tue 14:25",
+    };
+    for (const lv_font_t *font : fonts)
+        for (int32_t width = 200; width <= 440; width += 10)
+            for (const char *text : texts)
+                for (const uint32_t end : lineEnds(text, font, width))
+                {
+                    const char last = text[end - 1], next = text[end];
+                    if (last == ':' || (last >= '0' && last <= '9' && next >= '0' && next <= '9'))
+                        std::cerr << "time split in '" << text << "' at " << end << " width " << width << "\n";
+                    assert(last != ':' && next != ':');
+                    assert(!(last >= '0' && last <= '9' && next >= '0' && next <= '9'));
+                    assert(next != ')');
+                }
+
+    // Hyphenated and "first.last" names wrap at the hyphen or dot, never in the middle of a word.
+    const char *names[] = {"Maximiliane-Charlotte von Hohenzollern-Sigmaringen", "Anna-Lena Schmidt-Hohenzollern",
+                           "maximiliane.mustermann-hohenzollern"};
+    for (const char *name : names)
+        for (const int32_t width : {300, 360, 408})
+            for (const uint32_t end : lineEnds(name, &attractap_font_montserrat_latin1_36, width))
+            {
+                const bool atBreak = name[end - 1] == ' ' || name[end - 1] == '-' || name[end - 1] == '.' || name[end] == ' ';
+                if (!atBreak) std::cerr << "mid-word break in '" << name << "' at " << end << " width " << width << "\n";
+                assert(atBreak);
+            }
+
+    assert(!lv_text_is_break_char(':') && !lv_text_is_break_char(')'));
+    assert(lv_text_is_break_char('-') && lv_text_is_break_char(' ') && lv_text_is_break_char(','));
+    assert(lv_text_is_break_char('.') && lv_text_is_break_char('_'));
+    std::cout << "PASS reader UI texts wrap at spaces and punctuation, never inside a time" << std::endl;
 }
 
 void testReaderUiStepModal(SdlDisplay &display, const std::filesystem::path &screenshots)
