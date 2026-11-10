@@ -18,10 +18,11 @@ from types import SimpleNamespace
 import grpc
 from labgrid.binding import BindingState
 from labgrid.exceptions import NoDriverFoundError, NoResourceFoundError
+from labgrid.resource.remote import RemotePlace
 import pytest
 
 from attractap_lab import efuse, workflow
-from attractap_lab.drivers import ESPToolDriver, ReaderPowerDriver
+from attractap_lab.drivers import ESPToolDriver, ReaderPowerDriver, SwitchPowerDriver
 from attractap_lab.janitor import OWNER, Janitor
 from attractap_lab.workflow import flash_reader, park
 from test_lab_workflow import eventually, executable, free_port, running
@@ -161,6 +162,7 @@ class FakePower:
         self.events = events
         self.emulator = SimpleNamespace(state=BindingState.bound)
         self.powered = False
+        self.delay = 2.0
 
     def get(self):
         return self.powered
@@ -170,20 +172,36 @@ class FakePower:
         self.powered = True
 
 
+class FakeSwitch(FakePower):
+    """A Touch V2 behind the lab host's USB power switch."""
+
+    def __init__(self, events):
+        super().__init__(events)
+        self.powered = True
+        self.delay = 10.0
+
+    def cycle(self):
+        self.events.append("power-cycle")
+
+
 class FakeTarget:
-    def __init__(self, console, flash, power=None):
+    def __init__(self, console, flash, power=None, tags=None):
         self.console = console
         self.flash = flash
         self.power = power
+        self.tags = tags
         self.events = flash.events
 
     def get_driver(self, name, activate=True):
-        drivers = {"SerialDriver": self.console, ESPToolDriver: self.flash, ReaderPowerDriver: self.power}
+        drivers = {"SerialDriver": self.console, ESPToolDriver: self.flash,
+                   (SwitchPowerDriver if isinstance(self.power, FakeSwitch) else ReaderPowerDriver): self.power}
         if drivers.get(name) is None:
             raise NoDriverFoundError(f"no {name}")
         return drivers[name]
 
     def get_resource(self, cls, name=None, wait_avail=True):
+        if cls is RemotePlace and self.tags is not None:
+            return SimpleNamespace(tags=self.tags)
         raise NoResourceFoundError(f"no {name}")
 
     def await_resources(self, resources, timeout):
@@ -251,6 +269,23 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
     park(off, tmp_path / "park.bin", tmp_path / "off", baseline_dir=tmp_path / "base")
     assert events.index("power-on") < events.index("efuse")
 
+    # The janitor's retry for a reader behind a power switch cuts its power first.
+    events = []
+    switched = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                          FakeFlash(espefuse_output(), events), FakeSwitch(events), tags={"power": "switch"})
+    park(switched, tmp_path / "park.bin", tmp_path / "switch", baseline_dir=tmp_path / "base", cycle_power=True)
+    assert events.index("power-cycle") < events.index("efuse")
+    assert "power-on" not in events, "the reader is on after the cycle"
+    log = (tmp_path / "switch/power-cycle.log").read_text()
+    assert "off for 10s, then on" in log and "reader is on again" in log
+    # An always-on place has nothing to cycle with; the attempt fails before erasing.
+    events = []
+    always_on = FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(), events), FakeSwitch(events),
+                           tags={"power": "always-on"})
+    with pytest.raises(RuntimeError, match="no switchable reader power"):
+        park(always_on, tmp_path / "park.bin", tmp_path / "always-on", cycle_power=True)
+    assert "efuse" not in events
+
 
 FAKE_PARK = textwrap.dedent("""
     import json, os, sys, time
@@ -262,7 +297,8 @@ FAKE_PARK = textwrap.dedent("""
     with (root / "events.jsonl").open("a") as events:
         events.write(json.dumps({"place": place, "host": os.environ.get("LG_HOSTNAME"),
                                  "image": Path(value("--image")).name,
-                                 "profile": value("--profile")}) + "\\n")
+                                 "profile": value("--profile"),
+                                 "cycle_power": "--cycle-power" in args}) + "\\n")
     time.sleep(float(os.environ.get("FAKE_PARK_SECONDS", "0")))
     while (root / f"hold-{place}").exists():
         time.sleep(0.05)
@@ -349,7 +385,7 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
             assert holder("reader-b") == OWNER
             assert len(parked("reader-b")) == 1, "eFuse quarantine must not retry"
             assert parked("reader-a")[0] == {"place": "reader-a", "host": "attractap-lab-janitor",
-                                             "image": "park.bin", "profile": "plain"}
+                                             "image": "park.bin", "profile": "plain", "cycle_power": False}
             assert parked("reader-b")[0]["image"] == "park.hex"
             assert parked("reader-b")[0]["profile"] == "secure-lab"
             assert not parked("other") and holder("other") is None
@@ -398,6 +434,7 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
             client("-p", "reader-a", "release")
             eventually(lambda: (state / "quarantine/reader-a.json").exists(), janitor, 30)
             assert len(parked("reader-a")) == before + 2
+            assert not any(entry["cycle_power"] for entry in parked("reader-a")), "no power switch to cycle"
             reason = json.loads((state / "quarantine/reader-a.json").read_text())["reason"]
             assert "failed 2 times" in reason
 
@@ -568,3 +605,59 @@ def test_janitor_parks_again_when_variant_or_profile_changes(tmp_path):
     session.places["reader"] = place(variant="touch-v2-secure", profile="secure-lab")
     asyncio.run(janitor.tick())
     assert janitor.dirty == {"reader"}
+
+
+@pytest.mark.parametrize("power,outcomes,runs,quarantined", [
+    # A reader behind a power switch is power-cycled before each retry...
+    ("switch", [1, 0], [False, True], None),
+    # ...and quarantined only once an attempt after a power cycle failed too.
+    ("switch", [1, 1], [False, True], "parking failed 2 times (last exit 1), also after a power cycle"),
+    # Burned eFuses quarantine at once; a power cycle must never retry them away.
+    ("switch", [3], [False], "eFuses burned"),
+    ("switch", [1, 3], [False, True], "eFuses burned"),
+    # Readers without a power switch keep the plain retry count.
+    ("button", [1], [False], "parking failed 1 times (last exit 1)"),
+    (None, [1], [False], "parking failed 1 times (last exit 1)"),
+])
+def test_janitor_power_cycles_a_switched_reader_before_giving_up(tmp_path, power, outcomes, runs, quarantined):
+    from labgrid.remote.common import Place, ResourceMatch
+    released, calls = [], []
+
+    class Stub:
+        async def ReleasePlace(self, request, timeout):
+            released.append(request.placename)
+
+    async def sync_with_coordinator():
+        return True
+
+    tags = {"variant": "touch-v2", **({"power": power} if power else {})}
+    session = SimpleNamespace(stub=Stub(), sync_with_coordinator=sync_with_coordinator, places={
+        "reader": Place(name="reader", tags=tags, matches=[ResourceMatch.fromstr("test/reader/*")])})
+    janitor = Janitor(session, config=None, images={"touch-v2": "park.bin"}, state_dir=tmp_path,
+                      priority=1000, max_parallel=1, attempts=1, park_command=[], job_seconds=1,
+                      marker_seconds=1)
+
+    async def run_child(name, image, profile, *, cycle_power=False):
+        calls.append(cycle_power)
+        run = tmp_path / "runs" / str(len(calls))
+        run.mkdir(parents=True)
+        code = outcomes[len(calls) - 1]
+        if code == 3:
+            (run / "reason.txt").write_text("eFuses burned\n")
+        return code, run
+
+    janitor._run_child = run_child
+
+    async def attempts():
+        for _ in outcomes:
+            await janitor._park("reader", "touch-v2", efuse.PLAIN)
+
+    asyncio.run(attempts())
+    assert calls == runs
+    hold = tmp_path / "quarantine/reader.json"
+    if quarantined is None:
+        assert released == ["reader"] and not hold.exists()
+    else:
+        assert json.loads(hold.read_text())["reason"] == quarantined
+        assert not released
+    assert not janitor.power_cycle

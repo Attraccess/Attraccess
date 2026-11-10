@@ -9,17 +9,20 @@ import time
 
 import pytest
 
+from attractap_lab.drivers import SwitchPowerDriver
 from attractap_lab.enrollment import latest_code
-from attractap_lab.workflow import reader_power
+from attractap_lab.workflow import POWER_BUTTON, POWER_SWITCH, place_power, reader_power
 
-from conftest import POWER_BUTTON_VARIANTS, READER_VARIANT, approve_pairing, open_console
+from conftest import approve_pairing, open_console
 from test_nfc_cards import card_ids, enroll, login, sign_out
 from test_nfc_flows import make_factory
 
 REVOKE_DISCONNECT_SECONDS = 1.0
 ROTATION_SECONDS = 35  # codes rotate every 30 s
 # Long enough for the reader to lose all power, and for its power-bank chip to
-# take the next press: it ignores one right after switching.
+# take the next press: it ignores one right after switching. A reader behind a
+# power switch stays off for its driver's cycle delay (10 s), which also resets
+# a Touch V2's I/O expander.
 POWER_OFF_SECONDS = 5
 
 
@@ -184,16 +187,24 @@ def test_reboot_stays_paired(target, reader, hooks):
     expect_still_paired(reader, hooks, reopen_console(target, reader))
 
 
-@pytest.mark.skipif(READER_VARIANT not in POWER_BUTTON_VARIANTS,
-                    reason=f"{READER_VARIANT or 'this reader'}: no power button for the NFC emulator to press")
-def test_power_cycle_stays_paired(target, reader, hooks):
+@pytest.fixture
+def switchable_power(target):
+    """The reader's power driver, on places tagged power=button or power=switch; skips elsewhere."""
+    power = place_power(target)
+    if power not in (POWER_BUTTON, POWER_SWITCH):
+        pytest.skip(f"place tagged power={power or '(none)'}: the NFC emulator cannot switch this reader")
+    return reader_power(target)
+
+
+def test_power_cycle_stays_paired(target, switchable_power, reader, hooks):
     """Cut the reader's power, unlike the esptool reset above, and switch it on again."""
-    power = reader_power(target)
+    power = switchable_power
+    off_seconds = power.delay if isinstance(power, SwitchPowerDriver) else POWER_OFF_SECONDS
     close_console(target, reader)
     target.activate(power)
     try:
         power.off()  # returns once the reader's port has disappeared
-        time.sleep(POWER_OFF_SECONDS)
+        time.sleep(off_seconds)
     finally:
         # Also after a failed switch-off, so later tests find the reader on with its console open.
         power.on()

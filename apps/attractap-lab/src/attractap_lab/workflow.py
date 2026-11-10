@@ -16,11 +16,11 @@ from labgrid.exceptions import NoDriverFoundError, NoResourceFoundError
 from labgrid.remote.client import start_session
 from labgrid.remote.generated import labgrid_coordinator_pb2 as messages
 from labgrid.resource.common import Resource
-from labgrid.resource.remote import RemotePlaceManager
+from labgrid.resource.remote import RemotePlace, RemotePlaceManager
 from pexpect import TIMEOUT
 
 from . import efuse
-from .drivers import ESPToolDriver, NfcEmulatorDriver, ReaderPowerDriver, ScreenCaptureDriver
+from .drivers import ESPToolDriver, NfcEmulatorDriver, ReaderPowerDriver, ScreenCaptureDriver, SwitchPowerDriver
 
 
 @contextmanager
@@ -111,17 +111,52 @@ def _claim(config, place, role, *, acquire=True):
                     ]
 
 
-def reader_power(target):
-    """Return the reader's ReaderPowerDriver, or None if its place has no NFC emulator.
+# Values of a place's `power` tag: how the lab switches the reader.
+POWER_BUTTON = "button"  # its NFC emulator presses its power button (Touch V1)
+POWER_SWITCH = "switch"  # the lab host's USB power switch in its cable (Touch V2)
+POWER_ALWAYS_ON = "always-on"  # nothing: USB powers the reader whenever it is plugged in
+POWER_KINDS = (POWER_BUTTON, POWER_SWITCH, POWER_ALWAYS_ON)
+_POWER_DRIVERS = {POWER_BUTTON: ReaderPowerDriver, POWER_SWITCH: SwitchPowerDriver}
 
-    Uses the environment's driver when it lists one. Otherwise, as for
-    environments that only bind the reader, binds a new one (and an
-    NfcEmulatorDriver if needed) to the place's NfcEmulatorSerial resource.
+
+def place_power(target):
+    """Return the place's `power` tag, or None if it has none.
+
+    Tags come from the coordinator with the RemotePlace resource. Environments
+    without one (local resources, tests) have no tags either.
     """
     try:
-        return target.get_driver(ReaderPowerDriver, activate=False)
+        place = target.get_resource(RemotePlace, wait_avail=False)
+    except NoResourceFoundError:
+        return None
+    power = (getattr(place, "tags", None) or {}).get("power")
+    if power is not None and power not in POWER_KINDS:
+        raise ValueError(f"Place tag power={power} is not one of {', '.join(POWER_KINDS)}")
+    return power
+
+
+def reader_power(target):
+    """Return the driver switching the reader's power, or None if nothing can.
+
+    The place's `power` tag selects it: ReaderPowerDriver for `button`,
+    SwitchPowerDriver for `switch`, None for `always-on`. Without the tag, a
+    place with an NFC emulator gets ReaderPowerDriver, which leaves a reader
+    that is on alone. Uses the environment's driver when it lists one.
+    Otherwise, as for environments that only bind the reader, binds a new one;
+    a ReaderPowerDriver (and an NfcEmulatorDriver if needed) binds to the
+    place's NfcEmulatorSerial resource, and without that resource there is
+    nothing to press the button with.
+    """
+    power = place_power(target)
+    if power == POWER_ALWAYS_ON:
+        return None
+    driver = _POWER_DRIVERS.get(power, ReaderPowerDriver)
+    try:
+        return target.get_driver(driver, activate=False)
     except NoDriverFoundError:
         pass
+    if driver is SwitchPowerDriver:
+        return SwitchPowerDriver(target, None)
     try:
         target.get_driver(NfcEmulatorDriver, activate=False)
     except NoDriverFoundError:
@@ -131,26 +166,58 @@ def reader_power(target):
             return None
         target.set_binding_map({"port": "NfcEmulatorSerial"})
         NfcEmulatorDriver(target, None)
-    return ReaderPowerDriver(target, None)
+    return driver(target, None)
 
 
 def power_on(target):
-    """Turn the reader on if it is off and its NFC emulator can press its power button.
+    """Turn the reader on if it is off and the lab can switch it.
 
     A Touch V1 turns itself off about 30 s after its screen goes dark, as when
-    parked. Readers that are on, and places without an emulator, are left alone.
+    parked; a reader behind a power switch is off when someone left it off.
+    Readers that are on, and places without switchable power, are left alone.
     """
     power = reader_power(target)
     if power is None or power.get():
         return
+    with _switching(target, power):
+        power.on()
+
+
+def power_cycle(target, log):
+    """Cut the reader's power for the driver's delay, then wait until it is back.
+
+    For a reader behind a power switch this is the unplugging that frees a
+    Touch V2's I/O expander. Appends what happened, with times, to the file ``log``.
+    """
+    power = reader_power(target)
+    if power is None:
+        raise RuntimeError("The place has no switchable reader power to cycle")
+    with Path(log).open("a") as out:
+        def note(message):
+            out.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}\n")
+            out.flush()
+
+        note(f"{type(power).__name__}: off for {power.delay:g}s, then on")
+        with _switching(target, power):
+            try:
+                power.cycle()
+            except Exception as error:
+                note(f"failed: {error}")
+                raise
+        note("reader is on again")
+
+
+@contextmanager
+def _switching(target, power):
     # Keep an emulator connection the caller uses; close one opened here, as
-    # flashing the emulator needs its port.
-    close = power.emulator.state is not BindingState.active
+    # flashing the emulator needs its port. A power switch needs no emulator.
+    emulator = getattr(power, "emulator", None)
+    close = emulator is not None and emulator.state is not BindingState.active
     target.activate(power)
     try:
-        power.on()
+        yield
     finally:
-        target.deactivate(power.emulator if close else power)
+        target.deactivate(emulator if close else power)
 
 
 # A flash ends with a reset; give a reader that lost power time to show as off.
@@ -158,7 +225,7 @@ RESET_SETTLE_SECONDS = 3.0
 
 
 def power_on_after_reset(target):
-    """Switch a reader with a power button back on if it went off at a flash's reset.
+    """Switch a reader back on if it went off at a flash's reset.
 
     A Touch V1 switched on from parking runs the dark parking image, so its
     power-bank chip cuts the power about 30 s later. A flash that ends after
@@ -170,7 +237,7 @@ def power_on_after_reset(target):
 
 
 def flash_reader(target, image, *, erase=False):
-    """Flash a merged image at zero, switching a reader with a power button on first.
+    """Flash a merged image at zero, switching a reader with switchable power on first.
 
     A slow upload can let a Touch V1 switch itself off during the flash (see
     power_on_after_reset). It is then switched on and flashed once more; the
@@ -247,8 +314,12 @@ _PARK_FAILED_LINE = re.compile(rb"ATTRACTAP_PARK_FAILED[^\n]*\n")
 
 
 def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resource_seconds=30.0,
-         profile=efuse.PLAIN):
+         profile=efuse.PLAIN, cycle_power=False):
     """Check eFuses, erase the whole chip, flash a parking image and confirm it.
+
+    ``cycle_power`` first cuts the reader's power for its driver's delay (see
+    power_cycle), logging to power-cycle.log in output: the janitor's retry for
+    a reader behind a power switch whose I/O expander held the I2C bus.
 
     Raises efuse.EfuseViolation before erasing if the eFuses do not match the
     reader profile or changed since first seen; such a reader must not be
@@ -263,6 +334,8 @@ def park(target, image, output, *, baseline_dir=None, marker_seconds=30.0, resou
     console = target.get_driver("SerialDriver", activate=False)
     target.deactivate(console)
     flash = target.get_driver(ESPToolDriver, activate=False)
+    if cycle_power:
+        power_cycle(target, output / "power-cycle.log")
     power_on(target)
     # Labgrid waits forever for an unavailable resource; a missing reader must fail.
     target.await_resources([flash.device], timeout=resource_seconds)
