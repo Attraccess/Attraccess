@@ -1,5 +1,6 @@
 """Only the missing labgrid operations: ESP flashing/eFuse reads, screen snapshots,
-NFC card emulator commands and a reader power button pressed by the emulator.
+NFC card emulator commands, and reader power switched through a power button the
+emulator presses or a USB power switch the lab host controls.
 
 Resources, USB discovery, SSH transport, locking and serial access use labgrid.
 """
@@ -23,6 +24,7 @@ from labgrid.exceptions import NoResourceFoundError
 from labgrid.factory import target_factory
 from labgrid.protocol import ConsoleProtocol, PowerProtocol, ResetProtocol
 from labgrid.resource.common import NetworkResource, Resource
+from labgrid.resource.remote import RemotePlace
 from labgrid.util.managedfile import ManagedFile
 from labgrid.util.proxy import proxymanager
 from pexpect import TIMEOUT
@@ -363,3 +365,77 @@ class ReaderPowerDriver(Driver, PowerProtocol):
                     "pressing its power button; does this place have one?")
             # Resources without a manager report unavailable at once.
             time.sleep(max(0.0, min(attempt + wait, deadline) - time.monotonic()))
+
+
+@target_factory.reg_driver
+@attr.s(eq=False)
+class SwitchPowerDriver(Driver, PowerProtocol):
+    """Switch a reader through a network USB power switch the lab host controls.
+
+    For readers without a power button, like the Touch V2: cutting the power for
+    ``delay`` (10 s) is what frees its CH32 I/O expander when that holds I2C SCL
+    low. A Tasmota USB switch sits between the hub and the reader. Only the lab
+    host knows its password, so the driver runs ``attractap-lab-reader-switch``
+    there, over the SSH connection labgrid uses for the reader's port; the
+    host's sudo rule runs it as root (README "Reader power"). The reader's
+    serial port appearing or disappearing confirms each switch.
+
+    ``get()`` reports that port, like ReaderPowerDriver, so callers can treat
+    both drivers alike and need no SSH round trip to ask.
+    """
+    bindings = {}
+    # The reader's serial resource, present only while the reader is powered.
+    reader_port = attr.ib(default="USBSerialPort", validator=attr.validators.instance_of(str))
+    command = attr.ib(default="attractap-lab-reader-switch", validator=attr.validators.instance_of(str))
+    # Time for the reader's port to appear or disappear after switching.
+    timeout = attr.ib(default=20.0, converter=float)
+    # Off time for cycle(); `labgrid-client power cycle --delay` sets it. The
+    # Touch V2's I/O expander needs about 10 s without power to reset.
+    delay = attr.ib(default=10.0, converter=float)
+
+    @Driver.check_active
+    def on(self):
+        self._switch(True)
+
+    @Driver.check_active
+    def off(self):
+        self._switch(False)
+
+    @Driver.check_active
+    def cycle(self):
+        self.off()
+        time.sleep(self.delay)
+        self.on()
+
+    def get(self):
+        """Whether the reader is powered (its port is present). Needs no activation."""
+        port = self._port()
+        port.poll()
+        return port.avail
+
+    def _port(self):
+        return self.target.get_resource(Resource, name=self.reader_port, wait_avail=False)
+
+    def _place(self):
+        try:
+            return self.target.get_resource(RemotePlace, wait_avail=False).name
+        except NoResourceFoundError:
+            raise RuntimeError("The reader's power switch belongs to a labgrid place; "
+                               "use a RemotePlace environment") from None
+
+    def _switch(self, on):
+        action = "on" if on else "off"
+        port = self._port()
+        command = port.wrap_command([self.command, "--place", self._place(), action])
+        try:
+            subprocess.run(command, check=True, stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                           timeout=self.timeout)
+        except subprocess.CalledProcessError as error:
+            raise RuntimeError(f"Switching the reader's power {action} failed: "
+                               f"{(error.stderr or error.stdout or '').strip() or error}") from None
+        try:
+            self.target.await_resources([port], timeout=self.timeout, avail=on)
+        except NoResourceFoundError:
+            raise TimeoutError(
+                f"The reader's port did not {'appear' if on else 'disappear'} within {self.timeout:g}s "
+                f"of switching its power {action}; is the switch in its USB cable?") from None

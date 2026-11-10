@@ -9,7 +9,9 @@ chip, flashes the parking image for the place's `variant` tag (encrypted on a
 `secure-lab` reader) and releases the reader once the image reports it is parked.
 
 A reader whose eFuses were burned, or that fails to park repeatedly, stays
-claimed by the janitor (quarantine) until an operator runs `clear`.
+claimed by the janitor (quarantine) until an operator runs `clear`. A reader
+on a place tagged `power=switch` is power-cycled before each retry, and only
+quarantined once an attempt after a power cycle failed too.
 Quarantined claims carry no reservation, which maintenance relies on.
 """
 
@@ -32,7 +34,7 @@ from labgrid.remote.common import Reservation, ReservationState
 from labgrid.remote.generated import labgrid_coordinator_pb2 as messages
 
 from . import efuse
-from .workflow import attached, park
+from .workflow import POWER_SWITCH, attached, park
 
 OWNER_HOST = "attractap-lab-janitor"
 OWNER_USER = "janitor"
@@ -82,6 +84,7 @@ class Janitor:
         self.reserving = set()
         self.jobs = {}
         self.failures = {}
+        self.power_cycle = set()  # switched readers whose next attempt cuts their power first
         self.retry_after = {}
         self.wake = asyncio.Event()
 
@@ -277,10 +280,12 @@ class Janitor:
 
     async def _park(self, name, variant, profile):
         try:
+            cycled = name in self.power_cycle
             async with self.slots:
-                code, run = await self._run_child(name, self.images[variant], profile)
+                code, run = await self._run_child(name, self.images[variant], profile, cycle_power=cycled)
             if code == 0:
                 self.failures.pop(name, None)
+                self.power_cycle.discard(name)
                 self.dirty.discard(name)
                 await self._drop_reservation(name)
                 await self.session.stub.ReleasePlace(
@@ -290,13 +295,24 @@ class Janitor:
                 log.info("%s: parked and released", name)
                 return
             failures = self.failures[name] = self.failures.get(name, 0) + 1
-            if code == QUARANTINE_EXIT or failures >= self.attempts:
+            # A Touch V2's I/O expander can hold the I2C bus until the reader
+            # loses power. A reader behind a power switch gets that before giving up;
+            # burned eFuses are never retried.
+            switched = self._place_power(name) == POWER_SWITCH
+            if code == QUARANTINE_EXIT or (failures >= self.attempts and (cycled or not switched)):
                 reason_file = run / "reason.txt"
                 reason = reason_file.read_text().strip() if reason_file.exists() else (
-                    f"parking failed {failures} times (last exit {code})")
+                    f"parking failed {failures} times (last exit {code})"
+                    + (", also after a power cycle" if cycled else ""))
                 self._quarantine(name, reason, run)
                 self.failures.pop(name, None)
+                self.power_cycle.discard(name)
                 await self._drop_reservation(name)
+            elif switched:
+                log.warning("%s: parking attempt %d failed (exit %s); power-cycling the reader before "
+                            "the next attempt", name, failures, code)
+                self.power_cycle.add(name)
+                self.retry_after[name] = time.monotonic() + 5
             else:
                 log.warning("%s: parking attempt %d failed (exit %s); retrying", name, failures, code)
                 self.retry_after[name] = time.monotonic() + 5
@@ -308,7 +324,11 @@ class Janitor:
         finally:
             self.jobs.pop(name, None)
 
-    async def _run_child(self, name, image, profile):
+    def _place_power(self, name):
+        place = self.session.places.get(name)
+        return place.tags.get("power") if place is not None else None
+
+    async def _run_child(self, name, image, profile, *, cycle_power=False):
         runs = self.state_dir / "runs" / name
         run = runs / time.strftime("%Y%m%dT%H%M%S")
         run.mkdir(parents=True, exist_ok=True)
@@ -318,7 +338,11 @@ class Janitor:
                    "--image", str(image), "--profile", profile, "--output", str(run),
                    "--baseline-dir", str(self.state_dir / "efuse-baselines"),
                    "--marker-seconds", str(self.marker_seconds)]
-        log.info("%s: parking with %s (%s reader)", name, image, profile)
+        if cycle_power:
+            command.append("--cycle-power")
+            log.info("%s: power-cycling the reader, then parking with %s (%s reader)", name, image, profile)
+        else:
+            log.info("%s: parking with %s (%s reader)", name, image, profile)
         # Own process group: labgrid drivers and SSH children stop with it.
         process = await asyncio.create_subprocess_exec(*command, start_new_session=True)
         try:
@@ -390,7 +414,8 @@ def run_park(args):
     try:
         with attached(args.config, args.place) as target:
             mac = park(target, args.image, output, baseline_dir=args.baseline_dir,
-                       marker_seconds=args.marker_seconds, profile=args.profile)
+                       marker_seconds=args.marker_seconds, profile=args.profile,
+                       cycle_power=args.cycle_power)
     except efuse.EfuseViolation as violation:
         (output / "reason.txt").write_text(
             f"eFuses do not match the {args.profile} reader profile, reader must not be reused: {violation}\n")
@@ -433,7 +458,8 @@ def main(argv=None):
                              "profile=secure-lab need a lab-signed .hex image")
     daemon.add_argument("--priority", type=float, default=1000.0, help="reservation priority (sessions use 0)")
     daemon.add_argument("--max-parallel", type=int, default=2)
-    daemon.add_argument("--attempts", type=int, default=3, help="failed attempts before quarantine")
+    daemon.add_argument("--attempts", type=int, default=3,
+                        help="failed attempts before quarantine (power=switch: at least one after a power cycle)")
     daemon.add_argument("--job-seconds", type=float, default=900.0)
     daemon.add_argument("--marker-seconds", type=float, default=30.0)
     daemon.add_argument("--park-command", help="command prefix running this module (default: this interpreter)")
@@ -448,6 +474,8 @@ def main(argv=None):
     single.add_argument("--output", required=True)
     single.add_argument("--baseline-dir")
     single.add_argument("--marker-seconds", type=float, default=30.0)
+    single.add_argument("--cycle-power", action="store_true",
+                        help="cut the reader's power first (power=switch places), logged to power-cycle.log")
     single.set_defaults(func=run_park)
 
     clear = commands.add_parser("clear", help="release a quarantined reader after fixing it")

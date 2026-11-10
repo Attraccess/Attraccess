@@ -174,7 +174,51 @@ to the reader. `NfcEmulatorFlashDriver` flashes the emulator's merged image.
 Emulator profiles persist across sessions; runtime state (selection,
 presentation, faults, overrides) resets when the emulator reboots.
 
-## Readers with a power button
+## Reader power
+
+The lab can switch a reader's power. The place's `power` tag says how:
+
+| `power` tag | Reader              | Switched by                                          | Driver              |
+| ----------- | ------------------- | ---------------------------------------------------- | ------------------- |
+| `button`    | Touch V1            | The NFC emulator, pressing the reader's power button | `ReaderPowerDriver` |
+| `switch`    | Touch V2            | The lab host, with a USB power switch in the cable   | `SwitchPowerDriver` |
+| `always-on` | Any, without wiring | Nothing; USB powers the reader                       | none                |
+
+```nix
+coordinator.places.attractap-touch-v2-1.tags = {
+  board = "attractap";
+  variant = "attractap-touch-v2";
+  power = "switch";
+};
+```
+
+`attractap_lab.workflow.reader_power(target)` returns the place's driver, or
+None for `always-on`, and where pressing a button needs an NFC emulator but the
+place exports no `NfcEmulatorSerial`. A place without a `power` tag (or an
+environment without a `RemotePlace`, such as local resources) gets
+`ReaderPowerDriver` when it has an emulator, which
+leaves a reader that is on alone. The tag wins over a power driver listed in
+the environment file. Both drivers confirm each switch by the reader's serial
+port (`USBSerialPort`) appearing or disappearing, and `get()` reports that
+port.
+
+`attractap_lab.workflow.power_on(target)` turns the reader on only when it is
+off, binding the emulator itself when a `button` place's environment lists
+only the reader's drivers. `flash_reader(target, image)` powers the reader on before flashing
+(see below for the Touch V1), and `smoke`, the HIL reader fixture and the
+janitor's parking power on the same way. In a session, or while holding a
+place, `attractap-lab-power on|off|cycle|get` picks the driver from the tag and
+needs no environment file:
+
+```sh
+labgrid-client -p attractap-touch-1 session --purpose 'ATT-1234: cold boot' -- \
+  sh -c 'attractap-lab-power off && attractap-lab-power on'
+```
+
+For `button`, the emulator needs firmware with `button.press`; older firmware
+answers `unknown_command`.
+
+### Power button (Touch V1)
 
 A Touch V1 (Waveshare ESP32-S3-Touch-LCD-4 V3) only powers up after a press of
 its power button, and its power-bank chip turns it off again about 30 s after
@@ -183,8 +227,8 @@ an optocoupler from the place's NFC emulator across that button (see the
 [emulator README](../attractap/nfc-emulator/README.md#reader-power-button-optional))
 and plug a 1-cell LiPo into the board's BAT socket: without a battery the chip
 stops reacting to the button some time after switching off, until USB is
-plugged in again. `ReaderPowerDriver` then switches the reader through the
-emulator:
+plugged in again. Tag the place `power=button`. `ReaderPowerDriver` then
+switches the reader through the emulator:
 
 ```python
 power = target.get_driver("PowerProtocol")  # from example-emulator-env.yaml
@@ -194,24 +238,63 @@ power.off()  # two presses, then waits for it to disappear
 
 Native `labgrid-client power on|off|cycle|get` uses the same driver. A reader
 already in the requested state is left alone, so `on()` is safe on any reader.
-`attractap_lab.workflow.power_on(target)` turns the reader on only when it is
-off and the place exports `NfcEmulatorSerial`, binding the emulator itself when
-the environment lists only the reader's drivers. A V1 switched on from parking
-runs the dark parking image, so it switches itself off again about 30 s later,
-which a slow flash can outlast. `flash_reader(target, image)` therefore powers
-the reader on, flashes it once more if it went off mid-flash, and presses the
-button again if it is off after the reset. `smoke` and the HIL reader fixture
-flash through it; the janitor's parking powers on the same way. In a session,
-or while holding a place, `attractap-lab-power on|off|cycle|get` needs no
-environment file:
+A V1 switched on from parking runs the dark parking image, so it switches
+itself off again about 30 s later, which a slow flash can outlast.
+`flash_reader` therefore flashes it once more if it went off mid-flash, and
+presses the button again if it is off after the reset.
 
-```sh
-labgrid-client -p attractap-touch-1 session --purpose 'ATT-1234: cold boot' -- \
-  sh -c 'attractap-lab-power off && attractap-lab-power on'
+### USB power switch (Touch V2)
+
+The Touch V2 has no power button, but its CH32 I/O expander can lock up after
+an ESP32 reset and hold I2C SCL low until the reader loses power for about
+10 s. Parking then fails (see Reader parking). Put a USB power switch running
+[Tasmota](https://tasmota.github.io/) between the hub and the reader's cable,
+on the readers' Wi-Fi, and tag the place `power=switch`. The lab uses a
+Sinilink XY-WFUSB, flashed over its UART pads with the `XY-WFUSB` template.
+Set it up from its web interface or `http://SWITCH/cm?cmnd=...`:
+
+```text
+Backlog DeviceName attractap-touch-v2-1-power; PowerOnState 1; SetOption1 1; SetOption3 0
+Hostname attractap-touch-v2-1-power
 ```
 
-The emulator needs firmware with `button.press`; older firmware answers
-`unknown_command`.
+`PowerOnState 1` powers the reader whenever the switch gets power,
+`SetOption1 1` stops its button from resetting it or opening its setup access
+point, and `SetOption3 0` turns MQTT off. Then declare it on the lab host:
+
+```nix
+services.attractap-lab.readerSwitch.switches.attractap-touch-v2-1 =
+  "attractap-touch-v2-1-power.fritz.box";
+```
+
+The host generates a web password in the root-only `readerSwitch.passwordFile`
+and sets it on every declared switch that has none, at boot and on each
+deployment (`attractap-lab-reader-switch-secure.service`), so only the host
+can switch the reader or open the switch's web interface. `SwitchPowerDriver`
+runs `attractap-lab-reader-switch` on the host over the SSH connection labgrid
+uses for the reader's port; a sudo rule runs it as root, and it refuses to
+switch a place nobody holds:
+
+```python
+from attractap_lab.workflow import reader_power
+
+power = reader_power(target)  # SwitchPowerDriver on a power=switch place
+target.activate(power)
+power.off()    # switches it off, then waits for the reader's port to disappear
+power.cycle()  # off, 10 s (power.delay), on, then waits for the port
+```
+
+`attractap-lab-reader-switch get|secure` works without a claim. A switch that
+answers with another password (reset or replaced) is reported, never
+overwritten: reset its web password (`WebPassword "` in its console, over its
+UART), and the host sets its own again. For native `labgrid-client power` on
+such a place, list `SwitchPowerDriver: {}` instead of `ReaderPowerDriver` in a
+copy of `example-emulator-env.yaml`.
+
+`attractap-touch-v2-1` was tagged `power=always-on` before its switch was
+installed. A lab host deployment must retag it `power=switch` and declare its
+switch (in the host's configuration, outside this repository), or nothing
+switches it and the janitor cannot power-cycle it.
 
 ## Reader Wi-Fi without revealing the secret
 
@@ -261,8 +344,8 @@ throwaway database (`STORAGE_ROOT`), and runs pytest inside one labgrid
 session on `LG_PLACE_NAME` (default `attractap-touch-v2-1`). The reader image
 is built for `READER_VARIANT`, by default the place name without its `-<n>`
 suffix (`attractap-touch-1` runs the `attractap-touch` firmware). The tests
-flash the emulator first, then turn the reader on with its power button if it
-is off (a Touch V1 while idle), then flash the reader. The run seeds
+flash the emulator first, then turn the reader on with its power
+button if it is off (a Touch V1 while idle), then flash the reader. The run seeds
 `admin`/`password` into its own database, signs in, and approves the erased
 reader's rotating pairing code (`Enrollment: code=XXX-XXX` on the UART) through
 `POST /api/attractap/pairings/resolve` and `/pairings/:id/approve` with that
@@ -290,12 +373,11 @@ The tests in `test_nfc_cards.py` build on each other: one whose prerequisite
 (an enrolled card from an earlier test) is missing fails and names it, so
 run that file whole rather than picking single tests from it with `-k`.
 
-`test_power_cycle_stays_paired` switches the reader off with its power button,
-waits, switches it on again and expects it to open its secure session without
-a new approval. It runs only for the variants in `POWER_BUTTON_VARIANTS`
-(`hil/conftest.py`), currently the Touch V1 (`attractap-touch`). Other readers
-skip it: their emulator has no button to press. Add a variant there once its
-places have the emulator wired to its power button.
+`test_power_cycle_stays_paired` switches the reader off, waits (5 s with a
+power button, the driver's 10 s with a power switch), switches it on again and
+expects it to open its secure session without a new approval. It runs on
+places tagged `power=button` or `power=switch` and skips the others (see Reader
+power): the lab cannot switch those readers.
 
 ### Secure lab reader
 
@@ -314,7 +396,7 @@ READER_PROFILE=secure-lab pnpm nx run attractap-lab:hil
 ```
 
 - The runner builds the reader with `-DATTRACTAP_SECURE_PROFILE=ON
-  -DATTRACTAP_SECURE_LAB=ON -DATTRACTAP_TEST_HOOKS=ON`. The lab profile keeps
+-DATTRACTAP_SECURE_LAB=ON -DATTRACTAP_TEST_HOOKS=ON`. The lab profile keeps
   the USB console and serial command handler that the release profile compiles
   out.
 - `tools/secure_lab_reader.py hex` signs the bootloader and app with the lab key
@@ -564,7 +646,7 @@ the reader as `attractap-lab-janitor/janitor`, checks its eFuses, runs
 image prints `ATTRACTAP_PARKED` on the UART. Parking takes roughly 10–20 s. On
 startup and after coordinator restarts, every managed reader is parked once,
 and so is a reader whose place appears later, as when a deployment adds it.
-A reader with a power button that is off is switched on first; a parked Touch
+A reader with switchable power that is off is switched on first; a parked Touch
 V1 turns itself off again about 30 s later.
 
 Full erase also wipes NVS: each session must provision Wi-Fi/API settings
@@ -582,8 +664,11 @@ also compares every raw eFuse block with the first dump recorded for the chip
 `SECURE_VERSION` bits of BLOCK0 are left out and may only grow (anti-rollback
 burns them when the reader boots an image with a higher secure version). A park image older than that version no
 longer boots, so rebuild it from a branch with the new version. A mismatch
-quarantines the reader immediately; other failures retry, then quarantine after
-`janitor.attempts`. Quarantined readers stay claimed by the janitor without a
+quarantines the reader immediately, also on a `power=switch` place; other
+failures retry, then quarantine after `janitor.attempts`. On a `power=switch`
+place the janitor power-cycles the reader before each retry (switch off for
+10 s, on, then it waits for the reader's port) and quarantines it only once an
+attempt after a power cycle failed as well. Quarantined readers stay claimed by the janitor without a
 reservation, so sessions skip them and maintenance does not wait for them:
 
 ```sh
@@ -592,8 +677,8 @@ ssh root@lab-host attractap-lab-janitor clear attractap-touch-v2-1  # after repa
 ```
 
 Each attempt keeps `efuse.txt` and `serial.log` under
-`/var/lib/attractap-lab-janitor/runs/PLACE/`; `journalctl -u attractap-lab-janitor`
-shows decisions.
+`/var/lib/attractap-lab-janitor/runs/PLACE/`, and a power-cycled attempt
+`power-cycle.log`; `journalctl -u attractap-lab-janitor` shows decisions.
 
 A parking image that cannot park prints `ATTRACTAP_PARK_FAILED`, clears the
 I2C bus and retries every 2 s; the attempt fails only if `markerSeconds` pass
@@ -603,7 +688,9 @@ answer, for example `line=io-expander err=ESP_ERR_TIMEOUT sda=1 scl=0
 expander=ESP_ERR_TIMEOUT pn532=ESP_ERR_TIMEOUT`. An idle bus reads `sda=1
 scl=1`. A line still low after the bus clear is held by a slave (on the Touch
 V2 most likely the CH32 I/O expander MCU), which only lets go when the reader
-loses power: unplug its USB cable for at least 10 s, then `clear` the place. The janitor reaches the local exporter over SSH like any
+loses power for at least 10 s. On a `power=switch` place the janitor's power
+cycle does that. Elsewhere, unplug the reader's USB cable for at least 10 s,
+then `clear` the place. The janitor reaches the local exporter over SSH like any
 client, with a host-local key authorized only for the `labgrid` account.
 
 The parking image never deep-sleeps: that would power down USB-Serial-JTAG and
