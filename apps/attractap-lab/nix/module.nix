@@ -296,8 +296,10 @@ in {
       message = "services.attractap-lab.readerWifi needs the exporter on the same host.";
     } ];
     # Lab users run the command but cannot read the credentials it sends.
-    environment.systemPackages = [ readerWifiCommand ];
-    users.users.labgrid.packages = [ readerWifiCommand ];
+    # hiPrio: the package's unwrapped script of the same name must not win,
+    # as it did in root's PATH (it needs the root-only arguments).
+    environment.systemPackages = [ (lib.hiPrio readerWifiCommand) ];
+    users.users.labgrid.packages = [ (lib.hiPrio readerWifiCommand) ];
     security.sudo.extraRules = [ {
       users = [ "labgrid" ];
       commands = [ { command = "${readerWifiRoot}"; options = [ "NOPASSWD" ]; } ];
@@ -310,8 +312,9 @@ in {
       message = "services.attractap-lab.readerSwitch needs the coordinator on the same host (it checks who holds a place).";
     } ];
     # Lab users and the janitor switch readers but cannot read the password.
-    environment.systemPackages = [ readerSwitchCommand ];
-    users.users.labgrid.packages = [ readerSwitchCommand ];
+    # hiPrio, as for readerWifi.
+    environment.systemPackages = [ (lib.hiPrio readerSwitchCommand) ];
+    users.users.labgrid.packages = [ (lib.hiPrio readerSwitchCommand) ];
     security.sudo.extraRules = [ {
       users = [ "labgrid" ];
       commands = [ { command = "${readerSwitchRoot}"; options = [ "NOPASSWD" ]; } ];
