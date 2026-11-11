@@ -9,7 +9,10 @@ import {
 import { useShellyTranslations } from '../../i18n';
 import { TranslationMessage } from '@attraccess/plugins-frontend-ui';
 import { usePluginLiveUpdates } from '@attraccess/plugins-frontend-sdk';
-import { UPDATE_TIMEOUT_MS } from './FirmwareDrawer';
+
+// A Shelly OTA takes ~30-90s including the reboot; past this we stop claiming
+// progress and let the operator re-check manually.
+const UPDATE_TIMEOUT_MS = 5 * 60 * 1000;
 
 export function useFirmwareDrawerState({
   device,

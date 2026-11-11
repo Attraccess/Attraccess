@@ -4,7 +4,7 @@ import { Button, Input, Label, TextField } from '@heroui/react';
 import { Copy, Trash2 } from 'lucide-react';
 import { BUILTIN_MODBUS_PROFILES, duplicateProfile, type ModbusDevice } from '../../../../modbus/model';
 import { randomUUID } from '../../configuration/identity';
-import { Choice, NumericField } from '../../configuration/channels/DigitalChannelEditor';
+import { Choice, NumericField } from '../../configuration/channels/DigitalChannelEditorFields';
 import { ModbusProfileForm } from '../../configuration/modbus/ConfigurationForm';
 import { removeDevice, saveDevice, type ChannelEnabledSupport, type PanelConfiguration } from '../model';
 import { ReadingSettings } from './ReadingSettings';

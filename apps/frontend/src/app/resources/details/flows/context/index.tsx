@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useRef, useContext, createContext, ReactNode } from 'react';
+import { useCallback, useMemo, useState, useRef, ReactNode } from 'react';
 import { nanoid } from 'nanoid';
 import { buildClipboardData, parseClipboardData, buildPastedElements } from '../flowClipboard';
 import {
@@ -12,14 +12,13 @@ import {
   applyEdgeChanges,
   NodeTypes,
   NodeProps,
-  OnNodesChange,
-  OnEdgesChange,
 } from '@xyflow/react';
 import { ResourceFlowLog, useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from '../liveLogs';
 import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
 import { AttraccessNode } from '../node/index';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
 import nodesDeTranslations from '../node/de.json';
 import nodesEnTranslations from '../node/en.json';
 
@@ -272,49 +271,9 @@ export function useFlowProviderStateInputs({ children, owner }: FlowProviderProp
   } as const;
 }
 
-export type LiveLogReceiver = (log: ResourceFlowLog) => void;
-
-export interface FlowContextType {
-  nodes: Node[];
-  edges: Edge[];
-  onNodesChange: OnNodesChange<Node>;
-  onEdgesChange: OnEdgesChange<Edge>;
-  onConnect: (params: Edge | Connection) => void;
-  updateNodeData: (nodeId: string, data: Record<string, unknown>) => void;
-  addNode: (node: Node) => void;
-  removeNode: (nodeId: string) => void;
-  setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
-  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-  owner: FlowOwner;
-  /** Only set for resource flows. */
-  resourceId: number | undefined;
-  resourceType: 'machine' | 'door';
-  resourceSeparateUnlockAndUnlatch: boolean;
-  resourceAllowTakeOver: boolean;
-  liveLogs: ResourceFlowLog[];
-  addLiveLogReceiver: (receiver: LiveLogReceiver) => void;
-  removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
-  flowNodeTypes: NodeTypes;
-  copySelectedNodes: () => Promise<void>;
-  cutSelectedNodes: () => Promise<void>;
-  pasteNodes: (targetFlowPosition?: { x: number; y: number }) => Promise<void>;
-  validationErrors: Record<string, string>;
-  setValidationErrors: (errors: Array<{ nodeId: string; message: string }>) => void;
-}
-
 export interface FlowProviderProps {
   children: ReactNode;
   owner: FlowOwner;
-}
-
-export const FlowContext = createContext<FlowContextType | undefined>(undefined);
-
-export function useFlowContext(): FlowContextType {
-  const context = useContext(FlowContext);
-  if (context === undefined) {
-    throw new Error('useFlowContext must be used within a FlowProvider');
-  }
-  return context;
 }
 
 export function FlowProvider({ children, owner }: FlowProviderProps) {
@@ -322,3 +281,5 @@ export function FlowProvider({ children, owner }: FlowProviderProps) {
 
   return <FlowContext.Provider value={value}>{children}</FlowContext.Provider>;
 }
+
+export { FlowContext, useFlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';

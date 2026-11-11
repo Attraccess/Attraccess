@@ -4,8 +4,8 @@ import { availableDigitalTerminals } from '../../../../backend/configuration/dig
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from '../../api/client';
 import { useWagoTranslations } from '../../i18n';
 import { addDigitalChannel } from '../model';
-import { canAddChannel, Purpose, purposes } from './ChannelWorkspace';
-import { Choice, NumericField } from './DigitalChannelEditor';
+import { canAddChannel, Purpose, purposes } from './channelWorkspaceModel';
+import { Choice, NumericField } from './DigitalChannelEditorFields';
 
 export function useAddChannelState({
   snapshot,

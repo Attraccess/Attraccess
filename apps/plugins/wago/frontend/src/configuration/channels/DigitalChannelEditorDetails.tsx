@@ -1,5 +1,5 @@
 import { Checkbox } from '@heroui/react';
-import { NumericField } from './DigitalChannelEditor';
+import { NumericField } from './DigitalChannelEditorFields';
 import { useDigitalChannelEditorState } from './useDigitalChannelEditorState';
 type Props = Pick<ReturnType<typeof useDigitalChannelEditorState>, 'range' | 't' | 'channel' | 'onChange'>;
 export function DigitalChannelEditorDetails({ range, t, channel, onChange }: Props) {

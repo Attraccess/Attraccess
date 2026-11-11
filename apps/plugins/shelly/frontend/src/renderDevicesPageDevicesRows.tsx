@@ -1,9 +1,7 @@
 import { Chip, TableCell, TableRow } from '@heroui/react';
 import { FirmwareCell, UpdateAvailableIndicator } from './devices/firmware/FirmwareDrawer';
 import { reprobeDevice } from './api';
-import { AuthChip } from './devices/DevicesPage';
-import { ProbeErrorIndicator } from './devices/DevicesPage';
-import { RowActions } from './devices/DevicesPage';
+import { AuthChip, ProbeErrorIndicator, RowActions } from './devices/DeviceRowParts';
 import { useDevicesPageState } from './useDevicesPageState';
 type Model = ReturnType<typeof useDevicesPageState>;
 type Props = Pick<

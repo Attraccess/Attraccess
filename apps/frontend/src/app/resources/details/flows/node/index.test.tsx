@@ -20,7 +20,7 @@ const flowContext = vi.hoisted(() => ({
   resourceId: 1 as number | undefined,
 }));
 
-vi.mock('../context/index', () => ({
+vi.mock('../context/flowContext', () => ({
   useFlowContext: () => flowContext,
 }));
 

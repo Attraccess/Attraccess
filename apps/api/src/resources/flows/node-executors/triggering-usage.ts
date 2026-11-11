@@ -1,7 +1,7 @@
 import { ResourceUsage } from '@attraccess/database-entities';
 import { EntityManager } from 'typeorm';
 import { getSessionCapacity } from '../../usage/sessions/active-usage';
-import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
+import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 
 /** The usage id a flow payload names: `usageId` (button presses) wins over a usage payload's generic `id`. */
 export function triggeringUsageId(input: object): number | undefined {

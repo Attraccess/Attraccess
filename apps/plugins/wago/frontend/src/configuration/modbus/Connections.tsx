@@ -1,6 +1,6 @@
 import { Button } from '@heroui/react';
-import { Field } from './ConfigurationForm';
-import { Choice } from './ConfigurationForm';
+import { Field } from './FormFields';
+import { Choice } from './FormFields';
 import { useModbusConfigurationFormState } from './useModbusConfigurationFormState';
 type Model = ReturnType<typeof useModbusConfigurationFormState>;
 type Props = Pick<

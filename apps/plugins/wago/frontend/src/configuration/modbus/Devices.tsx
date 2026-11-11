@@ -1,7 +1,7 @@
 import { Button, Label, ListBox, Select } from '@heroui/react';
 import { modbusDisplayName } from './modbus-labels';
-import { Field } from './ConfigurationForm';
-import { Choice } from './ConfigurationForm';
+import { Field } from './FormFields';
+import { Choice } from './FormFields';
 import { useModbusConfigurationFormState } from './useModbusConfigurationFormState';
 type Model = ReturnType<typeof useModbusConfigurationFormState>;
 type Props = Pick<
