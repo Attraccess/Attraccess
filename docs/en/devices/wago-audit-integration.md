@@ -8,10 +8,11 @@ used as principal metadata.
 
 ## Durable storage
 
-The core `AuditModule` registers `AuditService` under
+The core `AuditModule` registers the plugin audit host under
 `PLUGIN_AUDIT_HOST_PROVIDER` (`Symbol.for('attraccess.plugin.auditHostProvider')`).
-It writes the shared `audit_log` table through the existing SDK bridge, not a
-WAGO-owned table or commissioning progress log. Existing authentication logging
+The host checks the event against the domain the plugin registered, maps it onto the
+core audit event and writes it through the same `AUDIT_RECORDER` port as core services,
+into the shared `audit_log` table. There is no WAGO-owned table or commissioning progress log. Existing authentication logging
 and password-policy audit storage remain separate; this does not implement every
 domain or the full admin UI from ATT-906 / ATT-917 / ATT-235.
 
