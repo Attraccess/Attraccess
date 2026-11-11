@@ -9,14 +9,13 @@ import {
   WAGO_DOUT,
   WAGO_RUN_LEDS,
   parseWagoHardwareDeploymentReport,
-  wagoCommissioningPreparationScript,
   wagoDockerProvisionFinishScript,
   wagoDockerProvisionRecoveryScript,
-  wagoDockerProvisionScript,
   wagoHardwareDeploymentDockerArgs,
   wagoHardwareDeploymentReportScript,
-  wagoRuntimeBootScript,
 } from './hardware-deployment';
+import { wagoRuntimeBootScript } from '../runtime/boot';
+import { wagoCommissioningPreparationScript, wagoDockerProvisionScript } from './commissioning-preparation';
 
 describe('FW31 destructive commissioning shell (isolated vendor command fixtures)', () => {
   let fixture: ReturnType<typeof fw31ShellFixture>;

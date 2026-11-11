@@ -16,7 +16,7 @@ import { ResourceFlowsService } from '../../../resources/flows/resource-flows.se
 import { EmailService } from '../../../email/email.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MetricsService } from '../../../metrics/metrics.service';
-import { BillingServiceTestScope } from '../billing.service.spec';
+import type { BillingServiceTestScope } from '../billing.service.spec';
 export async function resetTestFixture(scope: BillingServiceTestScope) {
   const module: TestingModule = await Test.createTestingModule({
     providers: [

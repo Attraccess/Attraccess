@@ -11,7 +11,7 @@ import { ConfigurationErrors } from './ConfigurationChanges';
 import { ConfigurationSessionContent } from './ConfigurationSessionContent';
 import { ConfigurationSessionForm } from './ConfigurationSessionForm';
 import { ControllerDiagnostics } from '../diagnostics/ControllerDiagnostics';
-import type { ConfigurationEditorMetadata, WagoConfigurationDraft, WagoConfigurationSnapshot } from '../api/client';
+import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from '../api/client';
 import { useWagoTranslations } from '../i18n';
 import { useConfigurationActions, useConfigurationBaselineQuery, useDraftQuery } from '../api/queries';
 import { useConfigurationSessionState } from './useConfigurationSessionState';
@@ -140,10 +140,6 @@ export function DraftFeedback({
       )}
     </>
   );
-}
-
-export function draftIdentity(draft: WagoConfigurationDraft | null | undefined) {
-  return draft ? JSON.stringify([draft.updatedAt, draft.snapshot, draft.presetProvenance]) : 'empty';
 }
 
 export function LocalDraftReview({
@@ -378,9 +374,3 @@ function ConfigurationSession({ controllerId, onClose }: { controllerId: number;
 }
 
 export type Section = 'channels' | 'devices' | 'review' | 'history' | 'diagnostics';
-
-export interface WorkingCopy {
-  snapshot: WagoConfigurationSnapshot;
-  metadata: ConfigurationEditorMetadata;
-  source: string | null;
-}

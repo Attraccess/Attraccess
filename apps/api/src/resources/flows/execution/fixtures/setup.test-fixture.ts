@@ -17,7 +17,7 @@ import { ResourceFlowVariablesService } from '../../variables/resource-flow-vari
 import { CronTimer } from '../../../../metrics/instrumentation/cron/cron.helper';
 import { FlowTimer } from '../../../../metrics/instrumentation/flow/flow.helper';
 import { CompanionGatewayService } from '../../../../companion/companion-gateway.service';
-import { ResourceFlowsExecutorServiceRunFlowTestScope } from '../resource-flows-executor.service.spec';
+import type { ResourceFlowsExecutorServiceRunFlowTestScope } from '../resource-flows-executor.service.spec';
 // Mirrors `flowId: IsNull()` / `flowId: <id>` / `resourceId: <id>` where clauses on in-memory rows.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function matchesFlowId(row: { flowId?: number | null }, flowId: any): boolean {
@@ -181,7 +181,6 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
     scope.resourceRepository as Repository<Resource>,
     scope.flowLogs,
     scope.mqttClientService,
-    scope.resourceUsageService,
     billingItemRepoMock,
     scope.eventEmitter,
     scope.resourceHealthService,
@@ -196,6 +195,7 @@ export function resetTestFixture(scope: ResourceFlowsExecutorServiceRunFlowTestS
       sendUnlockCommand: jest.fn(() => true),
     } as unknown as CompanionGatewayService,
     scope.operatingIntervals as never,
-    { report: jest.fn() } as never,
   );
+  scope.service.attachUsage(scope.resourceUsageService);
+  scope.service.attachMetering({ report: jest.fn() } as never);
 }

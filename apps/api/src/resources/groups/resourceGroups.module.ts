@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Resource,
@@ -8,7 +8,6 @@ import {
   ResourceIntroductionHistoryItem,
 } from '@attraccess/database-entities';
 import { ResourceGroupsController } from './resourceGroups.controller';
-import { ResourceGroupsService } from './resourceGroups.service';
 import { ResourceGroupsIntroductionsController } from './introductions/resourceGroups.introductions.controller';
 import { ResourceGroupsIntroducersController } from './introducers/resourceGroups.introducers.controller';
 import { ResourceGroupsIntroductionsService } from './introductions/resourceGroups.introductions.service';
@@ -16,6 +15,7 @@ import { ResourceGroupsIntroducersService } from './introducers/resourceGroups.i
 import { IsResourceGroupIntroducerGuard } from './introductions/isIntroducerGuard';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { ResourceRetrainingModule } from '../retraining/resourceRetraining.module';
+import { ResourceGroupsCoreModule } from './resourceGroupsCore.module';
 
 @Module({
   imports: [
@@ -27,17 +27,13 @@ import { ResourceRetrainingModule } from '../retraining/resourceRetraining.modul
       ResourceIntroducer,
     ]),
     NotificationsModule,
-    forwardRef(() => ResourceRetrainingModule),
+    ResourceGroupsCoreModule,
+    ResourceRetrainingModule,
   ],
   controllers: [ResourceGroupsController, ResourceGroupsIntroductionsController, ResourceGroupsIntroducersController],
-  providers: [
-    ResourceGroupsService,
-    ResourceGroupsIntroductionsService,
-    ResourceGroupsIntroducersService,
-    IsResourceGroupIntroducerGuard,
-  ],
+  providers: [ResourceGroupsIntroductionsService, ResourceGroupsIntroducersService, IsResourceGroupIntroducerGuard],
   exports: [
-    ResourceGroupsService,
+    ResourceGroupsCoreModule,
     ResourceGroupsIntroductionsService,
     ResourceGroupsIntroducersService,
     IsResourceGroupIntroducerGuard,

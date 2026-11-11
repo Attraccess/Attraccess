@@ -1,6 +1,6 @@
 import { Resource, ResourceType, User } from '@attraccess/database-entities';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
-import { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
+import type { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
 
 export function createStartSessionFixture(parentScope: ResourceUsageServiceTestScope) {
   const mockUser: User = { id: 1 } as User;

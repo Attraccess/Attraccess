@@ -1,12 +1,4 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  OnModuleInit,
-  ForbiddenException,
-  NotFoundException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, OnModuleInit, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -32,7 +24,7 @@ import { FlowLogRecorderService } from '../logs/flow-log-recorder.service';
 
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 
-import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
+import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 
 import { ResourceHealthService } from '../../health/resource-health.service';
 
@@ -44,13 +36,13 @@ import { ResourceOperatingIntervalService } from '../../operating-intervals/reso
 
 import { CompanionGatewayService } from '../../../companion/companion-gateway.service';
 
-import { ResourceMeteringService } from '../../metering/resource-metering.service';
+import type { ResourceMeteringService } from '../../metering/resource-metering.service';
 
 import { CompanionUsbDeviceDto } from '../../../companion/companion.types';
 
-import { heartbeatKey, NodeProcessingResult } from '../node-executors';
+import { heartbeatKey, NodeExecutor, NodeProcessingResult } from '../node-executors';
 
-import { FlowExecutionOptions, UsageEventData, FlowResourceContext } from './flow-execution.types';
+import type { FlowExecutionOptions, UsageEventData, FlowResourceContext } from './flow-execution.types';
 
 import { getFlowRepository, FlowExecutionContext } from './flow-execution-context';
 
@@ -66,7 +58,7 @@ import { FlowTriggerDispatcher } from './trigger-dispatcher';
 
 import { FlowResourceMonitor } from './resource-monitor';
 
-import { buildNodeExecutorRegistry } from './node-executor-registry';
+import { buildNodeExecutorRegistry, meteringNodeExecutors, usageNodeExecutors } from './node-executor-registry';
 
 import { isGlobalFlowNode, resourceOwnAndGlobalNodesWhere, triggerAppliesToResourceType } from './flow-node-queries';
 
@@ -81,10 +73,8 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     protected readonly resourceRepository: Repository<Resource>,
     flowLogs: FlowLogRecorderService,
     mqttClientService: MqttClientService,
-    @Inject(forwardRef(() => ResourceUsageService))
-    protected readonly resourceUsageService: ResourceUsageService,
     @InjectRepository(BillingTransactionItem)
-    billingTransactionItemRepository: Repository<BillingTransactionItem>,
+    protected readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
     eventEmitter: EventEmitter2,
     resourceHealthService: ResourceHealthService,
     variablesService: ResourceFlowVariablesService,
@@ -92,27 +82,23 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     flowTimer: FlowTimer,
     companionGatewayService: CompanionGatewayService,
     operatingIntervals: ResourceOperatingIntervalService,
-    @Inject(forwardRef(() => ResourceMeteringService)) metering: ResourceMeteringService,
   ) {
-    const nodeExecutors = buildNodeExecutorRegistry({
+    this.nodeExecutors = buildNodeExecutorRegistry({
       resourceActivity: this.resourceActivity,
       heartbeatLastSeen: this.heartbeatLastSeen,
       resourceHealthService,
-      resourceUsageService,
-      billingTransactionItemRepository,
       mqttClientService,
       operatingIntervals,
       eventEmitter,
       variablesService,
       companionGatewayService,
-      metering,
     });
     this.engine = new FlowExecutionEngine(
       flowNodeRepository,
       flowEdgeRepository,
       flowLogs,
       flowTimer,
-      nodeExecutors,
+      this.nodeExecutors,
       new FlowExecutionContext(resourceRepository, variablesService),
       this.logger,
     );
@@ -141,13 +127,36 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   protected readonly engine: FlowExecutionEngine;
 
+  protected readonly nodeExecutors: Partial<Record<ResourceFlowNodeType, NodeExecutor>>;
+
+  protected resourceUsageService?: ResourceUsageService;
+
+  /**
+   * Usage and metering depend on flows (they start flow runs) while some flow nodes call back into them, so they
+   * attach themselves here when constructed (see `ResourceUsageFlowsBridge` and `ResourceMeteringFlowsBridge`)
+   * instead of being injected, which would make the modules import each other.
+   */
+  public attachUsage(resourceUsageService: ResourceUsageService): void {
+    this.resourceUsageService = resourceUsageService;
+    Object.assign(this.nodeExecutors, usageNodeExecutors(resourceUsageService, this.billingTransactionItemRepository));
+  }
+
+  public attachMetering(metering: ResourceMeteringService): void {
+    Object.assign(this.nodeExecutors, meteringNodeExecutors(metering));
+  }
+
+  protected get usage(): ResourceUsageService {
+    if (!this.resourceUsageService) throw new Error('Resource usage is not attached to flows');
+    return this.resourceUsageService;
+  }
+
   protected readonly triggers: FlowTriggerDispatcher;
 
   protected readonly monitor: FlowResourceMonitor;
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
     // With parallel sessions any active session owner may press the machine's buttons.
-    const activeSessions = await this.resourceUsageService.getActiveSessionsForResource(resourceId);
+    const activeSessions = await this.usage.getActiveSessionsForResource(resourceId);
     const pressingSession = activeSessions.find((session) => session.userId === executingUserId);
 
     if (!executingUserId || !pressingSession) {

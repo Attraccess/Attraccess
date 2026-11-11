@@ -1,7 +1,7 @@
 import { Checkbox } from '@heroui/react';
-import { Choice } from './DigitalChannelEditor';
-import { NumericField } from './DigitalChannelEditor';
-import { options } from './DigitalChannelEditor';
+import { Choice } from './DigitalChannelEditorFields';
+import { NumericField } from './DigitalChannelEditorFields';
+import { options } from './DigitalChannelEditorFields';
 import { useDigitalChannelEditorState } from './useDigitalChannelEditorState';
 type Props = Pick<
   ReturnType<typeof useDigitalChannelEditorState>,

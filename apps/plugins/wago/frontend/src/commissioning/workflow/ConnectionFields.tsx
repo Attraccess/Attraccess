@@ -2,7 +2,7 @@ import { Form } from '@heroui/react';
 import { BundledRuntime } from '../artifacts/BundledRuntime';
 import { NameStep } from './Steps';
 import { ConnectionStep } from './Steps';
-import { CommissioningModel } from '../CommissioningModal';
+import type { CommissioningModel } from '../CommissioningModal';
 
 export function ConnectionFields({ model }: { model: CommissioningModel }) {
   const {

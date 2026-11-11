@@ -3,8 +3,8 @@ import type { BuildRuntimeArtifact } from '../artifacts/build';
 import {
   wagoHardwareDeploymentDockerArgs,
   wagoHardwareDeploymentPreflightScript,
-  wagoRuntimeBootScript,
 } from '../../host/hardware-deployment';
+import { wagoRuntimeBootScript } from '../boot';
 import { runtimeUpdateCapacityPreflightScript } from '../install';
 import { wagoRuntimeSupervisorLaunchShell } from '../supervisor';
 import { wagoShellFilesystemGuard } from '../../host/shell/filesystem';

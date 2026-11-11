@@ -1,5 +1,5 @@
 import { inheritTestScope } from '../../../test-utils/inherit-test-scope';
-import { BillingServiceTestScope } from '../billing.service.spec';
+import type { BillingServiceTestScope } from '../billing.service.spec';
 
 export function createBillingServiceChargeForResourceUsageFixture(parentScope: BillingServiceTestScope) {
   const scope = inheritTestScope(

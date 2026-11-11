@@ -1,7 +1,7 @@
 import { ResourceUsage, User } from '@attraccess/database-entities';
 import { SelectQueryBuilder } from 'typeorm';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
-import { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
+import type { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
 
 export function createEndSessionFixture(parentScope: ResourceUsageServiceTestScope) {
   const mockUser: User = { id: 1 } as User;

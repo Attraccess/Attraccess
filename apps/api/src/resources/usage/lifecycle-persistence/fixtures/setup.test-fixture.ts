@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { ResourceOperatingIntervalService } from '../../../operating-intervals/resource-operating-interval.service';
 import { ResourceOperatingAttributionService } from '../../../operating-intervals/resource-operating-attribution.service';
 import { USAGE_RECOVERY_TABLE_SQL } from '../../../../database/resource-usage-integrity';
-import { UsageLifecyclePersistenceAroundExternalFlowsTestScope } from '../lifecycle.persistence.spec';
+import type { UsageLifecyclePersistenceAroundExternalFlowsTestScope } from '../lifecycle.persistence.spec';
 import { composeResourceUsageService } from '../../sessions/fixtures/compose.test-fixture';
 export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExternalFlowsTestScope) {
   jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);

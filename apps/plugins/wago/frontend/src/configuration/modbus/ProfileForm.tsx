@@ -1,9 +1,9 @@
 import { randomUUID } from '../identity';
 import { Button } from '@heroui/react';
 import { modbusDisplayName } from './modbus-labels';
-import { type ModbusProfile } from '../../../../modbus/model';
-import { emptyFormat } from './ConfigurationForm';
-import { Field } from './ConfigurationForm';
+import type { ModbusProfile } from '../../../../modbus/model';
+import { emptyFormat } from './FormFields';
+import { Field } from './FormFields';
 import { useModbusProfileFormState } from './useModbusProfileFormState';
 import { renderModbusProfileFormMeasurements } from './Measurements';
 import { renderModbusProfileFormActions } from './Actions';

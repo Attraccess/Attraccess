@@ -1,12 +1,4 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  OnModuleInit,
-  BadRequestException,
-  ConflictException,
-  Logger,
-} from '@nestjs/common';
+import { Inject, Injectable, OnModuleInit, BadRequestException, ConflictException, Logger } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -66,7 +58,7 @@ export class ResourceMeteringService implements OnModuleInit {
     @InjectRepository(ResourceMeteringOperation) protected readonly operations: Repository<ResourceMeteringOperation>,
     @InjectRepository(ResourceFlowNode) nodes: Repository<ResourceFlowNode>,
     @InjectRepository(ResourceFlowEdge) edges: Repository<ResourceFlowEdge>,
-    @Inject(forwardRef(() => ResourceFlowsExecutorService)) protected readonly flows: ResourceFlowsExecutorService,
+    protected readonly flows: ResourceFlowsExecutorService,
     @Inject(AUDIT_RECORDER) audit: AuditRecorder,
     liveNotifications: LiveNotificationsService,
   ) {

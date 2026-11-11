@@ -1,6 +1,6 @@
 import { User } from '@attraccess/database-entities';
 
-import { Inject, Injectable, Logger, forwardRef, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 
 import { EntityManager } from 'typeorm';
 
@@ -30,7 +30,6 @@ import { Readable } from 'stream';
 export class UserInvitationService {
   constructor(
     protected readonly usersService: UsersService,
-    @Inject(forwardRef(() => AuthService))
     protected readonly authService: AuthService,
     protected readonly emailService: EmailService,
   ) {}
