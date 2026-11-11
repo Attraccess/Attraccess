@@ -1,13 +1,14 @@
 # Matter: Architecture
+
 <!-- llms-description: Architecture of the Matter integration: a plugin plus a sidecar, versioned REST and WebSocket contract, errors and events. -->
 
-> **Connectivity only.** This release provides the foundation for Matter support: a versioned contract, a standalone sidecar with health, version and event-stream endpoints, and a plugin that connects to it securely. It does **not** commission devices, list devices, send commands, manage Thread or install firmware updates. Do not plan equipment control around it. Those features follow in later tickets (see [What comes later](#what-comes-later)).
+> **Connectivity and data model.** This release provides the foundation for Matter support: a versioned contract, a standalone sidecar with health, version and event-stream endpoints, a plugin that connects to it securely, and the plugin's [device data model](devices/matter/data-model.md) (nodes, endpoints, state and lifecycle, with admin REST endpoints). The sidecar does **not** yet commission devices, list devices, send commands, manage Thread or install firmware updates, so the data model stays empty against it, and there is no device UI. Do not plan equipment control around it. Those features follow in later tickets (see [What comes later](#what-comes-later)).
 
 ## Plugin plus sidecar
 
 Matter ships as two cooperating parts, not as built-in Attraccess code:
 
-- **The Matter plugin** (`apps/plugins/matter`) is an installable Attraccess plugin. In this release it connects to the sidecar and offers an admin page (**Devices → Matter**) for the connection settings. It has no device features yet. It needs the `DATABASE_ACCESS` and `MANAGE_SECRETS` permissions.
+- **The Matter plugin** (`apps/plugins/matter`) is an installable Attraccess plugin. In this release it connects to the sidecar and offers an admin page (**Devices → Matter**) for the connection settings. It keeps the [device data model](devices/matter/data-model.md) (nodes, endpoints, state, lifecycle) and reconciles it with the sidecar once the sidecar can list nodes; there is no device UI yet. It needs the `DATABASE_ACCESS` and `MANAGE_SECRETS` permissions.
 - **The Matter sidecar** (`apps/matter-sidecar`) is a separate Node.js process. It is the only code that loads [matter.js](https://github.com/project-chip/matter.js) (`@matter/main`, pinned to one exact release). It can start and run without the Attraccess API, a database, a Matter fabric or any commissioned device.
 
 A shared library, `libs/matter-contract`, defines every request, response and event once, with runtime validation (Zod). The sidecar and the plugin both use it. It never imports matter.js, core code, database entities or plugins.
@@ -24,8 +25,8 @@ A matching wire version is not enough. Attraccess, the Matter plugin and the sid
 | -------------- | ---------------------------------------------------------- |
 | Wire version   | `1`                                                        |
 | Attraccess     | `^1.11.0` (prereleases of a matching version are accepted) |
-| Matter plugin  | exactly `0.2.0-alpha.0`                                    |
-| Matter sidecar | exactly `0.2.0-alpha.0`                                    |
+| Matter plugin  | exactly `0.3.0-alpha.0`                                    |
+| Matter sidecar | exactly `0.3.0-alpha.0`                                    |
 | matter.js      | exactly `0.18.0` (plugin and sidecar share one release)    |
 
 The plugin's `attraccess.host` (`package.json`) and `attraccessVersion.min` (`plugin.json`) are derived from the same table, and a test checks that they match. Every new plugin or sidecar release needs a table update; otherwise the sidecar rejects it. The Attraccess range is deliberately a range, so a new Attraccess 1.x release does not by itself require a sidecar release.
@@ -132,6 +133,6 @@ The plugin starts the connection without waiting for the sidecar. **A missing, r
 
 - [ATT-1000](https://linear.app/attraccess/issue/ATT-1000): production packaging and deployment.
 - [ATT-998](https://linear.app/attraccess/issue/ATT-998): fabric persistence, encrypted backup and recovery.
-- Later Matter feature tickets: commissioning, device inventory, commands, subscriptions, Thread, OTA, permissions and audit. Defining their contract shapes here does not deliver those features.
+- Later Matter feature tickets: commissioning, the sidecar's device inventory, commands and subscriptions, device UI and flow nodes, Thread, OTA and a dedicated permission. The contract already defines the shapes of the inventory, `device.state` and `command.outcome`, and the plugin stores and reconciles them (see the [data model](devices/matter/data-model.md)), but the sidecar still answers `unsupported_capability` for those families.
 
 See also the [operator guide](devices/matter/operator.md).

@@ -1,7 +1,8 @@
 # Matter: Operator Guide
+
 <!-- llms-description: Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation. -->
 
-> **Connectivity only.** The sidecar can be built, started, secured and connected to Attraccess, but it controls no devices yet. Read the [architecture](devices/matter/architecture.md) first.
+> **Connectivity only (on the sidecar side).** The sidecar can be built, started, secured and connected to Attraccess, but it controls no devices yet and does not list any, so the plugin's device records stay empty and `GET /matter/reconciliation` reports `skipped_unavailable`. Read the [architecture](devices/matter/architecture.md) and the [data model](devices/matter/data-model.md) first. When you upgrade, deploy the sidecar first and then the plugin: a mismatched pair shows as `incompatible`.
 
 ## Build and start
 
@@ -106,15 +107,15 @@ A `/v1/` request, or a WebSocket upgrade to `/v1/events`, with an unsupported re
     "correlationId": "5a1f6c0e-6f55-4a53-9a6e-2c6d6b0f5b1c",
     "retryable": false,
     "details": {
-      "received": { "wireVersion": 1, "attraccess": "1.10.0", "plugin": "0.2.0-alpha.0", "sidecar": "0.2.0-alpha.0" },
+      "received": { "wireVersion": 1, "attraccess": "1.10.0", "plugin": "0.3.0-alpha.0", "sidecar": "0.3.0-alpha.0" },
       "problems": [],
-      "running": { "sidecar": "0.2.0-alpha.0", "matterJs": "0.18.0" },
+      "running": { "sidecar": "0.3.0-alpha.0", "matterJs": "0.18.0" },
       "supported": [
         {
           "wireVersion": 1,
           "attraccess": "^1.11.0",
-          "plugin": "0.2.0-alpha.0",
-          "sidecar": "0.2.0-alpha.0",
+          "plugin": "0.3.0-alpha.0",
+          "sidecar": "0.3.0-alpha.0",
           "matterJs": "0.18.0"
         }
       ]
