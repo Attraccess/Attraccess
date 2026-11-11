@@ -3,7 +3,7 @@ import { Handle, NodeToolbar, Position, useNodeId, NodeProps } from '@xyflow/rea
 import { Edit2Icon, Trash2Icon, TriangleAlertIcon } from 'lucide-react';
 import { NodeEditor } from './editor/index';
 import { ResourceFlowLogType, ResourceFlowLog, ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
-import { useFlowContext } from '../context/index';
+import { useFlowContext } from '../context/flowContext';
 import { schemaSupportsOwner } from '../flowOwner';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNodePreviewRows } from './preview/index';

@@ -5,7 +5,7 @@ import { ResourceFlowNodeType } from '@attraccess/database-entities';
 import { ResourceFlowNodeDto } from './resource-flow-node.dto';
 import { ResourceFlowEdgeDto } from './resource-flow-edge.dto';
 import { ValidationErrorDto } from './validation-error.dto';
-import { ValidationError } from '../resource-flows.service';
+import type { ValidationError } from '../resource-flows.service';
 
 export class ResourceFlowResponseDto {
   @ApiProperty({

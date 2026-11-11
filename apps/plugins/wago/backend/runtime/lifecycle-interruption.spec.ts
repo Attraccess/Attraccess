@@ -3,7 +3,8 @@ import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, lstatSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fw31ShellFixture } from '../fixtures/fw31-shell-fixture';
-import { WAGO_DIN, WAGO_DOUT, wagoCommissioningPreparationScript } from '../host/hardware-deployment';
+import { WAGO_DIN, WAGO_DOUT } from '../host/hardware-deployment';
+import { wagoCommissioningPreparationScript } from '../host/commissioning-preparation';
 import {
   runtimeBundleAcceptScript,
   runtimeBundleDeliveryScript,

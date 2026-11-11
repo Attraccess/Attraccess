@@ -5,7 +5,7 @@ import {
   useResourcesServiceResourceUsageGetSession,
 } from '@attraccess/react-query-client';
 import { useAuth } from '../../../../../hooks/useAuth';
-import { TransactionDetailsModal } from '../../../../billing/dashboard/summary/transactionDetailsModal';
+import { TransactionDetailsModalView } from '../../../../billing/dashboard/summary/transactionDetailsModal/view';
 import { UsageNotesDrawer } from './drawer';
 import { useUsageSessionProject } from '../../hooks/useUsageSessionProject';
 import {
@@ -95,7 +95,20 @@ function OpenUsageNotesModal({
         }
       />
       {transactionId !== null && (
-        <TransactionDetailsModal transactionId={transactionId} isOpen onClose={() => setTransactionId(null)} />
+        <TransactionDetailsModalView
+          transactionId={transactionId}
+          isOpen
+          onClose={() => setTransactionId(null)}
+          renderUsageDetails={({ resourceId, usageId, onClose }) => (
+            <UsageNotesModal
+              isOpen
+              resourceId={resourceId}
+              usageId={usageId}
+              onClose={onClose}
+              onOpenBilling={onClose}
+            />
+          )}
+        />
       )}
     </>
   );

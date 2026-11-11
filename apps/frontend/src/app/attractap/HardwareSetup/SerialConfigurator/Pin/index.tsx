@@ -1,7 +1,7 @@
 import { AlertStatusIcon, Button, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { Alert, AlertContent, AlertDescription, Input, Label, TextField, cn } from '@heroui/react';
 import { useCallback, useState, type FormEvent } from 'react';
-import { useAttractapSerialComm } from '../Auth';
+import { useAttractapSerialComm } from '../Auth/context';
 
 import de from './de.json';
 import en from './en.json';

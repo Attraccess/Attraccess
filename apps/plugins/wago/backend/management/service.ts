@@ -15,7 +15,7 @@ import {
   type ManagementTarget,
 } from './model';
 
-import { ManagementOwner } from './model';
+import type { ManagementOwner } from './model';
 
 import { validId, publicStatus, validateCredential, exactKeys, cleanInspection, validateTarget } from './model';
 

@@ -33,12 +33,12 @@ import { randomBytes } from 'node:crypto';
 import { WagoCommissioningSession } from '../sessions/session.entity';
 
 import {
-  wagoCommissioningPreparationScript,
   wagoDockerProvisionRecoveryScript,
   wagoDockerProvisionFinishScript,
   wagoHardwareDeploymentReportScript,
   parseWagoHardwareDeploymentReport,
 } from '../../host/hardware-deployment';
+import { wagoCommissioningPreparationScript } from '../../host/commissioning-preparation';
 
 import { runtimeBundleStagingCapacityPreflightScript } from '../../runtime/install';
 

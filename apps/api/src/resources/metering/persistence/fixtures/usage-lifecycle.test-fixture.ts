@@ -1,5 +1,5 @@
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
-import { FlowDefinedMeteringTestScope } from '../flow-defined-meters.spec';
+import type { FlowDefinedMeteringTestScope } from '../flow-defined-meters.spec';
 
 export function createUsageLifecycleFixture(parentScope: FlowDefinedMeteringTestScope) {
   async function start(user = parentScope.users[0], dto: { forceTakeOver?: boolean } = {}) {

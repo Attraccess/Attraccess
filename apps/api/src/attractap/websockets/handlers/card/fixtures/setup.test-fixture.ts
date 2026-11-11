@@ -2,7 +2,7 @@
 import { SettingsService } from '../../../../../settings/settings.service';
 import { AttractapCardHandler } from '../card.handler';
 import { CardSessionService } from '../../ui/card-session.service';
-import { AttractapCardHandlerTestScope } from '../card.handler.spec';
+import type { AttractapCardHandlerTestScope } from '../card.handler.spec';
 export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   scope.handler = Object.create(AttractapCardHandler.prototype);
   (scope.handler as any).logger = {

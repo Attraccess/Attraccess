@@ -17,7 +17,7 @@ import { NodeExecutor, NodeProcessingResult } from '../node-executors/index';
 
 import { FlowExecutionContext, getFlowRepository } from './flow-execution-context';
 
-import { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
+import type { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
 import { ResourceFlowLogType } from '../dto/flow-log.dto';
 
 import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
@@ -65,7 +65,7 @@ export class FlowExecutionEngine {
     protected readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
     protected readonly flowLogs: FlowLogRecorderService,
     protected readonly flowTimer: FlowTimer,
-    protected readonly nodeExecutors: Record<ResourceFlowNodeType, NodeExecutor>,
+    protected readonly nodeExecutors: Partial<Record<ResourceFlowNodeType, NodeExecutor>>,
     protected readonly context: FlowExecutionContext,
     protected readonly logger: Logger,
   ) {}

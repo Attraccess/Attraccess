@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { DEFAULT_MQTT_PERMISSIONS, upsertUser, type UpsertRabbitmqUserBody } from './users-api';
 import { useRabbitmqTranslations } from '../i18n';
 import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
-import { RabbitmqUserFormModalProps } from './RabbitmqUserFormModal';
-import { parseTags } from './RabbitmqUserFormModal';
+import type { RabbitmqUserFormModalProps } from './RabbitmqUserFormModal';
+
 export function useRabbitmqUserFormModalState({
   mqttServerId,
   isOpen,
@@ -97,4 +97,11 @@ export function useRabbitmqUserFormModalState({
     vhosts,
     onClose,
   } as const;
+}
+
+export function parseTags(value: string): string[] {
+  return value
+    .split(',')
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
 }

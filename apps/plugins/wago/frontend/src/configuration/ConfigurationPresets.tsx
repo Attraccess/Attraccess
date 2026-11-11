@@ -8,7 +8,7 @@ import type {
   WagoPresetApplication,
 } from '../api/client';
 import { useApplyPresetMutation, usePresetsQuery, usePreviewPresetMutation } from '../api/queries';
-import { Choice } from './channels/DigitalChannelEditor';
+import { Choice } from './channels/DigitalChannelEditorFields';
 import { ConfigurationChanges, ConfigurationErrors } from './ConfigurationChanges';
 import { boundMeasurement, emptyModbus } from './modbus/modbus-editor';
 import { isEditableDigitalChannel } from '../../../backend/configuration/digital';

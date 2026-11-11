@@ -27,7 +27,7 @@ import { MetricsService } from '../../../../metrics/metrics.service';
 import { PluginEventsService } from '../../../../plugin-system/plugin-events.service';
 import { RbacService } from '../../../../users-and-auth/rbac/rbac.service';
 import { VALKEY_CLIENT } from '../../../../valkey/valkey.module';
-import { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
+import type { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
 import { RESOURCE_USAGE_COLLABORATORS } from '../../resource-usage.collaborators';
 export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
   const module: TestingModule = await Test.createTestingModule({

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { outputBehavior } from '../../../../channel-behavior';
 import type { ModbusConnection } from '../../../../modbus/model';
-import { Choice, NumericField } from '../../configuration/channels/DigitalChannelEditor';
+import { Choice, NumericField } from '../../configuration/channels/DigitalChannelEditorFields';
 import { useWagoTranslations } from '../../i18n';
 import type { PanelConfiguration } from '../model';
 import { busConnection, terminalChannel, terminalName, updateBus, updateTerminal, type Terminal } from '../model';

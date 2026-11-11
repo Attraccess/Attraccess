@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   ResourceMeter,
@@ -10,9 +10,8 @@ import {
 import { BillingModule } from '../../billing/billing.module';
 import { ResourceFlowsModule } from '../flows/resource-flows.module';
 import { ResourceTransactionsModule } from '../../database/resource-transactions.module';
-import { ResourceMeteringController } from './resource-metering.controller';
 import { ResourceMeteringService } from './resource-metering.service';
-import { ResourceUsageModule } from '../usage/resourceUsage.module';
+import { ResourceMeteringFlowsBridge } from './resource-metering-flows.bridge';
 
 @Module({
   imports: [
@@ -24,12 +23,10 @@ import { ResourceUsageModule } from '../usage/resourceUsage.module';
       ResourceFlowNode,
       ResourceFlowEdge,
     ]),
-    forwardRef(() => ResourceFlowsModule),
-    forwardRef(() => BillingModule),
-    forwardRef(() => ResourceUsageModule),
+    ResourceFlowsModule,
+    BillingModule,
   ],
-  controllers: [ResourceMeteringController],
-  providers: [ResourceMeteringService],
+  providers: [ResourceMeteringService, ResourceMeteringFlowsBridge],
   exports: [ResourceMeteringService],
 })
 export class ResourceMeteringModule {}

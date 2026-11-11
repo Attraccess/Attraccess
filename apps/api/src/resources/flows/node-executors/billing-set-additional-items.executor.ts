@@ -7,7 +7,7 @@ import {
   BillingTransactionItemCreateSchema,
   BillingTransactionStatus,
 } from '@attraccess/database-entities';
-import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
+import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { resolveTriggeringUsage, triggeringUsageId } from './triggering-usage';

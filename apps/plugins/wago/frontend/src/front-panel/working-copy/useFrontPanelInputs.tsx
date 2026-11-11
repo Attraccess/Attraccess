@@ -12,9 +12,9 @@ import { useWagoDiagnostics } from '../../diagnostics/diagnostics';
 import { useDraftQuery } from '../../api/queries';
 import { useWagoLiveQuery } from '../../api/live-updates';
 import { type PanelConfiguration } from '../model';
-import { WorkingCopy } from './useFrontPanel';
-import { readConfiguration } from './useFrontPanel';
-import { draftIdentity } from './useFrontPanel';
+import type { WorkingCopy } from './workingCopy';
+import { readConfiguration } from './workingCopy';
+import { draftIdentity } from './workingCopy';
 
 export function useFrontPanelInputs(controllerId: number) {
   const client = useQueryClient();
