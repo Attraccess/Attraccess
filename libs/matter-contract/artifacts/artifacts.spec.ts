@@ -73,6 +73,20 @@ describe('exported artifacts', () => {
     expect(check('EventEnvelope', event)).toBe(true);
     expect(check('EventEnvelope', { ...event, timestamp: 'bad' })).toBe(false);
     expect(check('EventEnvelope', { ...event, extra: 1 })).toBe(false);
+    const statePayload = {
+      nodeId: '5',
+      endpointId: 1,
+      clusterId: 6,
+      attributeId: 0,
+      value: true,
+      observedAt: '2026-10-29T10:00:00.000Z',
+      source: 'read',
+    };
+    expect(check('EventEnvelope', { ...event, type: 'device.state', payload: statePayload })).toBe(true);
+    // The by-type payload check is a runtime refinement; JSON Schema keeps the union with the opaque slot.
+    expect(check('EventEnvelope', { ...event, type: 'device.state', payload: 5 })).toBe(false);
+    expect(check('InventoryListResponse', { authoritative: true, fabricId: null, nodes: [] })).toBe(true);
+    expect(check('InventoryListResponse', { authoritative: true, nodes: [] })).toBe(false);
     expect(check('ClientMessage', { type: 'resume', wireVersion: 1 })).toBe(true);
     expect(check('ClientMessage', { type: 'resume', wireVersion: 2 })).toBe(false);
     expect(

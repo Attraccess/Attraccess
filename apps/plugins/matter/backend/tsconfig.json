@@ -14,5 +14,5 @@
     "strictFunctionTypes": true
   },
   "include": ["**/*.ts"],
-  "exclude": ["**/*.spec.ts"]
+  "exclude": ["**/*.spec.ts", "**/*.test-utils.ts"]
 }

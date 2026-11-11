@@ -40,7 +40,7 @@ describe('lifecycle', () => {
         features: {
           'inventory.list': () =>
             new Promise((resolve) => {
-              release = () => resolve({ authoritative: false, nodes: [] });
+              release = () => resolve({ authoritative: false, fabricId: null, nodes: [] });
               handlerStarted();
             }),
         },
