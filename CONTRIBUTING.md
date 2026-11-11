@@ -28,6 +28,23 @@ Use shared fixtures when they reduce repeated setup without hiding the tests.
 There are no historical allowances, and checking sizes does not require a target
 branch or merge base. `NX_AFFECTED_BASE` does not affect these checks.
 
+## Import cycles
+
+`pnpm lint:files` (and `--staged`) also rejects runtime import cycles between
+TypeScript files in `apps/` and `libs/`, tests included, and prints each cycle
+as a file chain. It always checks the whole repository and resolves relative
+imports and the `@attraccess/*` aliases from `tsconfig.base.json`.
+
+Only imports that run at module load count. `import type`, `export type`, imports
+whose specifiers are all inline `type`, and dynamic `import()` are ignored.
+Cycles made only of TypeORM entities in `libs/database-entities/src/lib/entities`
+are allowed, because their relations resolve through lazy `() => Entity` thunks.
+
+To break a cycle, move the shared type, constant, context or helper into a leaf
+file that both sides import, pass the dependency in as a prop or callback, or use
+`import type` when only types are needed. Do not add NestJS `forwardRef`: extract
+the shared provider into its own module instead.
+
 The check covers JS/TS (including module variants and declaration files), C/C++
 and Objective-C, Python, shell scripts, SQL, OpenSCAD, stylesheets, and HTML/MJML
 templates. Executable configuration in these languages is also code. Test files
