@@ -1,31 +1,23 @@
 import { AuditLog } from '@attraccess/database-entities';
 
-import { PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
-
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
-import { randomUUID } from 'crypto';
-
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 
 import { SettingsStoreService } from '../settings/settings-store.service';
 
 import {
-  AttractapAuditEvent,
-  IdentityAuditEvent,
-  projectAttractapAuditEvent,
-  projectIdentityAuditEvent,
-  projectSsoAuditEvent,
-  SsoAuditEvent,
-} from './audit-policy';
-
-import { AUDIT_SHUTDOWN_DRAIN_MS, SQLITE_BUSY_TIMEOUT_MS, sqliteErrorCode } from './persistence/audit-storage';
+  AUDIT_SHUTDOWN_DRAIN_MS,
+  auditCutoff,
+  AuditStorage,
+  hasPasswordPolicyOverflow,
+  SQLITE_BUSY_TIMEOUT_MS,
+  sqliteErrorCode,
+} from './persistence/audit-storage';
 
 import { getRegisteredPluginAuditDomains } from '../plugin-system/audit/audit-registry';
 
-import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
-
-import { AuditMetrics } from '../metrics/definitions/audit.metrics';
+import { AUDIT_DROP_REASONS, AuditMetrics } from '../metrics/definitions/audit.metrics';
 
 import { AUDIT_METRICS } from '../metrics/definitions/tokens';
 
@@ -33,12 +25,11 @@ import { Interval } from '@nestjs/schedule';
 
 import { readAuditSettings } from './audit.config';
 
-import { AuditStorage } from './persistence/audit-storage';
+import { AuditRecorder } from './recorder/audit-event';
 
-export { BillingTransactionAuditEvent } from './persistence/audit-storage';
-
+/** The audit storage engine and the implementation of the AuditRecorder port (bound as AUDIT_RECORDER). */
 @Injectable()
-export class AuditService extends AuditStorage implements PluginAuditHostProvider, OnModuleInit, OnModuleDestroy {
+export class AuditService extends AuditStorage implements AuditRecorder, OnModuleInit, OnModuleDestroy {
   constructor(
     protected readonly source: DataSource,
     protected readonly settings: SettingsStoreService,
@@ -116,80 +107,6 @@ export class AuditService extends AuditStorage implements PluginAuditHostProvide
     if (storage?.isInitialized) await storage.destroy().catch(() => undefined);
   }
 
-  async recordSso(event: SsoAuditEvent, transaction?: EntityManager): Promise<PluginAuditReceipt> {
-    const snapshot = this.project(() => projectSsoAuditEvent(event));
-    if (!snapshot) return this.drop('sso', 'invalid_event');
-    return this.recordSnapshot(
-      {
-        domain: 'sso',
-        pluginId: null,
-        action: snapshot.action,
-        operationId: snapshot.operationId,
-        actorId: snapshot.actorId,
-        authenticationMethod: snapshot.authenticationMethod,
-        apiTokenId: snapshot.apiTokenId ?? null,
-        outcome: 'succeeded',
-        subjectType: snapshot.subject.type,
-        subjectId: snapshot.subject.id,
-        ipAddress: null,
-        userAgent: null,
-        details: snapshot.details,
-      },
-      { transaction },
-    );
-  }
-
-  async recordIdentity(event: IdentityAuditEvent, transaction?: EntityManager): Promise<PluginAuditReceipt> {
-    const snapshot = this.project(() => projectIdentityAuditEvent(event));
-    if (!snapshot) return this.drop('identity', 'invalid_event');
-    return this.recordSnapshot(
-      {
-        domain: 'identity',
-        pluginId: null,
-        action: snapshot.action,
-        operationId: snapshot.operationId,
-        actorId: snapshot.actorId,
-        authenticationMethod: snapshot.authenticationMethod,
-        apiTokenId: snapshot.apiTokenId,
-        outcome: snapshot.outcome,
-        subjectType: snapshot.subjectType,
-        subjectId: snapshot.subjectId,
-        ipAddress: snapshot.ipAddress,
-        userAgent: snapshot.userAgent,
-        details: snapshot.details,
-      },
-      { transaction },
-    );
-  }
-
-  async recordAttractap(event: AttractapAuditEvent, transaction?: EntityManager): Promise<void> {
-    const snapshot = this.project(() => projectAttractapAuditEvent(event));
-    if (!snapshot) {
-      this.drop('attractap', 'invalid_event');
-      return;
-    }
-    await this.recordSnapshot(
-      {
-        domain: 'attractap',
-        pluginId: 'core',
-        action: `attractap.${snapshot.action}`,
-        operationId: randomUUID(),
-        actorId: snapshot.actorId,
-        authenticationMethod: snapshot.authenticationMethod,
-        apiTokenId: snapshot.apiTokenId ?? null,
-        outcome: 'succeeded',
-        subjectType: snapshot.action.startsWith('card.')
-          ? 'attractap.card'
-          : (snapshot.subjectType ?? 'attractap.reader'),
-        subjectId: snapshot.subjectId,
-        ipAddress: null,
-        userAgent: null,
-        details: snapshot.details,
-      },
-      { transaction },
-    );
-  }
-
   @Interval(60 * 60 * 1000)
   async cleanup(): Promise<void> {
     const storage = this.storage;
@@ -197,9 +114,9 @@ export class AuditService extends AuditStorage implements PluginAuditHostProvide
     this.cleaning = true;
     try {
       const config = await readAuditSettings(this.settings);
-      const cutoff = this.sqliteDate(this.cutoff(config.retention_days));
+      const cutoff = this.sqliteDate(auditCutoff(config.retention_days));
       while (!this.stopping) {
-        const hasOverflow = await this.hasPasswordPolicyOverflow();
+        const hasOverflow = await hasPasswordPolicyOverflow(storage);
         const count = await this.serializeStorageWrite(async () => {
           if (this.stopping) return 0;
           return storage.transaction(async (manager) => {

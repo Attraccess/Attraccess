@@ -31,7 +31,7 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
     findOne: jest.fn().mockResolvedValue({ id: 10, supervisionMode: 'introduction_required' }),
   };
   scope.rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) };
-  scope.audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+  scope.audit = { record: jest.fn().mockResolvedValue(undefined) };
 
   (scope.handler as any).settingsService = Object.assign(Object.create(SettingsService.prototype), {
     getDefaultLanguage: jest.fn().mockResolvedValue('en'),

@@ -52,6 +52,7 @@ describe('reservations email templates in the host template store', () => {
       dataSource.getRepository(EmailTemplate),
       dataSource.getRepository(EmailTemplateTranslation),
       new MjmlService(),
+      { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } as never,
     );
     registerPluginEmailTemplates(PLUGIN, EMAIL_TEMPLATES);
   });
@@ -82,6 +83,8 @@ describe('reservations email templates in the host template store', () => {
     expect(await validate(plainToInstance(UpdateEmailTemplateDto, edit))).toEqual([]);
     expect(() => assertRenderableTemplate(edit)).not.toThrow();
     await expect(new MjmlService().validateAndConvert(mjmlDocumentOf(edit.body))).resolves.toContain('<body');
-    await expect(service.update(keyOf(id), edit)).resolves.toMatchObject(edit);
+    await expect(service.update(keyOf(id), edit, { id: 1, authenticationMethod: 'session' })).resolves.toMatchObject(
+      edit,
+    );
   });
 });

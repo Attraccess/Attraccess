@@ -29,7 +29,7 @@ import { Redis } from 'ioredis';
 
 import { Repository, EntityManager, FindOneOptions, In } from 'typeorm';
 
-import { AuditService } from '../../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../../audit/recorder/audit-event';
 
 import { BillingService } from '../../../billing/charges/billing.service';
 
@@ -111,7 +111,7 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     protected readonly resourceHealthService: ResourceHealthService,
     protected readonly pluginEvents: PluginEventsService,
     protected readonly rbacService: RbacService,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
     @Inject(VALKEY_CLIENT) protected readonly valkeyClient: Redis | null,
     @Optional()
     @Inject(forwardRef(() => ResourceMeteringService))
@@ -421,7 +421,8 @@ export class ResourceUsageService extends UsageSessions implements OnModuleInit,
     skipNoteNotification: boolean,
   ): Promise<void> {
     this.emitSystemUsageEvent(SystemEvent.RESOURCE_USAGE_ENDED, updatedUsage?.resource, updatedUsage?.user);
-    if (updatedUsage) emitPluginSessionEnded(this.pluginEvents, this.logger, updatedUsage, updatedUsage.endTime, 'ended');
+    if (updatedUsage)
+      emitPluginSessionEnded(this.pluginEvents, this.logger, updatedUsage, updatedUsage.endTime, 'ended');
 
     // Emitted after the transaction committed so listeners observe DB state. Every end fires it exactly once
     // (live feed, reader resource lists, maintenance evaluation); the notification listener skips self-ends.

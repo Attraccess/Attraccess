@@ -51,10 +51,7 @@ export class SettingsStoreService {
     return null;
   }
 
-  async getSecretSetting(
-    parent: string,
-    key: string,
-  ): Promise<{ value: string | null; configured: boolean }> {
+  async getSecretSetting(parent: string, key: string): Promise<{ value: string | null; configured: boolean }> {
     const cacheKey = this.getCacheKey(parent, key);
     const cached = this.getCached(cacheKey);
     if (cached) {

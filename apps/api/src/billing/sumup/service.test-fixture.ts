@@ -1,10 +1,10 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 // Tests for SumUpService billing integration with mocked SDK
 // FEATURE: Billing SumUp integration
 
 import { BillingTransaction, Setting } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuditService } from '../../audit/audit.service';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { ExternalCallTimer } from '../../metrics/instrumentation/external/external.helper';
@@ -79,7 +79,7 @@ export function registerSumUpServiceFixture() {
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mockAuditService: any = { recordBillingTransaction: jest.fn() };
+  const mockAuditService: any = { record: jest.fn() };
 
   let service: SumUpService;
 
@@ -118,7 +118,7 @@ export function registerSumUpServiceFixture() {
     mockLiveNotificationsService.notifyTransactionUpdate.mockReset();
     mockBillingService.getConfiguration.mockReset();
     mockSettingsService.getPublicInternetUrl.mockReset();
-    mockAuditService.recordBillingTransaction.mockReset();
+    mockAuditService.record.mockReset();
   };
 
   beforeEach(async () => {
@@ -135,7 +135,7 @@ export function registerSumUpServiceFixture() {
         { provide: SettingsService, useValue: mockSettingsService },
         { provide: LiveNotificationsService, useValue: mockLiveNotificationsService },
         { provide: BillingService, useValue: mockBillingService },
-        { provide: AuditService, useValue: mockAuditService },
+        { provide: AUDIT_RECORDER, useValue: mockAuditService },
         { provide: CronTimer, useValue: { time: <T>(_n: string, fn: () => Promise<T>) => fn() } },
         {
           provide: ExternalCallTimer,

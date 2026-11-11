@@ -21,6 +21,7 @@ import {
 } from './session-change-coordination';
 
 import { SESSION_CHANGE_WAIT_MS, SessionChangeQueue } from './session-change-queue';
+import { SYSTEM_AUDIT_ACTOR } from '../../../audit/recorder/audit-event';
 
 export type SessionEndTarget = { kind: 'user'; userId: number } | { kind: 'all' };
 
@@ -167,7 +168,7 @@ export abstract class UsageSessionChanges extends UsageAuthorization {
           {
             skipFormSubmissions: true,
             skipNoteNotification: true,
-            auditOrigin: { actorId: null },
+            auditOrigin: SYSTEM_AUDIT_ACTOR,
             triggeredByUserId,
             withinSessionChange,
           },

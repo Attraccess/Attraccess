@@ -137,7 +137,7 @@ describe('ResourceUsageService', () => {
       const transactions = captureTransactions(
         endSessionScope.resourceUsageRepository.manager as unknown as { transaction: jest.Mock },
         endSessionScope.transactionalEntityManager,
-        endSessionScope.mockAuditService.recordResource,
+        endSessionScope.mockAuditService.record,
       );
 
       const result = await endSessionScope.service.endSession(1, endSessionScope.mockUser, dto);
@@ -164,14 +164,14 @@ describe('ResourceUsageService', () => {
       // Written with the manager of the transaction that ends the session, so it commits or rolls back with it.
       const auditing = transactions.filter((transaction) => transaction.auditCalls.length > 0);
       expect(auditing).toHaveLength(1);
-      expect(endSessionScope.mockAuditService.recordResource).toHaveBeenCalledTimes(1);
+      expect(endSessionScope.mockAuditService.record).toHaveBeenCalledTimes(1);
       expect(auditing[0].auditCalls).toEqual([
         [
           {
+            domain: 'resource',
             action: 'usage_session.ended',
-            actorId: 1,
-            authenticationMethod: 'session',
-            subjectId: 1,
+            actor: { id: 1, authenticationMethod: 'session' },
+            subject: { type: 'resource', id: 1 },
             details: { usageId: 1, usageUserId: 1 },
           },
           expect.anything(),
@@ -288,7 +288,7 @@ describe('ResourceUsageService', () => {
       expect(sessionEnded).toBe(false);
       expect(endSessionScope.transactionalEntityManager.update).not.toHaveBeenCalled();
       expect(endSessionScope.billingService.chargeForResourceUsage).not.toHaveBeenCalled();
-      expect(endSessionScope.mockAuditService.recordResource).not.toHaveBeenCalled();
+      expect(endSessionScope.mockAuditService.record).not.toHaveBeenCalled();
       expect(endSessionScope.lifecycleAttempts.size).toBe(0);
       expect(endSessionScope.flowExecutorService.runFlow).toHaveBeenCalledWith(
         1,

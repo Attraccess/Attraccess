@@ -5,7 +5,6 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
-  UnauthorizedException,
   Body,
   Get,
   HttpStatus,
@@ -19,10 +18,6 @@ import {
 } from '@nestjs/common';
 
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
-
-import { IdentityAuditService } from '../../../audit/identity-audit.service';
-
-import { SsoAuditService } from '../../../audit/sso-audit.service';
 
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 
@@ -38,11 +33,7 @@ import { RbacService } from '../../rbac/rbac.service';
 
 import { UsersService } from '../../users/users.service';
 
-import { AuthService } from '../auth.service';
-
 import { SessionService } from '../session.service';
-
-import { SSOLinkTokenService } from './link-token.service';
 
 import { SSOService } from './sso.service';
 
@@ -50,23 +41,13 @@ import { installInheritedMethods } from '../../../common/inherited-implementatio
 
 import { SSOProvider, SSOProviderType, AuthenticationType } from '@attraccess/database-entities';
 
-import { AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-
-import { randomUUID } from 'node:crypto';
-
-import { isDeepStrictEqual } from 'node:util';
-
-import { ssoAuditSnapshot } from './audit/provider-audit';
-
-import { timingSafeEqual } from 'crypto';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import { Request, Response } from 'express';
 
-import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
+import { SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
 
 import { InvalidSSOProviderIdException, SSOProviderNotFoundException } from './errors';
-
-import { resolveSsoRoleAssignments } from './permission-mapping';
 
 import { CreateSessionResponse } from '../auth.types';
 
@@ -84,9 +65,9 @@ import { SSOSamlGuard } from './saml/saml.guard';
 
 import { SsoUserProvisioning } from './provisioning/user-provisioning';
 
-import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
+import { SsoProvisioningService } from './provisioning/sso-provisioning.service';
 
-import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
+import { SsoAccountLinkService } from './sso-account-link.service';
 
 import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.guard';
 
@@ -95,19 +76,15 @@ import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.g
 @RequiresLicense(LicenseModuleType.SSO)
 export class SSOController extends SsoUserProvisioning {
   constructor(
-    protected readonly authService: AuthService,
     protected readonly sessionService: SessionService,
     protected readonly usersService: UsersService,
     protected readonly ssoService: SSOService,
     protected readonly cookieConfigService: CookieConfigService,
-    protected readonly linkTokenService: SSOLinkTokenService,
     protected readonly settingsService: SettingsService,
     protected readonly metricsService: MetricsService,
     protected readonly rbacService: RbacService,
-    protected readonly bruteForce: BruteForceProtectionService,
-    protected readonly authAudit: AuthAuditLogger,
-    protected readonly identityAudit: IdentityAuditService,
-    protected readonly ssoAudit: SsoAuditService,
+    protected readonly provisioning: SsoProvisioningService,
+    protected readonly accountLinks: SsoAccountLinkService,
   ) {
     super();
   }
@@ -115,123 +92,6 @@ export class SSOController extends SsoUserProvisioning {
   protected readonly logger = new Logger(SSOController.name);
 
   // Per-role ceiling: each mapped role must have permissions that are a subset of the actor's own
-
-  protected async recordProviderAudit(
-    action: 'created' | 'updated' | 'deleted',
-    request: AuthenticatedRequest,
-    provider: SSOProvider,
-    before?: SSOProvider,
-    rotated: string[] = [],
-  ): Promise<void> {
-    const actor = request.user as AuthenticatedUser;
-    const snapshot = this.providerSnapshot(provider);
-    const beforeSnapshot = this.providerSnapshot(before ?? provider);
-    const changes = this.providerChanges(before ?? provider, provider, rotated);
-    if (action === 'updated' && changes === '{"changed":[],"rotated":[]}') return;
-    await this.recordSso({
-      action: `sso.provider.${action}`,
-      operationId: randomUUID(),
-      actorId: actor.id,
-      authenticationMethod: actor.authenticationMethod ?? 'session',
-      ...(actor.authenticationMethod === 'api-token' && actor.apiTokenId ? { apiTokenId: actor.apiTokenId } : {}),
-      subject: { type: 'sso.provider', id: provider.id },
-      details:
-        action === 'created'
-          ? { before: 'null', after: snapshot }
-          : action === 'deleted'
-            ? { before: snapshot, after: 'null' }
-            : { before: beforeSnapshot, after: snapshot, changes },
-    });
-  }
-
-  protected async recordProvisioningAudit(
-    action: 'sessions_revoked' | 'user_created' | 'user_deleted' | 'permissions_synced',
-    provider: SSOProvider,
-    userId: number,
-    changes:
-      | { sessionsRevoked: true }
-      | { userCreated: true }
-      | { userDeleted: true }
-      | { added: string[]; removed: string[]; updated: string[] },
-  ): Promise<void> {
-    await this.recordSso({
-      action: `sso.provisioning.${action}`,
-      operationId: randomUUID(),
-      actorId: null,
-      authenticationMethod: null,
-      subject: { type: 'user', id: userId },
-      details: { provider: this.providerSnapshot(provider), changes: JSON.stringify(changes) },
-    });
-  }
-
-  protected async recordSso(event: Parameters<SsoAuditService['record']>[0]): Promise<void> {
-    try {
-      await this.ssoAudit.record(event);
-    } catch {
-      // Auditing must not roll back an already-completed SSO operation.
-    }
-  }
-
-  protected providerSnapshot(provider: SSOProvider): string {
-    return ssoAuditSnapshot(provider);
-  }
-
-  protected providerChanges(before: SSOProvider, after: SSOProvider, rotated: string[]): string {
-    const beforeConfiguration = (before.type === SSOProviderType.OIDC
-      ? before.oidcConfiguration
-      : before.samlConfiguration) as unknown as Record<string, unknown> | undefined;
-    const afterConfiguration = (after.type === SSOProviderType.OIDC
-      ? after.oidcConfiguration
-      : after.samlConfiguration) as unknown as Record<string, unknown> | undefined;
-    const fields =
-      before.type === SSOProviderType.OIDC
-        ? [
-            'issuer',
-            'authorizationURL',
-            'tokenURL',
-            'userInfoURL',
-            'clientId',
-            'scopes',
-            'usernameClaimPaths',
-            'emailClaimPaths',
-            'roleClaimPaths',
-            'roleMappings',
-            'permissionSyncTtlMinutes',
-          ]
-        : [
-            'entryPoint',
-            'issuer',
-            'audience',
-            'signRequest',
-            'wantAssertionsSigned',
-            'wantAuthnResponseSigned',
-            'forceAuthn',
-            'emailAttributeKeys',
-            'roleAttributeKeys',
-            'roleMappings',
-          ];
-    const changed = [
-      ...(before.name === after.name ? [] : ['name']),
-      ...fields
-        .filter((key) => !isDeepStrictEqual(beforeConfiguration?.[key], afterConfiguration?.[key]))
-        .map((key) => `configuration.${key}`),
-    ];
-    return JSON.stringify({ changed, rotated });
-  }
-
-  protected providerRotationFlags(before: SSOProvider, after: SSOProvider): string[] {
-    const rotated: string[] = [];
-    if (before.oidcConfiguration?.clientSecret !== after.oidcConfiguration?.clientSecret) rotated.push('clientSecret');
-    if (before.samlConfiguration?.provisioningSecret !== after.samlConfiguration?.provisioningSecret)
-      rotated.push('provisioningSecret');
-    if (before.samlConfiguration?.certificate !== after.samlConfiguration?.certificate)
-      rotated.push('identityProviderCertificate');
-    if (before.samlConfiguration?.spSigningCertificate !== after.samlConfiguration?.spSigningCertificate)
-      rotated.push('signingCertificate');
-    if (before.samlConfiguration?.spSigningKeyEncrypted !== after.samlConfiguration?.spSigningKeyEncrypted)
-      rotated.push('signingPrivateKey');
-    return rotated;
-  }
 
   protected parseProviderId(rawProviderId: string): number {
     const providerId = parseInt(rawProviderId, 10);
@@ -258,74 +118,15 @@ export class SSOController extends SsoUserProvisioning {
     return null;
   }
 
-  protected async assertLinkAccountIpAllowed(request: Request, ip: string, email: string | null): Promise<void> {
+  /** The provisioning secret check; a throttled caller gets a Retry-After header. */
+  protected async authorizeProvisioning(provider: SSOProvider, request: Request): Promise<void> {
     try {
-      await this.bruteForce.assertIpAllowed('sso_link_account', ip, email);
+      const ip = resolveIp(request);
+      await this.provisioning.assertIpAllowed(provider, ip);
+      await this.provisioning.verifySecret(provider, ip, this.extractProvisioningToken(request));
     } catch (error) {
       setRetryAfter(request.res as Response, error);
-      await this.authAudit.log({
-        type: 'sso_link_account',
-        outcome: 'rate_limited',
-        ip,
-        username: email,
-        reason: 'ip_throttled',
-      });
       throw error;
-    }
-  }
-
-  /** Throttled per IP and provider; only a failed secret check counts, never what the call does afterwards. */
-  protected async assertProvisioningAuthorized(provider: SSOProvider, request: Request): Promise<void> {
-    const ip = resolveIp(request);
-    const username = `provider:${provider.type}:${provider.id}`;
-    try {
-      await this.bruteForce.assertIpAllowed('sso_provisioning', ip, username);
-    } catch (error) {
-      setRetryAfter(request.res as Response, error);
-      await this.authAudit.log({
-        type: 'sso_provisioning',
-        outcome: 'rate_limited',
-        ip,
-        username,
-        reason: 'ip_throttled',
-      });
-      throw error;
-    }
-
-    try {
-      this.verifyProvisioningSecret(provider, request);
-    } catch (error) {
-      await this.bruteForce.recordFailure('sso_provisioning', ip, null, username);
-      await this.authAudit.log({
-        type: 'sso_provisioning',
-        outcome: 'invalid_credentials',
-        ip,
-        username,
-        reason: error instanceof Error ? error.message : undefined,
-      });
-      throw error;
-    }
-    await this.bruteForce.recordSuccess('sso_provisioning', ip, null, username);
-  }
-
-  private verifyProvisioningSecret(provider: SSOProvider, request: Request): void {
-    const secret =
-      provider.type === SSOProviderType.SAML
-        ? provider.samlConfiguration?.provisioningSecret
-        : provider.oidcConfiguration?.clientSecret;
-    if (!secret) {
-      throw new UnauthorizedException('SSO_CLIENT_SECRET_NOT_CONFIGURED');
-    }
-
-    const provided = this.extractProvisioningToken(request);
-    if (!provided) {
-      throw new UnauthorizedException('SSO_PROVISIONING_TOKEN_REQUIRED');
-    }
-
-    const expectedBuffer = Buffer.from(secret);
-    const actualBuffer = Buffer.from(provided);
-    if (expectedBuffer.length !== actualBuffer.length || !timingSafeEqual(expectedBuffer, actualBuffer)) {
-      throw new UnauthorizedException('SSO_PROVISIONING_UNAUTHORIZED');
     }
   }
 
@@ -402,26 +203,6 @@ export class SSOController extends SsoUserProvisioning {
         );
       }
     }
-  }
-
-  protected async applyProvisioningPermissions(
-    userId: number,
-    provider: SSOProvider,
-    payload: SSOProvisioningPermissionsDto,
-  ): Promise<{ added: string[]; removed: string[]; updated: string[] } | undefined> {
-    const mapping =
-      provider.type === SSOProviderType.OIDC
-        ? provider.oidcConfiguration?.roleMappings
-        : provider.samlConfiguration?.roleMappings;
-
-    // If the payload contains no `roles` field at all, treat as "no permission info" and skip
-    // sync to avoid wiping SSO-granted roles on incremental provisioning calls.
-    if (payload.roles === undefined) return undefined;
-
-    const roleNames = payload.roles.map((r) => r.trim()).filter((r) => r.length > 0);
-    const roleAssignments = resolveSsoRoleAssignments(roleNames, mapping);
-
-    return this.rbacService.syncSsoRoles(userId, roleAssignments, provider.type, provider.id);
   }
 
   @Get(`/${SSOProviderType.OIDC}/:providerId/login`)
@@ -574,16 +355,8 @@ installInheritedMethods(SSOController, [
   'finalizeLogin',
   'parseProviderId',
   'extractProvisioningToken',
-  'assertProvisioningAuthorized',
-  'assertLinkAccountIpAllowed',
+  'authorizeProvisioning',
   'loadProvisioningProvider',
   'resolveProvisioningUser',
   'assertPermissionMappingCeiling',
-  'applyProvisioningPermissions',
-  'recordProviderAudit',
-  'recordProvisioningAudit',
-  'recordSso',
-  'providerSnapshot',
-  'providerChanges',
-  'providerRotationFlags',
 ]);

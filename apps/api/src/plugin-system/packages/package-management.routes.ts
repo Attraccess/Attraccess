@@ -14,15 +14,13 @@ import { ApiQuery, ApiResponse } from '@nestjs/swagger';
 
 import { PluginDependencyPlanDto, PluginRemovalItemDto } from '../dto/plugin-dependency-plan.dto';
 
-import { auditSubjectKeyId, safeAuditOrigin } from '../../audit/policies/administration';
-
 import { randomUUID } from 'crypto';
 
-import { AuditService } from '../../audit/audit.service';
+import { auditActorOf } from '../../audit/recorder/audit-event';
 
-import { InstalledNpmPlugin, NpmPluginAuditState, NpmPluginService } from '../npm-plugin.service';
+import { NpmPluginService } from '../npm-plugin.service';
 
-import { PluginService } from '../plugin.service';
+import { PluginAdministrationService } from '../plugin-administration.service';
 
 export const PLUGIN_SYSTEM_INSTANCE_ID = randomUUID();
 
@@ -42,34 +40,19 @@ export abstract class PackageManagementRoutes {
   @Post('update-policy')
   @Auth('system.plugins.manage')
   setUpdatePolicy(@Body() body: Record<string, unknown>, @Req() req: AuthenticatedRequest) {
-    return this.npmPluginService.setUpdatePolicy(body).then(async (policy) => {
-      await this.record(req, 'plugin.update_policy_updated', 1, 'plugin-policy', {
-        checksEnabled: policy.checksEnabled ? 1 : 0,
-        updateMode: policy.mode,
-        maintenanceStartMinute: policy.maintenanceWindow.startMinute,
-        maintenanceDurationMinutes: policy.maintenanceWindow.durationMinutes,
-        prerelease: policy.prerelease ? 1 : 0,
-      });
-      return policy;
-    });
+    return this.pluginAdministration.setUpdatePolicy(body, auditActorOf(req.user));
   }
 
   @Post('installed/check')
   @Auth('system.plugins.manage')
   checkAllInstalledPackages(@Req() req: AuthenticatedRequest) {
-    return this.npmPluginService.checkAllInstalled().then(async (installed) => {
-      for (const plugin of installed) await this.recordPackage(req, 'plugin.checked', plugin);
-      return installed;
-    });
+    return this.pluginAdministration.checkAllInstalled(auditActorOf(req.user));
   }
 
   @Post('installed/:packageName/check')
   @Auth('system.plugins.manage')
   checkInstalledPackage(@Param('packageName') packageName: string, @Req() req: AuthenticatedRequest) {
-    return this.npmPluginService.checkInstalled(packageName).then(async (installed) => {
-      await this.recordPackage(req, 'plugin.checked', installed);
-      return installed;
-    });
+    return this.pluginAdministration.checkInstalled(packageName, auditActorOf(req.user));
   }
 
   @Post('installed/:packageName/spec')
@@ -79,10 +62,7 @@ export abstract class PackageManagementRoutes {
     @Body('requestedSpec') requestedSpec: string,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.npmPluginService.updateRequestedSpec(packageName, requestedSpec).then(async (installed) => {
-      await this.recordPackage(req, 'plugin.spec_updated', installed);
-      return installed;
-    });
+    return this.pluginAdministration.updateRequestedSpec(packageName, requestedSpec, auditActorOf(req.user));
   }
 
   @Post('installed/:packageName/update-override')
@@ -92,10 +72,7 @@ export abstract class PackageManagementRoutes {
     @Body('updateOverride') updateOverride: 'inherit' | 'off' | 'patch' | 'minor' | 'follow',
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.npmPluginService.updateOverride(packageName, updateOverride).then(async (installed) => {
-      await this.recordPackage(req, 'plugin.update_override_updated', installed);
-      return installed;
-    });
+    return this.pluginAdministration.updateOverride(packageName, updateOverride, auditActorOf(req.user));
   }
 
   @Post('installed/:packageName/update-policy')
@@ -105,12 +82,12 @@ export abstract class PackageManagementRoutes {
     @Body() body: UpdateInstalledPluginPolicyDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    return this.npmPluginService
-      .updateVersionPolicy(packageName, body.requestedSpec, body.updateOverride)
-      .then(async (installed) => {
-        await this.recordPackage(req, 'plugin.package_policy_updated', installed);
-        return installed;
-      });
+    return this.pluginAdministration.updateVersionPolicy(
+      packageName,
+      body.requestedSpec,
+      body.updateOverride,
+      auditActorOf(req.user),
+    );
   }
 
   @Get('installed/:packageName/versions')
@@ -127,23 +104,7 @@ export abstract class PackageManagementRoutes {
     @Body() body: ReplaceInstalledPluginDto,
     @Req() req?: AuthenticatedRequest,
   ) {
-    const before = this.npmPluginService.listInstalled().find((plugin) => plugin.name === packageName);
-    return this.installWithAudit(
-      req,
-      'plugin.replaced',
-      packageName,
-      before?.requestedSpec ?? version,
-      (state) =>
-        this.npmPluginService.replaceInstalled(
-          packageName,
-          version,
-          body.approvedPermissionAdditions ?? [],
-          body.approvedMajorVersion === true,
-          state,
-          body.planToken,
-        ),
-      before,
-    );
+    return this.pluginAdministration.replaceInstalled(packageName, version, body, req && auditActorOf(req.user));
   }
 
   @Get('npm/:packageName/plan')
@@ -173,10 +134,11 @@ export abstract class PackageManagementRoutes {
     @Body() body: RemoveInstalledPluginDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    const removing = this.npmPluginService.removalPlan(packageName);
-    await this.npmPluginService.removeInstalled(packageName, Boolean(req), body.approvedDependants ?? []);
-    for (const plugin of removing) await this.recordPackage(req, 'plugin.removed', plugin);
-    if (req) this.pluginService.requestRestart();
+    await this.pluginAdministration.removePackageGraph(
+      packageName,
+      body.approvedDependants ?? [],
+      auditActorOf(req.user),
+    );
     return { ok: true };
   }
 
@@ -188,8 +150,12 @@ export abstract class PackageManagementRoutes {
     @Body() body: InstallPluginDto,
     @Req() req?: AuthenticatedRequest,
   ) {
-    return this.installWithAudit(req, 'plugin.installed', packageName, version, (state) =>
-      this.npmPluginService.install(packageName, version, body.registryId, state, body.planToken),
+    return this.pluginAdministration.install(
+      packageName,
+      version,
+      body.registryId,
+      body.planToken,
+      req && auditActorOf(req.user),
     );
   }
 
@@ -202,18 +168,13 @@ export abstract class PackageManagementRoutes {
     @Req() req?: AuthenticatedRequest,
     @Body('planToken') planToken?: string,
   ) {
-    return this.installWithAudit(req, 'plugin.installed', packageName, spec, (state) =>
-      this.npmPluginService.install(packageName, spec, registryId, state, planToken),
-    );
+    return this.pluginAdministration.install(packageName, spec, registryId, planToken, req && auditActorOf(req.user));
   }
 
   @Delete('installed/:packageName')
   @Auth('system.plugins.manage')
   async removeInstalledPackage(@Param('packageName') packageName: string, @Req() req: AuthenticatedRequest) {
-    const installed = this.npmPluginService.listInstalled().find((plugin) => plugin.name === packageName);
-    await this.npmPluginService.removeInstalled(packageName, Boolean(req));
-    if (installed) await this.recordPackage(req, 'plugin.removed', installed);
-    if (req) this.pluginService.requestRestart();
+    await this.pluginAdministration.removeInstalled(packageName, auditActorOf(req.user));
     return { ok: true };
   }
 
@@ -226,32 +187,20 @@ export abstract class PackageManagementRoutes {
   @Post('registries')
   @Auth('system.plugins.manage')
   addRegistry(@Body() body: AddPluginRegistryDto, @Req() req: AuthenticatedRequest) {
-    return this.npmPluginService.addRegistry(body).then(async (registry) => {
-      await this.record(req, 'plugin.registry_added', auditSubjectKeyId(registry.id), 'plugin-registry', {
-        registryId: registry.id,
-        registryName: registry.name,
-        registryUrl: safeAuditOrigin(registry.url),
-      });
-      return registry;
-    });
+    return this.pluginAdministration.addRegistry(body, auditActorOf(req.user));
   }
 
   @Post('registries/:registryId/test')
   @Auth('system.plugins.manage')
   async testRegistry(@Param('registryId') registryId: string, @Req() req: AuthenticatedRequest) {
-    await this.npmPluginService.testRegistry(registryId);
-    await this.record(req, 'plugin.registry_tested', auditSubjectKeyId(registryId), 'plugin-registry', { registryId });
+    await this.pluginAdministration.testRegistry(registryId, auditActorOf(req.user));
     return { ok: true };
   }
 
   @Delete('registries/:registryId')
   @Auth('system.plugins.manage')
   removeRegistry(@Param('registryId') registryId: string, @Req() req: AuthenticatedRequest) {
-    return this.npmPluginService.removeRegistry(registryId).then(async () => {
-      await this.record(req, 'plugin.registry_removed', auditSubjectKeyId(registryId), 'plugin-registry', {
-        registryId,
-      });
-    });
+    return this.pluginAdministration.removeRegistry(registryId, auditActorOf(req.user));
   }
 
   @Get('npm/:packageName/metadata')
@@ -285,36 +234,7 @@ export abstract class PackageManagementRoutes {
 
   protected abstract readonly npmPluginService: NpmPluginService;
 
-  protected abstract record(
-    req: AuthenticatedRequest,
-    action: string,
-    subjectId: number,
-    subjectType: string,
-    details: Record<string, string | number>,
-    outcome?: 'succeeded' | 'failed',
-    operationId?: string,
-  ): Promise<void>;
-
-  protected abstract recordPackage(
-    req: AuthenticatedRequest,
-    action: string,
-    installed: InstalledNpmPlugin,
-  ): Promise<void>;
-
-  protected abstract readonly pluginService: PluginService;
-
-  protected abstract installWithAudit(
-    req: AuthenticatedRequest | undefined,
-    action: string,
-    packageName: string,
-    requestedSpec: string,
-    operation: (state: NpmPluginAuditState) => Promise<InstalledNpmPlugin>,
-    before?: InstalledNpmPlugin,
-  ): Promise<InstalledNpmPlugin>;
+  protected abstract readonly pluginAdministration: PluginAdministrationService;
 
   protected abstract readonly logger: Logger;
-
-  protected abstract lifecycleDetails(state: NpmPluginAuditState): Record<string, string | number>;
-
-  protected abstract readonly audit: AuditService;
 }

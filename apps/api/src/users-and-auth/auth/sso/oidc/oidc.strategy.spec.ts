@@ -197,10 +197,15 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     } as unknown as Profile);
 
     expect(audit.record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 123 } }),
+      expect.objectContaining({
+        domain: 'sso',
+        action: 'sso.provisioning.user_created',
+        subject: { type: 'user', id: 123 },
+      }),
     );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
+        domain: 'sso',
         action: 'sso.provisioning.permissions_synced',
         details: expect.objectContaining({
           changes: JSON.stringify({ added: ['user-manager'], removed: [], updated: [] }),
@@ -252,7 +257,11 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
 
     expect(audit.record).toHaveBeenCalledTimes(1);
     expect(audit.record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 123 } }),
+      expect.objectContaining({
+        domain: 'sso',
+        action: 'sso.provisioning.user_created',
+        subject: { type: 'user', id: 123 },
+      }),
     );
   });
 

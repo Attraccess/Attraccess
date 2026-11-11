@@ -41,6 +41,7 @@ import { MachineBusyError } from '../errors/machine-busy.error';
 import { activeUsageWhere, countOccupiedSlots, pickSessionToEnd } from './active-usage';
 
 import { UsageSessionStartNotifications } from './usage-session-start-notifications';
+import { AuditActor } from '../../../audit/recorder/audit-event';
 
 export abstract class UsageSessions extends UsageSessionStartNotifications {
   async endSession(
@@ -67,7 +68,7 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
   ): Promise<ResourceUsage> {
     // skipNoteNotification: flow-ended sessions carry an auto-generated note, not a human one — skip personnel notification.
     const { skipFormSubmissions = false, skipNoteNotification = false } = options;
-    const auditOrigin = options.auditOrigin ?? { actorId: user.id, authenticationMethod: 'session' as const };
+    const auditOrigin = options.auditOrigin ?? ({ id: user.id, authenticationMethod: 'session' } satisfies AuditActor);
 
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
@@ -173,7 +174,7 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
         },
         'end',
         // The requester stops it (maybe someone else's session); a flow end passes on the user who caused it.
-        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.actorId ?? options.triggeredByUserId },
+        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.id ?? options.triggeredByUserId },
       );
       // Stop effects have run; only now read the final total. Failure leaves energy billing pending, not the stop undone.
       const final: FinalCollection = (await this.metering?.collectFinal(
@@ -197,11 +198,12 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
         await this.metering?.settleInTransaction(manager, endedSession.id, final);
         chargeTransactionId = (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
-        await this.audit.recordResource(
+        await this.audit.record(
           {
+            domain: 'resource',
             action: 'usage_session.ended',
-            ...auditOrigin,
-            subjectId: resourceId,
+            actor: auditOrigin,
+            subject: { type: 'resource', id: resourceId },
             details: {
               usageId: endedSession.id,
               usageUserId: endedSession.userId,
@@ -253,7 +255,7 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
     this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto, options });
 
     const supervisorUserId = options.supervisorUserId ?? null;
-    const auditOrigin = options.auditOrigin ?? { actorId: user.id, authenticationMethod: 'session' as const };
+    const auditOrigin = options.auditOrigin ?? ({ id: user.id, authenticationMethod: 'session' } satisfies AuditActor);
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let startedUsageIdToEmit: number | null = null;
@@ -295,7 +297,7 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
           : { ...this.getResourceUsageFlowPayload(createdSession, formSubmissions), activeSessions },
         existingActiveSession ? 'takeover' : 'start',
         // The starter, or the supervisor who started it for them.
-        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.actorId ?? user.id },
+        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.id ?? user.id },
       );
       newSession = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
         const currentAttempt = await this.getLifecycleAttempt(manager, attemptId, resourceId);
@@ -334,21 +336,23 @@ export abstract class UsageSessions extends UsageSessionStartNotifications {
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
         // Audit rows commit or roll back with the session change they describe.
         if (existingActiveSession) {
-          await this.audit.recordResource(
+          await this.audit.record(
             {
+              domain: 'resource',
               action: 'usage_session.ended',
-              ...auditOrigin,
-              subjectId: resourceId,
+              actor: auditOrigin,
+              subject: { type: 'resource', id: resourceId },
               details: { usageId: existingActiveSession.id, usageUserId: existingActiveSession.user.id },
             },
             manager,
           );
         }
-        await this.audit.recordResource(
+        await this.audit.record(
           {
+            domain: 'resource',
             action: 'usage_session.started',
-            ...auditOrigin,
-            subjectId: resourceId,
+            actor: auditOrigin,
+            subject: { type: 'resource', id: resourceId },
             details: {
               usageId: createdSession.id,
               usageUserId: createdSession.userId,

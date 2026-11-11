@@ -1,4 +1,4 @@
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import 'reflect-metadata';
 import { Global, INestApplication, Module } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
@@ -21,11 +21,11 @@ let hostDataSource: DataSource;
 @Global()
 @Module({
   providers: [
-    { provide: AuditService, useValue: { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
+    { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
     { provide: DataSource, useFactory: () => hostDataSource },
     { provide: 'POC_HOST_GREETER', useValue: { greet: () => 'hello from host' } },
   ],
-  exports: [AuditService, DataSource, 'POC_HOST_GREETER'],
+  exports: [AUDIT_RECORDER, DataSource, 'POC_HOST_GREETER'],
 })
 class HostModule {}
 

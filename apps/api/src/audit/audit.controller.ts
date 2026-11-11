@@ -1,7 +1,7 @@
 import { BadRequestException, Controller, Get, Query, ValidationPipe } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
 import { ApiExtraModels, ApiOkResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { AuditService } from './audit.service';
+import { AuditQueryService } from './audit-query.service';
 import { AuditQueryDto } from './dto/audit-query.dto';
 import { AuditMetaDto, AuditPageDto } from './dto/audit-response.dto';
 
@@ -9,7 +9,7 @@ import { AuditMetaDto, AuditPageDto } from './dto/audit-response.dto';
 @ApiExtraModels(AuditQueryDto)
 @Controller('admin/audit-log')
 export class AuditController {
-  constructor(private readonly audit: AuditService) {}
+  constructor(private readonly audit: AuditQueryService) {}
 
   @Get('meta')
   @Auth('system.audit.read')

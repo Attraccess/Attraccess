@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import 'reflect-metadata';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
@@ -21,7 +22,6 @@ import { MetricsService } from '../metrics/metrics.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
 import { Observable } from 'rxjs';
 import { LicenseService } from '../license/license.service';
-import { AuditService } from '../audit/audit.service';
 
 const mockMetricsService = {
   billingTransactionsTotal: { inc: jest.fn() },
@@ -57,8 +57,8 @@ describe('BillingModule', () => {
           BillingService,
           { provide: LiveNotificationsService, useValue: { notifyTransactionUpdate: jest.fn() } },
           {
-            provide: AuditService,
-            useValue: { recordBillingTransaction: jest.fn() },
+            provide: AUDIT_RECORDER,
+            useValue: { record: jest.fn() },
           },
           { provide: EventEmitter2, useValue: { emit: jest.fn() } },
           { provide: SumUpService, useValue: {} },

@@ -175,6 +175,7 @@ beforeAll(async () => {
     rolePermissionRepo,
     new EventEmitter2(),
     null,
+    { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } as never,
   );
   usersService = new UsersService(
     userRepo,

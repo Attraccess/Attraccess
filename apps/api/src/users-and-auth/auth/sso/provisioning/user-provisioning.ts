@@ -4,7 +4,7 @@ import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 import { Response, Request } from 'express';
 
-import { randomUUID } from 'node:crypto';
+import { auditActorOf } from '../../../../audit/recorder/audit-event';
 
 import { CreateSessionResponse } from '../../auth.types';
 
@@ -25,29 +25,18 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
     redirectTo?: string,
     providerId?: number,
   ): Promise<CreateSessionResponse | void> {
-    const sessionToken = await this.sessionService.createSession(request.user, {
+    const metadata = {
       userAgent: request.headers['user-agent'],
       ipAddress: request.ip || request.connection.remoteAddress,
       ssoContext: (request as unknown as SsoSessionRequest).ssoSessionContext,
-    });
+    };
+    const origin = {
+      actor: auditActorOf(request.user),
+      request: { ipAddress: metadata.ipAddress, userAgent: metadata.userAgent },
+    };
+    const sessionToken = await this.sessionService.createSsoSession(request.user, metadata, origin, providerId);
 
     await this.cookieConfigService.setAuthCookie(response, sessionToken);
-    if (providerId) {
-      await this.identityAudit.record({
-        action: 'sso_login',
-        operationId: randomUUID(),
-        outcome: 'succeeded',
-        actorId: request.user.id,
-        authenticationMethod: request.user.authenticationMethod ?? 'session',
-        apiTokenId: request.user.apiTokenId,
-        subjectId: request.user.id,
-        details: { providerId },
-        request: {
-          ipAddress: request.ip || request.connection.remoteAddress,
-          userAgent: request.headers['user-agent'],
-        },
-      });
-    }
 
     const auth: CreateSessionResponse = {
       user: request.user,
@@ -105,11 +94,10 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.SAML, parsedProviderId);
-    await this.assertProvisioningAuthorized(provider, request);
+    await this.authorizeProvisioning(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
-    await this.usersService.deleteOne(user.id);
-    await this.recordProvisioningAudit('user_deleted', provider, user.id, { userDeleted: true });
+    await this.provisioning.deleteUser(provider, user.id);
 
     return { OK: true };
   }
@@ -152,11 +140,10 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.OIDC, parsedProviderId);
-    await this.assertProvisioningAuthorized(provider, request);
+    await this.authorizeProvisioning(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
-    const changes = await this.applyProvisioningPermissions(user.id, provider, body);
-    if (changes) await this.recordProvisioningAudit('permissions_synced', provider, user.id, changes);
+    await this.provisioning.syncPermissions(provider, user.id, body);
 
     return { OK: true };
   }
@@ -199,11 +186,10 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.SAML, parsedProviderId);
-    await this.assertProvisioningAuthorized(provider, request);
+    await this.authorizeProvisioning(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
-    const changes = await this.applyProvisioningPermissions(user.id, provider, body);
-    if (changes) await this.recordProvisioningAudit('permissions_synced', provider, user.id, changes);
+    await this.provisioning.syncPermissions(provider, user.id, body);
 
     return { OK: true };
   }
@@ -246,11 +232,10 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.OIDC, parsedProviderId);
-    await this.assertProvisioningAuthorized(provider, request);
+    await this.authorizeProvisioning(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
-    await this.sessionService.revokeAllUserSessions(user.id);
-    await this.recordProvisioningAudit('sessions_revoked', provider, user.id, { sessionsRevoked: true });
+    await this.provisioning.revokeSessions(provider, user.id);
 
     return { OK: true };
   }
@@ -293,11 +278,10 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.SAML, parsedProviderId);
-    await this.assertProvisioningAuthorized(provider, request);
+    await this.authorizeProvisioning(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.SAML, parsedProviderId, body);
-    await this.sessionService.revokeAllUserSessions(user.id);
-    await this.recordProvisioningAudit('sessions_revoked', provider, user.id, { sessionsRevoked: true });
+    await this.provisioning.revokeSessions(provider, user.id);
 
     return { OK: true };
   }
@@ -340,11 +324,10 @@ export abstract class SsoUserProvisioning extends SsoProviderRoutes {
   ): Promise<{ OK: boolean }> {
     const parsedProviderId = this.parseProviderId(providerId);
     const provider = await this.loadProvisioningProvider(SSOProviderType.OIDC, parsedProviderId);
-    await this.assertProvisioningAuthorized(provider, request);
+    await this.authorizeProvisioning(provider, request);
 
     const user = await this.resolveProvisioningUser(SSOProviderType.OIDC, parsedProviderId, body);
-    await this.usersService.deleteOne(user.id);
-    await this.recordProvisioningAudit('user_deleted', provider, user.id, { userDeleted: true });
+    await this.provisioning.deleteUser(provider, user.id);
 
     return { OK: true };
   }

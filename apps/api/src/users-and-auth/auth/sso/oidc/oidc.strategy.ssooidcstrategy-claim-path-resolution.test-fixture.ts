@@ -1,6 +1,6 @@
+import { AuditRecorder } from '../../../../audit/recorder/audit-event';
 import { SSOProvider, SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
 import { ModuleRef } from '@nestjs/core';
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { RbacService } from '../../../rbac/rbac.service';
 import { UsersService } from '../../../users/users.service';
@@ -10,6 +10,17 @@ import { SsoAccountResolver } from '../account-resolution/sso-account-resolver.s
 import { DataSource } from 'typeorm';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { SSOOIDCStrategy } from './oidc.strategy';
+
+/** The SSO service mock records sign-in provisioning through the real method, on the given recorder. */
+export function withSignInProvisioning<T extends object>(sso: T | undefined, audit: unknown): T | undefined {
+  if (!sso) return sso;
+  return Object.assign(Object.create(sso), {
+    audit,
+    recordSignInProvisioning(this: SSOService, ...args: Parameters<SSOService['recordSignInProvisioning']>) {
+      return SSOService.prototype.recordSignInProvisioning.apply(this, args);
+    },
+  });
+}
 
 export function registerSsooidcstrategyClaimPathResolutionFixture() {
   const callbackURL = 'http://localhost/cb';
@@ -22,7 +33,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
     authServiceMock: Partial<AuthService>,
     rbacServiceMock?: Partial<RbacService>,
     ssoServiceMock?: Partial<SSOService>,
-    ssoAuditMock?: Partial<SsoAuditService>,
+    ssoAuditMock?: Partial<AuditRecorder>,
     metricsServiceMock?: Partial<MetricsService>,
   ) {
     const dataSource = { transaction: (work: (manager: unknown) => unknown) => work({}) } as unknown as DataSource;
@@ -37,8 +48,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
         if (token === UsersService) return usersServiceMock;
         if (token === AuthService) return authServiceMock;
         if (token === RbacService) return rbacServiceMock ?? { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
-        if (token === SSOService) return ssoServiceMock;
-        if (token === SsoAuditService) return ssoAuditMock;
+        if (token === SSOService) return withSignInProvisioning(ssoServiceMock, ssoAuditMock);
         if (token === MetricsService && metricsServiceMock) return metricsServiceMock;
         throw new Error('Unexpected dependency request');
       }),

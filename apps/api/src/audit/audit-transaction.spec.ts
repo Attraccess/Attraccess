@@ -1,3 +1,4 @@
+import { billingTransactionAuditEvent } from './policies/billing';
 import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { closeResourceTransactionConnection, runSerializedTransaction } from '../database/run-serialized-transaction';
@@ -16,7 +17,7 @@ describe('durable audit SQLite', () => {
       source: 'resource-usage',
     });
     const auditedSubjects = async () =>
-      (await fixture.service.list({ limit: 10 })).items.map((item) => item.subjectId).sort();
+      (await fixture.query.list({ limit: 10 })).items.map((item) => item.subjectId).sort();
 
     beforeEach(async () => {
       await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
@@ -38,7 +39,9 @@ describe('durable audit SQLite', () => {
       it('commits the audit row with the change', async () => {
         await run(async (manager) => {
           await manager.query('INSERT INTO business_change VALUES (1)');
-          expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({ status: 'recorded' });
+          expect(await fixture.service.record(billingTransactionAuditEvent(billing(8)), manager)).toEqual({
+            status: 'recorded',
+          });
           // Not visible to other connections before the caller commits.
           expect(await auditedSubjects()).toEqual([]);
         });
@@ -51,7 +54,7 @@ describe('durable audit SQLite', () => {
         await expect(
           run(async (manager) => {
             await manager.query('INSERT INTO business_change VALUES (1)');
-            expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({
+            expect(await fixture.service.record(billingTransactionAuditEvent(billing(8)), manager)).toEqual({
               status: 'recorded',
             });
             throw new Error('rollback');
@@ -63,13 +66,13 @@ describe('durable audit SQLite', () => {
 
       it('keeps rows of an outer and a committed savepoint when a sibling savepoint rolls back', async () => {
         await run(async (manager) => {
-          await fixture.service.recordBillingTransaction(billing(8), manager);
+          await fixture.service.record(billingTransactionAuditEvent(billing(8)), manager);
           await manager.transaction(async (nested) => {
-            await fixture.service.recordBillingTransaction(billing(9), nested);
+            await fixture.service.record(billingTransactionAuditEvent(billing(9)), nested);
           });
           await expect(
             manager.transaction(async (nested) => {
-              await fixture.service.recordBillingTransaction(billing(10), nested);
+              await fixture.service.record(billingTransactionAuditEvent(billing(10)), nested);
               throw new Error('nested rollback');
             }),
           ).rejects.toThrow('nested rollback');
@@ -85,13 +88,15 @@ describe('durable audit SQLite', () => {
         try {
           await run(async (manager) => {
             await manager.query('INSERT INTO business_change VALUES (1)');
-            expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({
+            expect(await fixture.service.record(billingTransactionAuditEvent(billing(8)), manager)).toEqual({
               status: 'unavailable',
             });
             // The failed savepoint is gone: the transaction keeps working and later audit rows still land.
             await manager.query('INSERT INTO business_change VALUES (2)');
             await manager.query('DROP TRIGGER fail_audit_insert');
-            expect(await fixture.service.recordBillingTransaction(billing(9), manager)).toEqual({ status: 'recorded' });
+            expect(await fixture.service.record(billingTransactionAuditEvent(billing(9)), manager)).toEqual({
+              status: 'recorded',
+            });
           });
           expect(await fixture.source.query('SELECT id FROM business_change ORDER BY id')).toEqual([
             { id: 1 },
@@ -117,8 +122,8 @@ describe('durable audit SQLite', () => {
         try {
           const receipts = await run((manager) =>
             Promise.all([
-              fixture.service.recordBillingTransaction(billing(8), manager),
-              fixture.service.recordBillingTransaction(billing(9), manager),
+              fixture.service.record(billingTransactionAuditEvent(billing(8)), manager),
+              fixture.service.record(billingTransactionAuditEvent(billing(9)), manager),
             ]),
           );
           expect(receipts).toEqual([{ status: 'unavailable' }, { status: 'recorded' }]);
@@ -140,7 +145,8 @@ describe('durable audit SQLite', () => {
               const [{ page_count }] = await manager.query('PRAGMA page_count');
               await manager.query(`PRAGMA max_page_count = ${page_count}`);
               while (
-                (await fixture.service.recordBillingTransaction(billing(++receipts), manager)).status === 'recorded'
+                (await fixture.service.record(billingTransactionAuditEvent(billing(++receipts)), manager)).status ===
+                'recorded'
               );
               await manager.query('INSERT INTO business_change VALUES (2)');
             }),
@@ -155,7 +161,7 @@ describe('durable audit SQLite', () => {
             await manager.query('PRAGMA max_page_count = 1073741823');
             expect((manager.queryRunner as unknown as { transactionDepth: number }).transactionDepth).toBe(1);
             await manager.query('INSERT INTO business_change VALUES (3)');
-            expect(await fixture.service.recordBillingTransaction(billing(99), manager)).toEqual({
+            expect(await fixture.service.record(billingTransactionAuditEvent(billing(99)), manager)).toEqual({
               status: 'recorded',
             });
           });
@@ -172,7 +178,7 @@ describe('durable audit SQLite', () => {
         try {
           await run(async (manager) => {
             store.cache.clear();
-            expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({
+            expect(await fixture.service.record(billingTransactionAuditEvent(billing(8)), manager)).toEqual({
               status: 'recorded',
             });
           });
@@ -190,7 +196,9 @@ describe('durable audit SQLite', () => {
       const storage = (fixture.service as unknown as { storage: DataSource }).storage;
       const insert = jest.spyOn(storage, 'getRepository');
       await fixture.source.transaction(async (manager) => {
-        expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({ status: 'recorded' });
+        expect(await fixture.service.record(billingTransactionAuditEvent(billing(8)), manager)).toEqual({
+          status: 'recorded',
+        });
       });
       expect(insert).not.toHaveBeenCalled();
       insert.mockRestore();
@@ -200,11 +208,13 @@ describe('durable audit SQLite', () => {
       const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
       await fixture.store.setPlainSetting('audit', 'domains', '[]');
       await fixture.source.transaction(async (manager) => {
-        expect(await fixture.service.recordBillingTransaction(billing(8), manager)).toEqual({ status: 'unavailable' });
+        expect(await fixture.service.record(billingTransactionAuditEvent(billing(8)), manager)).toEqual({
+          status: 'unavailable',
+        });
       });
       await fixture.store.setPlainSetting('audit', 'domains', '["billing"]');
       await fixture.store.setPlainSetting('audit', 'enabled', 'false');
-      expect(await fixture.service.recordBillingTransaction(billing(9))).toEqual({ status: 'unavailable' });
+      expect(await fixture.service.record(billingTransactionAuditEvent(billing(9)))).toEqual({ status: 'unavailable' });
       expect(await auditedSubjects()).toEqual([]);
       expect(await droppedRecords(fixture.metrics)).toEqual({});
       expect(warn).not.toHaveBeenCalled();

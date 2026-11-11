@@ -48,7 +48,9 @@ import { NpmPluginService } from '../npm-plugin.service';
 
 import { PluginService } from '../plugin.service';
 
-import { AuditService } from '../../audit/audit.service';
+import { auditActorOf, AuditRecorder } from '../../audit/recorder/audit-event';
+
+import { AuditQueryService } from '../../audit/audit-query.service';
 
 import { SettingsStoreService } from '../../settings/settings-store.service';
 
@@ -197,7 +199,7 @@ export abstract class NpmRegistryAccess {
   }
 
   async onApplicationBootstrap(): Promise<void> {
-    if (!this.audit) return;
+    if (!this.audit || !this.auditQuery) return;
     const manifests = PluginService.getPluginsWithLoadStatus();
     for (const installed of readInstalledNpmPlugins()) {
       const pending = installed.pendingAudit;
@@ -210,7 +212,7 @@ export abstract class NpmRegistryAccess {
       try {
         const config = await readAuditSettings(this.settings);
         if (config.enabled && config.domains.includes('administration')) {
-          const existing = await this.audit.list(
+          const existing = await this.auditQuery.list(
             Object.assign(new AuditQueryDto(), {
               action: 'plugin.activation_completed',
               operationId: pending.operationId,
@@ -218,14 +220,12 @@ export abstract class NpmRegistryAccess {
             }),
           );
           if (!existing.items.length) {
-            const receipt = await this.audit.recordAdministration({
+            const receipt = await this.audit.record({
+              domain: 'administration',
               action: 'plugin.activation_completed',
               operationId: pending.operationId,
-              actorId: pending.actorId,
-              authenticationMethod: pending.authenticationMethod,
-              apiTokenId: pending.apiTokenId,
-              subjectType: 'plugin-package',
-              subjectId: auditSubjectKeyId(installed.name),
+              actor: auditActorOf({ ...pending, id: pending.actorId }),
+              subject: { type: 'plugin-package', id: auditSubjectKeyId(installed.name) },
               outcome: loaded ? 'succeeded' : 'failed',
               details: {
                 ...pending.details,
@@ -313,7 +313,9 @@ export abstract class NpmRegistryAccess {
     }
   }
 
-  protected abstract readonly audit?: AuditService;
+  protected abstract readonly audit?: AuditRecorder;
+
+  protected abstract readonly auditQuery?: AuditQueryService;
 
   protected abstract readonly settings: SettingsStoreService;
 

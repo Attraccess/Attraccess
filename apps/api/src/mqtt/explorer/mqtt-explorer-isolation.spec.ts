@@ -36,7 +36,7 @@ describe('MQTT explorer isolation from flows', () => {
     jest.spyOn(sharedClient, 'resolveServerPassword').mockResolvedValue(null);
     const connections = new MqttExplorerConnectionsService(repository as never, sharedClient);
     const service = new MqttExplorerService(repository as never, connections, sharedClient, {
-      recordAdministration: jest.fn(),
+      record: jest.fn(),
     } as never);
 
     const events: unknown[] = [];

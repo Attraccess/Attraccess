@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AuditService } from '../../../api/src/audit/audit.service';
+import { PluginAuditHost } from '../../../api/src/audit/plugin-audit-host';
 import { createTestAuditMetrics } from '../../../api/src/audit/audit.test-fixture';
 import * as coreMigrations from '../../../api/src/database/migrations';
 import { EncryptionService } from '../../../api/src/encryption/encryption.service';
@@ -104,7 +105,7 @@ export async function bootHost(
     manifest: { id: PLUGIN_ID, name: 'matter', version: COMPATIBILITY_TABLE[0].plugin, pluginDirectory: 'matter' },
     dataSource: db,
     getRepository: (entity) => db.getRepository(entity),
-    audit: createPluginAuditContext(PLUGIN_ID, () => audit),
+    audit: createPluginAuditContext(PLUGIN_ID, () => new PluginAuditHost(audit)),
     events: new EventEmitter2(),
     logger: { log: sink('log'), debug: sink('debug'), warn: sink('warn'), error: sink('error') },
     secrets: {

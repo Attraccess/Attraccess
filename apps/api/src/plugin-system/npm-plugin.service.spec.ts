@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { projectAdministrationAuditEvent } from '../audit/policies/administration';
+import { projectAuditRow } from '../audit/recorder/audit-row';
 import { recordNpmBootMigrationOutcome } from './npm/audit-state';
 import { NpmPluginService } from './npm-plugin.service';
 import type { ServiceInternals, SettingsMock } from './npm-plugin.test-fixture';
@@ -21,11 +21,9 @@ describe('NpmPluginService', () => {
           async (_parent, key) => ({ enabled: 'true', domains: '["administration"]', retention_days: '90' })[key],
         ),
       };
-      const audit = {
-        list: jest.fn().mockResolvedValue({ items: [] }),
-        recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }),
-      };
-      const service = new NpmPluginService(settings as never, undefined, audit as never);
+      const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+      const query = { list: jest.fn().mockResolvedValue({ items: [] }) };
+      const service = new NpmPluginService(settings as never, undefined, audit as never, query as never);
       const internals = service as unknown as ServiceInternals;
       jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
       jest.spyOn(service, 'packageMetadata').mockResolvedValue({
@@ -55,16 +53,15 @@ describe('NpmPluginService', () => {
         .spyOn(PluginService, 'getPluginsWithLoadStatus')
         .mockReturnValue([{ ...manifest, status: migrationOutcome === 'succeeded' ? 'loaded' : 'error' }]);
       jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(migrationOutcome === 'failed');
-      const restarted = new NpmPluginService(settings as never, undefined, audit as never);
+      const restarted = new NpmPluginService(settings as never, undefined, audit as never, query as never);
       await restarted.onApplicationBootstrap();
-      const recorded = audit.recordAdministration.mock.calls[0][0];
-      expect(projectAdministrationAuditEvent(recorded)).not.toBeNull();
+      const recorded = audit.record.mock.calls[0][0];
+      expect(projectAuditRow(recorded)).not.toBeNull();
       expect(recorded).toMatchObject({
+        domain: 'administration',
         operationId: state.context.operationId,
         action: 'plugin.activation_completed',
-        actorId: 42,
-        authenticationMethod: 'api-token',
-        apiTokenId: 9,
+        actor: { id: 42, authenticationMethod: 'api-token', apiTokenId: 9 },
         outcome: migrationOutcome,
         details: {
           migrationOutcome,
@@ -72,7 +69,7 @@ describe('NpmPluginService', () => {
         },
       });
       await restarted.onApplicationBootstrap();
-      expect(audit.recordAdministration).toHaveBeenCalledTimes(1);
+      expect(audit.record).toHaveBeenCalledTimes(1);
       expect(JSON.parse(readFileSync(join(fixture.root, '.npm-plugin-state.json'), 'utf8'))[0]).not.toHaveProperty(
         'pendingAudit',
       );

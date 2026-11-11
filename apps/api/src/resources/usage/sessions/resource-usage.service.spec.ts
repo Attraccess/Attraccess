@@ -566,7 +566,7 @@ describe('ResourceUsageService', () => {
       const transactions = captureTransactions(
         startSessionScope.resourceUsageRepository.manager as unknown as { transaction: jest.Mock },
         startSessionScope.transactionalEntityManager,
-        startSessionScope.mockAuditService.recordResource,
+        startSessionScope.mockAuditService.record,
       );
 
       await startSessionScope.service.startSession(1, startSessionScope.mockUser, dto);
@@ -574,24 +574,24 @@ describe('ResourceUsageService', () => {
       // Both rows are written in the transaction that ends the old session and finalizes the new one,
       // so the take-over and its audit trail commit or roll back together.
       const auditTransaction = onlyAuditTransaction(transactions);
-      expect(startSessionScope.mockAuditService.recordResource).toHaveBeenCalledTimes(2);
+      expect(startSessionScope.mockAuditService.record).toHaveBeenCalledTimes(2);
       expect(auditTransaction.auditCalls).toEqual([
         [
           {
+            domain: 'resource',
             action: 'usage_session.ended',
-            actorId: 1,
-            authenticationMethod: 'session',
-            subjectId: 1,
+            actor: { id: 1, authenticationMethod: 'session' },
+            subject: { type: 'resource', id: 1 },
             details: { usageId: 10, usageUserId: 9 },
           },
           expect.anything(),
         ],
         [
           {
+            domain: 'resource',
             action: 'usage_session.started',
-            actorId: 1,
-            authenticationMethod: 'session',
-            subjectId: 1,
+            actor: { id: 1, authenticationMethod: 'session' },
+            subject: { type: 'resource', id: 1 },
             details: { usageId: 11, usageUserId: 1 },
           },
           expect.anything(),
@@ -846,7 +846,7 @@ describe('ResourceUsageService', () => {
       const transactions = captureTransactions(
         startSessionScope.resourceUsageRepository.manager as unknown as { transaction: jest.Mock },
         startSessionScope.transactionalEntityManager,
-        startSessionScope.mockAuditService.recordResource,
+        startSessionScope.mockAuditService.record,
       );
 
       const result = await startSessionScope.service.startSession(1, { id: 1 } as User, dto);
@@ -863,14 +863,14 @@ describe('ResourceUsageService', () => {
       );
       // Written inside the session's transaction, so the row commits or rolls back with it.
       const auditTransaction = onlyAuditTransaction(transactions);
-      expect(startSessionScope.mockAuditService.recordResource).toHaveBeenCalledTimes(1);
+      expect(startSessionScope.mockAuditService.record).toHaveBeenCalledTimes(1);
       expect(auditTransaction.auditCalls).toEqual([
         [
           {
+            domain: 'resource',
             action: 'usage_session.started',
-            actorId: 1,
-            authenticationMethod: 'session',
-            subjectId: 1,
+            actor: { id: 1, authenticationMethod: 'session' },
+            subject: { type: 'resource', id: 1 },
             details: { usageId: 1, usageUserId: 1 },
           },
           expect.anything(),

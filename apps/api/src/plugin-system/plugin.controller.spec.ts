@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { PluginController } from './plugin.controller';
+import { PluginAdministrationService } from './plugin-administration.service';
 import { PluginService } from './plugin.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
@@ -34,7 +35,7 @@ describe('PluginController', () => {
     searchMarketplace: jest.Mock;
     marketplacePackage: jest.Mock;
   };
-  let audit: { recordAdministration: jest.Mock };
+  let audit: { record: jest.Mock };
   let controller: PluginController;
 
   beforeEach(() => {
@@ -49,8 +50,11 @@ describe('PluginController', () => {
       searchMarketplace: jest.fn(),
       marketplacePackage: jest.fn(),
     };
-    audit = { recordAdministration: jest.fn() };
-    controller = new PluginController(service as unknown as PluginService, npmService as never, audit as never);
+    audit = { record: jest.fn() };
+    controller = new PluginController(
+      npmService as never,
+      new PluginAdministrationService(service as unknown as PluginService, npmService as never, audit as never),
+    );
   });
 
   afterEach(() => {
@@ -91,12 +95,12 @@ describe('PluginController', () => {
 
       await controller.retryPlugin(plugin.id, req);
 
-      expect(audit.recordAdministration).toHaveBeenCalledWith(
+      expect(audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
-          subjectId: auditSubjectKeyId(plugin.name),
+          domain: 'administration',
+          subject: expect.objectContaining({ id: auditSubjectKeyId(plugin.name) }),
           details: expect.objectContaining({ pluginId: plugin.id }),
         }),
-        undefined,
       );
     });
 

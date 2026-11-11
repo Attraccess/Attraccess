@@ -1,3 +1,4 @@
+import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import {
@@ -76,8 +77,12 @@ describe('BillingService', () => {
       refundOfId: 4,
     });
     expect(scope.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(refund);
-    expect(scope.auditService.recordBillingTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({ transactionId: 5, source: 'refund', amount: refund.amount }),
+    expect(scope.auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: 'billing',
+        subject: { type: 'billing.transaction', id: 5 },
+        details: expect.objectContaining({ source: 'refund', amount: refund.amount }),
+      }),
     );
   });
 
@@ -226,14 +231,16 @@ describe('BillingService', () => {
       expect(createManualTransactionScope.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith({
         id: 123,
       });
-      expect(createManualTransactionScope.auditService.recordBillingTransaction).toHaveBeenCalledWith({
-        transactionId: 123,
-        userId: 1,
-        initiatorId: 2,
-        amount: 100,
-        status: BillingTransactionStatus.Completed,
-        source: 'manual',
-      });
+      expect(createManualTransactionScope.auditService.record).toHaveBeenCalledWith(
+        billingTransactionAuditEvent({
+          transactionId: 123,
+          userId: 1,
+          initiatorId: 2,
+          amount: 100,
+          status: BillingTransactionStatus.Completed,
+          source: 'manual',
+        }),
+      );
     });
 
     it('throws InsufficientBalanceError when resulting balance would be negative', async () => {
@@ -588,19 +595,19 @@ describe('BillingService', () => {
         expect.any(Object),
       );
       // The new completed charge is audited inside the caller's transaction.
-      const recordBillingTransaction = handleResourceSessionStartedEventScope.auditService.recordBillingTransaction;
-      expect(recordBillingTransaction).toHaveBeenCalledTimes(1);
-      expect(recordBillingTransaction).toHaveBeenCalledWith(
-        {
+      const record = handleResourceSessionStartedEventScope.auditService.record;
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record).toHaveBeenCalledWith(
+        billingTransactionAuditEvent({
           transactionId: 999,
           userId: 10,
           amount: -35,
           status: BillingTransactionStatus.Completed,
           source: 'resource-usage',
-        },
+        }),
         expect.anything(),
       );
-      expect(recordBillingTransaction.mock.calls[0][1]).toBe(manager);
+      expect(record.mock.calls[0][1]).toBe(manager);
       // A caller-owned transaction returns the charge without publishing it before commit.
       expect(transaction).toEqual(expect.objectContaining({ id: 999, amount: -35, userId: 10, resourceUsageId: 13 }));
       expect(
@@ -635,20 +642,20 @@ describe('BillingService', () => {
 
       await handleResourceSessionStartedEventScope.service.chargeForResourceUsage(usage);
 
-      const recordBillingTransaction = handleResourceSessionStartedEventScope.auditService.recordBillingTransaction;
-      expect(recordBillingTransaction).toHaveBeenCalledTimes(1);
-      expect(recordBillingTransaction).toHaveBeenCalledWith(
-        {
+      const record = handleResourceSessionStartedEventScope.auditService.record;
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record).toHaveBeenCalledWith(
+        billingTransactionAuditEvent({
           transactionId: 999,
           userId: 30,
           amount: -25,
           status: BillingTransactionStatus.Completed,
           source: 'resource-usage',
-        },
+        }),
         expect.anything(),
       );
       expect(transactionManager).toBeDefined();
-      expect(recordBillingTransaction.mock.calls[0][1]).toBe(transactionManager);
+      expect(record.mock.calls[0][1]).toBe(transactionManager);
     });
 
     it('audits the pending start transaction inside the caller transaction', async () => {
@@ -667,19 +674,19 @@ describe('BillingService', () => {
 
       expect(manager.getRepository).toHaveBeenCalledWith(BillingTransaction);
       expect(handleResourceSessionStartedEventScope.billingTransactionRepository.save).not.toHaveBeenCalled();
-      const recordBillingTransaction = handleResourceSessionStartedEventScope.auditService.recordBillingTransaction;
-      expect(recordBillingTransaction).toHaveBeenCalledTimes(1);
-      expect(recordBillingTransaction).toHaveBeenCalledWith(
-        {
+      const record = handleResourceSessionStartedEventScope.auditService.record;
+      expect(record).toHaveBeenCalledTimes(1);
+      expect(record).toHaveBeenCalledWith(
+        billingTransactionAuditEvent({
           transactionId: 56,
           userId: 32,
           amount: 0,
           status: BillingTransactionStatus.Pending,
           source: 'resource-usage',
-        },
+        }),
         expect.anything(),
       );
-      expect(recordBillingTransaction.mock.calls[0][1]).toBe(manager);
+      expect(record.mock.calls[0][1]).toBe(manager);
     });
 
     it('applies billingFactor < 100% (discount) and creates BILLING_FACTOR item', async () => {
@@ -954,20 +961,18 @@ describe('BillingService', () => {
 
       expect(manager.update).toHaveBeenCalledWith(BillingTransaction, 77, expect.objectContaining({ amount: -24 }));
       expect(transaction).toEqual(expect.objectContaining({ id: 77, amount: -24 }));
-      expect(handleResourceSessionStartedEventScope.auditService.recordBillingTransaction).toHaveBeenCalledWith(
-        {
+      expect(handleResourceSessionStartedEventScope.auditService.record).toHaveBeenCalledWith(
+        billingTransactionAuditEvent({
           transactionId: 77,
           userId: 24,
           amount: -24,
           status: BillingTransactionStatus.Completed,
           previousStatus: BillingTransactionStatus.Pending,
           source: 'resource-usage',
-        },
+        }),
         manager,
       );
-      expect(handleResourceSessionStartedEventScope.auditService.recordBillingTransaction.mock.calls[0][1]).toBe(
-        manager,
-      );
+      expect(handleResourceSessionStartedEventScope.auditService.record.mock.calls[0][1]).toBe(manager);
 
       // No BILLING_FACTOR item because billingFactor is 100%
       const saves = (manager.save as jest.Mock).mock.calls.map(([, data]: any[]) => data);

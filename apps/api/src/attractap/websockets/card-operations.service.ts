@@ -2,7 +2,7 @@ import { NFCCard, NFCCardPendingChange, User } from '@attraccess/database-entiti
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { UsersService } from '../../users-and-auth/users/users.service';
 import {
@@ -55,8 +55,9 @@ export class CardOperationsService {
   @Inject(UsersService)
   private readonly usersService: UsersService;
 
-  @Inject(AuditService)
-  private readonly audit: AuditService;
+  @Inject(AUDIT_RECORDER)
+  @Inject(AUDIT_RECORDER)
+  private readonly audit: AuditRecorder;
 
   @InjectRepository(NFCCardPendingChange)
   private readonly pendingRepository: Repository<NFCCardPendingChange>;
@@ -170,12 +171,15 @@ export class CardOperationsService {
     // (e.g. after a reset). Records for other UIDs stay; their key may be on another card.
     await this.pendingRepository.delete(pending.id);
     await this.pendingRepository.delete({ uid, kind: 'enroll' });
-    await this.audit.recordAttractap({
-      action: 'card.linked',
-      actorId: auditPrincipal?.userId ?? pending.actorId ?? user.id,
-      authenticationMethod: auditPrincipal?.authenticationMethod ?? 'session',
-      ...(auditPrincipal?.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
-      subjectId: card.id,
+    await this.audit.record({
+      domain: 'attractap',
+      action: 'attractap.card.linked',
+      actor: {
+        id: auditPrincipal?.userId ?? pending.actorId ?? user.id,
+        authenticationMethod: auditPrincipal?.authenticationMethod ?? 'session',
+        ...(auditPrincipal?.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
+      },
+      subject: { type: 'attractap.card', id: card.id },
       details: { source },
     });
     card.key = keyHex;
@@ -326,12 +330,15 @@ export class CardOperationsService {
     // A reset card must not come back as someone's card from an older interrupted enrollment.
     await this.pendingRepository.delete({ uid, kind: 'enroll' });
     if (deleted.affected && auditPrincipal) {
-      await this.audit.recordAttractap({
-        action: 'card.unlinked',
-        actorId: auditPrincipal.userId,
-        authenticationMethod: auditPrincipal.authenticationMethod,
-        ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
-        subjectId: cardId,
+      await this.audit.record({
+        domain: 'attractap',
+        action: 'attractap.card.unlinked',
+        actor: {
+          id: auditPrincipal.userId,
+          authenticationMethod: auditPrincipal.authenticationMethod,
+          ...(auditPrincipal.authenticationMethod === 'api-token' ? { apiTokenId: auditPrincipal.apiTokenId } : {}),
+        },
+        subject: { type: 'attractap.card', id: cardId },
         details: { readerId, source },
       });
     }

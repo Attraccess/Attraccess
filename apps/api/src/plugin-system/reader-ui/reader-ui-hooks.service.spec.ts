@@ -27,7 +27,7 @@ function setup(
     raise: jest.fn().mockResolvedValue({}),
     clearWhere: jest.fn().mockResolvedValue(undefined),
   };
-  const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const service = new ReaderUiHooksService(
     registry as never,
     settings as never,
@@ -124,7 +124,7 @@ describe('ReaderUiHooksService', () => {
         { preStartHooks: () => [{ plugin: 'p', hook }], sessionEndHooks: () => [] } as never,
         { failurePolicy: jest.fn().mockResolvedValue('fail-closed') } as never,
         { onCleared: jest.fn(), raise: jest.fn().mockResolvedValue({}), clearWhere: jest.fn() } as never,
-        { recordAttractap: jest.fn().mockResolvedValue(undefined) } as never,
+        { record: jest.fn().mockResolvedValue(undefined) } as never,
         config(app),
       );
     expect(make({ READER_UI_HOOK_TIMEOUT_MS: 9000 }).timeoutMs).toBe(3000);
@@ -162,9 +162,10 @@ describe('ReaderUiHooksService', () => {
       'fail-open',
     );
     await expect(service.runPreStart(run())).resolves.toEqual({ decision: 'allow' });
-    expect(audit.recordAttractap).toHaveBeenCalledWith(
+    expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'ui.fail_open_used',
+        domain: 'attractap',
+        action: 'attractap.ui.fail_open_used',
         details: expect.objectContaining({
           plugin: 'boom',
           userId: 7,
@@ -184,9 +185,10 @@ describe('ReaderUiHooksService', () => {
   it('runs an invalid result through the failure policy: fail-open is honoured and audited', async () => {
     const { service, audit } = setup({ odd: () => ({ decision: 'maybe' }) as never }, 'fail-open');
     await expect(service.runPreStart(run())).resolves.toEqual({ decision: 'allow' });
-    expect(audit.recordAttractap).toHaveBeenCalledWith(
+    expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'ui.fail_open_used',
+        domain: 'attractap',
+        action: 'attractap.ui.fail_open_used',
         details: expect.objectContaining({ reasonCode: 'invalid-result' }),
       }),
     );
@@ -262,13 +264,14 @@ describe('ReaderUiHooksService', () => {
         plugin: 'p',
         reason: { code: 'HOOK_UNAVAILABLE', title: 'Vorübergehend nicht startbar', body: expect.any(String) },
       });
-      expect(audit.recordAttractap).toHaveBeenCalledWith(
+      expect(audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'ui.hook_decision',
+          domain: 'attractap',
+          action: 'attractap.ui.hook_decision',
           details: expect.objectContaining({ decision: 'block', reasonCode: 'invalid-result' }),
         }),
       );
-      expect(audit.recordAttractap).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'ui.fail_open_used' }));
+      expect(audit.record).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'ui.fail_open_used' }));
     });
 
     it('counts neither as a breaker failure nor as a success', async () => {
@@ -366,7 +369,7 @@ describe('ReaderUiHooksService.runSessionEnd', () => {
       raise: jest.fn().mockResolvedValue({}),
       clearWhere: jest.fn().mockResolvedValue(undefined),
     };
-    const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+    const audit = { record: jest.fn().mockResolvedValue(undefined) };
     return new ReaderUiHooksService(registry as never, settings as never, alerts as never, audit as never, config());
   }
 

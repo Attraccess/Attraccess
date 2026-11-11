@@ -1,5 +1,15 @@
-import { SsoAuditEvent } from './domain-events';
 import { dataFields, positive, uuid } from './projection';
+
+/** Projection input of an sso-domain event. */
+export type SsoAuditInput = {
+  action: string;
+  operationId: string;
+  actorId: number | null;
+  authenticationMethod: 'session' | 'api-token' | null;
+  apiTokenId?: number;
+  subject: { type: 'sso.provider' | 'user'; id: number };
+  details: Record<string, string>;
+};
 
 export function stringArray(value: unknown, max = 100): boolean {
   return (
@@ -330,7 +340,7 @@ export function validSsoDetails(
   return true;
 }
 
-export function projectSsoAuditEvent(input: unknown): SsoAuditEvent | null {
+export function projectSsoAuditEvent(input: unknown): SsoAuditInput | null {
   const event = dataFields(input, [
     'action',
     'operationId',
@@ -367,7 +377,7 @@ export function projectSsoAuditEvent(input: unknown): SsoAuditEvent | null {
     action: event.action as string,
     operationId: event.operationId as string,
     actorId: event.actorId as number | null,
-    authenticationMethod: event.authenticationMethod as SsoAuditEvent['authenticationMethod'],
+    authenticationMethod: event.authenticationMethod as SsoAuditInput['authenticationMethod'],
     ...(event.apiTokenId === undefined ? {} : { apiTokenId: event.apiTokenId as number }),
     subject: { type: subject.type as 'sso.provider' | 'user', id: subject.id as number },
     details: details as Record<string, string>,

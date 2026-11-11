@@ -23,10 +23,11 @@ describe('AuthAuditLogger', () => {
 
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'login',
+        domain: 'identity',
+        action: 'identity.login',
+        actor: expect.objectContaining({ id: 42 }),
+        subject: expect.objectContaining({ id: 42 }),
         outcome: 'failed',
-        actorId: 42,
-        subjectId: 42,
         details: { reason: 'invalid_credentials' },
         request: { ipAddress: '1.2.3.4' },
       }),
@@ -42,7 +43,12 @@ describe('AuthAuditLogger', () => {
     logger.log({ type: 'register', outcome: 'success', ip: '2.2.2.2' });
 
     expect(record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'registration', outcome: 'succeeded', details: {} }),
+      expect.objectContaining({
+        domain: 'identity',
+        action: 'identity.registration',
+        outcome: 'succeeded',
+        details: {},
+      }),
     );
   });
 
@@ -60,7 +66,8 @@ describe('AuthAuditLogger', () => {
 
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'sso_account_link',
+        domain: 'identity',
+        action: 'identity.sso_account_link',
         outcome: 'failed',
         details: { reason: 'invalid_credentials' },
       }),

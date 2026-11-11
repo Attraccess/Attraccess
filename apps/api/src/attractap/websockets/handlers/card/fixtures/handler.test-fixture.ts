@@ -26,7 +26,7 @@ export function createAttractapCardHandlerFixture() {
 
   let rbacService: { getEffectivePermissions: jest.Mock };
 
-  let audit: { recordAttractap: jest.Mock };
+  let audit: { record: jest.Mock };
 
   const mockUser = { id: 1, username: 'testuser' };
 

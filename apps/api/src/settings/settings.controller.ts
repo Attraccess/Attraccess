@@ -4,17 +4,9 @@ import { Body, Controller, ForbiddenException, Get, Patch, Post, Req, Delete } f
 
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
-import {
-  auditSubjectKeyId,
-  PreviousAuditSettings,
-  recordAdministrationSafely,
-  SETTING_KEYS,
-  safeAuditHost,
-  safeAuditOrigin,
-  safeAuditSender,
-} from '../audit/policies/administration';
+import { auditActorOf } from '../audit/recorder/audit-event';
 
-import { AuditService } from '../audit/audit.service';
+import { SettingsAdministrationService } from './settings-administration.service';
 import { AuditSettingsDto, UpdateAuditSettingsDto } from './dto/audit-settings.dto';
 
 import { FirstTimeSetupStatusDto } from './dto/first-time-setup-status.dto';
@@ -43,43 +35,12 @@ import { ResourceVisibilitySettingsDto } from './dto/resource-visibility-setting
 
 import { UpdateResourceVisibilitySettingsDto } from './dto/update-resource-visibility-settings.dto';
 
-export function systemSettingChanges(
-  before: SystemSettingsDto,
-  after: SystemSettingsDto,
-): Array<[string, string, string]> {
-  const values = [
-    ['app.url', safeAuditOrigin(before.app.url ?? ''), safeAuditOrigin(after.app.url ?? '')],
-    [
-      'app.publicInternetUrl',
-      safeAuditOrigin(before.app.publicInternetUrl ?? ''),
-      safeAuditOrigin(after.app.publicInternetUrl ?? ''),
-    ],
-    ['app.licenseKeyConfigured', before.app.licenseKeyConfigured, after.app.licenseKeyConfigured],
-    ['app.defaultLanguage', before.app.defaultLanguage, after.app.defaultLanguage],
-    ['smtp.service', before.smtp.service, after.smtp.service],
-    ['smtp.host', safeAuditHost(before.smtp.host ?? ''), safeAuditHost(after.smtp.host ?? '')],
-    ['smtp.port', before.smtp.port, after.smtp.port],
-    ['smtp.secure', before.smtp.secure, after.smtp.secure],
-    ['smtp.from', safeAuditSender(before.smtp.from ?? ''), safeAuditSender(after.smtp.from ?? '')],
-    ['smtp.userConfigured', !!before.smtp.user, !!after.smtp.user],
-    ['smtp.passConfigured', before.smtp.passConfigured, after.smtp.passConfigured],
-  ] as const;
-  return values
-    .filter(
-      ([key, oldValue, newValue]) =>
-        oldValue !== newValue ||
-        (key === 'app.url' && before.app.url !== after.app.url) ||
-        (key === 'app.publicInternetUrl' && before.app.publicInternetUrl !== after.app.publicInternetUrl),
-    )
-    .map(([key, oldValue, newValue]) => [key, String(oldValue ?? ''), String(newValue ?? '')]);
-}
-
 @ApiTags('Settings')
 @Controller('settings')
 export class SettingsController {
   constructor(
     protected readonly settingsService: SettingsService,
-    protected readonly audit: AuditService,
+    protected readonly administration: SettingsAdministrationService,
   ) {}
 
   @Get('language')
@@ -102,10 +63,7 @@ export class SettingsController {
   @ApiResponse({ status: 200, type: AuditSettingsDto })
   // Keep raw JSON for strict schema validation: global implicit conversion coerces "false" to true.
   async updateAuditSettings(@Body() body: unknown, @Req() req: AuthenticatedRequest): Promise<AuditSettingsDto> {
-    const before = await this.settingsService.getAuditSettings();
-    const after = await this.settingsService.updateAuditSettings(body);
-    await this.recordChanges(req, 'audit', before, after, before);
-    return after;
+    return this.administration.updateAuditSettings(body, auditActorOf(req.user));
   }
 
   @Get()
@@ -124,16 +82,7 @@ export class SettingsController {
     @Body() body: UpdateSystemSettingsDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<SystemSettingsDto> {
-    const before = await this.settingsService.getSystemSettings();
-    const after = await this.settingsService.updateSystemSettings(body);
-    for (const [key, oldValue, newValue] of systemSettingChanges(before, after)) {
-      await this.recordSetting(req, key, oldValue, newValue);
-    }
-    if (before.smtp.user !== after.smtp.user) await this.recordSetting(req, 'smtp.userChanged', 'false', 'true');
-    // Record credential rotation without retaining either credential value.
-    if (body.app?.licenseKey !== undefined) await this.recordSetting(req, 'app.licenseKeyChanged', 'false', 'true');
-    if (body.smtp?.pass !== undefined) await this.recordSetting(req, 'smtp.passwordChanged', 'false', 'true');
-    return after;
+    return this.administration.updateSystemSettings(body, auditActorOf(req.user));
   }
 
   @Get('first-time-setup')
@@ -150,59 +99,6 @@ export class SettingsController {
   })
   async getFirstTimeSetupStatus(): Promise<FirstTimeSetupStatusDto> {
     return this.settingsService.getFirstTimeSetupStatus();
-  }
-
-  protected async recordChanges(
-    req: AuthenticatedRequest,
-    prefix: string,
-    before: object,
-    after: object,
-    previousAuditSettings?: PreviousAuditSettings,
-  ) {
-    for (const key of SETTING_KEYS.filter((key) => key.startsWith(`${prefix}.`))) {
-      const field = key.slice(prefix.length + 1);
-      if (field.includes('.')) continue;
-      const oldValue = Object.getOwnPropertyDescriptor(before, field)?.value;
-      const newValue = Object.getOwnPropertyDescriptor(after, field)?.value;
-      if (oldValue === undefined || newValue === undefined) continue;
-      const oldText = Array.isArray(oldValue) ? oldValue.join(',') : String(oldValue);
-      const newText = Array.isArray(newValue) ? newValue.join(',') : String(newValue);
-      if (oldText !== newText) await this.recordSetting(req, key, oldText, newText, previousAuditSettings);
-    }
-  }
-
-  protected async recordSetting(
-    req: AuthenticatedRequest,
-    key: string,
-    before: string,
-    after: string,
-    previousAuditSettings?: PreviousAuditSettings,
-  ) {
-    await recordAdministrationSafely(
-      this.audit,
-      {
-        action: 'settings.updated',
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        apiTokenId: req.user.apiTokenId,
-        subjectType: 'setting',
-        subjectId: auditSubjectKeyId(key),
-        details: { settingKey: key, before, after },
-      },
-      previousAuditSettings,
-    );
-  }
-
-  protected async recordKey(req: AuthenticatedRequest, action: string, configured: number) {
-    await recordAdministrationSafely(this.audit, {
-      action,
-      actorId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-      subjectType: 'setting',
-      subjectId: auditSubjectKeyId('metrics.apiKeyConfigured'),
-      details: { settingKey: 'metrics.apiKeyConfigured', configured },
-    });
   }
 
   @Post('first-time-setup')
@@ -222,7 +118,7 @@ export class SettingsController {
   @ApiOperation({ summary: 'Get metrics settings', operationId: 'getMetricsSettings' })
   @ApiResponse({ status: 200, description: 'Current metrics settings.', type: MetricsSettingsDto })
   async getMetricsSettings(): Promise<MetricsSettingsDto> {
-    return this.buildMetricsSettings();
+    return this.administration.metricsSettings();
   }
 
   @Patch('metrics')
@@ -233,17 +129,7 @@ export class SettingsController {
     @Body() body: UpdateMetricsSettingsDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<MetricsSettingsDto> {
-    const before = await this.buildMetricsSettings();
-    if (body.toggles) {
-      await this.settingsService.updateMetricsToggles(body.toggles);
-    }
-    if (body.slowQueryThresholdSeconds !== undefined) {
-      await this.settingsService.setMetricsSlowQueryThresholdSeconds(body.slowQueryThresholdSeconds);
-    }
-    const after = await this.buildMetricsSettings();
-    await this.recordChanges(req, 'metrics', before, after);
-    await this.recordChanges(req, 'metrics.toggles', before.toggles, after.toggles);
-    return after;
+    return this.administration.updateMetricsSettings(body, auditActorOf(req.user));
   }
 
   @Post('metrics/generate-api-key')
@@ -251,9 +137,7 @@ export class SettingsController {
   @ApiOperation({ summary: 'Generate a new metrics API key', operationId: 'generateMetricsApiKey' })
   @ApiResponse({ status: 201, description: 'Metrics API key generated.', type: GenerateMetricsApiKeyResponseDto })
   async generateMetricsApiKey(@Req() req: AuthenticatedRequest): Promise<GenerateMetricsApiKeyResponseDto> {
-    const { apiKey } = await this.settingsService.generateMetricsApiKey();
-    await this.recordKey(req, 'settings.api_key.generated', 1);
-    return { apiKeyConfigured: true, apiKey };
+    return this.administration.generateMetricsApiKey(auditActorOf(req.user));
   }
 
   @Delete('metrics/api-key')
@@ -261,18 +145,7 @@ export class SettingsController {
   @ApiOperation({ summary: 'Remove the metrics API key', operationId: 'deleteMetricsApiKey' })
   @ApiResponse({ status: 200, description: 'Metrics API key removed.', type: MetricsSettingsDto })
   async deleteMetricsApiKey(@Req() req: AuthenticatedRequest): Promise<MetricsSettingsDto> {
-    await this.settingsService.setMetricsApiKey(null);
-    await this.recordKey(req, 'settings.api_key.deleted', 0);
-    return this.buildMetricsSettings();
-  }
-
-  protected async buildMetricsSettings(): Promise<MetricsSettingsDto> {
-    const [{ configured }, toggles, slowQueryThresholdSeconds] = await Promise.all([
-      this.settingsService.getMetricsApiKey(),
-      this.settingsService.getMetricsToggles(),
-      this.settingsService.getMetricsSlowQueryThresholdSeconds(),
-    ]);
-    return { apiKeyConfigured: configured, toggles, slowQueryThresholdSeconds };
+    return this.administration.deleteMetricsApiKey(auditActorOf(req.user));
   }
 
   @Get('auth/rate-limit')
@@ -291,10 +164,7 @@ export class SettingsController {
     @Body() body: UpdateAuthRateLimitSettingsDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<AuthRateLimitSettingsDto> {
-    const before = await this.settingsService.getAuthRateLimitSettings();
-    const after = await this.settingsService.updateAuthRateLimitSettings(body);
-    await this.recordChanges(req, 'auth.rateLimit', before, after);
-    return after;
+    return this.administration.updateAuthRateLimitSettings(body, auditActorOf(req.user));
   }
 
   @Get('messaging/rate-limit')
@@ -321,10 +191,7 @@ export class SettingsController {
     @Body() body: UpdateMessagingRateLimitSettingsDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<MessagingRateLimitSettingsDto> {
-    const before = await this.settingsService.getMessagingRateLimitSettings();
-    const after = await this.settingsService.updateMessagingRateLimitSettings(body);
-    await this.recordChanges(req, 'messaging.rateLimit', before, after);
-    return after;
+    return this.administration.updateMessagingRateLimitSettings(body, auditActorOf(req.user));
   }
 
   @Get('resources/visibility')
@@ -346,9 +213,6 @@ export class SettingsController {
     @Body() body: UpdateResourceVisibilitySettingsDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceVisibilitySettingsDto> {
-    const before = await this.settingsService.getResourceVisibilitySettings();
-    const after = await this.settingsService.updateResourceVisibilitySettings(body);
-    await this.recordChanges(req, 'resources', before, after);
-    return after;
+    return this.administration.updateResourceVisibilitySettings(body, auditActorOf(req.user));
   }
 }

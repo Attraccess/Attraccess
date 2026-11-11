@@ -1,3 +1,4 @@
+import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import {
   BillingTransaction,
   BillingTransactionItem,
@@ -18,7 +19,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { EntityManager, Repository, MoreThan } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { EmailService } from '../../email/email.service';
 
@@ -53,7 +54,7 @@ export class BillingService extends BillingLedger {
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
     protected readonly metricsService: MetricsService,
-    protected readonly auditService: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly auditService: AuditRecorder,
   ) {
     super();
   }
@@ -103,14 +104,14 @@ export class BillingService extends BillingLedger {
       amount: 0,
       status: BillingTransactionStatus.Pending,
     });
-    await this.auditService.recordBillingTransaction(
-      {
+    await this.auditService.record(
+      billingTransactionAuditEvent({
         transactionId: transaction.id,
         userId: transaction.userId,
         amount: transaction.amount,
         status: transaction.status,
         source: 'resource-usage',
-      },
+      }),
       transactionalEntityManager,
     );
   }
@@ -209,15 +210,15 @@ export class BillingService extends BillingLedger {
 
         transaction.amount = -totalCredits;
         transaction.status = BillingTransactionStatus.Completed;
-        await this.auditService.recordBillingTransaction(
-          {
+        await this.auditService.record(
+          billingTransactionAuditEvent({
             transactionId: transaction.id,
             userId: transaction.userId,
             amount: transaction.amount,
             status: transaction.status,
             previousStatus,
             source: 'resource-usage',
-          },
+          }),
           manager,
         );
       } else {
@@ -227,14 +228,14 @@ export class BillingService extends BillingLedger {
           amount: -totalCredits,
           status: BillingTransactionStatus.Completed,
         } as Partial<BillingTransaction>);
-        await this.auditService.recordBillingTransaction(
-          {
+        await this.auditService.record(
+          billingTransactionAuditEvent({
             transactionId: transaction.id,
             userId: transaction.userId,
             amount: transaction.amount,
             status: transaction.status,
             source: 'resource-usage',
-          },
+          }),
           manager,
         );
       }

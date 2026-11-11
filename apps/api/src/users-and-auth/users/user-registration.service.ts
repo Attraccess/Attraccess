@@ -22,6 +22,10 @@ import { UsersService } from './users.service';
 
 import { EntityManager } from 'typeorm';
 
+import { identityAuditEvent } from '../../audit/policies/identity';
+
+import { AUDIT_RECORDER, AuditOrigin, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../audit/recorder/audit-event';
+
 @Injectable()
 export class UserRegistrationService {
   constructor(
@@ -31,13 +35,15 @@ export class UserRegistrationService {
     protected readonly emailService: EmailService,
     protected readonly passwordPolicyService: PasswordPolicyService,
     protected readonly signupDomainService: SignupDomainService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(UserRegistrationService.name);
 
   protected firstTimeSetupOverwriteLock = Promise.resolve();
 
-  public async createOne(body: CreateUserDto, locale?: string): Promise<User> {
+  /** Registers an account (self-signup or by an administrator) and audits it; `request` is the signup request. */
+  public async createOne(body: CreateUserDto, locale?: string, request?: AuditOrigin['request']): Promise<User> {
     this.logger.debug(`Creating new user with username: ${body.username} and email: ${body.email}`);
 
     await this.signupDomainService.assertEmailDomainAllowed(body.email);
@@ -62,7 +68,12 @@ export class UserRegistrationService {
         : undefined;
 
     const register = () => this.registerUser(body, locale, hashedPassword, body.overwriteFirstTimeAdmin);
-    return body.overwriteFirstTimeAdmin ? await this.withFirstTimeSetupOverwriteLock(register) : await register();
+    const user = body.overwriteFirstTimeAdmin ? await this.withFirstTimeSetupOverwriteLock(register) : await register();
+    // Recorded without an actor: the request is anonymous or the new account is its own subject.
+    await this.audit.record(
+      identityAuditEvent('user_created', { actor: SYSTEM_AUDIT_ACTOR, request }, { id: user.id }),
+    );
+    return user;
   }
 
   public async verifyEmail(email: string, token: string): Promise<void> {

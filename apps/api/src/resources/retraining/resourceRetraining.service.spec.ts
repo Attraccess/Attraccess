@@ -99,7 +99,7 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('records a system-origin required transition when the scheduled evaluation first notifies', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue(true) };
     const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
     const service = new ResourceRetrainingService(
       {
@@ -127,17 +127,18 @@ describe('ResourceRetrainingService.evaluate', () => {
       new Date('2026-01-03T00:00:00.000Z'),
     );
 
-    expect(audit.recordResource).toHaveBeenCalledWith({
+    expect(audit.record).toHaveBeenCalledWith({
+      domain: 'resource',
       action: 'retraining.required',
-      actorId: null,
-      subjectId: 1,
+      actor: { id: null, authenticationMethod: null },
+      subject: { type: 'resource', id: 1 },
       details: { introductionId: 3, usageUserId: 2, retrainingReason: 'age' },
     });
     expect(introductionRepository.update).toHaveBeenCalledWith(3, { retrainingRequiredAuditedAt: expect.any(Date) });
   });
 
   it('retries failed email delivery without marking the notification delivered', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue(true) };
     const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
     const email = {
       sendUserRetrainingEmail: jest
@@ -184,7 +185,7 @@ describe('ResourceRetrainingService.evaluate', () => {
     );
     await notify(introduction, new Date('2026-01-04T00:00:00.000Z'));
     expect(email.sendUserRetrainingEmail).toHaveBeenCalledTimes(2);
-    expect(audit.recordResource).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
     expect(introductionRepository.update).toHaveBeenCalledWith(
       3,
       expect.objectContaining({ retrainingNotifiedAt: expect.any(Date) }),
@@ -192,7 +193,7 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('retries a missing required event after the email has been delivered', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue(true) };
     const introductionRepository = { update: jest.fn() };
     const email = { sendUserRetrainingEmail: jest.fn() };
     const service = new ResourceRetrainingService(
@@ -228,13 +229,13 @@ describe('ResourceRetrainingService.evaluate', () => {
       new Date('2026-01-04T00:00:00.000Z'),
     );
 
-    expect(audit.recordResource).toHaveBeenCalledTimes(1);
+    expect(audit.record).toHaveBeenCalledTimes(1);
     expect(email.sendUserRetrainingEmail).not.toHaveBeenCalled();
     expect(introductionRepository.update).toHaveBeenCalledWith(3, { retrainingRequiredAuditedAt: expect.any(Date) });
   });
 
   it('does not record retraining for a revoked introduction', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue(true) };
     const service = new ResourceRetrainingService(
       null as never,
       null as never,
@@ -251,11 +252,11 @@ describe('ResourceRetrainingService.evaluate', () => {
       new Date('2026-01-03T00:00:00.000Z'),
     );
 
-    expect(audit.recordResource).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('uses the introduction marker after audit retention has removed the audit row', async () => {
-    const audit = { recordResource: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue(true) };
     const service = new ResourceRetrainingService(
       {
         findOne: jest.fn().mockResolvedValue({
@@ -282,7 +283,7 @@ describe('ResourceRetrainingService.evaluate', () => {
       new Date('2026-01-03T00:00:00.000Z'),
     );
 
-    expect(audit.recordResource).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 });
 describe('ResourceRetrainingService status aggregation', () => {

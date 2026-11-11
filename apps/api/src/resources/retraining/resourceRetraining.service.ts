@@ -7,13 +7,13 @@ import {
   IntroductionHistoryAction,
 } from '@attraccess/database-entities';
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository, In, IsNull, Not } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { EmailService } from '../../email/email.service';
 
@@ -64,7 +64,7 @@ export class ResourceRetrainingService {
     protected readonly historyRepository: Repository<ResourceIntroductionHistoryItem>,
     protected readonly resourceGroupsService: ResourceGroupsService,
     protected readonly emailService: EmailService,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(ResourceRetrainingService.name);
@@ -331,16 +331,17 @@ export class ResourceRetrainingService {
     // This marker survives audit retention but is reset by a newer training cycle.
     if (!introduction.retrainingRequiredAuditedAt || introduction.retrainingRequiredAuditedAt < trainedAt) {
       const subjectId = introduction.resourceId ?? introduction.resourceGroupId;
-      const recorded = await this.audit.recordResource({
+      const recorded = await this.audit.record({
+        domain: 'resource',
         action: 'retraining.required',
-        actorId: null,
-        subjectId,
-        ...(introduction.resourceId ? {} : { subjectType: 'resource_group' }),
+        actor: { id: null, authenticationMethod: null },
+        subject: { type: 'resource', id: subjectId },
         details: {
           introductionId: introduction.id,
           usageUserId: introduction.receiverUserId,
           retrainingReason: evaluation.reason ?? 'unknown',
         },
+        ...(introduction.resourceId ? {} : { subjectType: 'resource_group' }),
       });
       if (recorded) {
         await this.resourceIntroductionRepository.update(introduction.id, { retrainingRequiredAuditedAt: now });

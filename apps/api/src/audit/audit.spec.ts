@@ -1,3 +1,4 @@
+import { billingTransactionAuditEvent } from './policies/billing';
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -14,6 +15,8 @@ import { SettingsService } from '../settings/settings.service';
 import { AuditQueryDto } from './dto/audit-query.dto';
 import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
+import { AuditQueryService } from './audit-query.service';
+import { PluginAuditHost } from './plugin-audit-host';
 import { AuditService } from './audit.service';
 import { AUDIT_BUSY_RETRIES, MAX_PENDING_AUDIT_WRITES, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
 import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
@@ -24,7 +27,7 @@ describe('durable audit SQLite', () => {
     expect(await fixture.source.query('SELECT * FROM role_permission')).toEqual([
       { roleId: 1, permissionKey: 'system.audit.read' },
     ]);
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+    expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'recorded' });
     await expect(fixture.source.query("UPDATE audit_log SET outcome = 'failed'")).rejects.toThrow('immutable');
     expect(await fixture.source.query('PRAGMA foreign_key_list(audit_log)')).toEqual([]);
     await fixture.source.query('DELETE FROM role WHERE id = 1');
@@ -37,7 +40,7 @@ describe('durable audit SQLite', () => {
     fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
     fixture.service = new AuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
-    expect((await fixture.service.list(new AuditQueryDto())).items).toEqual([
+    expect((await fixture.query.list(new AuditQueryDto())).items).toEqual([
       expect.objectContaining({ actorId: 42, details: { revision: 2 } }),
     ]);
     await fixture.service.onModuleDestroy();
@@ -161,27 +164,27 @@ describe('durable audit SQLite', () => {
     const runner = fixture.source.createQueryRunner();
     await runner.startTransaction();
     try {
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+      expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'recorded' });
     } finally {
       await runner.rollbackTransaction();
       await runner.release();
     }
-    expect((await fixture.service.list(new AuditQueryDto())).items).toHaveLength(1);
+    expect((await fixture.query.list(new AuditQueryDto())).items).toHaveLength(1);
     expect(await droppedRecords(fixture.metrics)).toEqual({});
   });
 
   it('filters and paginates without duplication; hides expired rows and cleans them', async () => {
-    await fixture.service.record(fixture.event());
-    await fixture.service.record({ ...fixture.event(), outcome: 'failed' });
-    await fixture.service.record(fixture.event());
-    const page = await fixture.service.list({ limit: 1 });
+    await fixture.plugins.record(fixture.event());
+    await fixture.plugins.record({ ...fixture.event(), outcome: 'failed' });
+    await fixture.plugins.record(fixture.event());
+    const page = await fixture.query.list({ limit: 1 });
     expect(page.nextCursor).toBe(3);
-    expect((await fixture.service.list({ limit: 10, beforeId: page.nextCursor })).items.map((row) => row.id)).toEqual([
+    expect((await fixture.query.list({ limit: 10, beforeId: page.nextCursor })).items.map((row) => row.id)).toEqual([
       2, 1,
     ]);
     expect(
       (
-        await fixture.service.list({
+        await fixture.query.list({
           limit: 10,
           outcome: 'failed',
           actorId: 42,
@@ -190,13 +193,13 @@ describe('durable audit SQLite', () => {
         })
       ).items,
     ).toHaveLength(1);
-    expect((await fixture.service.list({ limit: 10, subjectType: 'demo.commissioning' })).items).toHaveLength(0);
+    expect((await fixture.query.list({ limit: 10, subjectType: 'demo.commissioning' })).items).toHaveLength(0);
     const old = fixture.source
       .getRepository(AuditLog)
-      .create({ ...(await fixture.service.list({ limit: 1 })).items[0], id: undefined, at: new Date(0) });
+      .create({ ...(await fixture.query.list({ limit: 1 })).items[0], id: undefined, at: new Date(0) });
     await fixture.source.getRepository(AuditLog).insert(old);
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(4);
-    expect((await fixture.service.list({ limit: 10 })).items).toHaveLength(3);
+    expect((await fixture.query.list({ limit: 10 })).items).toHaveLength(3);
     await fixture.service.cleanup();
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(3);
   });
@@ -242,7 +245,7 @@ describe('durable audit SQLite', () => {
       const cleanup = fixture.service.cleanup();
       await cleanupStarted;
       let recorded = false;
-      const receipt = fixture.service.record(fixture.event()).then((value) => {
+      const receipt = fixture.plugins.record(fixture.event()).then((value) => {
         recorded = true;
         return value;
       });
@@ -297,7 +300,7 @@ describe('durable audit SQLite', () => {
       const cleanup = fixture.service.cleanup();
       await cleanupStarted;
       let recorded = false;
-      const receipt = fixture.service.record(fixture.event()).then((value) => {
+      const receipt = fixture.plugins.record(fixture.event()).then((value) => {
         recorded = true;
         return value;
       });
@@ -322,40 +325,41 @@ describe('durable audit SQLite', () => {
         await fixture.store.setPlainSetting('audit', key, JSON.stringify(value));
       const sink = new AuditService(fixture.source, fixture.store, fixture.metrics);
       await sink.onModuleInit();
-      expect(await sink.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(await new PluginAuditHost(sink).record(fixture.event())).toEqual({ status: 'unavailable' });
       await sink.onModuleDestroy();
     }
     await fixture.store.setPlainSetting('audit', 'enabled', 'true');
     await fixture.store.setPlainSetting('audit', 'plugin_domains_disabled', '[]');
     await fixture.store.setPlainSetting('audit', 'domains', '[]');
-    await fixture.service.recordResource({
+    await fixture.service.record({
+      domain: 'resource',
       action: 'resource.created',
-      actorId: 42,
-      subjectId: 7,
+      actor: { id: 42, authenticationMethod: 'session' },
+      subject: { type: 'resource', id: 7 },
       details: { 'after.name': 'Lathe', 'after.type': 'machine' },
     });
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(0);
     expect(await droppedRecords(fixture.metrics)).toEqual({});
-    expect(await fixture.service.record({ ...fixture.event(), details: { password: 'not-stored' } })).toEqual({
+    expect(await fixture.plugins.record({ ...fixture.event(), details: { password: 'not-stored' } })).toEqual({
       status: 'unavailable',
     });
     expect(await droppedRecords(fixture.metrics)).toEqual({ 'unknown:invalid_event': 1 });
     await fixture.source.query('DROP TABLE audit_log');
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
     expect(await droppedRecords(fixture.metrics)).toEqual({ 'unknown:invalid_event': 1, 'demo:storage_error': 1 });
     await expect(fixture.service.cleanup()).resolves.toBeUndefined();
   });
 
   it('rejects oversized details at the database boundary too', async () => {
-    await fixture.service.record(fixture.event());
-    const row = (await fixture.service.list({ limit: 1 })).items[0];
+    await fixture.plugins.record(fixture.event());
+    const row = (await fixture.query.list({ limit: 1 })).items[0];
     await expect(
       fixture.source.getRepository(AuditLog).insert({ ...row, id: undefined, details: { raw: 'x'.repeat(4096) } }),
     ).rejects.toThrow('CHECK constraint');
   });
 
   it('records every one of many concurrent writes', async () => {
-    const receipts = await Promise.all(Array.from({ length: 40 }, () => fixture.service.record(fixture.event())));
+    const receipts = await Promise.all(Array.from({ length: 40 }, () => fixture.plugins.record(fixture.event())));
     expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(40);
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(40);
     expect(await droppedRecords(fixture.metrics)).toEqual({});
@@ -381,7 +385,7 @@ describe('durable audit SQLite', () => {
 
     it('repeats the insert instead of dropping the record', async () => {
       const attempts = lockAuditInserts(AUDIT_BUSY_RETRIES);
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+      expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'recorded' });
       expect(attempts()).toBe(AUDIT_BUSY_RETRIES + 1);
       expect(await droppedRecords(fixture.metrics)).toEqual({});
       expect(await fixture.source.getRepository(AuditLog).count()).toBe(1);
@@ -390,7 +394,7 @@ describe('durable audit SQLite', () => {
     it('drops the record as storage_error once the retries are used up', async () => {
       const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
       const attempts = lockAuditInserts(AUDIT_BUSY_RETRIES + 1);
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
       expect(attempts()).toBe(AUDIT_BUSY_RETRIES + 1);
       expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:storage_error': 1 });
       expect(String(error.mock.calls[0][0])).toContain('code=SQLITE_BUSY');
@@ -400,14 +404,14 @@ describe('durable audit SQLite', () => {
       const attempts = lockAuditInserts(0);
       await fixture.source.query('DROP TABLE audit_log');
       jest.spyOn(Logger.prototype, 'error').mockImplementation();
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
       expect(attempts()).toBe(1);
     });
 
     it('does not repeat once shutdown has started', async () => {
       const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
       const attempts = lockAuditInserts(1);
-      const write = fixture.service.record(fixture.event());
+      const write = fixture.plugins.record(fixture.event());
       const shutdown = fixture.service.onModuleDestroy();
       expect(await write).toEqual({ status: 'unavailable' });
       await shutdown;
@@ -420,14 +424,14 @@ describe('durable audit SQLite', () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
       const receipts = await Promise.all(
-        Array.from({ length: MAX_PENDING_AUDIT_WRITES + 25 }, () => fixture.service.record(fixture.event())),
+        Array.from({ length: MAX_PENDING_AUDIT_WRITES + 25 }, () => fixture.plugins.record(fixture.event())),
       );
       expect(receipts.filter((r) => r.status === 'recorded')).toHaveLength(MAX_PENDING_AUDIT_WRITES);
       expect(await fixture.source.getRepository(AuditLog).count()).toBe(MAX_PENDING_AUDIT_WRITES);
       expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:queue_full': 25 });
       expect(warn).toHaveBeenCalledTimes(25);
       expect(String(warn.mock.calls[0][0])).toContain('reason=queue_full');
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+      expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'recorded' });
     } finally {
       warn.mockRestore();
     }
@@ -451,28 +455,28 @@ describe('durable audit SQLite', () => {
     });
     fixture.service = new AuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+    expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
     await settings.updateAuditSettings({ enabled: true, domains: ['resource'] });
     jest.spyOn(fixture.store, 'getPlainSetting').mockRejectedValue(new Error('private failure'));
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
-    await expect(fixture.service.list({ limit: 1 })).rejects.toThrow('Audit settings unavailable');
+    expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
+    await expect(fixture.query.list({ limit: 1 })).rejects.toThrow('Audit settings unavailable');
   });
 
   it('applies retention setting changes to reads immediately and rejects malformed persisted settings', async () => {
-    await fixture.service.record(fixture.event());
-    const row = (await fixture.service.list({ limit: 1 })).items[0];
+    await fixture.plugins.record(fixture.event());
+    const row = (await fixture.query.list({ limit: 1 })).items[0];
     await fixture.source
       .getRepository(AuditLog)
       .insert({ ...row, id: undefined, at: new Date(Date.now() - 3 * 86400000) });
-    expect((await fixture.service.list({ limit: 10 })).items).toHaveLength(2);
+    expect((await fixture.query.list({ limit: 10 })).items).toHaveLength(2);
     const settings = new SettingsService(null, fixture.store, null);
     await settings.updateAuditSettings({ retention_days: 2 });
-    expect((await fixture.service.list({ limit: 10 })).items).toHaveLength(1);
+    expect((await fixture.query.list({ limit: 10 })).items).toHaveLength(1);
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(2);
     for (const invalid of ['null', '"private"', '0']) {
       await fixture.store.setPlainSetting('audit', 'retention_days', invalid);
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
-      await expect(fixture.service.list({ limit: 1 })).rejects.toThrow('Audit settings unavailable');
+      expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
+      await expect(fixture.query.list({ limit: 1 })).rejects.toThrow('Audit settings unavailable');
       await fixture.service.cleanup();
       expect(await fixture.source.getRepository(AuditLog).count()).toBe(2);
     }
@@ -488,7 +492,7 @@ describe('durable audit SQLite', () => {
       await gate;
       throw new Error('private');
     });
-    const pending = Array.from({ length: 8 }, () => fixture.service.record(fixture.event()));
+    const pending = Array.from({ length: 8 }, () => fixture.plugins.record(fixture.event()));
     release();
     expect((await Promise.all(pending)).every((receipt) => receipt.status === 'unavailable')).toBe(true);
     expect(await droppedRecords(fixture.metrics)).toEqual({ 'demo:settings_unavailable': 8 });
@@ -496,24 +500,24 @@ describe('durable audit SQLite', () => {
     expect(String(warn.mock.calls[0][0])).not.toContain('private');
     read.mockRestore();
     warn.mockRestore();
-    expect(await fixture.service.record(fixture.event())).toEqual({ status: 'recorded' });
+    expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'recorded' });
   });
 
   it('drains multiple bounded retention batches and filters event prefixes and time windows', async () => {
-    await fixture.service.record(fixture.event());
-    const row = (await fixture.service.list({ limit: 1 })).items[0];
+    await fixture.plugins.record(fixture.event());
+    const row = (await fixture.query.list({ limit: 1 })).items[0];
     for (let batch = 0; batch < 3; batch++) {
       await fixture.source
         .getRepository(AuditLog)
         .insert(Array.from({ length: 800 }, () => ({ ...row, id: undefined, at: new Date(0) })));
     }
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(2401);
-    expect((await fixture.service.list({ limit: 10 })).items).toHaveLength(1);
+    expect((await fixture.query.list({ limit: 10 })).items).toHaveLength(1);
     await fixture.service.cleanup();
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(1);
     expect(
       (
-        await fixture.service.list({
+        await fixture.query.list({
           limit: 10,
           eventPrefix: 'demo.pub',
           from: row.at.toISOString(),
@@ -521,8 +525,8 @@ describe('durable audit SQLite', () => {
         })
       ).items,
     ).toHaveLength(1);
-    expect((await fixture.service.list({ limit: 10, eventPrefix: 'demo.commissioning.' })).items).toHaveLength(0);
-    expect((await fixture.service.list({ limit: 10, to: new Date(0).toISOString() })).items).toHaveLength(0);
+    expect((await fixture.query.list({ limit: 10, eventPrefix: 'demo.commissioning.' })).items).toHaveLength(0);
+    expect((await fixture.query.list({ limit: 10, to: new Date(0).toISOString() })).items).toHaveLength(0);
   });
 
   it('waits for a held SQLite write lock instead of dropping the write', async () => {
@@ -530,7 +534,7 @@ describe('durable audit SQLite', () => {
     const lock = await new DataSource({ type: 'sqlite', database: fixture.source.options.database }).initialize();
     try {
       await lock.query('BEGIN IMMEDIATE');
-      const receipts = Promise.all(Array.from({ length: 8 }, () => fixture.service.record(fixture.event())));
+      const receipts = Promise.all(Array.from({ length: 8 }, () => fixture.plugins.record(fixture.event())));
       await new Promise((resolve) => setTimeout(resolve, 400));
       await lock.query('ROLLBACK');
       expect((await receipts).every((receipt) => receipt.status === 'recorded')).toBe(true);
@@ -548,7 +552,7 @@ describe('durable audit SQLite', () => {
     const sink = new AuditService(memory, fixture.store, metrics);
     await sink.onModuleInit();
     try {
-      expect(await sink.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(await new PluginAuditHost(sink).record(fixture.event())).toEqual({ status: 'unavailable' });
       expect(await droppedRecords(metrics)).toEqual({ 'demo:storage_unavailable': 1 });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('reason=storage_unavailable'));
     } finally {
@@ -560,18 +564,13 @@ describe('durable audit SQLite', () => {
   it('counts invalid events of every domain as invalid_event without storing them', async () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
-      const invalid = { action: 'nope' } as never;
-      expect(await fixture.service.record({ ...fixture.event(), action: 'nope' })).toEqual({ status: 'unavailable' });
-      expect(await fixture.service.recordResource(invalid)).toBe(false);
-      await fixture.service.recordProject(invalid);
-      await fixture.service.recordAttractap(invalid);
-      expect(await fixture.service.recordSso(invalid)).toEqual({ status: 'unavailable' });
-      expect(await fixture.service.recordIdentity(invalid)).toEqual({ status: 'unavailable' });
-      expect(await fixture.service.recordAdministration(invalid)).toEqual({ status: 'unavailable' });
-      expect(await fixture.service.recordBillingTransaction({ transactionId: -1 } as never)).toEqual({
+      expect(await fixture.plugins.record({ ...fixture.event(), action: 'nope' })).toEqual({ status: 'unavailable' });
+      for (const domain of ['resource', 'project', 'attractap', 'sso', 'identity', 'administration'])
+        expect(await fixture.service.record({ domain, action: 'nope' } as never)).toEqual({ status: 'unavailable' });
+      expect(await fixture.service.record(billingTransactionAuditEvent({ transactionId: -1 } as never))).toEqual({
         status: 'unavailable',
       });
-      // Core methods know their domain; only an unprojectable plugin event is `unknown`.
+      // A core envelope names its domain; only an unprojectable plugin event is `unknown`.
       expect(await droppedRecords(fixture.metrics)).toEqual({
         'unknown:invalid_event': 1,
         'resource:invalid_event': 1,
@@ -601,21 +600,21 @@ describe('durable audit SQLite', () => {
       return originalRead(parent, key);
     });
     const input = fixture.event();
-    const pending = fixture.service.record(input);
+    const pending = fixture.plugins.record(input);
     input.principal.userId = 99;
     input.details.revision = 999;
     release();
     expect(await pending).toEqual({ status: 'recorded' });
     read.mockRestore();
-    expect((await fixture.service.list({ limit: 1 })).items[0]).toMatchObject({
+    expect((await fixture.query.list({ limit: 1 })).items[0]).toMatchObject({
       actorId: 42,
       details: { revision: 2 },
     });
-    const writes = Array.from({ length: 8 }, () => fixture.service.record(fixture.event()));
+    const writes = Array.from({ length: 8 }, () => fixture.plugins.record(fixture.event()));
     const shutdown = fixture.service.onModuleDestroy();
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
       // Writes queued before shutdown are stored; only the one arriving afterwards is dropped.
       expect(await Promise.all(writes)).toEqual(Array(8).fill({ status: 'recorded' }));
       await shutdown;
@@ -625,7 +624,7 @@ describe('durable audit SQLite', () => {
       warn.mockRestore();
     }
     expect(await fixture.source.getRepository(AuditLog).count()).toBe(9);
-    await expect(fixture.service.list({ limit: 1 })).rejects.toThrow('Audit storage unavailable');
+    await expect(fixture.query.list({ limit: 1 })).rejects.toThrow('Audit storage unavailable');
   });
 
   it('drops writes still queued when the shutdown drain runs out of time', async () => {
@@ -633,7 +632,7 @@ describe('durable audit SQLite', () => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     try {
       await lock.query('BEGIN IMMEDIATE');
-      const writes = Array.from({ length: 3 }, () => fixture.service.record(fixture.event()));
+      const writes = Array.from({ length: 3 }, () => fixture.plugins.record(fixture.event()));
       (fixture.service as unknown as { shutdownDrainMs: number }).shutdownDrainMs = 50;
       const shutdown = fixture.service.onModuleDestroy();
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -737,7 +736,9 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
     const migratedStore = new SettingsStoreService(source.getRepository(Setting), null);
     const migratedAudit = new AuditService(source, migratedStore, createTestAuditMetrics());
     await migratedAudit.onModuleInit();
-    const migratedList = await new AuditController(migratedAudit).list({ limit: 10 });
+    const migratedList = await new AuditController(new AuditQueryService(migratedAudit, source, migratedStore)).list({
+      limit: 10,
+    });
     const migratedOversizedEvent = migratedList.items.find((item) => item.details.legacyAuditId === 2);
     expect(migratedOversizedEvent).toMatchObject({
       details: {

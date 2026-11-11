@@ -1,3 +1,5 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
+import { AuditService } from '../audit/audit.service';
 import { entities } from '@attraccess/database-entities';
 import type { InjectionToken, ModuleMetadata, Type } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -5,8 +7,6 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuditModule } from '../audit/audit.module';
-import { IdentityAuditService } from '../audit/identity-audit.service';
-import { SsoAuditService } from '../audit/sso-audit.service';
 import { ApprovedOriginsService } from '../common/security/approved-origins.service';
 import { SecurityModule } from '../common/security/security.module';
 import appConfiguration from '../config/app.config';
@@ -20,6 +20,7 @@ import { SsoLogoutService } from './auth/sso/sso-logout.service';
 import { SessionPermissionSync } from './auth/sso/session-permission-sync';
 import { SsoSessionPermissionSyncService } from './auth/sso/session-permission-sync.service';
 import { SessionStrategy } from './strategies/session.strategy';
+import { SessionService } from './auth/session.service';
 import { UsersAndAuthModule } from './users-and-auth.module';
 
 // Config factories validate the environment when ConfigModule loads, not on import.
@@ -68,10 +69,15 @@ describe('UsersAndAuthModule boot (required security and audit collaborators)', 
       const controller = moduleRef.get(AuthController);
       const collaborators = controller as unknown as Record<string, unknown>;
 
-      expect(collaborators.identityAudit).toBeInstanceOf(IdentityAuditService);
       expect(collaborators.ssoLogout).toBeInstanceOf(SsoLogoutService);
       expect(collaborators.ssoPermissionSync).toBeInstanceOf(SsoSessionPermissionSyncService);
       expect(collaborators.approvedOrigins).toBeInstanceOf(ApprovedOriginsService);
+    });
+
+    it('gives the session service the audit recorder for logout and SSO sign-in events', () => {
+      const sessions = moduleRef.get(SessionService) as unknown as Record<string, unknown>;
+
+      expect(sessions.audit).toBeInstanceOf(AuditService);
     });
 
     it('resolves SessionStrategy with the permission sync defined', () => {
@@ -80,15 +86,15 @@ describe('UsersAndAuthModule boot (required security and audit collaborators)', 
       expect(strategy.ssoPermissionSync).toBeInstanceOf(SsoSessionPermissionSyncService);
     });
 
-    it('provides the SSO audit service to the permission sync', () => {
+    it('provides the audit recorder to the permission sync', () => {
       const sync = moduleRef.get(SessionPermissionSync) as unknown as Record<string, unknown>;
 
-      expect(sync.ssoAudit).toBeInstanceOf(SsoAuditService);
+      expect(sync.audit).toBeInstanceOf(AuditService);
     });
   });
 
   it('fails to compile without the AuditModule', async () => {
-    await expect(compile(SecurityModule, UsersAndAuthModule)).rejects.toThrow(/IdentityAuditService/);
+    await expect(compile(SecurityModule, UsersAndAuthModule)).rejects.toThrow(/AUDIT_RECORDER/);
   });
 
   it('fails to compile without the SecurityModule', async () => {
@@ -96,10 +102,13 @@ describe('UsersAndAuthModule boot (required security and audit collaborators)', 
   });
 
   // Each class on its own, so a regression in one of them cannot hide behind another.
-  const requiredCollaborators: Array<[Type, Array<InjectionToken & { name: string }>]> = [
-    [AuthController, [IdentityAuditService, SsoLogoutService, SessionPermissionSync, ApprovedOriginsService]],
-    [SessionStrategy, [SessionPermissionSync]],
-    [SsoSessionPermissionSyncService, [SsoAuditService]],
+  const named = (token: InjectionToken & { name?: string }) =>
+    [typeof token === 'symbol' ? 'Symbol(AUDIT_RECORDER)' : (token as { name: string }).name, token] as const;
+  const requiredCollaborators: Array<[Type, Array<readonly [string, InjectionToken]>]> = [
+    [AuthController, [SsoLogoutService, SessionPermissionSync, ApprovedOriginsService].map(named)],
+    [SessionStrategy, [SessionPermissionSync].map(named)],
+    [SsoSessionPermissionSyncService, [AUDIT_RECORDER].map(named)],
+    [SessionService, [AUDIT_RECORDER].map(named)],
   ];
 
   describe.each(requiredCollaborators.map(([target, required]) => [target.name, target, required] as const))(
@@ -109,14 +118,11 @@ describe('UsersAndAuthModule boot (required security and audit collaborators)', 
         await expect(compileWithout(target)).resolves.toBeDefined();
       });
 
-      it.each(required.map((token) => [token.name, token] as const))(
-        'fails to compile without %s',
-        async (name, token) => {
-          await expect(compileWithout(target, token)).rejects.toThrow(
-            new RegExp(`dependencies of the ${target.name}[\\s\\S]*argument ${name}`),
-          );
-        },
-      );
+      it.each(required)('fails to compile without %s', async (name, token) => {
+        await expect(compileWithout(target, token)).rejects.toThrow(
+          new RegExp(`dependencies of the ${target.name}[\\s\\S]*argument ${name.replace(/[()]/g, '\\$&')}`),
+        );
+      });
     },
   );
 });

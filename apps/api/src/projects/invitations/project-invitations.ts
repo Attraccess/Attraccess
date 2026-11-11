@@ -13,7 +13,7 @@ import { NotificationCategory } from '../../notifications/notification-types';
 
 import { Repository } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { FileStorageService } from '../../common/services/file-storage.service';
 
@@ -87,27 +87,23 @@ export abstract class ProjectInvitations {
     invitation.respondedAt = new Date();
     await this.projectInvitationRepository.save(invitation);
 
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action:
         status === ProjectInvitationStatus.ACCEPTED ? 'project.invitation.accepted' : 'project.invitation.rejected',
-      actorId: userId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project.invitation',
-      subjectId: invitation.id,
+      actor: { id: userId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project.invitation', id: invitation.id },
       details: this.invitationDetails(invitation),
     });
 
     if (status === ProjectInvitationStatus.ACCEPTED) {
       const member = await this.ensureMemberRecord(invitation.projectId, userId, invitation.requestedRole);
       if (member) {
-        await this.audit.recordProject({
+        await this.audit.record({
+          domain: 'project',
           action: 'project.member.added',
-          actorId: userId,
-          authenticationMethod,
-          apiTokenId,
-          subjectType: 'project.member',
-          subjectId: member.id,
+          actor: { id: userId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+          subject: { type: 'project.member', id: member.id },
           details: { projectId: invitation.projectId, memberId: member.id, userId, role: member.role },
         });
       }
@@ -216,13 +212,11 @@ export abstract class ProjectInvitations {
       requestedRole: role,
     });
 
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.invitation.sent',
-      actorId: ownerId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project.invitation',
-      subjectId: invitation.id,
+      actor: { id: ownerId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project.invitation', id: invitation.id },
       details: { projectId, invitationId: invitation.id, userId: invitedUserId, role },
     });
     const hydratedInvitation = await this.getInvitationWithRelations(invitation.id);
@@ -250,13 +244,11 @@ export abstract class ProjectInvitations {
 
     invitation.updatedAt = new Date();
     await this.projectInvitationRepository.save(invitation);
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.invitation.sent',
-      actorId: ownerId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project.invitation',
-      subjectId: invitation.id,
+      actor: { id: ownerId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project.invitation', id: invitation.id },
       details: this.invitationDetails(invitation),
     });
     await this.dispatchProjectInvitationNotification(invitation.invitedUser, invitation.project, invitation);
@@ -286,13 +278,11 @@ export abstract class ProjectInvitations {
     invitation.respondedAt = new Date();
     await this.projectInvitationRepository.save(invitation);
 
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.invitation.revoked',
-      actorId: ownerId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project.invitation',
-      subjectId: invitation.id,
+      actor: { id: ownerId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project.invitation', id: invitation.id },
       details: this.invitationDetails(invitation),
     });
     return this.getInvitationWithRelations(invitation.id);
@@ -302,7 +292,7 @@ export abstract class ProjectInvitations {
 
   protected abstract readonly projectRepository: Repository<Project>;
 
-  protected abstract readonly audit: AuditService;
+  protected abstract readonly audit: AuditRecorder;
 
   protected abstract projectDetails(project: Project, state: 'before' | 'after'): Record<string, string | number>;
 

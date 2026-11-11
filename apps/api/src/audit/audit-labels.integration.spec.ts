@@ -9,6 +9,8 @@ import { createTestAuditMetrics } from './audit.test-fixture';
 import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AuditController } from './audit.controller';
+import { AuditQueryService } from './audit-query.service';
+import { PluginAuditHost } from './plugin-audit-host';
 import { AuditService } from './audit.service';
 
 const fixturePluginId = 'abcdefghijklmnopqrstu';
@@ -40,13 +42,10 @@ describe('persisted audit names', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    service = new AuditService(
-      source,
-      new SettingsStoreService(source.getRepository(Setting), null),
-      createTestAuditMetrics(),
-    );
+    const store = new SettingsStoreService(source.getRepository(Setting), null);
+    service = new AuditService(source, store, createTestAuditMetrics());
     await service.onModuleInit();
-    controller = new AuditController(service);
+    controller = new AuditController(new AuditQueryService(service, source, store));
     await source.getRepository(User).insert({
       id: 7,
       username: 'Current admin',
@@ -68,10 +67,11 @@ describe('persisted audit names', () => {
   });
 
   it('returns readable current names from persisted events without selecting private entity fields', async () => {
-    await service.recordResource({
+    await service.record({
+      domain: 'resource',
       action: 'maintenance_schedule.updated',
-      actorId: 7,
-      subjectId: 7,
+      actor: { id: 7, authenticationMethod: 'session' },
+      subject: { type: 'resource', id: 7 },
       details: { scheduleId: 3, name: 'Monthly oiling' },
     });
     const queries: string[] = [];
@@ -117,7 +117,7 @@ describe('persisted audit names', () => {
       },
     ]);
     expect(
-      await service.record({
+      await new PluginAuditHost(service).record({
         pluginId: fixturePluginId,
         action: 'demo.publication',
         operationId: randomUUID(),
@@ -146,11 +146,11 @@ describe('persisted audit names', () => {
   });
 
   it('uses recorded MQTT names without joining coincident resource IDs', async () => {
-    await service.recordAdministration({
+    await service.record({
+      domain: 'administration',
       action: 'mqtt_server.deleted',
-      actorId: 7,
-      subjectType: 'mqtt-server',
-      subjectId: 7,
+      actor: { id: 7, authenticationMethod: 'session' },
+      subject: { type: 'mqtt-server', id: 7 },
       details: { serverName: 'Former workshop broker', host: 'mqtt.example.test', port: 1883, useTls: 0 },
     });
     const { items } = await controller.list({ domain: 'administration' });

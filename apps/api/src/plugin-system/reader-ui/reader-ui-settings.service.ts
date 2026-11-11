@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import {
@@ -7,7 +7,7 @@ import {
   ReaderUiResourceSettings,
 } from '@attraccess/database-entities';
 import type { HookFailurePolicy, NoScreenPolicy } from '@attraccess/plugins-backend-sdk';
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import { auditActorFields, type AuditActor } from './audit-actor';
 import { ReaderUiRegistry } from './reader-ui.registry';
 
@@ -23,7 +23,7 @@ export class ReaderUiSettingsService {
     @InjectRepository(ReaderUiResourceSettings) private readonly resources: Repository<ReaderUiResourceSettings>,
     @InjectRepository(ReaderUiPluginSettings) private readonly plugins: Repository<ReaderUiPluginSettings>,
     @InjectRepository(ReaderUiReaderSettings) private readonly readers: Repository<ReaderUiReaderSettings>,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly registry: ReaderUiRegistry,
   ) {}
 
@@ -128,11 +128,11 @@ export class ReaderUiSettingsService {
     details: { setting: string; resourceId?: number; readerId?: number; plugin?: string; value: string | boolean },
   ) {
     const subjectId = details.resourceId ?? details.readerId ?? 0;
-    await this.audit.recordAttractap({
-      action: 'ui.setting_changed',
-      subjectType: details.resourceId ? 'resource' : 'attractap.reader',
-      ...auditActorFields(actor),
-      subjectId,
+    await this.audit.record({
+      domain: 'attractap',
+      action: 'attractap.ui.setting_changed',
+      actor: auditActorFields(actor),
+      subject: { type: details.resourceId ? 'resource' : 'attractap.reader', id: subjectId },
       details,
     });
   }

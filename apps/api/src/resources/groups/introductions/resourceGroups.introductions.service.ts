@@ -13,13 +13,13 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { EntityManager, Repository } from 'typeorm';
 
-import { AuditService } from '../../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../../audit/recorder/audit-event';
 
 import { NotificationDispatchService } from '../../../notifications/notification-dispatch.service';
 
 import { ResourceRetrainingService } from '../../retraining/resourceRetraining.service';
 
-import { ResourceAuditOrigin } from '../../../audit/audit-policy';
+import { AuditActor } from '../../../audit/recorder/audit-event';
 
 import { NotificationCategory } from '../../../notifications/notification-types';
 
@@ -38,7 +38,7 @@ export class ResourceGroupsIntroductionsService {
     protected readonly eventEmitter: EventEmitter2,
     protected readonly notifications: NotificationDispatchService,
     protected readonly retraining: ResourceRetrainingService,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(ResourceGroupsIntroductionsService.name);
@@ -199,30 +199,28 @@ export class ResourceGroupsIntroductionsService {
       nextStatus === IntroductionHistoryAction.GRANT &&
       (await this.retraining.getIntroductionRetrainingStatus(existingIntroduction.id))?.isDue === true;
     if (retrainingWasDue && !retrainingIsDue) {
-      const retrainingOrigin: ResourceAuditOrigin =
+      const retrainingOrigin: AuditActor =
         performedByUserId === null
-          ? { actorId: null }
+          ? SYSTEM_AUDIT_ACTOR
           : {
-              actorId: performedByUserId ?? userId,
+              id: performedByUserId ?? userId,
               authenticationMethod: authenticationMethod === undefined ? 'session' : authenticationMethod,
               ...(apiTokenId === undefined || apiTokenId === null ? {} : { apiTokenId }),
             };
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'retraining.cleared',
-        ...retrainingOrigin,
-        subjectType: 'resource_group',
-        subjectId: groupId,
+        actor: retrainingOrigin,
+        subject: { type: 'resource_group', id: groupId },
         details: { introductionId: existingIntroduction.id, usageUserId: userId },
       });
     }
     if (performedByUserId !== undefined) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
-        actorId: performedByUserId,
-        authenticationMethod,
-        apiTokenId,
-        subjectType: 'resource_group',
-        subjectId: groupId,
+        actor: { id: performedByUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+        subject: { type: 'resource_group', id: groupId },
         details: { recipientUserId: userId, ...(tutorUserId === undefined ? {} : { tutorUserId }) },
       });
     }

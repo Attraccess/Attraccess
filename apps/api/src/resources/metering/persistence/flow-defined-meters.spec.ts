@@ -743,7 +743,7 @@ describe('Flow-defined metering', () => {
           expect(reconciliationScope.parentScope.onCollect).not.toHaveBeenCalled();
           expect((await reconciliationScope.parentScope.correctionsOf(ended.id)).corrections).toEqual([]);
           expect(await reconciliationScope.parentScope.items(ended.id)).toEqual(before);
-          expect(reconciliationScope.parentScope.audit.recordBillingTransaction).not.toHaveBeenCalled();
+          expect(reconciliationScope.parentScope.audit.record).not.toHaveBeenCalled();
           expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
         },
       );
@@ -776,7 +776,7 @@ describe('Flow-defined metering', () => {
         ]);
         expect(await reconciliationScope.parentScope.items(ended.id)).toEqual(before);
         expect((await reconciliationScope.parentScope.correctionsOf(ended.id)).corrections).toEqual([]);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).not.toHaveBeenCalled();
+        expect(reconciliationScope.parentScope.audit.record).not.toHaveBeenCalled();
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
       });
 
@@ -827,7 +827,7 @@ describe('Flow-defined metering', () => {
           );
           return (startTransaction as (...a: unknown[]) => Promise<unknown>).apply(this, wrapped);
         } as never);
-        reconciliationScope.parentScope.audit.recordBillingTransaction.mockImplementation(
+        reconciliationScope.parentScope.audit.record.mockImplementation(
           async (_event: unknown, manager?: EntityManager) => {
             auditedInOpenTransaction.push(manager?.queryRunner?.isTransactionActive === true);
           },
@@ -848,22 +848,19 @@ describe('Flow-defined metering', () => {
           expect.objectContaining({ amount: -45, status: 'completed', initiatorId: 1, resourceUsageId: null }),
         ]);
         expect(corrections[0].userId).toBe(original.userId);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).toHaveBeenCalledTimes(1);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).toHaveBeenCalledWith(
+        expect(reconciliationScope.parentScope.audit.record).toHaveBeenCalledTimes(1);
+        expect(reconciliationScope.parentScope.audit.record).toHaveBeenCalledWith(
           expect.objectContaining({
-            transactionId: corrections[0].id,
-            userId: original.userId,
-            initiatorId: 1,
-            amount: -45,
-            source: 'meter-correction',
+            domain: 'billing',
+            actor: { id: 1, authenticationMethod: 'session' },
+            subject: { type: 'billing.transaction', id: corrections[0].id },
+            details: expect.objectContaining({ amount: -45, source: 'meter-correction' }),
           }),
           expect.anything(),
         );
         // Written with the settlement transaction's own manager while that transaction is still open.
 
-        expect(transactionManagers).toContain(
-          reconciliationScope.parentScope.audit.recordBillingTransaction.mock.calls[0][1],
-        );
+        expect(transactionManagers).toContain(reconciliationScope.parentScope.audit.record.mock.calls[0][1]);
         expect(auditedInOpenTransaction).toEqual([true]);
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).toHaveBeenCalledWith(
           corrections[0].id,
@@ -951,7 +948,7 @@ describe('Flow-defined metering', () => {
         );
         expect((await reconciliationScope.parentScope.items(ended.id)).transaction.amount).toBe(0);
         expect((await reconciliationScope.parentScope.correctionsOf(ended.id)).corrections).toEqual([]);
-        expect(reconciliationScope.parentScope.audit.recordBillingTransaction).not.toHaveBeenCalled();
+        expect(reconciliationScope.parentScope.audit.record).not.toHaveBeenCalled();
         expect(reconciliationScope.parentScope.liveNotifications.notifyTransactionUpdate).not.toHaveBeenCalled();
       });
 
@@ -970,8 +967,13 @@ describe('Flow-defined metering', () => {
         expect((await reconciliationScope.parentScope.metering.waive(1, session.id, 7)).status).toBe(
           ResourceMeteringSessionStatus.Waived,
         );
-        expect(reconciliationScope.parentScope.audit.recordResource).toHaveBeenCalledWith(
-          expect.objectContaining({ action: 'meter_charge.waived', actorId: 7, subjectId: 1 }),
+        expect(reconciliationScope.parentScope.audit.record).toHaveBeenCalledWith(
+          expect.objectContaining({
+            domain: 'resource',
+            action: 'meter_charge.waived',
+            actor: expect.objectContaining({ id: 7 }),
+            subject: expect.objectContaining({ id: 1 }),
+          }),
         );
         await expect(reconciliationScope.parentScope.metering.waive(1, session.id, 7)).rejects.toThrow(
           expect.objectContaining({ message: 'METER_SESSION_NOT_PENDING' }),

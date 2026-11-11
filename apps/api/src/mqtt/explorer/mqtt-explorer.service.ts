@@ -1,13 +1,12 @@
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { hasControlCharacter } from '@attraccess/shared';
 import { MqttServer } from '@attraccess/database-entities';
-import { HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { finalize, Observable, share } from 'rxjs';
 import { In, Repository } from 'typeorm';
-import { AuditService } from '../../audit/audit.service';
-import { recordAdministrationSafely } from '../../audit/policies/administration';
+import { AUDIT_RECORDER, auditActorOf, AuditRecorder } from '../../audit/recorder/audit-event';
 import { MqttClientService } from '../mqtt-client.service';
 import { MqttServerChangedEvent } from '../mqtt-server-changed.event';
 import {
@@ -80,7 +79,7 @@ export class MqttExplorerService {
     @InjectRepository(MqttServer) private readonly servers: Repository<MqttServer>,
     private readonly connections: MqttExplorerConnectionsService,
     private readonly mqttClient: MqttClientService,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   findServer(mqttServerId: number): Promise<MqttServer | null> {
@@ -179,7 +178,7 @@ export class MqttExplorerService {
 
   private async record(
     user: AuthenticatedUser,
-    action: string,
+    action: 'mqtt_server.message_subscribe' | 'mqtt_server.message_publish',
     server: MqttServer,
     details: Record<string, string | number>,
   ): Promise<void> {
@@ -188,13 +187,11 @@ export class MqttExplorerService {
       if (typeof value === 'string') fields[name] = auditText(value);
     }
     // The payload is never recorded. A failing audit sink never fails the request.
-    await recordAdministrationSafely(this.audit, {
+    await this.audit.record({
+      domain: 'administration',
       action,
-      actorId: user.id,
-      authenticationMethod: user.authenticationMethod,
-      apiTokenId: user.apiTokenId,
-      subjectType: 'mqtt-server',
-      subjectId: server.id,
+      actor: auditActorOf(user),
+      subject: { type: 'mqtt-server', id: server.id },
       details: fields,
     });
   }

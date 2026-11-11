@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Attractap, AttractapSecureBootKey, type SecureBootKeyRole } from '@attraccess/database-entities';
 import { Mutex } from 'async-mutex';
@@ -6,6 +6,8 @@ import { createPrivateKey, createPublicKey, generateKeyPair, KeyObject } from 'c
 import { EntityManager, IsNull, Not, Raw, Repository } from 'typeorm';
 import { promisify } from 'util';
 import { EncryptionService } from '../../encryption/encryption.service';
+import type { AttractapAuditAction } from '../../audit/policies/attractap';
+import { AUDIT_RECORDER, AuditActor, AuditDetails, AuditRecorder } from '../../audit/recorder/audit-event';
 import {
   isLabSecureBootKey,
   publicKeyFingerprint,
@@ -51,13 +53,35 @@ function info(key: AttractapSecureBootKey): SecureBootKeyInfo {
   return { digest: key.digest, fingerprint: key.fingerprint, restoredAt: key.restoredAt };
 }
 
+/** The installation has one Secure Boot key set; audit events use this subject id. */
+const INSTALLATION_SUBJECT_ID = 1;
+
 @Injectable()
 export class SecureBootKeyService {
   constructor(
     @InjectRepository(AttractapSecureBootKey) private readonly keys: Repository<AttractapSecureBootKey>,
     @InjectRepository(Attractap) private readonly readers: Repository<Attractap>,
     private readonly encryption: EncryptionService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
+
+  private async record(
+    actor: AuditActor,
+    action: Extract<AttractapAuditAction, `reader.${string}`>,
+    details: AuditDetails,
+    manager?: EntityManager,
+  ): Promise<void> {
+    await this.audit.record(
+      {
+        domain: 'attractap',
+        action: `attractap.${action}`,
+        actor,
+        subject: { type: 'attractap.installation', id: INSTALLATION_SUBJECT_ID },
+        details,
+      },
+      manager,
+    );
+  }
 
   /**
    * Key changes check the current rows, then replace them, with slow key generation in between. Two
@@ -117,11 +141,11 @@ export class SecureBootKeyService {
     }
   }
 
-  createKeys(): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
-    return this.mutex.runExclusive(() => this.replaceKeys());
+  createKeys(actor: AuditActor): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
+    return this.mutex.runExclusive(() => this.replaceKeys(actor));
   }
 
-  private async replaceKeys(): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
+  private async replaceKeys(actor: AuditActor): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
     if ((await this.keys.count()) > 0 && (await this.burnedReaderCount()) > 0) {
       throw new ConflictException('Keys cannot be regenerated while readers have digests burned with them');
     }
@@ -130,7 +154,9 @@ export class SecureBootKeyService {
       await manager.getRepository(AttractapSecureBootKey).clear();
       const signing = await this.store(manager, 'signing', signingKey, null);
       const recovery = await this.store(manager, 'recovery', recoveryKey, null);
-      return { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
+      const fingerprints = { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
+      await this.record(actor, 'reader.secure_keys_created', fingerprints, manager);
+      return fingerprints;
     });
   }
 
@@ -180,14 +206,16 @@ export class SecureBootKeyService {
   }
 
   /** Repeatable until the check passes; afterwards the private key is gone. */
-  async downloadRecoveryKey(passphrase: string): Promise<{ pem: string; fingerprint: string }> {
+  async downloadRecoveryKey(passphrase: string, actor: AuditActor): Promise<{ pem: string; fingerprint: string }> {
     this.assertPassphrase(passphrase);
     const recovery = await this.latest('recovery');
     if (!recovery) throw new ConflictException('No keys have been created yet');
     if (recovery.verifiedAt || !recovery.privateKeyEncrypted) {
       throw new ConflictException('The recovery key was already verified and is no longer held by the server');
     }
-    return { pem: this.exportEncrypted(this.privateKeyOf(recovery), passphrase), fingerprint: recovery.fingerprint };
+    const pem = this.exportEncrypted(this.privateKeyOf(recovery), passphrase);
+    await this.record(actor, 'reader.recovery_key_downloaded', { recoveryFingerprint: recovery.fingerprint });
+    return { pem, fingerprint: recovery.fingerprint };
   }
 
   private importKey(pem: unknown, passphrase: unknown): KeyObject {
@@ -214,11 +242,15 @@ export class SecureBootKeyService {
     return key;
   }
 
-  checkRecoveryKey(pem: string, passphrase: string): Promise<{ fingerprint: string }> {
-    return this.mutex.runExclusive(() => this.verifyRecoveryKey(pem, passphrase));
+  checkRecoveryKey(pem: string, passphrase: string, actor: AuditActor): Promise<{ fingerprint: string }> {
+    return this.mutex.runExclusive(() => this.verifyRecoveryKey(pem, passphrase, actor));
   }
 
-  private async verifyRecoveryKey(pem: string, passphrase: string): Promise<{ fingerprint: string }> {
+  private async verifyRecoveryKey(
+    pem: string,
+    passphrase: string,
+    actor: AuditActor,
+  ): Promise<{ fingerprint: string }> {
     const recovery = await this.latest('recovery');
     if (!recovery) throw new ConflictException('No keys have been created yet');
     if (recovery.verifiedAt) throw new ConflictException('The recovery key was already verified');
@@ -227,14 +259,17 @@ export class SecureBootKeyService {
       throw new BadRequestException('This file is not the recovery key of this installation');
     }
     await this.keys.update(recovery.id, { privateKeyEncrypted: null, verifiedAt: new Date() });
+    await this.record(actor, 'reader.recovery_key_verified', { recoveryFingerprint: recovery.fingerprint });
     return { fingerprint: recovery.fingerprint };
   }
 
-  async downloadSigningKeyBackup(passphrase: string): Promise<{ pem: string; fingerprint: string }> {
+  async downloadSigningKeyBackup(passphrase: string, actor: AuditActor): Promise<{ pem: string; fingerprint: string }> {
     this.assertPassphrase(passphrase);
     const signing = await this.latest('signing');
     if (!signing?.privateKeyEncrypted) throw new ConflictException('There is no signing key to back up');
-    return { pem: this.exportEncrypted(this.privateKeyOf(signing), passphrase), fingerprint: signing.fingerprint };
+    const pem = this.exportEncrypted(this.privateKeyOf(signing), passphrase);
+    await this.record(actor, 'reader.signing_key_backup_downloaded', { signingFingerprint: signing.fingerprint });
+    return { pem, fingerprint: signing.fingerprint };
   }
 
   /**
@@ -245,14 +280,16 @@ export class SecureBootKeyService {
     source: RestoreSource,
     pem: string,
     passphrase: string,
+    actor: AuditActor,
   ): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
-    return this.mutex.runExclusive(() => this.restoreKeys(source, pem, passphrase));
+    return this.mutex.runExclusive(() => this.restoreKeys(source, pem, passphrase, actor));
   }
 
   private async restoreKeys(
     source: RestoreSource,
     pem: string,
     passphrase: string,
+    actor: AuditActor,
   ): Promise<{ signingFingerprint: string; recoveryFingerprint: string }> {
     const current = await this.latest('signing');
     if (!(await this.isRestoreAllowed(current))) {
@@ -288,7 +325,9 @@ export class SecureBootKeyService {
       await (fresh ? repository.clear() : repository.delete({ role: 'signing' }));
       const signing = await this.store(manager, 'signing', key, restoredAt);
       const recovery = fresh ? await this.store(manager, 'recovery', recoveryKey, restoredAt) : recoveryKey;
-      return { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
+      const fingerprints = { signingFingerprint: signing.fingerprint, recoveryFingerprint: recovery.fingerprint };
+      await this.record(actor, 'reader.secure_keys_restored', { ...fingerprints, source }, manager);
+      return fingerprints;
     });
   }
 

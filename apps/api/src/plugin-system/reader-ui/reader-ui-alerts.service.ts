@@ -1,8 +1,8 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { ReaderUiAlert, ReaderUiAlertKind } from '@attraccess/database-entities';
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../audit/recorder/audit-event';
 import { auditActorFields, type AuditActor } from './audit-actor';
 import { MetricsService } from '../../metrics/metrics.service';
 import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
@@ -20,7 +20,7 @@ export class ReaderUiAlertsService implements OnModuleInit {
 
   constructor(
     @InjectRepository(ReaderUiAlert) private readonly repository: Repository<ReaderUiAlert>,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly metrics: MetricsService,
   ) {}
 
@@ -141,11 +141,11 @@ export class ReaderUiAlertsService implements OnModuleInit {
   }
 
   private async record(alert: ReaderUiAlert, state: 'created' | 'cleared', actor: AuditActor | undefined) {
-    await this.audit.recordAttractap({
-      action: 'ui.alert_changed',
-      subjectType: 'attractap.ui-alert',
-      ...(actor ? auditActorFields(actor) : { actorId: null, authenticationMethod: null }),
-      subjectId: alert.id,
+    await this.audit.record({
+      domain: 'attractap',
+      action: 'attractap.ui.alert_changed',
+      actor: actor ? auditActorFields(actor) : SYSTEM_AUDIT_ACTOR,
+      subject: { type: 'attractap.ui-alert', id: alert.id },
       details: {
         kind: alert.kind,
         state,

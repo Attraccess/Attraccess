@@ -7,7 +7,7 @@ import { AttractapService } from '../../../attractap.service';
 import { verifyToken } from '../../websocket.utils';
 import { ResourceListService } from '../resource-list/resource-list.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
-import { AuditService } from '../../../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../../../audit/recorder/audit-event';
 import { AuthenticatedWebSocket, AttractapEvent, AttractapEventType } from '../../websocket.types';
 import { ReaderTimeZoneService } from '../../reader-time-zone.service';
 
@@ -29,8 +29,8 @@ export class AttractapAuthHandler {
   @Inject(MetricsService)
   private metricsService: MetricsService;
 
-  @Inject(AuditService)
-  private audit: AuditService;
+  @Inject(AUDIT_RECORDER)
+  private audit: AuditRecorder;
 
   @Inject(ReaderTimeZoneService)
   private readerTimeZone: ReaderTimeZoneService;
@@ -95,11 +95,11 @@ export class AttractapAuthHandler {
     if (reader.pairingState !== 'unpaired') {
       this.logger.warn(`Token sign-in rejected for ${reader.pairingState} reader ${reader.id}`);
       if (this.shouldAuditTokenRejection(reader.id))
-        await this.audit.recordAttractap({
-          action: 'reader.token_rejected',
-          actorId: null,
-          authenticationMethod: null,
-          subjectId: reader.id,
+        await this.audit.record({
+          domain: 'attractap',
+          action: 'attractap.reader.token_rejected',
+          actor: { id: null, authenticationMethod: null },
+          subject: { type: 'attractap.reader', id: reader.id },
           details: { reason: reader.pairingState },
         });
       return await socket.sendMessage(

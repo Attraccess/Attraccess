@@ -27,7 +27,7 @@ describe('AttractapAuthHandler', () => {
   let mockAttractapService: { createNewReader: jest.Mock; findReaderById: jest.Mock };
   let mockResourceListService: { sendResourceListToSocket: jest.Mock };
   let mockMetricsService: { attractapReaderConnected: { set: jest.Mock } };
-  let mockAudit: { recordAttractap: jest.Mock };
+  let mockAudit: { record: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -62,7 +62,7 @@ describe('AttractapAuthHandler', () => {
     mockMetricsService = {
       attractapReaderConnected: { set: jest.fn() },
     };
-    mockAudit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+    mockAudit = { record: jest.fn().mockResolvedValue(undefined) };
 
     (handler as any).attractapService = mockAttractapService;
     (handler as any).resourceListService = mockResourceListService;
@@ -82,7 +82,7 @@ describe('AttractapAuthHandler', () => {
         ).resolves.toBeUndefined();
 
         expect(mockAttractapService.createNewReader).not.toHaveBeenCalled();
-        expect(mockAudit.recordAttractap).not.toHaveBeenCalled();
+        expect(mockAudit.record).not.toHaveBeenCalled();
         expect(mockSocket.sendMessage).not.toHaveBeenCalled();
       },
     );
@@ -257,11 +257,12 @@ describe('AttractapAuthHandler', () => {
             }),
           }),
         );
-        expect(mockAudit.recordAttractap).toHaveBeenCalledTimes(1);
-        expect(mockAudit.recordAttractap).toHaveBeenCalledWith(
+        expect(mockAudit.record).toHaveBeenCalledTimes(1);
+        expect(mockAudit.record).toHaveBeenCalledWith(
           expect.objectContaining({
-            action: 'reader.token_rejected',
-            subjectId: 42,
+            domain: 'attractap',
+            action: 'attractap.reader.token_rejected',
+            subject: expect.objectContaining({ id: 42 }),
             details: { reason: pairingState },
           }),
         );

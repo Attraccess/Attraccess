@@ -1,5 +1,7 @@
 import { ADMINISTRATION_AUDIT_ACTIONS } from './administration';
-import { ATTRACTAP_AUDIT_ACTIONS, IDENTITY_AUDIT_ACTIONS, RESOURCE_AUDIT_ACTIONS } from '../audit-policy';
+import { ATTRACTAP_AUDIT_ACTIONS } from './attractap';
+import { IDENTITY_AUDIT_ACTIONS } from './identity';
+import { RESOURCE_AUDIT_ACTIONS } from './resources';
 
 /**
  * Audit domains owned by the core application. Plugins contribute additional

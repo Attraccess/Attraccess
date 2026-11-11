@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { ClassSerializerInterceptor, ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
@@ -10,10 +11,10 @@ import { AnalyticsService } from './analytics.service';
 import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 import { UsersAdminController } from '../users-and-auth/users/users-admin.controller';
 import { UsersService } from '../users-and-auth/users/users.service';
+import { UserAdministrationService } from '../users-and-auth/users/user-administration.service';
 import { UserPasswordService } from '../users-and-auth/users/user-password.service';
 import { BruteForceProtectionService } from '../users-and-auth/rate-limiting/brute-force.service';
 import { AuthAuditLogger } from '../users-and-auth/rate-limiting/auth-audit.logger';
-import { IdentityAuditService } from '../audit/identity-audit.service';
 
 // `User.email` is @Exclude()d globally. The analytics export responses expose it through explicit flat
 // fields only; this proves that, and that a regular user endpoint still never serializes it.
@@ -48,12 +49,13 @@ describe('email exposure (HTTP integration, with the global ClassSerializerInter
       controllers: [AnalyticsController, UsersAdminController],
       providers: [
         AnalyticsService,
-        { provide: IdentityAuditService, useValue: { record: jest.fn() } },
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         { provide: getRepositoryToken(ResourceUsage), useValue: { findAndCount: async () => [[usage], 1] } },
         { provide: getRepositoryToken(BillingTransaction), useValue: { findAndCount: async () => [[transaction], 1] } },
         { provide: ResourceOperatingAttributionService, useValue: {} },
         { provide: UsersService, useValue: usersService },
         { provide: UserPasswordService, useValue: {} },
+        { provide: UserAdministrationService, useValue: {} },
         { provide: BruteForceProtectionService, useValue: {} },
         { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
         DualAuthGuard,

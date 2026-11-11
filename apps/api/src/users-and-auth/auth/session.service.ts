@@ -6,6 +6,8 @@ import { TokenHashService } from '../../encryption/token-hash.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { SESSION_STORE, SessionStore, SessionMetadata } from './session-store/session-store';
+import { identityAuditEvent } from '../../audit/policies/identity';
+import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { SsoSessionSelector } from './session-store/sso-session-selector';
 
@@ -23,6 +25,7 @@ export class SessionService implements OnModuleInit {
     private readonly tokenHashService: TokenHashService,
     private readonly metricsService: MetricsService,
     private readonly cronTimer: CronTimer,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -83,6 +86,27 @@ export class SessionService implements OnModuleInit {
         this.metricsService.authActiveSessions.set(result.remainingActive);
       }
     });
+  }
+
+  /** Starts the session of an SSO sign-in; a sign-in through a provider is audited as `sso_login`. */
+  async createSsoSession(
+    user: User,
+    metadata: SessionMetadata,
+    origin: AuditOrigin,
+    providerId?: number,
+  ): Promise<string> {
+    const token = await this.createSession(user, metadata);
+    if (providerId) await this.audit.record(identityAuditEvent('sso_login', origin, { id: user.id }, { providerId }));
+    return token;
+  }
+
+  /**
+   * Ends the login in the web framework (Passport's logout), then audits the logout. `origin` is taken before:
+   * Passport clears the request's user.
+   */
+  async endLogin(origin: AuditOrigin, endFrameworkLogin: () => Promise<void>): Promise<void> {
+    await endFrameworkLogin();
+    await this.audit.record(identityAuditEvent('logout', origin, { id: origin.actor.id }));
   }
 
   async getLogoutSession(token: string) {

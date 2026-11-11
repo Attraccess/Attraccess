@@ -1,3 +1,6 @@
+import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
+import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
+import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException, UnauthorizedException } from '@nestjs/common';
@@ -20,6 +23,7 @@ function clientDataFor(challenge: string): string {
 
 describe('PasskeyService', () => {
   let service: PasskeyService;
+  const origin = { actor: { id: 42, authenticationMethod: 'session' as const } };
   let passkeyRepo: Record<string, jest.Mock>;
   let challengeRepo: Record<string, jest.Mock>;
   let userRepo: Record<string, jest.Mock>;
@@ -55,6 +59,9 @@ describe('PasskeyService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
+        { provide: BruteForceProtectionService, useValue: {} },
+        { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
         PasskeyService,
         { provide: getRepositoryToken(Passkey), useValue: passkeyRepo },
         { provide: getRepositoryToken(PasskeyChallenge), useValue: challengeRepo },
@@ -174,7 +181,7 @@ describe('PasskeyService', () => {
 
   describe('delete', () => {
     it('only deletes passkeys owned by the user', async () => {
-      await service.delete(42, 7);
+      await service.delete(42, 7, origin);
 
       expect(passkeyRepo.delete).toHaveBeenCalledWith({ id: 7, userId: 42 });
     });
@@ -182,7 +189,7 @@ describe('PasskeyService', () => {
     it('throws when the passkey belongs to somebody else', async () => {
       passkeyRepo.delete.mockResolvedValue({ affected: 0 });
 
-      await expect(service.delete(1, 7)).rejects.toThrow(NotFoundException);
+      await expect(service.delete(1, 7, origin)).rejects.toThrow(NotFoundException);
     });
   });
 });

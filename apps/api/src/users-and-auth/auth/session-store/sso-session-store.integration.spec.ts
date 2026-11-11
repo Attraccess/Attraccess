@@ -1,3 +1,4 @@
+import { AuditRecorder } from '../../../audit/recorder/audit-event';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -28,7 +29,6 @@ import { ValkeySessionStore } from './valkey.session-store';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SSOService } from '../sso/sso.service';
 import { SessionPermissionSync } from '../sso/session-permission-sync';
-import { IdentityAuditService } from '../../../audit/identity-audit.service';
 
 jest.setTimeout(90000);
 const hash = { hashToken: (token: string) => `hashed:${token}` } as TokenHashService;
@@ -193,6 +193,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
           hash,
           { authActiveSessions: { dec } } as unknown as MetricsService,
           {} as CronTimer,
+          { record: jest.fn() } as unknown as AuditRecorder,
         );
         let started: () => void;
         const preparing = new Promise<void>((resolve) => {
@@ -208,7 +209,6 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
             getCookieName: () => 'auth-session',
             clearAuthCookie: async () => undefined,
           } as unknown as CookieConfigService,
-          { record: jest.fn() } as unknown as IdentityAuditService,
           {
             returnURL: async () => 'https://app.example/',
             prepare: async () => {
@@ -260,6 +260,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
           hash,
           { authActiveSessions: { dec } } as unknown as MetricsService,
           {} as CronTimer,
+          { record: jest.fn() } as unknown as AuditRecorder,
         );
         let authenticated: () => void;
         const captured = new Promise<void>((resolve) => {
@@ -304,7 +305,6 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
             getCookieName: () => 'auth-session',
             clearAuthCookie: async () => undefined,
           } as unknown as CookieConfigService,
-          { record: jest.fn() } as unknown as IdentityAuditService,
           {
             returnURL: async () => 'https://app.example/',
             prepare: async () => ({ kind: 'local_only' }),
@@ -349,6 +349,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         hash,
         { authActiveSessions: { dec } } as unknown as MetricsService,
         {} as CronTimer,
+        { record: jest.fn() } as unknown as AuditRecorder,
       );
       const getSession = store.getLogoutSession.bind(store);
       const capture = jest.spyOn(store, 'getLogoutSession').mockImplementationOnce(async (token) => {

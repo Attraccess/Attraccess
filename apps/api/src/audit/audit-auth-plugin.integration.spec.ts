@@ -31,8 +31,11 @@ import { SessionStrategy } from '../users-and-auth/strategies/session.strategy';
 import { AuditQueryDto } from './dto/audit-query.dto';
 import { readAuditSettings } from './audit.config';
 import { AuditController } from './audit.controller';
+import { AuditQueryService } from './audit-query.service';
+import { PluginAuditHost } from './plugin-audit-host';
+import { AUDIT_RECORDER } from './recorder/audit-event';
+import { SettingsAdministrationService } from '../settings/settings-administration.service';
 import { AuditModule } from './audit.module';
-import { AuditService } from './audit.service';
 import { AUDIT_METRICS } from '../metrics/definitions/tokens';
 import { demoDomain, setupAuditDatabase } from './audit.test-fixture';
 import { SessionPermissionSync } from '../users-and-auth/auth/sso/session-permission-sync';
@@ -46,7 +49,9 @@ describe('durable audit SQLite', () => {
       providers: [
         SessionStrategy,
         { provide: SessionPermissionSync, useValue: { syncIfDue: async () => 'skipped' } },
-        { provide: AuditService, useValue: fixture.service },
+        { provide: AUDIT_RECORDER, useValue: fixture.service },
+        { provide: AuditQueryService, useValue: fixture.query },
+        SettingsAdministrationService,
         { provide: SettingsService, useValue: settings },
         {
           provide: SessionService,
@@ -88,12 +93,12 @@ describe('durable audit SQLite', () => {
     await app.init();
     try {
       await app.listen(0, '127.0.0.1');
-      await fixture.service.record(fixture.event());
-      await fixture.service.recordResource({
+      await fixture.plugins.record(fixture.event());
+      await fixture.service.record({
+        domain: 'resource',
         action: 'resource_group.resource_added',
-        actorId: 42,
-        subjectType: 'resource_group',
-        subjectId: 7,
+        actor: { id: 42, authenticationMethod: 'session' },
+        subject: { type: 'resource_group', id: 7 },
         details: { resourceId: 3 },
       });
       const server = app.getHttpServer();
@@ -141,7 +146,7 @@ describe('durable audit SQLite', () => {
         .set('Authorization', 'Bearer settings-token')
         .send({ enabled: false, retention_days: 3, domains: [] })
         .expect(200, { enabled: false, retention_days: 3, domains: [], plugin_domains_disabled: [] });
-      expect(await fixture.service.record(fixture.event())).toEqual({ status: 'unavailable' });
+      expect(await fixture.plugins.record(fixture.event())).toEqual({ status: 'unavailable' });
       await request(server)
         .patch('/api/settings/audit')
         .set('Authorization', 'Bearer settings-token')
@@ -247,7 +252,9 @@ describe('durable audit SQLite', () => {
         await module.init();
         expect(context).toBeDefined();
         expect(await context.audit.record(fixture.event())).toEqual({ status: 'recorded' });
-        expect((await module.get(AuditService).list({ limit: 1 })).items[0].pluginId).toBe(fixture.event().pluginId);
+        expect((await module.get(AuditQueryService).list({ limit: 1 })).items[0].pluginId).toBe(
+          fixture.event().pluginId,
+        );
       } finally {
         await module.close();
       }
@@ -275,8 +282,9 @@ describe('durable audit SQLite', () => {
       )
       .compile();
     await module.init();
-    const sink = module.get<AuditService>(PLUGIN_AUDIT_HOST_PROVIDER);
-    expect(sink).toBe(module.get(AuditService));
+    const sink = module.get<PluginAuditHost>(PLUGIN_AUDIT_HOST_PROVIDER);
+    // The SDK provider is the host mapping onto the one recorder port, not the storage engine itself.
+    expect(sink).toBeInstanceOf(PluginAuditHost);
     const bridge = createPluginAuditContext('abcdefghijklmnopqrstu', () => sink);
     expect(await bridge.record(fixture.event())).toEqual({ status: 'recorded' });
     await module.close();

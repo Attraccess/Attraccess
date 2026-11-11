@@ -533,8 +533,8 @@ describe('Shared machines: restart, waiting and audit', () => {
 
   describe('audit of sessions ended by a flow', () => {
     const auditCalls = () =>
-      (Reflect.get(scope.usage, 'audit').recordResource as jest.Mock).mock.calls
-        .map(([event]) => event as { action: string; actorId: number | null; details: Record<string, unknown> })
+      (Reflect.get(scope.usage, 'audit').record as jest.Mock).mock.calls
+        .map(([event]) => event as { action: string; actor: { id: number | null }; details: Record<string, unknown> })
         .filter((event) => event.action === 'usage_session.ended');
 
     it('records the user whose action triggered the flow on every ended session', async () => {
@@ -545,7 +545,10 @@ describe('Shared machines: restart, waiting and audit', () => {
       await scope.usage.endSessionsOfTarget(1, { kind: 'all' }, 'closing', undefined, second.id);
       expect(auditCalls()).toHaveLength(2);
       for (const event of auditCalls()) {
-        expect(event).toMatchObject({ actorId: null, details: { triggeredByUserId: second.id } });
+        expect(event).toMatchObject({
+          actor: { id: null, authenticationMethod: null },
+          details: { triggeredByUserId: second.id },
+        });
       }
     });
 
@@ -566,7 +569,7 @@ describe('Shared machines: restart, waiting and audit', () => {
       await scope.usage.startSession(1, scope.users[0], {});
       expect(auditCalls()).toEqual([
         expect.objectContaining({
-          actorId: null,
+          actor: { id: null, authenticationMethod: null },
           details: expect.objectContaining({ usageUserId: other.id, triggeredByUserId: 1 }),
         }),
       ]);

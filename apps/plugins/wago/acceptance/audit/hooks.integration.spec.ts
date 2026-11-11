@@ -1,6 +1,8 @@
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
 import httpRequest from 'supertest';
 import { AuditService } from '../../../../api/src/audit/audit.service';
+import { AuditQueryService } from '../../../../api/src/audit/audit-query.service';
+import { PluginAuditHost } from '../../../../api/src/audit/plugin-audit-host';
 import { createTestAuditMetrics } from '../../../../api/src/audit/audit.test-fixture';
 import { SettingsStoreService } from '../../../../api/src/settings/settings-store.service';
 import { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
@@ -89,7 +91,8 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       manifest: { id: pluginId, name: 'wago-fixture', version: '1.0.0', pluginDirectory: state.directory },
       dataSource: state.db,
       getRepository: (entity) => state.db.getRepository(entity),
-      audit: createPluginAuditContext(pluginId, () => state.audit),
+      // The SDK host provider, mapping onto the current audit service's recorder port.
+      audit: createPluginAuditContext(pluginId, () => new PluginAuditHost(state.audit)),
       mqtt: state.mqtt,
       events: new EventEmitter2(),
       logger: { log: jest.fn(), error: jest.fn(), warn: jest.fn() },
@@ -421,7 +424,12 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     );
     await state.audit.onModuleInit();
     expect(await state.db.getRepository(AuditLog).find({ order: { id: 'ASC' } })).toEqual(before);
-    expect((await state.audit.list({ limit: 100 })).items).toHaveLength(4);
+    const query = new AuditQueryService(
+      state.audit,
+      state.db,
+      new SettingsStoreService(state.db.getRepository(Setting), null),
+    );
+    expect((await query.list({ limit: 100 })).items).toHaveLength(4);
   });
 
   it('persists publication, forced publication, rollback and idempotent rejection acknowledgement revisions', async () => {

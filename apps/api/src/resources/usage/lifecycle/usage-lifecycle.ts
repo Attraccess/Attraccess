@@ -34,7 +34,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { Redis } from 'ioredis';
 
-import { AuditService } from '../../../audit/audit.service';
+import { AuditRecorder } from '../../../audit/recorder/audit-event';
 
 import { BillingService } from '../../../billing/charges/billing.service';
 
@@ -76,13 +76,13 @@ import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
 import { ResourceUsageService } from '../sessions/resource-usage.service';
 import { LOCK_TTL_MS, type SessionChangeCoordination } from '../sessions/session-change-coordination';
 import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
-import { ResourceAuditOrigin } from '../../../audit/audit-policy';
+import { AuditActor } from '../../../audit/recorder/audit-event';
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
   skipFormSubmissions?: boolean;
   /** Skip emitting ResourceUsageNoteAddedEvent (used when the note is auto-generated, e.g. flow-ended). */
   skipNoteNotification?: boolean;
-  auditOrigin?: ResourceAuditOrigin;
+  auditOrigin?: AuditActor;
   /** Flow ends: the user whose action triggered the flow, recorded in the audit entry of the ended session. */
   triggeredByUserId?: number;
   /** Internal: the caller already holds this machine's turn in the session-change queue (deferred flow ends). */
@@ -95,7 +95,7 @@ export interface StartSessionOptions {
    * The supervisor is validated as an introducer for the resource.
    */
   supervisorUserId?: number;
-  auditOrigin?: ResourceAuditOrigin;
+  auditOrigin?: AuditActor;
 }
 
 /** Published usage sessions on the machine around a start, stop or takeover, handed to flows as `activeSessions`. */
@@ -541,7 +541,7 @@ export abstract class UsageLifecycle {
     takeoverEndedUser: User | null,
   ): Promise<void>;
 
-  protected abstract readonly audit: AuditService;
+  protected abstract readonly audit: AuditRecorder;
 
   protected abstract emitUsageEvent(usageId: number, transactionalEntityManager?: EntityManager): Promise<void>;
 

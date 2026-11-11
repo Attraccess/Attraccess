@@ -3,6 +3,8 @@ import { SSOProviderType, SSOProviderSAMLConfiguration } from '@attraccess/datab
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { CreateSAMLConfigurationDto } from './dto/create-sso-provider.dto';
 
+const ACTOR = { id: 1, authenticationMethod: 'session' as const };
+
 describe('SsoService', () => {
   const fixture = registerSsoServiceFixture();
 
@@ -63,7 +65,7 @@ describe('SsoService', () => {
         },
       };
 
-      const result = await fixture.service.createProvider(createProviderDto);
+      const result = await fixture.service.createProvider(createProviderDto, ACTOR);
 
       expect(fixture.ssoProviderRepository.create).toHaveBeenCalledWith({
         name: createProviderDto.name,
@@ -79,24 +81,33 @@ describe('SsoService', () => {
         }),
       );
       expect(result).toEqual(fixture.mockSSOProviderWithOIDCConfig);
+      // Recorded inside the create transaction, with a snapshot that never carries the client secret.
+      expect(fixture.audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({ domain: 'sso', action: 'sso.provider.created', actor: ACTOR }),
+        expect.anything(),
+      );
+      expect(JSON.stringify(fixture.audit.record.mock.calls)).not.toContain('new-client-secret');
     });
 
     it('rolls back provider creation when the committed provider cannot be reloaded', async () => {
       jest.spyOn(fixture.ssoProviderRepository, 'findOne').mockResolvedValueOnce(null);
 
       await expect(
-        fixture.service.createProvider({
-          name: 'New Provider',
-          type: SSOProviderType.OIDC,
-          oidcConfiguration: {
-            issuer: 'https://new-issuer.com',
-            authorizationURL: 'https://new-issuer.com/auth',
-            tokenURL: 'https://new-issuer.com/token',
-            userInfoURL: 'https://new-issuer.com/userinfo',
-            clientId: 'new-client-id',
-            clientSecret: 'new-client-secret',
+        fixture.service.createProvider(
+          {
+            name: 'New Provider',
+            type: SSOProviderType.OIDC,
+            oidcConfiguration: {
+              issuer: 'https://new-issuer.com',
+              authorizationURL: 'https://new-issuer.com/auth',
+              tokenURL: 'https://new-issuer.com/token',
+              userInfoURL: 'https://new-issuer.com/userinfo',
+              clientId: 'new-client-id',
+              clientSecret: 'new-client-secret',
+            },
           },
-        }),
+          ACTOR,
+        ),
       ).rejects.toThrow('Provider not found after create');
       expect(fixture.ssoProviderRepository.manager.transaction).toHaveBeenCalled();
     });
@@ -108,7 +119,7 @@ describe('SsoService', () => {
 
       jest.spyOn(fixture.ssoProviderRepository, 'update').mockResolvedValueOnce(undefined);
 
-      const result = await fixture.service.updateProvider(1, updateDto);
+      const result = await fixture.service.updateProvider(1, updateDto, ACTOR);
 
       expect(fixture.ssoProviderRepository.update).toHaveBeenCalledWith(1, { name: updateDto.name });
       expect(result).toEqual(fixture.mockSSOProviderWithOIDCConfig);
@@ -118,7 +129,7 @@ describe('SsoService', () => {
       fixture.oidcConfigRepository.update.mockRejectedValueOnce(new Error('configuration write failed'));
 
       await expect(
-        fixture.service.updateProvider(1, { oidcConfiguration: { issuer: 'https://changed.example.com' } }),
+        fixture.service.updateProvider(1, { oidcConfiguration: { issuer: 'https://changed.example.com' } }, ACTOR),
       ).rejects.toThrow('configuration write failed');
       expect(fixture.ssoProviderRepository.manager.transaction).toHaveBeenCalled();
       expect(fixture.ssoProviderRepository.update).not.toHaveBeenCalled();
@@ -130,7 +141,7 @@ describe('SsoService', () => {
         .mockResolvedValueOnce(fixture.mockSSOProviderWithOIDCConfig)
         .mockResolvedValueOnce(null);
 
-      await expect(fixture.service.updateProvider(1, { name: 'Changed Provider' })).rejects.toThrow(
+      await expect(fixture.service.updateProvider(1, { name: 'Changed Provider' }, ACTOR)).rejects.toThrow(
         'Provider not found after update',
       );
       expect(fixture.ssoProviderRepository.manager.transaction).toHaveBeenCalled();
@@ -147,9 +158,13 @@ describe('SsoService', () => {
     };
 
     it('should not update clientSecret when it is an empty string (frontend placeholder)', async () => {
-      await fixture.service.updateProvider(1, {
-        oidcConfiguration: { ...baseOidcUpdate, clientSecret: '' },
-      });
+      await fixture.service.updateProvider(
+        1,
+        {
+          oidcConfiguration: { ...baseOidcUpdate, clientSecret: '' },
+        },
+        ACTOR,
+      );
 
       expect(fixture.encryptionService.encrypt).not.toHaveBeenCalled();
       const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
@@ -157,9 +172,13 @@ describe('SsoService', () => {
     });
 
     it('should not update clientSecret when it is null', async () => {
-      await fixture.service.updateProvider(1, {
-        oidcConfiguration: { ...baseOidcUpdate, clientSecret: null },
-      });
+      await fixture.service.updateProvider(
+        1,
+        {
+          oidcConfiguration: { ...baseOidcUpdate, clientSecret: null },
+        },
+        ACTOR,
+      );
 
       expect(fixture.encryptionService.encrypt).not.toHaveBeenCalled();
       const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
@@ -167,9 +186,13 @@ describe('SsoService', () => {
     });
 
     it('should not update clientSecret when it is omitted', async () => {
-      await fixture.service.updateProvider(1, {
-        oidcConfiguration: { ...baseOidcUpdate },
-      });
+      await fixture.service.updateProvider(
+        1,
+        {
+          oidcConfiguration: { ...baseOidcUpdate },
+        },
+        ACTOR,
+      );
 
       expect(fixture.encryptionService.encrypt).not.toHaveBeenCalled();
       const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
@@ -177,9 +200,13 @@ describe('SsoService', () => {
     });
 
     it('should encrypt and update clientSecret when a new value is provided', async () => {
-      await fixture.service.updateProvider(1, {
-        oidcConfiguration: { ...baseOidcUpdate, clientSecret: 'new-secret' },
-      });
+      await fixture.service.updateProvider(
+        1,
+        {
+          oidcConfiguration: { ...baseOidcUpdate, clientSecret: 'new-secret' },
+        },
+        ACTOR,
+      );
 
       expect(fixture.encryptionService.encrypt).toHaveBeenCalledWith('new-secret');
       const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
@@ -188,19 +215,23 @@ describe('SsoService', () => {
   });
 
   it('stores emptied OIDC lists as null so they never hydrate as [""]', async () => {
-    await fixture.service.updateProvider(1, {
-      oidcConfiguration: {
-        scopes: [],
-        usernameClaimPaths: [],
-        emailClaimPaths: [],
-        roleClaimPaths: [],
+    await fixture.service.updateProvider(
+      1,
+      {
+        oidcConfiguration: {
+          scopes: [],
+          usernameClaimPaths: [],
+          emailClaimPaths: [],
+          roleClaimPaths: [],
+        },
       },
-    });
+      ACTOR,
+    );
     expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith(
       { ssoProviderId: 1 },
       { scopes: null, usernameClaimPaths: null, emailClaimPaths: null, roleClaimPaths: null },
     );
-    await fixture.service.updateProvider(1, { oidcConfiguration: { scopes: ['email'], roleClaimPaths: null } });
+    await fixture.service.updateProvider(1, { oidcConfiguration: { scopes: ['email'], roleClaimPaths: null } }, ACTOR);
     expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith(
       { ssoProviderId: 1 },
       { scopes: ['email'], roleClaimPaths: null },
@@ -213,22 +244,26 @@ describe('SsoService', () => {
       jwksURL: 'https://idp.example/jwks',
       signingAlgorithms: ['RS256'],
     };
-    await fixture.service.updateProvider(1, { oidcConfiguration: settings });
+    await fixture.service.updateProvider(1, { oidcConfiguration: settings }, ACTOR);
     expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith({ ssoProviderId: 1 }, settings);
-    await fixture.service.updateProvider(1, { oidcConfiguration: { clientId: 'changed-client' } });
+    await fixture.service.updateProvider(1, { oidcConfiguration: { clientId: 'changed-client' } }, ACTOR);
     expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith(
       { ssoProviderId: 1 },
       { clientId: 'changed-client' },
     );
-    await fixture.service.updateProvider(1, {
-      oidcConfiguration: { endSessionURL: null, jwksURL: null, signingAlgorithms: null },
-    });
+    await fixture.service.updateProvider(
+      1,
+      {
+        oidcConfiguration: { endSessionURL: null, jwksURL: null, signingAlgorithms: null },
+      },
+      ACTOR,
+    );
     expect(fixture.oidcConfigRepository.update).toHaveBeenLastCalledWith(
       { ssoProviderId: 1 },
       { endSessionURL: null, jwksURL: null, signingAlgorithms: null },
     );
     await expect(
-      fixture.service.updateProvider(1, { oidcConfiguration: { signingAlgorithms: ['HS256'] } }),
+      fixture.service.updateProvider(1, { oidcConfiguration: { signingAlgorithms: ['HS256'] } }, ACTOR),
     ).rejects.toThrow('Unsupported');
   });
 
@@ -243,18 +278,26 @@ describe('SsoService', () => {
     const asMappings = (value: unknown) => value as Record<string, string[]>;
 
     it('persists explicit null on roleMappings to clear mappings', async () => {
-      await fixture.service.updateProvider(1, {
-        oidcConfiguration: { ...baseOidcUpdate, roleMappings: asMappings(null) },
-      });
+      await fixture.service.updateProvider(
+        1,
+        {
+          oidcConfiguration: { ...baseOidcUpdate, roleMappings: asMappings(null) },
+        },
+        ACTOR,
+      );
 
       const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
       expect(updateCall[1]).toHaveProperty('roleMappings', null);
     });
 
     it('persists an empty object (emptied mapping table)', async () => {
-      await fixture.service.updateProvider(1, {
-        oidcConfiguration: { ...baseOidcUpdate, roleMappings: {} },
-      });
+      await fixture.service.updateProvider(
+        1,
+        {
+          oidcConfiguration: { ...baseOidcUpdate, roleMappings: {} },
+        },
+        ACTOR,
+      );
 
       const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
       expect(updateCall[1]).toHaveProperty('roleMappings');
@@ -262,9 +305,13 @@ describe('SsoService', () => {
     });
 
     it('leaves roleMappings untouched when the field is omitted', async () => {
-      await fixture.service.updateProvider(1, {
-        oidcConfiguration: { ...baseOidcUpdate },
-      });
+      await fixture.service.updateProvider(
+        1,
+        {
+          oidcConfiguration: { ...baseOidcUpdate },
+        },
+        ACTOR,
+      );
 
       const updateCall = (fixture.oidcConfigRepository.update as jest.Mock).mock.calls[0];
       expect(updateCall[1]).not.toHaveProperty('roleMappings');
@@ -273,7 +320,7 @@ describe('SsoService', () => {
 
   describe('deleteProvider', () => {
     it('should delete a provider and its OIDC configuration', async () => {
-      await fixture.service.deleteProvider(1);
+      await fixture.service.deleteProvider(1, ACTOR);
 
       expect(fixture.oidcConfigRepository.delete).toHaveBeenCalledWith(fixture.mockOIDCConfig.id);
       expect(fixture.ssoProviderRepository.delete).toHaveBeenCalledWith(1);
@@ -282,7 +329,7 @@ describe('SsoService', () => {
     it('should throw NotFoundException if provider not found', async () => {
       jest.spyOn(fixture.ssoProviderRepository, 'findOne').mockResolvedValueOnce(null);
 
-      await expect(fixture.service.deleteProvider(999)).rejects.toThrow(NotFoundException);
+      await expect(fixture.service.deleteProvider(999, ACTOR)).rejects.toThrow(NotFoundException);
     });
   });
 

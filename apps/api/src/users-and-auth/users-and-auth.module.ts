@@ -31,6 +31,9 @@ import { UserPasswordService } from './users/user-password.service';
 import { UserPermissionsController } from './users/user-permissions.controller';
 
 import { UserPermissionsService } from './users/user-permissions.service';
+import { UserAdministrationService } from './users/user-administration.service';
+import { SsoAccountLinkService } from './auth/sso/sso-account-link.service';
+import { SsoProvisioningService } from './auth/sso/provisioning/sso-provisioning.service';
 
 import { UserProfileController } from './users/user-profile.controller';
 
@@ -200,6 +203,7 @@ export const sessionStoreProvider = {
     UserPasswordService,
     UserInvitationService,
     UserPermissionsService,
+    UserAdministrationService,
     AuthService,
     SessionService,
     TwoFactorService,
@@ -232,6 +236,8 @@ export const sessionStoreProvider = {
     SSOSamlPassportGuard,
     SSOSamlStrategy,
     SSOLinkTokenService,
+    SsoAccountLinkService,
+    SsoProvisioningService,
     SsoAccountResolver,
     AccountLinkingExceptionFilter,
     BruteForceProtectionService,

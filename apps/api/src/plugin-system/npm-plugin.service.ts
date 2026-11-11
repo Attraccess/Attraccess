@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   Logger,
   OnApplicationBootstrap,
@@ -7,7 +8,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../audit/recorder/audit-event';
+import { AuditQueryService } from '../audit/audit-query.service';
 
 import { SettingsStoreService } from '../settings/settings-store.service';
 
@@ -58,7 +60,8 @@ export class NpmPluginService extends NpmInstallation implements OnModuleInit, O
   constructor(
     protected readonly settings: SettingsStoreService,
     @Optional() classification?: PluginClassificationService,
-    @Optional() protected readonly audit?: AuditService,
+    @Optional() @Inject(AUDIT_RECORDER) protected readonly audit?: AuditRecorder,
+    @Optional() protected readonly auditQuery?: AuditQueryService,
   ) {
     super();
     this.classification = classification ?? new PluginClassificationService();

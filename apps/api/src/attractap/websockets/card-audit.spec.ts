@@ -15,7 +15,11 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card audit records (%s)', (kind
     expect(await services.operations.enroll(reader.socket, detect(), { userId: 5, auditPrincipal })).toEqual({
       ok: true,
     });
-    return { ...services, card, audit: services.operations['audit'].recordAttractap as jest.Mock };
+    return {
+      ...services,
+      card,
+      audit: (services.operations as unknown as { audit: { record: jest.Mock } }).audit.record as jest.Mock,
+    };
   }
 
   it.each([
@@ -26,11 +30,10 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card audit records (%s)', (kind
 
     expect(audit).toHaveBeenCalledTimes(1);
     expect(audit).toHaveBeenCalledWith({
-      action: 'card.linked',
-      actorId: principal.userId,
-      authenticationMethod: principal.authenticationMethod,
-      ...token,
-      subjectId: cards[0].id,
+      domain: 'attractap',
+      action: 'attractap.card.linked',
+      actor: { id: principal.userId, authenticationMethod: principal.authenticationMethod, ...token },
+      subject: { type: 'attractap.card', id: cards[0].id },
       details: { source: 'reader-enrollment' },
     });
   });
@@ -51,11 +54,10 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card audit records (%s)', (kind
     expect(cards).toHaveLength(0);
     expect(audit).toHaveBeenCalledTimes(1);
     expect(audit).toHaveBeenCalledWith({
-      action: 'card.unlinked',
-      actorId: principal.userId,
-      authenticationMethod: principal.authenticationMethod,
-      ...token,
-      subjectId: cardId,
+      domain: 'attractap',
+      action: 'attractap.card.unlinked',
+      actor: { id: principal.userId, authenticationMethod: principal.authenticationMethod, ...token },
+      subject: { type: 'attractap.card', id: cardId },
       details: { readerId: 31, source: 'reader-reset' },
     });
   });
@@ -97,6 +99,6 @@ describe.each<CardKind>(['desfire', 'ntag424'])('card audit records (%s)', (kind
       false,
     );
 
-    expect(services.operations['audit'].recordAttractap).not.toHaveBeenCalled();
+    expect((services.operations as unknown as { audit: { record: jest.Mock } }).audit.record).not.toHaveBeenCalled();
   });
 });

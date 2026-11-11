@@ -1,8 +1,7 @@
-import { recordAdministrationSafely } from '../audit/policies/administration';
 import { Controller, Get, HttpCode, HttpStatus, Body, Patch, Post, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { AuditService } from '../audit/audit.service';
+import { auditActorOf } from '../audit/recorder/audit-event';
 import { EmailLayoutService } from './email-layout.service';
 import { UpdateEmailLayoutDto } from './dto/update-email-layout.dto';
 import { PreviewEmailLayoutDto } from './dto/preview-email-layout.dto';
@@ -13,10 +12,7 @@ import { EmailLayoutResponseDto } from './dto/email-layout-response.dto';
 @ApiBearerAuth()
 @Controller('email-layout')
 export class EmailLayoutController {
-  constructor(
-    private readonly emailLayoutService: EmailLayoutService,
-    private readonly audit: AuditService,
-  ) {}
+  constructor(private readonly emailLayoutService: EmailLayoutService) {}
 
   @Get()
   @Auth('system.settings.manage')
@@ -32,10 +28,7 @@ export class EmailLayoutController {
   @ApiResponse({ status: 200, type: EmailLayoutResponseDto })
   @ApiResponse({ status: 400, description: 'Invalid MJML content' })
   update(@Body() dto: UpdateEmailLayoutDto, @Req() req: AuthenticatedRequest): Promise<EmailLayoutResponseDto> {
-    return this.emailLayoutService.update(dto).then(async (layout) => {
-      await this.record(req, 'email_layout.updated');
-      return layout;
-    });
+    return this.emailLayoutService.update(dto, auditActorOf(req.user));
   }
 
   @Post('preview')
@@ -52,21 +45,6 @@ export class EmailLayoutController {
   @ApiOperation({ summary: 'Reset the global email layout to its bundled default' })
   @ApiResponse({ status: 200, type: EmailLayoutResponseDto })
   resetToDefault(@Req() req: AuthenticatedRequest): Promise<EmailLayoutResponseDto> {
-    return this.emailLayoutService.resetToDefault().then(async (layout) => {
-      await this.record(req, 'email_layout.reset');
-      return layout;
-    });
-  }
-
-  private async record(req: AuthenticatedRequest, action: string) {
-    await recordAdministrationSafely(this.audit, {
-      action,
-      actorId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-      subjectType: 'email-layout',
-      subjectId: 1,
-      details: {},
-    });
+    return this.emailLayoutService.resetToDefault(auditActorOf(req.user));
   }
 }

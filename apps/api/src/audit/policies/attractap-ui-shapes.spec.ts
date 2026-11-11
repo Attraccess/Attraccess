@@ -7,8 +7,9 @@ import { ReaderUiAlertsService } from '../../plugin-system/reader-ui/reader-ui-a
 import { ReaderUiHooksService } from '../../plugin-system/reader-ui/reader-ui-hooks.service';
 import { ReaderUiSettingsService } from '../../plugin-system/reader-ui/reader-ui-settings.service';
 import { WebStartStepStore } from '../../resources/usage/pre-start/web-start-step.store';
-import type { AttractapAuditEvent } from './domain-events';
-import { ATTRACTAP_AUDIT_ACTIONS, projectAttractapAuditEvent } from './attractap';
+import type { AttractapAuditInput as AttractapAuditEvent } from './attractap';
+import { ATTRACTAP_AUDIT_ACTIONS } from './attractap';
+import { projectAuditRow } from '../recorder/audit-row';
 
 /** A scoped npm name: the strictest plugin name every validator must accept. */
 const PLUGIN = '@scope/reservations';
@@ -19,7 +20,7 @@ const PLUGIN = '@scope/reservations';
  */
 function capture() {
   const events: AttractapAuditEvent[] = [];
-  const audit = { recordAttractap: jest.fn(async (event: AttractapAuditEvent) => void events.push(event)) };
+  const audit = { record: jest.fn(async (event: AttractapAuditEvent) => void events.push(event)) };
   return { events, audit };
 }
 
@@ -124,7 +125,13 @@ async function hookEvents(audit: any) {
       audit,
       { get: () => ({ READER_UI_BREAKER_THRESHOLD: 1 }) } as never,
     );
-  const run = { resourceId: 12, userId: 7, action: 'start' as const, origin: 'reader' as const, language: 'en' as const };
+  const run = {
+    resourceId: 12,
+    userId: 7,
+    action: 'start' as const,
+    origin: 'reader' as const,
+    language: 'en' as const,
+  };
   const reader = { ...run, readerId: 5, cardSessionId: 'AbCdEfGhIjKlMnOp', satisfied: new Map() };
   const service = make('fail-open');
   await service.runPreStart(reader); // fail_open_used + breaker_changed(open)
@@ -144,7 +151,9 @@ async function adminEvents(audit: any) {
       return x;
     }),
   };
-  const alerts = new ReaderUiAlertsService(repository as never, audit, { readerUiOpenAlerts: { set: jest.fn() } } as never);
+  const alerts = new ReaderUiAlertsService(repository as never, audit, {
+    readerUiOpenAlerts: { set: jest.fn() },
+  } as never);
   repository.findOne.mockResolvedValueOnce(null);
   const alert = await alerts.raise('breaker-open', 'Hooks keep failing', { plugin: PLUGIN });
   await alerts.clear(alert.id, { id: 9, authenticationMethod: 'api-token', apiTokenId: 4 });
@@ -155,13 +164,22 @@ async function adminEvents(audit: any) {
   } as never);
   await settings.setResource(
     12,
-    { noScreenPolicy: 'card-confirm', plugins: [{ plugin: PLUGIN, widgetsEnabled: false, hookFailurePolicy: 'fail-open' }] },
+    {
+      noScreenPolicy: 'card-confirm',
+      plugins: [{ plugin: PLUGIN, widgetsEnabled: false, hookFailurePolicy: 'fail-open' }],
+    },
     { id: 9 },
   );
   await settings.setReader(5, false, { id: 9, authenticationMethod: 'session' });
 
   const web = new WebStartStepStore(audit);
-  const id = web.issue({ userId: 7, resourceId: 12, action: 'start', origin: 'api', apiTokenId: 4 }, PLUGIN, 'k', 60, {});
+  const id = web.issue(
+    { userId: 7, resourceId: 12, action: 'start', origin: 'api', apiTokenId: 4 },
+    PLUGIN,
+    'k',
+    60,
+    {},
+  );
   web.consume([id.stepId], { userId: 7, resourceId: 12, action: 'start', origin: 'api', apiTokenId: 4 });
 }
 
@@ -177,18 +195,16 @@ describe('attractap.ui.* audit entries written by the real services', () => {
     await adminEvents(audit);
     await jest.advanceTimersByTimeAsync(0);
 
-    const dropped = events.filter((event) => projectAttractapAuditEvent(event) === null);
+    const dropped = events.filter((event) => projectAuditRow(event) === null);
     expect(dropped).toEqual([]);
-    const uiActions = ATTRACTAP_AUDIT_ACTIONS.filter((action) => action.startsWith('attractap.ui.')).map((action) =>
-      action.replace('attractap.', ''),
-    );
+    const uiActions = ATTRACTAP_AUDIT_ACTIONS.filter((action) => action.startsWith('attractap.ui.'));
     expect(new Set(events.map((event) => event.action))).toEqual(new Set(uiActions));
   });
 
   it('records who tapped when another user cancels a card-confirm', async () => {
     const { events, audit } = capture();
     await readerStepEvents(audit);
-    const cancelled = events.find((event) => event.action === 'ui.card_confirm_cancelled');
+    const cancelled = events.find((event) => event.action === 'attractap.ui.card_confirm_cancelled');
     expect(cancelled?.details).toMatchObject({ userId: 7, tappedUserId: 8, origin: 'reader', plugin: PLUGIN });
   });
 });

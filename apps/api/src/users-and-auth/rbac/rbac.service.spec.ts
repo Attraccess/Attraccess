@@ -7,6 +7,8 @@ import { UserNotFoundException } from './../../exceptions/user.notFound.exceptio
 import { UserPermissionsChangedEvent } from './events/user-permissions-changed.event';
 import { QueryFailedError } from 'typeorm';
 
+const ORIGIN = { actor: { id: 1, authenticationMethod: 'session' as const } };
+
 describe('RbacService', () => {
   const fixture = registerRbacServiceFixture();
 
@@ -539,6 +541,7 @@ describe('RbacService', () => {
       await fixture.service.createRole(
         { name: 'Workshop Supervisor!', description: 'desc', permissionKeys: ['resources.read'] },
         new Set(['resources.read']),
+        ORIGIN,
       );
 
       expect(fixture.roleRepo.create).toHaveBeenCalledWith(
@@ -554,7 +557,7 @@ describe('RbacService', () => {
       (fixture.roleRepo.existsBy as jest.Mock).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
       fixture.roleRepo.findOne.mockResolvedValue(fixture.makeRole({ id: 42 }));
 
-      await fixture.service.createRole({ name: 'User' }, new Set());
+      await fixture.service.createRole({ name: 'User' }, new Set(), ORIGIN);
 
       expect(fixture.roleRepo.create).toHaveBeenCalledWith(expect.objectContaining({ key: 'user-2' }));
     });
@@ -563,7 +566,11 @@ describe('RbacService', () => {
       fixture.permissionRepo.find.mockResolvedValue([]);
 
       await expect(
-        fixture.service.createRole({ name: 'X', permissionKeys: ['not.a.permission'] }, new Set(['not.a.permission'])),
+        fixture.service.createRole(
+          { name: 'X', permissionKeys: ['not.a.permission'] },
+          new Set(['not.a.permission']),
+          ORIGIN,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -571,7 +578,11 @@ describe('RbacService', () => {
       fixture.permissionRepo.find.mockResolvedValue([fixture.makePermission('billing.manage')]);
 
       await expect(
-        fixture.service.createRole({ name: 'X', permissionKeys: ['billing.manage'] }, new Set(['resources.read'])),
+        fixture.service.createRole(
+          { name: 'X', permissionKeys: ['billing.manage'] },
+          new Set(['resources.read']),
+          ORIGIN,
+        ),
       ).rejects.toThrow(ForbiddenException);
       expect(fixture.roleRepo.save).not.toHaveBeenCalled();
     });
@@ -581,19 +592,19 @@ describe('RbacService', () => {
     it('throws NotFoundException for a missing role', async () => {
       fixture.roleRepo.findOne.mockResolvedValue(null);
 
-      await expect(fixture.service.updateRole(99, { name: 'X' }, new Set())).rejects.toThrow(NotFoundException);
+      await expect(fixture.service.updateRole(99, { name: 'X' }, new Set(), ORIGIN)).rejects.toThrow(NotFoundException);
     });
 
     it('rejects modification of system-managed roles', async () => {
       fixture.roleRepo.findOne.mockResolvedValue(fixture.makeRole({ isSystemManaged: true }));
 
-      await expect(fixture.service.updateRole(1, { name: 'X' }, new Set())).rejects.toThrow(ForbiddenException);
+      await expect(fixture.service.updateRole(1, { name: 'X' }, new Set(), ORIGIN)).rejects.toThrow(ForbiddenException);
     });
 
     it('updates name and description without touching permissions', async () => {
       fixture.roleRepo.findOne.mockResolvedValue(fixture.makeRole({ id: 5 }));
 
-      await fixture.service.updateRole(5, { name: ' New Name ', description: 'new desc' }, new Set());
+      await fixture.service.updateRole(5, { name: ' New Name ', description: 'new desc' }, new Set(), ORIGIN);
 
       expect(fixture.roleRepo.save).toHaveBeenCalledWith({ id: 5, name: 'New Name', description: 'new desc' });
       expect(fixture.roleRepo.manager.transaction).not.toHaveBeenCalled();
@@ -604,7 +615,7 @@ describe('RbacService', () => {
       fixture.permissionRepo.find.mockResolvedValue([fixture.makePermission('billing.manage')]);
 
       await expect(
-        fixture.service.updateRole(5, { permissionKeys: ['billing.manage'] }, new Set(['resources.read'])),
+        fixture.service.updateRole(5, { permissionKeys: ['billing.manage'] }, new Set(['resources.read']), ORIGIN),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -617,9 +628,9 @@ describe('RbacService', () => {
       );
       fixture.permissionRepo.find.mockResolvedValue([]);
 
-      await expect(fixture.service.updateRole(5, { permissionKeys: [] }, new Set(['resources.read']))).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        fixture.service.updateRole(5, { permissionKeys: [] }, new Set(['resources.read']), ORIGIN),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('blocks a permission removal that would leave no administrator-equivalent user', async () => {
@@ -634,9 +645,9 @@ describe('RbacService', () => {
       const qbAfter = fixture.createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([]) });
       fixture.roleManager.createQueryBuilder.mockReturnValueOnce(qbBefore as any).mockReturnValueOnce(qbAfter as any);
 
-      await expect(fixture.service.updateRole(5, { permissionKeys: [] }, new Set(['resources.read']))).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        fixture.service.updateRole(5, { permissionKeys: [] }, new Set(['resources.read']), ORIGIN),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('allows a permission removal when administrator-equivalence is preserved', async () => {
@@ -651,7 +662,7 @@ describe('RbacService', () => {
       const qbAfter = fixture.createMockQueryBuilder({ getRawMany: jest.fn().mockResolvedValue([{ userId: 1 }]) });
       fixture.roleManager.createQueryBuilder.mockReturnValueOnce(qbBefore as any).mockReturnValueOnce(qbAfter as any);
 
-      await fixture.service.updateRole(5, { permissionKeys: [] }, new Set(['resources.read']));
+      await fixture.service.updateRole(5, { permissionKeys: [] }, new Set(['resources.read']), ORIGIN);
 
       expect(fixture.roleManager.delete).toHaveBeenCalledWith(RolePermission, expect.objectContaining({ roleId: 5 }));
     });
@@ -669,6 +680,7 @@ describe('RbacService', () => {
         5,
         { permissionKeys: ['users.read'] },
         new Set(['users.read', 'resources.read']),
+        ORIGIN,
       );
 
       expect(fixture.roleManager.delete).toHaveBeenCalledWith(RolePermission, expect.objectContaining({ roleId: 5 }));
@@ -692,13 +704,13 @@ describe('RbacService', () => {
     it('throws NotFoundException for a missing role', async () => {
       fixture.roleRepo.findOne.mockResolvedValue(null);
 
-      await expect(fixture.service.deleteRole(99, new Set())).rejects.toThrow(NotFoundException);
+      await expect(fixture.service.deleteRole(99, new Set(), ORIGIN)).rejects.toThrow(NotFoundException);
     });
 
     it('rejects deletion of system-managed roles', async () => {
       fixture.roleRepo.findOne.mockResolvedValue(fixture.makeRole({ isSystemManaged: true }));
 
-      await expect(fixture.service.deleteRole(1, new Set())).rejects.toThrow(ForbiddenException);
+      await expect(fixture.service.deleteRole(1, new Set(), ORIGIN)).rejects.toThrow(ForbiddenException);
     });
 
     it('rejects deleting a role whose permissions exceed the actor', async () => {
@@ -709,14 +721,16 @@ describe('RbacService', () => {
         }),
       );
 
-      await expect(fixture.service.deleteRole(5, new Set(['resources.read']))).rejects.toThrow(ForbiddenException);
+      await expect(fixture.service.deleteRole(5, new Set(['resources.read']), ORIGIN)).rejects.toThrow(
+        ForbiddenException,
+      );
       expect(fixture.roleManager.delete).not.toHaveBeenCalled();
     });
 
     it('rejects reassigning to the role being deleted', async () => {
       fixture.roleRepo.findOne.mockResolvedValue(fixture.makeRole({ id: 5 }));
 
-      await expect(fixture.service.deleteRole(5, new Set(), 5)).rejects.toThrow(BadRequestException);
+      await expect(fixture.service.deleteRole(5, new Set(), ORIGIN, 5)).rejects.toThrow(BadRequestException);
     });
 
     it('rejects reassignment to a role whose permissions exceed the actor', async () => {
@@ -727,14 +741,16 @@ describe('RbacService', () => {
         }),
       );
 
-      await expect(fixture.service.deleteRole(5, new Set(['resources.read']), 6)).rejects.toThrow(ForbiddenException);
+      await expect(fixture.service.deleteRole(5, new Set(['resources.read']), ORIGIN, 6)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('blocks deletion that would leave no administrator-equivalent user', async () => {
       fixture.roleRepo.findOne.mockResolvedValue(fixture.makeRole({ id: 5 }));
       setAdministratorEquivalentCounts(0, 1);
 
-      await expect(fixture.service.deleteRole(5, new Set())).rejects.toThrow(ForbiddenException);
+      await expect(fixture.service.deleteRole(5, new Set(), ORIGIN)).rejects.toThrow(ForbiddenException);
       expect(fixture.roleManager.delete).not.toHaveBeenCalled();
     });
 
@@ -742,7 +758,7 @@ describe('RbacService', () => {
       fixture.roleRepo.findOne.mockResolvedValue(fixture.makeRole({ id: 5 }));
       setAdministratorEquivalentCounts(1, 1);
 
-      await fixture.service.deleteRole(5, new Set());
+      await fixture.service.deleteRole(5, new Set(), ORIGIN);
 
       expect(fixture.roleManager.delete).toHaveBeenCalledWith(Role, { id: 5 });
     });
@@ -758,7 +774,7 @@ describe('RbacService', () => {
       ]);
       fixture.roleManager.findOne.mockResolvedValue(null);
 
-      await fixture.service.deleteRole(5, new Set(), 6);
+      await fixture.service.deleteRole(5, new Set(), ORIGIN, 6);
 
       expect(fixture.roleManager.save).toHaveBeenCalledTimes(2);
       expect(fixture.roleManager.save).toHaveBeenCalledWith(

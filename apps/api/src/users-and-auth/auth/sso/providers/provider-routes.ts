@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 
-import { AuthenticationType, SSOProvider, SSOProviderType } from '@attraccess/database-entities';
+import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 
 import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
@@ -10,7 +10,6 @@ import {
   Get,
   Post,
   Query,
-  UnauthorizedException,
   Delete,
   ForbiddenException,
   Param,
@@ -32,10 +31,6 @@ import { SSOProviderNotFoundException } from '../errors';
 
 import { Request, Response } from 'express';
 
-import { IdentityAuditService } from '../../../../audit/identity-audit.service';
-
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
-
 import { CookieConfigService } from '../../../../common/services/cookie-config.service';
 
 import { MetricsService } from '../../../../metrics/metrics.service';
@@ -46,23 +41,18 @@ import { RbacService } from '../../../rbac/rbac.service';
 
 import { UsersService } from '../../../users/users.service';
 
-import { AuthService } from '../../auth.service';
-
 import { CreateSessionResponse } from '../../auth.types';
 
 import { SessionService } from '../../session.service';
 
-import { AuthAuditLogger } from '../../../rate-limiting/auth-audit.logger';
-
-import { BruteForceProtectionService } from '../../../rate-limiting/brute-force.service';
-
 import { resolveIp, setRetryAfter } from '../../../rate-limiting/login.rate-limit.guard';
 
-import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from '../dto/sso-provisioning.dto';
-
-import { SSOLinkTokenPayload, SSOLinkTokenService } from '../link-token.service';
+import { SSOProvisioningUserDto } from '../dto/sso-provisioning.dto';
 
 import { SSOService } from '../sso.service';
+import { SsoAccountLinkService } from '../sso-account-link.service';
+import { SsoProvisioningService } from '../provisioning/sso-provisioning.service';
+import { auditActorOf } from '../../../../audit/recorder/audit-event';
 import { discoveryPathSegment, discoveryUrl, requestDiscoveryJson } from './discovery-client';
 
 /** Null, undefined and an empty list all mean "defaults"; returns the list only when custom paths are set. */
@@ -108,148 +98,14 @@ export abstract class SsoProviderRoutes {
     @Req() request: Request,
   ): Promise<{ OK: boolean }> {
     const ip = resolveIp(request);
-    // A throttled IP is refused before any token work, so garbage tokens do not bypass the limit.
-    await this.assertLinkAccountIpAllowed(request, ip, null);
-
-    const linkPayload = await this.verifyLinkToken(body.linkToken, ip);
-    const email = linkPayload.email;
-    await this.assertLinkAccountIpAllowed(request, ip, email);
-
-    const user = await this.usersService.findOne({ email }, ['authenticationDetails']);
-    if (!user) {
-      await this.bruteForce.recordFailure('sso_link_account', ip, null, email);
-      await this.authAudit.log({ type: 'sso_link_account', outcome: 'unknown_user', ip, username: email });
-      throw new UnauthorizedException();
-    }
-
-    return this.bruteForce.runAccountAttempt(user.id, async () => {
-      try {
-        await this.bruteForce.assertAccountAllowed(user);
-      } catch (error) {
-        setRetryAfter(request.res as Response, error);
-        await this.authAudit.log({
-          type: 'sso_link_account',
-          outcome: 'account_locked',
-          ip,
-          userId: user.id,
-          username: email,
-          reason: 'account_locked',
-        });
-        throw error;
-      }
-
-      // Earlier attempts queued on this account may have used up or consumed the token meanwhile.
-      await this.assertLinkTokenUsable(linkPayload, ip);
-
-      const existingSSODetail = await this.authService.findSSOAuthenticationDetail(user.id);
-      if (existingSSODetail && existingSSODetail.providerId !== linkPayload.providerId) {
-        throw new BadRequestException('SSO_ALREADY_LINKED');
-      }
-
-      const localAuth = user.authenticationDetails?.find((detail) => detail.type === AuthenticationType.LOCAL_PASSWORD);
-      if (!localAuth) {
-        throw new BadRequestException('PASSWORD_REQUIRED');
-      }
-
-      try {
-        await this.linkTokenService.reservePasswordAttempt(linkPayload);
-      } catch (error) {
-        await this.rejectLinkToken(error, ip);
-      }
-
-      const isAuthenticated = await this.authService.validateAuthenticationDetails(user.id, {
-        type: AuthenticationType.LOCAL_PASSWORD,
-        details: {
-          password: body.password,
-        },
-      });
-
-      if (!isAuthenticated) {
-        await this.bruteForce.recordFailure('sso_link_account', ip, user.id, email);
-        await this.authAudit.log({
-          type: 'sso_link_account',
-          outcome: 'invalid_credentials',
-          ip,
-          userId: user.id,
-          username: email,
-        });
-        throw new UnauthorizedException();
-      }
-
-      const existingSSOUserId = await this.authService.findUserIdBySSO(
-        linkPayload.providerType,
-        linkPayload.providerId,
-        linkPayload.ssoSubject,
-      );
-      if (existingSSOUserId && existingSSOUserId !== user.id) {
-        throw new BadRequestException('SSO_SUBJECT_ALREADY_LINKED');
-      }
-
-      // From here the token is spent, even if the writes below fail; the user restarts SSO sign-in.
-      try {
-        await this.linkTokenService.consume(linkPayload);
-      } catch (error) {
-        await this.rejectLinkToken(error, ip);
-      }
-
-      if (existingSSODetail) {
-        await this.authService.updateSSOSubject(existingSSODetail.id, linkPayload.ssoSubject);
-      } else {
-        await this.authService.addAuthenticationDetails(user.id, {
-          type: AuthenticationType.SSO,
-          details: {
-            providerType: linkPayload.providerType,
-            providerId: linkPayload.providerId,
-            subject: linkPayload.ssoSubject,
-          },
-        });
-      }
-
-      // Remove local password to enforce SSO-only after linking
-      await this.authService.removeAuthenticationDetails(localAuth.id);
-      await this.usersService.updateOne(user.id, { externalIdentifier: null });
-
-      await this.bruteForce.recordSuccess('sso_link_account', ip, user.id, email);
-      await this.authAudit.log({ type: 'sso_link_account', outcome: 'success', ip, userId: user.id, username: email });
-
-      return { OK: true };
-    });
-  }
-
-  /** Invalid, expired, used or exhausted tokens feed the per-IP counters only. */
-  private async verifyLinkToken(token: string, ip: string): Promise<SSOLinkTokenPayload> {
     try {
-      const payload = await this.linkTokenService.verify(token);
-      await this.linkTokenService.assertUsable(payload);
-      return payload;
+      // A throttled IP is refused before any token work, so garbage tokens do not bypass the limit.
+      await this.accountLinks.assertIpAllowed(ip, null);
+      return await this.accountLinks.link(body, ip);
     } catch (error) {
-      return this.rejectLinkToken(error, ip);
+      setRetryAfter(request.res as Response, error);
+      throw error;
     }
-  }
-
-  private async assertLinkTokenUsable(payload: SSOLinkTokenPayload, ip: string): Promise<void> {
-    try {
-      await this.linkTokenService.assertUsable(payload);
-    } catch (error) {
-      await this.rejectLinkToken(error, ip);
-    }
-  }
-
-  /**
-   * A rejected token names no account, so it only feeds the coarse per-IP counter; other accounts behind the same IP
-   * keep their own budget. Store or settings outages are not the caller's fault and pass through uncounted.
-   */
-  private async rejectLinkToken(error: unknown, ip: string): Promise<never> {
-    if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
-      await this.bruteForce.recordIpFailure('sso_link_account', ip);
-      await this.authAudit.log({
-        type: 'sso_link_account',
-        outcome: 'invalid_token',
-        ip,
-        reason: error.message,
-      });
-    }
-    throw error;
   }
 
   @Get('discovery/authentik')
@@ -362,9 +218,7 @@ export abstract class SsoProviderRoutes {
     if (customRolePaths(createDto.samlConfiguration?.roleAttributeKeys)) {
       this.assertCanManageSsoRoles(request, 'SSO role attribute keys');
     }
-    const provider = await this.ssoService.createProvider(createDto);
-    await this.recordProviderAudit('created', request, provider);
-    return provider;
+    return this.ssoService.createProvider(createDto, auditActorOf(request.user));
   }
 
   @Put('providers/:id')
@@ -413,9 +267,7 @@ export abstract class SsoProviderRoutes {
       this.assertCanManageSsoRoles(request, 'SSO role attribute keys');
     }
 
-    const provider = await this.ssoService.updateProvider(providerId, updateDto);
-    await this.recordProviderAudit('updated', request, provider, before, this.providerRotationFlags(before, provider));
-    return provider;
+    return this.ssoService.updateProvider(providerId, updateDto, auditActorOf(request.user));
   }
 
   @Delete('providers/:id')
@@ -440,46 +292,25 @@ export abstract class SsoProviderRoutes {
   })
   async deleteOne(@Param('id') id: string, @Req() request: AuthenticatedRequest): Promise<void> {
     const providerId = parseInt(id, 10);
-    const provider = await this.ssoService.getProviderById(providerId);
-    await this.ssoService.deleteProvider(providerId);
-    await this.recordProviderAudit('deleted', request, provider);
+    await this.ssoService.deleteProvider(providerId, auditActorOf(request.user));
   }
 
   protected abstract readonly ssoService: SSOService;
 
-  protected abstract readonly linkTokenService: SSOLinkTokenService;
+  protected abstract readonly accountLinks: SsoAccountLinkService;
 
-  protected abstract readonly bruteForce: BruteForceProtectionService;
-
-  protected abstract readonly authAudit: AuthAuditLogger;
-
-  /** Throws 429 (with Retry-After) while the IP is throttled for this account (or, with no email, at all). */
-  protected abstract assertLinkAccountIpAllowed(request: Request, ip: string, email: string | null): Promise<void>;
-
-  protected abstract readonly usersService: UsersService;
-
-  protected abstract readonly authService: AuthService;
+  protected abstract readonly provisioning: SsoProvisioningService;
 
   protected abstract assertPermissionMappingCeiling(
     mappings: Array<Record<string, string[]> | undefined>,
     actorPermissions: Set<string>,
   ): Promise<void>;
 
-  protected abstract recordProviderAudit(
-    action: 'created' | 'updated' | 'deleted',
-    request: AuthenticatedRequest,
-    provider: SSOProvider,
-    before?: SSOProvider,
-    rotated?: string[],
-  ): Promise<void>;
-
-  protected abstract providerRotationFlags(before: SSOProvider, after: SSOProvider): string[];
-
   protected abstract parseProviderId(rawProviderId: string): number;
 
   protected abstract loadProvisioningProvider(type: SSOProviderType, providerId: number): Promise<SSOProvider>;
 
-  protected abstract assertProvisioningAuthorized(provider: SSOProvider, request: Request): Promise<void>;
+  protected abstract authorizeProvisioning(provider: SSOProvider, request: Request): Promise<void>;
 
   protected abstract resolveProvisioningUser(
     providerType: SSOProviderType,
@@ -488,23 +319,6 @@ export abstract class SsoProviderRoutes {
   ): Promise<import('@attraccess/database-entities').User>;
 
   protected abstract readonly sessionService: SessionService;
-
-  protected abstract recordProvisioningAudit(
-    action: 'sessions_revoked' | 'user_created' | 'user_deleted' | 'permissions_synced',
-    provider: SSOProvider,
-    userId: number,
-    changes:
-      | { sessionsRevoked: true }
-      | { userCreated: true }
-      | { userDeleted: true }
-      | { added: string[]; removed: string[]; updated: string[] },
-  ): Promise<void>;
-
-  protected abstract applyProvisioningPermissions(
-    userId: number,
-    provider: SSOProvider,
-    payload: SSOProvisioningPermissionsDto,
-  ): Promise<{ added: string[]; removed: string[]; updated: string[] } | undefined>;
 
   protected abstract readonly metricsService: MetricsService;
 
@@ -519,19 +333,11 @@ export abstract class SsoProviderRoutes {
 
   protected abstract readonly cookieConfigService: CookieConfigService;
 
-  protected abstract readonly identityAudit: IdentityAuditService;
-
   protected abstract readonly logger: Logger;
 
   protected abstract extractProvisioningToken(request: Request): string | null;
 
   protected abstract readonly rbacService: RbacService;
 
-  protected abstract providerSnapshot(provider: SSOProvider): string;
-
-  protected abstract providerChanges(before: SSOProvider, after: SSOProvider, rotated: string[]): string;
-
-  protected abstract recordSso(event: Parameters<SsoAuditService['record']>[0]): Promise<void>;
-
-  protected abstract readonly ssoAudit: SsoAuditService;
+  protected abstract readonly usersService: UsersService;
 }

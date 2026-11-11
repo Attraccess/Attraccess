@@ -21,7 +21,7 @@ export function createResourceUsageMocks() {
     authorizationCacheSize: { set: jest.fn() },
   };
 
-  const mockAuditService = { recordResource: jest.fn().mockResolvedValue(undefined) };
+  const mockAuditService = { record: jest.fn().mockResolvedValue(undefined) };
 
   // Expose transactional entity manager for assertions
   const lifecycleAttempts = new Map<string, ResourceUsageLifecycleAttempt>();
