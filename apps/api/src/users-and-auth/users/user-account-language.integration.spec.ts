@@ -1,6 +1,5 @@
 import { createMock } from '@golevelup/ts-jest';
 import { entities, Setting, User } from '@attraccess/database-entities';
-import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as migrations from '../../database/migrations';
 import { EncryptionService } from '../../encryption/encryption.service';
@@ -11,6 +10,7 @@ import { SettingsStoreService } from '../../settings/settings-store.service';
 import { SettingsService } from '../../settings/settings.service';
 import { RbacService } from '../rbac/rbac.service';
 import { UsersService } from './users.service';
+import { composeUsersService } from './fixtures/compose.test-fixture';
 
 describe('new account language persistence', () => {
   let source: DataSource;
@@ -30,14 +30,19 @@ describe('new account language persistence', () => {
     settings = Object.assign(Object.create(SettingsService.prototype), { settingsStore: store });
     // Execute production creation, transactions, persistence and language resolution.
     // Licensing, roles and metrics are unrelated collaborators for this regression.
-    users = Object.assign(Object.create(UsersService.prototype), {
-      logger: createMock<Logger>(),
-      userRepository: source.getRepository(User),
-      dataSource: source,
-      licenseService: createMock<LicenseService>(),
-      rbacService: createMock<RbacService>(),
-      metricsService: createMock<MetricsService>(),
-    });
+    users = composeUsersService(
+      source.getRepository(User),
+      undefined,
+      undefined,
+      undefined,
+      createMock<LicenseService>(),
+      undefined,
+      source,
+      undefined,
+      createMock<MetricsService>(),
+      createMock<RbacService>(),
+      undefined,
+    );
   }, 60_000);
 
   afterAll(async () => {

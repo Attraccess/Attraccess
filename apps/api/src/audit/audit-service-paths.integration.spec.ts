@@ -331,6 +331,7 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
   it('sso: an identity-provider logout records the provisioning change without a user actor', async () => {
     const provisioning = new SsoProvisioningService(
       {} as never,
+      { findOneBySSO: jest.fn().mockResolvedValue({ id: 77 }) } as never,
       { revokeAllUserSessions: jest.fn() } as never,
       {} as never,
       {} as never,
@@ -353,7 +354,7 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
       },
     } as never;
 
-    await provisioning.revokeSessions(provider, 77);
+    await provisioning.revokeSessions({ type: SSOProviderType.OIDC, providerId: 3, provider }, { subject: 'idp-user' });
 
     const [stored] = await rows();
     expect(stored).toEqual(

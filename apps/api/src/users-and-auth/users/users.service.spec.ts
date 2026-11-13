@@ -536,7 +536,7 @@ describe('UsersService', () => {
 
   describe('changeUsername', () => {
     beforeEach(() => {
-      jest.spyOn(fixture.service, 'isSSOUser').mockResolvedValue(false);
+      jest.spyOn(fixture.accounts, 'isSSOUser').mockResolvedValue(false);
     });
 
     const baseUser = (overrides: Partial<User> = {}): User =>
@@ -568,14 +568,14 @@ describe('UsersService', () => {
       }) as User;
 
     it('should throw if target user not found', async () => {
-      jest.spyOn(fixture.service, 'findOne').mockResolvedValueOnce(null);
+      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(null);
 
       await expect(fixture.service.changeUsername(123, 'newuser', baseUser())).rejects.toThrow(UserNotFoundException);
     });
 
     it("should forbid changing another user's username without permission", async () => {
       const target = baseUser({ id: 2 });
-      jest.spyOn(fixture.service, 'findOne').mockResolvedValueOnce(target);
+      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(target);
 
       await expect(fixture.service.changeUsername(2, 'newuser', baseUser({ id: 1 }))).rejects.toThrow(
         ForbiddenException,
@@ -585,7 +585,7 @@ describe('UsersService', () => {
     it('should enforce once-per-day limit for self-change when not admin', async () => {
       const recent = new Date(Date.now() - 1 * 60 * 60 * 1000);
       const me = baseUser({ id: 10, lastUsernameChangeAt: recent });
-      jest.spyOn(fixture.service, 'findOne').mockResolvedValueOnce(me);
+      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(me);
 
       await expect(fixture.service.changeUsername(10, 'newuser', me)).rejects.toThrow(BadRequestException);
     });
@@ -593,7 +593,7 @@ describe('UsersService', () => {
     it('should allow self-change and update lastUsernameChangeAt and send email', async () => {
       const me = baseUser({ id: 10, username: 'me' });
       const updated = { ...me, username: 'newuser', lastUsernameChangeAt: new Date() } as User;
-      jest.spyOn(fixture.service, 'findOne').mockResolvedValueOnce(me).mockResolvedValueOnce(updated);
+      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(me).mockResolvedValueOnce(updated);
       const updateSpy = jest.spyOn(fixture.userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
 
       const result = await fixture.service.changeUsername(10, 'newuser', me);
@@ -616,7 +616,7 @@ describe('UsersService', () => {
         effectivePermissions: new Set(['users.update']),
       } as never);
       const updated = { ...target, username: 'new_admin_set', lastUsernameChangeAt: null } as User;
-      jest.spyOn(fixture.service, 'findOne').mockResolvedValueOnce(target).mockResolvedValueOnce(updated);
+      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(target).mockResolvedValueOnce(updated);
       const updateSpy = jest.spyOn(fixture.userRepository, 'update').mockResolvedValue({ affected: 1 } as UpdateResult);
 
       const result = await fixture.service.changeUsername(20, 'new_admin_set', admin);
@@ -633,15 +633,15 @@ describe('UsersService', () => {
 
     it('should validate new username format', async () => {
       const me = baseUser({ id: 10 });
-      jest.spyOn(fixture.service, 'findOne').mockResolvedValueOnce(me);
+      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(me);
 
       await expect(fixture.service.changeUsername(10, 'x', me)).rejects.toThrow(BadRequestException);
     });
 
     it('should forbid changing username for SSO users', async () => {
       const me = baseUser({ id: 5 });
-      jest.spyOn(fixture.service, 'findOne').mockResolvedValueOnce(me);
-      jest.spyOn(fixture.service, 'isSSOUser').mockResolvedValueOnce(true);
+      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(me);
+      jest.spyOn(fixture.accounts, 'isSSOUser').mockResolvedValueOnce(true);
 
       await expect(fixture.service.changeUsername(5, 'newuser', me)).rejects.toThrow(
         SSOUsernameChangeForbiddenException,
@@ -652,7 +652,7 @@ describe('UsersService', () => {
   describe('updateDateTimePreferences', () => {
     it('updates only the selected user format preferences without changing locale', async () => {
       jest
-        .spyOn(fixture.service, 'findOne')
+        .spyOn(fixture.accounts, 'findOne')
         .mockResolvedValueOnce(Object.assign(new User(), { id: 42, locale: 'de', dateTimeLocale: 'en-GB' }));
       const updated = await fixture.service.updateDateTimePreferences(42, { dateTimeLocale: ' en-gb ' });
       expect(fixture.userRepository.update).toHaveBeenCalledWith(42, { dateTimeLocale: 'en-GB' });
@@ -669,7 +669,7 @@ describe('UsersService', () => {
     });
     it('persists an explicit null without changing translation language', async () => {
       jest
-        .spyOn(fixture.service, 'findOne')
+        .spyOn(fixture.accounts, 'findOne')
         .mockResolvedValueOnce(Object.assign(new User(), { id: 42, locale: 'de', dateTimeLocale: null }));
       expect(await fixture.service.updateDateTimePreferences(42, { dateTimeLocale: null })).toMatchObject({
         locale: 'de',
@@ -729,7 +729,7 @@ describe('UsersService', () => {
       const existing = { id: 1, locale: 'en' } as User;
       const updated = { id: 1, locale: 'de' } as User;
       jest.spyOn(fixture.userRepository, 'update').mockResolvedValue({} as UpdateResult);
-      jest.spyOn(fixture.service, 'findOne').mockResolvedValueOnce(existing).mockResolvedValueOnce(updated);
+      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(existing).mockResolvedValueOnce(updated);
 
       const result = await fixture.service.updateLocale(1, 'de-DE');
       expect(fixture.userRepository.update).toHaveBeenCalledWith(1, { locale: 'de-DE' });
@@ -845,12 +845,12 @@ describe('UsersService', () => {
   describe('email changes', () => {
     const actor = Object.assign(new User(), { id: 1, email: 'old@example.com' });
     beforeEach(() => {
-      jest.spyOn(fixture.service, 'findOne').mockResolvedValueOnce(actor).mockResolvedValue(null);
+      jest.spyOn(fixture.accounts, 'findOne').mockResolvedValueOnce(actor).mockResolvedValue(null);
     });
     it('changes and reverifies an email inside the transaction', async () => {
       const updated = Object.assign(new User(), { id: 1, email: 'new@example.com' });
       jest
-        .mocked(fixture.service.findOne)
+        .mocked(fixture.accounts.findOne)
         .mockReset()
         .mockResolvedValueOnce(actor)
         .mockResolvedValueOnce(null)
@@ -872,7 +872,7 @@ describe('UsersService', () => {
           emailVerificationTokenExpiresAt: expect.any(Date),
         }),
       );
-      expect(fixture.service.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, manager);
+      expect(fixture.accounts.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, manager);
       expect(fixture.emailService.sendVerificationEmail).toHaveBeenCalledWith(updated, expect.any(String));
     });
     it('leaves an unchanged email verified without a transaction', async () => {
@@ -881,7 +881,7 @@ describe('UsersService', () => {
     });
     it.each(['', 'invalid'])('rejects invalid email %p before reading users', async (email) => {
       await expect(fixture.service.changeEmail(1, email, actor)).rejects.toThrow(BadRequestException);
-      expect(fixture.service.findOne).not.toHaveBeenCalled();
+      expect(fixture.accounts.findOne).not.toHaveBeenCalled();
     });
     it('rejects editing another user without permission', async () => {
       await expect(fixture.service.changeEmail(2, 'new@example.com', actor)).rejects.toThrow(ForbiddenException);

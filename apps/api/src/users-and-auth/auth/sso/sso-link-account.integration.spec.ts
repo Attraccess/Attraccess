@@ -1,5 +1,3 @@
-import { SsoAccountLinkService } from './sso-account-link.service';
-import { SsoProvisioningService } from './provisioning/sso-provisioning.service';
 import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
 import { AuthenticationType, Setting, SSOProviderType, User } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -25,6 +23,7 @@ import { OidcCookieStateStore } from './oidc/oidc-cookie-state-store';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { SSOController } from './sso.controller';
 import { SSOService } from './sso.service';
+import { SSO_CONTROLLER_SERVICES } from './sso-controller.services';
 
 const policy = {
   maxAttempts: 5,
@@ -115,6 +114,7 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
         SSOLinkTokenService,
         BruteForceProtectionService,
         SSOOIDCGuard,
+        ...SSO_CONTROLLER_SERVICES,
         { provide: SESSION_STORE, useValue: sharedStore },
         { provide: AuthAuditLogger, useValue: audit },
         { provide: AuthService, useValue: auth },
@@ -125,8 +125,6 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
         { provide: RbacService, useValue: {} },
         { provide: MetricsService, useValue: {} },
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
-        SsoAccountLinkService,
-        { provide: SsoProvisioningService, useValue: {} },
         { provide: OidcCookieStateStore, useValue: {} },
         { provide: ModuleRef, useValue: { get: jest.fn() } },
         { provide: LicenseService, useValue: { verifyLicense: jest.fn().mockResolvedValue({ valid: true }) } },

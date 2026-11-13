@@ -93,7 +93,33 @@ export async function hasPasswordPolicyOverflow(storage: DataSource): Promise<bo
   return rows.some((row: { name?: unknown }) => row.name === 'password_policy_audit_overflow');
 }
 
-export abstract class AuditStorage {
+/** The audit connection and its write queue, shared by AuditService's lifecycle hooks and AuditStorage. */
+export class AuditStorageState {
+  storage?: DataSource;
+
+  stopping = false;
+
+  /** Set when the shutdown drain timed out: queued writes are then dropped as `shutting_down`. */
+  drainExpired = false;
+
+  pending = 0;
+
+  activeReads = 0;
+
+  cleaning = false;
+
+  writeTail: Promise<void> = Promise.resolve();
+}
+
+/** Writes and reads audit records on the audit connection, honouring the audit settings. */
+export class AuditStorage {
+  constructor(
+    private readonly settings: SettingsStoreService,
+    private readonly metrics: AuditMetrics,
+    private readonly logger: Logger,
+    private readonly state: AuditStorageState,
+  ) {}
+
   /** Tail of the in-transaction audit writes per connection; see insertInTransaction. */
   private readonly savepointQueues = new WeakMap<DataSource, Promise<unknown>>();
 
@@ -121,18 +147,19 @@ export abstract class AuditStorage {
 
   /** Runs a read on the audit connection; shutdown waits for it. */
   async read<T>(query: (storage: DataSource) => Promise<T>): Promise<T> {
-    const storage = this.storage;
-    if (this.stopping || !storage?.isInitialized) throw new ServiceUnavailableException('Audit storage unavailable');
-    this.activeReads++;
+    const storage = this.state.storage;
+    if (this.state.stopping || !storage?.isInitialized)
+      throw new ServiceUnavailableException('Audit storage unavailable');
+    this.state.activeReads++;
     try {
       return await query(storage);
     } finally {
-      this.activeReads--;
+      this.state.activeReads--;
     }
   }
 
   /** Runs an event projection; a projection that throws is treated like one that rejects the event. */
-  protected project<T>(projection: () => T | null | undefined): T | undefined {
+  private project<T>(projection: () => T | null | undefined): T | undefined {
     try {
       return projection() ?? undefined;
     } catch {
@@ -148,7 +175,7 @@ export abstract class AuditStorage {
    * The one exception to "never rejects": AuditTransactionAbortedError, when SQLite already discarded the caller's
    * whole transaction, so the caller must not continue as if it were still open.
    */
-  protected async recordSnapshot(
+  private async recordSnapshot(
     event: AuditRow,
     { finalSettingsChange = false, transaction }: { finalSettingsChange?: boolean; transaction?: EntityManager } = {},
   ): Promise<PluginAuditReceipt> {
@@ -160,14 +187,14 @@ export abstract class AuditStorage {
         if (!(await this.auditEnabled(event, finalSettingsChange, callerTransaction))) return { status: 'unavailable' };
         return await this.insertInTransaction(callerTransaction, event);
       }
-      if (this.stopping) return this.drop(domain, 'shutting_down', action);
-      if (this.pending >= MAX_PENDING_AUDIT_WRITES) return this.drop(domain, 'queue_full', action);
-      this.pending++;
+      if (this.state.stopping) return this.drop(domain, 'shutting_down', action);
+      if (this.state.pending >= MAX_PENDING_AUDIT_WRITES) return this.drop(domain, 'queue_full', action);
+      this.state.pending++;
       try {
         if (!(await this.auditEnabled(event, finalSettingsChange))) return { status: 'unavailable' };
         return await this.insertOnAuditConnection(event);
       } finally {
-        this.pending--;
+        this.state.pending--;
       }
     } catch (error) {
       if (error instanceof AuditTransactionAbortedError) throw error;
@@ -242,16 +269,17 @@ export abstract class AuditStorage {
 
   private async insertOnAuditConnection(event: AuditRow): Promise<PluginAuditReceipt> {
     return this.serializeStorageWrite<PluginAuditReceipt>(async () => {
-      const storage = this.storage;
+      const storage = this.state.storage;
       // Writes admitted before shutdown still run; only a drain that ran out of time drops the rest.
-      if (this.drainExpired) return this.drop(event.domain, 'shutting_down', event.action);
+      if (this.state.drainExpired) return this.drop(event.domain, 'shutting_down', event.action);
       if (!storage?.isInitialized) return this.drop(event.domain, 'storage_unavailable', event.action);
       for (let attempt = 0; ; attempt++) {
         try {
           await storage.getRepository(AuditLog).insert({ at: new Date(), ...event });
           return { status: 'recorded' };
         } catch (error) {
-          const retry = sqliteErrorCode(error) === 'SQLITE_BUSY' && attempt < AUDIT_BUSY_RETRIES && !this.stopping;
+          const retry =
+            sqliteErrorCode(error) === 'SQLITE_BUSY' && attempt < AUDIT_BUSY_RETRIES && !this.state.stopping;
           if (!retry) return this.drop(event.domain, 'storage_error', event.action, error);
         }
       }
@@ -259,7 +287,7 @@ export abstract class AuditStorage {
   }
 
   /** Logs and counts an audit record that was not stored. Never logs event data or the raw exception. */
-  protected drop(
+  private drop(
     domain: string | undefined,
     reason: AuditDropReason,
     action?: string,
@@ -282,10 +310,10 @@ export abstract class AuditStorage {
   }
 
   /** Serializes every write on the audit storage connection, including cleanup transactions. */
-  protected async serializeStorageWrite<T>(write: () => Promise<T>): Promise<T> {
-    const precedingWrite = this.writeTail;
+  async serializeStorageWrite<T>(write: () => Promise<T>): Promise<T> {
+    const precedingWrite = this.state.writeTail;
     let releaseWrite!: () => void;
-    this.writeTail = new Promise<void>((resolve) => {
+    this.state.writeTail = new Promise<void>((resolve) => {
       releaseWrite = resolve;
     });
     try {
@@ -297,35 +325,13 @@ export abstract class AuditStorage {
   }
 
   /** Core domains follow the configured allowlist; plugin domains record while registered unless explicitly disabled. */
-  protected domainEnabled(config: AuditSettings, domain: string): boolean {
+  private domainEnabled(config: AuditSettings, domain: string): boolean {
     return getPluginAuditDomain(domain) !== undefined
       ? !config.plugin_domains_disabled.includes(domain)
       : (config.domains as readonly string[]).includes(domain);
   }
 
-  protected sqliteDate(date: Date): string {
+  sqliteDate(date: Date): string {
     return date.toISOString().replace('T', ' ').replace('Z', '');
   }
-
-  protected abstract readonly logger: Logger;
-
-  protected abstract readonly metrics: AuditMetrics;
-
-  protected abstract storage?: DataSource;
-
-  protected abstract stopping: boolean;
-
-  protected abstract drainExpired: boolean;
-
-  protected abstract pending: number;
-
-  protected abstract readonly settings: SettingsStoreService;
-
-  protected abstract readonly source: DataSource;
-
-  protected abstract writeTail: Promise<void>;
-
-  protected abstract activeReads: number;
-
-  protected abstract cleaning: boolean;
 }

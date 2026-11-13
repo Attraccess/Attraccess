@@ -4,11 +4,10 @@ import {
   BillingTransactionStatus,
   User,
   ResourceBillingConfiguration,
-  BillingTransactionItem,
   Setting,
 } from '@attraccess/database-entities';
 
-import { BadRequestException, Logger } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 
 import { EntityManager, Repository } from 'typeorm';
 
@@ -40,13 +39,25 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { AuditRecorder } from '../../audit/recorder/audit-event';
 
-import { EmailService } from '../../email/email.service';
-
 import { MetricsService } from '../../metrics/metrics.service';
 
 import { LiveNotificationsService } from '../live-notifications/live-notifications.service';
 
-export abstract class BillingLedger {
+/** Balances, transaction history, manual and refund transactions, and the billing configuration. */
+export class BillingLedger {
+  private readonly DEFAULT_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
+
+  constructor(
+    private readonly settingRepository: Repository<Setting>,
+    private readonly userRepository: Repository<User>,
+    private readonly billingTransactionRepository: Repository<BillingTransaction>,
+    private readonly liveNotificationsService: LiveNotificationsService,
+    private readonly auditService: AuditRecorder,
+    private readonly metricsService: MetricsService,
+    private readonly resourceBillingConfigurationRepository: Repository<ResourceBillingConfiguration>,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
   async getBalance(userId: number, transactionalEntityManager?: EntityManager): Promise<number> {
     const userRepository = transactionalEntityManager
       ? transactionalEntityManager.getRepository(User)
@@ -324,30 +335,4 @@ export abstract class BillingLedger {
     );
     return savedConfiguration;
   }
-
-  protected abstract readonly settingRepository: Repository<Setting>;
-
-  protected abstract readonly userRepository: Repository<User>;
-
-  protected abstract readonly billingTransactionRepository: Repository<BillingTransaction>;
-
-  protected abstract DEFAULT_RELATIONS: string[];
-
-  protected abstract readonly liveNotificationsService: LiveNotificationsService;
-
-  protected abstract readonly auditService: AuditRecorder;
-
-  protected abstract readonly metricsService: MetricsService;
-
-  protected abstract readonly resourceBillingConfigurationRepository: Repository<ResourceBillingConfiguration>;
-
-  protected abstract readonly eventEmitter: EventEmitter2;
-
-  protected abstract readonly billingTransactionItemRepository: Repository<BillingTransactionItem>;
-
-  public abstract notifyResourceUsageCharge(transactionId: number): Promise<void>;
-
-  protected abstract readonly emailService: EmailService;
-
-  protected abstract readonly logger: Logger;
 }

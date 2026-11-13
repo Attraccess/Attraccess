@@ -22,6 +22,7 @@ import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { TentativeSessionCancelledError } from '../errors/tentative-session-cancelled.error';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from './fixtures/state.test-fixture';
+import { usageInternals } from '../sessions/fixtures/compose.test-fixture';
 
 jest.setTimeout(30_000);
 
@@ -261,7 +262,7 @@ describe('Parallel sessions on one machine', () => {
       expect(await count('resource_usage_lifecycle_attempt')).toBe(1);
       expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(1);
       // The API process restarts: nothing of the old process is running any more.
-      Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', undefined);
+      Reflect.set(usageInternals(scope.usage).turns, 'sessionChangeCoordinationInstance', undefined);
       await scope.usage.recoverInterruptedLifecycles();
       expect(await count('resource_usage_lifecycle_attempt')).toBe(0);
       expect(await scope.source.getRepository(ResourceUsage).countBy({ lifecyclePending: true })).toBe(0);
@@ -687,7 +688,7 @@ describe('Parallel sessions on one machine', () => {
     it('lets a supervisor run their own session next to supervised ones without taking a slot', async () => {
       await setLimit(2);
       const [supervisee, other] = await addUsers(2);
-      jest.spyOn(scope.usage, 'validateSupervisedStart').mockResolvedValue(undefined);
+      jest.spyOn(usageInternals(scope.usage).gate, 'validateSupervisedStart').mockResolvedValue(undefined);
       await scope.usage.startSession(1, supervisee, {}, { supervisorUserId: 1 });
       await scope.usage.startSession(1, other, {}, { supervisorUserId: 1 });
       await expect(scope.usage.startSession(1, scope.users[0], {})).rejects.toBeInstanceOf(ResourceFullError);

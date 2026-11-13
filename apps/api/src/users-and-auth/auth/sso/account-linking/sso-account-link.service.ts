@@ -1,15 +1,20 @@
 import { AuthenticationType } from '@attraccess/database-entities';
+
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { UsersService } from '../../users/users.service';
-import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
-import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
-import { AuthService } from '../auth.service';
-import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
-import { SSOLinkTokenPayload, SSOLinkTokenService } from './link-token.service';
+
+import { AuthAuditLogger } from '../../../rate-limiting/auth-audit.logger';
+
+import { BruteForceProtectionService } from '../../../rate-limiting/brute-force.service';
+
+import { UsersService } from '../../../users/users.service';
+
+import { AuthService } from '../../auth.service';
+
+import { SSOLinkTokenPayload, SSOLinkTokenService } from '../link-token.service';
 
 /**
- * Links a local account to an SSO identity with a signed link token and the account password. Every attempt is
- * throttled and audited through the auth audit logger; the caller adds the HTTP Retry-After header.
+ * Links a local account to an SSO identity with a signed link token and the account password, after which the
+ * account signs in through SSO only. Wrong tokens count per IP, wrong passwords per account.
  */
 @Injectable()
 export class SsoAccountLinkService {
@@ -21,12 +26,19 @@ export class SsoAccountLinkService {
     private readonly authAudit: AuthAuditLogger,
   ) {}
 
-  /** Call with no email before `link`: a throttled IP is refused before any token work. */
-  async link(body: LinkUserToExternalAccountRequestDto, ip: string): Promise<{ OK: boolean }> {
-    const linkPayload = await this.verifyLinkToken(body.linkToken, ip);
-    const email = linkPayload.email;
-    await this.assertIpAllowed(ip, email);
+  /** Invalid, expired, used or exhausted tokens feed the per-IP counters only. */
+  async verifyLinkToken(token: string, ip: string): Promise<SSOLinkTokenPayload> {
+    try {
+      const payload = await this.linkTokenService.verify(token);
+      await this.linkTokenService.assertUsable(payload);
+      return payload;
+    } catch (error) {
+      return this.rejectLinkToken(error, ip);
+    }
+  }
 
+  async link(linkPayload: SSOLinkTokenPayload, password: string, ip: string): Promise<{ OK: boolean }> {
+    const email = linkPayload.email;
     const user = await this.usersService.findOne({ email }, ['authenticationDetails']);
     if (!user) {
       await this.bruteForce.recordFailure('sso_link_account', ip, null, email);
@@ -71,7 +83,7 @@ export class SsoAccountLinkService {
       const isAuthenticated = await this.authService.validateAuthenticationDetails(user.id, {
         type: AuthenticationType.LOCAL_PASSWORD,
         details: {
-          password: body.password,
+          password,
         },
       });
 
@@ -125,33 +137,6 @@ export class SsoAccountLinkService {
 
       return { OK: true };
     });
-  }
-
-  /** Throws 429 while the IP is throttled for this account (or, with no email, at all). */
-  async assertIpAllowed(ip: string, email: string | null): Promise<void> {
-    try {
-      await this.bruteForce.assertIpAllowed('sso_link_account', ip, email);
-    } catch (error) {
-      await this.authAudit.log({
-        type: 'sso_link_account',
-        outcome: 'rate_limited',
-        ip,
-        username: email,
-        reason: 'ip_throttled',
-      });
-      throw error;
-    }
-  }
-
-  /** Invalid, expired, used or exhausted tokens feed the per-IP counters only. */
-  private async verifyLinkToken(token: string, ip: string): Promise<SSOLinkTokenPayload> {
-    try {
-      const payload = await this.linkTokenService.verify(token);
-      await this.linkTokenService.assertUsable(payload);
-      return payload;
-    } catch (error) {
-      return this.rejectLinkToken(error, ip);
-    }
   }
 
   private async assertLinkTokenUsable(payload: SSOLinkTokenPayload, ip: string): Promise<void> {

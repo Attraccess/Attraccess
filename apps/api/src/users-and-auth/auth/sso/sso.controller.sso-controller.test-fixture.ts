@@ -1,5 +1,3 @@
-import { SsoProvisioningService } from './provisioning/sso-provisioning.service';
-import { SsoAccountLinkService } from './sso-account-link.service';
 import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
 import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 import { ModuleRef } from '@nestjs/core';
@@ -19,6 +17,7 @@ import { OidcCookieStateStore } from './oidc/oidc-cookie-state-store';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { SSOController } from './sso.controller';
 import { SSOService } from './sso.service';
+import { SSO_CONTROLLER_SERVICES } from './sso-controller.services';
 
 const mockMetricsService = {
   authSsoLoginTotal: { inc: jest.fn() },
@@ -213,11 +212,10 @@ export function registerSsoControllerFixture() {
           useValue: mockMetricsService,
         },
         { provide: AUDIT_RECORDER, useValue: identityAudit },
-        SsoProvisioningService,
-        SsoAccountLinkService,
         { provide: BruteForceProtectionService, useValue: bruteForce },
         { provide: AuthAuditLogger, useValue: authAudit },
         SSOOIDCGuard,
+        ...SSO_CONTROLLER_SERVICES,
       ],
       controllers: [SSOController],
     }).compile();

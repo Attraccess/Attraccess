@@ -26,59 +26,56 @@ export const PLUGIN_BOOT_GUARD_FILE = '.plugin-boot-guard.json';
 
 export type PluginFailure = { pluginDirectory: string; message: string };
 
-export abstract class PluginBootGuard {
-  public static PLUGIN_PATH: string;
+/**
+ * The boot guard and quarantine of plugins that kept the host from starting. It owns the quarantine state and its
+ * files, and reads the plugin directory and discovered plugins from PluginService, which exposes these steps.
+ */
+export class PluginBootGuard {
+  private static pluginFailures: Map<string, PluginFailure> = new Map();
 
-  protected static RESTART_BY_EXIT_FLAG: boolean;
+  private static readonly logger = new Logger('PluginService');
 
-  protected static plugins: LoadedPluginManifest[] | null = null;
+  private static bootGuardSignalHandlers: Partial<Record<'SIGINT' | 'SIGTERM', () => void>> = {};
 
-  protected static loadedPlugins: Set<string> = new Set();
-
-  protected static pluginLoadErrors: Map<string, Error> = new Map();
-
-  protected static pluginFailures: Map<string, PluginFailure> = new Map();
-
-  protected static logger = new Logger('PluginService');
-
-  protected static bootGuardSignalHandlers: Partial<Record<'SIGINT' | 'SIGTERM', () => void>> = {};
-
-  protected static readonly pluginUploadLocks = new Map<string, Promise<void>>();
+  /** Reloads the persisted quarantine from the configured plugin directory. */
+  static loadFailures(): void {
+    PluginBootGuard.pluginFailures = new Map(
+      PluginBootGuard.readFailures().map((failure) => [failure.pluginDirectory, failure]),
+    );
+  }
 
   /** Marks active plugins only while Nest is running their lifecycle hooks. */
-  public static beginBootGuard(): void {
-    getImplementationClass().removeBootGuardSignalHandlers();
-    const previous = getImplementationClass().readBootGuard();
+  static beginBootGuard(): void {
+    PluginBootGuard.removeBootGuardSignalHandlers();
+    const previous = PluginBootGuard.readBootGuard();
     if (previous.length > 0) {
       for (const pluginDirectory of previous) {
-        if (!getImplementationClass().pluginFailures.has(pluginDirectory)) {
-          getImplementationClass().pluginFailures.set(pluginDirectory, {
+        if (!PluginBootGuard.pluginFailures.has(pluginDirectory)) {
+          PluginBootGuard.pluginFailures.set(pluginDirectory, {
             pluginDirectory,
             message: 'Plugin was disabled after an incomplete startup with no attributable stack frame.',
           });
         }
       }
-      getImplementationClass().writeFailures([...getImplementationClass().pluginFailures.values()]);
-      getImplementationClass().logger.error(
-        `Disabled ${previous.length} plugin(s) after an incomplete previous startup.`,
-      );
+      PluginBootGuard.writeFailures([...PluginBootGuard.pluginFailures.values()]);
+      PluginBootGuard.logger.error(`Disabled ${previous.length} plugin(s) after an incomplete previous startup.`);
     }
 
     const active = getImplementationClass()
       .getPlugins()
-      .filter((manifest) => !getImplementationClass().pluginFailures.has(manifest.pluginDirectory))
+      .filter((manifest) => !PluginBootGuard.pluginFailures.has(manifest.pluginDirectory))
       .map((manifest) => manifest.pluginDirectory);
-    getImplementationClass().writeBootGuard(active);
+    PluginBootGuard.writeBootGuard(active);
     // A dev watcher or operator may stop the process during migrations or app.init().
     // That is an intentional shutdown, not evidence that every plugin crashed.
     for (const signal of ['SIGINT', 'SIGTERM'] as const) {
       const handler = () => {
-        getImplementationClass().clearBootGuard();
+        PluginBootGuard.clearBootGuard();
         // Before Nest registers shutdown hooks, removing our listener restores
         // Node's normal signal termination. Once Nest is listening, let it close.
         if (process.listenerCount(signal) === 0) process.kill(process.pid, signal);
       };
-      getImplementationClass().bootGuardSignalHandlers[signal] = handler;
+      PluginBootGuard.bootGuardSignalHandlers[signal] = handler;
       process.once(signal, handler);
     }
   }
@@ -87,8 +84,8 @@ export abstract class PluginBootGuard {
    * Records the error that prevented the guarded startup from completing so the
    * next process can show the actionable cause rather than a generic warning.
    */
-  public static recordBootFailure(error: unknown): void {
-    const active = getImplementationClass().readBootGuard();
+  static recordBootFailure(error: unknown): void {
+    const active = PluginBootGuard.readBootGuard();
     if (active.length === 0) return;
 
     const message = error instanceof Error ? error.message : String(error);
@@ -97,85 +94,87 @@ export abstract class PluginBootGuard {
       stack.includes(join(getImplementationClass().PLUGIN_PATH, pluginDirectory)),
     );
     if (affected.length === 0) {
-      getImplementationClass().logger.error(
-        'Could not attribute the startup failure to a plugin; no plugins were quarantined.',
-      );
+      PluginBootGuard.logger.error('Could not attribute the startup failure to a plugin; no plugins were quarantined.');
       return;
     }
 
     for (const pluginDirectory of affected) {
-      getImplementationClass().pluginFailures.set(pluginDirectory, { pluginDirectory, message });
+      PluginBootGuard.pluginFailures.set(pluginDirectory, { pluginDirectory, message });
     }
-    getImplementationClass().writeFailures([...getImplementationClass().pluginFailures.values()]);
+    PluginBootGuard.writeFailures([...PluginBootGuard.pluginFailures.values()]);
   }
 
-  public static clearBootGuard(): void {
-    getImplementationClass().removeBootGuardSignalHandlers();
+  static clearBootGuard(): void {
+    PluginBootGuard.removeBootGuardSignalHandlers();
     const path = join(getImplementationClass().PLUGIN_PATH, PLUGIN_BOOT_GUARD_FILE);
     if (existsSync(path)) rmSync(path, { force: true });
   }
 
-  protected static removeBootGuardSignalHandlers(): void {
+  static removeBootGuardSignalHandlers(): void {
     for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-      const handler = getImplementationClass().bootGuardSignalHandlers[signal];
+      const handler = PluginBootGuard.bootGuardSignalHandlers[signal];
       if (handler) process.removeListener(signal, handler);
     }
-    getImplementationClass().bootGuardSignalHandlers = {};
+    PluginBootGuard.bootGuardSignalHandlers = {};
   }
 
   /**
    * Persist a failed plugin outside its package. A subsequent process must never
    * retry code which already prevented the host from starting.
    */
-  public static quarantinePlugin(manifest: LoadedPluginManifest, error: Error): void {
+  static quarantinePlugin(manifest: LoadedPluginManifest, error: Error): void {
     const key = `${manifest.name}@${manifest.version}`;
     getImplementationClass().setPluginLoadError(key, error);
     try {
-      getImplementationClass().quarantinePluginDirectory(manifest.pluginDirectory, error);
+      PluginBootGuard.quarantinePluginDirectory(manifest.pluginDirectory, error);
     } catch (persistenceError) {
-      getImplementationClass().logger.error(`Failed to persist quarantine for ${key}`, persistenceError as Error);
+      PluginBootGuard.logger.error(`Failed to persist quarantine for ${key}`, persistenceError as Error);
     }
   }
 
-  public static quarantinePluginDirectory(pluginDirectory: string, error: Error): void {
-    getImplementationClass().pluginFailures.set(pluginDirectory, { pluginDirectory, message: error.message });
-    getImplementationClass().writeFailures([...getImplementationClass().pluginFailures.values()]);
+  static quarantinePluginDirectory(pluginDirectory: string, error: Error): void {
+    PluginBootGuard.pluginFailures.set(pluginDirectory, { pluginDirectory, message: error.message });
+    PluginBootGuard.writeFailures([...PluginBootGuard.pluginFailures.values()]);
   }
 
-  public static pluginQuarantineError(pluginDirectory: string): string | undefined {
-    return getImplementationClass().pluginFailures.get(pluginDirectory)?.message;
+  static isQuarantined(pluginDirectory: string): boolean {
+    return PluginBootGuard.pluginFailures.has(pluginDirectory);
   }
 
-  public static clearPluginQuarantine(pluginDirectory: string): void {
-    const failure = getImplementationClass().pluginFailures.get(pluginDirectory);
+  static pluginQuarantineError(pluginDirectory: string): string | undefined {
+    return PluginBootGuard.pluginFailures.get(pluginDirectory)?.message;
+  }
+
+  static clearPluginQuarantine(pluginDirectory: string): void {
+    const failure = PluginBootGuard.pluginFailures.get(pluginDirectory);
     if (!failure) return;
 
-    getImplementationClass().pluginFailures.delete(pluginDirectory);
+    PluginBootGuard.pluginFailures.delete(pluginDirectory);
     try {
-      getImplementationClass().writeFailures([...getImplementationClass().pluginFailures.values()]);
+      PluginBootGuard.writeFailures([...PluginBootGuard.pluginFailures.values()]);
     } catch (error) {
-      getImplementationClass().pluginFailures.set(pluginDirectory, failure);
+      PluginBootGuard.pluginFailures.set(pluginDirectory, failure);
       throw error;
     }
   }
 
-  protected static readFailures(): PluginFailure[] {
-    return getImplementationClass().readJsonFile<PluginFailure[]>(PLUGIN_FAILURES_FILE, []);
+  private static readFailures(): PluginFailure[] {
+    return PluginBootGuard.readJsonFile<PluginFailure[]>(PLUGIN_FAILURES_FILE, []);
   }
 
-  protected static writeFailures(failures: PluginFailure[]): void {
-    getImplementationClass().writeJsonFile(PLUGIN_FAILURES_FILE, failures);
+  private static writeFailures(failures: PluginFailure[]): void {
+    PluginBootGuard.writeJsonFile(PLUGIN_FAILURES_FILE, failures);
   }
 
-  protected static readBootGuard(): string[] {
-    return getImplementationClass().readJsonFile<string[]>(PLUGIN_BOOT_GUARD_FILE, []);
+  private static readBootGuard(): string[] {
+    return PluginBootGuard.readJsonFile<string[]>(PLUGIN_BOOT_GUARD_FILE, []);
   }
 
-  protected static writeBootGuard(pluginDirectories: string[]): void {
-    getImplementationClass().writeJsonFile(PLUGIN_BOOT_GUARD_FILE, pluginDirectories);
+  private static writeBootGuard(pluginDirectories: string[]): void {
+    PluginBootGuard.writeJsonFile(PLUGIN_BOOT_GUARD_FILE, pluginDirectories);
   }
 
-  protected static readJsonFile<T>(name: string, fallback: T): T {
+  private static readJsonFile<T>(name: string, fallback: T): T {
     try {
       const value: unknown = JSON.parse(readFileSync(join(getImplementationClass().PLUGIN_PATH, name), 'utf8'));
       return Array.isArray(fallback) && !Array.isArray(value) ? fallback : (value as T);
@@ -184,7 +183,7 @@ export abstract class PluginBootGuard {
     }
   }
 
-  protected static writeJsonFile(name: string, value: unknown): void {
+  private static writeJsonFile(name: string, value: unknown): void {
     mkdirSync(getImplementationClass().PLUGIN_PATH, { recursive: true });
     const path = join(getImplementationClass().PLUGIN_PATH, name);
     const temporary = `${path}.${randomBytes(8).toString('hex')}.tmp`;
@@ -196,8 +195,4 @@ export abstract class PluginBootGuard {
       throw error;
     }
   }
-
-  public abstract requestRestart(): void;
-
-  protected abstract restartApp(): void;
 }

@@ -11,6 +11,7 @@ import {
 } from '@attraccess/database-entities';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { ResourceOperatingAttributionService } from '../operating-intervals/resource-operating-attribution.service';
+import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 const UsageSchema = new EntitySchema<ResourceUsage>({
   name: 'ResourceUsage',
@@ -89,7 +90,9 @@ describe('Maintenance duration from authoritative intervals', () => {
       {} as never,
       attribution,
     );
-    jest.spyOn(evaluator, 'getBaselineDate').mockResolvedValue(baseline);
+    jest
+      .spyOn(Reflect.get(evaluator, 'evaluation') as MaintenanceResourceEvaluation, 'getBaselineDate')
+      .mockResolvedValue(baseline);
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] }).setSystemTime(now);
   });
 

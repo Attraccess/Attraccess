@@ -516,7 +516,7 @@ export class EmailService {
     return { subject, body };
   }
 
-  protected async sendEmail(
+  async sendEmail(
     user: User,
     templateType: EmailTemplateKey,
     context: Record<string, unknown>,
@@ -541,7 +541,7 @@ export class EmailService {
   }
 
   /** Hands one rendered email to the SMTP transport, with the layout's inline logo attached. */
-  protected async deliverEmail(user: User, subject: string, html: string, text?: string): Promise<void> {
+  async deliverEmail(user: User, subject: string, html: string, text?: string): Promise<void> {
     const { transporter, from } = await this.createTransporter();
     await this.externalCallTimer.time('smtp', 'send', () =>
       transporter.sendMail({
@@ -558,7 +558,7 @@ export class EmailService {
     }
   }
 
-  protected async getBaseContext(user: User) {
+  async getBaseContext(user: User) {
     const url = await this.settingsService.getUrl();
     if (!url) {
       throw new Error('Application URL not configured');

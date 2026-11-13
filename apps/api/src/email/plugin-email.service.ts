@@ -1,7 +1,11 @@
 import { User } from '@attraccess/database-entities';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import * as Handlebars from 'handlebars';
 import { EmailService } from './email.service';
+import { EmailLayoutService } from '../email-layout/email-layout.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { getPluginEmailTemplate, pluginEmailTemplateKey } from '../email-template/plugin-email-templates';
 
 export interface PluginEmailContent {
@@ -18,7 +22,17 @@ const CONTENT_MJML = `<mj-section><mj-column><mj-text>{{{pluginContent}}}</mj-te
  * through the template engine as source: it is injected as a value, so `{{` in plugin text stays literal.
  */
 @Injectable()
-export class PluginEmailService extends EmailService {
+export class PluginEmailService {
+  private readonly logger = new Logger(EmailService.name);
+
+  constructor(
+    private readonly emailService: EmailService,
+    private readonly emailLayoutService: EmailLayoutService,
+    private readonly metricsService: MetricsService,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
   /**
    * Renders the stored template `plugin.<pluginName>.<id>` (the admin's edits included) in the recipient's
    * language and sends it. `variables` sit next to the host's `user`, `host` and `url`, which they cannot replace.
@@ -39,7 +53,7 @@ export class PluginEmailService extends EmailService {
     }
     const user = recipient?.email ? recipient : await this.userRepository.findOne({ where: { id: recipient.id } });
     if (!user?.email) return;
-    await this.sendEmail(user, key, { ...variables, ...(await this.getBaseContext(user)) });
+    await this.emailService.sendEmail(user, key, { ...variables, ...(await this.emailService.getBaseContext(user)) });
   }
 
   public async sendPluginEmail(recipient: User, content: PluginEmailContent): Promise<void> {
@@ -54,8 +68,8 @@ export class PluginEmailService extends EmailService {
           .split(/\n{2,}/)
           .map((paragraph) => `<p>${Handlebars.escapeExpression(paragraph).replace(/\n/g, '<br>')}</p>`)
           .join('');
-      const html = Handlebars.compile(layoutHtml)({ ...(await this.getBaseContext(user)), pluginContent });
-      await this.deliverEmail(user, content.subject, html, content.text);
+      const html = Handlebars.compile(layoutHtml)({ ...(await this.emailService.getBaseContext(user)), pluginContent });
+      await this.emailService.deliverEmail(user, content.subject, html, content.text);
       this.metricsService.emailSentTotal.inc({ status: 'success' });
     } catch (error) {
       this.metricsService.emailSentTotal.inc({ status: 'fail' });
