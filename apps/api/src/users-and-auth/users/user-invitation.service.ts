@@ -80,11 +80,18 @@ export class UserInvitationService {
     adminLocale?: string,
     actorId?: number,
   ): Promise<User[]> {
-    let configPayload: CsvInviteConfigDto | string;
+    let configPayload: unknown;
     try {
       configPayload = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
     } catch {
       throw new BadRequestException('Invalid config payload');
+    }
+    // class-validator throws a TypeError for null/undefined, so reject anything that is not an object first
+    if (configPayload === undefined || configPayload === null) {
+      throw new BadRequestException('config is required');
+    }
+    if (typeof configPayload !== 'object' || Array.isArray(configPayload)) {
+      throw new BadRequestException('config must be a JSON object');
     }
     const config = plainToInstance(CsvInviteConfigDto, configPayload);
     const validationErrors = await validate(config, { whitelist: true, forbidNonWhitelisted: true });

@@ -137,6 +137,14 @@ describe('CSV invitations', () => {
     });
     expect(users.createMany).not.toHaveBeenCalled();
   });
+  it('rejects a missing or non-object config before reading the file', async () => {
+    const { service } = setup();
+    await expect(service.inviteUsersFromCsv(undefined, undefined as never)).rejects.toThrow('config is required');
+    await expect(service.inviteUsersFromCsv(undefined, 'null')).rejects.toThrow('config is required');
+    for (const rawConfig of ['123', '"abc"', '[]', 'true']) {
+      await expect(service.inviteUsersFromCsv(undefined, rawConfig)).rejects.toThrow('config must be a JSON object');
+    }
+  });
   it('collects missing, invalid and duplicate identity errors without accepting those rows', async () => {
     const { service, users } = setup();
     users.validateUsernameOrThrow.mockImplementation((value) => {
