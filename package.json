@@ -35,7 +35,7 @@
     "@matter/nodejs": "0.18.0",
     "@million/lint": "^1.0.14",
     "@monaco-editor/react": "^4.7.0",
-    "@nestjs-modules/mailer": "^2.3.7",
+    "@nestjs-modules/mailer": "^4.0.0",
     "@nestjs/common": "^11.1.28",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.28",
