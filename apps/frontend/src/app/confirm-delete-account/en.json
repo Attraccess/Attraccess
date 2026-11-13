@@ -20,6 +20,8 @@
     "DeleteAccountTokenInvalidException": "The confirmation link is invalid or already used.",
     "DeleteAccountTokenExpiredException": "The confirmation link has expired. Please request a new one.",
     "UserHasActiveUsageSessions": "Your account still has active usage sessions. End them before deleting your account.",
+    "Cannot delete the last administrator": "You are the last administrator, so your account cannot be deleted. Make another user an administrator first.",
+    "TooManyAuthAttempts": "Too many attempts. Please wait {{retryAfterSeconds}} seconds before trying again.",
     "unexpectedError": "Something went wrong. Please try again."
   }
 }

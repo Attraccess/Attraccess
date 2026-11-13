@@ -13,7 +13,11 @@ import { getTranslationKeyForApiError } from '../../utils/apiError';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 
-const NON_RETRYABLE_ERRORS = ['DeleteAccountTokenInvalidException', 'DeleteAccountTokenExpiredException'];
+const NON_RETRYABLE_ERRORS = [
+  'DeleteAccountTokenInvalidException',
+  'DeleteAccountTokenExpiredException',
+  'Cannot delete the last administrator',
+];
 
 export function ConfirmDeleteAccount() {
   const query = useUrlQuery();
@@ -47,8 +51,11 @@ export function ConfirmDeleteAccount() {
         baseTranslationKey: 'apiErrors',
         fallbackKey: 'unexpectedError',
       });
+      // Some API errors translate to `{ title, description }`; the dialog has its own title.
+      const messageKey = tExists(key) ? key : `${key}.description`;
+      const { retryAfterSeconds } = ((apiError as ApiError).body ?? {}) as { retryAfterSeconds?: number };
       setError({
-        message: t(key, { error: errorMessage }),
+        message: t(messageKey, { error: errorMessage, retryAfterSeconds }),
         retryable: !NON_RETRYABLE_ERRORS.some((name) => key.endsWith(`.${name}`)),
       });
     },

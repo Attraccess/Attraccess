@@ -20,6 +20,8 @@
     "DeleteAccountTokenInvalidException": "Der Bestätigungslink ist ungültig oder wurde bereits verwendet.",
     "DeleteAccountTokenExpiredException": "Der Bestätigungslink ist abgelaufen. Bitte fordere einen neuen an.",
     "UserHasActiveUsageSessions": "Dein Konto hat noch aktive Nutzungssitzungen. Beende diese, bevor du dein Konto löschst.",
+    "Cannot delete the last administrator": "Du bist der letzte Administrator, daher kann dein Konto nicht gelöscht werden. Ernenne zuerst einen anderen Benutzer zum Administrator.",
+    "TooManyAuthAttempts": "Zu viele Versuche. Bitte warte {{retryAfterSeconds}} Sekunden, bevor du es erneut versuchst.",
     "unexpectedError": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
   }
 }

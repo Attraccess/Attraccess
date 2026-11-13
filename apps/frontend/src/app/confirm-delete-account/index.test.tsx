@@ -14,7 +14,12 @@ const t = (key: string, vars?: { email?: string }) => (vars?.email ? `${key}:${v
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
-    useTranslations: () => ({ t, tExists: (key: string) => state.existing.includes(key) }),
+    useTranslations: () => ({
+      t,
+      tExists: (key: string, options?: { succeedIfKeyIsObject?: boolean }) =>
+        state.existing.includes(key) ||
+        (!!options?.succeedIfKeyIsObject && state.existing.some((existing) => existing.startsWith(`${key}.`))),
+    }),
     useUrlQuery: () => state.query,
   }))()),
 }));
@@ -105,6 +110,7 @@ it('shows success, invalidates the current user and returns to login', () => {
 });
 
 it('offers an explicit retry after a retryable error and then shows success', () => {
+  state.existing = ['apiErrors.unexpectedError'];
   mount();
   act(() => state.options.onError(new Error('server failed')));
   expect(screen.getByText('apiErrors.unexpectedError')).toBeTruthy();
@@ -114,14 +120,25 @@ it('offers an explicit retry after a retryable error and then shows success', ()
   expect(screen.getByText('success.title')).toBeTruthy();
 });
 
-it('does not offer a retry for invalid or expired tokens', () => {
-  state.existing = ['apiErrors.DeleteAccountTokenExpiredException'];
+it.each(['DeleteAccountTokenExpiredException', 'Cannot delete the last administrator'])(
+  'does not offer a retry for %s',
+  (message) => {
+    state.existing = [`apiErrors.${message}`];
+    mount();
+    act(() => state.options.onError(apiError(message)));
+    expect(screen.getByText(`apiErrors.${message}`)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'error.tryAgain' })).toBeNull();
+    press('error.backToLogin');
+    expect(screen.getByTestId('location')).toHaveTextContent('/');
+  },
+);
+
+it('shows the description of an error that translates to a title and description, and allows a retry', () => {
+  state.existing = ['apiErrors.TooManyAuthAttempts.title', 'apiErrors.TooManyAuthAttempts.description'];
   mount();
-  act(() => state.options.onError(apiError('DeleteAccountTokenExpiredException')));
-  expect(screen.getByText('apiErrors.DeleteAccountTokenExpiredException')).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'error.tryAgain' })).toBeNull();
-  press('error.backToLogin');
-  expect(screen.getByTestId('location')).toHaveTextContent('/');
+  act(() => state.options.onError(Object.assign(new Error('429'), { body: { message: 'TooManyAuthAttempts' } })));
+  expect(screen.getByText('apiErrors.TooManyAuthAttempts.description')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'error.tryAgain' })).toBeTruthy();
 });
 
 it.each(['token=&email=', 'token=abc', ''])('shows the invalid link dialog for "%s" without an API call', (search) => {
