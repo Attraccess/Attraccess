@@ -1,9 +1,17 @@
 import { User } from '@attraccess/database-entities';
+import { RequestMethod } from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { instanceToPlain } from 'class-transformer';
 import { AUTH_RATE_LIMIT_METADATA, AUTH_RATE_LIMIT_OPTIONS_METADATA } from '../rate-limiting/rate-limit.decorator';
 import { UserProfileController } from './user-profile.controller';
 
 describe('UserProfileController', () => {
+  it('accepts account deletion confirmation via POST only', () => {
+    const handler = UserProfileController.prototype.confirmDeleteAccount;
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('me/delete-confirm');
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.POST);
+  });
+
   it('rate limits account deletion confirmation requests', () => {
     expect(Reflect.getMetadata(AUTH_RATE_LIMIT_METADATA, UserProfileController.prototype.confirmDeleteAccount)).toBe(
       'delete_account_confirm',

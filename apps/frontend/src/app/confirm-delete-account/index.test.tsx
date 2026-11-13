@@ -7,13 +7,14 @@ const state = vi.hoisted(() => ({
   mutate: vi.fn(),
   invalidate: vi.fn(),
   pending: false,
+  existing: [] as string[],
   options: {} as { onSuccess: () => void; onError: (error: Error) => void },
 }));
-const t = (key: string) => key;
+const t = (key: string, vars?: { email?: string }) => (vars?.email ? `${key}:${vars.email}` : key);
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
-    useTranslations: () => ({ t, tExists: () => false }),
+    useTranslations: () => ({ t, tExists: (key: string) => state.existing.includes(key) }),
     useUrlQuery: () => state.query,
   }))()),
 }));
@@ -29,6 +30,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.query = new URLSearchParams('token=one-use-token&email=user%40example.com');
   state.pending = false;
+  state.existing = [];
 });
 afterEach(() => {
   cleanup();
@@ -45,62 +47,89 @@ function mount() {
     </MemoryRouter>,
   );
 }
-it('submits confirmation only once across rerenders and clears the current-user cache after success', () => {
+const apiError = (message: string) => Object.assign(new Error(message), { body: { message } });
+const press = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
+
+it('never calls the mutation on mount, rerender or after timers', () => {
+  vi.useFakeTimers();
   const view = mount();
-  expect(state.mutate).toHaveBeenCalledExactlyOnceWith({
-    requestBody: { token: 'one-use-token', email: 'user@example.com' },
-  });
   view.rerender(
     <MemoryRouter>
       <ConfirmDeleteAccount />
-      <Location />
     </MemoryRouter>,
   );
-  expect(state.mutate).toHaveBeenCalledOnce();
+  act(() => {
+    vi.advanceTimersByTime(10000);
+  });
+  expect(state.mutate).not.toHaveBeenCalled();
+  expect(screen.getByText('confirm.title')).toBeTruthy();
+  expect(screen.getByText('confirm.description:user@example.com')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'confirm.action' })).toBeTruthy();
+});
+
+it('cancels to the start page without an API call, also with Escape', () => {
+  mount();
+  press('confirm.cancel');
+  expect(screen.getByTestId('location')).toHaveTextContent('/');
+  expect(state.mutate).not.toHaveBeenCalled();
+  cleanup();
+  mount();
+  fireEvent.keyDown(screen.getByRole('alertdialog'), { key: 'Escape' });
+  expect(screen.getByTestId('location')).toHaveTextContent('/');
+  expect(state.mutate).not.toHaveBeenCalled();
+});
+
+it('sends one request with the link parameters on confirm', () => {
+  mount();
+  press('confirm.action');
+  expect(state.mutate).toHaveBeenCalledExactlyOnceWith({
+    requestBody: { token: 'one-use-token', email: 'user@example.com' },
+  });
+});
+
+it('does not send a second request while pending and disables Cancel', () => {
+  state.pending = true;
+  mount();
+  expect(screen.getByRole('button', { name: 'confirm.cancel' })).toBeDisabled();
+  press('confirm.action');
+  expect(state.mutate).not.toHaveBeenCalled();
+});
+
+it('shows success, invalidates the current user and returns to login', () => {
+  mount();
   act(() => state.options.onSuccess());
   expect(screen.getByText('success.title')).toBeTruthy();
   expect(state.invalidate).toHaveBeenCalledWith({ queryKey: ['current-user'] });
-  fireEvent.click(screen.getByRole('button', { name: 'success.backToLogin' }));
+  press('success.backToLogin');
   expect(screen.getByTestId('location')).toHaveTextContent('/');
 });
-it('allows an explicit retry after an API failure and then shows success', () => {
+
+it('offers an explicit retry after a retryable error and then shows success', () => {
   mount();
   act(() => state.options.onError(new Error('server failed')));
   expect(screen.getByText('apiErrors.unexpectedError')).toBeTruthy();
-  fireEvent.click(screen.getByRole('button', { name: 'error.tryAgain' }));
-  expect(state.mutate).toHaveBeenCalledTimes(2);
+  press('error.tryAgain');
+  expect(state.mutate).toHaveBeenCalledOnce();
   act(() => state.options.onSuccess());
-  expect(screen.queryByText('error.title')).toBeNull();
   expect(screen.getByText('success.title')).toBeTruthy();
 });
-it('rejects empty confirmation parameters without an API call', () => {
-  state.query = new URLSearchParams('token=&email=');
+
+it('does not offer a retry for invalid or expired tokens', () => {
+  state.existing = ['apiErrors.DeleteAccountTokenExpiredException'];
+  mount();
+  act(() => state.options.onError(apiError('DeleteAccountTokenExpiredException')));
+  expect(screen.getByText('apiErrors.DeleteAccountTokenExpiredException')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'error.tryAgain' })).toBeNull();
+  press('error.backToLogin');
+  expect(screen.getByTestId('location')).toHaveTextContent('/');
+});
+
+it.each(['token=&email=', 'token=abc', ''])('shows the invalid link dialog for "%s" without an API call', (search) => {
+  state.query = new URLSearchParams(search);
   mount();
   expect(screen.getByText('apiErrors.invalidLink')).toBeTruthy();
   expect(state.mutate).not.toHaveBeenCalled();
   expect(screen.queryByRole('button', { name: 'error.tryAgain' })).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'error.backToLogin' }));
+  press('error.backToLogin');
   expect(screen.getByTestId('location')).toHaveTextContent('/');
-});
-it('reports a missing mutation result after the fallback timeout', () => {
-  vi.useFakeTimers();
-  mount();
-  act(() => {
-    vi.advanceTimersByTime(3000);
-  });
-  expect(screen.getByText('apiErrors.unexpectedError')).toBeTruthy();
-});
-it('does not time out a pending request or send a request with missing parameters', () => {
-  vi.useFakeTimers();
-  state.pending = true;
-  const view = mount();
-  act(() => {
-    vi.advanceTimersByTime(5000);
-  });
-  expect(screen.queryByText('apiErrors.unexpectedError')).toBeNull();
-  view.unmount();
-  state.query = new URLSearchParams();
-  state.mutate.mockClear();
-  mount();
-  expect(state.mutate).not.toHaveBeenCalled();
 });

@@ -1,4 +1,10 @@
 {
+  "confirm": {
+    "title": "Delete your account?",
+    "description": "This permanently deletes the account {{email}}. Your personal data will be anonymized, you will be signed out and you can no longer sign in. This cannot be undone.",
+    "action": "Delete account",
+    "cancel": "Cancel"
+  },
   "success": {
     "title": "Account deleted",
     "message": "Your account has been deleted and can no longer be used to sign in.",
@@ -6,7 +12,6 @@
   },
   "error": {
     "title": "Unable to delete account",
-    "errorTitle": "Delete account failed",
     "tryAgain": "Try again",
     "backToLogin": "Back to login"
   },
