@@ -7,7 +7,7 @@ WORKDIR /workspace
 COPY . .
 RUN corepack enable && pnpm install --frozen-lockfile && pnpm nx run plugin-wago:build-cc100-runtime
 
-FROM node:22.23.4-bookworm-slim
+FROM node:26.13.0-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y --no-install-recommends python3 \
