@@ -55,12 +55,14 @@ test('a two-file runtime cycle fails and is printed as a file chain', (t) => {
   fails(check(), 'apps/web/src/a.ts', 'apps/web/src/b.tsx', 'apps/web/src/a.ts');
 });
 
-test('side-effect imports, re-exports and import-equals count as runtime edges', (t) => {
+test('side-effect imports, re-exports, import-equals and top-level require count as runtime edges', (t) => {
   for (const back of [
     "import './a';\n",
     "export { a } from './a';\n",
     "export * from './a';\n",
     "import a = require('./a');\n",
+    "const { a } = require('./a');\n",
+    "require('./a');\n",
   ]) {
     const { check } = repository(t, {
       'apps/web/src/a.ts': "import { b } from './b';\nexport const a = b;\n",
@@ -79,6 +81,7 @@ test('type-only imports and exports never form a cycle', (t) => {
     "export { type A } from './a';\n",
     "import type * as a from './a';\nexport type B = a.A;\n",
     "const lazy = () => import('./a');\nexport { lazy };\n",
+    "export const lazy = () => require('./a').a;\n",
   ]) {
     const { check } = repository(t, {
       'apps/web/src/a.ts':
@@ -95,6 +98,19 @@ test('a default import beside an inline type specifier is still a runtime edge',
     'apps/web/src/b.ts': "import a, { type A } from './a';\nexport const b: A = String(a);\n",
   });
   fails(check(), 'apps/web/src/a.ts', 'apps/web/src/b.ts', 'apps/web/src/a.ts');
+});
+
+test('a named runtime specifier beside an inline type specifier is still a runtime edge', (t) => {
+  for (const back of [
+    "import { type A, a } from './a';\nexport const b = a;\n",
+    "export { type A, a } from './a';\n",
+  ]) {
+    const { check } = repository(t, {
+      'apps/web/src/a.ts': "import { b } from './b';\nexport type A = string;\nexport const a = b;\n",
+      'apps/web/src/b.ts': `${back}export const c = 1;\n`,
+    });
+    fails(check(), 'apps/web/src/a.ts', 'apps/web/src/b.ts', 'apps/web/src/a.ts');
+  }
 });
 
 test('cycles through @attraccess path aliases are detected', (t) => {
@@ -115,13 +131,15 @@ test('cycles through @attraccess path aliases are detected', (t) => {
 test('entity-only cycles are exempt, but a cycle through any other file is reported', (t) => {
   const entities = 'libs/database-entities/src/lib/entities';
   const { write, check } = repository(t, {
-    [`${entities}/user.entity.ts`]: "import { Project } from './project';\nexport class User { p = () => Project; }\n",
-    [`${entities}/project.ts`]: "import { User } from './user.entity';\nexport class Project { u = () => User; }\n",
+    [`${entities}/user.entity.ts`]:
+      "import { Project } from './project';\n@Entity()\nexport class User { p = () => Project; }\n",
+    [`${entities}/project.ts`]:
+      "import { User } from './user.entity';\n@Entity()\nexport class Project { u = () => User; }\n",
   });
   succeeds(check());
   write(
     `${entities}/project.ts`,
-    "import { User } from './user.entity';\nimport '../helper';\nexport class Project {}\n",
+    "import { User } from './user.entity';\nimport '../helper';\n@Entity()\nexport class Project {}\n",
   );
   write('libs/database-entities/src/lib/helper.ts', "import './entities/user.entity';\n");
   const result = check();
@@ -134,10 +152,40 @@ test('entity-only cycles are exempt, but a cycle through any other file is repor
   );
 });
 
+test('a helper in the entities directory is not exempt just because of its location', (t) => {
+  const entities = 'libs/database-entities/src/lib/entities';
+  const { check } = repository(t, {
+    [`${entities}/node.entity.ts`]:
+      "import { schema } from './schemas';\n@Entity()\nexport class Node { s = schema; }\n",
+    [`${entities}/schemas.ts`]: "import { Node } from './node.entity';\nexport const schema = () => Node;\n",
+  });
+  fails(check(), `${entities}/node.entity.ts`, `${entities}/schemas.ts`, `${entities}/node.entity.ts`);
+});
+
+test('a spec in the entities directory is never exempt', (t) => {
+  const entities = 'libs/database-entities/src/lib/entities';
+  const { check } = repository(t, {
+    [`${entities}/user.entity.ts`]: "import './user.entity.spec';\n@Entity()\nexport class User {}\n",
+    [`${entities}/user.entity.spec.ts`]:
+      "import { User } from './user.entity';\n// @Entity()\nexport const u = User;\n",
+  });
+  fails(check(), `${entities}/user.entity.spec.ts`, `${entities}/user.entity.ts`, `${entities}/user.entity.spec.ts`);
+});
+
 test('generated code, declaration files and files outside apps and libs are ignored', (t) => {
   const { check } = repository(t, {
     'libs/react-query-client/src/lib/a.ts': "import './b';\n",
     'libs/react-query-client/src/lib/b.ts': "import './a';\n",
+    'libs/companion-ws-client/src/lib/a.ts': "import './b';\n",
+    'libs/companion-ws-client/src/lib/b.ts': "import './a';\n",
+    'apps/web/dist/a.ts': "import './b';\n",
+    'apps/web/dist/b.ts': "import './a';\n",
+    'apps/web/build/a.ts': "import './b';\n",
+    'apps/web/build/b.ts': "import './a';\n",
+    'apps/fw/managed_components/a.ts': "import './b';\n",
+    'apps/fw/managed_components/b.ts': "import './a';\n",
+    'apps/web/.nx/a.ts': "import './b';\n",
+    'apps/web/.nx/b.ts': "import './a';\n",
     'apps/web/src/generated/a.ts': "import './b';\n",
     'apps/web/src/generated/b.ts': "import './a';\n",
     'apps/web/src/types.d.ts': "import './other';\n",
