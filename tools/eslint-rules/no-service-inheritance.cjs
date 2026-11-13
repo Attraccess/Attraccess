@@ -7,20 +7,32 @@ const DI_DECORATORS = new Set(['Injectable', 'Controller']);
  * Framework base classes a provider may extend. Call expressions such as `PassportStrategy(...)` and
  * `AuthGuard(...)` are always allowed: they are framework mixins, not service layers.
  * - SAML: @node-saml's protocol client, which the SAML logout adapter specialises.
+ * - EventEmitter: Node's event base for connection objects that emit events.
+ * - Duplex: Node's stream base for adapting a WebSocket to a byte stream.
+ * - ConsoleLogger: Nest's logger base, specialised for log formatting and routing.
+ * - BaseExceptionFilter: Nest's exception filter base, extended by `@Catch()` filters.
+ * - Set: the built-in collection, specialised by serialisable permission sets.
  */
-const ALLOWED_BASES = new Set(['SAML']);
+const ALLOWED_BASES = new Set(['SAML', 'EventEmitter', 'Duplex', 'ConsoleLogger', 'BaseExceptionFilter', 'Set']);
+
+/** `Error` and every `*Error` / `*Exception` base: error hierarchies are data, not service layers. */
+const ERROR_BASE = /^(Error|.*(Error|Exception))$/;
+
+/** DTO files and folders (`dto/`, `dtos/`, `*.dto.ts`): undecorated data classes there may extend. */
+const DTO_FILE = /(^|\/)dtos?\/|\.dto\.ts$/;
 
 /**
- * ATT-1213: services and controllers compose their collaborators. Reports every abstract class and every
- * @Injectable()/@Controller() class that extends another class, unless `// inheritance: <reason>` sits directly
- * above it.
+ * ATT-1213 / ATT-1235: services, controllers and plain classes compose their collaborators. Reports every abstract
+ * class and every class that extends another class, unless `// inheritance: <reason>` sits directly above it.
+ * Always allowed: mixin calls such as `PassportStrategy(...)`, error bases, `ALLOWED_BASES`, and undecorated classes
+ * in DTO files.
  */
 module.exports = {
   meta: {
     type: 'problem',
     docs: {
       description:
-        'Disallow abstract classes and inheritance in Nest providers and controllers; compose collaborators instead',
+        'Disallow abstract classes and class inheritance (except errors, mixins, DTOs and framework bases); compose collaborators instead',
     },
     schema: [],
     messages: {
@@ -28,6 +40,8 @@ module.exports = {
         'Compose an injectable collaborator instead of an abstract base class. If this class is a genuine DI token or framework contract, put `// inheritance: <reason>` directly above it.',
       providerInheritance:
         '@{{decorator}}() classes must not extend {{base}}; inject the collaborator instead. Framework bases need `// inheritance: <reason>` directly above the class.',
+      classInheritance:
+        'Classes must not extend {{base}}; compose the collaborator instead. Errors, DTOs and framework bases are allowed; other genuine cases need `// inheritance: <reason>` directly above the class.',
     },
   },
   create(context) {
@@ -66,6 +80,9 @@ module.exports = {
       return undefined;
     };
 
+    const isErrorBase = (superClass) => superClass.type === 'Identifier' && ERROR_BASE.test(superClass.name);
+    const isDtoFile = () => DTO_FILE.test(context.filename.replace(/\\/g, '/'));
+
     const check = (node) => {
       if (node.abstract) {
         if (!justified(node)) context.report({ node: node.id ?? node, messageId: 'abstractClass' });
@@ -73,13 +90,14 @@ module.exports = {
       }
       if (!node.superClass) return;
       const decorator = (node.decorators ?? []).map(decoratorName).find((name) => DI_DECORATORS.has(name));
-      if (!decorator) return;
       if (node.superClass.type === 'CallExpression') return;
+      if (isErrorBase(node.superClass)) return;
       if (node.superClass.type === 'Identifier' && ALLOWED_BASES.has(node.superClass.name)) return;
+      if (!decorator && isDtoFile()) return;
       if (justified(node)) return;
       context.report({
         node: node.superClass,
-        messageId: 'providerInheritance',
+        messageId: decorator ? 'providerInheritance' : 'classInheritance',
         data: { decorator, base: source.getText(node.superClass) },
       });
     };

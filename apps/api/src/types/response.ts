@@ -22,7 +22,8 @@ export class PaginatedResponse<T> {
 
 /** Base for paginated responses whose endpoint computes `nextPage` (see computeNextPage).
  * Kept separate from PaginatedResponse so endpoints that never populate the field
- * don't advertise it in their schema. */
+ * don't advertise it in their schema.
+ * inheritance: response DTO base shared by paginated endpoints. */
 export class PaginatedResponseWithNextPage<T> extends PaginatedResponse<T> {
   @ApiProperty({ required: false })
   nextPage?: number;
