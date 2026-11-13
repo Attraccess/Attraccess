@@ -1,12 +1,13 @@
 import axios from 'axios';
 import { MAX_CONFIGURED_REGISTRIES, NpmPluginService } from './npm-plugin.service';
-import type { ServiceInternals, SettingsMock } from './npm-plugin.test-fixture';
+import type { SettingsMock } from './npm-plugin.test-fixture';
 import { setupNpmPluginFixture } from './npm-plugin.test-fixture';
+import { npmInternals } from './npm/fixtures/compose.test-fixture';
 jest.mock('dns/promises', () => ({ lookup: jest.fn() }));
 describe('NpmPluginService', () => {
   const fixture = setupNpmPluginFixture();
   it('pins tarball DNS on every same-origin redirect and returns archive bytes', async () => {
-    const service = new NpmPluginService({} as never) as unknown as {
+    const service = npmInternals(new NpmPluginService({} as never)).registry as unknown as {
       download: (url: string, registry: { url: string; token: string | null }) => Promise<Buffer>;
     };
     fixture.lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
@@ -37,7 +38,7 @@ describe('NpmPluginService', () => {
   });
 
   it('rejects tarball redirects without destinations, across origins, or beyond the limit', async () => {
-    const service = new NpmPluginService({} as never) as unknown as {
+    const service = npmInternals(new NpmPluginService({} as never)).registry as unknown as {
       download: (url: string, registry: { url: string; token: string | null }) => Promise<Buffer>;
     };
     const registry = { url: 'https://registry.npmjs.org', token: null };
@@ -78,8 +79,7 @@ describe('NpmPluginService', () => {
     const service = new NpmPluginService({
       getPlainSetting: jest.fn().mockResolvedValue(null),
     } as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
     fixture.lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
@@ -93,7 +93,7 @@ describe('NpmPluginService', () => {
         ],
       },
     });
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
@@ -120,15 +120,14 @@ describe('NpmPluginService', () => {
 
   it('hydrates abbreviated search results before validating marketplace packages', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
     fixture.lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [{ package: { name: '@example/plugin', version: '1.2.3' } }],
       },
     });
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
@@ -151,14 +150,13 @@ describe('NpmPluginService', () => {
       results: [expect.objectContaining({ name: '@example/plugin', installable: true, provenance: null })],
       errors: [],
     });
-    expect(service.packageMetadata).toHaveBeenCalledWith('@example/plugin', 'npm');
+    expect(npmInternals(service).catalog.packageMetadata).toHaveBeenCalledWith('@example/plugin', 'npm');
   });
 
   it('returns an attestation URL when the registry provides package provenance', async () => {
     const service = new NpmPluginService({} as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
@@ -185,8 +183,7 @@ describe('NpmPluginService', () => {
 
   it('discovers plugins through registry keyword search without a hardcoded package list', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
     fixture.lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
@@ -197,26 +194,28 @@ describe('NpmPluginService', () => {
         ],
       },
     });
-    const packageMetadata = jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => ({
-      name,
-      publisher: { username: 'attraccess' },
-      'dist-tags': { latest: '1.2.3' },
-      versions: {
-        '1.2.3': {
-          name,
-          version: '1.2.3',
-          keywords: ['attraccess-plugin'],
-          peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
-          attraccess: {
-            displayName: name,
-            host: '*',
-            backend: 'dist/index.js',
-            sdk: { backend: '*' },
-            permissions: [],
+    const packageMetadata = jest
+      .spyOn(npmInternals(service).catalog, 'packageMetadata')
+      .mockImplementation(async (name) => ({
+        name,
+        publisher: { username: 'attraccess' },
+        'dist-tags': { latest: '1.2.3' },
+        versions: {
+          '1.2.3': {
+            name,
+            version: '1.2.3',
+            keywords: ['attraccess-plugin'],
+            peerDependencies: { '@attraccess/plugins-backend-sdk': '*' },
+            attraccess: {
+              displayName: name,
+              host: '*',
+              backend: 'dist/index.js',
+              sdk: { backend: '*' },
+              permissions: [],
+            },
           },
         },
-      },
-    }));
+      }));
 
     const result = await service.searchMarketplace('example');
 
@@ -229,15 +228,14 @@ describe('NpmPluginService', () => {
 
   it('retains hydrated marketplace packages when another result no longer has metadata', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
     fixture.lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     jest.spyOn(axios, 'get').mockResolvedValue({
       data: {
         objects: [{ package: { name: '@example/stale' } }, { package: { name: '@example/plugin' } }],
       },
     });
-    jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => {
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockImplementation(async (name) => {
       if (name === '@example/stale') throw new Error('Package no longer exists');
       return {
         'dist-tags': { latest: '1.2.3' },
@@ -267,9 +265,8 @@ describe('NpmPluginService', () => {
 
   it('does not trust a package-declared official flag or publisher outside the official scope', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       publisher: { username: 'attraccess' },
       'dist-tags': { latest: '1.2.3' },
       versions: {
@@ -298,7 +295,7 @@ describe('NpmPluginService', () => {
 
   it('rejects marketplace metadata that claims an allowlisted package identity for a different request', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       name: '@example/community-plugin',
       'dist-tags': { latest: '1.2.3' },
       versions: {
@@ -325,9 +322,8 @@ describe('NpmPluginService', () => {
       setSecretSetting: jest.fn(),
     };
     const service = new NpmPluginService(settings as unknown as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
@@ -351,7 +347,7 @@ describe('NpmPluginService', () => {
       registry: { id: 'private', name: 'Private' },
       installable: true,
     });
-    expect(service.packageMetadata).toHaveBeenCalledWith('@private/plugin', 'private');
+    expect(npmInternals(service).catalog.packageMetadata).toHaveBeenCalledWith('@private/plugin', 'private');
   });
 
   it('searches a configured registry when it supports npm search', async () => {
@@ -364,13 +360,12 @@ describe('NpmPluginService', () => {
       setSecretSetting: jest.fn(),
     };
     const service = new NpmPluginService(settings as unknown as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
     fixture.lookupAll.mockResolvedValue([{ address: '1.1.1.1', family: 4 }]);
     const axiosGet = jest.spyOn(axios, 'get').mockResolvedValue({
       data: { objects: [{ package: { name: '@private/plugin' } }] },
     });
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       'dist-tags': { latest: '1.2.3' },
       versions: {
         '1.2.3': {
@@ -401,7 +396,7 @@ describe('NpmPluginService', () => {
       expect.stringContaining('https://registry.example.com/-/v1/search?text='),
       expect.anything(),
     );
-    expect(service.packageMetadata).toHaveBeenCalledWith('@private/plugin', 'private');
+    expect(npmInternals(service).catalog.packageMetadata).toHaveBeenCalledWith('@private/plugin', 'private');
   });
 
   it('rejects metadata requests to private registry addresses', async () => {

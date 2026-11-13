@@ -12,7 +12,11 @@ import {
   Project,
 } from '@attraccess/database-entities';
 
-import { ConflictException, Logger } from '@nestjs/common';
+import { ConflictException, forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+
+import { EventEmitter2 } from '@nestjs/event-emitter';
+
+import { InjectRepository } from '@nestjs/typeorm';
 
 import { EntityManager, In, IsNull, Repository } from 'typeorm';
 
@@ -28,55 +32,24 @@ import { ExternalEffectFailureError } from '../../flows/errors/external-effect-f
 
 import { FlowExecutionError } from '../../flows/errors/flow-execution.error';
 
-import { SystemEvent } from '@attraccess/plugins-backend-sdk';
-
-import { EventEmitter2 } from '@nestjs/event-emitter';
-
-import { Redis } from 'ioredis';
-
-import { AuditService } from '../../../audit/audit.service';
-
 import { BillingService } from '../../../billing/charges/billing.service';
-
-import { MetricsService } from '../../../metrics/metrics.service';
-
-import { PluginEventsService } from '../../../plugin-system/plugin-events.service';
-
-import { ProjectsService } from '../../../projects/projects.service';
-
-import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 
 import { FlowExecutionOptions } from '../../flows/execution/flow-execution.types';
 import { ResourceFlowsExecutorService } from '../../flows/execution/resource-flows-executor.service';
 
-import { ResourceFormsService } from '../../forms/forms.service';
-
-import { ResourceGroupsIntroductionsService } from '../../groups/introductions/resourceGroups.introductions.service';
-
-import { ResourceGroupsService } from '../../groups/resourceGroups.service';
-
-import { ResourceHealthService } from '../../health/resource-health.service';
-
-import { ResourceIntroducersService } from '../../introducers/resourceIntroducers.service';
-
-import { ResourceIntroductionsService } from '../../introductions/resouceIntroductions.service';
-
-import { ResourceMaintenanceService } from '../../maintenances/maintenance.service';
-
-import { ResourceMeteringService } from '../../metering/resource-metering.service';
+import { FinalCollection, ResourceMeteringService } from '../../metering/resource-metering.service';
 
 import { ResourceOperatingAttributionService } from '../../operating-intervals/resource-operating-attribution.service';
 
-import { ResourceRetrainingService } from '../../retraining/resourceRetraining.service';
-
-import { EndUsageSessionDto } from '../dtos/endUsageSession.dto';
-
-import { StartUsageSessionDto } from '../dtos/startUsageSession.dto';
-
-import { ResourceUsageService } from '../sessions/resource-usage.service';
-import { LOCK_TTL_MS, type SessionChangeCoordination } from '../sessions/session-change-coordination';
+import { LOCK_TTL_MS, SWEEP_EVERY_MS } from '../sessions/session-change-coordination';
+import { SessionChangeTurns } from '../sessions/session-change-turns';
 import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
 import { ResourceAuditOrigin } from '../../../audit/audit-policy';
+import { usageFlowPayload } from './usage-flow-payload';
+
+/** Log context shared by the usage collaborators, so their log lines read as before the split. */
+export const RESOURCE_USAGE_LOG_CONTEXT = 'ResourceUsageService';
+
 export interface EndSessionOptions {
   /** Skip persisting required END-action form submissions (used by automated/flow paths). */
   skipFormSubmissions?: boolean;
@@ -135,8 +108,58 @@ export type UsageFlowPayload = {
   attributedOperatingDurationInMinutes: number | null;
 };
 
-export abstract class UsageLifecycle {
-  protected async applyLifecycleDrafts(manager: EntityManager, attempt: ResourceUsageLifecycleAttempt): Promise<void> {
+/** Lifecycle attempts of starts, stops and takeovers: their drafts, flows, metering, recovery and abort. */
+@Injectable()
+export class UsageLifecycle {
+  private readonly logger = new Logger(RESOURCE_USAGE_LOG_CONTEXT);
+
+  private lifecycleSweepInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor(
+    @InjectRepository(ResourceUsage)
+    private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly billingService: BillingService,
+    private readonly turns: SessionChangeTurns,
+    @Optional() private readonly operatingAttributionService: ResourceOperatingAttributionService | undefined,
+    @Inject(forwardRef(() => ResourceFlowsExecutorService))
+    private readonly flowExecutorService: ResourceFlowsExecutorService,
+    @Optional()
+    @Inject(forwardRef(() => ResourceMeteringService))
+    private readonly metering?: ResourceMeteringService,
+  ) {}
+
+  /** The manager every serialized usage transaction runs on. */
+  get manager(): EntityManager {
+    return this.resourceUsageRepository.manager;
+  }
+
+  /** Whether sessions are metered at all, so their meter rates are worth recording. */
+  get metered(): boolean {
+    return Boolean(this.metering);
+  }
+
+  /** The final meter total of a session, `not-metered` without metering. */
+  async collectFinal(usageId: number, at: Date): Promise<FinalCollection> {
+    return (await this.metering?.collectFinal(usageId, at)) ?? { status: 'not-metered' };
+  }
+
+  async initializeMeter(options: Parameters<ResourceMeteringService['initialize']>[0]): Promise<void> {
+    await this.metering?.initialize(options);
+  }
+
+  /** Attributes operating time, settles the meter and charges an ended session; returns the charge transaction id. */
+  async settleEndedSession(
+    manager: EntityManager,
+    endedSession: ResourceUsage,
+    final: FinalCollection,
+  ): Promise<number | undefined> {
+    await this.persistAttributedOperatingDuration(endedSession, manager);
+    await this.metering?.settleInTransaction(manager, endedSession.id, final);
+    return (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
+  }
+
+  async applyLifecycleDrafts(manager: EntityManager, attempt: ResourceUsageLifecycleAttempt): Promise<void> {
     for (const submission of attempt.formSubmissions) {
       await manager.save(FormSubmission, {
         formId: submission.formId,
@@ -164,7 +187,7 @@ export abstract class UsageLifecycle {
     }
   }
 
-  protected async abortLifecycleAttempt(attemptId: string, resourceId: number): Promise<void> {
+  async abortLifecycleAttempt(attemptId: string, resourceId: number): Promise<void> {
     const aborted = await runSerializedTransaction(this.resourceUsageRepository.manager, async (manager) => {
       const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id: attemptId, resourceId } });
       if (!attempt) return false;
@@ -237,7 +260,7 @@ export abstract class UsageLifecycle {
       undefined,
       resourceId,
       ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
-      { ...this.getResourceUsageFlowPayload(candidate), endTime: new Date(), endNotes, activeSessions },
+      { ...usageFlowPayload(candidate), endTime: new Date(), endNotes, activeSessions },
       'tentative end',
       { lifecycleAttemptId: attemptId, lifecycleCandidateCancellation: true, actorUserId },
     );
@@ -257,7 +280,7 @@ export abstract class UsageLifecycle {
     const attempts = await this.resourceUsageRepository.manager.find(ResourceUsageLifecycleAttempt, {
       select: { id: true, createdAt: true },
     });
-    const gone = await this.sessionChangeCoordination.findGone(
+    const gone = await this.turns.coordination.findGone(
       attempts.filter(({ createdAt }) => !sweep || createdAt <= oldEnough).map(({ id }) => id),
       !sweep,
     );
@@ -286,7 +309,30 @@ export abstract class UsageLifecycle {
     }
   }
 
-  protected async runUsageFlow(
+  /** Other instances share the machines through Valkey, so a crashed one can leave an attempt no restart cleans up. */
+  startSweep(): void {
+    if (!this.turns.distributed) return;
+    let sweeping = false;
+    this.lifecycleSweepInterval = setInterval(() => {
+      if (sweeping) return;
+      sweeping = true;
+      this.recoverInterruptedLifecycles(true)
+        .catch((error: unknown) =>
+          this.logger.warn(`Sweeping interrupted usage lifecycles failed: ${(error as Error).message}`),
+        )
+        .finally(() => (sweeping = false));
+    }, SWEEP_EVERY_MS);
+    this.lifecycleSweepInterval.unref?.();
+  }
+
+  stopSweep(): void {
+    if (this.lifecycleSweepInterval) {
+      clearInterval(this.lifecycleSweepInterval);
+      this.lifecycleSweepInterval = null;
+    }
+  }
+
+  async runUsageFlow(
     manager: EntityManager | undefined,
     resourceId: number,
     triggerNodeType: ResourceFlowNodeType,
@@ -305,7 +351,7 @@ export abstract class UsageLifecycle {
     }
   }
 
-  protected async persistAttributedOperatingDuration(usage: ResourceUsage, manager: EntityManager): Promise<void> {
+  private async persistAttributedOperatingDuration(usage: ResourceUsage, manager: EntityManager): Promise<void> {
     const attributedOperatingDurationInMinutes = this.operatingAttributionService
       ? await this.operatingAttributionService.getForUsage(usage, manager)
       : 0;
@@ -314,7 +360,7 @@ export abstract class UsageLifecycle {
   }
 
   /** Effective number of parallel sessions. Doors and unknown resources behave like a limit of 1. */
-  protected async getSessionLimit(manager: EntityManager, resourceId: number): Promise<number> {
+  async getSessionLimit(manager: EntityManager, resourceId: number): Promise<number> {
     const resource = await manager.findOne(Resource, {
       where: { id: resourceId },
       select: { id: true, type: true, maxParallelSessions: true },
@@ -327,11 +373,7 @@ export abstract class UsageLifecycle {
    * sessions only a takeover reservation (exclusive) blocks; capacity and one-session-per-person are
    * enforced by the caller, and the same session cannot be ended twice (unique attempt index).
    */
-  protected async assertLifecycleAvailable(
-    manager: EntityManager,
-    resourceId: number,
-    sharedMachine = false,
-  ): Promise<void> {
+  async assertLifecycleAvailable(manager: EntityManager, resourceId: number, sharedMachine = false): Promise<void> {
     if (sharedMachine) {
       if (await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId, kind: 'takeover' } })) {
         throw new ConflictException('A usage lifecycle operation is already in progress for this resource');
@@ -346,7 +388,7 @@ export abstract class UsageLifecycle {
     }
   }
 
-  protected async getLifecycleAttempt(
+  async getLifecycleAttempt(
     manager: EntityManager,
     id: string,
     resourceId: number,
@@ -374,198 +416,4 @@ export abstract class UsageLifecycle {
       });
     });
   }
-
-  protected abstract readonly flowExecutorService: ResourceFlowsExecutorService;
-
-  protected abstract readonly logger: Logger;
-
-  protected abstract readonly sessionChangeCoordination: SessionChangeCoordination;
-
-  protected abstract readonly operatingAttributionService: ResourceOperatingAttributionService | undefined;
-
-  protected abstract readonly resourceUsageRepository: Repository<ResourceUsage>;
-
-  protected abstract readonly metering?: ResourceMeteringService;
-
-  protected abstract readonly eventEmitter: EventEmitter2;
-
-  protected abstract getResourceUsageFlowPayload(
-    resourceUsage: ResourceUsage,
-    formSubmissions?: FormSubmission[],
-  ): UsageFlowPayload;
-
-  protected abstract cacheCleanupInterval: ReturnType<typeof setInterval> | null;
-  protected abstract lifecycleSweepInterval: ReturnType<typeof setInterval> | null;
-
-  protected abstract pruneAccessCache(): void;
-
-  protected abstract readonly valkeyClient: Redis | null;
-
-  protected abstract authorizationCacheSubscriber: Redis | null;
-
-  protected abstract readonly accessCache: Map<
-    string,
-    { userId: number; resourceId: number; result: boolean; expiresAt: number }
-  >;
-
-  protected abstract readonly accessCacheKeysByUser: Map<number, Set<string>>;
-
-  protected abstract deleteAccessCacheEntry(key: string): void;
-
-  protected abstract readonly metricsService: MetricsService;
-
-  protected abstract accessCacheGeneration: number;
-
-  protected abstract canControllResourceUncached(
-    resourceId: number,
-    user: User,
-    canUpdateResource: boolean,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<boolean>;
-
-  protected abstract readonly ACCESS_CACHE_TTL_MS: 30000;
-
-  protected abstract readonly resourceRetrainingService: ResourceRetrainingService;
-
-  protected abstract readonly ACCESS_CACHE_MAX_SIZE: 5000;
-
-  protected abstract setAccessCacheEntry(
-    key: string,
-    entry: { userId: number; resourceId: number; result: boolean; expiresAt: number },
-  ): void;
-
-  protected abstract invalidateAccessCache(
-    predicate?: (entry: { userId: number; resourceId: number }) => boolean,
-  ): void;
-
-  protected abstract invalidateUserAccessCache(userId: number): void;
-
-  protected abstract readonly pluginEvents: PluginEventsService;
-
-  protected abstract readonly accessCacheInFlight: Map<string, { generation: number; result: Promise<boolean> }>;
-
-  protected abstract readonly rbacService: RbacService;
-
-  protected abstract resolveAuthorizationCacheMiss(
-    key: string,
-    resourceId: number,
-    user: User,
-    canUpdateResource: boolean,
-    transactionalEntityManager: EntityManager | undefined,
-    generation: number,
-  ): Promise<boolean>;
-
-  protected abstract readonly resourceIntroductionService: ResourceIntroductionsService;
-
-  protected abstract readonly resourceIntroducersService: ResourceIntroducersService;
-
-  protected abstract readonly resourceGroupsService: ResourceGroupsService;
-
-  protected abstract readonly resourceGroupsIntroductionsService: ResourceGroupsIntroductionsService;
-
-  public abstract assertSupportsSupervision(
-    resourceId: number,
-    transactionalEntityManager?: EntityManager,
-    preloadedResource?: Resource,
-  ): Promise<Resource>;
-
-  protected abstract readonly userRepository: Repository<User>;
-
-  protected abstract readonly resourceRepository: Repository<Resource>;
-
-  protected abstract readonly resourceMaintenanceService: ResourceMaintenanceService;
-
-  protected abstract readonly resourceHealthService: ResourceHealthService;
-
-  public abstract canControllResource(
-    resourceId: number,
-    user: User,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<boolean>;
-
-  protected abstract getResource(
-    resourceId: number,
-    user: User,
-    opts: { checkMaintenance: boolean; checkControlPermission: boolean },
-    transactionalEntityManager?: EntityManager,
-  ): Promise<Resource>;
-
-  public abstract validateSupervisedStart(
-    resourceId: number,
-    requester: User,
-    supervisorUserId: number,
-    transactionalEntityManager?: EntityManager,
-    preloadedResource?: Resource,
-  ): Promise<void>;
-
-  public abstract getActiveSession(
-    resourceId: number,
-    transactionalEntityManager?: EntityManager,
-    preferUserId?: number,
-  ): Promise<ResourceUsage | null>;
-
-  public abstract getActiveSessionsForResource(
-    resourceId: number,
-    transactionalEntityManager?: EntityManager,
-  ): Promise<ResourceUsage[]>;
-
-  protected abstract readonly billingService: BillingService;
-
-  protected abstract readonly projectsService: ProjectsService;
-
-  protected abstract readonly resourceFormsService: ResourceFormsService;
-
-  protected abstract prepareSessionStart(
-    resourceId: number,
-    user: User,
-    dto: StartUsageSessionDto,
-    supervisorUserId: number | null,
-    attemptId: string,
-  ): Promise<{
-    resource: Resource;
-    createdSession: ResourceUsage;
-    existingActiveSession: ResourceUsage;
-    attempt: import('typeorm').DeepPartial<ResourceUsageLifecycleAttempt> & ResourceUsageLifecycleAttempt;
-    formSubmissions: FormSubmission[];
-    activeSessions: ActiveSessionCounts;
-  }>;
-
-  protected abstract notifySessionStarted(
-    resourceId: number,
-    user: User,
-    dto: StartUsageSessionDto,
-    supervisorUserId: number | null,
-    prepared: Awaited<ReturnType<ResourceUsageService['prepareSessionStart']>>,
-    newSession: ResourceUsage,
-    startedUsageIdToEmit: number | null,
-    takeoverEndedUser: User | null,
-  ): Promise<void>;
-
-  protected abstract readonly audit: AuditService;
-
-  protected abstract emitUsageEvent(usageId: number, transactionalEntityManager?: EntityManager): Promise<void>;
-
-  protected abstract emitSystemUsageEvent(
-    event: SystemEvent.RESOURCE_USAGE_STARTED | SystemEvent.RESOURCE_USAGE_ENDED,
-    resource: Resource | undefined,
-    user: User | undefined,
-  ): void;
-
-  protected abstract notifySessionEnded(
-    resourceId: number,
-    user: User,
-    dto: EndUsageSessionDto,
-    updatedUsage: ResourceUsage,
-    endedUsageIdToEmit: number | null,
-    activeSession: ResourceUsage | null,
-    skipNoteNotification: boolean,
-  ): Promise<void>;
-
-  protected abstract handleDoorAction(
-    resourceId: number,
-    user: User,
-    action: ResourceUsageAction,
-  ): Promise<ResourceUsage>;
-
-  protected abstract readonly DETAIL_RELATIONS: string[];
 }

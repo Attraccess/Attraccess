@@ -5,6 +5,7 @@ import { AuditMetrics } from '../metrics/definitions/audit.metrics';
 import { resetTestFixture } from '../resources/usage/lifecycle-persistence/fixtures/setup.test-fixture';
 import { createUsageLifecyclePersistenceAroundExternalFlowsFixture } from '../resources/usage/lifecycle-persistence/fixtures/state.test-fixture';
 import { SettingsStoreService } from '../settings/settings-store.service';
+import { usageInternals } from '../resources/usage/sessions/fixtures/compose.test-fixture';
 import { AuditService } from './audit.service';
 import { createTestAuditMetrics } from './audit.test-fixture';
 
@@ -40,8 +41,10 @@ export function setupAuditLoadFixture(machineCount: number) {
       metrics,
     );
     await audit.onModuleInit();
-    // Swap the fixture's audit stub for the real service.
-    Object.assign(scope.usage, { audit });
+    // Swap the fixture's audit stub for the real service in the collaborators that record usage audits.
+    const { starts, ends } = usageInternals(scope.usage);
+    Object.assign(starts, { audit });
+    Object.assign(ends, { audit });
 
     const resources = Array.from({ length: machineCount }, (_, index) => index + 1);
     await scope.source.getRepository(Resource).save(

@@ -4,6 +4,7 @@ import { join } from 'path';
 import { NpmPluginService } from './npm-plugin.service';
 import type { ServiceInternals } from './npm-plugin.test-fixture';
 import { setupNpmPluginFixture } from './npm-plugin.test-fixture';
+import { npmInternals } from './npm/fixtures/compose.test-fixture';
 jest.mock('dns/promises', () => ({ lookup: jest.fn() }));
 describe('NpmPluginService', () => {
   const fixture = setupNpmPluginFixture();
@@ -24,7 +25,7 @@ describe('NpmPluginService', () => {
         },
       ]),
     );
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       time: {
         '1.1.0': '2026-01-01T00:00:00.000Z',
         '1.2.0': '2026-02-01T00:00:00.000Z',
@@ -66,14 +67,14 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
 
     await expect(service.installedVersionCandidates('@attraccess/plugin')).resolves.toEqual([
       expect.objectContaining({ version: '1.3.0', direction: 'newer', permissionAdditions: ['READ_USERS'] }),
       expect.objectContaining({ version: '1.2.0', direction: 'current', permissionAdditions: [] }),
       expect.objectContaining({ version: '1.1.0', direction: 'older', permissionRemovals: ['DATABASE_ACCESS'] }),
     ]);
-    expect(service.packageMetadata).toHaveBeenCalledWith('@attraccess/plugin', 'private');
+    expect(npmInternals(service).catalog.packageMetadata).toHaveBeenCalledWith('@attraccess/plugin', 'private');
   });
 
   it('classifies official-scope versions on npm regardless of their publisher', async () => {
@@ -94,7 +95,7 @@ describe('NpmPluginService', () => {
         },
       ]),
     );
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       publisher: { name: 'attraccess' },
       versions: {
         '1.1.0': {
@@ -113,7 +114,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
 
     await expect(service.installedVersionCandidates('@attraccess/plugin-example')).resolves.toEqual([
       expect.objectContaining({
@@ -141,7 +142,7 @@ describe('NpmPluginService', () => {
         },
       ]),
     );
-    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+    jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates').mockResolvedValue([
       {
         version: '1.1.0',
         publishedAt: null,
@@ -190,7 +191,7 @@ describe('NpmPluginService', () => {
         },
       ]),
     );
-    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+    jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates').mockResolvedValue([
       {
         version: '1.2.3',
         publishedAt: null,
@@ -202,7 +203,7 @@ describe('NpmPluginService', () => {
         permissionRemovals: [],
       },
     ]);
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
           version: '1.2.3',
@@ -210,8 +211,8 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service as unknown as ServiceInternals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).registry as unknown as ServiceInternals, 'download').mockResolvedValue(tarball);
 
     await expect(service.replaceInstalled(name, '1.2.3', [])).rejects.toThrow(
       'Permission approval required for: READ_USERS',
@@ -237,7 +238,7 @@ describe('NpmPluginService', () => {
       ]),
     );
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+    jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates').mockResolvedValue([
       {
         version: '1.2.1',
         direction: 'newer',
@@ -281,7 +282,7 @@ describe('NpmPluginService', () => {
         },
       ]),
     );
-    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+    jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates').mockResolvedValue([
       {
         version: '2.0.0',
         direction: 'newer',
@@ -324,7 +325,7 @@ describe('NpmPluginService', () => {
         },
       ]),
     );
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '2.0.0-beta.1': {
           name: '@attraccess/plugin',
@@ -335,7 +336,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(service as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog as unknown as ServiceInternals, 'hostVersion').mockReturnValue('1.9.0');
 
     await expect(service.installedVersionCandidates('@attraccess/plugin')).resolves.toEqual([
       expect.objectContaining({ version: '2.0.0-beta.1', semverImpact: 'major' }),
@@ -370,7 +371,7 @@ describe('NpmPluginService', () => {
         }),
       ),
     } as never);
-    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+    jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates').mockResolvedValue([
       {
         version: '2.0.0-beta.2',
         direction: 'newer',
@@ -424,11 +425,11 @@ describe('NpmPluginService', () => {
         }),
       ),
     } as never);
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       'dist-tags': { next: '1.1.0' },
       versions: { '1.1.0': { version: '1.1.0' } },
     });
-    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+    jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates').mockResolvedValue([
       {
         version: '1.2.0',
         direction: 'newer',
@@ -500,7 +501,7 @@ describe('NpmPluginService', () => {
         }),
       ),
     } as never);
-    const candidates = jest.spyOn(service, 'installedVersionCandidates');
+    const candidates = jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates');
 
     await expect(service.checkInstalled(name)).resolves.toMatchObject({
       name,
@@ -554,7 +555,7 @@ describe('NpmPluginService', () => {
     );
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
     let releaseCandidates: ((value: never[]) => void) | undefined;
-    jest.spyOn(service, 'installedVersionCandidates').mockReturnValue(
+    jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates').mockReturnValue(
       new Promise((resolve) => {
         releaseCandidates = resolve;
       }),
@@ -619,7 +620,7 @@ describe('NpmPluginService', () => {
     } as never);
     let releaseCandidates: ((value: never[]) => void) | undefined;
     jest
-      .spyOn(service, 'installedVersionCandidates')
+      .spyOn(npmInternals(service).plan, 'installedVersionCandidates')
       .mockImplementationOnce(
         () =>
           new Promise((resolve) => {
@@ -675,12 +676,12 @@ describe('NpmPluginService', () => {
       ]),
     );
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: { '1.1.0': { version: '1.1.0' } },
     });
     let rejectCandidates: ((error: Error) => void) | undefined;
     jest
-      .spyOn(service, 'installedVersionCandidates')
+      .spyOn(npmInternals(service).plan, 'installedVersionCandidates')
       .mockImplementationOnce(
         () =>
           new Promise((_, reject) => {
@@ -729,7 +730,7 @@ describe('NpmPluginService', () => {
         }),
       ),
     } as never);
-    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+    jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates').mockResolvedValue([
       {
         version: '1.2.0',
         direction: 'newer',
@@ -750,7 +751,7 @@ describe('NpmPluginService', () => {
       },
     ]);
     let resolveNext: ((value: unknown) => void) | undefined;
-    jest.spyOn(service, 'packageMetadata').mockImplementation(async () => {
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockImplementation(async () => {
       if (!resolveNext)
         return new Promise((resolve) => {
           resolveNext = resolve;
@@ -800,7 +801,7 @@ describe('NpmPluginService', () => {
         }),
       ),
     } as never);
-    jest.spyOn(service, 'installedVersionCandidates').mockResolvedValue([
+    jest.spyOn(npmInternals(service).plan, 'installedVersionCandidates').mockResolvedValue([
       {
         version: '1.1.0',
         direction: 'newer',
@@ -836,7 +837,7 @@ describe('NpmPluginService', () => {
     );
     let active = 0;
     let maximum = 0;
-    jest.spyOn(service, 'checkInstalled').mockImplementation(async (name) => {
+    jest.spyOn(npmInternals(service).installation, 'checkInstalled').mockImplementation(async (name) => {
       active += 1;
       maximum = Math.max(maximum, active);
       await new Promise((resolve) => setTimeout(resolve, 1));

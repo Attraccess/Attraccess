@@ -23,6 +23,7 @@ import { createBillingServiceChargeForResourceUsageFixture } from './fixtures/re
 import { createBillingServiceFixture } from './fixtures/service.test-fixture';
 
 import { InsufficientBalanceError } from '../errors/insufficient-balance.error';
+import { BillingLedger } from '../accounting/billing-ledger';
 
 export type BillingServiceTestScope = ReturnType<typeof createBillingServiceFixture>;
 
@@ -65,7 +66,10 @@ describe('BillingService', () => {
       amount: amount > 0 ? -25 : 25,
       status: BillingTransactionStatus.Completed,
     } as BillingTransaction;
-    jest.spyOn(scope.service, 'getTransaction').mockResolvedValueOnce(original).mockResolvedValueOnce(refund);
+    jest
+      .spyOn(Reflect.get(scope.service, 'ledger') as BillingLedger, 'getTransaction')
+      .mockResolvedValueOnce(original)
+      .mockResolvedValueOnce(refund);
     scope.billingTransactionRepository.save.mockResolvedValue(refund);
     expect(await scope.service.refundTransaction(9, 4, { amount: 25 })).toBe(refund);
     expect(scope.billingTransactionRepository.save).toHaveBeenCalledWith({
@@ -82,7 +86,9 @@ describe('BillingService', () => {
   });
 
   it('rejects absent transactions and invalid refund amounts before writing', async () => {
-    const get = jest.spyOn(scope.service, 'getTransaction').mockResolvedValue(null);
+    const get = jest
+      .spyOn(Reflect.get(scope.service, 'ledger') as BillingLedger, 'getTransaction')
+      .mockResolvedValue(null);
     await expect(scope.service.refundTransaction(9, 4, { amount: 25 })).rejects.toThrow();
     get.mockResolvedValue({ id: 4, amount: -100 } as BillingTransaction);
     await expect(scope.service.refundTransaction(9, 4, { amount: 0 })).rejects.toThrow('Amount must be greater than 0');

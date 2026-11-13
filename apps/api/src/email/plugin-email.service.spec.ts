@@ -9,6 +9,7 @@ import { MetricsService } from '../metrics/metrics.service';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsService } from '../settings/settings.service';
 import { PluginEmailService } from './plugin-email.service';
+import { EmailService } from './email.service';
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
@@ -38,11 +39,16 @@ describe('PluginEmailService', () => {
     const metricsService = { emailSentTotal: { inc: jest.fn() } };
     const userRepository = { findOne: jest.fn() };
     const service = new PluginEmailService(
-      settingsService as unknown as SettingsService,
-      {} as EmailTemplateService,
+      new EmailService(
+        settingsService as unknown as SettingsService,
+        {} as EmailTemplateService,
+        layout,
+        metricsService as unknown as MetricsService,
+        { time: <T>(_target: string, _operation: string, fn: () => Promise<T>) => fn() } as ExternalCallTimer,
+        userRepository as unknown as Repository<User>,
+      ),
       layout,
       metricsService as unknown as MetricsService,
-      { time: <T>(_target: string, _operation: string, fn: () => Promise<T>) => fn() } as ExternalCallTimer,
       userRepository as unknown as Repository<User>,
     );
     return { service, sendMail, settingsService, metricsService, userRepository };

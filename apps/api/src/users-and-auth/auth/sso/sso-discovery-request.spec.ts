@@ -6,7 +6,6 @@ import { Reflector } from '@nestjs/core';
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
 import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
 import { SSOController } from './sso.controller';
-import { SsoProviderRoutes } from './providers/provider-routes';
 import {
   assertDiscoveryAddress,
   discoveryLookup,
@@ -75,7 +74,7 @@ describe('SSO discovery HTTP boundaries', () => {
   let server: Server;
   let origin: string;
   const paths: string[] = [];
-  const routes = Object.create(SsoProviderRoutes.prototype) as SsoProviderRoutes;
+  const routes = Object.create(SSOController.prototype) as SSOController;
 
   beforeEach(async () => {
     paths.length = 0;

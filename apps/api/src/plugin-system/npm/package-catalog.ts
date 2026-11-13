@@ -1,17 +1,15 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 
-import { randomUUID } from 'crypto';
-
+import { resolveAppVersion } from '../../config/app.config';
 import { existsSync } from 'fs';
 
-import { mkdir, rename, rm, writeFile } from 'fs/promises';
+import { mkdir, rename, rm } from 'fs/promises';
 
 import { join } from 'path';
 
 import {
   BACKUP_DIRECTORY,
   InstalledNpmPlugin,
-  STATE_FILE,
   TRANSACTION_FILE,
   backupDirectoryName,
   readInstalledNpmPlugins,
@@ -33,14 +31,24 @@ import { parseNpmPluginPackage } from './contract-validation';
 
 import { NpmRegistryAccess } from './registry-access';
 
-export abstract class NpmPackageCatalog extends NpmRegistryAccess {
+import { NpmPluginState } from './plugin-state';
+
+/** What the registries offer, and removing installed packages. */
+export class NpmPackageCatalog {
+  private readonly logger = new Logger('NpmPluginService');
+
+  constructor(
+    private readonly registry: NpmRegistryAccess,
+    private readonly state: NpmPluginState,
+  ) {}
+
   removalPlan(name: string): InstalledNpmPlugin[] {
-    this.installed(name);
-    return pluginRemovalClosure(name, this.listInstalled());
+    this.state.installed(name);
+    return pluginRemovalClosure(name, this.state.listInstalled());
   }
 
   async removeInstalled(name: string, deferRestart = false, approvedDependants: string[] = []): Promise<void> {
-    await this.mutateInstalls(async () => {
+    await this.state.mutateInstalls(async () => {
       const removing = this.removalPlan(name);
       const dependants = removing.filter((plugin) => plugin.name !== name).map((plugin) => plugin.name);
       if (!samePermissions(dependants, approvedDependants))
@@ -54,7 +62,7 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
         backupName: backupDirectoryName(plugin.installPath),
         hadTarget: existsSync(join(PluginService.PLUGIN_PATH, plugin.installPath)),
       }));
-      await this.writeTransaction(records, moves);
+      await this.state.writeTransaction(records, moves);
       try {
         for (const [index, installed] of removing.entries()) {
           const target = join(PluginService.PLUGIN_PATH, installed.installPath);
@@ -65,8 +73,8 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
             moved.push({ target, backup });
           }
         }
-        if (removing.length === 1) await this.writeStateWithout(name);
-        else await this.writeRecords(records);
+        if (removing.length === 1) await this.state.writeStateWithout(name);
+        else await this.state.writeRecords(records);
       } catch (error) {
         for (const { target, backup } of moved.reverse()) await rename(backup, target);
         await rm(join(PluginService.PLUGIN_PATH, TRANSACTION_FILE), { force: true });
@@ -86,7 +94,7 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
       }
       for (const { backup } of moved) {
         try {
-          await this.removeBackup(backup);
+          await this.state.removeBackup(backup);
         } catch (error) {
           this.logger.error('Failed to remove uninstalled package files', error);
         }
@@ -96,24 +104,9 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
     });
   }
 
-  protected async writeStateWithout(name: string): Promise<void> {
-    const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
-    const temporaryPath = `${statePath}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(
-        temporaryPath,
-        JSON.stringify(readInstalledNpmPlugins().filter((plugin) => plugin.name !== name)),
-      );
-      await rename(temporaryPath, statePath);
-    } catch (error) {
-      await rm(temporaryPath, { force: true });
-      throw error;
-    }
-  }
-
   async packageMetadata(name: string, registryId?: string): Promise<unknown> {
-    const registry = await this.registry(registryId);
-    return this.getJson(`${registry.url}/${encodeURIComponent(name)}`, registry);
+    const registry = await this.registry.registry(registryId);
+    return this.registry.getJson(`${registry.url}/${encodeURIComponent(name)}`, registry);
   }
 
   async packageVersions(name: string, registryId?: string): Promise<string[]> {
@@ -125,11 +118,11 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
     query: string,
     registryId?: string,
   ): Promise<{ results: MarketplacePlugin[]; errors: string[] }> {
-    const registries = registryId ? [await this.registry(registryId)] : await this.searchRegistries();
+    const registries = registryId ? [await this.registry.registry(registryId)] : await this.searchRegistries();
     const responses = await Promise.all(
       registries.map(async (registry) => {
         try {
-          const search = (await this.getJson(
+          const search = (await this.registry.getJson(
             `${registry.url}/-/v1/search?text=${encodeURIComponent(`keywords:attraccess-plugin ${query.trim()}`)}&size=20`,
             registry,
           )) as { objects?: Array<{ package?: unknown }> };
@@ -163,7 +156,7 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
   }
 
   async marketplacePackage(name: string, registryId?: string): Promise<MarketplacePlugin> {
-    const registry = await this.registry(registryId);
+    const registry = await this.registry.registry(registryId);
     const metadata = (await this.packageMetadata(name, registry.id)) as {
       name?: string;
       'dist-tags'?: { latest?: string };
@@ -179,12 +172,15 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
     return this.marketplacePlugin(pkg, registry, registryPublisher(pkg) ?? registryPublisher(metadata), name);
   }
 
-  protected async searchRegistries(): Promise<Registry[]> {
-    const registries = await this.storedRegistries();
-    return Promise.all([this.registry(), ...registries.map((registry) => this.registry(registry.id))]);
+  private async searchRegistries(): Promise<Registry[]> {
+    const registries = await this.registry.storedRegistries();
+    return Promise.all([
+      this.registry.registry(),
+      ...registries.map((registry) => this.registry.registry(registry.id)),
+    ]);
   }
 
-  protected marketplacePlugin(
+  marketplacePlugin(
     value: unknown,
     registry: Registry,
     publisher = registryPublisher(value),
@@ -193,7 +189,7 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
     const fallback = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
     const name = resolvedName ?? packageName(fallback) ?? 'Unknown package';
     const version = typeof fallback.version === 'string' ? fallback.version : null;
-    const classified = this.classification.classify(name, registry.url);
+    const classified = this.state.classification.classify(name, registry.url);
     try {
       const { pkg } = parseNpmPluginPackage(value, this.hostVersion());
       return {
@@ -245,5 +241,9 @@ export abstract class NpmPackageCatalog extends NpmRegistryAccess {
         provenance: null,
       };
     }
+  }
+
+  hostVersion(): string {
+    return resolveAppVersion();
   }
 }

@@ -1,5 +1,4 @@
 import { getSupportedDeviceLanguage } from '@attraccess/shared';
-import { SettingsService } from '../../../settings/settings.service';
 import { AuthenticationType, SSOProviderType, User } from '@attraccess/database-entities';
 
 import {
@@ -11,17 +10,14 @@ import {
   QueryFailedError,
   DataSource,
   Repository,
-  SelectQueryBuilder,
 } from 'typeorm';
-import { BadRequestException, ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+
+import { InjectRepository } from '@nestjs/typeorm';
 
 import { randomBytes } from 'crypto';
 
 import { LicenseError, LicenseService } from '../../../license/license.service';
-
-import { EmailService } from '../../../email/email.service';
-
-import { TokenHashService } from '../../../encryption/token-hash.service';
 
 import { MetricsService } from '../../../metrics/metrics.service';
 
@@ -91,7 +87,20 @@ export const FindOneOptionsSchema = z
 
 export type FindOneOptions = z.infer<typeof FindOneOptionsSchema>;
 
-export abstract class UserAccounts {
+/** Looking up, creating and naming user accounts. */
+@Injectable()
+export class UserAccounts {
+  private readonly logger = new Logger('UsersService');
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly licenseService: LicenseService,
+    private readonly dataSource: DataSource,
+    private readonly metricsService: MetricsService,
+    private readonly rbacService: RbacService,
+  ) {}
+
   async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
     const validatedOptions = FindOneOptionsSchema.parse(options);
 
@@ -338,7 +347,7 @@ export abstract class UserAccounts {
     return username.trim().toLowerCase();
   }
 
-  protected normalizeUsernameCandidate(value: string): string {
+  private normalizeUsernameCandidate(value: string): string {
     const cleaned = this.cleanupUsername(value)
       .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
@@ -376,7 +385,7 @@ export abstract class UserAccounts {
     return `sso-user-${suffix}`;
   }
 
-  protected isEmailUniqueConstraintViolation(error: unknown): boolean {
+  isEmailUniqueConstraintViolation(error: unknown): boolean {
     if (!(error instanceof QueryFailedError)) {
       return false;
     }
@@ -400,28 +409,4 @@ export abstract class UserAccounts {
       typeof message === 'string' && message.toLowerCase().includes('unique') && message.toLowerCase().includes('email')
     );
   }
-
-  protected abstract userRepository: Repository<User>;
-
-  protected abstract readonly logger: Logger;
-
-  protected abstract licenseService: LicenseService;
-
-  protected abstract readonly rbacService: RbacService;
-
-  protected abstract dataSource: DataSource;
-
-  protected abstract readonly metricsService: MetricsService;
-
-  protected abstract anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void>;
-
-  protected abstract emailService: EmailService;
-
-  protected abstract readonly settingsService: SettingsService;
-
-  protected abstract applyRoleFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void;
-
-  protected abstract applySsoFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void;
-
-  protected abstract readonly tokenHashService: TokenHashService;
 }

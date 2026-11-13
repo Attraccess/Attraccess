@@ -12,4 +12,20 @@ module.exports = [
       '@nx/workspace-optional-injection-justification': 'error',
     },
   },
+  // ATT-1213: services and controllers compose collaborators; no abstract layers or provider inheritance.
+  {
+    files: ['src/**/*.ts'],
+    ignores: [
+      '**/*.spec.ts',
+      '**/*.test.ts',
+      '**/*test-fixture*',
+      '**/*.fixture.ts',
+      '**/*.test-utils.ts',
+      'src/test-utils/**',
+      '**/testing/**',
+    ],
+    rules: {
+      '@nx/workspace-no-service-inheritance': 'error',
+    },
+  },
 ];

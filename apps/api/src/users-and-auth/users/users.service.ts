@@ -1,6 +1,12 @@
-import { SettingsService } from '../../settings/settings.service';
 import { DateTimePreferences, getSupportedDeviceLanguage, validateDateTimeLocale } from '@attraccess/shared';
-import { AuthenticationDetail, ResourceUsage, Session, User, Role } from '@attraccess/database-entities';
+import {
+  AuthenticationDetail,
+  ResourceUsage,
+  Session,
+  SSOProviderType,
+  User,
+  Role,
+} from '@attraccess/database-entities';
 
 import { BadRequestException, Injectable, Logger, ForbiddenException } from '@nestjs/common';
 
@@ -26,35 +32,120 @@ import { addDays } from 'date-fns';
 
 import { UserDirectory } from './directory/user-directory';
 
+import { UserAccounts } from './accounts/user-accounts';
+
 import {
   DeleteAccountTokenExpiredException,
   DeleteAccountTokenInvalidException,
+  FindOneOptions,
+  UpdateUserData,
   UserHasActiveUsageSessionsException,
+  UserListOptions,
 } from './accounts/user-accounts';
 
+import { PaginatedResponse } from '../../types/response';
+
+/**
+ * User accounts: creation, lookup, identity changes, preferences and deletion. Lookup and creation live in
+ * {@link UserAccounts}, listing and identity changes in {@link UserDirectory}; this service is their entry point.
+ */
 @Injectable()
-export class UsersService extends UserDirectory {
+export class UsersService {
   constructor(
     @InjectRepository(User)
-    protected userRepository: Repository<User>,
-    @InjectRepository(AuthenticationDetail)
-    protected authenticationDetailRepository: Repository<AuthenticationDetail>,
-    @InjectRepository(Session)
-    protected sessionRepository: Repository<Session>,
-    @InjectRepository(ResourceUsage)
-    protected resourceUsageRepository: Repository<ResourceUsage>,
-    protected licenseService: LicenseService,
-    protected emailService: EmailService,
-    protected dataSource: DataSource,
-    protected readonly tokenHashService: TokenHashService,
-    protected readonly metricsService: MetricsService,
-    protected readonly rbacService: RbacService,
-    protected readonly settingsService: SettingsService,
-  ) {
-    super();
+    private readonly userRepository: Repository<User>,
+    private readonly licenseService: LicenseService,
+    private readonly emailService: EmailService,
+    private readonly dataSource: DataSource,
+    private readonly tokenHashService: TokenHashService,
+    private readonly metricsService: MetricsService,
+    private readonly rbacService: RbacService,
+    private readonly accounts: UserAccounts,
+    private readonly directory: UserDirectory,
+  ) {}
+
+  private readonly logger = new Logger(UsersService.name);
+
+  async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
+    return this.accounts.findOne(options, relations, manager);
   }
 
-  protected readonly logger = new Logger(UsersService.name);
+  public async isSSOUser(userId: number): Promise<boolean> {
+    return this.accounts.isSSOUser(userId);
+  }
+
+  public async findOneBySSO(providerType: SSOProviderType, providerId: number, subject: string): Promise<User | null> {
+    return this.accounts.findOneBySSO(providerType, providerId, subject);
+  }
+
+  async countUsers(): Promise<number> {
+    return this.accounts.countUsers();
+  }
+
+  async findByEmailsOrUsernames(emails: string[], usernames: string[]): Promise<User[]> {
+    return this.accounts.findByEmailsOrUsernames(emails, usernames);
+  }
+
+  async createOne(
+    userData: Parameters<UserAccounts['createOne']>[0],
+    manager?: EntityManager,
+    options: { excludedUserIdFromLicenseUsage?: number } = {},
+  ): Promise<User> {
+    return this.accounts.createOne(userData, manager, options);
+  }
+
+  public recordCreatedUser(user: User): void {
+    this.accounts.recordCreatedUser(user);
+  }
+
+  public async rollbackFailedRegistration(userId: number): Promise<void> {
+    return this.accounts.rollbackFailedRegistration(userId);
+  }
+
+  public async releaseFirstTimeSetupAdminIdentifiers(manager: EntityManager): Promise<User> {
+    return this.accounts.releaseFirstTimeSetupAdminIdentifiers(manager);
+  }
+
+  public async rollbackFirstTimeSetupAdminReplacement(replacementUserId: number, existingAdmin: User): Promise<void> {
+    return this.accounts.rollbackFirstTimeSetupAdminReplacement(replacementUserId, existingAdmin);
+  }
+
+  public validateUsernameOrThrow(username: string): void {
+    this.accounts.validateUsernameOrThrow(username);
+  }
+
+  public cleanupUsername(username: string): string {
+    return this.accounts.cleanupUsername(username);
+  }
+
+  public buildUsernameFromSSOClaim(rawUsername?: string | null, fallback?: string): string {
+    return this.accounts.buildUsernameFromSSOClaim(rawUsername, fallback);
+  }
+
+  /** Resolve the identifier accepted by local login without ambiguous username/email queries. */
+  async findByLoginIdentifier(identifier: string): Promise<User | null> {
+    return this.directory.findByLoginIdentifier(identifier);
+  }
+
+  async findMany(options: UserListOptions): Promise<PaginatedResponse<User>> {
+    return this.directory.findMany(options);
+  }
+
+  async updateOne(id: number, updateData: UpdateUserData, manager?: EntityManager): Promise<User> {
+    return this.directory.updateOne(id, updateData, manager);
+  }
+
+  async changeUsername(targetUserId: number, newUsername: string, executingUser: User): Promise<User> {
+    return this.directory.changeUsername(targetUserId, newUsername, executingUser);
+  }
+
+  async changeEmail(targetUserId: number, newEmail: string, executingUser: User): Promise<User> {
+    return this.directory.changeEmail(targetUserId, newEmail, executingUser);
+  }
+
+  async changeBillingFactor(targetUserId: number, newBillingFactor: number): Promise<User> {
+    return this.directory.changeBillingFactor(targetUserId, newBillingFactor);
+  }
 
   async updateDateTimePreferences(userId: number, preferences: DateTimePreferences): Promise<User> {
     const validation = preferences.dateTimeLocale === null ? null : validateDateTimeLocale(preferences.dateTimeLocale);
@@ -62,7 +153,7 @@ export class UsersService extends UserDirectory {
       throw new BadRequestException(`Invalid or unsupported date/time locale: ${validation.error}`);
     }
     await this.userRepository.update(userId, { dateTimeLocale: validation?.locale ?? null });
-    const updated = await this.findOne({ id: userId });
+    const updated = await this.accounts.findOne({ id: userId });
     if (!updated) throw new UserNotFoundException(userId);
     return updated;
   }
@@ -73,7 +164,7 @@ export class UsersService extends UserDirectory {
       throw new BadRequestException('Locale cannot be empty');
     }
 
-    const existing = await this.findOne({ id: userId });
+    const existing = await this.accounts.findOne({ id: userId });
     if (!existing) {
       throw new UserNotFoundException(userId);
     }
@@ -84,7 +175,7 @@ export class UsersService extends UserDirectory {
     this.metricsService.usersPerLocale.dec({ locale: oldLocale });
     this.metricsService.usersPerLocale.inc({ locale: cleaned });
 
-    const updated = await this.findOne({ id: userId });
+    const updated = await this.accounts.findOne({ id: userId });
     if (!updated) {
       throw new UserNotFoundException(userId);
     }
@@ -117,7 +208,7 @@ export class UsersService extends UserDirectory {
     }
 
     const normalized = users.map((userData) => ({
-      username: this.cleanupUsername(userData.username),
+      username: this.accounts.cleanupUsername(userData.username),
       email: userData.email.trim(),
       locale: userData.locale,
       roleKey: userData.roleKey,
@@ -128,7 +219,7 @@ export class UsersService extends UserDirectory {
       const totalExisting = await repo.count();
 
       const entities = normalized.map((data) => {
-        this.validateUsernameOrThrow(data.username);
+        this.accounts.validateUsernameOrThrow(data.username);
         if (!data.email) {
           throw new BadRequestException('Email is required');
         }
@@ -216,7 +307,7 @@ export class UsersService extends UserDirectory {
   }
 
   async requestSelfDeletion(userId: number): Promise<void> {
-    const user = await this.findOne({ id: userId });
+    const user = await this.accounts.findOne({ id: userId });
     if (!user) {
       throw new UserNotFoundException(userId);
     }
@@ -273,7 +364,7 @@ export class UsersService extends UserDirectory {
     await this.anonymizeAndSoftDelete(user.id);
   }
 
-  protected async anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void> {
+  private async anonymizeAndSoftDelete(id: number, manager?: EntityManager): Promise<void> {
     // ponytail: wrap check-then-delete in a transaction to close the TOCTOU race where two concurrent
     // deletions of the last two administrators could both pass the isLastAdministrator guard and both proceed
     const run = async (em: EntityManager) => {

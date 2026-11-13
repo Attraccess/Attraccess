@@ -14,20 +14,33 @@ import { NotificationCategory } from '../../notifications/notification-types';
 import { Repository } from 'typeorm';
 
 import { AuditService } from '../../audit/audit.service';
-
-import { FileStorageService } from '../../common/services/file-storage.service';
-
-import { FileUpload } from '../../common/types/file-upload.types';
-
 import { EmailService } from '../../email/email.service';
-
-import { MetricsService } from '../../metrics/metrics.service';
-
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 
 import { ProjectAccessService } from '../project-access.service';
 
-export abstract class ProjectInvitations {
+/** Audit details of an invitation. */
+export function invitationDetails(invitation: ProjectInvitation): Record<string, string | number> {
+  return {
+    projectId: invitation.projectId,
+    invitationId: invitation.id,
+    userId: invitation.invitedUserId,
+    role: invitation.requestedRole,
+  };
+}
+
+/** Invitations to projects: sending, listing, accepting, declining and revoking them. */
+export class ProjectInvitations {
+  constructor(
+    private readonly audit: AuditService,
+    private readonly projectAccessService: ProjectAccessService,
+    private readonly userRepository: Repository<User>,
+    private readonly projectMemberRepository: Repository<ProjectMember>,
+    private readonly projectInvitationRepository: Repository<ProjectInvitation>,
+    private readonly notifications: NotificationDispatchService,
+    private readonly emailService: EmailService,
+  ) {}
+
   public async listPendingInvitationsForUser(userId: number): Promise<ProjectInvitation[]> {
     return await this.projectInvitationRepository.find({
       where: { invitedUser: { id: userId }, status: ProjectInvitationStatus.PENDING },
@@ -66,7 +79,7 @@ export abstract class ProjectInvitations {
     );
   }
 
-  protected async respondToInvitation(
+  public async respondToInvitation(
     userId: number,
     invitationId: number,
     status: ProjectInvitationStatus,
@@ -95,7 +108,7 @@ export abstract class ProjectInvitations {
       apiTokenId,
       subjectType: 'project.invitation',
       subjectId: invitation.id,
-      details: this.invitationDetails(invitation),
+      details: invitationDetails(invitation),
     });
 
     if (status === ProjectInvitationStatus.ACCEPTED) {
@@ -116,7 +129,7 @@ export abstract class ProjectInvitations {
     return this.getInvitationWithRelations(invitation.id);
   }
 
-  protected async ensureMemberRecord(
+  public async ensureMemberRecord(
     projectId: number,
     userId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
@@ -139,7 +152,7 @@ export abstract class ProjectInvitations {
     });
   }
 
-  protected async getInvitationWithRelations(invitationId: number): Promise<ProjectInvitation> {
+  public async getInvitationWithRelations(invitationId: number): Promise<ProjectInvitation> {
     const invitation = await this.projectInvitationRepository.findOne({
       where: { id: invitationId },
       relations: { invitedUser: true, inviter: true, project: { owner: true } },
@@ -152,7 +165,7 @@ export abstract class ProjectInvitations {
     return invitation;
   }
 
-  protected async dispatchProjectInvitationNotification(
+  public async dispatchProjectInvitationNotification(
     invitedUser: User,
     project: Project,
     invitation: ProjectInvitation,
@@ -257,7 +270,7 @@ export abstract class ProjectInvitations {
       apiTokenId,
       subjectType: 'project.invitation',
       subjectId: invitation.id,
-      details: this.invitationDetails(invitation),
+      details: invitationDetails(invitation),
     });
     await this.dispatchProjectInvitationNotification(invitation.invitedUser, invitation.project, invitation);
 
@@ -293,34 +306,8 @@ export abstract class ProjectInvitations {
       apiTokenId,
       subjectType: 'project.invitation',
       subjectId: invitation.id,
-      details: this.invitationDetails(invitation),
+      details: invitationDetails(invitation),
     });
     return this.getInvitationWithRelations(invitation.id);
   }
-
-  protected abstract readonly fileStorageService: FileStorageService;
-
-  protected abstract readonly projectRepository: Repository<Project>;
-
-  protected abstract readonly audit: AuditService;
-
-  protected abstract projectDetails(project: Project, state: 'before' | 'after'): Record<string, string | number>;
-
-  protected abstract readonly metricsService: MetricsService;
-
-  protected abstract setLogo(project: Project, logo: FileUpload): Promise<void>;
-
-  protected abstract readonly projectAccessService: ProjectAccessService;
-
-  protected abstract readonly userRepository: Repository<User>;
-
-  protected abstract readonly projectMemberRepository: Repository<ProjectMember>;
-
-  protected abstract readonly projectInvitationRepository: Repository<ProjectInvitation>;
-
-  protected abstract invitationDetails(invitation: ProjectInvitation): Record<string, string | number>;
-
-  protected abstract readonly notifications: NotificationDispatchService;
-
-  protected abstract readonly emailService: EmailService;
 }
