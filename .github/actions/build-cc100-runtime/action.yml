@@ -3,7 +3,7 @@ description: Build one offline ARMv7 runtime from the checked-out server source,
 runs:
   using: composite
   steps:
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v7
       with:
         node-version-file: .nvmrc
     - uses: docker/setup-qemu-action@v3
