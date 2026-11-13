@@ -3,7 +3,7 @@ import { get as httpGet, RequestOptions } from 'node:http';
 import { get as httpsGet } from 'node:https';
 import { isIP, LookupFunction } from 'node:net';
 import ipaddr from 'ipaddr.js';
-import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, HttpException, UnauthorizedException } from '@nestjs/common';
 
 // Private and loopback IdPs are supported. Metadata services and non-unicast
 // destinations are not IdPs, including their IPv4-mapped IPv6 representations.
@@ -65,12 +65,24 @@ export const discoveryLookup: LookupFunction = (hostname, options, callback) => 
   );
 };
 
+// Policy rejections keep their status. Anything else failed on the way to the
+// upstream; report only the admin-supplied origin and an error code, because
+// deeper messages can contain resolved addresses.
+export function toDiscoveryError(error: unknown, url: URL, timedOut: boolean, timeoutMs: number): HttpException {
+  if (error instanceof HttpException) return error;
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  const reason = timedOut ? `timed out after ${timeoutMs} ms` : code;
+  return new BadGatewayException(`Discovery URL could not be reached: ${url.origin}${reason ? ` (${reason})` : ''}`);
+}
+
 export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024 * 1024): Promise<unknown> {
   return new Promise((resolve, reject) => {
     // Literal IPs bypass Node's lookup callback, so enforce the destination
     // policy here as well as while constructing a discovery URL.
     const hostname = url.hostname.replace(/^\[|\]$/g, '');
     if (isIP(hostname)) assertDiscoveryAddress(hostname);
+    const signal = AbortSignal.timeout(timeoutMs);
+    const fail = (error: unknown) => reject(toDiscoveryError(error, url, signal.aborted, timeoutMs));
     const get = url.protocol === 'https:' ? httpsGet : httpGet;
     // HTTP forwards this socket option, but RequestOptions omits it. Enable
     // fallback across the validated list while retaining one request deadline.
@@ -78,7 +90,7 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
       agent: false,
       autoSelectFamily: true,
       lookup: discoveryLookup,
-      signal: AbortSignal.timeout(timeoutMs),
+      signal,
       headers: { Accept: 'application/json' },
     };
     // Node's HTTP client never follows redirects. A 3xx response is rejected.
@@ -95,22 +107,22 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
       response.on('data', (chunk: Buffer) => {
         bytes += chunk.length;
         if (bytes > maxBytes) {
-          const error = new Error('Discovery response exceeds size limit');
+          const error = new BadGatewayException('Discovery response exceeds size limit');
           reject(error);
           request.destroy(error);
           return;
         }
         chunks.push(chunk);
       });
-      response.on('error', reject);
+      response.on('error', fail);
       response.on('end', () => {
         try {
           resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
         } catch {
-          reject(new Error('Invalid discovery JSON'));
+          reject(new BadGatewayException('Invalid discovery JSON'));
         }
       });
     });
-    request.on('error', reject);
+    request.on('error', fail);
   });
 }
