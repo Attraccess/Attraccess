@@ -76,8 +76,11 @@ export function ConfirmDeleteAccount() {
   const goToLogin = () => navigate('/');
 
   const leaveDeletedAccount = () => {
-    // The deleted session's user stays cached after the failed refetch; reset it so the app signs out.
-    queryClient.resetQueries({ queryKey: [useUsersServiceGetCurrentKey] });
+    // A failed refetch keeps the deleted user cached; reset it unless another signed-in user was confirmed.
+    const currentUser = queryClient.getQueryState([useUsersServiceGetCurrentKey]);
+    if (currentUser?.status !== 'success' || currentUser.fetchStatus !== 'idle') {
+      queryClient.resetQueries({ queryKey: [useUsersServiceGetCurrentKey] });
+    }
     goToLogin();
   };
 

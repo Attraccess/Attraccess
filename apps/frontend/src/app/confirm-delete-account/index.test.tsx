@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   mutate: vi.fn(),
   invalidate: vi.fn(),
   reset: vi.fn(),
+  currentUser: undefined as { status: string; fetchStatus: string } | undefined,
   pending: false,
   existing: [] as string[],
   options: {} as { onSuccess: () => void; onError: (error: Error) => void; onSettled: () => void },
@@ -27,7 +28,11 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   useUrlQuery: () => state.query,
 }));
 vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: () => ({ invalidateQueries: state.invalidate, resetQueries: state.reset }),
+  useQueryClient: () => ({
+    invalidateQueries: state.invalidate,
+    resetQueries: state.reset,
+    getQueryState: () => state.currentUser,
+  }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
   useUsersServiceGetCurrentKey: 'current-user',
@@ -41,6 +46,7 @@ beforeEach(() => {
   state.query = new URLSearchParams('token=one-use-token&email=user%40example.com');
   state.pending = false;
   state.existing = [];
+  state.currentUser = { status: 'error', fetchStatus: 'idle' };
 });
 afterEach(() => {
   cleanup();
@@ -126,6 +132,15 @@ it('shows success, invalidates the current user and returns to login', () => {
   expect(state.reset).not.toHaveBeenCalled();
   press('success.backToLogin');
   expect(state.reset).toHaveBeenCalledWith({ queryKey: ['current-user'] });
+  expectStartPage();
+});
+
+it('keeps a different signed-in user when leaving the success dialog', () => {
+  state.currentUser = { status: 'success', fetchStatus: 'idle' };
+  mount();
+  act(() => state.options.onSuccess());
+  press('success.backToLogin');
+  expect(state.reset).not.toHaveBeenCalled();
   expectStartPage();
 });
 
