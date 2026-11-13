@@ -3,7 +3,9 @@ import { get as httpGet, RequestOptions } from 'node:http';
 import { get as httpsGet } from 'node:https';
 import { isIP, LookupFunction } from 'node:net';
 import ipaddr from 'ipaddr.js';
-import { BadGatewayException, BadRequestException, HttpException, UnauthorizedException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, HttpException, Logger, UnauthorizedException } from '@nestjs/common';
+
+const logger = new Logger('SsoDiscovery');
 
 // Private and loopback IdPs are supported. Metadata services and non-unicast
 // destinations are not IdPs, including their IPv4-mapped IPv6 representations.
@@ -67,9 +69,10 @@ export const discoveryLookup: LookupFunction = (hostname, options, callback) => 
 
 // Policy rejections keep their status. Anything else failed on the way to the
 // upstream; report only the admin-supplied origin and an error code, because
-// deeper messages can contain resolved addresses.
+// deeper messages can contain resolved addresses. Operators get the full cause.
 export function toDiscoveryError(error: unknown, url: URL, timedOut: boolean, timeoutMs: number): HttpException {
   if (error instanceof HttpException) return error;
+  logger.warn(`Discovery request to ${url.origin} failed: ${String(error)}`);
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
   const reason = timedOut ? `timed out after ${timeoutMs} ms` : code;
   return new BadGatewayException(`Discovery URL could not be reached: ${url.origin}${reason ? ` (${reason})` : ''}`);

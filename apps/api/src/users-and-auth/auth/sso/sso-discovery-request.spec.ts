@@ -242,6 +242,7 @@ describe('SSO discovery HTTP boundaries', () => {
       `Discovery URL could not be reached: ${refused} (ECONNREFUSED)`,
     );
     await expectBadGateway(routes.discoverKeycloak(refused, 'realm'), 'could not be reached', 'ECONNREFUSED');
+    await expectBadGateway(routes.discoverAuthentik(refused, 'app'), 'could not be reached', 'ECONNREFUSED');
   });
 
   it('reports a failed DNS resolution as an unreachable discovery URL', async () => {
@@ -253,6 +254,13 @@ describe('SSO discovery HTTP boundaries', () => {
     expect(paths).toEqual([]);
   });
 
+  it('reports a host without addresses as an unreachable discovery URL', async () => {
+    jest.spyOn(dns, 'lookup').mockResolvedValueOnce([]);
+    const url = discoveryUrl(origin.replace('127.0.0.1', 'idp.example'), '/discovery');
+    await expectBadGateway(requestDiscoveryJson(url), `Discovery URL could not be reached: ${url.origin}`);
+    expect(paths).toEqual([]);
+  });
+
   it('reports a dropped response body as an unreachable discovery URL', async () => {
     server.removeAllListeners('request');
     server.on('request', (_req, res) => {
@@ -260,7 +268,11 @@ describe('SSO discovery HTTP boundaries', () => {
       res.write('{');
       setImmediate(() => res.destroy());
     });
-    await expectBadGateway(requestDiscoveryJson(new URL('/discovery', origin)), 'could not be reached');
+    // A short deadline keeps the timeout path from satisfying this assertion.
+    await expectBadGateway(
+      requestDiscoveryJson(new URL('/discovery', origin), 1000),
+      `Discovery URL could not be reached: ${origin} (ECONNRESET)`,
+    );
   });
 });
 
