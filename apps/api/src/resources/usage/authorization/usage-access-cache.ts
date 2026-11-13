@@ -232,17 +232,18 @@ export class UsageAccessCache {
       return;
     }
     this.authorizationCacheSubscriber = this.valkeyClient.duplicate();
-    // ioredis emits `error` on every reconnect attempt; log each outage once instead of once per attempt.
+    // ioredis emits `error` on every reconnect attempt; log each outage once, and only the message: AUTH errors
+    // carry the password in `error.command.args`.
     let disconnected = false;
-    this.authorizationCacheSubscriber.on('error', (error) => {
+    this.authorizationCacheSubscriber.on('error', (error: NodeJS.ErrnoException) => {
       if (disconnected) {
         return;
       }
       disconnected = true;
       this.logger.warn(
-        'Authorization cache invalidation subscriber lost its Valkey connection; permission changes on other API ' +
-          'instances are not seen until it reconnects (cached answers still expire within 30 s)',
-        error,
+        `Authorization cache invalidation subscriber lost its Valkey connection (${error.message || error.code}); ` +
+          'permission changes on other API instances are not seen until it reconnects (cached answers still expire ' +
+          `within ${this.ACCESS_CACHE_TTL_MS / 1000} s)`,
       );
     });
     this.authorizationCacheSubscriber.on('ready', () => {

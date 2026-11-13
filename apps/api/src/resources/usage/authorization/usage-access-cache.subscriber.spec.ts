@@ -10,6 +10,7 @@ import {
   authorizationCacheInvalidationSource,
 } from '../../../users-and-auth/rbac/authorization-cache-invalidation';
 import { ResourceRetrainingService } from '../../retraining/resourceRetraining.service';
+import { RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
 import { UsageAccessCache } from './usage-access-cache';
 import { UsageAccessRules } from './usage-access-rules';
 
@@ -53,14 +54,16 @@ describe('UsageAccessCache authorization cache invalidation subscriber', () => {
   });
 
   it('listens for errors before it subscribes', async () => {
+    let errorListeners = -1;
     subscriber.subscribe.mockImplementation(async () => {
-      expect(subscriber.listenerCount('error')).toBe(1);
+      errorListeners = subscriber.listenerCount('error');
       return 1;
     });
 
     await createCache(valkeyClient as unknown as Redis).subscribe();
 
     expect(subscriber.subscribe).toHaveBeenCalledWith(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL);
+    expect(errorListeners).toBe(1);
   });
 
   it('logs one warning per outage and one line when it reconnects', async () => {
@@ -69,12 +72,12 @@ describe('UsageAccessCache authorization cache invalidation subscriber', () => {
     subscriber.emit('ready');
     expect(log).not.toHaveBeenCalled();
 
-    const outage = new Error('connect ECONNREFUSED');
-    subscriber.emit('error', outage);
+    subscriber.emit('error', new Error('connect ECONNREFUSED'));
     subscriber.emit('error', new Error('connect ECONNREFUSED'));
     subscriber.emit('error', new Error('connect ECONNREFUSED'));
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('lost its Valkey connection'), outage);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('lost its Valkey connection (connect ECONNREFUSED)'));
+    expect(warn.mock.contexts[0]).toMatchObject({ context: RESOURCE_USAGE_LOG_CONTEXT });
 
     subscriber.emit('ready');
     expect(log).toHaveBeenCalledTimes(1);
@@ -97,12 +100,29 @@ describe('UsageAccessCache authorization cache invalidation subscriber', () => {
     const previous = subscriber;
     subscriber = new FakeSubscriber();
     await cache.subscribe();
-    previous.emit('error', new Error('late'));
     subscriber.emit('ready');
     subscriber.emit('error', new Error('connect ECONNREFUSED'));
-
     expect(log).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledTimes(2);
+
+    previous.emit('ready');
+    expect(log).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs the error message without the AUTH password, or the code when the message is empty', async () => {
+    await createCache(valkeyClient as unknown as Redis).subscribe();
+
+    const authError = Object.assign(new Error('WRONGPASS invalid username-password pair'), {
+      command: { name: 'auth', args: ['default', 'secret-password'] },
+    });
+    subscriber.emit('error', authError);
+    subscriber.emit('ready');
+    subscriber.emit('error', Object.assign(new AggregateError([]), { code: 'ECONNREFUSED' }));
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0]).toEqual([expect.stringContaining('(WRONGPASS invalid username-password pair)')]);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('secret-password');
+    expect(warn.mock.calls[1]).toEqual([expect.stringContaining('(ECONNREFUSED)')]);
   });
 
   it('still forwards invalidations from other instances', async () => {
