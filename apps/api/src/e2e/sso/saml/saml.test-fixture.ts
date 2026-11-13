@@ -50,6 +50,7 @@ import { SSOSamlStrategy } from '../../../users-and-auth/auth/sso/saml/saml.stra
 import type { SSOSamlRequest } from '../../../users-and-auth/auth/sso/saml/saml.types';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
+import { composeUsersService } from '../../../users-and-auth/users/fixtures/compose.test-fixture';
 
 jest.setTimeout(120_000);
 
@@ -176,7 +177,7 @@ beforeAll(async () => {
     new EventEmitter2(),
     null,
   );
-  usersService = new UsersService(
+  usersService = composeUsersService(
     userRepo,
     authDetailRepo,
     sessionRepo,
