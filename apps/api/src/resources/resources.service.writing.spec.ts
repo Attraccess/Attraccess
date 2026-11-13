@@ -1,7 +1,13 @@
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { DocumentationType, Resource, ResourceType } from '@attraccess/database-entities';
+import {
+  DocumentationType,
+  Resource,
+  ResourceFlowEdge,
+  ResourceFlowNode,
+  ResourceType,
+} from '@attraccess/database-entities';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -391,6 +397,12 @@ describe('ResourcesService', () => {
           details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine, flowNodeCount: 3, flowEdgeCount: 2 },
         }),
       );
+      const { count } = (deleteResourceScope.resourceRepository as unknown as { manager: { count: jest.Mock } })
+        .manager;
+      expect(count.mock.calls).toEqual([
+        [ResourceFlowNode, { where: { resourceId: 1 } }],
+        [ResourceFlowEdge, { where: { resourceId: 1 } }],
+      ]);
     });
 
     it('bounds an oversized resource name in a deletion audit projection', async () => {

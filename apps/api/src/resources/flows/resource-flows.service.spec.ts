@@ -50,6 +50,7 @@ describe('saving MQTT flow subscriptions', () => {
   const mqtt = createMock<MqttClientService>();
   const events = new EventEmitter2();
   const resources = createMock<Repository<Resource>>();
+  const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
   const service = new ResourceFlowsService(
     createMock<Repository<ResourceFlowNode>>({ manager }),
     createMock<Repository<ResourceFlowEdge>>(),
@@ -57,7 +58,7 @@ describe('saving MQTT flow subscriptions', () => {
     mqtt,
     events,
     createMock<Repository<Flow>>(),
-    { record: jest.fn().mockResolvedValue({}) } as never,
+    audit as never,
   );
   const node = (id: string, type: ResourceFlowNodeType, topic: string, serverId = 2) => ({
     id,
@@ -166,13 +167,24 @@ describe('saving MQTT flow subscriptions', () => {
     expect(manager.delete).not.toHaveBeenCalled();
     expect(manager.save).not.toHaveBeenCalled();
     expect(events.emit).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
   it('does not announce a flow change when persistence fails', async () => {
     manager.save.mockRejectedValueOnce(new Error('database rejected write'));
+    oldNodes.push(
+      Object.assign(new ResourceFlowNode(), node('old', ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, 'a')),
+    );
     await expect(service.saveResourceFlow(1, { nodes: [], edges: [] }, testActor)).rejects.toThrow(
       'database rejected write',
     );
     expect(events.emit).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+  it('records nothing for a missing resource', async () => {
+    resources.findOne.mockResolvedValue(null);
+    await expect(service.saveResourceFlow(99, { nodes: [], edges: [] }, testActor)).rejects.toThrow();
+    expect(manager.transaction).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 });
 
@@ -392,6 +404,7 @@ describe('saving a resource flow with ids owned by another flow', () => {
   it('rejects ids of a global flow with 400 naming them and leaves both flows untouched', async () => {
     await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'), testActor);
     await db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'), testActor);
+    db.audit.record.mockClear();
 
     const saving = db.resourceFlows.saveResourceFlow(
       db.resource.id,
@@ -409,6 +422,7 @@ describe('saving a resource flow with ids owned by another flow', () => {
         edgeIds: ['g-edge'],
       },
     });
+    expect(db.audit.record).not.toHaveBeenCalled();
 
     const owners = async () =>
       (await db.nodes.find({ order: { id: 'ASC' } })).map(({ id, resourceId, flowId }) => ({ id, resourceId, flowId }));

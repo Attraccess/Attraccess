@@ -243,6 +243,128 @@ describe('canvasSaveDetails', () => {
       expect(bytes(details)).toBeLessThanOrEqual(4096);
     });
   });
+
+  describe('degrades the snapshot before it shortens a diff list', () => {
+    /** Every node's data changes, so every node is in `changedNodes`. */
+    const editAll = (before: AuditCanvas): AuditCanvas => ({
+      nodes: before.nodes.map((n) => ({ ...n, data: { ...n.data, v: 2 } })),
+      edges: before.edges,
+    });
+
+    it('drops positions and keeps every listed node when the full snapshot fits only without the lists', () => {
+      const before: AuditCanvas = {
+        nodes: Array.from({ length: 14 }, (_, i) => ({
+          ...node(`node-${i}`, { body: 'x'.repeat(120), v: 1 }),
+          position: { x: 123456.789, y: 98765.4321 },
+        })),
+        edges: [],
+      };
+      const details = detailsFor(before, editAll(before));
+      // The full snapshot alone would fit, so shortening the lists first would have kept the positions.
+      const fullSnapshot = JSON.stringify({ nodes: before.nodes, edges: [] });
+      expect(bytes({ ...details, 'before.snapshot': fullSnapshot, changedNodes: '[]' })).toBeLessThanOrEqual(4096);
+
+      expect(details.snapshotDetail).toBe('no_positions');
+      expect(JSON.parse(details.changedNodes as string)).toHaveLength(14);
+      expect(details.changedNodeCount).toBe(14);
+      expect(JSON.parse(details['before.snapshot'] as string).nodes[13]).toEqual({
+        id: 'node-13',
+        type: 'output.http',
+        data: { body: 'x'.repeat(120), v: 1 },
+      });
+      expect(bytes(details)).toBeLessThanOrEqual(4096);
+      expect(projected('resource_flow.updated', details)).not.toBeNull();
+    });
+
+    it('omits the snapshot and keeps every listed node when the lists fit alone', () => {
+      const before: AuditCanvas = {
+        nodes: Array.from({ length: 50 }, (_, i) => node(`node-${i}`, { v: 1 })),
+        edges: [],
+      };
+      const details = detailsFor(before, editAll(before));
+      expect(details.snapshotDetail).toBe('omitted');
+      expect(details).not.toHaveProperty('before.snapshot');
+      expect(JSON.parse(details.changedNodes as string)).toHaveLength(50);
+      expect(details).toMatchObject({ changedNodeCount: 50, 'before.nodeCount': 50, 'after.nodeCount': 50 });
+      expect(bytes(details)).toBeLessThanOrEqual(4096);
+      expect(projected('resource_flow.updated', details)).not.toBeNull();
+    });
+
+    it('shortens the lists only once the snapshot is gone, keeping a prefix and the full counts', () => {
+      const before: AuditCanvas = {
+        nodes: Array.from({ length: 150 }, (_, i) => node(`node-${i}`, { v: 1 })),
+        edges: [],
+      };
+      const details = detailsFor(before, editAll(before));
+      expect(details.snapshotDetail).toBe('omitted');
+      const listed = JSON.parse(details.changedNodes as string);
+      expect(listed.length).toBeGreaterThan(0);
+      expect(listed.length).toBeLessThan(150);
+      expect(listed).toEqual(before.nodes.slice(0, listed.length).map(({ id, type }) => ({ id, type })));
+      expect(details).toMatchObject({ changedNodeCount: 150, 'before.nodeCount': 150 });
+      expect(bytes(details)).toBeLessThanOrEqual(4096);
+      expect(projected('resource_flow.updated', details)).not.toBeNull();
+    });
+  });
+
+  it('stores Set variables, Set payload and name/value entries of credentials redacted', () => {
+    const before: AuditCanvas = {
+      nodes: [
+        node('vars', { variables: [{ key: 'apiToken', value: 'S3CRET', scope: 'resource' }] }),
+        node('payload', { entries: [{ key: 'headers.Authorization', value: 'Bearer S3CRET' }] }),
+        node('named', { name: 'password', value: 'S3CRET' }),
+        node('plain', { key: 'mode', value: 'on' }),
+      ],
+      edges: [],
+    };
+    const details = detailsFor(before, emptied);
+    expect(JSON.stringify(details)).not.toContain('S3CRET');
+    const data = Object.fromEntries(
+      JSON.parse(details['before.snapshot'] as string).nodes.map((n: AuditFlowNode) => [n.id, n.data]),
+    );
+    expect(data).toEqual({
+      vars: { variables: [{ key: 'apiToken', value: '[redacted]', scope: 'resource' }] },
+      payload: { entries: [{ key: 'headers.Authorization', value: '[redacted]' }] },
+      named: { name: 'password', value: '[redacted]' },
+      plain: { key: 'mode', value: 'on' },
+    });
+  });
+});
+
+describe('redactFlowData in texts and header lists', () => {
+  it('masks URL passwords and secret query parameters, and keeps other parameters', () => {
+    expect(redactFlowData({ url: 'https://user:S3CRET@host/x?api_key=S3CRET&page=2' })).toEqual({
+      url: 'https://user:[redacted]@host/x?api_key=[redacted]&page=2',
+    });
+  });
+
+  it('masks every string inside an array under headers', () => {
+    expect(
+      redactFlowData({
+        headers: ['Authorization: Bearer S3CRET', 'X-Plain: v'],
+        request: { headers: [{ name: 'Cookie', value: 'S3CRET' }] },
+      }),
+    ).toEqual({
+      headers: ['[redacted]', '[redacted]'],
+      request: { headers: [{ name: '[redacted]', value: '[redacted]' }] },
+    });
+  });
+
+  it('keeps a plain key/value entry', () => {
+    expect(redactFlowData({ entries: [{ key: 'mode', value: 'on' }] })).toEqual({
+      entries: [{ key: 'mode', value: 'on' }],
+    });
+  });
+});
+
+describe('diffCanvas edge handles', () => {
+  it('treats omitted handles like the null handles the database stores', () => {
+    const stored = { id: 'e1', source: 'a', target: 'b', sourceHandle: null, targetHandle: null };
+    const sent = { id: 'e1', source: 'a', target: 'b' };
+    expect(
+      diffCanvas({ nodes: [node('a'), node('b')], edges: [stored] }, { nodes: [node('a'), node('b')], edges: [sent] }),
+    ).toBeNull();
+  });
 });
 
 describe('canvasDetails for a deleted flow', () => {

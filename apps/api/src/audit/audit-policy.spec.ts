@@ -85,6 +85,53 @@ describe('audit storage safe snapshot', () => {
     ).not.toBeNull();
   });
 
+  it('rejects flow metadata fields outside each event and flow events about a resource', () => {
+    const base = { operationId: randomUUID(), actorId: 42, subjectId: 7, subjectType: 'flow' as const };
+    const valid = {
+      'flow.created': { 'after.name': 'Door bell', 'after.enabled': 1, 'after.description': 'rings' },
+      'flow.updated': { flowName: 'Door bell', 'before.enabled': 1, 'after.enabled': 0, changedFields: '["enabled"]' },
+      'flow.deleted': {
+        'before.name': 'Door bell',
+        'before.enabled': 1,
+        'before.snapshot': '{}',
+        snapshotDetail: 'full',
+      },
+    } as const;
+    const foreign = {
+      'flow.created': { 'before.snapshot': '{}' },
+      'flow.updated': { 'before.snapshot': '{}' },
+      'flow.deleted': { flowName: 'Door bell' },
+    } as const;
+    for (const action of ['flow.created', 'flow.updated', 'flow.deleted'] as const) {
+      const event = { ...base, action, details: valid[action] };
+      expect(projectResourceAuditEvent(event)).toEqual(event);
+      expect(projectResourceAuditEvent({ ...event, details: { ...valid[action], ...foreign[action] } })).toBeNull();
+      expect(projectResourceAuditEvent({ ...event, subjectType: 'resource' })).toBeNull();
+    }
+  });
+
+  it('accepts a deleted flow variable about a resource and resource flow saves about a resource only', () => {
+    const base = { operationId: randomUUID(), actorId: 42, subjectId: 7 };
+    const deleted = {
+      ...base,
+      action: 'flow_variable.deleted' as const,
+      subjectType: 'resource' as const,
+      details: { scope: 'resource', key: 'mode', valueType: 'string', 'before.value': '"on"' },
+    };
+    expect(projectResourceAuditEvent(deleted)).toEqual(deleted);
+    expect(projectResourceAuditEvent({ ...deleted, subjectType: 'flow' })).toBeNull();
+
+    const saved = {
+      ...base,
+      action: 'resource_flow.updated' as const,
+      subjectType: 'resource' as const,
+      details: { 'before.nodeCount': 0, 'after.nodeCount': 1, snapshotDetail: 'full' },
+    };
+    expect(projectResourceAuditEvent(saved)).toEqual(saved);
+    expect(projectResourceAuditEvent({ ...saved, subjectType: 'resource_group' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...saved, subjectType: undefined })).toBeNull();
+  });
+
   it('accepts generated role keys truncated after a separator', () => {
     expect(
       projectIdentityAuditEvent({

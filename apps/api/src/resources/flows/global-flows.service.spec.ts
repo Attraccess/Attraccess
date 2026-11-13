@@ -118,6 +118,29 @@ describe('GlobalFlowsService', () => {
       response: { message: [expect.stringContaining('btn-1')], nodes: [{ nodeId: 'btn-1', nodeType: T.INPUT_BUTTON }] },
     });
     expect(manager.save).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('records nothing when the database rejects a canvas save', async () => {
+    manager.save.mockRejectedValueOnce(new Error('database rejected write'));
+    await expect(
+      service.saveCanvas(
+        5,
+        { nodes: [{ id: 'a', type: T.INPUT_RESOURCE_USAGE_STARTED, position, data: {} }], edges: [] },
+        testActor,
+      ),
+    ).rejects.toThrow('database rejected write');
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('records nothing when the database rejects a create, an update or a delete', async () => {
+    flowRepository.save.mockRejectedValueOnce(new Error('database rejected write'));
+    await expect(service.create({ name: 'New' }, testActor)).rejects.toThrow('database rejected write');
+    flowRepository.save.mockRejectedValueOnce(new Error('database rejected write'));
+    await expect(service.update(5, { name: 'Renamed' }, testActor)).rejects.toThrow('database rejected write');
+    manager.delete.mockRejectedValueOnce(new Error('database rejected delete'));
+    await expect(service.delete(5, testActor)).rejects.toThrow('database rejected delete');
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('subscribes to MQTT topics of new nodes of an enabled flow only', async () => {
@@ -132,7 +155,7 @@ describe('GlobalFlowsService', () => {
 
     // Turning the flow on subscribes the topics of its stored nodes.
     nodeRepository.find.mockResolvedValue([{ ...mqtt, flowId: 5 }]);
-    await service.update(5, { enabled: true });
+    await service.update(5, { enabled: true }, testActor);
     expect(subscribe).toHaveBeenCalledWith(2, 'a/b');
   });
 
@@ -144,20 +167,24 @@ describe('GlobalFlowsService', () => {
   describe('name, description and enabled', () => {
     it('rejects a null or blank name and a null enabled with 400 and saves nothing', async () => {
       for (const dto of [{ name: null }, { name: '   ' }, { enabled: null }]) {
-        await expect(service.update(5, dto as never)).rejects.toBeInstanceOf(BadRequestException);
+        await expect(service.update(5, dto as never, testActor)).rejects.toBeInstanceOf(BadRequestException);
       }
-      await expect(service.create({ name: '  ' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.create({ name: '  ' }, testActor)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.update(5, { enabled: 'yes' } as never, testActor)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
       expect(flowRepository.save).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
     });
 
     it('trims the name and clears the description with null', async () => {
       flowRepository.findOne.mockResolvedValue({ ...flow, description: 'old' });
-      await expect(service.update(5, { name: '  Renamed ', description: null })).resolves.toMatchObject({
+      await expect(service.update(5, { name: '  Renamed ', description: null }, testActor)).resolves.toMatchObject({
         name: 'Renamed',
         description: null,
         enabled: true,
       });
-      await expect(service.create({ name: ' New ', description: '  ' })).resolves.toMatchObject({
+      await expect(service.create({ name: ' New ', description: '  ' }, testActor)).resolves.toMatchObject({
         name: 'New',
         description: null,
         enabled: true,
@@ -195,7 +222,11 @@ describe('GlobalFlowsService', () => {
   it('reports a missing flow', async () => {
     flowRepository.findOne.mockResolvedValue(null);
     await expect(service.getCanvas(99)).rejects.toThrow(NotFoundException);
-    await expect(service.delete(99)).rejects.toThrow(NotFoundException);
+    await expect(service.delete(99, testActor)).rejects.toThrow(NotFoundException);
+    await expect(service.update(99, { name: 'Renamed' }, testActor)).rejects.toThrow(NotFoundException);
+    await expect(service.delete(99, testActor)).rejects.toThrow(NotFoundException);
+    await expect(service.saveCanvas(99, { nodes: [], edges: [] }, testActor)).rejects.toThrow(NotFoundException);
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('deletes the flow row only: nodes and edges go by cascade', async () => {
@@ -249,9 +280,11 @@ describe('GlobalFlowsService with a database', () => {
   it('rejects ids of a resource flow with 400 naming them and leaves both flows untouched', async () => {
     await db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'), testActor);
     await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'), testActor);
+    db.audit.record.mockClear();
 
     const saving = db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('r'), testActor);
     await expect(saving).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.audit.record).not.toHaveBeenCalled();
     await expect(saving).rejects.toMatchObject({
       response: { nodeIds: expect.arrayContaining(['r-start', 'r-http']), edgeIds: ['r-edge'] },
     });
@@ -313,7 +346,11 @@ describe('GlobalFlowsService with a database', () => {
     ]);
     await expect(db.globalFlows.get(foreign.id)).rejects.toBeInstanceOf(NotFoundException);
     await expect(db.globalFlows.getCanvas(foreign.id)).rejects.toBeInstanceOf(NotFoundException);
-    await expect(db.globalFlows.update(foreign.id, { enabled: false })).rejects.toBeInstanceOf(NotFoundException);
-    await expect(db.globalFlows.delete(foreign.id)).rejects.toBeInstanceOf(NotFoundException);
+    db.audit.record.mockClear();
+    await expect(db.globalFlows.update(foreign.id, { enabled: false }, testActor)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(db.globalFlows.delete(foreign.id, testActor)).rejects.toBeInstanceOf(NotFoundException);
+    expect(db.audit.record).not.toHaveBeenCalled();
   });
 });
