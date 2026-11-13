@@ -232,6 +232,12 @@ describe('MatterBackupService', () => {
   });
 });
 
+/** Polls until the condition holds (a loaded machine can delay the scheduler's timers by far more than a fixed sleep). */
+const until = async (condition: () => Promise<boolean>, timeoutMs = 5_000) => {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await condition()) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+};
+
 describe('MatterBackupSchedulerService', () => {
   let h: FabricHarness;
   afterEach(() => h.close());
@@ -261,7 +267,7 @@ describe('MatterBackupSchedulerService', () => {
     await make();
     h.scheduler.onModuleInit();
     await h.fabric.create(undefined, ADMIN);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await until(async () => (await h.fabric.status()).backups.nextScheduledAt !== null);
     const latest = (await h.fabric.status()).backups.lastSuccessfulAt as string;
     expect((await h.fabric.status()).backups.nextScheduledAt).toBe(
       new Date(new Date(latest).getTime() + 24 * 3_600_000).toISOString(),
@@ -297,11 +303,29 @@ describe('MatterBackupSchedulerService', () => {
     await h.fabric.detect('event');
     h.backend.generationCounter = 3;
     await h.fabric.detect('event');
-    await new Promise((resolve) => setTimeout(resolve, 120));
+    await until(async () => (await h.backups.list()).some((entry) => entry.trigger === 'fabric_changed'));
+    // A second backup for the same burst would show up within a few debounce periods.
+    await new Promise((resolve) => setTimeout(resolve, 100));
     const list = await h.backups.list();
     expect(list.filter((entry) => entry.trigger === 'fabric_changed')).toHaveLength(1);
     expect(list[0].fabricGeneration).toBe(3);
     h.scheduler.onModuleDestroy();
+  });
+
+  it('does not bring the next run back when the connection dropped during a check', async () => {
+    await make();
+    await h.fabric.create(undefined, ADMIN);
+    await h.dataSource.query(`UPDATE plugin_matter_backups SET created_at = '2020-01-01T00:00:00.000Z'`);
+    h.connection.setState('connected');
+    const backup = h.backups.backup.bind(h.backups);
+    jest.spyOn(h.backups, 'backup').mockImplementation(async (...args) => {
+      const result = await backup(...args);
+      h.connection.setState('degraded');
+      return result;
+    });
+    await h.scheduler.tick();
+    expect(await h.backups.list()).toHaveLength(2);
+    expect((await h.fabric.status()).backups.nextScheduledAt).toBeNull();
   });
 
   it('skips the change backup when the newest backup already holds the generation', async () => {
@@ -319,7 +343,7 @@ describe('MatterBackupSchedulerService', () => {
     h.connection.setState('degraded');
     h.scheduler.onModuleInit();
     h.connection.setState('connected');
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await until(async () => (await h.backups.list()).length > 1);
     expect((await h.backups.list())[0].trigger).toBe('daily');
     h.connection.setState('degraded');
     expect((await h.fabric.status()).backups.nextScheduledAt).toBeNull();

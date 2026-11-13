@@ -90,13 +90,16 @@ export class MatterBackupSchedulerService implements OnModuleInit, OnModuleDestr
     if (!(await this.fabricExists())) return this.backups.setNextScheduledAt(null);
     const latest = (await this.backups.summary()).lastSuccessfulAt;
     const dueAt = latest ? new Date(latest).getTime() + this.timing.intervalMs : Date.now();
-    this.backups.setNextScheduledAt(new Date(Math.max(dueAt, Date.now())).toISOString());
+    this.publishNext(new Date(Math.max(dueAt, Date.now())).toISOString());
     if (Date.now() < dueAt) return;
     await this.backups.backup('daily').catch(() => undefined);
     const after = (await this.backups.summary()).lastSuccessfulAt;
-    this.backups.setNextScheduledAt(
-      new Date((after ? new Date(after).getTime() : Date.now()) + this.timing.intervalMs).toISOString(),
-    );
+    this.publishNext(new Date((after ? new Date(after).getTime() : Date.now()) + this.timing.intervalMs).toISOString());
+  }
+
+  /** The connection may have dropped while a check was running; a stale check must not bring the next run back. */
+  private publishNext(next: string | null): void {
+    this.backups.setNextScheduledAt(this.connection.status().state === 'connected' ? next : null);
   }
 
   /** The next run is one interval after the newest backup; shown right after a backup, not only after the next check. */
@@ -105,9 +108,7 @@ export class MatterBackupSchedulerService implements OnModuleInit, OnModuleDestr
     const latest = (await this.backups.summary()).lastSuccessfulAt;
     // The connection may have gone away while the summary was read.
     if (this.checkTimer === undefined) return;
-    this.backups.setNextScheduledAt(
-      latest ? new Date(new Date(latest).getTime() + this.timing.intervalMs).toISOString() : null,
-    );
+    this.publishNext(latest ? new Date(new Date(latest).getTime() + this.timing.intervalMs).toISOString() : null);
   }
 
   private async fabricExists(): Promise<boolean> {
