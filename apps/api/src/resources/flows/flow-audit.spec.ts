@@ -350,6 +350,14 @@ describe('redactFlowData in texts and header lists', () => {
     });
   });
 
+  it('scans long texts in linear time', () => {
+    const texts = ['a-'.repeat(50_000), 'a.'.repeat(50_000), '?'.repeat(100_000), '?a'.repeat(50_000)];
+    const started = Date.now();
+    for (const text of texts) expect(redactFlowData({ text })).toEqual({ text });
+    // Quadratic scans took tens of seconds on these texts.
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
   it('keeps a plain key/value entry', () => {
     expect(redactFlowData({ entries: [{ key: 'mode', value: 'on' }] })).toEqual({
       entries: [{ key: 'mode', value: 'on' }],

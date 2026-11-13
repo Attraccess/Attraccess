@@ -161,7 +161,9 @@ export class GlobalFlowsService {
     await this.nodeRepository.manager.transaction(async (manager) => {
       const nodes = await manager.find(ResourceFlowNode, { where: { flowId } });
       const edges = await manager.find(ResourceFlowEdge, { where: { flowId } });
-      await manager.delete(Flow, { id: flowId });
+      const deleted = await manager.delete(Flow, { id: flowId });
+      // A concurrent delete got there first and recorded it.
+      if (!deleted.affected) return;
       await this.recordFlow(
         'flow.deleted',
         actor,

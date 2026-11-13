@@ -32,7 +32,7 @@ describe('GlobalFlowsService', () => {
   const flow = Object.assign(new Flow(), { id: 5, name: 'Notify', description: null, enabled: true, scope: 'global' });
   const manager = {
     find: jest.fn(),
-    delete: jest.fn(),
+    delete: jest.fn(async () => ({ affected: 1, raw: [] })),
     save: jest.fn(async (_entity: unknown, rows: unknown) => rows),
   };
   const flowRepository = {
@@ -234,6 +234,13 @@ describe('GlobalFlowsService', () => {
     await service.delete(5, testActor);
     expect(manager.delete).toHaveBeenCalledWith(Flow, { id: 5 });
     expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'flow.deleted' }), manager);
+  });
+
+  it('records nothing when a concurrent delete removed the flow first', async () => {
+    manager.find.mockResolvedValue([]);
+    manager.delete.mockResolvedValueOnce({ affected: 0, raw: [] });
+    await service.delete(5, testActor);
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('refuses to resolve a resource-only plugin node for a global flow', async () => {

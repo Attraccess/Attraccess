@@ -4,10 +4,13 @@ import { AUDIT_DETAILS_BYTE_LIMIT, fitAuditText, withinDetailsLimit } from '../.
 export const REDACTED = '[redacted]';
 
 const SECRET_KEY = /pass|secret|token|auth|api[-_]?key|credential/i;
-/** The password in `scheme://user:password@host`. */
-const URL_PASSWORD = /(\b[a-z][a-z\d+.-]*:\/\/[^\s/:@]*:)[^\s/@]*@/gi;
+/**
+ * The password in `scheme://user:password@host`. The scheme starts only where no scheme character precedes it, and a
+ * parameter name never spans a `?`, so both scans stay linear on long user texts.
+ */
+const URL_PASSWORD = /((?<![a-z\d+.-])[a-z][a-z\d+.-]*:\/\/[^\s/:@]*:)[^\s/@]*@/gi;
 /** A `name=value` query parameter. */
-const QUERY_PARAMETER = /([?&])([^=&#\s]+)=([^&#\s]*)/g;
+const QUERY_PARAMETER = /([?&])([^=&#\s?]+)=([^&#\s]*)/g;
 
 /** Longest flow name recorded with a flow event, in JSON bytes. */
 export const FLOW_NAME_BYTES = 256;
