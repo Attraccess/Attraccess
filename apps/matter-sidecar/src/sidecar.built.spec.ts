@@ -87,10 +87,17 @@ describe('built sidecar process', () => {
     });
     expect(created.status).toBe(200);
     const loose: string[] = [];
+    // matter.js writes through temporary files that it renames while the sidecar runs: one that vanished is not loose.
     const walk = (directory: string) => {
       for (const name of readdirSync(directory)) {
         const path = join(directory, name);
-        const stat = statSync(path);
+        let stat;
+        try {
+          stat = statSync(path);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+          throw error;
+        }
         if ((stat.mode & 0o077) !== 0) loose.push(path);
         if (stat.isDirectory()) walk(path);
       }

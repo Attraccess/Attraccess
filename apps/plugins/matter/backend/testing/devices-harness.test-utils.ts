@@ -11,6 +11,7 @@ import { BACKUP_ENTITIES } from '../backup/entities';
 import { DeviceAuditService } from '../devices/audit.service';
 import { DEVICE_ENTITIES } from '../devices/entities';
 import { MatterLifecycleService } from '../devices/lifecycle.service';
+import { MatterFabricGuard } from '../fabric/guard';
 import { MatterReconciliationService } from '../devices/reconciliation.service';
 import { MatterStateService } from '../devices/state.service';
 import * as migrations from '../migrations';
@@ -157,8 +158,9 @@ export async function createHarness() {
   const sidecar = new ScriptedSidecar();
   const connectionService = { connection: sidecar } as unknown as MatterConnectionService;
   const auditService = new DeviceAuditService(context);
+  const guard = new MatterFabricGuard();
   const state = new MatterStateService(context);
-  const reconciliation = new MatterReconciliationService(context, connectionService, auditService);
+  const reconciliation = new MatterReconciliationService(context, connectionService, auditService, guard);
   const lifecycle = new MatterLifecycleService(context, connectionService, auditService);
   const actions = () => audit.mock.calls.map((call) => (call as unknown as [{ action: string }])[0].action);
   return {
@@ -168,6 +170,7 @@ export async function createHarness() {
     actions,
     sidecar,
     state,
+    guard,
     reconciliation,
     lifecycle,
     reconcile: (list: NodeListView | Error) => {

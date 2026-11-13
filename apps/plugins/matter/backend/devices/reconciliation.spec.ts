@@ -400,6 +400,37 @@ describe('Matter reconciliation', () => {
     expect(manual).toMatchObject({ principal: { userId: 7 }, details: { initiator: 'administrator' } });
   });
 
+  describe('around a restore', () => {
+    it('applies nothing while a restore is replacing the tables', async () => {
+      h.guard.restoring = true;
+      const status = await h.reconcile(inventory('1', [node('5')]));
+      expect(status).toMatchObject({
+        lastResult: 'skipped_unavailable',
+        lastSummary: { reason: 'restore_in_progress' },
+      });
+      expect(h.sidecar.requests).not.toContain('inventory.list');
+      expect(await nodes(h).count()).toBe(0);
+    });
+
+    it('drops an inventory that was read before a restore and would be applied after it', async () => {
+      h.sidecar.list = inventory('1', [node('5')]);
+      h.sidecar.listDelayMs = 30;
+      const run = h.reconciliation.request();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      h.guard.restoring = true;
+      h.guard.restoring = false;
+      expect(await run).toMatchObject({
+        lastResult: 'skipped_unavailable',
+        lastSummary: { reason: 'restore_in_progress' },
+      });
+      expect(await nodes(h).count()).toBe(0);
+      // The follow-up the restore requests reads the sidecar afresh.
+      h.sidecar.listDelayMs = 0;
+      expect((await h.reconciliation.request()).lastResult).toBe('applied');
+      expect(await nodes(h).count()).toBe(1);
+    });
+  });
+
   describe('single flight', () => {
     it('coalesces triggers that arrive during a run into one follow-up run', async () => {
       h.sidecar.list = inventory('1', [node('5')]);

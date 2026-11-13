@@ -29,7 +29,7 @@ export async function createFabricHarness(
   const migrationReader: PluginMigrationReader = async () =>
     ((await h.dataSource.query('SELECT name FROM migrations ORDER BY timestamp DESC LIMIT 1')) as { name: string }[])[0]
       ?.name ?? null;
-  const reconciliation = new MatterReconciliationService(h.context, connectionService, audit);
+  const reconciliation = new MatterReconciliationService(h.context, connectionService, audit, guard);
   const backups = new MatterBackupService(h.context, connectionService, keys, audit, guard, migrationReader);
   const fabric = new MatterFabricService(h.context, connectionService, guard, keys, backups, audit, reconciliation);
   const restore = new MatterRestoreService(

@@ -1,6 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import { MatterRecoveryKey } from '../backup/entities';
-import { MatterFabric } from '../devices/entities';
+import { MatterFabric, MatterNode } from '../devices/entities';
 import { ADMIN, createFabricHarness, type FabricHarness } from '../testing/fabric-harness.test-utils';
 import { parseRecoveryKey, recoveryKeyId } from '../backup/recovery-key';
 import { SidecarUnavailableError } from '../client/errors';
@@ -355,6 +355,34 @@ describe('MatterFabricService', () => {
         fabricId: h.backend.storage?.fabricId,
       });
       expect(h.actions()).toEqual(expect.arrayContaining(['matter.recovery_action_chosen', 'matter.fabric_created']));
+    });
+
+    it('start-new detaches the old fabric nodes as a fabric mismatch, even after a run saw the empty sidecar', async () => {
+      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ retiredAt: undefined });
+      await h.dataSource.getRepository(MatterNode).save({
+        id: 'n-1',
+        fabricRef: old.id,
+        nodeId: '5',
+        lifecycleState: 'claimed',
+        firstSeenAt: 't',
+        lastSeenAt: 't',
+        createdAt: 't',
+        updatedAt: 't',
+      } as MatterNode);
+      h.backend.clear();
+      await h.fabric.detect('connect');
+      // The sidecar was first seen without a fabric: the node is detached for that reason, which is not yet a mismatch.
+      await h.reconciliation.request();
+      expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
+        lifecycleState: 'detached',
+        detachedReason: 'fabric_absent',
+      });
+
+      await h.fabric.startNew(undefined, ADMIN);
+      expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
+        lifecycleState: 'detached',
+        detachedReason: 'fabric_mismatch',
+      });
     });
 
     it('start-new refuses while the sidecar still has a fabric, and outside recovery', async () => {

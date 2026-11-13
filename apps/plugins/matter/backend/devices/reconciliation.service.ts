@@ -5,6 +5,7 @@ import type { EntityManager } from 'typeorm';
 import { SidecarClientError } from '../client/errors';
 import type { SidecarConnection } from '../client/connection';
 import { MatterConnectionService } from '../connection/connection.service';
+import { MatterFabricGuard } from '../fabric/guard';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { DeviceAuditService, type AuditActor, type DeviceAuditSubject } from './audit.service';
 import { pruneCommands } from './commands';
@@ -74,6 +75,7 @@ export class MatterReconciliationService {
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
     @Inject(MatterConnectionService) private readonly connectionService: Pick<MatterConnectionService, 'connection'>,
     @Inject(DeviceAuditService) private readonly audit: DeviceAuditService,
+    @Inject(MatterFabricGuard) private readonly guard: MatterFabricGuard,
   ) {}
 
   private get source(): InventorySource {
@@ -159,6 +161,8 @@ export class MatterReconciliationService {
     });
     const status = this.source.status();
     if (status.state !== 'connected') return skipped(status.reason ?? status.state);
+    if (this.guard.restoring) return skipped('restore_in_progress');
+    const epoch = this.guard.epoch;
     const inventory = status.capabilities?.capabilities.find((entry) => entry.family === 'inventory');
     if (inventory && !inventory.available) return skipped('unsupported_capability');
 
@@ -176,11 +180,15 @@ export class MatterReconciliationService {
 
     const summary = emptySummary();
     summary.nodesListed = list.nodes.length;
-    await this.context.runSerialized(async (manager) => {
+    const applied = await this.context.runSerialized(async (manager) => {
+      // A restore ran (or is running) since the inventory was read: it replaced the tables this list was meant for.
+      if (this.guard.restoring || this.guard.epoch !== epoch) return false;
       const now = new Date();
       await this.apply(manager, list, summary, audits, now.toISOString());
       await pruneCommands(manager, now);
+      return true;
     });
+    if (!applied) return skipped('restore_in_progress');
     summary.changeCount = totalChanges(summary.changes);
     return { result: 'applied', summary, fabricId: list.fabricId };
   }

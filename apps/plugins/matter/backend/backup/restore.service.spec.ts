@@ -124,6 +124,23 @@ describe('MatterRestoreService', () => {
       ]);
     });
 
+    it('does not let a reconciliation that starts during the restore touch the tables', async () => {
+      await disaster();
+      const validation = await h.restore.validate(stored(), undefined, ADMIN);
+      let overlapping: Promise<unknown> | undefined;
+      const handle = h.backend.handle.bind(h.backend);
+      jest.spyOn(h.backend, 'handle').mockImplementation((operation, body) => {
+        if (operation === 'backup.restore.commit') overlapping = h.reconciliation.request();
+        return handle(operation, body);
+      });
+      await h.restore.confirm(validation.validationId, undefined, ADMIN);
+      await overlapping;
+      // Only the run the restore asks for afterwards read the inventory: the overlapping one never did.
+      expect(h.connection.requests.filter((operation) => operation === 'inventory.list')).toHaveLength(1);
+      expect(await nodeIds()).toEqual(['5', '6']);
+      expect(h.guard.restoring).toBe(false);
+    });
+
     it('also restores onto a sidecar that needs recovery', async () => {
       h.backend.enterRecovery();
       await h.fabric.detect('connect');

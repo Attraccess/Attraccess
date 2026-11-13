@@ -47,7 +47,7 @@ describe('backup and restore over the HTTP client', () => {
       (
         (await h.dataSource.query('SELECT name FROM migrations ORDER BY timestamp DESC LIMIT 1')) as { name: string }[]
       )[0]?.name ?? null;
-    const reconciliation = new MatterReconciliationService(h.context, connection, audit);
+    const reconciliation = new MatterReconciliationService(h.context, connection, audit, guard);
     backups = new MatterBackupService(h.context, connection, keys, audit, guard, reader);
     fabric = new MatterFabricService(h.context, connection, guard, keys, backups, audit, reconciliation);
     restore = new MatterRestoreService(

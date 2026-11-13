@@ -11,6 +11,27 @@ export class MatterFabricGuard {
   private current: MismatchKind | null = null;
   /** True while the plugin itself changes the fabric (create, restore): backups wait and events are not judged. */
   busy = false;
+  private restoringNow = false;
+  private restoreEpoch = 0;
+
+  /**
+   * True from the moment a restore commits on the sidecar until the plugin's tables are replaced. An inventory read
+   * in that window, or one that straddles it, describes a sidecar the tables no longer match: reconciliation must not
+   * apply it (under the mismatch rules it could detach the restored nodes for good).
+   */
+  get restoring(): boolean {
+    return this.restoringNow;
+  }
+
+  set restoring(value: boolean) {
+    if (value !== this.restoringNow) this.restoreEpoch += 1;
+    this.restoringNow = value;
+  }
+
+  /** Changes whenever a restore starts or ends, so a reconciliation can tell that one ran while it was reading. */
+  get epoch(): number {
+    return this.restoreEpoch;
+  }
 
   get mismatch(): MismatchKind | null {
     return this.current;

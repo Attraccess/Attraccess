@@ -342,6 +342,7 @@ export class MatterRestoreService implements OnModuleDestroy {
       } catch (error) {
         // Whatever the outcome, settle again whether the sidecar and the plugin's records agree.
         this.guard.busy = false;
+        this.guard.restoring = false;
         await this.fabric.detect('connect').catch(() => undefined);
         throw error;
       }
@@ -384,6 +385,7 @@ export class MatterRestoreService implements OnModuleDestroy {
     }
 
     this.guard.busy = true;
+    this.guard.restoring = true;
     let committed;
     try {
       try {
@@ -455,6 +457,7 @@ export class MatterRestoreService implements OnModuleDestroy {
       );
     } finally {
       this.guard.busy = false;
+      this.guard.restoring = false;
     }
 
     await this.fabric.detect('connect');
