@@ -232,8 +232,8 @@ export class UsageAccessCache {
       return;
     }
     this.authorizationCacheSubscriber = this.valkeyClient.duplicate();
-    // ioredis emits `error` on every reconnect attempt; log each outage once, and only the message: AUTH errors
-    // carry the password in `error.command.args`.
+    // ioredis emits `error` on every reconnect attempt; log each outage once. Log only error messages here: AUTH
+    // errors carry the password in `error.command.args`.
     let disconnected = false;
     this.authorizationCacheSubscriber.on('error', (error: NodeJS.ErrnoException) => {
       if (disconnected) {
@@ -269,7 +269,8 @@ export class UsageAccessCache {
     try {
       await this.authorizationCacheSubscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL);
     } catch (error) {
-      this.logger.error('Failed to subscribe to authorization cache invalidations', error);
+      const { message, code } = error as NodeJS.ErrnoException;
+      this.logger.error(`Failed to subscribe to authorization cache invalidations (${message || code})`);
       this.authorizationCacheSubscriber.disconnect();
       this.authorizationCacheSubscriber = null;
     }

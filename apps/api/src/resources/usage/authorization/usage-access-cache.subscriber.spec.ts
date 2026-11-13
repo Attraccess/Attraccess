@@ -51,6 +51,9 @@ describe('UsageAccessCache authorization cache invalidation subscriber', () => {
 
   it('does nothing without Valkey', async () => {
     await expect(createCache(null).subscribe()).resolves.toBeUndefined();
+    expect(warn).not.toHaveBeenCalled();
+    expect(log).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
   });
 
   it('listens for errors before it subscribes', async () => {
@@ -107,6 +110,8 @@ describe('UsageAccessCache authorization cache invalidation subscriber', () => {
 
     previous.emit('ready');
     expect(log).toHaveBeenCalledTimes(1);
+    subscriber.emit('error', new Error('connect ECONNREFUSED'));
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 
   it('logs the error message without the AUTH password, or the code when the message is empty', async () => {
@@ -146,14 +151,22 @@ describe('UsageAccessCache authorization cache invalidation subscriber', () => {
     );
   });
 
-  it('gives up and disconnects when the initial subscribe fails', async () => {
-    subscriber.subscribe.mockRejectedValue(new Error('down'));
+  it('gives up and disconnects when the initial subscribe fails, logging only the message', async () => {
+    subscriber.subscribe.mockRejectedValue(
+      Object.assign(new Error('WRONGPASS invalid username-password pair'), {
+        command: { name: 'auth', args: ['default', 'secret-password'] },
+      }),
+    );
     const cache = createCache(valkeyClient as unknown as Redis);
 
     await cache.subscribe();
-    cache.unsubscribe();
 
-    expect(error).toHaveBeenCalledWith('Failed to subscribe to authorization cache invalidations', expect.any(Error));
+    expect(subscriber.disconnect).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith(
+      'Failed to subscribe to authorization cache invalidations (WRONGPASS invalid username-password pair)',
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain('secret-password');
+    cache.unsubscribe();
     expect(subscriber.disconnect).toHaveBeenCalledTimes(1);
   });
 });
