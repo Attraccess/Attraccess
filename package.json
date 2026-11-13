@@ -244,7 +244,7 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "happy-dom": "^20.11.0",
     "husky": "^9.1.7",
-    "ink": "^7.1.1",
+    "ink": "^8.0.0",
     "istanbul-lib-coverage": "3.2.2",
     "istanbul-lib-instrument": "6.0.3",
     "jest": "30.4.2",
