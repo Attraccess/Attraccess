@@ -71,10 +71,11 @@ If you want to permanently delete your account:
 1. Navigate to **My Account**
 2. Open **Delete account** under **Advanced**
 3. Click **Delete account**
-4. Confirm the deletion
+4. Confirm the request. Attraccess sends a confirmation link to your email address
+5. Open the link and click **Delete account**. Opening the link alone does not delete anything; click **Cancel** to keep your account
 
 > [!WARNING]
-> Deleting your account is permanent and cannot be undone. All your data, usage history, and project memberships will be removed.
+> Deleting your account is permanent and cannot be undone. Your personal data is anonymized, you are signed out and you can no longer sign in.
 
 ## See Also
 

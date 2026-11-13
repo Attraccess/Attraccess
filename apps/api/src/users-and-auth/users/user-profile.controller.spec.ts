@@ -10,6 +10,13 @@ describe('UserProfileController', () => {
     const handler = UserProfileController.prototype.confirmDeleteAccount;
     expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('me/delete-confirm');
     expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(RequestMethod.POST);
+    const prototype = UserProfileController.prototype as unknown as Record<string, object>;
+    const confirmRoutes = Object.getOwnPropertyNames(prototype)
+      .filter(
+        (name) => name !== 'constructor' && Reflect.getMetadata(PATH_METADATA, prototype[name]) === 'me/delete-confirm',
+      )
+      .map((name) => Reflect.getMetadata(METHOD_METADATA, prototype[name]));
+    expect(confirmRoutes).toEqual([RequestMethod.POST]);
   });
 
   it('rate limits account deletion confirmation requests', () => {

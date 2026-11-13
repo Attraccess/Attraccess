@@ -73,7 +73,9 @@ export function StatusDialog(props: Readonly<StatusDialogProps>) {
             <AlertDialog.Heading>{title}</AlertDialog.Heading>
           </AlertDialog.Header>
           {children !== undefined && (
-            <AlertDialog.Body>{typeof children === 'string' ? <p className="break-words">{children}</p> : children}</AlertDialog.Body>
+            <AlertDialog.Body>
+              {typeof children === 'string' ? <p className="break-words">{children}</p> : children}
+            </AlertDialog.Body>
           )}
           <AlertDialog.Footer>
             <Button

@@ -71,10 +71,11 @@ Wenn Sie Ihr Konto dauerhaft löschen möchten:
 1. Navigieren Sie zu **Mein Konto**
 2. Öffnen Sie **Konto löschen** unter **Erweitert**
 3. Klicken Sie auf **Konto löschen**
-4. Bestätigen Sie die Löschung
+4. Bestätigen Sie die Anfrage. Attraccess sendet einen Bestätigungslink an Ihre E-Mail-Adresse
+5. Öffnen Sie den Link und klicken Sie auf **Konto löschen**. Das Öffnen des Links allein löscht nichts; mit **Abbrechen** behalten Sie Ihr Konto
 
 > [!WARNING]
-> Das Löschen Ihres Kontos ist dauerhaft und kann nicht rückgängig gemacht werden. Alle Ihre Daten, Ihr Nutzungsverlauf und Ihre Projektmitgliedschaften werden entfernt.
+> Das Löschen Ihres Kontos ist dauerhaft und kann nicht rückgängig gemacht werden. Ihre persönlichen Daten werden anonymisiert, Sie werden abgemeldet und können sich nicht mehr anmelden.
 
 ## Siehe auch
 

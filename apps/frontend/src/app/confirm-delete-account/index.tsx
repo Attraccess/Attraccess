@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { StatusDialog, useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
+import { useMemo, useRef, useState } from 'react';
+import { StatusDialog, TranslationMessage, useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
 import en from './en.json';
 import de from './de.json';
@@ -19,23 +19,35 @@ const NON_RETRYABLE_ERRORS = [
   'Cannot delete the last administrator',
 ];
 
+// Rejects free text in the link's email parameter, which the confirm dialog displays.
+const isPlausibleEmail = (value: string) => value.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(value);
+
 export function ConfirmDeleteAccount() {
   const query = useUrlQuery();
   const navigate = useNavigate();
-  const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
+  const [error, setError] = useState<{ message: TranslationMessage; retryable: boolean } | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
-  const { t, tExists } = useTranslations({
-    en: { ...en, apiErrors: { ...API_ERROR_TRANSLATIONS_EN, ...en.apiErrors } },
-    de: { ...de, apiErrors: { ...API_ERROR_TRANSLATIONS_DE, ...de.apiErrors } },
-  });
+  // Values only end up as React text, which escapes them already.
+  const { t, tMessage, tExists } = useTranslations(
+    {
+      en: { ...en, apiErrors: { ...API_ERROR_TRANSLATIONS_EN, ...en.apiErrors } },
+      de: { ...de, apiErrors: { ...API_ERROR_TRANSLATIONS_DE, ...de.apiErrors } },
+    },
+    { escapeValues: false },
+  );
 
   const token = useMemo(() => query.get('token'), [query]);
   const email = useMemo(() => query.get('email'), [query]);
 
   const queryClient = useQueryClient();
+  // `isPending` reaches the render only after react-query notifies, so a fast double press needs this guard.
+  const isSending = useRef(false);
 
   const confirmDelete = useUsersServiceConfirmDeleteAccount({
     retry: false,
+    onSettled: () => {
+      isSending.current = false;
+    },
     onSuccess: () => {
       setIsSuccess(true);
       setError(null);
@@ -55,22 +67,29 @@ export function ConfirmDeleteAccount() {
       const messageKey = tExists(key) ? key : `${key}.description`;
       const { retryAfterSeconds } = ((apiError as ApiError).body ?? {}) as { retryAfterSeconds?: number };
       setError({
-        message: t(messageKey, { error: errorMessage, retryAfterSeconds }),
-        retryable: !NON_RETRYABLE_ERRORS.some((name) => key.endsWith(`.${name}`)),
+        message: { key: messageKey, data: { error: errorMessage, retryAfterSeconds } },
+        retryable: !NON_RETRYABLE_ERRORS.includes(errorMessage),
       });
     },
   });
 
   const goToLogin = () => navigate('/');
 
+  const leaveDeletedAccount = () => {
+    // The deleted session's user stays cached after the failed refetch; reset it so the app signs out.
+    queryClient.resetQueries({ queryKey: [useUsersServiceGetCurrentKey] });
+    goToLogin();
+  };
+
   const confirm = () => {
-    if (!token || !email || confirmDelete.isPending) {
+    if (!token || !email || confirmDelete.isPending || isSending.current) {
       return;
     }
+    isSending.current = true;
     confirmDelete.mutate({ requestBody: { token, email } });
   };
 
-  if (!token || !email) {
+  if (!token || !email || !isPlausibleEmail(email)) {
     return (
       <StatusDialog
         isOpen
@@ -92,7 +111,7 @@ export function ConfirmDeleteAccount() {
         status="success"
         title={t('success.title')}
         closeLabel={t('success.backToLogin')}
-        onClose={goToLogin}
+        onClose={leaveDeletedAccount}
         data-cy="confirm-delete-account-success-dialog"
       >
         {t('success.message')}
@@ -120,7 +139,7 @@ export function ConfirmDeleteAccount() {
         }
         data-cy="confirm-delete-account-error-dialog"
       >
-        {error.message}
+        {tMessage(error.message)}
       </StatusDialog>
     );
   }
