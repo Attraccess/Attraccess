@@ -44,7 +44,7 @@ jobs:
       - run: pnpm nx run plugin-wago:typecheck-cc100-runtime
       - run: pnpm nx run plugin-wago:test-cc100-runtime
       - run: pnpm nx run plugin-wago:build-cc100-runtime
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wago-cc100-runtime-manifest
           path: apps/plugins/wago/cc100-runtime/manifest.json
@@ -89,12 +89,12 @@ jobs:
           VERSION=$(node -p "require('./apps/plugins/wago/cc100-runtime/manifest.json').runtimeVersion")
           PROFILE=$(node -p "require('./apps/plugins/wago/cc100-runtime/manifest.json').deployment.hardwareProfile")
           node apps/plugins/wago/scripts/package-runtime-artifact.mjs --image-archive image.tar --image "$IMAGE@$DIGEST" --version "$VERSION" --hardware-profile "$PROFILE" --out runtime-release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name == 'push'
         with:
           name: wago-cc100-runtime-image
           path: wago-cc100-runtime-image.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: github.event_name == 'push'
         with:
           name: wago-cc100-runtime-bundle
