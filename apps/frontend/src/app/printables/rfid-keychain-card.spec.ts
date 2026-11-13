@@ -122,13 +122,19 @@ describe('rfid-keychain-card.scad', () => {
   it('leaves 6 mm of wall between the keyring bore and the edge', async () => {
     const { mesh } = await render({ PART: 'body', LABEL: '' });
     const m = mesh as Mesh;
-    // The straight bore (radius 2) runs through the mid-plane; its centre sets the wall.
+    // Around the mid-plane the bore is straight (radius 2). Beyond the flare (radius <= 3),
+    // the first vertex outward from the bore axis is on the outer edge, so the gap is the wall.
     let boreVertices = 0;
+    let nearestEdge = Infinity;
     for (let i = 0; i < m.positions.length; i += 3) {
       const [x, y, z] = [m.positions[i], m.positions[i + 1], m.positions[i + 2]];
-      if (Math.abs(z - 1) < 0.5 && Math.abs(Math.hypot(x - 8, y - 8) - 2) < 0.05) boreVertices++;
+      if (Math.abs(z - 1) > 0.3) continue;
+      const r = Math.hypot(x - 8, y - 8);
+      if (Math.abs(r - 2) < 0.05) boreVertices++;
+      else if (r > 3.01) nearestEdge = Math.min(nearestEdge, r);
     }
     expect(boreVertices).toBeGreaterThan(0);
+    expect(nearestEdge - 2).toBeGreaterThanOrEqual(5.95);
   }, 30_000);
 
   it('keeps letters inside the text area and in the top 0.4 mm', async () => {
