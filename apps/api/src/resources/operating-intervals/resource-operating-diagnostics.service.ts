@@ -33,8 +33,6 @@ import { verifyTimeline as verifyTimelineImplementation } from './operating-time
 
 import { ResourceOperatingAttributionService } from './resource-operating-attribution.service';
 
-export { unionDurationMs } from './operating-duration-union';
-
 export /** A resource with tracking configured but no transition for this long is reported as stale. */
 const STALE_SIGNAL_DAYS = 7;
 

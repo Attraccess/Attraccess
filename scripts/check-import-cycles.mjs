@@ -1,28 +1,28 @@
 /* eslint-disable no-console -- CLI diagnostics are intentional. */
-import { execFileSync } from 'node:child_process';
 import { lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { excludedDirectory, generatedClients, git, readBlobs } from './lib/repo-files.mjs';
 
 const sourceFile = /^(apps|libs)\/.*\.(?:[cm]?ts|tsx)$/;
-const excludedDirectory = /(^|\/)(node_modules|dist|build|coverage|managed_components|generated|\.tools|\.nx)(\/|$)/;
-const generatedClients = /^libs\/(react-query-client|companion-ws-client)\/src\/lib\//;
 
 // TypeORM bidirectional relations reference each other through lazy `() => Entity`
 // thunks, so a cycle made only of entity files is resolved at runtime and allowed.
 // Not every entity file uses the `.entity.ts` suffix (e.g. `form.ts`, `project.ts`),
-// so the rule covers the whole entities directory. A cycle that also passes through
-// any other file is still reported.
-const exemptCycleMember = /^libs\/database-entities\/src\/lib\/entities\/(?!.*\.spec\.ts$).*\.ts$/;
+// so an entity is a file in the entities directory that declares an `@Entity`,
+// `@ChildEntity` or `@ViewEntity` class. A cycle that also passes through any other
+// file, such as a schema helper in the same directory, is still reported.
+const entityDirectory = /^libs\/database-entities\/src\/lib\/entities\/(?!.*\.spec\.ts$).*\.ts$/;
+const entityDecorator = /@(?:Entity|ChildEntity|ViewEntity)\(/;
+
+function exemptCycleMember(file, content) {
+  return entityDirectory.test(file) && entityDecorator.test(content);
+}
 
 function checked(file) {
   return (
     sourceFile.test(file) && !file.endsWith('.d.ts') && !excludedDirectory.test(file) && !generatedClients.test(file)
   );
-}
-
-function git(args, options = {}) {
-  return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 128 * 1024 * 1024, ...options });
 }
 
 function stagedSources() {
@@ -36,20 +36,7 @@ function stagedSources() {
       return { file: entry.slice(tab + 1), mode, oid };
     })
     .filter(({ file, mode }) => /^100/.test(mode) && checked(file));
-  const result = new Map();
-  if (files.length === 0) return result;
-  const output = git(['cat-file', '--batch'], { input: files.map(({ oid }) => oid).join('\n') + '\n', encoding: null });
-  let offset = 0;
-  for (const { file } of files) {
-    const end = output.indexOf(10, offset);
-    const [, type, size] = output.subarray(offset, end).toString().split(' ');
-    if (type !== 'blob') throw new Error(`Could not read Git blob for ${file}.`);
-    const start = end + 1;
-    offset = start + Number(size);
-    result.set(file, output.subarray(start, offset).toString('utf8'));
-    offset += 1;
-  }
-  return result;
+  return readBlobs(files);
 }
 
 function workingTreeSources() {
@@ -72,8 +59,30 @@ function compilerOptions() {
     .options;
 }
 
+function requireCall(expression) {
+  return expression &&
+    ts.isCallExpression(expression) &&
+    ts.isIdentifier(expression.expression) &&
+    expression.expression.text === 'require' &&
+    expression.arguments.length === 1 &&
+    ts.isStringLiteralLike(expression.arguments[0])
+    ? expression.arguments[0].text
+    : undefined;
+}
+
+// `const x = require('./x')` and `require('./x')` at the top level run at module load.
+function topLevelRequires(statement) {
+  const expressions = ts.isExpressionStatement(statement)
+    ? [statement.expression]
+    : ts.isVariableStatement(statement)
+      ? statement.declarationList.declarations.map((declaration) => declaration.initializer)
+      : [];
+  return expressions.map(requireCall).filter(Boolean);
+}
+
 // Only imports evaluated at module load count: type-only imports are erased, and
-// dynamic `import()` runs after both modules have finished initialising.
+// dynamic `import()` and a `require()` inside a function run after both modules have
+// finished initialising.
 function runtimeSpecifiers(file, content) {
   const kind = file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, false, kind);
@@ -106,6 +115,8 @@ function runtimeSpecifiers(file, content) {
       ts.isStringLiteral(statement.moduleReference.expression)
     ) {
       specifiers.push(statement.moduleReference.expression.text);
+    } else {
+      specifiers.push(...topLevelRequires(statement));
     }
   }
   return specifiers;
@@ -213,11 +224,11 @@ function shortestCycleThrough(graph, component, start) {
 
 // One shortest cycle per non-exempt file is enough to name every offending file
 // without enumerating every elementary cycle of a large tangle.
-function reportedCycles(graph) {
+function reportedCycles(graph, sources) {
   const cycles = new Map();
   for (const component of stronglyConnectedComponents(graph)) {
     for (const file of [...component].sort()) {
-      if (exemptCycleMember.test(file)) continue;
+      if (exemptCycleMember(file, sources.get(file))) continue;
       const cycle = shortestCycleThrough(graph, component, file);
       const first = cycle.indexOf([...cycle].sort()[0]);
       const canonical = [...cycle.slice(first), ...cycle.slice(0, first)];
@@ -235,12 +246,13 @@ function check() {
   }
   process.chdir(git(['rev-parse', '--show-toplevel']).trim());
   const sources = staged ? stagedSources() : workingTreeSources();
-  const cycles = reportedCycles(importGraph(sources));
-  for (const cycle of cycles) console.error([...cycle, cycle[0]].join('\n  -> '));
+  const cycles = reportedCycles(importGraph(sources), sources);
+  for (const cycle of cycles) console.error([...cycle, cycle[0]].join('\n  -> ') + '\n');
   if (cycles.length) {
     console.error(
-      `\nFound ${cycles.length} runtime import cycle(s). Move shared code into a leaf module, ` +
-        'pass it in, or use `import type` when only types are needed.',
+      `Found ${cycles.length} runtime import cycle(s). Move shared code into a leaf module, ` +
+        'pass the dependency in as a prop or callback, or use `import type` when only types are needed. ' +
+        'See "Import cycles" in CONTRIBUTING.md.',
     );
     process.exitCode = 1;
   } else {

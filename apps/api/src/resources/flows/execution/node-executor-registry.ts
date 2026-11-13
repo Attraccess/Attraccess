@@ -47,15 +47,15 @@ interface ExecutorDependencies {
  * Nodes that call back into usage or metering. Those modules depend on flows, so their executors are attached
  * when the usage and metering services are constructed instead of being built here.
  */
-export type SessionNodeType =
+export type AttachedNodeType =
   | ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS
   | ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION
   | ResourceFlowNodeType.OUTPUT_METERING_REPORT;
 
-/** Exhaustive core-node registry; each strategy receives only the collaborators it needs. */
+/** Core-node registry except the attached nodes; each strategy receives only the collaborators it needs. */
 export function buildNodeExecutorRegistry(
   dependencies: ExecutorDependencies,
-): Omit<Record<ResourceFlowNodeType, NodeExecutor>, SessionNodeType> {
+): Omit<Record<ResourceFlowNodeType, NodeExecutor>, AttachedNodeType> {
   const passthrough = new PassthroughExecutor();
 
   return {
@@ -125,7 +125,7 @@ export function usageNodeExecutors(
   billingTransactionItemRepository: Repository<BillingTransactionItem>,
 ): Pick<
   Record<ResourceFlowNodeType, NodeExecutor>,
-  Exclude<SessionNodeType, ResourceFlowNodeType.OUTPUT_METERING_REPORT>
+  Exclude<AttachedNodeType, ResourceFlowNodeType.OUTPUT_METERING_REPORT>
 > {
   return {
     [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS]: new BillingSetAdditionalItemsExecutor(

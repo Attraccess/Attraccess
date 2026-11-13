@@ -18,8 +18,6 @@ import {
   ipCoarseKey,
 } from './brute-force-policy';
 
-export type { RateLimitScope } from './brute-force-policy';
-
 @Injectable()
 export class BruteForceProtectionService {
   private readonly ipCounters = new FixedWindowCounterStore<string, CounterEntry>(MAX_COUNTER_ENTRIES);

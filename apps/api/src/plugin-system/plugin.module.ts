@@ -99,6 +99,8 @@ import {
 
 import { createPluginRunSerialized } from './runtime/plugin-serialized';
 
+import { arePluginsDisabled, setPluginsDisabled } from './plugins-disabled';
+
 function getImplementationClass(): typeof PluginModule {
   return require('./plugin.module').PluginModule;
 }
@@ -116,8 +118,6 @@ export class PluginModule {
     PluginModule.moduleRef = moduleRef;
   }
 
-  protected static DISABLE_PLUGINS_FLAG = false;
-
   protected static logger = new Logger('PluginModule');
 
   protected static pluginManifests: LoadedPluginManifest[];
@@ -129,7 +129,7 @@ export class PluginModule {
   protected static dataSourceRef: HostDataSource | null = null;
 
   public static forRoot(): DynamicModule {
-    if (getImplementationClass().DISABLE_PLUGINS_FLAG) {
+    if (arePluginsDisabled()) {
       getImplementationClass().logger.log('Plugins are disabled');
 
       return {
@@ -528,14 +528,12 @@ export class PluginModule {
   }
 
   public static configure(config: { DISABLE_PLUGINS: boolean }): void {
-    getImplementationClass().DISABLE_PLUGINS_FLAG = config.DISABLE_PLUGINS;
-    getImplementationClass().logger.log(
-      `PluginModule configured. DisablePlugins: ${getImplementationClass().DISABLE_PLUGINS_FLAG}`,
-    );
+    setPluginsDisabled(config.DISABLE_PLUGINS);
+    getImplementationClass().logger.log(`PluginModule configured. DisablePlugins: ${arePluginsDisabled()}`);
   }
 
   public static arePluginsDisabled(): boolean {
-    return getImplementationClass().DISABLE_PLUGINS_FLAG;
+    return arePluginsDisabled();
   }
 
   protected static pluginEvents(): PluginEventsService {
