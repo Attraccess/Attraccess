@@ -120,7 +120,7 @@ describe('UsersAndAuthModule boot (required security and audit collaborators)', 
 
       it.each(required)('fails to compile without %s', async (name, token) => {
         await expect(compileWithout(target, token)).rejects.toThrow(
-          new RegExp(`dependencies of the ${target.name}[\\s\\S]*argument ${name.replace(/[()]/g, '\\$&')}`),
+          new RegExp(`dependencies of the ${target.name}[\\s\\S]*argument ${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
         );
       });
     },
