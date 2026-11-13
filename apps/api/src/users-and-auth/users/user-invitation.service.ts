@@ -62,6 +62,17 @@ export class UserInvitationService {
   }
 
   public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {
+    // createMany relies on the unique constraints, which surface as a 500, so reject taken identities first
+    const email = body.email.trim().toLowerCase();
+    const username = this.usersService.cleanupUsername(body.username);
+    const existingUsers = await this.usersService.findByEmailsOrUsernames([body.email], [body.username]);
+    if (existingUsers.some((user) => user.email.trim().toLowerCase() === email)) {
+      throw new BadRequestException('Email already exists');
+    }
+    if (existingUsers.some((user) => user.username === username)) {
+      throw new BadRequestException('Username already exists');
+    }
+
     try {
       const [invited] = await this.inviteUsersTransactional(
         [{ username: body.username, email: body.email, locale: adminLocale }],

@@ -10,7 +10,7 @@ import { UserInvitationService } from './user-invitation.service';
 import { UserInvitationsController } from './user-invitations.controller';
 import { UsersService } from './users.service';
 
-describe('POST /users/invite-csv', () => {
+describe('user invitation endpoints (HTTP)', () => {
   let app: INestApplication;
   const users = {
     cleanupUsername: jest.fn((value: string) => value.toLowerCase()),
@@ -106,5 +106,34 @@ describe('POST /users/invite-csv', () => {
       .field('config', JSON.stringify({ ...config, roleKeyColumn: 'role' }))
       .expect(403);
     expect(users.createMany).not.toHaveBeenCalled();
+  });
+
+  describe('POST /users/invite', () => {
+    const invite = (body: object) =>
+      request(app.getHttpServer())
+        .post('/users/invite')
+        .set('x-test-user', '1')
+        .set('x-test-permissions', 'users.create')
+        .send(body);
+
+    it('returns 400 when the email is already taken', async () => {
+      users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'someone', email: 'Alex@Example.com' }]);
+      const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(400);
+      expect(response.body.message).toBe('Email already exists');
+      expect(users.createMany).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when the username is already taken', async () => {
+      users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'alex', email: 'other@example.com' }]);
+      const response = await invite({ username: 'Alex', email: 'alex@example.com' }).expect(400);
+      expect(response.body.message).toBe('Username already exists');
+      expect(users.createMany).not.toHaveBeenCalled();
+    });
+
+    it('invites a user whose email and username are free', async () => {
+      const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(201);
+      expect(response.body).toEqual({ id: 7, username: 'alex', email: 'alex@example.com' });
+      expect(users.findByEmailsOrUsernames).toHaveBeenCalledWith(['alex@example.com'], ['alex']);
+    });
   });
 });
