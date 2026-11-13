@@ -292,6 +292,9 @@ describe('Matter plugin against the real sidecar', () => {
     await put({ url: `http://127.0.0.1:${port}`, credential: NEW_TOKEN }).expect(200);
     await until(async () => (await status()).state === 'connected');
     const connection = host.service.connection;
+    // The plugin checks the fabric itself when it connects; that call is not part of what this test counts.
+    await until(() => calls.length >= 1);
+    calls.length = 0;
 
     const read = await rejection(connection.request('fabric.get', { timeoutMs: 200 }));
     expect(read).toMatchObject({ kind: 'timeout', code: 'timeout' });

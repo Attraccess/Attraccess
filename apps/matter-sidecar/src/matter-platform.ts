@@ -1,16 +1,43 @@
-import { loadedMatterJsVersion } from './version';
+import type { SidecarConfig } from './config';
+import { FabricManager } from './fabric/manager';
+import type { Logger } from './logger';
+import { SIDECAR_VERSION, loadedMatterJsVersion } from './version';
 
 export type MatterPlatform = {
   version: string;
-  /** Releases matter.js resources. Nothing is opened yet, so this is cheap and idempotent. */
+  /** The persistent fabric state. Absent for stand-ins that simulate Matter features. */
+  fabric?: FabricManager;
+  /** Releases matter.js resources. Idempotent. */
   close(): Promise<void>;
 };
 
+export type PlatformContext = {
+  config: SidecarConfig;
+  logger: Logger;
+  /** Publishes `fabric.changed` on the event stream. */
+  onFabricChanged: ConstructorParameters<typeof FabricManager>[0]['onFabricChanged'];
+};
+
 /**
- * Loads matter.js and reports the version it resolved. Loading alone opens no Matter ports (UDP 5540, mDNS) and
- * writes no Matter storage; a later ticket creates the controller, and with it the fabric.
+ * Loads matter.js and opens the sidecar's persistent storage. Loading alone opens no Matter ports. The controller (UDP,
+ * mDNS) starts only when a complete fabric is found in `MATTER_SIDECAR_STORAGE_DIR`; the sidecar never creates one
+ * by itself.
  */
-export async function loadMatterPlatform(): Promise<MatterPlatform> {
+export async function loadMatterPlatform(context: PlatformContext): Promise<MatterPlatform> {
   require('@matter/main');
-  return { version: loadedMatterJsVersion(), close: async () => undefined };
+  const version = loadedMatterJsVersion();
+  const fabric = new FabricManager({
+    storageDir: context.config.storageDir,
+    matterPort: context.config.matterPort,
+    versions: { sidecar: SIDECAR_VERSION, matterJs: version },
+    logger: context.logger,
+    onFabricChanged: context.onFabricChanged,
+  });
+  try {
+    await fabric.init();
+  } catch (error) {
+    await fabric.close();
+    throw error;
+  }
+  return { version, fabric, close: () => fabric.close() };
 }

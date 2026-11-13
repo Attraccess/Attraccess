@@ -7,6 +7,7 @@ import { SidecarClientError, SidecarTimeoutError, SidecarUnavailableError } from
 import type { ConnectionStatus } from '../client/connection';
 import { MatterConnectionService } from '../connection/connection.service';
 import { CONNECTION_ROW_ID, MatterConnection } from '../connection/entity';
+import { BACKUP_ENTITIES } from '../backup/entities';
 import { DeviceAuditService } from '../devices/audit.service';
 import { DEVICE_ENTITIES } from '../devices/entities';
 import { MatterLifecycleService } from '../devices/lifecycle.service';
@@ -118,7 +119,7 @@ export async function createHarness() {
   const dataSource = await new DataSource({
     type: 'sqlite',
     database: ':memory:',
-    entities: [MatterConnection, ...DEVICE_ENTITIES],
+    entities: [MatterConnection, ...DEVICE_ENTITIES, ...BACKUP_ENTITIES],
     migrations: Object.values(migrations),
   }).initialize();
   await dataSource.runMigrations();
@@ -142,7 +143,7 @@ export async function createHarness() {
   };
   const context = {
     hostVersion: '1.11.0',
-    manifest: { id: 'matter', name: 'matter', version: '0.3.0-alpha.0', pluginDirectory: 'matter' },
+    manifest: { id: 'matter', name: 'matter', version: '0.4.0-alpha.0', pluginDirectory: 'matter' },
     logger: { debug: jest.fn(), warn: jest.fn(), error: jest.fn(), log: jest.fn() },
     getRepository: (entity: never) => dataSource.getRepository(entity),
     runSerialized,

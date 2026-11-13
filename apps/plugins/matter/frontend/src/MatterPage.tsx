@@ -1,6 +1,7 @@
 import { PageHeader, StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { Spinner } from '@heroui/react';
 import { CableIcon } from 'lucide-react';
+import { FabricBackupSection } from './fabric-backup/FabricBackupSection';
 import { useMatterTranslations } from './i18n';
 import { SettingsForm } from './SettingsForm';
 import { StatusCard } from './StatusCard';
@@ -39,6 +40,7 @@ export function MatterPage() {
           {settingsError}
         </StatusAlert>
       )}
+      <FabricBackupSection />
       {settings && <SettingsForm settings={settings} onSave={save} onRemove={remove} />}
     </div>
   );

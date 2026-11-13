@@ -11,6 +11,19 @@ import {
   uuidSchema,
 } from './primitives';
 
+export const fabricStateSchema = z.enum(['uninitialized', 'initialized', 'recovery_required']);
+/** Why the sidecar refuses to use its storage. A code only: it never carries paths or key material. */
+export const recoveryReasonSchema = z.enum([
+  'storage_unreadable',
+  'storage_corrupt',
+  'storage_incomplete',
+  'schema_mismatch',
+  'metadata_missing',
+  'metadata_orphaned',
+]);
+const sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/);
+const generationSchema = z.int().min(0);
+
 // --- health / version -------------------------------------------------------------------------
 
 export const liveResponseSchema = z.strictObject({ status: z.literal('live') });
@@ -23,7 +36,7 @@ export const readyResponseSchema = z.strictObject({
     shuttingDown: z.boolean(),
   }),
   /** Fabric state is reported separately; readiness never depends on it. */
-  fabric: z.strictObject({ state: z.enum(['uninitialized', 'initialized']) }),
+  fabric: z.strictObject({ state: fabricStateSchema }),
 });
 export const versionResponseSchema = z.strictObject({
   build: z.strictObject({ version: z.string(), commit: z.string() }),
@@ -35,13 +48,63 @@ export const versionResponseSchema = z.strictObject({
 
 // --- fabric -----------------------------------------------------------------------------------
 
+/** Public fabric facts only. Keys, the IPK and certificate private material never appear in any response. */
 export const fabricStatusSchema = z.strictObject({
-  state: z.enum(['uninitialized', 'initialized']),
+  state: fabricStateSchema,
+  /** Set only while `state` is `recovery_required`. */
+  reason: recoveryReasonSchema.nullable(),
   fabricId: matterId64Schema.nullable(),
+  /** Bumped by every operation that changes the fabric identity (create, restore, later commission and remove). */
+  fabricGeneration: generationSchema,
+  /** SHA-256 of the root CA certificate, which is public. */
+  rootCertFingerprint: sha256HexSchema.nullable(),
+  storageInstanceId: uuidSchema.nullable(),
+  storageSchemaVersion: z.literal(STORAGE_SCHEMA_VERSION),
 });
 export const fabricCreateRequestSchema = z.strictObject({
   label: z.string().min(1).max(32),
   deadlineMs: deadlineSchema.optional(),
+});
+
+// --- backup -----------------------------------------------------------------------------------
+
+/** Non-secret description of a snapshot. The payload itself is opaque and holds the fabric secrets. */
+export const backupHeaderSchema = z.strictObject({
+  storageSchemaVersion: z.int().min(1),
+  sidecarVersion: z.string().max(64),
+  matterJsVersion: z.string().max(64),
+  fabricId: matterId64Schema,
+  rootCertFingerprint: sha256HexSchema,
+  fabricGeneration: generationSchema,
+  storageInstanceId: uuidSchema,
+  /** SHA-256 of the decoded payload bytes. */
+  payloadSha256: sha256HexSchema,
+  payloadBytes: z.int().min(1),
+  createdAt: timestampSchema,
+});
+export type BackupHeader = z.infer<typeof backupHeaderSchema>;
+/** The payload travels as standard base64. It is a secret: only ever over an encrypted link, never logged. */
+const payloadBase64Schema = z
+  .string()
+  .min(4)
+  .regex(/^[A-Za-z0-9+/]+={0,2}$/);
+export const backupSnapshotRequestSchema = z.strictObject({ deadlineMs: deadlineSchema.optional() });
+export const backupSnapshotSchema = z.strictObject({ header: backupHeaderSchema, payload: payloadBase64Schema });
+export const backupStageRequestSchema = z.strictObject({ header: backupHeaderSchema, payload: payloadBase64Schema });
+/** What a restore would put in place. Staging touches no live storage. */
+export const backupStageSchema = z.strictObject({
+  stageId: uuidSchema,
+  fabricId: matterId64Schema,
+  rootCertFingerprint: sha256HexSchema,
+  fabricGeneration: generationSchema,
+  storageInstanceId: uuidSchema,
+  expiresAt: timestampSchema,
+});
+export const backupStageIdSchema = z.strictObject({ stageId: uuidSchema, deadlineMs: deadlineSchema.optional() });
+export const backupRestoreResultSchema = z.strictObject({
+  /** `committed`: the staged storage is live and verified; the previous storage is kept as a rollback copy. */
+  state: z.enum(['committed', 'rolled_back', 'finalized', 'aborted']),
+  fabric: fabricStatusSchema,
 });
 
 // --- commissioning ----------------------------------------------------------------------------

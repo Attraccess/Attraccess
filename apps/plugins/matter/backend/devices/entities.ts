@@ -43,6 +43,20 @@ export class MatterFabric {
 
   @Column({ type: 'varchar', name: 'retired_at', nullable: true })
   retiredAt!: string | null;
+
+  // --- identity the plugin recorded for backup and restore (ATT-998). Null on a row the inventory created and that
+  // no fabric operation has recorded yet. The newest row with a generation is the plugin's recorded fabric.
+  @Column({ type: 'integer', name: 'fabric_generation', nullable: true })
+  fabricGeneration!: number | null;
+
+  @Column({ type: 'varchar', name: 'storage_instance_id', nullable: true })
+  storageInstanceId!: string | null;
+
+  @Column({ type: 'varchar', name: 'root_cert_fingerprint', nullable: true })
+  rootCertFingerprint!: string | null;
+
+  @Column({ type: 'varchar', name: 'recorded_at', nullable: true })
+  recordedAt!: string | null;
 }
 
 @Entity({ name: 'plugin_matter_nodes' })

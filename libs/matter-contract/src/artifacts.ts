@@ -75,6 +75,8 @@ function errorStatuses(operation: ResponseShape): number[] {
   if (operation.versioned) codes.push(409, 426, 503);
   if (operation.params || operation.body) codes.push(400);
   if (operation.body) codes.push(413);
+  // A snapshot that fails validation is refused with 422; any backup operation can be refused over plain HTTP.
+  if (operation.family === 'backup') codes.push(422);
   // Only feature operations can be unimplemented or run into their deadline.
   const isFeature = operation.family !== 'health' && operation.id !== 'events.stream';
   if (isFeature) codes.push(501, 504);
@@ -113,6 +115,10 @@ function buildPathItem(operation: OperationDefinition): JsonObject {
     summary: operation.summary,
     tags: [operation.family],
     ...(operation.anonymous ? { security: [] } : {}),
+    ...(operation.bodyLimitBytes ? { 'x-max-body-bytes': operation.bodyLimitBytes } : {}),
+    ...(operation.secretsOnWire
+      ? { 'x-secrets-on-wire': 'Refused over plain HTTP to a non-loopback address (insecure_transport).' }
+      : {}),
     parameters: [...(operation.versioned ? COMPAT_PARAMETERS : []), ...pathParams],
     ...(operation.body
       ? {

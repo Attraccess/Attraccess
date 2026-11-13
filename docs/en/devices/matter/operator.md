@@ -2,7 +2,7 @@
 
 <!-- llms-description: Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation. -->
 
-> **Connectivity only (on the sidecar side).** The sidecar can be built, started, secured and connected to Attraccess, but it controls no devices yet and does not list any, so the plugin's device records stay empty and `GET /matter/reconciliation` reports `skipped_unavailable`. Read the [architecture](devices/matter/architecture.md) and the [data model](devices/matter/data-model.md) first. When you upgrade, deploy the sidecar first and then the plugin: a mismatched pair shows as `incompatible`.
+> **Fabric and backup, no devices yet (on the sidecar side).** The sidecar can be built, started, secured and connected to Attraccess, and it can hold a persistent Matter fabric with encrypted backup and recovery (see [Backup and Recovery](devices/matter/backup-restore.md)). It still controls no devices and does not list any, so the plugin's device records stay empty and `GET /matter/reconciliation` reports `skipped_unavailable`. Read the [architecture](devices/matter/architecture.md) and the [data model](devices/matter/data-model.md) first. When you upgrade, deploy the sidecar first and then the plugin: a mismatched pair shows as `incompatible`.
 
 ## Build and start
 
@@ -14,29 +14,46 @@ node dist/apps/matter-sidecar/main.js
 
 The build bundles the sidecar into `dist/apps/matter-sidecar/main.js` and stamps the current Git revision. matter.js is loaded from `node_modules` at run time, so the pinned release is the one that runs. Node.js `>=24.22.1 <25` is required.
 
-The sidecar **refuses to start without a service token** (see below). Starting it loads matter.js but opens no Matter ports (UDP 5540, mDNS), writes no Matter storage and creates no fabric. By default it listens on `127.0.0.1` only. Prefer `MATTER_SIDECAR_AUTH_TOKEN_FILE` (a file or a deployment secret) over the environment variable where you can, because environment variables are visible to other processes of the same user.
+The sidecar **refuses to start without a service token** (see below). Starting it loads matter.js and opens the storage directory (see `MATTER_SIDECAR_STORAGE_DIR` below). It **never creates a fabric on its own**: an administrator does that in Attraccess. While no fabric exists, the sidecar opens no Matter ports. **Once a fabric exists, it opens Matter networking** (mDNS and UDP on `MATTER_SIDECAR_MATTER_PORT`, which defaults to a free port chosen at start), so the host and any container network must allow that traffic. By default it listens on `127.0.0.1` only. Prefer `MATTER_SIDECAR_AUTH_TOKEN_FILE` (a file or a deployment secret) over the environment variable where you can, because environment variables are visible to other processes of the same user.
 
 ## Configuration
 
 All settings are environment variables, validated before the sidecar listens. An empty variable counts as unset. A missing or invalid value stops only the sidecar and prints which variable to fix.
 
-| Variable                                                       | Default      | Range                             | Meaning                                                                                                                        |
-| -------------------------------------------------------------- | ------------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `MATTER_SIDECAR_AUTH_TOKEN` / `MATTER_SIDECAR_AUTH_TOKEN_FILE` | **required** | 32–512 printable ASCII characters | The service token. The file variant is read at start-up and surrounding whitespace is trimmed. Set only one of the two.        |
-| `MATTER_SIDECAR_AUTH_TOKEN_PREVIOUS` / `…_PREVIOUS_FILE`       | unset        | same                              | The old token, accepted alongside the current one while you rotate it.                                                         |
-| `MATTER_SIDECAR_BIND_HOST`                                     | `127.0.0.1`  | an address                        | Address to listen on. Anything but loopback needs the next two rows.                                                           |
-| `MATTER_SIDECAR_ALLOWED_HOSTS`                                 | unset        | comma-separated names             | Extra `Host` names accepted besides loopback. **Required** when the bind address is not loopback.                              |
-| `MATTER_SIDECAR_TLS_CERT_FILE` / `MATTER_SIDECAR_TLS_KEY_FILE` | unset        | PEM file paths                    | Serve HTTPS and WSS. Set both or neither.                                                                                      |
-| `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE`                         | `false`      | `true` / `false`                  | Allow a non-loopback bind **without** TLS, for a trusted container network or a TLS-terminating reverse proxy. Logs a warning. |
-| `MATTER_SIDECAR_PORT`                                          | `8581`       | `0`–`65535`                       | TCP port (`0` picks a free port)                                                                                               |
-| `MATTER_SIDECAR_MAX_MESSAGE_BYTES`                             | `1048576`    | `1`–`16777216`                    | Largest request body and WebSocket message                                                                                     |
-| `MATTER_SIDECAR_REQUEST_DEADLINE_MS`                           | `10000`      | `1`–`60000`                       | Request deadline                                                                                                               |
-| `MATTER_SIDECAR_SHUTDOWN_GRACE_MS`                             | `5000`       | `1`–`60000`                       | Time allowed for shutdown                                                                                                      |
-| `MATTER_SIDECAR_REPLAY_MAX_EVENTS`                             | `1000`       | `1`–`100000`                      | Events kept for replay                                                                                                         |
-| `MATTER_SIDECAR_REPLAY_MAX_AGE_MS`                             | `300000`     | `1`–`86400000`                    | Maximum age of replayable events                                                                                               |
-| `MATTER_SIDECAR_CLIENT_QUEUE_BYTES`                            | `1048576`    | `1`–`67108864`                    | Per-WebSocket-client queue budget, including the replay after a reconnect                                                      |
+| Variable                                                       | Default            | Range                             | Meaning                                                                                                                           |
+| -------------------------------------------------------------- | ------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `MATTER_SIDECAR_AUTH_TOKEN` / `MATTER_SIDECAR_AUTH_TOKEN_FILE` | **required**       | 32–512 printable ASCII characters | The service token. The file variant is read at start-up and surrounding whitespace is trimmed. Set only one of the two.           |
+| `MATTER_SIDECAR_AUTH_TOKEN_PREVIOUS` / `…_PREVIOUS_FILE`       | unset              | same                              | The old token, accepted alongside the current one while you rotate it.                                                            |
+| `MATTER_SIDECAR_BIND_HOST`                                     | `127.0.0.1`        | an address                        | Address to listen on. Anything but loopback needs the next two rows.                                                              |
+| `MATTER_SIDECAR_ALLOWED_HOSTS`                                 | unset              | comma-separated names             | Extra `Host` names accepted besides loopback. **Required** when the bind address is not loopback.                                 |
+| `MATTER_SIDECAR_TLS_CERT_FILE` / `MATTER_SIDECAR_TLS_KEY_FILE` | unset              | PEM file paths                    | Serve HTTPS and WSS. Set both or neither.                                                                                         |
+| `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE`                         | `false`            | `true` / `false`                  | Allow a non-loopback bind **without** TLS, for a trusted container network or a TLS-terminating reverse proxy. Logs a warning.    |
+| `MATTER_SIDECAR_PORT`                                          | `8581`             | `0`–`65535`                       | TCP port (`0` picks a free port)                                                                                                  |
+| `MATTER_SIDECAR_MATTER_PORT`                                   | `0`                | `0`–`65535`                       | UDP port of the controller's Matter endpoint once a fabric exists (`0` picks a free port). Matter discovery uses mDNS (UDP 5353). |
+| `MATTER_SIDECAR_STORAGE_DIR`                                   | `./matter-storage` | a directory path                  | Where the sidecar keeps the Matter fabric and its state. Relative to the working directory. Optional. See [Storage](#storage).    |
+| `MATTER_SIDECAR_MAX_MESSAGE_BYTES`                             | `1048576`          | `1`–`16777216`                    | Largest request body and WebSocket message. The backup endpoints have their own 64 MiB request body limit.                        |
+| `MATTER_SIDECAR_REQUEST_DEADLINE_MS`                           | `10000`            | `1`–`60000`                       | Request deadline                                                                                                                  |
+| `MATTER_SIDECAR_SHUTDOWN_GRACE_MS`                             | `5000`             | `1`–`60000`                       | Time allowed for shutdown                                                                                                         |
+| `MATTER_SIDECAR_REPLAY_MAX_EVENTS`                             | `1000`             | `1`–`100000`                      | Events kept for replay                                                                                                            |
+| `MATTER_SIDECAR_REPLAY_MAX_AGE_MS`                             | `300000`           | `1`–`86400000`                    | Maximum age of replayable events                                                                                                  |
+| `MATTER_SIDECAR_CLIENT_QUEUE_BYTES`                            | `1048576`          | `1`–`67108864`                    | Per-WebSocket-client queue budget, including the replay after a reconnect                                                         |
 
-The sidecar refuses to start (and names the variable to fix) when: there is no token, a token has the wrong length or characters, both `X` and `X_FILE` are set, the bind address is not loopback and there is no allowed host, the bind address is not loopback without TLS and without `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true`, or only one of the certificate and key files is set.
+The sidecar refuses to start (and names the variable to fix) when: there is no token, a token has the wrong length or characters, both `X` and `X_FILE` are set, the bind address is not loopback and there is no allowed host, the bind address is not loopback without TLS and without `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true`, only one of the certificate and key files is set, or the storage directory cannot be created or written to.
+
+### Storage
+
+The sidecar keeps the Matter fabric in `MATTER_SIDECAR_STORAGE_DIR` (default `./matter-storage`, relative to the working directory). It creates the directory with mode `0700` and its files with `0600`. If the directory cannot be created or written to, the sidecar refuses to start and says so.
+
+> [!WARNING]
+> Give the sidecar **its own persistent volume** for this directory, **not** the Attraccess volume. The fabric is the identity of your devices; if the directory is lost, devices commissioned since the last backup have to be factory-reset. The Attraccess volume backup does not contain it. See [Backup and Recovery](devices/matter/backup-restore.md).
+
+The fabric is in one of three states, shown in `/health/ready` and in the Matter page:
+
+| State               | Meaning                                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `uninitialized`     | No fabric exists. An administrator creates one, or restores a backup.                                                                                 |
+| `initialized`       | A fabric exists and the storage is healthy.                                                                                                           |
+| `recovery_required` | The storage is present but unusable or inconsistent. The sidecar creates and changes nothing until an administrator restores, accepts or starts anew. |
 
 ### Generating a token
 
@@ -90,8 +107,8 @@ curl -H "Authorization: Bearer $MATTER_SIDECAR_AUTH_TOKEN" http://127.0.0.1:8581
 ```
 
 - `/health/live` answers `{"status":"live"}` whenever the process runs.
-- `/health/ready` answers 200 with `"status":"ready"` once configuration, matter.js start-up and the transport succeeded. It answers 503 with `"draining"` while the sidecar shuts down. The sidecar opens its port only after start-up, so `"starting"` never reaches a caller in this release. The `fabric` field (`uninitialized` in this release) is reported separately and never affects readiness.
-- `/version` needs the token. It reports `build.version` and `build.commit` (the Git revision the sidecar was built from), `sidecar` (the sidecar release), `matterJs` (the matter.js release actually loaded), `storageSchemaVersion` (`1`; reporting it adds no persistence) and `wireVersion` (`1`).
+- `/health/ready` answers 200 with `"status":"ready"` once configuration, matter.js start-up and the transport succeeded. It answers 503 with `"draining"` while the sidecar shuts down. The sidecar opens its port only after start-up, so `"starting"` never reaches a caller in this release. The `fabric` field (`uninitialized`, `initialized` or `recovery_required`) is reported separately and never affects readiness.
+- `/version` needs the token. It reports `build.version` and `build.commit` (the Git revision the sidecar was built from), `sidecar` (the sidecar release), `matterJs` (the matter.js release actually loaded), `storageSchemaVersion` (the version of the sidecar's storage schema) and `wireVersion` (`1`).
 
 `/health/live` and `/health/ready` are anonymous, so container probes work, and reveal no versions. `/version` needs the token but no compatibility headers, so it stays usable while you troubleshoot a version mismatch. Without a valid token the answer is HTTP 401, and nothing about versions is revealed.
 
@@ -107,15 +124,15 @@ A `/v1/` request, or a WebSocket upgrade to `/v1/events`, with an unsupported re
     "correlationId": "5a1f6c0e-6f55-4a53-9a6e-2c6d6b0f5b1c",
     "retryable": false,
     "details": {
-      "received": { "wireVersion": 1, "attraccess": "1.10.0", "plugin": "0.3.0-alpha.0", "sidecar": "0.3.0-alpha.0" },
+      "received": { "wireVersion": 1, "attraccess": "1.10.0", "plugin": "0.4.0-alpha.0", "sidecar": "0.4.0-alpha.0" },
       "problems": [],
-      "running": { "sidecar": "0.3.0-alpha.0", "matterJs": "0.18.0" },
+      "running": { "sidecar": "0.4.0-alpha.0", "matterJs": "0.18.0" },
       "supported": [
         {
           "wireVersion": 1,
           "attraccess": "^1.11.0",
-          "plugin": "0.3.0-alpha.0",
-          "sidecar": "0.3.0-alpha.0",
+          "plugin": "0.4.0-alpha.0",
+          "sidecar": "0.4.0-alpha.0",
           "matterJs": "0.18.0"
         }
       ]
@@ -137,6 +154,7 @@ To fix it, compare `received` with `supported`, then **upgrade or downgrade** At
 - Every request except `/health/live` and `/health/ready` needs `Authorization: Bearer <token>`. Keep the token secret, give it to the sidecar through a secret or file, and rotate it with the procedure above when it may have leaked. There is no lockout; the token's length and randomness protect it, so use a generated one.
 - Keep the default loopback bind unless the sidecar must be reached across a network. For a remote bind, use TLS (and enter the CA in the Matter page) or a trusted private network. `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true` sends the token unencrypted and must not cross an untrusted network.
 - Requests with a browser `Origin` header are refused with HTTP 403, and a `Host` that is neither loopback nor in `MATTER_SIDECAR_ALLOWED_HOSTS` is refused too. The check runs before authentication.
+- Backup and restore requests carry fabric secrets. The sidecar refuses them over a plain-HTTP connection to a remote address with `insecure_transport` (HTTP 403). Use TLS, a loopback connection or a TLS-terminating reverse proxy in front of a trusted network path. Their request body limit is 64 MiB, independent of `MATTER_SIDECAR_MAX_MESSAGE_BYTES`.
 - Failed authentications are logged at warn level (rate-limited) and never include the token or the header value. Setup codes, Thread datasets and fabric secrets never appear in logs, events or health output.
 - Certificates and token files are read at start-up. Renew or rotate them with a restart.
 

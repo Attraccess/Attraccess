@@ -19,7 +19,8 @@ type Started = {
   exited: Promise<number | null>;
 };
 
-// Only PATH is passed on: no Attraccess API, database, fabric or Matter storage configuration exists.
+// Only PATH is passed on: no Attraccess API, database, fabric or Matter storage configuration exists, so the default
+// storage directory (./matter-storage in the working directory) applies.
 function start(env: Record<string, string>, cwd: string, nodeArgs: string[] = []): Started {
   const child = spawn(process.execPath, [...nodeArgs, entry], { cwd, env: { PATH: process.env.PATH ?? '', ...env } });
   const stdout: string[] = [];
@@ -70,7 +71,9 @@ describe('built sidecar process', () => {
     expect(version).toMatchObject({ wireVersion: 1, storageSchemaVersion: 1 });
     const readiness = await http(port, 'GET', '/health/ready');
     expect(readiness.body).toMatchObject({ status: 'ready', fabric: { state: 'uninitialized' } });
-    expect(readdirSync(cwd)).toEqual([]); // no Matter storage was written, no fabric was created
+    // The storage directory exists (owner-only) but stays empty: no Matter state was written and no fabric was created.
+    expect(readdirSync(cwd)).toEqual(['matter-storage']);
+    expect(readdirSync(join(cwd, 'matter-storage'))).toEqual([]);
     started.child.kill('SIGTERM');
     expect(await started.exited).toBe(0);
   });

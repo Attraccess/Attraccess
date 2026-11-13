@@ -15,14 +15,18 @@ import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { TestCertificate } from './certs';
+import { FakeFabricBackend, FakeSidecarError } from './fake-fabric';
 
 export const TOKEN = 'plugin-test-token-0123456789abcdef0123456789';
 export const entry = COMPATIBILITY_TABLE[0];
 export const HOST_VERSION = '1.11.0';
 
-const reportBody = (inventoryAvailable: boolean) => ({
+const reportBody = (inventoryAvailable: boolean, fabricAvailable: boolean) => ({
   capabilities: FEATURE_FAMILIES.map((family) => {
-    const available = family === 'health' || (family === 'inventory' && inventoryAvailable);
+    const available =
+      family === 'health' ||
+      (family === 'inventory' && inventoryAvailable) ||
+      (fabricAvailable && (family === 'fabric' || family === 'backup'));
     return {
       family,
       defined: true as const,
@@ -78,6 +82,11 @@ export class FakeSidecar {
    * real sidecar today, `null` answers `unsupported_capability`.
    */
   inventory: FakeInventory | null = null;
+  /**
+   * Serve the fabric and backup operations from this state (fabric.get/create, snapshot, two-phase restore). Without
+   * it `GET /v1/fabric` is derived from `inventory`.
+   */
+  fabricBackend: FakeFabricBackend | null = null;
   /** Replaces the sidecar's 401 message, such as with one that echoes a credential. */
   unauthorizedMessage = UNAUTHORIZED_MESSAGE;
   private readonly server: Server;
@@ -201,7 +210,11 @@ export class FakeSidecar {
       res.writeHead(refused.status, { 'content-type': 'application/json' });
       return void res.end(refused.body);
     }
-    if (path === '/v1/capabilities') return json(reportBody(this.inventory !== null));
+    if (path === '/v1/capabilities') return json(reportBody(this.inventory !== null, this.fabricBackend !== null));
+    const backend = this.fabricBackend;
+    if (backend && (path === '/v1/fabric' || path.startsWith('/v1/backup/'))) {
+      return void this.serveFabric(backend, req, path, res, json);
+    }
     if (path === '/v1/nodes' || path === '/v1/fabric' || path.startsWith('/v1/nodes/')) {
       return this.serveInventory(path, res, json);
     }
@@ -213,13 +226,56 @@ export class FakeSidecar {
     if (!inventory) return error(res, 501, 'unsupported_capability', 'Not implemented in this sidecar release.');
     if (path === '/v1/nodes') return json(inventory);
     if (path === '/v1/fabric') {
+      const present = inventory.fabricId !== null;
       return json({
-        state: inventory.fabricId === null ? 'uninitialized' : 'initialized',
+        state: present ? 'initialized' : 'uninitialized',
+        reason: null,
         fabricId: inventory.fabricId,
+        fabricGeneration: present ? 1 : 0,
+        rootCertFingerprint: present ? 'a'.repeat(64) : null,
+        storageInstanceId: present ? '00000000-0000-4000-8000-000000000001' : null,
+        storageSchemaVersion: 1,
       });
     }
     const node = (inventory.nodes as { nodeId: string }[]).find((entry) => `/v1/nodes/${entry.nodeId}` === path);
     return node ? json(node) : error(res, 404, 'not_found', 'Unknown node.');
+  }
+
+  private async serveFabric(
+    backend: FakeFabricBackend,
+    req: IncomingMessage,
+    path: string,
+    res: ServerResponse,
+    json: (body: unknown) => void,
+  ): Promise<void> {
+    backend.emit = (type, payload) => this.broadcast(this.nextEvent({ type, payload } as Partial<EventEnvelope>));
+    const operations: Record<string, string> = {
+      'GET /v1/fabric': 'fabric.get',
+      'POST /v1/fabric': 'fabric.create',
+      'POST /v1/backup/snapshot': 'backup.snapshot',
+      'POST /v1/backup/restore/stage': 'backup.restore.stage',
+      'POST /v1/backup/restore/commit': 'backup.restore.commit',
+      'POST /v1/backup/restore/rollback': 'backup.restore.rollback',
+      'POST /v1/backup/restore/finalize': 'backup.restore.finalize',
+      'POST /v1/backup/restore/abort': 'backup.restore.abort',
+    };
+    const operation = operations[`${req.method} ${path}`];
+    if (!operation) return error(res, 404, 'not_found', 'Unknown path.');
+    // Backup bodies exceed the general message limit; they have their own.
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of req as AsyncIterable<Buffer>) {
+      size += chunk.length;
+      if (size > 64 * 1024 * 1024) return error(res, 413, 'payload_too_large', 'Too large.');
+      chunks.push(chunk);
+    }
+    try {
+      const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined;
+      json(backend.handle(operation as never, body));
+    } catch (failure) {
+      if (failure instanceof FakeSidecarError) return error(res, failure.status, failure.code, failure.message);
+      error(res, 500, 'internal_error', 'The fake failed.');
+    }
   }
 
   private accept(ws: WebSocket): void {

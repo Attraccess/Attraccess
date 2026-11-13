@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FeatureFamily } from './constants';
+import { FeatureFamily, MAX_BACKUP_BODY_BYTES } from './constants';
 import { capabilityReportSchema } from './capabilities';
 import * as f from './families';
 
@@ -17,6 +17,12 @@ export type OperationDefinition = {
   response: z.ZodType;
   /** Physical effects: a timeout is reported as `uncertain` and is never retried automatically. */
   physical?: boolean;
+  /** Own request body limit in bytes; the sidecar's general message limit applies when absent. */
+  bodyLimitBytes?: number;
+  /** Carries fabric secrets: the sidecar refuses it on plain HTTP to a non-loopback address. */
+  secretsOnWire?: true;
+  /** Changes the fabric: refused while a snapshot or restore is in progress. */
+  fabricMutating?: true;
   /** Served without the service token: the container probes, which reveal no versions. */
   anonymous?: true;
 };
@@ -82,6 +88,7 @@ const DEFINITIONS = [
     body: f.fabricCreateRequestSchema,
     response: f.fabricStatusSchema,
     physical: true,
+    fabricMutating: true,
   }),
   op({
     id: 'commissioning.start',
@@ -195,6 +202,78 @@ const DEFINITIONS = [
     summary: 'OTA update status',
     params: f.otaParamsSchema,
     response: f.otaUpdateSchema,
+  }),
+  op({
+    id: 'backup.snapshot',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/snapshot',
+    versioned: true,
+    summary: 'Take a consistent snapshot of the sidecar storage',
+    body: f.backupSnapshotRequestSchema,
+    response: f.backupSnapshotSchema,
+    bodyLimitBytes: MAX_BACKUP_BODY_BYTES,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.stage',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/stage',
+    versioned: true,
+    summary: 'Stage and validate a snapshot without touching live storage',
+    body: f.backupStageRequestSchema,
+    response: f.backupStageSchema,
+    bodyLimitBytes: MAX_BACKUP_BODY_BYTES,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.commit',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/commit',
+    versioned: true,
+    summary: 'Swap the staged storage in, keep the previous one as a rollback copy, then verify',
+    body: f.backupStageIdSchema,
+    response: f.backupRestoreResultSchema,
+    physical: true,
+    fabricMutating: true,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.rollback',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/rollback',
+    versioned: true,
+    summary: 'Swap the rollback copy of the previous storage back in',
+    body: f.backupStageIdSchema,
+    response: f.backupRestoreResultSchema,
+    physical: true,
+    fabricMutating: true,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.finalize',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/finalize',
+    versioned: true,
+    summary: 'Delete the rollback copy once the plugin has committed too',
+    body: f.backupStageIdSchema,
+    response: f.backupRestoreResultSchema,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.abort',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/abort',
+    versioned: true,
+    summary: 'Discard staged data',
+    body: f.backupStageIdSchema,
+    response: f.backupRestoreResultSchema,
+    secretsOnWire: true,
   }),
 ];
 

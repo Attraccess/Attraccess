@@ -9,6 +9,7 @@ import {
   type OperationDefinition,
 } from '@attraccess/matter-contract';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { ApiError } from './api-error';
 import { versionedRefusal, type RunningReleases } from './admission';
 import { UNAUTHORIZED_MESSAGE, type TokenAuthenticator } from './auth';
 import type { SidecarConfig } from './config';
@@ -53,6 +54,9 @@ const ANONYMOUS_OPERATIONS: ReadonlySet<string> = new Set(
 class DeadlineError extends Error {}
 
 const invalidResponse: ErrorReply = { code: 'internal_error', message: 'The sidecar produced an invalid response.' };
+
+/** Backup operations stop and restart the controller, which takes longer than a plain request. */
+const BACKUP_MIN_DEADLINE_MS = 30_000;
 
 function parseDeadline(req: IncomingMessage, body: unknown, fallback: number): number {
   const header = req.headers[HEADER_REQUEST_DEADLINE];
@@ -121,7 +125,11 @@ async function runFeature(
   deps: PipelineDeps,
 ): Promise<{ status: number; body: unknown } | { error: ErrorReply }> {
   const controller = new AbortController();
-  const deadlineMs = parseDeadline(req, input.body, deps.config.requestDeadlineMs);
+  const base =
+    operation.family === 'backup'
+      ? Math.max(deps.config.requestDeadlineMs, BACKUP_MIN_DEADLINE_MS)
+      : deps.config.requestDeadlineMs;
+  const deadlineMs = parseDeadline(req, input.body, base);
   try {
     const value = await withDeadline(
       handler({ ...input, correlationId, signal: controller.signal }),
@@ -146,9 +154,18 @@ async function runFeature(
         },
       };
     }
+    if (error instanceof ApiError) {
+      return {
+        error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) },
+      };
+    }
     deps.logger('error', 'handler failed', { operation: operation.id, correlationId });
     return { error: { code: 'internal_error', message: 'The request failed.' } };
   }
+}
+
+function operationLimit(operation: OperationDefinition, deps: PipelineDeps): number {
+  return operation.bodyLimitBytes ?? deps.config.maxMessageBytes;
 }
 
 function unsupported(family: FeatureFamily): ErrorReply {
@@ -174,7 +191,19 @@ async function respond(
     deps.logger('error', 'built-in returned an invalid response', { operation: operation.id, correlationId });
     return { error: invalidResponse };
   }
-  const input = await parseInput(req, operation, params, deps.config.maxMessageBytes);
+  if (operation.secretsOnWire && deps.config.insecureRemote) {
+    // Fabric secrets never cross an unencrypted network link, whatever the handler would have done.
+    return {
+      error: {
+        code: 'insecure_transport',
+        message:
+          'Backup and restore carry fabric secrets and are refused over plain HTTP on a non-loopback address. ' +
+          'Serve the sidecar with TLS (MATTER_SIDECAR_TLS_CERT_FILE and MATTER_SIDECAR_TLS_KEY_FILE).',
+      } as ErrorReply,
+    };
+  }
+  const limit = operation.bodyLimitBytes ?? deps.config.maxMessageBytes;
+  const input = await parseInput(req, operation, params, limit);
   if ('error' in input && input.error) return { error: input.error };
   const handler = deps.features[operation.id];
   if (!handler) return { error: unsupported(operation.family) };
@@ -219,7 +248,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, d
         {
           code: 'payload_too_large',
           message: 'Request body exceeds the size limit.',
-          details: { limitBytes: deps.config.maxMessageBytes },
+          details: { limitBytes: operationLimit(operation, deps) },
         },
         correlationId,
         true,
