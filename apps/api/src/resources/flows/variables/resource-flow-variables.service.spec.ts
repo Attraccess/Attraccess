@@ -51,7 +51,11 @@ describe('ResourceFlowVariablesService', () => {
         const before = store.length;
         store = store.filter(
           (r) =>
-            !(r.scope === criteria.scope && r.key === criteria.key && (criteria.resourceId ?? null) === r.resourceId),
+            !(
+              r.scope === criteria.scope &&
+              r.key === criteria.key &&
+              matchResourceId(criteria.resourceId, r.resourceId)
+            ),
         );
         return { affected: before - store.length, raw: [] };
       }),

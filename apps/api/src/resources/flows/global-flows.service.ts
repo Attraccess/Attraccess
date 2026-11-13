@@ -1,7 +1,7 @@
 import { Flow, ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
 import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import {
   CreateGlobalFlowDto,
   GlobalFlowSummaryDto,
@@ -10,8 +10,8 @@ import {
   UpdateGlobalFlowDto,
 } from './dto/index';
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../audit/recorder/audit-event';
-import { auditResourceName, auditResourceNames } from '../resources.service';
-import { canvasDetails, canvasSaveDetails, diffCanvas } from './flow-audit';
+import { fitAuditText, fitAuditTexts } from '../../audit/policies/projection';
+import { FLOW_NAME_BYTES, canvasDetails, canvasSaveDetails, diffCanvas } from './flow-audit';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 import { ResourceFlowResponse, ResourceFlowsService, ValidationError } from './resource-flows.service';
 
@@ -73,8 +73,12 @@ export class GlobalFlowsService {
     actor: AuditActor,
     flowId: number,
     details: Record<string, string | number>,
+    manager?: EntityManager,
   ) {
-    return this.audit.record({ domain: 'resource', action, actor, subject: { type: 'flow', id: flowId }, details });
+    return this.audit.record(
+      { domain: 'resource', action, actor, subject: { type: 'flow', id: flowId }, details },
+      manager,
+    );
   }
 
   public async create(dto: CreateGlobalFlowDto, actor: AuditActor): Promise<GlobalFlow> {
@@ -86,12 +90,13 @@ export class GlobalFlowsService {
         scope: 'global',
       }),
     )) as GlobalFlow;
+    const enabled = { 'after.enabled': flow.enabled ? 1 : 0 };
     await this.recordFlow('flow.created', actor, flow.id, {
-      ...auditResourceNames(
+      ...fitAuditTexts(
         { 'after.name': flow.name, ...(flow.description ? { 'after.description': flow.description } : {}) },
-        { 'after.enabled': '0' },
+        enabled,
       ),
-      'after.enabled': flow.enabled ? 1 : 0,
+      ...enabled,
     });
     return flow;
   }
@@ -142,31 +147,32 @@ export class GlobalFlowsService {
       : {};
     const fixed = { changedFields: JSON.stringify(changedFields), ...enabled };
     await this.recordFlow('flow.updated', actor, flowId, {
-      ...auditResourceNames(
-        { flowName: saved.name, ...text('before', before), ...text('after', after) },
-        fixed as Record<string, string>,
-      ),
+      ...fitAuditTexts({ flowName: saved.name, ...text('before', before), ...text('after', after) }, fixed),
       ...fixed,
     });
   }
 
-  /** Nodes and edges go with the flow (cascade), so the canvas is recorded before it is deleted. */
+  /**
+   * Nodes and edges go with the flow (cascade), so the canvas is read and recorded in the same transaction as the
+   * delete: the audit row holds exactly what was deleted and commits or rolls back with it.
+   */
   public async delete(flowId: number, actor: AuditActor): Promise<void> {
     const flow = await this.get(flowId);
-    const [nodes, edges] = await Promise.all([
-      this.nodeRepository.find({ where: { flowId } }),
-      this.edgeRepository.find({ where: { flowId } }),
-    ]);
-    await this.flowRepository.delete({ id: flowId });
-    await this.recordFlow(
-      'flow.deleted',
-      actor,
-      flowId,
-      canvasDetails(
-        { 'before.name': auditResourceName(flow.name, 256), 'before.enabled': flow.enabled ? 1 : 0 },
-        { nodes, edges },
-      ) as Record<string, string | number>,
-    );
+    await this.nodeRepository.manager.transaction(async (manager) => {
+      const nodes = await manager.find(ResourceFlowNode, { where: { flowId } });
+      const edges = await manager.find(ResourceFlowEdge, { where: { flowId } });
+      await manager.delete(Flow, { id: flowId });
+      await this.recordFlow(
+        'flow.deleted',
+        actor,
+        flowId,
+        canvasDetails(
+          { 'before.name': fitAuditText(flow.name, FLOW_NAME_BYTES), 'before.enabled': flow.enabled ? 1 : 0 },
+          { nodes, edges },
+        ) as Record<string, string | number>,
+        manager,
+      );
+    });
   }
 
   public async getCanvas(flowId: number): Promise<ResourceFlowResponse> {

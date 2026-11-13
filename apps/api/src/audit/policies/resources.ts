@@ -1,4 +1,4 @@
-import { dataFields, positive, uuid } from './projection';
+import { dataFields, positive, uuid, withinDetailsLimit } from './projection';
 
 export const RESOURCE_AUDIT_ACTIONS = [
   'resource.created',
@@ -161,11 +161,14 @@ export function validResourcePrincipal(input: ResourceAuditInput): boolean {
   return true;
 }
 
-/** Global flow events are about a `flow`; resource_group events about a group; everything else about a resource. */
+/**
+ * Global flow events are about a `flow`, resource flow and flow variable events about a `resource`. Other events name a
+ * resource or a resource group (no subject type means a resource).
+ */
 function validSubjectType(input: ResourceAuditInput): boolean {
-  if (input.subjectType === undefined) return !input.action.startsWith('flow.');
   if (input.action.startsWith('flow.')) return input.subjectType === 'flow';
-  return input.subjectType === 'resource' || input.subjectType === 'resource_group';
+  if (/^(resource_flow|flow_variable)\./.test(input.action)) return input.subjectType === 'resource';
+  return input.subjectType === undefined || input.subjectType === 'resource' || input.subjectType === 'resource_group';
 }
 
 export function projectResourceAuditEvent(input: ResourceAuditInput): ResourceAuditInput | null {
@@ -185,7 +188,7 @@ export function projectResourceAuditEvent(input: ResourceAuditInput): ResourceAu
   for (const [key, value] of Object.entries(details)) {
     if (!allowedFields.includes(key) || (typeof value !== 'string' && typeof value !== 'number')) return null;
   }
-  if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
+  if (!withinDetailsLimit(details)) return null;
   if (!validResourcePrincipal(input)) return null;
   return { ...input, details: details as Record<string, string | number> };
 }

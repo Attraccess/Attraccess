@@ -197,12 +197,13 @@ describe('canvasSaveDetails', () => {
     });
 
     it('drops node data next, keeping ids, types and all edges', () => {
-      const details = detailsFor(bigFlow(20, 400), emptied);
+      const details = detailsFor(bigFlow(10, 400), emptied);
       expect(details.snapshotDetail).toBe('no_data');
       const snapshot = JSON.parse(details['before.snapshot'] as string);
-      expect(snapshot.nodes).toHaveLength(20);
+      expect(snapshot.nodes).toHaveLength(10);
       expect(snapshot.nodes[0]).toEqual({ id: 'node-0', type: 'output.http' });
-      expect(snapshot.edges).toHaveLength(19);
+      expect(snapshot.edges).toHaveLength(9);
+      expect(JSON.parse(details.removedNodes as string)).toHaveLength(10);
       expect(bytes(details)).toBeLessThanOrEqual(4096);
       expect(projected('resource_flow.updated', details)).not.toBeNull();
     });

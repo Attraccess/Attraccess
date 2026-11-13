@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
 import { auditLabel } from './components/AuditLogPanels';
+import { humanize } from './audit-log-model';
 import de from './de.json';
 import en from './en.json';
 
@@ -448,48 +449,73 @@ it('labels the recorded details of MQTT explorer events in both languages', () =
 });
 
 it('labels every flow audit event, target and detail field in both languages', () => {
-  const actions = [
-    'resource_flow.updated',
-    'flow.created',
-    'flow.updated',
-    'flow.deleted',
-    'flow.canvas_updated',
-    'flow_variable.set',
-    'flow_variable.deleted',
-  ];
   const translate = (strings: typeof en) => (key: string) => {
     const [, section, value] = /^(\w+)\[(.*)\]$/.exec(key) ?? [];
     return (strings as unknown as Record<string, Record<string, string>>)[section][JSON.parse(value)];
   };
-  expect(actions.map((action) => auditLabel('events', action, translate(en)))).toEqual([
-    'Resource flow changed',
-    'Global flow created',
-    'Global flow updated',
-    'Global flow deleted',
-    'Global flow canvas changed',
-    'Flow variable set',
-    'Flow variable deleted',
-  ]);
-  for (const strings of [en, de]) {
-    for (const action of actions) expect(strings.events).toHaveProperty([action]);
-    expect(strings.targets.flow).toBeTruthy();
-    for (const field of [
-      'flowName',
-      'snapshot',
-      'snapshotDetail',
-      'addedNodes',
-      'removedEdges',
-      'flowNodeCount',
-      'scope',
-      'key',
-      'before.nodeCount',
-      'after.edgeCount',
-      'before.snapshot',
-      'after.value',
-    ])
-      expect(strings.fields).toHaveProperty([field]);
+  const events = {
+    'resource_flow.updated': ['Resource flow updated', 'Ressourcen-Flow geändert'],
+    'flow.created': ['Global flow created', 'Globaler Flow erstellt'],
+    'flow.updated': ['Global flow updated', 'Globaler Flow geändert'],
+    'flow.deleted': ['Global flow deleted', 'Globaler Flow gelöscht'],
+    'flow.canvas_updated': ['Global flow canvas updated', 'Canvas eines globalen Flows geändert'],
+    'flow_variable.set': ['Flow variable set', 'Flow-Variable gesetzt'],
+    'flow_variable.deleted': ['Flow variable deleted', 'Flow-Variable gelöscht'],
+  };
+  for (const [action, [english, german]] of Object.entries(events)) {
+    expect(auditLabel('events', action, translate(en))).toBe(english);
+    expect(auditLabel('events', action, translate(de))).toBe(german);
   }
+  expect(auditLabel('targets', 'flow', translate(en))).toBe('Global flow');
   expect(auditLabel('targets', 'flow', translate(de))).toBe('Globaler Flow');
+  // Detail fields added for flow events; each needs its own label rather than the humanized key.
+  const fields = [
+    'flowName',
+    'nodeCount',
+    'edgeCount',
+    'snapshot',
+    'snapshotDetail',
+    'addedNodes',
+    'removedNodes',
+    'changedNodes',
+    'addedEdges',
+    'removedEdges',
+    'addedNodeCount',
+    'removedNodeCount',
+    'changedNodeCount',
+    'addedEdgeCount',
+    'removedEdgeCount',
+    'flowNodeCount',
+    'flowEdgeCount',
+    'scope',
+    'key',
+    'valueType',
+    'before.nodeCount',
+    'after.nodeCount',
+    'before.edgeCount',
+    'after.edgeCount',
+    'before.snapshot',
+    'before.value',
+    'after.value',
+    'before.name',
+    'after.name',
+    'before.enabled',
+    'after.enabled',
+    'before.description',
+    'after.description',
+  ];
+  // English labels that are already the humanized key.
+  const humanizedInEnglish = ['scope', 'key'];
+  for (const field of fields) {
+    for (const strings of [en, de]) {
+      expect(strings.fields).toHaveProperty([field]);
+      const label = auditLabel('fields', field, translate(strings));
+      expect(label.trim()).not.toBe('');
+      if (strings === de || !humanizedInEnglish.includes(field)) expect(label).not.toBe(humanize(field));
+    }
+  }
+  expect(auditLabel('fields', 'snapshot', translate(en))).toBe('Flow (JSON)');
+  expect(auditLabel('fields', 'before.snapshot', translate(de))).toBe('Vorheriger Flow (JSON)');
 });
 
 it('shows a global flow audit entry with its recorded flow name and a readable previous-flow snapshot', async () => {

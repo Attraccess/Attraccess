@@ -199,10 +199,10 @@ describe('GlobalFlowsService', () => {
   });
 
   it('deletes the flow row only: nodes and edges go by cascade', async () => {
-    nodeRepository.find.mockResolvedValue([]);
-    edgeRepository.find.mockResolvedValue([]);
+    manager.find.mockResolvedValue([]);
     await service.delete(5, testActor);
-    expect(flowRepository.delete).toHaveBeenCalledWith({ id: 5 });
+    expect(manager.delete).toHaveBeenCalledWith(Flow, { id: 5 });
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'flow.deleted' }), manager);
   });
 
   it('refuses to resolve a resource-only plugin node for a global flow', async () => {

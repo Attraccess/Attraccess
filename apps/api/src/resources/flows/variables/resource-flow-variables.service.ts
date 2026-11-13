@@ -8,8 +8,8 @@ import {
   ResourceFlowVariableValueType,
 } from '@attraccess/database-entities';
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/recorder/audit-event';
-import { auditResourceNames } from '../../resources.service';
-import { REDACTED, isSecretKey } from '../flow-audit';
+import { fitAuditTexts } from '../../../audit/policies/projection';
+import { REDACTED, isSecretKey, redactFlowData } from '../flow-audit';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 
 function classifyValueType(value: unknown): ResourceFlowVariableValueType {
@@ -142,14 +142,14 @@ export class ResourceFlowVariablesService {
     const serialized = Object.fromEntries(
       Object.entries(values)
         .filter(([, value]) => value !== undefined)
-        .map(([field, value]) => [field, secret ? REDACTED : (JSON.stringify(value) ?? '')]),
+        .map(([field, value]) => [field, secret ? REDACTED : (JSON.stringify(redactFlowData(value)) ?? '')]),
     );
     await this.audit.record({
       domain: 'resource',
       action,
       actor,
       subject: { type: 'resource', id: resourceId },
-      details: { scope, valueType, ...auditResourceNames({ key, ...serialized }, { scope, valueType }) },
+      details: { scope, valueType, ...fitAuditTexts({ key, ...serialized }, { scope, valueType }) },
     });
   }
 
@@ -163,8 +163,9 @@ export class ResourceFlowVariablesService {
     const existing = actor
       ? await this.repository.findOne({ where: { scope, resourceId: ownerId ?? IsNull(), key } })
       : null;
-    await this.repository.delete({ scope, resourceId: ownerId, key });
-    if (actor && existing && resourceId !== null) {
+    // A plain `null` would compare `resourceId = NULL`, which matches no global variable.
+    const result = await this.repository.delete({ scope, resourceId: ownerId ?? IsNull(), key });
+    if (actor && existing && resourceId !== null && result.affected) {
       await this.recordVariable('flow_variable.deleted', actor, resourceId, scope, key, existing.valueType, {
         'before.value': this.deserialize(existing),
         'after.value': undefined,

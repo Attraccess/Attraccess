@@ -66,7 +66,7 @@ export class ResourceFlowsService {
     protected readonly eventEmitter: EventEmitter2,
     @InjectRepository(Flow)
     protected readonly flowRepository: Repository<Flow>,
-    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(ResourceFlowsService.name);
@@ -270,14 +270,16 @@ export class ResourceFlowsService {
 
     // Start transaction to ensure data consistency
     const result = await this.flowNodeRepository.manager.transaction(async (transactionalEntityManager) => {
-      const [oldMqttMessageReceivedNodes, oldMqttWaitForMessageNodes] = await Promise.all([
-        transactionalEntityManager.find(ResourceFlowNode, {
-          where: { resource: { id: resourceId }, type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
-        }),
-        transactionalEntityManager.find(ResourceFlowNode, {
-          where: { resource: { id: resourceId }, type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE },
-        }),
-      ]);
+      const previousCanvas = {
+        nodes: await transactionalEntityManager.find(ResourceFlowNode, { where: { resource: { id: resourceId } } }),
+        edges: await transactionalEntityManager.find(ResourceFlowEdge, { where: { resource: { id: resourceId } } }),
+      };
+      const oldMqttMessageReceivedNodes = previousCanvas.nodes.filter(
+        (node) => node.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
+      );
+      const oldMqttWaitForMessageNodes = previousCanvas.nodes.filter(
+        (node) => node.type === ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
+      );
 
       const newOrChangedMqttMessageReceivedNodes = [] as typeof flowData.nodes;
       const newOrChangedMqttWaitForMessageNodes = [] as typeof flowData.nodes;
@@ -307,11 +309,6 @@ export class ResourceFlowsService {
           }
         }
       }
-
-      const previousCanvas = {
-        nodes: await transactionalEntityManager.find(ResourceFlowNode, { where: { resource: { id: resourceId } } }),
-        edges: await transactionalEntityManager.find(ResourceFlowEdge, { where: { resource: { id: resourceId } } }),
-      };
 
       // Delete existing nodes and edges (cascading will handle relationships)
       await transactionalEntityManager.delete(ResourceFlowNode, { resource: { id: resourceId } });

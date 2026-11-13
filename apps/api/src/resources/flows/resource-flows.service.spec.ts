@@ -79,8 +79,9 @@ describe('saving MQTT flow subscriptions', () => {
         return work(manager);
       },
     );
-    manager.find.mockImplementation(async (_entity, options) =>
-      oldNodes.filter((old) => !Array.isArray(options.where) && old.type === options.where.type),
+    // The previous canvas; the id-ownership check (no `resource` filter) finds nothing elsewhere.
+    manager.find.mockImplementation(async (entity, options) =>
+      entity === ResourceFlowNode && !Array.isArray(options?.where) && options?.where?.resource ? oldNodes : [],
     );
     manager.save.mockImplementation(async (_entity, entities) => entities);
     mqtt.subscribe.mockResolvedValue(undefined);

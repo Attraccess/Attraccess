@@ -68,10 +68,13 @@ describe('audit storage safe snapshot', () => {
     const variable = {
       ...base,
       action: 'flow_variable.set' as const,
+      subjectType: 'resource' as const,
       details: { scope: 'global', key: 'mode', valueType: 'string', 'after.value': '"on"' },
     };
     expect(projectResourceAuditEvent(variable)).toEqual(variable);
     expect(projectResourceAuditEvent({ ...variable, subjectType: 'flow' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...variable, subjectType: 'resource_group' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...variable, subjectType: undefined })).toBeNull();
     expect(projectResourceAuditEvent({ ...variable, details: { ...variable.details, 'before.name': 'x' } })).toBeNull();
     expect(
       projectResourceAuditEvent({

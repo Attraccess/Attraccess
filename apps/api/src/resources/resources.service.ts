@@ -30,30 +30,13 @@ import { UpdateResourceDto } from './dtos/updateResource.dto';
 
 import { ResourceChangedEvent } from './events/resource-changed.event';
 
-export const MAX_AUDIT_DETAILS_BYTES = 4096;
+import { AUDIT_DETAILS_BYTE_LIMIT, fitAuditText, fitAuditTexts } from '../audit/policies/projection';
 
-export function auditResourceName(name: string, maxJsonBytes: number): string {
-  if (Buffer.byteLength(JSON.stringify(name), 'utf8') <= maxJsonBytes) return name;
+export const MAX_AUDIT_DETAILS_BYTES = AUDIT_DETAILS_BYTE_LIMIT;
 
-  const suffix = '...';
-  let result = '';
-  for (const character of name) {
-    if (Buffer.byteLength(JSON.stringify(result + character + suffix), 'utf8') > maxJsonBytes) break;
-    result += character;
-  }
-  return result + suffix;
-}
+export const auditResourceName = fitAuditText;
 
-export function auditResourceNames(
-  names: Record<string, string>,
-  details: Record<string, string>,
-): Record<string, string> {
-  const emptyNames = Object.fromEntries(Object.keys(names).map((key) => [key, '']));
-  const availableBytes =
-    MAX_AUDIT_DETAILS_BYTES - Buffer.byteLength(JSON.stringify({ ...details, ...emptyNames }), 'utf8');
-  const maxJsonBytes = Math.floor(availableBytes / Object.keys(names).length);
-  return Object.fromEntries(Object.entries(names).map(([key, name]) => [key, auditResourceName(name, maxJsonBytes)]));
-}
+export const auditResourceNames = fitAuditTexts;
 
 export function resourceAuditSnapshot(resource: Resource) {
   return {
