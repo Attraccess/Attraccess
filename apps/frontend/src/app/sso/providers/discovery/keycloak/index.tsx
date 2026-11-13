@@ -45,7 +45,8 @@ export function KeycloakDiscoveryDialog(props: Props) {
   const { refetch: discoverKeycloak } = useAuthenticationServiceDiscoverKeycloakOidc<OpenIDConfiguration>(
     { host, realm },
     undefined,
-    { enabled: false },
+    // Discovery runs once per click: retrying a 4xx/502 only delays the error toast (a timeout by ~30 s).
+    { enabled: false, retry: false },
   );
 
   const discover = useCallback(async () => {
