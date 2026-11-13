@@ -3,6 +3,7 @@ import { Resource, ResourceType, SupervisionMode, User } from '@attraccess/datab
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 import { createResourceUsageServiceFixture } from './fixtures/service.test-fixture';
+import { usageInternals } from './fixtures/compose.test-fixture';
 
 describe('ResourceUsageService.precheckStart', () => {
   const scope = createResourceUsageServiceFixture();
@@ -28,18 +29,20 @@ describe('ResourceUsageService.precheckStart', () => {
 
   beforeEach(async () => {
     await resetTestFixture(scope);
-    const service = scope.service as unknown as Internals;
+    const parts = usageInternals(scope.service);
     internals = {
-      getResource: jest.spyOn(service as never, 'getResource').mockResolvedValue(machine() as never) as never,
+      getResource: jest.spyOn(parts.gate as never, 'getResource').mockResolvedValue(machine() as never) as never,
       canControllResource: jest
-        .spyOn(service as never, 'canControllResource')
+        .spyOn(parts.access as never, 'canControllResource')
         .mockResolvedValue(true as never) as never,
       validateSupervisedStart: jest
-        .spyOn(service as never, 'validateSupervisedStart')
+        .spyOn(parts.gate as never, 'validateSupervisedStart')
         .mockResolvedValue(undefined as never) as never,
-      getActiveSession: jest.spyOn(service as never, 'getActiveSession').mockResolvedValue(null as never) as never,
+      getActiveSession: jest
+        .spyOn(parts.records as never, 'getActiveSession')
+        .mockResolvedValue(null as never) as never,
       assertLifecycleAvailable: jest
-        .spyOn(service as never, 'assertLifecycleAvailable')
+        .spyOn(parts.lifecycle as never, 'assertLifecycleAvailable')
         .mockResolvedValue(undefined as never) as never,
     };
   });

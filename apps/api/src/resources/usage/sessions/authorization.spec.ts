@@ -18,6 +18,8 @@ import { createSupervisedStartFixture } from './fixtures/supervised-start.test-f
 
 import { mockRbacService } from './fixtures/rbac.test-fixture';
 
+import { usageInternals } from './fixtures/compose.test-fixture';
+
 export type ResourceUsageServiceTestScope = ReturnType<typeof createResourceUsageServiceFixture>;
 
 export type EndSessionTestScope = ReturnType<typeof createEndSessionFixture>;
@@ -488,7 +490,9 @@ describe('ResourceUsageService', () => {
 
       expect(
         // @ts-expect-error access private field for testing
-        canControllResourceCacheScope.service.accessCacheKeysByUser.has(canControllResourceCacheScope.mockUser.id),
+        usageInternals(canControllResourceCacheScope.service).access.accessCacheKeysByUser.has(
+          canControllResourceCacheScope.mockUser.id,
+        ),
       ).toBe(false);
 
       await canControllResourceCacheScope.service.canControllResource(
@@ -541,10 +545,14 @@ describe('ResourceUsageService', () => {
 
       expect(
         // @ts-expect-error access private field for testing
-        canControllResourceCacheScope.service.accessCacheKeysByUser.has(canControllResourceCacheScope.mockUser.id),
+        usageInternals(canControllResourceCacheScope.service).access.accessCacheKeysByUser.has(
+          canControllResourceCacheScope.mockUser.id,
+        ),
       ).toBe(false);
       // @ts-expect-error access private field for testing
-      expect(canControllResourceCacheScope.service.accessCacheKeysByUser.has(otherUser.id)).toBe(true);
+      expect(usageInternals(canControllResourceCacheScope.service).access.accessCacheKeysByUser.has(otherUser.id)).toBe(
+        true,
+      );
     });
 
     it('does not share privileged results with a restricted principal', async () => {
@@ -650,9 +658,9 @@ describe('ResourceUsageService', () => {
         );
         jest.advanceTimersByTime(30_001);
         // @ts-expect-error access private method for testing
-        canControllResourceCacheScope.service.pruneAccessCache();
+        usageInternals(canControllResourceCacheScope.service).access.pruneAccessCache();
         // @ts-expect-error access private field for testing
-        expect(canControllResourceCacheScope.service.accessCache.size).toBe(0);
+        expect(usageInternals(canControllResourceCacheScope.service).access.accessCache.size).toBe(0);
       } finally {
         jest.useRealTimers();
       }
@@ -679,9 +687,9 @@ describe('ResourceUsageService', () => {
 
     it('prunes expired entries before adding a new result to a full cache', async () => {
       // @ts-expect-error access private field for testing
-      const MAX = canControllResourceCacheScope.service.ACCESS_CACHE_MAX_SIZE as number;
+      const MAX = usageInternals(canControllResourceCacheScope.service).access.ACCESS_CACHE_MAX_SIZE as number;
       // @ts-expect-error access private field for testing
-      const cache = canControllResourceCacheScope.service.accessCache as Map<string, unknown>;
+      const cache = usageInternals(canControllResourceCacheScope.service).access.accessCache as Map<string, unknown>;
 
       // Fill the cache with expired entries so the next result can claim a slot.
       for (let i = 0; i < MAX; i++) {

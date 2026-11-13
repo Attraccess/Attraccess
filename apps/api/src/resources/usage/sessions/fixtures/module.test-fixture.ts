@@ -20,6 +20,7 @@ import { ResourcesService } from '../../../resources.service';
 import { ResourceRetrainingService } from '../../../retraining/resourceRetraining.service';
 import { createResourceUsageMocks } from './mocks.test-fixture';
 import { ResourceUsageService } from '../resource-usage.service';
+import { RESOURCE_USAGE_COLLABORATORS } from '../../resource-usage.collaborators';
 export function createResourceUsageTestingModule(mocks: ReturnType<typeof createResourceUsageMocks>) {
   const {
     mockRbacService,
@@ -44,6 +45,7 @@ export function createResourceUsageTestingModule(mocks: ReturnType<typeof create
   return Test.createTestingModule({
     providers: [
       ResourceUsageService,
+      ...RESOURCE_USAGE_COLLABORATORS,
       {
         provide: getRepositoryToken(Resource),
         useFactory: mockRepository,

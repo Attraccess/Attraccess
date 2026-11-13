@@ -1,5 +1,5 @@
 import { ResourceFlowNode, ResourceUsageEndSessionNodeDataSchema } from '@attraccess/database-entities';
-import { SessionEndTarget } from '../../usage/sessions/usage-session-changes';
+import { SessionEndTarget } from '../../usage/sessions/usage-session-ends';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
