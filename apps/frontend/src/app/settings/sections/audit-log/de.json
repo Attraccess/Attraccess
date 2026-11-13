@@ -414,7 +414,14 @@
     "flowEdgeCount": "Flow-Verbindungen beim Löschen",
     "scope": "Geltungsbereich",
     "key": "Schlüssel",
-    "valueType": "Werttyp"
+    "valueType": "Werttyp",
+    "before.nodeCount": "Anzahl Knoten vorher",
+    "after.nodeCount": "Anzahl Knoten nachher",
+    "before.edgeCount": "Anzahl Verbindungen vorher",
+    "after.edgeCount": "Anzahl Verbindungen nachher",
+    "before.snapshot": "Vorheriger Flow (JSON)",
+    "before.value": "Wert vorher",
+    "after.value": "Wert nachher"
   },
   "eventType": "Ereignistyp",
   "pluginId": "Integrations-ID",

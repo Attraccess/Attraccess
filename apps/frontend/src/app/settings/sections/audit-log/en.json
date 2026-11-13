@@ -414,7 +414,14 @@
     "flowEdgeCount": "Flow connections at deletion",
     "scope": "Scope",
     "key": "Key",
-    "valueType": "Value type"
+    "valueType": "Value type",
+    "before.nodeCount": "Number of nodes before",
+    "after.nodeCount": "Number of nodes after",
+    "before.edgeCount": "Number of connections before",
+    "after.edgeCount": "Number of connections after",
+    "before.snapshot": "Previous flow (JSON)",
+    "before.value": "Value before",
+    "after.value": "Value after"
   },
   "eventType": "Event type",
   "pluginId": "Integration ID",

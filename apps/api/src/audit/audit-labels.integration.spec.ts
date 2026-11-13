@@ -138,6 +138,11 @@ describe('persisted audit names', () => {
         details: { 'after.name': 'Alarm', 'after.enabled': 1 },
       },
       {
+        action: 'flow.updated' as const,
+        subject: { type: 'flow' as const, id: 3 },
+        details: { flowName: 'Door bell', changedFields: '["enabled"]', 'before.enabled': 1, 'after.enabled': 0 },
+      },
+      {
         action: 'flow_variable.set' as const,
         subject: { type: 'resource' as const, id: 7 },
         details: { scope: 'global', key: 'mode', valueType: 'string', 'after.value': '"on"' },
@@ -147,7 +152,7 @@ describe('persisted audit names', () => {
       expect(await service.record({ domain: 'resource', actor, ...event })).toEqual({ status: 'recorded' });
 
     const { items } = await controller.list({ limit: 50 });
-    expect(items).toHaveLength(5);
+    expect(items).toHaveLength(6);
     const byAction = (action: string) => items.filter((entry) => entry.action === action);
     expect(byAction('resource_flow.updated')[0]).toMatchObject({
       subjectType: 'resource',
@@ -165,10 +170,11 @@ describe('persisted audit names', () => {
       subjectLabel: 'Door bell',
       details: { snapshotDetail: 'omitted' },
     });
+    expect(byAction('flow.updated')[0]).toMatchObject({ subjectLabel: 'Door bell', subjectLabelSource: 'recorded' });
     expect(byAction('flow.created')[0]).toMatchObject({ subjectType: 'flow', subjectLabel: 'Alarm' });
     expect(byAction('flow_variable.set')[0]).toMatchObject({ subjectType: 'resource', subjectLabel: 'Current lathe' });
     const filtered = await controller.list({ limit: 50, subjectType: 'flow', eventPrefix: 'flow.' });
-    expect(filtered.items).toHaveLength(3);
+    expect(filtered.items).toHaveLength(4);
   });
 
   it('retains recorded names after deletion and never joins plugin target IDs to core resources', async () => {

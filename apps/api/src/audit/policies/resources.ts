@@ -117,6 +117,7 @@ export const resourceDetailFields: Partial<Record<ResourceAuditAction, readonly 
   'resource_flow.updated': CANVAS_FIELDS,
   'flow.created': ['after.name', 'after.enabled', 'after.description'],
   'flow.updated': [
+    'flowName',
     'before.name',
     'after.name',
     'before.enabled',

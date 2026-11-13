@@ -482,6 +482,10 @@ it('labels every flow audit event, target and detail field in both languages', (
       'flowNodeCount',
       'scope',
       'key',
+      'before.nodeCount',
+      'after.edgeCount',
+      'before.snapshot',
+      'after.value',
     ])
       expect(strings.fields).toHaveProperty([field]);
   }

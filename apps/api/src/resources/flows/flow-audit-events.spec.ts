@@ -147,6 +147,7 @@ describe('flow audit events', () => {
         action: 'flow.updated',
         subject: subject(db.flow.id),
         details: {
+          flowName: 'Alarm',
           'before.name': 'Notify',
           'after.name': 'Alarm',
           'before.enabled': 1,
@@ -155,6 +156,15 @@ describe('flow audit events', () => {
         },
       });
       expect(lastEvent().details).not.toHaveProperty('before.description');
+      expect(projectAuditRow(lastEvent())).not.toBeNull();
+    });
+
+    it('names the flow when only its switch or description changed, so the log can label the subject', async () => {
+      await db.globalFlows.update(db.flow.id, { enabled: false }, testActor);
+      expect(lastEvent().details).toMatchObject({ flowName: 'Notify', changedFields: '["enabled"]' });
+
+      await db.globalFlows.update(db.flow.id, { description: 'rings twice' }, testActor);
+      expect(lastEvent().details).toMatchObject({ flowName: 'Notify', changedFields: '["description"]' });
       expect(projectAuditRow(lastEvent())).not.toBeNull();
     });
 

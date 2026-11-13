@@ -142,7 +142,10 @@ export class GlobalFlowsService {
       : {};
     const fixed = { changedFields: JSON.stringify(changedFields), ...enabled };
     await this.recordFlow('flow.updated', actor, flowId, {
-      ...auditResourceNames({ ...text('before', before), ...text('after', after) }, fixed as Record<string, string>),
+      ...auditResourceNames(
+        { flowName: saved.name, ...text('before', before), ...text('after', after) },
+        fixed as Record<string, string>,
+      ),
       ...fixed,
     });
   }
