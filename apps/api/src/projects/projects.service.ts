@@ -1,4 +1,11 @@
-import { Project, ProjectInvitation, ProjectMember, ResourceUsage, User } from '@attraccess/database-entities';
+import {
+  Project,
+  ProjectInvitation,
+  ProjectMember,
+  ProjectMemberRole,
+  ResourceUsage,
+  User,
+} from '@attraccess/database-entities';
 
 import { Injectable, NotFoundException } from '@nestjs/common';
 
@@ -31,26 +38,36 @@ import { UpdateProjectDto } from './dto/update.dto';
 import { ProjectInvitations } from './invitations/project-invitations';
 
 @Injectable()
-export class ProjectsService extends ProjectInvitations {
+export class ProjectsService {
+  private readonly invitations: ProjectInvitations;
+
   constructor(
     @InjectRepository(Project)
-    protected readonly projectRepository: Repository<Project>,
+    private readonly projectRepository: Repository<Project>,
     @InjectRepository(ProjectMember)
-    protected readonly projectMemberRepository: Repository<ProjectMember>,
+    private readonly projectMemberRepository: Repository<ProjectMember>,
     @InjectRepository(ProjectInvitation)
-    protected readonly projectInvitationRepository: Repository<ProjectInvitation>,
+    private readonly projectInvitationRepository: Repository<ProjectInvitation>,
     @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
     @InjectRepository(ResourceUsage)
-    protected readonly resourceUsageRepository: Repository<ResourceUsage>,
-    protected readonly fileStorageService: FileStorageService,
-    protected readonly projectAccessService: ProjectAccessService,
-    protected readonly emailService: EmailService,
-    protected readonly metricsService: MetricsService,
-    protected readonly notifications: NotificationDispatchService,
-    protected readonly audit: AuditService,
+    private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    private readonly fileStorageService: FileStorageService,
+    private readonly projectAccessService: ProjectAccessService,
+    private readonly emailService: EmailService,
+    private readonly metricsService: MetricsService,
+    private readonly notifications: NotificationDispatchService,
+    private readonly audit: AuditService,
   ) {
-    super();
+    this.invitations = new ProjectInvitations(
+      this.audit,
+      this.projectAccessService,
+      this.userRepository,
+      this.projectMemberRepository,
+      this.projectInvitationRepository,
+      this.notifications,
+      this.emailService,
+    );
   }
 
   public async findMany(userId: number, query: FindManyProjectsQueryDto): Promise<ProjectWithAccessDto[]> {
@@ -196,7 +213,7 @@ export class ProjectsService extends ProjectInvitations {
     });
   }
 
-  protected projectDetails(project: Project, state: 'before' | 'after'): Record<string, string | number> {
+  private projectDetails(project: Project, state: 'before' | 'after'): Record<string, string | number> {
     const details: Record<string, string | number> = {
       projectId: project.id,
       [`${state}.hasLogo`]: project.logo ? 1 : 0,
@@ -215,16 +232,7 @@ export class ProjectsService extends ProjectInvitations {
     };
   }
 
-  protected invitationDetails(invitation: ProjectInvitation): Record<string, string | number> {
-    return {
-      projectId: invitation.projectId,
-      invitationId: invitation.id,
-      userId: invitation.invitedUserId,
-      role: invitation.requestedRole,
-    };
-  }
-
-  protected async setLogo(project: Project, logo: FileUpload) {
+  private async setLogo(project: Project, logo: FileUpload) {
     const logoFilename = await this.fileStorageService.saveFile(logo, `projects/${project.id}`);
     project.logo = logoFilename;
   }
@@ -354,5 +362,65 @@ export class ProjectsService extends ProjectInvitations {
       });
     }
     return saved;
+  }
+
+  async listPendingInvitationsForUser(userId: number): Promise<ProjectInvitation[]> {
+    return this.invitations.listPendingInvitationsForUser(userId);
+  }
+
+  async acceptInvitation(
+    userId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.acceptInvitation(userId, invitationId, authenticationMethod, apiTokenId);
+  }
+
+  async declineInvitation(
+    userId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.declineInvitation(userId, invitationId, authenticationMethod, apiTokenId);
+  }
+
+  async createProjectInvitation(
+    ownerId: number,
+    projectId: number,
+    invitedUserId: number,
+    role: ProjectMemberRole = ProjectMemberRole.VIEWER,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.createProjectInvitation(
+      ownerId,
+      projectId,
+      invitedUserId,
+      role,
+      authenticationMethod,
+      apiTokenId,
+    );
+  }
+
+  async resendProjectInvitation(
+    ownerId: number,
+    projectId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.resendProjectInvitation(ownerId, projectId, invitationId, authenticationMethod, apiTokenId);
+  }
+
+  async cancelProjectInvitation(
+    ownerId: number,
+    projectId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.cancelProjectInvitation(ownerId, projectId, invitationId, authenticationMethod, apiTokenId);
   }
 }
