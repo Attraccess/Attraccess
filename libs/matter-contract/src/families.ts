@@ -60,19 +60,63 @@ export const commissioningSessionSchema = z.strictObject({
 
 // --- inventory --------------------------------------------------------------------------------
 
+/**
+ * Device types travel as `{deviceTypeId, revision}` pairs, so one list keeps each ID with its revision.
+ * Matter device type revisions are uint16.
+ */
+export const deviceTypeSchema = z.strictObject({
+  deviceTypeId: deviceTypeIdSchema,
+  revision: z.int().min(0).max(0xffff),
+});
+export const clusterRoleSchema = z.enum(['server', 'client']);
+export const endpointClusterSchema = z.strictObject({
+  clusterId: clusterIdSchema,
+  role: clusterRoleSchema,
+  revision: z.int().min(0).max(0xffff).nullable(),
+  featureMap: z.int().min(0).max(0xffff_ffff).nullable(),
+  attributeIds: z.array(clusterIdSchema).max(512),
+  acceptedCommandIds: z.array(clusterIdSchema).max(256),
+});
+/** Basic information a bridge reports about the device behind one of its endpoints. */
+export const bridgedInfoSchema = z.strictObject({
+  uniqueId: z.string().max(32).nullable(),
+  nodeLabel: z.string().max(32).nullable(),
+  vendorName: z.string().max(32).nullable(),
+  productName: z.string().max(32).nullable(),
+  serialNumber: z.string().max(32).nullable(),
+  reachable: z.boolean().nullable(),
+});
 export const endpointSchema = z.strictObject({
   endpointId: endpointIdSchema,
-  deviceTypes: z.array(deviceTypeIdSchema).max(32),
+  parentEndpointId: endpointIdSchema.nullable(),
+  deviceTypes: z.array(deviceTypeSchema).max(32),
+  clusters: z.array(endpointClusterSchema).max(128),
+  /** Present only for endpoints a bridge exposes. */
+  bridged: bridgedInfoSchema.nullable(),
 });
+export const attestationStatusSchema = z.enum(['verified', 'unverified', 'failed', 'unknown']);
 export const nodeSchema = z.strictObject({
   nodeId: matterId64Schema,
   reachable: z.boolean(),
+  vendorId: z.int().min(0).max(0xffff).nullable(),
+  productId: z.int().min(0).max(0xffff).nullable(),
+  vendorName: z.string().max(32).nullable(),
+  productName: z.string().max(32).nullable(),
+  serialNumber: z.string().max(32).nullable(),
+  uniqueId: z.string().max(32).nullable(),
+  hardwareVersion: z.int().min(0).max(0xffff).nullable(),
+  softwareVersion: z.int().min(0).max(0xffff_ffff).nullable(),
+  softwareVersionString: z.string().max(64).nullable(),
+  attestation: z.strictObject({ status: attestationStatusSchema, checkedAt: timestampSchema.nullable() }),
   endpoints: z.array(endpointSchema).max(256),
   /** When this inventory view was last confirmed by the device. */
   observedAt: timestampSchema.nullable(),
 });
 export const nodeListSchema = z.strictObject({
+  /** False when the sidecar's view may be partial: consumers must not detach anything because of it. */
   authoritative: z.boolean(),
+  /** The fabric the nodes belong to; null while the sidecar has no fabric. */
+  fabricId: matterId64Schema.nullable(),
   nodes: z.array(nodeSchema).max(1_000),
 });
 export const nodeParamsSchema = z.strictObject({ nodeId: matterId64Schema });

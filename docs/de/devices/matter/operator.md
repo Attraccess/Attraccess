@@ -1,7 +1,8 @@
 # Matter: Betriebsanleitung
+
 <!-- llms-description: Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation. -->
 
-> **Nur Konnektivität.** Der Sidecar lässt sich bauen, starten, absichern und mit Attraccess verbinden, steuert aber noch keine Geräte. Lesen Sie zuerst die [Architektur](devices/matter/architecture.md).
+> **Nur Konnektivität (auf Sidecar-Seite).** Der Sidecar lässt sich bauen, starten, absichern und mit Attraccess verbinden, steuert aber noch keine Geräte und listet auch keine auf. Die Geräteeinträge des Plugins bleiben daher leer, und `GET /matter/reconciliation` meldet `skipped_unavailable`. Lesen Sie zuerst die [Architektur](devices/matter/architecture.md) und das [Datenmodell](devices/matter/data-model.md). Spielen Sie bei einem Update zuerst den Sidecar und dann das Plugin ein: Ein nicht zusammenpassendes Paar erscheint als `incompatible`.
 
 ## Bauen und starten
 
@@ -106,15 +107,15 @@ Eine `/v1/`-Anfrage oder ein WebSocket-Upgrade auf `/v1/events` mit nicht unters
     "correlationId": "5a1f6c0e-6f55-4a53-9a6e-2c6d6b0f5b1c",
     "retryable": false,
     "details": {
-      "received": { "wireVersion": 1, "attraccess": "1.10.0", "plugin": "0.2.0-alpha.0", "sidecar": "0.2.0-alpha.0" },
+      "received": { "wireVersion": 1, "attraccess": "1.10.0", "plugin": "0.3.0-alpha.0", "sidecar": "0.3.0-alpha.0" },
       "problems": [],
-      "running": { "sidecar": "0.2.0-alpha.0", "matterJs": "0.18.0" },
+      "running": { "sidecar": "0.3.0-alpha.0", "matterJs": "0.18.0" },
       "supported": [
         {
           "wireVersion": 1,
           "attraccess": "^1.11.0",
-          "plugin": "0.2.0-alpha.0",
-          "sidecar": "0.2.0-alpha.0",
+          "plugin": "0.3.0-alpha.0",
+          "sidecar": "0.3.0-alpha.0",
           "matterJs": "0.18.0"
         }
       ]

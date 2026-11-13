@@ -73,6 +73,72 @@ describe('exported artifacts', () => {
     expect(check('EventEnvelope', event)).toBe(true);
     expect(check('EventEnvelope', { ...event, timestamp: 'bad' })).toBe(false);
     expect(check('EventEnvelope', { ...event, extra: 1 })).toBe(false);
+    const statePayload = {
+      nodeId: '5',
+      endpointId: 1,
+      clusterId: 6,
+      attributeId: 0,
+      value: true,
+      observedAt: '2026-10-29T10:00:00.000Z',
+      source: 'read',
+    };
+    expect(check('EventEnvelope', { ...event, type: 'device.state', payload: statePayload })).toBe(true);
+    // The by-type payload check is a runtime refinement; JSON Schema keeps the union with the opaque slot.
+    expect(check('EventEnvelope', { ...event, type: 'device.state', payload: 5 })).toBe(false);
+    expect(check('DeviceStatePayload', { ...statePayload, fabricId: '1' })).toBe(true);
+    expect(check('DeviceStatePayload', { ...statePayload, extra: 1 })).toBe(false);
+    const outcomePayload = {
+      requestId: id,
+      outcome: 'uncertain',
+      acceptedAt: '2026-10-29T10:00:00.000Z',
+      reportedAt: null,
+      fabricId: '1',
+      nodeId: '5',
+      endpointId: 1,
+      failureCode: 'timeout',
+    };
+    expect(check('CommandOutcomePayload', outcomePayload)).toBe(true);
+    expect(check('CommandOutcomePayload', { ...outcomePayload, outcome: 'done' })).toBe(false);
+    expect(check('EventEnvelope', { ...event, type: 'command.outcome', payload: outcomePayload })).toBe(true);
+    const node = {
+      nodeId: '18446744073709551615',
+      reachable: true,
+      vendorId: 65521,
+      productId: 32768,
+      vendorName: 'Vendor',
+      productName: 'Plug',
+      serialNumber: 'SN-1',
+      uniqueId: 'U-1',
+      hardwareVersion: 1,
+      softwareVersion: 2,
+      softwareVersionString: '2.0',
+      attestation: { status: 'verified', checkedAt: '2026-10-29T10:00:00.000Z' },
+      observedAt: '2026-10-29T10:00:00.000Z',
+      endpoints: [
+        {
+          endpointId: 1,
+          parentEndpointId: 0,
+          deviceTypes: [{ deviceTypeId: 266, revision: 3 }],
+          clusters: [
+            { clusterId: 6, role: 'server', revision: 6, featureMap: 1, attributeIds: [0], acceptedCommandIds: [0, 1] },
+          ],
+          bridged: {
+            uniqueId: 'B-1',
+            nodeLabel: null,
+            vendorName: null,
+            productName: null,
+            serialNumber: null,
+            reachable: true,
+          },
+        },
+      ],
+    };
+    expect(check('InventoryListResponse', { authoritative: true, fabricId: '1', nodes: [node] })).toBe(true);
+    const tooManyAttributes = { ...node.endpoints[0].clusters[0], attributeIds: Array.from({ length: 513 }, () => 0) };
+    const oversized = { ...node, endpoints: [{ ...node.endpoints[0], clusters: [tooManyAttributes] }] };
+    expect(check('InventoryListResponse', { authoritative: true, fabricId: '1', nodes: [oversized] })).toBe(false);
+    expect(check('InventoryListResponse', { authoritative: true, fabricId: null, nodes: [] })).toBe(true);
+    expect(check('InventoryListResponse', { authoritative: true, nodes: [] })).toBe(false);
     expect(check('ClientMessage', { type: 'resume', wireVersion: 1 })).toBe(true);
     expect(check('ClientMessage', { type: 'resume', wireVersion: 2 })).toBe(false);
     expect(

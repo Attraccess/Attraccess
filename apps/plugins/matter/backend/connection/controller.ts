@@ -5,7 +5,7 @@ import { MissingCredentialError, MatterSettingsService, type PublicSettings } fr
 import { settingsSchema, validationMessages } from './validation';
 import type { ConnectionStatus } from '../client/connection';
 
-function principalOf(request: AuthenticatedRequest): PluginAuditPrincipal {
+export function principalOf(request: AuthenticatedRequest): PluginAuditPrincipal {
   const user = request.user;
   return {
     userId: user.id,

@@ -1,13 +1,14 @@
 # Matter: Architektur
+
 <!-- llms-description: Architektur der Matter-Integration: Plugin plus Sidecar, versionierter REST- und WebSocket-Vertrag, Fehler und Events. -->
 
-> **Nur Konnektivität.** Dieses Release legt das Fundament für Matter-Unterstützung: einen versionierten Vertrag (Contract), einen eigenständigen Sidecar mit Health-, Versions- und Event-Stream-Endpunkten und ein Plugin, das sich sicher mit ihm verbindet. Es kann Geräte **nicht** in Betrieb nehmen (Commissioning), nicht auflisten, keine Befehle senden, Thread nicht verwalten und keine Firmware-Updates einspielen. Planen Sie keine Gerätesteuerung damit. Diese Funktionen folgen in späteren Tickets (siehe [Wie es weitergeht](#wie-es-weitergeht)).
+> **Konnektivität und Datenmodell.** Dieses Release legt das Fundament für Matter-Unterstützung: einen versionierten Vertrag (Contract), einen eigenständigen Sidecar mit Health-, Versions- und Event-Stream-Endpunkten, ein Plugin, das sich sicher mit ihm verbindet, und das [Gerätedatenmodell](devices/matter/data-model.md) des Plugins (Nodes, Endpoints, Zustand und Lebenszyklus, mit Admin-REST-Endpunkten). Der Sidecar kann Geräte noch **nicht** in Betrieb nehmen (Commissioning), nicht auflisten, keine Befehle senden, Thread nicht verwalten und keine Firmware-Updates einspielen; das Datenmodell bleibt damit leer, und es gibt keine Geräte-Oberfläche. Planen Sie keine Gerätesteuerung damit. Diese Funktionen folgen in späteren Tickets (siehe [Wie es weitergeht](#wie-es-weitergeht)).
 
 ## Plugin plus Sidecar
 
 Matter wird in zwei zusammenarbeitenden Teilen ausgeliefert, nicht als eingebauter Attraccess-Code:
 
-- **Das Matter-Plugin** (`apps/plugins/matter`) ist ein installierbares Attraccess-Plugin. In diesem Release verbindet es sich mit dem Sidecar und bietet eine Admin-Seite (**Geräte → Matter**) für die Verbindungseinstellungen. Es hat noch keine Gerätefunktionen. Es braucht die Berechtigungen `DATABASE_ACCESS` und `MANAGE_SECRETS`.
+- **Das Matter-Plugin** (`apps/plugins/matter`) ist ein installierbares Attraccess-Plugin. In diesem Release verbindet es sich mit dem Sidecar und bietet eine Admin-Seite (**Geräte → Matter**) für die Verbindungseinstellungen. Es führt das [Gerätedatenmodell](devices/matter/data-model.md) (Nodes, Endpoints, Zustand, Lebenszyklus) und gleicht es mit dem Sidecar ab, sobald dieser Nodes auflisten kann; eine Geräte-Oberfläche gibt es noch nicht. Es braucht die Berechtigungen `DATABASE_ACCESS` und `MANAGE_SECRETS`.
 - **Der Matter-Sidecar** (`apps/matter-sidecar`) ist ein eigener Node.js-Prozess. Nur er lädt [matter.js](https://github.com/project-chip/matter.js) (`@matter/main`, auf ein exaktes Release festgelegt). Er startet und läuft ohne die Attraccess-API, ohne Datenbank, ohne Matter-Fabric und ohne in Betrieb genommenes Gerät.
 
 Eine gemeinsame Bibliothek, `libs/matter-contract`, definiert jede Anfrage, Antwort und jedes Event genau einmal, mit Laufzeitvalidierung (Zod). Sidecar und Plugin verwenden sie beide. Sie importiert niemals matter.js, Core-Code, Datenbank-Entitäten oder Plugins.
@@ -24,8 +25,8 @@ Eine passende Wire-Version genügt nicht. Attraccess, das Matter-Plugin und der 
 | -------------- | -------------------------------------------------------------------- |
 | Wire-Version   | `1`                                                                  |
 | Attraccess     | `^1.11.0` (Vorabversionen einer passenden Version werden akzeptiert) |
-| Matter-Plugin  | genau `0.2.0-alpha.0`                                                |
-| Matter-Sidecar | genau `0.2.0-alpha.0`                                                |
+| Matter-Plugin  | genau `0.3.0-alpha.0`                                                |
+| Matter-Sidecar | genau `0.3.0-alpha.0`                                                |
 | matter.js      | genau `0.18.0` (Plugin und Sidecar teilen sich ein Release)          |
 
 `attraccess.host` (`package.json`) und `attraccessVersion.min` (`plugin.json`) des Plugins werden aus derselben Tabelle abgeleitet; ein Test prüft, dass sie übereinstimmen. Jedes neue Plugin- oder Sidecar-Release braucht eine Tabellenaktualisierung, sonst lehnt der Sidecar es ab. Der Attraccess-Bereich ist bewusst ein Bereich: Ein neues Attraccess-1.x-Release erfordert nicht automatisch ein Sidecar-Release.
@@ -132,6 +133,6 @@ Das Plugin startet die Verbindung, ohne auf den Sidecar zu warten. **Ein fehlend
 
 - [ATT-1000](https://linear.app/attraccess/issue/ATT-1000): Produktives Packaging und Deployment.
 - [ATT-998](https://linear.app/attraccess/issue/ATT-998): Fabric-Persistenz, verschlüsseltes Backup und Wiederherstellung.
-- Spätere Matter-Feature-Tickets: Commissioning, Geräteinventar, Befehle, Subscriptions, Thread, OTA, Berechtigungen und Audit. Dass ihre Vertragsformen hier definiert sind, liefert diese Funktionen nicht.
+- Spätere Matter-Feature-Tickets: Commissioning, das Geräteinventar des Sidecars, Befehle und Subscriptions, Geräte-Oberfläche und Flow-Nodes, Thread, OTA und eine eigene Berechtigung. Der Vertrag definiert bereits die Formen von Inventar, `device.state` und `command.outcome`, und das Plugin speichert und gleicht sie ab (siehe [Datenmodell](devices/matter/data-model.md)), aber der Sidecar antwortet für diese Familien weiterhin mit `unsupported_capability`.
 
 Siehe auch die [Betriebsanleitung](devices/matter/operator.md).

@@ -48,7 +48,7 @@ describe('checkAdmission', () => {
   it('treats array-valued (repeated) headers as malformed', () => {
     const repeated = {
       ...headers(),
-      'x-matter-plugin-version': ['0.2.0-alpha.0', '0.2.0-alpha.0'] as unknown as string,
+      'x-matter-plugin-version': ['0.3.0-alpha.0', '0.3.0-alpha.0'] as unknown as string,
     };
     expect(checkAdmission(repeated, running)).toMatchObject({ ok: false, code: 'incompatible_release' });
   });

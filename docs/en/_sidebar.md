@@ -82,6 +82,7 @@
   - [WAGO Safety Boundary](devices/wago-safety-boundary.md)
   - [Matter: Architecture](devices/matter/architecture.md)
   - [Matter: Operator Guide](devices/matter/operator.md)
+  - [Matter: Data Model and Lifecycle](devices/matter/data-model.md)
 
 - **Billing**
   - [Overview](billing/overview.md)

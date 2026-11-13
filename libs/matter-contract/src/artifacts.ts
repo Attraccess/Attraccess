@@ -3,7 +3,7 @@ import { WIRE_VERSION } from './constants';
 import { capabilityReportSchema } from './capabilities';
 import { COMPATIBILITY_TABLE, supportedCombinationSchema } from './compatibility';
 import { errorEnvelopeSchema } from './errors';
-import { eventEnvelopeSchema } from './events';
+import { commandOutcomePayloadSchema, deviceStatePayloadSchema, eventEnvelopeSchema } from './events';
 import { clientMessageSchema, serverMessageSchema } from './messages';
 import { EVENTS_PATH, OPERATIONS, OperationDefinition } from './operations';
 
@@ -14,6 +14,8 @@ const NAMED_SCHEMAS: Record<string, z.ZodType> = {
   CapabilityReport: capabilityReportSchema,
   SupportedCombination: supportedCombinationSchema,
   EventEnvelope: eventEnvelopeSchema,
+  DeviceStatePayload: deviceStatePayloadSchema,
+  CommandOutcomePayload: commandOutcomePayloadSchema,
   ClientMessage: clientMessageSchema,
   ServerMessage: serverMessageSchema,
 };

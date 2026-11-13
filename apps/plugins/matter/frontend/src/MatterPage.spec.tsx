@@ -19,8 +19,8 @@ vi.mock('./api', () => api);
 const entry = {
   wireVersion: 1,
   attraccess: '^1.11.0',
-  plugin: '0.2.0-alpha.0',
-  sidecar: '0.2.0-alpha.0',
+  plugin: '0.3.0-alpha.0',
+  sidecar: '0.3.0-alpha.0',
   matterJs: '0.18.0',
 };
 const baseStatus: ConnectionStatus = {
@@ -83,16 +83,16 @@ describe('MatterPage', () => {
       {
         state: 'connected',
         sidecar: {
-          sidecar: '0.2.0-alpha.0',
+          sidecar: '0.3.0-alpha.0',
           matterJs: '0.18.0',
           wireVersion: 1,
-          build: { version: '0.2.0-alpha.0+abc' },
+          build: { version: '0.3.0-alpha.0+abc' },
         },
       },
       configured,
     );
     expect(await screen.findByText('Connected')).toBeInTheDocument();
-    expect(screen.getByText('0.2.0-alpha.0')).toBeInTheDocument();
+    expect(screen.getByText('0.3.0-alpha.0')).toBeInTheDocument();
     expect(screen.getByText('0.18.0')).toBeInTheDocument();
   });
 
@@ -136,7 +136,7 @@ describe('MatterPage', () => {
           message: 'Not a supported combination.',
           correlationId: null,
           details: {
-            received: { attraccess: '1.11.0', plugin: '0.2.0-alpha.0', sidecar: '9.9.9', matterJs: '0.18.0' },
+            received: { attraccess: '1.11.0', plugin: '0.3.0-alpha.0', sidecar: '9.9.9', matterJs: '0.18.0' },
           },
         },
       },
@@ -146,7 +146,7 @@ describe('MatterPage', () => {
       await screen.findByText(/Upgrade or downgrade Attraccess, the Matter plugin or the sidecar/),
     ).toBeInTheDocument();
     expect(screen.getByText(/sidecar 9\.9\.9/)).toBeInTheDocument();
-    expect(screen.getByText(/sidecar 0\.2\.0-alpha\.0, matter\.js 0\.18\.0/)).toBeInTheDocument();
+    expect(screen.getByText(/sidecar 0\.3\.0-alpha\.0, matter\.js 0\.18\.0/)).toBeInTheDocument();
   });
 
   it('says to upgrade Attraccess when the host version is unavailable', async () => {

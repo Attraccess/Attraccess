@@ -55,6 +55,6 @@ export const settingsSchema = z.strictObject({
 export type SettingsInput = z.infer<typeof settingsSchema>;
 
 /** Messages only; the submitted values (especially the credential) are never echoed back. */
-export function validationMessages(error: z.ZodError): string[] {
-  return error.issues.map((issue) => `${issue.path.join('.') || 'body'}: ${issue.message}`);
+export function validationMessages(error: z.ZodError, root = 'body'): string[] {
+  return error.issues.map((issue) => `${issue.path.join('.') || root}: ${issue.message}`);
 }

@@ -37,7 +37,7 @@ function setup(options: { draining?: boolean; maxClients?: number } = {}) {
     logger,
     auth,
     isDraining,
-    features: { 'inventory.list': async () => ({ authoritative: false, nodes: [] }) },
+    features: { 'inventory.list': async () => ({ authoritative: false, fabricId: null, nodes: [] }) },
     builtIns: {},
   };
   const stream = new EventStream({ maxEvents: config.replayMaxEvents, maxAgeMs: config.replayMaxAgeMs });

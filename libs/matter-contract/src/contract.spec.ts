@@ -128,8 +128,60 @@ describe('families', () => {
   });
 
   it('caps device type IDs at uint32', () => {
-    expect(families.endpointSchema.safeParse({ endpointId: 1, deviceTypes: [0xffff_ffff] }).success).toBe(true);
-    expect(families.endpointSchema.safeParse({ endpointId: 1, deviceTypes: [0x1_0000_0000] }).success).toBe(false);
+    const base = { endpointId: 1, parentEndpointId: null, clusters: [], bridged: null };
+    expect(
+      families.endpointSchema.safeParse({ ...base, deviceTypes: [{ deviceTypeId: 0xffff_ffff, revision: 1 }] }).success,
+    ).toBe(true);
+    expect(
+      families.endpointSchema.safeParse({ ...base, deviceTypes: [{ deviceTypeId: 0x1_0000_0000, revision: 1 }] })
+        .success,
+    ).toBe(false);
+    expect(families.endpointSchema.safeParse({ ...base, deviceTypes: [0xffff_ffff] }).success).toBe(false);
+  });
+
+  it('describes the inventory with identity, bounded clusters and bridged data', () => {
+    const node = {
+      nodeId: '5',
+      reachable: true,
+      vendorId: 4_874,
+      productId: 1,
+      vendorName: 'Acme',
+      productName: 'Plug',
+      serialNumber: 'SN1',
+      uniqueId: 'U1',
+      hardwareVersion: 1,
+      softwareVersion: 3,
+      softwareVersionString: '1.0.3',
+      attestation: { status: 'verified', checkedAt: '2026-10-29T10:00:00.000Z' },
+      observedAt: null,
+      endpoints: [
+        {
+          endpointId: 1,
+          parentEndpointId: 0,
+          deviceTypes: [{ deviceTypeId: 266, revision: 1 }],
+          clusters: [
+            { clusterId: 6, role: 'server', revision: 5, featureMap: 1, attributeIds: [0], acceptedCommandIds: [0, 1] },
+          ],
+          bridged: {
+            uniqueId: 'B1',
+            nodeLabel: null,
+            vendorName: null,
+            productName: null,
+            serialNumber: null,
+            reachable: true,
+          },
+        },
+      ],
+    };
+    expect(families.nodeListSchema.safeParse({ authoritative: true, fabricId: '1', nodes: [node] }).success).toBe(true);
+    expect(families.nodeListSchema.safeParse({ authoritative: true, fabricId: null, nodes: [] }).success).toBe(true);
+    expect(families.nodeListSchema.safeParse({ authoritative: true, nodes: [] }).success).toBe(false);
+    expect(families.nodeSchema.safeParse({ ...node, attestation: { status: 'bogus', checkedAt: null } }).success).toBe(
+      false,
+    );
+    const cluster = node.endpoints[0].clusters[0];
+    const oversized = { ...node.endpoints[0], clusters: [{ ...cluster, attributeIds: new Array(513).fill(1) }] };
+    expect(families.endpointSchema.safeParse(oversized).success).toBe(false);
   });
 
   it('keeps the subscription interval invariant in the shared schema', () => {
@@ -151,7 +203,7 @@ describe('families', () => {
 
   it.each([
     ['fabric', families.fabricStatusSchema, { state: 'uninitialized', fabricId: null }],
-    ['inventory', families.nodeListSchema, { authoritative: false, nodes: [] }],
+    ['inventory', families.nodeListSchema, { authoritative: false, fabricId: null, nodes: [] }],
     ['subscription', families.subscriptionSchema, { subscriptionId: id, nodeId: '1', state: 'active' }],
     ['ota', families.otaUpdateSchema, { updateId: id, nodeId: '1', state: 'queued', outcome: 'requested' }],
     [
@@ -181,6 +233,62 @@ describe('events and messages', () => {
     }
     expect(eventEnvelopeSchema.safeParse({ ...event, timestamp: 'yesterday' }).success).toBe(false);
     expect(eventEnvelopeSchema.safeParse({ ...event, sequence: 0 }).success).toBe(false);
+  });
+
+  it('validates device.state and command.outcome payloads by type', () => {
+    const state = {
+      nodeId: '5',
+      endpointId: 1,
+      clusterId: 6,
+      attributeId: 0,
+      value: true,
+      observedAt: '2026-10-29T10:00:00.000Z',
+      source: 'subscription_report',
+    };
+    expect(eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: state }).success).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({
+        ...event,
+        type: 'device.state',
+        payload: { ...state, fault: { code: 'x', message: 'y' } },
+      }).success,
+    ).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { ...state, fabricId: '1' } }).success,
+    ).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { ...state, fabricId: 'x' } }).success,
+    ).toBe(false);
+    expect(eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { nodeId: '5' } }).success).toBe(
+      false,
+    );
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { phase: 'started' } }).success,
+    ).toBe(false);
+    const outcome = {
+      requestId: id,
+      outcome: 'accepted',
+      acceptedAt: null,
+      reportedAt: null,
+      nodeId: '5',
+      endpointId: 1,
+    };
+    expect(eventEnvelopeSchema.safeParse({ ...event, type: 'command.outcome', payload: outcome }).success).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({
+        ...event,
+        type: 'command.outcome',
+        payload: { ...outcome, fabricId: '1', failureCode: 'timeout' },
+      }).success,
+    ).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'command.outcome', payload: { ...outcome, outcome: 'done' } })
+        .success,
+    ).toBe(false);
+    // Types without an implementation keep the opaque slot.
+    expect(eventEnvelopeSchema.safeParse({ ...event, type: 'fabric.changed', payload: { anything: 1 } }).success).toBe(
+      true,
+    );
   });
 
   it('round-trips cursors and rejects malformed ones', () => {
@@ -244,15 +352,15 @@ describe('client helpers', () => {
   it('builds the full header set with a bearer token only when given', () => {
     const base = {
       attraccessVersion: '1.11.0',
-      pluginVersion: '0.2.0-alpha.0',
-      sidecarVersion: '0.2.0-alpha.0',
+      pluginVersion: '0.3.0-alpha.0',
+      sidecarVersion: '0.3.0-alpha.0',
       correlationId: id,
     };
     expect(buildRequestHeaders({ ...base, deadlineMs: 1500.2, token: 'x'.repeat(32) })).toEqual({
       'x-matter-wire-version': '1',
       'x-attraccess-version': '1.11.0',
-      'x-matter-plugin-version': '0.2.0-alpha.0',
-      'x-matter-sidecar-version': '0.2.0-alpha.0',
+      'x-matter-plugin-version': '0.3.0-alpha.0',
+      'x-matter-sidecar-version': '0.3.0-alpha.0',
       'x-correlation-id': id,
       'x-request-deadline-ms': '1501',
       authorization: `Bearer ${'x'.repeat(32)}`,
