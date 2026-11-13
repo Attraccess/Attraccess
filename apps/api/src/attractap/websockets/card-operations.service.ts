@@ -56,7 +56,6 @@ export class CardOperationsService {
   private readonly usersService: UsersService;
 
   @Inject(AUDIT_RECORDER)
-  @Inject(AUDIT_RECORDER)
   private readonly audit: AuditRecorder;
 
   @InjectRepository(NFCCardPendingChange)

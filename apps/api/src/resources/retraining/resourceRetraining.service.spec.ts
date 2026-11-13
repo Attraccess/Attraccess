@@ -99,7 +99,7 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('records a system-origin required transition when the scheduled evaluation first notifies', async () => {
-    const audit = { record: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
     const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
     const service = new ResourceRetrainingService(
       {
@@ -137,8 +137,43 @@ describe('ResourceRetrainingService.evaluate', () => {
     expect(introductionRepository.update).toHaveBeenCalledWith(3, { retrainingRequiredAuditedAt: expect.any(Date) });
   });
 
+  it('leaves the audit marker unset when the required transition was not recorded, so the next run retries', async () => {
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'unavailable' }) };
+    const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
+    const service = new ResourceRetrainingService(
+      {
+        findOne: jest.fn().mockResolvedValue({
+          id: 1,
+          name: 'Lathe',
+          retrainingMaxAgeDays: 1,
+          retrainingMaxInactivityDays: null,
+          retrainingBlocksAccess: true,
+        }),
+      } as never,
+      null as never,
+      { findOne: jest.fn().mockResolvedValue(null) } as never,
+      introductionRepository as never,
+      {
+        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
+      } as never,
+      null as never,
+      null as never,
+      audit as never,
+    );
+
+    await (service as never as { notifyIfDue: (introduction: object, now: Date) => Promise<void> }).notifyIfDue(
+      { id: 3, resourceId: 1, receiverUserId: 2, retrainingNotifiedAt: new Date('2026-01-02T12:00:00.000Z') },
+      new Date('2026-01-03T00:00:00.000Z'),
+    );
+
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(introductionRepository.update).not.toHaveBeenCalledWith(3, {
+      retrainingRequiredAuditedAt: expect.any(Date),
+    });
+  });
+
   it('records a group introduction transition with the resource group as subject', async () => {
-    const audit = { record: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
     const service = new ResourceRetrainingService(
       null as never,
       {
@@ -172,7 +207,7 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('retries failed email delivery without marking the notification delivered', async () => {
-    const audit = { record: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
     const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };
     const email = {
       sendUserRetrainingEmail: jest
@@ -227,7 +262,7 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('retries a missing required event after the email has been delivered', async () => {
-    const audit = { record: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
     const introductionRepository = { update: jest.fn() };
     const email = { sendUserRetrainingEmail: jest.fn() };
     const service = new ResourceRetrainingService(
@@ -269,7 +304,7 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('does not record retraining for a revoked introduction', async () => {
-    const audit = { record: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
     const service = new ResourceRetrainingService(
       null as never,
       null as never,
@@ -290,7 +325,7 @@ describe('ResourceRetrainingService.evaluate', () => {
   });
 
   it('uses the introduction marker after audit retention has removed the audit row', async () => {
-    const audit = { record: jest.fn().mockResolvedValue(true) };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
     const service = new ResourceRetrainingService(
       {
         findOne: jest.fn().mockResolvedValue({

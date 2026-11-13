@@ -43,6 +43,8 @@ export const AUDIT_SHUTDOWN_DRAIN_MS = 4000;
 /** One name is enough: audit savepoints on one connection never overlap (see insertInTransaction). */
 const AUDIT_SAVEPOINT = 'attraccess_audit_record';
 
+const SAFE_LOGGED_ACTION = /^[a-z0-9][a-z0-9_.-]{0,99}$/i;
+
 class SettingsUnavailableError extends Error {}
 
 /**
@@ -267,7 +269,9 @@ export abstract class AuditStorage {
     const code = sqliteErrorCode(error);
     // Without a SQLite code, the error class name (never its message) still tells a driver error from a bug.
     const errorType = !code && error instanceof Error ? error.constructor.name : undefined;
-    const message = `Audit record dropped: domain=${domainLabel}${action ? ` action=${action}` : ''} reason=${reason}${
+    // A rejected event's action is caller input (plugins): only a short identifier is safe to put in a log line.
+    const safeAction = typeof action === 'string' && SAFE_LOGGED_ACTION.test(action) ? action : undefined;
+    const message = `Audit record dropped: domain=${domainLabel}${safeAction ? ` action=${safeAction}` : ''} reason=${reason}${
       code ? ` code=${code}` : ''
     }${errorType ? ` error=${errorType}` : ''}`;
     // Never log the event, SQLite parameters, or exception message (may contain secrets).

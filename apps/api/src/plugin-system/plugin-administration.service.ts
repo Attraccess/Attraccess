@@ -114,14 +114,14 @@ export class PluginAdministrationService {
   }
 
   /** Removes the package and the dependants the administrator approved, auditing each removed package. */
-  async removePackageGraph(packageName: string, approvedDependants: string[], actor: AuditActor) {
+  async removePackageGraph(packageName: string, approvedDependants: string[], actor?: AuditActor) {
     const removing = this.npmPluginService.removalPlan(packageName);
     await this.npmPluginService.removeInstalled(packageName, Boolean(actor), approvedDependants);
     for (const plugin of removing) await this.recordPackage(actor, 'plugin.removed', plugin);
     if (actor) this.pluginService.requestRestart();
   }
 
-  async removeInstalled(packageName: string, actor: AuditActor) {
+  async removeInstalled(packageName: string, actor?: AuditActor) {
     const installed = this.npmPluginService.listInstalled().find((plugin) => plugin.name === packageName);
     await this.npmPluginService.removeInstalled(packageName, Boolean(actor));
     if (installed) await this.recordPackage(actor, 'plugin.removed', installed);
@@ -169,7 +169,7 @@ export class PluginAdministrationService {
     this.pluginService.requestRestart();
   }
 
-  async uploadPlugin(file: FileUpload, actor: AuditActor) {
+  async uploadPlugin(file: FileUpload, actor?: AuditActor) {
     const plugin = await this.pluginService.uploadPlugin(file, Boolean(actor));
     await this.record(actor, 'plugin.zip_uploaded', auditSubjectKeyId(plugin.name), 'plugin-package', {
       pluginName: plugin.name,
@@ -181,7 +181,7 @@ export class PluginAdministrationService {
   }
 
   /** An npm-installed plugin is removed as a package; an uploaded one by deleting its directory. */
-  async deletePlugin(pluginId: string, actor: AuditActor) {
+  async deletePlugin(pluginId: string, actor?: AuditActor) {
     const plugin = PluginService.getManifestById(pluginId);
     const installed =
       this.npmPluginService.findInstalledByPluginId(pluginId) ??

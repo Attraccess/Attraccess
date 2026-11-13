@@ -1,4 +1,5 @@
 import { AuditLog, SSOProviderType } from '@attraccess/database-entities';
+import { Logger } from '@nestjs/common';
 import { ssoProviderAuditEvent } from '../users-and-auth/auth/sso/audit/provider-audit';
 import { randomUUID } from 'node:crypto';
 import { droppedRecords, setupAuditDatabase } from './audit.test-fixture';
@@ -134,6 +135,14 @@ describe('AuditRecorder', () => {
       expect(projectAuditRow(event)).toMatchObject({ actorId: null, authenticationMethod: null });
     });
 
+    it.each(['project', 'administration'])(
+      'stores the session default for a %s actor that names no method, as the policy validated it',
+      (domain) => {
+        const event = { ...samples[domain], actor: { id: 42, authenticationMethod: null } } as AuditEvent;
+        expect(projectAuditRow(event)).toMatchObject({ authenticationMethod: 'session', apiTokenId: null });
+      },
+    );
+
     it('keeps an omitted method invalid when an API token is named', () => {
       expect(projectAuditRow({ ...samples.resource, actor: { id: 42, apiTokenId: 3 } } as never)).toBeNull();
     });
@@ -157,6 +166,21 @@ describe('AuditRecorder', () => {
         status: 'unavailable',
       });
       expect(await droppedRecords(fixture.metrics)).toEqual({ 'project:invalid_event': 1 });
+    });
+
+    it('logs a rejected action only when it is a plain identifier', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      try {
+        await fixture.service.record({ ...samples.project, action: 'project.deleted\nforged line' as never });
+        await fixture.service.record({ ...samples.project, details: { secret: 'x' } });
+        const lines = warn.mock.calls.map(([line]) => String(line));
+        expect(lines).toEqual([
+          'Audit record dropped: domain=project reason=invalid_event',
+          'Audit record dropped: domain=project action=project.deleted reason=invalid_event',
+        ]);
+      } finally {
+        warn.mockRestore();
+      }
     });
   });
 

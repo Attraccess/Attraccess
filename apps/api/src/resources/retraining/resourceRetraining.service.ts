@@ -331,7 +331,7 @@ export class ResourceRetrainingService {
     // This marker survives audit retention but is reset by a newer training cycle.
     if (!introduction.retrainingRequiredAuditedAt || introduction.retrainingRequiredAuditedAt < trainedAt) {
       const subjectId = introduction.resourceId ?? introduction.resourceGroupId;
-      const recorded = await this.audit.record({
+      const receipt = await this.audit.record({
         domain: 'resource',
         action: 'retraining.required',
         actor: { id: null, authenticationMethod: null },
@@ -342,7 +342,8 @@ export class ResourceRetrainingService {
           retrainingReason: evaluation.reason ?? 'unknown',
         },
       });
-      if (recorded) {
+      // A dropped row (audit off, queue full, storage error) is retried on the next evaluation.
+      if (receipt.status === 'recorded') {
         await this.resourceIntroductionRepository.update(introduction.id, { retrainingRequiredAuditedAt: now });
       }
     }

@@ -214,6 +214,9 @@ const coreRows: { [D in CoreAuditDomain]: (event: CoreEvent<D>) => AuditRow | nu
       domain: 'project',
       pluginId: 'core',
       action: snapshot.action,
+      // The validated method, never null: these domains always stored the session default.
+      authenticationMethod: snapshot.authenticationMethod ?? 'session',
+      apiTokenId: snapshot.apiTokenId ?? null,
       subjectType: snapshot.subjectType,
       subjectId: snapshot.subjectId,
       details: snapshot.details,
@@ -240,6 +243,9 @@ const coreRows: { [D in CoreAuditDomain]: (event: CoreEvent<D>) => AuditRow | nu
       domain: 'administration',
       pluginId: 'core',
       action: snapshot.action,
+      // The validated method, never null: these domains always stored the session default.
+      authenticationMethod: snapshot.authenticationMethod ?? 'session',
+      apiTokenId: snapshot.apiTokenId ?? null,
       subjectType: snapshot.subjectType,
       subjectId: snapshot.subjectId,
       details: snapshot.details,
