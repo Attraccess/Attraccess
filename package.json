@@ -234,7 +234,7 @@
     "core-js": "^3.49.0",
     "crap-score": "1.2.1",
     "electron": "^45.0.0",
-    "electron-builder": "^25.0.0",
+    "electron-builder": "^26.0.0",
     "esbuild": "^0.28.1",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "10.1.8",
