@@ -6,19 +6,19 @@ Core code records audit events in the service that owns a change, through one po
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../audit/recorder/audit-event';
 
 @Injectable()
-export class MaintenanceService {
+export class MaintenanceScheduleService {
   constructor(@Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder) {}
 
-  async archive(id: number, actor: AuditActor): Promise<void> {
+  async disable(resourceId: number, scheduleId: number, actor: AuditActor): Promise<void> {
     await this.repository.manager.transaction(async (manager) => {
-      await manager.update(Maintenance, id, { archivedAt: new Date() });
+      await manager.update(MaintenanceSchedule, { id: scheduleId, resourceId }, { enabled: false });
       await this.audit.record(
         {
           domain: 'resource',
           action: 'maintenance_schedule.updated',
           actor,
-          subject: { type: 'resource', id },
-          details: { scheduleId: id },
+          subject: { type: 'resource', id: resourceId },
+          details: { scheduleId, enabled: 0 },
         },
         manager,
       );
@@ -39,7 +39,8 @@ export class MaintenanceService {
   audit connection.
 - **The actor is the real origin.** Use `SYSTEM_AUDIT_ACTOR` (`id: null`, no authentication method) for changes
   no user started, or `{ id: userId, authenticationMethod: null }` for a reader acting for a linked user. Never
-  reuse a request user outside its request.
+  reuse a request user outside its request. Administration, project and billing events need a user actor; the
+  recorder drops them as `invalid_event` without one.
 - **`record()` does not throw.** An event the domain policy rejects, a full queue or a storage error is logged
   and counted in `attraccess_audit_records_dropped_total`; the change itself goes on. The one exception is
   `AuditTransactionAbortedError`, when SQLite discarded the caller's whole transaction.
@@ -55,7 +56,7 @@ export class MaintenanceService {
 | `operationId` | Optional. Generated when omitted; billing uses `billing-transaction-<id>`.              |
 | `actor`       | `{ id, authenticationMethod, apiTokenId? }`.                                            |
 | `subject`     | `{ type, id }`. Card events use `attractap.card`.                                       |
-| `outcome`     | Defaults to `succeeded`. Only identity and administration events record other outcomes. |
+| `outcome`     | Defaults to `succeeded`. Identity, administration and plugin events may record others.  |
 | `request`     | Client address and user agent; stored for identity events only.                         |
 | `details`     | Scalar values the domain policy in `audit/policies/` allows for the action.             |
 
