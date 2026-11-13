@@ -24,6 +24,7 @@ import { OidcCookieStateStore } from './oidc/oidc-cookie-state-store';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { SSOController } from './sso.controller';
 import { SSOService } from './sso.service';
+import { SSO_CONTROLLER_SERVICES } from './sso-controller.services';
 
 const policy = {
   maxAttempts: 5,
@@ -114,6 +115,7 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
         SSOLinkTokenService,
         BruteForceProtectionService,
         SSOOIDCGuard,
+        ...SSO_CONTROLLER_SERVICES,
         { provide: SESSION_STORE, useValue: sharedStore },
         { provide: AuthAuditLogger, useValue: audit },
         { provide: AuthService, useValue: auth },

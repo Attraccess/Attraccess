@@ -116,6 +116,7 @@ import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
 import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
 
 import { SSOController } from './auth/sso/sso.controller';
+import { SSO_CONTROLLER_SERVICES } from './auth/sso/sso-controller.services';
 
 import { SSOService } from './auth/sso/sso.service';
 
@@ -213,6 +214,7 @@ export const sessionStoreProvider = {
     LocalStrategy,
     SessionStrategy,
     SSOService,
+    ...SSO_CONTROLLER_SERVICES,
     SsoLogoutService,
     OidcTokenVerifier,
     OidcSessionResyncer,
