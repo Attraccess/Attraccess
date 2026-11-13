@@ -232,6 +232,26 @@ export class UsageAccessCache {
       return;
     }
     this.authorizationCacheSubscriber = this.valkeyClient.duplicate();
+    // ioredis emits `error` on every reconnect attempt; log each outage once instead of once per attempt.
+    let disconnected = false;
+    this.authorizationCacheSubscriber.on('error', (error) => {
+      if (disconnected) {
+        return;
+      }
+      disconnected = true;
+      this.logger.warn(
+        'Authorization cache invalidation subscriber lost its Valkey connection; permission changes on other API ' +
+          'instances are not seen until it reconnects (cached answers still expire within 30 s)',
+        error,
+      );
+    });
+    this.authorizationCacheSubscriber.on('ready', () => {
+      if (!disconnected) {
+        return;
+      }
+      disconnected = false;
+      this.logger.log('Authorization cache invalidation subscriber reconnected to Valkey');
+    });
     this.authorizationCacheSubscriber.on('message', (channel, message) => {
       if (channel !== AUTHORIZATION_CACHE_INVALIDATION_CHANNEL) {
         return;
