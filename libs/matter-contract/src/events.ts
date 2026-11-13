@@ -37,6 +37,11 @@ export const opaquePayloadSchema = z.record(z.string(), z.unknown());
 
 /** One attribute value of one endpoint, as the sidecar observed it. */
 export const deviceStatePayloadSchema = z.strictObject({
+  /**
+   * The fabric the node belongs to. A node ID is only unique within a fabric: when present, a consumer applies the
+   * value only to the node of that fabric.
+   */
+  fabricId: matterId64Schema.optional(),
   nodeId: matterId64Schema,
   endpointId: endpointIdSchema,
   clusterId: clusterIdSchema,
@@ -60,6 +65,8 @@ export const deviceStatePayloadSchema = z.strictObject({
 export type DeviceStatePayload = z.infer<typeof deviceStatePayloadSchema>;
 
 export const commandOutcomePayloadSchema = commandResultSchema.extend({
+  /** The fabric the node belongs to, as for `device.state`. */
+  fabricId: matterId64Schema.optional(),
   nodeId: matterId64Schema,
   endpointId: endpointIdSchema,
   failureCode: z.string().min(1).max(64).optional(),

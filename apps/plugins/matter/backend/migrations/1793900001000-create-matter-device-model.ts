@@ -99,7 +99,8 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
         "last_seen_at" varchar NOT NULL,
         "removed_at" varchar,
         "removal_reason" varchar,
-        CONSTRAINT "CHK_plugin_matter_endpoints_range" CHECK ("endpoint_id" BETWEEN 0 AND 65534)
+        CONSTRAINT "CHK_plugin_matter_endpoints_range" CHECK ("endpoint_id" BETWEEN 0 AND 65534),
+        CONSTRAINT "CHK_plugin_matter_endpoints_removal_reason" CHECK ("removal_reason" IS NULL OR "removal_reason" IN ('absent_from_sidecar', 'replaced', 'force_removed', 'merged'))
       )`,
     );
     await queryRunner.query(
@@ -163,7 +164,8 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
         "fault_at" varchar,
         "updated_at" varchar NOT NULL,
         CONSTRAINT "CHK_plugin_matter_endpoint_state_command" CHECK ("command_state" IN ('none', 'requested', 'accepted', 'reported', 'uncertain', 'failed')),
-        CONSTRAINT "CHK_plugin_matter_endpoint_state_quality" CHECK ("quality" IS NULL OR "quality" IN ('good', 'uncertain', 'fault', 'unavailable'))
+        CONSTRAINT "CHK_plugin_matter_endpoint_state_quality" CHECK ("quality" IS NULL OR "quality" IN ('good', 'uncertain', 'fault', 'unavailable')),
+        CONSTRAINT "CHK_plugin_matter_endpoint_state_source" CHECK ("source" IS NULL OR "source" IN ('subscription_report', 'read', 'command_response'))
       )`,
     );
     await queryRunner.query(
@@ -188,7 +190,7 @@ export class CreateMatterDeviceModel1793900001000 implements MigrationInterface 
       )`,
     );
     await queryRunner.query(
-      `CREATE INDEX "IDX_plugin_matter_commands_requested_at" ON "plugin_matter_commands" ("requested_at")`,
+      `CREATE INDEX "IDX_plugin_matter_commands_requested_at" ON "plugin_matter_commands" ("requested_at", "request_id")`,
     );
 
     await queryRunner.query(

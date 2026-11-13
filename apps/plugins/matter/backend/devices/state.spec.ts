@@ -244,6 +244,8 @@ describe('Matter endpoint state', () => {
   it('keeps one row per state key under a flood of reports, with no history and no audit entries', async () => {
     for (let i = 0; i < 300; i += 1) await h.state.ingestReport(report(i % 2 === 0, i * 10), at(i * 10 + 5));
     expect(await h.dataSource.getRepository(MatterEndpointState).count()).toBe(1);
+    expect(h.state.stats.applied).toBe(300);
+    expect(await entry()).toMatchObject({ reported: { value: false, observedAt: at(2_990) } });
     expect(await h.dataSource.getRepository(MatterCommand).count()).toBe(0);
     expect(h.audit).not.toHaveBeenCalled();
     const tables = await h.dataSource.query(
@@ -260,6 +262,140 @@ describe('Matter endpoint state', () => {
     await request(false, 2_000, requestId);
     expect(await h.dataSource.getRepository(MatterCommand).count()).toBe(1);
     expect((await entry()).requested.value).toBe(true);
+  });
+
+  it('keeps the last good value on a fault report: no external change, no confirmation', async () => {
+    await h.state.ingestReport(report(false, 0), at(0));
+    const requestId = randomUUID();
+    await request(true, 500, requestId);
+    await h.state.ingestReport(report(true, 1_000, { fault: { code: 'stuck', message: 'Relay stuck' } }), at(1_000));
+    expect(await entry()).toMatchObject({
+      // The value keeps its own observation time: a fault does not make it fresher.
+      reported: { value: false, quality: 'fault', observedAt: at(0) },
+      fault: { code: 'stuck', at: at(1_000) },
+      command: { state: 'requested' },
+      confirmed: false,
+      externalChange: null,
+    });
+    await h.state.recordTimeout(requestId, at(1_500));
+    // Recovered with the value it had: neither the fault nor the recovery is an external change.
+    await h.state.ingestReport(report(false, 2_000), at(2_000));
+    expect(await entry()).toMatchObject({
+      reported: { value: false, quality: 'good' },
+      fault: null,
+      externalChange: null,
+      uncertainActuation: true,
+    });
+  });
+
+  it('does not let a fault report stand in for the value a command waits for', async () => {
+    const requestId = randomUUID();
+    await h.state.ingestReport(report(true, 0), at(0));
+    await request(true, 1_000, requestId);
+    await h.state.ingestReport(report(true, 2_000, { fault: { code: 'x', message: 'y' } }), at(2_000));
+    await h.state.ingestOutcome(outcome(requestId, 'reported'), at(3_100));
+    expect(await entry()).toMatchObject({
+      command: { state: 'reported' },
+      confirmed: false,
+      reported: { value: true, observedAt: at(0), receivedAt: at(0), quality: 'fault' },
+    });
+  });
+
+  it('confirms when the sidecar reports the command done before the new value arrives', async () => {
+    const requestId = randomUUID();
+    await h.state.ingestReport(report(false, 0), at(0));
+    await request(true, 1_000, requestId);
+    await h.state.ingestOutcome(outcome(requestId, 'accepted'), at(2_100));
+    await h.state.ingestOutcome(outcome(requestId, 'reported'), at(3_100));
+    expect((await entry()).confirmed).toBe(false);
+    await h.state.ingestReport(report(true, 4_000), at(4_100));
+    expect(await entry()).toMatchObject({ confirmed: true, externalChange: null, command: { reportedAt: at(3_000) } });
+  });
+
+  it('treats a manual switch back to the requested value as an external change, not a confirmation', async () => {
+    const requestId = randomUUID();
+    await h.state.ingestReport(report(false, 0), at(0));
+    await request(true, 1_000, requestId);
+    await h.state.ingestReport(report(true, 2_000), at(2_000));
+    expect((await entry()).confirmed).toBe(true);
+    await h.state.ingestReport(report(false, 3_000), at(3_000));
+    expect(await entry()).toMatchObject({ confirmed: false, externalChange: { at: at(3_000), value: false } });
+    await h.state.ingestReport(report(true, 4_000), at(4_000));
+    expect(await entry()).toMatchObject({ confirmed: false, externalChange: { at: at(4_000), value: true } });
+  });
+
+  it('records an external change after a failed command', async () => {
+    const requestId = randomUUID();
+    await h.state.ingestReport(report(false, 0), at(0));
+    await request(true, 1_000, requestId);
+    await h.state.ingestOutcome(outcome(requestId, 'failed', { failureCode: 'busy', acceptedAt: null }), at(2_000));
+    await h.state.ingestReport(report(true, 3_000), at(3_000));
+    expect(await entry()).toMatchObject({
+      command: { state: 'failed' },
+      confirmed: false,
+      externalChange: { at: at(3_000), value: true },
+    });
+  });
+
+  it('confirms by the time the report arrived, so a device clock that runs behind cannot hide it', async () => {
+    const requestId = randomUUID();
+    await h.state.ingestReport(report(false, 0), at(0));
+    await request(true, 1_000, requestId);
+    // Observed "before" the request by the device's clock, received after it by ours.
+    await h.state.ingestReport(report(true, 800), at(1_200));
+    expect(await entry()).toMatchObject({ command: { state: 'reported' }, confirmed: true });
+  });
+
+  it('ignores a report from far in the future, which would otherwise freeze the row', async () => {
+    await h.state.ingestReport(report(true, 3_600_000), at(0));
+    expect(h.state.stats.futureTimestamp).toBe(1);
+    await h.state.ingestReport(report(false, 1_000), at(1_000));
+    expect(await entry()).toMatchObject({ reported: { value: false, observedAt: at(1_000) } });
+  });
+
+  it('ignores an oversized value', async () => {
+    await h.state.ingestReport(report({ blob: 'x'.repeat(5_000) }, 0), at(0));
+    expect(h.state.stats.oversizedValue).toBe(1);
+    expect(await h.dataSource.getRepository(MatterEndpointState).count()).toBe(0);
+  });
+
+  it('applies an event that names a fabric only to the node of that fabric', async () => {
+    await h.state.ingestReport(report(true, 0, { fabricId: '2' }), at(0));
+    expect(h.state.stats.unknownEndpoint).toBe(1);
+    await h.state.ingestReport(report(true, 0, { fabricId: '1' }), at(0));
+    expect(await entry()).toMatchObject({ reported: { value: true } });
+  });
+
+  it('ignores an outcome that places a command on another endpoint', async () => {
+    const requestId = randomUUID();
+    await request(true, 1_000, requestId);
+    await h.state.ingestOutcome(outcome(requestId, 'accepted', { endpointId: 0 }), at(2_000));
+    expect(h.state.stats.unknownCommand).toBe(1);
+    expect(await entry()).toMatchObject({ command: { state: 'requested' } });
+    await h.state.ingestOutcome(outcome(randomUUID(), 'accepted'), at(2_000));
+    expect(h.state.stats.unknownCommand).toBe(2);
+  });
+
+  it('stays idempotent for a recorded request id when its state row is gone', async () => {
+    const requestId = randomUUID();
+    await request(true, 1_000, requestId);
+    await h.dataSource.getRepository(MatterEndpointState).clear();
+    await expect(request(false, 2_000, requestId)).resolves.toMatchObject({ command: { state: 'none' } });
+    expect(await h.dataSource.getRepository(MatterCommand).count()).toBe(1);
+    expect(await h.dataSource.getRepository(MatterEndpointState).count()).toBe(0);
+  });
+
+  it('applies a batch of events in order, in one transaction', async () => {
+    await h.state.ingest(
+      [
+        { type: 'device.state', payload: report(false, 0) },
+        { type: 'device.state', payload: report(true, 1_000) },
+        { type: 'device.state', payload: report(false, 500) },
+      ],
+      at(2_000),
+    );
+    expect(h.state.stats).toMatchObject({ applied: 2, outOfOrder: 1 });
+    expect(await entry()).toMatchObject({ reported: { value: true }, externalChange: { value: true } });
   });
 
   describe('command log bound', () => {
@@ -287,6 +423,32 @@ describe('Matter endpoint state', () => {
       expect(rows).toHaveLength(MAX_COMMAND_ROWS);
       // The oldest ones went; the newest stayed.
       expect(rows[rows.length - 1].requestedAt).toBe(new Date(recent + MAX_COMMAND_ROWS + 19).toISOString());
+    });
+
+    it('keeps rows younger than 30 days and never prunes below the bound', async () => {
+      const repo = h.dataSource.getRepository(MatterCommand);
+      const row = (days: number) => ({
+        requestId: randomUUID(),
+        endpointRef,
+        clusterId: 6,
+        commandId: 1,
+        stateKey: null,
+        requestedAt: new Date(T0 - days * 86_400_000).toISOString(),
+        requestedBy: null,
+        correlationId: null,
+        outcome: 'requested',
+        acceptedAt: null,
+        reportedAt: null,
+        failureCode: null,
+      });
+      const young = row(29);
+      const old = row(31);
+      await repo.insert([young, old]);
+      const requestId = randomUUID();
+      await request(true, 0, requestId);
+      const kept = (await repo.find()).map((r) => r.requestId);
+      expect(kept).toHaveLength(2);
+      expect(kept).toEqual(expect.arrayContaining([young.requestId, requestId]));
     });
 
     it('prunes rows older than 30 days, and reconciliation prunes too', async () => {

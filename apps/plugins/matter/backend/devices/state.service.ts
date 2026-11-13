@@ -2,6 +2,7 @@ import type { CommandOutcomePayload, DeviceStatePayload } from '@attraccess/matt
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import type { EntityManager } from 'typeorm';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { pruneCommands } from './commands';
 import { MatterCommand, MatterEndpoint, MatterEndpointState, MatterFabric, MatterNode } from './entities';
@@ -11,9 +12,11 @@ import {
   applyOutcome,
   applyReport,
   applyRequest,
+  canonicalJson,
   emptyState,
   outcomeAdvances,
   toView,
+  type OutcomeInput,
   type StateEntryView,
 } from './state-machine';
 
@@ -25,6 +28,12 @@ export type IngestStats = {
   inactiveNode: number;
   unmappedCluster: number;
   unknownCommand: number;
+  /** Observed further in the future than clock skew explains; applying it would freeze the row. */
+  futureTimestamp: number;
+  /** A value larger than `MAX_VALUE_BYTES` once serialized. */
+  oversizedValue: number;
+  /** Dropped because the ingestion queue was full. */
+  dropped: number;
 };
 
 export type RecordRequestInput = {
@@ -39,12 +48,22 @@ export type RecordRequestInput = {
   correlationId?: string | null;
 };
 
+/** One event for the state, already validated against the contract. `receivedAt` is when the plugin received it. */
+export type StateEvent = (
+  { type: 'device.state'; payload: DeviceStatePayload } | { type: 'command.outcome'; payload: CommandOutcomePayload }
+) & { receivedAt?: string };
+
+/** How far a device or sidecar clock may run ahead of the plugin's before a report is rejected. */
+export const MAX_CLOCK_SKEW_MS = 5 * 60_000;
+/** The largest stored value, serialized. Matter attribute values are small; a larger one is a fault upstream. */
+export const MAX_VALUE_BYTES = 4_096;
+
 type Resolved = { endpoint: MatterEndpoint } | { ignored: 'unknownEndpoint' | 'inactiveNode' };
 
 /**
  * The current state of endpoints: reported, requested, accepted, external change and faults, one row per state key
  * updated in place. Telemetry only ever updates that row: it writes no history and no audit entries. The commands
- * table is a bounded log of requests.
+ * table is a bounded log of requests. Every write runs inside `runSerialized`.
  */
 @Injectable()
 export class MatterStateService {
@@ -55,6 +74,9 @@ export class MatterStateService {
     inactiveNode: 0,
     unmappedCluster: 0,
     unknownCommand: 0,
+    futureTimestamp: 0,
+    oversizedValue: 0,
+    dropped: 0,
   };
 
   constructor(@Inject(PLUGIN_CONTEXT) private readonly context: PluginContext) {}
@@ -74,18 +96,14 @@ export class MatterStateService {
 
   /** Records that a command was requested for a state key. Sets `requested`; the command stays unconfirmed. */
   async recordRequest(input: RecordRequestInput, now: string = new Date().toISOString()): Promise<StateEntryView> {
-    const commands = this.context.getRepository(MatterCommand);
-    const existing = await commands.findOneBy({ requestId: input.requestId });
-    if (existing) {
-      const row = await this.states.findOneBy({ endpointRef: input.endpointRef, stateKey: input.stateKey });
-      if (row) return toView(row);
-    }
-    return commands.manager.transaction(async (manager) => {
+    return this.context.runSerialized(async (manager) => {
       const states = manager.getRepository(MatterEndpointState);
-      const row =
-        (await states.findOneBy({ endpointRef: input.endpointRef, stateKey: input.stateKey })) ??
-        emptyState(input.endpointRef, input.stateKey, randomUUID(), now);
-      const next = applyRequest(row, {
+      const current = await states.findOneBy({ endpointRef: input.endpointRef, stateKey: input.stateKey });
+      if (await manager.findOneBy(MatterCommand, { requestId: input.requestId })) {
+        // Recorded before: nothing changes, whatever happened to the state row since.
+        return toView(current ?? emptyState(input.endpointRef, input.stateKey, randomUUID(), now));
+      }
+      const next = applyRequest(current ?? emptyState(input.endpointRef, input.stateKey, randomUUID(), now), {
         value: input.value,
         requestedAt: now,
         requestedBy: input.requestedBy,
@@ -107,25 +125,72 @@ export class MatterStateService {
         reportedAt: null,
         failureCode: null,
       });
-      await pruneCommands(manager);
+      await pruneCommands(manager, new Date(now));
       return toView(next);
     });
   }
 
   /** A physical command timed out: the effect is unknown. It becomes `uncertain` and is never retried here. */
   async recordTimeout(requestId: string, now: string = new Date().toISOString()): Promise<void> {
-    await this.applyOutcomeFor(requestId, { outcome: TIMEOUT_OUTCOME, acceptedAt: null, reportedAt: null }, null, now);
+    await this.context.runSerialized((manager) =>
+      this.applyOutcomeFor(
+        manager,
+        requestId,
+        null,
+        { outcome: TIMEOUT_OUTCOME, acceptedAt: null, reportedAt: null },
+        null,
+        now,
+      ),
+    );
   }
 
   // --- event ingestion -------------------------------------------------------------------------------------------
 
-  async ingestReport(payload: DeviceStatePayload, receivedAt: string = new Date().toISOString()): Promise<void> {
+  /**
+   * Applies events in order, in one serialized transaction: one commit for a whole burst of telemetry. Each event runs
+   * in its own savepoint, so one that cannot be applied is undone alone and the others still apply.
+   */
+  async ingest(events: readonly StateEvent[], receivedAt: string = new Date().toISOString()): Promise<void> {
+    if (events.length === 0) return;
+    await this.context.runSerialized(async (manager) => {
+      for (const event of events) {
+        const at = event.receivedAt ?? receivedAt;
+        await manager.query('SAVEPOINT matter_event');
+        try {
+          if (event.type === 'device.state') await this.reportIn(manager, event.payload, at);
+          else await this.outcomeIn(manager, event.payload, at);
+        } catch {
+          // Fails, and fails the batch, when SQLite already rolled the whole transaction back (disk full, I/O).
+          await manager.query('ROLLBACK TO SAVEPOINT matter_event');
+          this.context.logger.warn?.('A Matter event could not be applied to the device state.');
+        }
+        await manager.query('RELEASE SAVEPOINT matter_event');
+      }
+    });
+  }
+
+  /** One `device.state` event on its own. */
+  ingestReport(payload: DeviceStatePayload, receivedAt: string = new Date().toISOString()): Promise<void> {
+    return this.ingest([{ type: 'device.state', payload }], receivedAt);
+  }
+
+  /** One `command.outcome` event on its own. */
+  ingestOutcome(payload: CommandOutcomePayload, now: string = new Date().toISOString()): Promise<void> {
+    return this.ingest([{ type: 'command.outcome', payload }], now);
+  }
+
+  private async reportIn(manager: EntityManager, payload: DeviceStatePayload, receivedAt: string): Promise<void> {
     const stateKey = stateKeyFor(payload.clusterId, payload.attributeId);
     if (stateKey === null) return void (this.stats.unmappedCluster += 1);
-    const resolved = await this.resolve(payload.nodeId, payload.endpointId);
+    if (Date.parse(payload.observedAt) > Date.parse(receivedAt) + MAX_CLOCK_SKEW_MS) {
+      return void (this.stats.futureTimestamp += 1);
+    }
+    if (!fitsValueBound(payload.value)) return void (this.stats.oversizedValue += 1);
+    const resolved = await this.resolve(manager, payload);
     if ('ignored' in resolved) return void (this.stats[resolved.ignored] += 1);
+    const states = manager.getRepository(MatterEndpointState);
     const row =
-      (await this.states.findOneBy({ endpointRef: resolved.endpoint.id, stateKey })) ??
+      (await states.findOneBy({ endpointRef: resolved.endpoint.id, stateKey })) ??
       emptyState(resolved.endpoint.id, stateKey, randomUUID(), receivedAt);
     const next = applyReport(
       row,
@@ -139,78 +204,100 @@ export class MatterStateService {
       receivedAt,
     );
     if (!next) return void (this.stats.outOfOrder += 1);
-    await this.states.save(next);
+    await states.save(next);
     // A matching report resolves the command; keep the bounded command record in step with the state row.
     if (next.commandState === 'reported' && row.commandState !== 'reported' && next.requestId) {
-      await this.context
-        .getRepository(MatterCommand)
-        .update({ requestId: next.requestId }, { outcome: 'reported', reportedAt: next.commandReportedAt });
+      await manager.update(
+        MatterCommand,
+        { requestId: next.requestId },
+        { outcome: 'reported', reportedAt: next.commandReportedAt },
+      );
     }
     this.stats.applied += 1;
   }
 
-  async ingestOutcome(payload: CommandOutcomePayload, now: string = new Date().toISOString()): Promise<void> {
-    const resolved = await this.resolve(payload.nodeId, payload.endpointId);
+  private async outcomeIn(manager: EntityManager, payload: CommandOutcomePayload, now: string): Promise<void> {
+    const resolved = await this.resolve(manager, payload);
     if ('ignored' in resolved) return void (this.stats[resolved.ignored] += 1);
     await this.applyOutcomeFor(
+      manager,
       payload.requestId,
+      resolved.endpoint.id,
       { outcome: payload.outcome, acceptedAt: payload.acceptedAt, reportedAt: payload.reportedAt },
       payload.failureCode ?? null,
       now,
     );
   }
 
+  /** `endpointRef` is where the event says the command ran; null for the plugin's own timeout. */
   private async applyOutcomeFor(
+    manager: EntityManager,
     requestId: string,
-    input: {
-      outcome: 'requested' | 'accepted' | 'reported' | 'uncertain' | 'failed';
-      acceptedAt: string | null;
-      reportedAt: string | null;
-    },
+    endpointRef: string | null,
+    input: OutcomeInput,
     failureCode: string | null,
     now: string,
   ): Promise<void> {
-    const commands = this.context.getRepository(MatterCommand);
-    const command = await commands.findOneBy({ requestId });
-    // A command this plugin did not record (or that was pruned) cannot be attributed to any state.
-    if (!command) return void (this.stats.unknownCommand += 1);
-    await commands.manager.transaction(async (manager) => {
-      if (outcomeAdvances(command.outcome, input.outcome)) {
-        command.outcome = input.outcome;
-        command.acceptedAt = input.acceptedAt ?? command.acceptedAt;
-        command.reportedAt = input.reportedAt ?? command.reportedAt;
-        command.failureCode = failureCode ?? command.failureCode;
-        await manager.save(MatterCommand, command);
-      }
-      if (!command.stateKey) return;
-      const states = manager.getRepository(MatterEndpointState);
-      const row = await states.findOneBy({ endpointRef: command.endpointRef, stateKey: command.stateKey });
-      if (!row) return;
-      const next = applyOutcome(row, requestId, input, now);
-      if (next !== row) await states.save(next);
-    });
+    const command = await manager.findOneBy(MatterCommand, { requestId });
+    // A command this plugin did not record (or that was pruned) cannot be attributed to any state. Neither can one
+    // that the event places on another endpoint.
+    if (!command || (endpointRef !== null && command.endpointRef !== endpointRef)) {
+      return void (this.stats.unknownCommand += 1);
+    }
+    if (outcomeAdvances(command.outcome, input.outcome)) {
+      await manager.update(
+        MatterCommand,
+        { requestId },
+        {
+          outcome: input.outcome,
+          acceptedAt: input.acceptedAt ?? command.acceptedAt,
+          reportedAt: input.reportedAt ?? command.reportedAt,
+          failureCode: failureCode ?? command.failureCode,
+        },
+      );
+    }
     this.stats.applied += 1;
+    if (!command.stateKey) return;
+    const states = manager.getRepository(MatterEndpointState);
+    const row = await states.findOneBy({ endpointRef: command.endpointRef, stateKey: command.stateKey });
+    if (!row) return;
+    const next = applyOutcome(row, requestId, input, now);
+    if (next !== row) await states.save(next);
   }
 
-  /** Events only reach endpoints that are live on a claimed or unclaimed (or detached) node of the active fabric. */
-  private async resolve(nodeId: string, endpointId: number): Promise<Resolved> {
-    const found = await this.context
-      .getRepository(MatterNode)
-      .createQueryBuilder('n')
+  /**
+   * Events only reach live endpoints of a claimed, unclaimed or detached node of the active fabric (or of the fabric
+   * the event names, which must be the active one).
+   */
+  private async resolve(
+    manager: EntityManager,
+    target: { fabricId?: string; nodeId: string; endpointId: number },
+  ): Promise<Resolved> {
+    const query = manager
+      .createQueryBuilder(MatterNode, 'n')
       .innerJoin(MatterFabric, 'f', 'f.id = n.fabricRef')
-      .where(`n.nodeId = :nodeId AND f.status = 'active' AND f.retiredAt IS NULL`, { nodeId })
-      .andWhere('n.removedAt IS NULL')
-      .getOne();
+      .where(`n.nodeId = :nodeId AND f.status = 'active' AND f.retiredAt IS NULL`, { nodeId: target.nodeId })
+      .andWhere('n.removedAt IS NULL');
+    if (target.fabricId !== undefined) query.andWhere('f.fabricId = :fabricId', { fabricId: target.fabricId });
+    const found = await query.getOne();
     if (!found) return { ignored: 'unknownEndpoint' };
     if (found.lifecycleState === 'archived' || found.lifecycleState === 'removed') return { ignored: 'inactiveNode' };
-    const endpoint = await this.context
-      .getRepository(MatterEndpoint)
-      .createQueryBuilder('e')
+    const endpoint = await manager
+      .createQueryBuilder(MatterEndpoint, 'e')
       .where('e.nodeRef = :ref AND e.endpointId = :endpointId AND e.removedAt IS NULL', {
         ref: found.id,
-        endpointId,
+        endpointId: target.endpointId,
       })
       .getOne();
     return endpoint ? { endpoint } : { ignored: 'unknownEndpoint' };
+  }
+}
+
+function fitsValueBound(value: unknown): boolean {
+  try {
+    return Buffer.byteLength(canonicalJson(value)) <= MAX_VALUE_BYTES;
+  } catch {
+    // Nested deeper than the stack allows.
+    return false;
   }
 }

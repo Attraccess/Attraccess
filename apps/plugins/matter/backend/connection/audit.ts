@@ -6,6 +6,11 @@ const NODE_REF = { nodeRef: UUID_FIELD } as const;
 const FABRIC_ID = { fabricId: DECIMAL_ID_FIELD } as const;
 const NODE_ID = { nodeId: DECIMAL_ID_FIELD } as const;
 const DETACHED_REASONS = ['absent_from_sidecar', 'fabric_mismatch', 'fabric_absent'] as const;
+/**
+ * Reconciliation entries: `system` when an automatic trigger ran it. The host has no system principal for plugins, so
+ * those entries carry the administrator who last saved the connection settings as the actor.
+ */
+const INITIATOR = { initiator: { type: 'string', oneOf: ['system', 'administrator'] } } as const;
 const METADATA_FLAGS = {
   displayNameChanged: { type: 'boolean' },
   descriptionChanged: { type: 'boolean' },
@@ -32,17 +37,29 @@ export const MATTER_AUDIT_DOMAIN: PluginAuditDomainDeclaration = {
     {
       action: 'matter.node_quarantined',
       subjectTypes: ['matter.node'],
-      details: { ...NODE_REF, ...FABRIC_ID, ...NODE_ID },
+      details: { ...NODE_REF, ...FABRIC_ID, ...NODE_ID, ...INITIATOR },
     },
     {
       action: 'matter.node_detached',
       subjectTypes: ['matter.node'],
-      details: { ...NODE_REF, ...NODE_ID, reason: { type: 'string', oneOf: DETACHED_REASONS } },
+      details: {
+        ...NODE_REF,
+        ...FABRIC_ID,
+        ...NODE_ID,
+        reason: { type: 'string', oneOf: DETACHED_REASONS },
+        ...INITIATOR,
+      },
     },
     {
       action: 'matter.node_reattached',
       subjectTypes: ['matter.node'],
-      details: { ...NODE_REF, ...NODE_ID, resultingState: { type: 'string', oneOf: ['claimed', 'unclaimed'] } },
+      details: {
+        ...NODE_REF,
+        ...FABRIC_ID,
+        ...NODE_ID,
+        resultingState: { type: 'string', oneOf: ['claimed', 'unclaimed'] },
+        ...INITIATOR,
+      },
     },
     {
       action: 'matter.node_claimed',
@@ -99,6 +116,7 @@ export const MATTER_AUDIT_DOMAIN: PluginAuditDomainDeclaration = {
         previousFabricId: DECIMAL_ID_FIELD,
         detachedNodes: { type: 'number', integer: true, min: 0 },
         quarantinedNodes: { type: 'number', integer: true, min: 0 },
+        ...INITIATOR,
       },
     },
   ],

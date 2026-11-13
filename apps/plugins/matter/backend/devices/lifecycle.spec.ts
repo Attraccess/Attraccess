@@ -52,7 +52,9 @@ describe('Matter lifecycle actions', () => {
       ConflictException,
     );
     await h.lifecycle.claim(unclaimed.id, {}, ADMIN);
-    await expect(h.lifecycle.claim(unclaimed.id, {}, ADMIN)).rejects.toThrow(/claimed node cannot be claimed/);
+    await expect(h.lifecycle.claim(unclaimed.id, {}, ADMIN)).rejects.toThrow(
+      /The node is claimed. Only a node that is unclaimed can be claimed/,
+    );
     await expect(h.lifecycle.archive(unclaimed.id, ADMIN)).rejects.toBeInstanceOf(ConflictException);
     await h.lifecycle.forceRemove(unclaimed.id, ADMIN);
     for (const action of ['claim', 'archive', 'restore', 'forceRemove', 'repair'] as const) {
@@ -93,6 +95,22 @@ describe('Matter lifecycle actions', () => {
     expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id })).toMatchObject({
       lifecycleState: 'claimed',
     });
+  });
+
+  it('keeps a fabric mismatch through archive and restore, so it is not re-attached by itself', async () => {
+    await seed('5', '6');
+    const id = (await findNode(h, '5')).id;
+    const archivedEarly = (await findNode(h, '6')).id;
+    await h.lifecycle.archive(archivedEarly, ADMIN);
+    await h.reconcile(inventory('2', []));
+    expect(await h.lifecycle.restore(archivedEarly, ADMIN)).toMatchObject({ detachedReason: 'fabric_mismatch' });
+    await h.lifecycle.archive(id, ADMIN);
+    expect(await h.lifecycle.restore(id, ADMIN)).toMatchObject({
+      lifecycleState: 'detached',
+      detachedReason: 'fabric_mismatch',
+    });
+    await h.reconcile(inventory('1', [node('5')]));
+    expect((await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id })).lifecycleState).toBe('detached');
   });
 
   it('archives an unclaimed node', async () => {
@@ -254,15 +272,48 @@ describe('Matter lifecycle actions', () => {
     it('requires a detached target and an unclaimed source', async () => {
       await seed('5', '6');
       const [a, b] = [await findNode(h, '5'), await findNode(h, '6')];
-      await expect(h.lifecycle.relink(a.id, { sourceNodeId: b.id }, ADMIN)).rejects.toThrow(/must be detached/);
+      await expect(h.lifecycle.relink(a.id, { sourceNodeId: b.id }, ADMIN)).rejects.toThrow(
+        /Only a node that is detached can be relinked/,
+      );
       await h.reconcile(inventory('1', [node('6')]));
       await h.lifecycle.claim(b.id, {}, ADMIN);
       await expect(h.lifecycle.relink(a.id, { sourceNodeId: b.id }, ADMIN)).rejects.toThrow(
         /source node must be unclaimed/,
       );
-      await expect(h.lifecycle.relink(a.id, { sourceNodeId: randomUUID() }, ADMIN)).rejects.toBeInstanceOf(
-        NotFoundException,
+      await expect(h.lifecycle.relink(a.id, { sourceNodeId: randomUUID() }, ADMIN)).rejects.toThrow(
+        /Unknown source node/,
       );
+    });
+
+    it('leaves a never-claimed target unclaimed, and keeps the state of the endpoints it retires', async () => {
+      await h.reconcile(inventory('1', [node('5', { endpoints: [endpoint(1, [0x0006]), endpoint(2, [0x0006])] })]));
+      const target = await findNode(h, '5');
+      const retiring = await h.dataSource
+        .getRepository(MatterEndpoint)
+        .findOneByOrFail({ nodeRef: target.id, endpointId: 2 });
+      await h.state.ingestReport(
+        {
+          nodeId: '5',
+          endpointId: 2,
+          clusterId: 6,
+          attributeId: 0,
+          value: true,
+          observedAt: '2026-10-29T10:00:00.000Z',
+          source: 'read',
+        },
+        '2026-10-29T10:00:00.000Z',
+      );
+      await h.reconcile(inventory('1', []));
+      await h.reconcile(
+        inventory('1', [node('9', { serialNumber: 'SN-5', uniqueId: 'U-5', endpoints: [endpoint(1)] })]),
+      );
+      const source = await findNode(h, '9');
+      const relinked = await h.lifecycle.relink(target.id, { sourceNodeId: source.id }, ADMIN);
+      expect(relinked).toMatchObject({ lifecycleState: 'unclaimed', claimedAt: null, claimedBy: null });
+      expect(await h.dataSource.getRepository(MatterEndpoint).findOneByOrFail({ id: retiring.id })).toMatchObject({
+        removalReason: 'absent_from_sidecar',
+      });
+      expect(await h.state.read(retiring.id)).toHaveLength(1);
     });
 
     it('retires a target endpoint when other bridged hardware sits behind the same endpoint ID', async () => {
@@ -313,6 +364,19 @@ describe('Matter lifecycle actions', () => {
       h.sidecar.list = inventory('1', [node('5', { productName: 'Plug 2' })]);
       expect(await h.lifecycle.repair(id, ADMIN)).toMatchObject({ lifecycleState: 'claimed', productName: 'Plug 2' });
       expect(lastAudit()).toMatchObject({ details: { reattached: false } });
+    });
+
+    it('refuses while the node’s fabric is not the active one, so two fabrics are never active', async () => {
+      await seed('5');
+      const id = (await findNode(h, '5')).id;
+      await h.reconcile(inventory(null, []));
+      h.sidecar.fabricId = '1';
+      h.sidecar.list = inventory('1', [node('5')]);
+      const before = await h.rows('plugin_matter_nodes');
+      await expect(h.lifecycle.repair(id, ADMIN)).rejects.toThrow(/Run a reconciliation first/);
+      expect(await h.rows('plugin_matter_nodes')).toEqual(before);
+      await h.reconcile(inventory('1', [node('5')]));
+      expect((await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id })).lifecycleState).toBe('unclaimed');
     });
 
     it('changes nothing when the sidecar cannot answer, or runs another fabric, or does not list the node', async () => {

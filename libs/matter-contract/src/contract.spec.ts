@@ -253,6 +253,12 @@ describe('events and messages', () => {
         payload: { ...state, fault: { code: 'x', message: 'y' } },
       }).success,
     ).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { ...state, fabricId: '1' } }).success,
+    ).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { ...state, fabricId: 'x' } }).success,
+    ).toBe(false);
     expect(eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { nodeId: '5' } }).success).toBe(
       false,
     );
@@ -268,6 +274,13 @@ describe('events and messages', () => {
       endpointId: 1,
     };
     expect(eventEnvelopeSchema.safeParse({ ...event, type: 'command.outcome', payload: outcome }).success).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({
+        ...event,
+        type: 'command.outcome',
+        payload: { ...outcome, fabricId: '1', failureCode: 'timeout' },
+      }).success,
+    ).toBe(true);
     expect(
       eventEnvelopeSchema.safeParse({ ...event, type: 'command.outcome', payload: { ...outcome, outcome: 'done' } })
         .success,

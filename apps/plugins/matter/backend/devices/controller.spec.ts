@@ -77,7 +77,8 @@ describe('Matter devices controller', () => {
       requestId: randomUUID(),
       correlationId: 'corr',
     });
-    const { states } = await controller.endpointState(endpoint.id);
+    const { endpointRef, states } = await controller.endpointState(endpoint.id);
+    expect(endpointRef).toBe(endpoint.id);
     expect(states[0]).toMatchObject({
       stateKey: 'onOff.onOff',
       reported: {
@@ -107,8 +108,21 @@ describe('Matter devices controller', () => {
     h.sidecar.list = inventory('1', [node('5')]);
     await controller.trigger(request);
     const { id } = (await controller.listNodes({}))[0];
-    await expect(controller.getNode('not-a-uuid')).rejects.toBeInstanceOf(BadRequestException);
+    const messages = async (call: Promise<unknown>) =>
+      ((await call.catch((error: BadRequestException) => error)) as BadRequestException).getResponse();
+    expect(await messages(controller.getNode('not-a-uuid'))).toMatchObject({
+      message: [expect.stringMatching(/^id: /)],
+    });
+    expect(await messages(controller.archive('x', request))).toMatchObject({
+      message: [expect.stringMatching(/^id: /)],
+    });
+    expect(await messages(controller.listNodes({ foo: '1' }))).toMatchObject({
+      message: [expect.stringMatching(/^query: /)],
+    });
     await expect(controller.listNodes({ lifecycleState: 'bogus' })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      controller.relink(id, { sourceNodeId: id, confirmIdentityMismatch: 'yes' }, request),
+    ).rejects.toBeInstanceOf(BadRequestException);
     await expect(controller.updateNode(id, {}, request)).rejects.toBeInstanceOf(BadRequestException);
     await expect(controller.updateNode(id, { displayName: 'x'.repeat(101) }, request)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -142,5 +156,23 @@ describe('Matter devices controller', () => {
     expect(await controller.restore(id, request)).toMatchObject({ lifecycleState: 'detached' });
     expect(await controller.forceRemove(id, { confirm: true }, request)).toMatchObject({ lifecycleState: 'removed' });
     expect(await controller.listNodes({})).toEqual([]);
+    expect(await controller.listNodes({ includeInactive: 'false' })).toEqual([]);
+    expect(await controller.listNodes({ includeInactive: 'true' })).toHaveLength(1);
+  });
+
+  it('reports the event counters with the reconciliation status', async () => {
+    await h.state.ingestReport({
+      nodeId: '99',
+      endpointId: 1,
+      clusterId: 6,
+      attributeId: 0,
+      value: true,
+      observedAt: new Date().toISOString(),
+      source: 'read',
+    });
+    expect(await controller.reconciliationStatus()).toMatchObject({
+      lastResult: null,
+      events: { applied: 0, unknownEndpoint: 1 },
+    });
   });
 });

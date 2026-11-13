@@ -5,7 +5,7 @@ import { FakeSidecar, TOKEN } from '../testing/fake-sidecar';
 import { createHarness, endpoint, node, type Harness } from '../testing/devices-harness.test-utils';
 import { DeviceAuditService } from './audit.service';
 import { MatterEndpoint, MatterEndpointState } from './entities';
-import { MatterIngestionService } from './ingestion.service';
+import { MAX_PENDING_EVENTS, MatterIngestionService } from './ingestion.service';
 import { MatterReconciliationService } from './reconciliation.service';
 import { MatterStateService } from './state.service';
 
@@ -103,7 +103,68 @@ describe('Matter device ingestion over a real sidecar connection', () => {
     expect(h.actions()).toEqual(['matter.node_quarantined']);
   });
 
-  it('reconciles again when the sidecar asks for it', async () => {
+  it('reconciles after a successful commissioning, and not for other progress', async () => {
+    await start({ authoritative: true, fabricId: '1', nodes: [node('5')] });
+    await until(async () => (await reconciliation.status()).lastResult === 'applied');
+    await until(() => fake.sockets.size > 0);
+    const lists = () => fake.requests.filter((r) => r.path === '/v1/nodes').length;
+    const before = lists();
+    fake.inventory = { authoritative: true, fabricId: '1', nodes: [node('5'), node('6')] };
+    fake.broadcast(fake.nextEvent({ type: 'commissioning.progress', payload: { state: 'running' } }));
+    fake.broadcast(fake.nextEvent({ type: 'commissioning.progress', payload: { state: 'succeeded' } }));
+    await until(async () => (await h.dataSource.getRepository('plugin_matter_nodes').count()) === 2);
+    expect(lists()).toBe(before + 1);
+  });
+
+  it('reconciles when the sidecar sends reconciliation-required', async () => {
+    await start({ authoritative: true, fabricId: '1', nodes: [node('5')] });
+    await until(async () => (await reconciliation.status()).lastResult === 'applied');
+    await until(() => fake.sockets.size > 0);
+    fake.inventory = { authoritative: true, fabricId: '1', nodes: [node('5'), node('6')] };
+    fake.onResume = (socket) => {
+      fake.onResume = null;
+      socket.send(
+        JSON.stringify({
+          type: 'reconciliation-required',
+          reason: 'evicted',
+          snapshot: 'unavailable',
+          streamInstanceId: fake.streamInstanceId,
+        }),
+      );
+    };
+    fake.killSockets();
+    await until(async () => (await h.dataSource.getRepository('plugin_matter_nodes').count()) === 2, 10_000);
+  });
+
+  it('drops events beyond the queue bound and counts them', async () => {
+    await start(null);
+    // The bound is about memory, not the database: hold the writes and count what was handed over.
+    let applied = 0;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    jest.spyOn(state, 'ingest').mockImplementation(async (events) => {
+      await held;
+      applied += events.length;
+    });
+    const enqueue = (ingestion as unknown as { enqueue: (event: unknown) => void }).enqueue.bind(ingestion);
+    const event = fake.deviceState({
+      nodeId: '5',
+      endpointId: 1,
+      clusterId: 6,
+      attributeId: 0,
+      value: true,
+      observedAt: new Date().toISOString(),
+      source: 'read',
+    });
+    for (let i = 0; i < MAX_PENDING_EVENTS + 5; i += 1) enqueue({ event });
+    // The first batch is already on its way to the database, so it no longer waits in the queue.
+    expect(state.stats.dropped).toBe(4);
+    release();
+    await ingestion.idle();
+    expect(applied + state.stats.dropped).toBe(MAX_PENDING_EVENTS + 5);
+  });
+
+  it('reconciles again after the stream reconnects', async () => {
     await start({ authoritative: true, fabricId: '1', nodes: [node('5')] });
     await until(async () => (await reconciliation.status()).lastResult === 'applied');
     fake.inventory = { authoritative: true, fabricId: '1', nodes: [node('5'), node('6')] };

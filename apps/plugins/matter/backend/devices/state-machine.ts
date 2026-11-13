@@ -2,8 +2,11 @@
 //
 // Terms: a *request* is what Attraccess asked for; *accepted* only means the sidecar took the command and is never
 // physical completion; *reported* is what the device told us. `confirmed` is derived: a report equal to the
-// requested value that arrived after the request. A timeout of a physical command is `uncertain` and is never
-// retried automatically.
+// requested value that arrived after the request and resolved the command. A timeout of a physical command is
+// `uncertain` and is never retried automatically.
+//
+// "After the request" compares the plugin's own clock on both sides (`received_at` against `requested_at`), so a
+// sidecar or device clock that runs behind cannot hide a confirmation.
 import type { CommandState, MatterEndpointState, StateQuality, StateSource } from './entities';
 
 export const DEFAULT_STALE_AFTER_MS = 600_000;
@@ -66,6 +69,8 @@ const time = (iso: string | null) => (iso === null ? Number.NaN : Date.parse(iso
 
 /** A command that has been sent and whose result is not known yet. */
 const isPending = (state: CommandState) => state === 'requested' || state === 'accepted';
+/** A command that a matching report can still resolve. A failed or already reported one cannot. */
+const isResolvable = (state: CommandState) => isPending(state) || state === 'uncertain';
 
 export function applyRequest(
   row: MatterEndpointState,
@@ -130,16 +135,36 @@ export const TIMEOUT_OUTCOME: OutcomeInput['outcome'] = 'uncertain';
 /**
  * Applies a device report. Returns `null` when it is ignored: older than what is stored (out-of-order delivery) or an
  * exact duplicate.
+ *
+ * A fault report sets the quality and the fault but keeps the last good value with its times: a fault is not a value
+ * the device took, so it neither resolves a command nor counts as an external change, and the value does not become
+ * fresher by it. The next good report clears the fault.
  */
 export function applyReport(row: MatterEndpointState, report: Report, receivedAt: string): MatterEndpointState | null {
   const value = canonicalJson(report.value);
-  if (row.reportedAt !== null) {
-    const stored = time(row.reportedAt);
+  const seen = [row.reportedAt, row.faultAt].filter((at): at is string => at !== null).map(time);
+  if (seen.length > 0) {
+    const latest = Math.max(...seen);
     const observed = time(report.observedAt);
-    if (observed < stored) return null;
-    if (observed === stored && value === row.reportedValue && !report.fault === (row.faultCode === null)) {
-      return null;
-    }
+    if (observed < latest) return null;
+    const duplicate = report.fault
+      ? row.faultCode === report.fault.code && time(row.faultAt) === observed
+      : row.faultCode === null && value === row.reportedValue;
+    if (observed === latest && duplicate) return null;
+  }
+
+  const staleAfterMs = report.maxIntervalSec ? report.maxIntervalSec * 2_000 : row.staleAfterMs;
+  if (report.fault) {
+    return {
+      ...row,
+      source: report.source,
+      quality: 'fault' satisfies StateQuality,
+      faultCode: report.fault.code,
+      faultMessage: report.fault.message,
+      faultAt: report.observedAt,
+      staleAfterMs,
+      updatedAt: receivedAt,
+    };
   }
 
   const next: MatterEndpointState = {
@@ -148,26 +173,31 @@ export function applyReport(row: MatterEndpointState, report: Report, receivedAt
     reportedAt: report.observedAt,
     receivedAt,
     source: report.source,
-    quality: (report.fault ? 'fault' : 'good') satisfies StateQuality,
-    faultCode: report.fault?.code ?? null,
-    faultMessage: report.fault?.message ?? null,
-    faultAt: report.fault ? report.observedAt : null,
-    staleAfterMs: report.maxIntervalSec ? report.maxIntervalSec * 2_000 : row.staleAfterMs,
+    quality: 'good' satisfies StateQuality,
+    faultCode: null,
+    faultMessage: null,
+    faultAt: null,
+    staleAfterMs,
     updatedAt: receivedAt,
   };
 
-  const matchesRequest =
+  // The sidecar may report the command done before the attribute report with the new value arrives: that report is
+  // still the command's effect, unless something else changed the device since the request.
+  const valueAwaited =
+    row.commandState === 'reported' &&
+    row.reportedValue !== row.requestedValue &&
+    !(time(row.externalChangeAt) >= time(row.requestedAt));
+  const resolvesCommand =
+    (isResolvable(row.commandState) || valueAwaited) &&
     row.requestedValue !== null &&
     row.requestedAt !== null &&
-    time(report.observedAt) >= time(row.requestedAt) &&
+    time(receivedAt) >= time(row.requestedAt) &&
     value === row.requestedValue;
-  if (matchesRequest) {
-    // A report that matches the request resolves a pending or uncertain command; a failed one stays failed.
-    if (row.commandState === 'requested' || row.commandState === 'accepted' || row.commandState === 'uncertain') {
-      next.commandState = 'reported';
-      next.commandReportedAt = report.observedAt;
-    }
+  if (resolvesCommand) {
+    next.commandState = 'reported';
+    next.commandReportedAt = valueAwaited ? (row.commandReportedAt ?? report.observedAt) : report.observedAt;
   } else if (!isPending(row.commandState) && row.reportedValue !== null && row.reportedValue !== value) {
+    // Nothing of ours is in flight (or it already settled): somebody or something else changed the device.
     next.externalChangeAt = report.observedAt;
     next.externalChangeValue = value;
   }
@@ -193,7 +223,10 @@ export type StateEntryView = {
     correlationId: string | null;
   };
   command: { state: CommandState; acceptedAt: string | null; reportedAt: string | null };
-  /** True only when a report equal to the requested value arrived after the request, for a command that did not fail. */
+  /**
+   * True only when a report equal to the requested value arrived after the request and resolved the command, and no
+   * external change happened since.
+   */
   confirmed: boolean;
   externalChange: { at: string; value: unknown } | null;
   fault: { code: string; message: string; at: string } | null;
@@ -210,12 +243,14 @@ export function freshnessOf(row: MatterEndpointState, now: number): StateEntryVi
 /** Freshness is computed here, at read time, from the observation time and `staleAfterMs`. */
 export function toView(row: MatterEndpointState, now: number = Date.now()): StateEntryView {
   const confirmed =
-    row.commandState !== 'failed' &&
+    row.commandState === 'reported' &&
     row.requestedValue !== null &&
     row.requestedAt !== null &&
-    row.reportedAt !== null &&
+    row.receivedAt !== null &&
     row.reportedValue === row.requestedValue &&
-    Date.parse(row.reportedAt) >= Date.parse(row.requestedAt);
+    Date.parse(row.receivedAt) >= Date.parse(row.requestedAt) &&
+    // A manual switch back to the requested value is an external change, not our confirmation.
+    !(time(row.externalChangeAt) > time(row.commandReportedAt));
   return {
     stateKey: row.stateKey,
     reported: {

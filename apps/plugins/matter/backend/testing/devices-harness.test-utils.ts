@@ -2,7 +2,7 @@
 // context on top of it, and a scripted stand-in for the sidecar connection.
 import type { NodeListView, NodeView } from '../devices/sidecar-types';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import { SidecarClientError, SidecarTimeoutError, SidecarUnavailableError } from '../client/errors';
 import type { ConnectionStatus } from '../client/connection';
 import { MatterConnectionService } from '../connection/connection.service';
@@ -133,11 +133,19 @@ export async function createHarness() {
     updatedBy: 1,
   });
   const audit = jest.fn(async () => ({ status: 'recorded' as const }));
+  // Mirrors the host: concurrent callers run one at a time inside a transaction.
+  let tail: Promise<unknown> = Promise.resolve();
+  const runSerialized = <T>(work: (manager: EntityManager) => Promise<T>): Promise<T> => {
+    const next = tail.catch(() => undefined).then(() => dataSource.transaction(work));
+    tail = next;
+    return next;
+  };
   const context = {
     hostVersion: '1.11.0',
     manifest: { id: 'matter', name: 'matter', version: '0.3.0-alpha.0', pluginDirectory: 'matter' },
     logger: { debug: jest.fn(), warn: jest.fn(), error: jest.fn(), log: jest.fn() },
     getRepository: (entity: never) => dataSource.getRepository(entity),
+    runSerialized,
     audit: { record: audit },
     // A reversible stand-in for the host's encryption, visibly not plaintext.
     secrets: {

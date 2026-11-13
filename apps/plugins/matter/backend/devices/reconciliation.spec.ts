@@ -302,6 +302,43 @@ describe('Matter reconciliation', () => {
       expect(back.lastSummary?.changes.nodesReattached).toBe(2);
     });
 
+    it('treats a new fabric after an uninitialized sidecar as a mismatch', async () => {
+      await h.reconcile(inventory('1', [node('5')]));
+      const old = await live(h, '5');
+      await h.reconcile(inventory(null, []));
+      h.audit.mockClear();
+      const status = await h.reconcile(inventory('2', [node('5')]));
+      expect(status.lastSummary?.changes).toMatchObject({ nodesDetached: 1, nodesQuarantined: 1 });
+      expect(await nodes(h).findOneByOrFail({ id: old.id })).toMatchObject({ detachedReason: 'fabric_mismatch' });
+      expect(h.actions().sort()).toEqual(
+        ['matter.fabric_mismatch_detected', 'matter.node_detached', 'matter.node_quarantined'].sort(),
+      );
+      expect((await h.reconcile(inventory('2', [node('5')]))).lastSummary?.changeCount).toBe(0);
+      // The old fabric returning does not re-attach them by itself any more.
+      const back = await h.reconcile(inventory('1', [node('5')]));
+      expect(back.lastSummary?.observed.mismatchedStillListed).toBe(1);
+      expect((await nodes(h).findOneByOrFail({ id: old.id })).lifecycleState).toBe('detached');
+    });
+
+    it('keeps fabric_mismatch nodes detached when their fabric returns, and repair brings them back', async () => {
+      await h.reconcile(inventory('1', [node('5')]));
+      const old = await live(h, '5');
+      await h.lifecycle.claim(old.id, { displayName: 'Press' }, ADMIN);
+      await h.reconcile(inventory('2', [node('5')]));
+      const back = await h.reconcile(inventory('1', [node('5')]));
+      expect(back.lastResult).toBe('applied');
+      expect(back.lastSummary?.observed.mismatchedStillListed).toBe(1);
+      const fabrics = await h.dataSource.getRepository(MatterFabric).find({ order: { fabricId: 'ASC' } });
+      expect(fabrics.map((f) => [f.fabricId, f.status])).toEqual([
+        ['1', 'active'],
+        ['2', 'absent'],
+      ]);
+      expect(await nodes(h).countBy({ nodeId: '5', fabricRef: old.fabricRef })).toBe(1);
+      h.sidecar.fabricId = '1';
+      const repaired = await h.lifecycle.repair(old.id, ADMIN);
+      expect(repaired).toMatchObject({ id: old.id, lifecycleState: 'claimed', displayName: 'Press' });
+    });
+
     it('quarantines the unknown nodes when the plugin database is older than the sidecar', async () => {
       await h.reconcile(inventory('1', [node('5')]));
       const status = await h.reconcile(inventory('1', [node('5'), node('8'), node('9')]));
@@ -335,6 +372,34 @@ describe('Matter reconciliation', () => {
     });
   });
 
+  it('survives an inventory that lists an endpoint or a cluster twice', async () => {
+    const twice = node('5', {
+      endpoints: [endpoint(1, [0x0006, 0x0006]), endpoint(1, [0x0008])],
+    });
+    const status = await h.reconcile(inventory('1', [twice]));
+    expect(status.lastResult).toBe('applied');
+    expect(await h.dataSource.getRepository(MatterEndpoint).count()).toBe(1);
+    expect(await h.dataSource.getRepository(MatterEndpointCluster).count()).toBe(1);
+  });
+
+  it('refreshes an endpoint’s last-seen time from the sidecar’s observation', async () => {
+    await h.reconcile(inventory('1', [node('5')]));
+    await h.reconcile(inventory('1', [node('5', { observedAt: '2026-10-30T10:00:00.000Z' })]));
+    const endpoints = await h.dataSource.getRepository(MatterEndpoint).find();
+    expect(endpoints.map((e) => e.lastSeenAt)).toEqual(['2026-10-30T10:00:00.000Z', '2026-10-30T10:00:00.000Z']);
+  });
+
+  it('attributes automatic runs to the system and manual ones to the administrator', async () => {
+    await h.reconcile(inventory('1', [node('5')]));
+    const [system] = h.audit.mock.calls[0] as unknown as [{ principal: { userId: number }; details: object }];
+    expect(system).toMatchObject({ principal: { userId: 1 }, details: { initiator: 'system', fabricId: '1' } });
+    h.audit.mockClear();
+    h.sidecar.list = inventory('1', [node('5'), node('6')]);
+    await h.reconciliation.request(ADMIN);
+    const [manual] = h.audit.mock.calls[0] as unknown as [{ principal: { userId: number }; details: object }];
+    expect(manual).toMatchObject({ principal: { userId: 7 }, details: { initiator: 'administrator' } });
+  });
+
   describe('single flight', () => {
     it('coalesces triggers that arrive during a run into one follow-up run', async () => {
       h.sidecar.list = inventory('1', [node('5')]);
@@ -343,6 +408,22 @@ describe('Matter reconciliation', () => {
       await Promise.all(runs);
       expect(h.sidecar.requests.filter((r) => r === 'inventory.list')).toHaveLength(2);
       expect(await nodes(h).count()).toBe(1);
+      const [, second, third] = await Promise.all(runs);
+      expect(second).toEqual(third);
+    });
+
+    it('gives the follow-up run the administrator who joined it, not the automatic trigger', async () => {
+      h.sidecar.list = inventory('1', []);
+      h.sidecar.listDelayMs = 30;
+      const first = h.reconciliation.request();
+      const joined = [h.reconciliation.request(), h.reconciliation.request(ADMIN)];
+      await first;
+      // The follow-up reads the inventory only after its delay.
+      h.sidecar.list = inventory('1', [node('5')]);
+      await Promise.all(joined);
+      expect(h.actions()).toEqual(['matter.node_quarantined']);
+      const [entry] = h.audit.mock.calls.at(-1) as unknown as [{ principal: { userId: number }; details: object }];
+      expect(entry).toMatchObject({ principal: { userId: 7 }, details: { initiator: 'administrator' } });
     });
   });
 });
