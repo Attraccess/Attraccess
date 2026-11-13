@@ -84,7 +84,7 @@ services:
       - grafana-dashboards:/grafana-dashboards
 
   mailpit:
-    image: axllent/mailpit:v1.31.4
+    image: axllent/mailpit:v1.33.1
     restart: unless-stopped
     expose:
       - '8025'
@@ -106,7 +106,7 @@ services:
       - .env.docker-compose
 
   rabbitmq:
-    image: rabbitmq:4.3.6-management
+    image: rabbitmq:4.4.0-management
     hostname: rabbitmq
     restart: unless-stopped
     command: '/bin/bash -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_web_mqtt rabbitmq_amqp1_0; rabbitmq-server"'
@@ -135,7 +135,7 @@ services:
       interval: 30s
 
   zigbee2mqtt:
-    image: ghcr.io/koenkk/zigbee2mqtt:2.14.2
+    image: ghcr.io/koenkk/zigbee2mqtt:2.14.3
     restart: unless-stopped
     expose:
       - '8080'
@@ -212,7 +212,7 @@ services:
       io.balena.features.balena-socket: '1'
 
   prometheus:
-    image: prom/prometheus:v3.15.0
+    image: prom/prometheus:v3.16.0
     restart: unless-stopped
     expose:
       - '9090'
@@ -230,7 +230,7 @@ services:
       - '--web.enable-lifecycle'
 
   grafana:
-    image: grafana/grafana:13.2.3
+    image: grafana/grafana:13.3.1
     restart: unless-stopped
     expose:
       - '3001'
@@ -267,7 +267,7 @@ services:
       - grafana
 
   duplicati:
-    image: duplicati/duplicati:2.4.0.0-stable
+    image: duplicati/duplicati:2.4.1.0-stable
     expose:
       - '8200'
     volumes:
