@@ -137,6 +137,40 @@ describe('ResourceRetrainingService.evaluate', () => {
     expect(introductionRepository.update).toHaveBeenCalledWith(3, { retrainingRequiredAuditedAt: expect.any(Date) });
   });
 
+  it('records a group introduction transition with the resource group as subject', async () => {
+    const audit = { record: jest.fn().mockResolvedValue(true) };
+    const service = new ResourceRetrainingService(
+      null as never,
+      {
+        findOne: jest.fn().mockResolvedValue({
+          id: 4,
+          name: 'Wood shop',
+          resources: [],
+          retrainingMaxAgeDays: 1,
+          retrainingMaxInactivityDays: null,
+          retrainingBlocksAccess: true,
+        }),
+      } as never,
+      null as never,
+      { update: jest.fn().mockResolvedValue(undefined) } as never,
+      {
+        findOne: jest.fn().mockResolvedValue({ createdAt: fixture.trainedAt, action: IntroductionHistoryAction.GRANT }),
+      } as never,
+      null as never,
+      null as never,
+      audit as never,
+    );
+
+    await (service as never as { notifyIfDue: (introduction: object, now: Date) => Promise<void> }).notifyIfDue(
+      { id: 5, resourceId: null, resourceGroupId: 4, receiverUserId: 2, retrainingNotifiedAt: null },
+      new Date('2026-01-03T00:00:00.000Z'),
+    );
+
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'retraining.required', subject: { type: 'resource_group', id: 4 } }),
+    );
+  });
+
   it('retries failed email delivery without marking the notification delivered', async () => {
     const audit = { record: jest.fn().mockResolvedValue(true) };
     const introductionRepository = { update: jest.fn().mockResolvedValue(undefined) };

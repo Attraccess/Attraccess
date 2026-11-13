@@ -335,13 +335,12 @@ export class ResourceRetrainingService {
         domain: 'resource',
         action: 'retraining.required',
         actor: { id: null, authenticationMethod: null },
-        subject: { type: 'resource', id: subjectId },
+        subject: { type: introduction.resourceId ? 'resource' : 'resource_group', id: subjectId },
         details: {
           introductionId: introduction.id,
           usageUserId: introduction.receiverUserId,
           retrainingReason: evaluation.reason ?? 'unknown',
         },
-        ...(introduction.resourceId ? {} : { subjectType: 'resource_group' }),
       });
       if (recorded) {
         await this.resourceIntroductionRepository.update(introduction.id, { retrainingRequiredAuditedAt: now });
