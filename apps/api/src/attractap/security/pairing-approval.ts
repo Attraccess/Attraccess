@@ -1,7 +1,7 @@
-import { BadRequestException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Logger, NotFoundException, Inject } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Attractap } from '@attraccess/database-entities';
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import { AttractapService } from '../attractap.service';
 import { BootstrapGrants } from './bootstrap-grants';
 import { CredentialRegistryService, CredentialSnapshot } from './credential-registry.service';
@@ -46,7 +46,7 @@ export class PairingApproval {
     private readonly attractap: AttractapService,
     private readonly identity: InstallationIdentityService,
     private readonly registry: CredentialRegistryService,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly events: EventEmitter2,
     private readonly grants: BootstrapGrants,
   ) {}

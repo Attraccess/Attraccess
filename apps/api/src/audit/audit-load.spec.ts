@@ -54,12 +54,11 @@ describe('audit under concurrent load', () => {
       for (let index = 0; index < ADMIN_EVENTS; index++) {
         adminCalls++;
         receipts.push(
-          audit.recordAdministration({
+          audit.record({
+            domain: 'administration',
             action: 'mqtt_server.created',
-            actorId: 1,
-            authenticationMethod: 'session',
-            subjectType: 'mqtt-server',
-            subjectId: 1000 + index,
+            actor: { id: 1, authenticationMethod: 'session' },
+            subject: { type: 'mqtt-server', id: 1000 + index },
             details: { serverName: `Broker ${index}`, host: 'mqtt.example.test', port: 1883, useTls: 0 },
           }),
         );

@@ -1,3 +1,5 @@
+import { AUDIT_RECORDER } from './recorder/audit-event';
+import { billingTransactionAuditEvent } from './policies/billing';
 import { AuditLog, entities, Setting } from '@attraccess/database-entities';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -17,6 +19,9 @@ import {
 } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { SettingsController } from '../settings/settings.controller';
+import { SettingsAdministrationService } from '../settings/settings-administration.service';
+import { AuditQueryService } from './audit-query.service';
+import { PluginAuditHost } from './plugin-audit-host';
 import { SettingsService } from '../settings/settings.service';
 import { ApiTokenService } from '../users-and-auth/auth/api-token/api-token.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
@@ -89,6 +94,9 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
         SessionStrategy,
         { provide: SessionPermissionSync, useValue: { syncIfDue: async () => 'skipped' } },
         { provide: AuditService, useValue: audit },
+        { provide: AUDIT_RECORDER, useValue: audit },
+        { provide: AuditQueryService, useFactory: () => new AuditQueryService(audit, source, store) },
+        SettingsAdministrationService,
         {
           provide: SettingsService,
           useValue: settings,
@@ -235,13 +243,11 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       .expect(({ body }) => expect(body.items).toHaveLength(2));
   });
 
-  it('keeps a persisted language save and reader notification successful when auditing fails', async () => {
+  it('keeps a persisted language save and reader notification successful when the audit record is dropped', async () => {
     await store.setPlainSetting('app', 'default_language', 'de');
     const notified = jest.fn();
     events.on('settings.default-language', notified);
-    const failure = jest
-      .spyOn(audit, 'recordAdministration')
-      .mockRejectedValueOnce(new Error('Injected audit failure'));
+    const failure = jest.spyOn(audit, 'record').mockResolvedValueOnce({ status: 'unavailable' });
     try {
       await request(app.getHttpServer())
         .patch('/api/settings')
@@ -424,7 +430,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
   it('keeps representative credential-bearing inputs out of stored and exported details', async () => {
     const secret = 'audit-security-sentinel-secret';
     await fixture.emitAll();
-    await fixture.audit.record({
+    await new PluginAuditHost(fixture.audit).record({
       pluginId: fixture.fixturePluginId,
       action: 'demo.publication',
       operationId: randomUUID(),
@@ -433,47 +439,48 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       subject: { type: 'demo.device', id: 102 },
       details: { password: secret },
     } as never);
-    await fixture.audit.recordResource({
+    await fixture.audit.record({
+      domain: 'resource',
       action: 'maintenance_schedule.updated',
-      actorId: 42,
-      subjectId: 101,
+      actor: { id: 42, authenticationMethod: 'session' },
+      subject: { type: 'resource', id: 101 },
       details: { scheduleId: 12, password: secret },
-    } as never);
-    await fixture.audit.recordIdentity({
-      action: 'user_updated',
+    });
+    await fixture.audit.record({
+      domain: 'identity',
+      action: 'identity.user_updated',
       operationId: randomUUID(),
-      actorId: 42,
+      actor: { id: 42, authenticationMethod: null },
+      subject: { type: 'identity.user', id: 105 },
       outcome: 'succeeded',
-      subjectType: 'identity.user',
-      subjectId: 105,
       details: { password: secret },
     });
-    await fixture.audit.recordProject({
+    await fixture.audit.record({
+      domain: 'project',
       action: 'project.created',
-      actorId: 42,
-      subjectType: 'project',
-      subjectId: 106,
+      actor: { id: 42, authenticationMethod: 'session' },
+      subject: { type: 'project', id: 106 },
       details: { projectId: 106, invitationToken: secret },
-    } as never);
-    await fixture.audit.recordAdministration({
+    });
+    await fixture.audit.record({
+      domain: 'administration',
       action: 'mqtt_server.created',
-      actorId: 42,
-      subjectType: 'mqtt-server',
-      subjectId: 104,
+      actor: { id: 42, authenticationMethod: 'session' },
+      subject: { type: 'mqtt-server', id: 104 },
       details: { password: secret },
-    } as never);
-    await fixture.audit.recordAttractap({
-      action: 'card.linked',
-      actorId: 42,
-      authenticationMethod: 'session',
-      subjectId: 107,
+    });
+    await fixture.audit.record({
+      domain: 'attractap',
+      action: 'attractap.card.linked',
+      actor: { id: 42, authenticationMethod: 'session' },
+      subject: { type: 'attractap.card', id: 107 },
       details: { source: 'reader-enrollment', cardKey: secret },
-    } as never);
-    await fixture.audit.recordSso({
+    });
+    await fixture.audit.record({
+      domain: 'sso',
       action: 'sso.provider.created',
       operationId: randomUUID(),
-      actorId: 42,
-      authenticationMethod: 'session',
+      actor: { id: 42, authenticationMethod: 'session' },
       subject: { type: 'sso.provider', id: 108 },
       details: {
         before: 'null',
@@ -486,15 +493,17 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       },
     });
     // Billing projects its own scalar fields and never copies provider payloads.
-    await fixture.audit.recordBillingTransaction({
-      transactionId: 109,
-      userId: 42,
-      initiatorId: 42,
-      amount: 125,
-      status: 'completed',
-      source: 'manual',
-      providerPayload: { token: secret },
-    } as never);
+    await fixture.audit.record(
+      billingTransactionAuditEvent({
+        transactionId: 109,
+        userId: 42,
+        initiatorId: 42,
+        amount: 125,
+        status: 'completed',
+        source: 'manual',
+        providerPayload: { token: secret },
+      } as never),
+    );
     const { body } = await fixture.read().expect(200);
     expect(body.items).toHaveLength(fixture.scenarios.length + 1);
     expect(JSON.stringify(body)).not.toContain(secret);
@@ -505,14 +514,13 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
   it('records password-policy snapshots for valid generated role keys ending in a separator', async () => {
     const role = `${'a'.repeat(79)}-`;
     await expect(
-      fixture.audit.recordIdentity({
-        action: 'password_policy_override_updated',
+      fixture.audit.record({
+        domain: 'identity',
+        action: 'identity.password_policy_override_updated',
         operationId: randomUUID(),
-        actorId: 42,
-        authenticationMethod: 'session',
+        actor: { id: 42, authenticationMethod: 'session' },
+        subject: { type: 'identity.password_policy', id: 110 },
         outcome: 'succeeded',
-        subjectType: 'identity.password_policy',
-        subjectId: 110,
         details: {
           role,
           before: JSON.stringify({ role, minLength: 8 }),

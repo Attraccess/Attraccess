@@ -1,3 +1,4 @@
+import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import { registerSumUpServiceFixture } from './service.test-fixture';
 import { SumupTransactionEventType } from '../dto/sumup/sumup-transaction-callback.dto';
 import { BadRequestException } from '@nestjs/common';
@@ -183,13 +184,15 @@ describe('SumUpService', () => {
       expect(fixture.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ id: 1 }),
       );
-      expect(fixture.mockAuditService.recordBillingTransaction).toHaveBeenCalledWith({
-        transactionId: 1,
-        userId: 42,
-        amount: 500,
-        status: BillingTransactionStatus.Pending,
-        source: 'sumup-topup',
-      });
+      expect(fixture.mockAuditService.record).toHaveBeenCalledWith(
+        billingTransactionAuditEvent({
+          transactionId: 1,
+          userId: 42,
+          amount: 500,
+          status: BillingTransactionStatus.Pending,
+          source: 'sumup-topup',
+        }),
+      );
       expect(tx).toEqual(expect.objectContaining({ id: 1, userId: 42 }));
     });
 
@@ -263,14 +266,16 @@ describe('SumUpService', () => {
       expect(transaction.status).toBe(BillingTransactionStatus.Completed);
       expect(fixture.billingTransactionRepository.save).toHaveBeenCalledWith(transaction);
       expect(fixture.liveNotificationsService.notifyTransactionUpdate).toHaveBeenCalledWith(transaction);
-      expect(fixture.mockAuditService.recordBillingTransaction).toHaveBeenCalledWith({
-        transactionId: 10,
-        userId: 42,
-        amount: 500,
-        status: BillingTransactionStatus.Completed,
-        previousStatus: BillingTransactionStatus.Pending,
-        source: 'sumup-topup',
-      });
+      expect(fixture.mockAuditService.record).toHaveBeenCalledWith(
+        billingTransactionAuditEvent({
+          transactionId: 10,
+          userId: 42,
+          amount: 500,
+          status: BillingTransactionStatus.Completed,
+          previousStatus: BillingTransactionStatus.Pending,
+          source: 'sumup-topup',
+        }),
+      );
     });
 
     it('maps FAILED to Failed', async () => {

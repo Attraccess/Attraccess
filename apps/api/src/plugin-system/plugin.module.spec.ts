@@ -20,6 +20,7 @@ import { PluginEventsService } from './plugin-events.service';
 import { PluginMqttService } from './plugin-mqtt.service';
 import { PluginController } from './plugin.controller';
 import { NpmPluginService } from './npm-plugin.service';
+import { PluginAdministrationService } from './plugin-administration.service';
 import { PluginClassificationService } from './plugin-classification.service';
 import { SettingsModule } from './../settings/settings.module';
 import { LiveTopicsModule } from './../live-updates/live-topics.module';
@@ -72,6 +73,7 @@ describe('PluginModule', () => {
         PluginEventsService,
         PluginMqttService,
         NpmPluginService,
+        PluginAdministrationService,
         PluginClassificationService,
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,

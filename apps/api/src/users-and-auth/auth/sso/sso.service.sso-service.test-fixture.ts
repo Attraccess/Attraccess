@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
 import {
   SSOProvider,
   SSOProviderOIDCConfiguration,
@@ -10,6 +11,8 @@ import { Repository } from 'typeorm';
 import { EncryptionService } from '../../../encryption/encryption.service';
 import { LicenseService } from '../../../license/license.service';
 import { SSOService } from './sso.service';
+
+const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 
 const SSOProviderRepository = getRepositoryToken(SSOProvider);
 
@@ -57,6 +60,7 @@ export function registerSsoServiceFixture() {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AUDIT_RECORDER, useValue: audit },
         SSOService,
         {
           provide: LicenseService,
@@ -142,6 +146,9 @@ export function registerSsoServiceFixture() {
     encryptionService = module.get<EncryptionService>(EncryptionService);
   });
   return {
+    get audit() {
+      return audit;
+    },
     get service() {
       return service;
     },

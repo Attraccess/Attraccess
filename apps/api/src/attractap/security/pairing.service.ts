@@ -5,13 +5,14 @@ import {
   Logger,
   NotFoundException,
   OnApplicationShutdown,
+  Inject,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes, randomUUID } from 'crypto';
 import type { IncomingMessage } from 'http';
 import type { WebSocket } from 'ws';
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import type { AppConfigType } from '../../config/app.config';
 import { resolveClientAddress } from '../../device-enrollment/client-address';
 import {
@@ -89,7 +90,7 @@ export class PairingService implements OnApplicationShutdown {
     private readonly attractap: AttractapService,
     private readonly identity: InstallationIdentityService,
     private readonly registry: CredentialRegistryService,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly events: EventEmitter2,
     private readonly limits: EnrollmentLimitsService,
     private readonly settings: SettingsService,

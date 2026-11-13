@@ -185,7 +185,7 @@ describe('PairingService', () => {
       attractap as never,
       identity as never,
       registry as never,
-      { recordAttractap: async (event: Record<string, unknown>) => void audited.push(event) } as never,
+      { record: async (event: Record<string, unknown>) => void audited.push(event) } as never,
       {
         emit: (event: string, id: unknown) => {
           emittedEvents.push(event);
@@ -228,7 +228,12 @@ describe('PairingService', () => {
     const reveal = await client.next('reveal');
     const serverKey = Buffer.from(round['serverPublicKey'] as string, 'base64');
     const serverNonce = Buffer.from(reveal['serverNonce'] as string, 'base64');
-    const checks = commitmentMatches(Buffer.from(round['commitment'] as string, 'base64'), serverKey, publicKey, serverNonce);
+    const checks = commitmentMatches(
+      Buffer.from(round['commitment'] as string, 'base64'),
+      serverKey,
+      publicKey,
+      serverNonce,
+    );
     const derived = deriveCode(publicKey, serverKey, readerNonce, serverNonce);
     return { round, reveal, checks, derived, code: derived.code };
   }
@@ -260,9 +265,15 @@ describe('PairingService', () => {
     await client.next('accepted');
     expect(done.state).toBe('completed');
     expect(readers.size).toBe(1);
-    expect(readers.get(done.targetReaderId as number)).toMatchObject({ name: 'Laser', pairingState: 'paired', apiTokenHash: '' });
+    expect(readers.get(done.targetReaderId as number)).toMatchObject({
+      name: 'Laser',
+      pairingState: 'paired',
+      apiTokenHash: '',
+    });
     expect(credentialEvents).toEqual([expect.objectContaining({ state: 'paired' })]);
-    expect(audited).toEqual([expect.objectContaining({ action: 'reader.enrolled', details: { method: 'code' } })]);
+    expect(audited).toEqual([
+      expect.objectContaining({ action: 'attractap.reader.enrolled', details: { method: 'code' } }),
+    ]);
     expect(emitted).toEqual([done.targetReaderId]);
     expect(service.list()).toEqual([]);
   });
@@ -311,7 +322,7 @@ describe('PairingService', () => {
     expect(detail.round).toBe(round['round']);
 
     await service.approve(pending.id, { round: detail.round as number, mode: 'new' }, actor);
-    expect(audited[0]).toMatchObject({ action: 'reader.enrolled', details: { method: 'led-pattern' } });
+    expect(audited[0]).toMatchObject({ action: 'attractap.reader.enrolled', details: { method: 'led-pattern' } });
   });
 
   it('refuses a stale Lite round without counting it as a wrong code, and a touch reader without a code', async () => {
@@ -380,9 +391,9 @@ describe('PairingService', () => {
     expect(() => service.resolve(readerSide.code, actor)).toThrow('PairingCodeNotFound');
     // Approving the attacker's request with the code on the real reader is refused too.
     const attackerRequest = await pendingOf();
-    await expect(
-      service.approve(attackerRequest.id, { code: readerSide.code, mode: 'new' }, actor),
-    ).rejects.toThrow('PairingCodeNotFound');
+    await expect(service.approve(attackerRequest.id, { code: readerSide.code, mode: 'new' }, actor)).rejects.toThrow(
+      'PairingCodeNotFound',
+    );
     expect(readers.size).toBe(0);
     expect(service.get(attackerRequest.id).state).toBe('waiting');
   });
@@ -392,15 +403,21 @@ describe('PairingService', () => {
     await announce();
     const pending = service.list();
     expect(pending).toHaveLength(2);
-    const other = pending.find((p) => service.get(p.id) && p.id !== service.resolve(a.code, actor).id) as { id: string };
-    await expect(service.approve(other.id, { code: a.code, mode: 'new' }, actor)).rejects.toThrow('PairingCodeNotFound');
+    const other = pending.find((p) => service.get(p.id) && p.id !== service.resolve(a.code, actor).id) as {
+      id: string;
+    };
+    await expect(service.approve(other.id, { code: a.code, mode: 'new' }, actor)).rejects.toThrow(
+      'PairingCodeNotFound',
+    );
     expect(readers.size).toBe(0);
   });
 
   it('asks to wait when two readers show the same code, without counting a wrong code', async () => {
     await announce();
     await announce();
-    const [first, second] = [...(service as unknown as { requests: Map<string, { current: { derived: unknown } }> }).requests.values()];
+    const [first, second] = [
+      ...(service as unknown as { requests: Map<string, { current: { derived: unknown } }> }).requests.values(),
+    ];
     first.current.derived = second.current.derived; // forced collision
     const code = (second.current.derived as { code: string }).code;
     for (let i = 0; i < 6; i++) expect(() => service.resolve(code, actor)).toThrow('PairingCodeAmbiguous');
@@ -413,10 +430,14 @@ describe('PairingService', () => {
     const pending = await pendingOf();
     for (let i = 0; i < 3; i++) expect(() => service.resolve('AAAAAA', actor)).toThrow('PairingCodeNotFound');
     for (let i = 0; i < 2; i++) {
-      await expect(service.approve(pending.id, { code: '222222', mode: 'new' }, actor)).rejects.toThrow('PairingCodeNotFound');
+      await expect(service.approve(pending.id, { code: '222222', mode: 'new' }, actor)).rejects.toThrow(
+        'PairingCodeNotFound',
+      );
     }
     expect(() => service.resolve('AAAAAA', actor)).toThrow(EnrollmentRateLimitedException);
-    await expect(service.approve(pending.id, { code, mode: 'new' }, actor)).rejects.toThrow(EnrollmentRateLimitedException);
+    await expect(service.approve(pending.id, { code, mode: 'new' }, actor)).rejects.toThrow(
+      EnrollmentRateLimitedException,
+    );
     expect(readers.size).toBe(0);
     // another approver is not affected
     expect(service.resolve(code, { ...actor, userId: 2 }).id).toBe(pending.id);
@@ -445,7 +466,7 @@ describe('PairingService', () => {
     );
     await service.approve(pending.id, { round: second.round['round'] as number, mode: 'new' }, actor);
     expect(readers.size).toBe(1);
-    expect(audited[0]).toMatchObject({ action: 'reader.enrolled', details: { method: 'led-pattern' } });
+    expect(audited[0]).toMatchObject({ action: 'attractap.reader.enrolled', details: { method: 'led-pattern' } });
   });
 
   it('lets only one of several concurrent approvals through', async () => {
@@ -471,7 +492,10 @@ describe('PairingService', () => {
     await service.approve(pending.id, { code, mode: 'pair' }, actor);
     expect(readers.get(7)).toMatchObject({ pairingState: 'paired', apiTokenHash: '' });
     expect(readers.size).toBe(1);
-    expect(audited[0]).toMatchObject({ action: 'reader.pairing_confirmed', details: { mode: 'pair', method: 'code' } });
+    expect(audited[0]).toMatchObject({
+      action: 'attractap.reader.pairing_confirmed',
+      details: { mode: 'pair', method: 'code' },
+    });
   });
 
   it('hands the same reader the ticket it already has, and a new one once that ran low', async () => {
@@ -513,26 +537,47 @@ describe('PairingService', () => {
     clients.push(client);
     await client.opened();
     client.send({
-      type: 'hello', v: 1, kind: 'touch', publicKey: (await readerKey()).toString('base64'), firmware, ticket,
+      type: 'hello',
+      v: 1,
+      kind: 'touch',
+      publicKey: (await readerKey()).toString('base64'),
+      firmware,
+      ticket,
     });
     await new Promise<void>((resolve) => client.ws.once('close', () => resolve()));
     const bogus = new PairingClient(url);
     clients.push(bogus);
     await bogus.opened();
-    bogus.send({ type: 'hello', v: 1, kind: 'touch', publicKey: (await readerKey()).toString('base64'), firmware, ticket: 'nope' });
+    bogus.send({
+      type: 'hello',
+      v: 1,
+      kind: 'touch',
+      publicKey: (await readerKey()).toString('base64'),
+      firmware,
+      ticket: 'nope',
+    });
     await new Promise<void>((resolve) => bogus.ws.once('close', () => resolve()));
     expect(service.list()).toHaveLength(1);
   });
 
   it('takes over an existing record and closes the old credential as replaced', async () => {
-    readers.set(3, { id: 3, name: 'old', pairingState: 'paired', credentialFingerprint: 'old-fp', certificateSerial: '00' });
+    readers.set(3, {
+      id: 3,
+      name: 'old',
+      pairingState: 'paired',
+      credentialFingerprint: 'old-fp',
+      certificateSerial: '00',
+    });
     const { code } = await announce();
     const pending = await pendingOf();
     await expect(service.approve(pending.id, { code, mode: 'takeover' }, actor)).rejects.toThrow('targetReaderId');
     await service.approve(pending.id, { code, mode: 'takeover', targetReaderId: 3 }, actor);
     expect(credentialEvents.map((e) => e['state'])).toEqual(['replaced', 'paired']);
-    expect(audited.map((a) => a['action'])).toEqual(['reader.replaced', 'reader.pairing_confirmed']);
-    expect(audited[0]).toMatchObject({ subjectId: 3, details: { mode: 'takeover' } });
+    expect(audited.map((a) => a['action'])).toEqual([
+      'attractap.reader.replaced',
+      'attractap.reader.pairing_confirmed',
+    ]);
+    expect(audited[0]).toMatchObject({ subject: { id: 3 }, details: { mode: 'takeover' } });
     expect(readers.size).toBe(1);
   });
 
@@ -588,7 +633,7 @@ describe('PairingService', () => {
     expect(readers.size).toBe(0);
     expect(credentialEvents).toEqual([]);
     expect(emitted).toEqual([]);
-    expect(audited.map((a) => a['action'])).not.toContain('reader.enrolled');
+    expect(audited.map((a) => a['action'])).not.toContain('attractap.reader.enrolled');
     expect(service.get(pending.id)).toMatchObject({ state: 'failed', failureReason: 'reader-disconnected' });
     expect(limits.pendingCount).toBe(0);
   });
@@ -626,7 +671,7 @@ describe('PairingService', () => {
     // The new credential is closed in the history and the record created for it is gone.
     expect(credentialEvents.map((e) => e['state'])).toEqual(['paired', 'revoked']);
     expect(readers.size).toBe(0);
-    expect(audited.map((a) => a['action'])).not.toContain('reader.enrolled');
+    expect(audited.map((a) => a['action'])).not.toContain('attractap.reader.enrolled');
     expect(service.get(pending.id)).toMatchObject({ state: 'failed', failureReason: 'reader-disconnected' });
   });
 
@@ -648,7 +693,11 @@ describe('PairingService', () => {
     expect(credentialEvents.map((e) => e['state'])).toEqual(['paired', 'revoked']);
     // One audit event says why; no enrolment or confirmation for the undone approval.
     expect(audited).toEqual([
-      expect.objectContaining({ action: 'reader.pairing_failed', subjectId: 7, details: { reason: 'not-delivered' } }),
+      expect.objectContaining({
+        action: 'attractap.reader.pairing_failed',
+        subject: { type: 'attractap.reader', id: 7 },
+        details: { reason: 'not-delivered' },
+      }),
     ]);
     expect(emitted).toEqual([7, 7]); // after the commit and after the undo
   });
@@ -681,7 +730,11 @@ describe('PairingService', () => {
       'PairingReaderGone',
     );
     // Reader A keeps working: its key is the active credential again, with its certificate.
-    expect(readers.get(3)).toMatchObject({ pairingState: 'paired', credentialFingerprint: 'old-fp', certificateSerial: '00' });
+    expect(readers.get(3)).toMatchObject({
+      pairingState: 'paired',
+      credentialFingerprint: 'old-fp',
+      certificateSerial: '00',
+    });
     expect(await (registry['isActive'] as (id: number, fp: string) => Promise<boolean>)(3, 'old-fp')).toBe(true);
     // Append-only history: replaced, the undone key, then the old key active again.
     expect(credentialEvents.map((e) => [e['state'], e['keyFingerprint']])).toEqual([
@@ -691,24 +744,41 @@ describe('PairingService', () => {
       ['paired', 'old-fp'],
     ]);
     expect(audited).toEqual([
-      expect.objectContaining({ action: 'reader.pairing_failed', subjectId: 3, details: { reason: 'not-delivered' } }),
+      expect.objectContaining({
+        action: 'attractap.reader.pairing_failed',
+        subject: { type: 'attractap.reader', id: 3 },
+        details: { reason: 'not-delivered' },
+      }),
     ]);
     expect(emitted).toEqual([3, 3]); // live sessions and caches refresh after the undo
     expect(readers.size).toBe(1);
   });
 
   it('leaves a pairing alone that another approval committed while this one waited for the reader', async () => {
-    readers.set(3, { id: 3, name: 'old', pairingState: 'paired', credentialFingerprint: 'old-fp', certificateSerial: '00' });
+    readers.set(3, {
+      id: 3,
+      name: 'old',
+      pairingState: 'paired',
+      credentialFingerprint: 'old-fp',
+      certificateSerial: '00',
+    });
     const { client, code } = await announce();
     const pending = await pendingOf();
     leaveAfterCommit(client, pending.id, () =>
       // What a second approval for the same record commits meanwhile.
-      Object.assign(readers.get(3) as Record<string, unknown>, { credentialFingerprint: 'other-fp', certificateSerial: '02' }),
+      Object.assign(readers.get(3) as Record<string, unknown>, {
+        credentialFingerprint: 'other-fp',
+        certificateSerial: '02',
+      }),
     );
     await expect(service.approve(pending.id, { code, mode: 'takeover', targetReaderId: 3 }, actor)).rejects.toThrow(
       'PairingReaderGone',
     );
-    expect(readers.get(3)).toMatchObject({ pairingState: 'paired', credentialFingerprint: 'other-fp', certificateSerial: '02' });
+    expect(readers.get(3)).toMatchObject({
+      pairingState: 'paired',
+      credentialFingerprint: 'other-fp',
+      certificateSerial: '02',
+    });
     expect(credentialEvents.map((e) => e['state'])).toEqual(['replaced', 'paired']);
   });
 
@@ -770,7 +840,14 @@ describe('PairingService', () => {
     const limited = new PairingClient(url);
     clients.push(limited);
     await limited.opened();
-    limited.send({ type: 'hello', v: 1, kind: 'touch', publicKey: (await readerKey()).toString('base64'), firmware, ticket });
+    limited.send({
+      type: 'hello',
+      v: 1,
+      kind: 'touch',
+      publicKey: (await readerKey()).toString('base64'),
+      firmware,
+      ticket,
+    });
     expect((await limited.next('failed'))['reason']).toBe('rate-limited');
 
     await announce({ ticket });
@@ -893,7 +970,7 @@ describe('PairingService', () => {
 
     await service.revoke(readerId, actor);
     expect(readers.get(readerId)).toMatchObject({ pairingState: 'revoked' });
-    expect(audited.at(-1)).toMatchObject({ action: 'reader.revoked' });
+    expect(audited.at(-1)).toMatchObject({ action: 'attractap.reader.revoked' });
     expect(emittedEvents).toEqual([CREDENTIAL_CHANGED_EVENT]);
     expect(emitted).toEqual([readerId]);
     expect(grants.get(peer.spkiFingerprint)).toBeUndefined();
@@ -908,11 +985,9 @@ describe('PairingService', () => {
     expect((await client.next('failed'))['reason']).toBe('cancelled-by-admin');
     expect(audited).toEqual([
       expect.objectContaining({
-        action: 'reader.pairing_failed',
-        actorId: 2,
-        authenticationMethod: 'api-token',
-        apiTokenId: 5,
-        subjectId: 7,
+        action: 'attractap.reader.pairing_failed',
+        actor: { id: 2, authenticationMethod: 'api-token', apiTokenId: 5 },
+        subject: { type: 'attractap.reader', id: 7 },
         details: { reason: 'cancelled-by-admin' },
       }),
     ]);

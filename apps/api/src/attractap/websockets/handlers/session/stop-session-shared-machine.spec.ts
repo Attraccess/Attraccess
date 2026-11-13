@@ -94,7 +94,7 @@ describe('AttractapSessionHandler stop on a machine shared by several people', (
     await stop(socket, { usageId: 55 });
 
     expect(endSession).toHaveBeenCalledWith(10, expect.anything(), expect.objectContaining({ usageId: 55 }), {
-      auditOrigin: { actorId: 7, authenticationMethod: null },
+      auditOrigin: { id: 7, authenticationMethod: null },
     });
     expect(reply(socket).data.payload).toMatchObject({ success: true, endedOwnSession: false, durationSeconds: 60 });
     expect(reply(socket).data.payload).not.toHaveProperty('billingSummary');

@@ -1,8 +1,8 @@
+import { AUDIT_RECORDER } from '../../../../audit/recorder/audit-event';
 import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuditService } from '../../../../audit/audit.service';
 import { BillingService } from '../../../../billing/charges/billing.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { PluginEventsService } from '../../../../plugin-system/plugin-events.service';
@@ -133,7 +133,7 @@ export function createResourceUsageTestingModule(mocks: ReturnType<typeof create
         provide: RbacService,
         useValue: mockRbacService,
       },
-      { provide: AuditService, useValue: mockAuditService },
+      { provide: AUDIT_RECORDER, useValue: mockAuditService },
     ],
   }).compile();
 }

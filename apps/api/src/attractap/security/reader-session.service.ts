@@ -1,6 +1,6 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Inject } from '@nestjs/common';
 import type { WebSocket } from 'ws';
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import { AttractapAuthHandler } from '../websockets/handlers/auth/auth.handler';
 import { AuthenticatedWebSocket } from '../websockets/websocket.types';
 import { CredentialRegistryService } from './credential-registry.service';
@@ -32,7 +32,7 @@ export class ReaderSessionService implements OnModuleDestroy {
     private readonly pairing: PairingService,
     private readonly authHandler: AttractapAuthHandler,
     private readonly metrics: SessionMetrics,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {
     this.flushTimer = setInterval(() => void this.flushRejections(), AGGREGATE_FLUSH_MS);
     this.flushTimer.unref();
@@ -209,11 +209,11 @@ export class ReaderSessionService implements OnModuleDestroy {
     this.rejections.clear();
     for (const entry of entries) {
       if (!entry.readerId) continue; // the audit log needs a reader to attach the event to
-      await this.audit.recordAttractap({
-        action: 'reader.handshake_rejected',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: entry.readerId,
+      await this.audit.record({
+        domain: 'attractap',
+        action: 'attractap.reader.handshake_rejected',
+        actor: { id: null, authenticationMethod: null },
+        subject: { type: 'attractap.reader', id: entry.readerId },
         details: { reason: entry.reason, count: entry.count },
       });
     }

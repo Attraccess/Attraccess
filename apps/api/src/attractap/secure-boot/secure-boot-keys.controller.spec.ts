@@ -13,31 +13,21 @@ describe('AttractapSecureBootKeysController', () => {
     downloadSigningKeyBackup: jest.fn(async () => ({ pem: 'PEM', fingerprint: FP })),
     restore: jest.fn(async () => ({ signingFingerprint: FP, recoveryFingerprint: FP })),
   };
-  const events: Array<Parameters<typeof projectAttractapAuditEvent>[0]> = [];
-  const audit = { recordAttractap: jest.fn(async (event) => void events.push(event)) };
-  const controller = new AttractapSecureBootKeysController(keys as never, audit as never);
+  const controller = new AttractapSecureBootKeysController(keys as never);
+  const actor = { id: 7, authenticationMethod: 'session' };
 
-  beforeEach(() => (events.length = 0));
-
-  it('audits every key operation with fingerprints only, never key material or the passphrase', async () => {
+  it('passes the signed-in admin to every key operation, which audits it', async () => {
     await controller.createKeys(request);
     await controller.downloadRecoveryKey({ passphrase: 'secret passphrase' }, request);
     await controller.checkRecoveryKey({ pem: 'PEM-IN', passphrase: 'secret passphrase' }, request);
     await controller.downloadSigningKeyBackup({ passphrase: 'secret passphrase' }, request);
     await controller.restore({ source: 'recovery-file', pem: 'PEM-IN', passphrase: 'secret passphrase' }, request);
 
-    expect(events.map((e) => e.action)).toEqual([
-      'reader.secure_keys_created',
-      'reader.recovery_key_downloaded',
-      'reader.recovery_key_verified',
-      'reader.signing_key_backup_downloaded',
-      'reader.secure_keys_restored',
-    ]);
-    for (const event of events) {
-      expect(JSON.stringify(event)).not.toMatch(/PEM|passphrase/);
-      expect(projectAttractapAuditEvent(event)).toEqual(event); // survives the whitelist projection
-      expect(event.subjectType).toBe('attractap.installation');
-    }
+    expect(keys.createKeys).toHaveBeenCalledWith(actor);
+    expect(keys.downloadRecoveryKey).toHaveBeenCalledWith('secret passphrase', actor);
+    expect(keys.checkRecoveryKey).toHaveBeenCalledWith('PEM-IN', 'secret passphrase', actor);
+    expect(keys.downloadSigningKeyBackup).toHaveBeenCalledWith('secret passphrase', actor);
+    expect(keys.restore).toHaveBeenCalledWith('recovery-file', 'PEM-IN', 'secret passphrase', actor);
   });
 
   it('drops audit details that are not fingerprints', () => {
@@ -60,12 +50,6 @@ describe('AttractapSecureBootKeysController', () => {
     const whitelisted = { signingFingerprint: FP, recoveryFingerprint: FP, source: 'recovery-file' };
     expect(projectAttractapAuditEvent({ ...restored, details: whitelisted })?.details).toEqual(whitelisted);
     expect(projectAttractapAuditEvent({ ...restored, details: { ...whitelisted, source: 'bogus' } })).toBeNull();
-  });
-
-  it('records nothing when the key operation fails', async () => {
-    keys.checkRecoveryKey.mockRejectedValueOnce(new Error('wrong passphrase'));
-    await expect(controller.checkRecoveryKey({ pem: 'PEM-IN', passphrase: 'wrong' }, request)).rejects.toThrow();
-    expect(events).toEqual([]);
   });
 
   it('keeps downloaded key files out of HTTP caches', () => {

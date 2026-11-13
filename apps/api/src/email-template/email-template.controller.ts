@@ -1,8 +1,7 @@
-import { recordAdministrationSafely, auditSubjectKeyId } from '../audit/policies/administration';
 import { Controller, Delete, Get, HttpCode, HttpStatus, Post, Body, Patch, Param, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { AuditService } from '../audit/audit.service';
+import { auditActorOf } from '../audit/recorder/audit-event';
 import { EmailTemplate } from '@attraccess/database-entities';
 import {
   EmailTemplateKey,
@@ -26,10 +25,7 @@ const TEMPLATE_TYPE_PARAM = {
 @ApiBearerAuth()
 @Controller('email-templates')
 export class EmailTemplateController {
-  constructor(
-    private readonly emailTemplateService: EmailTemplateService,
-    private readonly audit: AuditService,
-  ) {}
+  constructor(private readonly emailTemplateService: EmailTemplateService) {}
 
   @Get()
   @Auth('system.settings.manage')
@@ -61,10 +57,7 @@ export class EmailTemplateController {
     @Body() updateEmailTemplateDto: UpdateEmailTemplateDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<EmailTemplate> {
-    return this.emailTemplateService.update(type, updateEmailTemplateDto).then(async (template) => {
-      await this.record(req, 'email_template.updated', type, { templateType: type });
-      return template;
-    });
+    return this.emailTemplateService.update(type, updateEmailTemplateDto, auditActorOf(req.user));
   }
 
   @Post(':type/reset')
@@ -75,10 +68,7 @@ export class EmailTemplateController {
   @ApiResponse({ status: 200, description: 'Template reset to default', type: EmailTemplate })
   @ApiResponse({ status: 404, description: 'Template not found' })
   resetToDefault(@Param('type') type: EmailTemplateKey, @Req() req: AuthenticatedRequest): Promise<EmailTemplate> {
-    return this.emailTemplateService.resetToDefault(type).then(async (template) => {
-      await this.record(req, 'email_template.reset', type, { templateType: type });
-      return template;
-    });
+    return this.emailTemplateService.resetToDefault(type, auditActorOf(req.user));
   }
 
   @Get(':type/translations')
@@ -102,12 +92,7 @@ export class EmailTemplateController {
     @Body() dto: UpsertTranslationsDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    await this.emailTemplateService.setTranslations(type, dto.locale, dto.translations);
-    await this.record(req, 'email_template.translations_set', type, {
-      templateType: type,
-      locale: dto.locale,
-      translationCount: Object.keys(dto.translations).length,
-    });
+    await this.emailTemplateService.setTranslations(type, dto.locale, dto.translations, auditActorOf(req.user));
   }
 
   @Delete(':type/translations/:locale')
@@ -121,25 +106,6 @@ export class EmailTemplateController {
     @Param('locale') locale: string,
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    return this.emailTemplateService.deleteTranslations(type, locale).then(async () => {
-      await this.record(req, 'email_template.translations_deleted', type, { templateType: type, locale });
-    });
-  }
-
-  private async record(
-    req: AuthenticatedRequest,
-    action: string,
-    type: string,
-    details: Record<string, string | number>,
-  ) {
-    await recordAdministrationSafely(this.audit, {
-      action,
-      actorId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-      subjectType: 'email-template',
-      subjectId: auditSubjectKeyId(type),
-      details,
-    });
+    return this.emailTemplateService.deleteTranslations(type, locale, auditActorOf(req.user));
   }
 }

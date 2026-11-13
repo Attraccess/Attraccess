@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   READER_UI_LIMITS,
@@ -12,7 +12,7 @@ import {
   type SessionEndResult,
   type StartBlockedState,
 } from '@attraccess/plugins-backend-sdk';
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import type { AppConfigType } from '../../config/app.config';
 import {
   cleanPluginText,
@@ -92,7 +92,7 @@ export class ReaderUiHooksService {
     private readonly registry: ReaderUiRegistry,
     private readonly settings: ReaderUiSettingsService,
     private readonly alerts: ReaderUiAlertsService,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     config: ConfigService,
   ) {
     const app = config.get<AppConfigType>('app');
@@ -239,12 +239,11 @@ export class ReaderUiHooksService {
     } else {
       await this.alerts.clearWhere('breaker-open', { plugin }).catch(() => undefined);
     }
-    await this.audit.recordAttractap({
-      action: 'ui.breaker_changed',
-      subjectType: 'resource',
-      actorId: null,
-      authenticationMethod: null,
-      subjectId: run.resourceId,
+    await this.audit.record({
+      domain: 'attractap',
+      action: 'attractap.ui.breaker_changed',
+      actor: { id: null, authenticationMethod: null },
+      subject: { type: 'resource', id: run.resourceId },
       details: {
         plugin,
         state: transition,
@@ -286,12 +285,11 @@ export class ReaderUiHooksService {
     decision: 'allow' | 'confirm' | 'block',
     reasonCode: string,
   ) {
-    await this.audit.recordAttractap({
-      action,
-      subjectType: run.readerId ? 'attractap.reader' : 'resource',
-      actorId: null,
-      authenticationMethod: null,
-      subjectId: run.readerId ?? run.resourceId,
+    await this.audit.record({
+      domain: 'attractap',
+      action: `attractap.${action}` as const,
+      actor: { id: null, authenticationMethod: null },
+      subject: { type: run.readerId ? 'attractap.reader' : 'resource', id: run.readerId ?? run.resourceId },
       details: {
         plugin,
         userId: run.userId,

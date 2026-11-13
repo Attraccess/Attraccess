@@ -1,20 +1,16 @@
-import { recordAdministrationSafely, safeAuditHost } from '../../audit/policies/administration';
 import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { MqttServer } from '@attraccess/database-entities';
 import { MqttServerService } from './mqtt-server.service';
 import { CreateMqttServerDto, UpdateMqttServerDto } from './dtos/mqtt-server.dto';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { AuditService } from '../../audit/audit.service';
+import { auditActorOf } from '../../audit/recorder/audit-event';
 
 @ApiTags('MQTT')
 @Auth('resources.update')
 @Controller('mqtt/servers')
 export class MqttServerController {
-  constructor(
-    private readonly mqttServerService: MqttServerService,
-    private readonly audit: AuditService,
-  ) {}
+  constructor(private readonly mqttServerService: MqttServerService) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all MQTT servers', operationId: 'mqttServersGetAll' })
@@ -50,9 +46,7 @@ export class MqttServerController {
     @Body() createMqttServerDto: CreateMqttServerDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<MqttServer> {
-    const server = await this.mqttServerService.create(createMqttServerDto);
-    await this.record(req, 'mqtt_server.created', server, createMqttServerDto.password !== undefined);
-    return server;
+    return this.mqttServerService.create(createMqttServerDto, auditActorOf(req.user));
   }
 
   @Put(':id')
@@ -68,10 +62,7 @@ export class MqttServerController {
     @Body() updateMqttServerDto: UpdateMqttServerDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<MqttServer> {
-    return this.mqttServerService.update(id, updateMqttServerDto).then(async (server) => {
-      await this.record(req, 'mqtt_server.updated', server, updateMqttServerDto.password !== undefined);
-      return server;
-    });
+    return this.mqttServerService.update(id, updateMqttServerDto, auditActorOf(req.user));
   }
 
   @Delete(':id')
@@ -79,34 +70,6 @@ export class MqttServerController {
   @ApiResponse({ status: 200, description: 'MQTT server deleted successfully' })
   @ApiResponse({ status: 404, description: 'MQTT server not found' })
   async deleteOne(@Param('id', ParseIntPipe) id: number, @Req() req: AuthenticatedRequest): Promise<void> {
-    const server = await this.mqttServerService.findOne(id);
-    await this.mqttServerService.remove(id);
-    await this.record(req, 'mqtt_server.deleted', server);
-  }
-
-  private async record(req: AuthenticatedRequest, action: string, server: MqttServer, passwordChanged = false) {
-    await recordAdministrationSafely(this.audit, {
-      action,
-      actorId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-      subjectType: 'mqtt-server',
-      subjectId: server.id,
-      details: {
-        serverName: server.name,
-        host: safeAuditHost(server.host),
-        passwordChanged: passwordChanged ? 1 : 0,
-        port: server.port,
-        managementPort: server.managementPort ?? 0,
-        usernameConfigured: server.username ? 1 : 0,
-        useTls: server.useTls ? 1 : 0,
-        caCertConfigured: server.caCert ? 1 : 0,
-        tlsInsecure: server.tlsInsecure ? 1 : 0,
-        tlsServername: safeAuditHost(server.tlsServername ?? ''),
-        defaultPublishQos: server.defaultPublishQos,
-        defaultPublishRetain: server.defaultPublishRetain ? 1 : 0,
-        defaultSubscribeQos: server.defaultSubscribeQos,
-      },
-    });
+    await this.mqttServerService.remove(id, auditActorOf(req.user));
   }
 }

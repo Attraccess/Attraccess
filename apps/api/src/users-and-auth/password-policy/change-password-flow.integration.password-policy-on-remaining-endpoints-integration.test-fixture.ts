@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import {
   AuthenticationDetail,
   AuthenticationType,
@@ -23,7 +24,6 @@ import { UsersService } from '../users/users.service';
 import { HibpClient } from './hibp.client';
 import { PasswordPolicyService } from './password-policy.service';
 import { ZxcvbnService } from './zxcvbn.service';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
 
 const STRONG_PASSWORD = 'Tr0ub4dor-Hummingbird-9!plate';
 
@@ -105,7 +105,7 @@ async function buildController(opts: BuildOpts = {}) {
 
   const module: TestingModule = await Test.createTestingModule({
     providers: [
-      { provide: IdentityAuditService, useValue: { record: jest.fn() } },
+      { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
       UserPasswordService,
       UserRegistrationService,
       SignupDomainService,

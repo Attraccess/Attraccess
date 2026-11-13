@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Setting } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -7,6 +8,8 @@ import { PasswordPolicyService } from '../password-policy/password-policy.servic
 import { SignupDomainService } from './signup-domain.service';
 import { UserRegistrationService } from './user-registration.service';
 import { UsersService } from './users.service';
+
+const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 
 export function registerUserRegistrationServiceFixture() {
   let service: UserRegistrationService;
@@ -22,6 +25,7 @@ export function registerUserRegistrationServiceFixture() {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AUDIT_RECORDER, useValue: audit },
         UserRegistrationService,
         // Real SignupDomainService so the domain-whitelist check is genuinely exercised
         SignupDomainService,
@@ -73,6 +77,9 @@ export function registerUserRegistrationServiceFixture() {
     settingRepository = module.get(getRepositoryToken(Setting));
   });
   return {
+    get audit() {
+      return audit;
+    },
     get service() {
       return service;
     },

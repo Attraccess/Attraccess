@@ -1,6 +1,7 @@
-import { Injectable, OnApplicationBootstrap, OnModuleInit, Optional } from '@nestjs/common';
+import { Inject, Injectable, OnApplicationBootstrap, OnModuleInit, Optional } from '@nestjs/common';
 
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER, auditActorOf, AuditRecorder } from '../audit/recorder/audit-event';
+import { AuditQueryService } from '../audit/audit-query.service';
 
 import { readAuditSettings } from '../audit/audit.config';
 
@@ -67,7 +68,8 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
   constructor(
     private readonly settings: SettingsStoreService,
     @Optional() classification?: PluginClassificationService,
-    @Optional() private readonly audit?: AuditService,
+    @Optional() @Inject(AUDIT_RECORDER) private readonly audit?: AuditRecorder,
+    @Optional() private readonly auditQuery?: AuditQueryService,
   ) {
     this.state = new NpmPluginState(classification);
     this.registries = new NpmRegistryAccess(settings);
@@ -86,7 +88,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
   }
 
   async onApplicationBootstrap(): Promise<void> {
-    if (!this.audit) return;
+    if (!this.audit || !this.auditQuery) return;
     const manifests = PluginService.getPluginsWithLoadStatus();
     for (const installed of readInstalledNpmPlugins()) {
       const pending = installed.pendingAudit;
@@ -99,7 +101,7 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
       try {
         const config = await readAuditSettings(this.settings);
         if (config.enabled && config.domains.includes('administration')) {
-          const existing = await this.audit.list(
+          const existing = await this.auditQuery.list(
             Object.assign(new AuditQueryDto(), {
               action: 'plugin.activation_completed',
               operationId: pending.operationId,
@@ -107,14 +109,12 @@ export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
             }),
           );
           if (!existing.items.length) {
-            const receipt = await this.audit.recordAdministration({
+            const receipt = await this.audit.record({
+              domain: 'administration',
               action: 'plugin.activation_completed',
               operationId: pending.operationId,
-              actorId: pending.actorId,
-              authenticationMethod: pending.authenticationMethod,
-              apiTokenId: pending.apiTokenId,
-              subjectType: 'plugin-package',
-              subjectId: auditSubjectKeyId(installed.name),
+              actor: auditActorOf({ ...pending, id: pending.actorId }),
+              subject: { type: 'plugin-package', id: auditSubjectKeyId(installed.name) },
               outcome: loaded ? 'succeeded' : 'failed',
               details: {
                 ...pending.details,

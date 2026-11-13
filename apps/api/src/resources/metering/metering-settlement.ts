@@ -1,4 +1,5 @@
-import { Logger, ConflictException } from '@nestjs/common';
+import { billingTransactionAuditEvent } from '../../audit/policies/billing';
+import { Logger, ConflictException, Inject } from '@nestjs/common';
 
 import { Repository, In, EntityManager, MoreThan } from 'typeorm';
 
@@ -12,7 +13,7 @@ import {
   ResourceUsage,
 } from '@attraccess/database-entities';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { LiveNotificationsService } from '../../billing/live-notifications/live-notifications.service';
 
@@ -27,7 +28,7 @@ export type FinalCollection = { status: 'not-metered' } | { status: 'collected';
 export class MeteringSettlement {
   public constructor(
     protected readonly sessions: Repository<ResourceMeteringSession>,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
     protected readonly liveNotifications: LiveNotificationsService,
     protected readonly logger: Logger,
   ) {}
@@ -43,10 +44,11 @@ export class MeteringSettlement {
     );
     if (!result.affected) throw new ConflictException('METER_SESSION_NOT_PENDING');
     const session = await this.sessions.findOneByOrFail({ id: sessionId });
-    void this.audit.recordResource({
+    void this.audit.record({
+      domain: 'resource',
       action: 'meter_charge.waived',
-      actorId: initiatorId,
-      subjectId: resourceId,
+      actor: { id: initiatorId, authenticationMethod: 'session' },
+      subject: { type: 'resource', id: resourceId },
       details: {
         usageId: session.usageId,
         meterId: session.meterId,
@@ -108,15 +110,15 @@ export class MeteringSettlement {
         failureReason: null,
         settledAt: new Date(),
       });
-      await this.audit.recordBillingTransaction(
-        {
+      await this.audit.record(
+        billingTransactionAuditEvent({
           transactionId: correction.id,
           userId: correction.userId,
           initiatorId,
           amount: correction.amount,
           status: correction.status,
           source: 'meter-correction',
-        },
+        }),
         manager,
       );
       return correction;

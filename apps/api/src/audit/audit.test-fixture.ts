@@ -13,6 +13,8 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import { Registry } from 'prom-client';
 import { AuditMetrics, createAuditMetrics } from '../metrics/definitions/audit.metrics';
 import { AuditService } from './audit.service';
+import { AuditQueryService } from './audit-query.service';
+import { PluginAuditHost } from './plugin-audit-host';
 
 /** Fresh registry per call so drop counters never leak between tests. */
 export const createTestAuditMetrics = (): AuditMetrics => createAuditMetrics(new Registry());
@@ -160,6 +162,13 @@ export function setupAuditDatabase() {
     },
     get service() {
       return service;
+    },
+    /** The plugin SDK's host provider, writing through the service's recorder port. */
+    get plugins() {
+      return new PluginAuditHost(service);
+    },
+    get query() {
+      return new AuditQueryService(service, source, store);
     },
     get store() {
       return store;

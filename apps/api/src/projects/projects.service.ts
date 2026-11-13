@@ -7,13 +7,13 @@ import {
   User,
 } from '@attraccess/database-entities';
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { IsNull, Not, Repository, SelectQueryBuilder } from 'typeorm';
 
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../audit/recorder/audit-event';
 
 import { FileStorageService } from '../common/services/file-storage.service';
 
@@ -57,7 +57,7 @@ export class ProjectsService {
     private readonly emailService: EmailService,
     private readonly metricsService: MetricsService,
     private readonly notifications: NotificationDispatchService,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {
     this.invitations = new ProjectInvitations(
       this.audit,
@@ -134,13 +134,11 @@ export class ProjectsService {
     const result = await this.projectRepository.update({ id, archivedAt: IsNull() }, { archivedAt });
     if (result.affected !== 1) return await this.projectRepository.findOneByOrFail({ id });
     project.archivedAt = archivedAt;
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.archived',
-      actorId: ownerUserId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project',
-      subjectId: project.id,
+      actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project', id: project.id },
       details: { ...this.projectDetails(project, 'after'), 'after.archived': 1 },
     });
     return project;
@@ -156,13 +154,11 @@ export class ProjectsService {
     const result = await this.projectRepository.update({ id, archivedAt: Not(IsNull()) }, { archivedAt: null });
     if (result.affected !== 1) return await this.projectRepository.findOneByOrFail({ id });
     project.archivedAt = null;
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.unarchived',
-      actorId: ownerUserId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project',
-      subjectId: project.id,
+      actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project', id: project.id },
       details: { ...this.projectDetails(project, 'after'), 'after.archived': 0 },
     });
     return project;
@@ -194,13 +190,11 @@ export class ProjectsService {
 
     const result = await this.projectMemberRepository.delete(member.id);
     if (result.affected !== 1) return;
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.member.removed',
-      actorId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project.member',
-      subjectId: member.id,
+      actor: { id: actorId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project.member', id: member.id },
       details: { projectId, memberId: member.id, userId: member.userId, role: member.role },
     });
   }
@@ -249,13 +243,11 @@ export class ProjectsService {
       description: data.description,
     });
 
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.created',
-      actorId: ownerUserId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project',
-      subjectId: project.id,
+      actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project', id: project.id },
       details: this.projectDetails(project, 'after'),
     });
     this.metricsService.projectsTotal.inc();
@@ -264,13 +256,11 @@ export class ProjectsService {
       const before = this.projectDetails(project, 'before');
       await this.setLogo(project, data.logo);
       await this.projectRepository.save(project);
-      await this.audit.recordProject({
+      await this.audit.record({
+        domain: 'project',
         action: 'project.updated',
-        actorId: ownerUserId,
-        authenticationMethod,
-        apiTokenId,
-        subjectType: 'project',
-        subjectId: project.id,
+        actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+        subject: { type: 'project', id: project.id },
         details: { ...before, ...this.projectDetails(project, 'after'), changedFields: JSON.stringify(['logo']) },
       });
     }
@@ -289,15 +279,13 @@ export class ProjectsService {
       await manager.getRepository(ResourceUsage).update({ projectId: id }, { projectId: null });
       const result = await manager.getRepository(Project).delete(id);
       if (result.affected !== 1) throw new NotFoundException('Project not found');
-      await this.audit.recordProject(
+      await this.audit.record(
         {
+          domain: 'project',
           action: 'project.deleted',
-          actorId: ownerUserId,
-          authenticationMethod,
-          apiTokenId,
-          subjectType: 'project',
-          subjectId: id,
-          details,
+          actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+          subject: { type: 'project', id: id },
+          details: details,
         },
         manager,
       );
@@ -344,13 +332,11 @@ export class ProjectsService {
       ...(beforeLogo !== saved.logo ? ['logo'] : []),
     ];
     if (changedFields.length) {
-      await this.audit.recordProject({
+      await this.audit.record({
+        domain: 'project',
         action: 'project.updated',
-        actorId: ownerUserId,
-        authenticationMethod,
-        apiTokenId,
-        subjectType: 'project',
-        subjectId: saved.id,
+        actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+        subject: { type: 'project', id: saved.id },
         details: {
           ...before,
           ...this.projectDetails(saved, 'after'),

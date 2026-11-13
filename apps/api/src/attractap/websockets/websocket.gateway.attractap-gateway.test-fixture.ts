@@ -1,10 +1,10 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { readerTimeZoneStub } from './reader-time-zone.test-fixture';
 import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Provider } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/settings.service';
 
 import { BillingService } from '../../billing/charges/billing.service';
@@ -139,7 +139,7 @@ export function gatewayProviders(
     { provide: SupervisionService, useValue: {} },
     { provide: MassIntroductionService, useValue: { setReaderPort: jest.fn() } },
     { provide: RbacService, useValue: {} },
-    { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
+    { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
     CardConversationService,
     CardDetectedRouter,
     { provide: CardOperationsService, useValue: { verifyCard: jest.fn(), enroll: jest.fn(), reset: jest.fn() } },

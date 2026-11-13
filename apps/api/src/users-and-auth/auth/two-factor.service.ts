@@ -1,6 +1,8 @@
 import { AuthenticationDetail, AuthenticationType, Setting, User } from '@attraccess/database-entities';
 
-import { Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, Logger, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { identityAuditEvent } from '../../audit/policies/identity';
+import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -26,6 +28,7 @@ export class TwoFactorService {
     protected readonly settingsService: SettingsService,
     protected readonly encryptionService: EncryptionService,
     protected readonly metricsService: MetricsService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(TwoFactorService.name);
@@ -181,7 +184,7 @@ export class TwoFactorService {
     return [...effectivePerms].some((p) => !p.startsWith('resources.'));
   }
 
-  async createSetup(user: User): Promise<{ secret: string; otpauthUrl: string }> {
+  async createSetup(user: User, origin: AuditOrigin): Promise<{ secret: string; otpauthUrl: string }> {
     const existing = await this.getTwoFactorDetail(user.id);
     if (existing?.totpEnabledAt) {
       throw new BadRequestException('TwoFactorAlreadyEnabled');
@@ -213,10 +216,11 @@ export class TwoFactorService {
     }
 
     this.metricsService.auth2faUsageTotal.inc({ action: 'setup' });
+    await this.audit.record(identityAuditEvent('two_factor_setup_started', origin, { id: user.id }));
     return { secret, otpauthUrl };
   }
 
-  async enable(user: User, code: string): Promise<void> {
+  async enable(user: User, code: string, origin: AuditOrigin): Promise<void> {
     const detail = await this.getTwoFactorDetail(user.id);
     if (!detail?.totpSecret) {
       throw new BadRequestException('TwoFactorNotInitialized');
@@ -233,9 +237,10 @@ export class TwoFactorService {
     detail.totpEnabledAt = new Date();
     await this.authenticationDetailRepository.save(detail);
     this.metricsService.auth2faUsageTotal.inc({ action: 'enable' });
+    await this.audit.record(identityAuditEvent('two_factor_enabled', origin, { id: user.id }));
   }
 
-  async disable(user: User, code: string): Promise<void> {
+  async disable(user: User, code: string, origin: AuditOrigin): Promise<void> {
     const detail = await this.getTwoFactorDetail(user.id);
     if (!detail?.totpSecret || !detail.totpEnabledAt) {
       throw new BadRequestException('TwoFactorNotEnabled');
@@ -248,5 +253,6 @@ export class TwoFactorService {
 
     await this.authenticationDetailRepository.delete(detail.id);
     this.metricsService.auth2faUsageTotal.inc({ action: 'disable' });
+    await this.audit.record(identityAuditEvent('two_factor_disabled', origin, { id: user.id }));
   }
 }

@@ -1,3 +1,6 @@
+import { UsersService } from './users.service';
+import { RbacService } from '../rbac/rbac.service';
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserPermissionsService } from './user-permissions.service';
@@ -17,7 +20,13 @@ describe('UserPermissionsService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [UserPermissionsService, { provide: NotificationDispatchService, useValue: notifications }],
+      providers: [
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
+        { provide: RbacService, useValue: {} },
+        { provide: UsersService, useValue: {} },
+        UserPermissionsService,
+        { provide: NotificationDispatchService, useValue: notifications },
+      ],
     }).compile();
 
     service = module.get<UserPermissionsService>(UserPermissionsService);

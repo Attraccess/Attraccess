@@ -1,14 +1,16 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { AuthenticatedRequest, DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
 import { Test } from '@nestjs/testing';
-import { AuditService } from '../audit/audit.service';
 import { LicenseService } from '../license/license.service';
 import { projectAdministrationAuditEvent } from '../audit/policies/administration';
-import { CardWriterSettingsController, cardWriterSettingChanges } from './card-writer-settings.controller';
+import { CardWriterSettingsController } from './card-writer-settings.controller';
 import { AttractapService } from './attractap.service';
-import { CardWriterPolicyService } from './websockets/card-writer-policy.service';
+import { CardWriterPolicyService, cardWriterSettingChanges } from './websockets/card-writer-policy.service';
+import { SettingsStoreService } from '../settings/settings-store.service';
+import { ATTRACTAP_KEYS, ATTRACTAP_PARENT } from '../settings/constants';
 import { CardWriterSettingsDto } from './dtos/card-writer-settings.dto';
 
 const guardFor = (method: 'get' | 'update') => {
@@ -51,12 +53,8 @@ describe('CardWriterSettingsController', () => {
       const moduleRef = await Test.createTestingModule({
         controllers: [CardWriterSettingsController],
         providers: [
-          { provide: CardWriterPolicyService, useValue: { get: jest.fn(async () => stored), set } },
+          { provide: CardWriterPolicyService, useValue: { get: jest.fn(async () => stored), update: set } },
           { provide: AttractapService, useValue: { getPairedReaders: jest.fn(async () => paired) } },
-          {
-            provide: AuditService,
-            useValue: { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) },
-          },
           { provide: LicenseService, useValue: {} },
         ],
       }).compile();
@@ -76,31 +74,44 @@ describe('CardWriterSettingsController', () => {
 
     it('saves paired readers', async () => {
       await controller.update({ mode: 'selected', readerIds: [5] }, { user: { id: 1 } } as AuthenticatedRequest);
-      expect(set).toHaveBeenCalledWith({ mode: 'selected', readerIds: [5] });
+      expect(set).toHaveBeenCalledWith(
+        { mode: 'selected', readerIds: [5] },
+        { id: 1, authenticationMethod: 'session' },
+      );
     });
   });
 
+  // The policy service records the change; the controller only names the actor.
   describe('PUT audit', () => {
     let current: CardWriterSettingsDto;
     let controller: CardWriterSettingsController;
-    const recordAdministration = jest.fn().mockResolvedValue({ status: 'recorded' });
+    const record = jest.fn().mockResolvedValue({ status: 'recorded' });
     const req = { user: { id: 42, authenticationMethod: 'session' } } as AuthenticatedRequest;
 
     beforeEach(async () => {
-      recordAdministration.mockClear();
+      record.mockClear();
       current = { mode: 'all', readerIds: [] };
       const moduleRef = await Test.createTestingModule({
         controllers: [CardWriterSettingsController],
         providers: [
+          CardWriterPolicyService,
           {
-            provide: CardWriterPolicyService,
+            provide: SettingsStoreService,
             useValue: {
-              get: jest.fn(async () => current),
-              set: jest.fn(async (next: CardWriterSettingsDto) => (current = { ...next })),
+              getPlainSetting: jest.fn(async (_parent: string, key: string) =>
+                key === ATTRACTAP_KEYS.cardWriterMode ? current.mode : JSON.stringify(current.readerIds),
+              ),
+              setPlainSetting: jest.fn(async (parent: string, key: string, value: string) => {
+                expect(parent).toBe(ATTRACTAP_PARENT);
+                current =
+                  key === ATTRACTAP_KEYS.cardWriterMode
+                    ? { ...current, mode: value as CardWriterSettingsDto['mode'] }
+                    : { ...current, readerIds: JSON.parse(value) };
+              }),
             },
           },
           { provide: AttractapService, useValue: { getPairedReaders: jest.fn(async () => [{ id: 2 }, { id: 5 }]) } },
-          { provide: AuditService, useValue: { recordAdministration } },
+          { provide: AUDIT_RECORDER, useValue: { record } },
           { provide: LicenseService, useValue: {} },
         ],
       }).compile();
@@ -109,12 +120,13 @@ describe('CardWriterSettingsController', () => {
 
     it('records the old and new mode and reader list', async () => {
       await controller.update({ mode: 'selected', readerIds: [2, 5] }, req);
-      const events = recordAdministration.mock.calls.map(([event]) => event);
+      const events = record.mock.calls.map(([event]) => event);
       expect(events).toEqual([
         expect.objectContaining({
+          domain: 'administration',
           action: 'settings.updated',
-          actorId: 42,
-          subjectType: 'setting',
+          actor: { id: 42, authenticationMethod: 'session' },
+          subject: expect.objectContaining({ type: 'setting' }),
           details: { settingKey: 'attractap.cardWriterMode', before: 'all', after: 'selected' },
         }),
         expect.objectContaining({
@@ -126,20 +138,20 @@ describe('CardWriterSettingsController', () => {
     it('records nothing when nothing changed', async () => {
       current = { mode: 'selected', readerIds: [2] };
       await controller.update({ mode: 'selected', readerIds: [2] }, req);
-      expect(recordAdministration).not.toHaveBeenCalled();
+      expect(record).not.toHaveBeenCalled();
     });
 
     it('records the removal of a reader whose pairing was revoked', async () => {
       // Reader 3 was selected, then its pairing was revoked: GET no longer shows it, the stored setting still does.
       current = { mode: 'selected', readerIds: [2, 3, 5] };
       await controller.update({ mode: 'selected', readerIds: [2, 5] }, req);
-      expect(recordAdministration.mock.calls.map(([event]) => event.details)).toEqual([
+      expect(record.mock.calls.map(([event]) => event.details)).toEqual([
         { settingKey: 'attractap.cardWriterReaders', before: '2,3,5', after: '2,5' },
       ]);
     });
 
-    it('still returns the saved setting when the audit provider fails', async () => {
-      recordAdministration.mockRejectedValueOnce(new Error('down'));
+    it('still returns the saved setting when the audit record is dropped', async () => {
+      record.mockResolvedValueOnce({ status: 'unavailable' });
       await expect(controller.update({ mode: 'selected', readerIds: [2] }, req)).resolves.toEqual({
         mode: 'selected',
         readerIds: [2],

@@ -14,11 +14,8 @@ import {
 import { SessionService } from '../session.service';
 import { CreateSessionResponse } from '../auth.types';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
-import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
-import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
 import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.guard';
-import { IdentityAuditService } from '../../../audit/identity-audit.service';
-import { randomUUID } from 'node:crypto';
+import { auditOriginOf } from '../../../audit/recorder/audit-event';
 
 @ApiTags('Passkeys')
 @Controller('/auth')
@@ -27,9 +24,6 @@ export class PasskeyController {
     private readonly passkeyService: PasskeyService,
     private readonly sessionService: SessionService,
     private readonly cookieConfigService: CookieConfigService,
-    private readonly bruteForce: BruteForceProtectionService,
-    private readonly audit: AuthAuditLogger,
-    private readonly identityAudit: IdentityAuditService,
   ) {}
 
   @SessionAuth()
@@ -58,14 +52,13 @@ export class PasskeyController {
     @Req() request: AuthenticatedRequest,
     @Body() body: VerifyPasskeyRegistrationDto,
   ): Promise<Passkey> {
-    const passkey = await this.passkeyService.verifyRegistration(
+    return this.passkeyService.verifyRegistration(
       request.user,
       body.response as unknown as RegistrationResponseJSON,
       body.name,
       requestOrigin(request),
+      auditOriginOf(request),
     );
-    await this.record('passkey_created', request);
-    return passkey;
   }
 
   @SessionAuth()
@@ -77,9 +70,7 @@ export class PasskeyController {
     @Param('id', ParseIntPipe) id: number,
     @Body() body: RenamePasskeyDto,
   ): Promise<Passkey> {
-    const passkey = await this.passkeyService.rename(request.user.id, id, body.name);
-    await this.record('passkey_renamed', request);
-    return passkey;
+    return this.passkeyService.rename(request.user.id, id, body.name, auditOriginOf(request));
   }
 
   @SessionAuth()
@@ -87,8 +78,7 @@ export class PasskeyController {
   @ApiOperation({ summary: 'Delete one of the current users passkeys', operationId: 'deletePasskey' })
   @ApiOkResponse({ description: 'The passkey has been deleted' })
   async delete(@Req() request: AuthenticatedRequest, @Param('id', ParseIntPipe) id: number): Promise<void> {
-    await this.passkeyService.delete(request.user.id, id);
-    await this.record('passkey_deleted', request);
+    await this.passkeyService.delete(request.user.id, id, auditOriginOf(request));
   }
 
   @Post('/passkey/authenticate/options')
@@ -112,20 +102,11 @@ export class PasskeyController {
     await this.assertNotThrottled(request);
     const ip = resolveIp(request);
 
-    let user;
-    try {
-      user = await this.passkeyService.verifyAuthentication(
-        body.response as unknown as AuthenticationResponseJSON,
-        requestOrigin(request),
-      );
-    } catch (error) {
-      await this.bruteForce.recordFailure('login', ip, null);
-      await this.audit.log({ type: 'login', outcome: 'invalid_credentials', ip, reason: 'passkey_rejected' });
-      throw error;
-    }
-
-    await this.bruteForce.recordSuccess('login', ip, user.id, user.username);
-    await this.audit.log({ type: 'login', outcome: 'success', ip, userId: user.id, username: user.username });
+    const user = await this.passkeyService.signIn(
+      body.response as unknown as AuthenticationResponseJSON,
+      requestOrigin(request),
+      ip,
+    );
 
     // A passkey proves possession of the authenticator (and usually a biometric/PIN on top of it),
     // so it stands on its own and does not additionally prompt for the TOTP code.
@@ -143,31 +124,12 @@ export class PasskeyController {
   }
 
   private async assertNotThrottled(request: Request): Promise<void> {
-    const ip = resolveIp(request);
     try {
-      await this.bruteForce.assertIpAllowed('login', ip);
+      await this.passkeyService.assertIpAllowed(resolveIp(request));
     } catch (error) {
       setRetryAfter(request.res as Response, error);
-      await this.audit.log({ type: 'login', outcome: 'rate_limited', ip, reason: 'ip_throttled' });
       throw error;
     }
-  }
-
-  private record(
-    action: 'passkey_created' | 'passkey_renamed' | 'passkey_deleted',
-    request: AuthenticatedRequest,
-  ): Promise<void> {
-    return Promise.resolve(this.identityAudit.record({
-      action,
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      actorId: request.user.id,
-      authenticationMethod: request.user.authenticationMethod ?? 'session',
-      apiTokenId: request.user.apiTokenId,
-      subjectId: request.user.id,
-      details: {},
-      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    })).then(() => undefined);
   }
 }
 

@@ -44,7 +44,7 @@ import { ResourceOperatingAttributionService } from '../../operating-intervals/r
 import { LOCK_TTL_MS, SWEEP_EVERY_MS } from '../sessions/session-change-coordination';
 import { SessionChangeTurns } from '../sessions/session-change-turns';
 import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
-import { ResourceAuditOrigin } from '../../../audit/audit-policy';
+import { AuditActor } from '../../../audit/recorder/audit-event';
 import { usageFlowPayload } from './usage-flow-payload';
 
 /** Log context shared by the usage collaborators, so their log lines read as before the split. */
@@ -55,7 +55,7 @@ export interface EndSessionOptions {
   skipFormSubmissions?: boolean;
   /** Skip emitting ResourceUsageNoteAddedEvent (used when the note is auto-generated, e.g. flow-ended). */
   skipNoteNotification?: boolean;
-  auditOrigin?: ResourceAuditOrigin;
+  auditOrigin?: AuditActor;
   /** Flow ends: the user whose action triggered the flow, recorded in the audit entry of the ended session. */
   triggeredByUserId?: number;
   /** Internal: the caller already holds this machine's turn in the session-change queue (deferred flow ends). */
@@ -68,7 +68,7 @@ export interface StartSessionOptions {
    * The supervisor is validated as an introducer for the resource.
    */
   supervisorUserId?: number;
-  auditOrigin?: ResourceAuditOrigin;
+  auditOrigin?: AuditActor;
 }
 
 /** Published usage sessions on the machine around a start, stop or takeover, handed to flows as `activeSessions`. */

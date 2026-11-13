@@ -10,6 +10,7 @@ import {
 } from '@attraccess/database-entities';
 
 import {
+  Inject,
   Injectable,
   Logger,
   OnModuleInit,
@@ -22,7 +23,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { DataSource, EntityManager, Repository, OptimisticLockVersionMismatchError, QueryFailedError } from 'typeorm';
 
-import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { RbacService } from '../rbac/rbac.service';
 
@@ -102,7 +103,7 @@ export class PasswordPolicyService implements OnModuleInit {
     protected readonly hibp: HibpClient,
     protected readonly zxcvbn: ZxcvbnService,
     protected readonly rbacService: RbacService,
-    protected readonly identityAudit: IdentityAuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(PasswordPolicyService.name);
@@ -129,16 +130,18 @@ export class PasswordPolicyService implements OnModuleInit {
     if (input.before) details.before = JSON.stringify(input.before);
     if (input.after) details.after = JSON.stringify(input.after);
     if (input.changedFields.length === 1) details.field = input.changedFields[0];
-    await this.identityAudit.record(
+    await this.audit.record(
       {
-        action,
+        domain: 'identity',
+        action: `identity.${action}`,
         operationId: randomUUID(),
         outcome: 'succeeded',
-        actorId: input.audit.actorId ?? undefined,
-        authenticationMethod: input.audit.authenticationMethod,
-        apiTokenId: input.audit.apiTokenId ?? undefined,
-        subjectType: 'identity.password_policy',
-        subjectId: PASSWORD_POLICY_SINGLETON_ID,
+        actor: {
+          id: input.audit.actorId,
+          authenticationMethod: input.audit.authenticationMethod,
+          apiTokenId: input.audit.apiTokenId,
+        },
+        subject: { type: 'identity.password_policy', id: PASSWORD_POLICY_SINGLETON_ID },
         details,
         request: {
           ipAddress: input.audit.ip ?? undefined,

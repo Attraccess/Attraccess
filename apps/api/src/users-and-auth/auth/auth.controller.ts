@@ -21,8 +21,7 @@ import { AuthenticatedRequest, SessionAuth } from '@attraccess/plugins-backend-s
 import { CreateSessionResponse } from './auth.types';
 import { ApiBody, ApiOkResponse, ApiResponse, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
-import { randomUUID } from 'node:crypto';
+import { auditOriginOf } from '../../audit/recorder/audit-event';
 import { ApprovedOriginsService } from '../../common/security/approved-origins.service';
 import { SessionPermissionSync } from './sso/session-permission-sync';
 
@@ -32,7 +31,6 @@ export class AuthController {
   constructor(
     private readonly sessionService: SessionService,
     private readonly cookieConfigService: CookieConfigService,
-    private readonly identityAudit: IdentityAuditService,
     private readonly ssoLogout: SsoLogoutService,
     private readonly ssoPermissionSync: SessionPermissionSync,
     private readonly approvedOrigins: ApprovedOriginsService,
@@ -217,24 +215,13 @@ export class AuthController {
   private async finishLogout(request: AuthenticatedRequest, response: Response): Promise<void> {
     await this.cookieConfigService.clearAuthCookie(response);
 
-    // Passport clears request.user as part of logout, so retain the principal for the audit record.
-    const principal = {
-      userId: request.user.id,
-      authenticationMethod: request.user.authenticationMethod ?? 'session',
-      apiTokenId: request.user.apiTokenId,
-    };
+    // Passport clears request.user as part of logout, so retain the origin for the audit record.
+    const origin = auditOriginOf(request);
     const logout = request.logout as unknown as (callback: (error?: Error) => void) => void;
-    await new Promise<void>((resolve, reject) => logout.call(request, (error) => (error ? reject(error) : resolve())));
-    await this.identityAudit.record({
-      action: 'logout',
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      actorId: principal.userId,
-      authenticationMethod: principal.authenticationMethod,
-      apiTokenId: principal.apiTokenId,
-      subjectId: principal.userId,
-      details: {},
-      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    });
+    await this.sessionService.endLogin(
+      origin,
+      () =>
+        new Promise<void>((resolve, reject) => logout.call(request, (error) => (error ? reject(error) : resolve()))),
+    );
   }
 }

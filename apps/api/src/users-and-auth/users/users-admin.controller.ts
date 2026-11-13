@@ -21,7 +21,7 @@ import {
 
 import { ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from '@nestjs/swagger';
 
-import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { auditOriginOf } from '../../audit/recorder/audit-event';
 
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
 
@@ -33,10 +33,8 @@ import { FindManyUsersQueryDto } from './dtos/findManyUsersQuery.dto';
 
 import { PaginatedUserSummariesResponseDto, PaginatedUsersResponseDto } from './dtos/paginatedUsersResponse.dto';
 
-import { UserPasswordService } from './user-password.service';
-
 import { UsersService } from './users.service';
-import { randomUUID } from 'node:crypto';
+import { UserAdministrationService } from './user-administration.service';
 
 import { ChangeBillingFactorDto } from './dtos/changeBillingFactor.dto';
 
@@ -54,8 +52,7 @@ import { mapEmailSendError } from './email-send-error.util';
 export class UsersAdminController {
   constructor(
     protected readonly usersService: UsersService,
-    protected readonly passwordService: UserPasswordService,
-    protected readonly identityAudit: IdentityAuditService,
+    protected readonly administration: UserAdministrationService,
   ) {}
 
   protected readonly logger = new Logger(UsersAdminController.name);
@@ -113,8 +110,7 @@ export class UsersAdminController {
       throw new BadRequestException('DeleteAccountUseSelfEndpoint');
     }
 
-    await this.usersService.deleteOne(id);
-    await this.record('user_deleted', id, request);
+    await this.administration.deleteUser(id, auditOriginOf(request));
   }
 
   @Get()
@@ -207,8 +203,7 @@ export class UsersAdminController {
     @Body() body: SetUserPasswordDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<{ message: string }> {
-    await this.passwordService.setUserPassword(id, body, request.user);
-    await this.record('user_updated', id, request, 'password');
+    await this.administration.setPassword(id, body, request.user, auditOriginOf(request));
     return { message: 'Password updated successfully' };
   }
 
@@ -221,9 +216,7 @@ export class UsersAdminController {
     @Body() body: ChangeUsernameDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
-    const user = await this.usersService.changeUsername(id, body.username, request.user);
-    await this.record('user_updated', id, request, 'username');
-    return user;
+    return this.administration.changeUsername(id, body.username, request.user, auditOriginOf(request));
   }
 
   @Patch(':id/email')
@@ -236,9 +229,7 @@ export class UsersAdminController {
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
     try {
-      const user = await this.usersService.changeEmail(id, body.email, request.user);
-      await this.record('user_updated', id, request, 'email');
-      return user;
+      return await this.administration.changeEmail(id, body.email, request.user, auditOriginOf(request));
     } catch (error) {
       throw mapEmailSendError(error);
     }
@@ -253,29 +244,6 @@ export class UsersAdminController {
     @Body() body: ChangeBillingFactorDto,
     @Req() request: AuthenticatedRequest,
   ): Promise<User> {
-    const user = await this.usersService.changeBillingFactor(id, body.billingFactor);
-    await this.record('user_updated', id, request, 'billingFactor');
-    return user;
-  }
-
-  protected record(
-    action: 'user_deleted' | 'user_updated',
-    subjectId: number,
-    request: AuthenticatedRequest,
-    field?: 'username' | 'email' | 'password' | 'billingFactor',
-  ): Promise<void> {
-    return Promise.resolve(
-      this.identityAudit.record({
-        action,
-        operationId: randomUUID(),
-        outcome: 'succeeded',
-        actorId: request.user.id,
-        authenticationMethod: request.user.authenticationMethod ?? 'session',
-        apiTokenId: request.user.apiTokenId,
-        subjectId,
-        details: field ? { field } : {},
-        request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-      }),
-    ).then(() => undefined);
+    return this.administration.changeBillingFactor(id, body.billingFactor, auditOriginOf(request));
   }
 }

@@ -1,7 +1,6 @@
-import { ResourceAuditEvent } from './domain-events';
 import { dataFields, positive, uuid } from './projection';
 
-export const RESOURCE_AUDIT_ACTIONS: ResourceAuditEvent['action'][] = [
+export const RESOURCE_AUDIT_ACTIONS = [
   'resource.created',
   'resource.updated',
   'resource.deleted',
@@ -24,9 +23,23 @@ export const RESOURCE_AUDIT_ACTIONS: ResourceAuditEvent['action'][] = [
   'meter_charge.waived',
   'retraining.required',
   'retraining.cleared',
-];
-export const resourceActions = new Set<ResourceAuditEvent['action']>(RESOURCE_AUDIT_ACTIONS);
-export const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], readonly string[]>> = {
+] as const;
+
+export type ResourceAuditAction = (typeof RESOURCE_AUDIT_ACTIONS)[number];
+
+/** Projection input of a resource-domain event. */
+export interface ResourceAuditInput {
+  action: ResourceAuditAction;
+  operationId: string;
+  actorId: number | null;
+  authenticationMethod?: 'session' | 'api-token' | null;
+  apiTokenId?: number | null;
+  subjectId: number;
+  subjectType?: 'resource' | 'resource_group';
+  details: Record<string, string | number>;
+}
+export const resourceActions = new Set<ResourceAuditAction>(RESOURCE_AUDIT_ACTIONS);
+export const resourceDetailFields: Partial<Record<ResourceAuditAction, readonly string[]>> = {
   'resource.created': ['after.name', 'after.type'],
   'resource.updated': ['before.name', 'after.name', 'before.type', 'after.type', 'changedFields'],
   'resource.deleted': ['before.name', 'before.type'],
@@ -74,7 +87,7 @@ export const resourceDetailFields: Partial<Record<ResourceAuditEvent['action'], 
   'retraining.required': ['introductionId', 'retrainingReason', 'usageUserId'],
   'retraining.cleared': ['introductionId', 'usageUserId'],
 };
-export function validResourcePrincipal(input: ResourceAuditEvent): boolean {
+export function validResourcePrincipal(input: ResourceAuditInput): boolean {
   if (input.actorId === null) {
     if (
       (input.authenticationMethod !== undefined && input.authenticationMethod !== null) ||
@@ -97,7 +110,7 @@ export function validResourcePrincipal(input: ResourceAuditEvent): boolean {
   return true;
 }
 
-export function projectResourceAuditEvent(input: ResourceAuditEvent): ResourceAuditEvent | null {
+export function projectResourceAuditEvent(input: ResourceAuditInput): ResourceAuditInput | null {
   if (
     !resourceActions.has(input.action) ||
     !uuid(input.operationId) ||

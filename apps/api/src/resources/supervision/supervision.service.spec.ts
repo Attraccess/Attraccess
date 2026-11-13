@@ -51,7 +51,7 @@ describe('SupervisionService', () => {
 
     expect(fixture.resourceUsageService.startSession).toHaveBeenCalledWith(5, fixture.requester, fixture.dto, {
       supervisorUserId: 2,
-      auditOrigin: { actorId: 2, authenticationMethod: 'api-token', apiTokenId: 9 },
+      auditOrigin: { id: 2, authenticationMethod: 'api-token', apiTokenId: 9 },
     });
     expect(approved).toBe(fixture.startedSession);
     await expect(pending).resolves.toBe(fixture.startedSession);
@@ -59,12 +59,11 @@ describe('SupervisionService', () => {
     expect(fixture.live.emitToSupervisor.mock.calls.some((c) => c[1].type === SupervisionLiveEventType.RESOLVED)).toBe(
       true,
     );
-    expect(fixture.audit.recordResource).toHaveBeenCalledWith({
+    expect(fixture.audit.record).toHaveBeenCalledWith({
+      domain: 'resource',
       action: 'supervision.approved',
-      actorId: 2,
-      authenticationMethod: 'api-token',
-      apiTokenId: 9,
-      subjectId: 5,
+      actor: { id: 2, authenticationMethod: 'api-token', apiTokenId: 9 },
+      subject: { type: 'resource', id: 5 },
       details: expect.objectContaining({ requesterUserId: 1, supervisorUserId: 2 }),
     });
   });
@@ -80,12 +79,11 @@ describe('SupervisionService', () => {
     expect(fixture.live.emitToSupervisor.mock.calls.some((c) => c[1].type === SupervisionLiveEventType.REJECTED)).toBe(
       true,
     );
-    expect(fixture.audit.recordResource).toHaveBeenCalledWith({
+    expect(fixture.audit.record).toHaveBeenCalledWith({
+      domain: 'resource',
       action: 'supervision.rejected',
-      actorId: 2,
-      authenticationMethod: 'api-token',
-      apiTokenId: 9,
-      subjectId: 5,
+      actor: { id: 2, authenticationMethod: 'api-token', apiTokenId: 9 },
+      subject: { type: 'resource', id: 5 },
       details: expect.objectContaining({ requesterUserId: 1, supervisorUserId: 2 }),
     });
   });
@@ -179,7 +177,7 @@ describe('SupervisionService', () => {
         {},
         {
           supervisorUserId: 3,
-          auditOrigin: { actorId: 3, authenticationMethod: 'session' },
+          auditOrigin: { id: 3, authenticationMethod: 'session' },
         },
       );
       expect(session).toBe(fixture.startedSession);
@@ -215,7 +213,7 @@ describe('SupervisionService', () => {
         {},
         {
           supervisorUserId: 9,
-          auditOrigin: { actorId: 9, authenticationMethod: 'session' },
+          auditOrigin: { id: 9, authenticationMethod: 'session' },
         },
       );
       expect(session).toBe(fixture.startedSession);
@@ -304,7 +302,7 @@ describe('SupervisionService', () => {
       await expect(pending).resolves.toBe(fixture.startedSession);
       expect(fixture.resourceUsageService.startSession).toHaveBeenCalledWith(5, fixture.requester, readerDto, {
         supervisorUserId: 2,
-        auditOrigin: { actorId: 2, authenticationMethod: 'session' },
+        auditOrigin: { id: 2, authenticationMethod: 'session' },
       });
       // The reader is told through the callbacks the armer handed back.
       expect(readerCallbacks.onResolved).toHaveBeenCalledWith(fixture.startedSession, {

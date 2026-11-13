@@ -26,7 +26,7 @@ import {
 
 import { ResourceFlowsExecutorService } from '../flows/execution/resource-flows-executor.service';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { LiveNotificationsService } from '../../billing/live-notifications/live-notifications.service';
 
@@ -67,7 +67,7 @@ export class ResourceMeteringService implements OnModuleInit {
     @InjectRepository(ResourceFlowNode) nodes: Repository<ResourceFlowNode>,
     @InjectRepository(ResourceFlowEdge) edges: Repository<ResourceFlowEdge>,
     @Inject(forwardRef(() => ResourceFlowsExecutorService)) protected readonly flows: ResourceFlowsExecutorService,
-    audit: AuditService,
+    @Inject(AUDIT_RECORDER) audit: AuditRecorder,
     liveNotifications: LiveNotificationsService,
   ) {
     this.catalog = new MeteringCatalog(this.meters, this.sessions, nodes, edges);

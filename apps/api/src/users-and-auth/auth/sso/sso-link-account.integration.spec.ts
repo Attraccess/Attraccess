@@ -1,11 +1,10 @@
+import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
 import { AuthenticationType, Setting, SSOProviderType, User } from '@attraccess/database-entities';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ModuleRef } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import { IdentityAuditService } from '../../../audit/identity-audit.service';
-import { SsoAuditService } from '../../../audit/sso-audit.service';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { EncryptionService } from '../../../encryption/encryption.service';
 import { LicenseService } from '../../../license/license.service';
@@ -125,8 +124,7 @@ describe('POST /auth/sso/link-account (HTTP integration)', () => {
         { provide: CookieConfigService, useValue: {} },
         { provide: RbacService, useValue: {} },
         { provide: MetricsService, useValue: {} },
-        { provide: IdentityAuditService, useValue: { record: jest.fn() } },
-        { provide: SsoAuditService, useValue: { record: jest.fn() } },
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         { provide: OidcCookieStateStore, useValue: {} },
         { provide: ModuleRef, useValue: { get: jest.fn() } },
         { provide: LicenseService, useValue: { verifyLicense: jest.fn().mockResolvedValue({ valid: true }) } },

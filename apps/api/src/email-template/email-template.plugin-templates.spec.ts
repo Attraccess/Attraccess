@@ -5,6 +5,9 @@ import { EmailTemplateService } from './email-template.service';
 import { MjmlService } from './mjml.service';
 import { registerPluginEmailTemplates, unregisterPluginEmailTemplates } from './plugin-email-templates';
 
+const ACTOR = { id: 1, authenticationMethod: 'session' as const };
+const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+
 const KEY = 'plugin.demo.confirmed' as EmailTemplateType;
 
 const declared = (patch: Partial<PluginEmailTemplate> = {}): PluginEmailTemplate => ({
@@ -41,6 +44,7 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
       dataSource.getRepository(EmailTemplate),
       dataSource.getRepository(EmailTemplateTranslation),
       new MjmlService(),
+      audit as never,
     );
     registerPluginEmailTemplates('demo', [declared()]);
   });
@@ -58,11 +62,15 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
 
   it('is idempotent and never overwrites admin edits', async () => {
     await service.onApplicationBootstrap();
-    await service.update(KEY, {
-      subject: 'Admin subject',
-      body: '<mj-section><mj-column><mj-text>Mine</mj-text></mj-column></mj-section>',
-    });
-    await service.setTranslations(KEY, 'de', { subject: 'Admin Betreff' });
+    await service.update(
+      KEY,
+      {
+        subject: 'Admin subject',
+        body: '<mj-section><mj-column><mj-text>Mine</mj-text></mj-column></mj-section>',
+      },
+      ACTOR,
+    );
+    await service.setTranslations(KEY, 'de', { subject: 'Admin Betreff' }, ACTOR);
 
     registerPluginEmailTemplates('demo', [
       declared({ subject: '{{t "subject" "New default"}}', translations: { de: { subject: 'Neu', body: 'Neu' } } }),
@@ -77,7 +85,7 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
 
   it('does not bring back translations an admin deleted when it syncs again', async () => {
     await service.onApplicationBootstrap();
-    await service.deleteTranslations(KEY, 'de');
+    await service.deleteTranslations(KEY, 'de', ACTOR);
 
     registerPluginEmailTemplates('demo', [declared()]); // what a reboot or plugin reload does
     await service.findAll();
@@ -136,9 +144,9 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
 
   it('resets a plugin template to the declared default and shipped translations', async () => {
     await service.onApplicationBootstrap();
-    await service.update(KEY, { subject: 'Admin subject' });
-    await service.setTranslations(KEY, 'de', { subject: 'Admin Betreff' });
-    const reset = await service.resetToDefault(KEY);
+    await service.update(KEY, { subject: 'Admin subject' }, ACTOR);
+    await service.setTranslations(KEY, 'de', { subject: 'Admin Betreff' }, ACTOR);
+    const reset = await service.resetToDefault(KEY, ACTOR);
     expect(reset.subject).toBe(declared().subject);
     expect(await translations()).toEqual({ 'de:subject': 'Bestätigt: {resource}', 'de:body': 'Gebucht {when}' });
   });

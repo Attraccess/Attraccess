@@ -1,8 +1,10 @@
 import { AuthenticationType, SSOProvider, SSOProviderType, User } from '@attraccess/database-entities';
 
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 
 import { timingSafeEqual } from 'crypto';
+
+import { AUDIT_RECORDER, AuditRecorder } from '../../../../audit/recorder/audit-event';
 
 import { RbacService } from '../../../rbac/rbac.service';
 
@@ -14,7 +16,7 @@ import { UsersService } from '../../../users/users.service';
 
 import { SessionService } from '../../session.service';
 
-import { SsoChangeAuditService } from '../audit/sso-change-audit.service';
+import { recordSsoProvisioningAudit } from '../audit/provider-audit';
 
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from '../dto/sso-provisioning.dto';
 
@@ -31,7 +33,10 @@ export interface SsoProvisioningTarget {
   provider: SSOProvider;
 }
 
-/** What identity providers provision through their shared secret: logouts, deletions and role syncs. */
+/**
+ * What identity providers provision through their shared secret: logouts, deletions and role syncs. Each change
+ * is audited as `sso.provisioning.*`.
+ */
 @Injectable()
 export class SsoProvisioningService {
   constructor(
@@ -41,7 +46,7 @@ export class SsoProvisioningService {
     private readonly rbacService: RbacService,
     private readonly bruteForce: BruteForceProtectionService,
     private readonly authAudit: AuthAuditLogger,
-    private readonly changeAudit: SsoChangeAuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   async loadProvider(type: SSOProviderType, providerId: number): Promise<SSOProvider> {
@@ -81,19 +86,21 @@ export class SsoProvisioningService {
   async revokeSessions(target: SsoProvisioningTarget, payload: SSOProvisioningUserDto): Promise<void> {
     const user = await this.resolveUser(target, payload);
     await this.sessionService.revokeAllUserSessions(user.id);
-    await this.changeAudit.recordProvisioning('sessions_revoked', target.provider, user.id, { sessionsRevoked: true });
+    await recordSsoProvisioningAudit(this.audit, 'sessions_revoked', user.id, target.provider, {
+      sessionsRevoked: true,
+    });
   }
 
   async deleteUser(target: SsoProvisioningTarget, payload: SSOProvisioningUserDto): Promise<void> {
     const user = await this.resolveUser(target, payload);
     await this.usersService.deleteOne(user.id);
-    await this.changeAudit.recordProvisioning('user_deleted', target.provider, user.id, { userDeleted: true });
+    await recordSsoProvisioningAudit(this.audit, 'user_deleted', user.id, target.provider, { userDeleted: true });
   }
 
   async updatePermissions(target: SsoProvisioningTarget, payload: SSOProvisioningPermissionsDto): Promise<void> {
     const user = await this.resolveUser(target, payload);
     const changes = await this.applyPermissions(user.id, target.provider, payload);
-    if (changes) await this.changeAudit.recordProvisioning('permissions_synced', target.provider, user.id, changes);
+    if (changes) await recordSsoProvisioningAudit(this.audit, 'permissions_synced', user.id, target.provider, changes);
   }
 
   private compareSecret(provider: SSOProvider, provided: string | null): void {

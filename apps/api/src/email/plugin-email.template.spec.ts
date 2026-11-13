@@ -13,6 +13,9 @@ import { SettingsService } from '../settings/settings.service';
 import { PluginEmailService } from './plugin-email.service';
 import { EmailService } from './email.service';
 
+const ACTOR = { id: 1, authenticationMethod: 'session' as const };
+const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+
 jest.mock('nodemailer', () => ({ createTransport: jest.fn() }));
 
 const LAYOUT_MJML =
@@ -50,6 +53,7 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
       dataSource.getRepository(EmailTemplate),
       dataSource.getRepository(EmailTemplateTranslation),
       new MjmlService(),
+      audit as never,
     );
     sendMail = jest.fn().mockResolvedValue(undefined);
     (createTransport as jest.Mock).mockReturnValue({ sendMail, close: jest.fn() });
@@ -62,6 +66,7 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
     const layout = new EmailLayoutService(
       { getPlainSetting: jest.fn().mockResolvedValue(LAYOUT_MJML) } as unknown as SettingsStoreService,
       new MjmlService(),
+      audit as never,
     );
     const metrics = { emailSentTotal: { inc: jest.fn() } } as unknown as MetricsService;
     const users = { findOne: jest.fn() } as unknown as Repository<User>;
@@ -112,10 +117,19 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
       Reflect.get(service, 'emailService') as unknown as { emailTemplateService: EmailTemplateService }
     ).emailTemplateService;
     await templates.findOne('plugin.demo.confirmed' as never);
-    await templates.update('plugin.demo.confirmed' as never, {
-      subject: '{{t "subject" "Edited {resource}" resource=resource.name}}',
-    });
-    await templates.setTranslations('plugin.demo.confirmed' as never, 'de', { subject: 'Bearbeitet {resource}' });
+    await templates.update(
+      'plugin.demo.confirmed' as never,
+      {
+        subject: '{{t "subject" "Edited {resource}" resource=resource.name}}',
+      },
+      ACTOR,
+    );
+    await templates.setTranslations(
+      'plugin.demo.confirmed' as never,
+      'de',
+      { subject: 'Bearbeitet {resource}' },
+      ACTOR,
+    );
     await service.sendPluginTemplate('demo', alice, 'confirmed', variables);
     await service.sendPluginTemplate('demo', bob, 'confirmed', variables);
     expect(sendMail.mock.calls[0][0].subject).toBe('Edited Laser &lt;1&gt;');

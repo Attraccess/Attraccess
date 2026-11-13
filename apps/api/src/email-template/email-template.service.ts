@@ -1,9 +1,18 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EmailTemplate, EmailTemplateTranslation, EmailTemplateType } from '@attraccess/database-entities';
 import { EntityManager, Repository } from 'typeorm';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { MjmlService } from './mjml.service';
+import { auditSubjectKeyId } from '../audit/policies/administration';
+import { AUDIT_RECORDER, AuditActor, AuditDetails, AuditRecorder } from '../audit/recorder/audit-event';
 import { assertRenderableTemplate } from './template-syntax';
 import { EMAIL_TEMPLATE_DEFAULTS, readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from './email-defaults';
 import { extractTranslationKeys, isFullMjmlDocument, TranslationKey } from '@attraccess/shared';
@@ -41,6 +50,7 @@ export class EmailTemplateService implements OnApplicationBootstrap {
     @InjectRepository(EmailTemplateTranslation)
     private readonly translationRepository: Repository<EmailTemplateTranslation>,
     private readonly mjmlService: MjmlService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -77,7 +87,11 @@ export class EmailTemplateService implements OnApplicationBootstrap {
     return template;
   }
 
-  async update(type: EmailTemplateKey, updateEmailTemplateDto: UpdateEmailTemplateDto): Promise<EmailTemplate> {
+  async update(
+    type: EmailTemplateKey,
+    updateEmailTemplateDto: UpdateEmailTemplateDto,
+    actor: AuditActor,
+  ): Promise<EmailTemplate> {
     await this.findOne(type);
     assertRenderableTemplate(updateEmailTemplateDto);
 
@@ -98,10 +112,12 @@ export class EmailTemplateService implements OnApplicationBootstrap {
       },
     );
 
-    return this.findOne(type);
+    const template = await this.findOne(type);
+    await this.record(actor, 'email_template.updated', type, { templateType: type });
+    return template;
   }
 
-  async resetToDefault(type: EmailTemplateKey): Promise<EmailTemplate> {
+  async resetToDefault(type: EmailTemplateKey, actor: AuditActor): Promise<EmailTemplate> {
     await this.findOne(type);
 
     const { subject, body, variables, translations } = this.defaultsFor(type);
@@ -125,7 +141,9 @@ export class EmailTemplateService implements OnApplicationBootstrap {
       }
     });
 
-    return this.findOne(type);
+    const template = await this.findOne(type);
+    await this.record(actor, 'email_template.reset', type, { templateType: type });
+    return template;
   }
 
   /** What "reset to default" restores: the bundled core default or the plugin's declaration. */
@@ -267,7 +285,12 @@ export class EmailTemplateService implements OnApplicationBootstrap {
     return { keys, translations };
   }
 
-  async setTranslations(type: EmailTemplateKey, locale: string, data: Record<string, string>): Promise<void> {
+  async setTranslations(
+    type: EmailTemplateKey,
+    locale: string,
+    data: Record<string, string>,
+    actor: AuditActor,
+  ): Promise<void> {
     await this.findOne(type);
     const entities = Object.entries(data).map(([key, value]) =>
       this.translationRepository.create({ templateType: type as EmailTemplateType, key, locale, value }),
@@ -277,12 +300,34 @@ export class EmailTemplateService implements OnApplicationBootstrap {
       if (entities.length > 0) {
         await manager.insert(EmailTemplateTranslation, entities);
       }
+      const details = { templateType: type, locale, translationCount: Object.keys(data).length };
+      await this.record(actor, 'email_template.translations_set', type, details, manager);
     });
   }
 
-  async deleteTranslations(type: EmailTemplateKey, locale: string): Promise<void> {
+  async deleteTranslations(type: EmailTemplateKey, locale: string, actor: AuditActor): Promise<void> {
     await this.findOne(type);
     await this.translationRepository.delete({ templateType: type as EmailTemplateType, locale });
+    await this.record(actor, 'email_template.translations_deleted', type, { templateType: type, locale });
+  }
+
+  private async record(
+    actor: AuditActor,
+    action: `email_template.${'updated' | 'reset' | 'translations_set' | 'translations_deleted'}`,
+    type: string,
+    details: AuditDetails,
+    manager?: EntityManager,
+  ) {
+    await this.audit.record(
+      {
+        domain: 'administration',
+        action,
+        actor,
+        subject: { type: 'email-template', id: auditSubjectKeyId(type) },
+        details,
+      },
+      manager,
+    );
   }
 }
 

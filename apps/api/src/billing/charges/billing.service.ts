@@ -1,3 +1,4 @@
+import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import {
   BillingTransaction,
   BillingTransactionItem,
@@ -18,7 +19,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { EntityManager, Repository, MoreThan } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { EmailService } from '../../email/email.service';
 
@@ -61,7 +62,7 @@ export class BillingService {
     @Inject(EventEmitter2)
     private readonly eventEmitter: EventEmitter2,
     private readonly metricsService: MetricsService,
-    private readonly auditService: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly auditService: AuditRecorder,
   ) {
     this.ledger = new BillingLedger(
       this.settingRepository,
@@ -118,14 +119,14 @@ export class BillingService {
       amount: 0,
       status: BillingTransactionStatus.Pending,
     });
-    await this.auditService.recordBillingTransaction(
-      {
+    await this.auditService.record(
+      billingTransactionAuditEvent({
         transactionId: transaction.id,
         userId: transaction.userId,
         amount: transaction.amount,
         status: transaction.status,
         source: 'resource-usage',
-      },
+      }),
       transactionalEntityManager,
     );
   }
@@ -224,15 +225,15 @@ export class BillingService {
 
         transaction.amount = -totalCredits;
         transaction.status = BillingTransactionStatus.Completed;
-        await this.auditService.recordBillingTransaction(
-          {
+        await this.auditService.record(
+          billingTransactionAuditEvent({
             transactionId: transaction.id,
             userId: transaction.userId,
             amount: transaction.amount,
             status: transaction.status,
             previousStatus,
             source: 'resource-usage',
-          },
+          }),
           manager,
         );
       } else {
@@ -242,14 +243,14 @@ export class BillingService {
           amount: -totalCredits,
           status: BillingTransactionStatus.Completed,
         } as Partial<BillingTransaction>);
-        await this.auditService.recordBillingTransaction(
-          {
+        await this.auditService.record(
+          billingTransactionAuditEvent({
             transactionId: transaction.id,
             userId: transaction.userId,
             amount: transaction.amount,
             status: transaction.status,
             source: 'resource-usage',
-          },
+          }),
           manager,
         );
       }

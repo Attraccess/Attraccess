@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 // Mock crypto module first, before any imports
 const mockRandomBytes = jest.fn();
 jest.mock('crypto', () => ({
@@ -57,6 +58,7 @@ describe('SessionService', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
         SessionService,
         { provide: SESSION_STORE, useValue: store },
         { provide: TokenHashService, useValue: { hashToken: jest.fn((t: string) => `hashed:${t}`) } },

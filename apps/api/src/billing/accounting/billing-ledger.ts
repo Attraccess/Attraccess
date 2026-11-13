@@ -1,3 +1,4 @@
+import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import {
   BillingTransaction,
   BillingTransactionStatus,
@@ -36,7 +37,8 @@ import { ResourceBillingConfigurationChangedEvent } from '../events/resource-bil
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
-import { AuditService } from '../../audit/audit.service';
+import { AuditRecorder } from '../../audit/recorder/audit-event';
+
 import { MetricsService } from '../../metrics/metrics.service';
 
 import { LiveNotificationsService } from '../live-notifications/live-notifications.service';
@@ -50,7 +52,7 @@ export class BillingLedger {
     private readonly userRepository: Repository<User>,
     private readonly billingTransactionRepository: Repository<BillingTransaction>,
     private readonly liveNotificationsService: LiveNotificationsService,
-    private readonly auditService: AuditService,
+    private readonly auditService: AuditRecorder,
     private readonly metricsService: MetricsService,
     private readonly resourceBillingConfigurationRepository: Repository<ResourceBillingConfiguration>,
     private readonly eventEmitter: EventEmitter2,
@@ -142,14 +144,16 @@ export class BillingLedger {
     });
 
     this.liveNotificationsService.notifyTransactionUpdate(transaction);
-    void this.auditService.recordBillingTransaction({
-      transactionId: transaction.id,
-      userId,
-      initiatorId,
-      amount,
-      status: BillingTransactionStatus.Completed,
-      source: 'manual',
-    });
+    void this.auditService.record(
+      billingTransactionAuditEvent({
+        transactionId: transaction.id,
+        userId,
+        initiatorId,
+        amount,
+        status: BillingTransactionStatus.Completed,
+        source: 'manual',
+      }),
+    );
     this.metricsService.billingTransactionsTotal.inc({ status: transaction.status });
     if (amount) {
       this.metricsService.billingTransactionAmount.observe(Math.abs(amount));
@@ -184,14 +188,16 @@ export class BillingLedger {
     } as Partial<BillingTransaction>);
 
     this.liveNotificationsService.notifyTransactionUpdate(refundTransaction);
-    void this.auditService.recordBillingTransaction({
-      transactionId: refundTransaction.id,
-      userId: refundTransaction.userId,
-      initiatorId: executingUserId,
-      amount: refundTransaction.amount,
-      status: refundTransaction.status,
-      source: 'refund',
-    });
+    void this.auditService.record(
+      billingTransactionAuditEvent({
+        transactionId: refundTransaction.id,
+        userId: refundTransaction.userId,
+        initiatorId: executingUserId,
+        amount: refundTransaction.amount,
+        status: refundTransaction.status,
+        source: 'refund',
+      }),
+    );
 
     return await this.getTransaction(refundTransaction.id);
   }

@@ -15,7 +15,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository, FindManyOptions, In, Not, DeleteResult } from 'typeorm';
 
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../audit/recorder/audit-event';
 
 import { EncryptionService } from '../encryption/encryption.service';
 
@@ -77,7 +77,7 @@ export class AttractapService {
     protected readonly coredumpSymbolicationService: CoredumpSymbolicationService,
     protected readonly firmwareService: AttractapFirmwareService,
     protected readonly notifications: NotificationDispatchService,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(AttractapService.name);
@@ -347,12 +347,15 @@ export class AttractapService {
     readerId: number,
     principal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number },
   ): Promise<void> {
-    await this.audit.recordAttractap({
-      action: 'reader.deregistered',
-      actorId: principal.userId,
-      authenticationMethod: principal.authenticationMethod,
-      ...(principal.authenticationMethod === 'api-token' ? { apiTokenId: principal.apiTokenId } : {}),
-      subjectId: readerId,
+    await this.audit.record({
+      domain: 'attractap',
+      action: 'attractap.reader.deregistered',
+      actor: {
+        id: principal.userId,
+        authenticationMethod: principal.authenticationMethod,
+        ...(principal.authenticationMethod === 'api-token' ? { apiTokenId: principal.apiTokenId } : {}),
+      },
+      subject: { type: 'attractap.reader', id: readerId },
       details: { source: 'admin-api' },
     });
   }

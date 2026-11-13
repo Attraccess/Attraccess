@@ -35,7 +35,7 @@ export function createFlowDefinedMeteringFixture() {
 
   let flows: { runFlow: jest.Mock; trackResourceActivity: jest.Mock };
 
-  let audit: { recordBillingTransaction: jest.Mock; recordResource: jest.Mock };
+  let audit: { record: jest.Mock };
 
   let liveNotifications: { notifyTransactionUpdate: jest.Mock };
 

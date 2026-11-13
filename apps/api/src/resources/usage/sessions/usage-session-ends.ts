@@ -8,13 +8,13 @@ import {
   User,
 } from '@attraccess/database-entities';
 
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
 
 import { EntityManager, IsNull } from 'typeorm';
 
-import { AuditService } from '../../../audit/audit.service';
+import { AUDIT_RECORDER, AuditActor, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../../audit/recorder/audit-event';
 
 import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 
@@ -72,7 +72,7 @@ export class UsageSessionEnds {
     private readonly gate: UsageResourceGate,
     private readonly turns: SessionChangeTurns,
     private readonly resourceFormsService: ResourceFormsService,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly notifications: UsageSessionNotifications,
   ) {}
 
@@ -100,7 +100,7 @@ export class UsageSessionEnds {
   ): Promise<ResourceUsage> {
     // skipNoteNotification: flow-ended sessions carry an auto-generated note, not a human one — skip personnel notification.
     const { skipFormSubmissions = false, skipNoteNotification = false } = options;
-    const auditOrigin = options.auditOrigin ?? { actorId: user.id, authenticationMethod: 'session' as const };
+    const auditOrigin = options.auditOrigin ?? ({ id: user.id, authenticationMethod: 'session' } satisfies AuditActor);
 
     this.logger.debug(`Ending session for resource ${resourceId} by user ${user.id}`, { dto });
 
@@ -183,7 +183,7 @@ export class UsageSessionEnds {
         },
         'end',
         // The requester stops it (maybe someone else's session); a flow end passes on the user who caused it.
-        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.actorId ?? options.triggeredByUserId },
+        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.id ?? options.triggeredByUserId },
       );
       // Stop effects have run; only now read the final total. Failure leaves energy billing pending, not the stop undone.
       const final: FinalCollection = await this.lifecycle.collectFinal(
@@ -205,11 +205,12 @@ export class UsageSessionEnds {
         });
         chargeTransactionId = await this.lifecycle.settleEndedSession(manager, endedSession, final);
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
-        await this.audit.recordResource(
+        await this.audit.record(
           {
+            domain: 'resource',
             action: 'usage_session.ended',
-            ...auditOrigin,
-            subjectId: resourceId,
+            actor: auditOrigin,
+            subject: { type: 'resource', id: resourceId },
             details: {
               usageId: endedSession.id,
               usageUserId: endedSession.userId,
@@ -349,7 +350,7 @@ export class UsageSessionEnds {
           {
             skipFormSubmissions: true,
             skipNoteNotification: true,
-            auditOrigin: { actorId: null },
+            auditOrigin: SYSTEM_AUDIT_ACTOR,
             triggeredByUserId,
             withinSessionChange,
           },

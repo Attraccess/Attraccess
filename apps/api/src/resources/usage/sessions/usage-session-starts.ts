@@ -5,13 +5,13 @@ import {
   User,
 } from '@attraccess/database-entities';
 
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
 
 import { IsNull } from 'typeorm';
 
-import { AuditService } from '../../../audit/audit.service';
+import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/recorder/audit-event';
 
 import { BillingService } from '../../../billing/charges/billing.service';
 
@@ -46,7 +46,7 @@ export class UsageSessionStarts {
     private readonly gate: UsageResourceGate,
     private readonly ends: UsageSessionEnds,
     private readonly billingService: BillingService,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
     private readonly notifications: UsageSessionNotifications,
   ) {}
 
@@ -72,7 +72,7 @@ export class UsageSessionStarts {
     this.logger.debug(`Starting session for resource ${resourceId} by user ${user.id}`, { dto, options });
 
     const supervisorUserId = options.supervisorUserId ?? null;
-    const auditOrigin = options.auditOrigin ?? { actorId: user.id, authenticationMethod: 'session' as const };
+    const auditOrigin = options.auditOrigin ?? ({ id: user.id, authenticationMethod: 'session' } satisfies AuditActor);
 
     // Defer event emission until after the transaction commits to avoid stale reads in listeners
     let startedUsageIdToEmit: number | null = null;
@@ -112,7 +112,7 @@ export class UsageSessionStarts {
           : { ...usageFlowPayload(createdSession, formSubmissions), activeSessions },
         existingActiveSession ? 'takeover' : 'start',
         // The starter, or the supervisor who started it for them.
-        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.actorId ?? user.id },
+        { lifecycleAttemptId: attemptId, actorUserId: auditOrigin.id ?? user.id },
       );
       newSession = await runSerializedTransaction(this.lifecycle.manager, async (manager) => {
         const currentAttempt = await this.lifecycle.getLifecycleAttempt(manager, attemptId, resourceId);
@@ -154,21 +154,23 @@ export class UsageSessionStarts {
         await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
         // Audit rows commit or roll back with the session change they describe.
         if (existingActiveSession) {
-          await this.audit.recordResource(
+          await this.audit.record(
             {
+              domain: 'resource',
               action: 'usage_session.ended',
-              ...auditOrigin,
-              subjectId: resourceId,
+              actor: auditOrigin,
+              subject: { type: 'resource', id: resourceId },
               details: { usageId: existingActiveSession.id, usageUserId: existingActiveSession.user.id },
             },
             manager,
           );
         }
-        await this.audit.recordResource(
+        await this.audit.record(
           {
+            domain: 'resource',
             action: 'usage_session.started',
-            ...auditOrigin,
-            subjectId: resourceId,
+            actor: auditOrigin,
+            subject: { type: 'resource', id: resourceId },
             details: {
               usageId: createdSession.id,
               usageUserId: createdSession.userId,

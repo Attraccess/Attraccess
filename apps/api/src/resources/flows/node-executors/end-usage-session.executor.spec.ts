@@ -146,7 +146,7 @@ describe('EndUsageSessionExecutor', () => {
       5,
       user,
       { notes: 'compiled notes' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
     );
     expect(result).toEqual({ payload: input });
   });
@@ -164,7 +164,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: 'raw value' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
     );
   });
 
@@ -181,7 +181,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
     );
   });
 
@@ -198,7 +198,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
     );
   });
 
@@ -215,7 +215,7 @@ describe('EndUsageSessionExecutor', () => {
       1,
       user,
       { notes: '' },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
     );
     expect(result).toEqual({ payload: { foo: 'bar' } });
   });
@@ -334,7 +334,7 @@ describe('EndUsageSessionExecutor', () => {
         1,
         { id: 7 },
         { notes: '', usageId: 3 },
-        expect.objectContaining({ auditOrigin: { actorId: null }, triggeredByUserId: 12 }),
+        expect.objectContaining({ auditOrigin: { id: null, authenticationMethod: null }, triggeredByUserId: 12 }),
       );
     });
   });

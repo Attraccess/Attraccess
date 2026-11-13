@@ -26,7 +26,7 @@ export function createBillingServiceFixture() {
 
   let billingTransactionItemRepository: jest.Mocked<Repository<BillingTransactionItem>>;
 
-  let auditService: { recordBillingTransaction: jest.Mock };
+  let auditService: { record: jest.Mock };
 
   const scope = {
     get billingTransactionRepository() {

@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { AttractapService } from '../../../attractap.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
-import { AuditService } from '../../../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../../../audit/recorder/audit-event';
 import {
   AuthenticatedWebSocket,
   AttractapEvent,
@@ -19,8 +19,8 @@ export class AttractapCrashReportHandler {
   @Inject(MetricsService)
   private metricsService: MetricsService;
 
-  @Inject(AuditService)
-  private audit: AuditService;
+  @Inject(AUDIT_RECORDER)
+  private audit: AuditRecorder;
 
   public async handleCrashReport(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const payload = data.payload as ReaderCrashReportPayload;
@@ -35,11 +35,11 @@ export class AttractapCrashReportHandler {
 
     try {
       const report = await this.attractapService.createCrashReport(socket.readerId, payload);
-      await this.audit.recordAttractap({
-        action: 'reader.crash_reported',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: socket.readerId,
+      await this.audit.record({
+        domain: 'attractap',
+        action: 'attractap.reader.crash_reported',
+        actor: { id: null, authenticationMethod: null },
+        subject: { type: 'attractap.reader', id: socket.readerId },
         details: {
           source: 'reader-websocket',
           resetReason: this.normalizeResetReason(report.resetReason),

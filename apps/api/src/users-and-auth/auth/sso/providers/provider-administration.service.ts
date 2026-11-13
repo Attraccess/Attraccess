@@ -6,9 +6,9 @@ import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
 import { ForbiddenException, Injectable } from '@nestjs/common';
 
-import { RbacService } from '../../../rbac/rbac.service';
+import { auditActorOf } from '../../../../audit/recorder/audit-event';
 
-import { SsoChangeAuditService } from '../audit/sso-change-audit.service';
+import { RbacService } from '../../../rbac/rbac.service';
 
 import { CreateSSOProviderDto } from '../dto/create-sso-provider.dto';
 
@@ -30,14 +30,13 @@ function sameRolePaths(incoming: string[] | null | undefined, stored: string[] |
 
 /**
  * Creating, changing and deleting SSO providers. Role settings need users.roles.manage, and a mapped role may
- * grant no permission the actor lacks. Every change is audited.
+ * grant no permission the actor lacks. SSOService audits every change.
  */
 @Injectable()
 export class SsoProviderAdministrationService {
   constructor(
     private readonly ssoService: SSOService,
     private readonly rbacService: RbacService,
-    private readonly changeAudit: SsoChangeAuditService,
   ) {}
 
   async getAll(): Promise<SSOProvider[]> {
@@ -64,9 +63,7 @@ export class SsoProviderAdministrationService {
     if (customRolePaths(createDto.samlConfiguration?.roleAttributeKeys)) {
       this.assertCanManageSsoRoles(actor, 'SSO role attribute keys');
     }
-    const provider = await this.ssoService.createProvider(createDto);
-    await this.changeAudit.recordProvider('created', actor, provider);
-    return provider;
+    return this.ssoService.createProvider(createDto, auditActorOf(actor));
   }
 
   async update(providerId: number, updateDto: UpdateSSOProviderDto, actor: AuthenticatedUser): Promise<SSOProvider> {
@@ -87,21 +84,11 @@ export class SsoProviderAdministrationService {
       this.assertCanManageSsoRoles(actor, 'SSO role attribute keys');
     }
 
-    const provider = await this.ssoService.updateProvider(providerId, updateDto);
-    await this.changeAudit.recordProvider(
-      'updated',
-      actor,
-      provider,
-      before,
-      this.changeAudit.rotationFlags(before, provider),
-    );
-    return provider;
+    return this.ssoService.updateProvider(providerId, updateDto, auditActorOf(actor));
   }
 
   async delete(providerId: number, actor: AuthenticatedUser): Promise<void> {
-    const provider = await this.ssoService.getProviderById(providerId);
-    await this.ssoService.deleteProvider(providerId);
-    await this.changeAudit.recordProvider('deleted', actor, provider);
+    await this.ssoService.deleteProvider(providerId, auditActorOf(actor));
   }
 
   private assertCanManageSsoRoles(actor: AuthenticatedUser, setting: string): void {

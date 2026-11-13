@@ -1,3 +1,5 @@
+import type { AuditActor as RecordedAuditActor } from '../../audit/recorder/audit-event';
+
 /** The admin behind a reader UI change, as the audit records it (session or API token). */
 export interface AuditActor {
   id: number;
@@ -5,11 +7,11 @@ export interface AuditActor {
   apiTokenId?: number;
 }
 
-export function auditActorFields(actor: AuditActor) {
+export function auditActorFields(actor: AuditActor): RecordedAuditActor {
   const viaToken = actor.authenticationMethod === 'api-token' && actor.apiTokenId !== undefined;
   return {
-    actorId: actor.id,
-    authenticationMethod: viaToken ? ('api-token' as const) : ('session' as const),
+    id: actor.id,
+    authenticationMethod: viaToken ? 'api-token' : 'session',
     ...(viaToken ? { apiTokenId: actor.apiTokenId } : {}),
   };
 }

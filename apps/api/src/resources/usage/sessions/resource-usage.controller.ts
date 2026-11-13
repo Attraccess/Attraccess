@@ -1,3 +1,4 @@
+import { auditActorOf } from '../../../audit/recorder/audit-event';
 import { ResourceUsage } from '@attraccess/database-entities';
 
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
@@ -239,11 +240,7 @@ export class ResourceUsageController {
       ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
     });
     return this.resourceUsageService.startSession(resourceId, req.user, dto, {
-      auditOrigin: {
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-      },
+      auditOrigin: auditActorOf(req.user),
     });
   }
 
@@ -274,11 +271,7 @@ export class ResourceUsageController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
     const ended = await this.resourceUsageService.endSession(resourceId, req.user, dto, {
-      auditOrigin: {
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-      },
+      auditOrigin: auditActorOf(req.user),
     });
     if (ended) {
       // Nobody can answer an after-stop question on web/API, also when a manager ends someone else's session.

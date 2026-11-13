@@ -538,12 +538,9 @@ export class SSOController {
     redirectTo?: string,
     providerId?: number,
   ): Promise<CreateSessionResponse | void> {
-    const sessionToken = await this.login.createSession(request);
+    const sessionToken = await this.login.createSession(request, providerId);
 
     await this.cookieConfigService.setAuthCookie(response, sessionToken);
-    if (providerId) {
-      await this.login.recordLogin(request, providerId);
-    }
 
     const auth: CreateSessionResponse = {
       user: request.user,

@@ -1,13 +1,18 @@
 import { EmailTemplateType, MqttServer } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { EmailLayoutController } from '../email-layout/email-layout.controller';
+import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { EmailTemplateController } from '../email-template/email-template.controller';
+import { EmailTemplateService } from '../email-template/email-template.service';
 import { MqttServerController } from '../mqtt/servers/mqtt-server.controller';
+import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
+import { PluginAdministrationService } from '../plugin-system/plugin-administration.service';
 import { InstalledNpmPlugin, NpmPluginAuditState } from '../plugin-system/npm-plugin.service';
 import { PluginController } from '../plugin-system/plugin.controller';
 import { PluginService } from '../plugin-system/plugin.service';
 import { SettingsController } from '../settings/settings.controller';
-import { projectAdministrationAuditEvent } from './policies/administration';
+import { SettingsAdministrationService } from '../settings/settings-administration.service';
+import { projectAuditRow } from './recorder/audit-row';
 const req = { user: { id: 42, authenticationMethod: 'api-token', apiTokenId: 9 } } as AuthenticatedRequest;
 const secret = 'SECRET_MUST_NOT_BE_RECORDED';
 const plugin = {
@@ -23,12 +28,23 @@ const plugin = {
   classification: 'community',
 } as InstalledNpmPlugin;
 function recorder() {
-  return { recordAdministration: jest.fn().mockResolvedValue(undefined) };
+  return { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 }
 
+/** The admin changes now run through the owning services, which record them; the controllers only name the actor. */
+const pluginController = (
+  pluginService: Record<string, unknown>,
+  npm: Record<string, unknown>,
+  audit: ReturnType<typeof recorder>,
+) =>
+  new PluginController(
+    npm as never,
+    new PluginAdministrationService(pluginService as never, npm as never, audit as never),
+  );
+
 function recorded(audit: ReturnType<typeof recorder>) {
-  const events = audit.recordAdministration.mock.calls.map(([event]) => event);
-  for (const event of events) expect(projectAdministrationAuditEvent(event)).not.toBeNull();
+  const events = audit.record.mock.calls.map(([event]) => event);
+  for (const event of events) expect(projectAuditRow(event)).toMatchObject({ domain: 'administration' });
   expect(JSON.stringify(events)).not.toContain(secret);
   return events;
 }
@@ -48,21 +64,31 @@ describe('administration lifecycle hooks', () => {
       defaultPublishRetain: false,
       defaultSubscribeQos: 1,
     } as MqttServer;
-    const service = {
-      create: jest.fn().mockResolvedValue(server),
-      update: jest.fn().mockResolvedValue(server),
-      findOne: jest.fn().mockResolvedValue(server),
-      remove: jest.fn().mockResolvedValue(undefined),
+    const repository = {
+      create: jest.fn((value) => ({ ...server, ...value })),
+      save: jest.fn(async () => ({ ...server })),
+      findOne: jest.fn(async () => ({ ...server })),
+      remove: jest.fn(async (entity: MqttServer) => {
+        // TypeORM clears the id of a removed entity; the audit must not depend on it.
+        delete (entity as Partial<MqttServer>).id;
+      }),
     };
     const audit = recorder();
+    const service = new MqttServerService(
+      repository as never,
+      { encrypt: (value: string) => `enc:${value}`, decryptIfEncrypted: (value: string) => value } as never,
+      { mqttServersTotal: { inc: jest.fn(), dec: jest.fn() } } as never,
+      { emit: jest.fn() } as never,
+      audit as never,
+    );
     let finish: () => void;
-    audit.recordAdministration.mockImplementationOnce(
+    audit.record.mockImplementationOnce(
       () =>
         new Promise<void>((resolve) => {
           finish = resolve;
         }),
     );
-    const controller = new MqttServerController(service as never, audit as never);
+    const controller = new MqttServerController(service);
     let returned = false;
     const pending = controller.createOne({ password: secret } as never, req).then(() => {
       returned = true;
@@ -79,35 +105,48 @@ describe('administration lifecycle hooks', () => {
       'mqtt_server.deleted',
     ]);
     expect(recorded(audit)[1]).toMatchObject({
-      actorId: 42,
-      authenticationMethod: 'api-token',
-      apiTokenId: 9,
+      actor: { id: 42, authenticationMethod: 'api-token', apiTokenId: 9 },
       details: { passwordChanged: 1 },
     });
-    audit.recordAdministration.mockRejectedValueOnce(new Error(secret));
-    await expect(controller.updateOne(7, {} as never, req)).resolves.toBe(server);
-    service.update.mockRejectedValueOnce(new Error('primary failure'));
-    audit.recordAdministration.mockClear();
+    expect(recorded(audit)[2]).toMatchObject({ subject: { type: 'mqtt-server', id: 7 } });
+    audit.record.mockResolvedValueOnce({ status: 'unavailable' });
+    await expect(controller.updateOne(7, {} as never, req)).resolves.toMatchObject({ id: 7 });
+    repository.save.mockRejectedValueOnce(new Error('primary failure'));
+    audit.record.mockClear();
     await expect(controller.updateOne(7, {} as never, req)).rejects.toThrow('primary failure');
-    expect(audit.recordAdministration).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('records template and layout edits, resets and translations without body content', async () => {
     const audit = recorder();
-    const service = {
-      update: jest.fn().mockResolvedValue({ body: secret }),
-      resetToDefault: jest.fn().mockResolvedValue({ body: secret }),
-      setTranslations: jest.fn().mockResolvedValue(undefined),
-      deleteTranslations: jest.fn().mockResolvedValue(undefined),
-    };
-    const controller = new EmailTemplateController(service as never, audit as never);
+    const manager = { delete: jest.fn(), insert: jest.fn(), create: jest.fn((_entity, value) => value) };
+    const templates = new EmailTemplateService(
+      { findOneBy: jest.fn(async () => ({ body: secret })), update: jest.fn() } as never,
+      {
+        create: jest.fn((value) => value),
+        delete: jest.fn(),
+        manager: { transaction: jest.fn(async (work: (m: typeof manager) => unknown) => work(manager)) },
+      } as never,
+      { validateAndConvert: jest.fn() } as never,
+      audit as never,
+    );
+    const controller = new EmailTemplateController(templates);
     const type = EmailTemplateType.RESET_PASSWORD;
-    await controller.update(type, { subject: secret, body: secret } as never, req);
+    await controller.update(type, { subject: secret, body: `<mj-text>${secret}</mj-text>` } as never, req);
     await controller.resetToDefault(type, req);
     await controller.setTranslations(type, { locale: 'de', translations: { greeting: secret } }, req);
     await controller.deleteTranslations(type, 'de', req);
-    const layout = new EmailLayoutController(service as never, audit as never);
-    await layout.update({ body: secret }, req);
+    const layout = new EmailLayoutController(
+      new EmailLayoutService(
+        {
+          getPlainSetting: jest.fn(async () => '<mj-section>{{content}}</mj-section>'),
+          setPlainSetting: jest.fn(),
+        } as never,
+        { validateAndConvert: jest.fn() } as never,
+        audit as never,
+      ),
+    );
+    await layout.update({ body: `${secret}{{content}}` }, req);
     await layout.resetToDefault(req);
     expect(recorded(audit).map((event) => event.action)).toEqual([
       'email_template.updated',
@@ -146,7 +185,10 @@ describe('administration lifecycle hooks', () => {
       getMetricsSlowQueryThresholdSeconds: jest.fn().mockResolvedValue(1),
     };
     const audit = recorder();
-    const controller = new SettingsController(service as never, audit as never);
+    const controller = new SettingsController(
+      service as never,
+      new SettingsAdministrationService(service as never, audit as never),
+    );
     await controller.updateSystemSettings({ app: { licenseKey: secret }, smtp: { pass: secret } } as never, req);
     await expect(controller.generateMetricsApiKey(req)).resolves.toMatchObject({ apiKey: secret });
     await controller.deleteMetricsApiKey(req);
@@ -187,7 +229,10 @@ describe('administration lifecycle hooks', () => {
       getResourceVisibilitySettings: jest.fn().mockResolvedValue({ activityVisibility: 'all' }),
       updateResourceVisibilitySettings: jest.fn().mockResolvedValue({ activityVisibility: 'introduced' }),
     };
-    const controller = new SettingsController(service as never, audit as never);
+    const controller = new SettingsController(
+      service as never,
+      new SettingsAdministrationService(service as never, audit as never),
+    );
     await controller.updateAuditSettings({ retention_days: 30 }, req);
     await controller.updateAuthRateLimitSettings({ maxAttempts: 3, exponentialBackoff: true }, req);
     await controller.updateMessagingRateLimitSettings({ sendMaxPerWindow: 20 }, req);
@@ -212,7 +257,7 @@ describe('administration lifecycle hooks', () => {
       requestRestart: jest.fn(),
     };
     const npm = { findInstalledByPluginId: jest.fn(), listInstalled: jest.fn().mockReturnValue([]) };
-    const controller = new PluginController(service as never, npm as never, audit as never);
+    const controller = pluginController(service, npm, audit);
     const get = jest.spyOn(PluginService, 'getManifestById').mockReturnValue(manifest as never);
     const quarantined = jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(true);
     const clear = jest.spyOn(PluginService, 'clearPluginQuarantine').mockImplementation(() => undefined);
@@ -260,7 +305,7 @@ describe('administration lifecycle hooks', () => {
         prerelease: false,
       }),
     };
-    const controller = new PluginController({ requestRestart: jest.fn() } as never, npm as never, audit as never);
+    const controller = pluginController({ requestRestart: jest.fn() }, npm, audit);
     await controller.addRegistry({ name: 'Private', url: plugin.registryUrl, token: secret }, req);
     await controller.testRegistry('private', req);
     await controller.removeRegistry('private', req);
@@ -305,7 +350,7 @@ describe('administration lifecycle hooks', () => {
         throw new Error(secret);
       }),
     };
-    const controller = new PluginController({ requestRestart: jest.fn() } as never, npm as never, audit as never);
+    const controller = pluginController({ requestRestart: jest.fn() }, npm, audit);
     await controller.installPackage(plugin.name, '2.0.0', { registryId: 'default' }, req);
     await expect(
       controller.replaceInstalledPackage(
