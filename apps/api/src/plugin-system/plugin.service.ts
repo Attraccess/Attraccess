@@ -8,7 +8,7 @@ import { rm, rename } from 'fs/promises';
 
 import { join, basename, isAbsolute, relative, resolve } from 'path';
 
-import { PluginMigrationService } from './plugin-migration.service';
+import type { PluginMigrationService } from './plugin-migration.service';
 
 import { randomBytes, createHash } from 'crypto';
 
@@ -28,6 +28,11 @@ import { INTERNAL_PLUGIN_DIRECTORIES } from './runtime/boot-guard';
 
 function getImplementationClass(): typeof PluginService {
   return require('./plugin.service').PluginService;
+}
+
+// Resolved lazily: migrations locate plugin bundles through PluginService, so a static import would be an import cycle.
+function migrations(): typeof PluginMigrationService {
+  return require('./plugin-migration.service').PluginMigrationService;
 }
 
 export class PluginService {
@@ -144,9 +149,9 @@ export class PluginService {
     // files are removed — the migration classes live in the plugin bundle and
     // must still be on disk to run. A failure here is logged but never blocks the
     // uninstall: the admin asked for the plugin to be gone.
-    if (PluginMigrationService.hasMigrations(plugin)) {
+    if (migrations().hasMigrations(plugin)) {
       try {
-        await PluginMigrationService.runDownMigrations(plugin);
+        await migrations().runDownMigrations(plugin);
       } catch (error) {
         PluginService.logger.error(
           `Failed to revert migrations for plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
