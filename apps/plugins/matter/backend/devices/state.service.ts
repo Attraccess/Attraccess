@@ -140,6 +140,12 @@ export class MatterStateService {
     );
     if (!next) return void (this.stats.outOfOrder += 1);
     await this.states.save(next);
+    // A matching report resolves the command; keep the bounded command record in step with the state row.
+    if (next.commandState === 'reported' && row.commandState !== 'reported' && next.requestId) {
+      await this.context
+        .getRepository(MatterCommand)
+        .update({ requestId: next.requestId }, { outcome: 'reported', reportedAt: next.commandReportedAt });
+    }
     this.stats.applied += 1;
   }
 

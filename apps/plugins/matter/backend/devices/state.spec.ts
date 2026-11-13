@@ -134,6 +134,25 @@ describe('Matter endpoint state', () => {
     expect((await h.dataSource.getRepository(MatterCommand).findOneByOrFail({ requestId })).failureCode).toBe('busy');
   });
 
+  it('does not turn a failed command into a confirmed one when an equal report arrives later', async () => {
+    const requestId = randomUUID();
+    await request(true, 1_000, requestId);
+    await h.state.ingestOutcome(outcome(requestId, 'failed', { failureCode: 'busy', acceptedAt: null }), at(2_000));
+    await h.state.ingestReport(report(true, 3_000), at(3_000));
+    expect(await entry()).toMatchObject({ command: { state: 'failed' }, confirmed: false, reported: { value: true } });
+  });
+
+  it('marks the stored command as reported when a matching report resolves it', async () => {
+    const requestId = randomUUID();
+    await request(true, 1_000, requestId);
+    await h.state.ingestOutcome(outcome(requestId, 'accepted'), at(2_100));
+    await h.state.ingestReport(report(true, 4_000), at(4_100));
+    expect(await h.dataSource.getRepository(MatterCommand).findOneByOrFail({ requestId })).toMatchObject({
+      outcome: 'reported',
+      reportedAt: at(4_000),
+    });
+  });
+
   it('records a changed report with no command pending as an external state change', async () => {
     await h.state.ingestReport(report(false, 0), at(0));
     expect((await entry()).externalChange).toBeNull();

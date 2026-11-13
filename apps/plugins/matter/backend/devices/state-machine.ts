@@ -193,7 +193,7 @@ export type StateEntryView = {
     correlationId: string | null;
   };
   command: { state: CommandState; acceptedAt: string | null; reportedAt: string | null };
-  /** True only when a report equal to the requested value arrived after the request. */
+  /** True only when a report equal to the requested value arrived after the request, for a command that did not fail. */
   confirmed: boolean;
   externalChange: { at: string; value: unknown } | null;
   fault: { code: string; message: string; at: string } | null;
@@ -210,6 +210,7 @@ export function freshnessOf(row: MatterEndpointState, now: number): StateEntryVi
 /** Freshness is computed here, at read time, from the observation time and `staleAfterMs`. */
 export function toView(row: MatterEndpointState, now: number = Date.now()): StateEntryView {
   const confirmed =
+    row.commandState !== 'failed' &&
     row.requestedValue !== null &&
     row.requestedAt !== null &&
     row.reportedAt !== null &&
