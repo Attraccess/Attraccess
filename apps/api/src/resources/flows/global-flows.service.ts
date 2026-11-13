@@ -1,5 +1,5 @@
 import { Flow, ResourceFlowEdge, ResourceFlowNode, ResourceFlowNodeType } from '@attraccess/database-entities';
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -9,6 +9,9 @@ import {
   ResourceFlowSaveDto,
   UpdateGlobalFlowDto,
 } from './dto/index';
+import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../audit/recorder/audit-event';
+import { auditResourceName, auditResourceNames } from '../resources.service';
+import { canvasDetails, canvasSaveDetails, diffCanvas } from './flow-audit';
 import { ResourceFlowNodeSchemaDto } from './dto/resource-flow-node-schemas-response.dto';
 import { ResourceFlowResponse, ResourceFlowsService, ValidationError } from './resource-flows.service';
 
@@ -39,6 +42,7 @@ export class GlobalFlowsService {
     @InjectRepository(ResourceFlowNode) private readonly nodeRepository: Repository<ResourceFlowNode>,
     @InjectRepository(ResourceFlowEdge) private readonly edgeRepository: Repository<ResourceFlowEdge>,
     private readonly resourceFlows: ResourceFlowsService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   public async list(): Promise<GlobalFlowSummaryDto[]> {
@@ -64,28 +68,47 @@ export class GlobalFlowsService {
     return flow as GlobalFlow;
   }
 
-  public async create(dto: CreateGlobalFlowDto): Promise<GlobalFlow> {
-    return this.flowRepository.save(
+  private recordFlow(
+    action: 'flow.created' | 'flow.updated' | 'flow.deleted',
+    actor: AuditActor,
+    flowId: number,
+    details: Record<string, string | number>,
+  ) {
+    return this.audit.record({ domain: 'resource', action, actor, subject: { type: 'flow', id: flowId }, details });
+  }
+
+  public async create(dto: CreateGlobalFlowDto, actor: AuditActor): Promise<GlobalFlow> {
+    const flow = (await this.flowRepository.save(
       this.flowRepository.create({
         name: requireName(dto.name),
         description: dto.description?.trim() || null,
         enabled: dto.enabled ?? true,
         scope: 'global',
       }),
-    ) as Promise<GlobalFlow>;
+    )) as GlobalFlow;
+    await this.recordFlow('flow.created', actor, flow.id, {
+      ...auditResourceNames(
+        { 'after.name': flow.name, ...(flow.description ? { 'after.description': flow.description } : {}) },
+        { 'after.enabled': '0' },
+      ),
+      'after.enabled': flow.enabled ? 1 : 0,
+    });
+    return flow;
   }
 
-  public async update(flowId: number, dto: UpdateGlobalFlowDto): Promise<GlobalFlow> {
+  public async update(flowId: number, dto: UpdateGlobalFlowDto, actor: AuditActor): Promise<GlobalFlow> {
     if (dto.enabled !== undefined && typeof dto.enabled !== 'boolean') {
       throw new BadRequestException('enabled must be a boolean');
     }
     const name = dto.name !== undefined ? requireName(dto.name) : undefined;
     const flow = await this.get(flowId);
+    const before = { name: flow.name, description: flow.description ?? '', enabled: flow.enabled };
     const wasEnabled = flow.enabled;
     if (name !== undefined) flow.name = name;
     if (dto.description !== undefined) flow.description = dto.description?.trim() || null;
     if (dto.enabled !== undefined) flow.enabled = dto.enabled;
     const saved = (await this.flowRepository.save(flow)) as GlobalFlow;
+    await this.recordFlowUpdate(flowId, actor, before, saved);
     if (!wasEnabled && saved.enabled) {
       // Topics of a flow that was off may not be subscribed yet.
       const nodes = await this.nodeRepository.find({ where: { flowId } });
@@ -96,10 +119,51 @@ export class GlobalFlowsService {
     return saved;
   }
 
-  /** Nodes and edges go with the flow (cascade). */
-  public async delete(flowId: number): Promise<void> {
-    await this.get(flowId);
+  /** Records the changed metadata fields, before and after. Nothing changed, nothing recorded. */
+  private async recordFlowUpdate(
+    flowId: number,
+    actor: AuditActor,
+    before: { name: string; description: string; enabled: boolean },
+    saved: GlobalFlow,
+  ): Promise<void> {
+    const after = { name: saved.name, description: saved.description ?? '', enabled: saved.enabled };
+    const changedFields = (['name', 'description', 'enabled'] as const).filter(
+      (field) => before[field] !== after[field],
+    );
+    if (changedFields.length === 0) return;
+    const text = (prefix: 'before' | 'after', source: typeof before) =>
+      Object.fromEntries(
+        changedFields
+          .filter((field) => field !== 'enabled')
+          .map((field) => [`${prefix}.${field}`, source[field] as string]),
+      );
+    const enabled = changedFields.includes('enabled')
+      ? { 'before.enabled': before.enabled ? 1 : 0, 'after.enabled': after.enabled ? 1 : 0 }
+      : {};
+    const fixed = { changedFields: JSON.stringify(changedFields), ...enabled };
+    await this.recordFlow('flow.updated', actor, flowId, {
+      ...auditResourceNames({ ...text('before', before), ...text('after', after) }, fixed as Record<string, string>),
+      ...fixed,
+    });
+  }
+
+  /** Nodes and edges go with the flow (cascade), so the canvas is recorded before it is deleted. */
+  public async delete(flowId: number, actor: AuditActor): Promise<void> {
+    const flow = await this.get(flowId);
+    const [nodes, edges] = await Promise.all([
+      this.nodeRepository.find({ where: { flowId } }),
+      this.edgeRepository.find({ where: { flowId } }),
+    ]);
     await this.flowRepository.delete({ id: flowId });
+    await this.recordFlow(
+      'flow.deleted',
+      actor,
+      flowId,
+      canvasDetails(
+        { 'before.name': auditResourceName(flow.name, 256), 'before.enabled': flow.enabled ? 1 : 0 },
+        { nodes, edges },
+      ) as Record<string, string | number>,
+    );
   }
 
   public async getCanvas(flowId: number): Promise<ResourceFlowResponse> {
@@ -122,7 +186,11 @@ export class GlobalFlowsService {
     return { nodes, edges, ...(validationErrors.length ? { validationErrors } : {}) };
   }
 
-  public async saveCanvas(flowId: number, flowData: ResourceFlowSaveDto): Promise<ResourceFlowResponseDto> {
+  public async saveCanvas(
+    flowId: number,
+    flowData: ResourceFlowSaveDto,
+    actor: AuditActor,
+  ): Promise<ResourceFlowResponseDto> {
     const flow = await this.get(flowId);
     this.resourceFlows.assertNodesSupportScope(flowData.nodes, 'global');
 
@@ -134,6 +202,7 @@ export class GlobalFlowsService {
 
     const result = await this.nodeRepository.manager.transaction(async (manager) => {
       const oldNodes = await manager.find(ResourceFlowNode, { where: { flowId } });
+      const oldEdges = await manager.find(ResourceFlowEdge, { where: { flowId } });
       await manager.delete(ResourceFlowNode, { flowId });
       await manager.delete(ResourceFlowEdge, { flowId });
       await this.resourceFlows.assertCanvasIdsNotOwnedElsewhere(manager, flowData);
@@ -163,6 +232,19 @@ export class GlobalFlowsService {
         manager.save(ResourceFlowNode, newNodes),
         manager.save(ResourceFlowEdge, newEdges),
       ]);
+      const diff = diffCanvas({ nodes: oldNodes, edges: oldEdges }, flowData);
+      if (diff) {
+        await this.audit.record(
+          {
+            domain: 'resource',
+            action: 'flow.canvas_updated',
+            actor,
+            subject: { type: 'flow', id: flowId },
+            details: canvasSaveDetails({ nodes: oldNodes, edges: oldEdges }, flowData, diff, flow.name),
+          },
+          manager,
+        );
+      }
       return { savedNodes, savedEdges, oldNodes };
     });
 

@@ -180,7 +180,7 @@ const coreRows: { [D in CoreAuditDomain]: (event: CoreEvent<D>) => AuditRow | nu
       authenticationMethod: event.actor.authenticationMethod,
       apiTokenId: event.actor.apiTokenId,
       subjectId: event.subject.id,
-      subjectType: event.subject.type as 'resource',
+      subjectType: event.subject.type as 'resource' | 'flow',
       details: event.details as Record<string, string | number>,
     });
     if (!snapshot) return null;

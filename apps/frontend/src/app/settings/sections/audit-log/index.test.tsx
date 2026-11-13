@@ -446,3 +446,74 @@ it('labels the recorded details of MQTT explorer events in both languages', () =
     'Nachricht behalten (retain)',
   ]);
 });
+
+it('labels every flow audit event, target and detail field in both languages', () => {
+  const actions = [
+    'resource_flow.updated',
+    'flow.created',
+    'flow.updated',
+    'flow.deleted',
+    'flow.canvas_updated',
+    'flow_variable.set',
+    'flow_variable.deleted',
+  ];
+  const translate = (strings: typeof en) => (key: string) => {
+    const [, section, value] = /^(\w+)\[(.*)\]$/.exec(key) ?? [];
+    return (strings as unknown as Record<string, Record<string, string>>)[section][JSON.parse(value)];
+  };
+  expect(actions.map((action) => auditLabel('events', action, translate(en)))).toEqual([
+    'Resource flow changed',
+    'Global flow created',
+    'Global flow updated',
+    'Global flow deleted',
+    'Global flow canvas changed',
+    'Flow variable set',
+    'Flow variable deleted',
+  ]);
+  for (const strings of [en, de]) {
+    for (const action of actions) expect(strings.events).toHaveProperty([action]);
+    expect(strings.targets.flow).toBeTruthy();
+    for (const field of [
+      'flowName',
+      'snapshot',
+      'snapshotDetail',
+      'addedNodes',
+      'removedEdges',
+      'flowNodeCount',
+      'scope',
+      'key',
+    ])
+      expect(strings.fields).toHaveProperty([field]);
+  }
+  expect(auditLabel('targets', 'flow', translate(de))).toBe('Globaler Flow');
+});
+
+it('shows a global flow audit entry with its recorded flow name and a readable previous-flow snapshot', async () => {
+  list.mockResolvedValue({
+    items: [
+      {
+        ...entry,
+        id: 31,
+        action: 'flow.deleted',
+        subjectType: 'flow',
+        subjectId: 3,
+        subjectLabel: 'Door bell',
+        subjectLabelSource: 'recorded',
+        details: {
+          'before.name': 'Door bell',
+          'before.nodeCount': 2,
+          'before.snapshot': '{"nodes":[{"id":"a","type":"output.http"}],"edges":[]}',
+          snapshotDetail: 'no_data',
+        },
+      },
+    ],
+    nextCursor: null,
+  });
+  mount();
+  await userEvent.click(await screen.findByRole('button', { name: 'View event #31' }));
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getAllByText('Global flow deleted').length).toBeGreaterThan(0);
+  expect(within(dialog).getAllByText('Door bell').length).toBeGreaterThan(0);
+  expect(within(dialog).getAllByText(/"type": "output.http"/).length).toBeGreaterThan(0);
+  expect(within(dialog).getByText('Previous flow detail level')).toBeInTheDocument();
+});

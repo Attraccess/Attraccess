@@ -28,6 +28,60 @@ describe('audit storage safe snapshot', () => {
     expect(projectResourceAuditEvent({ ...deletion, details: { password: 'raw-secret' } })).toBeNull();
   });
 
+  it('allows the flow events with their reviewed fields and subject types only', () => {
+    const base = { operationId: randomUUID(), actorId: 42, subjectId: 7 };
+    const canvas = {
+      'before.nodeCount': 2,
+      'after.nodeCount': 0,
+      removedNodes: '[{"id":"a","type":"t"}]',
+      snapshotDetail: 'full',
+    };
+    const resourceFlow = {
+      ...base,
+      action: 'resource_flow.updated' as const,
+      subjectType: 'resource' as const,
+      details: canvas,
+    };
+    expect(projectResourceAuditEvent(resourceFlow)).toEqual(resourceFlow);
+    expect(projectResourceAuditEvent({ ...resourceFlow, subjectType: 'flow' })).toBeNull();
+    expect(
+      projectResourceAuditEvent({ ...resourceFlow, details: { ...canvas, flowName: 'Not for resource flows' } }),
+    ).toBeNull();
+    expect(projectResourceAuditEvent({ ...resourceFlow, details: { ...canvas, secret: 'x' } })).toBeNull();
+    expect(
+      projectResourceAuditEvent({ ...resourceFlow, details: { ...canvas, addedNodes: ['a'] as never } }),
+    ).toBeNull();
+
+    const globalFlow = {
+      ...base,
+      action: 'flow.canvas_updated' as const,
+      subjectType: 'flow' as const,
+      details: { ...canvas, flowName: 'Door bell' },
+    };
+    expect(projectResourceAuditEvent(globalFlow)).toEqual(globalFlow);
+    expect(projectResourceAuditEvent({ ...globalFlow, subjectType: 'resource' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...globalFlow, subjectType: undefined })).toBeNull();
+
+    for (const action of ['flow.created', 'flow.updated', 'flow.deleted'] as const) {
+      expect(projectResourceAuditEvent({ ...base, action, subjectType: 'flow', details: {} })).not.toBeNull();
+    }
+    const variable = {
+      ...base,
+      action: 'flow_variable.set' as const,
+      details: { scope: 'global', key: 'mode', valueType: 'string', 'after.value': '"on"' },
+    };
+    expect(projectResourceAuditEvent(variable)).toEqual(variable);
+    expect(projectResourceAuditEvent({ ...variable, subjectType: 'flow' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...variable, details: { ...variable.details, 'before.name': 'x' } })).toBeNull();
+    expect(
+      projectResourceAuditEvent({
+        action: 'resource.deleted',
+        ...base,
+        details: { 'before.name': 'Lathe', 'before.type': 'machine', flowNodeCount: 3, flowEdgeCount: 2 },
+      }),
+    ).not.toBeNull();
+  });
+
   it('accepts generated role keys truncated after a separator', () => {
     expect(
       projectIdentityAuditEvent({

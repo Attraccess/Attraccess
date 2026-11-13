@@ -5,11 +5,14 @@ import {
   ResourceFlowNode,
   ResourceFlowNodeType,
   ResourceMeter,
+  Flow,
 } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EntityManager, Repository } from 'typeorm';
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { ResourceFlowsService } from './resource-flows.service';
+
+const testActor = { id: 7, authenticationMethod: 'session' as const };
 
 describe('resource flow meter validation', () => {
   const resourceId = 7;
@@ -52,6 +55,8 @@ describe('resource flow meter validation', () => {
       createMock<Repository<Resource>>({ manager, findOne: jest.fn().mockResolvedValue(resource) }),
       createMock<MqttClientService>(),
       new EventEmitter2(),
+      createMock<Repository<Flow>>(),
+      { record: jest.fn().mockResolvedValue({}) } as never,
     );
     return { service, nodes, manager, meters };
   }
@@ -67,7 +72,7 @@ describe('resource flow meter validation', () => {
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
-        : await service.saveResourceFlow(resourceId, { nodes, edges: [] });
+        : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toEqual(
       nodes.map((node) => ({
@@ -87,7 +92,7 @@ describe('resource flow meter validation', () => {
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
-        : await service.saveResourceFlow(resourceId, { nodes, edges: [] });
+        : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toBeUndefined();
     expectOneMeterQuery(manager);
@@ -101,7 +106,7 @@ describe('resource flow meter validation', () => {
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
-        : await service.saveResourceFlow(resourceId, { nodes, edges: [] });
+        : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toEqual([
       {
@@ -119,7 +124,7 @@ describe('resource flow meter validation', () => {
     const run = () =>
       operation === 'load'
         ? service.getResourceFlow(resourceId)
-        : service.saveResourceFlow(resourceId, { nodes, edges: [] });
+        : service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
     expect((await run()).validationErrors).toBeUndefined();
     meters.length = 0;
 
@@ -133,7 +138,7 @@ describe('resource flow meter validation', () => {
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
-        : await service.saveResourceFlow(resourceId, { nodes, edges: [] });
+        : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toBeUndefined();
     expect(manager.find).not.toHaveBeenCalledWith(ResourceMeter, expect.anything());
@@ -148,7 +153,7 @@ describe('resource flow meter validation', () => {
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
-        : await service.saveResourceFlow(resourceId, { nodes, edges: [] });
+        : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toBeUndefined();
     expect(manager.find).not.toHaveBeenCalledWith(ResourceMeter, expect.anything());
@@ -160,7 +165,7 @@ describe('resource flow meter validation', () => {
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
-        : await service.saveResourceFlow(resourceId, { nodes, edges: [] });
+        : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toHaveLength(types.length);
     expect(manager.find).not.toHaveBeenCalledWith(ResourceMeter, expect.anything());
@@ -172,7 +177,7 @@ describe('resource flow meter validation', () => {
     const result =
       operation === 'load'
         ? await service.getResourceFlow(resourceId)
-        : await service.saveResourceFlow(resourceId, { nodes, edges: [] });
+        : await service.saveResourceFlow(resourceId, { nodes, edges: [] }, testActor);
 
     expect(result.validationErrors).toEqual(
       nodes.map((node) => ({

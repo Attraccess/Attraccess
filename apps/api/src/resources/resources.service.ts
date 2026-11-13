@@ -1,4 +1,4 @@
-import { Resource, SupervisionMode } from '@attraccess/database-entities';
+import { Resource, ResourceFlowEdge, ResourceFlowNode, SupervisionMode } from '@attraccess/database-entities';
 
 import { Inject, Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 
@@ -473,6 +473,13 @@ export class ResourcesService {
     actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
   ): Promise<void> {
     const resource = actor ? await this.getResourceById(id) : undefined;
+    // A soft delete keeps the flow rows; the counts say what flow the resource had when it was deleted.
+    const [flowNodeCount, flowEdgeCount] = actor
+      ? await Promise.all([
+          this.resourceRepository.manager.count(ResourceFlowNode, { where: { resourceId: id } }),
+          this.resourceRepository.manager.count(ResourceFlowEdge, { where: { resourceId: id } }),
+        ])
+      : [0, 0];
     const result = await this.resourceRepository.softDelete(id);
     if (result.affected === 0) {
       throw new ResourceNotFoundException(id);
@@ -487,8 +494,17 @@ export class ResourcesService {
         actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
         subject: { type: 'resource', id: id },
         details: {
-          ...auditResourceNames({ 'before.name': resource.name }, { 'before.type': resource.type }),
+          ...auditResourceNames(
+            { 'before.name': resource.name },
+            {
+              'before.type': resource.type,
+              flowNodeCount: String(flowNodeCount),
+              flowEdgeCount: String(flowEdgeCount),
+            },
+          ),
           'before.type': resource.type,
+          flowNodeCount,
+          flowEdgeCount,
         },
       });
     }

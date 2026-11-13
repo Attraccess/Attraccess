@@ -14,7 +14,7 @@ import { MqttClientService } from '../../mqtt/mqtt-client.service';
 import { registerPluginFlowNodes } from '../../plugin-system/flows/node-registry';
 import { ResourceFlowChangedEvent } from './events/resource-flow-changed.event';
 import { ResourceFlowsService } from './resource-flows.service';
-import { openFlowCanvasDatabase, startToHttpCanvas } from './flow-canvas-database.test-fixture';
+import { openFlowCanvasDatabase, startToHttpCanvas, testActor } from './flow-canvas-database.test-fixture';
 
 it('reports invalid plugin trigger configuration when loading a saved flow', async () => {
   const definition: PluginFlowTriggerNodeDefinition = {
@@ -34,6 +34,7 @@ it('reports invalid plugin trigger configuration when loading a saved flow', asy
     createMock<MqttClientService>(),
     new EventEmitter2(),
     createMock<Repository<Flow>>(),
+    { record: jest.fn().mockResolvedValue({}) } as never,
   );
   await expect(service.getResourceFlow(1)).resolves.toMatchObject({
     validationErrors: [
@@ -56,6 +57,7 @@ describe('saving MQTT flow subscriptions', () => {
     mqtt,
     events,
     createMock<Repository<Flow>>(),
+    { record: jest.fn().mockResolvedValue({}) } as never,
   );
   const node = (id: string, type: ResourceFlowNodeType, topic: string, serverId = 2) => ({
     id,
@@ -104,7 +106,7 @@ describe('saving MQTT flow subscriptions', () => {
       ].map((value) => Object.assign(new ResourceFlowNode(), value)),
     );
     const edges = [{ id: 'edge', source: 'same', target: 'new-wait', sourceHandle: 'output', targetHandle: 'input' }];
-    const result = await service.saveResourceFlow(1, { nodes, edges });
+    const result = await service.saveResourceFlow(1, { nodes, edges }, testActor);
     expect(mqtt.subscribe.mock.calls).toEqual([
       [2, 'new'],
       [2, 'wait'],
@@ -117,10 +119,14 @@ describe('saving MQTT flow subscriptions', () => {
     expect(events.emit).toHaveBeenCalledWith(ResourceFlowChangedEvent.EVENT_NAME, 1);
   });
   it('retains invalid drafts with validation errors but skips incomplete subscriptions', async () => {
-    const result = await service.saveResourceFlow(1, {
-      nodes: [node('invalid', ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, '')],
-      edges: [],
-    });
+    const result = await service.saveResourceFlow(
+      1,
+      {
+        nodes: [node('invalid', ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, '')],
+        edges: [],
+      },
+      testActor,
+    );
     expect(result.nodes).toHaveLength(1);
     expect(result.validationErrors).toEqual(expect.arrayContaining([expect.objectContaining({ nodeId: 'invalid' })]));
     expect(mqtt.subscribe).not.toHaveBeenCalled();
@@ -137,13 +143,17 @@ describe('saving MQTT flow subscriptions', () => {
         execute: jest.fn(),
       },
     ]);
-    const saving = service.saveResourceFlow(1, {
-      nodes: [
-        node('mqtt', ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, 'a'),
-        { id: 'notify-1', type: 'plugin.global-only-test.notify', position: { x: 0, y: 0 }, data: {} },
-      ],
-      edges: [],
-    });
+    const saving = service.saveResourceFlow(
+      1,
+      {
+        nodes: [
+          node('mqtt', ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED, 'a'),
+          { id: 'notify-1', type: 'plugin.global-only-test.notify', position: { x: 0, y: 0 }, data: {} },
+        ],
+        edges: [],
+      },
+      testActor,
+    );
     await expect(saving).rejects.toBeInstanceOf(BadRequestException);
     await expect(saving).rejects.toMatchObject({
       response: {
@@ -158,7 +168,9 @@ describe('saving MQTT flow subscriptions', () => {
   });
   it('does not announce a flow change when persistence fails', async () => {
     manager.save.mockRejectedValueOnce(new Error('database rejected write'));
-    await expect(service.saveResourceFlow(1, { nodes: [], edges: [] })).rejects.toThrow('database rejected write');
+    await expect(service.saveResourceFlow(1, { nodes: [], edges: [] }, testActor)).rejects.toThrow(
+      'database rejected write',
+    );
     expect(events.emit).not.toHaveBeenCalled();
   });
 });
@@ -172,6 +184,7 @@ describe('plugin node configuration schemas', () => {
     createMock<MqttClientService>(),
     new EventEmitter2(),
     createMock<Repository<Flow>>(),
+    { record: jest.fn().mockResolvedValue({}) } as never,
   );
   it('resolves dynamic schemas with resource context and falls back to static schemas', async () => {
     resources.findOne.mockResolvedValue({ id: 1 } as Resource);
@@ -250,6 +263,7 @@ describe('shared machine flow warnings', () => {
       createMock<MqttClientService>(),
       new EventEmitter2(),
       flowRepository,
+      { record: jest.fn().mockResolvedValue({}) } as never,
     );
     return Object.assign(service, { nodeRepository, edgeRepository, flowRepository });
   };
@@ -375,13 +389,17 @@ describe('saving a resource flow with ids owned by another flow', () => {
   afterEach(() => db.source.destroy());
 
   it('rejects ids of a global flow with 400 naming them and leaves both flows untouched', async () => {
-    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'));
-    await db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'));
+    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'), testActor);
+    await db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'), testActor);
 
-    const saving = db.resourceFlows.saveResourceFlow(db.resource.id, {
-      nodes: [...startToHttpCanvas('g').nodes, ...startToHttpCanvas('r2').nodes],
-      edges: startToHttpCanvas('g').edges,
-    });
+    const saving = db.resourceFlows.saveResourceFlow(
+      db.resource.id,
+      {
+        nodes: [...startToHttpCanvas('g').nodes, ...startToHttpCanvas('r2').nodes],
+        edges: startToHttpCanvas('g').edges,
+      },
+      testActor,
+    );
     await expect(saving).rejects.toBeInstanceOf(BadRequestException);
     await expect(saving).rejects.toMatchObject({
       response: {
@@ -404,8 +422,10 @@ describe('saving a resource flow with ids owned by another flow', () => {
   });
 
   it('saves its own ids again', async () => {
-    await db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'));
-    await expect(db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'))).resolves.toMatchObject({
+    await db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'), testActor);
+    await expect(
+      db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'), testActor),
+    ).resolves.toMatchObject({
       nodes: [{ id: 'r-start' }, { id: 'r-http' }],
     });
     expect(await db.nodes.count({ where: { resourceId: db.resource.id } })).toBe(2);

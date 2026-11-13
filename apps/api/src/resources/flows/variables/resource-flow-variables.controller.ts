@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Put, Req } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Auth, ResourceFlowVariableScope } from '@attraccess/plugins-backend-sdk';
+import { Auth, AuthenticatedRequest, ResourceFlowVariableScope } from '@attraccess/plugins-backend-sdk';
+import { auditActorOf } from '../../../audit/recorder/audit-event';
 import { ResourceFlowVariablesService } from './resource-flow-variables.service';
 import { FlowVariableDto, FlowVariableUpsertDto } from '../dto/flow-variable.dto';
 
@@ -37,8 +38,9 @@ export class ResourceFlowVariablesController {
     @Param('scope') scope: ResourceFlowVariableScope,
     @Param('key') key: string,
     @Body() body: FlowVariableUpsertDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    await this.service.set(scope, resourceId, key, body.value, resourceId);
+    await this.service.set(scope, resourceId, key, body.value, resourceId, null, auditActorOf(req.user));
   }
 
   @Delete(':scope/:key')
@@ -50,7 +52,8 @@ export class ResourceFlowVariablesController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('scope') scope: ResourceFlowVariableScope,
     @Param('key') key: string,
+    @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    await this.service.delete(scope, resourceId, key);
+    await this.service.delete(scope, resourceId, key, auditActorOf(req.user));
   }
 }

@@ -1,4 +1,5 @@
 # Audit-Protokoll
+
 <!-- llms-description: Wie Sie das Audit-Protokoll durchsuchen, filtern, prüfen und exportieren sowie Aufzeichnung und Aufbewahrung steuern. -->
 
 Unter **Einstellungen → Auditprotokoll** können Sie erfasste Aktivitäten nachvollziehen. Der Reiter **Aktivitäten** zeigt die neuesten Ereignisse zuerst. Unter **Protokollierung** legen Sie Erfassung und Aufbewahrung fest.
@@ -27,6 +28,25 @@ Die Details zeigen außerdem API-Token-ID, Integrations-ID, IP-Adresse und User-
 Protokolleinträge sind historische Aufzeichnungen und lassen sich in der Anwendung nicht bearbeiten. Ein Ereignis enthält die für diesen Vorgang erfassten Informationen; es ist keine vollständige Kopie des zugrunde liegenden Objekts. Fehlt bei einem geänderten Feld ein gespeicherter Vorher- oder Nachher-Wert, erscheint **Nicht erfasst**.
 
 Änderungen an der Standardsprache des Systems verwenden das bestehende Ereignis `settings.updated` im Administrationsbereich. Die Details nennen `app.defaultLanguage` sowie den vorherigen und neuen Wert (`de` oder `en`). Ist die Erfassung für diesen Bereich aktiviert, erscheinen erfolgreiche Sprachänderungen unter diesem Ereignis. Ein fehlgeschlagener Speichervorgang erzeugt keinen Eintrag für eine erfolgreiche Änderung.
+
+## Flow-Änderungen
+
+Jede Änderung an einem Flow wird im Bereich **resource** erfasst, mit dem ausführenden Benutzer (oder API-Token), dem Zeitpunkt und dem, was sich geändert hat:
+
+| Ereignis                                                                                          | Erfasst, wenn                                                                                                                 |
+| ------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `resource_flow.updated` (Ressourcen-Flow geändert)                                                | Der Flow-Canvas einer Ressource mit einer Änderung gespeichert wird. Ziel: die Ressource.                                     |
+| `flow.created`, `flow.updated`, `flow.deleted` (Globaler Flow erstellt / aktualisiert / gelöscht) | Ein globaler Flow angelegt wird, sich Name, Beschreibung oder Ein/Aus-Schalter ändern oder er gelöscht wird. Zieltyp: `flow`. |
+| `flow.canvas_updated` (Canvas eines globalen Flows geändert)                                      | Der Canvas eines globalen Flows mit einer Änderung gespeichert wird. Zieltyp: `flow`.                                         |
+| `flow_variable.set`, `flow_variable.deleted` (Flow-Variable gesetzt / gelöscht)                   | Ein Benutzer auf der Flow-Seite einer Ressource eine Flow-Variable setzt oder löscht. Ziel: die Ressource.                    |
+
+Canvas-Ereignisse nennen die Anzahl der Knoten und Verbindungen vorher und nachher, die hinzugefügten, entfernten und geänderten Knoten (ID und Typ) sowie die hinzugefügten und entfernten Verbindungen. Ein Knoten gilt als geändert, wenn sich Typ oder Einstellungen ändern; ein bloßes Verschieben zählt nicht. Ein Speichern ohne Änderung, auch wenn nur Knoten verschoben wurden, wird nicht erfasst. Wird ein gefüllter Canvas durch einen leeren ersetzt, wird das immer erfasst.
+
+Die Details enthalten außerdem den vorherigen Canvas als JSON (**Vorheriger Flow**). Damit lässt sich ein verlorener Flow aus dem Eintrag oder dem CSV-Export von Hand wiederherstellen. Details sind auf 4.096 Byte begrenzt. Bei großen Flows wird der vorherige Canvas schrittweise reduziert: zuerst ohne Knotenpositionen, dann ohne Knoteneinstellungen (nur IDs, Typen und Verbindungen bleiben) und zuletzt ganz weggelassen. Das Feld **Detailgrad des vorherigen Flows** zeigt die Stufe (`full`, `no_positions`, `no_data`, `omitted`). Lange Listen geänderter Knoten werden gekürzt, die Anzahlen bleiben vollständig.
+
+Geheimnisse werden nicht gespeichert: Alle HTTP-Header-Werte und jede Einstellung, deren Name nach Zugangsdaten klingt (zum Beispiel Passwort, Token, Secret, API-Schlüssel, Authorization), werden als `[redacted]` erfasst. Das ist ein bestmöglicher Schutz; legen Sie Geheimnisse nicht in frei formulierten Knoteneinstellungen ab, wenn Sie sich nicht darauf verlassen können.
+
+Beim Löschen eines globalen Flows werden der Flow sowie seine Knoten und Verbindungen so erfasst, wie sie vor dem Löschen waren. Das Löschen einer Ressource lässt deren Flow in der Datenbank, aber das Ereignis `resource.deleted` nennt, wie viele Flow-Knoten (`flowNodeCount`) und Verbindungen (`flowEdgeCount`) sie hatte. Werte, die ein laufender Flow in Flow-Variablen schreibt, werden nicht erfasst.
 
 ## Exportieren
 

@@ -23,6 +23,13 @@ export const RESOURCE_AUDIT_ACTIONS = [
   'meter_charge.waived',
   'retraining.required',
   'retraining.cleared',
+  'resource_flow.updated',
+  'flow.created',
+  'flow.updated',
+  'flow.deleted',
+  'flow.canvas_updated',
+  'flow_variable.set',
+  'flow_variable.deleted',
 ] as const;
 
 export type ResourceAuditAction = (typeof RESOURCE_AUDIT_ACTIONS)[number];
@@ -35,14 +42,35 @@ export interface ResourceAuditInput {
   authenticationMethod?: 'session' | 'api-token' | null;
   apiTokenId?: number | null;
   subjectId: number;
-  subjectType?: 'resource' | 'resource_group';
+  subjectType?: 'resource' | 'resource_group' | 'flow';
   details: Record<string, string | number>;
 }
+
+const CANVAS_FIELDS = [
+  'before.nodeCount',
+  'after.nodeCount',
+  'before.edgeCount',
+  'after.edgeCount',
+  'addedNodes',
+  'removedNodes',
+  'changedNodes',
+  'addedEdges',
+  'removedEdges',
+  'addedNodeCount',
+  'removedNodeCount',
+  'changedNodeCount',
+  'addedEdgeCount',
+  'removedEdgeCount',
+  'before.snapshot',
+  'snapshotDetail',
+] as const;
+const VARIABLE_FIELDS = ['scope', 'key', 'before.value', 'after.value', 'valueType'] as const;
+
 export const resourceActions = new Set<ResourceAuditAction>(RESOURCE_AUDIT_ACTIONS);
 export const resourceDetailFields: Partial<Record<ResourceAuditAction, readonly string[]>> = {
   'resource.created': ['after.name', 'after.type'],
   'resource.updated': ['before.name', 'after.name', 'before.type', 'after.type', 'changedFields'],
-  'resource.deleted': ['before.name', 'before.type'],
+  'resource.deleted': ['before.name', 'before.type', 'flowNodeCount', 'flowEdgeCount'],
   'resource_group.created': ['after.name', 'after.isHidden'],
   'resource_group.updated': ['before.name', 'after.name', 'before.isHidden', 'after.isHidden', 'changedFields'],
   'resource_group.deleted': ['before.name', 'before.isHidden'],
@@ -86,6 +114,28 @@ export const resourceDetailFields: Partial<Record<ResourceAuditAction, readonly 
   'meter_charge.waived': ['meterId', 'usageId', 'waivedCredits'],
   'retraining.required': ['introductionId', 'retrainingReason', 'usageUserId'],
   'retraining.cleared': ['introductionId', 'usageUserId'],
+  'resource_flow.updated': CANVAS_FIELDS,
+  'flow.created': ['after.name', 'after.enabled', 'after.description'],
+  'flow.updated': [
+    'before.name',
+    'after.name',
+    'before.enabled',
+    'after.enabled',
+    'before.description',
+    'after.description',
+    'changedFields',
+  ],
+  'flow.deleted': [
+    'before.name',
+    'before.enabled',
+    'before.nodeCount',
+    'before.edgeCount',
+    'before.snapshot',
+    'snapshotDetail',
+  ],
+  'flow.canvas_updated': ['flowName', ...CANVAS_FIELDS],
+  'flow_variable.set': VARIABLE_FIELDS,
+  'flow_variable.deleted': VARIABLE_FIELDS,
 };
 export function validResourcePrincipal(input: ResourceAuditInput): boolean {
   if (input.actorId === null) {
@@ -110,13 +160,20 @@ export function validResourcePrincipal(input: ResourceAuditInput): boolean {
   return true;
 }
 
+/** Global flow events are about a `flow`; resource_group events about a group; everything else about a resource. */
+function validSubjectType(input: ResourceAuditInput): boolean {
+  if (input.subjectType === undefined) return !input.action.startsWith('flow.');
+  if (input.action.startsWith('flow.')) return input.subjectType === 'flow';
+  return input.subjectType === 'resource' || input.subjectType === 'resource_group';
+}
+
 export function projectResourceAuditEvent(input: ResourceAuditInput): ResourceAuditInput | null {
   if (
     !resourceActions.has(input.action) ||
     !uuid(input.operationId) ||
     (input.actorId !== null && !positive(input.actorId)) ||
     !positive(input.subjectId) ||
-    (input.subjectType !== undefined && input.subjectType !== 'resource' && input.subjectType !== 'resource_group')
+    !validSubjectType(input)
   ) {
     return null;
   }

@@ -219,7 +219,14 @@
     "plugin.zip_deleted": "Plugin-Archiv gelöscht",
     "plugin.retry_requested": "Erneuter Plugin-Versuch angefordert",
     "billing.transaction.updated": "Abrechnung geändert",
-    "meter_charge.waived": "Zählerkosten erlassen"
+    "meter_charge.waived": "Zählerkosten erlassen",
+    "resource_flow.updated": "Ressourcen-Flow geändert",
+    "flow.created": "Globaler Flow erstellt",
+    "flow.updated": "Globaler Flow aktualisiert",
+    "flow.deleted": "Globaler Flow gelöscht",
+    "flow.canvas_updated": "Canvas eines globalen Flows geändert",
+    "flow_variable.set": "Flow-Variable gesetzt",
+    "flow_variable.deleted": "Flow-Variable gelöscht"
   },
   "targets": {
     "resource": "Ressource",
@@ -246,7 +253,8 @@
     "mqtt-server": "MQTT-Server",
     "plugin-package": "Plugin-Paket",
     "plugin-registry": "Plugin-Registry",
-    "plugin-policy": "Plugin-Regel"
+    "plugin-policy": "Plugin-Regel",
+    "flow": "Globaler Flow"
   },
   "fields": {
     "name": "Name",
@@ -386,7 +394,27 @@
     "topic": "Thema",
     "size": "Größe (Bytes)",
     "qos": "QoS",
-    "retain": "Nachricht behalten (retain)"
+    "retain": "Nachricht behalten (retain)",
+    "flowName": "Flow-Name",
+    "nodeCount": "Anzahl Knoten",
+    "edgeCount": "Anzahl Verbindungen",
+    "snapshot": "Vorheriger Flow (JSON)",
+    "snapshotDetail": "Detailgrad des vorherigen Flows",
+    "addedNodes": "Hinzugefügte Knoten",
+    "removedNodes": "Entfernte Knoten",
+    "changedNodes": "Geänderte Knoten",
+    "addedEdges": "Hinzugefügte Verbindungen",
+    "removedEdges": "Entfernte Verbindungen",
+    "addedNodeCount": "Anzahl hinzugefügter Knoten",
+    "removedNodeCount": "Anzahl entfernter Knoten",
+    "changedNodeCount": "Anzahl geänderter Knoten",
+    "addedEdgeCount": "Anzahl hinzugefügter Verbindungen",
+    "removedEdgeCount": "Anzahl entfernter Verbindungen",
+    "flowNodeCount": "Flow-Knoten beim Löschen",
+    "flowEdgeCount": "Flow-Verbindungen beim Löschen",
+    "scope": "Geltungsbereich",
+    "key": "Schlüssel",
+    "valueType": "Werttyp"
   },
   "eventType": "Ereignistyp",
   "pluginId": "Integrations-ID",

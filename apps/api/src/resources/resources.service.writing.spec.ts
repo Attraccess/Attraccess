@@ -370,7 +370,13 @@ describe('ResourcesService', () => {
       expect(deleteResourceScope.resourceRepository.softDelete).toHaveBeenCalledWith(1);
     });
 
-    it('audits deletion with the pre-delete safe projection', async () => {
+    beforeEach(() => {
+      (deleteResourceScope.resourceRepository as { manager: unknown }).manager = {
+        count: jest.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(2),
+      };
+    });
+
+    it('audits deletion with the pre-delete safe projection and the flow it had', async () => {
       const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
       jest.spyOn(deleteResourceScope.service, 'getResourceById').mockResolvedValue(resource);
       deleteResourceScope.resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
@@ -382,7 +388,7 @@ describe('ResourcesService', () => {
           domain: 'resource',
           action: 'resource.deleted',
           actor: expect.objectContaining({ id: 9 }),
-          details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine },
+          details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine, flowNodeCount: 3, flowEdgeCount: 2 },
         }),
       );
     });
