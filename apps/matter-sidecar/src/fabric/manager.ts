@@ -10,6 +10,7 @@ import { MatterController } from './controller';
 import {
   advanceRestoredCounters,
   ensureStorageDir,
+  hardenStorage,
   inspectStorage,
   layoutFor,
   metadataSchema,
@@ -73,6 +74,9 @@ export class FabricManager {
   /** Inspects the storage and, when a complete fabric exists, resumes the controller. Never creates a fabric. */
   async init(): Promise<void> {
     ensureStorageDir(this.options.storageDir);
+    // A stage is only kept in memory, so one found on disk belongs to a process that is gone. It holds a full copy of
+    // the staged fabric keys, so it is not left behind.
+    rmSync(this.layout.stagingDir, { recursive: true, force: true });
     this.#inspection = inspectStorage(this.layout);
     if (this.#inspection.kind === 'recovery') {
       this.options.logger('warn', 'matter storage needs recovery; the controller is not started', {
@@ -80,7 +84,11 @@ export class FabricManager {
       });
       return;
     }
-    if (this.#inspection.kind === 'initialized') await this.#resume(this.#inspection);
+    if (this.#inspection.kind === 'initialized') {
+      hardenStorage(this.options.storageDir);
+      await this.#resume(this.#inspection);
+      hardenStorage(this.options.storageDir);
+    }
   }
 
   async close(): Promise<void> {
@@ -189,6 +197,7 @@ export class FabricManager {
           updatedAt: stamp,
         };
         writeMetadata(this.layout, metadata);
+        hardenStorage(this.options.storageDir);
         this.#controller = controller;
         this.#inspection = { kind: 'initialized', metadata, facts };
       } catch (error) {

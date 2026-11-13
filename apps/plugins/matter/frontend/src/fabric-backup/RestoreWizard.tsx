@@ -24,6 +24,15 @@ import {
 type Step = 'select' | 'preview' | 'running' | 'success' | 'failed';
 type Mode = 'stored' | 'upload';
 
+/** The host reads the upload as JSON (base64, about a third larger) with a 10 MB body limit. */
+const MAX_UPLOAD_BYTES = 7 * 1024 * 1024;
+
+/** What is wrong with a file before it is sent, if anything. */
+function uploadProblem(file: File): 'empty' | 'tooLarge' | null {
+  if (file.size === 0) return 'empty';
+  return file.size > MAX_UPLOAD_BYTES ? 'tooLarge' : null;
+}
+
 type Props = Readonly<{
   stored: BackupView[];
   onClose: () => void;
@@ -44,6 +53,50 @@ function useErrorText() {
     }
     return error instanceof Error ? error.message : String(error);
   };
+}
+
+type PreviewProps = {
+  validation: RestoreValidation;
+  preflight: RestoreValidation['preflight'];
+  typed: string;
+  onTyped: (value: string) => void;
+  formatDateTime: (value: string) => React.ReactNode;
+};
+
+/** What the validated backup would do to this installation, with the typed confirmation where it overwrites. */
+function PreviewStep({ validation, preflight, typed, onTyped, formatDateTime }: Readonly<PreviewProps>) {
+  const { t } = useMatterTranslations();
+  return (
+    <>
+      <div className="mt:flex mt:flex-wrap mt:gap-2">
+        <Chip variant="soft">{t(`fabric.restore.kind.${preflight.kind}`)}</Chip>
+        <Chip variant="soft">{t(`fabric.state.${preflight.sidecarState}`)}</Chip>
+      </div>
+      <dl className="mt:grid mt:grid-cols-1 mt:gap-3 mt:sm:grid-cols-2" data-cy="matter-restore-summary">
+        <Fact label={t('fabric.restore.backupCreated')}>{formatDateTime(validation.backup.createdAt)}</Fact>
+        <Fact label={t('fabric.restore.pluginVersion')}>{validation.backup.pluginVersion}</Fact>
+        <Fact label={t('fabric.restore.sidecarVersion')}>{validation.backup.sidecarVersion}</Fact>
+        <Fact label={t('fabric.generationLabel')}>{validation.backup.fabricGeneration}</Fact>
+        <Fact label={t('fabric.restore.backupFabric')}>{validation.backup.fabricId}</Fact>
+        <Fact label={t('fabric.restore.currentFabric')}>{preflight.currentFabricId ?? t('fabric.none')}</Fact>
+      </dl>
+      <p>
+        {t('fabric.restore.previewHint')}
+        {preflight.requiresTypedConfirmation && ` ${t('fabric.restore.previewHintBackup')}`}
+      </p>
+      {preflight.requiresTypedConfirmation && (
+        <>
+          <StatusAlert status="danger" title={t('fabric.restore.overwriteTitle')} data-cy="matter-restore-overwrite">
+            {t('fabric.restore.overwriteText')}
+          </StatusAlert>
+          <TextField value={typed} onChange={onTyped} className="mt:w-full">
+            <Label>{t('fabric.restore.typeFabricId', { fabricId: preflight.confirmationFabricId ?? '' })}</Label>
+            <Input autoComplete="off" spellCheck={false} data-cy="matter-restore-typed" />
+          </TextField>
+        </>
+      )}
+    </>
+  );
 }
 
 /**
@@ -71,8 +124,10 @@ export function RestoreWizard({ stored, onClose, onRestored }: Props) {
   const confirmed = !preflight?.requiresTypedConfirmation || typed.trim() === preflight.confirmationFabricId;
 
   const validate = async () => {
-    setBusy(true);
     setError(null);
+    const problem = mode === 'upload' && file ? uploadProblem(file) : null;
+    if (problem) return setError({ code: null, text: t(`fabric.restore.error.${problem}`) });
+    setBusy(true);
     try {
       const source: RestoreSource =
         mode === 'stored' && backupId
@@ -199,36 +254,13 @@ export function RestoreWizard({ stored, onClose, onRestored }: Props) {
         )}
 
         {step === 'preview' && validation && preflight && (
-          <>
-            <div className="mt:flex mt:flex-wrap mt:gap-2">
-              <Chip variant="soft">{t(`fabric.restore.kind.${preflight.kind}`)}</Chip>
-              <Chip variant="soft">{t(`fabric.state.${preflight.sidecarState}`)}</Chip>
-            </div>
-            <dl className="mt:grid mt:grid-cols-1 mt:gap-3 mt:sm:grid-cols-2" data-cy="matter-restore-summary">
-              <Fact label={t('fabric.restore.backupCreated')}>{formatDateTime(validation.backup.createdAt)}</Fact>
-              <Fact label={t('fabric.restore.pluginVersion')}>{validation.backup.pluginVersion}</Fact>
-              <Fact label={t('fabric.restore.sidecarVersion')}>{validation.backup.sidecarVersion}</Fact>
-              <Fact label={t('fabric.generationLabel')}>{validation.backup.fabricGeneration}</Fact>
-              <Fact label={t('fabric.restore.backupFabric')}>{validation.backup.fabricId}</Fact>
-              <Fact label={t('fabric.restore.currentFabric')}>{preflight.currentFabricId ?? t('fabric.none')}</Fact>
-            </dl>
-            <p>{t('fabric.restore.previewHint')}</p>
-            {preflight.requiresTypedConfirmation && (
-              <>
-                <StatusAlert
-                  status="danger"
-                  title={t('fabric.restore.overwriteTitle')}
-                  data-cy="matter-restore-overwrite"
-                >
-                  {t('fabric.restore.overwriteText')}
-                </StatusAlert>
-                <TextField value={typed} onChange={setTyped} className="mt:w-full">
-                  <Label>{t('fabric.restore.typeFabricId', { fabricId: preflight.confirmationFabricId ?? '' })}</Label>
-                  <Input autoComplete="off" spellCheck={false} data-cy="matter-restore-typed" />
-                </TextField>
-              </>
-            )}
-          </>
+          <PreviewStep
+            validation={validation}
+            preflight={preflight}
+            typed={typed}
+            onTyped={setTyped}
+            formatDateTime={formatDateTime}
+          />
         )}
 
         {step === 'running' && <p role="status">{t('fabric.restore.running')}</p>}

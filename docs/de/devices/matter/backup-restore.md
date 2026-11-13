@@ -40,21 +40,21 @@ Zusätzlich können Sie jederzeit **Jetzt sichern** wählen. Die Statuskarte zei
 
 ## Der Recovery-Schlüssel
 
-Wenn Sie die Fabric erzeugen (oder eine neue beginnen), erzeugt Attraccess einen **256-Bit-Recovery-Schlüssel**, angezeigt als gruppierte Großbuchstaben und Ziffern (zum Beispiel `ABCD-EFGH-…`). Die Backups werden mit einem daraus abgeleiteten Schlüssel verschlüsselt.
+Wenn Sie die Fabric erzeugen, erzeugt Attraccess einen **256-Bit-Recovery-Schlüssel**, angezeigt als gruppierte Großbuchstaben und Ziffern (zum Beispiel `ABCD-EFGH-…`). Die Backups werden mit einem daraus abgeleiteten Schlüssel verschlüsselt.
 
 - Der Schlüssel wird **genau einmal** angezeigt. Sie können ihn kopieren oder als Textdatei herunterladen. Bevor sich der Dialog schließt, müssen Sie das Bestätigungs-Kontrollkästchen aktivieren.
 - **Bewahren Sie ihn außerhalb des Servers auf**, zum Beispiel in einem Passwortmanager und ausgedruckt an einem sicheren Ort. Er wird nie wieder angezeigt und erscheint weder in Logs noch im Audit-Log noch in einem Backup.
 - **Verlieren Sie Schlüssel und Server, ist die Fabric nicht wiederherstellbar.** Niemand, auch nicht das Projekt, kann ein Backup ohne den Schlüssel entschlüsseln.
-- **Rotation.** **Schlüssel rotieren** (nach einer Bestätigung) erzeugt einen neuen Schlüssel, zeigt ihn einmal an und verschlüsselt alle neuen Backups damit. Bestehende Backups behalten den Schlüssel, mit dem sie erstellt wurden: Der Header jedes Backups nennt seinen Schlüssel per ID. **Bewahren Sie alte Schlüssel so lange auf, wie Sie alte Backups brauchen könnten.**
+- **Rotation.** **Wiederherstellungsschlüssel rotieren** (nach einer Bestätigung) erzeugt einen neuen Schlüssel, zeigt ihn einmal an und verschlüsselt alle neuen Backups damit. Bestehende Backups behalten den Schlüssel, mit dem sie erstellt wurden: Der Header jedes Backups nennt seinen Schlüssel per ID. Diese Installation behält ihre ausgemusterten Schlüssel (verschlüsselt), ihre eigenen gespeicherten Backups bleiben also nutzbar; auf einer frischen Installation brauchen Sie aber den im Header genannten Schlüssel. **Bewahren Sie alte Schlüssel so lange auf, wie Sie alte Backups brauchen könnten.**
 - Der Server speichert den Recovery-Schlüssel verschlüsselt mit einem aus `AUTH_SESSION_SECRET` abgeleiteten Schlüssel. Wer die Datenbank **und** die `.env`-Datei hat, kann die gespeicherten Backups daher entschlüsseln. Das ist dieselbe Vertrauensgrenze wie beim Rest von Attraccess (dieselben Personen können Datenbank und Ihre Geheimnisse ohnehin lesen), ist aber der Grund, beides zu schützen.
 - **Das Deinstallieren des Matter-Plugins löscht den gespeicherten Schlüssel und alle gespeicherten Backups** zusammen mit den übrigen Plugin-Daten. Laden Sie vor dem Deinstallieren ein Backup herunter und bewahren Sie den Schlüssel auf.
 
 ## Wiederherstellung
 
-Wählen Sie im Bereich Fabric & Backup **Wiederherstellen**. Es öffnet sich ein Assistent:
+Wählen Sie im Bereich Fabric & Backup **Aus Backup wiederherstellen**. Es öffnet sich ein Assistent:
 
-1. **Backup wählen:** Wählen Sie ein gespeichertes Backup oder laden Sie eine `.attraccess-matter-backup`-Datei hoch.
-2. **Recovery-Schlüssel eingeben**, mit dem das Backup erstellt wurde. Haben Sie Schlüssel rotiert, verwenden Sie den im Header des Backups genannten Schlüssel (angezeigt als ID).
+1. **Backup wählen:** Wählen Sie ein gespeichertes Backup oder laden Sie eine `.attraccess-matter-backup`-Datei hoch (höchstens 7 MB).
+2. **Recovery-Schlüssel eingeben**, mit dem das Backup erstellt wurde. Attraccess fragt ihn nur ab, wenn das Backup mit einem Schlüssel erstellt wurde, den diese Installation nicht kennt, zum Beispiel nach einer Neuinstallation. Verwenden Sie den im Header des Backups genannten Schlüssel (angezeigt als ID).
 3. **Prüfen.** Attraccess prüft die Datei vollständig, bevor sich etwas ändert: Dateiformat, Integrität beider Teile, Schlüssel und ob das Backup zu dieser Installation passt (siehe unten). Fehler sind konkret, zum Beispiel falscher Schlüssel, beschädigte oder abgeschnittene Datei oder ein anderes Plugin-Release. Schlägt die Prüfung fehl, wird nichts geändert.
 4. **Vorabprüfung (Preflight).** Sie sehen, welche Fabric das Backup enthält, wann es erstellt wurde und was es ersetzt.
 5. **Getippte Bestätigung.** Hält der Sidecar gerade eine **gesunde** Fabric, die die Wiederherstellung überschreiben würde, müssen Sie zur Bestätigung die Fabric-ID eintippen. Hat der Sidecar keine verwendbare Fabric (siehe „Degradierte Zustände und Recovery“ weiter unten), ist keine getippte Bestätigung nötig.
@@ -66,7 +66,7 @@ Wählen Sie im Bereich Fabric & Backup **Wiederherstellen**. Es öffnet sich ein
 
 Eine Wiederherstellung läuft in zwei Phasen, damit keine Seite halb wiederhergestellt bleibt:
 
-1. Es wird ein Backup des aktuellen Zustands erstellt (wenn eine gesunde Fabric existiert).
+1. Es wird ein Backup des aktuellen Zustands erstellt (wenn eine gesunde Fabric existiert). Gelingt das nicht, wird die Wiederherstellung abgelehnt und nichts ändert sich.
 2. Der Sidecar **stagt** das Backup (nur Prüfung, keine Änderung am Livezustand).
 3. Der Sidecar **führt aus (Commit)**: Er tauscht seinen Speicher aus und behält den vorherigen als Rollback-Kopie.
 4. Das Plugin ersetzt seine Tabellen in einer einzigen Datenbanktransaktion.
@@ -78,7 +78,7 @@ Die Prüfung ändert nie etwas. Eine vor dem Commit abgebrochene Wiederherstellu
 
 1. Installieren Sie ein neues Attraccess **und** starten Sie einen Sidecar mit einem **frischen, leeren Speicher-Volume** (siehe `MATTER_SIDECAR_STORAGE_DIR` in der [Betriebsanleitung](devices/matter/operator.md#konfiguration)).
 2. Installieren Sie **dasselbe Matter-Plugin-Release**, das das Backup erstellt hat, und verbinden Sie es mit dem Sidecar.
-3. Öffnen Sie **Geräte → Matter**. Der Sidecar meldet keine Fabric, daher bietet Attraccess **Wiederherstellen** an.
+3. Öffnen Sie **Geräte → Matter**. Der Sidecar meldet keine Fabric, daher bietet Attraccess **Aus Backup wiederherstellen** an.
 4. Laden Sie Ihre Backup-Datei hoch, geben Sie den Recovery-Schlüssel ein, prüfen Sie und stellen Sie wieder her.
 5. Setzen Sie anschließend jedes Gerät, das nach dem Backup hinzugekommen ist, auf Werkseinstellungen zurück und nehmen Sie es erneut in Betrieb.
 
@@ -86,19 +86,19 @@ Die Prüfung ändert nie etwas. Eine vor dem Commit abgebrochene Wiederherstellu
 
 Attraccess vergleicht, was es aufgezeichnet hat, mit dem, was der Sidecar meldet (Fabric-ID, Fingerabdruck des Root-Zertifikats, Storage-Instanz-ID und eine **Fabric-Generation**, die mit jeder Änderung steigt). Stimmen sie nicht überein, wechselt es in einen Recovery-Zustand und **sperrt Aktionen, die die Fabric ändern**, bis ein Administrator entscheidet.
 
-| Situation                                | Typische Ursache                                                                                          |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Sidecar-Speicher verloren (keine Fabric) | Das Sidecar-Volume wurde geleert oder ersetzt.                                                            |
-| Andere Fabric                            | Der Sidecar zeigt auf ein anderes Speicher-Volume, oder die Fabric wurde anderswo erzeugt.                |
-| Generation zurückliegend                 | Das Attraccess-Volume wurde aus einem älteren Backup wiederhergestellt, der Sidecar behielt seinen Stand. |
-| Generation voraus                        | Der Sidecar-Speicher ist älter als Attraccess, oder Attraccess wurde ohne den Sidecar wiederhergestellt.  |
-| Sidecar `recovery_required`              | Der Sidecar hält seinen eigenen Speicher für unbrauchbar und erzeugt von sich aus keine Fabric.           |
+| Situation                                | Typische Ursache                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Sidecar-Speicher verloren (keine Fabric) | Das Sidecar-Volume wurde geleert oder ersetzt.                                                          |
+| Andere Fabric                            | Der Sidecar zeigt auf ein anderes Speicher-Volume, oder die Fabric wurde anderswo erzeugt.              |
+| Generation zurückliegend                 | Der Sidecar-Speicher ist älter als Attraccess, zum Beispiel aus einer alten Kopie wiederhergestellt.    |
+| Generation voraus                        | Der Sidecar ist neuer als Attraccess, zum Beispiel wurde Attraccess ohne den Sidecar wiederhergestellt. |
+| Sidecar `recovery_required`              | Der Sidecar hält seinen eigenen Speicher für unbrauchbar und erzeugt von sich aus keine Fabric.         |
 
 Das Recovery-Panel bietet dann drei Optionen:
 
-- **Wiederherstellen** aus einem Backup (der Assistent oben). Das ist die richtige Wahl, wenn Sie Backup und Schlüssel haben.
+- **Aus Backup wiederherstellen** (der Assistent oben). Das ist die richtige Wahl, wenn Sie Backup und Schlüssel haben.
 - **Fabric des Sidecars übernehmen.** Nur möglich, wenn der Sidecar gesund ist. Attraccess übernimmt die vom Sidecar gemeldete Fabric. Nutzen Sie das, wenn Sie wissen, dass der Sidecar stimmt, zum Beispiel nach einer Wiederherstellung von Attraccess ohne den Sidecar. Nicht passende Geräteeinträge werden wie gewohnt abgeglichen.
-- **Neue Fabric beginnen.** Nur möglich, wenn der Sidecar keine Fabric hat. Es wird eine komplett neue Fabric mit einem neuen Recovery-Schlüssel erzeugt. **Alle bisher in Betrieb genommenen Geräte müssen auf Werkseinstellungen zurückgesetzt und neu in Betrieb genommen werden.** Deshalb ist das eine Gefahren-Aktion mit Bestätigung.
+- **Neue Fabric starten.** Nur möglich, wenn der Sidecar keine Fabric hat. Es wird eine komplett neue, leere Fabric erzeugt. Der gespeicherte Recovery-Schlüssel bleibt erhalten und wird für ihre Backups verwendet (nur wenn keiner gespeichert ist, wird ein neuer erzeugt). **Alle bisher in Betrieb genommenen Geräte müssen auf Werkseinstellungen zurückgesetzt und neu in Betrieb genommen werden.** Deshalb ist das eine Gefahren-Aktion mit Bestätigung.
 
 Bis Sie sich entscheiden, wählt Attraccess nie selbst eine Option.
 

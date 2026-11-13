@@ -22,6 +22,31 @@ import { useFabricBackup } from './useFabricBackup';
 
 type Notice = { title: string; message: string } | null;
 
+/** The leading and trailing hex digits are enough to tell certificates apart; the whole value is in the tooltip. */
+export const shortFingerprint = (value: string) =>
+  value.length > 28 ? `${value.slice(0, 16)}…${value.slice(-8)}` : value;
+
+const BACKUP_FAILURE_REASONS = [
+  'inconsistent',
+  'sidecar_unavailable',
+  'sidecar_busy',
+  'insecure_transport',
+  'no_recovery_key',
+  'recovery_key_unreadable',
+  'recovery_required',
+  'no_fabric',
+  'sidecar_error',
+  'internal',
+];
+const STORAGE_REASONS = [
+  'storage_unreadable',
+  'storage_corrupt',
+  'storage_incomplete',
+  'schema_mismatch',
+  'metadata_missing',
+  'metadata_orphaned',
+];
+
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 function Field({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
@@ -200,7 +225,7 @@ function FabricContent(props: ContentProps) {
   const { recovery } = status;
   return (
     <>
-      <StatusCard status={status} busy={busy} onCreate={props.onCreate} />
+      <StatusCard status={status} busy={busy} onCreate={props.onCreate} onRestore={props.onRestore} />
       {recovery.required && (
         <RecoveryPanel
           status={status}
@@ -217,7 +242,12 @@ function FabricContent(props: ContentProps) {
   );
 }
 
-function StatusCard({ status, busy, onCreate }: Pick<ContentProps, 'status' | 'busy' | 'onCreate'>) {
+function StatusCard({
+  status,
+  busy,
+  onCreate,
+  onRestore,
+}: Pick<ContentProps, 'status' | 'busy' | 'onCreate' | 'onRestore'>) {
   const { t } = useMatterTranslations();
   const chip = stateChip(status);
   const { sidecar, recovery, actions } = status;
@@ -244,7 +274,10 @@ function StatusCard({ status, busy, onCreate }: Pick<ContentProps, 'status' | 'b
             {recovery.mismatch ? t(`fabric.mismatch.${recovery.mismatch}`) : t('fabric.mismatch.unknown')}
             {sidecar.reason && (
               <span className="mt:mt-1 mt:block mt:text-sm">
-                {t('fabric.reason')}: {sidecar.reason}
+                {t('fabric.reason')}:{' '}
+                {STORAGE_REASONS.includes(sidecar.reason)
+                  ? t(`fabric.storageReason.${sidecar.reason}`)
+                  : sidecar.reason}
               </span>
             )}
           </StatusAlert>
@@ -255,7 +288,15 @@ function StatusCard({ status, busy, onCreate }: Pick<ContentProps, 'status' | 'b
         <dl className="mt:grid mt:grid-cols-1 mt:gap-3 mt:sm:grid-cols-2">
           <Field label={t('fabric.fabricId')}>{sidecar.fabricId ?? t('fabric.none')}</Field>
           <Field label={t('fabric.generationLabel')}>{sidecar.fabricGeneration ?? t('fabric.none')}</Field>
-          <Field label={t('fabric.fingerprint')}>{sidecar.rootCertFingerprint ?? t('fabric.none')}</Field>
+          <Field label={t('fabric.fingerprint')}>
+            {sidecar.rootCertFingerprint ? (
+              <span title={sidecar.rootCertFingerprint} data-cy="matter-fabric-fingerprint">
+                {shortFingerprint(sidecar.rootCertFingerprint)}
+              </span>
+            ) : (
+              t('fabric.none')
+            )}
+          </Field>
           <Field label={t('fabric.storageInstance')}>{sidecar.storageInstanceId ?? t('fabric.none')}</Field>
         </dl>
         {recovery.required && status.recorded && (
@@ -269,10 +310,18 @@ function StatusCard({ status, busy, onCreate }: Pick<ContentProps, 'status' | 'b
         )}
         {canCreate && (
           <div>
-            <Button isPending={busy} onPress={onCreate} data-cy="matter-fabric-create">
-              {t('fabric.create')}
-            </Button>
+            <div className="mt:flex mt:flex-wrap mt:gap-2">
+              <Button isPending={busy} onPress={onCreate} data-cy="matter-fabric-create">
+                {t('fabric.create')}
+              </Button>
+              {actions.canRestore && (
+                <Button variant="secondary" isDisabled={busy} onPress={onRestore} data-cy="matter-restore-open-empty">
+                  {t('fabric.restore.open')}
+                </Button>
+              )}
+            </div>
             <p className="mt:mt-1 mt:text-sm mt:text-muted">{t('fabric.createHint')}</p>
+            {actions.canRestore && <p className="mt:text-sm mt:text-muted">{t('fabric.restoreInstead')}</p>}
           </div>
         )}
       </Card.Content>
@@ -361,7 +410,11 @@ function BackupsCard(props: ContentProps) {
             </dl>
             {backups.lastAttempt?.outcome === 'failed' && (
               <StatusAlert status="danger" title={t('fabric.backups.failed')} data-cy="matter-backup-failed">
-                {backups.lastAttempt.reason ?? t('fabric.backups.noReason')}
+                {backups.lastAttempt.reason === null
+                  ? t('fabric.backups.noReason')
+                  : BACKUP_FAILURE_REASONS.includes(backups.lastAttempt.reason)
+                    ? t(`fabric.backups.reason.${backups.lastAttempt.reason}`)
+                    : backups.lastAttempt.reason}
               </StatusAlert>
             )}
             <div className="mt:flex mt:flex-wrap mt:gap-2">

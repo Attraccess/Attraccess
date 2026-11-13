@@ -11,6 +11,7 @@ import {
   closeSync,
   existsSync,
   fsyncSync,
+  lstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -20,7 +21,7 @@ import {
   writeFileSync,
   writeSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { directoryHasFiles, sha256Hex } from './archive';
 
@@ -56,10 +57,25 @@ export class StorageDirError extends Error {
   readonly code = 'STORAGE_DIR_NOT_WRITABLE';
 }
 
+/**
+ * Creates the missing levels of `root`, each owner-only. Not `mkdir -p`: Node's recursive mkdir retries forever when a
+ * level keeps failing with ENOENT (for example below /proc), which would hang the start-up instead of failing it.
+ */
+function createDirectories(root: string): void {
+  const missing: string[] = [];
+  for (let current = resolve(root); !existsSync(current); current = dirname(current)) {
+    missing.unshift(current);
+    if (dirname(current) === current) break;
+  }
+  for (const directory of missing) mkdirSync(directory, { mode: 0o700 });
+}
+
 /** Creates the storage directory (0700) and proves it is writable. */
 export function ensureStorageDir(root: string): void {
   try {
-    mkdirSync(root, { recursive: true, mode: 0o700 });
+    createDirectories(root);
+    // A directory that already exists (a mounted volume, an older run) keeps its own mode otherwise.
+    chmodSync(root, 0o700);
     const probe = join(root, `.write-test-${randomUUID()}`);
     writeFileSync(probe, 'x', { mode: 0o600 });
     rmSync(probe);
@@ -69,6 +85,24 @@ export function ensureStorageDir(root: string): void {
         'Mount a persistent volume that the sidecar user may write to, or set MATTER_SIDECAR_STORAGE_DIR',
     );
   }
+}
+
+/**
+ * matter.js creates its files with the process umask, so the fabric keys it stores would be world-readable inside a
+ * group-readable tree. Owner-only for everything below the storage root, except links, which are left alone.
+ */
+export function hardenStorage(root: string): void {
+  const walk = (directory: string) => {
+    chmodSync(directory, 0o700);
+    for (const entry of readdirSync(directory)) {
+      const path = join(directory, entry);
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink()) continue;
+      if (stat.isDirectory()) walk(path);
+      else chmodSync(path, 0o600);
+    }
+  };
+  walk(root);
 }
 
 // --- metadata -----------------------------------------------------------------------------------

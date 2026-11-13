@@ -59,7 +59,7 @@ Jeder Fehler nutzt einen Umschlag: `{ "error": { "code", "message", "correlation
 | `validation_failed`                | 400       | Ungültige Pfadparameter oder ungültiger Body (zu WebSocket-Nachrichten siehe [Events](#events-reihenfolge-wiedergabe-und-duplikate)) |
 | `unauthorized`                     | 401       | Fehlendes, fehlerhaftes oder falsches Service-Token (wird vor jeder Versionsprüfung geprüft)                                         |
 | `forbidden_origin`                 | 403       | Browser-`Origin`, oder ein `Host`, der weder Loopback noch in `MATTER_SIDECAR_ALLOWED_HOSTS` ist                                     |
-| `insecure_transport`               | 403       | Eine Backup- oder Restore-Anfrage kam über unverschlüsseltes HTTP von einer entfernten Adresse                                       |
+| `insecure_transport`               | 403       | Der Sidecar bedient unverschlüsseltes HTTP an einer Nicht-Loopback-Adresse und wurde nach einem Backup oder Restore gefragt          |
 | `not_found` / `method_not_allowed` | 404 / 405 | Unbekannter Pfad oder unbekannte Methode                                                                                             |
 | `fabric_exists`                    | 409       | Es existiert bereits eine Fabric, daher wird `fabric.create` abgelehnt                                                               |
 | `recovery_required`                | 409       | Der Fabric-Speicher braucht eine Recovery-Entscheidung eines Administrators (siehe Abschnitt „Fabric-Zustände“)                      |
@@ -95,7 +95,7 @@ Das Plugin führt eine eigene Aufzeichnung der Fabric (ID, Fingerabdruck des Roo
 
 ## Backup und zweiphasige Wiederherstellung
 
-Die Familie `backup` hat sechs Operationen (alle unter `/v1/backup/`): `snapshot`, `restore.stage`, `restore.commit`, `restore.rollback`, `restore.finalize` und `restore.abort`. Sie erfordern eine `https`- oder Loopback-Verbindung (sonst `insecure_transport`) und erlauben einen Request-Body bis 64 MiB.
+Die Familie `backup` hat sechs Operationen (alle unter `/v1/backup/`): `snapshot`, `restore.stage`, `restore.commit`, `restore.rollback`, `restore.finalize` und `restore.abort`. Sie erfordern einen Sidecar, der HTTPS bedient oder auf Loopback lauscht (sonst `insecure_transport`). `snapshot` und `restore.stage` erlauben einen Request-Body bis 64 MiB; die übrigen nutzen das allgemeine Limit.
 
 - **`snapshot`** liefert den Speicher des Sidecars als Header plus Base64-Nutzlast. Der Header enthält die Version des Speicherschemas, die Versionen von Sidecar und matter.js, die Fabric-Daten, ein SHA-256 der Nutzlast samt Größe und den Erstellungszeitpunkt. Er braucht eine initialisierte Fabric.
 - **Die Wiederherstellung läuft in zwei Phasen**, damit Sidecar und Plugin-Datenbank nie halb wiederhergestellt bleiben:

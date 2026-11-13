@@ -126,6 +126,7 @@ export function backupView(row: MatterBackup): BackupView {
 export class MatterBackupService {
   private inFlight: Promise<BackupView> | undefined;
   private nextScheduledAt: string | null = null;
+  private readonly succeededListeners = new Set<(trigger: BackupTrigger) => void>();
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
@@ -142,6 +143,12 @@ export class MatterBackupService {
 
   setNextScheduledAt(at: string | null): void {
     this.nextScheduledAt = at;
+  }
+
+  /** Called after every stored backup, so the schedule can follow it without waiting for its next check. */
+  onSucceeded(listener: (trigger: BackupTrigger) => void): () => void {
+    this.succeededListeners.add(listener);
+    return () => this.succeededListeners.delete(listener);
   }
 
   /**
@@ -178,6 +185,7 @@ export class MatterBackupService {
           system: principal === null,
         },
       );
+      for (const listener of this.succeededListeners) listener(trigger);
       return backupView(row);
     } catch (error) {
       const reason = error instanceof BackupFailure ? error.reason : 'internal';

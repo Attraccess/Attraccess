@@ -59,7 +59,7 @@ Every error uses one envelope: `{ "error": { "code", "message", "correlationId",
 | `validation_failed`                | 400       | Invalid path parameters or body (for WebSocket messages, see [Events](#events-ordering-replay-and-duplicates)) |
 | `unauthorized`                     | 401       | Missing, malformed or wrong service token (checked before any version check)                                   |
 | `forbidden_origin`                 | 403       | Browser `Origin`, or a `Host` that is neither loopback nor in `MATTER_SIDECAR_ALLOWED_HOSTS`                   |
-| `insecure_transport`               | 403       | A backup or restore request arrived over plain HTTP from a remote address                                      |
+| `insecure_transport`               | 403       | The sidecar serves plain HTTP on a non-loopback address and was asked for a backup or restore                  |
 | `not_found` / `method_not_allowed` | 404 / 405 | Unknown path or method                                                                                         |
 | `incompatible_release`             | 409       | Unsupported release combination                                                                                |
 | `fabric_exists`                    | 409       | A fabric already exists, so `fabric.create` is refused                                                         |
@@ -95,7 +95,7 @@ The plugin keeps its own record of the fabric (ID, root certificate fingerprint,
 
 ## Backup and two-phase restore
 
-The `backup` family has six operations (all under `/v1/backup/`): `snapshot`, `restore.stage`, `restore.commit`, `restore.rollback`, `restore.finalize` and `restore.abort`. They require a `https` or loopback connection (`insecure_transport` otherwise) and a request body up to 64 MiB.
+The `backup` family has six operations (all under `/v1/backup/`): `snapshot`, `restore.stage`, `restore.commit`, `restore.rollback`, `restore.finalize` and `restore.abort`. They require a sidecar that serves HTTPS or listens on loopback (`insecure_transport` otherwise). `snapshot` and `restore.stage` accept a request body up to 64 MiB; the others use the general limit.
 
 - **`snapshot`** returns the sidecar's storage as a header plus a base64 payload. The header carries the storage schema version, the sidecar and matter.js versions, the fabric facts, a payload SHA-256 and its size, and the creation time. It needs an initialized fabric.
 - **Restore is two-phase** so that the sidecar and the plugin database never end up half-restored:

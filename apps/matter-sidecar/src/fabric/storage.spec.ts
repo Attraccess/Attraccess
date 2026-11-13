@@ -1,5 +1,5 @@
 import { STORAGE_SCHEMA_VERSION } from '@attraccess/matter-contract';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ArchiveError, packDirectory, sha256Hex, unpackInto } from './archive';
@@ -10,6 +10,7 @@ import {
   advanceRestoredCounters,
   countPeers,
   ensureStorageDir,
+  hardenStorage,
   inspectStorage,
   layoutFor,
   writeMetadata,
@@ -65,6 +66,39 @@ describe('ensureStorageDir', () => {
     writeFileSync(blocker, 'x');
     expect(() => ensureStorageDir(join(blocker, 'x'))).toThrow(StorageDirError);
     expect(new StorageDirError('x')).toHaveProperty('code');
+  });
+
+  it('fails fast, instead of retrying forever, below a path that cannot hold directories', () => {
+    expect(() => ensureStorageDir('/proc/matter-sidecar-qa/x')).toThrow(StorageDirError);
+  });
+
+  it('tightens a directory that already exists with a looser mode', () => {
+    const root = join(tmp(), 'volume');
+    mkdirSync(root, { mode: 0o755 });
+    chmodSync(root, 0o755);
+    ensureStorageDir(root);
+    expect(statSync(root).mode & 0o777).toBe(0o700);
+  });
+});
+
+describe('hardenStorage', () => {
+  it('makes every directory owner-only and every file 0600, and leaves links alone', () => {
+    const root = join(tmp(), 'tree');
+    mkdirSync(join(root, 'matter', 'controller'), { recursive: true, mode: 0o755 });
+    chmodSync(join(root, 'matter'), 0o755);
+    chmodSync(join(root, 'matter', 'controller'), 0o755);
+    const key = join(root, 'matter', 'controller', 'certificates.rootKeyPair');
+    writeFileSync(key, 'k', { mode: 0o644 });
+    chmodSync(key, 0o644);
+    const outside = join(tmp(), 'outside');
+    writeFileSync(outside, 'x', { mode: 0o644 });
+    chmodSync(outside, 0o644);
+    symlinkSync(outside, join(root, 'link'));
+    hardenStorage(root);
+    expect(statSync(join(root, 'matter')).mode & 0o777).toBe(0o700);
+    expect(statSync(join(root, 'matter', 'controller')).mode & 0o777).toBe(0o700);
+    expect(statSync(key).mode & 0o777).toBe(0o600);
+    expect(statSync(outside).mode & 0o777).toBe(0o644);
   });
 });
 

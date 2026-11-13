@@ -132,6 +132,13 @@ describe('FabricBackupSection status', () => {
     expect(screen.queryByRole('button', { name: 'Create fabric' })).not.toBeInTheDocument();
   });
 
+  it('offers to restore a backup next to creating a fabric, for a fresh installation', async () => {
+    const user = userEvent.setup();
+    renderSection({ ...uninitialized, backups: { ...uninitialized.backups, stored: [] } });
+    await user.click(await screen.findByRole('button', { name: 'Restore from backup' }));
+    expect(await screen.findByLabelText(/Backup file/)).toBeInTheDocument();
+  });
+
   it('does not offer to create a fabric while recovery is required', async () => {
     renderSection({
       ...recovery('sidecar_uninitialized', { state: 'uninitialized', ...noFacts }),
@@ -165,6 +172,35 @@ describe('FabricBackupSection status', () => {
     });
     expect(await screen.findByText('The last backup failed')).toBeInTheDocument();
     expect(screen.getByText('disk full')).toBeInTheDocument();
+  });
+
+  it('translates known failure reasons and storage reasons', async () => {
+    renderSection({
+      ...recovery('sidecar_recovery_required', { reason: 'storage_corrupt' }),
+      backups: {
+        ...healthy.backups,
+        lastAttempt: {
+          at: '2026-11-07T10:00:00.000Z',
+          outcome: 'failed',
+          trigger: 'daily',
+          reason: 'recovery_required',
+        },
+      },
+    });
+    expect(await screen.findByText(/Reason: The sidecar's storage is damaged\./)).toBeInTheDocument();
+    expect(screen.getByText('The fabric needs recovery first. No backup is made in this state.')).toBeInTheDocument();
+  });
+
+  it('shows the root certificate fingerprint shortened, with the whole value as its tooltip', async () => {
+    const full = `${'ab12cd34'.repeat(8)}`;
+    renderSection({
+      ...healthy,
+      sidecar: { ...healthy.sidecar, rootCertFingerprint: full },
+    });
+    await screen.findByText('Initialized');
+    const shown = document.querySelector('[data-cy=matter-fabric-fingerprint]') as HTMLElement;
+    expect(shown).toHaveTextContent('ab12cd34ab12cd34…ab12cd34');
+    expect(shown).toHaveAttribute('title', full);
   });
 
   it('shows empty and error states', async () => {
@@ -311,6 +347,30 @@ describe('restore wizard', () => {
     await user.click(screen.getByRole('button', { name: 'Validate' }));
     await screen.findByText('Restore now');
     expect(api.validateRestore).toHaveBeenCalledWith({ type: 'upload', contentBase64: 'QUJD' }, undefined);
+  });
+
+  it('refuses an empty or a too large file before sending anything', async () => {
+    const user = await openWizard();
+    await user.click(screen.getByRole('button', { name: 'Upload a file' }));
+    await user.upload(screen.getByLabelText(/Backup file/), new File([], 'e.attraccess-matter-backup'));
+    await user.click(screen.getByRole('button', { name: 'Validate' }));
+    expect(await screen.findByText('The file is empty. Choose the backup file you downloaded.')).toBeInTheDocument();
+    const large = new File(['x'], 'l.attraccess-matter-backup');
+    Object.defineProperty(large, 'size', { value: 8 * 1024 * 1024 });
+    await user.upload(screen.getByLabelText(/Backup file/), large);
+    await user.click(screen.getByRole('button', { name: 'Validate' }));
+    expect(await screen.findByText(/too large to upload here \(at most 7 MB\)/)).toBeInTheDocument();
+    expect(api.validateRestore).not.toHaveBeenCalled();
+  });
+
+  it('mentions the automatic backup only when a healthy fabric is overwritten', async () => {
+    const user = await openWizard();
+    api.validateRestore.mockResolvedValue(
+      validation({ requiresTypedConfirmation: false, sidecarState: 'uninitialized', kind: 'restore' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Validate' }));
+    await screen.findByText('Restore now');
+    expect(screen.queryByText(/A backup of the current state is taken first/)).not.toBeInTheDocument();
   });
 
   it('restores without typed confirmation when nothing healthy is overwritten', async () => {

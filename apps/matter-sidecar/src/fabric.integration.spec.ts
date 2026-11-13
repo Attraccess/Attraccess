@@ -280,6 +280,19 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
       expect((await post(target, '/v1/backup/restore/commit', { stageId: staged.stageId })).status).toBe(404);
     });
 
+    it('removes a stage that an earlier process left behind', async () => {
+      const donor = await start(newDir());
+      await post(donor, '/v1/fabric', { label: 'Donor' });
+      const snapshot = await snapshotOf(donor);
+      const dir = newDir();
+      const first = await start(dir);
+      await post(first, '/v1/backup/restore/stage', snapshot);
+      expect(readdirSync(join(dir, 'restore-staging'))).toHaveLength(1);
+      await stop(first);
+      await start(dir);
+      expect(readdirSync(dir)).not.toContain('restore-staging');
+    });
+
     it('rejects fabric-mutating operations while a snapshot is being taken', async () => {
       const sidecar = await start(newDir());
       await post(sidecar, '/v1/fabric', { label: 'Attraccess' });

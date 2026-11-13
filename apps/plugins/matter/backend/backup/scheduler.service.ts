@@ -50,6 +50,9 @@ export class MatterBackupSchedulerService implements OnModuleInit, OnModuleDestr
         else this.stop();
       }),
       this.fabric.onAdvanced(() => this.scheduleAfterChange()),
+      this.backups.onSucceeded((trigger) => {
+        if (trigger !== 'pre_restore') this.safely(() => this.refreshNext());
+      }),
     );
     if (this.connection.status().state === 'connected') this.start();
   }
@@ -93,6 +96,17 @@ export class MatterBackupSchedulerService implements OnModuleInit, OnModuleDestr
     const after = (await this.backups.summary()).lastSuccessfulAt;
     this.backups.setNextScheduledAt(
       new Date((after ? new Date(after).getTime() : Date.now()) + this.timing.intervalMs).toISOString(),
+    );
+  }
+
+  /** The next run is one interval after the newest backup; shown right after a backup, not only after the next check. */
+  private async refreshNext(): Promise<void> {
+    if (this.checkTimer === undefined || this.guard.recoveryRequired) return;
+    const latest = (await this.backups.summary()).lastSuccessfulAt;
+    // The connection may have gone away while the summary was read.
+    if (this.checkTimer === undefined) return;
+    this.backups.setNextScheduledAt(
+      latest ? new Date(new Date(latest).getTime() + this.timing.intervalMs).toISOString() : null,
     );
   }
 

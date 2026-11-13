@@ -257,6 +257,18 @@ describe('MatterBackupSchedulerService', () => {
     );
   });
 
+  it('shows the next run right after a backup, without waiting for the next check', async () => {
+    await make();
+    h.scheduler.onModuleInit();
+    await h.fabric.create(undefined, ADMIN);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const latest = (await h.fabric.status()).backups.lastSuccessfulAt as string;
+    expect((await h.fabric.status()).backups.nextScheduledAt).toBe(
+      new Date(new Date(latest).getTime() + 24 * 3_600_000).toISOString(),
+    );
+    h.scheduler.onModuleDestroy();
+  });
+
   it('does nothing without a fabric, without a connection and in recovery', async () => {
     await make();
     await h.scheduler.tick();
