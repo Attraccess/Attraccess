@@ -44,7 +44,7 @@ import { UploadPluginDto } from './dto/uploadPlugin.dto';
 
 import { LoadedPluginManifest } from './plugin.manifest';
 
-import { PluginModule } from './plugin.module';
+import { arePluginsDisabled } from './plugins-disabled';
 import {
   AddPluginRegistryDto,
   RemoveInstalledPluginDto,
@@ -289,7 +289,7 @@ export class PluginController {
   @ApiOperation({ summary: 'Get plugin system status', operationId: 'getPluginSystemStatus' })
   @ApiResponse({ status: 200, type: PluginSystemStatusDto })
   getPluginSystemStatus(): PluginSystemStatusDto {
-    return { disabled: PluginModule.arePluginsDisabled(), instanceId: PLUGIN_SYSTEM_INSTANCE_ID };
+    return { disabled: arePluginsDisabled(), instanceId: PLUGIN_SYSTEM_INSTANCE_ID };
   }
 
   @Post(':pluginId/retry')

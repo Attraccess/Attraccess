@@ -40,8 +40,8 @@ and Dockerfiles), and binary assets have no line limit. Their natural structure
 often needs larger files, so splitting them just to satisfy a line count adds
 little value. Generated/build output, generated API/WebSocket clients, dependency
 directories, and the vendored OpenSCAD WebAssembly runtime are excluded. Maintained
-public scripts and firmware headers remain covered. Exclusions are centralized
-in `scripts/check-file-size.mjs`.
+public scripts and firmware headers remain covered. The directory exclusions are
+shared with the import-cycle check in `scripts/lib/repo-files.mjs`.
 
 ## Import cycles
 
@@ -50,18 +50,24 @@ TypeScript files in `apps/` and `libs/`, tests included, and prints each cycle
 as a file chain. It always checks the whole repository and resolves relative
 imports and the `@attraccess/*` aliases from `tsconfig.base.json`.
 
-Only imports that run at module load count. `import type`, `export type`, imports
-whose specifiers are all inline `type`, and dynamic `import()` are ignored.
-Cycles made only of files in `libs/database-entities/src/lib/entities` are
-allowed, because TypeORM relations resolve through lazy `() => Entity` thunks. A
-cycle that also passes through any other file is reported. Declaration files,
+Only imports that run at module load count, including a top-level `require()`.
+`import type`, `export type`, imports whose specifiers are all inline `type`,
+dynamic `import()` and a `require()` inside a function are ignored. Cycles made
+only of entity files (files in `libs/database-entities/src/lib/entities` that
+declare an `@Entity`, `@ChildEntity` or `@ViewEntity` class) are allowed, because
+TypeORM relations resolve through lazy `() => Entity` thunks. A cycle that also
+passes through any other file, including a helper in the entities directory, is
+reported. Declaration files,
 build output (`dist`, `build`), `generated` directories and the generated API
 clients are not checked.
 
 To break a cycle, move the shared type, constant, context or helper into a leaf
 file that both sides import, pass the dependency in as a prop or callback, or use
 `import type` when only types are needed. Do not add NestJS `forwardRef`: extract
-the shared provider into its own module instead.
+the shared provider into its own module instead. A deferred `require()` inside a
+function hides a cycle from the check rather than removing it; use it only where
+the cycle cannot be split, as `plugin.service.ts` does to reach
+`plugin-migration.service.ts`, and say why in a comment.
 
 ## Commit Messages
 
