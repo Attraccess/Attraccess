@@ -23,6 +23,9 @@ export type RoleDelta = { added: string[]; removed: string[]; updated: string[] 
  * - Implementations must never throw: SsoSessionPermissionSyncService catches every other error
  *   and returns `skipped`. If an implementation throws anyway, callers do not catch it: the error
  *   propagates and the request is not authenticated (fails closed at the caller).
+ *
+ * inheritance: abstract only to serve as the DI token that SsoSessionPermissionSyncService implements;
+ * nothing extends it.
  */
 export abstract class SessionPermissionSync {
   abstract syncIfDue(
