@@ -22,8 +22,9 @@ CORNER_R = 4;       // outline corner radius
 EDGE_R = 1;         // bullnose radius (== T/2, so the edge is a full half-round)
 
 HOLE_D = 4;         // keyring bore
-HOLE_X = 4;
-HOLE_Y = 4;
+HOLE_WALL = 6;      // bore to outer edge; 2 mm snapped at the keyring
+HOLE_X = HOLE_D / 2 + HOLE_WALL;
+HOLE_Y = HOLE_D / 2 + HOLE_WALL;
 
 POCKET_D = 25;      // NFC sticker pocket
 POCKET_H = 0.25;

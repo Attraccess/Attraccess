@@ -119,6 +119,18 @@ describe('rfid-keychain-card.scad', () => {
     expect(pocketWallZ(mesh as Mesh)).toEqual([0, 1.125]);
   }, 30_000);
 
+  it('leaves 6 mm of wall between the keyring bore and the edge', async () => {
+    const { mesh } = await render({ PART: 'body', LABEL: '' });
+    const m = mesh as Mesh;
+    // The straight bore (radius 2) runs through the mid-plane; its centre sets the wall.
+    let boreVertices = 0;
+    for (let i = 0; i < m.positions.length; i += 3) {
+      const [x, y, z] = [m.positions[i], m.positions[i + 1], m.positions[i + 2]];
+      if (Math.abs(z - 1) < 0.5 && Math.abs(Math.hypot(x - 8, y - 8) - 2) < 0.05) boreVertices++;
+    }
+    expect(boreVertices).toBeGreaterThan(0);
+  }, 30_000);
+
   it('keeps letters inside the text area and in the top 0.4 mm', async () => {
     const { mesh } = await render({ PART: 'letters', LABEL: 'Makerspace' });
     const { min, max } = boundingBox(mesh as Mesh);
