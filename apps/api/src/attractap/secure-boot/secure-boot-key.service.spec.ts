@@ -3,7 +3,7 @@ import { Attractap, AttractapSecureBootKey, entities } from '@attraccess/databas
 import { createPrivateKey, createPublicKey, generateKeyPair, generateKeyPairSync, KeyObject } from 'crypto';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { promisify } from 'util';
 import { EncryptionService } from '../../encryption/encryption.service';
 import { SecureBootKeyService } from './secure-boot-key.service';
@@ -48,11 +48,18 @@ async function setup(secret = 'test-secret', database?: DataSource) {
   const readers = database.getRepository(Attractap);
   const encryption = new EncryptionService({ get: () => ({ AUTH_SESSION_SECRET: secret }) } as never);
   const events: AuditEvent[] = [];
-  const audit = { record: jest.fn(async (event: AuditEvent) => void events.push(event)) };
+  /** Per event: whether it was recorded with a manager inside an active transaction, so it rolls back with it. */
+  const inTransaction: boolean[] = [];
+  const audit = {
+    record: jest.fn(async (event: AuditEvent, manager?: EntityManager) => {
+      events.push(event);
+      inTransaction.push(manager?.queryRunner?.isTransactionActive ?? false);
+    }),
+  };
   const service = new SecureBootKeyService(keys, readers, encryption, audit as never);
   const addReader = (secureBootDigest0: string | null, secureBootDigest1: string | null) =>
     readers.save(readers.create({ name: 'reader', apiTokenHash: 'hash', secureBootDigest0, secureBootDigest1 }));
-  return { database, keys, readers, service, addReader, events };
+  return { database, keys, readers, service, addReader, events, inTransaction };
 }
 
 describe('SecureBootKeyService', () => {
@@ -73,27 +80,69 @@ describe('SecureBootKeyService', () => {
 
   it('audits every key operation for its actor, with fingerprints only, never key material or the passphrase', async () => {
     const first = await setup();
-    await first.service.createKeys(ACTOR);
+    const created = await first.service.createKeys(ACTOR);
     const recovery = await first.service.downloadRecoveryKey(PASSPHRASE, ACTOR);
     await first.service.checkRecoveryKey(recovery.pem, PASSPHRASE, ACTOR);
-    const { pem } = await first.service.downloadSigningKeyBackup(PASSPHRASE, ACTOR);
+    const { pem, fingerprint: signingFingerprint } = await first.service.downloadSigningKeyBackup(PASSPHRASE, ACTOR);
     const second = await setup();
-    await second.service.restore('signing-backup', pem, PASSPHRASE, ACTOR);
+    const restored = await second.service.restore('signing-backup', pem, PASSPHRASE, ACTOR);
 
     const events = [...first.events, ...second.events];
-    expect(events.map((event) => event.action)).toEqual([
-      'attractap.reader.secure_keys_created',
-      'attractap.reader.recovery_key_downloaded',
-      'attractap.reader.recovery_key_verified',
-      'attractap.reader.signing_key_backup_downloaded',
-      'attractap.reader.secure_keys_restored',
-    ]);
     for (const event of events) {
       expect(JSON.stringify(event)).not.toMatch(/PRIVATE KEY|correct horse/);
-      expect(event).toMatchObject({ actor: ACTOR, subject: { type: 'attractap.installation', id: 1 } });
-      // Survives the attractap policy and stores what the controller recorded before.
-      expect(projectAuditRow(event)).toMatchObject({ domain: 'attractap', pluginId: 'core', actorId: 7 });
     }
+    // Survives the attractap policy and stores what the controller recorded before.
+    const row = (action: string, details: Record<string, string>) => ({
+      domain: 'attractap',
+      pluginId: 'core',
+      action: `attractap.reader.${action}`,
+      operationId: expect.any(String),
+      actorId: 7,
+      authenticationMethod: 'session',
+      apiTokenId: null,
+      outcome: 'succeeded',
+      subjectType: 'attractap.installation',
+      subjectId: 1,
+      ipAddress: null,
+      userAgent: null,
+      details,
+    });
+    expect(events.map((event) => projectAuditRow(event))).toEqual([
+      row('secure_keys_created', created),
+      row('recovery_key_downloaded', { recoveryFingerprint: recovery.fingerprint }),
+      row('recovery_key_verified', { recoveryFingerprint: recovery.fingerprint }),
+      row('signing_key_backup_downloaded', { signingFingerprint }),
+      row('secure_keys_restored', { ...restored, source: 'signing-backup' }),
+    ]);
+    // Key replacements record inside their transaction, so a rolled-back swap leaves no audit row behind.
+    expect([...first.inTransaction, ...second.inTransaction]).toEqual([true, false, false, false, true]);
+  });
+
+  it('records nothing when a key operation fails', async () => {
+    const { service, events, addReader } = await setup();
+    await expect(service.downloadRecoveryKey(PASSPHRASE, ACTOR)).rejects.toThrow('No keys');
+    await expect(service.checkRecoveryKey('PEM', PASSPHRASE, ACTOR)).rejects.toThrow('No keys');
+    await expect(service.downloadSigningKeyBackup(PASSPHRASE, ACTOR)).rejects.toThrow('no signing key');
+    expect(events).toEqual([]);
+
+    await service.createKeys(ACTOR);
+    const recovery = await service.downloadRecoveryKey(PASSPHRASE, ACTOR);
+    const backup = await service.downloadSigningKeyBackup(PASSPHRASE, ACTOR);
+    events.length = 0;
+
+    await expect(service.downloadRecoveryKey('short', ACTOR)).rejects.toThrow('at least 12');
+    await expect(service.downloadSigningKeyBackup('short', ACTOR)).rejects.toThrow('at least 12');
+    await expect(service.checkRecoveryKey(recovery.pem, 'wrong passphrase!!', ACTOR)).rejects.toThrow('passphrase');
+    await expect(service.checkRecoveryKey(backup.pem, PASSPHRASE, ACTOR)).rejects.toThrow('not the recovery key');
+    await expect(service.restore('signing-backup', backup.pem, 'wrong passphrase!!', ACTOR)).rejects.toThrow(
+      'passphrase',
+    );
+    await expect(service.restore('signing-backup', backup.pem, PASSPHRASE, ACTOR)).rejects.toThrow('already');
+    await addReader((await service.getState()).signingKey?.digest ?? null, null);
+    await expect(service.createKeys(ACTOR)).rejects.toThrow('digests burned');
+    await expect(service.restore('recovery-file', recovery.pem, PASSPHRASE, ACTOR)).rejects.toThrow('secured');
+
+    expect(events).toEqual([]);
   });
 
   it('keeps exactly one key pair when key creation is requested concurrently', async () => {

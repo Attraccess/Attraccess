@@ -12,11 +12,20 @@ function sourceFiles(directory = SOURCE_ROOT): string[] {
 }
 
 /** Identifiers that reach audit storage. Comments are stripped first, so prose may still name them. */
-const RECORDER_TOKENS = ['AuditService', 'AuditRecorder', 'AUDIT_RECORDER', 'IdentityAuditService', 'SsoAuditService'];
+const RECORDER_TOKENS = [
+  'AuditService',
+  'AuditStorage',
+  'AuditRecorder',
+  'AUDIT_RECORDER',
+  'PluginAuditHost',
+  'PLUGIN_AUDIT_HOST_PROVIDER',
+  'IdentityAuditService',
+  'SsoAuditService',
+];
 
 function code(path: string): string {
   return readFileSync(path, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|\s)\/\*[\s\S]*?\*\//g, '$1')
     .replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
@@ -30,7 +39,8 @@ describe('audit boundaries', () => {
 
   it('keeps audit out of controllers and route helpers: the services that own a change record it', () => {
     const httpEdge = files.filter(
-      (path) => /(\.controller|routes)\.ts$/.test(path) || /@Controller\(/.test(code(path)),
+      (path) =>
+        /(\.controller|routes)\.ts$/.test(path) || /@(Controller|Get|Post|Put|Patch|Delete|All)\(/.test(code(path)),
     );
     expect(httpEdge.length).toBeGreaterThan(50);
     const violations = httpEdge
@@ -43,7 +53,13 @@ describe('audit boundaries', () => {
   });
 
   it('lets guards, interceptors and strategies record auth events only through AuthAuditLogger', () => {
-    const enhancers = files.filter((path) => /\.(guard|interceptor|strategy)\.ts$/.test(path));
+    const enhancers = files.filter(
+      (path) =>
+        /\.(guard|interceptor|strategy|filter|middleware)\.ts$/.test(path) ||
+        /\b(implements\s+(CanActivate|NestInterceptor|ExceptionFilter|NestMiddleware)|extends\s+(PassportStrategy|AuthGuard)\()/.test(
+          code(path),
+        ),
+    );
     expect(enhancers.length).toBeGreaterThan(5);
     const violations = enhancers
       .map((path) => ({ file: relative(SOURCE_ROOT, path), tokens: usedTokens(path, RECORDER_TOKENS) }))
@@ -62,6 +78,14 @@ describe('audit boundaries', () => {
   it('declares the port without depending on the audit implementation', () => {
     const port = code(join(SOURCE_ROOT, 'audit/recorder/audit-event.ts'));
     expect(port).not.toMatch(/audit\.service|audit\.module/);
-    expect(files.filter((path) => /forwardRef\([^)]*Audit/.test(code(path)))).toEqual([]);
+    expect(files.filter((path) => /forwardRef\(\s*\(\)\s*=>\s*\w*Audit/.test(code(path)))).toEqual([]);
+  });
+
+  it('keeps the audit implementation inside the audit module: everything else depends on the port', () => {
+    const outside = files
+      .filter((path) => !relative(SOURCE_ROOT, path).startsWith('audit/'))
+      .filter((path) => usedTokens(path, ['AuditService', 'AuditStorage', 'PluginAuditHost']).length > 0)
+      .map((path) => relative(SOURCE_ROOT, path));
+    expect(outside).toEqual([]);
   });
 });

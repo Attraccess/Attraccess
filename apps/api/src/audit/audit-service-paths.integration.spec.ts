@@ -1,10 +1,19 @@
-import { AuditLog, ResourceHealthSource, ResourceHealthStatus, SSOProviderType } from '@attraccess/database-entities';
+import { AuditLog, ResourceHealthStatus, SSOProviderType } from '@attraccess/database-entities';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { recordPairingEvent } from '../attractap/security/pairing-audit';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { WebSocket } from 'ws';
+import { AttractapPairingController } from '../attractap/pairing.controller';
+import { PairingService } from '../attractap/security/pairing.service';
+import { AttractapAuthHandler } from '../attractap/websockets/handlers/auth/auth.handler';
+import { readerTimeZoneStub } from '../attractap/websockets/reader-time-zone.test-fixture';
+import { WebsocketService } from '../attractap/websockets/websocket.service';
+import { AttractapEvent, AttractapEventType } from '../attractap/websockets/websocket.types';
 import { BillingService } from '../billing/charges/billing.service';
 import { MqttServerController } from '../mqtt/servers/mqtt-server.controller';
 import { MqttServerService } from '../mqtt/servers/mqtt-server.service';
+import { ProjectsController } from '../projects/projects.controller';
 import { ProjectsService } from '../projects/projects.service';
+import { ResourceHealthController } from '../resources/health/resource-health.controller';
 import { ResourceHealthService } from '../resources/health/resource-health.service';
 import { SessionService } from '../users-and-auth/auth/session.service';
 import { SsoProvisioningService } from '../users-and-auth/auth/sso/provisioning/sso-provisioning.service';
@@ -13,7 +22,7 @@ import { auditActorOf } from './recorder/audit-event';
 
 /**
  * Audit lives in the services that own a change, so a change made without an HTTP request (a flow, a reader, the
- * SumUp poll, an identity provider, a plugin) is recorded like the HTTP path. These run the real services against
+ * SumUp poll, an identity provider, a reader) is recorded like the HTTP path. These run the real services against
  * the real audit storage; only the domain repositories are stand-ins.
  */
 describe('audit recorded by the owning services, without the HTTP layer', () => {
@@ -51,7 +60,7 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
     ...fields,
   });
 
-  it('administration: a plugin calling the MQTT server service records the same row as the HTTP route', async () => {
+  it('administration: creating an MQTT server through the service records the same row as the HTTP route', async () => {
     // Entity defaults, as a saved row carries them.
     const server = {
       id: 7,
@@ -88,52 +97,138 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
         apiTokenId: 9,
         subjectType: 'mqtt-server',
         subjectId: 7,
-        details: expect.objectContaining({ serverName: 'Workshop', host: 'mqtt.example', passwordChanged: 0 }),
+        details: {
+          serverName: 'Workshop',
+          host: 'mqtt.example',
+          passwordChanged: 0,
+          port: 1883,
+          managementPort: 0,
+          usernameConfigured: 0,
+          useTls: 0,
+          caCertConfigured: 0,
+          tlsInsecure: 0,
+          tlsServername: '',
+          defaultPublishQos: 0,
+          defaultPublishRetain: 0,
+          defaultSubscribeQos: 0,
+        },
       }),
     );
     expect(direct).toEqual(http);
   });
 
-  it('resource: a flow reporting health records the transition without a user', async () => {
+  it('resource: clearing a health entry through the service records the same row as the HTTP route', async () => {
+    // Two stuck unhealthy entries of one resource, as a flow left them.
+    const entries = [1, 2].map((id) => ({
+      id,
+      resourceId: 5,
+      identifier: `bridge-${id}`,
+      status: ResourceHealthStatus.UNHEALTHY,
+      source: 'payload',
+    }));
     const health = new ResourceHealthService(
-      { findOne: async () => null, create: (value: object) => value, save: async (value: object) => value } as never,
+      {
+        findOne: async ({ where }: { where: { id: number; resourceId: number } }) =>
+          entries.find((entry) => entry.id === where.id && entry.resourceId === where.resourceId) ?? null,
+        remove: async (entry: object) => entry,
+      } as never,
       {} as never,
       { emit: jest.fn() } as never,
       fixture.service,
     );
 
-    await health.reportHealth({
-      resourceId: 5,
-      status: ResourceHealthStatus.UNHEALTHY,
-      source: ResourceHealthSource.HEARTBEAT,
-    });
+    await new ResourceHealthController(health).clearResourceHealthEntry(5, 1, req);
+    await health.clearEntry(5, 2, auditActorOf(req.user));
 
-    expect(await rows()).toEqual([
+    const [http, direct] = await rows();
+    expect(http).toEqual(
       row({
         domain: 'resource',
         action: 'health.transition',
+        actorId: 42,
+        authenticationMethod: 'api-token',
+        apiTokenId: 9,
         subjectType: 'resource',
         subjectId: 5,
-        details: { previousStatus: 'none', status: 'unhealthy', healthSource: 'heartbeat' },
+        details: { previousStatus: 'unhealthy', status: 'healthy', healthSource: 'payload' },
       }),
-    ]);
+    );
+    expect(direct).toEqual(http);
   });
 
-  it('attractap: a reader-initiated pairing event records the device actor', async () => {
-    await recordPairingEvent(fixture.service, 9, 'reader.pairing_failed', null, { reason: 'not-delivered' });
+  describe('attractap', () => {
+    it('revoking a reader through the pairing service records the same row as the HTTP route', async () => {
+      const registry = { revoke: jest.fn(async () => undefined) };
+      const pairing = new PairingService(
+        {} as never,
+        {} as never,
+        registry as never,
+        fixture.service,
+        new EventEmitter2(),
+        {} as never,
+        {} as never,
+        {} as never,
+      );
 
-    expect(await rows()).toEqual([
-      row({
-        domain: 'attractap',
-        action: 'attractap.reader.pairing_failed',
-        subjectType: 'attractap.reader',
-        subjectId: 9,
-        details: { reason: 'not-delivered' },
-      }),
-    ]);
+      await new AttractapPairingController(pairing, registry as never, new WebsocketService()).revoke(9, req);
+      await pairing.revoke(9, { userId: 42, authenticationMethod: 'api-token', apiTokenId: 9 });
+
+      expect(registry.revoke).toHaveBeenCalledTimes(2);
+      const [http, direct] = await rows();
+      expect(http).toEqual(
+        row({
+          domain: 'attractap',
+          action: 'attractap.reader.revoked',
+          actorId: 42,
+          authenticationMethod: 'api-token',
+          apiTokenId: 9,
+          subjectType: 'attractap.reader',
+          subjectId: 9,
+          details: { reason: 'admin' },
+        }),
+      );
+      expect(direct).toEqual(http);
+    });
+
+    it('a paired reader signing in with a token over the reader websocket records the rejection as the device', async () => {
+      const handler = new AttractapAuthHandler();
+      Object.assign(handler, {
+        logger: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() },
+        attractapService: { findReaderById: async (id: number) => ({ id, name: 'Lathe', pairingState: 'paired' }) },
+        metricsService: { attractapReaderConnected: { set: jest.fn() } },
+        audit: fixture.service,
+        readerTimeZone: readerTimeZoneStub(),
+        settingsService: { getDefaultLanguage: async () => 'en' },
+        websocketService: new WebsocketService(),
+      });
+      const socket = {
+        id: 'socket-1',
+        readerId: null,
+        readerName: null,
+        readyState: WebSocket.OPEN,
+        state: {},
+        sendMessage: jest.fn(async () => undefined),
+      };
+
+      await handler.handleAuthentication(socket as never, { payload: { id: 9, token: 'stolen-token' } } as never);
+
+      expect(socket.sendMessage).toHaveBeenCalledWith(
+        new AttractapEvent(AttractapEventType.READER_UNAUTHORIZED, { message: 'PAIRING_REQUIRED' }),
+      );
+      expect(await rows()).toEqual([
+        row({
+          domain: 'attractap',
+          action: 'attractap.reader.token_rejected',
+          subjectType: 'attractap.reader',
+          subjectId: 9,
+          details: { reason: 'paired' },
+        }),
+      ]);
+      expect(JSON.stringify(await rows())).not.toContain('stolen-token');
+    });
   });
 
-  it('project: creating a project through the service records the owner as actor', async () => {
+  it('project: creating a project through the service records the same row as the HTTP route', async () => {
     const projects = new ProjectsService(
       { save: async (value: object) => ({ ...value, id: 3 }) } as never,
       {} as never,
@@ -147,20 +242,30 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
       {} as never,
       fixture.service,
     );
+    const controller = new ProjectsController(
+      projects,
+      {} as never,
+      {} as never,
+      { getAccessOrThrow: async (_userId: number, id: number) => ({ id, name: 'Workshop project' }) } as never,
+    );
 
-    await projects.create(42, { name: 'Workshop project' } as never);
+    await controller.create(req, { name: 'Workshop project' } as never);
+    await projects.create(42, { name: 'Workshop project' } as never, 'api-token', 9);
 
-    expect(await rows()).toEqual([
+    const [http, direct] = await rows();
+    expect(http).toEqual(
       row({
         domain: 'project',
         action: 'project.created',
         actorId: 42,
-        authenticationMethod: 'session',
+        authenticationMethod: 'api-token',
+        apiTokenId: 9,
         subjectType: 'project',
         subjectId: 3,
-        details: expect.objectContaining({ 'after.name': 'Workshop project' }),
+        details: { projectId: 3, 'after.hasLogo': 0, 'after.name': 'Workshop project' },
       }),
-    ]);
+    );
+    expect(direct).toEqual(http);
   });
 
   it('billing: a manual transaction records the deterministic billing operation', async () => {

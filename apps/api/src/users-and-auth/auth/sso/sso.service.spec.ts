@@ -1,7 +1,13 @@
 import { registerSsoServiceFixture } from './sso.service.sso-service.test-fixture';
-import { SSOProviderType, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import {
+  SSOProvider,
+  SSOProviderOIDCConfiguration,
+  SSOProviderType,
+  SSOProviderSAMLConfiguration,
+} from '@attraccess/database-entities';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { CreateSAMLConfigurationDto } from './dto/create-sso-provider.dto';
+import { ssoAuditSnapshot } from './audit/provider-audit';
 
 const ACTOR = { id: 1, authenticationMethod: 'session' as const };
 
@@ -501,6 +507,162 @@ describe('SsoService', () => {
 
       expect(fixture.encryptionService.encrypt).not.toHaveBeenCalled();
       expect(fixture.samlConfigRepository.update).toHaveBeenCalledWith({ ssoProviderId: 1 }, {});
+    });
+  });
+
+  describe('provider lifecycle audit', () => {
+    const oidcProvider = {
+      issuer: 'https://new-issuer.com',
+      authorizationURL: 'https://new-issuer.com/auth',
+      tokenURL: 'https://new-issuer.com/token',
+      userInfoURL: 'https://new-issuer.com/userinfo',
+      clientId: 'new-client-id',
+      clientSecret: 'new-client-secret',
+    };
+
+    /** The manager of the next provider transaction, so a test can tell it apart from any other manager. */
+    function nextTransactionManager() {
+      const manager = {
+        getRepository: (entity: unknown) =>
+          entity === SSOProvider
+            ? fixture.ssoProviderRepository
+            : entity === SSOProviderOIDCConfiguration
+              ? fixture.oidcConfigRepository
+              : fixture.samlConfigRepository,
+      };
+      (fixture.ssoProviderRepository.manager.transaction as jest.Mock).mockImplementationOnce(
+        (callback: (transactionManager: typeof manager) => Promise<unknown>) => callback(manager),
+      );
+      return manager;
+    }
+
+    beforeEach(() => {
+      fixture.audit.record.mockClear();
+    });
+
+    it('records the created provider with the create transaction manager', async () => {
+      const manager = nextTransactionManager();
+
+      await fixture.service.createProvider(
+        { name: 'New Provider', type: SSOProviderType.OIDC, oidcConfiguration: oidcProvider },
+        ACTOR,
+      );
+
+      expect(fixture.audit.record).toHaveBeenCalledTimes(1);
+      expect(fixture.audit.record).toHaveBeenCalledWith(
+        {
+          domain: 'sso',
+          action: 'sso.provider.created',
+          operationId: expect.any(String),
+          actor: ACTOR,
+          subject: { type: 'sso.provider', id: 1 },
+          details: { before: 'null', after: ssoAuditSnapshot(fixture.mockSSOProviderWithOIDCConfig) },
+        },
+        manager,
+      );
+    });
+
+    it('keeps provider creation successful when the audit receipt is unavailable', async () => {
+      fixture.audit.record.mockResolvedValueOnce({ status: 'unavailable' });
+
+      await expect(
+        fixture.service.createProvider(
+          { name: 'New Provider', type: SSOProviderType.OIDC, oidcConfiguration: oidcProvider },
+          ACTOR,
+        ),
+      ).resolves.toEqual(fixture.mockSSOProviderWithOIDCConfig);
+      expect(fixture.audit.record).toHaveBeenCalledTimes(1);
+    });
+
+    it('records the changed fields and rotated secrets of an update with the update transaction manager', async () => {
+      const before = { ...fixture.mockSSOProviderWithOIDCConfig, oidcConfiguration: { ...fixture.mockOIDCConfig } };
+      const after = {
+        ...before,
+        name: 'Renamed Provider',
+        oidcConfiguration: {
+          ...before.oidcConfiguration,
+          issuer: 'https://changed.example.com',
+          clientSecret: 'rotated-client-secret',
+        },
+      } as SSOProvider;
+      jest.spyOn(fixture.ssoProviderRepository, 'findOne').mockResolvedValueOnce(before).mockResolvedValueOnce(after);
+      const manager = nextTransactionManager();
+
+      await fixture.service.updateProvider(
+        1,
+        {
+          name: 'Renamed Provider',
+          oidcConfiguration: { issuer: 'https://changed.example.com', clientSecret: 'rotated-client-secret' },
+        },
+        ACTOR,
+      );
+
+      expect(fixture.audit.record).toHaveBeenCalledTimes(1);
+      expect(fixture.audit.record).toHaveBeenCalledWith(
+        {
+          domain: 'sso',
+          action: 'sso.provider.updated',
+          operationId: expect.any(String),
+          actor: ACTOR,
+          subject: { type: 'sso.provider', id: 1 },
+          details: {
+            before: ssoAuditSnapshot(before),
+            after: ssoAuditSnapshot(after),
+            changes: JSON.stringify({ changed: ['name', 'configuration.issuer'], rotated: ['clientSecret'] }),
+          },
+        },
+        manager,
+      );
+      expect(JSON.stringify(fixture.audit.record.mock.calls)).not.toMatch(/rotated-client-secret|test-client-secret/);
+    });
+
+    it('records nothing for an update that changes nothing', async () => {
+      await fixture.service.updateProvider(1, {}, ACTOR);
+      await fixture.service.updateProvider(
+        1,
+        { oidcConfiguration: { clientSecret: fixture.mockOIDCConfig.clientSecret } },
+        ACTOR,
+      );
+
+      expect(fixture.ssoProviderRepository.manager.transaction).toHaveBeenCalledTimes(2);
+      expect(fixture.audit.record).not.toHaveBeenCalled();
+    });
+
+    it('records nothing for an update that fails before commit', async () => {
+      jest.spyOn(fixture.ssoProviderRepository, 'update').mockRejectedValueOnce(new Error('name write failed'));
+
+      await expect(fixture.service.updateProvider(1, { name: 'Renamed Provider' }, ACTOR)).rejects.toThrow(
+        'name write failed',
+      );
+
+      expect(fixture.audit.record).not.toHaveBeenCalled();
+    });
+
+    it('records the deleted provider with the delete transaction manager', async () => {
+      const manager = nextTransactionManager();
+
+      await fixture.service.deleteProvider(1, ACTOR);
+
+      expect(fixture.audit.record).toHaveBeenCalledTimes(1);
+      expect(fixture.audit.record).toHaveBeenCalledWith(
+        {
+          domain: 'sso',
+          action: 'sso.provider.deleted',
+          operationId: expect.any(String),
+          actor: ACTOR,
+          subject: { type: 'sso.provider', id: 1 },
+          details: { before: ssoAuditSnapshot(fixture.mockSSOProviderWithOIDCConfig), after: 'null' },
+        },
+        manager,
+      );
+    });
+
+    it('records nothing for a delete that fails before commit', async () => {
+      jest.spyOn(fixture.ssoProviderRepository, 'delete').mockRejectedValueOnce(new Error('delete failed'));
+
+      await expect(fixture.service.deleteProvider(1, ACTOR)).rejects.toThrow('delete failed');
+
+      expect(fixture.audit.record).not.toHaveBeenCalled();
     });
   });
 });

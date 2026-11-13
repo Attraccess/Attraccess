@@ -28,6 +28,8 @@ describe('PasskeyService', () => {
   let challengeRepo: Record<string, jest.Mock>;
   let userRepo: Record<string, jest.Mock>;
   let getUrl: jest.Mock;
+  let bruteForce: Record<string, jest.Mock>;
+  let authAuditLog: jest.Mock;
 
   const storedPasskey = {
     id: 7,
@@ -56,12 +58,18 @@ describe('PasskeyService', () => {
       findOneBy: jest.fn().mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: true } as User),
     };
     getUrl = jest.fn().mockResolvedValue('https://make.example.com');
+    bruteForce = {
+      assertIpAllowed: jest.fn().mockResolvedValue(undefined),
+      recordFailure: jest.fn().mockResolvedValue(undefined),
+      recordSuccess: jest.fn().mockResolvedValue(undefined),
+    };
+    authAuditLog = jest.fn().mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
-        { provide: BruteForceProtectionService, useValue: {} },
-        { provide: AuthAuditLogger, useValue: { log: jest.fn() } },
+        { provide: BruteForceProtectionService, useValue: bruteForce },
+        { provide: AuthAuditLogger, useValue: { log: authAuditLog } },
         PasskeyService,
         { provide: getRepositoryToken(Passkey), useValue: passkeyRepo },
         { provide: getRepositoryToken(PasskeyChallenge), useValue: challengeRepo },
@@ -176,6 +184,64 @@ describe('PasskeyService', () => {
       userRepo.findOneBy.mockResolvedValue({ id: 42, username: 'maker', isEmailVerified: false } as User);
 
       await expect(service.verifyAuthentication(response as never)).rejects.toThrow(UserEmailNotVerifiedException);
+    });
+  });
+
+  describe('sign-in audit', () => {
+    const response = { id: 'cred-1', response: { clientDataJSON: clientDataFor('auth-challenge') } };
+    const ip = '203.0.113.7';
+
+    it('logs a throttled IP as rate limited and rethrows the throttle', async () => {
+      const throttled = new Error('too many attempts');
+      bruteForce.assertIpAllowed.mockRejectedValue(throttled);
+
+      await expect(service.assertIpAllowed(ip)).rejects.toBe(throttled);
+
+      expect(bruteForce.assertIpAllowed).toHaveBeenCalledWith('login', ip);
+      expect(authAuditLog).toHaveBeenCalledTimes(1);
+      expect(authAuditLog).toHaveBeenCalledWith({ type: 'login', outcome: 'rate_limited', ip, reason: 'ip_throttled' });
+    });
+
+    it('logs nothing for an IP that is not throttled', async () => {
+      await service.assertIpAllowed(ip);
+
+      expect(authAuditLog).not.toHaveBeenCalled();
+    });
+
+    it('counts and logs a rejected passkey as invalid credentials', async () => {
+      const rejected = new UnauthorizedException('Passkey not recognized');
+      jest.spyOn(service, 'verifyAuthentication').mockRejectedValue(rejected);
+
+      await expect(service.signIn(response as never, 'https://make.example.com', ip)).rejects.toBe(rejected);
+
+      expect(bruteForce.recordFailure).toHaveBeenCalledWith('login', ip, null);
+      expect(bruteForce.recordSuccess).not.toHaveBeenCalled();
+      expect(authAuditLog).toHaveBeenCalledTimes(1);
+      expect(authAuditLog).toHaveBeenCalledWith({
+        type: 'login',
+        outcome: 'invalid_credentials',
+        ip,
+        reason: 'passkey_rejected',
+      });
+    });
+
+    it('counts and logs a verified passkey as a successful login for its user', async () => {
+      const user = { id: 42, username: 'maker', isEmailVerified: true } as User;
+      jest.spyOn(service, 'verifyAuthentication').mockResolvedValue(user);
+
+      await expect(service.signIn(response as never, 'https://make.example.com', ip)).resolves.toBe(user);
+
+      expect(service.verifyAuthentication).toHaveBeenCalledWith(response, 'https://make.example.com');
+      expect(bruteForce.recordSuccess).toHaveBeenCalledWith('login', ip, 42, 'maker');
+      expect(bruteForce.recordFailure).not.toHaveBeenCalled();
+      expect(authAuditLog).toHaveBeenCalledTimes(1);
+      expect(authAuditLog).toHaveBeenCalledWith({
+        type: 'login',
+        outcome: 'success',
+        ip,
+        userId: 42,
+        username: 'maker',
+      });
     });
   });
 
