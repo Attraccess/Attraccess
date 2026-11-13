@@ -1,5 +1,6 @@
 import {
   STORAGE_SCHEMA_VERSION,
+  type fabricStatusSchema,
   recoveryReasonSchema,
   timestampSchema,
   uuidSchema,
@@ -26,6 +27,7 @@ import { z } from 'zod';
 import { directoryHasFiles, sha256Hex } from './archive';
 
 export type RecoveryReason = z.infer<typeof recoveryReasonSchema>;
+export type FabricStatus = z.infer<typeof fabricStatusSchema>;
 
 /** Where the sidecar keeps what it owns. Everything lives under one directory, which needs its own persistent volume. */
 export type StorageLayout = {
@@ -275,6 +277,29 @@ export function inspectStorage(layout: StorageLayout): StorageInspection {
   } catch (error) {
     return recovery(error instanceof StorageProblem ? error.reason : 'storage_unreadable');
   }
+}
+
+/** The fabric status the API reports for an inspection. */
+export function fabricStatusOf(inspection: StorageInspection): FabricStatus {
+  const base = {
+    storageSchemaVersion: STORAGE_SCHEMA_VERSION as 1,
+    reason: null,
+    fabricId: null,
+    fabricGeneration: 0,
+    rootCertFingerprint: null,
+    storageInstanceId: null,
+  };
+  if (inspection.kind === 'uninitialized') return { ...base, state: 'uninitialized' };
+  if (inspection.kind === 'recovery') return { ...base, state: 'recovery_required', reason: inspection.reason };
+  const { metadata } = inspection;
+  return {
+    ...base,
+    state: 'initialized',
+    fabricId: metadata.fabricId,
+    fabricGeneration: metadata.fabricGeneration,
+    rootCertFingerprint: metadata.rootCertFingerprint,
+    storageInstanceId: metadata.storageInstanceId,
+  };
 }
 
 // --- counters --------------------------------------------------------------------------------------

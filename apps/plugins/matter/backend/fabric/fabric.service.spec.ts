@@ -4,6 +4,11 @@ import { MatterFabric, MatterNode } from '../devices/entities';
 import { ADMIN, createFabricHarness, type FabricHarness } from '../testing/fabric-harness.test-utils';
 import { parseRecoveryKey, recoveryKeyId } from '../backup/recovery-key';
 import { SidecarUnavailableError } from '../client/errors';
+import { auditSubjectId } from '../devices/audit.service';
+
+type AuditCall = { action: string; subject: { type: string; id: number }; details: Record<string, unknown> };
+const callsOf = (h: FabricHarness, action: string) =>
+  h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0]).filter((entry) => entry.action === action);
 
 const codeOf = async (promise: Promise<unknown>) => {
   try {
@@ -131,6 +136,28 @@ describe('MatterFabricService', () => {
       expect(await h.dataSource.getRepository(MatterRecoveryKey).count()).toBe(2);
     });
 
+    it('rotating during a running backup takes a new backup under the new key instead of joining the old one', async () => {
+      await h.fabric.create(undefined, ADMIN);
+      let release: () => void = () => undefined;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      const request = h.connection.request.bind(h.connection);
+      let snapshots = 0;
+      jest.spyOn(h.connection, 'request').mockImplementation(async (operation, options) => {
+        if (operation === 'backup.snapshot' && snapshots++ === 0) await held;
+        return request(operation, options);
+      });
+      const running = h.backups.backup('manual', ADMIN);
+      await new Promise((resolve) => setImmediate(resolve));
+      const oldKeyId = (await h.keys.current())?.keyId;
+      const rotating = h.fabric.rotateRecoveryKey(ADMIN);
+      await new Promise((resolve) => setImmediate(resolve));
+      release();
+      expect((await running).recoveryKeyId).toBe(oldKeyId);
+      const rotated = await rotating;
+      expect(snapshots).toBe(2);
+      expect((await h.backups.list())[0]).toMatchObject({ trigger: 'manual', recoveryKeyId: rotated.keyId });
+    });
+
     it('cannot rotate without a key', async () => {
       expect(await codeOf(h.keys.rotate(ADMIN))).toBe('no_recovery_key');
     });
@@ -197,7 +224,23 @@ describe('MatterFabricService', () => {
       const status = await h.fabric.status();
       expect(status.recovery).toEqual({ required: true, mismatch: expected });
       expect(h.actions()).toEqual(['matter.fabric_recovery_required']);
-      expect((h.audit.mock.calls[0] as unknown as [{ details: object }])[0].details).toEqual({ mismatch: expected });
+      // The #2173 convention: the recorded row's UUID is the subject, and travels in full as `fabricRef`.
+      const [recorded] = await h.dataSource.getRepository(MatterFabric).find();
+      expect(callsOf(h, 'matter.fabric_recovery_required')[0]).toMatchObject({
+        subject: { type: 'matter.fabric', id: auditSubjectId(recorded.id) },
+        details: { fabricRef: recorded.id, mismatch: expected },
+      });
+    });
+
+    it('audits a mismatch without a recorded fabric on the fixed "no fabric" subject, without a fabricRef', async () => {
+      await h.dataSource.query('DELETE FROM plugin_matter_fabrics');
+      h.backend.enterRecovery();
+      expect(await h.fabric.detect('connect')).toBe('sidecar_recovery_required');
+      expect(callsOf(h, 'matter.fabric_recovery_required')[0]).toMatchObject({
+        subject: { type: 'matter.fabric', id: 1 },
+        details: { mismatch: 'sidecar_recovery_required' },
+      });
+      expect(callsOf(h, 'matter.fabric_recovery_required')[0].details).not.toHaveProperty('fabricRef');
     });
 
     it('clears the state again when the sidecar matches once more', async () => {
@@ -266,6 +309,46 @@ describe('MatterFabricService', () => {
       h.fabric.onModuleDestroy();
     });
 
+    it('judges a generation advance like a reconnect while a restore of unknown outcome may still land', async () => {
+      h.guard.outcomeUnknown = true;
+      h.backend.generationCounter = 2;
+      expect(await h.fabric.detect('event')).toBe('generation_ahead');
+      expect(h.guard.recoveryRequired).toBe(true);
+      expect((await h.fabric.status()).recorded?.fabricGeneration).toBe(1);
+    });
+
+    it('ends an unknown restore outcome once a connect check finds the sidecar agreeing', async () => {
+      h.guard.outcomeUnknown = true;
+      // Neither an event nor the check right after the restore itself settles it: that restore may still land.
+      expect(await h.fabric.detect('event')).toBeNull();
+      expect(await h.fabric.detect('connect', { keepOutcomeUnknown: true })).toBeNull();
+      expect(h.guard.outcomeUnknown).toBe(true);
+      expect(await h.fabric.detect('connect')).toBeNull();
+      expect(h.guard.outcomeUnknown).toBe(false);
+      h.backend.generationCounter = 2;
+      expect(await h.fabric.detect('event')).toBeNull();
+      expect((await h.fabric.status()).recorded?.fabricGeneration).toBe(2);
+    });
+
+    it('keeps an unknown restore outcome when the restore did land: that connect check is a mismatch', async () => {
+      h.guard.outcomeUnknown = true;
+      h.backend.generationCounter = 2;
+      expect(await h.fabric.detect('connect')).toBe('generation_ahead');
+      expect(h.guard.outcomeUnknown).toBe(true);
+      expect((await h.fabric.status()).recorded?.fabricGeneration).toBe(1);
+    });
+
+    it('trusts events again once the plugin recorded a fabric itself', async () => {
+      h.guard.outcomeUnknown = true;
+      h.backend.seedFabric('4242', 3);
+      await h.fabric.detect('connect');
+      await h.fabric.acceptSidecar(ADMIN);
+      expect(h.guard.outcomeUnknown).toBe(false);
+      h.backend.generationCounter = 4;
+      expect(await h.fabric.detect('event')).toBeNull();
+      expect((await h.fabric.status()).recorded?.fabricGeneration).toBe(4);
+    });
+
     it('does not judge the sidecar while the plugin itself is changing the fabric', async () => {
       h.guard.busy = true;
       h.backend.clear();
@@ -315,6 +398,7 @@ describe('MatterFabricService', () => {
     });
 
     it('accept-sidecar records the sidecar facts, runs the reconciliation and takes a backup', async () => {
+      const original = h.backend.storage?.fabricId;
       h.backend.seedFabric('4242', 7);
       await h.fabric.detect('connect');
       expect(h.guard.mismatch).toBe('fabric_changed');
@@ -327,6 +411,14 @@ describe('MatterFabricService', () => {
       expect(h.backend.calls.slice(before)).toContain('backup.snapshot');
       expect(status.backups.stored[0]).toMatchObject({ fabricId: '4242', trigger: 'fabric_changed' });
       expect(h.actions()).toEqual(expect.arrayContaining(['matter.recovery_action_chosen', 'matter.backup_succeeded']));
+      // Audited on the row of the fabric the plugin had recorded when the administrator chose.
+      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ fabricId: original });
+      expect(callsOf(h, 'matter.recovery_action_chosen')).toEqual([
+        expect.objectContaining({
+          subject: { type: 'matter.fabric', id: auditSubjectId(old.id) },
+          details: { fabricRef: old.id, choice: 'accept_sidecar' },
+        }),
+      ]);
       const detached = await h.rows<{ status: string; fabric_id: string }>('plugin_matter_fabrics');
       expect(detached.find((row) => row.fabric_id !== '4242')?.status).toBe('absent');
     });
@@ -341,6 +433,7 @@ describe('MatterFabricService', () => {
 
     it('start-new creates a new fabric on an empty sidecar and keeps the existing recovery key', async () => {
       const before = await h.keys.current();
+      const oldFabricId = h.backend.storage?.fabricId;
       h.backend.clear();
       await h.fabric.detect('connect');
       expect(h.guard.mismatch).toBe('sidecar_uninitialized');
@@ -355,6 +448,27 @@ describe('MatterFabricService', () => {
         fabricId: h.backend.storage?.fabricId,
       });
       expect(h.actions()).toEqual(expect.arrayContaining(['matter.recovery_action_chosen', 'matter.fabric_created']));
+      const [chosen] = callsOf(h, 'matter.recovery_action_chosen');
+      const oldRow = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ fabricId: oldFabricId });
+      expect(chosen).toMatchObject({
+        subject: { type: 'matter.fabric', id: auditSubjectId(oldRow.id) },
+        details: { fabricRef: oldRow.id, choice: 'start_new' },
+      });
+    });
+
+    it('start-new audits the choice on the new fabric row when no old one was recorded', async () => {
+      await h.dataSource.query('DELETE FROM plugin_matter_fabrics');
+      h.backend.enterRecovery();
+      await h.fabric.detect('connect');
+      h.backend.clear();
+      await h.fabric.startNew(undefined, ADMIN);
+      const created = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({
+        fabricId: h.backend.storage?.fabricId,
+      });
+      expect(callsOf(h, 'matter.recovery_action_chosen')[0]).toMatchObject({
+        subject: { type: 'matter.fabric', id: auditSubjectId(created.id) },
+        details: { fabricRef: created.id, choice: 'start_new' },
+      });
     });
 
     it('start-new detaches the old fabric nodes as a fabric mismatch, even after a run saw the empty sidecar', async () => {
@@ -370,18 +484,45 @@ describe('MatterFabricService', () => {
         updatedAt: 't',
       } as MatterNode);
       h.backend.clear();
-      await h.fabric.detect('connect');
-      // The sidecar was first seen without a fabric: the node is detached for that reason, which is not yet a mismatch.
+      // A run saw the empty sidecar before the mismatch was detected: the node is detached for that reason.
       await h.reconciliation.request();
       expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
         lifecycleState: 'detached',
         detachedReason: 'fabric_absent',
       });
+      await h.fabric.detect('connect');
 
       await h.fabric.startNew(undefined, ADMIN);
       expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
         lifecycleState: 'detached',
         detachedReason: 'fabric_mismatch',
+      });
+    });
+
+    it('no other reconciliation applies anything while recovery waits for the administrator', async () => {
+      const old = await h.dataSource.getRepository(MatterFabric).findOneByOrFail({ retiredAt: undefined });
+      await h.dataSource.getRepository(MatterNode).save({
+        id: 'n-1',
+        fabricRef: old.id,
+        nodeId: '5',
+        lifecycleState: 'claimed',
+        firstSeenAt: 't',
+        lastSeenAt: 't',
+        createdAt: 't',
+        updatedAt: 't',
+      } as MatterNode);
+      h.backend.seedFabric('4242', 7);
+      await h.fabric.detect('connect');
+      const status = await h.reconciliation.request(ADMIN);
+      expect(status).toMatchObject({ lastResult: 'skipped_unavailable', lastSummary: { reason: 'recovery_required' } });
+      expect(h.connection.requests).not.toContain('inventory.list');
+      expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
+        lifecycleState: 'claimed',
+      });
+      // The administrator's choice reconciles while the plugin is still in recovery.
+      await h.fabric.acceptSidecar(ADMIN);
+      expect(await h.dataSource.getRepository(MatterNode).findOneByOrFail({ id: 'n-1' })).toMatchObject({
+        lifecycleState: 'detached',
       });
     });
 

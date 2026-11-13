@@ -1,9 +1,9 @@
 import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
-import { createHash } from 'node:crypto';
-import { MatterNode } from '../devices/entities';
-import { formatRecoveryKey, generateRecoveryKey } from './recovery-key';
+import { auditSubjectId } from '../devices/audit.service';
+import { MatterFabric, MatterNode } from '../devices/entities';
+import { formatRecoveryKey, generateRecoveryKey, recoveryKeyId } from './recovery-key';
 import { ADMIN, createFabricHarness, type FabricHarness } from '../testing/fabric-harness.test-utils';
-import { MatterBackup } from './entities';
+import { MatterBackup, MatterRecoveryKey } from './entities';
 import { encryptBackup, type BackupBody } from './format';
 import { PLUGIN_TABLES, readTables } from './tables';
 
@@ -19,6 +19,7 @@ const failure = async (promise: Promise<unknown>): Promise<{ status: number; bod
   }
   throw new Error('expected a failure');
 };
+type AuditCall = { action: string; subject: { type: string; id: number }; details: Record<string, unknown> };
 
 describe('MatterRestoreService', () => {
   let h: FabricHarness;
@@ -54,6 +55,9 @@ describe('MatterRestoreService', () => {
   };
   const upload = (contentBase64: string) => ({ type: 'upload' as const, contentBase64 });
   const stored = () => ({ type: 'stored' as const, backupId });
+  const auditCalls = (action: string) =>
+    h.audit.mock.calls.map((call) => (call as unknown as [AuditCall])[0]).filter((entry) => entry.action === action);
+  const count = (operation: string) => h.backend.calls.filter((call) => call === operation).length;
 
   beforeEach(async () => {
     h = await createFabricHarness();
@@ -79,6 +83,9 @@ describe('MatterRestoreService', () => {
       expect(h.guard.mismatch).toBe('sidecar_uninitialized');
       h.audit.mockClear();
 
+      const recordedRow = await h.dataSource
+        .getRepository(MatterFabric)
+        .findOneByOrFail({ fabricId: originalFabricId });
       const validation = await h.restore.validate(stored(), undefined, ADMIN);
       expect(validation.preflight).toEqual({
         sidecarState: 'uninitialized',
@@ -118,10 +125,16 @@ describe('MatterRestoreService', () => {
       expect(result.status.backups.stored.map((b) => b.trigger)).not.toContain('pre_restore');
       expect(h.actions()).toEqual([
         'matter.restore_validated',
+        'matter.recovery_action_chosen',
         'matter.restore_confirmed',
         'matter.restore_succeeded',
         'matter.backup_succeeded',
       ]);
+      // Restoring was the administrator's way out of recovery: audited on the fabric row the plugin had recorded.
+      expect(auditCalls('matter.recovery_action_chosen')[0]).toMatchObject({
+        subject: { type: 'matter.fabric', id: auditSubjectId(recordedRow.id) },
+        details: { fabricRef: recordedRow.id, choice: 'restore' },
+      });
     });
 
     it('does not let a reconciliation that starts during the restore touch the tables', async () => {
@@ -153,6 +166,47 @@ describe('MatterRestoreService', () => {
       await h.restore.confirm(validation.validationId, undefined, ADMIN);
       expect(h.backend.state).toBe('initialized');
       expect(h.guard.recoveryRequired).toBe(false);
+    });
+
+    it('keeps the typed-in key on an installation without one, so the backup after the restore can be made', async () => {
+      // Disaster recovery onto a fresh installation: no recovery key, no fabric, only the file and the key on paper.
+      const key = generateRecoveryKey();
+      const file = await forge(undefined, key);
+      await disaster();
+      await h.dataSource.getRepository(MatterRecoveryKey).clear();
+      h.audit.mockClear();
+      const typed = formatRecoveryKey(key);
+
+      const validation = await h.restore.validate(upload(file), typed, ADMIN);
+      const result = await h.restore.confirm(validation.validationId, undefined, ADMIN);
+
+      const keyId = recoveryKeyId(key);
+      expect(validation.backup.recoveryKeyId).toBe(keyId);
+      expect(result.status.recoveryKey).toMatchObject({ present: true, keyId, acknowledged: true });
+      expect((await h.keys.currentKey())?.key.equals(key)).toBe(true);
+      const row = await h.dataSource.getRepository(MatterRecoveryKey).findOneByOrFail({ keyId });
+      expect(row.encryptedKey).not.toContain(key.toString('base64'));
+      expect(result.status.backups.stored[0]).toMatchObject({ trigger: 'restore', recoveryKeyId: keyId });
+      expect(auditCalls('matter.recovery_key_generated')).toEqual([
+        expect.objectContaining({ details: { keyId, source: 'restore' } }),
+      ]);
+      // Never in a response, a log or the audit trail.
+      expect(JSON.stringify([validation, result])).not.toContain(typed);
+      expect(h.emitted()).not.toContain(typed);
+      expect(h.emitted()).not.toContain(key.toString('base64'));
+    });
+
+    it('does not replace an existing key with the typed-in one', async () => {
+      const current = (await h.keys.current())?.keyId;
+      const other = generateRecoveryKey();
+      const validation = await h.restore.validate(
+        upload(await forge(undefined, other)),
+        formatRecoveryKey(other),
+        ADMIN,
+      );
+      await h.restore.confirm(validation.validationId, originalFabricId, ADMIN);
+      expect((await h.keys.current())?.keyId).toBe(current);
+      expect(await h.keys.keyById(recoveryKeyId(other))).toBeNull();
     });
 
     it('restores an uploaded file with the key typed in, when the installation does not have it', async () => {
@@ -218,21 +272,45 @@ describe('MatterRestoreService', () => {
       expect(order.indexOf('backup.snapshot')).toBeLessThan(order.indexOf('backup.restore.commit'));
     });
 
-    it('classifies a different fabric as a replacement', async () => {
+    it('classifies a different fabric as a replacement, and backs it up first although the plugin is in recovery', async () => {
       h.backend.seedFabric('999', 3);
       await h.fabric.detect('connect');
+      expect(h.guard.mismatch).toBe('fabric_changed');
       const validation = await h.restore.validate(stored(), undefined, ADMIN);
       expect(validation.preflight).toMatchObject({
         kind: 'replacement',
         currentFabricId: '999',
         confirmationFabricId: '999',
       });
-      // The plugin is in recovery, so no consistent backup of the current state can be made: it goes ahead without one.
       await expect(h.restore.confirm(validation.validationId, '999', ADMIN)).resolves.toMatchObject({
         outcome: 'succeeded',
       });
       expect(h.backend.storage?.fabricId).toBe(originalFabricId);
-      expect((await h.backups.list()).map((b) => b.trigger)).not.toContain('pre_restore');
+      // The sidecar's healthy fabric is kept: its snapshot header gives the facts, the tables are taken as they were.
+      const preRestore = (await h.backups.list()).find((b) => b.trigger === 'pre_restore');
+      expect(preRestore).toMatchObject({ fabricId: '999', fabricGeneration: 3 });
+      expect(auditCalls('matter.restore_confirmed')[0].details).toMatchObject({ preRestoreBackup: true });
+    });
+
+    it('refuses to replace a healthy fabric in recovery when it cannot be backed up first', async () => {
+      const other = generateRecoveryKey();
+      const file = await forge(undefined, other);
+      h.backend.seedFabric('999', 3);
+      await h.fabric.detect('connect');
+      await h.dataSource.getRepository(MatterRecoveryKey).clear();
+      const before = { tables: await tables(), sidecar: sidecarFacts() };
+      const validation = await h.restore.validate(upload(file), formatRecoveryKey(other), ADMIN);
+      expect(await failure(h.restore.confirm(validation.validationId, '999', ADMIN))).toMatchObject({
+        status: 409,
+        body: { code: 'pre_restore_backup_failed' },
+      });
+      expect(h.backend.calls).not.toContain('backup.restore.commit');
+      expect(await tables()).toBe(before.tables);
+      expect(sidecarFacts()).toBe(before.sidecar);
+      expect(auditCalls('matter.backup_failed')[0].details).toMatchObject({
+        trigger: 'pre_restore',
+        reason: 'no_recovery_key',
+      });
     });
 
     it('does not restore when the pre-restore backup cannot be made', async () => {
@@ -251,33 +329,30 @@ describe('MatterRestoreService', () => {
   });
 
   describe('validation fails before anything is changed', () => {
-    const expectRefused = async (promise: Promise<unknown>, code: string) => {
-      const before = {
-        tables: await tables(),
-        sidecar: sidecarFacts(),
-        stages: h.backend.calls.filter((c) => c === 'backup.restore.stage').length,
-      };
-      expect(await failure(promise)).toMatchObject({ status: 422, body: { code, message: expect.any(String) } });
+    /**
+     * The state is taken before the validation starts. Everything except the sidecar's own rejection is found before
+     * anything is staged, so the sidecar never sees the snapshot.
+     */
+    const expectRefused = async (validate: () => Promise<unknown>, code: string, options = { staged: false }) => {
+      const before = { tables: await tables(), sidecar: sidecarFacts(), stages: count('backup.restore.stage') };
+      expect(await failure(validate())).toMatchObject({ status: 422, body: { code, message: expect.any(String) } });
       expect(await tables()).toBe(before.tables);
       expect(sidecarFacts()).toBe(before.sidecar);
       expect(h.backend.calls).not.toContain('backup.restore.commit');
-      return before;
+      expect(count('backup.restore.stage')).toBe(before.stages + (options.staged ? 1 : 0));
     };
 
     it('refuses a wrong key, before staging anything', async () => {
-      const before = await expectRefused(
-        h.restore.validate(stored(), formatRecoveryKey(generateRecoveryKey()), ADMIN),
+      await expectRefused(
+        () => h.restore.validate(stored(), formatRecoveryKey(generateRecoveryKey()), ADMIN),
         'wrong_key',
       );
-      expect(h.backend.calls.filter((c) => c === 'backup.restore.stage')).toHaveLength(before.stages);
-      await expectRefused(h.restore.validate(stored(), 'not a key', ADMIN), 'wrong_key');
+      await expectRefused(() => h.restore.validate(stored(), 'not a key', ADMIN), 'wrong_key');
     });
 
     it('refuses a key it does not have and was not given', async () => {
-      await expectRefused(
-        h.restore.validate(upload(await forge(undefined, generateRecoveryKey())), undefined, ADMIN),
-        'key_required',
-      );
+      const file = await forge(undefined, generateRecoveryKey());
+      await expectRefused(() => h.restore.validate(upload(file), undefined, ADMIN), 'key_required');
     });
 
     it('refuses damage anywhere in the file', async () => {
@@ -288,115 +363,121 @@ describe('MatterRestoreService', () => {
         return copy.toString('base64');
       };
       const bodyStart = 12 + file.readUInt32BE(8);
-      await expectRefused(h.restore.validate(upload(flipAt(file.length - 40)), undefined, ADMIN), 'corrupt');
-      await expectRefused(h.restore.validate(upload(flipAt(bodyStart + 3)), undefined, ADMIN), 'corrupt');
+      await expectRefused(() => h.restore.validate(upload(flipAt(file.length - 40)), undefined, ADMIN), 'corrupt');
+      await expectRefused(() => h.restore.validate(upload(flipAt(bodyStart + 3)), undefined, ADMIN), 'corrupt');
       await expectRefused(
-        h.restore.validate(upload(file.subarray(0, file.length - 9).toString('base64')), undefined, ADMIN),
+        () => h.restore.validate(upload(file.subarray(0, file.length - 9).toString('base64')), undefined, ADMIN),
         'truncated',
       );
       await expectRefused(
-        h.restore.validate(
-          upload(Buffer.from('nonsense that is long enough to be read').toString('base64')),
-          undefined,
-          ADMIN,
-        ),
+        () =>
+          h.restore.validate(
+            upload(Buffer.from('nonsense that is long enough to be read').toString('base64')),
+            undefined,
+            ADMIN,
+          ),
         'incompatible_format',
       );
-      await expectRefused(h.restore.validate(upload(flipAt(0)), undefined, ADMIN), 'incompatible_format');
-      // The header carries the key ID: a bit flip there reads as another key.
-      const bad = await h.restore.validate(upload(flipAt(bodyStart - 40)), undefined, ADMIN).catch((e) => e);
-      expect(bad.getStatus()).toBe(422);
+      await expectRefused(() => h.restore.validate(upload(flipAt(0)), undefined, ADMIN), 'incompatible_format');
+      // The header is authenticated as a whole: a bit flip in it (here in a section digest) fails like one in the body.
+      await expectRefused(() => h.restore.validate(upload(flipAt(bodyStart - 40)), undefined, ADMIN), 'corrupt');
     });
 
     it('refuses an incompatible storage schema, plugin migration or release', async () => {
       await expectRefused(
-        h.restore.validate(
-          upload(
-            await forge((b) => {
-              b.sidecar.header.storageSchemaVersion = 2;
-            }),
+        async () =>
+          h.restore.validate(
+            upload(
+              await forge((b) => {
+                b.sidecar.header.storageSchemaVersion = 2;
+              }),
+            ),
+            undefined,
+            ADMIN,
           ),
-          undefined,
-          ADMIN,
-        ),
         'incompatible_schema',
       );
       await expectRefused(
-        h.restore.validate(
-          upload(
-            await forge((_b, m) => {
-              m.pluginMigration = 'SomethingElse1999999999999';
-            }),
+        async () =>
+          h.restore.validate(
+            upload(
+              await forge((_b, m) => {
+                m.pluginMigration = 'SomethingElse1999999999999';
+              }),
+            ),
+            undefined,
+            ADMIN,
           ),
-          undefined,
-          ADMIN,
-        ),
         'incompatible_migration',
       );
       await expectRefused(
-        h.restore.validate(
-          upload(
-            await forge((_b, m) => {
-              m.pluginVersion = '0.0.1';
-            }),
+        async () =>
+          h.restore.validate(
+            upload(
+              await forge((_b, m) => {
+                m.pluginVersion = '0.0.1';
+              }),
+            ),
+            undefined,
+            ADMIN,
           ),
-          undefined,
-          ADMIN,
-        ),
         'incompatible_version',
       );
     });
 
     it('refuses tables that do not fit this installation', async () => {
       await expectRefused(
-        h.restore.validate(
-          upload(
-            await forge((b) => {
-              b.tables['plugin_matter_connection'] = [{ id: 1 }];
-            }),
+        async () =>
+          h.restore.validate(
+            upload(
+              await forge((b) => {
+                b.tables['plugin_matter_connection'] = [{ id: 1 }];
+              }),
+            ),
+            undefined,
+            ADMIN,
           ),
-          undefined,
-          ADMIN,
-        ),
         'incompatible_schema',
       );
       await expectRefused(
-        h.restore.validate(
-          upload(
-            await forge((b) => {
-              b.tables['plugin_matter_nodes'][0]['no_such_column'] = 1;
-            }),
+        async () =>
+          h.restore.validate(
+            upload(
+              await forge((b) => {
+                b.tables['plugin_matter_nodes'][0]['no_such_column'] = 1;
+              }),
+            ),
+            undefined,
+            ADMIN,
           ),
-          undefined,
-          ADMIN,
-        ),
         'incompatible_schema',
       );
       await expectRefused(
-        h.restore.validate(
-          upload(
-            await forge((b) => {
-              b.tables['plugin_matter_nodes'][0]['display_name'] = { x: 1 };
-            }),
+        async () =>
+          h.restore.validate(
+            upload(
+              await forge((b) => {
+                b.tables['plugin_matter_nodes'][0]['display_name'] = { x: 1 };
+              }),
+            ),
+            undefined,
+            ADMIN,
           ),
-          undefined,
-          ADMIN,
-        ),
         'incompatible_schema',
       );
     });
 
     it('refuses when the sidecar rejects the snapshot', async () => {
       h.backend.faults.stageRejects = true;
-      await expectRefused(h.restore.validate(stored(), undefined, ADMIN), 'stage_failed');
+      await expectRefused(() => h.restore.validate(stored(), undefined, ADMIN), 'stage_failed', { staged: true });
     });
 
     it('refuses over plain HTTP to another machine, and without a connection', async () => {
       h.connection.insecureTransport = true;
-      await expectRefused(h.restore.validate(stored(), undefined, ADMIN), 'insecure_transport');
+      await expectRefused(() => h.restore.validate(stored(), undefined, ADMIN), 'insecure_transport');
       h.connection.insecureTransport = false;
       h.connection.setState('degraded');
-      await expectRefused(h.restore.validate(stored(), undefined, ADMIN), 'sidecar_unavailable');
+      await expectRefused(() => h.restore.validate(stored(), undefined, ADMIN), 'sidecar_unavailable');
     });
 
     it('answers 404 for a backup that does not exist', async () => {
@@ -447,6 +528,101 @@ describe('MatterRestoreService', () => {
       expect(await nodeIds()).toEqual([]);
     });
 
+    it('reports the installation unchanged when the commit never took effect and its answer timed out', async () => {
+      await disaster();
+      await addNode('n-9', '9');
+      const before = { tables: await tables(), sidecar: sidecarFacts() };
+      const validation = await h.restore.validate(stored(), undefined, ADMIN);
+      h.backend.faults.commitTimeout = true;
+      expect(await failure(h.restore.confirm(validation.validationId, undefined, ADMIN))).toMatchObject({
+        status: 409,
+        body: { code: 'restore_failed', message: expect.stringContaining('unchanged') },
+      });
+      // The sidecar answered the rollback with not_found: there was nothing to roll back.
+      expect(count('backup.restore.rollback')).toBe(1);
+      expect(await tables()).toBe(before.tables);
+      expect(sidecarFacts()).toBe(before.sidecar);
+      expect(h.guard.outcomeUnknown).toBe(false);
+    });
+
+    it('keeps asking for the rollback while the sidecar is still busy committing', async () => {
+      await addNode('n-3', '7');
+      const secret = h.backend.storage?.secret;
+      const validation = await h.restore.validate(stored(), undefined, ADMIN);
+      h.backend.faults.commitTimeoutAfterSwap = true;
+      // The commit goes on after the plugin stopped waiting: the first rollback attempts find the sidecar busy.
+      const handle = h.backend.handle.bind(h.backend);
+      let busyAnswers = 3;
+      jest.spyOn(h.backend, 'handle').mockImplementation((operation, body) => {
+        if (operation === 'backup.restore.rollback') h.backend.busy = busyAnswers-- > 0;
+        return handle(operation, body);
+      });
+      expect(await failure(h.restore.confirm(validation.validationId, originalFabricId, ADMIN))).toMatchObject({
+        status: 409,
+        body: { code: 'restore_failed', message: expect.stringContaining('unchanged') },
+      });
+      expect(count('backup.restore.rollback')).toBe(4);
+      expect(h.backend.storage?.secret).toBe(secret);
+      // The plugin tables were never replaced (only the fabric record followed the rollback's generation).
+      expect(await nodeIds()).toEqual(['5', '6', '7']);
+      expect(h.actions()).toContain('matter.restore_rolled_back');
+      // The plugin recorded the generation its own rollback moved to: no recovery.
+      expect(h.guard.recoveryRequired).toBe(false);
+      expect((await h.fabric.status()).recorded?.fabricGeneration).toBe(h.backend.fabric().fabricGeneration);
+    });
+
+    it('does not claim "unchanged" when the outcome stays unknown, and never adopts that restore later', async () => {
+      const before = await tables();
+      const validation = await h.restore.validate(stored(), undefined, ADMIN);
+      // The commit did not land yet and the sidecar stays busy: no rollback answer within the bounded time.
+      h.backend.faults.commitTimeout = true;
+      const handle = h.backend.handle.bind(h.backend);
+      jest.spyOn(h.backend, 'handle').mockImplementation((operation, body) => {
+        h.backend.busy = operation === 'backup.restore.rollback';
+        return handle(operation, body);
+      });
+      const refused = await failure(h.restore.confirm(validation.validationId, originalFabricId, ADMIN));
+      expect(refused).toMatchObject({ status: 500, body: { code: 'rollback_failed' } });
+      expect(refused.body.message).not.toContain('unchanged');
+      expect(count('backup.restore.rollback')).toBeGreaterThan(1);
+      expect(await tables()).toBe(before);
+      expect(h.actions()).toContain('matter.restore_failed');
+      expect(h.guard).toMatchObject({ busy: false, restoring: false, outcomeUnknown: true });
+
+      // The restore lands on the sidecar after all: the same fabric, a newer generation. Not the plugin's own change.
+      h.backend.generationCounter += 2;
+      expect(await h.fabric.detect('event')).toBe('generation_ahead');
+      expect(h.guard.recoveryRequired).toBe(true);
+      expect((await h.fabric.status()).recorded?.fabricGeneration).toBe(1);
+    });
+
+    it('does not claim "unchanged" when the sidecar could not put its previous storage back and needs recovery', async () => {
+      const before = await tables();
+      const validation = await h.restore.validate(stored(), undefined, ADMIN);
+      h.backend.faults.commitEndsInRecovery = true;
+      const refused = await failure(h.restore.confirm(validation.validationId, originalFabricId, ADMIN));
+      expect(refused).toMatchObject({ status: 500, body: { code: 'rollback_failed' } });
+      expect(refused.body.message).not.toContain('unchanged');
+      // Nothing to ask the sidecar to roll back: it said itself that it needs recovery.
+      expect(count('backup.restore.rollback')).toBe(0);
+      expect(await tables()).toBe(before);
+      expect(h.actions()).toContain('matter.restore_failed');
+      expect(h.actions()).not.toContain('matter.restore_rolled_back');
+      expect(h.guard).toMatchObject({ busy: false, restoring: false, outcomeUnknown: true });
+      expect(h.guard.mismatch).toBe('sidecar_recovery_required');
+    });
+
+    it('reports success with a warning when the sidecar does not confirm the clean-up', async () => {
+      const validation = await h.restore.validate(stored(), undefined, ADMIN);
+      h.backend.faults.finalizeFails = true;
+      await expect(h.restore.confirm(validation.validationId, originalFabricId, ADMIN)).resolves.toMatchObject({
+        outcome: 'succeeded',
+      });
+      expect(h.backend.calls).toContain('backup.restore.finalize');
+      expect(h.context.logger.warn).toHaveBeenCalledWith(expect.stringContaining('cleaning up'));
+      expect(h.actions()).toContain('matter.restore_succeeded');
+    });
+
     it('an unknown stage is simply refused', async () => {
       const validation = await h.restore.validate(stored(), undefined, ADMIN);
       expect(
@@ -490,14 +666,98 @@ describe('MatterRestoreService', () => {
       expect(h.guard.busy).toBe(false);
     });
 
-    it('reports it when even the rollback fails', async () => {
+    it('reports it when even the rollback fails, without claiming anything is unchanged', async () => {
+      const before = await tables();
       const validation = await h.restore.validate(upload(await poisoned()), undefined, ADMIN);
       h.backend.faults.rollbackFails = true;
-      expect(await failure(h.restore.confirm(validation.validationId, originalFabricId, ADMIN))).toMatchObject({
-        status: 500,
-        body: { code: 'rollback_failed' },
-      });
+      const refused = await failure(h.restore.confirm(validation.validationId, originalFabricId, ADMIN));
+      expect(refused).toMatchObject({ status: 500, body: { code: 'rollback_failed' } });
+      expect(refused.body.message).not.toContain('unchanged');
       expect(h.actions()).toContain('matter.restore_failed');
+      // The plugin tables were never replaced; the sidecar holds the restored storage at a newer generation, which the
+      // plugin did not record: it is in recovery and waits for the administrator.
+      expect(await tables()).toBe(before);
+      expect(h.backend.fabric().fabricGeneration).toBeGreaterThan(1);
+      expect(h.guard).toMatchObject({ busy: false, restoring: false, outcomeUnknown: true });
+      expect(h.guard.mismatch).toBe('generation_ahead');
+    });
+
+    it('does not count a rollback that left the sidecar needing recovery as rolled back', async () => {
+      const before = await tables();
+      const validation = await h.restore.validate(upload(await poisoned()), undefined, ADMIN);
+      h.backend.faults.rollbackEndsInRecovery = true;
+      const refused = await failure(h.restore.confirm(validation.validationId, originalFabricId, ADMIN));
+      expect(refused).toMatchObject({ status: 500, body: { code: 'rollback_failed' } });
+      expect(refused.body.message).not.toContain('unchanged');
+      expect(count('backup.restore.rollback')).toBe(1);
+      expect(h.actions()).not.toContain('matter.restore_rolled_back');
+      expect(await tables()).toBe(before);
+      expect(h.guard).toMatchObject({ busy: false, restoring: false, outcomeUnknown: true });
+      expect(h.guard.mismatch).toBe('sidecar_recovery_required');
+    });
+
+    it('counts a rollback onto a sidecar that needed recovery before the restore as rolled back', async () => {
+      const file = await poisoned();
+      h.backend.enterRecovery();
+      await h.fabric.detect('connect');
+      const before = await tables();
+      const validation = await h.restore.validate(upload(file), undefined, ADMIN);
+      const refused = await failure(h.restore.confirm(validation.validationId, undefined, ADMIN));
+      expect(refused).toMatchObject({ status: 409, body: { code: 'rolled_back' } });
+      expect(h.actions()).toContain('matter.restore_rolled_back');
+      expect(await tables()).toBe(before);
+      expect(h.backend.state).toBe('recovery_required');
+    });
+
+    it('does not count a rollback answer that reports a sidecar in recovery as rolled back', async () => {
+      const validation = await h.restore.validate(upload(await poisoned()), undefined, ADMIN);
+      const handle = h.backend.handle.bind(h.backend);
+      jest.spyOn(h.backend, 'handle').mockImplementation((operation, body) => {
+        const answer = handle(operation, body);
+        if (operation !== 'backup.restore.rollback') return answer;
+        h.backend.enterRecovery('restore_interrupted');
+        return { ...(answer as object), fabric: h.backend.fabric() };
+      });
+      const refused = await failure(h.restore.confirm(validation.validationId, originalFabricId, ADMIN));
+      expect(refused).toMatchObject({ status: 500, body: { code: 'rollback_failed' } });
+      expect(h.actions()).not.toContain('matter.restore_rolled_back');
+      expect(h.guard.mismatch).toBe('sidecar_recovery_required');
+    });
+  });
+
+  describe('a backup marked inconsistent', () => {
+    /** A pre-restore backup taken in recovery: the tables of the recorded fabric, the snapshot of the sidecar's '999'. */
+    const inconsistentBackup = async () => {
+      h.backend.seedFabric('999', 3);
+      await h.fabric.detect('connect');
+      expect(h.guard.mismatch).toBe('fabric_changed');
+      const view = await h.backups.backup('pre_restore', ADMIN, { allowInRecovery: true });
+      expect(view.consistent).toBe(false);
+      return view.id;
+    };
+
+    it('restores the tables with their own fabric record, so the mismatch comes back instead of being hidden', async () => {
+      const id = await inconsistentBackup();
+      // Settle the recovery by restoring the consistent backup of the original fabric first.
+      const first = await h.restore.validate(stored(), undefined, ADMIN);
+      expect(first.backup.consistent).toBe(true);
+      await h.restore.confirm(first.validationId, '999', ADMIN);
+      expect(h.guard.recoveryRequired).toBe(false);
+      await addNode('n-3', '7');
+      h.audit.mockClear();
+
+      const validation = await h.restore.validate({ type: 'stored', backupId: id }, undefined, ADMIN);
+      expect(validation.backup).toMatchObject({ fabricId: '999', consistent: false });
+      const result = await h.restore.confirm(validation.validationId, originalFabricId, ADMIN);
+      expect(result.outcome).toBe('succeeded');
+      expect(h.backend.storage?.fabricId).toBe('999');
+      // The tables are the ones of the backup (without the node added since), still naming the original fabric.
+      expect(await nodeIds()).toEqual(['5', '6']);
+      expect(result.status.recorded).toMatchObject({ fabricId: originalFabricId });
+      expect(result.status.recovery).toEqual({ required: true, mismatch: 'fabric_changed' });
+      expect(h.actions()).toEqual(
+        expect.arrayContaining(['matter.restore_succeeded', 'matter.fabric_recovery_required']),
+      );
     });
   });
 
@@ -533,16 +793,25 @@ describe('MatterRestoreService', () => {
     });
 
     it('expires, which aborts the staging', async () => {
-      const short = await createFabricHarness({ validationTtlMs: 20 });
-      await short.fabric.create(undefined, ADMIN);
-      const id = (await short.backups.backup('manual', ADMIN)).id;
-      const validation = await short.restore.validate({ type: 'stored', backupId: id }, undefined, ADMIN);
-      await new Promise((resolve) => setTimeout(resolve, 80));
-      expect(short.backend.calls).toContain('backup.restore.abort');
-      expect(
-        await failure(short.restore.confirm(validation.validationId, short.backend.storage?.fabricId, ADMIN)),
-      ).toMatchObject({ body: { code: 'validation_expired' } });
-      await short.close();
+      const ttl = 60_000;
+      const short = await createFabricHarness({ validationTtlMs: ttl });
+      try {
+        await short.fabric.create(undefined, ADMIN);
+        const id = (await short.backups.backup('manual', ADMIN)).id;
+        // Only timers are faked: the database still answers through the event loop.
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+        const validation = await short.restore.validate({ type: 'stored', backupId: id }, undefined, ADMIN);
+        await jest.advanceTimersByTimeAsync(ttl - 1);
+        expect(short.backend.calls).not.toContain('backup.restore.abort');
+        await jest.advanceTimersByTimeAsync(1);
+        expect(short.backend.calls).toContain('backup.restore.abort');
+        expect(
+          await failure(short.restore.confirm(validation.validationId, short.backend.storage?.fabricId, ADMIN)),
+        ).toMatchObject({ body: { code: 'validation_expired' } });
+      } finally {
+        jest.useRealTimers();
+        await short.close();
+      }
     });
 
     it('is invalidated when the sidecar changed in between', async () => {
@@ -560,8 +829,22 @@ describe('MatterRestoreService', () => {
       const running = h.restore.confirm(validation.validationId, originalFabricId, ADMIN);
       expect(await failure(h.restore.confirm(validation.validationId, originalFabricId, ADMIN))).toMatchObject({
         status: 409,
+        body: { code: 'busy' },
       });
       await running;
+    });
+
+    it('refuses a new validation while a restore runs, which would replace the stage being restored', async () => {
+      const validation = await h.restore.validate(stored(), undefined, ADMIN);
+      const running = h.restore.confirm(validation.validationId, originalFabricId, ADMIN);
+      const stages = count('backup.restore.stage');
+      expect(await failure(h.restore.validate(stored(), undefined, ADMIN))).toMatchObject({
+        status: 409,
+        body: { code: 'busy' },
+      });
+      expect(count('backup.restore.stage')).toBe(stages);
+      expect(auditCalls('matter.restore_refused').map((entry) => entry.details.reason)).toEqual(['busy']);
+      await expect(running).resolves.toMatchObject({ outcome: 'succeeded' });
     });
   });
 
@@ -573,6 +856,5 @@ describe('MatterRestoreService', () => {
     await h.restore.confirm(validation.validationId, undefined, ADMIN);
     expect(JSON.stringify(await h.rows('plugin_matter_connection'))).toBe(connectionBefore);
     expect((await h.backups.list()).some((b) => b.id === backupId)).toBe(true);
-    expect(createHash('sha256').update('x').digest('hex')).toHaveLength(64);
   });
 });

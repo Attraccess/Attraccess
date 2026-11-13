@@ -2,13 +2,7 @@ import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-ba
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { MatterRecoveryKey } from '../backup/entities';
-import {
-  InvalidRecoveryKeyError,
-  formatRecoveryKey,
-  generateRecoveryKey,
-  parseRecoveryKey,
-  recoveryKeyId,
-} from '../backup/recovery-key';
+import { InvalidRecoveryKeyError, formatRecoveryKey, generateRecoveryKey, recoveryKeyId } from '../backup/recovery-key';
 import { DeviceAuditService } from '../devices/audit.service';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { conflict } from './errors';
@@ -109,6 +103,31 @@ export class RecoveryKeyService {
     return reveal;
   }
 
+  /**
+   * Keeps a key the administrator already holds as the current one: the key a disaster-recovery restore was made with,
+   * on an installation that has none. It is off-host with them already, so it counts as acknowledged, and it is never
+   * returned. Does nothing when a current key exists or the key is not the one with `keyId`.
+   */
+  async adopt(key: Buffer, keyId: string, principal: PluginAuditPrincipal | null): Promise<boolean> {
+    if (recoveryKeyId(key) !== keyId || (await this.current())) return false;
+    const now = new Date().toISOString();
+    const row = await this.repo.save({
+      id: randomUUID(),
+      keyId,
+      encryptedKey: this.context.secrets.encrypt(key.toString('base64')),
+      createdAt: now,
+      acknowledgedAt: now,
+      retiredAt: null,
+    });
+    await this.audit.record(
+      'matter.recovery_key_generated',
+      principal,
+      { type: 'matter.recovery_key', ref: row.id },
+      { keyId, source: 'restore' },
+    );
+    return true;
+  }
+
   /** The current key's bytes, or null when there is none. Throws when it cannot be decrypted. */
   async currentKey(): Promise<{ keyId: string; key: Buffer } | null> {
     const row = await this.current();
@@ -119,11 +138,6 @@ export class RecoveryKeyService {
   async keyById(keyId: string): Promise<{ keyId: string; key: Buffer } | null> {
     const row = await this.repo.findOneBy({ keyId });
     return row ? this.open(row) : null;
-  }
-
-  /** Parses an administrator-supplied key. */
-  parse(text: string): Buffer {
-    return parseRecoveryKey(text);
   }
 
   private open(row: MatterRecoveryKey): { keyId: string; key: Buffer } {

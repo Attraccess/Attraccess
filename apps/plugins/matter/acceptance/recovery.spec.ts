@@ -164,6 +164,20 @@ describe('Matter backup and restore, end to end', () => {
     ).body;
     expect(restored.outcome).toBe('succeeded');
     expect(restored.status.sidecar).toMatchObject({ state: 'initialized', fabricId });
+    // Settled: the plugin recorded exactly the generation the sidecar reached by the restore.
+    expect(restored.status.recovery.required).toBe(false);
+    expect(restored.status.recorded).toMatchObject({
+      fabricId,
+      fabricGeneration: restored.status.sidecar.fabricGeneration,
+    });
+    // This installation had no recovery key: it keeps the one the restore was made with, never showing it again, and
+    // the backup after the restore is made under it.
+    expect(restored.status.recoveryKey).toMatchObject({ present: true, keyId: validation.backup.recoveryKeyId });
+    expect(restored.status.backups.stored[0]).toMatchObject({
+      trigger: 'restore',
+      recoveryKeyId: validation.backup.recoveryKeyId,
+    });
+    expect(JSON.stringify(restored)).not.toContain(recoveryKey);
 
     // No recommissioning: the restored controller talks to the same device, which still lists the Attraccess fabric.
     const restoredController = second.platform().fabric?.controller;
@@ -220,13 +234,27 @@ describe('Matter backup and restore, end to end', () => {
       requiresTypedConfirmation: true,
       confirmationFabricId: liveFabricId,
     });
+    const before = await fabricStatus(live);
+    const identity = (status: typeof before) => ({
+      fabricId: status.sidecar.fabricId,
+      fabricGeneration: status.sidecar.fabricGeneration,
+      rootCertFingerprint: status.sidecar.rootCertFingerprint,
+      storageInstanceId: status.sidecar.storageInstanceId,
+      recorded: status.recorded,
+    });
     for (const body of [
       { validationId: validation.validationId },
       { validationId: validation.validationId, confirmFabricId: '1' },
     ]) {
-      await live.api().post('/api/matter/restore/confirm').set(ADMIN).send(body).expect(409);
+      const refused = await live.api().post('/api/matter/restore/confirm').set(ADMIN).send(body).expect(409);
+      expect(refused.body.code).toBe('confirmation_required');
     }
-    expect((await fabricStatus(live)).sidecar).toMatchObject({ state: 'initialized', fabricId: liveFabricId });
-    expect((await fabricStatus(live)).recovery.required).toBe(false);
+    const after = await fabricStatus(live);
+    expect(after.sidecar).toMatchObject({ state: 'initialized', fabricId: liveFabricId });
+    expect(identity(after)).toEqual(identity(before));
+    expect(after.recovery.required).toBe(false);
+    // Refused before anything ran: not even the pre-restore backup.
+    expect(after.backups.stored.map((stored: { trigger: string }) => stored.trigger)).not.toContain('pre_restore');
+    await live.api().post(`/api/matter/restore/${validation.validationId}/cancel`).set(ADMIN).expect(204);
   }, 180_000);
 });

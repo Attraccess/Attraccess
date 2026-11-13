@@ -171,7 +171,12 @@ export const MATTER_AUDIT_DOMAIN: PluginAuditDomainDeclaration = {
       subjectTypes: ['matter.fabric'],
       details: { fabricRef: UUID_FIELD, ...FABRIC_ID, recoveryKeyCreated: { type: 'boolean' } },
     },
-    { action: 'matter.recovery_key_generated', subjectTypes: ['matter.recovery_key'], details: KEY_ID_FIELD },
+    {
+      action: 'matter.recovery_key_generated',
+      subjectTypes: ['matter.recovery_key'],
+      // `source: 'restore'`: the key a disaster-recovery restore was made with, kept on an installation without one.
+      details: { ...KEY_ID_FIELD, source: { type: 'string', oneOf: ['restore'] } },
+    },
     { action: 'matter.recovery_key_acknowledged', subjectTypes: ['matter.recovery_key'], details: KEY_ID_FIELD },
     {
       action: 'matter.recovery_key_rotated',
@@ -228,12 +233,12 @@ export const MATTER_AUDIT_DOMAIN: PluginAuditDomainDeclaration = {
     {
       action: 'matter.fabric_recovery_required',
       subjectTypes: ['matter.fabric'],
-      details: { mismatch: { type: 'string', oneOf: MISMATCHES } },
+      details: { fabricRef: UUID_FIELD, mismatch: { type: 'string', oneOf: MISMATCHES } },
     },
     {
       action: 'matter.recovery_action_chosen',
       subjectTypes: ['matter.fabric'],
-      details: { choice: { type: 'string', oneOf: ['accept_sidecar', 'start_new'] } },
+      details: { fabricRef: UUID_FIELD, choice: { type: 'string', oneOf: ['accept_sidecar', 'start_new', 'restore'] } },
     },
   ],
 };

@@ -1,6 +1,6 @@
 import { CLOSE_CODES, DEFAULT_REPLAY_MAX_EVENTS, parseCursor } from '@attraccess/matter-contract';
 import type { WebSocket } from 'ws';
-import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
+import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar.test-utils';
 import {
   PING_INTERVAL_MS,
   SEEN_EVENT_IDS,

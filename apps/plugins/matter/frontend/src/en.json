@@ -74,6 +74,47 @@
     "cancel": "Cancel",
     "close": "Close",
     "reason": "Reason",
+    "loading": "Loading the fabric status",
+    "error": {
+      "key_required": "This backup was encrypted with a different recovery key. Enter that recovery key.",
+      "wrong_key": "The recovery key is wrong. Check it and try again.",
+      "corrupt": "The backup is corrupt or has been modified and cannot be used.",
+      "truncated": "The backup is incomplete, probably because the file was cut off. Download it again.",
+      "incompatible_format": "This file is not a backup in a supported format.",
+      "incompatible_schema": "The backup uses a storage schema version that this installation cannot restore.",
+      "incompatible_migration": "The backup was made with a different plugin database version. Install the plugin version that created it.",
+      "incompatible_version": "The plugin version must match the version that created the backup. Install that version first.",
+      "stage_failed": "The sidecar could not prepare the backup. Your installation was left unchanged.",
+      "fabric_exists": "The sidecar already has a fabric.",
+      "recovery_required": "The fabric needs recovery first. Restore a backup, accept the sidecar's fabric or start a new fabric.",
+      "recovery_not_required": "The fabric does not need recovery any more.",
+      "busy": "The Matter sidecar is busy with another backup or restore. Try again shortly.",
+      "sidecar_unavailable": "The sidecar cannot be reached. Try again when it is connected.",
+      "sidecar_error": "The Matter sidecar refused the request.",
+      "sidecar_not_empty": "A new fabric can only be started while the sidecar has no fabric.",
+      "sidecar_not_initialized": "The sidecar has no healthy fabric to accept.",
+      "insecure_transport": "The connection to the sidecar is plain HTTP to another machine. Backups and restores carry fabric secrets, so they need https or a sidecar on this machine.",
+      "recovery_key_exists": "A recovery key already exists.",
+      "recovery_key_mismatch": "That is no longer the current recovery key. Reload the page.",
+      "no_recovery_key": "There is no recovery key yet. Generate one first.",
+      "not_found": "This backup no longer exists.",
+      "file_unreadable": "The file could not be read. Choose it again.",
+      "validation_expired": "This check has expired. Validate the backup again.",
+      "preflight_changed": "The sidecar changed since the backup was checked. Validate the backup again.",
+      "confirmation_required": "Type the fabric ID to confirm.",
+      "pre_restore_backup_failed": "The backup of the current fabric failed, so nothing was restored. Your installation was left unchanged.",
+      "restore_failed": "The Matter sidecar could not apply or verify the backup. Your installation was left unchanged.",
+      "rolled_back": "The restore failed and was rolled back. Your installation was left unchanged.",
+      "rollback_failed": "The restore failed and the Matter sidecar could not be rolled back automatically, so its state is unknown. Check the sidecar, then restore the backup again.",
+      "http": "The request failed (HTTP {{status}})."
+    },
+    "blocked": {
+      "unreachable": "The sidecar is not reachable.",
+      "recovery": "Not available while the fabric needs recovery.",
+      "noFabric": "There is no fabric to back up yet.",
+      "noKey": "Generate a recovery key first.",
+      "insecure": "Needs https or a sidecar on this machine: the connection is plain HTTP to another machine."
+    },
     "state": {
       "initialized": "Initialized",
       "uninitialized": "No fabric yet",
@@ -90,7 +131,8 @@
       "storage_incomplete": "The sidecar's storage is incomplete.",
       "schema_mismatch": "The sidecar's storage has a different schema version.",
       "metadata_missing": "The sidecar's storage metadata is missing.",
-      "metadata_orphaned": "The sidecar's storage metadata has no fabric data."
+      "metadata_orphaned": "The sidecar's storage metadata has no fabric data.",
+      "restore_interrupted": "A restore was interrupted. The previous storage was kept; restore a backup."
     },
     "mismatch": {
       "unknown": "The sidecar's fabric differs from what Attraccess recorded.",
@@ -110,6 +152,8 @@
     "generationLabel": "Fabric generation",
     "generation": "generation {{generation}}",
     "fingerprint": "Root certificate fingerprint",
+    "fingerprintShowFull": "Show full fingerprint",
+    "fingerprintShowShort": "Shorten fingerprint",
     "storageInstance": "Storage instance",
     "trigger": {
       "manual": "Manual",
@@ -175,7 +219,8 @@
       "stored": "Stored backups",
       "download": "Download",
       "downloadError": "The backup could not be downloaded",
-      "retention": "The latest {{count}} backups are kept. Backup files are encrypted and need the recovery key to restore."
+      "retention": "The latest {{count}} backups are kept. Backup files are encrypted and need the recovery key to restore.",
+      "inconsistentMark": "taken during recovery"
     },
     "restore": {
       "open": "Restore from backup",
@@ -191,19 +236,7 @@
       "validationFailed": "The backup cannot be restored",
       "error": {
         "empty": "The file is empty. Choose the backup file you downloaded.",
-        "tooLarge": "The file is too large to upload here (at most 7 MB). Restore from a stored backup instead.",
-        "key_required": "This backup was encrypted with a different recovery key. Enter that recovery key.",
-        "wrong_key": "The recovery key is wrong. Check it and try again.",
-        "corrupt": "The backup is corrupt or has been modified and cannot be used.",
-        "truncated": "The backup is incomplete, probably because the file was cut off. Download it again.",
-        "incompatible_format": "This file is not a backup in a supported format.",
-        "incompatible_schema": "The backup uses a storage schema version that this installation cannot restore.",
-        "incompatible_migration": "The backup was made with a different plugin database version. Install the plugin version that created it.",
-        "incompatible_version": "The plugin version must match the version that created the backup. Install that version first.",
-        "stage_failed": "The sidecar could not prepare the backup. Your installation was left unchanged.",
-        "insecure_transport": "Restoring needs a secure connection to the sidecar. Use https or a local sidecar.",
-        "sidecar_unavailable": "The sidecar cannot be reached. Try again when it is connected.",
-        "confirmation_required": "Type the fabric ID to confirm."
+        "tooLarge": "The file is too large to upload here (at most 7 MB). Restore from a stored backup instead."
       },
       "kind": {
         "plain": "Restore",
@@ -225,7 +258,12 @@
       "successTitle": "Restore completed",
       "successText": "The fabric and the plugin data were restored and verified.",
       "failedTitle": "The restore failed",
-      "unchanged": "Your installation was left unchanged."
+      "fromStoredHint": "One of the backups this installation keeps.",
+      "fromUploadHint": "A backup file you downloaded, for example after reinstalling.",
+      "retryTitle": "Validate the backup again",
+      "rollbackFailedTitle": "The restore failed and could not be rolled back",
+      "inconsistentTitle": "This backup was taken during recovery",
+      "inconsistentText": "When it was taken, the plugin's data and the sidecar's fabric did not match. Restoring it brings that mismatch back, and you will have to settle the recovery again afterwards."
     },
     "recovery": {
       "title": "Recovery",

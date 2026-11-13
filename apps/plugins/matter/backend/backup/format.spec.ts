@@ -182,6 +182,26 @@ describe('backup file format', () => {
     expect(code(() => decryptBackup(forged, key))).toBe('corrupt');
   });
 
+  it('marks a backup whose tables do not belong to its snapshot in the authenticated header only', () => {
+    const consistent = encryptBackup(body(), { ...meta, consistent: true }, key);
+    expect(readHeader(consistent)).not.toHaveProperty('consistent');
+    expect(decryptBackup(consistent, key).header).not.toHaveProperty('consistent');
+
+    const marked = encryptBackup(body(), { ...meta, consistent: false }, key);
+    expect(readHeader(marked).consistent).toBe(false);
+    expect(decryptBackup(marked, key).header.consistent).toBe(false);
+
+    // Dropping the mark (to pass the backup off as consistent) breaks the authentication.
+    const header = JSON.parse(marked.subarray(12, headerEnd(marked)).toString()) as FileHeader;
+    delete header.consistent;
+    const edited = Buffer.from(JSON.stringify(header));
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(edited.length);
+    const forged = Buffer.concat([marked.subarray(0, 8), length, edited, marked.subarray(headerEnd(marked))]);
+    expect(readHeader(forged)).not.toHaveProperty('consistent');
+    expect(code(() => decryptBackup(forged, key))).toBe('corrupt');
+  });
+
   it('rejects another format version', () => {
     const file = encryptBackup(body(), meta, key);
     const header = JSON.parse(file.subarray(12, headerEnd(file)).toString());

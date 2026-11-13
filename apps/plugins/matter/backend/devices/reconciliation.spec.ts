@@ -429,6 +429,42 @@ describe('Matter reconciliation', () => {
       expect((await h.reconciliation.request()).lastResult).toBe('applied');
       expect(await nodes(h).count()).toBe(1);
     });
+
+    it('skips while the plugin is in recovery, unless the run is the recovery choice of an administrator', async () => {
+      h.guard.set('fabric_changed');
+      h.sidecar.list = inventory('1', [node('5')]);
+      expect(await h.reconciliation.request(ADMIN)).toMatchObject({
+        lastResult: 'skipped_unavailable',
+        lastSummary: { reason: 'recovery_required' },
+      });
+      expect(h.sidecar.requests).not.toContain('inventory.list');
+      expect(await nodes(h).count()).toBe(0);
+      expect((await h.reconciliation.request(ADMIN, { allowInRecovery: true })).lastResult).toBe('applied');
+      expect(await nodes(h).count()).toBe(1);
+    });
+
+    it('drops an inventory when recovery is entered while it is read', async () => {
+      h.sidecar.list = inventory('1', [node('5')]);
+      h.sidecar.listDelayMs = 30;
+      const run = h.reconciliation.request();
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      h.guard.set('generation_ahead');
+      expect(await run).toMatchObject({ lastSummary: { reason: 'recovery_required' } });
+      expect(await nodes(h).count()).toBe(0);
+    });
+
+    it('keeps the recovery permission of a run that had to wait behind another', async () => {
+      h.sidecar.list = inventory('1', [node('5')]);
+      h.sidecar.listDelayMs = 30;
+      const first = h.reconciliation.request();
+      const queued = h.reconciliation.request(ADMIN, { allowInRecovery: true });
+      const joined = h.reconciliation.request();
+      h.guard.set('fabric_changed');
+      expect((await first).lastSummary).toMatchObject({ reason: 'recovery_required' });
+      expect(await queued).toMatchObject({ lastResult: 'applied' });
+      expect(await joined).toEqual(await queued);
+      expect(await nodes(h).count()).toBe(1);
+    });
   });
 
   describe('single flight', () => {

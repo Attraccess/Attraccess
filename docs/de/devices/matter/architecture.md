@@ -106,7 +106,7 @@ Die Familie `backup` hat sechs Operationen (alle unter `/v1/backup/`): `snapshot
 - **Konsistenzprüfung.** Das Plugin vergleicht bei jeder Verbindung `fabricGeneration` (sowie Fabric-ID und Storage-Instanz) mit seiner Aufzeichnung. Liegt die Generation des Sidecars hinter oder vor der Aufzeichnung des Plugins, zum Beispiel weil nur eine Seite wiederhergestellt wurde, ist das eine Abweichung und löst den oben beschriebenen Recovery-Zustand aus.
 - Eine Wiederherstellung auf einen Sidecar in `recovery_required` oder `uninitialized` ist erlaubt. Der Sidecar erzeugt bei einer Wiederherstellung nie eine Fabric.
 
-Das Plugin verpackt diese Operationen in eine verschlüsselte Backup-Datei mit Recovery-Schlüssel; Datei, Schlüssel und Ablauf für Administratoren stehen unter [Backup und Wiederherstellung](devices/matter/backup-restore.md).
+Das Plugin verpackt diese Operationen in eine verschlüsselte Backup-Datei mit Wiederherstellungsschlüssel; Datei, Schlüssel und Ablauf für Administratoren stehen unter [Backup und Wiederherstellung](devices/matter/backup-restore.md).
 
 ## Events, Reihenfolge, Wiedergabe und Duplikate
 

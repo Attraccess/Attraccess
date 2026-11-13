@@ -55,6 +55,7 @@ export class CreateMatterBackup1793900002000 implements MigrationInterface {
         "fabric_generation" integer,
         "storage_instance_id" varchar,
         "recovery_key_id" varchar,
+        "consistent" boolean,
         "blob" blob,
         CONSTRAINT "CHK_plugin_matter_backups_outcome" CHECK ("outcome" IN ('succeeded', 'failed')),
         CONSTRAINT "CHK_plugin_matter_backups_trigger" CHECK ("trigger" IN ('manual', 'fabric_created', 'restore', 'daily', 'fabric_changed', 'pre_restore'))

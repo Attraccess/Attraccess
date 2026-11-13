@@ -98,6 +98,13 @@ describe('MatterBackupService', () => {
     expect(fresh.trigger).toBe('pre_restore');
   });
 
+  it('starts a new run after the running one when asked for a fresh backup', async () => {
+    const running = h.backups.backup('manual', ADMIN);
+    const fresh = await h.backups.backup('manual', ADMIN, { fresh: true });
+    expect(fresh.id).not.toBe((await running).id);
+    expect(h.backend.calls.filter((call) => call === 'backup.snapshot')).toHaveLength(3);
+  });
+
   describe('consistency', () => {
     it('fails as inconsistent when the snapshot has another generation than the plugin recorded', async () => {
       h.backend.faults.snapshotGenerationSkew = 1;
@@ -163,6 +170,38 @@ describe('MatterBackupService', () => {
       expect(await codeOf(h.backups.backup('manual', ADMIN))).toBe('recovery_required');
     });
 
+    it('in recovery, backs up the sidecar as it is only when explicitly allowed', async () => {
+      h.backend.seedFabric('999', 4);
+      await h.fabric.detect('connect');
+      expect(h.guard.mismatch).toBe('fabric_changed');
+      expect(await codeOf(h.backups.backup('pre_restore', ADMIN))).toBe('recovery_required');
+      // The sidecar's snapshot header gives the facts, not the plugin's record (which names another fabric).
+      const view = await h.backups.backup('pre_restore', ADMIN, { allowInRecovery: true });
+      expect(view).toMatchObject({ trigger: 'pre_restore', fabricId: '999', fabricGeneration: 4 });
+      // The tables belong to the recorded fabric, the snapshot to another: marked in the row and the file's header.
+      expect(view.consistent).toBe(false);
+      const [row] = await stored().then((rows) => rows.filter((r) => r.id === view.id));
+      expect(row.consistent).toBe(false);
+      expect(readHeader(row.blob as Buffer).consistent).toBe(false);
+      expect((await h.backups.list()).find((b) => b.id === view.id)?.consistent).toBe(false);
+    });
+
+    it('marks a backup consistent when the snapshot matches the record, also when recovery was allowed', async () => {
+      const plain = await h.backups.backup('manual', ADMIN);
+      const allowed = await h.backups.backup('pre_restore', ADMIN, { allowInRecovery: true });
+      for (const view of [plain, allowed]) {
+        expect(view.consistent).toBe(true);
+        const [row] = await stored().then((rows) => rows.filter((r) => r.id === view.id));
+        expect(row.consistent).toBe(true);
+        expect(readHeader(row.blob as Buffer)).not.toHaveProperty('consistent');
+      }
+    });
+
+    it('reports a sidecar without a fabric as no fabric', async () => {
+      h.backend.clear();
+      expect(await codeOf(h.backups.backup('manual', ADMIN))).toBe('no_fabric');
+    });
+
     it('refuses without a fabric record and without a recovery key', async () => {
       const bare = await createFabricHarness();
       expect(await codeOf(bare.backups.backup('manual', ADMIN))).toBe('no_recovery_key');
@@ -205,6 +244,7 @@ describe('MatterBackupService', () => {
       expect(JSON.stringify(listed)).not.toContain('blob');
       expect(Object.keys(listed).sort()).toEqual([
         'actor',
+        'consistent',
         'createdAt',
         'fabricGeneration',
         'fabricId',
@@ -233,9 +273,12 @@ describe('MatterBackupService', () => {
 });
 
 /** Polls until the condition holds (a loaded machine can delay the scheduler's timers by far more than a fixed sleep). */
-const until = async (condition: () => Promise<boolean>, timeoutMs = 5_000) => {
+const until = async (condition: () => Promise<boolean>, timeoutMs = 10_000) => {
   const deadline = Date.now() + timeoutMs;
-  while (!(await condition()) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+  while (!(await condition())) {
+    if (Date.now() > deadline) throw new Error('The condition did not hold in time.');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 };
 
 describe('MatterBackupSchedulerService', () => {
@@ -294,22 +337,35 @@ describe('MatterBackupSchedulerService', () => {
   });
 
   it('backs up shortly after a generation advance, once for a burst', async () => {
-    await make();
+    const debounceMs = 30_000;
+    await make({ debounceMs });
     await h.fabric.create(undefined, ADMIN);
-    h.scheduler.onModuleInit();
-    // Let the connect-time check finish before the generation moves.
-    await h.fabric.detect('connect');
-    h.backend.generationCounter = 2;
-    await h.fabric.detect('event');
-    h.backend.generationCounter = 3;
-    await h.fabric.detect('event');
-    await until(async () => (await h.backups.list()).some((entry) => entry.trigger === 'fabric_changed'));
-    // A second backup for the same burst would show up within a few debounce periods.
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Only the debounce is driven by hand: the database still answers through the event loop.
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+    try {
+      h.scheduler.onModuleInit();
+      // Let the connect-time check finish before the generation moves.
+      await h.fabric.detect('connect');
+      const afterChange = jest.spyOn(h.scheduler, 'backupAfterChange');
+      h.backend.generationCounter = 2;
+      await h.fabric.detect('event');
+      jest.advanceTimersByTime(debounceMs / 2);
+      h.backend.generationCounter = 3;
+      await h.fabric.detect('event');
+      jest.advanceTimersByTime(debounceMs - 1);
+      expect(afterChange).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(1);
+      expect(afterChange).toHaveBeenCalledTimes(1);
+      jest.advanceTimersByTime(debounceMs * 5);
+      expect(afterChange).toHaveBeenCalledTimes(1);
+      await afterChange.mock.results[0].value;
+    } finally {
+      h.scheduler.onModuleDestroy();
+      jest.useRealTimers();
+    }
     const list = await h.backups.list();
     expect(list.filter((entry) => entry.trigger === 'fabric_changed')).toHaveLength(1);
     expect(list[0].fabricGeneration).toBe(3);
-    h.scheduler.onModuleDestroy();
   });
 
   it('does not bring the next run back when the connection dropped during a check', async () => {

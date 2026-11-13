@@ -29,6 +29,8 @@ export interface BackupView {
   fabricId: string;
   fabricGeneration: number;
   recoveryKeyId: string;
+  /** False for a backup taken while the plugin and the sidecar disagreed (a pre-restore backup in recovery). */
+  consistent: boolean;
 }
 
 export interface FabricBackupStatus {
@@ -73,6 +75,7 @@ export interface RestoreValidation {
     rootCertFingerprint: string;
     fabricGeneration: number;
     recoveryKeyId: string;
+    consistent: boolean;
   };
   preflight: {
     sidecarState: 'uninitialized' | 'recovery_required' | 'initialized';
@@ -88,21 +91,10 @@ export interface RestoreResult {
   status: FabricBackupStatus;
 }
 
-export const RESTORE_VALIDATION_CODES = [
-  'key_required',
-  'wrong_key',
-  'corrupt',
-  'truncated',
-  'incompatible_format',
-  'incompatible_schema',
-  'incompatible_migration',
-  'incompatible_version',
-  'stage_failed',
-  'insecure_transport',
-  'sidecar_unavailable',
-] as const;
-
-/** An error response with the machine-readable `code` the backend sends next to the message. */
+/**
+ * An error response with the machine-readable `code` the backend sends next to its (English) message. The UI shows
+ * the translation of the code; the message is only a fallback and is empty when the response had none.
+ */
 export class FabricApiError extends Error {
   constructor(
     message: string,
@@ -120,13 +112,9 @@ async function toError(response: Response): Promise<FabricApiError> {
   try {
     const body = (await response.json()) as { code?: string; message?: string | string[] };
     const message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
-    return new FabricApiError(
-      message ?? `Request failed (HTTP ${response.status}).`,
-      response.status,
-      body.code ?? null,
-    );
+    return new FabricApiError(message ?? '', response.status, body.code ?? null);
   } catch {
-    return new FabricApiError(`Request failed (HTTP ${response.status}).`, response.status, null);
+    return new FabricApiError('', response.status, null);
   }
 }
 
@@ -187,7 +175,7 @@ export function saveBlob(blob: Blob, filename: string): void {
 export function readFileAsBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error('The file could not be read.'));
+    reader.onerror = () => reject(new FabricApiError('', 0, 'file_unreadable'));
     reader.onload = () => {
       const result = String(reader.result ?? '');
       resolve(result.slice(result.indexOf(',') + 1));

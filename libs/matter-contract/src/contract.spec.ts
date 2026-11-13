@@ -86,7 +86,7 @@ describe('errors', () => {
 });
 
 describe('capabilities and operations', () => {
-  it('covers all eight families', () => {
+  it('covers all nine families', () => {
     expect(FEATURE_FAMILIES).toHaveLength(9);
     for (const family of FEATURE_FAMILIES) {
       expect(OPERATIONS.some((operation) => operation.family === family)).toBe(true);

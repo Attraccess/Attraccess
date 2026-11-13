@@ -20,6 +20,11 @@ export const recoveryReasonSchema = z.enum([
   'schema_mismatch',
   'metadata_missing',
   'metadata_orphaned',
+  /**
+   * A restore stopped after the live storage was moved into the rollback copy and before the restored storage was in
+   * place. The rollback copy holds the previous fabric; the sidecar leaves both alone.
+   */
+  'restore_interrupted',
 ]);
 const sha256HexSchema = z.string().regex(/^[0-9a-f]{64}$/);
 const generationSchema = z.int().min(0);

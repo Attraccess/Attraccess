@@ -5,12 +5,29 @@ import { Endpoint, Logger, LogLevel, Seconds, ServerNode, VendorId } from '@matt
 import { OnOffClient } from '@matter/main/behaviors';
 import { OnOffLightDevice } from '@matter/main/devices';
 import { NodeJsEnvironment } from '@matter/nodejs';
+import { randomInt } from 'node:crypto';
 import type { MatterController } from '../fabric/controller';
 
-const PASSCODE = 20202021;
-const DISCRIMINATOR = 3840;
+/** Setup passcodes the Matter specification forbids, besides 0 and 99999999, which are out of range. */
+const INVALID_PASSCODES = new Set([
+  11111111, 22222222, 33333333, 44444444, 55555555, 66666666, 77777777, 88888888, 12345678, 87654321,
+]);
 
-export type VirtualDevice = {
+/**
+ * Random commissioning credentials. Test processes in parallel worktrees share the loopback mDNS, so a fixed
+ * discriminator and passcode would let one test commission another test's device.
+ */
+export function randomCommissioningCredentials(): { passcode: number; discriminator: number } {
+  let passcode = randomInt(1, 99_999_999);
+  while (INVALID_PASSCODES.has(passcode)) passcode = randomInt(1, 99_999_999);
+  return { passcode, discriminator: randomInt(0, 4096) };
+}
+
+type Credentials = ReturnType<typeof randomCommissioningCredentials>;
+/** The device `commissionVirtualDevice` uses when the caller names none. */
+let lastStarted: Credentials | undefined;
+
+export type VirtualDevice = Credentials & {
   node: ServerNode;
   light: Endpoint<typeof OnOffLightDevice>;
   /** Fabric IDs the device lists, as decimal strings. */
@@ -27,11 +44,12 @@ export async function startVirtualDevice(storageDir: string, port: number): Prom
   environment.vars.set('storage.path', storageDir);
   environment.vars.set('runtime.signals', false);
   environment.vars.set('runtime.unhandlederrors', false);
+  const credentials = randomCommissioningCredentials();
   const node = await ServerNode.create({
     environment,
     id: 'virtual-device',
     network: { port },
-    commissioning: { passcode: PASSCODE, discriminator: DISCRIMINATOR },
+    commissioning: credentials,
     productDescription: { deviceType: OnOffLightDevice.deviceType, name: 'Virtual light' },
     basicInformation: {
       vendorName: 'Attraccess tests',
@@ -51,7 +69,9 @@ export async function startVirtualDevice(storageDir: string, port: number): Prom
   const light = new Endpoint(OnOffLightDevice, { id: 'light' });
   await node.add(light);
   await node.start();
+  lastStarted = credentials;
   return {
+    ...credentials,
     node,
     light,
     fabricIds: () => Object.values(node.state.operationalCredentials.fabrics).map((fabric) => String(fabric.fabricId)),
@@ -60,11 +80,16 @@ export async function startVirtualDevice(storageDir: string, port: number): Prom
   };
 }
 
-/** Commissions the virtual device into the controller's fabric and returns the node ID it received. */
-export async function commissionVirtualDevice(controller: MatterController): Promise<string> {
+/**
+ * Commissions the virtual device into the controller's fabric and returns the node ID it received. Without `device`,
+ * the device this process started last is commissioned.
+ */
+export async function commissionVirtualDevice(controller: MatterController, device?: Credentials): Promise<string> {
+  const credentials = device ?? lastStarted;
+  if (!credentials) throw new Error('No virtual device was started.');
   const peer = await controller.serverNode.peers.commission({
-    passcode: PASSCODE,
-    discriminator: DISCRIMINATOR,
+    passcode: credentials.passcode,
+    discriminator: credentials.discriminator,
     timeout: Seconds(60),
   });
   return String(peer.state.commissioning.peerAddress?.nodeId);

@@ -10,6 +10,7 @@ export class FakeSidecarError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -31,7 +32,14 @@ export type FabricFaults = {
   commitTimeoutAfterSwap?: boolean;
   /** Commit never takes effect and times out. */
   commitTimeout?: boolean;
+  /**
+   * Commit swaps the staged storage in, it does not verify, and putting the previous storage back fails too: the
+   * sidecar needs recovery and answers 409 `recovery_required` (not `restore_failed`).
+   */
+  commitEndsInRecovery?: boolean;
   rollbackFails?: boolean;
+  /** Rollback cannot put the previous storage back: the sidecar needs recovery and answers 409 `recovery_required`. */
+  rollbackEndsInRecovery?: boolean;
   finalizeFails?: boolean;
   /** The next stage call refuses the payload (422 invalid_backup). */
   stageRejects?: boolean;
@@ -57,9 +65,13 @@ export class FakeFabricBackend {
   faults: FabricFaults = {};
   readonly calls: string[] = [];
   emit: ((type: 'fabric.changed', payload: Record<string, unknown>) => void) | null = null;
-  private readonly staged = new Map<string, Storage>();
+  /** Like the real sidecar: one stage at a time, and a new one discards the previous. */
+  private staged: { stageId: string; storage: Storage } | null = null;
   private rollbackCopy: Storage | null = null;
   private previousState: { state: FakeFabricBackend['state']; reason: string | null } | null = null;
+  /** The committed restore that can still be rolled back or finalized. */
+  private pendingStageId: string | null = null;
+  private fabricsCreated = 0;
 
   /** Puts the sidecar into the state of one that holds a fabric. */
   seedFabric(fabricId = '1234567890123', generation = 1): Storage {
@@ -93,7 +105,8 @@ export class FakeFabricBackend {
       state: this.state,
       reason: this.state === 'recovery_required' ? this.reason : null,
       fabricId: s?.fabricId ?? null,
-      fabricGeneration: this.generationCounter,
+      // The real sidecar reports 0 while it has no healthy fabric.
+      fabricGeneration: s ? this.generationCounter : 0,
       rootCertFingerprint: s?.rootCertFingerprint ?? null,
       storageInstanceId: s?.storageInstanceId ?? null,
       storageSchemaVersion: STORAGE_SCHEMA_VERSION,
@@ -102,16 +115,34 @@ export class FakeFabricBackend {
 
   private changed(): void {
     this.emit?.('fabric.changed', {
-      fabricGeneration: this.generationCounter,
+      fabricGeneration: this.fabric().fabricGeneration,
       fabricId: this.storage?.fabricId ?? null,
       state: this.state,
     });
   }
 
-  private secure(): void {
+  /** Every backup operation: refused over insecure transport, and one at a time like the real sidecar's gate. */
+  private gate(): void {
     if (this.insecure) {
       throw new FakeSidecarError(403, 'insecure_transport', 'Secrets are not sent over plain HTTP to another machine.');
     }
+    if (this.busy) throw new FakeSidecarError(409, 'busy', 'Busy.');
+  }
+
+  /** The generation the live storage holds: 0 without a healthy fabric, like the real metadata. */
+  private liveGeneration(): number {
+    return this.state === 'initialized' && this.storage ? this.generationCounter : 0;
+  }
+
+  /** A restore that could put neither storage in place: the sidecar keeps both and needs recovery. */
+  private failIntoRecovery(): never {
+    this.state = 'recovery_required';
+    this.reason = 'restore_interrupted';
+    this.rollbackCopy = this.previousState = this.pendingStageId = null;
+    this.changed();
+    throw new FakeSidecarError(409, 'recovery_required', 'The restore could not be completed or undone.', {
+      reason: 'restore_interrupted',
+    });
   }
 
   handle(operation: OperationId, body: unknown): unknown {
@@ -131,9 +162,11 @@ export class FakeFabricBackend {
           throw new FakeSidecarError(409, 'recovery_required', 'Recovery required.');
         if (this.busy) throw new FakeSidecarError(409, 'busy', 'Busy.');
         if (this.state === 'initialized') throw new FakeSidecarError(409, 'fabric_exists', 'A fabric exists.');
-        this.generationCounter += 1;
+        // Fresh storage starts at generation 1, like the real sidecar's new metadata file.
+        this.generationCounter = 1;
+        this.fabricsCreated += 1;
         this.storage = {
-          fabricId: String(1_000_000 + this.generationCounter * 7),
+          fabricId: String(1_000_000 + this.fabricsCreated * 7),
           rootCertFingerprint: hex(32),
           storageInstanceId: randomUUID(),
           generation: this.generationCounter,
@@ -144,10 +177,12 @@ export class FakeFabricBackend {
         return this.fabric();
       },
       'backup.snapshot': () => {
-        this.secure();
-        if (this.busy) throw new FakeSidecarError(409, 'busy', 'Busy.');
+        this.gate();
+        if (this.state === 'recovery_required') {
+          throw new FakeSidecarError(409, 'recovery_required', 'The storage needs recovery.');
+        }
         if (this.state !== 'initialized' || !this.storage) {
-          throw new FakeSidecarError(409, 'recovery_required', 'There is no fabric to back up.');
+          throw new FakeSidecarError(409, 'fabric_absent', 'There is no fabric to back up.');
         }
         if (this.faults.snapshotFails) throw new FakeSidecarError(500, 'internal_error', 'Snapshot failed.');
         const payload = Buffer.from(JSON.stringify({ ...this.storage }), 'utf8');
@@ -168,7 +203,8 @@ export class FakeFabricBackend {
         };
       },
       'backup.restore.stage': (input) => {
-        this.secure();
+        this.gate();
+        this.staged = null;
         const payload = Buffer.from(String(input.payload ?? ''), 'base64');
         const header = input.header ?? {};
         let parsed: Storage;
@@ -183,7 +219,7 @@ export class FakeFabricBackend {
           throw new FakeSidecarError(422, 'invalid_backup', 'The snapshot is not valid.');
         }
         const stageId = randomUUID();
-        this.staged.set(stageId, { ...parsed, generation: Number(header.fabricGeneration) });
+        this.staged = { stageId, storage: { ...parsed, generation: Number(header.fabricGeneration) } };
         return {
           stageId,
           fabricId: parsed.fabricId,
@@ -194,9 +230,11 @@ export class FakeFabricBackend {
         };
       },
       'backup.restore.commit': (input) => {
-        this.secure();
-        const staged = this.staged.get(String(input.stageId));
-        if (!staged) throw new FakeSidecarError(404, 'not_found', 'Unknown stage.');
+        this.gate();
+        if (this.staged?.stageId !== String(input.stageId)) {
+          throw new FakeSidecarError(404, 'not_found', 'Unknown stage.');
+        }
+        const staged = this.staged.storage;
         if (this.faults.commitRestoreFailed) {
           throw new FakeSidecarError(409, 'restore_failed', 'The restored storage did not verify; swapped back.');
         }
@@ -204,35 +242,48 @@ export class FakeFabricBackend {
           throw new SidecarTimeoutError('The request timed out.', { outcome: 'uncertain' });
         this.rollbackCopy = this.storage ? { ...this.storage, generation: this.generationCounter } : null;
         this.previousState = { state: this.state, reason: this.reason };
-        this.generationCounter = Math.max(staged.generation, this.generationCounter) + 1;
+        this.generationCounter = Math.max(staged.generation, this.liveGeneration()) + 1;
         this.storage = { ...staged, generation: this.generationCounter };
         this.state = 'initialized';
         this.reason = null;
+        this.pendingStageId = this.staged.stageId;
+        this.staged = null;
         this.changed();
+        if (this.faults.commitEndsInRecovery) this.failIntoRecovery();
         if (this.faults.commitTimeoutAfterSwap) {
           throw new SidecarTimeoutError('The request timed out.', { outcome: 'uncertain' });
         }
         return { state: 'committed', fabric: this.fabric() };
       },
-      'backup.restore.rollback': () => {
+      'backup.restore.rollback': (input) => {
+        this.gate();
         if (this.faults.rollbackFails) throw new FakeSidecarError(500, 'internal_error', 'Rollback failed.');
-        if (!this.previousState) throw new FakeSidecarError(409, 'restore_failed', 'Nothing to roll back.');
+        if (!this.previousState || this.pendingStageId !== String(input.stageId)) {
+          throw new FakeSidecarError(404, 'not_found', 'There is no restore to roll back.');
+        }
+        if (this.faults.rollbackEndsInRecovery) this.failIntoRecovery();
+        // A plugin-driven rollback moves the generation past the committed one, so it never looks like going back.
+        const committed = this.generationCounter;
         this.storage = this.rollbackCopy;
         this.state = this.previousState.state;
         this.reason = this.previousState.reason;
-        this.generationCounter = (this.rollbackCopy?.generation ?? this.generationCounter) + 1;
-        this.rollbackCopy = this.previousState = null;
+        this.generationCounter = committed + 1;
+        this.rollbackCopy = this.previousState = this.pendingStageId = null;
         this.changed();
         return { state: 'rolled_back', fabric: this.fabric() };
       },
       'backup.restore.finalize': (input) => {
+        this.gate();
         if (this.faults.finalizeFails) throw new FakeSidecarError(500, 'internal_error', 'Finalize failed.');
-        this.staged.delete(String(input.stageId));
-        this.rollbackCopy = this.previousState = null;
+        if (this.pendingStageId !== String(input.stageId)) {
+          throw new FakeSidecarError(404, 'not_found', 'There is no restore to finalize.');
+        }
+        this.rollbackCopy = this.previousState = this.pendingStageId = null;
         return { state: 'finalized', fabric: this.fabric() };
       },
       'backup.restore.abort': (input) => {
-        this.staged.delete(String(input.stageId));
+        this.gate();
+        if (this.staged?.stageId === String(input.stageId)) this.staged = null;
         return { state: 'aborted', fabric: this.fabric() };
       },
     };
@@ -285,7 +336,11 @@ export class FakeFabricConnection {
       return this.backend.handle(operation, options.body);
     } catch (error) {
       if (error instanceof FakeSidecarError) {
-        throw new SidecarRequestError(error.message, { code: error.code as never, status: error.status });
+        throw new SidecarRequestError(error.message, {
+          code: error.code as never,
+          status: error.status,
+          details: error.details,
+        });
       }
       throw error;
     }

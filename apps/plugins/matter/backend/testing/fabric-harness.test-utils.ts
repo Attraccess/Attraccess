@@ -1,7 +1,7 @@
 // Test harness for fabric persistence and backups: the device harness (real SQLite with the plugin's migrations) plus
 // the fabric, backup and restore services on top of an in-process fake sidecar.
 import { MatterBackupService } from '../backup/backup.service';
-import { MatterRestoreService } from '../backup/restore.service';
+import { MatterRestoreService, type RollbackTiming } from '../backup/restore.service';
 import { MatterBackupSchedulerService, type SchedulerTiming } from '../backup/scheduler.service';
 import { MatterFabricService } from '../fabric/fabric.service';
 import { MatterFabricGuard } from '../fabric/guard';
@@ -11,12 +11,15 @@ import type { MatterConnectionService } from '../connection/connection.service';
 import { DeviceAuditService } from '../devices/audit.service';
 import { MatterReconciliationService } from '../devices/reconciliation.service';
 import { createHarness, ADMIN } from './devices-harness.test-utils';
-import { FakeFabricBackend, FakeFabricConnection } from './fake-fabric';
+import { FakeFabricBackend, FakeFabricConnection } from './fake-fabric.test-utils';
 
 export { ADMIN };
 
+/** Rollback retries short enough for a test, still several attempts before the outcome counts as unknown. */
+export const TEST_ROLLBACK_TIMING: RollbackTiming = { windowMs: 300, firstRetryMs: 5, maxRetryMs: 40 };
+
 export async function createFabricHarness(
-  options: { timing?: Partial<SchedulerTiming>; validationTtlMs?: number } = {},
+  options: { timing?: Partial<SchedulerTiming>; validationTtlMs?: number; rollbackTiming?: RollbackTiming } = {},
 ) {
   const h = await createHarness();
   const backend = new FakeFabricBackend();
@@ -43,6 +46,7 @@ export async function createFabricHarness(
     reconciliation,
     migrationReader,
     options.validationTtlMs,
+    options.rollbackTiming ?? TEST_ROLLBACK_TIMING,
   );
   const scheduler = new MatterBackupSchedulerService(
     h.context,
@@ -57,6 +61,8 @@ export async function createFabricHarness(
     backend,
     connection,
     guard,
+    /** The reconciliation the fabric services use (against the fake fabric sidecar), not the device harness's. */
+    reconciliation,
     keys,
     backups,
     fabric,

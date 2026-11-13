@@ -1,3 +1,4 @@
+import { MAX_BACKUP_BODY_BYTES } from '@attraccess/matter-contract';
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -7,6 +8,12 @@ import { gunzipSync, gzipSync } from 'node:zlib';
 type ArchiveBody = { version: 1; files: { path: string; data: string }[] };
 
 const MAX_FILES = 100_000;
+/**
+ * Largest unpacked archive. The packed archive travels base64-encoded in a request of at most `MAX_BACKUP_BODY_BYTES`;
+ * twice that leaves room for the gzip ratio of the matter.js storage while bounding what a crafted archive can inflate
+ * to. Snapshots above it are refused when they are made, so every snapshot the sidecar hands out can be restored.
+ */
+export const MAX_UNPACKED_BYTES = 2 * MAX_BACKUP_BODY_BYTES;
 
 export class ArchiveError extends Error {}
 
@@ -35,7 +42,9 @@ export function packDirectory(root: string, include?: readonly string[]): Buffer
     version: 1,
     files: paths.map((path) => ({ path, data: readFileSync(join(root, path)).toString('base64') })),
   };
-  return gzipSync(Buffer.from(JSON.stringify(body)));
+  const json = Buffer.from(JSON.stringify(body));
+  if (json.length > MAX_UNPACKED_BYTES) throw new ArchiveError('The Matter storage is too large for a snapshot.');
+  return gzipSync(json);
 }
 
 /** True for a relative POSIX path that stays inside the extraction root. */
@@ -45,7 +54,7 @@ function isSafePath(path: string): boolean {
 }
 
 /** Extracts into `target`, which must not exist yet. Directories get 0700 and files 0600. Throws ArchiveError. */
-export function unpackInto(archive: Buffer, target: string, maxBytes = 512 * 1024 * 1024): void {
+export function unpackInto(archive: Buffer, target: string, maxBytes = MAX_UNPACKED_BYTES): void {
   let body: ArchiveBody;
   try {
     body = JSON.parse(gunzipSync(archive, { maxOutputLength: maxBytes }).toString('utf8')) as ArchiveBody;

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { MatterConnectionService } from '../connection/connection.service';
 import { MatterSettingsService } from '../connection/settings.service';
-import { FakeSidecar, TOKEN } from '../testing/fake-sidecar';
+import { FakeSidecar, TOKEN } from '../testing/fake-sidecar.test-utils';
 import { createHarness, endpoint, node, type Harness } from '../testing/devices-harness.test-utils';
 import { MatterFabricGuard } from '../fabric/guard';
 import { DeviceAuditService } from './audit.service';

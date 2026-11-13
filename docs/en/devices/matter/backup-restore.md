@@ -34,7 +34,7 @@ Attraccess creates a backup automatically:
 - after every change to the fabric, and
 - before a restore (so you can go back).
 
-You can also click **Back up now** at any time. The status card shows the last successful backup, the last attempt (with the reason if it failed) and the time of the next run.
+You can also click **Back up now** at any time. The **Backups** card shows the last successful backup, the last attempt (with the reason if it failed) and the time of the next run. When **Back up now** or **Restore from backup** is unavailable, the card says why, for example that there is no recovery key yet, that the fabric needs recovery or that the connection to the sidecar is not secure.
 
 **Retention:** the newest **10** backups are kept, older ones are deleted. Backups are stored **encrypted in the plugin database**, so a normal [Attraccess volume backup](installation/backup-restore.md) already includes them. You can also download any stored backup from the list and keep a copy off the server. For disaster recovery you need such a copy, because the database that holds the stored backups is gone with the server.
 
@@ -58,7 +58,7 @@ Use **Restore from backup** in the Fabric & backup section. It opens a wizard:
 3. **Validate.** Attraccess checks the file completely before anything changes: the file format, the integrity of both parts, the key, and that the backup matches this installation (see below). Errors are specific, for example wrong key, damaged or truncated file, or a different plugin release. Nothing is changed while validation fails.
 4. **Preflight summary.** You see which fabric the backup contains, when it was made and what it replaces.
 5. **Typed confirmation.** If the sidecar currently holds a **healthy** fabric that the restore would overwrite, you must type the fabric ID to confirm. When the sidecar has no usable fabric (see [Degraded states](#degraded-states-and-recovery)), no typed confirmation is needed.
-6. **Result.** The wizard reports success, or that the restore was rolled back and your installation was left unchanged.
+6. **Result.** The wizard reports success, or that the restore failed and your installation was left unchanged. If the check has expired, the sidecar changed in the meantime or it is busy, the wizard goes back to step 3 and keeps your backup and key, so you only validate again. In the rare case that the sidecar could not be rolled back automatically, the wizard says so instead: its state is then unknown, so check the sidecar and restore the backup again.
 
 **Same release required.** The backup must come from the same Matter plugin release as the target: the plugin's last migration and the sidecar's storage schema must match **exactly**. Restore onto the same release (install the release recorded in the backup first), then upgrade afterwards.
 
@@ -74,6 +74,8 @@ A restore is a two-phase process so that neither side is left half-restored:
 
 Validation never changes anything. Before the commit, a cancelled restore just **aborts** the staged data.
 
+The sidecar never deletes storage that may be the only copy of a fabric. Broken storage that a restore replaced, a rollback copy that a crashed or stopped sidecar left behind, and a rollback copy that was neither finalized nor rolled back in time are moved into an owner-only (`0700`) `quarantine-<timestamp>-<id>` directory inside `MATTER_SIDECAR_STORAGE_DIR`, and the sidecar logs a warning that names it. **These directories contain fabric keys.** The sidecar never removes them: delete them yourself once you no longer need them (see [Storage](devices/matter/operator.md#storage)).
+
 ### Disaster recovery onto a fresh host
 
 1. Install a fresh Attraccess **and** start a sidecar with a **fresh, empty storage volume** (see `MATTER_SIDECAR_STORAGE_DIR` in the [operator guide](devices/matter/operator.md#configuration)).
@@ -81,6 +83,8 @@ Validation never changes anything. Before the commit, a cancelled restore just *
 3. Open **Devices → Matter**. The sidecar reports no fabric, so Attraccess offers **Restore from backup**.
 4. Upload your backup file, enter the recovery key, validate and restore.
 5. Afterwards, factory-reset and commission again any device that was added after the backup was made.
+
+The recovery key you entered becomes the stored recovery key of the new installation, so automatic backups resume right away, encrypted with that same key. Keep it as before; you do not get a new one.
 
 ## Degraded states and recovery
 
@@ -94,7 +98,9 @@ Attraccess compares what it recorded with what the sidecar reports (fabric ID, r
 | Generation ahead                 | The sidecar is newer than Attraccess, for example Attraccess was restored without the sidecar. |
 | Sidecar `recovery_required`      | The sidecar found its own storage unusable and refuses to create a fabric on its own.          |
 
-The recovery panel then offers three options:
+A restore that was interrupted, for example because the sidecar crashed or was stopped in the middle of it, also ends in `recovery_required`, with the reason `restore_interrupted` ("A restore was interrupted. The previous storage was kept; restore a backup."). The sidecar keeps the previous storage and changes nothing else. Restore a backup to continue.
+
+The **Recovery** card then offers three options:
 
 - **Restore from backup** (the wizard above). This is the right choice when you have a backup and key.
 - **Accept sidecar's fabric.** Only possible when the sidecar is healthy. Attraccess adopts the fabric the sidecar reports. Use this when you know the sidecar is correct, for example after restoring Attraccess without the sidecar. Device records that do not match are reconciled as usual.

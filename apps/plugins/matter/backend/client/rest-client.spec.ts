@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getCACertificates } from 'node:tls';
 import { selfSignedCertificate } from '../testing/certs';
-import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
+import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar.test-utils';
 import {
   SidecarAbortedError,
   SidecarIncompatibleError,

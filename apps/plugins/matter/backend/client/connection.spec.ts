@@ -6,7 +6,7 @@ import {
 } from '@attraccess/matter-contract';
 import { randomUUID } from 'node:crypto';
 import { selfSignedCertificate } from '../testing/certs';
-import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
+import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar.test-utils';
 import { SidecarConnection, type ConnectionStatus } from './connection';
 import { SidecarAbortedError, SidecarUnavailableError } from './errors';
 import { BACKOFF_CAP_MS } from './backoff';

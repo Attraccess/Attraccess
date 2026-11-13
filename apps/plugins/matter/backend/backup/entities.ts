@@ -98,6 +98,13 @@ export class MatterBackup {
   @Column({ type: 'varchar', name: 'recovery_key_id', nullable: true })
   recoveryKeyId!: string | null;
 
+  /**
+   * `false` for a backup whose plugin tables did not agree with the sidecar snapshot (a pre-restore backup taken in
+   * recovery); the same flag is in the file's authenticated header. Null for a failed attempt.
+   */
+  @Column({ type: 'boolean', nullable: true })
+  consistent!: boolean | null;
+
   @Column({ type: 'blob', nullable: true })
   blob!: Buffer | null;
 }

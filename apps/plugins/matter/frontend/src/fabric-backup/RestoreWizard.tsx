@@ -1,16 +1,8 @@
-import {
-  Button,
-  PasswordInput,
-  StandardModal,
-  StatusAlert,
-  useDateTimeFormatter,
-} from '@attraccess/plugins-frontend-ui';
+import { Button, StandardModal, StatusAlert, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
 import { Chip, Input, Label, ModalBody, ModalFooter, ModalHeader, ModalHeading, TextField } from '@heroui/react';
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 import {
-  FabricApiError,
-  RESTORE_VALIDATION_CODES,
   cancelRestore,
   confirmRestore,
   readFileAsBase64,
@@ -20,9 +12,11 @@ import {
   type RestoreSource,
   type RestoreValidation,
 } from './api';
+import { codeOf, useErrorText } from './errors';
+import { Field } from './Field';
+import { RETRY_CODES, RestoreSourceStep, type Mode, type WizardError } from './RestoreSourceStep';
 
 type Step = 'select' | 'preview' | 'running' | 'success' | 'failed';
-type Mode = 'stored' | 'upload';
 
 /** The host reads the upload as JSON (base64, about a third larger) with a 10 MB body limit. */
 const MAX_UPLOAD_BYTES = 7 * 1024 * 1024;
@@ -33,6 +27,15 @@ function uploadProblem(file: File): 'empty' | 'tooLarge' | null {
   return file.size > MAX_UPLOAD_BYTES ? 'tooLarge' : null;
 }
 
+/**
+ * Where a failed confirmation leaves the wizard: a missing typed confirmation stays on the preview, an expired or
+ * outdated check (or a busy sidecar) goes back to validate again, anything else ends the wizard.
+ */
+function stepAfterFailure(code: string | null): Step {
+  if (code === 'confirmation_required') return 'preview';
+  return code !== null && RETRY_CODES.has(code) ? 'select' : 'failed';
+}
+
 type Props = Readonly<{
   stored: BackupView[];
   onClose: () => void;
@@ -40,32 +43,18 @@ type Props = Readonly<{
   onRestored: (status: FabricBackupStatus) => void;
 }>;
 
-const KEY_CODES = new Set(['key_required', 'wrong_key']);
-
-/** The administrator-facing explanation of a failed validation or restore. */
-function useErrorText() {
-  const { t } = useMatterTranslations();
-  return (error: unknown): string => {
-    if (error instanceof FabricApiError && error.code) {
-      if ((RESTORE_VALIDATION_CODES as readonly string[]).includes(error.code))
-        return t(`fabric.restore.error.${error.code}`);
-      if (error.code === 'confirmation_required') return t('fabric.restore.error.confirmation_required');
-    }
-    return error instanceof Error ? error.message : String(error);
-  };
-}
-
 type PreviewProps = {
   validation: RestoreValidation;
-  preflight: RestoreValidation['preflight'];
   typed: string;
   onTyped: (value: string) => void;
-  formatDateTime: (value: string) => React.ReactNode;
+  error: WizardError | null;
 };
 
 /** What the validated backup would do to this installation, with the typed confirmation where it overwrites. */
-function PreviewStep({ validation, preflight, typed, onTyped, formatDateTime }: Readonly<PreviewProps>) {
+function PreviewStep({ validation, typed, onTyped, error }: Readonly<PreviewProps>) {
   const { t } = useMatterTranslations();
+  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
+  const { backup, preflight } = validation;
   return (
     <>
       <div className="mt:flex mt:flex-wrap mt:gap-2">
@@ -73,17 +62,26 @@ function PreviewStep({ validation, preflight, typed, onTyped, formatDateTime }: 
         <Chip variant="soft">{t(`fabric.state.${preflight.sidecarState}`)}</Chip>
       </div>
       <dl className="mt:grid mt:grid-cols-1 mt:gap-3 mt:sm:grid-cols-2" data-cy="matter-restore-summary">
-        <Fact label={t('fabric.restore.backupCreated')}>{formatDateTime(validation.backup.createdAt)}</Fact>
-        <Fact label={t('fabric.restore.pluginVersion')}>{validation.backup.pluginVersion}</Fact>
-        <Fact label={t('fabric.restore.sidecarVersion')}>{validation.backup.sidecarVersion}</Fact>
-        <Fact label={t('fabric.generationLabel')}>{validation.backup.fabricGeneration}</Fact>
-        <Fact label={t('fabric.restore.backupFabric')}>{validation.backup.fabricId}</Fact>
-        <Fact label={t('fabric.restore.currentFabric')}>{preflight.currentFabricId ?? t('fabric.none')}</Fact>
+        <Field label={t('fabric.restore.backupCreated')}>{formatDateTime(backup.createdAt)}</Field>
+        <Field label={t('fabric.restore.pluginVersion')}>{backup.pluginVersion}</Field>
+        <Field label={t('fabric.restore.sidecarVersion')}>{backup.sidecarVersion}</Field>
+        <Field label={t('fabric.generationLabel')}>{backup.fabricGeneration}</Field>
+        <Field label={t('fabric.restore.backupFabric')}>{backup.fabricId}</Field>
+        <Field label={t('fabric.restore.currentFabric')}>{preflight.currentFabricId ?? t('fabric.none')}</Field>
       </dl>
       <p>
         {t('fabric.restore.previewHint')}
         {preflight.requiresTypedConfirmation && ` ${t('fabric.restore.previewHintBackup')}`}
       </p>
+      {!backup.consistent && (
+        <StatusAlert
+          status="warning"
+          title={t('fabric.restore.inconsistentTitle')}
+          data-cy="matter-restore-inconsistent"
+        >
+          {t('fabric.restore.inconsistentText')}
+        </StatusAlert>
+      )}
       {preflight.requiresTypedConfirmation && (
         <>
           <StatusAlert status="danger" title={t('fabric.restore.overwriteTitle')} data-cy="matter-restore-overwrite">
@@ -95,6 +93,77 @@ function PreviewStep({ validation, preflight, typed, onTyped, formatDateTime }: 
           </TextField>
         </>
       )}
+      {error && (
+        <StatusAlert status="danger" data-cy="matter-restore-confirm-error">
+          {error.text}
+        </StatusAlert>
+      )}
+    </>
+  );
+}
+
+/** The end of a restore. A failed rollback is the one outcome that leaves the sidecar in an unknown state. */
+function ResultStep({ step, error }: Readonly<{ step: 'success' | 'failed'; error: WizardError | null }>) {
+  const { t } = useMatterTranslations();
+  if (step === 'success') {
+    return (
+      <StatusAlert status="success" title={t('fabric.restore.successTitle')} data-cy="matter-restore-success">
+        {t('fabric.restore.successText')}
+      </StatusAlert>
+    );
+  }
+  const rollbackFailed = error?.code === 'rollback_failed';
+  return (
+    <StatusAlert
+      status="danger"
+      title={rollbackFailed ? t('fabric.restore.rollbackFailedTitle') : t('fabric.restore.failedTitle')}
+      data-cy={rollbackFailed ? 'matter-restore-rollback-failed' : 'matter-restore-failed'}
+    >
+      {error?.text}
+    </StatusAlert>
+  );
+}
+
+type FooterProps = Readonly<{
+  step: Step;
+  busy: boolean;
+  canValidate: boolean;
+  canConfirm: boolean;
+  danger: boolean;
+  onClose: () => void;
+  onValidate: () => void;
+  onConfirm: () => void;
+}>;
+
+function WizardFooter({ step, busy, canValidate, canConfirm, danger, onClose, onValidate, onConfirm }: FooterProps) {
+  const { t } = useMatterTranslations();
+  if (step === 'success' || step === 'failed') {
+    return (
+      <Button onPress={onClose} data-cy="matter-restore-close">
+        {t('fabric.close')}
+      </Button>
+    );
+  }
+  if (step === 'running') return null;
+  return (
+    <>
+      <Button variant="tertiary" onPress={onClose}>
+        {t('fabric.cancel')}
+      </Button>
+      {step === 'select' ? (
+        <Button isDisabled={!canValidate} isPending={busy} onPress={onValidate} data-cy="matter-restore-validate">
+          {t('fabric.restore.validate')}
+        </Button>
+      ) : (
+        <Button
+          variant={danger ? 'danger' : 'primary'}
+          isDisabled={!canConfirm}
+          onPress={onConfirm}
+          data-cy="matter-restore-confirm"
+        >
+          {t('fabric.restore.confirm')}
+        </Button>
+      )}
     </>
   );
 }
@@ -102,26 +171,24 @@ function PreviewStep({ validation, preflight, typed, onTyped, formatDateTime }: 
 /**
  * Restore from a stored backup or an uploaded file: validate (no live change), review the preflight, then confirm.
  * A healthy fabric is only overwritten after typing its fabric ID. The recovery key typed here lives in this
- * component's state only and is gone when the wizard closes.
+ * component's state only and is gone when the wizard closes or the restore ended.
  */
 export function RestoreWizard({ stored, onClose, onRestored }: Props) {
   const { t } = useMatterTranslations();
   const errorText = useErrorText();
-  const formatDateTime = useDateTimeFormatter({ showSeconds: true });
   const [step, setStep] = useState<Step>('select');
   const [mode, setMode] = useState<Mode>(stored.length > 0 ? 'stored' : 'upload');
   const [backupId, setBackupId] = useState<string | null>(stored[0]?.id ?? null);
   const [file, setFile] = useState<File | null>(null);
   const [recoveryKey, setRecoveryKey] = useState('');
-  const [error, setError] = useState<{ code: string | null; text: string } | null>(null);
+  const [error, setError] = useState<WizardError | null>(null);
   const [validation, setValidation] = useState<RestoreValidation | null>(null);
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const needsKey = error?.code != null && KEY_CODES.has(error.code);
-  const canValidate = !busy && (mode === 'stored' ? backupId !== null : file !== null);
   const preflight = validation?.preflight;
   const confirmed = !preflight?.requiresTypedConfirmation || typed.trim() === preflight.confirmationFabricId;
+  const fail = (caught: unknown) => setError({ code: codeOf(caught), text: errorText(caught) });
 
   const validate = async () => {
     setError(null);
@@ -137,7 +204,7 @@ export function RestoreWizard({ stored, onClose, onRestored }: Props) {
       setTyped('');
       setStep('preview');
     } catch (caught) {
-      setError({ code: caught instanceof FabricApiError ? caught.code : null, text: errorText(caught) });
+      fail(caught);
     } finally {
       setBusy(false);
     }
@@ -145,22 +212,26 @@ export function RestoreWizard({ stored, onClose, onRestored }: Props) {
 
   const confirm = async () => {
     if (!validation) return;
+    setError(null);
     setBusy(true);
     setStep('running');
+    let next: Step = 'success';
     try {
       const result = await confirmRestore(
         validation.validationId,
         preflight?.requiresTypedConfirmation ? typed.trim() : undefined,
       );
       onRestored(result.status);
-      setStep('success');
     } catch (caught) {
-      setError({ code: caught instanceof FabricApiError ? caught.code : null, text: errorText(caught) });
-      setStep('failed');
+      fail(caught);
+      next = stepAfterFailure(codeOf(caught));
     } finally {
       setBusy(false);
-      setRecoveryKey('');
     }
+    // Back to validating keeps the source and the key; an ended restore forgets the key.
+    if (next === 'select') setValidation(null);
+    if (next === 'success' || next === 'failed') setRecoveryKey('');
+    setStep(next);
   };
 
   const close = () => {
@@ -183,147 +254,39 @@ export function RestoreWizard({ stored, onClose, onRestored }: Props) {
       </ModalHeader>
       <ModalBody className="mt:flex mt:flex-col mt:gap-4">
         {step === 'select' && (
-          <>
-            <p>{t('fabric.restore.intro')}</p>
-            <div className="mt:flex mt:flex-wrap mt:gap-2" role="group" aria-label={t('fabric.restore.source')}>
-              <Button
-                variant={mode === 'stored' ? 'primary' : 'secondary'}
-                aria-pressed={mode === 'stored'}
-                isDisabled={stored.length === 0}
-                onPress={() => setMode('stored')}
-              >
-                {t('fabric.restore.fromStored')}
-              </Button>
-              <Button
-                variant={mode === 'upload' ? 'primary' : 'secondary'}
-                aria-pressed={mode === 'upload'}
-                onPress={() => setMode('upload')}
-              >
-                {t('fabric.restore.fromUpload')}
-              </Button>
-            </div>
-            {mode === 'stored' ? (
-              <ul className="mt:flex mt:flex-col mt:gap-2" aria-label={t('fabric.restore.fromStored')}>
-                {stored.map((backup) => (
-                  <li key={backup.id}>
-                    <Button
-                      variant={backup.id === backupId ? 'primary' : 'tertiary'}
-                      aria-pressed={backup.id === backupId}
-                      onPress={() => setBackupId(backup.id)}
-                      className="mt:w-full mt:justify-start"
-                    >
-                      {formatDateTime(backup.createdAt)} · {t(`fabric.trigger.${backup.trigger}`)} ·{' '}
-                      {t('fabric.generation', { generation: backup.fabricGeneration })}
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="mt:flex mt:flex-col mt:gap-1">
-                <label htmlFor="matter-restore-file" className="mt:text-sm">
-                  {t('fabric.restore.file')}
-                </label>
-                <input
-                  id="matter-restore-file"
-                  type="file"
-                  accept=".attraccess-matter-backup,application/octet-stream"
-                  onChange={(event) => {
-                    setFile(event.target.files?.[0] ?? null);
-                    setError(null);
-                  }}
-                  data-cy="matter-restore-file"
-                />
-              </div>
-            )}
-            {(needsKey || recoveryKey !== '') && (
-              <PasswordInput
-                label={t('fabric.restore.recoveryKey')}
-                description={t('fabric.restore.recoveryKeyHint')}
-                autoComplete="off"
-                value={recoveryKey}
-                onValueChange={setRecoveryKey}
-                data-cy="matter-restore-key"
-              />
-            )}
-            {error && (
-              <StatusAlert status="danger" title={t('fabric.restore.validationFailed')} data-cy="matter-restore-error">
-                {error.text}
-              </StatusAlert>
-            )}
-          </>
-        )}
-
-        {step === 'preview' && validation && preflight && (
-          <PreviewStep
-            validation={validation}
-            preflight={preflight}
-            typed={typed}
-            onTyped={setTyped}
-            formatDateTime={formatDateTime}
+          <RestoreSourceStep
+            stored={stored}
+            mode={mode}
+            onMode={setMode}
+            backupId={backupId}
+            onBackupId={setBackupId}
+            onFile={(next) => {
+              setFile(next);
+              setError(null);
+            }}
+            recoveryKey={recoveryKey}
+            onRecoveryKey={setRecoveryKey}
+            error={error}
           />
         )}
-
+        {step === 'preview' && validation && (
+          <PreviewStep validation={validation} typed={typed} onTyped={setTyped} error={error} />
+        )}
         {step === 'running' && <p role="status">{t('fabric.restore.running')}</p>}
-
-        {step === 'success' && (
-          <StatusAlert status="success" title={t('fabric.restore.successTitle')} data-cy="matter-restore-success">
-            {t('fabric.restore.successText')}
-          </StatusAlert>
-        )}
-
-        {step === 'failed' && (
-          <StatusAlert status="danger" title={t('fabric.restore.failedTitle')} data-cy="matter-restore-failed">
-            {t('fabric.restore.unchanged')}
-            {error && <span className="mt:mt-1 mt:block mt:text-sm">{error.text}</span>}
-          </StatusAlert>
-        )}
+        {(step === 'success' || step === 'failed') && <ResultStep step={step} error={error} />}
       </ModalBody>
       <ModalFooter>
-        {step === 'select' && (
-          <>
-            <Button variant="tertiary" onPress={close}>
-              {t('fabric.cancel')}
-            </Button>
-            <Button
-              isDisabled={!canValidate}
-              isPending={busy}
-              onPress={() => void validate()}
-              data-cy="matter-restore-validate"
-            >
-              {t('fabric.restore.validate')}
-            </Button>
-          </>
-        )}
-        {step === 'preview' && (
-          <>
-            <Button variant="tertiary" onPress={close}>
-              {t('fabric.cancel')}
-            </Button>
-            <Button
-              variant={preflight?.requiresTypedConfirmation ? 'danger' : 'primary'}
-              isDisabled={!confirmed}
-              onPress={() => void confirm()}
-              data-cy="matter-restore-confirm"
-            >
-              {t('fabric.restore.confirm')}
-            </Button>
-          </>
-        )}
-        {(step === 'success' || step === 'failed') && (
-          <Button onPress={close} data-cy="matter-restore-close">
-            {t('fabric.close')}
-          </Button>
-        )}
+        <WizardFooter
+          step={step}
+          busy={busy}
+          canValidate={!busy && (mode === 'stored' ? backupId !== null : file !== null)}
+          canConfirm={confirmed}
+          danger={preflight?.requiresTypedConfirmation === true}
+          onClose={close}
+          onValidate={() => void validate()}
+          onConfirm={() => void confirm()}
+        />
       </ModalFooter>
     </StandardModal>
-  );
-}
-
-function Fact({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return (
-    <div className="mt:flex mt:flex-col">
-      <dt className="mt:text-xs mt:text-muted">{label}</dt>
-      <dd className="mt:break-all">{children}</dd>
-    </div>
   );
 }

@@ -49,6 +49,14 @@ export type ReconciliationStatusView = {
 
 type PendingAudit = { action: string; subject: DeviceAuditSubject; details: Record<string, string | number | boolean> };
 
+export type ReconciliationOptions = {
+  /**
+   * Run although the plugin is in recovery. Only for the run an administrator's recovery choice starts: any other run
+   * would apply the sidecar's view (and detach nodes) before the administrator decided.
+   */
+  allowInRecovery?: boolean;
+};
+
 /** The part of the connection reconciliation needs; `SidecarConnection` satisfies it. */
 export type InventorySource = Pick<SidecarConnection, 'request' | 'status'>;
 
@@ -70,6 +78,8 @@ export class MatterReconciliationService {
   private queued: Promise<ReconciliationStatusView> | undefined;
   /** The administrator of the newest manual trigger that joined the queued run; null when only automatic ones did. */
   private queuedPrincipal: PluginAuditPrincipal | null = null;
+  /** Whether a trigger that joined the queued run allowed it to run in recovery. */
+  private queuedAllowInRecovery = false;
 
   constructor(
     @Inject(PLUGIN_CONTEXT) private readonly context: PluginContext,
@@ -91,33 +101,43 @@ export class MatterReconciliationService {
    * Starts a run. A trigger that arrives during a run does not start a second one in parallel: all of them coalesce
    * into one follow-up run that starts when the current one ends.
    */
-  request(principal: PluginAuditPrincipal | null = null): Promise<ReconciliationStatusView> {
+  request(
+    principal: PluginAuditPrincipal | null = null,
+    options: ReconciliationOptions = {},
+  ): Promise<ReconciliationStatusView> {
     if (!this.current) {
-      this.current = this.execute(principal).finally(() => {
+      this.current = this.execute(principal, options).finally(() => {
         this.current = undefined;
       });
       return this.current;
     }
     if (principal) this.queuedPrincipal = principal;
+    // The run a recovery choice asked for must not lose its permission by joining the queue.
+    if (options.allowInRecovery) this.queuedAllowInRecovery = true;
     this.queued ??= this.current
       .catch(() => undefined)
       .then(() => {
         const queuedPrincipal = this.queuedPrincipal;
+        const allowInRecovery = this.queuedAllowInRecovery;
         this.queued = undefined;
         this.queuedPrincipal = null;
-        return this.request(queuedPrincipal);
+        this.queuedAllowInRecovery = false;
+        return this.request(queuedPrincipal, { allowInRecovery });
       });
     return this.queued;
   }
 
-  private async execute(principal: PluginAuditPrincipal | null): Promise<ReconciliationStatusView> {
+  private async execute(
+    principal: PluginAuditPrincipal | null,
+    options: ReconciliationOptions,
+  ): Promise<ReconciliationStatusView> {
     const startedAt = new Date().toISOString();
     let result: ReconciliationResult;
     let summary: ReconciliationSummary = emptySummary();
     let fabricId: string | null = null;
     const audits: PendingAudit[] = [];
     try {
-      const outcome = await this.run(audits);
+      const outcome = await this.run(audits, options.allowInRecovery === true);
       result = outcome.result;
       summary = outcome.summary;
       fabricId = outcome.fabricId;
@@ -153,6 +173,7 @@ export class MatterReconciliationService {
 
   private async run(
     audits: PendingAudit[],
+    allowInRecovery: boolean,
   ): Promise<{ result: ReconciliationResult; summary: ReconciliationSummary; fabricId: string | null }> {
     const skipped = (reason: string, result: ReconciliationResult = 'skipped_unavailable') => ({
       result,
@@ -161,7 +182,8 @@ export class MatterReconciliationService {
     });
     const status = this.source.status();
     if (status.state !== 'connected') return skipped(status.reason ?? status.state);
-    if (this.guard.restoring) return skipped('restore_in_progress');
+    const blockedAtStart = this.blocked(allowInRecovery);
+    if (blockedAtStart) return skipped(blockedAtStart);
     const epoch = this.guard.epoch;
     const inventory = status.capabilities?.capabilities.find((entry) => entry.family === 'inventory');
     if (inventory && !inventory.available) return skipped('unsupported_capability');
@@ -180,17 +202,26 @@ export class MatterReconciliationService {
 
     const summary = emptySummary();
     summary.nodesListed = list.nodes.length;
-    const applied = await this.context.runSerialized(async (manager) => {
+    const blocked = await this.context.runSerialized(async (manager) => {
       // A restore ran (or is running) since the inventory was read: it replaced the tables this list was meant for.
-      if (this.guard.restoring || this.guard.epoch !== epoch) return false;
+      // Recovery may also have been entered meanwhile.
+      const reason = this.guard.epoch !== epoch ? 'restore_in_progress' : this.blocked(allowInRecovery);
+      if (reason) return reason;
       const now = new Date();
       await this.apply(manager, list, summary, audits, now.toISOString());
       await pruneCommands(manager, now);
-      return true;
+      return null;
     });
-    if (!applied) return skipped('restore_in_progress');
+    if (blocked) return skipped(blocked);
     summary.changeCount = totalChanges(summary.changes);
     return { result: 'applied', summary, fabricId: list.fabricId };
+  }
+
+  /** Why the plugin's records must not follow the sidecar right now, if anything stops it. */
+  private blocked(allowInRecovery: boolean): 'restore_in_progress' | 'recovery_required' | null {
+    if (this.guard.restoring) return 'restore_in_progress';
+    if (this.guard.recoveryRequired && !allowInRecovery) return 'recovery_required';
+    return null;
   }
 
   private async apply(

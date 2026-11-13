@@ -1,8 +1,22 @@
+import { MAX_BACKUP_BODY_BYTES } from '@attraccess/matter-contract';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadMatterPlatform } from './matter-platform';
+import { gunzipSync } from 'node:zlib';
+import { MatterController, type ControllerOptions } from './fabric/controller';
+import { loadMatterPlatform, type FabricTuning, type MatterPlatform } from './matter-platform';
 import { http, startSidecar, validHeaders, type JsonBody, type Running } from './testing/harness';
 
 const post = (running: Running, path: string, body: unknown) =>
@@ -26,6 +40,74 @@ function fingerprint(directory: string): string {
   return hash.digest('hex');
 }
 
+/** matter.js keeps writing counters while it runs, so a live fabric is compared by its identity files only. */
+const identityOf = (dir: string) =>
+  ['sidecar-metadata.json', 'matter/controller/certificates.rootKeyPair', 'matter/controller/fabrics.fabrics'].map(
+    (file) => readFileSync(join(dir, file), 'utf8'),
+  );
+
+const quarantinesIn = (dir: string) => readdirSync(dir).filter((name) => name.startsWith('quarantine-'));
+const generationIn = (dir: string, file = 'sidecar-metadata.json') =>
+  JSON.parse(readFileSync(join(dir, file), 'utf8')).fabricGeneration;
+
+/** The state a crash leaves between moving the live storage aside and moving the restored one in. */
+function interruptRestore(dir: string) {
+  mkdirSync(join(dir, 'restore-rollback'));
+  renameSync(join(dir, 'matter'), join(dir, 'restore-rollback', 'matter'));
+  renameSync(join(dir, 'sidecar-metadata.json'), join(dir, 'restore-rollback', 'sidecar-metadata.json'));
+}
+
+/**
+ * The secret key material as matter.js stores it (root CA private key, operational private key, IPK), in every form a
+ * leak would take: hex as stored, upper-case hex and base64.
+ */
+function storedSecrets(storage: string): string[] {
+  const hex: string[] = [];
+  const visit = (value: unknown, field: string): void => {
+    if (typeof value === 'string') {
+      const wrapped = /^\{"__object__":"Uint8Array","__value__":"([0-9a-f]+)"\}$/.exec(value);
+      if (wrapped && /privateKey|identityProtectionKey/i.test(field)) hex.push(wrapped[1]);
+      return;
+    }
+    if (value === null || typeof value !== 'object') return;
+    for (const [key, inner] of Object.entries(value)) visit(inner, Array.isArray(value) ? field : key);
+  };
+  for (const file of ['certificates.rootKeyPair', 'fabrics.fabrics']) {
+    visit(JSON.parse(readFileSync(join(storage, 'matter', 'controller', file), 'utf8')), '');
+  }
+  return hex.flatMap((value) => [value, value.toUpperCase(), Buffer.from(value, 'hex').toString('base64')]);
+}
+
+/** Controllers whose stop can be held open and whose next verifications can be made to fail. */
+function controllerHooks() {
+  const hooks: { hold?: Promise<void>; onStop?: () => void; failVerifications: number } = { failVerifications: 0 };
+  const createController = (options: ControllerOptions) => {
+    const controller = new MatterController(options);
+    const stop = controller.stop.bind(controller);
+    controller.stop = async () => {
+      hooks.onStop?.();
+      await hooks.hold;
+      return stop();
+    };
+    if (hooks.failVerifications > 0) {
+      hooks.failVerifications -= 1;
+      controller.loadedFacts = async () => ({ fabricId: '1', rootCertFingerprint: '0'.repeat(64) });
+    }
+    return controller;
+  };
+  return { hooks, createController };
+}
+
+async function until(condition: () => boolean, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error('condition not met in time');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+}
+
+type FabricSidecar = Running & { changes: JsonBody[]; platform: () => MatterPlatform | undefined };
+
 describe('sidecar fabric persistence (real matter.js controller)', () => {
   const directories: string[] = [];
   const running: Running[] = [];
@@ -34,10 +116,29 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     directories.push(directory);
     return directory;
   };
-  const start = async (storageDir: string, overrides: Parameters<typeof startSidecar>[0] = {}) => {
-    const sidecar = await startSidecar({ storageDir, ...overrides }, { loadPlatform: loadMatterPlatform });
+  /** Starts a sidecar with the real matter.js platform and records every `fabric.changed` it publishes. */
+  const start = async (
+    storageDir: string,
+    overrides: Parameters<typeof startSidecar>[0] = {},
+    tuning: FabricTuning = {},
+  ): Promise<FabricSidecar> => {
+    const changes: JsonBody[] = [];
+    let platform: MatterPlatform | undefined;
+    const sidecar = await startSidecar(
+      { storageDir, ...overrides },
+      {
+        loadPlatform: async (context) => {
+          const onFabricChanged: typeof context.onFabricChanged = (payload) => {
+            changes.push(payload);
+            context.onFabricChanged(payload);
+          };
+          platform = await loadMatterPlatform({ ...context, onFabricChanged }, tuning);
+          return platform;
+        },
+      },
+    );
     running.push(sidecar);
-    return sidecar;
+    return Object.assign(sidecar, { changes, platform: () => platform });
   };
   const stop = async (sidecar: Running) => {
     await sidecar.stop();
@@ -99,6 +200,36 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     const second = await start(storage);
     expect((await get(second, '/v1/fabric')).body).toEqual(created.body);
     expect(logs).not.toContain(created.body.rootCertFingerprint);
+    expect(first.changes).toEqual([{ fabricGeneration: 1, fabricId: created.body.fabricId, state: 'initialized' }]);
+    expect(second.changes).toEqual([]);
+  });
+
+  it('never puts fabric key material in a log line or in any response but the snapshot', async () => {
+    const dir = newDir();
+    const sidecar = await start(dir);
+    const responses: string[] = [];
+    const call = async (path: string, body: unknown) => {
+      const result = await post(sidecar, path, body);
+      responses.push(result.raw);
+      return result.body;
+    };
+    await call('/v1/fabric', { label: 'Attraccess' });
+    const snapshot = await snapshotOf(sidecar);
+    const { stageId } = await call('/v1/backup/restore/stage', snapshot);
+    await call('/v1/backup/restore/commit', { stageId });
+    await call('/v1/backup/restore/rollback', { stageId });
+    await call('/v1/backup/restore/commit', { stageId });
+    responses.push((await get(sidecar, '/v1/fabric')).raw);
+
+    const secrets = storedSecrets(dir);
+    // Root CA key, operational key and IPK, each in three forms.
+    expect(secrets.length).toBeGreaterThanOrEqual(9);
+    // The snapshot is the one place they belong: proof that the search finds them where they are.
+    const archive = JSON.parse(gunzipSync(Buffer.from(snapshot.payload, 'base64')).toString('utf8'));
+    const files = archive.files.map((file: JsonBody) => Buffer.from(file.data, 'base64').toString('utf8')).join('\n');
+    for (const secret of secrets.filter((value) => /^[0-9a-f]+$/.test(value))) expect(files).toContain(secret);
+    const exposed = [...sidecar.logs, ...responses].join('\n');
+    for (const secret of secrets) expect(exposed).not.toContain(secret);
   });
 
   describe('storage that cannot be trusted', () => {
@@ -157,6 +288,14 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
   };
 
   describe('backup and two-phase restore', () => {
+    const donorSnapshot = async () => {
+      const donor = await start(newDir());
+      await post(donor, '/v1/fabric', { label: 'Donor' });
+      const snapshot = await snapshotOf(donor);
+      await stop(donor);
+      return snapshot;
+    };
+
     it('restores a snapshot onto a fresh storage directory and resumes the same fabric', async () => {
       const source = await start(newDir());
       const created = (await post(source, '/v1/fabric', { label: 'Attraccess' })).body;
@@ -190,6 +329,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
         storageInstanceId: created.storageInstanceId,
         fabricGeneration: 2,
       });
+      expect(target.changes).toEqual([{ fabricGeneration: 2, fabricId: created.fabricId, state: 'initialized' }]);
       expect((await post(target, '/v1/backup/restore/finalize', { stageId: staged.body.stageId })).body.state).toBe(
         'finalized',
       );
@@ -220,12 +360,237 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
 
       const rolledBack = await post(live, '/v1/backup/restore/rollback', { stageId: staged.stageId });
       expect(rolledBack.body.state).toBe('rolled_back');
+      // The restored generation was announced, so the fabric that comes back gets a newer one, never its old one.
+      const generation = committed.body.fabric.fabricGeneration + 1;
       expect(rolledBack.body.fabric).toMatchObject({
         fabricId: original.fabricId,
         storageInstanceId: original.storageInstanceId,
-        fabricGeneration: original.fabricGeneration,
+        fabricGeneration: generation,
       });
       expect(existsSync(join(dir, 'restore-rollback'))).toBe(false);
+      expect(live.changes).toEqual([
+        { fabricGeneration: 1, fabricId: original.fabricId, state: 'initialized' },
+        { fabricGeneration: 2, fabricId: snapshot.header.fabricId, state: 'initialized' },
+        { fabricGeneration: generation, fabricId: original.fabricId, state: 'initialized' },
+      ]);
+      await stop(live);
+      const resumed = await start(dir);
+      expect((await get(resumed, '/v1/fabric')).body).toMatchObject({
+        state: 'initialized',
+        fabricId: original.fabricId,
+        fabricGeneration: generation,
+      });
+    });
+
+    it('puts the previous fabric back and resumes it when the restored one fails verification', async () => {
+      const donor = await start(newDir());
+      await post(donor, '/v1/fabric', { label: 'Donor' });
+      const snapshot = await snapshotOf(donor);
+      await stop(donor);
+
+      const { hooks, createController } = controllerHooks();
+      const dir = newDir();
+      const live = await start(dir, {}, { createController });
+      const original = (await post(live, '/v1/fabric', { label: 'Live' })).body;
+      const before = identityOf(dir);
+      const staged = (await post(live, '/v1/backup/restore/stage', snapshot)).body;
+      hooks.failVerifications = 1;
+      const failed = await post(live, '/v1/backup/restore/commit', { stageId: staged.stageId });
+      expect(failed.status).toBe(409);
+      expect(failed.body.error.code).toBe('restore_failed');
+      expect(identityOf(dir)).toEqual(before);
+      expect(readdirSync(dir)).not.toContain('restore-rollback');
+      expect(readdirSync(dir)).not.toContain('restore-staging');
+      expect(quarantinesIn(dir)).toEqual([]);
+      expect((await get(live, '/v1/fabric')).body).toEqual(original);
+      expect(live.platform()?.fabric?.controller?.running).toBe(true);
+      // Nothing changed, so nothing was announced after the create.
+      expect(live.changes).toHaveLength(1);
+      expect((await post(live, '/v1/backup/restore/commit', { stageId: staged.stageId })).status).toBe(404);
+    });
+
+    it.each<[string, (dir: string) => void]>([
+      ['no live storage', () => undefined],
+      ['partial live storage', (dir) => writeFileSync(join(dir, 'sidecar-metadata.json'), '{"partial":')],
+    ])('leaves an interrupted restore alone: %s and a rollback copy -> restore_interrupted', async (_name, damage) => {
+      const dir = newDir();
+      const first = await start(dir);
+      await post(first, '/v1/fabric', { label: 'Attraccess' });
+      await stop(first);
+      interruptRestore(dir);
+      damage(dir);
+      const before = fingerprint(dir);
+
+      const second = await start(dir);
+      expect((await get(second, '/v1/fabric')).body).toMatchObject({
+        state: 'recovery_required',
+        reason: 'restore_interrupted',
+      });
+      expect((await post(second, '/v1/fabric', { label: 'Attraccess' })).body.error.code).toBe('recovery_required');
+      await stop(second);
+      expect(fingerprint(dir)).toBe(before);
+    });
+
+    describe('starting from an interrupted restore', () => {
+      const interrupted = async () => {
+        const snapshot = await donorSnapshot();
+        const dir = newDir();
+        const first = await start(dir);
+        await post(first, '/v1/fabric', { label: 'Attraccess' });
+        await stop(first);
+        interruptRestore(dir);
+        const before = fingerprint(dir);
+        const { hooks, createController } = controllerHooks();
+        const live = await start(dir, {}, { createController });
+        const staged = (await post(live, '/v1/backup/restore/stage', snapshot)).body;
+        return { dir, live, hooks, stageId: staged.stageId as string, before };
+      };
+      const expectStillInterrupted = async (live: FabricSidecar, dir: string, before: string) => {
+        expect((await get(live, '/v1/fabric')).body).toMatchObject({
+          state: 'recovery_required',
+          reason: 'restore_interrupted',
+        });
+        expect((await post(live, '/v1/fabric', { label: 'Attraccess' })).body.error.code).toBe('recovery_required');
+        expect(quarantinesIn(dir)).toEqual([]);
+        await stop(live);
+        expect(fingerprint(dir)).toBe(before);
+        const restarted = await start(dir);
+        expect((await get(restarted, '/v1/fabric')).body.reason).toBe('restore_interrupted');
+      };
+
+      it('keeps restore_interrupted and the leftover rollback copy when the restore fails', async () => {
+        const { dir, live, hooks, stageId, before } = await interrupted();
+        hooks.failVerifications = 1;
+        const failed = await post(live, '/v1/backup/restore/commit', { stageId });
+        expect(failed.status).toBe(409);
+        expect(failed.body.error.code).toBe('restore_failed');
+        await expectStillInterrupted(live, dir, before);
+      });
+
+      it('keeps restore_interrupted and the leftover rollback copy when the restore is rolled back', async () => {
+        const { dir, live, stageId, before } = await interrupted();
+        expect((await post(live, '/v1/backup/restore/commit', { stageId })).body.fabric.state).toBe('initialized');
+        expect(quarantinesIn(dir)).toHaveLength(1);
+        const rolledBack = await post(live, '/v1/backup/restore/rollback', { stageId });
+        expect(rolledBack.status).toBe(200);
+        expect(rolledBack.body).toMatchObject({
+          state: 'rolled_back',
+          fabric: { state: 'recovery_required', reason: 'restore_interrupted' },
+        });
+        await expectStillInterrupted(live, dir, before);
+      });
+    });
+
+    it('reports recovery_required when the previous fabric cannot be resumed after a failed restore', async () => {
+      const snapshot = await donorSnapshot();
+      const { hooks, createController } = controllerHooks();
+      const dir = newDir();
+      const live = await start(dir, {}, { createController });
+      await post(live, '/v1/fabric', { label: 'Live' });
+      const before = identityOf(dir);
+      const staged = (await post(live, '/v1/backup/restore/stage', snapshot)).body;
+      // The restored fabric fails verification, then the previous one fails to resume.
+      hooks.failVerifications = 2;
+      const failed = await post(live, '/v1/backup/restore/commit', { stageId: staged.stageId });
+      expect(failed.status).toBe(409);
+      expect(failed.body.error).toMatchObject({ code: 'recovery_required', details: { reason: 'storage_corrupt' } });
+      expect((await get(live, '/v1/fabric')).body).toMatchObject({ state: 'recovery_required' });
+      expect(live.changes.at(-1)).toEqual({ fabricGeneration: 0, fabricId: null, state: 'recovery_required' });
+      // The previous fabric is back in place, untouched, for an administrator.
+      expect(identityOf(dir)).toEqual(before);
+      expect(readdirSync(dir)).not.toContain('restore-rollback');
+    });
+
+    it('reports recovery_required when the rolled-back fabric cannot be resumed', async () => {
+      const snapshot = await donorSnapshot();
+      const { hooks, createController } = controllerHooks();
+      const dir = newDir();
+      const live = await start(dir, {}, { createController });
+      await post(live, '/v1/fabric', { label: 'Live' });
+      const staged = (await post(live, '/v1/backup/restore/stage', snapshot)).body;
+      const committed = (await post(live, '/v1/backup/restore/commit', { stageId: staged.stageId })).body;
+      hooks.failVerifications = 1;
+      const failed = await post(live, '/v1/backup/restore/rollback', { stageId: staged.stageId });
+      expect(failed.status).toBe(409);
+      expect(failed.body.error).toMatchObject({ code: 'recovery_required', details: { reason: 'storage_corrupt' } });
+      expect(live.changes.at(-1)).toMatchObject({ state: 'recovery_required' });
+      // The previous fabric is back with a generation above the announced one, so a restart never goes backwards.
+      expect(generationIn(dir)).toBe(committed.fabric.fabricGeneration + 1);
+      expect((await post(live, '/v1/backup/restore/rollback', { stageId: staged.stageId })).status).toBe(404);
+    });
+
+    it('changes nothing when the rollback copy cannot be prepared, and rolls back on the next attempt', async () => {
+      const snapshot = await donorSnapshot();
+      const dir = newDir();
+      const live = await start(dir);
+      const original = (await post(live, '/v1/fabric', { label: 'Live' })).body;
+      const staged = (await post(live, '/v1/backup/restore/stage', snapshot)).body;
+      const committed = (await post(live, '/v1/backup/restore/commit', { stageId: staged.stageId })).body;
+      chmodSync(join(dir, 'restore-rollback'), 0o500);
+      const failed = await post(live, '/v1/backup/restore/rollback', { stageId: staged.stageId });
+      chmodSync(join(dir, 'restore-rollback'), 0o700);
+      expect(failed.status).toBe(500);
+      expect(failed.body.error.code).toBe('internal_error');
+      expect((await get(live, '/v1/fabric')).body).toEqual(committed.fabric);
+      expect(live.platform()?.fabric?.controller?.running).toBe(true);
+      expect(generationIn(dir, 'restore-rollback/sidecar-metadata.json')).toBe(original.fabricGeneration);
+
+      const rolledBack = await post(live, '/v1/backup/restore/rollback', { stageId: staged.stageId });
+      expect(rolledBack.body).toMatchObject({
+        state: 'rolled_back',
+        fabric: { fabricId: original.fabricId, fabricGeneration: committed.fabric.fabricGeneration + 1 },
+      });
+    });
+
+    it('quarantines a rollback copy left next to a healthy fabric and resumes the fabric', async () => {
+      const dir = newDir();
+      const first = await start(dir);
+      const created = (await post(first, '/v1/fabric', { label: 'Attraccess' })).body;
+      await stop(first);
+      mkdirSync(join(dir, 'restore-rollback', 'matter'), { recursive: true });
+      writeFileSync(join(dir, 'restore-rollback', 'matter', 'leftover'), 'previous fabric');
+
+      const second = await start(dir);
+      expect((await get(second, '/v1/fabric')).body).toEqual(created);
+      expect(readdirSync(dir)).not.toContain('restore-rollback');
+      const [quarantine, ...others] = quarantinesIn(dir);
+      expect(others).toEqual([]);
+      expect(readFileSync(join(dir, quarantine, 'matter', 'leftover'), 'utf8')).toBe('previous fabric');
+      expect(statSync(join(dir, quarantine)).mode & 0o777).toBe(0o700);
+      expect(second.logs.join('\n')).toContain('quarantine');
+    });
+
+    it('quarantines the rollback copy when neither finalize nor rollback arrives in time', async () => {
+      const donor = await start(newDir());
+      await post(donor, '/v1/fabric', { label: 'Donor' });
+      const snapshot = await snapshotOf(donor);
+      await stop(donor);
+
+      const dir = newDir();
+      const live = await start(dir, {}, { pendingTtlMs: 300 });
+      await post(live, '/v1/fabric', { label: 'Live' });
+      const staged = (await post(live, '/v1/backup/restore/stage', snapshot)).body;
+      expect((await post(live, '/v1/backup/restore/commit', { stageId: staged.stageId })).status).toBe(200);
+      await until(() => !existsSync(join(dir, 'restore-rollback')));
+      const [quarantine] = quarantinesIn(dir);
+      expect(existsSync(join(dir, quarantine, 'matter', 'controller'))).toBe(true);
+      expect((await post(live, '/v1/backup/restore/finalize', { stageId: staged.stageId })).status).toBe(404);
+      expect((await post(live, '/v1/backup/restore/rollback', { stageId: staged.stageId })).status).toBe(404);
+      expect((await get(live, '/v1/fabric')).body.fabricId).toBe(snapshot.header.fabricId);
+    });
+
+    it('removes an expired stage from disk without waiting for its next use', async () => {
+      const donor = await start(newDir());
+      await post(donor, '/v1/fabric', { label: 'Donor' });
+      const snapshot = await snapshotOf(donor);
+      await stop(donor);
+
+      const dir = newDir();
+      const target = await start(dir, {}, { stageTtlMs: 300 });
+      const staged = (await post(target, '/v1/backup/restore/stage', snapshot)).body;
+      expect(existsSync(join(dir, 'restore-staging'))).toBe(true);
+      await until(() => !existsSync(join(dir, 'restore-staging')));
+      expect((await post(target, '/v1/backup/restore/commit', { stageId: staged.stageId })).status).toBe(404);
     });
 
     it('rejects a corrupt, incomplete or incompatible snapshot before touching live storage', async () => {
@@ -237,14 +602,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
       const dir = newDir();
       const live = await start(dir);
       await post(live, '/v1/fabric', { label: 'Live' });
-      // matter.js keeps writing counters while it runs, so the identity files are compared, not the whole tree.
-      const identity = () =>
-        [
-          'sidecar-metadata.json',
-          'matter/controller/certificates.rootKeyPair',
-          'matter/controller/fabrics.fabrics',
-        ].map((file) => readFileSync(join(dir, file), 'utf8'));
-      const before = identity();
+      const before = identityOf(dir);
       const flipped = Buffer.from(snapshot.payload, 'base64');
       flipped[flipped.length - 20] ^= 0xff;
       const attempts: [string, JsonBody][] = [
@@ -262,7 +620,7 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
         expect(result.status).toBe(422);
         expect(result.body.error).toMatchObject({ code: 'invalid_backup', details: { code } });
       }
-      expect(identity()).toEqual(before);
+      expect(identityOf(dir)).toEqual(before);
       expect(existsSync(join(dir, 'restore-staging'))).toBe(false);
       expect((await post(live, '/v1/backup/restore/commit', { stageId: crypto.randomUUID() })).status).toBe(404);
     });
@@ -294,17 +652,52 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
     });
 
     it('rejects fabric-mutating operations while a snapshot is being taken', async () => {
-      const sidecar = await start(newDir());
+      const { hooks, createController } = controllerHooks();
+      const sidecar = await start(newDir(), {}, { createController });
       await post(sidecar, '/v1/fabric', { label: 'Attraccess' });
       const spare = await snapshotOf(sidecar);
-      const [first, second] = await Promise.all([
-        post(sidecar, '/v1/backup/snapshot', {}),
-        post(sidecar, '/v1/backup/restore/stage', spare),
-      ]);
-      const statuses = [first.status, second.status];
-      expect(statuses).toContain(200);
-      const refused = [first, second].find((result) => result.status === 409);
-      expect(refused?.body.error.code).toBe('busy');
+      // The snapshot is held open while it stops the controller, so every other operation meets it in progress.
+      let release = () => undefined as void;
+      hooks.hold = new Promise<void>((resolve) => (release = resolve));
+      const stopping = new Promise<void>((resolve) => (hooks.onStop = resolve));
+      const snapshot = post(sidecar, '/v1/backup/snapshot', {});
+      await stopping;
+      for (const [path, body] of [
+        ['/v1/fabric', { label: 'Attraccess' }],
+        ['/v1/backup/restore/stage', spare],
+        ['/v1/backup/snapshot', {}],
+      ] as const) {
+        const refused = await post(sidecar, path, body);
+        expect(refused.status).toBe(409);
+        expect(refused.body.error.code).toBe('busy');
+      }
+      hooks.onStop = undefined;
+      hooks.hold = undefined;
+      release();
+      expect((await snapshot).status).toBe(200);
+      expect((await post(sidecar, '/v1/backup/restore/stage', spare)).status).toBe(200);
+    });
+
+    it('lets close() wait for a snapshot in progress and leaves no controller running', async () => {
+      const { hooks, createController } = controllerHooks();
+      const sidecar = await start(newDir(), {}, { createController });
+      await post(sidecar, '/v1/fabric', { label: 'Attraccess' });
+      let release = () => undefined as void;
+      hooks.hold = new Promise<void>((resolve) => (release = resolve));
+      const stopping = new Promise<void>((resolve) => (hooks.onStop = resolve));
+      const snapshot = post(sidecar, '/v1/backup/snapshot', {});
+      await stopping;
+      const fabric = sidecar.platform()?.fabric;
+      const closing = fabric?.close();
+      hooks.onStop = undefined;
+      hooks.hold = undefined;
+      release();
+      await closing;
+      expect((await snapshot).status).toBe(200);
+      expect(fabric?.controller).toBeUndefined();
+      const refused = await post(sidecar, '/v1/backup/snapshot', {});
+      expect(refused.status).toBe(503);
+      expect(refused.body.error.code).toBe('sidecar_unavailable');
     });
   });
 
@@ -335,12 +728,18 @@ describe('sidecar fabric persistence (real matter.js controller)', () => {
       // Over the general limit but inside the backup limit: reaches validation instead of being cut off.
       const backup = await post(sidecar, '/v1/backup/restore/stage', { header: {}, payload: big });
       expect(backup.status).toBe(400);
-      const over = await http(sidecar.port, 'POST', '/v1/backup/restore/stage', {
-        headers: { ...validHeaders(), 'content-type': 'application/json' },
-        body: Buffer.alloc(64 * 1024 * 1024 + 1, 0x20),
-      });
+      const sized = (bytes: number) =>
+        http(sidecar.port, 'POST', '/v1/backup/restore/stage', {
+          headers: { ...validHeaders(), 'content-type': 'application/json' },
+          body: Buffer.alloc(bytes, 0x20),
+        });
+      // Exactly at the limit is read in full: it fails as JSON, not on its size.
+      const atLimit = await sized(MAX_BACKUP_BODY_BYTES);
+      expect(atLimit.status).toBe(400);
+      expect(atLimit.body.error.code).toBe('validation_failed');
+      const over = await sized(MAX_BACKUP_BODY_BYTES + 1);
       expect(over.status).toBe(413);
-      expect(over.body.error.details.limitBytes).toBe(64 * 1024 * 1024);
+      expect(over.body.error.details.limitBytes).toBe(MAX_BACKUP_BODY_BYTES);
     });
   });
 });

@@ -55,6 +55,10 @@ The fabric is in one of three states, shown in `/health/ready` and in the Matter
 | `initialized`       | A fabric exists and the storage is healthy.                                                                                                           |
 | `recovery_required` | The storage is present but unusable or inconsistent. The sidecar creates and changes nothing until an administrator restores, accepts or starts anew. |
 
+A restore that was interrupted, for example because the sidecar crashed or was stopped during it, leaves the fabric in `recovery_required` with the reason `restore_interrupted`. The previous storage is kept; restore a backup in Attraccess.
+
+The sidecar never deletes storage that may be the only copy of a fabric. Broken storage that a restore replaced and rollback copies that an interrupted or unfinished restore left behind are moved into `quarantine-<timestamp>-<id>` directories inside `MATTER_SIDECAR_STORAGE_DIR`, with mode `0700`, and the sidecar logs a warning naming each one. **They contain fabric keys**, so treat them like the storage itself: keep them only as long as you need them for analysis or as a last copy, then delete them manually. The sidecar never removes them.
+
 ### Generating a token
 
 ```bash

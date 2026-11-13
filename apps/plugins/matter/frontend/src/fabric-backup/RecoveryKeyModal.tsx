@@ -3,6 +3,7 @@ import { Checkbox, ModalBody, ModalFooter, ModalHeader, ModalHeading } from '@he
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 import { saveBlob, type RecoveryKeyReveal } from './api';
+import { useErrorText } from './errors';
 
 type Props = Readonly<{
   reveal: RecoveryKeyReveal;
@@ -18,6 +19,7 @@ type Props = Readonly<{
  */
 export function RecoveryKeyModal({ reveal, onAcknowledge, onDone }: Props) {
   const { t } = useMatterTranslations();
+  const errorText = useErrorText();
   const [confirmed, setConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -45,7 +47,7 @@ export function RecoveryKeyModal({ reveal, onAcknowledge, onDone }: Props) {
       await onAcknowledge(reveal.keyId);
       onDone();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      setError(errorText(caught));
     } finally {
       setBusy(false);
     }
@@ -79,6 +81,9 @@ export function RecoveryKeyModal({ reveal, onAcknowledge, onDone }: Props) {
           <Button variant="secondary" onPress={() => void copy()} data-cy="matter-key-copy">
             {copied ? t('fabric.key.copied') : t('fabric.key.copy')}
           </Button>
+          <span role="status" aria-live="polite" className="mt:sr-only">
+            {copied ? t('fabric.key.copied') : ''}
+          </span>
           <Button variant="secondary" onPress={download} data-cy="matter-key-download">
             {t('fabric.key.download')}
           </Button>

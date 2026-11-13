@@ -74,6 +74,47 @@
     "cancel": "Abbrechen",
     "close": "Schließen",
     "reason": "Grund",
+    "loading": "Fabric-Status wird geladen",
+    "error": {
+      "key_required": "Dieses Backup wurde mit einem anderen Wiederherstellungsschlüssel verschlüsselt. Gib diesen Schlüssel ein.",
+      "wrong_key": "Der Wiederherstellungsschlüssel ist falsch. Prüfe ihn und versuche es erneut.",
+      "corrupt": "Das Backup ist beschädigt oder wurde verändert und kann nicht verwendet werden.",
+      "truncated": "Das Backup ist unvollständig, vermutlich wurde die Datei abgeschnitten. Lade es erneut herunter.",
+      "incompatible_format": "Diese Datei ist kein Backup in einem unterstützten Format.",
+      "incompatible_schema": "Das Backup nutzt eine Speicherschema-Version, die diese Installation nicht wiederherstellen kann.",
+      "incompatible_migration": "Das Backup wurde mit einer anderen Plugin-Datenbankversion erstellt. Installiere die Plugin-Version, die es erstellt hat.",
+      "incompatible_version": "Die Plugin-Version muss mit der Version übereinstimmen, die das Backup erstellt hat. Installiere zuerst diese Version.",
+      "stage_failed": "Der Sidecar konnte das Backup nicht vorbereiten. Deine Installation blieb unverändert.",
+      "fabric_exists": "Der Sidecar hat bereits eine Fabric.",
+      "recovery_required": "Die Fabric muss zuerst wiederhergestellt werden. Stelle ein Backup wieder her, übernimm die Fabric des Sidecars oder starte eine neue Fabric.",
+      "recovery_not_required": "Die Fabric muss nicht mehr wiederhergestellt werden.",
+      "busy": "Der Matter-Sidecar ist mit einem anderen Backup oder einer Wiederherstellung beschäftigt. Versuche es gleich noch einmal.",
+      "sidecar_unavailable": "Der Sidecar ist nicht erreichbar. Versuche es erneut, sobald er verbunden ist.",
+      "sidecar_error": "Der Matter-Sidecar hat die Anfrage abgelehnt.",
+      "sidecar_not_empty": "Eine neue Fabric kann nur gestartet werden, solange der Sidecar keine Fabric hat.",
+      "sidecar_not_initialized": "Der Sidecar hat keine gesunde Fabric, die übernommen werden könnte.",
+      "insecure_transport": "Die Verbindung zum Sidecar ist unverschlüsseltes HTTP zu einem anderen Rechner. Backups und Wiederherstellungen enthalten Fabric-Geheimnisse und brauchen daher https oder einen Sidecar auf diesem Rechner.",
+      "recovery_key_exists": "Es gibt bereits einen Wiederherstellungsschlüssel.",
+      "recovery_key_mismatch": "Das ist nicht mehr der aktuelle Wiederherstellungsschlüssel. Lade die Seite neu.",
+      "no_recovery_key": "Es gibt noch keinen Wiederherstellungsschlüssel. Erzeuge zuerst einen.",
+      "not_found": "Dieses Backup existiert nicht mehr.",
+      "file_unreadable": "Die Datei konnte nicht gelesen werden. Wähle sie erneut aus.",
+      "validation_expired": "Diese Prüfung ist abgelaufen. Prüfe das Backup erneut.",
+      "preflight_changed": "Der Sidecar hat sich seit der Prüfung des Backups verändert. Prüfe das Backup erneut.",
+      "confirmation_required": "Gib zur Bestätigung die Fabric-ID ein.",
+      "pre_restore_backup_failed": "Das Backup der aktuellen Fabric ist fehlgeschlagen, daher wurde nichts wiederhergestellt. Deine Installation blieb unverändert.",
+      "restore_failed": "Der Matter-Sidecar konnte das Backup nicht anwenden oder prüfen. Deine Installation blieb unverändert.",
+      "rolled_back": "Die Wiederherstellung ist fehlgeschlagen und wurde zurückgerollt. Deine Installation blieb unverändert.",
+      "rollback_failed": "Die Wiederherstellung ist fehlgeschlagen und der Matter-Sidecar konnte nicht automatisch zurückgerollt werden, sein Zustand ist daher unbekannt. Prüfe den Sidecar und stelle das Backup dann erneut wieder her.",
+      "http": "Die Anfrage ist fehlgeschlagen (HTTP {{status}})."
+    },
+    "blocked": {
+      "unreachable": "Der Sidecar ist nicht erreichbar.",
+      "recovery": "Nicht verfügbar, solange die Fabric wiederhergestellt werden muss.",
+      "noFabric": "Es gibt noch keine Fabric, die gesichert werden könnte.",
+      "noKey": "Erzeuge zuerst einen Wiederherstellungsschlüssel.",
+      "insecure": "Braucht https oder einen Sidecar auf diesem Rechner: Die Verbindung ist unverschlüsseltes HTTP zu einem anderen Rechner."
+    },
     "state": {
       "initialized": "Initialisiert",
       "uninitialized": "Noch keine Fabric",
@@ -90,7 +131,8 @@
       "storage_incomplete": "Der Speicher des Sidecars ist unvollständig.",
       "schema_mismatch": "Der Speicher des Sidecars hat eine andere Schemaversion.",
       "metadata_missing": "Die Metadaten im Speicher des Sidecars fehlen.",
-      "metadata_orphaned": "Die Metadaten im Speicher des Sidecars haben keine Fabric-Daten."
+      "metadata_orphaned": "Die Metadaten im Speicher des Sidecars haben keine Fabric-Daten.",
+      "restore_interrupted": "Eine Wiederherstellung wurde unterbrochen. Der vorherige Speicher blieb erhalten; stelle ein Backup wieder her."
     },
     "mismatch": {
       "unknown": "Die Fabric des Sidecars weicht von der in Attraccess gespeicherten ab.",
@@ -110,6 +152,8 @@
     "generationLabel": "Fabric-Generation",
     "generation": "Generation {{generation}}",
     "fingerprint": "Fingerabdruck des Root-Zertifikats",
+    "fingerprintShowFull": "Ganzen Fingerabdruck zeigen",
+    "fingerprintShowShort": "Fingerabdruck kürzen",
     "storageInstance": "Speicher-Instanz",
     "trigger": {
       "manual": "Manuell",
@@ -175,7 +219,8 @@
       "stored": "Gespeicherte Backups",
       "download": "Herunterladen",
       "downloadError": "Das Backup konnte nicht heruntergeladen werden",
-      "retention": "Die letzten {{count}} Backups werden aufbewahrt. Backup-Dateien sind verschlüsselt und brauchen zur Wiederherstellung den Wiederherstellungsschlüssel."
+      "retention": "Die letzten {{count}} Backups werden aufbewahrt. Backup-Dateien sind verschlüsselt und brauchen zur Wiederherstellung den Wiederherstellungsschlüssel.",
+      "inconsistentMark": "während einer Wiederherstellung erstellt"
     },
     "restore": {
       "open": "Aus Backup wiederherstellen",
@@ -191,19 +236,7 @@
       "validationFailed": "Das Backup kann nicht wiederhergestellt werden",
       "error": {
         "empty": "Die Datei ist leer. Wähle die heruntergeladene Backup-Datei.",
-        "tooLarge": "Die Datei ist zu groß für den Upload (höchstens 7 MB). Stelle stattdessen aus einem gespeicherten Backup wieder her.",
-        "key_required": "Dieses Backup wurde mit einem anderen Wiederherstellungsschlüssel verschlüsselt. Gib diesen Schlüssel ein.",
-        "wrong_key": "Der Wiederherstellungsschlüssel ist falsch. Prüfe ihn und versuche es erneut.",
-        "corrupt": "Das Backup ist beschädigt oder wurde verändert und kann nicht verwendet werden.",
-        "truncated": "Das Backup ist unvollständig, vermutlich wurde die Datei abgeschnitten. Lade es erneut herunter.",
-        "incompatible_format": "Diese Datei ist kein Backup in einem unterstützten Format.",
-        "incompatible_schema": "Das Backup nutzt eine Speicherschema-Version, die diese Installation nicht wiederherstellen kann.",
-        "incompatible_migration": "Das Backup wurde mit einer anderen Plugin-Datenbankversion erstellt. Installiere die Plugin-Version, die es erstellt hat.",
-        "incompatible_version": "Die Plugin-Version muss mit der Version übereinstimmen, die das Backup erstellt hat. Installiere zuerst diese Version.",
-        "stage_failed": "Der Sidecar konnte das Backup nicht vorbereiten. Deine Installation blieb unverändert.",
-        "insecure_transport": "Für die Wiederherstellung ist eine sichere Verbindung zum Sidecar nötig. Verwende https oder einen lokalen Sidecar.",
-        "sidecar_unavailable": "Der Sidecar ist nicht erreichbar. Versuche es erneut, sobald er verbunden ist.",
-        "confirmation_required": "Gib zur Bestätigung die Fabric-ID ein."
+        "tooLarge": "Die Datei ist zu groß für den Upload (höchstens 7 MB). Stelle stattdessen aus einem gespeicherten Backup wieder her."
       },
       "kind": {
         "plain": "Wiederherstellung",
@@ -225,7 +258,12 @@
       "successTitle": "Wiederherstellung abgeschlossen",
       "successText": "Die Fabric und die Plugin-Daten wurden wiederhergestellt und geprüft.",
       "failedTitle": "Die Wiederherstellung ist fehlgeschlagen",
-      "unchanged": "Deine Installation blieb unverändert."
+      "fromStoredHint": "Eines der Backups, die diese Installation aufbewahrt.",
+      "fromUploadHint": "Eine heruntergeladene Backup-Datei, zum Beispiel nach einer Neuinstallation.",
+      "retryTitle": "Prüfe das Backup erneut",
+      "rollbackFailedTitle": "Die Wiederherstellung ist fehlgeschlagen und konnte nicht zurückgerollt werden",
+      "inconsistentTitle": "Dieses Backup wurde während einer Wiederherstellung erstellt",
+      "inconsistentText": "Als es erstellt wurde, passten die Daten des Plugins und die Fabric des Sidecars nicht zusammen. Stellst du es wieder her, kehrt diese Abweichung zurück, und du musst die Wiederherstellung danach erneut abschließen."
     },
     "recovery": {
       "title": "Wiederherstellung",

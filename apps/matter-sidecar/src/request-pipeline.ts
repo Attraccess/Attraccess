@@ -55,9 +55,6 @@ class DeadlineError extends Error {}
 
 const invalidResponse: ErrorReply = { code: 'internal_error', message: 'The sidecar produced an invalid response.' };
 
-/** Backup operations stop and restart the controller, which takes longer than a plain request. */
-const BACKUP_MIN_DEADLINE_MS = 30_000;
-
 function parseDeadline(req: IncomingMessage, body: unknown, fallback: number): number {
   const header = req.headers[HEADER_REQUEST_DEADLINE];
   const fromBody = (body as { deadlineMs?: unknown } | null)?.deadlineMs;
@@ -125,10 +122,9 @@ async function runFeature(
   deps: PipelineDeps,
 ): Promise<{ status: number; body: unknown } | { error: ErrorReply }> {
   const controller = new AbortController();
-  const base =
-    operation.family === 'backup'
-      ? Math.max(deps.config.requestDeadlineMs, BACKUP_MIN_DEADLINE_MS)
-      : deps.config.requestDeadlineMs;
+  // Backup operations stop and restart the controller, and a commit cannot be cancelled halfway: the caller's deadline
+  // header governs them, up to the contract maximum, instead of the shorter default.
+  const base = operation.family === 'backup' ? MAX_REQUEST_DEADLINE_MS : deps.config.requestDeadlineMs;
   const deadlineMs = parseDeadline(req, input.body, base);
   try {
     const value = await withDeadline(

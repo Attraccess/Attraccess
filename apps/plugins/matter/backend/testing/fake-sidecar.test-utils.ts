@@ -15,7 +15,7 @@ import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { TestCertificate } from './certs';
-import { FakeFabricBackend, FakeSidecarError } from './fake-fabric';
+import { FakeFabricBackend, FakeSidecarError } from './fake-fabric.test-utils';
 
 export const TOKEN = 'plugin-test-token-0123456789abcdef0123456789';
 export const entry = COMPATIBILITY_TABLE[0];
@@ -273,7 +273,8 @@ export class FakeSidecar {
       const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : undefined;
       json(backend.handle(operation as never, body));
     } catch (failure) {
-      if (failure instanceof FakeSidecarError) return error(res, failure.status, failure.code, failure.message);
+      if (failure instanceof FakeSidecarError)
+        return error(res, failure.status, failure.code, failure.message, failure.details);
       error(res, 500, 'internal_error', 'The fake failed.');
     }
   }

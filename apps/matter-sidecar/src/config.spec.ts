@@ -1,3 +1,4 @@
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { ConfigError, isLoopbackHost, loadConfig, normaliseAllowedHost } from './config';
 import { TEST_TOKEN, configWith } from './testing/config';
@@ -79,6 +80,13 @@ describe('loadConfig', () => {
 
   it('configWith binds an ephemeral port and carries the test token', () => {
     expect(configWith({ replayMaxEvents: 3 })).toMatchObject({ port: 0, replayMaxEvents: 3, authTokens: [TOKEN] });
+  });
+
+  it('configWith gives every test sidecar its own storage directory', () => {
+    const [first, second] = [configWith().storageDir, configWith().storageDir];
+    expect(first).not.toBe(second);
+    expect(first.startsWith(tmpdir())).toBe(true);
+    expect(configWith({ storageDir: '/data' }).storageDir).toBe('/data');
   });
 });
 

@@ -69,6 +69,11 @@ export const fileHeaderSchema = z.strictObject({
     sidecarSnapshot: z.string().regex(/^[0-9a-f]{64}$/),
     pluginTables: z.string().regex(/^[0-9a-f]{64}$/),
   }),
+  /**
+   * `false`: the plugin tables did not agree with the sidecar snapshot when the backup was taken (a pre-restore backup
+   * in recovery). Absent in a consistent backup, so files without it stay readable.
+   */
+  consistent: z.literal(false).optional(),
 });
 export type FileHeader = z.infer<typeof fileHeaderSchema>;
 
@@ -81,6 +86,8 @@ export type BackupMetadata = {
   createdAt?: string;
   pluginVersion: string;
   pluginMigration: string;
+  /** `false` for a backup whose tables do not belong to the sidecar snapshot; recorded in the authenticated header. */
+  consistent?: boolean;
 };
 
 /** JSON with sorted keys at every level: the same value always digests to the same hash. */
@@ -129,6 +136,7 @@ export function encryptBackup(body: BackupBody, metadata: BackupMetadata, recove
       sidecarSnapshot: sha256(canonicalJson(body.sidecar)),
       pluginTables: sha256(canonicalJson(body.tables)),
     },
+    ...(metadata.consistent === false ? { consistent: false as const } : {}),
   };
   const headerBytes = Buffer.from(JSON.stringify(header), 'utf8');
   const prefix = Buffer.concat([MAGIC, uint32(headerBytes.length), headerBytes]);

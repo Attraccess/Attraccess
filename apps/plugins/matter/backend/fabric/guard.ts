@@ -11,6 +11,12 @@ export class MatterFabricGuard {
   private current: MismatchKind | null = null;
   /** True while the plugin itself changes the fabric (create, restore): backups wait and events are not judged. */
   busy = false;
+  /**
+   * True after a restore whose outcome on the sidecar stayed unknown (its rollback failed): the sidecar may still apply
+   * it. Until the plugin records a fabric itself again, a `fabric.changed` that moves the generation on is judged like
+   * a reconnect instead of being recorded as the plugin's own change.
+   */
+  outcomeUnknown = false;
   private restoringNow = false;
   private restoreEpoch = 0;
 

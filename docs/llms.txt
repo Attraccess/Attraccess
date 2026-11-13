@@ -214,7 +214,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Matter: Architektur](https://docs.attraccess.org/de/devices/matter/architecture.md): Architektur der Matter-Integration: Plugin plus Sidecar, versionierter REST- und WebSocket-Vertrag, Fehler und Events.
 - [Matter: Betriebsanleitung](https://docs.attraccess.org/de/devices/matter/operator.md): Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation.
 - [Matter: Datenmodell und Lebenszyklus](https://docs.attraccess.org/de/devices/matter/data-model.md): Matter-Gerätedatenmodell: Begriffe, Nodes, Endpoints, Lebenszyklus, Zustandssemantik, Abgleich, Admin-Aktionen und Datenaufbewahrung.
-- [Matter: Backup und Wiederherstellung](https://docs.attraccess.org/de/devices/matter/backup-restore.md): Backup und Wiederherstellung der Matter-Fabric: Inhalt, automatische und manuelle Backups, Recovery-Schlüssel, Restore, Disaster Recovery, degradierte Zustände und Garantien.
+- [Matter: Backup und Wiederherstellung](https://docs.attraccess.org/de/devices/matter/backup-restore.md): Backup und Wiederherstellung der Matter-Fabric: Inhalt, automatische und manuelle Backups, Wiederherstellungsschlüssel, Restore, Disaster Recovery, degradierte Zustände und Garantien.
 
 ## Deutsch: Abrechnung
 - [Überblick](https://docs.attraccess.org/de/billing/overview.md): Stellt die Abrechnung vor: Credits werden bei Ressourcennutzung abgezogen; Credit-System, Zahlungsintegration und nötige Berechtigung.

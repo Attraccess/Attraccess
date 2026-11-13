@@ -15,7 +15,7 @@ export function fabricHandlers(manager: FabricManager): FeatureHandlers {
       const { header, payload } = body as StageBody;
       return manager.stage(header, payload);
     },
-    'backup.restore.commit': ({ body }) => manager.commit((body as StageIdBody).stageId),
+    'backup.restore.commit': ({ body, signal }) => manager.commit((body as StageIdBody).stageId, signal),
     'backup.restore.rollback': ({ body }) => manager.rollback((body as StageIdBody).stageId),
     'backup.restore.finalize': ({ body }) => manager.finalize((body as StageIdBody).stageId),
     'backup.restore.abort': ({ body }) => manager.abort((body as StageIdBody).stageId),

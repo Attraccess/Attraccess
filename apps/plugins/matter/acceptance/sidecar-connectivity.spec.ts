@@ -1,6 +1,7 @@
 // The Matter plugin against the real Matter sidecar (in process, with the Matter platform simulated, and as the built
 // process for the kill tests). Acceptance composes plugin and sidecar; shipped code never imports across them.
 import { spawn, type ChildProcess } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { createServer, connect, type Server, type Socket } from 'node:net';
 import { join, resolve } from 'node:path';
 import { runInThisContext } from 'node:vm';
@@ -279,12 +280,24 @@ describe('Matter plugin against the real sidecar', () => {
   });
 
   it('turns a stalled request into a typed timeout and never repeats a physical operation', async () => {
-    const calls: string[] = [];
+    const received: { id: string; correlationId: string }[] = [];
     // A handler that never answers; the sidecar gives up at the request deadline the plugin sent.
-    const stall = (id: string) => () => {
-      calls.push(id);
-      return new Promise<never>(() => undefined);
+    const stall =
+      (id: string) =>
+      ({ correlationId }: { correlationId: string }) => {
+        received.push({ id, correlationId });
+        return new Promise<never>(() => undefined);
+      };
+    // The plugin reads the fabric on its own too (on connect, and its backup schedule): those reads carry their own
+    // correlation IDs, so the requests this test sends are told apart by theirs, without switching anything off.
+    const ours = new Set<string>();
+    const tagged = () => {
+      const correlationId = randomUUID();
+      ours.add(correlationId);
+      return correlationId;
     };
+    const calls = () => received.filter((call) => ours.has(call.correlationId)).map((call) => call.id);
+    const others = () => received.filter((call) => !ours.has(call.correlationId)).map((call) => call.id);
     const port = await startSidecar(
       { authTokens: [NEW_TOKEN] },
       { features: { 'fabric.get': stall('fabric.get'), 'fabric.create': stall('fabric.create') } },
@@ -292,28 +305,29 @@ describe('Matter plugin against the real sidecar', () => {
     await put({ url: `http://127.0.0.1:${port}`, credential: NEW_TOKEN }).expect(200);
     await until(async () => (await status()).state === 'connected');
     const connection = host.service.connection;
-    // The plugin checks the fabric itself when it connects; that call is not part of what this test counts.
-    await until(() => calls.length >= 1);
-    calls.length = 0;
 
-    const read = await rejection(connection.request('fabric.get', { timeoutMs: 200 }));
+    const read = await rejection(connection.request('fabric.get', { timeoutMs: 200, correlationId: tagged() }));
     expect(read).toMatchObject({ kind: 'timeout', code: 'timeout' });
     expect(read.outcome).toBeUndefined();
 
     const physical = await rejection(
-      connection.request('fabric.create', { body: { label: 'Workshop' }, timeoutMs: 200 }),
+      connection.request('fabric.create', { body: { label: 'Workshop' }, timeoutMs: 200, correlationId: tagged() }),
     );
     expect(physical).toMatchObject({ kind: 'timeout', code: 'timeout', outcome: 'uncertain' });
 
     const controller = new AbortController();
-    const cancelled = rejection(connection.request('fabric.get', { signal: controller.signal, timeoutMs: 10_000 }));
-    await until(() => calls.length === 3);
+    const cancelled = rejection(
+      connection.request('fabric.get', { signal: controller.signal, timeoutMs: 10_000, correlationId: tagged() }),
+    );
+    await until(() => calls().length === 3);
     controller.abort();
     expect(await cancelled).toMatchObject({ kind: 'aborted' });
 
     // Give a retry every chance to happen: none does, and the failed requests do not degrade the connection.
     await new Promise((resolveWait) => setTimeout(resolveWait, 500));
-    expect(calls).toEqual(['fabric.get', 'fabric.create', 'fabric.get']);
+    expect(calls()).toEqual(['fabric.get', 'fabric.create', 'fabric.get']);
+    // A repeat under a new correlation ID would show up here: the plugin's own requests are fabric reads only.
+    expect(others().filter((id) => id !== 'fabric.get')).toEqual([]);
     expect((await status()).state).toBe('connected');
   }, 30_000);
 

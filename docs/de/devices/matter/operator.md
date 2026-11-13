@@ -55,6 +55,10 @@ Die Fabric befindet sich in einem von drei Zuständen, die `/health/ready` und d
 | `initialized`       | Eine Fabric existiert, der Speicher ist gesund.                                                                                                                           |
 | `recovery_required` | Der Speicher ist vorhanden, aber unbrauchbar oder inkonsistent. Der Sidecar erzeugt und ändert nichts, bis ein Administrator wiederherstellt, übernimmt oder neu beginnt. |
 
+Eine unterbrochene Wiederherstellung, etwa weil der Sidecar währenddessen abgestürzt ist oder angehalten wurde, hinterlässt die Fabric in `recovery_required` mit dem Grund `restore_interrupted`. Der vorherige Speicher bleibt erhalten; stellen Sie in Attraccess ein Backup wieder her.
+
+Der Sidecar löscht nie einen Speicher, der die einzige Kopie einer Fabric sein könnte. Beschädigter Speicher, den eine Wiederherstellung ersetzt hat, und Rollback-Kopien, die eine unterbrochene oder nicht abgeschlossene Wiederherstellung hinterlassen hat, landen in Verzeichnissen `quarantine-<Zeitstempel>-<ID>` in `MATTER_SIDECAR_STORAGE_DIR`, mit Modus `0700`; der Sidecar protokolliert für jedes eine Warnung mit dem Namen. **Sie enthalten Fabric-Schlüssel**, behandeln Sie sie also wie den Speicher selbst: Bewahren Sie sie nur so lange auf, wie Sie sie zur Analyse oder als letzte Kopie brauchen, und löschen Sie sie dann von Hand. Der Sidecar entfernt sie nie.
+
 ### Ein Token erzeugen
 
 ```bash

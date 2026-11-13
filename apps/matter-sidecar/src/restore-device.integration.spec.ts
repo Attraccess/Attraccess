@@ -52,7 +52,7 @@ describe('restoring a snapshot keeps a commissioned device controllable', () => 
     const created = (await post(first.sidecar, '/v1/fabric', { label: 'Attraccess' })).body;
     const controller = first.platform().fabric?.controller;
     if (!controller) throw new Error('the controller is not running');
-    const nodeId = await commissionVirtualDevice(controller);
+    const nodeId = await commissionVirtualDevice(controller, device);
     expect(device.fabricIds()).toContain(created.fabricId);
     expect(device.isOn()).toBe(false);
     await toggleDevice(controller, nodeId);

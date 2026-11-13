@@ -3,10 +3,12 @@ import { Card } from '@heroui/react';
 import { useState } from 'react';
 import { useMatterTranslations } from '../i18n';
 import type { FabricBackupStatus } from './api';
+import { restoreBlocker } from './blockers';
 
 type Props = Readonly<{
   status: FabricBackupStatus;
-  busy: boolean;
+  /** The action that is running (its button spins), or null. */
+  pending: string | null;
   onRestore: () => void;
   onAcceptSidecar: () => Promise<void>;
   onStartNew: () => Promise<void>;
@@ -18,11 +20,13 @@ type Confirm = 'accept' | 'start-new' | null;
  * Recovery options for a plugin in `recovery_required`. Each option is admin-confirmed; none runs automatically.
  * An option the current sidecar state does not allow stays visible but disabled, with the reason.
  */
-export function RecoveryPanel({ status, busy, onRestore, onAcceptSidecar, onStartNew }: Props) {
+export function RecoveryPanel({ status, pending, onRestore, onAcceptSidecar, onStartNew }: Props) {
   const { t } = useMatterTranslations();
   const [confirm, setConfirm] = useState<Confirm>(null);
   const canAccept = status.actions.canAcceptSidecar && status.sidecar.state === 'initialized';
   const canStartNew = status.actions.canStartNew && status.sidecar.state === 'uninitialized';
+  const restoreBlocked = restoreBlocker(status);
+  const busy = pending !== null;
 
   const run = async (action: () => Promise<void>) => {
     try {
@@ -43,13 +47,9 @@ export function RecoveryPanel({ status, busy, onRestore, onAcceptSidecar, onStar
         </StatusAlert>
         <Option
           title={t('fabric.recovery.restoreTitle')}
-          text={t('fabric.recovery.restoreText')}
+          text={restoreBlocked ? t(`fabric.blocked.${restoreBlocked}`) : t('fabric.recovery.restoreText')}
           action={
-            <Button
-              isDisabled={busy || !status.actions.canRestore}
-              onPress={onRestore}
-              data-cy="matter-recovery-restore"
-            >
+            <Button isDisabled={busy || restoreBlocked !== null} onPress={onRestore} data-cy="matter-recovery-restore">
               {t('fabric.recovery.restoreAction')}
             </Button>
           }
@@ -91,7 +91,7 @@ export function RecoveryPanel({ status, busy, onRestore, onAcceptSidecar, onStar
         onClose={() => setConfirm(null)}
         action={{
           label: t('fabric.recovery.acceptConfirm'),
-          isPending: busy,
+          isPending: pending === 'accept',
           onPress: () => run(onAcceptSidecar),
           'data-cy': 'matter-recovery-accept-confirm',
         }}
@@ -106,7 +106,7 @@ export function RecoveryPanel({ status, busy, onRestore, onAcceptSidecar, onStar
         onClose={() => setConfirm(null)}
         action={{
           label: t('fabric.recovery.newConfirm'),
-          isPending: busy,
+          isPending: pending === 'startNew',
           onPress: () => run(onStartNew),
           'data-cy': 'matter-recovery-new-confirm',
         }}
