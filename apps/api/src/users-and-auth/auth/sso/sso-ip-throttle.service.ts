@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 
 import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
 
-import { BruteForceProtectionService, RateLimitScope } from '../../rate-limiting/brute-force.service';
+import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
+import type { RateLimitScope } from '../../rate-limiting/brute-force-policy';
 
 /** The per-IP throttle in front of SSO account linking and provisioning, audited when it refuses a request. */
 @Injectable()

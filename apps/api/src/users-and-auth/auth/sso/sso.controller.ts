@@ -82,7 +82,7 @@ import { SsoLoginService } from './sso-login.service';
 
 import { SsoIpThrottleService } from './sso-ip-throttle.service';
 
-import { RateLimitScope } from '../../rate-limiting/brute-force.service';
+import type { RateLimitScope } from '../../rate-limiting/brute-force-policy';
 
 import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.guard';
 
