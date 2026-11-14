@@ -121,6 +121,9 @@ describe('meter notices', () => {
     render(<MeterSetupNotice resourceId={7} />);
     expect(screen.getByText('Heartbeats: ' + en.setup.problems['shared-needs-collect'])).toBeInTheDocument();
     expect(screen.queryByText(/Per session/)).not.toBeInTheDocument();
+    // Sessions can still start, so the notice must not claim that none can.
+    expect(screen.getByText(en.setup.sharingTitle)).toBeInTheDocument();
+    expect(screen.queryByText(en.setup.title)).not.toBeInTheDocument();
   });
 
   it('stays silent for a complete meter or when energy billing is off', () => {

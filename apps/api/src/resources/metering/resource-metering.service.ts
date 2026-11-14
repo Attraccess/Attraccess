@@ -571,6 +571,7 @@ export class ResourceMeteringService implements OnModuleInit {
             compromisedReason: 'The meter was re-initialized by a takeover that did not complete',
           },
         );
+      if (error instanceof BadRequestException && this.reason(error).startsWith('METER_SHARING_UNSUPPORTED: ')) throw error;
       throw new BadRequestException(`METER_INITIALIZATION_FAILED: ${this.reason(error)}`);
     }
   }

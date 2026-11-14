@@ -385,11 +385,17 @@ describe('Metering on a shared machine', () => {
       expect((await scope.metering.getStatus(1)).meters[0].problems).not.toContain('shared-needs-collect');
     });
 
+    it('does not flag a tracking-only meter', async () => {
+      await setUpIncrementOnly(0);
+
+      expect((await scope.metering.getStatus(1)).meters[0].problems).not.toContain('shared-needs-collect');
+    });
+
     it('refuses a billed start that would overlap another session', async () => {
       await setUpIncrementOnly(30);
       await start(0);
 
-      await expect(start(1)).rejects.toThrow('METER_SHARING_UNSUPPORTED');
+      await expect(start(1)).rejects.toThrow(/^METER_SHARING_UNSUPPORTED: /);
     });
 
     it('tracks only, without a meter session, at a rate of 0', async () => {

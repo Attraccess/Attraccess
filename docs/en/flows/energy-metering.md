@@ -87,7 +87,7 @@ A person's charge for a meter or for running time is the sum of their whole-cred
 
 #### Meters that cannot be split
 
-Increment-only meters (only a **Report meter** node in increment mode, without start and collection branches) and meters without a collection branch cannot be read on demand, so they cannot be split in **Shared and split** mode. On a machine whose limit of parallel sessions is above 1, the meter status shows a configuration problem for such a meter.
+Increment-only meters (only a **Report meter** node in increment mode, without start and collection branches) and meters without a collection branch cannot be read on demand, so they cannot be split in **Shared and split** mode. On a machine whose limit of parallel sessions is above 1, the meter status shows a configuration problem for such a meter as long as its rate is above 0.
 
 - With a rate above 0, a start that would overlap another running session is refused with the error `METER_SHARING_UNSUPPORTED`.
 - With a rate of 0 (tracking only), the meter is skipped for that session.

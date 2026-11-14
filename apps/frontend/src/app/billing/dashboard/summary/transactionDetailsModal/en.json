@@ -52,7 +52,7 @@
       "shared": "Shared",
       "shareLine": "{{share}} — your share of {{total}}",
       "breakdown": "Show breakdown",
-      "segment": "{{people}} people: total {{total}} ({{totalCredits}}), your share {{share}} ({{shareCredits}})"
+      "segment": "People: {{people}} · total {{total}} ({{totalCredits}}), your share {{share}} ({{shareCredits}})"
     }
   },
   "actions": {

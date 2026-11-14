@@ -52,7 +52,7 @@
       "shared": "Geteilt",
       "shareLine": "{{share}} — dein Anteil an {{total}}",
       "breakdown": "Aufschlüsselung anzeigen",
-      "segment": "{{people}} Personen: gesamt {{total}} ({{totalCredits}}), dein Anteil {{share}} ({{shareCredits}})"
+      "segment": "Personen: {{people}} · gesamt {{total}} ({{totalCredits}}), dein Anteil {{share}} ({{shareCredits}})"
     }
   },
   "actions": {

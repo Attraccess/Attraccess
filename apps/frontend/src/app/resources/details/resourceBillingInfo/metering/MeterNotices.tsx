@@ -37,12 +37,14 @@ export function MeterSetupNotice({ resourceId }: { resourceId: number }) {
         (meter.allocation === 'shared' && meter.problems.includes('shared-needs-collect')),
     ) ?? [];
   if (!hasPermission('billing.manage') || !incomplete.length) return null;
+  // Sessions can still start when the only problem is a meter that cannot be split between them.
+  const sharingOnly = incomplete.every((meter) => problemsOf(meter).every((problem) => problem === 'shared-needs-collect'));
 
   return (
     <Alert status="warning" data-cy="meter-setup-notice">
       <AlertContent>
-        <AlertTitle>{t('setup.title')}</AlertTitle>
-        <AlertDescription>{t('setup.description')}</AlertDescription>
+        <AlertTitle>{t(sharingOnly ? 'setup.sharingTitle' : 'setup.title')}</AlertTitle>
+        <AlertDescription>{t(sharingOnly ? 'setup.sharingDescription' : 'setup.description')}</AlertDescription>
         <ul className="list-disc pl-4 text-sm">
           {incomplete.flatMap((meter) =>
             problemsOf(meter).map((problem) => (

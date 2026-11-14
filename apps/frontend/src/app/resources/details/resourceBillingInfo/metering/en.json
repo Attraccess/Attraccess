@@ -22,6 +22,8 @@
   "setup": {
     "title": "Meter not set up",
     "description": "Meter billing is enabled, but no session can start until this resource's flow defines its meter.",
+    "sharingTitle": "Meter cannot be shared",
+    "sharingDescription": "Sessions can start, but this meter cannot be split between sessions running at the same time.",
     "problems": {
       "start-trigger-missing": "Add a \"Metering start\" trigger.",
       "ready-unreachable": "Connect \"Metering start\" to a \"Metering ready\" node.",

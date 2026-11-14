@@ -87,7 +87,7 @@ Die Gebühr einer Person für einen Zähler oder die Laufzeit ist die Summe ihre
 
 #### Nicht teilbare Zähler
 
-Zähler, die nur Zuwächse melden (nur ein Knoten **Zähler melden** im Modus increment, ohne Start- und Abfragezweige), und Zähler ohne Abfragezweig lassen sich nicht bei Bedarf lesen und daher im Modus **Geteilt und aufgeteilt** nicht aufteilen. Bei einer Maschine mit einem Limit paralleler Sitzungen über 1 zeigt der Zählerstatus für einen solchen Zähler ein Konfigurationsproblem.
+Zähler, die nur Zuwächse melden (nur ein Knoten **Zähler melden** im Modus increment, ohne Start- und Abfragezweige), und Zähler ohne Abfragezweig lassen sich nicht bei Bedarf lesen und daher im Modus **Geteilt und aufgeteilt** nicht aufteilen. Bei einer Maschine mit einem Limit paralleler Sitzungen über 1 zeigt der Zählerstatus für einen solchen Zähler ein Konfigurationsproblem, solange sein Preis über 0 liegt.
 
 - Bei einem Preis über 0 wird ein Start, der sich mit einer anderen laufenden Sitzung überschneiden würde, mit dem Fehler `METER_SHARING_UNSUPPORTED` abgelehnt.
 - Bei einem Preis von 0 (nur Erfassung) wird der Zähler für diese Sitzung übersprungen.

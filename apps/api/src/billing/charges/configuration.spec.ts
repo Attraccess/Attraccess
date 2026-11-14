@@ -209,6 +209,37 @@ describe('BillingService', () => {
       );
     });
 
+    it('shows no share of running time when the shared session had none', async () => {
+      jest
+        .spyOn(sharedScope.service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 99, creditsPerUsage: 0 } as ResourceBillingConfiguration);
+      const manager = {
+        findOneBy: jest.fn().mockResolvedValue(null),
+        findOne: jest.fn().mockResolvedValue(null),
+        save: jest.fn(async (_entity: unknown, data: Record<string, unknown>) =>
+          'amount' in data ? { id: 1008, ...data } : data,
+        ),
+      } as unknown as never;
+
+      const transaction = await sharedScope.service.chargeForResourceUsage(usage, manager, {
+        shared: true,
+        shareMs: 0,
+        credits: 0,
+        shareCredits: 0,
+        segments: [],
+      } as never);
+
+      expect(transaction).toEqual(expect.objectContaining({ amount: -(5 + 20) }));
+      const saved = (manager as { save: jest.Mock }).save;
+      expect(saved).toHaveBeenCalledWith(BillingTransactionItem, {
+        billingTransactionId: 1008,
+        name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+        durationMs: 0,
+        unitPrice: 6,
+        quantity: 0,
+      });
+    });
+
     it('bills a session that did not share exactly as before even when a share is passed', async () => {
       jest
         .spyOn(sharedScope.service, 'getResourceBillingConfiguration')

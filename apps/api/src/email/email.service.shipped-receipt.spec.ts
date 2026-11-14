@@ -255,8 +255,8 @@ describe('EmailService shipped usage receipt', () => {
           'Shared',
           '0.8 — your share of 2.4',
           '90 s — your share of 240 s',
-          '2 people, total 1.2 (0.18 credits), your share 0.6 (0.09 credits)',
-          '4 people, total 120 s (0.06 credits), your share 30 s (0.03 credits)',
+          'People: 2, total 1.2 (0.18 credits), your share 0.6 (0.09 credits)',
+          'People: 4, total 120 s (0.06 credits), your share 30 s (0.03 credits)',
         ],
       },
       {
@@ -265,8 +265,8 @@ describe('EmailService shipped usage receipt', () => {
           'Geteilt',
           '0.8 — dein Anteil an 2.4',
           '90 s — dein Anteil an 240 s',
-          '2 Personen, gesamt 1.2 (0.18 Credits), dein Anteil 0.6 (0.09 Credits)',
-          '4 Personen, gesamt 120 s (0.06 Credits), dein Anteil 30 s (0.03 Credits)',
+          'Personen: 2, gesamt 1.2 (0.18 Credits), dein Anteil 0.6 (0.09 Credits)',
+          'Personen: 4, gesamt 120 s (0.06 Credits), dein Anteil 30 s (0.03 Credits)',
         ],
       },
     ] as const)('renders the shared breakdown in $locale', async ({ locale, texts }) => {

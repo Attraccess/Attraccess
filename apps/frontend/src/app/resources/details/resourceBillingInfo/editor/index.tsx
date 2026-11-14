@@ -421,12 +421,12 @@ export function ResourceBillingInfoEditor(props: Props) {
                     </Label>
                     <Description>{t(`inputs.meterAllocation.description.${allocation}`)}</Description>
                     {Object.values(ResourceMeterAllocation).map((option) => (
-                      <Radio key={option} value={option}>
-                        <Radio.Control>
-                          <Radio.Indicator />
-                        </Radio.Control>
+                      <Radio key={option} value={option} data-cy={`meter-allocation-${meter.id}-${option}`}>
                         <Radio.Content>
-                          <Label>{t(`inputs.meterAllocation.options.${option}`)}</Label>
+                          <Radio.Control>
+                            <Radio.Indicator />
+                          </Radio.Control>
+                          {t(`inputs.meterAllocation.options.${option}`)}
                         </Radio.Content>
                       </Radio>
                     ))}

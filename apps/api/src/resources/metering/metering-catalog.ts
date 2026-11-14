@@ -206,8 +206,12 @@ export class MeteringCatalog {
     const sharedMachine = (await getMeteringSessionLimit(this.sessions.manager, resourceId)) > 1;
     const definitions = meters.map((meter) => {
       const definition = meterDefinitionFromFlow(meter.id, flow);
-      // Splitting a shared meter needs a reading at every start and stop.
-      const unreadable = sharedMachine && meter.allocation === 'shared' && (definition.incrementOnly || !definition.hasCollection);
+      // Splitting a shared meter needs a reading at every start and stop. A rate of 0 only tracks, so nothing is split.
+      const unreadable =
+        sharedMachine &&
+        meter.allocation === 'shared' &&
+        meter.creditsPerUnit > 0 &&
+        (definition.incrementOnly || !definition.hasCollection);
       return {
         meterId: meter.id,
         name: meter.name,

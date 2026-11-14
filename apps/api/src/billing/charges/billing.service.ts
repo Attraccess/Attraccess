@@ -278,14 +278,27 @@ export class BillingService {
       });
 
       if (operatingDurationRate > 0 && sharedOperating) {
-        await manager.save(BillingTransactionItem, {
-          billingTransactionId: transaction.id,
-          name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
-          durationMs: sharedOperating.shareMs,
-          unitPrice: sharedOperating.credits,
-          quantity: 1,
-          allocation: { kind: 'operating-time', segments: operatingBreakdown(sharedOperating) },
-        });
+        const breakdown = operatingBreakdown(sharedOperating);
+        await manager.save(
+          BillingTransactionItem,
+          breakdown.length
+            ? {
+                billingTransactionId: transaction.id,
+                name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+                durationMs: sharedOperating.shareMs,
+                unitPrice: sharedOperating.credits,
+                quantity: 1,
+                allocation: { kind: 'operating-time' as const, segments: breakdown },
+              }
+            : // Without any running time there is nothing to show a share of; it reads like a solo session with none.
+              {
+                billingTransactionId: transaction.id,
+                name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+                durationMs: 0,
+                unitPrice: operatingDurationRate,
+                quantity: 0,
+              },
+        );
       } else if (operatingDurationRate > 0) {
         await manager.save(BillingTransactionItem, {
           billingTransactionId: transaction.id,
