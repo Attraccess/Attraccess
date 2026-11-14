@@ -78,18 +78,18 @@ You can keep editing after loading a template without saving. The download alway
 
 ### Resource hours summary
 
-One row per resource: every resource with at least one usage session or one recorded operating interval that overlaps the selected range. Use it to compare **person hours** with **machine hours** (see [Machine hours and person hours](resources/usage-tracking.md#machine-hours-and-person-hours)).
+One row per resource: every resource with at least one usage session or one recorded operating interval that overlaps the selected range, including resources deleted since. Use it to compare **person hours** with **machine hours** (see [Machine hours and person hours](resources/usage-tracking.md#machine-hours-and-person-hours)).
 
-| Field                             | Description                                                                                                                                               |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Resource ID / Resource Name       | The resource                                                                                                                                              |
-| Sessions                          | Number of usage sessions that overlap the range                                                                                                           |
-| Person Hours                      | The durations of all sessions added up. Sessions that run at the same time count each                                                                     |
-| Machine Hours with a Session      | Time in which at least one session was running. Overlapping sessions count once                                                                           |
-| Machine Running Time (Hours)      | Time the machine was recorded as running, with or without a session. Empty if the resource has no operating data                                          |
-| Running Outside a Session (Hours) | Part of the running time without any session (not selected by default). Empty if the resource has no operating data                                       |
-| Operating Data Status             | _Provisional_ if the values can still change (the range ends in the future, or a session or interval is still open), _Unavailable_ without operating data |
-| **Resource metadata: \<key\>**    | One field for every metadata key found on the resources in the loaded rows                                                                                |
+| Field                             | Description                                                                                                                                                                                  |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Resource ID / Resource Name       | The resource                                                                                                                                                                                 |
+| Sessions                          | Number of usage sessions that overlap the range                                                                                                                                              |
+| Person Hours                      | The durations of all sessions added up. Sessions that run at the same time count each                                                                                                        |
+| Machine Hours with a Session      | Time in which at least one session was running. Overlapping sessions count once                                                                                                              |
+| Machine Running Time (Hours)      | Time the machine was recorded as running, with or without a session. Empty if the resource has no operating data                                                                             |
+| Running Outside a Session (Hours) | Part of the running time without any session (not selected by default). Empty if the resource has no operating data                                                                          |
+| Operating Data Status             | _Provisional_ if the range has not ended yet, so the values can still change. _Unavailable_ without operating data. Both, separated by `;`, when both apply; empty when the values are final |
+| **Resource metadata: \<key\>**    | One field for every metadata key found on the resources in the loaded rows                                                                                                                   |
 
 The hours are decimal numbers formatted for your locale. The export is limited to `resources.reports.export`; without it the request is refused.
 

@@ -57,13 +57,13 @@ Jede Person beendet ihre eigene Sitzung. Ressourcenverwalter, Einweiser, Wartend
 
 ### Maschinenstunden und Personenstunden
 
-Berichte zeigen zwei Werte getrennt, damit Personen, die eine gemeinsam genutzte Maschine gleichzeitig nutzen, nicht als zusätzliche Maschinenzeit zählen:
+Berichte zeigen diese Werte getrennt, damit Personen, die eine gemeinsam genutzte Maschine gleichzeitig nutzen, nicht als zusätzliche Maschinenzeit zählen:
 
 - **Personenstunden**: die Dauer jeder Sitzung addiert. Nutzt A die Maschine von 10:00 bis 12:00 und B von 11:00 bis 13:00, sind das 4 Stunden.
 - **Maschinenstunden mit Sitzung**: die Zeit, in der mindestens eine Sitzung auf der Maschine lief. Überlappende Sitzungen zählen einmal, das Beispiel ergibt also 3 Stunden.
 - **Maschinenlaufzeit**: die Zeit, in der die Maschine als laufend aufgezeichnet wurde (siehe [Flows](flows/node-types.md)), sofern Betriebsdaten vorliegen. Sie enthält auch Zeiten ohne Sitzung.
 
-Bei einer Maschine mit **Maximale parallele Sitzungen** von 1 sind Personenstunden und Maschinenstunden mit Sitzung gleich.
+Bei einer Maschine mit **Maximale parallele Sitzungen** von 1 sind Personenstunden und Maschinenstunden mit Sitzung gleich. Die Projektstatistiken nennen die Maschinenstunden mit Sitzung kurz **Maschinenstunden**.
 
 Die Werte finden Sie in der Karte **Betriebsdauer** auf der [Detailseite](resources/resource-details.md) der Ressource, in den Statistiken eines [Projekts](projects/overview.md#nutzungsstatistiken) und im Export [Ressourcen-Stundenübersicht](resources/csv-export.md#ressourcen-stundenübersicht). Das ändert nur, was berichtet wird: Wie die Laufzeit einzelnen Sitzungen zugerechnet wird und die Abrechnung bleiben wie oben beschrieben.
 
