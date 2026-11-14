@@ -218,5 +218,21 @@
   "INVALID_LINK_TOKEN": {
     "title": "Link nicht mehr gültig",
     "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
+  },
+  "Email already exists": {
+    "title": "E-Mail-Adresse bereits vergeben",
+    "description": "Es existiert bereits ein Konto mit dieser E-Mail-Adresse. Verwende eine andere E-Mail-Adresse."
+  },
+  "Username already exists": {
+    "title": "Benutzername bereits vergeben",
+    "description": "Es existiert bereits ein Konto mit diesem Benutzernamen. Wähle einen anderen Benutzernamen."
+  },
+  "DUPLICATE_IN_DB": {
+    "title": "Nutzer existieren bereits",
+    "description": "Einige Zeilen verwenden eine E-Mail-Adresse oder einen Benutzernamen, der bereits zu einem Konto gehört. Siehe die Import-Fehler unten, korrigiere die Datei oder lade ein und überspringe dabei die fehlgeschlagenen Zeilen."
+  },
+  "NO_CANDIDATES_IN_CSV": {
+    "title": "Keine Nutzer zum Einladen",
+    "description": "Die CSV-Datei enthält keine gültigen Zeilen zum Einladen. Prüfe die Datei und die Spaltenzuordnung."
   }
 }

@@ -34,6 +34,15 @@ export type CsvRowError = {
   value?: string;
 };
 
+const CSV_ROW_ERROR_REASON_KEYS: Record<string, string> = {
+  DUPLICATE_IN_DB: 'DUPLICATE_IN_DB',
+  DUPLICATE_IN_CSV: 'DUPLICATE_IN_CSV',
+  REQUIRED: 'REQUIRED',
+  INVALID: 'INVALID',
+  'Row is empty': 'ROW_IS_EMPTY',
+  NO_VALID_ROWS_FOUND_IN_CSV: 'NO_VALID_ROWS_FOUND_IN_CSV',
+};
+
 export interface Props {
   onSuccess?: () => void;
   onError?: (error: ApiError) => void;
@@ -222,6 +231,18 @@ export function CsvInvite({ onSuccess, onError }: Props) {
     submit,
   } = useCsvInviteState({ onSuccess, onError });
 
+  const translateErrorField = (field?: string) => {
+    if (!field) return '-';
+    return field === 'email' || field === 'username' ? t(`inputs.fieldMapping.${field}`) : field;
+  };
+
+  const translateErrorReason = (message: string) => {
+    const reasonKey = Object.hasOwn(CSV_ROW_ERROR_REASON_KEYS, message)
+      ? CSV_ROW_ERROR_REASON_KEYS[message]
+      : undefined;
+    return reasonKey ? t(`errors.reasons.${reasonKey}`) : message;
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <Button variant="secondary" onPress={selectFile}>
@@ -302,8 +323,8 @@ export function CsvInvite({ onSuccess, onError }: Props) {
                   {(error) => (
                     <TableRow key={`${error.row}-${error.field ?? 'general'}`}>
                       <TableCell>#{error.row}</TableCell>
-                      <TableCell>{error.field ?? '-'}</TableCell>
-                      <TableCell>{error.message}</TableCell>
+                      <TableCell>{translateErrorField(error.field)}</TableCell>
+                      <TableCell>{translateErrorReason(error.message)}</TableCell>
                       <TableCell>{error.value ?? '-'}</TableCell>
                     </TableRow>
                   )}

@@ -44,6 +44,41 @@ describe('getTranslationKeyForApiError', () => {
     expect(getTranslation(translations, 'INVALID_CSV.description')).not.toBe('INVALID_CSV');
   });
 
+  it.each(
+    (
+      [
+        ['English', API_ERROR_TRANSLATIONS_EN, 'Server Error'],
+        ['German', API_ERROR_TRANSLATIONS_DE, API_ERROR_TRANSLATIONS_DE.generic.title],
+      ] as const
+    ).flatMap(([locale, translations, genericTitle]) =>
+      ['Email already exists', 'Username already exists', 'DUPLICATE_IN_DB', 'NO_CANDIDATES_IN_CSV'].map(
+        (message) => [locale, translations, genericTitle, message] as const,
+      ),
+    ),
+  )('translates the "%s" user error %s', (_locale, translations, genericTitle, message) => {
+    const result = getTranslationKeyForApiError({
+      error: { body: { message } } as unknown as Error,
+      t: (key: string) => key,
+      tExists: (key: string) => getTranslation({ api: translations }, key) !== undefined,
+      baseTranslationKey: 'api',
+    });
+    const entry = translations[message as keyof typeof translations] as { title: string; description: string };
+
+    expect(result.key).toBe(`api.${message}`);
+    expect(entry.title).toBeTruthy();
+    expect(entry.title).not.toBe(message);
+    expect(entry.title).not.toBe(genericTitle);
+    expect(entry.description).toBeTruthy();
+    expect(entry.description).not.toContain('{{');
+    expect(entry.description).not.toContain(message);
+  });
+
+  it('keeps the English and German CSV row reason keys in parity', async () => {
+    const en = (await import('../app/user-management/invite-user-modal/csv-invite/en.json')).default;
+    const de = (await import('../app/user-management/invite-user-modal/csv-invite/de.json')).default;
+    expect(Object.keys(de.errors.reasons).sort()).toEqual(Object.keys(en.errors.reasons).sort());
+  });
+
   it.each([
     ['English', API_ERROR_TRANSLATIONS_EN, 'Meter not set up', 'METER_NOT_CONFIGURED: Heartbeats'],
     ['German', API_ERROR_TRANSLATIONS_DE, 'Zähler nicht eingerichtet', 'METER_NOT_CONFIGURED: Heartbeats'],

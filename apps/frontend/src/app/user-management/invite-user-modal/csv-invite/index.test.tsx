@@ -24,6 +24,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
           'errors.columns.field': 'Field',
           'errors.columns.message': 'Reason',
           'errors.columns.value': 'Value',
+          'errors.reasons.DUPLICATE_IN_DB': 'Already used by an existing account',
           'actions.invite': 'Invite',
           'actions.inviteIgnore': 'Invite skipping failed rows',
         })[key] ?? key,
@@ -68,5 +69,26 @@ describe('CsvInvite', () => {
     expect(badge).not.toBeNull();
     expect(badge).toHaveTextContent('2');
     expect(anchor).toContainElement(badge as HTMLElement);
+  });
+
+  it('translates known row error reasons and fields and leaves unknown ones unchanged', () => {
+    render(<CsvInvite />, { wrapper: TestWrapper });
+
+    act(() => {
+      inviteFromCsvOptions?.onError?.({
+        body: {
+          errors: [
+            { row: 2, field: 'email', message: 'DUPLICATE_IN_DB', value: 'a@example.com' },
+            { row: 3, field: 'Mail Column', message: 'SOMETHING_NEW', value: 'b' },
+          ],
+        },
+      });
+    });
+
+    expect(screen.getByText('Already used by an existing account')).toBeInTheDocument();
+    expect(screen.queryByText('DUPLICATE_IN_DB')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Email').length).toBeGreaterThan(0);
+    expect(screen.getByText('Mail Column')).toBeInTheDocument();
+    expect(screen.getByText('SOMETHING_NEW')).toBeInTheDocument();
   });
 });

@@ -218,5 +218,21 @@
   "INVALID_LINK_TOKEN": {
     "title": "Link no longer valid",
     "description": "This link is no longer valid. Please sign in with your company account again."
+  },
+  "Email already exists": {
+    "title": "Email already in use",
+    "description": "An account with this email address already exists. Use a different email address."
+  },
+  "Username already exists": {
+    "title": "Username already taken",
+    "description": "An account with this username already exists. Choose a different username."
+  },
+  "DUPLICATE_IN_DB": {
+    "title": "Users already exist",
+    "description": "Some rows use an email address or username that already belongs to an account. See the import errors below, then fix the file or invite while skipping the failed rows."
+  },
+  "NO_CANDIDATES_IN_CSV": {
+    "title": "No users to invite",
+    "description": "The CSV file contains no valid rows to invite. Check the file and the column mapping."
   }
 }
