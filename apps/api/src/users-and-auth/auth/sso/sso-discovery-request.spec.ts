@@ -1,6 +1,7 @@
 import { promises as dns } from 'node:dns';
 import { createServer, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
+import { BadRequestException, HttpException, Logger } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
@@ -11,7 +12,26 @@ import {
   discoveryLookup,
   discoveryUrl,
   requestDiscoveryJson,
+  toDiscoveryError,
 } from './providers/discovery-client';
+
+async function expectBadGateway(promise: Promise<unknown>, ...messages: string[]): Promise<void> {
+  const error = await promise.then(
+    () => undefined,
+    (error: unknown) => error,
+  );
+  expect(error).toBeInstanceOf(HttpException);
+  expect((error as HttpException).getStatus()).toBe(502);
+  messages.forEach((message) => expect((error as HttpException).message).toContain(message));
+}
+
+async function refusedOrigin(): Promise<string> {
+  const closed = createServer();
+  await new Promise<void>((resolve) => closed.listen(0, '127.0.0.1', resolve));
+  const { port } = closed.address() as AddressInfo;
+  await new Promise<void>((resolve) => closed.close(() => resolve()));
+  return `http://127.0.0.1:${port}`;
+}
 
 describe('SSO discovery destinations', () => {
   it.each(['discoverAuthentik', 'discoverKeycloak'] as const)('requires SSO management permission for %s', (method) => {
@@ -206,9 +226,80 @@ describe('SSO discovery HTTP boundaries', () => {
   });
 
   it('bounds response size and request duration and rejects malformed JSON/non-success responses', async () => {
-    await expect(requestDiscoveryJson(new URL('/large', origin), 5000, 32)).rejects.toThrow('size limit');
-    await expect(requestDiscoveryJson(new URL('/stall', origin), 50)).rejects.toThrow('aborted');
-    await expect(requestDiscoveryJson(new URL('/invalid', origin))).rejects.toThrow('Invalid discovery JSON');
+    await expectBadGateway(requestDiscoveryJson(new URL('/large', origin), 5000, 32), 'size limit');
+    await expectBadGateway(
+      requestDiscoveryJson(new URL('/stall', origin), 50),
+      `Discovery URL could not be reached: ${origin} (timed out after 50 ms)`,
+    );
+    await expectBadGateway(requestDiscoveryJson(new URL('/invalid', origin)), 'Invalid discovery JSON');
     await expect(requestDiscoveryJson(new URL('/unavailable', origin))).rejects.toThrow('503');
+  });
+
+  it('logs oversized and malformed upstream responses for operators', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    await expectBadGateway(requestDiscoveryJson(new URL('/large', origin), 5000, 32), 'size limit');
+    await expectBadGateway(requestDiscoveryJson(new URL('/invalid', origin)), 'Invalid discovery JSON');
+    expect(warn).toHaveBeenCalledWith(`Discovery response from ${origin} exceeds 32 bytes`);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`Discovery response from ${origin} is not valid JSON`));
+  });
+
+  it('reports a refused connection as an unreachable discovery URL', async () => {
+    const refused = await refusedOrigin();
+    await expectBadGateway(
+      requestDiscoveryJson(new URL('/discovery', refused)),
+      `Discovery URL could not be reached: ${refused} (ECONNREFUSED)`,
+    );
+    await expectBadGateway(routes.discoverKeycloak(refused, 'realm'), 'could not be reached', 'ECONNREFUSED');
+    await expectBadGateway(routes.discoverAuthentik(refused, 'app'), 'could not be reached', 'ECONNREFUSED');
+  });
+
+  it('reports a failed DNS resolution as an unreachable discovery URL', async () => {
+    jest
+      .spyOn(dns, 'lookup')
+      .mockRejectedValueOnce(Object.assign(new Error('getaddrinfo ENOTFOUND idp.example'), { code: 'ENOTFOUND' }));
+    const url = discoveryUrl(origin.replace('127.0.0.1', 'idp.example'), '/discovery');
+    await expectBadGateway(requestDiscoveryJson(url), `Discovery URL could not be reached: ${url.origin} (ENOTFOUND)`);
+    expect(paths).toEqual([]);
+  });
+
+  it('reports a host without addresses as an unreachable discovery URL', async () => {
+    jest.spyOn(dns, 'lookup').mockResolvedValueOnce([]);
+    const url = discoveryUrl(origin.replace('127.0.0.1', 'idp.example'), '/discovery');
+    await expectBadGateway(requestDiscoveryJson(url), `Discovery URL could not be reached: ${url.origin}`);
+    expect(paths).toEqual([]);
+  });
+
+  it('reports a dropped response body as an unreachable discovery URL', async () => {
+    server.removeAllListeners('request');
+    server.on('request', (_req, res) => {
+      res.writeHead(200, { 'Content-Length': '100' });
+      res.write('{');
+      setImmediate(() => res.destroy());
+    });
+    // A short deadline keeps the timeout path from satisfying this assertion.
+    await expectBadGateway(
+      requestDiscoveryJson(new URL('/discovery', origin), 1000),
+      `Discovery URL could not be reached: ${origin} (ECONNRESET)`,
+    );
+  });
+});
+
+describe('toDiscoveryError', () => {
+  const url = new URL('http://idp.example:8080/realms/x/.well-known/openid-configuration');
+
+  it('keeps HTTP exceptions such as destination policy rejections unchanged', () => {
+    const policy = new BadRequestException('Invalid discovery destination');
+    expect(toDiscoveryError(policy, url, true, 50)).toBe(policy);
+  });
+
+  it('omits the reason when neither a timeout nor an error code is known', () => {
+    const error = toDiscoveryError(new Error('Discovery host has no addresses 10.0.0.1'), url, false, 50);
+    expect(error.getStatus()).toBe(502);
+    expect(error.message).toBe('Discovery URL could not be reached: http://idp.example:8080');
+  });
+
+  it('prefers the timeout over the socket error code', () => {
+    const error = toDiscoveryError(Object.assign(new Error('aborted'), { code: 'ABORT_ERR' }), url, true, 50);
+    expect(error.message).toBe('Discovery URL could not be reached: http://idp.example:8080 (timed out after 50 ms)');
   });
 });

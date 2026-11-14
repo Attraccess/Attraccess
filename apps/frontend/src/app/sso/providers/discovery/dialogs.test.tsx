@@ -53,6 +53,7 @@ describe.each([
     fill();
     expect(state.query).toHaveBeenLastCalledWith({ host: 'https://idp.example.test', [field]: 'workshop' }, undefined, {
       enabled: false,
+      retry: false,
     });
     fireEvent.click(screen.getByRole('button', { name: 'discover' }));
     await waitFor(() => expect(state.discovered).toHaveBeenCalledWith({ issuer: 'https://idp.example.test' }));
