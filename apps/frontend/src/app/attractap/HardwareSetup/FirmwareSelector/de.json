@@ -1,4 +1,6 @@
 {
+  "empty": "Auf diesem Server ist keine Firmware verfügbar.",
+  "loadFailed": "Die Firmware-Liste konnte nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.",
   "demo": {
     "title": "Demo-Firmware",
     "description": "Läuft mit lokalem Mock ohne Server — nur für Demos und Tests."

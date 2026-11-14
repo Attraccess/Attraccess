@@ -8,6 +8,7 @@
   "connect": {
     "title": "Attractap verbinden",
     "description": "Schließe deinen Attractap an einen USB-Port an, klicke auf Verbinden und wähle im Browser-Dialog den richtigen seriellen Port aus.",
+    "unsupported": "Dieser Browser unterstützt Web Serial nicht und kann den Leser daher nicht per USB ansprechen. Verwende einen Chromium-basierten Browser wie Chrome, Edge oder Brave.",
     "button": {
       "label": "Per USB verbinden"
     }
