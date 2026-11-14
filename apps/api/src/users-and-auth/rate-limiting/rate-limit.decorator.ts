@@ -1,5 +1,5 @@
 import { SetMetadata } from '@nestjs/common';
-import { RateLimitScope } from './brute-force.service';
+import type { RateLimitScope } from './brute-force-policy';
 
 export const AUTH_RATE_LIMIT_METADATA = 'auth_rate_limit_scope';
 export const AUTH_RATE_LIMIT_OPTIONS_METADATA = 'auth_rate_limit_options';

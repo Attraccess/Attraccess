@@ -1,5 +1,5 @@
 import { TFunction } from '@attraccess/plugins-frontend-ui';
-import { CommissioningModel } from '../CommissioningModal';
+import type { CommissioningModel } from '../CommissioningModal';
 
 export function commissioningLoadingStatus(
   {

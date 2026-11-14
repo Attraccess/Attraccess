@@ -1,6 +1,6 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
 import { Auth } from '@attraccess/plugins-backend-sdk';
-import { WagoRuntimeArtifactsService } from './catalog';
+import { WagoRuntimeArtifactsService } from './service';
 
 @Auth('system.settings.manage')
 @Controller('wago/runtime-artifacts')

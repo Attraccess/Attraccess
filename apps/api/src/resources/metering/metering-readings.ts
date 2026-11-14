@@ -10,7 +10,7 @@ import {
   ResourceUsageLifecycleAttempt,
 } from '@attraccess/database-entities';
 
-import { MeteringReport } from '../flows/node-executors/index';
+import type { MeteringReport } from '../flows/node-executors/node-executor.interface';
 
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 

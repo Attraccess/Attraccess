@@ -25,7 +25,7 @@ import { join } from 'node:path';
 import { ResourceOperatingAttributionService } from '../../../operating-intervals/resource-operating-attribution.service';
 import { MeteringReport } from '../../../flows/node-executors';
 import { ResourceMeteringService } from '../../resource-metering.service';
-import { FlowDefinedMeteringTestScope } from '../flow-defined-meters.spec';
+import type { FlowDefinedMeteringTestScope } from '../flow-defined-meters.spec';
 import { composeResourceUsageService } from '../../../usage/sessions/fixtures/compose.test-fixture';
 export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
   for (const method of ['debug', 'log', 'warn', 'error'] as const) {

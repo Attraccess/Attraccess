@@ -204,14 +204,6 @@ export class ManagementError extends Error {
   }
 }
 
-export { WagoManagementService as WagoManagementServiceEnforceBaselineOperation } from './service';
-
-export { WagoManagementService as WagoManagementServiceInspectOperation } from './service';
-
-export { WagoManagementService as WagoManagementServiceLockedOperation } from './service';
-
-export { WagoManagementService as WagoManagementServiceRecoverOperation } from './service';
-
 export const exceptionNames: ManagementException[] = [
   'wbm_exposed',
   'other_services_exposed',
