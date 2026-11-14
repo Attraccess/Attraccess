@@ -281,13 +281,17 @@ export class UserDirectory {
   }
 
   async updateOne(id: number, updateData: UpdateUserData, manager?: EntityManager): Promise<User> {
+    // An explicit null clears the column; undefined leaves it unchanged.
+    const trimOrNull = (value: string | null | undefined) => (value === null ? null : value?.trim());
     const updates: UpdateUserData = {
-      externalIdentifier: updateData.externalIdentifier?.trim() ?? undefined,
-      emailVerificationToken: updateData.emailVerificationToken?.trim() ?? undefined,
-      emailVerificationTokenExpiresAt: updateData.emailVerificationTokenExpiresAt ?? undefined,
+      externalIdentifier: trimOrNull(updateData.externalIdentifier),
+      emailVerificationToken: trimOrNull(updateData.emailVerificationToken),
+      emailVerificationTokenExpiresAt:
+        'emailVerificationTokenExpiresAt' in updateData ? updateData.emailVerificationTokenExpiresAt : undefined,
       isEmailVerified: updateData.isEmailVerified ?? undefined,
-      passwordResetToken: updateData.passwordResetToken?.trim() ?? undefined,
-      passwordResetTokenExpiresAt: updateData.passwordResetTokenExpiresAt ?? undefined,
+      passwordResetToken: trimOrNull(updateData.passwordResetToken),
+      passwordResetTokenExpiresAt:
+        'passwordResetTokenExpiresAt' in updateData ? updateData.passwordResetTokenExpiresAt : undefined,
       lockedUntil: 'lockedUntil' in updateData ? updateData.lockedUntil : undefined,
       failedLoginAttempts: updateData.failedLoginAttempts ?? undefined,
       firstFailedLoginAt: 'firstFailedLoginAt' in updateData ? updateData.firstFailedLoginAt : undefined,

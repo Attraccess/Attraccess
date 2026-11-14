@@ -71,6 +71,11 @@ export class UserPasswordService {
       throw new ForbiddenException('Invalid token');
     }
 
+    if (!user.passwordResetTokenExpiresAt || user.passwordResetTokenExpiresAt < new Date()) {
+      this.logger.debug(`Expired reset token for user ID: ${userId}`);
+      throw new ForbiddenException('Invalid token');
+    }
+
     const policyResult = await this.passwordPolicyService.validate(
       body.password,
       { username: user.username, email: user.email },
@@ -89,7 +94,11 @@ export class UserPasswordService {
     });
   }
 
-  public async setUserPassword(id: number, body: SetUserPasswordDto, requestUser: User | AuthenticatedUser): Promise<void> {
+  public async setUserPassword(
+    id: number,
+    body: SetUserPasswordDto,
+    requestUser: User | AuthenticatedUser,
+  ): Promise<void> {
     this.logger.debug(`Setting password for user ID: ${id}, by user ID: ${requestUser.id}`);
 
     // Prevent users from updating their own password through this endpoint
