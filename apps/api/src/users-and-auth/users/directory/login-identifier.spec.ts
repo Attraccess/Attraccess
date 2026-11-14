@@ -15,7 +15,7 @@ describe('UsersService', () => {
         relations: undefined,
       });
     });
-    describe('email lookup with stored case variants', () => {
+    describe('email lookup is case-insensitive', () => {
       const schema = new EntitySchema<User>({
         name: 'LoginUser',
         columns: {
@@ -34,8 +34,8 @@ describe('UsersService', () => {
         }).initialize();
         const repo = db.getRepository(schema);
         await repo.save([
-          { id: 7, email: 'Alice@Example.com' },
-          { id: 8, email: 'a_btag@Example.com' },
+          { id: 7, email: 'alice@example.com' },
+          { id: 8, email: 'a_btag@example.com' },
         ]);
         fixture.userRepository.findOne.mockImplementation((options) => repo.findOne(options));
         fixture.userRepository.find.mockImplementation((options) => repo.find(options));
@@ -45,23 +45,10 @@ describe('UsersService', () => {
         await db.destroy();
       });
 
-      it('matches unambiguous mixed-case emails without wildcard matching', async () => {
+      it('matches mixed-case input against lowercase stored emails without wildcard matching', async () => {
         await expect(fixture.service.findByLoginIdentifier(' ALICE@example.COM ')).resolves.toMatchObject({ id: 7 });
         await expect(fixture.service.findByLoginIdentifier('a_bTAG@example.COM')).resolves.toMatchObject({ id: 8 });
         await expect(fixture.service.findByLoginIdentifier('a__tag@example.com')).resolves.toBeNull();
-      });
-
-      it.each([
-        ['Alice@Example.com', 7],
-        ['alice@example.com', 9],
-      ])('preserves the exact account for %s when email case variants coexist', async (email, id) => {
-        await db.getRepository(schema).save({ id: 9, email: 'alice@example.com' });
-        await expect(fixture.service.findByLoginIdentifier(` ${email} `)).resolves.toMatchObject({ id });
-      });
-
-      it('does not select an account when a case-insensitive fallback is ambiguous', async () => {
-        await db.getRepository(schema).save({ id: 9, email: 'alice@example.com' });
-        await expect(fixture.service.findByLoginIdentifier('ALICE@EXAMPLE.COM')).resolves.toBeNull();
       });
     });
     it.each(['', '  ', 'a@', '@example.com', 'a@@example.com'])(

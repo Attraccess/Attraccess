@@ -6,7 +6,6 @@ import {
   FindOptionsWhere,
   ILike,
   In,
-  Raw,
   Repository,
   SelectQueryBuilder,
   EntityManager,
@@ -35,6 +34,7 @@ import { UserNotFoundException } from '../../../exceptions/user.notFound.excepti
 import { SSOUsernameChangeForbiddenException } from '../errors/ssoUsernameChangeForbidden.exception';
 
 import { UserAccounts } from '../accounts/user-accounts';
+import { normalizeEmail } from '../accounts/normalize-email';
 
 import { EmailService } from '../../../email/email.service';
 
@@ -60,21 +60,6 @@ export class UserDirectory {
     const parsed = FindOneOptionsSchema.safeParse(options);
     if (!parsed.success) return null;
 
-    if (parsed.data.email !== undefined) {
-      // Preserve distinct existing accounts whose addresses differ only by case.
-      const exactMatch = await this.userRepository.findOne({ where: { email: parsed.data.email } });
-      if (exactMatch) return exactMatch;
-
-      // Fall back only when case-insensitive matching identifies one account.
-      // Equality keeps underscores literal, unlike a LIKE query.
-      const matches = await this.userRepository.find({
-        where: {
-          email: Raw((alias) => `LOWER(${alias}) = :loginEmail`, { loginEmail: parsed.data.email.toLowerCase() }),
-        },
-        take: 2,
-      });
-      return matches.length === 1 ? matches[0] : null;
-    }
     return this.accounts.findOne(parsed.data);
   }
 
@@ -371,7 +356,7 @@ export class UserDirectory {
   }
 
   async changeEmail(targetUserId: number, newEmail: string, executingUser: User): Promise<User> {
-    const trimmedEmail = (newEmail ?? '').trim();
+    const trimmedEmail = normalizeEmail(newEmail ?? '');
     if (!trimmedEmail) {
       throw new BadRequestException('Email cannot be empty');
     }
@@ -391,7 +376,7 @@ export class UserDirectory {
       throw new ForbiddenException("You do not have permission to change this user's email");
     }
 
-    if (targetUser.email.trim() === trimmedEmail) {
+    if (normalizeEmail(targetUser.email) === trimmedEmail) {
       return targetUser;
     }
 

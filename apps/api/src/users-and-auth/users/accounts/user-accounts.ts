@@ -24,6 +24,7 @@ import { MetricsService } from '../../../metrics/metrics.service';
 import { RbacService } from '../../rbac/rbac.service';
 import { z } from 'zod';
 import { PaginationOptions } from '../../../types/request';
+import { normalizeEmail } from './normalize-email';
 
 export type UserListOptions = PaginationOptions & {
   search?: string;
@@ -116,7 +117,7 @@ export class UserAccounts {
     }
 
     if (validatedOptions.email !== undefined) {
-      whereCondition.email = validatedOptions.email;
+      whereCondition.email = normalizeEmail(validatedOptions.email);
     }
 
     const userRepo = manager ? manager.getRepository(User) : this.userRepository;
@@ -157,7 +158,7 @@ export class UserAccounts {
   }
 
   async findByEmailsOrUsernames(emails: string[], usernames: string[]): Promise<User[]> {
-    const normalizedEmails = Array.from(new Set(emails.map((email) => email.trim()).filter((email) => email !== '')));
+    const normalizedEmails = Array.from(new Set(emails.map(normalizeEmail).filter((email) => email !== '')));
     const normalizedUsernames = Array.from(
       new Set(usernames.map((username) => this.cleanupUsername(username)).filter((username) => username !== '')),
     );
@@ -194,7 +195,7 @@ export class UserAccounts {
   ): Promise<User> {
     const data = {
       username: this.cleanupUsername(userData.username),
-      email: userData.email.trim(),
+      email: normalizeEmail(userData.email),
       externalIdentifier: userData.externalIdentifier?.trim() ?? null,
       isEmailVerified: userData.isEmailVerified ?? false,
     };
@@ -305,7 +306,7 @@ export class UserAccounts {
       .update(User)
       .set({
         username: `first-time-setup-${existingAdmin.id}-${suffix}`,
-        email: `first-time-setup-${existingAdmin.id}-${suffix}@deleted.local`,
+        email: normalizeEmail(`first-time-setup-${existingAdmin.id}-${suffix}@deleted.local`),
       })
       .where('id = :id', { id: existingAdmin.id })
       .andWhere('isEmailVerified = :isEmailVerified', { isEmailVerified: false })

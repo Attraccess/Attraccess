@@ -875,6 +875,11 @@ describe('UsersService', () => {
       expect(fixture.accounts.findOne).toHaveBeenLastCalledWith({ id: 1 }, undefined, manager);
       expect(fixture.emailService.sendVerificationEmail).toHaveBeenCalledWith(updated, expect.any(String));
     });
+    it('treats a case-only change of the own email as unchanged', async () => {
+      expect(await fixture.service.changeEmail(1, ' OLD@Example.com ', actor)).toBe(actor);
+      expect(fixture.dataSource.transaction).not.toHaveBeenCalled();
+      expect(fixture.emailService.sendVerificationEmail).not.toHaveBeenCalled();
+    });
     it('leaves an unchanged email verified without a transaction', async () => {
       expect(await fixture.service.changeEmail(1, ' old@example.com ', actor)).toBe(actor);
       expect(fixture.dataSource.transaction).not.toHaveBeenCalled();
