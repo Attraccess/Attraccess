@@ -30,12 +30,23 @@ export interface SlotContext {
 
 const blocksSlot = (reservation: Reservation) => reservation.status === 'pending' || reservation.status === 'confirmed';
 
+/** Span a booking keeps the resource busy for: [start − bufferBefore, end + bufferAfter), in epoch ms. */
+export function blockedSpanOf(reservation: Reservation): { start: number; end: number } {
+  return {
+    start: new Date(reservation.startTime).getTime() - reservation.bufferBeforeMinutes * MINUTE_MS,
+    end: new Date(reservation.endTime).getTime() + reservation.bufferAfterMinutes * MINUTE_MS,
+  };
+}
+
 /** Highest number of spans running at the same instant inside [from, to); touching spans do not overlap. */
-function peakConcurrency(spans: { start: number; end: number }[], from: number, to: number): number {
-  const events = spans.flatMap((span) => [
-    { at: Math.max(span.start, from), delta: 1 },
-    { at: Math.min(span.end, to), delta: -1 },
-  ]);
+export function peakConcurrency(spans: { start: number; end: number }[], from: number, to: number): number {
+  const events = spans
+    .map((span) => ({ start: Math.max(span.start, from), end: Math.min(span.end, to) }))
+    .filter((span) => span.start < span.end)
+    .flatMap((span) => [
+      { at: span.start, delta: 1 },
+      { at: span.end, delta: -1 },
+    ]);
   events.sort((a, b) => a.at - b.at || a.delta - b.delta);
   let current = 0;
   let peak = 0;
@@ -63,16 +74,15 @@ export function checkWindow(context: SlotContext, start: Date, end: Date): SlotV
   const spanStart = new Date(start.getTime() - rules.bufferBeforeMinutes * MINUTE_MS);
   const spanEnd = new Date(end.getTime() + rules.bufferAfterMinutes * MINUTE_MS);
   if (!isWithinBookableHours(rules.bookableHours, timezone, spanStart, spanEnd)) return 'OUTSIDE_BOOKABLE_HOURS';
+  const slots = context.slots ?? 1;
   const blocking = context.reservations
     .filter(blocksSlot)
-    .map((reservation) => ({
-      start: new Date(reservation.startTime).getTime() - reservation.bufferBeforeMinutes * MINUTE_MS,
-      end: new Date(reservation.endTime).getTime() + reservation.bufferAfterMinutes * MINUTE_MS,
-      mine: reservation.mine,
-    }))
+    .map((reservation) => ({ ...blockedSpanOf(reservation), mine: reservation.mine }))
     .filter((span) => spanStart.getTime() < span.end && span.start < spanEnd.getTime());
-  if (peakConcurrency(blocking, spanStart.getTime(), spanEnd.getTime()) + 1 > (context.slots ?? 1)) return 'OVERLAP';
-  if (blocking.some((span) => span.mine)) return 'OWN_OVERLAP';
+  // Same order as the server: on a shared machine an own overlapping booking is reported before a full one;
+  // on an exclusive resource every overlap is OVERLAP.
+  if (slots > 1 && blocking.some((span) => span.mine)) return 'OWN_OVERLAP';
+  if (peakConcurrency(blocking, spanStart.getTime(), spanEnd.getTime()) + 1 > slots) return 'OVERLAP';
   // Like the server: the booking including its buffers must stay clear of maintenance.
   const inMaintenance = context.maintenance.some(
     (span) =>

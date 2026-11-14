@@ -1,4 +1,3 @@
-import { ResourceUsage, ResourceUsageAction } from '@attraccess/plugins-backend-sdk';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
@@ -169,22 +168,6 @@ export class ReservationStore {
       .andWhere('r.startTime <= :now AND r.endTime > :now', { now })
       .orderBy('r.startTime', 'ASC')
       .getMany();
-  }
-
-  /**
-   * Which of `userIds` have a session (running or still starting) on the resource, read through the host's
-   * transaction. Like the host's slot count: published sessions and pending starts, never supervisor rows.
-   */
-  async findUsersInSession(manager: EntityManager, resourceId: number, userIds: number[]): Promise<Set<number>> {
-    const rows = await manager
-      .getRepository(ResourceUsage)
-      .createQueryBuilder('usage')
-      .select('usage.userId', 'userId')
-      .where('usage.resourceId = :resourceId AND usage.userId IN (:...userIds)', { resourceId, userIds })
-      .andWhere('usage.usageAction = :action AND usage.endTime IS NULL', { action: ResourceUsageAction.Usage })
-      .andWhere('(usage.isFinalized = 1 OR usage.lifecyclePending = 1)')
-      .getRawMany<{ userId: number }>();
-    return new Set(rows.map((row) => Number(row.userId)));
   }
 
   /**

@@ -1,4 +1,4 @@
-import type { PluginContext } from '@attraccess/plugins-backend-sdk';
+import type { PluginActiveSession, PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Clock, PLUGIN_CONTEXT, READER_HORIZON_MS, RESERVATION_CLOCK } from '../constants';
 import type { ReservationEntity } from '../entities/reservation.entity';
@@ -266,13 +266,25 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Slots held at the booking's start by other people's confirmed bookings (holders in session count as sessions). */
-  private async heldAtStart(r: ReservationEntity, inSession: ReadonlySet<number>): Promise<number> {
+  private async heldAtStart(r: ReservationEntity, sessions: PluginActiveSession[]): Promise<number> {
     const confirmed = await this.store.findConfirmedOverlapping(
       r.resourceId,
       r.startTime,
       new Date(r.startTime.getTime() + 1),
     );
+    const inSession = new Set(sessions.map((session) => session.userId));
     return heldBookings({ confirmed, starterId: r.userId, inSession, at: r.startTime }).length;
+  }
+
+  /** Shared machine: the holder is in session, or a slot was free for them at the start besides the lingering ones. */
+  private async holderHadSlot(
+    r: ReservationEntity,
+    sessions: PluginActiveSession[],
+    lingering: number,
+    limit: number,
+  ): Promise<boolean> {
+    if (sessions.some((session) => session.userId === r.userId)) return true;
+    return limit - lingering - (await this.heldAtStart(r, sessions)) > 0;
   }
 
   /** Users with a running session on the resource, other than the holder, shortly before a booking starts. */
@@ -287,18 +299,13 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
       const settings = this.settings.getCachedSettings(r.resourceId);
       const minutes = settings.handoverReminderMinutes;
       if (!settings.enabled || minutes <= 0 || r.startTime.getTime() - now.getTime() > minutes * MINUTE_MS) return;
-      const others = (await this.context.resourceAccess.getActiveSessions(r.resourceId)).filter(
-        (session) => session.userId !== r.userId,
-      );
+      const sessions = await this.context.resourceAccess.getActiveSessions(r.resourceId);
+      const others = sessions.filter((session) => session.userId !== r.userId);
       // Nothing to say yet: stay unclaimed so a session that starts later inside the window is still told.
       if (others.length === 0) return;
       // Shared machine: only when the booking would find no free slot at its start (sessions + other held slots).
       const limit = await this.directory.getSessionLimit(r.resourceId);
-      if (limit > 1) {
-        const sessions = await this.context.resourceAccess.getActiveSessions(r.resourceId);
-        const held = await this.heldAtStart(r, new Set(sessions.map((session) => session.userId)));
-        if (others.length + held < limit) return;
-      }
+      if (limit > 1 && others.length + (await this.heldAtStart(r, sessions)) < limit) return;
       if (await this.store.claimFlag(r.id, 'handoverSentAt', now)) {
         await this.notifications.notifyHandover(r, [...new Set(others.map((session) => session.userId))]);
       }
@@ -315,18 +322,14 @@ export class ReservationScheduler implements OnModuleInit, OnModuleDestroy {
     const recent = await this.store.findUpcomingConfirmed(new Date(now.getTime() - OVERRUN_CHECK_WINDOW_MS), now);
     await this.each(recent, async (r) => {
       if (!this.isEnabled(r) || r.overrunSentAt || r.endTime.getTime() <= now.getTime()) return;
-      const lingering = (await this.context.resourceAccess.getActiveSessions(r.resourceId)).filter(
+      const sessions = await this.context.resourceAccess.getActiveSessions(r.resourceId);
+      const lingering = sessions.filter(
         (session) => session.userId !== r.userId && session.startTime.getTime() < r.startTime.getTime(),
       );
       if (lingering.length === 0) return;
       // Shared machine: only when the holder has no session and no slot was free for them at the start.
       const limit = await this.directory.getSessionLimit(r.resourceId);
-      if (limit > 1) {
-        const sessions = await this.context.resourceAccess.getActiveSessions(r.resourceId);
-        if (sessions.some((session) => session.userId === r.userId)) return;
-        const held = await this.heldAtStart(r, new Set(sessions.map((session) => session.userId)));
-        if (limit - lingering.length - held > 0) return;
-      }
+      if (limit > 1 && (await this.holderHadSlot(r, sessions, lingering.length, limit))) return;
       if (await this.store.claimFlag(r.id, 'overrunSentAt', now)) {
         await this.notifications.notifyOverrun(r, [...new Set(lingering.map((session) => session.userId))]);
       }

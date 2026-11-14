@@ -27,6 +27,13 @@ describe('shared machine reservations', () => {
       startTime: at(`${day}T${String(startHour).padStart(2, '0')}:00:00`),
       endTime: at(`${day}T${String(endHour).padStart(2, '0')}:00:00`),
     });
+  /** A booking at arbitrary times (`HH:MM` on 2026-06-02 unless a full date is given). */
+  const bookAt = (userId: number, start: string, end: string) =>
+    h.reservations.create(principal(userId), {
+      resourceId: 1,
+      startTime: at(start.includes('T') ? start : `2026-06-02T${start}:00`),
+      endTime: at(end.includes('T') ? end : `2026-06-02T${end}:00`),
+    });
   const statusOf = async (id: number) =>
     (await h.dataSource.getRepository(ReservationEntity).findOneByOrFail({ id })).status;
   const session = (userId: number, usageId = userId) => ({
@@ -71,6 +78,34 @@ describe('shared machine reservations', () => {
       await h.settings.update(1, { bufferAfterMinutes: 30 });
       // Existing bookings were stored without buffers; the new one blocks [9:00-0, 10:30) with its own buffer.
       expect(await codeOf(book(12, 9, 10))).toBe('NO_ERROR');
+    });
+
+    it("counts the new booking's buffer before against bookings that end at its start", async () => {
+      h.setLimit(1, 2);
+      await book(10, 8, 9);
+      await book(11, 8, 9);
+      await h.settings.update(1, { bufferBeforeMinutes: 30 });
+      // The new booking blocks [8:30, 10:00): both 8-9 bookings are open at 8:30.
+      expect(await codeOf(book(12, 9, 10))).toBe('OVERLAP');
+    });
+
+    it("counts a stored booking's buffer after that reaches into the new span", async () => {
+      h.setLimit(1, 2);
+      await h.settings.update(1, { bufferAfterMinutes: 30 });
+      await book(10, 8, 9); // blocks [8:00, 9:30)
+      await h.settings.update(1, { bufferAfterMinutes: 0 });
+      await book(11, 9, 10);
+      expect(await codeOf(book(12, 9, 10))).toBe('OVERLAP');
+      expect(await codeOf(book(12, 10, 11))).toBe('NO_ERROR');
+    });
+
+    it('lets pending requests occupy a slot', async () => {
+      h.setLimit(1, 2);
+      await book(10, 8, 10);
+      await h.settings.update(1, { approvalRequired: true });
+      expect((await book(11, 8, 10)).status).toBe('pending');
+      await h.settings.update(1, { approvalRequired: false });
+      expect(await codeOf(book(12, 9, 10))).toBe('OVERLAP');
     });
 
     it('refuses a second overlapping booking of the same person with OWN_OVERLAP', async () => {
@@ -186,6 +221,37 @@ describe('shared machine reservations', () => {
       await p.newScheduler().tick();
       expect(h.notifier.onRemoved).toHaveBeenCalledTimes(1);
     });
+
+    it('counts pending requests and cancels them like confirmed bookings', async () => {
+      await book(10, 8, 10);
+      await book(11, 8, 10);
+      await h.settings.update(1, { approvalRequired: true });
+      const pending = await book(12, 8, 10);
+      expect(pending.status).toBe('pending');
+      await lower(3, 2);
+      expect(await statusOf(pending.id)).toBe('cancelled');
+    });
+
+    it('never cancels a booking whose holder checked in early', async () => {
+      await book(10, 8, 10);
+      const b = await book(11, 8, 10);
+      const c = await book(12, 8, 10);
+      h.setNow('2026-06-02T07:50:00Z');
+      await h.reservations.markCheckedIn(c.id, 300, h.clock());
+      await lower(3, 2);
+      expect(await statusOf(c.id)).toBe('confirmed');
+      expect(await statusOf(b.id)).toBe('cancelled');
+    });
+
+    it('leaves the bookings of a deleted resource alone', async () => {
+      const a = await book(10, 8, 10);
+      await book(11, 8, 10);
+      h.deleteResource(1); // a deleted resource reads as limit 1 everywhere else
+      await p.newScheduler().tick();
+      expect(await h.reservations.cancelExcessBookings(1, null)).toBe(0);
+      expect(await statusOf(a.id)).toBe('confirmed');
+      expect(h.notifier.onRemoved).not.toHaveBeenCalled();
+    });
   });
 
   describe('pre-start gate', () => {
@@ -253,6 +319,14 @@ describe('shared machine reservations', () => {
         expect(await p.preStart.evaluateStartBlocked(blocked(99))).toBeNull();
       });
 
+      it('does not hold a slot for a running pending request', async () => {
+        h.setLimit(1, 2);
+        h.state.sessions.push(session(20));
+        await h.dataSource.getRepository(ReservationEntity).update(bob.id, { status: 'pending' });
+        expect(await p.preStart.evaluate(ctx(10))).toEqual({ decision: 'allow' });
+        expect(await p.preStart.evaluateStartBlocked(blocked(10))).toBeNull();
+      });
+
       it('names nobody for a viewer who may not see who uses the machine', async () => {
         h.setLimit(1, 2);
         h.state.sessions.push(session(20));
@@ -285,6 +359,43 @@ describe('shared machine reservations', () => {
         expect(await p.preStart.evaluate(ctx(10, { confirmedStepKeys: [stepKey] }))).toEqual({ decision: 'allow' });
         expect(stepKey).toBe(reservationStepKey(1));
       });
+
+      it('counts the slots other bookings hold at that start', async () => {
+        await book(12, 12, 14, '2026-06-01');
+        h.setLimit(1, 3);
+        // No session: the starter plus two held slots fit three.
+        expect(await p.preStart.evaluate(ctx(10))).toEqual({ decision: 'allow' });
+        h.state.sessions.push(session(20));
+        expect(await p.preStart.evaluate(ctx(10))).toMatchObject({
+          decision: 'confirm',
+          confirmation: { title: 'Reserved soon' },
+        });
+      });
+
+      it('counts a holder who is already in session once', async () => {
+        await book(12, 12, 14, '2026-06-01');
+        h.setLimit(1, 3);
+        h.state.sessions.push(session(11));
+        expect(await p.preStart.evaluate(ctx(10))).toEqual({ decision: 'allow' });
+      });
+    });
+
+    describe('after a manager override', () => {
+      it('does not count the overridden booking again at a later start', async () => {
+        const bob = await book(11, 8, 10);
+        const later = await book(13, 9, 10);
+        h.setNow('2026-06-02T08:30:00Z');
+        h.state.sessions.push(session(20));
+        // One session, the manager, bob's slot and the 9:00 booking would need four slots.
+        expect(await p.preStart.evaluate(ctx(99))).toMatchObject({
+          decision: 'confirm',
+          confirmation: { stepKey: reservationStepKey(later.id) },
+        });
+        // The manager's session takes bob's slot (e.g. confirmed while a second session still ran).
+        expect(await p.preStart.evaluate(ctx(99, { confirmedStepKeys: [overrideStepKey(bob.id)] }))).toEqual({
+          decision: 'allow',
+        });
+      });
     });
   });
 
@@ -299,6 +410,7 @@ describe('shared machine reservations', () => {
         origin: 'web',
         sessionLimit: 2,
         occupiedSlots,
+        usersInSession: [],
         confirmedStepKeys: [],
         language: 'en',
         now: h.clock(),
@@ -310,7 +422,6 @@ describe('shared machine reservations', () => {
       h.setLimit(1, 2);
       bob = await book(11, 8, 10);
       h.setNow('2026-06-02T08:30:00Z');
-      jest.spyOn(h.store, 'findUsersInSession').mockResolvedValue(new Set());
     });
 
     it('answers how many slots are held for others, with a reason only when the machine would be full', async () => {
@@ -320,9 +431,7 @@ describe('shared machine reservations', () => {
 
     it('holds nothing for the starter themself, for holders in session or after a confirmed override', async () => {
       expect(await capacity(11, 1)).toEqual({ heldSlots: 0 });
-      jest.spyOn(h.store, 'findUsersInSession').mockResolvedValue(new Set([11]));
-      expect(await capacity(10, 1)).toEqual({ heldSlots: 0 });
-      jest.spyOn(h.store, 'findUsersInSession').mockResolvedValue(new Set());
+      expect(await capacity(10, 1, { usersInSession: [11] })).toEqual({ heldSlots: 0 });
       expect(await capacity(99, 1, { confirmedStepKeys: [overrideStepKey(bob.id)] })).toEqual({ heldSlots: 0 });
     });
 
@@ -331,10 +440,64 @@ describe('shared machine reservations', () => {
       expect(await capacity(10, 1)).toEqual({ heldSlots: 0 });
     });
 
-    it('reads bookings through the given manager', async () => {
+    it('reads bookings through the given manager, in one query', async () => {
       const read = jest.spyOn(h.store, 'findRunningConfirmed');
       await capacity(10, 0);
+      expect(read).toHaveBeenCalledTimes(1);
       expect(read).toHaveBeenCalledWith(h.dataSource.manager, 1, expect.any(Date));
+    });
+
+    it('holds no slot for a running pending request', async () => {
+      await h.dataSource.getRepository(ReservationEntity).update(bob.id, { status: 'pending' });
+      expect(await capacity(10, 1)).toEqual({ heldSlots: 0 });
+    });
+  });
+
+  describe('manager override detection', () => {
+    const start = (userId: number, usageId: number) => {
+      h.state.sessions.push(session(userId, usageId));
+      return h.emit(SystemEvent.RESOURCE_USAGE_SESSION_STARTED, {
+        resourceId: 1,
+        usageId,
+        userId,
+        startTime: h.clock(),
+      });
+    };
+    const overrides = () =>
+      (h.audit.record.mock.calls as unknown as [{ action: string; subject: { id: number } }][])
+        .map(([call]) => call)
+        .filter((call) => call.action === 'reservations.override_start');
+    let carol: ReservationEntity;
+
+    beforeEach(async () => {
+      p.events.subscribe();
+      await book(11, 8, 10);
+      carol = await book(12, 8, 9);
+      h.setNow('2026-06-02T08:30:00Z');
+    });
+
+    it("records nothing when a manager's start found a free slot", async () => {
+      await start(99, 200);
+      expect(overrides()).toHaveLength(0);
+      expect(h.notifier.onRemoved).not.toHaveBeenCalled();
+      expect(h.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('records nothing when a manager starts in their own booking, even on a full machine', async () => {
+      h.setNow('2026-06-01T11:30:00Z');
+      await book(99, 8, 10);
+      h.setNow('2026-06-02T08:30:00Z');
+      h.state.sessions.push(session(20));
+      await start(99, 200);
+      expect(overrides()).toHaveLength(0);
+      expect(h.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('records the override of the booking whose slot the start took, the one the gate asked about first', async () => {
+      h.state.sessions.push(session(20));
+      await start(99, 200);
+      // One other session and two held slots fill three: carol's booking ends first, so it is named.
+      expect(overrides().map((call) => call.subject.id)).toEqual([carol.id]);
     });
   });
 
@@ -387,6 +550,16 @@ describe('shared machine reservations', () => {
       language: 'en',
       ...patch,
     });
+    const gate = (userId: number): PreStartContext => ({
+      resourceId: 1,
+      userId,
+      principal: userId,
+      action: 'start',
+      origin: 'reader',
+      confirmedStepKeys: [],
+      language: 'en',
+      now: h.clock(),
+    });
     const rowText = (list: Awaited<ReturnType<BackgroundServices['readerUi']['getSlotContributions']>>) =>
       (list.find((c) => c.slotId === 'resourceList.row.status')?.tree as { text: string }).text;
 
@@ -416,6 +589,59 @@ describe('shared machine reservations', () => {
     it('expires at every booking start and end', async () => {
       const list = await p.readerUi.getSlotContributions(ctx({ userId: 10 }));
       expect(list[0].expiresAt?.toISOString()).toBe('2026-06-02T10:00:00.000Z');
+    });
+
+    it('expires at the earliest booking start or end that changes the free slots', async () => {
+      h.setNow('2026-06-02T07:00:00Z');
+      await bookAt(12, '08:00', '09:15');
+      h.setNow('2026-06-02T08:30:00Z');
+      const ending = await p.readerUi.getSlotContributions(ctx({ userId: 10 }));
+      expect(ending[0].expiresAt?.toISOString()).toBe('2026-06-02T09:15:00.000Z');
+      await bookAt(13, '09:00', '11:00');
+      const starting = await p.readerUi.getSlotContributions(ctx({ userId: 10 }));
+      expect(starting[0].expiresAt?.toISOString()).toBe('2026-06-02T09:00:00.000Z');
+    });
+
+    it("shows the viewer's own running booking, even when another one started earlier", async () => {
+      h.setNow('2026-06-02T07:00:00Z');
+      await bookAt(10, '08:15', '10:00');
+      h.setNow('2026-06-02T08:30:00Z');
+      const list = await p.readerUi.getSlotContributions(ctx({ userId: 10 }));
+      expect(rowText(list)).toMatch(/^Your booking/);
+      expect(list[0].fallback?.tone).toBe('primary');
+    });
+
+    it("names the booking that leaves the viewer no slot instead of the viewer's upcoming one", async () => {
+      h.setLimit(1, 2);
+      await book(10, 10, 11);
+      h.setNow('2026-06-02T09:50:00Z'); // inside the early check-in window of the viewer's booking
+      expect(rowText(await p.readerUi.getSlotContributions(ctx({ userId: 10 })))).toMatch(/^Your booking/);
+      h.state.sessions.push(session(20));
+      const list = await p.readerUi.getSlotContributions(ctx({ userId: 10 }));
+      expect(rowText(list)).toMatch(/^Reserved until/);
+      expect(list[0].fallback?.tone).toBe('warning');
+    });
+
+    it('shows an upcoming booking that would lack its slot instead of the count, as the gate asks', async () => {
+      h.setLimit(1, 2);
+      await book(12, 9, 10);
+      // Bob's booking runs and one slot is free, but starting now leaves the 9:00 booking without one.
+      const list = await p.readerUi.getSlotContributions(ctx({ userId: 10 }));
+      expect(rowText(list)).toMatch(/^Free until/);
+      expect(await p.preStart.evaluate(gate(10))).toMatchObject({
+        decision: 'confirm',
+        confirmation: { title: 'Reserved soon' },
+      });
+    });
+
+    it('counts the slot a viewer without a session would take for the countdown', async () => {
+      await book(12, 11, 12);
+      h.setNow('2026-06-02T10:30:00Z');
+      h.setLimit(1, 2);
+      h.state.sessions.push(session(20)); // someone else's usage: the viewer is not in session
+      const list = await p.readerUi.getSlotContributions(ctx({ userId: 10, sessionActive: true }));
+      expect(list.find((c) => c.slotId === 'resource.details.session')).toBeDefined();
+      expect(await p.preStart.evaluate(gate(10))).toMatchObject({ decision: 'confirm' });
     });
 
     it('keeps the count text German and Latin-1 within the row limit', async () => {

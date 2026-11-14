@@ -60,7 +60,7 @@ export interface PluginBackendModule {
 
   /**
    * Optional atomic capacity hook: tells the host how many slots of a shared machine the plugin holds back from the
-   * starter. The host evaluates it inside its serialized start transaction. Requires ACCESS_HOOKS.
+   * starter. The host evaluates it inside its serialized start transaction. Requires ACCESS_HOOKS and DATABASE_ACCESS.
    */
   startCapacityHook?: StartCapacityHook;
 

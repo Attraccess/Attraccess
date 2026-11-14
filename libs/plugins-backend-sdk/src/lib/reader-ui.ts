@@ -308,13 +308,15 @@ export interface StartCapacityContext {
    * transaction would wait for itself.
    */
   manager: EntityManager;
-  /** Always `start` for now: the hook only runs when a start adds a session. */
+  /** Always `start` for now: the hook only runs when a start adds a session (shared machines have no takeover). */
   action: 'start' | 'takeover';
   origin: PreStartOrigin;
   /** Effective session limit of the machine (always above 1 here). */
   sessionLimit: number;
   /** Slots taken by sessions and by starts that are in progress, read in the same transaction. */
   occupiedSlots: number;
+  /** The users behind `occupiedSlots` (sessions and starts in progress), read in the same transaction. */
+  usersInSession: number[];
   /** Only this plugin's step keys confirmed in the same start attempt. */
   confirmedStepKeys: string[];
   /** Language for texts: the card user's on a reader, the user's preferred language elsewhere. */
@@ -334,7 +336,8 @@ export interface StartCapacityResult {
  * INSIDE the serialized start transaction, after its own capacity check. The host refuses the start with the plugin's
  * block reason when `occupiedSlots + heldSlots >= sessionLimit`, so simultaneous starts can never take a held slot.
  * Keep it to one indexed query on `ctx.manager`. Failure, timeout and an open breaker follow the per-resource failure
- * policy of the plugin, like `preStartHook`. Requires ACCESS_HOOKS.
+ * policy of the plugin, like `preStartHook`. Requires ACCESS_HOOKS and DATABASE_ACCESS (it is handed the host's
+ * transaction).
  */
 export type StartCapacityHook = (ctx: StartCapacityContext) => StartCapacityResult | Promise<StartCapacityResult>;
 

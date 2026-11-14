@@ -163,7 +163,9 @@ export async function createHarness() {
   const directory = {
     getResource: async (id: number) => (knownResources.has(id) ? { id, name: `Resource ${id}` } : null),
     getResourceNames: async (ids: number[]) => new Map(ids.map((id) => [id, `Resource ${id}`])),
-    getSessionLimit: async (id: number) => state.limits.get(id) ?? 1,
+    // Like the real lookup: an unknown (deleted) resource reads as limit 1, or as null where the caller asks.
+    getSessionLimit: async (id: number) => (knownResources.has(id) ? (state.limits.get(id) ?? 1) : 1),
+    findSessionLimit: async (id: number) => (knownResources.has(id) ? (state.limits.get(id) ?? 1) : null),
     getActiveSessions: async (id: number) => state.sessions.filter((session) => session.resourceId === id),
     getUserNames: async (ids: number[]) => new Map(ids.map((id) => [id, `user${id}`])),
   } as unknown as DirectoryService;
@@ -239,6 +241,10 @@ export async function createHarness() {
     /** Effective session limit of the resource (what core's `sessionLimitOf` answers). */
     setLimit(resourceId: number, limit: number) {
       state.limits.set(resourceId, limit);
+    },
+    /** The resource is (soft-)deleted in core: lookups no longer find it. */
+    deleteResource(resourceId: number) {
+      knownResources.delete(resourceId);
     },
     makeManager(userId: number, resourceId: number) {
       state.maintainers.set(userId, new Set([...(state.maintainers.get(userId) ?? []), resourceId]));

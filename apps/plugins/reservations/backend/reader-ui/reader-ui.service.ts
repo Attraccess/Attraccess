@@ -85,7 +85,7 @@ export class ReaderUiService {
     const shared = limit > 1 ? await this.sharedSlots(ctx, bookings, limit, now) : null;
 
     // The booking the details are about: your own running one, else the running one, else the next one.
-    const own = userId === undefined ? undefined : this.ownBooking(userId, running, upcoming, nowMs, early);
+    const own = userId === undefined ? undefined : this.ownBooking(userId, running, upcoming, nowMs, early, shared);
     // On a shared machine a running booking only shows as a warning when it holds the last free slot; while slots
     // remain, a short count replaces it, and an upcoming booking shows only if it would lack its slot.
     const subject = this.subjectOf(own, running, upcoming, shared);
@@ -157,9 +157,11 @@ export class ReaderUiService {
 
   /**
    * The slot picture of a shared machine: sessions and the bookings that hold slots for the viewer's disadvantage.
-   * `blocker`: the running booking to name when no free slot is left for the viewer (a signed-out reader counts as
-   * nobody); `reserved`: running bookings (one per person); `nextLacking`: the next booking that would find no slot
-   * at its start; `lacksSlotWith`: whether a booking would lack its slot if the viewer's session keeps running.
+   * `ownRunning`: the viewer's own running booking (their slot); `blocker`: the running booking to name when no free
+   * slot is left for the viewer (a signed-out reader counts as nobody); `reserved`: running bookings (one per person);
+   * `nextLacking`: the next booking of someone else that would find no slot at its start if the viewer started now;
+   * `lacksSlotWith`: whether a booking would lack its slot with the viewer's session running (as in the gate: sessions,
+   * one more slot for a viewer not in session yet, and the slots held at the booking's start).
    */
   private async sharedSlots(
     ctx: ReaderUiContext,
@@ -167,6 +169,7 @@ export class ReaderUiService {
     limit: number,
     now: Date,
   ): Promise<{
+    ownRunning: ReservationEntity | undefined;
     blocker: ReservationEntity | undefined;
     reserved: number;
     nextLacking: ReservationEntity | undefined;
@@ -178,24 +181,20 @@ export class ReaderUiService {
     const running = bookings.filter((r) => r.startTime.getTime() <= nowMs);
     const viewerId = ctx.userId ?? -1;
     const held = heldBookings({ confirmed: running, starterId: viewerId, inSession, at: now });
-    const ownRunning = running.some((r) => r.userId === viewerId);
+    const ownRunning = running.find((r) => r.userId === viewerId);
     const free = limit - sessions.length - held.length;
+    // A viewer not in session takes one more slot by starting (a signed-out reader has no starter yet).
     const lacksSlotWith = (booking: ReservationEntity, viewer: number | undefined) =>
       sessions.length +
+        (viewer === undefined || inSession.has(viewer) ? 0 : 1) +
         heldBookings({ confirmed: bookings, starterId: viewer ?? -1, inSession, at: booking.startTime }).length >
       limit;
     return {
+      ownRunning,
       blocker: !ownRunning && held.length > 0 && free <= 0 ? held[0] : undefined,
       reserved: new Set(running.map((r) => r.userId)).size,
       nextLacking: bookings.find(
-        (r) =>
-          r.startTime.getTime() > nowMs &&
-          r.userId !== ctx.userId &&
-          // Starting now takes one more slot (a signed-out reader has no starter yet).
-          sessions.length +
-            (ctx.userId === undefined ? 0 : 1) +
-            heldBookings({ confirmed: bookings, starterId: viewerId, inSession, at: r.startTime }).length >
-            limit,
+        (r) => r.startTime.getTime() > nowMs && r.userId !== ctx.userId && lacksSlotWith(r, ctx.userId),
       ),
       lacksSlotWith,
     };
@@ -220,17 +219,17 @@ export class ReaderUiService {
 
   /**
    * The booking the details are about. On a shared machine a running booking only shows as a warning when it holds
-   * the last free slot; while slots remain a short count replaces it (no subject), and an upcoming booking shows only
-   * if it would lack its slot.
+   * the last free slot, and an upcoming booking only if it would lack its slot (the gate would ask about it); with
+   * none of these a short count replaces it (no subject).
    */
   private subjectOf(
     own: ReservationEntity | undefined,
     running: ReservationEntity | undefined,
     upcoming: ReservationEntity[],
-    shared: { blocker?: ReservationEntity; reserved: number; nextLacking?: ReservationEntity } | null,
+    shared: { blocker?: ReservationEntity; nextLacking?: ReservationEntity } | null,
   ): ReservationEntity | undefined {
     if (!shared) return own ?? running ?? upcoming[0];
-    return own ?? shared.blocker ?? (shared.reserved > 0 ? undefined : shared.nextLacking);
+    return own ?? shared.blocker ?? shared.nextLacking;
   }
 
   /**
@@ -274,17 +273,24 @@ export class ReaderUiService {
     };
   }
 
-  /** Your own booking while it runs or within the early check-in window before it starts. */
+  /**
+   * Your own booking while it runs or within the early check-in window before it starts. On a shared machine your
+   * running booking is found among all running ones, and a booking that leaves you no free slot wins over your
+   * upcoming one (you could not start yet).
+   */
   private ownBooking(
     userId: number,
     running: ReservationEntity | undefined,
     upcoming: ReservationEntity[],
     nowMs: number,
     early: number,
+    shared: { ownRunning?: ReservationEntity; blocker?: ReservationEntity } | null,
   ): ReservationEntity | undefined {
+    const soon = () => upcoming.find((r) => r.userId === userId && r.startTime.getTime() - nowMs <= early);
+    if (shared) return shared.ownRunning ?? (shared.blocker ? undefined : soon());
     if (running?.userId === userId) return running;
     if (running) return undefined; // someone else's booking runs: that is what the reader shows
-    return upcoming.find((r) => r.userId === userId && r.startTime.getTime() - nowMs <= early);
+    return soon();
   }
 
   /**

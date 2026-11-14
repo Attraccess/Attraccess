@@ -129,5 +129,31 @@ describe('capacity rules', () => {
         { ...b, bufferBeforeMinutes: 30 },
       ]);
     });
+
+    it('never cancels a booking whose holder checked in early (it runs already)', () => {
+      const older = booking(1, 1, 3, { createdAt: new Date(T0 - 2 * HOUR) });
+      const early = booking(2, 1, 3, { createdAt: new Date(T0 - HOUR), checkedInAt: now });
+      expect(selectExcessBookings([older, early], 1, now)).toEqual([older]);
+      expect(selectExcessBookings([early, { ...older, checkedInAt: now }], 1, now)).toEqual([]);
+    });
+
+    it('ignores overlaps that are already over', () => {
+      // `past` blocked until 7:54; `next` starts at 8:15 but its buffer reaches back to 7:45.
+      const past = booking(1, -2, -0.1);
+      const next = booking(2, 0.25, 2, { bufferBeforeMinutes: 30 });
+      expect(selectExcessBookings([past, next], 1, now)).toEqual([]);
+      // A span that is still open at `now` still counts there.
+      const lingering = booking(3, -2, 0.1);
+      expect(selectExcessBookings([lingering, next], 1, now)).toEqual([next]);
+    });
+
+    it('settles the instants in time order, each until it fits', () => {
+      const a = booking(1, 1, 3, { createdAt: new Date(T0 - 3 * HOUR) });
+      const b = booking(2, 2, 4, { createdAt: new Date(T0 - 2 * HOUR) });
+      const c = booking(3, 1, 2, { createdAt: new Date(T0 - 1 * HOUR) });
+      const d = booking(4, 1, 2, { createdAt: new Date(T0 - 0.5 * HOUR) });
+      // 9:00 holds a, c, d: d then c go; 10:00 holds a and b: b goes.
+      expect(selectExcessBookings([a, b, c, d], 1, now)).toEqual([d, c, b]);
+    });
   });
 });

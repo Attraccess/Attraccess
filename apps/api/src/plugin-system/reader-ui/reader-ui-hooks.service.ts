@@ -51,6 +51,8 @@ export interface StartCapacityRun {
   language: ReaderUiLanguage;
   sessionLimit: number;
   occupiedSlots: number;
+  /** The users behind `occupiedSlots`. */
+  usersInSession: number[];
   /** The host's serialized start transaction; handed to the plugin. */
   manager: EntityManager;
   /** plugin -> stepKeys confirmed in this start attempt. */
@@ -219,6 +221,7 @@ export class ReaderUiHooksService {
             origin: run.origin,
             sessionLimit: run.sessionLimit,
             occupiedSlots: run.occupiedSlots,
+            usersInSession: [...run.usersInSession],
             confirmedStepKeys,
             language: run.language,
             now: new Date(),
@@ -317,6 +320,7 @@ export class ReaderUiHooksService {
     this.runner.reset(plugin);
     this.runner.reset(sessionEndKey(plugin));
     this.runner.reset(startBlockedKey(plugin));
+    this.runner.reset(startCapacityKey(plugin));
   }
 
   /** The plugin's answer callback, at most once, with the hook timeout, never rejecting. */

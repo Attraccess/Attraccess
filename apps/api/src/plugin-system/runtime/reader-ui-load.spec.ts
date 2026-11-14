@@ -23,6 +23,18 @@ describe('collectReaderUiContributions', () => {
     },
   );
 
+  it('rejects startCapacityHook without DATABASE_ACCESS: it is handed the host transaction', () => {
+    const load = () =>
+      collectReaderUiContributions(
+        'p',
+        [PluginPermission.ACCESS_HOOKS],
+        { startCapacityHook: () => ({ heldSlots: 0 }) },
+        ctx,
+      );
+    expect(load).toThrow(PluginPermissionError);
+    expect(load).toThrow(/"startCapacityHook", which requires the "DATABASE_ACCESS" permission/);
+  });
+
   it('collects provider factories and hooks when permitted', () => {
     const out = collectReaderUiContributions(
       'p',
@@ -54,7 +66,7 @@ describe('collectReaderUiContributions', () => {
   it('counts a start capacity hook alone as a contribution', () => {
     const out = collectReaderUiContributions(
       'p',
-      [PluginPermission.ACCESS_HOOKS],
+      [PluginPermission.ACCESS_HOOKS, PluginPermission.DATABASE_ACCESS],
       { startCapacityHook: () => ({ heldSlots: 0 }) },
       ctx,
     );

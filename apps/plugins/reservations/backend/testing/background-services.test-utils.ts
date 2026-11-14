@@ -58,6 +58,7 @@ export function createBackgroundServices(h: Harness) {
       hostInfo,
       decisions,
       h.clock,
+      h.directory,
     );
   return {
     info,

@@ -135,7 +135,12 @@ export class ReaderStartGate {
       policy,
     });
     if (policy === 'allow-with-warning') {
-      return { kind: 'proceed', warning: true, satisfied: ctx.satisfied, language: card?.language };
+      // The policy accepted the step in the user's place: later checks of this start see it as confirmed.
+      const satisfied = {
+        ...ctx.satisfied,
+        [ctx.plugin]: [...(ctx.satisfied[ctx.plugin] ?? []), confirmation.stepKey],
+      };
+      return { kind: 'proceed', warning: true, satisfied, language: card?.language };
     }
     if (policy === 'card-confirm' && usable && caps.steps.includes('card-confirm')) {
       if (this.steps.issueStart(socket, { ...spec, cardConfirm: true })) return { kind: 'held' };

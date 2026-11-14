@@ -10,6 +10,8 @@ export interface CapacityBooking {
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
   createdAt: Date;
+  /** Set once the holder checked in (also early, before the start): the booking runs from then on. */
+  checkedInAt?: Date | null;
 }
 
 /** Effective number of parallel sessions of a resource (core's `sessionLimitOf`): machines only, minimum 1. */
@@ -75,36 +77,50 @@ export function heldBookings<T extends CapacityBooking>(args: {
 }
 
 /**
- * The bookings to cancel after the limit dropped to `limit`: while some instant has more occupying bookings than
- * slots, the most recently created booking that has not started yet and covers that instant goes first (ties by
- * id, highest first). Running bookings count but are never picked; an instant that only running bookings
- * overfill stays as it is. `occupying` is every pending/confirmed booking that ends after `now`.
+ * The bookings to cancel after the limit dropped to `limit`: while some instant at or after `now` has more occupying
+ * bookings than slots, the most recently created booking that has not started yet and covers that instant goes first
+ * (ties by id, highest first). Running bookings (started, or checked in early) count but are never picked; an instant
+ * that only running bookings overfill stays as it is. An overlap that is already over cancels nothing. `occupying` is
+ * every pending/confirmed booking whose span can still matter at `now`.
  */
 export function selectExcessBookings<T extends CapacityBooking>(occupying: T[], limit: number, now: Date): T[] {
-  const remaining = [...occupying];
+  const nowMs = now.getTime();
+  const remaining = new Set(
+    occupying.map((booking) => ({ booking, ...spanMs(booking) })).filter((span) => span.end > nowMs),
+  );
+  const instants = [...new Set([...remaining].map((span) => Math.max(span.start, nowMs)))].sort((a, b) => a - b);
   const cancelled: T[] = [];
-  const spanOf = new Map(remaining.map((b) => [b, blockedSpan(b)]));
-  const hasStarted = (b: T) => b.startTime.getTime() <= now.getTime();
-  for (;;) {
-    const instants = [...new Set(remaining.map((b) => (spanOf.get(b) as BlockedSpan).start.getTime()))].sort(
-      (a, b) => a - b,
-    );
-    let victim: T | null = null;
-    for (const t of instants) {
-      const covering = remaining.filter((b) => {
-        const span = spanOf.get(b) as BlockedSpan;
-        return span.start.getTime() <= t && t < span.end.getTime();
-      });
-      if (covering.length <= limit) continue;
-      const removable = covering
-        .filter((b) => !hasStarted(b))
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id);
-      if (removable.length === 0) continue;
-      victim = removable[0];
-      break;
+  // One pass in time order: removing a booking never overfills an earlier instant, so each instant is settled once.
+  for (const t of instants) {
+    for (let victim = excessAt(remaining, t, limit, nowMs); victim; victim = excessAt(remaining, t, limit, nowMs)) {
+      remaining.delete(victim);
+      cancelled.push(victim.booking);
     }
-    if (!victim) return cancelled;
-    cancelled.push(victim);
-    remaining.splice(remaining.indexOf(victim), 1);
   }
+  return cancelled;
+}
+
+interface SpanMs<T> {
+  booking: T;
+  start: number;
+  end: number;
+}
+
+function spanMs(booking: CapacityBooking): { start: number; end: number } {
+  const span = blockedSpan(booking);
+  return { start: span.start.getTime(), end: span.end.getTime() };
+}
+
+/** The booking to cancel at instant `t`, if more bookings than slots cover it and one of them has not started yet. */
+function excessAt<T extends CapacityBooking>(
+  spans: ReadonlySet<SpanMs<T>>,
+  t: number,
+  limit: number,
+  nowMs: number,
+): SpanMs<T> | undefined {
+  const covering = [...spans].filter((span) => span.start <= t && t < span.end);
+  if (covering.length <= limit) return undefined;
+  return covering
+    .filter(({ booking }) => booking.startTime.getTime() > nowMs && !booking.checkedInAt)
+    .sort((a, b) => b.booking.createdAt.getTime() - a.booking.createdAt.getTime() || b.booking.id - a.booking.id)[0];
 }

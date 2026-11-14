@@ -118,7 +118,7 @@ export function endedEarlyByManager(m: MessageContext, r: ReservationEntity): No
   };
 }
 
-/** A future booking was cancelled by the system: reservations were switched off, or the machine lost slots. */
+/** A future booking was cancelled by the system: reservations were switched off, or fewer parallel bookings are allowed. */
 export function removed(m: MessageContext, r: ReservationEntity, capacityReduced = false): NoticeText {
   const { lang, resourceName } = m;
   return {
@@ -128,8 +128,8 @@ export function removed(m: MessageContext, r: ReservationEntity, capacityReduced
       capacityReduced
         ? pick(
             lang,
-            `${resourceName} now has fewer slots, so your booking (${when(m, r)}) was cancelled because the time is fully booked.`,
-            `${resourceName} hat jetzt weniger Plätze, daher wurde deine Reservierung (${when(m, r)}) storniert, weil der Zeitraum voll belegt ist.`,
+            `${resourceName} now allows fewer parallel bookings, so your booking (${when(m, r)}) no longer fit and was cancelled.`,
+            `Für ${resourceName} sind jetzt weniger parallele Buchungen möglich, daher passte deine Reservierung (${when(m, r)}) nicht mehr und wurde storniert.`,
           )
         : pick(
             lang,

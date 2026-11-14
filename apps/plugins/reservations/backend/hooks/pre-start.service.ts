@@ -112,14 +112,10 @@ export class PreStartService {
     const sessions = await this.directory.getActiveSessions(ctx.resourceId);
     const inSession = new Set(sessions.map((session) => session.userId));
     const running = confirmed.filter((r) => r.startTime.getTime() <= nowMs);
+    // A booking whose override this attempt confirmed gave its slot to the manager, now and at later starts.
+    const overridden = overriddenBookingIds(ctx.confirmedStepKeys);
     if (!running.some((r) => r.userId === ctx.userId)) {
-      const held = heldBookings({
-        confirmed: running,
-        starterId: ctx.userId,
-        inSession,
-        at: now,
-        overridden: overriddenBookingIds(ctx.confirmedStepKeys),
-      });
+      const held = heldBookings({ confirmed: running, starterId: ctx.userId, inSession, at: now, overridden });
       if (held.length > 0 && limit - sessions.length - held.length <= 0) {
         const verdict = await this.whenActive(ctx, held, now);
         if (verdict) return verdict;
@@ -129,7 +125,7 @@ export class PreStartService {
       if (booking.userId === ctx.userId || booking.startTime.getTime() <= nowMs) continue;
       if (ctx.confirmedStepKeys.includes(reservationStepKey(booking.id))) continue;
       // Sessions now keep running, the starter takes one more slot, and the bookings held at that start need theirs.
-      const heldThen = heldBookings({ confirmed, starterId: ctx.userId, inSession, at: booking.startTime });
+      const heldThen = heldBookings({ confirmed, starterId: ctx.userId, inSession, at: booking.startTime, overridden });
       if (sessions.length + 1 + heldThen.length > limit) return this.askReservedSoon(ctx, booking, now);
     }
     return ALLOW;

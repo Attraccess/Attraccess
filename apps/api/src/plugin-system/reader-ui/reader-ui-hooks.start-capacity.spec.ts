@@ -8,8 +8,9 @@ function setup(hooks: Record<string, StartCapacityHook>, policy: 'fail-closed' |
     startCapacityHooks: () => Object.entries(hooks).map(([plugin, hook]) => ({ plugin, hook })),
   };
   const settings = { failurePolicy: jest.fn().mockResolvedValue(policy) };
+  const cleared: Array<(alert: { kind: string; plugin: string }) => void> = [];
   const alerts = {
-    onCleared: jest.fn(),
+    onCleared: (cb: (alert: { kind: string; plugin: string }) => void) => cleared.push(cb),
     raise: jest.fn().mockResolvedValue({}),
     clearWhere: jest.fn().mockResolvedValue(undefined),
   };
@@ -21,7 +22,7 @@ function setup(hooks: Record<string, StartCapacityHook>, policy: 'fail-closed' |
     audit as never,
     { get: () => ({}) } as never,
   );
-  return { service, audit };
+  return { service, audit, alerts, cleared };
 }
 
 const run = (occupiedSlots: number, satisfied: StartCapacityRun['satisfied'] = new Map()): StartCapacityRun => ({
@@ -33,6 +34,7 @@ const run = (occupiedSlots: number, satisfied: StartCapacityRun['satisfied'] = n
   language: 'en',
   sessionLimit: 3,
   occupiedSlots,
+  usersInSession: [11, 12, 13].slice(0, occupiedSlots),
   manager: { marker: 'manager' } as never,
   satisfied,
 });
@@ -58,6 +60,7 @@ describe('ReaderUiHooksService.runStartCapacity', () => {
         manager: { marker: 'manager' },
         sessionLimit: 3,
         occupiedSlots: 1,
+        usersInSession: [11],
         confirmedStepKeys: ['override-4'],
         resourceId: 3,
         userId: 7,
@@ -118,10 +121,73 @@ describe('ReaderUiHooksService.runStartCapacity', () => {
     expect((await service.runStartCapacity(run(0))).refusal).toMatchObject({ reason: { code: 'HOOK_UNAVAILABLE' } });
   });
 
-  it('times out a slow hook', async () => {
-    const { service } = setup({ reservations: () => new Promise(() => undefined) });
+  it('times out a slow hook and audits the refusal with reason code timeout', async () => {
+    const { service, audit } = setup({ reservations: () => new Promise(() => undefined) });
     const pending = service.runStartCapacity(run(0));
     await jest.advanceTimersByTimeAsync(5000);
-    expect((await pending).refusal).toMatchObject({ reason: { code: 'HOOK_UNAVAILABLE' } });
+    const outcome = await pending;
+    expect(outcome.refusal).toMatchObject({ reason: { code: 'HOOK_UNAVAILABLE' } });
+    await outcome.flush();
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'attractap.ui.hook_decision',
+        details: expect.objectContaining({ plugin: 'reservations', decision: 'block', reasonCode: 'timeout' }),
+      }),
+    );
+  });
+
+  describe('circuit breaker', () => {
+    const failing = () => {
+      const hook = jest.fn(() => {
+        throw new Error('down');
+      });
+      return hook;
+    };
+    const runTimes = async (service: ReaderUiHooksService, times: number) => {
+      for (let i = 0; i < times; i += 1) await (await service.runStartCapacity(run(0))).flush();
+    };
+
+    it('opens after repeated failures: the hook is no longer called and fail-closed still refuses', async () => {
+      const hook = failing();
+      const { service, audit, alerts } = setup({ reservations: hook });
+      await runTimes(service, 5);
+      expect(hook).toHaveBeenCalledTimes(5);
+      expect(alerts.raise).toHaveBeenCalledWith('breaker-open', expect.any(String), { plugin: 'reservations' });
+
+      const outcome = await service.runStartCapacity(run(0));
+      expect(hook).toHaveBeenCalledTimes(5);
+      expect(outcome.refusal).toMatchObject({ plugin: 'reservations', reason: { code: 'HOOK_UNAVAILABLE' } });
+      await outcome.flush();
+      expect(audit.record).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          details: expect.objectContaining({ decision: 'block', reasonCode: 'breaker-open' }),
+        }),
+      );
+    });
+
+    it('applies fail-open while open without calling the hook', async () => {
+      const hook = failing();
+      const { service } = setup({ reservations: hook }, 'fail-open');
+      await runTimes(service, 5);
+      expect((await service.runStartCapacity(run(0))).refusal).toBeNull();
+      expect(hook).toHaveBeenCalledTimes(5);
+    });
+
+    it('closes when the breaker alert is cleared or an admin resets the plugin', async () => {
+      const hook = failing();
+      const { service, cleared } = setup({ reservations: hook });
+      await runTimes(service, 5);
+      cleared.forEach((cb) => cb({ kind: 'breaker-open', plugin: 'reservations' }));
+      await service.runStartCapacity(run(0));
+      expect(hook).toHaveBeenCalledTimes(6);
+
+      await runTimes(service, 4);
+      expect(hook).toHaveBeenCalledTimes(10);
+      await service.runStartCapacity(run(0));
+      expect(hook).toHaveBeenCalledTimes(10); // open again
+      await service.resetBreaker('reservations');
+      await service.runStartCapacity(run(0));
+      expect(hook).toHaveBeenCalledTimes(11);
+    });
   });
 });

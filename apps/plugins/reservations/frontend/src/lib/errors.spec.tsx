@@ -5,7 +5,7 @@ import { ReservationsApiError } from '../api';
 import { useReservationsTranslations } from '../i18n';
 import de from '../de.json';
 import en from '../en.json';
-import { describeError } from './errors';
+import { describeCode, describeError } from './errors';
 
 const errorsOf = (messages: { errors: object }) => messages.errors as unknown as Record<string, string>;
 
@@ -23,6 +23,21 @@ describe('describeError', () => {
     expect(german).not.toBe('English server text');
     expect(german).toBe(errorsOf(de)[code]);
     expect(describeError(failure, translate('en'))).toBe(errorsOf(en)[code]);
+  });
+});
+
+describe('OVERLAP on a shared machine', () => {
+  it('says all slots are booked when the resource has more than one slot', () => {
+    const failure = new ReservationsApiError('All slots are booked at that time', 409, 'OVERLAP');
+    for (const language of ['en', 'de'] as const) {
+      const t = translate(language);
+      const messages = errorsOf(language === 'en' ? en : de);
+      expect(describeError(failure, t, { slots: 2 })).toBe(messages.OVERLAP_FULL);
+      expect(describeCode('OVERLAP', t, { slots: 3 })).toBe(messages.OVERLAP_FULL);
+      expect(describeError(failure, t, { slots: 1 })).toBe(messages.OVERLAP);
+      expect(describeError(failure, t)).toBe(messages.OVERLAP);
+      expect(describeCode('OWN_OVERLAP', t, { slots: 2 })).toBe(messages.OWN_OVERLAP);
+    }
   });
 });
 

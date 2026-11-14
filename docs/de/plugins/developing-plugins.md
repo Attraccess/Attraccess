@@ -146,19 +146,19 @@ nennt.
 }
 ```
 
-| Berechtigung             | Gewährt Zugriff auf                                                                                                                                                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `READ_USERS`             | `context.getRepository(User)` -- Benutzerkonten lesen.                                                                                                                                                                                                 |
-| `ACCESS_RESOURCES`       | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben -- sowie die lesenden `context.resourceAccess`-Abfragen. Siehe [Ressourcen-Zugriff](#ressourcen-zugriff-abfragen).                                                                 |
-| `READ_SETTINGS`          | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen.                                                                                                                                                                                     |
-| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` für jede andere Entität und `context.runSerialized(...)`.                                                                                                                                           |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden.                                                                                                                                      |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren.                                                                                                                                         |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen.                                                                                                                                                                           |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen.                                                                                                             |
-| `READER_UI`              | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).                                                                                   |
-| `ACCESS_HOOKS`           | `preStartHook`, `sessionEndHook`, `startBlockedQuery` und `startCapacityHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
-| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen).         |
+| Berechtigung             | Gewährt Zugriff auf                                                                                                                                                                                                                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.getRepository(User)` -- Benutzerkonten lesen.                                                                                                                                                                                                                                                            |
+| `ACCESS_RESOURCES`       | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben -- sowie die lesenden `context.resourceAccess`-Abfragen. Siehe [Ressourcen-Zugriff](#ressourcen-zugriff-abfragen).                                                                                                                            |
+| `READ_SETTINGS`          | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen.                                                                                                                                                                                                                                                |
+| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` für jede andere Entität und `context.runSerialized(...)`.                                                                                                                                                                                                      |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden.                                                                                                                                                                                                 |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren.                                                                                                                                                                                                    |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen.                                                                                                                                                                                                                                      |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen.                                                                                                                                                                        |
+| `READER_UI`              | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).                                                                                                                                              |
+| `ACCESS_HOOKS`           | `preStartHook`, `sessionEndHook`, `startBlockedQuery` und `startCapacityHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. `startCapacityHook` benötigt zusätzlich `DATABASE_ACCESS`. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen).                                                                    |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
 keine Berechtigung. Dasselbe gilt für `context.hostVersion`: die Version des
@@ -193,14 +193,14 @@ einfügen. Ein Plugin beschreibt nur **Daten** (einen Knotenbaum nach „Reader 
 kein Plugin-Code; der Host prüft, bereinigt und rendert alles. Admins stellen das unter **Reader-Anzeige** ein,
 siehe [Reader-Anzeige](attractap/reader-ui.md).
 
-| Was                            | Deklaration                                                               | Berechtigung   |
-| ------------------------------ | ------------------------------------------------------------------------- | -------------- |
-| Slot-Widgets                   | `readerUi` (Provider oder `(context) => provider`)                        | `READER_UI`    |
-| Pre-Start-Hook                 | `preStartHook`                                                            | `ACCESS_HOOKS` |
-| Beratende Frage nach dem Stopp | `sessionEndHook`                                                          | `ACCESS_HOOKS` |
-| Start-blockiert-Zustand        | `startBlockedQuery` und `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS` |
-| Start-Kapazität                | `startCapacityHook`                                                       | `ACCESS_HOOKS` |
-| Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`    |
+| Was                            | Deklaration                                                               | Berechtigung                         |
+| ------------------------------ | ------------------------------------------------------------------------- | ------------------------------------ |
+| Slot-Widgets                   | `readerUi` (Provider oder `(context) => provider`)                        | `READER_UI`                          |
+| Pre-Start-Hook                 | `preStartHook`                                                            | `ACCESS_HOOKS`                       |
+| Beratende Frage nach dem Stopp | `sessionEndHook`                                                          | `ACCESS_HOOKS`                       |
+| Start-blockiert-Zustand        | `startBlockedQuery` und `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS`                       |
+| Start-Kapazität                | `startCapacityHook`                                                       | `ACCESS_HOOKS` und `DATABASE_ACCESS` |
+| Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`                          |
 
 Ein Plugin, das `readerUi` oder einen Hook ohne die passende Berechtigung deklariert, **wird nicht geladen** und
 unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](resources/reservations.md) nutzt beide Hooks in der Praxis: Sein Pre-Start-Hook blockiert oder bestätigt Starts rund um Buchungen, sein Session-End-Hook fragt die buchende Person, ob sie den Rest einer Buchung behalten oder freigeben möchte. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
@@ -422,12 +422,13 @@ const startBlockedQuery: StartBlockedQuery = async (ctx) => {
 ### Start-Kapazität auf geteilten Maschinen
 
 Bei einer Maschine mit `maxParallelSessions` über 1 deklariert ein Plugin, das Plätze für andere zurückhält (das
-Reservierungs-Plugin tut das für bevorstehende Buchungen), den `startCapacityHook`. Der `preStartHook` allein kann das
+Reservierungs-Plugin tut das für laufende bestätigte Buchungen, deren Inhaber noch keine Sitzung hat), den
+`startCapacityHook`. Der `preStartHook` allein kann das
 nicht sicher leisten: Zwei gleichzeitige Starts könnten beide durchkommen und denselben Platz belegen.
 
 ```ts
 const startCapacityHook: StartCapacityHook = async (ctx) => {
-  // ctx.manager ist die Start-Transaktion des Hosts: Lesen Sie darüber
+  // ctx.manager ist die Start-Transaktion des Hosts: Lesen Sie ausschließlich darüber
   const held = await countSlotsHeldForOthers(ctx.manager, ctx.resourceId, ctx.userId, ctx.now); // Ihre eigene Abfrage
   if (!held) return { heldSlots: 0 };
   return {
@@ -443,18 +444,27 @@ const startCapacityHook: StartCapacityHook = async (ctx) => {
 
 - **Wann er läuft.** Nur auf geteilten Maschinen (Limit über 1), innerhalb der serialisierten Start-Transaktion des
   Kerns und nach dessen eigener Kapazitätsprüfung. Der Kontext enthält `sessionLimit`, `occupiedSlots` (Sitzungen und
-  laufende Starts, in derselben Transaktion gelesen), `userId`, `principal`, `action`, `origin`, `confirmedStepKeys`,
-  `language` und `now`.
+  laufende Starts, in derselben Transaktion gelesen), `usersInSession`, `userId`, `principal`, `action`, `origin`,
+  `confirmedStepKeys`, `language` und `now`.
+- **`usersInSession`** (`number[]`) nennt die Personen hinter `occupiedSlots` (Sitzungen und laufende Starts), in
+  derselben Transaktion gelesen. Damit erkennen Sie, ob ein Inhaber schon in einer Sitzung ist; der Hook muss die
+  Sitzungstabelle des Kerns nicht abfragen.
+- **`action` ist immer `start`.** Geteilte Maschinen kennen keine Übernahme: Ein Start fügt dort immer eine Sitzung
+  hinzu.
 - **Der Kern entscheidet.** Geben Sie `{ heldSlots, reason? }` zurück. Der Kern lehnt den Start mit Ihrem `reason` ab,
   wenn `occupiedSlots + heldSlots >= sessionLimit`; gleichzeitige Starts können so nie einen zurückgehaltenen Platz
   belegen.
-- **Nutzen Sie `ctx.manager`, verschachteln Sie nie `runSerialized`.** Die Start-Transaktion ist bereits
+- **Geben Sie immer einen `reason` zurück, wenn Ihre zurückgehaltenen Plätze die Maschine füllen können.** Ohne ihn
+  lehnt der Kern mit seinem allgemeinen „nicht verfügbar“-Text ab und protokolliert ein ungültiges Ergebnis.
+- **Lesen Sie nur über `ctx.manager`, verschachteln Sie nie `runSerialized`.** `ctx.manager` ist der
+  transaktionale `EntityManager` des Kerns: Schreiben Sie nie darüber. Die Start-Transaktion ist bereits
   serialisiert; eine weitere im Hook zu starten, lässt sie auf sich selbst warten. Beschränken Sie den Hook auf eine
   indizierte Abfrage.
 - **Ausfälle.** Fehler, Timeout und ein offener Circuit Breaker folgen der Ausfallrichtlinie pro Ressource und
   Plugin (fail open oder fail closed, siehe [Ausfälle und Vertrauen](#ausfälle-und-vertrauen)) und werden
   protokolliert.
-- Benötigt `ACCESS_HOOKS`. Ist kein Hook registriert, ändert sich nichts.
+- Benötigt `ACCESS_HOOKS` und `DATABASE_ACCESS` (der Hook erhält die Transaktion des Kerns). Ein Plugin, das ihn ohne
+  beide deklariert, wird nicht geladen. Ist kein Hook registriert, ändert sich nichts.
 
 ### Frage nach dem Stopp
 

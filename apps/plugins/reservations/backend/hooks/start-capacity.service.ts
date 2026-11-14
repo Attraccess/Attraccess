@@ -9,8 +9,9 @@ import { hookDeadline, waitUntil } from './runtime';
 /**
  * The plugin's half of the host's atomic start check on machines with several slots. The host calls it inside its
  * serialized start transaction, so it reads only through the given manager: one indexed query for the running
- * confirmed bookings and, only when someone else holds one, one for their sessions. It answers how many slots are
- * held for people other than the starter; the host refuses the start when those plus the occupied slots fill the machine.
+ * confirmed bookings (who is in session comes from the host, read in the same transaction). It answers how many slots
+ * are held for people other than the starter; the host refuses the start when those plus the occupied slots fill the
+ * machine.
  */
 @Injectable()
 export class StartCapacityService {
@@ -30,12 +31,11 @@ export class StartCapacityService {
     // The starter's own running booking is the slot they take; the host's normal limit still applies.
     if (running.length === 0 || running.some((r) => r.userId === ctx.userId)) return { heldSlots: 0 };
 
-    const holderIds = [...new Set(running.map((r) => r.userId))];
-    const inSession = await this.store.findUsersInSession(ctx.manager, ctx.resourceId, holderIds);
     const held = heldBookings({
       confirmed: running,
       starterId: ctx.userId,
-      inSession,
+      // A holder in session (or starting) is counted through `occupiedSlots`, never twice.
+      inSession: new Set(ctx.usersInSession),
       at: ctx.now,
       overridden: overriddenBookingIds(ctx.confirmedStepKeys),
     });

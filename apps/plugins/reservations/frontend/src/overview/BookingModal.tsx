@@ -105,7 +105,7 @@ export function BookingModal(props: Readonly<Props>) {
       setOpen(false);
     },
     onError: (failure) => {
-      setError(describeError(failure, t));
+      setError(describeError(failure, t, { slots: context.slots }));
       void invalidate();
     },
   });

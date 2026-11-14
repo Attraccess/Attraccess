@@ -25,11 +25,16 @@ export class DirectoryService {
 
   /** Effective session limit (core's rule): 1 for doors, unknown resources and machines without parallel sessions. */
   async getSessionLimit(resourceId: number, manager?: EntityManager): Promise<number> {
+    return (await this.findSessionLimit(resourceId, manager)) ?? 1;
+  }
+
+  /** Effective session limit, or null when the resource does not exist (anymore: deleted resources are not found). */
+  async findSessionLimit(resourceId: number, manager?: EntityManager): Promise<number | null> {
     const row = await (manager ? manager.getRepository(Resource) : this.context.getRepository(Resource)).findOne({
       where: { id: resourceId },
       select: { id: true, type: true, maxParallelSessions: true },
     });
-    return sessionLimitOf(row);
+    return row ? sessionLimitOf(row) : null;
   }
 
   /** Running sessions on the resource, earliest first. */

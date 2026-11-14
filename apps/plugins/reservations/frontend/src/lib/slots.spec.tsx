@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkWindow, validDurations, validStarts, type SlotContext } from './slots';
+import { checkWindow, peakConcurrency, validDurations, validStarts, type SlotContext } from './slots';
 import { wallClockToDate } from './time';
 import type { BookingRules, Reservation } from './types';
 import { validateSettingsForm } from './validation';
@@ -81,6 +81,12 @@ describe('checkWindow on shared resources', () => {
     expect(checkWindow(shared(1, own), at(2, 11), at(2, 13))).toBe('OVERLAP');
   });
 
+  it('reports an own overlap before a full machine, like the server', () => {
+    const fullWithOwn = [book(10, 12, { id: 1, mine: true }), book(10, 12, { id: 2 })];
+    expect(checkWindow(shared(2, fullWithOwn), at(2, 11), at(2, 12))).toBe('OWN_OVERLAP');
+    expect(checkWindow(shared(1, fullWithOwn), at(2, 11), at(2, 12))).toBe('OVERLAP');
+  });
+
   it('offers only windows with a free slot', () => {
     const full = [book(10, 11, { id: 1 }), book(10, 11, { id: 2 })];
     const ctx = shared(2, full);
@@ -88,6 +94,19 @@ describe('checkWindow on shared resources', () => {
     expect(validStarts(ctx, { year: 2030, month: 6, day: 2 }).some((d) => d.getTime() === at(2, 10).getTime())).toBe(
       false,
     );
+  });
+});
+
+describe('peakConcurrency', () => {
+  it('counts only the part of each span inside the window', () => {
+    const spans = [
+      { start: 0, end: 10 },
+      { start: 5, end: 15 },
+      { start: 20, end: 30 },
+    ];
+    expect(peakConcurrency(spans, 0, 30)).toBe(2);
+    expect(peakConcurrency(spans, 10, 30)).toBe(1);
+    expect(peakConcurrency(spans, 30, 40)).toBe(0);
   });
 });
 

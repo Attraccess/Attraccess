@@ -70,7 +70,7 @@ export function resetTestFixture(scope: AttractapSessionHandlerSessionFlowButton
     hold: jest.fn().mockReturnValue(() => undefined),
   };
   (scope.handler as any).startGate = {
-    run: jest.fn().mockResolvedValue({ kind: 'proceed' }),
+    run: jest.fn().mockResolvedValue({ kind: 'proceed', satisfied: {} }),
     afterStop: jest.fn().mockResolvedValue(undefined),
   };
   scope.mockBillingService = {
