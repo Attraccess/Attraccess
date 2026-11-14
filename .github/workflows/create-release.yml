@@ -18,6 +18,12 @@ permissions:
   # npm trusted publishing (OIDC) — no long-lived npm token.
   id-token: write
 
+# One release at a time: each run pushes a release commit and tag, and an older run publishing last would move
+# the npm dist-tag back to its version.
+concurrency:
+  group: create-release
+  cancel-in-progress: false
+
 env:
   # Nx remote cache — writable only when dispatched on main; a dispatch against
   # any other ref reads but cannot plant artifacts.
