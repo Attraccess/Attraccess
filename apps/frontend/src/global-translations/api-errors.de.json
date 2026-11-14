@@ -218,5 +218,25 @@
   "INVALID_LINK_TOKEN": {
     "title": "Link nicht mehr gültig",
     "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
+  },
+  "Email already exists": {
+    "title": "E-Mail-Adresse bereits vergeben",
+    "description": "Es existiert bereits ein Konto mit dieser E-Mail-Adresse. Verwende eine andere E-Mail-Adresse."
+  },
+  "Username already exists": {
+    "title": "Benutzername bereits vergeben",
+    "description": "Es existiert bereits ein Konto mit diesem Benutzernamen. Wähle einen anderen Benutzernamen."
+  },
+  "DUPLICATE_IN_DB": {
+    "title": "E-Mail-Adresse oder Benutzername bereits vergeben",
+    "description": "Bei einigen Zeilen ist die E-Mail-Adresse oder der Benutzername bereits vergeben. Prüfe die Zeilen unter „Import-Fehler“ und korrigiere die Datei oder nutze „Fehlgeschlagene Zeilen überspringen und einladen“."
+  },
+  "NO_CANDIDATES_IN_CSV": {
+    "title": "Keine Benutzer zum Einladen",
+    "description": "Es sind keine Zeilen zum Einladen übrig, weil alle Zeilen übersprungen wurden. Prüfe die Datei und die Spaltenzuordnung."
+  },
+  "MISSING_HEADER_ROW": {
+    "title": "CSV-Datei ohne Daten",
+    "description": "Die CSV-Datei hat keine Kopfzeile oder keine Zeilen darunter. Die erste Zeile muss die Spaltennamen enthalten, danach folgt eine Zeile pro Benutzer."
   }
 }

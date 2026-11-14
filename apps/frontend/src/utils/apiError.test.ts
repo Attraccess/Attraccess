@@ -44,6 +44,39 @@ describe('getTranslationKeyForApiError', () => {
     expect(getTranslation(translations, 'INVALID_CSV.description')).not.toBe('INVALID_CSV');
   });
 
+  describe.each([
+    ['English', API_ERROR_TRANSLATIONS_EN],
+    ['German', API_ERROR_TRANSLATIONS_DE],
+  ] as const)('%s user error translations', (_locale, translations) => {
+    it.each([
+      'Email already exists',
+      'Username already exists',
+      'DUPLICATE_IN_DB',
+      'NO_CANDIDATES_IN_CSV',
+      'MISSING_HEADER_ROW',
+    ] as const)('translates "%s"', (message) => {
+      const result = getTranslationKeyForApiError({
+        error: { body: { message } } as unknown as Error,
+        t: (key: string) => key,
+        tExists: (key: string) => getTranslation({ api: translations }, key) !== undefined,
+        baseTranslationKey: 'api',
+      });
+      const entry = translations[message];
+
+      expect(result.key).toBe(`api.${message}`);
+      expect(entry.title).toBeTruthy();
+      expect(entry.title).not.toBe(message);
+      expect(entry.title).not.toBe(translations.generic.title);
+      expect(entry.description).toBeTruthy();
+      expect(entry.description).not.toContain('{{');
+      expect(entry.description).not.toContain(message);
+    });
+  });
+
+  it('keeps the English and German API error keys in parity', () => {
+    expect(Object.keys(API_ERROR_TRANSLATIONS_DE).sort()).toEqual(Object.keys(API_ERROR_TRANSLATIONS_EN).sort());
+  });
+
   it.each([
     ['English', API_ERROR_TRANSLATIONS_EN, 'Meter not set up', 'METER_NOT_CONFIGURED: Heartbeats'],
     ['German', API_ERROR_TRANSLATIONS_DE, 'Zähler nicht eingerichtet', 'METER_NOT_CONFIGURED: Heartbeats'],
