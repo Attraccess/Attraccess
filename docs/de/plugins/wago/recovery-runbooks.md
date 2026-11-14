@@ -13,8 +13,8 @@ Die Tests liegen in `apps/plugins/wago/`, sofern nichts anderes angegeben ist. *
 [Reliability-Harness](plugins/wago/production-support.md#gemessene-grenzen), eine Simulatormessung.
 
 **Die Inbetriebnahme ist destruktiv, und es gibt kein Backup der Workloads.** Die Installation der Laufzeit ersetzt, was auf dem
-Controller liegt, und deaktiviert CODESYS dauerhaft. Weder ein Runbook hier noch irgendetwas in Attraccess sichert oder stellt frühere
-Anwendungen oder Daten eines Controllers wieder her. Sichern Sie vor der Inbetriebnahme selbst, was Sie benötigen.
+Controller liegt, und deaktiviert CODESYS dauerhaft. Weder ein Runbook hier noch irgendetwas in Attraccess erstellt eine Sicherungskopie früherer
+Anwendungen oder Daten eines Controllers oder stellt sie wieder her. Speichern Sie vor der Inbetriebnahme selbst, was Sie benötigen.
 
 ## 1. Attraccess-Konfiguration und Laufzeit wiederherstellen
 
@@ -32,7 +32,7 @@ neu registriert werden. Andere Server-Secrets sind zum Lesen der WAGO-Daten nich
 | Lassen Sie den in Attraccess konfigurierten MQTT-Servereintrag unverändert. Die Controller verbinden sich mit ihren gespeicherten Zugangsdaten wieder mit demselben Broker. | **Nicht abgedeckt** |
 | Warten Sie auf Heartbeats. Der Server baut sein Bild aus Heartbeats und gehaltenem (retained) Zustand neu auf; die Controller behalten ihre akzeptierte Konfiguration, solange der Server ausfällt. Messwerte werden nicht gehalten: Ein unveränderter Messwert hat keinen Wert, bis der Controller ihn erneut veröffentlicht, nach etwa 30 s plus dem Abfrageintervall des Geräts ([Veröffentlichungstakt](plugins/wago/measurement-contract.md#veröffentlichungsrhythmus)). | `backend/diagnostics/store.spec.ts`; Reliability: `server-restart` |
 | Vergleichen Sie unter **Konfiguration** die angewendete Revision jedes Controllers mit der veröffentlichten. Veröffentlichen Sie nichts, solange sie nicht abweichen. | `backend/wago-configuration.service.spec.ts` |
-| Ein Controller, dessen verwalteter Zugang sich nicht entschlüsseln lässt: Entfernen Sie ihn und nehmen Sie ihn erneut in Betrieb, siehe [Szenario 4](#4-einen-controller-ersetzen). | **Nicht abgedeckt** |
+| Ein Controller, dessen verwalteter Zugang sich nicht entschlüsseln lässt: Entfernen Sie ihn und nehmen Sie ihn erneut in Betrieb, siehe [Szenario 4](#_4-einen-controller-ersetzen). | **Nicht abgedeckt** |
 | Prüfen Sie nach der Wiederherstellung in der [Diagnose](plugins/wago/diagnostics.md) auf veraltete Controller und auf die Zähler verworfener Nachrichten. | `frontend/src/diagnostics/ControllerDiagnostics.spec.tsx` |
 
 Vorhandenes Verfahren: [Wiederherstellung der Laufzeit](plugins/wago/cc100-runtime.md#wiederherstellung) (Container-Absturz, Neustart, ungültige Konfiguration).
@@ -43,7 +43,7 @@ Vorhandenes Verfahren: [Wiederherstellung der Laufzeit](plugins/wago/cc100-runti
 
 | Schritt | Abgedeckt durch |
 | ------- | --------------- |
-| Rotieren Sie die Broker-Zugangsdaten des Controllers. Dafür gibt es in der Oberfläche keine Schaltfläche: Ein Administrator mit `system.settings.manage` ruft `POST /api/wago/controllers/<id>/credentials/rotate` auf (`<id>` ist die numerische Attraccess-ID des Controllers) und übergibt den Body `{"confirm": true}` als ausdrückliche Zustimmung. Die Laufzeit muss `credential-rotation-v1` melden. Details: [Zugangsdaten-Rotation](plugins/wago/credential-rotation.md). Solange die ACL des Controllers nicht eingeschränkt ist (ATT-1057), kann die offengelegte Zugangsdaten diesen Controller steuern und seine Konfiguration ersetzen ([Bedrohungsmodell](plugins/wago/threat-model.md#2-mqtt-autorisierung)); rotieren Sie daher zuerst. | `backend/credentials/service.spec.ts`; `acceptance/credential-rotation-mqtt.spec.ts`; `cc100-runtime/src/runtime/identity/rotation.spec.ts`; Reliability: `credential-rotation` |
+| Rotieren Sie die Broker-Zugangsdaten des Controllers. Dafür gibt es in der Oberfläche keine Schaltfläche: Ein Administrator mit `system.settings.manage` ruft `POST /api/wago/controllers/<id>/credentials/rotate` auf (`<id>` ist die numerische Attraccess-ID des Controllers) und übergibt den Body `{"confirm": true}` als ausdrückliche Zustimmung. Die Laufzeit muss `credential-rotation-v1` melden. Details: [Zugangsdaten-Rotation](plugins/wago/credential-rotation.md). Solange die ACL des Controllers nicht eingeschränkt ist (ATT-1057), kann die offengelegte Zugangsdaten diesen Controller steuern und seine Konfiguration ersetzen ([Bedrohungsmodell](plugins/wago/threat-model.md#_2-mqtt-autorisierung)); rotieren Sie daher zuerst. | `backend/credentials/service.spec.ts`; `acceptance/credential-rotation-mqtt.spec.ts`; `cc100-runtime/src/runtime/identity/rotation.spec.ts`; Reliability: `credential-rotation` |
 | Läuft die Rotation in ein Timeout, wiederholen Sie sie mit `{"confirm": true, "retry": true}`: Die gespeicherten Zugangsdaten und das Token werden wiederverwendet, der Broker wird nicht erneut rotiert. | `backend/credentials/service.spec.ts` |
 | Meldet die Laufzeit die Fähigkeit nicht, aktualisieren Sie sie zuerst (Szenario 5) oder entfernen Sie den Controller und registrieren Sie ihn neu. | `backend/credentials/service.spec.ts` (ältere Laufzeiten scheitern bei der Zulassung) |
 | Widerrufen Sie ein kompromittiertes, nicht beanspruchtes Enrollment, indem Sie die Sitzung abbrechen. Die Enrollment-Zugangsdaten laufen außerdem nach 15 Minuten ab. | **Nicht abgedeckt** |
@@ -52,7 +52,7 @@ Vorhandenes Verfahren: [Wiederherstellung der Laufzeit](plugins/wago/cc100-runti
 | Prüfen Sie den Audit-Verlauf: [Audit-Integration](plugins/wago/audit-integration.md). | `backend/audit/audit.spec.ts` |
 
 Das Bedrohungsmodell listet auf, was ein Angreifer mit den Zugangsdaten eines Controllers tun kann und was nicht:
-[Bedrohungsmodell](plugins/wago/threat-model.md#2-mqtt-autorisierung).
+[Bedrohungsmodell](plugins/wago/threat-model.md#_2-mqtt-autorisierung).
 
 ## 3. Broker-Ausfall
 

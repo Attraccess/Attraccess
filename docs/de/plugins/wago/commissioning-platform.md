@@ -5,8 +5,8 @@
 
 Seit dem **2026-09-06** ist die Inbetriebnahme destruktiv. Vorhandene Anwendungen und
 Workloads können aufhören zu funktionieren oder gelöscht werden. Attraccess bewahrt vorhandene CODESYS-Anwendungen,
-gespeicherte SPS-Daten, andere Workloads oder deren Host-Einstellungen weder auf, noch sichert oder
-stellt es sie wieder her. Die [frühere Entscheidung zur Bewahrung und die Befunde zur Herstellerquelle](plugins/wago/fw31-support.md)
+gespeicherte SPS-Daten, andere Workloads oder deren Host-Einstellungen nicht auf, erstellt keine Sicherungskopie davon
+und stellt sie nicht wieder her. Die [frühere Entscheidung zur Bewahrung und die Befunde zur Herstellerquelle](plugins/wago/fw31-support.md)
 bleiben als Historie bestehen. Tests verwenden temporäre Dateien und gefälschte
 Geräte-Transporte; **es wird keine Abnahme für physische E/A, Firmware-Neustart oder
 Management-Härtung behauptet**. ATT-984 bleibt ein Release-Gate.

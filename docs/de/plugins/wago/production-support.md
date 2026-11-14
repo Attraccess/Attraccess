@@ -44,7 +44,7 @@ deswegen nie abgelehnt.
 Eine verwaltete Laufzeit aktualisiert sich nach einem Server-Update automatisch, wobei die Ausgänge ausgeschaltet bleiben,
 bis der Server das laufende Image bestätigt. Eine nicht verwaltete Laufzeit (von Hand installiert oder vor den verwalteten
 Updates eingerichtet) bleibt im Failsafe, bis sie von Hand aktualisiert wird
-([Runbook 5](plugins/wago/recovery-runbooks.md#5-laufzeit-upgrade-und-rollback)).
+([Runbook 5](plugins/wago/recovery-runbooks.md#_5-laufzeit-upgrade-und-rollback)).
 
 ## Broker-Einstellungen
 
@@ -86,13 +86,13 @@ Die Laufzeit überspringt die Konfigurationsgrenzen nur, wenn eine eingehende Re
 akzeptierten Konfiguration entspricht. Ein ersetzter oder zurückgesetzter Controller hat keine, daher wird eine
 Retained-Revision, die vor diesen Grenzen veröffentlicht wurde und sie überschreitet, mit
 `configuration_limit_exceeded` abgelehnt. Verkleinern Sie die Konfiguration und veröffentlichen Sie eine neue Revision
-([Runbook 4](plugins/wago/recovery-runbooks.md#4-einen-controller-ersetzen)).
+([Runbook 4](plugins/wago/recovery-runbooks.md#_4-einen-controller-ersetzen)).
 
 Laufzeiten älter als `0.3.0` veröffentlichen Ablehnungsberichte beliebiger Größe. Der Server ignoriert jede
 Controller-Nachricht über 64 KiB oder mit mehr als 8 Verschachtelungsebenen. Eine sehr große Ablehnung einer solchen
 Laufzeit führt daher dazu, dass die Revision als veröffentlicht angezeigt wird, ohne dass eine Ablehnung erscheint.
 Aktualisieren Sie zuerst die Laufzeit
-([Runbook 5](plugins/wago/recovery-runbooks.md#5-laufzeit-upgrade-und-rollback)).
+([Runbook 5](plugins/wago/recovery-runbooks.md#_5-laufzeit-upgrade-und-rollback)).
 
 Jedes auf der Seite **Ein- & Ausgänge** hinzugefügte integrierte 879-3020-Messgerät erzeugt 131 physische Punkte und 131
 Kanäle, von denen 11 empfohlene Messwerte aktiviert sind ([Standard-Messwerte](plugins/wago/879-3020-modbus-rtu.md#standard-messwerte-und-weitere-aktivieren)).

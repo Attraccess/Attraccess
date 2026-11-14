@@ -30,8 +30,8 @@ Englisch und auf Deutsch.
 7. **Modbus-Profile sind unqualifiziert.** Die eingebauten Profile sind Referenzen, bis isolierte Hardware-Nachweise
    vorliegen.
 8. **Die Installation ist destruktiv.** Die Inbetriebnahme ersetzt die Controller-Software und deaktiviert CODESYS
-   dauerhaft. Attraccess sichert nichts, was vorher auf dem Controller war, und bewahrt oder stellt es nicht wieder
-   her.
+   dauerhaft. Attraccess erstellt keine Sicherungskopie dessen, was vorher auf dem Controller war, bewahrt es nicht und stellt
+   es nicht wieder her.
 9. **Keine Zusicherung der Produktionsreife.** Ein Penetrationstest und eine externe Sicherheitsprüfung wurden nicht
    durchgeführt. Siehe [Bedrohungsmodell und Pen-Test-Briefing](plugins/wago/threat-model.md).
 10. **Zurückgestellte Funktionen werden nicht beworben.** Die Qualifizierung aller vier Paket-Zusammenstellungen,

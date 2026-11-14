@@ -42,7 +42,7 @@ that has them receives one; a configuration that is already running is never ref
 A managed runtime updates automatically after the server is updated, with outputs off until the server confirms the
 running image. An unmanaged runtime (installed by hand, or enrolled before managed updates) stays in failsafe until it
 is updated by hand
-([runbook 5](plugins/wago/recovery-runbooks.md#5-runtime-upgrade-and-rollback)).
+([runbook 5](plugins/wago/recovery-runbooks.md#_5-runtime-upgrade-and-rollback)).
 
 ## Broker settings
 
@@ -82,12 +82,12 @@ A dropped command gets no reply, so it times out like a command to an offline co
 The runtime skips the configuration limits only when an incoming revision and hash equal its saved accepted
 configuration. A replacement or reset controller has none, so a retained revision that was published before these
 limits and exceeds them is rejected with `configuration_limit_exceeded`. Reduce the configuration and publish a new
-revision ([runbook 4](plugins/wago/recovery-runbooks.md#4-replace-a-controller)).
+revision ([runbook 4](plugins/wago/recovery-runbooks.md#_4-replace-a-controller)).
 
 Runtimes older than `0.3.0` publish rejection reports of any size. The server ignores any controller message over
 64 KiB or nested deeper than 8 levels, so a very large rejection from such a runtime leaves the revision shown as
 published with no rejection. Update the runtime first
-([runbook 5](plugins/wago/recovery-runbooks.md#5-runtime-upgrade-and-rollback)).
+([runbook 5](plugins/wago/recovery-runbooks.md#_5-runtime-upgrade-and-rollback)).
 
 Each built-in 879-3020 meter added on the **Inputs & outputs** page creates 131 physical points and 131 channels, of
 which 11 recommended readings are enabled ([default readings](plugins/wago/879-3020-modbus-rtu.md#default-readings-and-enabling-more)).

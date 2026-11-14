@@ -8,8 +8,8 @@
 Die Produktentscheidung vom **2026-09-06** löst die unten aufgeführten Anforderungen zur Erhaltung
 und Wiederherstellung früherer Workloads ab. Die Inbetriebnahme übernimmt den CC100: Vorhandene
 Anwendungen und Workloads funktionieren möglicherweise nicht mehr oder werden gelöscht. Attraccess
-erhält, sichert oder stellt vorhandene CODESYS-Programme, gespeicherte PLC-Daten, andere Workloads
-oder deren Host-Einstellungen nicht wieder her. Es gibt eine einzige Bestätigung der destruktiven
+erhält vorhandene CODESYS-Programme, gespeicherte PLC-Daten, andere Workloads
+oder deren Host-Einstellungen nicht, erstellt keine Sicherungskopie davon und stellt sie nicht wieder her. Es gibt eine einzige Bestätigung der destruktiven
 Installationsfolgen; keine separate Freigabe einer PLC-Sicherung und keine verpflichtende WBM-Schranke.
 
 Der aktuelle Übertragungsvertrag stoppt und deaktiviert CODESYS immer dauerhaft und
