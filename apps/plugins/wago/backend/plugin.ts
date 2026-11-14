@@ -11,7 +11,7 @@ import { WagoCredentialRotationEntity } from './credentials/service';
 import { WagoCommissioningSession } from './commissioning/sessions/session.entity';
 import { WagoCommissioningService } from './commissioning/service';
 import { WagoCredentialRotationService } from './credentials/service';
-import { WagoRuntimeArtifactsService } from './runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from './runtime/artifacts/service';
 import { WagoArtifactsController } from './runtime/artifacts/controller';
 import { WagoDiagnosticsController } from './diagnostics/service';
 import { WagoDiagnosticsService } from './diagnostics/service';

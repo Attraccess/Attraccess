@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import request from 'supertest';
 import { PluginService } from './plugin.service';
+import { PluginUninstallService } from './plugin-uninstall.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { zipFileUpload } from './__test__/make-zip';
@@ -214,7 +215,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     const plugin = PluginService.getPlugins().find((p) => p.name === PLUGIN_NAME);
     expect(plugin).toBeDefined();
 
-    await new PluginService().deletePlugin((plugin as LoadedPluginManifest).id);
+    await new PluginUninstallService(new PluginService()).deletePlugin((plugin as LoadedPluginManifest).id);
 
     expect(existsSync(join(PLUGIN_PATH, PLUGIN_NAME))).toBe(false);
     expect(restartSpy).toHaveBeenCalledTimes(0);

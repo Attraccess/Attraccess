@@ -20,7 +20,8 @@ import { promisify } from 'node:util';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { WagoArtifactsController } from './controller';
 import { WagoBuildRuntimeCatalog, sameRuntimeImage } from './build';
-import { WagoRuntimeArtifactCatalog, WagoRuntimeArtifactsService } from './catalog';
+import { WagoRuntimeArtifactCatalog } from './catalog';
+import { WagoRuntimeArtifactsService } from './service';
 function bundle(value: unknown = manifest, reference = image, extra = Buffer.alloc(0)) {
   return Buffer.concat([
     tarMember('image.tar', 'isolated image fixture'),

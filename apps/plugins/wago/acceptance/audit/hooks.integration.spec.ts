@@ -31,7 +31,8 @@ import { createPluginAuditContext } from '../../../../api/src/plugin-system/runt
 import { fw31IdentityOutput } from '../../backend/fixtures/fw31-identity';
 import { CLOCK_INSPECTION_SCRIPT } from '../../backend/commissioning/delivery/clock';
 import { WAGO_HARDWARE_PROFILE } from '../../backend/host/hardware-deployment';
-import { type RuntimeArtifactManifest, WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/catalog';
+import { type RuntimeArtifactManifest } from '../../backend/runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/service';
 
 describe('composed WAGO hooks through the host bridge and durable SQLite provider', () => {
   const state = new AuditFixtureState();

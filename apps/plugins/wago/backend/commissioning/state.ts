@@ -8,7 +8,8 @@ import { WagoCommissioningSession } from './sessions/session.entity';
 
 import { WagoService } from '../controllers/service';
 
-import { WagoRuntimeArtifactsService, WagoRuntimeArtifactCatalog } from '../runtime/artifacts/catalog';
+import { WagoRuntimeArtifactCatalog } from '../runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../runtime/artifacts/service';
 
 import { WagoCommissioningReadiness } from './readiness/readiness';
 

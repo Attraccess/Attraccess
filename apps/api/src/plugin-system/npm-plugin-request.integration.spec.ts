@@ -1,4 +1,5 @@
 import { PluginAdministrationService } from './plugin-administration.service';
+import { PluginUninstallService } from './plugin-uninstall.service';
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -32,6 +33,7 @@ describe('npm plugin request DTOs (HTTP integration)', () => {
         { provide: NpmPluginService, useValue: npmPluginService },
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         PluginAdministrationService,
+        PluginUninstallService,
         DualAuthGuard,
         EffectivePermissionsGuard,
       ],
