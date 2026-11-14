@@ -14,6 +14,7 @@ import {
 } from '@attraccess/database-entities';
 
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+import { MeteringOperationError } from './metering-readings';
 import { findActiveUsages } from '../usage/sessions/active-usage';
 import type { meterDefinitionFromFlow } from './metering-definition';
 import type { MeterFinal } from './metering-settlement';
@@ -52,6 +53,24 @@ export class MeteringSegments {
     return { usageId: session.usageId, creditsPerUnit: session.creditsPerUnit };
   }
 
+  /**
+   * The participants of the segment that follows a boundary: the sessions still running, earliest first, keeping
+   * what the open segment stored for them. A session that stopped (even one whose own stop reading failed) is never
+   * carried into it.
+   */
+  private nextParticipants(
+    open: ResourceMeteringSegment | null,
+    actives: { session: ResourceMeteringSession }[],
+  ): ResourceMeteringSegmentParticipant[] {
+    const stored = new Map((open?.participants ?? []).map((participant) => [participant.usageId, participant]));
+    return actives.map(({ session }) => stored.get(session.usageId) ?? this.toParticipant(session));
+  }
+
+  /** Participants stay ordered by usage, which is their start order: the position decides a rounding tie. */
+  private inStartOrder(participants: ResourceMeteringSegmentParticipant[]): ResourceMeteringSegmentParticipant[] {
+    return [...participants].sort((left, right) => left.usageId - right.usageId);
+  }
+
   /** Running sessions that use the meter through shared segments (or alone, on their own total), earliest first. */
   async activeParticipants(
     manager: EntityManager,
@@ -83,24 +102,68 @@ export class MeteringSegments {
     return (await findActiveUsages(this.manager, resourceId)).some((usage) => !excluded.has(usage.id));
   }
 
-  /** Closes the open segment after a retried boundary reading that the caller already ran. */
+  /**
+   * A retry of a share whose segment never got its closing reading. While sessions run, their next start or stop
+   * reads the meter and bills it; a retry does not take a session-change turn, so it never reads the meter under them.
+   */
+  async retryClosing(session: ResourceMeteringSession, usage: ResourceUsage, timeoutSeconds: number): Promise<void> {
+    const open = await this.findOpen(this.manager, session.meterId);
+    if (!open?.participants.some((participant) => participant.usageId === session.usageId)) return;
+    if ((await this.activeParticipants(this.manager, session.resourceId, session.meterId)).length)
+      throw new MeteringOperationError(
+        'Sessions are still running on this machine; the share is billed when one of them starts or stops',
+      );
+    const operation = await this.hooks.runOperation(session, 'final', {
+      trigger: ResourceFlowNodeType.INPUT_METERING_COLLECT,
+      timeoutSeconds,
+      freshAfter: usage.endTime ?? undefined,
+    });
+    await this.closeAfter(operation, open, []);
+  }
+
+  /** Whether running sessions other than the starting one (and the one it takes over) share the meter's segments. */
+  async inUseBySegments(
+    resourceId: number,
+    meterId: number,
+    starting: { usageId: number; supersedes?: number },
+  ): Promise<boolean> {
+    const others = await this.activeParticipants(this.manager, resourceId, meterId, [
+      starting.usageId,
+      starting.supersedes,
+    ]);
+    return others.some(({ session }) => session.accounting === 'segmented');
+  }
+
+  /** The meter starts over: open segments can no longer get their closing reading. */
+  async abandonOpen(manager: EntityManager, meterId: number, at = new Date()): Promise<void> {
+    await manager.update(ResourceMeteringSegment, { meterId, status: 'open' }, { status: 'abandoned', endedAt: at });
+  }
+
+  /**
+   * Closes the segment a retry read the meter for. A retry does not take a session-change turn, so a start or
+   * stop may have closed that segment meanwhile; then nothing is closed and the retry is refused, since its
+   * snapshot of the running sessions is out of date.
+   */
   async closeAfter(
     operation: ResourceMeteringOperation,
+    segment: ResourceMeteringSegment,
     actives: { usage: ResourceUsage; session: ResourceMeteringSession }[],
   ): Promise<void> {
     const meter = await this.manager.findOneOrFail(ResourceMeter, { where: { id: operation.meterId } });
-    const open = await this.findOpen(this.manager, operation.meterId);
-    const stored = new Map((open?.participants ?? []).map((participant) => [participant.usageId, participant]));
     await this.close({
       resourceId: operation.resourceId,
       meterId: operation.meterId,
       reading: this.readingOf(operation, meter),
-      next: actives.map(({ session }) => stored.get(session.usageId) ?? this.toParticipant(session)),
+      next: this.nextParticipants(segment, actives),
+      expectedOpenId: segment.id,
     });
   }
 
   findOpen(manager: EntityManager, meterId: number): Promise<ResourceMeteringSegment | null> {
-    return manager.findOne(ResourceMeteringSegment, { where: { meterId, status: 'open' }, order: { startedAt: 'DESC' } });
+    return manager.findOne(ResourceMeteringSegment, {
+      where: { meterId, status: 'open' },
+      order: { startedAt: 'DESC' },
+    });
   }
 
   /**
@@ -131,7 +194,10 @@ export class MeteringSegments {
     const known = new Set(segment.participants.map((participant) => participant.usageId));
     const missing = actives.filter(({ session }) => !known.has(session.usageId));
     if (missing.length) {
-      segment.participants = [...segment.participants, ...missing.map(({ session }) => this.toParticipant(session))];
+      segment.participants = this.inStartOrder([
+        ...segment.participants,
+        ...missing.map(({ session }) => this.toParticipant(session)),
+      ]);
       await manager.update(ResourceMeteringSegment, segment.id, { participants: segment.participants });
     }
     const ids = actives.map(({ session }) => session.id);
@@ -149,9 +215,15 @@ export class MeteringSegments {
     meterId: number;
     reading: { value: string; observedAt: Date };
     next: ResourceMeteringSegmentParticipant[];
+    /** Only close this segment: refuse when another boundary closed it first. */
+    expectedOpenId?: string;
   }): Promise<ResourceMeteringSegment | null> {
     const closed = await runSerializedTransaction(this.manager, async (manager) => {
       const segment = await this.findOpen(manager, input.meterId);
+      if (input.expectedOpenId !== undefined && segment?.id !== input.expectedOpenId)
+        throw new MeteringOperationError(
+          'Sessions on the machine changed during the retry; their next start or stop bills it',
+        );
       if (segment) {
         await manager.update(ResourceMeteringSegment, segment.id, {
           status: 'closed',
@@ -214,12 +286,7 @@ export class MeteringSegments {
     const session = await this.manager.save(ResourceMeteringSession, { ...values, accounting: 'segmented' });
     const newcomer = this.toParticipant(session);
     if (!actives.length) {
-      // Nobody is using the meter: initialize it as a single session does. Segments nobody can claim are stale.
-      await this.manager.update(
-        ResourceMeteringSegment,
-        { meterId: values.meterId, status: 'open' },
-        { status: 'abandoned' },
-      );
+      // Nobody is using the meter: initialize it as a single session does.
       try {
         await this.hooks.runOperation(session, 'start', {
           trigger: ResourceFlowNodeType.INPUT_METERING_START,
@@ -231,6 +298,9 @@ export class MeteringSegments {
         this.logger.warn(`Skipping tracking-only meter ${values.meterId}: ${String(error)}`);
         return null;
       }
+      // The meter starts over, so a segment still waiting for its closing reading can no longer get one. Only now:
+      // a start that fails leaves it open for a retry. The caller fails the sessions that were waiting for it.
+      await this.abandonOpen(this.manager, values.meterId, now);
       const started = await this.manager.findOneOrFail(ResourceMeteringSession, { where: { id: session.id } });
       await this.manager.save(ResourceMeteringSegment, {
         id: randomUUID(),
@@ -258,7 +328,7 @@ export class MeteringSegments {
         resourceId: values.resourceId,
         meterId: values.meterId,
         reading: this.readingOf(operation, fresh),
-        next: [...open.participants, newcomer],
+        next: [...this.nextParticipants(open, actives), newcomer],
       });
     } catch (error) {
       await this.manager.delete(ResourceMeteringSession, session.id);
@@ -295,12 +365,11 @@ export class MeteringSegments {
         });
         const meter = await this.manager.findOneOrFail(ResourceMeter, { where: { id: session.meterId } });
         const open = await this.findOpen(this.manager, session.meterId);
-        const stored = new Map((open?.participants ?? []).map((participant) => [participant.usageId, participant]));
         await this.close({
           resourceId: session.resourceId,
           meterId: session.meterId,
           reading: this.readingOf(operation, meter),
-          next: actives.map(({ session: other }) => stored.get(other.usageId) ?? this.toParticipant(other)),
+          next: this.nextParticipants(open, actives),
         });
         return { status: 'ready', operationId: operation.id };
       } catch (error) {
@@ -339,19 +408,21 @@ export class MeteringSegments {
         });
       } else if (!open.participants.some((participant) => participant.usageId === usageId)) {
         await manager.update(ResourceMeteringSegment, open.id, {
-          participants: [...open.participants, this.toParticipant(session)],
+          participants: this.inStartOrder([...open.participants, this.toParticipant(session)]),
         });
       }
     }
   }
 
-  /** A tentative start that is rolled back never took part: the segment it was added to simply goes on without it. */
-  async withdraw(manager: EntityManager, usageId: number): Promise<void> {
-    const meterIds = (await manager.find(ResourceMeteringSession, { where: { usageId }, select: { meterId: true } })).map(
-      (session) => session.meterId,
-    );
-    if (!meterIds.length) return;
-    const open = await manager.find(ResourceMeteringSegment, { where: { status: 'open', meterId: In(meterIds) } });
+  /**
+   * A tentative start that is rolled back never took part: the segments it was added to simply go on without it.
+   * Found through the open segments themselves, so it also works after its metering sessions were deleted.
+   */
+  async withdraw(manager: EntityManager, usageId: number, resourceId?: number): Promise<void> {
+    // Few segments are open at any time: one per meter in use.
+    const open = await manager.find(ResourceMeteringSegment, {
+      where: resourceId === undefined ? { status: 'open' } : { status: 'open', resourceId },
+    });
     for (const segment of open) {
       if (segment.participants.some((participant) => participant.usageId === usageId)) {
         await manager.update(ResourceMeteringSegment, segment.id, {

@@ -57,7 +57,7 @@ Everybody is billed for their own session, and every person's charges are on the
 
 For example, a machine uses 8 kWh at 30 credits per kWh. Person A is alone for 2 kWh, A and B are together for 2 kWh and B is alone for 4 kWh. A pays 2 + 1 = 3 kWh = 90 credits, B pays 1 + 4 = 5 kWh = 150 credits.
 
-On receipts, in the billing history and in the live session billing view, a shared session shows the person's share (for example "0.8 kWh - your share of 2.4 kWh") with a **shared** marker and a breakdown of every segment the person was in. See [Billing transactions](billing/transactions.md#shared-sessions).
+On receipts and in the billing history, a shared session shows the person's share against the total (for example "0.8 — your share of 2.4") with a **Shared** marker and a breakdown of every segment the person was in. See [Billing transactions](billing/transactions.md#shared-sessions). While the session runs, the live session billing view shows the meter share so far (for example "0.8 — your share of 1.2 so far"), marked "provisional until the next reading", and the same breakdown with the open segment marked provisional; it shows no **Shared** marker.
 
 With a limit of 1, nothing changes. If a limit is lowered while sessions are running, overlapping sessions are still split fairly. If it is raised during a solo session, that session joins the segments from the moment others start.
 

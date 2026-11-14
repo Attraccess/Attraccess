@@ -101,6 +101,9 @@ it.each(['0.001', '90071992547409.92', '-1', ''])(
 it('saves a changed meter allocation and leaves unchanged ones alone', async () => {
   await openEditor();
   const group = document.querySelector('[data-cy="meter-allocation-2"]') as HTMLElement;
+  // Each option explains itself, not only the selected one.
+  expect(within(group).getByText('inputs.meterAllocation.description.shared')).toBeTruthy();
+  expect(within(group).getByText('inputs.meterAllocation.description.per-session')).toBeTruthy();
   fireEvent.click(within(group).getByRole('radio', { name: 'inputs.meterAllocation.options.per-session' }));
   fireEvent.click(screen.getByRole('button', { name: 'actions.save' }));
   await waitFor(() => expect(state.updateConfiguration).toHaveBeenCalledOnce());

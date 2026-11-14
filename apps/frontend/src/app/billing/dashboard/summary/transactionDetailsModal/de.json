@@ -48,12 +48,9 @@
     "meterDescription": "{{value}} zu {{rate}} pro Messwert",
     "unavailable": "Nicht verfügbar",
     "meterUnavailable": "Endwert nicht verfügbar; keine Zählergebühr enthalten. Erfasster Preis: {{rate}} pro Messwert.",
-    "allocation": {
-      "shared": "Geteilt",
-      "shareLine": "{{share}} — dein Anteil an {{total}}",
-      "breakdown": "Aufschlüsselung anzeigen",
-      "segment": "Personen: {{people}} · gesamt {{total}} ({{totalCredits}}), dein Anteil {{share}} ({{shareCredits}})"
-    }
+    "pending": "Ausstehend",
+    "meterPending": "Ausstehend: Dein Anteil wird separat abgerechnet, sobald der Zähler wieder gelesen werden kann. Erfasster Preis: {{rate}} pro Messwert.",
+    "meterSharedDescription": "Dein Anteil, je Abschnitt gerundet, zu {{rate}} pro Messwert"
   },
   "actions": {
     "refund": "Erstattung",

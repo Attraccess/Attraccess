@@ -13,6 +13,8 @@ import {
 
 import { rm } from 'node:fs/promises';
 
+import { IsNull, Not } from 'typeorm';
+
 import { closeResourceTransactionConnection } from '../../../database/run-serialized-transaction';
 
 import { resetTestFixture } from './fixtures/setup.test-fixture';
@@ -166,7 +168,9 @@ describe('Metering on a shared machine', () => {
 
       expect(await meterSessions().findBy({ status: ResourceMeteringSessionStatus.Active })).toHaveLength(1);
       expect(await segments()).toEqual(open);
-      expect(await scope.source.getRepository(ResourceUsage).countBy({ endTime: undefined })).toBeGreaterThan(0);
+      // Only A's usage is left: the refused start left nothing behind.
+      expect(await scope.source.getRepository(ResourceUsage).find({ select: { id: true } })).toEqual([{ id: a.id }]);
+      expect(await scope.source.getRepository(BillingTransaction).countBy({ resourceUsageId: Not(a.id) })).toBe(0);
       counter = 101;
       scope.onCollect = ({ complete }) => complete({ kind: 'reading', value: String(counter) });
       await end(0);
@@ -205,9 +209,7 @@ describe('Metering on a shared machine', () => {
         allocation: { kind: 'meter', segments: [expect.objectContaining({ participants: 2, totalQuantity: '10' })] },
       });
       expect((await scope.sessionOf(b.id)).status).toBe(ResourceMeteringSessionStatus.Settled);
-      expect(
-        await scope.source.getRepository(BillingTransaction).countBy({ correctionOfId: undefined }),
-      ).toBeGreaterThan(0);
+      expect(await scope.source.getRepository(BillingTransaction).countBy({ correctionOfId: Not(IsNull()) })).toBe(1);
     });
 
     it('keeps every affected session pending when the final reading fails too, and bills them on retry', async () => {
@@ -233,10 +235,176 @@ describe('Metering on a shared machine', () => {
 
       expect(retried.status).toBe(ResourceMeteringSessionStatus.Settled);
       expect((await scope.sessionOf(b.id)).status).toBe(ResourceMeteringSessionStatus.Settled);
-      const total = (await scope.correctionsOf(a.id)).corrections.reduce((sum, c) => sum - c.amount, 0);
-      const totalB = (await scope.correctionsOf(b.id)).corrections.reduce((sum, c) => sum - c.amount, 0);
-      // 10 kWh between 100 and 110 at 30 credits, all of it billed to the two of them.
-      expect(total + totalB + (await charged(a.id)) + (await charged(b.id))).toBe(300);
+      // 10 kWh between 100 and 110 at 30 credits: A 2 alone + half of the merged 8, B the other half; once each.
+      expect(await charged(a.id)).toBe(0);
+      expect(await charged(b.id)).toBe(0);
+      expect((await scope.correctionsOf(a.id)).corrections).toEqual([expect.objectContaining({ amount: -(60 + 120) })]);
+      expect((await scope.correctionsOf(b.id)).corrections).toEqual([expect.objectContaining({ amount: -120 })]);
+      expect(await meterItem(a.id)).toMatchObject({ unitPrice: 0, allocation: { kind: 'meter', pending: true } });
+    });
+
+    it('does not carry a person whose stop reading failed into the segment a later start opens', async () => {
+      await setUpSharedMachine(3);
+      const offline = async () => {
+        throw new Error('meter offline');
+      };
+      const online = scope.onCollect;
+      const a = await start(0);
+      counter = 102;
+      const b = await start(1);
+      counter = 110;
+      scope.onCollect = offline;
+      await end(1);
+      scope.onCollect = online;
+      counter = 112;
+      const c = await start(2);
+      counter = 130;
+      await end(0);
+      counter = 160;
+      await end(2);
+
+      const all = await segments();
+      expect(all.map((segment) => segment.participants.map((p) => p.usageId))).toEqual([
+        [a.id],
+        [a.id, b.id],
+        [a.id, c.id],
+        [c.id],
+      ]);
+      // A: 2 alone + 5 of the merged 10 + 9 of 18 = 16 kWh; B: 5 kWh, later; C: 9 + 30 = 39 kWh.
+      expect(await charged(a.id)).toBe(480);
+      expect((await scope.correctionsOf(b.id)).corrections).toEqual([expect.objectContaining({ amount: -150 })]);
+      expect(await charged(c.id)).toBe(1170);
+    });
+
+    it('keeps a stopped person waiting for the merged segment when a pushed reading arrives meanwhile', async () => {
+      await setUpSharedMachine(3);
+      const online = scope.onCollect;
+      const a = await start(0);
+      counter = 102;
+      const b = await start(1);
+      counter = 110;
+      scope.onCollect = async () => {
+        throw new Error('meter offline');
+      };
+      await end(1);
+      scope.onCollect = online;
+
+      counter = 111;
+      await scope.metering.report(1, 1, { kind: 'reading', value: '111' });
+      expect((await scope.sessionOf(b.id)).status).toBe(ResourceMeteringSessionStatus.Pending);
+      counter = 112;
+      await end(0);
+
+      expect(await charged(a.id)).toBe(60 + 150);
+      expect((await scope.correctionsOf(b.id)).corrections).toEqual([expect.objectContaining({ amount: -150 })]);
+    });
+
+    it('keeps a pending segment billable when the next start on the idle machine fails', async () => {
+      await setUpSharedMachine(3);
+      const a = await start(0);
+      counter = 102;
+      await start(1);
+      counter = 104;
+      await end(1);
+      counter = 106;
+      scope.onCollect = async () => {
+        throw new Error('meter offline');
+      };
+      await end(0);
+      expect((await scope.sessionOf(a.id)).status).toBe(ResourceMeteringSessionStatus.Pending);
+
+      const onStart = scope.onStart;
+      scope.onStart = jest.fn(async () => {
+        throw new Error('meter offline');
+      });
+      await expect(start(2)).rejects.toThrow('METER_INITIALIZATION_FAILED');
+      expect((await segments()).map((segment) => segment.status)).toEqual(['closed', 'closed', 'open']);
+
+      scope.onStart = onStart;
+      counter = 108;
+      const endedA = await scope.source.getRepository(ResourceUsage).findOneByOrFail({ id: a.id });
+      scope.onCollect = ({ complete }) =>
+        complete({ kind: 'reading', value: String(counter), observedAt: endedA.endTime?.toISOString() });
+      await scope.metering.retrySettlement(1, (await scope.sessionOf(a.id)).id, 1);
+      // A: 2 alone + 1 of 2 shared + 4 alone, nothing dropped.
+      expect((await scope.correctionsOf(a.id)).corrections).toEqual([expect.objectContaining({ amount: -210 })]);
+    });
+
+    it('fails a pending share, instead of billing part of it, once a new start re-initializes the meter', async () => {
+      await setUpSharedMachine(3);
+      const a = await start(0);
+      counter = 102;
+      await start(1);
+      counter = 104;
+      await end(1);
+      scope.onCollect = async () => {
+        throw new Error('meter offline');
+      };
+      await end(0);
+      scope.onCollect = ({ complete }) => complete({ kind: 'reading', value: String(counter) });
+
+      await start(2);
+
+      expect(await scope.sessionOf(a.id)).toMatchObject({
+        status: ResourceMeteringSessionStatus.Failed,
+        failureReason: expect.stringContaining('re-initialized'),
+      });
+      expect((await scope.correctionsOf(a.id)).corrections).toEqual([]);
+      // No charge follows any more, so the line no longer says one will.
+      expect(await meterItem(a.id)).toMatchObject({ unitPrice: 0, meterQuantity: null, allocation: null });
+    });
+
+    it('leaves a pending share to the next start or stop while others still run', async () => {
+      await setUpSharedMachine(3);
+      const online = scope.onCollect;
+      const a = await start(0);
+      counter = 102;
+      const b = await start(1);
+      counter = 104;
+      scope.onCollect = async () => {
+        throw new Error('meter offline');
+      };
+      await end(1);
+      scope.onCollect = online;
+
+      await expect(scope.metering.retrySettlement(1, (await scope.sessionOf(b.id)).id, 1)).rejects.toThrow(
+        'Sessions are still running',
+      );
+      expect((await scope.sessionOf(b.id)).status).toBe(ResourceMeteringSessionStatus.Pending);
+      counter = 106;
+      await end(0);
+      expect((await scope.correctionsOf(b.id)).corrections).toEqual([expect.objectContaining({ amount: -60 })]);
+      expect(await charged(a.id)).toBe(60 + 60);
+    });
+
+    it('takes a participant that never started out of the open segment, even after its meter sessions are gone', async () => {
+      await setUpSharedMachine(3);
+      const a = await start(0);
+      const b = await start(1);
+      await meterSessions().delete({ usageId: b.id });
+
+      await scope.metering.discardCandidate(scope.source.manager, b.id);
+
+      const open = (await segments()).find((segment) => segment.status === 'open');
+      expect(open?.participants.map((participant) => participant.usageId)).toEqual([a.id]);
+    });
+
+    it('refuses a retry whose segment another boundary closed meanwhile', async () => {
+      await setUpSharedMachine(3);
+      await start(0);
+      counter = 102;
+      await start(1);
+      const [, stale] = await segments();
+      counter = 104;
+      await start(2);
+      const operation = { meterId: 1, resourceId: 1, readingMode: 'total', reportedValue: '104000000000' } as never;
+
+      await expect(
+        (
+          scope.metering as unknown as { segments: { closeAfter: (...args: unknown[]) => Promise<void> } }
+        ).segments.closeAfter(operation, stale, []),
+      ).rejects.toThrow('changed during the retry');
+      expect((await segments()).filter((segment) => segment.status === 'open')).toHaveLength(1);
     });
 
     it('lets a session joined late share from the moment others start, when the limit was raised', async () => {
@@ -267,6 +435,49 @@ describe('Metering on a shared machine', () => {
 
       expect(await charged(a.id)).toBe(30);
       expect(await charged(b.id)).toBe(30 + 60);
+    });
+
+    it('serializes simultaneous stops after the limit was lowered while sessions run', async () => {
+      await setUpSharedMachine(2);
+      const a = await start(0);
+      const b = await start(1);
+      await scope.source.getRepository(Resource).update(1, { maxParallelSessions: 1 });
+      counter = 102;
+      await Promise.all([end(0), end(1)]);
+
+      expect(await meterSessions().findBy({ status: ResourceMeteringSessionStatus.Settled })).toHaveLength(2);
+      expect((await segments()).every((segment) => segment.status === 'closed')).toBe(true);
+      expect((await charged(a.id)) + (await charged(b.id))).toBe(60);
+    });
+
+    it('keeps interleaved starts and stops ordered while the meter keeps counting', async () => {
+      await setUpSharedMachine(3);
+      // Every reading finds the meter one unit further.
+      scope.onStart = jest.fn(({ complete }) => complete({ kind: 'ready', baseline: { value: String(counter++) } }));
+      scope.onCollect = ({ complete }) => complete({ kind: 'reading', value: String(counter++) });
+      const first = await Promise.all([start(0), start(1), start(2)]);
+      await Promise.all([end(0), end(1)]);
+      const [second] = await Promise.all([start(0), end(2)]);
+      await end(0);
+      const last = counter - 1;
+
+      const all = await segments();
+      expect(all.every((segment) => segment.status === 'closed')).toBe(true);
+      all.slice(1).forEach((segment, index) => {
+        expect(segment.startValue).toBe(all[index].endValue);
+        expect(segment.startedAt.getTime()).toBeGreaterThanOrEqual(all[index].startedAt.getTime());
+      });
+      const consumed = all.reduce(
+        (sum, segment) => sum + (BigInt(segment.endValue ?? 0) - BigInt(segment.startValue)),
+        BigInt(0),
+      );
+      expect(consumed).toBe(BigInt(last - 100) * BigInt(1_000_000_000));
+      const total = (await Promise.all([...first, second].map((usage) => charged(usage.id)))).reduce(
+        (sum, value) => sum + value,
+        0,
+      );
+      // Whole kWh per segment at 30 credits: the charges add up to what the meter counted.
+      expect(total).toBe((last - 100) * 30);
     });
 
     it('produces ordered, non-overlapping segments for simultaneous starts and stops', async () => {
@@ -350,6 +561,23 @@ describe('Metering on a shared machine', () => {
       await expect(
         scope.metering.report(1, 1, { kind: 'reading', value: '52' }, undefined, undefined, undefined, 999),
       ).rejects.toThrow('no running metering session');
+    });
+
+    it('keeps a running session on the allocation it captured when the meter setting changes', async () => {
+      await setUpPerSession();
+      const a = await start(0);
+      await start(1);
+      await scope.metering.setAllocation(1, 1, 'shared', 1);
+
+      await scope.metering.report(1, 1, { kind: 'reading', value: '13' }, undefined, undefined, undefined, a.id);
+
+      expect((await scope.sessionOf(a.id)).latestValue).toBe('3000000000');
+      expect(scope.audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'meter.updated',
+          details: expect.objectContaining({ 'before.allocation': 'per-session', 'after.allocation': 'shared' }),
+        }),
+      );
     });
 
     it('keeps the old fallback for a single running session', async () => {

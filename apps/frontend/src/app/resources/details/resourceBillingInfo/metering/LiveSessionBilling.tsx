@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../../../../../hooks/useAuth';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { applyBillingFactor, formatDurationMs, toExactCredits } from '@attraccess/shared';
+import { AllocationBreakdown, useAllocationShareLine } from '../../../../../components/allocationBreakdown';
 import de from './de.json';
 import en from './en.json';
 
@@ -25,6 +26,7 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
   const { t } = useTranslations({ en, de });
   const formatMoney = useCreditsFormatter(minorUnit);
   const formatValue = useMeterValueFormatter();
+  const shareLine = useAllocationShareLine();
 
   const { data: active } = useResourcesServiceResourceUsageGetActiveSession({ resourceId }, undefined);
   const { user } = useAuth();
@@ -121,7 +123,14 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
                   ? t('live.meterUnavailable')
                   : t('live.meterWaiting')
                 : meter.shared
-                  ? t('live.meterShare', { value: formatValue(meter.latestValue) })
+                  ? meter.segments?.length
+                    ? shareLine({
+                        allocation: { kind: 'meter', segments: meter.segments },
+                        shareValue: meter.latestValue,
+                        formatMeterValue: formatValue,
+                        soFar: true,
+                      })
+                    : t('live.meterShare', { value: formatValue(meter.latestValue) })
                   : formatValue(meter.latestValue)}
               {meter.shared && meter.provisional && meter.latestValue != null && (
                 <small className="ml-1 text-foreground-500" data-cy="live-meter-provisional">
@@ -154,6 +163,22 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
           </>
         )}
       </dl>
+      <AllocationBreakdown
+        entries={meters.flatMap((meter) =>
+          meter.shared && meter.segments?.length
+            ? [
+                {
+                  id: meter.id,
+                  name: meter.meterName,
+                  allocation: { kind: 'meter' as const, segments: meter.segments },
+                  provisional: meter.provisional,
+                },
+              ]
+            : [],
+        )}
+        formatMeterValue={formatValue}
+        formatCredits={(credits) => money(Number(credits))}
+      />
       {hasBillableRates && <small className="text-foreground-500">{t('live.estimateNote')}</small>}
     </div>
   );

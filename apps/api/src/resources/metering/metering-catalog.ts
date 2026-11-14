@@ -5,7 +5,6 @@ import {
   ResourceMeter,
   ResourceFlowNode,
   ResourceFlowEdge,
-  ResourceMeteringSegment,
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
   ResourceMeterAllocation,
@@ -14,8 +13,7 @@ import {
 import { meterDefinitionFromFlow } from './metering-definition';
 import { meterCharge, formatMeterValue } from './quantity';
 import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessions';
-import { ClosedSegment, sessionShare } from './segment-charges';
-import { IsNull, MoreThanOrEqual } from 'typeorm';
+import { ClosedSegment, findUsageSegments, sessionShare } from './segment-charges';
 
 export async function requireMeter(manager: EntityManager, resourceId: number, meterId: number) {
   const meter = await manager.findOne(ResourceMeter, { where: { id: meterId, resourceId } });
@@ -56,16 +54,9 @@ export class MeteringCatalog {
     usage: ResourceUsage,
     session: ResourceMeteringSession,
   ) {
-    const segments = await manager.find(ResourceMeteringSegment, {
-      where: [
-        { meterId: meter.id, endedAt: MoreThanOrEqual(usage.startTime) },
-        { meterId: meter.id, endedAt: IsNull() },
-      ],
-      order: { startedAt: 'ASC' },
-    });
-    const mine = segments.filter(
-      (segment) =>
-        segment.status !== 'abandoned' && segment.participants.some((participant) => participant.usageId === usage.id),
+    // A segment a new start abandoned no longer counts: the session's share of it is not billable any more.
+    const mine = (await findUsageSegments(manager, meter.id, usage)).filter(
+      (segment) => segment.status !== 'abandoned',
     );
     const closed: ClosedSegment[] = mine.filter((segment) => segment.status === 'closed');
     const open = mine.find((segment) => segment.status === 'open');
@@ -121,7 +112,12 @@ export class MeteringCatalog {
             source: session.source,
             // Only a session that shares the meter with others has a share and segments to show.
             ...(live
-              ? { shared: live.shared, provisional: live.provisional, participants: live.participants, segments: live.breakdown }
+              ? {
+                  shared: live.shared,
+                  provisional: live.provisional,
+                  participants: live.participants,
+                  segments: live.breakdown,
+                }
               : {}),
           });
         } else if (captured) {

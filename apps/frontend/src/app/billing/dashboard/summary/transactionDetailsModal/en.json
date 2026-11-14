@@ -48,12 +48,9 @@
     "meterDescription": "{{value}} at {{rate}} per measured value",
     "unavailable": "Unavailable",
     "meterUnavailable": "Final reading unavailable; no meter charge included. Captured rate: {{rate}} per measured value.",
-    "allocation": {
-      "shared": "Shared",
-      "shareLine": "{{share}} — your share of {{total}}",
-      "breakdown": "Show breakdown",
-      "segment": "People: {{people}} · total {{total}} ({{totalCredits}}), your share {{share}} ({{shareCredits}})"
-    }
+    "pending": "Pending",
+    "meterPending": "Pending: your share is charged separately once the meter can be read again. Captured rate: {{rate}} per measured value.",
+    "meterSharedDescription": "Your share, rounded per segment, at {{rate}} per measured value"
   },
   "actions": {
     "refund": "Refund",

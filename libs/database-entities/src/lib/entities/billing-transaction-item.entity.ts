@@ -94,4 +94,9 @@ export interface BillingItemAllocationSegment {
 export interface BillingItemAllocation {
   kind: 'meter' | 'operating-time';
   segments: BillingItemAllocationSegment[];
+  /**
+   * The person's share is not known yet: a segment they were in has no closing reading. The share is charged
+   * automatically as a correction once a later reading closes it. Only on a meter line without a charge.
+   */
+  pending?: boolean;
 }

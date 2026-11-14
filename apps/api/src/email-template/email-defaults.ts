@@ -100,6 +100,7 @@ export const emailResourceDefaults = {
       'items[].durationMs',
       'items[].hasDuration',
       'items[].durationSeconds',
+      'items[].isSharePending',
       'items[].isShared',
       'items[].isSharedMeter',
       'items[].isSharedOperatingTime',

@@ -21,7 +21,7 @@ Sie können die folgenden Optionen pro Ressource kombinieren:
 | **Credits pro Nutzung**        | Eine pauschale Anzahl von Credits, die pro Nutzungssitzung berechnet wird. Die Dauer spielt keine Rolle.                          |
 | **Credits pro Minute**         | Credits für jede angefangene Minute der Nutzungssitzung.                                                                          |
 | **Credits pro Betriebsminute** | Credits für jede angefangene Minute des aufgezeichneten Maschinenbetriebs, die der Sitzung zugeordnet ist. Standardwert ist null. |
-| **Preis pro Messwert**            | Optionaler Preis für jeden benannten Zähler. Standardwert ist null.     |
+| **Preis pro Messwert**         | Optionaler Preis für jeden benannten Zähler. Standardwert ist null.                                                               |
 
 > [!TIP]
 > Die Gebühren werden addiert. Beispiel: 10 Credits pro Nutzung + 2 Credits pro Sitzungsminute für eine 30-minütige Sitzung + 3 Credits pro Betriebsminute für 10 Minuten Maschinenbetrieb = 10 + 60 + 30 = 100 Credits, vor Anwendung des Abrechnungsfaktors des Benutzers.
@@ -38,10 +38,10 @@ Jeder benannte Zähler kann in den Abrechnungseinstellungen einen Preis pro Mess
 
 Bei Maschinen mit mehreren parallelen Sitzungen hat jeder Zähler in seinen Zählereinstellungen die Einstellung **Zuordnung**:
 
-- **Geteilt und aufgeteilt** (Standard): Verbrauch und Betriebszeit der Maschine werden zu gleichen Teilen auf die gleichzeitig aktiven Personen verteilt. Anteile werden exakt geführt und einmal pro Zeitsegment und Gebührenart auf ganze Credits gerundet, sodass die berechneten Anteile immer die Segmentsumme ergeben.
+- **Geteilt und aufgeteilt** (Standard): Der Verbrauch des Zählers wird zu gleichen Teilen auf die gleichzeitig aktiven Personen verteilt. Anteile werden exakt geführt und einmal pro Zeitsegment auf ganze Credits gerundet, sodass die berechneten Anteile immer die Segmentsumme ergeben.
 - **Pro Sitzung gemessen**: Jede Sitzung erhält ihren eigenen Messpunkt und wird eigenständig abgerechnet.
 
-Der Modus wird beim Sitzungsstart gespeichert; Änderungen werden im Audit-Log protokolliert. Nutzungsgebühr und Sitzungszeit werden nie aufgeteilt. Zähler, die sich nicht bei Bedarf lesen lassen, benötigen auf gemeinsam genutzten Maschinen **Pro Sitzung gemessen** oder einen Preis von 0. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen) für Segmente, Rundung, fehlgeschlagene Messungen und Beispiele.
+Der Modus wird beim Sitzungsstart gespeichert; Änderungen werden im Audit-Log protokolliert. Die Betriebszeit wird unabhängig von dieser Einstellung immer auf dieselbe Weise auf die gleichzeitig aktiven Personen aufgeteilt. Nutzungsgebühr und Sitzungszeit werden nie aufgeteilt. Ein kostenpflichtiger Zähler, der sich nicht bei Bedarf lesen lässt (nur Zuwächse), kann immer nur von einer Sitzung gleichzeitig genutzt werden, sofern er nicht auf **Pro Sitzung gemessen** steht. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen) für Segmente, Rundung, fehlgeschlagene Messungen und Beispiele.
 
 Siehe [Zähler und verbrauchsbasierte Abrechnung](flows/energy-metering.md) für Einrichtung, Meldemodi, Migration und Abrechnung.
 

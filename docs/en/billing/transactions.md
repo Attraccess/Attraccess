@@ -27,7 +27,7 @@ For nonzero totals, the default email receipt shows separate session and operati
 
 ### Shared sessions
 
-On a machine with parallel sessions, meter and running-time lines of a shared session show the person's share (for example "0.8 kWh - your share of 2.4 kWh") and their credits with a **shared** marker. A breakdown lists each segment the person was in: time range, number of people, the segment's total quantity and credits, and the person's share. It appears in the transaction details, the session receipt email and the session's billing view. If a meter reading failed when someone stopped, the line shows as pending until the merged segment closes; the share is then charged as a correction transaction on the original charge. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines).
+On a machine with parallel sessions, meter and running-time lines of a shared session show the person's share against the total (for example "0.8 — your share of 2.4") and their credits with a **Shared** marker. A shared running-time line shows no rate ("—"). A breakdown lists each segment the person was in: time range, number of people, the segment's total quantity and credits, and the person's share. It appears in the transaction details, the session receipt email and the live session billing view. If a meter reading failed when someone stopped, their meter line says "Pending: your share is charged separately once the meter can be read again." until the merged segment closes; the share is then charged as a correction transaction on the original charge, without an email. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines).
 
 ## Filtering Transactions
 

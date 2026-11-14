@@ -1,0 +1,13 @@
+{
+  "shared": "Shared",
+  "shareLine": "{{share}} — your share of {{total}}",
+  "shareLineSoFar": "{{share}} — your share of {{total}} so far",
+  "breakdown": "Breakdown: {{name}}",
+  "now": "now",
+  "provisional": "provisional",
+  "people": {
+    "one": "{{count}} person",
+    "many": "{{count}} people"
+  },
+  "segment": "{{people}} · total {{total}} ({{totalCredits}}) · your share {{share}} ({{shareCredits}})"
+}

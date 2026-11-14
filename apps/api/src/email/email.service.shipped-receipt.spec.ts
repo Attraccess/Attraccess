@@ -14,12 +14,17 @@ import {
 } from './../email-template/email-defaults';
 import { inheritTestScope } from './../test-utils/inherit-test-scope';
 import { makeUser, setup } from './email.service.test-fixture';
+import { segmentRangeFormatter } from './usage-receipt-allocation';
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
 }));
 
 describe('EmailService shipped usage receipt', () => {
+  // Receipt times are in the API process zone, so expected texts are formatted in the zone of the test host.
+  const range = (locale: string) =>
+    segmentRangeFormatter(locale)('2026-09-20T10:00:00.000Z', '2026-09-20T10:30:00.000Z');
+
   const scope = {
     get setup() {
       return setup;
@@ -224,8 +229,8 @@ describe('EmailService shipped usage receipt', () => {
         total: '0.12',
         segments: [
           {
-            startedAt: '2026-09-20T10:00:00.000Z',
-            endedAt: '2026-09-20T10:30:00.000Z',
+            startedAt: range('en').start,
+            endedAt: range('en').end,
             participants: 2,
             totalQuantity: '1.2',
             totalCredits: '0.18',
@@ -256,6 +261,7 @@ describe('EmailService shipped usage receipt', () => {
           '0.8 — your share of 2.4',
           '90 s — your share of 240 s',
           'People: 2, total 1.2 (0.18 credits), your share 0.6 (0.09 credits)',
+          `${range('en').start} – ${range('en').end}: People: 2`,
           'People: 4, total 120 s (0.06 credits), your share 30 s (0.03 credits)',
         ],
       },
@@ -266,6 +272,7 @@ describe('EmailService shipped usage receipt', () => {
           '0.8 — dein Anteil an 2.4',
           '90 s — dein Anteil an 240 s',
           'Personen: 2, gesamt 1.2 (0.18 Credits), dein Anteil 0.6 (0.09 Credits)',
+          `${range('de').start} – ${range('de').end}: Personen: 2`,
           'Personen: 4, gesamt 120 s (0.06 Credits), dein Anteil 30 s (0.03 Credits)',
         ],
       },
@@ -276,9 +283,66 @@ describe('EmailService shipped usage receipt', () => {
       await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
 
       const { html } = sendMail.mock.calls[0][0];
-      for (const text of texts) expect(html).toContain(text);
-      expect(html).toContain('2026-09-20T10:00:00.000Z');
+      for (const text of texts) expect(html).toMatch(text);
+      // Segment times are localized; only segments start or end at 10:30.
+      expect(html).not.toContain('2026-09-20T10:30:00.000Z');
       expect(html).not.toContain('PER_ATTRIBUTABLE_OPERATING_MINUTE');
+    });
+
+    it.each([
+      ['de', '20.09.26, 23:00', '21.09.26, 01:00 UTC'],
+      ['en', /^9\/20\/26, 11:00\sPM$/, /^09\/21\/26, 01:00\sAM UTC$/],
+    ] as const)('prints the end date of a segment only when it ends on another day in %s', (locale, start, end) => {
+      const overnight = segmentRangeFormatter(locale, 'UTC')('2026-09-20T23:00:00.000Z', '2026-09-21T01:00:00.000Z');
+      expect(overnight.start).toMatch(start);
+      expect(overnight.end).toMatch(end);
+      expect(
+        segmentRangeFormatter(locale, 'Europe/Berlin')('2026-09-20T10:00:00Z', '2026-09-20T10:30:00Z').end,
+      ).toMatch(/^12:30(\sPM)? (MESZ|GMT\+2)$/);
+      expect(segmentRangeFormatter(locale)('not a date', 'x')).toEqual({ start: 'not a date', end: 'x' });
+    });
+
+    it.each([
+      {
+        locale: 'en',
+        notice: 'Pending: your share is charged separately once the meter can be read again.',
+        quantity: '>Pending</td>',
+        absent: ['Final reading unavailable', 'Shared', '>Unavailable</td>'],
+      },
+      {
+        locale: 'de',
+        notice: 'Ausstehend: Dein Anteil wird separat abgerechnet, sobald der Zähler wieder gelesen werden kann.',
+        quantity: '>Ausstehend</td>',
+        absent: ['Endwert nicht verfügbar', 'Geteilt', '>Nicht verfügbar</td>'],
+      },
+    ] as const)('explains a pending shared meter share in $locale', async ({ locale, notice, quantity, absent }) => {
+      const { service, sendMail, user, usage, transaction } = shippedUsageReceiptScope.setupReceipt(locale);
+      transaction.amount = -100;
+      transaction.items = [
+        Object.assign(new BillingTransactionItem(), { name: 'PER_SESSION', quantity: 1, unitPrice: 100 }),
+        Object.assign(new BillingTransactionItem(), {
+          name: 'Energy',
+          quantity: 1,
+          unitPrice: 0,
+          meterQuantity: null,
+          meterCreditsPerUnit: 30,
+          allocation: { kind: 'meter', segments: [], pending: true },
+        }),
+      ];
+      const render = jest.spyOn(service as never, 'sendEmail');
+
+      await service.sendResourceUsageBillingSummaryEmail(user, transaction, usage, 2);
+
+      expect((render.mock.calls[0][2] as { items: Record<string, unknown>[] }).items[1]).toMatchObject({
+        isSharePending: true,
+        isShared: false,
+        isUnavailable: false,
+        segments: [],
+      });
+      const { html } = sendMail.mock.calls[0][0];
+      expect(html).toContain(notice);
+      expect(html).toContain(quantity);
+      for (const text of absent) expect(html).not.toContain(text);
     });
 
     it.each(['en', 'de'] as const)('renders solo sessions exactly as the previous default in %s', async (locale) => {

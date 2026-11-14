@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   useResourceMeteringServiceGetResourceMeteringLive,
@@ -16,20 +16,23 @@ vi.mock('../../../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 1
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (async () => {
-    const translations = (await import('./en.json')).default as Record<string, unknown>;
-    const resolve = (key: string): string | undefined =>
-      key
+    // Every component resolves its own English strings, plurals by `count`.
+    const resolve = (translations: Record<string, unknown>, key: string, count: unknown): string | undefined => {
+      const value = key
         .split('.')
         .reduce<unknown>(
           (acc, part) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined),
           translations,
-        ) as string | undefined;
+        );
+      if (value && typeof value === 'object') return (value as Record<string, string>)[count === 1 ? 'one' : 'many'];
+      return value as string | undefined;
+    };
     return {
-      useTranslations: () => ({
+      useTranslations: ({ en }: { en: Record<string, unknown> }) => ({
         t: (key: string, params?: Record<string, string | number>) =>
           Object.entries(params ?? {}).reduce(
             (out, [name, value]) => out.replaceAll(`{{${name}}}`, String(value)),
-            resolve(key) ?? key,
+            resolve(en, key, params?.count) ?? key,
           ),
       }),
       useTranslationState: () => ({ language: 'en' }),
@@ -357,6 +360,38 @@ describe('LiveSessionBilling', () => {
       expect(screen.getByText(en.live.provisional)).toBeInTheDocument();
       expect(screen.getByText('Energy: your share of the cost so far')).toBeInTheDocument();
       expect(screen.getAllByText('0.24 EUR').length).toBeGreaterThan(0);
+    });
+
+    it('shows my share against the total so far and the segments, with the open one provisional', () => {
+      const segment = (startedAt: string, endedAt: string, participants: number, share: string) => ({
+        startedAt,
+        endedAt,
+        participants,
+        totalQuantity: '0.6',
+        totalCredits: 18,
+        shareQuantity: share,
+        shareCredits: 18 / participants,
+      });
+      shared({
+        latestValue: '0.8',
+        chargeCredits: 24,
+        shared: true,
+        provisional: true,
+        segments: [
+          segment('2026-09-28T10:01:00Z', '2026-09-28T10:02:00Z', 2, '0.3'),
+          segment('2026-09-28T10:02:00Z', '2026-09-28T10:03:30Z', 1, '0.5'),
+        ],
+      });
+      render(<LiveSessionBilling {...props} />);
+      expect(screen.getByText(/0\.8 — your share of 1\.2 so far/)).toBeInTheDocument();
+      expect(screen.getByText(en.live.provisional)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Breakdown: Energy' }));
+      expect(document.querySelectorAll('[data-cy="allocation-segment"]')).toHaveLength(2);
+      expect(screen.getByText('now')).toBeInTheDocument();
+      expect(screen.getByText('(provisional)')).toBeInTheDocument();
+      expect(
+        screen.getByText(/^2 people · total 0\.6 \(0\.18 EUR\) · your share 0\.3 \(0\.09 EUR\)$/),
+      ).toBeInTheDocument();
     });
 
     it('drops the provisional marker once the share is final', () => {

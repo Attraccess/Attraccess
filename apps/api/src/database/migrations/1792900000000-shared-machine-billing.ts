@@ -10,9 +10,10 @@ export class SharedMachineBilling1792900000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasColumn('resource_meter', 'allocation'))) {
       await queryRunner.query(`ALTER TABLE "resource_meter" ADD COLUMN "allocation" varchar NOT NULL DEFAULT 'shared'`);
+      // Existing meters keep splitting a shared machine's consumption, which is the default for new ones too.
+      // Only when the column is new: a repeated run must not undo an admin's choice.
+      await queryRunner.query(`UPDATE "resource_meter" SET "allocation" = 'shared'`);
     }
-    // Existing meters keep splitting a shared machine's consumption, which is the default for new ones too.
-    await queryRunner.query(`UPDATE "resource_meter" SET "allocation" = 'shared'`);
     if (!(await queryRunner.hasColumn('resource_metering_session', 'accounting'))) {
       await queryRunner.query(
         `ALTER TABLE "resource_metering_session" ADD COLUMN "accounting" varchar NOT NULL DEFAULT 'own'`,
@@ -38,9 +39,13 @@ export class SharedMachineBilling1792900000000 implements MigrationInterface {
     await queryRunner.query(
       `CREATE INDEX IF NOT EXISTS "IDX_resource_metering_segment_meter" ON "resource_metering_segment" ("meterId", "status")`,
     );
+    await queryRunner.query(
+      `CREATE INDEX IF NOT EXISTS "IDX_resource_metering_segment_meter_ended" ON "resource_metering_segment" ("meterId", "endedAt")`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_resource_metering_segment_meter_ended"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "IDX_resource_metering_segment_meter"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "resource_metering_segment"`);
     if (await queryRunner.hasColumn('billing_transaction_item', 'allocation')) {

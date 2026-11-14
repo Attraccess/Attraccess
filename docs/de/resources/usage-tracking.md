@@ -57,7 +57,7 @@ Jede Person wird für ihre eigene Sitzung abgerechnet. Die Gebühren jeder Perso
 
 Beispiel: Eine Maschine verbraucht 8 kWh zu 30 Credits pro kWh. Person A ist allein für 2 kWh aktiv, A und B zusammen für 2 kWh und B allein für 4 kWh. A zahlt 2 + 1 = 3 kWh = 90 Credits, B zahlt 1 + 4 = 5 kWh = 150 Credits.
 
-Auf Belegen, im Abrechnungsverlauf und in der laufenden Sitzungsabrechnung zeigt eine geteilte Sitzung den Anteil der Person (zum Beispiel „0,8 kWh - Ihr Anteil an 2,4 kWh“) mit der Markierung **geteilt** sowie eine Aufschlüsselung aller Segmente, an denen die Person beteiligt war. Siehe [Abrechnungstransaktionen](billing/transactions.md#geteilte-sitzungen).
+Auf Belegen und im Abrechnungsverlauf zeigt eine geteilte Sitzung den Anteil der Person am Gesamtwert (zum Beispiel „0,8 — dein Anteil an 2,4“) mit der Markierung **Geteilt** sowie eine Aufschlüsselung aller Segmente, an denen die Person beteiligt war. Siehe [Abrechnungstransaktionen](billing/transactions.md#geteilte-sitzungen). Während die Sitzung läuft, zeigt die laufende Abrechnungsansicht den bisherigen Zähleranteil (zum Beispiel „0,8 — dein Anteil an 1,2 bisher“), gekennzeichnet als „vorläufig bis zur nächsten Messung“, und dieselbe Aufschlüsselung, in der das offene Segment als vorläufig gekennzeichnet ist; eine Markierung **Geteilt** zeigt sie nicht.
 
 Bei einem Limit von 1 ändert sich nichts. Wird ein Limit gesenkt, während Sitzungen laufen, werden überlappende Sitzungen weiterhin fair aufgeteilt. Wird es während einer Einzelsitzung erhöht, nimmt diese Sitzung ab dem Moment an den Segmenten teil, in dem andere starten.
 

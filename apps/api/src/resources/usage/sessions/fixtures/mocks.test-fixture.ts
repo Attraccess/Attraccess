@@ -28,6 +28,8 @@ export function createResourceUsageMocks() {
 
   const mockRepository = () => ({
     find: jest.fn(),
+    // Session changes count the running sessions of a machine through the manager.
+    manager: { count: jest.fn().mockResolvedValue(0) },
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),

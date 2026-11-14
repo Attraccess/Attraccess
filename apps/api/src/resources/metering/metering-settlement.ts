@@ -1,12 +1,13 @@
 import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import { Logger, ConflictException, Inject } from '@nestjs/common';
 
-import { Repository, In, EntityManager, IsNull, MoreThan, MoreThanOrEqual } from 'typeorm';
+import { Repository, In, EntityManager, MoreThan, Not } from 'typeorm';
 
 import {
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
   BillingTransaction,
+  BillingItemAllocation,
   BillingTransactionItem,
   BillingTransactionStatus,
   ResourceMeteringOperation,
@@ -22,7 +23,9 @@ import { meterCharge, meterDiscount, formatMeterValue } from './quantity';
 
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
 
-import { sessionShare } from './segment-charges';
+import { clearPendingShareMarkers, findUsageSegments, sessionShare } from './segment-charges';
+
+const REINITIALIZED = 'The meter was re-initialized for a later session before the final reading was collected';
 
 export type MeterFinal = { status: 'ready'; operationId: string } | { status: 'unavailable'; reason: string };
 
@@ -46,6 +49,7 @@ export class MeteringSettlement {
       { status: ResourceMeteringSessionStatus.Waived, settledAt: new Date() },
     );
     if (!result.affected) throw new ConflictException('METER_SESSION_NOT_PENDING');
+    await clearPendingShareMarkers(this.sessions.manager, [sessionId]);
     const session = await this.sessions.findOneByOrFail({ id: sessionId });
     void this.audit.record({
       domain: 'resource',
@@ -61,6 +65,24 @@ export class MeteringSettlement {
       },
     });
     return session;
+  }
+
+  /** A re-initialized meter makes older pending charges unrecoverable. Measuring points of their own are not affected. */
+  async failOlderPending(meterId: number): Promise<void> {
+    const pending = await this.sessions.find({
+      where: { meterId, status: ResourceMeteringSessionStatus.Pending, accounting: Not('per-session') },
+      select: { id: true },
+    });
+    if (!pending.length) return;
+    const ids = pending.map(({ id }) => id);
+    await this.sessions.update(
+      { id: In(ids) },
+      {
+        status: ResourceMeteringSessionStatus.Failed,
+        failureReason: 'The meter was re-initialized for a later session',
+      },
+    );
+    await clearPendingShareMarkers(this.sessions.manager, ids);
   }
 
   /** The usage's bill is completed and immutable: the meter consumption goes onto a new correction transaction. */
@@ -133,26 +155,15 @@ export class MeteringSettlement {
     }
   }
 
-
-  /** The closed or open segments a usage took part in, oldest first. Segments that were abandoned are no longer billable. */
-  protected async segmentsOf(manager: EntityManager, session: ResourceMeteringSession, usage: ResourceUsage) {
-    const candidates = await manager.find(ResourceMeteringSegment, {
-      where: [
-        { meterId: session.meterId, endedAt: MoreThanOrEqual(usage.startTime) },
-        { meterId: session.meterId, endedAt: IsNull() },
-      ],
-      order: { startedAt: 'ASC' },
-    });
-    return candidates.filter(
-      (segment) =>
-        segment.status !== 'abandoned' && segment.participants.some((participant) => participant.usageId === usage.id),
-    );
-  }
-
-  /** The item a session's shares of its shared segments become. Null while a segment it took part in is still open. */
+  /**
+   * The item a session's shares of its shared segments become. Null while a segment it took part in is still open;
+   * `abandoned` when the meter was re-initialized before such a segment got its closing reading, so the share can
+   * never be known (it is not billed partially).
+   */
   protected async segmentedItem(manager: EntityManager, session: ResourceMeteringSession) {
     const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId } });
-    const segments = await this.segmentsOf(manager, session, usage);
+    const segments = await findUsageSegments(manager, session.meterId, usage);
+    if (segments.some((segment) => segment.status === 'abandoned')) return 'abandoned' as const;
     if (!segments.length || segments.some((segment) => segment.status !== 'closed')) return null;
     const share = sessionShare(segments, usage.id);
     return {
@@ -180,6 +191,20 @@ export class MeteringSettlement {
     final: MeterFinal,
   ): Promise<void> {
     const billed = await this.segmentedItem(manager, session);
+    if (billed === 'abandoned') {
+      await this.addUnavailableItem(
+        manager,
+        session.usageId,
+        session.meterName,
+        session.creditsPerUnit,
+        `metering:${session.id}:unavailable`,
+      );
+      await manager.update(ResourceMeteringSession, session.id, {
+        status: ResourceMeteringSessionStatus.Failed,
+        failureReason: REINITIALIZED,
+      });
+      return;
+    }
     if (!billed) {
       await this.addUnavailableItem(
         manager,
@@ -187,6 +212,7 @@ export class MeteringSettlement {
         session.meterName,
         session.creditsPerUnit,
         `metering:${session.id}:unavailable`,
+        { kind: 'meter', segments: [], pending: true },
       );
       await manager.update(ResourceMeteringSession, session.id, {
         status: ResourceMeteringSessionStatus.Pending,
@@ -197,7 +223,9 @@ export class MeteringSettlement {
       });
       return;
     }
-    const transaction = await manager.findOneOrFail(BillingTransaction, { where: { resourceUsageId: session.usageId } });
+    const transaction = await manager.findOneOrFail(BillingTransaction, {
+      where: { resourceUsageId: session.usageId },
+    });
     if (
       !(await manager.exists(BillingTransactionItem, {
         where: { billingTransactionId: transaction.id, externalReference: billed.item.externalReference },
@@ -242,6 +270,14 @@ export class MeteringSettlement {
       const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId }, relations: ['user'] });
       if (!usage.endTime) return null;
       const billed = await this.segmentedItem(manager, session);
+      if (billed === 'abandoned') {
+        await manager.update(ResourceMeteringSession, session.id, {
+          status: ResourceMeteringSessionStatus.Failed,
+          failureReason: REINITIALIZED,
+        });
+        await clearPendingShareMarkers(manager, [session.id]);
+        return null;
+      }
       if (!billed) return null;
       const settled = {
         status: ResourceMeteringSessionStatus.Settled,
@@ -358,7 +394,7 @@ export class MeteringSettlement {
       await manager.update(ResourceMeteringSession, session.id, {
         status: unrecoverable ? ResourceMeteringSessionStatus.Failed : ResourceMeteringSessionStatus.Pending,
         failureReason: superseded
-          ? 'The meter was re-initialized for a later session before the final reading was collected'
+          ? REINITIALIZED
           : session.compromisedReason
             ? session.compromisedReason
             : final.status === 'unavailable'
@@ -385,6 +421,7 @@ export class MeteringSettlement {
     name: string,
     creditsPerUnit: number,
     externalReference: string,
+    allocation: BillingItemAllocation | null = null,
   ): Promise<void> {
     const transaction = await manager.findOneOrFail(BillingTransaction, { where: { resourceUsageId: usageId } });
     if (
@@ -402,6 +439,7 @@ export class MeteringSettlement {
       quantity: 1,
       meterQuantity: null,
       meterCreditsPerUnit: creditsPerUnit,
+      allocation,
     });
   }
 

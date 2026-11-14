@@ -10,7 +10,7 @@ import {
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository, EntityManager, In, Not } from 'typeorm';
+import { Repository, EntityManager, In } from 'typeorm';
 
 import {
   ResourceMeter,
@@ -47,7 +47,6 @@ import { MeteringCatalog } from './metering-catalog';
 import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessions';
 
 import { MeteringSegments } from './metering-segments';
-
 
 export type { MeterProblem } from './metering-definition';
 
@@ -118,15 +117,7 @@ export class ResourceMeteringService implements OnModuleInit {
     reportId?: string,
     usageId?: number,
   ): Promise<void> {
-    return this.readings.report(
-      resourceId,
-      meterId,
-      report,
-      transactionManager,
-      lifecycleAttemptId,
-      reportId,
-      usageId,
-    );
+    return this.readings.report(resourceId, meterId, report, transactionManager, lifecycleAttemptId, reportId, usageId);
   }
 
   protected async close(operationId: string, status: 'failed' | 'expired', error: string): Promise<void> {
@@ -243,11 +234,15 @@ export class ResourceMeteringService implements OnModuleInit {
             definition.collect.interimIntervalMinutes * 60_000
         )
           continue;
-        if (await this.sessions.manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: meter.resourceId })) continue;
+        if (await this.sessions.manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: meter.resourceId }))
+          continue;
         const { byMeter } = await findActiveMeterSessions(this.sessions.manager, meter.resourceId, [meter.id]);
         const running = (byMeter.get(meter.id) ?? []).flatMap(({ session }) => (session ? [session] : []));
-        // A meter measured per session is read at every session's own measuring point; a shared meter is one reading.
-        const targets = meter.allocation === 'per-session' ? running : running.slice(0, 1);
+        // A session measured per session is read at its own measuring point; everyone else shares one reading.
+        // Each session follows the allocation it captured at its start.
+        const own = running.filter((session) => session.accounting === 'per-session');
+        const shared = running.filter((session) => session.accounting !== 'per-session');
+        const targets = [...own, ...shared.slice(0, 1)];
         this.interimAttempts.set(key, { at: Date.now(), running: true });
         try {
           for (const session of targets.length ? targets : [null])
@@ -296,12 +291,7 @@ export class ResourceMeteringService implements OnModuleInit {
   }
 
   /** The rate and allocation are billing terms: every change is recorded. */
-  async setAllocation(
-    resourceId: number,
-    meterId: number,
-    allocation: ResourceMeterAllocation,
-    initiatorId: number,
-  ) {
+  async setAllocation(resourceId: number, meterId: number, allocation: ResourceMeterAllocation, initiatorId: number) {
     const before = await this.meters.findOneBy({ id: meterId, resourceId });
     const updated = await this.catalog.setAllocation(resourceId, meterId, allocation);
     if (before && before.allocation !== allocation)
@@ -376,16 +366,7 @@ export class ResourceMeteringService implements OnModuleInit {
     initiatorId: number,
   ): Promise<ResourceMeteringSession> {
     try {
-      const open = await this.segments.findOpen(this.sessions.manager, session.meterId);
-      if (open?.participants.some((participant) => participant.usageId === session.usageId)) {
-        const actives = await this.segments.activeParticipants(this.sessions.manager, session.resourceId, session.meterId);
-        const operation = await this.runOperation(session, actives.length ? 'boundary' : 'final', {
-          trigger: ResourceFlowNodeType.INPUT_METERING_COLLECT,
-          timeoutSeconds: collect.timeoutSeconds,
-          freshAfter: usage.endTime ?? undefined,
-        });
-        await this.segments.closeAfter(operation, actives);
-      }
+      await this.segments.retryClosing(session, usage, collect.timeoutSeconds);
       await this.settlement.settleSegmentedLate(session.id, initiatorId);
     } catch (error) {
       const reason = this.reason(error);
@@ -498,7 +479,7 @@ export class ResourceMeteringService implements OnModuleInit {
         allocation: m.allocation,
       }));
     const initializedMeters = new Set<number>();
-    const sharedMachine = (await getMeteringSessionLimit(this.sessions.manager, input.resourceId)) > 1;
+    const parallelSessions = (await getMeteringSessionLimit(this.sessions.manager, input.resourceId)) > 1;
     try {
       for (const meter of meters) {
         const definition = await this.getDefinition(input.resourceId, meter.meterId);
@@ -521,15 +502,21 @@ export class ResourceMeteringService implements OnModuleInit {
           collectionMode: definition.incrementOnly ? ('increment' as const) : ('requested' as const),
           latestValue: definition.incrementOnly ? '0' : null,
         };
+        // After a lowered limit, a new session (a takeover) joins the segments of the sessions still sharing it.
+        const sharedMachine =
+          parallelSessions ||
+          (!perSession && (await this.segments.inUseBySegments(input.resourceId, meter.meterId, input)));
         if (!perSession && sharedMachine) {
           if (definition.incrementOnly) {
             // It cannot be read on demand, so its consumption cannot be told apart between sessions.
             const others = await this.segments.otherActiveUsages(input.resourceId, input.usageId, input.supersedes);
             if (others) {
               if (meter.creditsPerUnit > 0)
-                throw new BadRequestException(
-                  `METER_SHARING_UNSUPPORTED: ${meter.name} cannot be read on demand, so its consumption cannot be split between sessions running at the same time`,
-                );
+                // The message carries only the meter name; clients explain the rule in the viewer's language.
+                throw new BadRequestException(`METER_SHARING_UNSUPPORTED: ${meter.name}`, {
+                  description:
+                    'The meter cannot be read on demand, so its consumption cannot be split between sessions running at the same time',
+                });
               this.logger.warn(`Skipping tracking-only meter ${meter.meterId}: it cannot be shared`);
               continue;
             }
@@ -560,9 +547,14 @@ export class ResourceMeteringService implements OnModuleInit {
           }
         }
         // A measuring point of its own restarts nothing that earlier sessions could still be owed from.
-        if (!perSession) await this.invalidateOlderPending(meter.meterId);
+        if (!perSession) {
+          await this.segments.abandonOpen(this.sessions.manager, meter.meterId);
+          await this.invalidateOlderPending(meter.meterId);
+        }
       }
     } catch (error) {
+      // A meter read before the failing one already added the session to its open segment.
+      await this.segments.withdraw(this.sessions.manager, input.usageId, input.resourceId);
       await this.sessions.delete({ usageId: input.usageId });
       if (input.supersedes !== undefined && initializedMeters.size)
         await this.sessions.update(
@@ -571,20 +563,15 @@ export class ResourceMeteringService implements OnModuleInit {
             compromisedReason: 'The meter was re-initialized by a takeover that did not complete',
           },
         );
-      if (error instanceof BadRequestException && this.reason(error).startsWith('METER_SHARING_UNSUPPORTED: ')) throw error;
+      if (error instanceof BadRequestException && this.reason(error).startsWith('METER_SHARING_UNSUPPORTED: '))
+        throw error;
       throw new BadRequestException(`METER_INITIALIZATION_FAILED: ${this.reason(error)}`);
     }
   }
 
   /** Increment-only starts have no ready reply to invalidate older pending charges; for requested starts this is an idempotent safeguard. */
-  protected async invalidateOlderPending(meterId: number): Promise<void> {
-    await this.sessions.update(
-      { meterId, status: ResourceMeteringSessionStatus.Pending, accounting: Not('per-session') },
-      {
-        status: ResourceMeteringSessionStatus.Failed,
-        failureReason: 'The meter was re-initialized for a later session',
-      },
-    );
+  protected invalidateOlderPending(meterId: number): Promise<void> {
+    return this.settlement.failOlderPending(meterId);
   }
 
   // ---- meter definition -------------------------------------------------------------------------

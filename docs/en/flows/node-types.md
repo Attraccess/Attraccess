@@ -425,11 +425,11 @@ Type: `output.resource.metering.report` · Resource flows only
 | **Value**       | Required non-negative numeric value or template                   |
 | **Observed at** | Optional ISO timestamp template; defaults to reporting time       |
 | **Source**      | Optional template naming the meter                                |
-| **Usage ID**    | Optional template rendering the session ID the reading belongs to |
+| **Usage ID**    | Optional template rendering the usage ID the reading belongs to   |
 
 Reports values in collection branches and ordinary flows, including outside sessions. A reply in a collection branch must match the requested meter. No unit is required. The first unsolicited cumulative reading establishes a baseline; subsequent increases update lifetime consumption. Increments directly increase consumption. During an active session, accepted increases also update that session's total. A configured observed-at template that renders empty fails; final readings must be fresh. The catalog exposes no outgoing connection.
 
-On a machine with more than one running session, a reading pushed outside a metering run must name its session: inside a session lifecycle flow (start, stop, takeover) the lifecycle's own session is used, otherwise set **Usage ID** to a template that renders a session ID, such as `{{ usageId }}` of the flow payload. A reading that cannot be tied to exactly one active session is rejected with a flow error and never guessed. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines).
+A reading pushed outside a metering run to a meter set to **Measured per session** must name the usage it belongs to: in a session lifecycle flow (start, stop, takeover) the lifecycle's usage is used, otherwise set **Usage ID** to a template that renders a usage ID, such as `{{ id }}` in a flow started by **Usage started** or **Usage stopped**, or `{{ metering.usageId }}` in a metering flow. A **Usage ID** that names a different usage than the lifecycle the flow runs in is rejected. With more than one running session, a reading that names no usage is rejected with a flow error and never guessed. Readings of a **Shared and split** meter belong to the meter and need no usage ID. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines).
 
 Example after **Wait for MQTT Message** returning `{"heartbeats":1500}` in its content: choose **Heartbeats**, mode **total**, value `{{payload.heartbeats}}`. See [Meters](flows/energy-metering.md) for baselines and retries.
 

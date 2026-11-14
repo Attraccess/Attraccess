@@ -69,6 +69,21 @@ describe('splitSegment', () => {
 
       expect(BigInt(split.totalCredits)).toBe((exactNumerator * BigInt(2) + denominator) / (denominator * BigInt(2)));
       expect(sum(split.credits.values())).toBe(split.totalCredits);
+      // Everyone pays the whole credits of their exact share, or one more; extra credits go to the largest
+      // remainders first, ties to the earlier start.
+      const exact = rates.map((rate, index) => ({
+        index,
+        floor: (quantity * BigInt(rate)) / denominator,
+        remainder: (quantity * BigInt(rate)) % denominator,
+      }));
+      const charged = rates.map((_, index) => BigInt(split.credits.get(index + 1) ?? -1));
+      exact.forEach(({ index, floor }) => expect(charged[index] - floor).toBeGreaterThanOrEqual(BigInt(0)));
+      exact.forEach(({ index, floor }) => expect(charged[index] - floor).toBeLessThanOrEqual(BigInt(1)));
+      for (const winner of exact.filter(({ index, floor }) => charged[index] > floor))
+        for (const loser of exact.filter(({ index, floor }) => charged[index] === floor))
+          expect(
+            winner.remainder > loser.remainder || (winner.remainder === loser.remainder && winner.index < loser.index),
+          ).toBe(true);
     }
   });
 

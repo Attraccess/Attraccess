@@ -194,6 +194,7 @@ export interface ResourceMeteringSegmentParticipant {
  */
 @Entity()
 @Index('IDX_resource_metering_segment_meter', ['meterId', 'status'])
+@Index('IDX_resource_metering_segment_meter_ended', ['meterId', 'endedAt'])
 export class ResourceMeteringSegment {
   @PrimaryColumn({ type: 'varchar' })
   id!: string;

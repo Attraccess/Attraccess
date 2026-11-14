@@ -19,6 +19,8 @@ import { requireMeter } from './metering-catalog';
 import { toMeterValue, MeteringValueError, meterCharge } from './quantity';
 
 import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessions';
+import { findActiveUsages } from '../usage/sessions/active-usage';
+import { clearPendingShareMarkers } from './segment-charges';
 import { ConflictException } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
@@ -133,20 +135,30 @@ export class MeteringReadings {
       report.baseline && previous !== null && BigInt(baseline) >= previous ? BigInt(baseline) - previous : BigInt(0);
     // Accepting a new boundary makes older pending charges unrecoverable, even if
     // another start branch later fails and the tracking-only session is removed.
-    await manager.update(
-      ResourceMeteringSession,
-      {
+    const superseded = await manager.find(ResourceMeteringSession, {
+      where: {
         resourceId: session.resourceId,
         meterId: meter.id,
         usageId: LessThan(session.usageId),
         status: ResourceMeteringSessionStatus.Pending,
         accounting: Not('per-session'),
       },
-      {
-        status: ResourceMeteringSessionStatus.Failed,
-        failureReason: 'The meter was re-initialized for a later session',
-      },
-    );
+      select: { id: true },
+    });
+    if (superseded.length) {
+      await manager.update(
+        ResourceMeteringSession,
+        { id: In(superseded.map(({ id }) => id)) },
+        {
+          status: ResourceMeteringSessionStatus.Failed,
+          failureReason: 'The meter was re-initialized for a later session',
+        },
+      );
+      await clearPendingShareMarkers(
+        manager,
+        superseded.map(({ id }) => id),
+      );
+    }
     await manager.update(ResourceMeter, meter.id, {
       counterValue: baseline,
       lifetimeValue: (BigInt(meter.lifetimeValue) + delta).toString(),
@@ -244,7 +256,9 @@ export class MeteringReadings {
     session: ResourceMeteringSession,
     report: Extract<MeteringReport, { kind: 'reading' }>,
   ): Promise<void> {
-    const open = await manager.findOne(ResourceMeteringSegment, { where: { meterId: session.meterId, status: 'open' } });
+    const open = await manager.findOne(ResourceMeteringSegment, {
+      where: { meterId: session.meterId, status: 'open' },
+    });
     if (!open) return;
     const usages = await manager.find(ResourceUsage, {
       where: { id: In(open.participants.map((participant) => participant.usageId)) },
@@ -266,16 +280,35 @@ export class MeteringReadings {
     const observedAt = observationTime(report);
     await this.assertFreshObservation(manager, meter, session, observedAt, freshAfter);
     const { value, increment, delta } = readingDelta(meter, session, report);
-    if (!session && delta > BigInt(0))
-      await manager.update(
-        ResourceMeteringSession,
-        { meterId: meter.id, status: ResourceMeteringSessionStatus.Pending, accounting: Not('per-session') },
-        {
-          status: ResourceMeteringSessionStatus.Failed,
-          failureReason:
-            'The meter advanced outside the ended session; its final consumption can no longer be distinguished from idle consumption',
+    if (!session && delta > BigInt(0)) {
+      const invalidated = await manager.find(ResourceMeteringSession, {
+        where: {
+          meterId: meter.id,
+          status: ResourceMeteringSessionStatus.Pending,
+          // A stopped session waiting for its merged segment to close keeps waiting while others still run: the
+          // reading falls inside that segment. Only on an idle machine is it idle consumption.
+          accounting: (await findActiveUsages(manager, meter.resourceId)).length
+            ? Not(In(['per-session', 'segmented']))
+            : Not('per-session'),
         },
-      );
+        select: { id: true },
+      });
+      if (invalidated.length) {
+        await manager.update(
+          ResourceMeteringSession,
+          { id: In(invalidated.map(({ id }) => id)) },
+          {
+            status: ResourceMeteringSessionStatus.Failed,
+            failureReason:
+              'The meter advanced outside the ended session; its final consumption can no longer be distinguished from idle consumption',
+          },
+        );
+        await clearPendingShareMarkers(
+          manager,
+          invalidated.map(({ id }) => id),
+        );
+      }
+    }
     // Sessions that share the meter have no total of their own: their segments are told apart by boundary readings.
     const sessionTotal = session && session.accounting !== 'segmented' ? acceptedSessionTotal(session, delta) : null;
     await manager.update(ResourceMeter, meter.id, {
@@ -291,7 +324,8 @@ export class MeteringReadings {
                 : (BigInt(meter.counterValue) + delta).toString()
               : value.toString(),
           }),
-      latestObservedAt: meter.latestObservedAt && meter.latestObservedAt > observedAt ? meter.latestObservedAt : observedAt,
+      latestObservedAt:
+        meter.latestObservedAt && meter.latestObservedAt > observedAt ? meter.latestObservedAt : observedAt,
     });
     if (session && sessionTotal !== null)
       await manager.update(ResourceMeteringSession, session.id, {
@@ -405,22 +439,35 @@ export class MeteringReadings {
       ? await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id: lifecycleAttemptId, resourceId } })
       : null;
     const ownUsageId = attempt ? (attempt.candidateUsageId ?? attempt.previousUsageId) : null;
+    // A takeover's lifecycle belongs to both its incoming and its outgoing session.
+    const lifecycleUsageIds = [attempt?.candidateUsageId, attempt?.previousUsageId].filter((id) => id != null);
+    const running = (byMeter.get(meter.id) ?? []).flatMap(({ session }) => (session ? [session] : []));
     const sessionOf = (id: number) =>
       manager.findOne(ResourceMeteringSession, {
         where: { resourceId, meterId: meter.id, usageId: id, status: ResourceMeteringSessionStatus.Active },
       });
-    if (meter.allocation === 'per-session') {
-      const named = usageId ?? ownUsageId;
-      if (named != null) {
-        const session = await sessionOf(named);
-        if (!session) throw new MeteringOperationError(`Session ${named} has no running metering session for this meter`);
-        return session;
-      }
-      if (usages.length > 1)
+    // Each session follows the allocation it captured at its start, not a later change of the meter setting.
+    const perSession = running.length
+      ? running.some((session) => session.accounting === 'per-session')
+      : meter.allocation === 'per-session';
+    if (perSession) {
+      if (usageId != null && lifecycleUsageIds.length && !lifecycleUsageIds.includes(usageId))
         throw new MeteringOperationError(
-          'Several sessions are running and this reading names none of them. Run the flow in a session lifecycle or set the usage ID on the Report meter node.',
+          `The usage ID ${usageId} names another session than the one whose lifecycle runs this flow (${ownUsageId})`,
         );
-      return byMeter.get(meter.id)?.[0]?.session ?? null;
+      const named = usageId ?? ownUsageId;
+      const session = named == null ? null : await sessionOf(named);
+      if (named != null && !session)
+        throw new MeteringOperationError(`Session ${named} has no running metering session for this meter`);
+      if (session?.accounting === 'per-session') return session;
+      if (!session) {
+        if (usages.length > 1)
+          throw new MeteringOperationError(
+            'Several sessions are running and this reading names none of them. Run the flow in a session lifecycle or set the usage ID on the Report meter node.',
+          );
+        return byMeter.get(meter.id)?.[0]?.session ?? null;
+      }
+      // The named session shares the meter (it started before the setting changed): the shared rules below apply.
     }
     if ((await getMeteringSessionLimit(manager, resourceId)) > 1 || usages.length > 1) {
       const only = usages.length === 1 ? byMeter.get(meter.id)?.[0]?.session : null;

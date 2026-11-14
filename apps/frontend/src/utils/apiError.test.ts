@@ -118,14 +118,15 @@ describe('getTranslationKeyForApiError', () => {
     ['German', API_ERROR_TRANSLATIONS_DE, 'Zähler nicht teilbar'],
   ])('explains a meter that cannot be shared in %s', (_locale, translations, expectedTitle) => {
     const result = getTranslationKeyForApiError({
-      error: { body: { message: 'METER_SHARING_UNSUPPORTED: Counter cannot be read on demand' } } as unknown as Error,
+      error: { body: { message: 'METER_SHARING_UNSUPPORTED: Counter' } } as unknown as Error,
       t: (key: string) => key,
       tExists: (key: string) => getTranslation({ api: translations }, key) !== undefined,
       baseTranslationKey: 'api',
     });
 
     expect(result.key).toBe('api.METER_SHARING_UNSUPPORTED');
-    expect(result.errorMessage).toBe('Counter cannot be read on demand');
+    expect(result.errorMessage).toBe('Counter');
     expect(getTranslation(translations, 'METER_SHARING_UNSUPPORTED.title')).toBe(expectedTitle);
+    expect(getTranslation(translations, 'METER_SHARING_UNSUPPORTED.description')).toContain('{{error}}');
   });
 });

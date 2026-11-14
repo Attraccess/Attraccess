@@ -45,7 +45,7 @@
   },
   "METER_SHARING_UNSUPPORTED": {
     "title": "Meter cannot be shared",
-    "description": "This session was not started because a meter that is billed cannot be read on demand, so its consumption cannot be split between sessions running at the same time: {{error}}"
+    "description": "The session was not started: the meter \"{{error}}\" cannot be read on demand, so it cannot be shared while another session is running."
   },
   "METER_SETTLEMENT_FAILED": {
     "title": "Meter reading still unavailable",

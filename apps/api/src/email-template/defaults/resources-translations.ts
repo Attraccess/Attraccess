@@ -276,6 +276,18 @@ export const resourceUsageBillingTransactionSummaryTranslations: ShippedTranslat
     value:
       '{start} – {end}: Personen: {people}, gesamt {total} s ({totalCredits} Credits), dein Anteil {share} s ({shareCredits} Credits)',
   },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'meter_share_pending',
+    value: 'Ausstehend: Dein Anteil wird separat abgerechnet, sobald der Zähler wieder gelesen werden kann.',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'quantity_pending',
+    value: 'Ausstehend',
+  },
 ];
 
 export const userRetrainingRequiredTranslations: ShippedTranslation[] = [

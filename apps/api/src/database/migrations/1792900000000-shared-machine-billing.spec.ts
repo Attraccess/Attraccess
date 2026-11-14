@@ -39,6 +39,20 @@ describe('SharedMachineBilling migration', () => {
     });
   });
 
+  it('keeps a chosen allocation when it runs again', async () => {
+    await withDatabase(async (runner) => {
+      const migration = new SharedMachineBilling1792900000000();
+      await migration.up(runner);
+      await runner.query(`UPDATE "resource_meter" SET "allocation" = 'per-session' WHERE id = 2`);
+      await migration.up(runner);
+
+      expect(await runner.query(`SELECT id, allocation FROM "resource_meter" ORDER BY id`)).toEqual([
+        { id: 1, allocation: 'shared' },
+        { id: 2, allocation: 'per-session' },
+      ]);
+    });
+  });
+
   it('can run twice and be reverted', async () => {
     await withDatabase(async (runner) => {
       const migration = new SharedMachineBilling1792900000000();

@@ -414,18 +414,18 @@ Beispiel nach HTTP-Antwort `{"counter":1500}`: Basiswert `{{counter}}`. Eine Ein
 
 Typ: `output.resource.metering.report` · Nur Ressourcen-Flows
 
-| Einstellung  | Beschreibung                                                           |
-| ------------ | ---------------------------------------------------------------------- |
-| **Zähler**   | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen   |
-| **Modus**    | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
-| **Wert**     | Erforderlicher nichtnegativer Zahlenwert oder Vorlage                  |
-| **Messzeit** | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt     |
-| **Quelle**   | Optionale Vorlage mit dem Namen des Zählers                            |
-| **Nutzungs-ID** | Optionale Vorlage mit der Sitzungs-ID, zu der die Messung gehört    |
+| Einstellung     | Beschreibung                                                           |
+| --------------- | ---------------------------------------------------------------------- |
+| **Zähler**      | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen   |
+| **Modus**       | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
+| **Wert**        | Erforderlicher nichtnegativer Zahlenwert oder Vorlage                  |
+| **Messzeit**    | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt     |
+| **Quelle**      | Optionale Vorlage mit dem Namen des Zählers                            |
+| **Nutzungs-ID** | Optionale Vorlage mit der Nutzungs-ID, zu der die Messung gehört       |
 
 Meldet Werte in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung. Eine Antwort im Abfragezweig muss zum angefragten Zähler passen. Eine Einheit ist nicht erforderlich. Der erste unaufgeforderte Gesamtstand legt einen Basiswert fest; spätere Zuwächse erhöhen den Gesamtverbrauch. Inkremente erhöhen den Verbrauch direkt. Während einer laufenden Sitzung aktualisieren akzeptierte Zuwächse auch deren Verbrauch. Eine konfigurierte Messzeit-Vorlage, die leer gerendert wird, führt zum Fehler; Endwerte müssen aktuell sein. Der Katalog bietet keinen ausgehenden Anschluss.
 
-Bei einer Maschine mit mehr als einer laufenden Sitzung muss eine außerhalb eines Messlaufs gesendete Messung ihre Sitzung benennen: In einem Sitzungs-Lifecycle-Flow (Start, Ende, Übernahme) wird die Sitzung des Lifecycles verwendet, andernfalls setzen Sie **Nutzungs-ID** auf eine Vorlage, die eine Sitzungs-ID ergibt, etwa `{{ usageId }}` aus der Flow-Payload. Eine Messung, die sich nicht genau einer aktiven Sitzung zuordnen lässt, wird mit einem Flow-Fehler abgelehnt und nie geraten. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen).
+Eine außerhalb eines Messlaufs gesendete Messung an einen Zähler mit **Pro Sitzung gemessen** muss die Nutzung benennen, zu der sie gehört: In einem Flow des Sitzungsablaufs (Start, Ende, Übernahme) wird die Nutzung des Ablaufs verwendet, andernfalls setzen Sie **Nutzungs-ID** auf eine Vorlage, die eine Nutzungs-ID ergibt, etwa `{{ id }}` in einem Flow, den **Nutzung gestartet** oder **Nutzung beendet** auslöst, oder `{{ metering.usageId }}` in einem Mess-Flow. Eine **Nutzungs-ID**, die eine andere Nutzung als die des laufenden Sitzungsablaufs benennt, wird abgelehnt. Bei mehr als einer laufenden Sitzung wird eine Messung ohne Nutzung mit einem Flow-Fehler abgelehnt und nie geraten. Messungen eines Zählers mit **Geteilt und aufgeteilt** gehören zum Zähler und benötigen keine Nutzungs-ID. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen).
 
 Beispiel nach **Auf MQTT-Nachricht warten** mit Inhalt `{"heartbeats":1500}`: **Heartbeats** auswählen, Modus **total**, Wert `{{payload.heartbeats}}`. Siehe [Zähler](flows/energy-metering.md) für Basiswerte und Wiederholungsversuche.
 

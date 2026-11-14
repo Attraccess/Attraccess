@@ -1,4 +1,6 @@
 import { ResourceMeteringService } from '../../metering/resource-metering.service';
+import { MeteringOperationError } from '../../metering/metering-readings';
+import { MeteringValueError } from '../../metering/quantity';
 import { MeteringReportNodeDataSchema, ResourceFlowNode } from '@attraccess/database-entities';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
@@ -31,15 +33,22 @@ export class MeteringReportExecutor implements NodeExecutor {
         throw new FlowExecutionError('The selected meter does not match the metering request');
       await ctx.metering.complete(report);
     } else {
-      await this.metering.report(
-        requireRunResourceId(node, ctx),
-        data.meterId,
-        report,
-        ctx.transactionManager,
-        ctx.lifecycleAttemptId,
-        ctx.flowRunId ? `flow:${ctx.flowRunId}:${node.id}` : undefined,
-        usageId === undefined ? undefined : Number(usageId),
-      );
+      try {
+        await this.metering.report(
+          requireRunResourceId(node, ctx),
+          data.meterId,
+          report,
+          ctx.transactionManager,
+          ctx.lifecycleAttemptId,
+          ctx.flowRunId ? `flow:${ctx.flowRunId}:${node.id}` : undefined,
+          usageId === undefined ? undefined : Number(usageId),
+        );
+      } catch (error) {
+        // A reading the meter refuses (for example one that names no session) is a flow error the person sees.
+        if (error instanceof MeteringOperationError || error instanceof MeteringValueError)
+          throw new FlowExecutionError(error.message);
+        throw error;
+      }
     }
     return { payload: input };
   }
