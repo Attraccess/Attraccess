@@ -8,6 +8,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const SUBMODULE_PATH = 'apps/cesentry';
+export const SUBMODULE_URL = 'https://github.com/Attraccess/cesentry.git';
+const HINT = 'See CONTRIBUTING.md, "Private submodule".';
 
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
@@ -23,27 +25,32 @@ function gitmodulesValue(key, cwd) {
 }
 
 /** Returns the problems found in the index and in .gitmodules (empty when the pointer is intact). */
-export function checkPrivateSubmodule(cwd = process.cwd()) {
+export function checkPrivateSubmodule(start = process.cwd()) {
+  const cwd = git(['rev-parse', '--show-toplevel'], start).trim();
   const problems = [];
   const entries = git(['ls-files', '--stage', '-z', '--', SUBMODULE_PATH], cwd).split('\0').filter(Boolean);
   const gitlinks = entries.filter((entry) => entry.startsWith('160000 ') && entry.endsWith(`\t${SUBMODULE_PATH}`));
-  if (entries.length !== 1 || gitlinks.length !== 1) {
+  if (entries.length === 0) {
+    problems.push(`The submodule pointer ${SUBMODULE_PATH} (mode 160000) is missing from the index. ${HINT}`);
+  } else if (entries.length !== 1 || gitlinks.length !== 1) {
     problems.push(
       `${SUBMODULE_PATH} must be exactly one submodule pointer (mode 160000); the index has ${entries.length} ` +
-        `entr${entries.length === 1 ? 'y' : 'ies'} there:\n${entries.map((entry) => `  ${entry}`).join('\n')}`,
+        `entr${entries.length === 1 ? 'y' : 'ies'} there:\n${entries.map((entry) => `  ${entry}`).join('\n')}\n` +
+        `Remove the others with \`git rm -r --cached <path>\`. ${HINT}`,
     );
   }
   const paths = gitmodulesValue('path', cwd);
   if (paths.length !== 1 || paths[0] !== SUBMODULE_PATH)
-    problems.push(`.gitmodules must declare [submodule "${SUBMODULE_PATH}"] with path = ${SUBMODULE_PATH}.`);
+    problems.push(`.gitmodules must declare [submodule "${SUBMODULE_PATH}"] with path = ${SUBMODULE_PATH}. ${HINT}`);
   const updates = gitmodulesValue('update', cwd);
   if (updates.length !== 1 || updates[0] !== 'none')
-    problems.push(`.gitmodules must keep update = none for ${SUBMODULE_PATH}, so clones without access skip it.`);
-  const urls = gitmodulesValue('url', cwd);
-  if (urls.length !== 1 || !urls[0].startsWith('https://'))
     problems.push(
-      `.gitmodules must give ${SUBMODULE_PATH} one HTTPS url, so people with access clone it with their credentials.`,
+      `.gitmodules must keep update = none for ${SUBMODULE_PATH}, so clones without access skip it. ${HINT}`,
     );
+  const urls = gitmodulesValue('url', cwd);
+  // Exact match: a different url would make maintainers fetch and run someone else's code.
+  if (urls.length !== 1 || urls[0] !== SUBMODULE_URL)
+    problems.push(`.gitmodules must give ${SUBMODULE_PATH} exactly url = ${SUBMODULE_URL}. ${HINT}`);
   return problems;
 }
 

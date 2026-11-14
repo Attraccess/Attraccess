@@ -20,24 +20,32 @@ export function isSource(file) {
   );
 }
 
-const gitFiles = (args, cwd) =>
-  execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 })
+const gitFiles = (args, cwd, env) =>
+  execFileSync('git', args, { cwd, env, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 })
     .split('\0')
     .filter(Boolean);
+
+// A submodule is its own repository: variables such as GIT_INDEX_FILE (set inside Git hooks) name the outer one.
+function submoduleEnv() {
+  const env = { ...process.env };
+  for (const name of execFileSync('git', ['rev-parse', '--local-env-vars'], { encoding: 'utf8' }).split('\n'))
+    delete env[name];
+  return env;
+}
 
 // Existing tracked and untracked (not ignored) files below `cwd`. A gitlink (mode 160000) is a directory, not a
 // file: a checked-out submodule contributes its own files under its path, one that is not checked out contributes
 // nothing. `submodules` lists every gitlink path, checked out or not.
-export function workspaceFiles(cwd = workspace) {
-  const submodules = gitFiles(['ls-files', '--stage', '-z'], cwd)
+export function workspaceFiles(cwd = workspace, env = process.env) {
+  const submodules = gitFiles(['ls-files', '--stage', '-z'], cwd, env)
     .filter((entry) => entry.startsWith('160000 '))
     .map((entry) => entry.slice(entry.indexOf('\t') + 1));
-  const files = gitFiles(['ls-files', '--cached', '--others', '--exclude-standard', '-z'], cwd).filter(
+  const files = gitFiles(['ls-files', '--cached', '--others', '--exclude-standard', '-z'], cwd, env).filter(
     (file) => !submodules.includes(file) && existsSync(path.resolve(cwd, file)),
   );
   for (const submodule of [...submodules]) {
     if (!existsSync(path.join(cwd, submodule, '.git'))) continue;
-    const nested = workspaceFiles(path.join(cwd, submodule));
+    const nested = workspaceFiles(path.join(cwd, submodule), submoduleEnv());
     files.push(...nested.files.map((file) => `${submodule}/${file}`));
     submodules.push(...nested.submodules.map((file) => `${submodule}/${file}`));
   }
