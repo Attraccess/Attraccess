@@ -1,8 +1,9 @@
 import { commandOutcomePayloadSchema, deviceStatePayloadSchema } from '@attraccess/matter-contract';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
-import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Optional, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import type { StreamEvent } from '../client/event-stream';
 import { MatterConnectionService } from '../connection/connection.service';
+import { MatterFabricService } from '../fabric/fabric.service';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { MatterReconciliationService } from './reconciliation.service';
 import { MatterStateService, type StateEvent } from './state.service';
@@ -29,6 +30,9 @@ export class MatterIngestionService implements OnModuleInit, OnModuleDestroy {
     @Inject(MatterConnectionService) private readonly connectionService: MatterConnectionService,
     @Inject(MatterReconciliationService) private readonly reconciliation: MatterReconciliationService,
     @Inject(MatterStateService) private readonly state: MatterStateService,
+    // Settles whether the fabric needs recovery first: while it does, the device records are not reconciled with a
+    // sidecar the plugin has not accepted.
+    @Optional() @Inject(MatterFabricService) private readonly fabric?: MatterFabricService,
   ) {}
 
   onModuleInit(): void {
@@ -54,8 +58,9 @@ export class MatterIngestionService implements OnModuleInit, OnModuleDestroy {
   }
 
   private reconcile(): void {
-    this.reconciliation
-      .request()
+    const settled = this.fabric ? this.fabric.detect('connect').catch(() => null) : Promise.resolve(null);
+    void settled
+      .then((mismatch) => (mismatch === null ? this.reconciliation.request() : undefined))
       .catch(() => this.context.logger.warn?.('Matter reconciliation could not be started.'));
   }
 

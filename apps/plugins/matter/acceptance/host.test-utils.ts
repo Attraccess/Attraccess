@@ -89,6 +89,8 @@ export async function bootHost(
     entities: [...Object.values(entities), ...(plugin.entities ?? [])],
     migrations: [...Object.values(coreMigrations), ...(Object.values(matterMigrations) as (new () => never)[])],
     synchronize: false,
+    // The audit service writes on a second connection; wait for its lock like the other file-backed fixtures do.
+    busyTimeout: 5000,
   }).initialize();
   await db.runMigrations();
   const audit = new AuditService(

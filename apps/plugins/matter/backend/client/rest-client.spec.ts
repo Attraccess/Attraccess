@@ -1,8 +1,9 @@
+import { FEATURE_FAMILIES } from '@attraccess/matter-contract';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getCACertificates } from 'node:tls';
 import { selfSignedCertificate } from '../testing/certs';
-import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
+import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar.test-utils';
 import {
   SidecarAbortedError,
   SidecarIncompatibleError,
@@ -30,7 +31,7 @@ describe('SidecarHttpClient', () => {
       correlationId: '11111111-1111-4111-8111-111111111111',
       timeoutMs: 1500,
     });
-    expect(report.capabilities).toHaveLength(8);
+    expect(report.capabilities).toHaveLength(FEATURE_FAMILIES.length);
     expect(fake.requests[0].headers).toMatchObject({
       'x-matter-wire-version': '1',
       'x-attraccess-version': HOST_VERSION,

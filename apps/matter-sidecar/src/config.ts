@@ -7,6 +7,7 @@ import {
   MAX_MESSAGE_BYTES,
 } from '@attraccess/matter-contract';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { isIPv6 } from 'node:net';
 import { z } from 'zod';
 
@@ -74,6 +75,8 @@ const configSchema = z.object({
   MATTER_SIDECAR_TLS_CERT_FILE: optionalString,
   MATTER_SIDECAR_TLS_KEY_FILE: optionalString,
   MATTER_SIDECAR_ALLOW_INSECURE_REMOTE: optionalBoolean,
+  MATTER_SIDECAR_STORAGE_DIR: optionalString,
+  MATTER_SIDECAR_MATTER_PORT: integer(0, 65_535, 0),
   MATTER_SIDECAR_PORT: integer(0, 65_535, 8581),
   MATTER_SIDECAR_MAX_MESSAGE_BYTES: positiveInt(MAX_MESSAGE_BYTES, 16 * 1024 * 1024),
   MATTER_SIDECAR_REQUEST_DEADLINE_MS: positiveInt(DEFAULT_REQUEST_DEADLINE_MS, 60_000),
@@ -94,6 +97,10 @@ export type SidecarConfig = {
   tls: { cert: Buffer; key: Buffer } | null;
   /** True when the sidecar serves plain HTTP on a non-loopback address (explicitly allowed by the operator). */
   insecureRemote: boolean;
+  /** Where the fabric and the controller state are persisted. Needs its own persistent volume. */
+  storageDir: string;
+  /** UDP port of the controller's Matter endpoint; 0 picks a free port. */
+  matterPort: number;
   maxMessageBytes: number;
   requestDeadlineMs: number;
   shutdownGraceMs: number;
@@ -217,6 +224,8 @@ export function loadConfig(
     allowedHosts,
     tls,
     insecureRemote: remote && !tls,
+    storageDir: resolve(values.MATTER_SIDECAR_STORAGE_DIR ?? './matter-storage'),
+    matterPort: values.MATTER_SIDECAR_MATTER_PORT,
     maxMessageBytes: values.MATTER_SIDECAR_MAX_MESSAGE_BYTES,
     requestDeadlineMs: values.MATTER_SIDECAR_REQUEST_DEADLINE_MS,
     shutdownGraceMs: values.MATTER_SIDECAR_SHUTDOWN_GRACE_MS,

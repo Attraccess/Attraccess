@@ -2,7 +2,7 @@ import Ajv2020 from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { OPERATIONS } from '../src';
+import { MAX_BACKUP_BODY_BYTES, OPERATIONS } from '../src';
 import {
   buildJsonSchemaDocument,
   buildOpenApiDocument,
@@ -62,6 +62,48 @@ describe('exported artifacts', () => {
     expect(openapi.security).toEqual([{ serviceToken: [] }]);
     expect(openapi.paths['/health/live'].get.security).toEqual([]);
     expect(openapi.paths['/v1/capabilities'].get.responses['401']).toBeDefined();
+  });
+
+  it('document the backup operations: own body limit, refusal over plain HTTP and 422 for a bad snapshot', () => {
+    const backup = OPERATIONS.filter((operation) => operation.family === 'backup');
+    expect(backup.map((operation) => `${operation.method} ${operation.path}`).sort()).toEqual([
+      'POST /v1/backup/restore/abort',
+      'POST /v1/backup/restore/commit',
+      'POST /v1/backup/restore/finalize',
+      'POST /v1/backup/restore/rollback',
+      'POST /v1/backup/restore/stage',
+      'POST /v1/backup/snapshot',
+    ]);
+    for (const operation of backup) {
+      const item = openapi.paths[operation.path].post;
+      expect(item.operationId).toBe(operation.id);
+      expect(item['x-secrets-on-wire']).toMatch(/insecure_transport/);
+      expect(Object.keys(item.responses)).toEqual(expect.arrayContaining(['403', '413', '422']));
+    }
+    // Only the operations that carry a snapshot get the larger limit; the general limit stays for everything else.
+    expect(openapi.paths['/v1/backup/snapshot'].post['x-max-body-bytes']).toBe(MAX_BACKUP_BODY_BYTES);
+    expect(openapi.paths['/v1/backup/restore/stage'].post['x-max-body-bytes']).toBe(MAX_BACKUP_BODY_BYTES);
+    expect(openapi.paths['/v1/backup/restore/commit'].post['x-max-body-bytes']).toBeUndefined();
+    const fabricCreate = openapi.paths['/v1/fabric'].post;
+    expect(fabricCreate['x-max-body-bytes']).toBeUndefined();
+    expect(fabricCreate['x-secrets-on-wire']).toBeUndefined();
+    expect(fabricCreate.responses['422']).toBeUndefined();
+  });
+
+  it.each([['$defs'], ['components']])('accept every recovery reason in the fabric status (%s)', (where) => {
+    const fabricGet = OPERATIONS.find((operation) => operation.id === 'fabric.get');
+    if (!fabricGet) throw new Error('fabric.get is missing');
+    const check = validatorFor(where, operationSchemaName(fabricGet, 'Response'));
+    const status = {
+      state: 'recovery_required',
+      fabricId: null,
+      fabricGeneration: 0,
+      rootCertFingerprint: null,
+      storageInstanceId: null,
+      storageSchemaVersion: 1,
+    };
+    expect(check({ ...status, reason: 'restore_interrupted' }).valid).toBe(true);
+    expect(check({ ...status, reason: 'bogus' }).valid).toBe(false);
   });
 
   it('keeps schemas small', () => {
