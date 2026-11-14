@@ -5,7 +5,7 @@ import { ResourceFlowsService } from './resource-flows.service';
 import { getCoreNodeFlowScopes } from './schemas/core-node-schemas';
 import { getNodeFlowScopes } from './schemas/node-flow-scopes';
 import { registerPluginFlowNodes } from '../../plugin-system/flows/node-registry';
-import { openFlowCanvasDatabase, startToHttpCanvas } from './flow-canvas-database.test-fixture';
+import { openFlowCanvasDatabase, startToHttpCanvas, testActor } from './flow-canvas-database.test-fixture';
 
 const T = ResourceFlowNodeType;
 
@@ -32,7 +32,7 @@ describe('GlobalFlowsService', () => {
   const flow = Object.assign(new Flow(), { id: 5, name: 'Notify', description: null, enabled: true, scope: 'global' });
   const manager = {
     find: jest.fn(),
-    delete: jest.fn(),
+    delete: jest.fn(async () => ({ affected: 1, raw: [] })),
     save: jest.fn(async (_entity: unknown, rows: unknown) => rows),
   };
   const flowRepository = {
@@ -45,6 +45,7 @@ describe('GlobalFlowsService', () => {
   const nodeRepository = { manager: { transaction: jest.fn(async (work) => work(manager)) }, find: jest.fn() };
   const edgeRepository = { find: jest.fn() };
   const subscribe = jest.fn();
+  const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
   const resourceFlows = new ResourceFlowsService(
     nodeRepository as never,
     edgeRepository as never,
@@ -52,12 +53,14 @@ describe('GlobalFlowsService', () => {
     { subscribe: subscribe.mockResolvedValue(undefined) } as never,
     { emit: jest.fn() } as never,
     flowRepository as never,
+    audit as never,
   );
   const service = new GlobalFlowsService(
     flowRepository as never,
     nodeRepository as never,
     edgeRepository as never,
     resourceFlows,
+    audit as never,
   );
 
   const position = { x: 0, y: 0 };
@@ -70,13 +73,17 @@ describe('GlobalFlowsService', () => {
   });
 
   it('saves nodes and edges with flowId and without resourceId', async () => {
-    const result = await service.saveCanvas(5, {
-      nodes: [
-        { id: 'a', type: T.INPUT_RESOURCE_USAGE_STARTED, position, data: {} },
-        { id: 'b', type: T.OUTPUT_HTTP_SEND_REQUEST, position, data: { url: 'https://example.com', method: 'POST' } },
-      ],
-      edges: [{ id: 'e', source: 'a', sourceHandle: 'output', target: 'b', targetHandle: 'input' }],
-    });
+    const result = await service.saveCanvas(
+      5,
+      {
+        nodes: [
+          { id: 'a', type: T.INPUT_RESOURCE_USAGE_STARTED, position, data: {} },
+          { id: 'b', type: T.OUTPUT_HTTP_SEND_REQUEST, position, data: { url: 'https://example.com', method: 'POST' } },
+        ],
+        edges: [{ id: 'e', source: 'a', sourceHandle: 'output', target: 'b', targetHandle: 'input' }],
+      },
+      testActor,
+    );
 
     expect(manager.delete).toHaveBeenCalledWith(ResourceFlowNode, { flowId: 5 });
     expect(manager.delete).toHaveBeenCalledWith(ResourceFlowEdge, { flowId: 5 });
@@ -89,35 +96,66 @@ describe('GlobalFlowsService', () => {
 
   it('rejects a canvas with a node that is resource-only and names it', async () => {
     await expect(
-      service.saveCanvas(5, {
-        nodes: [
-          { id: 'ok', type: T.INPUT_RESOURCE_USAGE_STARTED, position, data: {} },
-          { id: 'btn-1', type: T.INPUT_BUTTON, position, data: { label: 'Go' } },
-        ],
-        edges: [],
-      }),
+      service.saveCanvas(
+        5,
+        {
+          nodes: [
+            { id: 'ok', type: T.INPUT_RESOURCE_USAGE_STARTED, position, data: {} },
+            { id: 'btn-1', type: T.INPUT_BUTTON, position, data: { label: 'Go' } },
+          ],
+          edges: [],
+        },
+        testActor,
+      ),
     ).rejects.toThrow(BadRequestException);
     await expect(
-      service.saveCanvas(5, { nodes: [{ id: 'btn-1', type: T.INPUT_BUTTON, position, data: {} }], edges: [] }),
+      service.saveCanvas(
+        5,
+        { nodes: [{ id: 'btn-1', type: T.INPUT_BUTTON, position, data: {} }], edges: [] },
+        testActor,
+      ),
     ).rejects.toMatchObject({
       response: { message: [expect.stringContaining('btn-1')], nodes: [{ nodeId: 'btn-1', nodeType: T.INPUT_BUTTON }] },
     });
     expect(manager.save).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('records nothing when the database rejects a canvas save', async () => {
+    manager.save.mockRejectedValueOnce(new Error('database rejected write'));
+    await expect(
+      service.saveCanvas(
+        5,
+        { nodes: [{ id: 'a', type: T.INPUT_RESOURCE_USAGE_STARTED, position, data: {} }], edges: [] },
+        testActor,
+      ),
+    ).rejects.toThrow('database rejected write');
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('records nothing when the database rejects a create, an update or a delete', async () => {
+    flowRepository.save.mockRejectedValueOnce(new Error('database rejected write'));
+    await expect(service.create({ name: 'New' }, testActor)).rejects.toThrow('database rejected write');
+    flowRepository.save.mockRejectedValueOnce(new Error('database rejected write'));
+    await expect(service.update(5, { name: 'Renamed' }, testActor)).rejects.toThrow('database rejected write');
+    manager.delete.mockRejectedValueOnce(new Error('database rejected delete'));
+    await expect(service.delete(5, testActor)).rejects.toThrow('database rejected delete');
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('subscribes to MQTT topics of new nodes of an enabled flow only', async () => {
     const mqtt = { id: 'm', type: T.INPUT_MQTT_MESSAGE_RECEIVED, position, data: { serverId: 2, topic: 'a/b' } };
-    await service.saveCanvas(5, { nodes: [mqtt], edges: [] });
+    await service.saveCanvas(5, { nodes: [mqtt], edges: [] }, testActor);
     expect(subscribe).toHaveBeenCalledWith(2, 'a/b');
 
     subscribe.mockClear();
     flow.enabled = false;
-    await service.saveCanvas(5, { nodes: [mqtt], edges: [] });
+    await service.saveCanvas(5, { nodes: [mqtt], edges: [] }, testActor);
     expect(subscribe).not.toHaveBeenCalled();
 
     // Turning the flow on subscribes the topics of its stored nodes.
     nodeRepository.find.mockResolvedValue([{ ...mqtt, flowId: 5 }]);
-    await service.update(5, { enabled: true });
+    await service.update(5, { enabled: true }, testActor);
     expect(subscribe).toHaveBeenCalledWith(2, 'a/b');
   });
 
@@ -129,20 +167,24 @@ describe('GlobalFlowsService', () => {
   describe('name, description and enabled', () => {
     it('rejects a null or blank name and a null enabled with 400 and saves nothing', async () => {
       for (const dto of [{ name: null }, { name: '   ' }, { enabled: null }]) {
-        await expect(service.update(5, dto as never)).rejects.toBeInstanceOf(BadRequestException);
+        await expect(service.update(5, dto as never, testActor)).rejects.toBeInstanceOf(BadRequestException);
       }
-      await expect(service.create({ name: '  ' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.create({ name: '  ' }, testActor)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.update(5, { enabled: 'yes' } as never, testActor)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
       expect(flowRepository.save).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
     });
 
     it('trims the name and clears the description with null', async () => {
       flowRepository.findOne.mockResolvedValue({ ...flow, description: 'old' });
-      await expect(service.update(5, { name: '  Renamed ', description: null })).resolves.toMatchObject({
+      await expect(service.update(5, { name: '  Renamed ', description: null }, testActor)).resolves.toMatchObject({
         name: 'Renamed',
         description: null,
         enabled: true,
       });
-      await expect(service.create({ name: ' New ', description: '  ' })).resolves.toMatchObject({
+      await expect(service.create({ name: ' New ', description: '  ' }, testActor)).resolves.toMatchObject({
         name: 'New',
         description: null,
         enabled: true,
@@ -180,12 +222,25 @@ describe('GlobalFlowsService', () => {
   it('reports a missing flow', async () => {
     flowRepository.findOne.mockResolvedValue(null);
     await expect(service.getCanvas(99)).rejects.toThrow(NotFoundException);
-    await expect(service.delete(99)).rejects.toThrow(NotFoundException);
+    await expect(service.delete(99, testActor)).rejects.toThrow(NotFoundException);
+    await expect(service.update(99, { name: 'Renamed' }, testActor)).rejects.toThrow(NotFoundException);
+    await expect(service.delete(99, testActor)).rejects.toThrow(NotFoundException);
+    await expect(service.saveCanvas(99, { nodes: [], edges: [] }, testActor)).rejects.toThrow(NotFoundException);
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('deletes the flow row only: nodes and edges go by cascade', async () => {
-    await service.delete(5);
-    expect(flowRepository.delete).toHaveBeenCalledWith({ id: 5 });
+    manager.find.mockResolvedValue([]);
+    await service.delete(5, testActor);
+    expect(manager.delete).toHaveBeenCalledWith(Flow, { id: 5 });
+    expect(audit.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'flow.deleted' }), manager);
+  });
+
+  it('records nothing when a concurrent delete removed the flow first', async () => {
+    manager.find.mockResolvedValue([]);
+    manager.delete.mockResolvedValueOnce({ affected: 0, raw: [] });
+    await service.delete(5, testActor);
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('refuses to resolve a resource-only plugin node for a global flow', async () => {
@@ -230,11 +285,13 @@ describe('GlobalFlowsService with a database', () => {
     (await db.nodes.find({ order: { id: 'ASC' } })).map(({ id, resourceId, flowId }) => ({ id, resourceId, flowId }));
 
   it('rejects ids of a resource flow with 400 naming them and leaves both flows untouched', async () => {
-    await db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'));
-    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'));
+    await db.resourceFlows.saveResourceFlow(db.resource.id, startToHttpCanvas('r'), testActor);
+    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'), testActor);
+    db.audit.record.mockClear();
 
-    const saving = db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('r'));
+    const saving = db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('r'), testActor);
     await expect(saving).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.audit.record).not.toHaveBeenCalled();
     await expect(saving).rejects.toMatchObject({
       response: { nodeIds: expect.arrayContaining(['r-start', 'r-http']), edgeIds: ['r-edge'] },
     });
@@ -253,14 +310,14 @@ describe('GlobalFlowsService with a database', () => {
 
   it('rejects ids of another global flow and saves its own ids again', async () => {
     const other = await db.flows.save(db.flows.create({ name: 'Other', enabled: true, scope: 'global' }));
-    await db.globalFlows.saveCanvas(other.id, startToHttpCanvas('o'));
-    await expect(db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('o'))).rejects.toMatchObject({
+    await db.globalFlows.saveCanvas(other.id, startToHttpCanvas('o'), testActor);
+    await expect(db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('o'), testActor)).rejects.toMatchObject({
       response: { edgeIds: ['o-edge'] },
     });
     expect(await db.nodes.count({ where: { flowId: other.id } })).toBe(2);
 
-    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'));
-    await expect(db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'))).resolves.toMatchObject({
+    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'), testActor);
+    await expect(db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'), testActor)).resolves.toMatchObject({
       nodes: [{ id: 'g-start' }, { id: 'g-http' }],
     });
   });
@@ -279,7 +336,7 @@ describe('GlobalFlowsService with a database', () => {
   });
 
   it('does not list, count or open flows of another scope', async () => {
-    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'));
+    await db.globalFlows.saveCanvas(db.flow.id, startToHttpCanvas('g'), testActor);
     // A future flow scope (ATT-1204) sharing the table.
     const foreign = await db.flows.save(db.flows.create({ name: 'Resource scoped', scope: 'resource' }));
     await db.nodes.insert({
@@ -296,7 +353,11 @@ describe('GlobalFlowsService with a database', () => {
     ]);
     await expect(db.globalFlows.get(foreign.id)).rejects.toBeInstanceOf(NotFoundException);
     await expect(db.globalFlows.getCanvas(foreign.id)).rejects.toBeInstanceOf(NotFoundException);
-    await expect(db.globalFlows.update(foreign.id, { enabled: false })).rejects.toBeInstanceOf(NotFoundException);
-    await expect(db.globalFlows.delete(foreign.id)).rejects.toBeInstanceOf(NotFoundException);
+    db.audit.record.mockClear();
+    await expect(db.globalFlows.update(foreign.id, { enabled: false }, testActor)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    await expect(db.globalFlows.delete(foreign.id, testActor)).rejects.toBeInstanceOf(NotFoundException);
+    expect(db.audit.record).not.toHaveBeenCalled();
   });
 });

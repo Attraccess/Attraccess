@@ -12,6 +12,7 @@ import { AuditController } from './audit.controller';
 import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
 import { AuditService } from './audit.service';
+import { canvasDetails, canvasSaveDetails, diffCanvas } from '../resources/flows/flow-audit';
 
 const fixturePluginId = 'abcdefghijklmnopqrstu';
 
@@ -97,6 +98,83 @@ describe('persisted audit names', () => {
     expect(nameQueries).toHaveLength(2);
     expect(nameQueries.join('\n')).not.toMatch(/email|password|documentation|SELECT \*/i);
     expect(JSON.stringify(items)).not.toContain('private');
+  });
+
+  it('persists flow events, including a degraded large snapshot, and labels them', async () => {
+    const actor = { id: 7, authenticationMethod: 'api-token' as const, apiTokenId: 4 };
+    const large = {
+      nodes: Array.from({ length: 200 }, (_, i) => ({
+        id: `node-${i}`,
+        type: 'output.http',
+        data: { body: 'x'.repeat(4000) },
+      })),
+      edges: Array.from({ length: 199 }, (_, i) => ({ id: `edge-${i}`, source: `node-${i}`, target: `node-${i + 1}` })),
+    };
+    const emptied = { nodes: [], edges: [] };
+    const changeOf = (before: typeof large, after: typeof emptied) => {
+      const diff = diffCanvas(before, after);
+      if (!diff) throw new Error('expected a change');
+      return diff;
+    };
+    const events = [
+      {
+        action: 'resource_flow.updated' as const,
+        subject: { type: 'resource' as const, id: 7 },
+        details: canvasSaveDetails(large, emptied, changeOf(large, emptied)),
+      },
+      {
+        action: 'flow.canvas_updated' as const,
+        subject: { type: 'flow' as const, id: 3 },
+        details: canvasSaveDetails(large, emptied, changeOf(large, emptied), 'Door bell'),
+      },
+      {
+        action: 'flow.deleted' as const,
+        subject: { type: 'flow' as const, id: 3 },
+        details: canvasDetails({ 'before.name': 'Door bell', 'before.enabled': 1 }, large),
+      },
+      {
+        action: 'flow.created' as const,
+        subject: { type: 'flow' as const, id: 4 },
+        details: { 'after.name': 'Alarm', 'after.enabled': 1 },
+      },
+      {
+        action: 'flow.updated' as const,
+        subject: { type: 'flow' as const, id: 3 },
+        details: { flowName: 'Door bell', changedFields: '["enabled"]', 'before.enabled': 1, 'after.enabled': 0 },
+      },
+      {
+        action: 'flow_variable.set' as const,
+        subject: { type: 'resource' as const, id: 7 },
+        details: { scope: 'global', key: 'mode', valueType: 'string', 'after.value': '"on"' },
+      },
+    ];
+    for (const event of events)
+      expect(await service.record({ domain: 'resource', actor, ...event })).toEqual({ status: 'recorded' });
+
+    const { items } = await controller.list({ limit: 50 });
+    expect(items).toHaveLength(6);
+    const byAction = (action: string) => items.filter((entry) => entry.action === action);
+    expect(byAction('resource_flow.updated')[0]).toMatchObject({
+      subjectType: 'resource',
+      subjectLabel: 'Current lathe',
+      authenticationMethod: 'api-token',
+      apiTokenId: 4,
+      details: { snapshotDetail: 'omitted', 'before.nodeCount': 200 },
+    });
+    expect(byAction('flow.canvas_updated')[0]).toMatchObject({
+      subjectType: 'flow',
+      subjectLabel: 'Door bell',
+      subjectLabelSource: 'recorded',
+    });
+    expect(byAction('flow.deleted')[0]).toMatchObject({
+      subjectLabel: 'Door bell',
+      details: { snapshotDetail: 'omitted' },
+    });
+    expect(byAction('flow.updated')[0]).toMatchObject({ subjectLabel: 'Door bell', subjectLabelSource: 'recorded' });
+    expect(byAction('flow.created')[0]).toMatchObject({ subjectType: 'flow', subjectLabel: 'Alarm' });
+    expect(byAction('flow_variable.set')[0]).toMatchObject({ subjectType: 'resource', subjectLabel: 'Current lathe' });
+    const filtered = await controller.list({ limit: 50, subjectType: 'flow', eventPrefix: 'flow.' });
+    expect(filtered.items).toHaveLength(4);
   });
 
   it('retains recorded names after deletion and never joins plugin target IDs to core resources', async () => {

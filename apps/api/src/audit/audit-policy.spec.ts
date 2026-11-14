@@ -28,6 +28,110 @@ describe('audit storage safe snapshot', () => {
     expect(projectResourceAuditEvent({ ...deletion, details: { password: 'raw-secret' } })).toBeNull();
   });
 
+  it('allows the flow events with their reviewed fields and subject types only', () => {
+    const base = { operationId: randomUUID(), actorId: 42, subjectId: 7 };
+    const canvas = {
+      'before.nodeCount': 2,
+      'after.nodeCount': 0,
+      removedNodes: '[{"id":"a","type":"t"}]',
+      snapshotDetail: 'full',
+    };
+    const resourceFlow = {
+      ...base,
+      action: 'resource_flow.updated' as const,
+      subjectType: 'resource' as const,
+      details: canvas,
+    };
+    expect(projectResourceAuditEvent(resourceFlow)).toEqual(resourceFlow);
+    expect(projectResourceAuditEvent({ ...resourceFlow, subjectType: 'flow' })).toBeNull();
+    expect(
+      projectResourceAuditEvent({ ...resourceFlow, details: { ...canvas, flowName: 'Not for resource flows' } }),
+    ).toBeNull();
+    expect(projectResourceAuditEvent({ ...resourceFlow, details: { ...canvas, secret: 'x' } })).toBeNull();
+    expect(
+      projectResourceAuditEvent({ ...resourceFlow, details: { ...canvas, addedNodes: ['a'] as never } }),
+    ).toBeNull();
+
+    const globalFlow = {
+      ...base,
+      action: 'flow.canvas_updated' as const,
+      subjectType: 'flow' as const,
+      details: { ...canvas, flowName: 'Door bell' },
+    };
+    expect(projectResourceAuditEvent(globalFlow)).toEqual(globalFlow);
+    expect(projectResourceAuditEvent({ ...globalFlow, subjectType: 'resource' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...globalFlow, subjectType: undefined })).toBeNull();
+
+    for (const action of ['flow.created', 'flow.updated', 'flow.deleted'] as const) {
+      expect(projectResourceAuditEvent({ ...base, action, subjectType: 'flow', details: {} })).not.toBeNull();
+    }
+    const variable = {
+      ...base,
+      action: 'flow_variable.set' as const,
+      subjectType: 'resource' as const,
+      details: { scope: 'global', key: 'mode', valueType: 'string', 'after.value': '"on"' },
+    };
+    expect(projectResourceAuditEvent(variable)).toEqual(variable);
+    expect(projectResourceAuditEvent({ ...variable, subjectType: 'flow' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...variable, subjectType: 'resource_group' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...variable, subjectType: undefined })).toBeNull();
+    expect(projectResourceAuditEvent({ ...variable, details: { ...variable.details, 'before.name': 'x' } })).toBeNull();
+    expect(
+      projectResourceAuditEvent({
+        action: 'resource.deleted',
+        ...base,
+        details: { 'before.name': 'Lathe', 'before.type': 'machine', flowNodeCount: 3, flowEdgeCount: 2 },
+      }),
+    ).not.toBeNull();
+  });
+
+  it('rejects flow metadata fields outside each event and flow events about a resource', () => {
+    const base = { operationId: randomUUID(), actorId: 42, subjectId: 7, subjectType: 'flow' as const };
+    const valid = {
+      'flow.created': { 'after.name': 'Door bell', 'after.enabled': 1, 'after.description': 'rings' },
+      'flow.updated': { flowName: 'Door bell', 'before.enabled': 1, 'after.enabled': 0, changedFields: '["enabled"]' },
+      'flow.deleted': {
+        'before.name': 'Door bell',
+        'before.enabled': 1,
+        'before.snapshot': '{}',
+        snapshotDetail: 'full',
+      },
+    } as const;
+    const foreign = {
+      'flow.created': { 'before.snapshot': '{}' },
+      'flow.updated': { 'before.snapshot': '{}' },
+      'flow.deleted': { flowName: 'Door bell' },
+    } as const;
+    for (const action of ['flow.created', 'flow.updated', 'flow.deleted'] as const) {
+      const event = { ...base, action, details: valid[action] };
+      expect(projectResourceAuditEvent(event)).toEqual(event);
+      expect(projectResourceAuditEvent({ ...event, details: { ...valid[action], ...foreign[action] } })).toBeNull();
+      expect(projectResourceAuditEvent({ ...event, subjectType: 'resource' })).toBeNull();
+    }
+  });
+
+  it('accepts a deleted flow variable about a resource and resource flow saves about a resource only', () => {
+    const base = { operationId: randomUUID(), actorId: 42, subjectId: 7 };
+    const deleted = {
+      ...base,
+      action: 'flow_variable.deleted' as const,
+      subjectType: 'resource' as const,
+      details: { scope: 'resource', key: 'mode', valueType: 'string', 'before.value': '"on"' },
+    };
+    expect(projectResourceAuditEvent(deleted)).toEqual(deleted);
+    expect(projectResourceAuditEvent({ ...deleted, subjectType: 'flow' })).toBeNull();
+
+    const saved = {
+      ...base,
+      action: 'resource_flow.updated' as const,
+      subjectType: 'resource' as const,
+      details: { 'before.nodeCount': 0, 'after.nodeCount': 1, snapshotDetail: 'full' },
+    };
+    expect(projectResourceAuditEvent(saved)).toEqual(saved);
+    expect(projectResourceAuditEvent({ ...saved, subjectType: 'resource_group' })).toBeNull();
+    expect(projectResourceAuditEvent({ ...saved, subjectType: undefined })).toBeNull();
+  });
+
   it('accepts generated role keys truncated after a separator', () => {
     expect(
       projectIdentityAuditEvent({

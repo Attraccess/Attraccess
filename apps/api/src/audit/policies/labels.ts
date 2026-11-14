@@ -26,6 +26,8 @@ function recordedSubjectLabel(entry: AuditLog): string | undefined {
   const isResource =
     entry.domain === 'resource' && entry.subjectType === 'resource' && entry.action.startsWith('resource.');
   const isGroup = entry.domain === 'resource' && entry.subjectType === 'resource_group';
+  if (entry.domain === 'resource' && entry.subjectType === 'flow')
+    return name(details.flowName) ?? name(details['after.name']) ?? name(details['before.name']);
   const isProject = entry.domain === 'project' && entry.subjectType === 'project';
   if (isResource || isGroup || isProject)
     return name(details['after.name']) ?? name(details['before.name']) ?? name(details.name);

@@ -1,5 +1,6 @@
-import { Auth } from '@attraccess/plugins-backend-sdk';
-import { Body, Controller, Delete, Get, Logger, Param, ParseIntPipe, Patch, Post, Put, Sse } from '@nestjs/common';
+import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
+import { auditActorOf } from '../../audit/recorder/audit-event';
+import { Body, Controller, Delete, Get, Logger, Param, ParseIntPipe, Patch, Post, Put, Req, Sse } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { finalize } from 'rxjs/operators';
@@ -43,8 +44,8 @@ export class GlobalFlowsController {
   @Post()
   @ApiOperation({ summary: 'Create a global flow', operationId: 'createGlobalFlow' })
   @ApiResponse({ status: 201, type: GlobalFlowDto })
-  create(@Body() body: CreateGlobalFlowDto): Promise<GlobalFlowDto> {
-    return this.globalFlows.create(body);
+  create(@Body() body: CreateGlobalFlowDto, @Req() req: AuthenticatedRequest): Promise<GlobalFlowDto> {
+    return this.globalFlows.create(body, auditActorOf(req.user));
   }
 
   @Get('node-schemas')
@@ -77,16 +78,20 @@ export class GlobalFlowsController {
   })
   @ApiParam({ name: 'flowId', type: 'integer' })
   @ApiResponse({ status: 200, type: GlobalFlowDto })
-  update(@Param('flowId', ParseIntPipe) flowId: number, @Body() body: UpdateGlobalFlowDto): Promise<GlobalFlowDto> {
-    return this.globalFlows.update(flowId, body);
+  update(
+    @Param('flowId', ParseIntPipe) flowId: number,
+    @Body() body: UpdateGlobalFlowDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<GlobalFlowDto> {
+    return this.globalFlows.update(flowId, body, auditActorOf(req.user));
   }
 
   @Delete(':flowId')
   @ApiOperation({ summary: 'Delete a global flow with its nodes and edges', operationId: 'deleteGlobalFlow' })
   @ApiParam({ name: 'flowId', type: 'integer' })
   @ApiResponse({ status: 200, description: 'Deleted' })
-  async delete(@Param('flowId', ParseIntPipe) flowId: number): Promise<void> {
-    await this.globalFlows.delete(flowId);
+  async delete(@Param('flowId', ParseIntPipe) flowId: number, @Req() req: AuthenticatedRequest): Promise<void> {
+    await this.globalFlows.delete(flowId, auditActorOf(req.user));
   }
 
   @Get(':flowId/canvas')
@@ -110,8 +115,9 @@ export class GlobalFlowsController {
   saveCanvas(
     @Param('flowId', ParseIntPipe) flowId: number,
     @Body() body: ResourceFlowSaveDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceFlowResponseDto> {
-    return this.globalFlows.saveCanvas(flowId, body);
+    return this.globalFlows.saveCanvas(flowId, body, auditActorOf(req.user));
   }
 
   @Post(':flowId/node-schemas/:nodeType')

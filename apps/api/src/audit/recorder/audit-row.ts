@@ -8,7 +8,7 @@ import { CORE_AUDIT_DOMAINS, CoreAuditDomain } from '../policies/domains';
 import { IdentityAuditAction, projectIdentityAuditEvent } from '../policies/identity';
 import { projectPluginAuditEvent } from '../policies/plugins';
 import { projectProjectAuditEvent } from '../policies/projects';
-import { projectResourceAuditEvent } from '../policies/resources';
+import { ResourceAuditInput, projectResourceAuditEvent } from '../policies/resources';
 import { projectSsoAuditEvent } from '../policies/sso';
 import { dataFields } from '../policies/projection';
 import type { AuditEvent } from './audit-event';
@@ -180,7 +180,7 @@ const coreRows: { [D in CoreAuditDomain]: (event: CoreEvent<D>) => AuditRow | nu
       authenticationMethod: event.actor.authenticationMethod,
       apiTokenId: event.actor.apiTokenId,
       subjectId: event.subject.id,
-      subjectType: event.subject.type as 'resource',
+      subjectType: event.subject.type as ResourceAuditInput['subjectType'],
       details: event.details as Record<string, string | number>,
     });
     if (!snapshot) return null;

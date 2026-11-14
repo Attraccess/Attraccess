@@ -1,4 +1,4 @@
-import { Resource, SupervisionMode } from '@attraccess/database-entities';
+import { Resource, ResourceFlowEdge, ResourceFlowNode, SupervisionMode } from '@attraccess/database-entities';
 
 import { Inject, Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 
@@ -30,30 +30,13 @@ import { UpdateResourceDto } from './dtos/updateResource.dto';
 
 import { ResourceChangedEvent } from './events/resource-changed.event';
 
-export const MAX_AUDIT_DETAILS_BYTES = 4096;
+import { AUDIT_DETAILS_BYTE_LIMIT, fitAuditText, fitAuditTexts } from '../audit/policies/projection';
 
-export function auditResourceName(name: string, maxJsonBytes: number): string {
-  if (Buffer.byteLength(JSON.stringify(name), 'utf8') <= maxJsonBytes) return name;
+export const MAX_AUDIT_DETAILS_BYTES = AUDIT_DETAILS_BYTE_LIMIT;
 
-  const suffix = '...';
-  let result = '';
-  for (const character of name) {
-    if (Buffer.byteLength(JSON.stringify(result + character + suffix), 'utf8') > maxJsonBytes) break;
-    result += character;
-  }
-  return result + suffix;
-}
+export const auditResourceName = fitAuditText;
 
-export function auditResourceNames(
-  names: Record<string, string>,
-  details: Record<string, string>,
-): Record<string, string> {
-  const emptyNames = Object.fromEntries(Object.keys(names).map((key) => [key, '']));
-  const availableBytes =
-    MAX_AUDIT_DETAILS_BYTES - Buffer.byteLength(JSON.stringify({ ...details, ...emptyNames }), 'utf8');
-  const maxJsonBytes = Math.floor(availableBytes / Object.keys(names).length);
-  return Object.fromEntries(Object.entries(names).map(([key, name]) => [key, auditResourceName(name, maxJsonBytes)]));
-}
+export const auditResourceNames = fitAuditTexts;
 
 export function resourceAuditSnapshot(resource: Resource) {
   return {
@@ -473,6 +456,13 @@ export class ResourcesService {
     actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
   ): Promise<void> {
     const resource = actor ? await this.getResourceById(id) : undefined;
+    // A soft delete keeps the flow rows; the counts say what flow the resource had when it was deleted.
+    const [flowNodeCount, flowEdgeCount] = actor
+      ? await Promise.all([
+          this.resourceRepository.manager.count(ResourceFlowNode, { where: { resourceId: id } }),
+          this.resourceRepository.manager.count(ResourceFlowEdge, { where: { resourceId: id } }),
+        ])
+      : [0, 0];
     const result = await this.resourceRepository.softDelete(id);
     if (result.affected === 0) {
       throw new ResourceNotFoundException(id);
@@ -487,8 +477,17 @@ export class ResourcesService {
         actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
         subject: { type: 'resource', id: id },
         details: {
-          ...auditResourceNames({ 'before.name': resource.name }, { 'before.type': resource.type }),
+          ...auditResourceNames(
+            { 'before.name': resource.name },
+            {
+              'before.type': resource.type,
+              flowNodeCount: String(flowNodeCount),
+              flowEdgeCount: String(flowEdgeCount),
+            },
+          ),
           'before.type': resource.type,
+          flowNodeCount,
+          flowEdgeCount,
         },
       });
     }

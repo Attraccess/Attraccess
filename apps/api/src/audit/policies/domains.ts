@@ -39,6 +39,7 @@ export const CORE_SUBJECT_TYPES = [
   'identity.password_policy',
   'identity.role',
   'identity.user',
+  'flow',
   'resource',
   'resource_group',
   'sso.provider',
