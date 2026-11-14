@@ -43,14 +43,19 @@ interface ExecutorDependencies {
   companionGatewayService: CompanionGatewayService;
 }
 
-/**
- * Nodes that call back into usage or metering. Those modules depend on flows, so their executors are attached
- * when the usage and metering services are constructed instead of being built here.
- */
-export type AttachedNodeType =
+/** Nodes that call back into usage. */
+export type UsageNodeType =
   | ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS
-  | ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION
-  | ResourceFlowNodeType.OUTPUT_METERING_REPORT;
+  | ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION;
+
+/** Nodes that call back into metering. */
+export type MeteringNodeType = ResourceFlowNodeType.OUTPUT_METERING_REPORT;
+
+/**
+ * Nodes that call back into usage or metering. Those modules depend on flows, so their executors are attached by
+ * `ResourceUsageFlowsBridge` and `ResourceMeteringFlowsBridge` instead of being built here.
+ */
+export type AttachedNodeType = UsageNodeType | MeteringNodeType;
 
 /** Core-node registry except the attached nodes; each strategy receives only the collaborators it needs. */
 export function buildNodeExecutorRegistry(
@@ -123,10 +128,7 @@ export function buildNodeExecutorRegistry(
 export function usageNodeExecutors(
   resourceUsageService: ResourceUsageService,
   billingTransactionItemRepository: Repository<BillingTransactionItem>,
-): Pick<
-  Record<ResourceFlowNodeType, NodeExecutor>,
-  Exclude<AttachedNodeType, ResourceFlowNodeType.OUTPUT_METERING_REPORT>
-> {
+): Pick<Record<ResourceFlowNodeType, NodeExecutor>, UsageNodeType> {
   return {
     [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS]: new BillingSetAdditionalItemsExecutor(
       resourceUsageService,
@@ -138,6 +140,6 @@ export function usageNodeExecutors(
 
 export function meteringNodeExecutors(
   metering: ResourceMeteringService,
-): Pick<Record<ResourceFlowNodeType, NodeExecutor>, ResourceFlowNodeType.OUTPUT_METERING_REPORT> {
+): Pick<Record<ResourceFlowNodeType, NodeExecutor>, MeteringNodeType> {
   return { [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: new MeteringReportExecutor(metering) };
 }

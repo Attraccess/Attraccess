@@ -127,14 +127,15 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   protected readonly engine: FlowExecutionEngine;
 
+  /** Shared with the engine by reference, so executors attached later reach it. Never copy it. */
   protected readonly nodeExecutors: Partial<Record<ResourceFlowNodeType, NodeExecutor>>;
 
   protected resourceUsageService?: ResourceUsageService;
 
   /**
-   * Usage and metering depend on flows (they start flow runs) while some flow nodes call back into them, so they
-   * attach themselves here when constructed (see `ResourceUsageFlowsBridge` and `ResourceMeteringFlowsBridge`)
-   * instead of being injected, which would make the modules import each other.
+   * Usage and metering depend on flows (they start flow runs) while some flow nodes call back into them, so
+   * `ResourceUsageFlowsBridge` and `ResourceMeteringFlowsBridge` attach them here at startup instead of flows
+   * injecting them, which would make the modules import each other.
    */
   public attachUsage(resourceUsageService: ResourceUsageService): void {
     this.resourceUsageService = resourceUsageService;

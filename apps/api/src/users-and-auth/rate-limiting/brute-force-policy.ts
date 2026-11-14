@@ -16,8 +16,8 @@ export interface CounterEntry extends WindowCounterEntry {
 
 export const MAX_COUNTER_ENTRIES = 10_000;
 
-export // ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
-const COARSE_IP_MULTIPLIER = 10;
+// ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
+export const COARSE_IP_MULTIPLIER = 10;
 
 export function isStale(entry: CounterEntry, now: number, windowMs: number): boolean {
   if (entry.lockoutUntil > now) return false;
