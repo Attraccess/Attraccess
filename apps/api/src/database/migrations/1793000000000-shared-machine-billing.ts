@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Billing on shared machines (ATT-1191): a per-meter allocation mode, the shared time segments of a meter, how a
  * metering session accounts its consumption, and the segment breakdown of a charged item.
  */
-export class SharedMachineBilling1792900000000 implements MigrationInterface {
-  name = 'SharedMachineBilling1792900000000';
+export class SharedMachineBilling1793000000000 implements MigrationInterface {
+  name = 'SharedMachineBilling1793000000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasColumn('resource_meter', 'allocation'))) {

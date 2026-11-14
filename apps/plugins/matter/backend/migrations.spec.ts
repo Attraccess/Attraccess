@@ -1,8 +1,10 @@
 import { DataSource } from 'typeorm';
 import * as migrations from './migrations';
 import { CreateMatterConnection1793900000000 } from './migrations/1793900000000-create-matter-connection';
+import { CreateMatterDeviceModel1793900001000 } from './migrations/1793900001000-create-matter-device-model';
+import { CreateMatterBackup1793900002000 } from './migrations/1793900002000-create-matter-backup';
 
-const TABLES = [
+const DEVICE_TABLES = [
   'plugin_matter_fabrics',
   'plugin_matter_nodes',
   'plugin_matter_endpoints',
@@ -12,6 +14,8 @@ const TABLES = [
   'plugin_matter_commands',
   'plugin_matter_reconciliation_status',
 ];
+const BACKUP_TABLES = ['plugin_matter_recovery_keys', 'plugin_matter_backups'];
+const TABLES = [...DEVICE_TABLES, ...BACKUP_TABLES];
 
 const open = () =>
   new DataSource({ type: 'sqlite', database: ':memory:', migrations: Object.values(migrations) }).initialize();
@@ -26,6 +30,8 @@ describe('Matter device model migrations', () => {
     try {
       await db.runMigrations();
       expect(await tables(db)).toEqual(['plugin_matter_connection', ...TABLES].sort());
+      await db.undoLastMigration();
+      expect(await tables(db)).toEqual(['plugin_matter_connection', ...DEVICE_TABLES].sort());
       await db.undoLastMigration();
       expect(await tables(db)).toEqual(['plugin_matter_connection']);
       await db.undoLastMigration();
@@ -53,14 +59,98 @@ describe('Matter device model migrations', () => {
       const pending = Object.values(migrations).filter(
         (migration) => migration !== CreateMatterConnection1793900000000,
       );
-      expect(pending).toHaveLength(1);
+      expect(pending).toEqual([CreateMatterDeviceModel1793900001000, CreateMatterBackup1793900002000]);
       const queryRunner = db.createQueryRunner();
-      await new (pending[0] as new () => { up(runner: typeof queryRunner): Promise<void> })().up(queryRunner);
+      for (const migration of pending) {
+        await new (migration as new () => { up(runner: typeof queryRunner): Promise<void> })().up(queryRunner);
+      }
       await queryRunner.release();
       expect(await db.query('SELECT url, updated_by FROM plugin_matter_connection')).toEqual([
         { url: 'http://sidecar', updated_by: 3 },
       ]);
       expect(await tables(db)).toEqual(['plugin_matter_connection', ...TABLES].sort());
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  it('add the recorded fabric identity to existing fabric rows, keeping them', async () => {
+    const db = await new DataSource({
+      type: 'sqlite',
+      database: ':memory:',
+      migrations: [CreateMatterConnection1793900000000, CreateMatterDeviceModel1793900001000],
+    }).initialize();
+    try {
+      await db.runMigrations();
+      await db.query(
+        `INSERT INTO plugin_matter_fabrics (id, fabric_id, first_seen_at, last_seen_at, status) VALUES ('f1', '7', 't', 't', 'active')`,
+      );
+      const queryRunner = db.createQueryRunner();
+      await new CreateMatterBackup1793900002000().up(queryRunner);
+      expect(
+        await db.query(
+          'SELECT fabric_id, fabric_generation, storage_instance_id, root_cert_fingerprint, recorded_at FROM plugin_matter_fabrics',
+        ),
+      ).toEqual([
+        {
+          fabric_id: '7',
+          fabric_generation: null,
+          storage_instance_id: null,
+          root_cert_fingerprint: null,
+          recorded_at: null,
+        },
+      ]);
+      await new CreateMatterBackup1793900002000().down(queryRunner);
+      expect(await db.query('SELECT * FROM plugin_matter_fabrics')).toEqual([
+        {
+          id: 'f1',
+          fabric_id: '7',
+          label: null,
+          first_seen_at: 't',
+          last_seen_at: 't',
+          status: 'active',
+          retired_at: null,
+        },
+      ]);
+      await queryRunner.release();
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  it('allow one current recovery key, keep retired ones, and keep key IDs unique', async () => {
+    const db = await open();
+    try {
+      await db.runMigrations();
+      const key = (id: string, keyId: string, retiredAt: string | null) =>
+        db.query(
+          `INSERT INTO plugin_matter_recovery_keys (id, key_id, encrypted_key, created_at, retired_at) VALUES (?, ?, 'enc', 't', ?)`,
+          [id, keyId, retiredAt],
+        );
+      await key('k1', 'aaaaaaaaaaaaaaaa', null);
+      await expect(key('k2', 'bbbbbbbbbbbbbbbb', null)).rejects.toThrow(/UNIQUE/);
+      await db.query(`UPDATE plugin_matter_recovery_keys SET retired_at = 'now'`);
+      await key('k2', 'bbbbbbbbbbbbbbbb', null);
+      await expect(key('k3', 'bbbbbbbbbbbbbbbb', 'x')).rejects.toThrow(/UNIQUE/);
+    } finally {
+      await db.destroy();
+    }
+  });
+
+  it('constrain backups to known triggers and outcomes and store the file as a blob', async () => {
+    const db = await open();
+    try {
+      await db.runMigrations();
+      const insert = (trigger: string, outcome: string) =>
+        db.query(
+          `INSERT INTO plugin_matter_backups (id, created_at, trigger, outcome, blob) VALUES (lower(hex(randomblob(8))), 't', ?, ?, x'0102')`,
+          [trigger, outcome],
+        );
+      await insert('manual', 'succeeded');
+      await insert('pre_restore', 'failed');
+      await expect(insert('whenever', 'succeeded')).rejects.toThrow(/CHECK/);
+      await expect(insert('manual', 'maybe')).rejects.toThrow(/CHECK/);
+      expect((await db.query('SELECT blob FROM plugin_matter_backups LIMIT 1'))[0].blob).toBeInstanceOf(Buffer);
     } finally {
       await db.destroy();
     }

@@ -4,7 +4,7 @@ import { DataSource } from 'typeorm';
 import { EmailTemplateType } from '@attraccess/database-entities';
 import { readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from '../../email-template/email-defaults';
 import { EmailTemplateTranslations1782500000000 } from './1782500000000-email-templates-locale';
-import { RefreshSharedMachineReceipt1793000000000 } from './1793000000000-refresh-shared-machine-receipt';
+import { RefreshSharedMachineReceipt1793100000000 } from './1793100000000-refresh-shared-machine-receipt';
 
 it('refreshes the preceding stock receipt while preserving customized bodies, subjects, and variables', async () => {
   const type = EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY;
@@ -27,7 +27,7 @@ it('refreshes the preceding stock receipt while preserving customized bodies, su
       'INSERT INTO "email_template_translations" ("templateType", "key", "locale", "value") VALUES (?, ?, ?, ?)',
       [type, 'shared_marker', 'de', 'Gemeinsam'],
     );
-    const migration = new RefreshSharedMachineReceipt1793000000000();
+    const migration = new RefreshSharedMachineReceipt1793100000000();
     await migration.up(runner);
     expect(await runner.query('SELECT body, subject, variables FROM email_templates')).toEqual([
       {

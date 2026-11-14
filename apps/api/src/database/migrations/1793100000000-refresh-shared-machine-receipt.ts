@@ -14,7 +14,7 @@ const NEW_KEYS = [
   'quantity_pending',
 ];
 
-export class RefreshSharedMachineReceipt1793000000000 implements MigrationInterface {
+export class RefreshSharedMachineReceipt1793100000000 implements MigrationInterface {
   async up(runner: QueryRunner): Promise<void> {
     const type = EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY;
     if (

@@ -1,7 +1,12 @@
-import { CLOSE_CODES, UNAUTHORIZED_MESSAGE, type CapabilityReport } from '@attraccess/matter-contract';
+import {
+  CLOSE_CODES,
+  FEATURE_FAMILIES,
+  UNAUTHORIZED_MESSAGE,
+  type CapabilityReport,
+} from '@attraccess/matter-contract';
 import { randomUUID } from 'node:crypto';
 import { selfSignedCertificate } from '../testing/certs';
-import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
+import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar.test-utils';
 import { SidecarConnection, type ConnectionStatus } from './connection';
 import { SidecarAbortedError, SidecarUnavailableError } from './errors';
 import { BACKOFF_CAP_MS } from './backoff';
@@ -66,7 +71,7 @@ describe('SidecarConnection', () => {
       lastError: null,
       sidecar: { sidecar: entry.sidecar, matterJs: entry.matterJs, wireVersion: 1 },
     });
-    expect(status.capabilities?.capabilities).toHaveLength(8);
+    expect(status.capabilities?.capabilities).toHaveLength(FEATURE_FAMILIES.length);
     expect(status.supported).toEqual([entry]);
     expect(states.map((s) => s.state)).toEqual(['connecting', 'connected']);
   });
@@ -187,7 +192,7 @@ describe('SidecarConnection', () => {
     create().configure({ url: fake.url, token: TOKEN });
     await until(() => connection.status().state === 'connected');
     const report: CapabilityReport = await connection.request('health.capabilities');
-    expect(report.capabilities).toHaveLength(8);
+    expect(report.capabilities).toHaveLength(FEATURE_FAMILIES.length);
     // @ts-expect-error /version does not answer with a capability report
     const wrong: () => Promise<CapabilityReport> = () => connection.request('health.version');
     // @ts-expect-error fabric.create needs a body

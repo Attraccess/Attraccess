@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { SharedMachineBilling1792900000000 } from './1792900000000-shared-machine-billing';
+import { SharedMachineBilling1793000000000 } from './1793000000000-shared-machine-billing';
 
 describe('SharedMachineBilling migration', () => {
   async function withDatabase(test: (runner: ReturnType<DataSource['createQueryRunner']>) => Promise<void>) {
@@ -24,7 +24,7 @@ describe('SharedMachineBilling migration', () => {
 
   it('sets the shared allocation on every existing meter and keeps existing sessions on their own total', async () => {
     await withDatabase(async (runner) => {
-      await new SharedMachineBilling1792900000000().up(runner);
+      await new SharedMachineBilling1793000000000().up(runner);
 
       expect(await runner.query(`SELECT id, allocation FROM "resource_meter" ORDER BY id`)).toEqual([
         { id: 1, allocation: 'shared' },
@@ -41,7 +41,7 @@ describe('SharedMachineBilling migration', () => {
 
   it('keeps a chosen allocation when it runs again', async () => {
     await withDatabase(async (runner) => {
-      const migration = new SharedMachineBilling1792900000000();
+      const migration = new SharedMachineBilling1793000000000();
       await migration.up(runner);
       await runner.query(`UPDATE "resource_meter" SET "allocation" = 'per-session' WHERE id = 2`);
       await migration.up(runner);
@@ -55,7 +55,7 @@ describe('SharedMachineBilling migration', () => {
 
   it('can run twice and be reverted', async () => {
     await withDatabase(async (runner) => {
-      const migration = new SharedMachineBilling1792900000000();
+      const migration = new SharedMachineBilling1793000000000();
       await migration.up(runner);
       await migration.up(runner);
       await migration.down(runner);
