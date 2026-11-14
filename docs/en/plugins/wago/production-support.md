@@ -154,7 +154,7 @@ exercises (including a destructive commissioning) are run on a real CC100 `751-9
 > **Not yet performed.** They need a prepared CC100 and a person to run them. Results are added to this table, and
 > the evidence recorded against the [evidence guide](plugins/wago/acceptance-evidence.md), before the integration is described as production-ready.
 
-**Preconditions.** A CC100 that may be wiped, with no connected equipment (or only safe low-voltage fixtures), a
+**Preconditions.** A CC100 that may be wiped, with no connected equipment (or only safety extra-low voltage (SELV/PELV) fixtures), a
 reachable private IPv4 address, the factory or known SSH login, and a RabbitMQ 4 broker with an administrator
 account. Record the commit, runtime version, firmware, broker version and operator.
 

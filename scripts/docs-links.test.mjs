@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 // Checks internal links in docs/<lang>/ the way the docs site (docsify 4.13.1, hash routing, relativePath off)
 // resolves them. Not handled, because the docs do not use them: setext headings, headings inside blockquotes or
-// lists, reference-style links, raw <a href> links and percent-encoded anchors.
+// lists, reference-style links, raw <a href> links, links split across lines and percent-encoded anchors.
 
 const DOCS = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'docs');
 const LANGUAGES = ['en', 'de'];
@@ -19,14 +19,15 @@ function markdownFiles(dir) {
   });
 }
 
-/** Lines outside fenced code blocks, with their 1-based numbers. A fence closes only with its own marker. */
+/** Lines outside fenced code blocks, with their 1-based numbers. A fence closes only with its own bare marker. */
 function proseLines(text) {
   let fence = null;
   const lines = [];
   text.split('\n').forEach((line, index) => {
     const marker = line.match(/^\s*(`{3,}|~{3,})/)?.[1];
     if (fence) {
-      if (marker && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+      const bare = /^\s*(`{3,}|~{3,})\s*$/.test(line);
+      if (bare && marker[0] === fence[0] && marker.length >= fence.length) fence = null;
     } else if (marker) {
       fence = marker;
     } else {
@@ -38,7 +39,7 @@ function proseLines(text) {
 
 const escapeHtml = (text) =>
   text
-    .replace(/&/g, '&amp;')
+    .replace(/&(?!#?\w+;)/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
@@ -51,8 +52,10 @@ function headingHtml(heading) {
     .map((part) => {
       if (/^`[^`]*`$/.test(part)) return `<code>${escapeHtml(part.slice(1, -1))}</code>`;
       return escapeHtml(part.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'))
-        .replace(/(\*\*|__)(.+?)\1/g, '<strong>$2</strong>')
-        .replace(/(\*|_)(.+?)\1/g, '<em>$2</em>');
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|\W)__(.+?)__(?!\w)/g, '$1<strong>$2</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/(^|\W)_(.+?)_(?!\w)/g, '$1<em>$2</em>');
     })
     .join('');
 }
@@ -63,7 +66,7 @@ function slugify(html) {
     .trim()
     .replace(/[A-Z]+/g, (s) => s.toLowerCase())
     .replace(/<[^>]+>/g, '')
-    .replace(/[ -⁯⸀-⹿\\'!"#$%&()*+,./:;<=>?@[\]^`{|}~]/g, '')
+    .replace(/[\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,./:;<=>?@[\]^`{|}~]/g, '')
     .replace(/\s/g, '-')
     .replace(/-+/g, '-')
     .replace(/^(\d)/, '_$1');
@@ -76,9 +79,9 @@ function headingIds(text) {
   for (const { line } of proseLines(text)) {
     const heading = line.match(/^#{1,6}\s+(.*?)\s*#*\s*$/)?.[1];
     if (heading === undefined) continue;
-    const explicitId = heading.match(/:id=([^\s]+)/)?.[1];
+    const explicitId = heading.match(/:id=([\w%-]+)/)?.[1];
     const source = heading
-      .replace(/:id=[^\s]+/, '')
+      .replace(/:id=[\w%-]+/, '')
       .replace(/<!-- \{docsify-ignore(-all)?\} -->|\{docsify-ignore(-all)?\}/g, '');
     const slug = slugify(explicitId ?? headingHtml(source));
     const count = counts.has(slug) ? counts.get(slug) + 1 : 0;
@@ -94,11 +97,13 @@ function anchorsOf(file) {
   return anchorCache.get(file);
 }
 
-/** Internal links of a line, with inline code removed: { image, target }. */
+/** Internal links of a line, with inline code removed: { image, target }. Links docsify does not compile are skipped. */
 function internalLinks(line) {
   const links = [];
-  for (const match of line.replace(/`[^`]*`/g, '').matchAll(/(!?)\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
-    if (!/^(https?:|mailto:|#\/)/.test(match[2])) links.push({ image: match[1] === '!', target: match[2] });
+  const pattern = /(!?)\[[^\]]*\]\(([^)\s]+)(?:\s+("[^"]*"|'[^']*'))?\)/g;
+  for (const [, bang, target, title = ''] of line.replace(/`[^`]*`/g, '').matchAll(pattern)) {
+    if (/^(https?:|mailto:|#\/)/.test(target) || /:(ignore|include)\b/.test(title)) continue;
+    links.push({ image: bang === '!', target });
   }
   return links;
 }
@@ -154,6 +159,11 @@ test('heading ids follow docsify slug rules', () => {
       '```',
       '## Custom :id=my-anchor',
       '## Ignored {docsify-ignore}',
+      '## http_requests_total and _emphasis_',
+      '## A &amp; B',
+      '```js title',
+      '## Inside a fence with an info string',
+      '```',
     ].join('\n'),
   );
   assert.deepEqual(ids, [
@@ -166,6 +176,8 @@ test('heading ids follow docsify slug rules', () => {
     'setup-1',
     'my-anchor',
     'ignored',
+    'http_requests_total-and-emphasis',
+    'a-amp-b',
   ]);
 });
 
@@ -175,4 +187,8 @@ test('relative page links are rejected, relative images are resolved from the pa
   assert.match(linkProblem(file, root, { image: false, target: '../settings/security.md' }), /relative page link/);
   assert.equal(linkProblem(file, root, { image: false, target: 'settings/security.md' }), null);
   assert.match(linkProblem(file, root, { image: true, target: '../missing.png' }), /missing image/);
+});
+
+test('links with a single-quoted title are checked, :ignore links are skipped', () => {
+  assert.deepEqual(internalLinks("[a](x.md#c 'title') and [b](y.md ':ignore')"), [{ image: false, target: 'x.md#c' }]);
 });

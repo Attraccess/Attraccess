@@ -51,13 +51,13 @@ können jeden Teil eines Hinweises in eine eigene Zeile setzen. Das Plugin Reser
 
 ## Uhrzeit und Zeitzone
 
-Reader zeigen die Ortszeit im 24-Stunden-Format. Jeder Reader verwendet **eine** Zeitzone: die eines Plugins, das eine festlegt, sonst die des Servers (`TZ`). Ein Plugin entscheidet, für welche Ressourcen es seine Zone vorschlägt; für alle anderen gilt die Zone des Servers. So passen Uhr und Texte wie
+Reader zeigen die Ortszeit im 24-Stunden-Format. Jeder Reader verwendet **eine** Zeitzone: die eines Plugins, das eine festlegt, sonst die des Servers (`TZ`). Ein Plugin entscheidet, für welche Ressourcen es seine Zone vorschlägt; für alle anderen gilt die Zone des Servers (ein Beispiel steht unter
+[Reservierungen: Attractap-Reader](plugins/reservations/using-reservations.md#attractap-reader)). So passen Uhr und Texte wie
 „Check-in bis 14:15“ immer zusammen, ebenso die Startzeiten von Sitzungen. Ändern Admins die Zeitzone des Plugins,
 wechseln die Reader sofort, die Startzeiten von Sitzungen eingeschlossen; die Sommerzeit wird automatisch
 berücksichtigt. Antwortet kein Plugin rechtzeitig, zum Beispiel direkt nach einem Neustart des Servers, behält der
 Reader die bisherige Zone (nach einem Neustart die des Servers), und der Server fragt nach einigen Sekunden erneut,
-danach seltener (höchstens alle 5 Minuten), bis ein Plugin antwortet. Ein Beispiel steht unter
-[Reservierungen: Attractap-Reader](plugins/reservations/using-reservations.md#attractap-reader).
+danach seltener (höchstens alle 5 Minuten), bis ein Plugin antwortet.
 
 Wollen Plugins auf einem Reader unterschiedliche Zeitzonen, nutzt der Reader die erste gültige Zone in Host-Reihenfolge:
 die Ressourcen des Readers nach ID und je Ressource die Plugins alphabetisch nach Namen; ein langsameres Plugin, das

@@ -48,12 +48,12 @@ each part of a note on its own line. The Reservations plugin does this; see
 ## Time and time zone
 
 Readers show local time in 24-hour format. Each reader uses **one** time zone: the time zone of a plugin that sets one, otherwise the
-server's own (`TZ`). A plugin decides for which resources it proposes its zone; for all others the server's zone applies. This way the clock and a text like "check in by 14:15" always agree, and so do
+server's own (`TZ`). A plugin decides for which resources it proposes its zone; for all others the server's zone applies (for an example, see
+[Reservations: Attractap readers](plugins/reservations/using-reservations.md#attractap-readers)). This way the clock and a text like "check in by 14:15" always agree, and so do
 the start times of sessions. If an admin changes the plugin's timezone, the readers switch at once, the start times
 of sessions included; the offset also follows daylight saving time by itself. If no plugin answers in time, for
 example right after a server restart, the reader keeps the zone it had (the server's after a restart) and the server
-asks again after a few seconds, then less often (at most every 5 minutes) until a plugin answers. For an example, see
-[Reservations: Attractap readers](plugins/reservations/using-reservations.md#attractap-readers).
+asks again after a few seconds, then less often (at most every 5 minutes) until a plugin answers.
 
 If plugins ask for different zones on one reader, the reader uses the first valid zone in host order: the reader's
 resources by id, and for each resource the plugins alphabetically by name; a slower plugin that answers within the time

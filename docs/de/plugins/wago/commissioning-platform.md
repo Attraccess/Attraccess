@@ -32,7 +32,7 @@ und bereitet dann den Controller unter seiner Operationssperre vor:
    Nicht unterstützte Pakete, fehlende Werkzeuge und mehrdeutige Dienstzustände schlagen geschlossen fehl (fail closed).
 4. Sie richtet einen dauerhaften Zugriff ein, der auf die erforderlichen digitalen Register beschränkt ist, und prüft
    die Ausgangs-Eigentümerschaft und die Berechtigungen des Laufzeit-Kontos erneut.
-5. Sie schließt die eingeschränkte Registrierung und die gesperrte Laufzeit-Bereitstellung ab und wartet dann
+5. Sie schließt die eingeschränkte Registrierung und die sperrgeschützte Laufzeit-Bereitstellung ab und wartet dann
    auf die dauerhafte Erkennung und die unabhängige Bereitschaftsprüfung.
 
 `codesysState=disabled` wird nur nach erfolgreich verifizierter Vorbereitung festgehalten.
@@ -121,7 +121,7 @@ bevor die Laufzeit startet.
 Die Prüfung der Ausgangs-Eigentümerschaft untersucht CODESYS-Prozesse/Boot-Zustand und alle Container,
 einschließlich gestoppter Container. Mounts der exakten Ausgangsdatei, übergeordneter Verzeichnisse und kanonischer
 Symlink-Aliasse sowie andere privilegierte Container stellen einen Konflikt dar. Nur der exakte
-Vorgänger `attraccess-wago` ist ausgenommen, da das gesperrte Installationsprogramm seine
+Vorgänger `attraccess-wago` ist ausgenommen, da das unter der Installationssperre laufende Installationsprogramm seine
 Ersetzung steuert. Vor dem Gewähren von Berechtigungen muss dieser Vorgänger als
 gestoppt mit deaktiviertem Neustart verifiziert sein.
 

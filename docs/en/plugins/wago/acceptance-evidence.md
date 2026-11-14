@@ -7,7 +7,7 @@
 
 ## Before Any Hardware Session
 
-Use a CC100 `751-9301`, firmware `31`, safe low-voltage fixtures and qualified wiring where required. Keep emergency-stop and personnel-protection circuits independent. Operational guards, disconnect policies and acknowledgements are not safety-rated functions.
+Use a CC100 `751-9301`, firmware `31`, safety extra-low voltage (SELV/PELV) fixtures and qualified wiring where required. Keep emergency-stop and personnel-protection circuits independent. Operational guards, disconnect policies and acknowledgements are not safety-rated functions.
 
 Record the starting controller state and the explicit destructive-install approval. As of 2026-09-06, commissioning may stop or erase existing applications and data; Attraccess does not preserve, back up, or restore preexisting CODESYS or other workloads. A prior-workload backup is not a commissioning gate. Verify that CODESYS is stopped and permanently disabled before I/O, and repeat that verification after reboot. For changes to existing Attraccess credentials, retain the supported management-access recovery path: a server backup alone does **not** include device-side MQTT credentials, SSH access or runtime state. Unavailable hardware or unresolved credential recovery remains an acceptance blocker. Never attach credential files, raw broker payloads, full configuration dumps or unreviewed logs to tickets.
 
