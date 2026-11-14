@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException, Logger } from '@nestjs/common';
+import { LicenseError } from '../../license/license.service';
 import { UserInvitationService } from './user-invitation.service';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
@@ -108,6 +110,29 @@ describe('CSV invitations', () => {
     expect(auth.generateEmailVerificationToken).toHaveBeenCalledWith(result[0], manager);
     expect(email.sendUserInvitationEmail).toHaveBeenCalledWith(result[0], 'verification-token', manager);
   });
+  it('maps a LicenseError to a ForbiddenException with the reason', async () => {
+    const { service, users } = setup();
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    users.ensureLicenseForNewUsers.mockRejectedValue(
+      new LicenseError('Trying to use more than the allowed amount of users'),
+    );
+    const promise = service.inviteUsersFromCsv(file('email,username,role\nalex@example.com,Alex,\n'), config);
+    await expect(promise).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(promise).rejects.toMatchObject({ message: 'Trying to use more than the allowed amount of users' });
+    expect(users.createMany).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      'Blocking user invitation due to license: Trying to use more than the allowed amount of users',
+    );
+    warn.mockRestore();
+  });
+  it('re-throws non-license errors from the license check unchanged', async () => {
+    const { service, users } = setup();
+    const failure = new Error('database down');
+    users.ensureLicenseForNewUsers.mockRejectedValue(failure);
+    await expect(
+      service.inviteUsersFromCsv(file('email,username,role\nalex@example.com,Alex,\n'), config),
+    ).rejects.toBe(failure);
+  });
   it('reports database email and username collisions at their source row', async () => {
     const { service, users } = setup();
     users.findByEmailsOrUsernames.mockResolvedValue([{ email: 'ALEX@example.com', username: 'Alex' }]);
@@ -137,6 +162,16 @@ describe('CSV invitations', () => {
     });
     expect(users.createMany).not.toHaveBeenCalled();
   });
+  it('rejects a missing or non-object config before reading the file', async () => {
+    const { service, users } = setup();
+    await expect(service.inviteUsersFromCsv(undefined, undefined)).rejects.toThrow('config is required');
+    await expect(service.inviteUsersFromCsv(undefined, 'null')).rejects.toThrow('config is required');
+    for (const rawConfig of ['123', '"abc"', '[]', 'true']) {
+      await expect(service.inviteUsersFromCsv(undefined, rawConfig)).rejects.toThrow('config must be a JSON object');
+    }
+    expect(users.findByEmailsOrUsernames).not.toHaveBeenCalled();
+    expect(users.createMany).not.toHaveBeenCalled();
+  });
   it('collects missing, invalid and duplicate identity errors without accepting those rows', async () => {
     const { service, users } = setup();
     users.validateUsernameOrThrow.mockImplementation((value) => {
@@ -157,5 +192,60 @@ describe('CSV invitations', () => {
         expect.objectContaining({ row: 5, message: 'Row is empty' }),
       ]),
     );
+  });
+});
+
+describe('single invitations', () => {
+  const setup = () => {
+    const users = {
+      cleanupUsername: jest.fn((value: string) => value.trim().toLowerCase()),
+      findByEmailsOrUsernames: jest.fn().mockResolvedValue([]),
+      ensureLicenseForNewUsers: jest.fn(),
+      withTransaction: jest.fn(async (run) => run({})),
+      createMany: jest.fn().mockResolvedValue([{ id: 7, username: 'alex', email: 'alex@example.com' }]),
+    };
+    const auth = { generateEmailVerificationToken: jest.fn().mockResolvedValue('verification-token') };
+    const email = { sendUserInvitationEmail: jest.fn() };
+    const service = new UserInvitationService(users as never, auth as never, email as never);
+    return { service, users, email };
+  };
+
+  it.each([
+    ['email', [{ id: 3, username: 'someone', email: 'alex@example.com' }], 'Email already exists'],
+    ['username', [{ id: 3, username: 'alex', email: 'other@example.com' }], 'Username already exists'],
+    [
+      'email before username',
+      [
+        { id: 3, username: 'alex', email: 'other@example.com' },
+        { id: 4, username: 'someone', email: 'alex@example.com' },
+      ],
+      'Email already exists',
+    ],
+  ])('rejects a taken %s before creating the account', async (_case, existing, message) => {
+    const { service, users, email } = setup();
+    users.findByEmailsOrUsernames.mockResolvedValue(existing);
+    await expect(service.inviteUser({ username: ' Alex ', email: ' alex@example.com ' })).rejects.toThrow(message);
+    expect(users.findByEmailsOrUsernames).toHaveBeenCalledWith(['alex@example.com'], ['alex']);
+    expect(users.createMany).not.toHaveBeenCalled();
+    expect(email.sendUserInvitationEmail).not.toHaveBeenCalled();
+  });
+
+  it('does not treat an email that differs only in case as taken', async () => {
+    const { service, users } = setup();
+    users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'alex', email: 'Alex@Example.com' }]);
+    await expect(service.inviteUser({ username: 'alex', email: 'alex@example.com' })).rejects.toThrow(
+      'Username already exists',
+    );
+  });
+
+  it('invites a user whose email and username are free', async () => {
+    const { service, users, email } = setup();
+    await expect(service.inviteUser({ username: 'alex', email: 'alex@example.com' }, 'de')).resolves.toEqual({
+      id: 7,
+      username: 'alex',
+      email: 'alex@example.com',
+    });
+    expect(users.createMany).toHaveBeenCalledTimes(1);
+    expect(email.sendUserInvitationEmail).toHaveBeenCalledTimes(1);
   });
 });

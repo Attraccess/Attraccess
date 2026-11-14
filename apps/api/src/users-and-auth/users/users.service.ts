@@ -194,7 +194,9 @@ export class UsersService {
     const currentAmountOfUsers = await this.userRepository.count();
     await this.licenseService.verifyLicense({
       usageLimits: {
-        users: currentAmountOfUsers + newUsersCount,
+        // like createOne, pass the count before the last new user is added: verifyLicense refuses usage >= limit,
+        // so the total may reach the limit but not exceed it
+        users: currentAmountOfUsers + newUsersCount - 1,
       },
     });
   }
