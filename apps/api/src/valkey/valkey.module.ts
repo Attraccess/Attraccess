@@ -2,6 +2,7 @@ import { Global, Injectable, Logger, Module, OnApplicationShutdown } from '@nest
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { ValkeyConfigType } from '../config/valkey.config';
+import { logValkeyOutages } from './valkey-outage-logging';
 
 export const VALKEY_CLIENT = 'VALKEY_CLIENT';
 
@@ -22,8 +23,11 @@ export class ValkeyClientService implements OnApplicationShutdown {
       enableReadyCheck: true,
       maxRetriesPerRequest: 3,
     });
-    client.on('connect', () => this.logger.log('Connected to Valkey'));
-    client.on('error', (err) => this.logger.error('Valkey connection error', err));
+    logValkeyOutages(client, this.logger, {
+      lost: (reason) => `Lost connection to Valkey (${reason}); retrying`,
+      reconnected: 'Reconnected to Valkey',
+      connected: 'Connected to Valkey',
+    });
     this.client = client;
   }
 
