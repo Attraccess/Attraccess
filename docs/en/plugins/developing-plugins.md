@@ -211,19 +211,19 @@ array. At runtime the host hands your plugin a **guarded** `PluginContext`:
 accessing a capability whose permission you did not declare throws a clear error
 naming the missing permission.
 
-| Permission               | Grants access to                                                                                                                                                                                   |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                                              |
-| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                              |
-| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                                                    |
-| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` for any other entity and `context.runSerialized(...)`.                                                                                          |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                        |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                            |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                   |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                              |
-| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                            |
-| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook` and `startBlockedQuery` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks).   |
-| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications). |
+| Permission               | Grants access to                                                                                                                                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                                                                 |
+| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                 |
+| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                                                                       |
+| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` for any other entity and `context.runSerialized(...)`.                                                                                                             |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                                           |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                                               |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                                      |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                                                 |
+| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                                               |
+| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. See [Reader UI](#reader-ui-and-start-hooks). |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                    |
 
 ### MQTT subscriptions
 
@@ -301,6 +301,12 @@ Further events for plugins that follow maintenance, health and live sessions
 | `SystemEvent.RESOURCE_USAGE_SESSION_STARTED`    | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                                    | A user started a session on an idle resource (not a takeover). `supervisorUserId` is set for supervised starts.                                                                             |
 | `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`                     | A user took over a running session. Fires for the **new** user.                                                                                                                             |
 | `SystemEvent.RESOURCE_USAGE_SESSION_ENDED`      | `{ resourceId, usageId, userId, startTime, endTime, reason: 'ended' \| 'taken_over' }`            | A session ended, explicitly or because it was taken over.                                                                                                                                   |
+
+`SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED` carries a `ResourceSessionLimitChangedPayload`:
+
+| Event                                        | Payload                                                | Fires                                                                                                                                                                                                                                              |
+| -------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED` | `{ resourceId, previousLimit, newLimit, actorUserId }` | After commit, when the effective session limit of a resource changed (`maxParallelSessions`, or a type change that changes the limit). The limit is 1 for doors and other non-machine types. `actorUserId` is `null` when no user made the change. |
 
 ### Notifications
 
@@ -545,6 +551,7 @@ host validates, sanitizes and renders it. Admins configure this under **Reader d
 | Pre-start hook      | `preStartHook`                                                            | `ACCESS_HOOKS` |
 | Advisory after-stop | `sessionEndHook`                                                          | `ACCESS_HOOKS` |
 | Start-blocked state | `startBlockedQuery` and `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS` |
+| Start capacity      | `startCapacityHook`                                                       | `ACCESS_HOOKS` |
 | Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`    |
 
 A plugin that declares `readerUi` or a hook without the matching permission **fails to load** and is quarantined.
@@ -750,6 +757,39 @@ const startBlockedQuery: StartBlockedQuery = async (ctx) => {
   open pages ask again at once. Viewers who may not follow the resource live still refresh by polling and at `until`.
 - The HTTP side is `GET /api/resources/:resourceId/usage/start-blocked`, answering `{ blocked, reason?, until?, plugin? }`
   for the signed-in user.
+
+### Start capacity on shared machines
+
+On a machine with `maxParallelSessions` above 1, a plugin that holds slots back for others (the reservations plugin
+does this for upcoming bookings) declares `startCapacityHook`. `preStartHook` alone cannot do this safely: two
+simultaneous starts could both pass and take the same slot.
+
+```ts
+const startCapacityHook: StartCapacityHook = async (ctx) => {
+  // ctx.manager is the host's start transaction: read through it
+  const held = await countSlotsHeldForOthers(ctx.manager, ctx.resourceId, ctx.userId, ctx.now); // your own query
+  if (!held) return { heldSlots: 0 };
+  return {
+    heldSlots: held,
+    reason: {
+      code: 'RESERVED',
+      title: ctx.language === 'de' ? 'Reserviert' : 'Reserved',
+      body: ctx.language === 'de' ? 'Alle freien Plätze sind reserviert.' : 'All free slots are reserved.',
+    },
+  };
+};
+```
+
+- **When it runs.** Only on shared machines (limit above 1), inside core's serialized start transaction and after
+  core's own capacity check. The context carries `sessionLimit`, `occupiedSlots` (sessions and starts in progress, read
+  in the same transaction), `userId`, `principal`, `action`, `origin`, `confirmedStepKeys`, `language` and `now`.
+- **Core decides.** Return `{ heldSlots, reason? }`. Core refuses the start with your `reason` when
+  `occupiedSlots + heldSlots >= sessionLimit`, so simultaneous starts can never take a held slot.
+- **Use `ctx.manager`, never nest `runSerialized`.** The start transaction is already serialized; starting another
+  one inside the hook makes it wait for itself. Keep the hook to one indexed query.
+- **Failures.** A failure, a timeout and an open circuit breaker follow the per-resource, per-plugin failure policy
+  (fail open or fail closed, see [Failures and trust](#failures-and-trust)) and are audited.
+- Requires `ACCESS_HOOKS`. Without a registered hook nothing changes.
 
 ### After-stop question
 

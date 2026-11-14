@@ -1,6 +1,6 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK, RESERVATION_NOTIFIER } from '../constants';
+import { CAPACITY_REDUCED_REASON, Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK, RESERVATION_NOTIFIER } from '../constants';
 import { ReservationEntity, ReservationStatus } from '../entities/reservation.entity';
 import { VisibilityService } from '../ical/visibility.service';
 import { ResourceSettingsService } from '../settings/resource-settings.service';
@@ -13,6 +13,7 @@ import { ReservationError } from './errors';
 import { KeyedMutex } from './mutex';
 import type { ReservationNotifier } from './notifier';
 import { ReservationStore } from './reservation.store';
+import { exceedsCapacity, selectExcessBookings } from './capacity';
 import { blockedSpan, checkBookingRules, spansOverlap } from './rules';
 
 export const MAX_TEXT_LENGTH = 500;
@@ -195,8 +196,19 @@ export class ReservationService implements OnModuleDestroy {
           }
         }
         const candidates = await this.store.findOverlapCandidates(manager, input.resourceId, span.start, span.end);
-        if (candidates.some((other) => spansOverlap(span, blockedSpan(other)))) {
-          throw new ReservationError('OVERLAP', 'The time is already reserved');
+        const overlapping = candidates.filter((other) => spansOverlap(span, blockedSpan(other)));
+        // Read inside the serialized transaction (and under the resource mutex), so concurrent creates and a
+        // concurrent limit change cannot exceed the limit.
+        const limit = await this.directory.getSessionLimit(input.resourceId, manager);
+        if (limit <= 1) {
+          if (overlapping.length > 0) throw new ReservationError('OVERLAP', 'The time is already reserved');
+        } else {
+          if (overlapping.some((other) => other.userId === actor.userId)) {
+            throw new ReservationError('OWN_OVERLAP', 'You already have a booking for this resource at that time');
+          }
+          if (exceedsCapacity(overlapping.map(blockedSpan), span, limit)) {
+            throw new ReservationError('OVERLAP', 'All slots are booked at that time');
+          }
         }
         const entity = new ReservationEntity();
         Object.assign(entity, {
@@ -421,6 +433,59 @@ export class ReservationService implements OnModuleDestroy {
     );
     if (cancelled.length > 0) this.invalidateViews(resourceId);
     return cancelled.length;
+  }
+
+  // ------------------------------------------------ lowered session limit
+
+  /**
+   * Cancels the bookings a lowered session limit left without a slot: the newest-created not-yet-started ones first,
+   * until every instant fits (see `selectExcessBookings`). Running bookings are never touched. Takes the resource lock;
+   * idempotent, so it also serves the start-up and scheduler reconciliation. A higher limit cancels nothing.
+   * `actorUserId` null = no user (system): the audit then attributes each cancellation to its holder.
+   */
+  async cancelExcessBookings(resourceId: number, actorUserId: number | null): Promise<number> {
+    return this.mutex.run(resourceId, async () => {
+      const now = this.clock();
+      const limit = await this.directory.getSessionLimit(resourceId);
+      const occupying = await this.store.findOccupyingFrom(resourceId, now);
+      // Fast exit: with fewer bookings than slots nothing can overlap beyond the limit.
+      if (occupying.length <= limit) return 0;
+      const excess = selectExcessBookings(occupying, limit, now);
+      const cancelled: ReservationEntity[] = [];
+      for (const booking of excess) {
+        const changed = await this.store.transition(booking.id, [booking.status], {
+          status: 'cancelled',
+          cancelledBy: actorUserId,
+          cancelReason: CAPACITY_REDUCED_REASON,
+        });
+        if (!changed) continue;
+        Object.assign(booking, {
+          status: 'cancelled',
+          cancelledBy: actorUserId,
+          cancelReason: CAPACITY_REDUCED_REASON,
+        });
+        cancelled.push(booking);
+        await this.audit.record(
+          'cancelled',
+          actorUserId === null
+            ? ReservationAudit.systemPrincipal(booking.userId)
+            : { userId: actorUserId, authenticationMethod: 'session' },
+          { type: 'reservation', id: booking.id },
+          {
+            resourceId,
+            holderUserId: booking.userId,
+            byManager: actorUserId !== null && actorUserId !== booking.userId,
+            reason: CAPACITY_REDUCED_REASON,
+            bulk: true,
+          },
+        );
+      }
+      this.notifyEach('onRemoved', cancelled, (booking) =>
+        this.notifier.onRemoved(booking, { byUserId: null, reason: CAPACITY_REDUCED_REASON }),
+      );
+      if (cancelled.length > 0) this.invalidateViews(resourceId);
+      return cancelled.length;
+    });
   }
 
   // ------------------------------------------- scheduler / hook transitions

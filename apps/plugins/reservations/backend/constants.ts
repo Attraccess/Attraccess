@@ -10,3 +10,6 @@ export const RESERVATION_CLOCK = Symbol.for('attraccess.reservations.clock');
 export const READER_HORIZON_MS = 24 * 60 * 60_000;
 
 export type Clock = () => Date;
+
+/** Cancel reason of bookings removed because the machine lost slots (shown in audit and mails). */
+export const CAPACITY_REDUCED_REASON = 'machine capacity reduced';

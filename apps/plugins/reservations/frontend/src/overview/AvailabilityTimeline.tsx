@@ -41,12 +41,19 @@ function entriesOf(availability: Availability): Entry[] {
   return [...reservations, ...maintenance].sort((a, b) => a.start - b.start);
 }
 
+/** Number of occupying bookings (incl. the given one) running at the start of `entry`. */
+function bookedAt(entry: Entry, all: Entry[]): number {
+  return all.filter((other) => other.kind !== 'maintenance' && other.start <= entry.start && other.end > entry.start)
+    .length;
+}
+
 export function AvailabilityTimeline(props: Readonly<{ availability: Availability; days: LocalDate[] }>) {
   const { availability, days } = props;
   const { t } = useReservationsTranslations();
   const format = useFormatters(availability.timezone);
   const zone = availability.timezone;
   const entries = entriesOf(availability);
+  const slots = availability.slots ?? 1;
 
   return (
     <div className="rv:flex rv:flex-col rv:gap-4" data-cy="reservations-timeline">
@@ -96,6 +103,11 @@ export function AvailabilityTimeline(props: Readonly<{ availability: Availabilit
                       </>
                     ) : (
                       <span>{entry.kind === 'pending' ? t('card.reservedPending') : t('card.reserved')}</span>
+                    )}
+                    {slots > 1 && entry.kind !== 'maintenance' && (
+                      <Chip size="sm" variant="soft" color={bookedAt(entry, entries) >= slots ? 'danger' : 'default'}>
+                        {t('card.slotsBooked', { booked: bookedAt(entry, entries), total: slots })}
+                      </Chip>
                     )}
                   </li>
                 ))}

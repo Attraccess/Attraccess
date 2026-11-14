@@ -11,7 +11,9 @@ import {
   type PreStartResult,
   type SessionEndResult,
   type StartBlockedState,
+  type StartCapacityResult,
 } from '@attraccess/plugins-backend-sdk';
+import type { EntityManager } from 'typeorm';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 import type { AppConfigType } from '../../config/app.config';
 import {
@@ -38,6 +40,31 @@ export interface PreStartRun {
   cardSessionId?: string;
   /** plugin -> stepKeys confirmed in this start attempt. */
   satisfied: Map<string, Set<string>>;
+}
+
+export interface StartCapacityRun {
+  resourceId: number;
+  userId: number;
+  principal: PluginAccessPrincipal;
+  action: 'start' | 'takeover';
+  origin: PreStartOrigin;
+  language: ReaderUiLanguage;
+  sessionLimit: number;
+  occupiedSlots: number;
+  /** The host's serialized start transaction; handed to the plugin. */
+  manager: EntityManager;
+  /** plugin -> stepKeys confirmed in this start attempt. */
+  satisfied: Map<string, Set<string>>;
+}
+
+/**
+ * `refusal` is set when a plugin holds back the slots the starter needs. `flush` writes the audit rows and the
+ * breaker alerts; the caller runs it AFTER the start transaction ended (a second writer inside it would wait
+ * for the transaction itself).
+ */
+export interface StartCapacityOutcome {
+  refusal: { plugin: string; reason: PluginBlockReason } | null;
+  flush: () => Promise<void>;
 }
 
 export interface SessionEndRun {
@@ -82,6 +109,9 @@ const startBlockedKey = (plugin: string) => `${plugin}#start-blocked`;
 /** Session-end hooks are advisory, so their failures must never open the pre-start breaker. */
 const sessionEndKey = (plugin: string) => `${plugin}#session-end`;
 
+/** The capacity hook runs inside the start transaction; its failures are counted apart from the pre-start gate. */
+const startCapacityKey = (plugin: string) => `${plugin}#start-capacity`;
+
 /** Runs plugin hooks with timeout, circuit breaker, failure policy and host audit. */
 @Injectable()
 export class ReaderUiHooksService {
@@ -111,6 +141,10 @@ export class ReaderUiHooksService {
 
   hasPreStartHooks(): boolean {
     return this.registry.preStartHooks().length > 0;
+  }
+
+  hasStartCapacityHooks(): boolean {
+    return this.registry.startCapacityHooks().length > 0;
   }
 
   get timeoutMs(): number {
@@ -153,6 +187,79 @@ export class ReaderUiHooksService {
       if (outcome.decision === 'confirm') firstConfirm ??= outcome;
     }
     return firstConfirm ?? { decision: 'allow' };
+  }
+
+  /**
+   * Atomic held-slot check, called inside the serialized start transaction of a shared machine. The first plugin that
+   * holds back enough slots to fill the machine refuses the start. A failing hook follows the per-resource failure
+   * policy like {@link runPreStart}: fail-open skips it, fail-closed refuses with the host's "unavailable" text.
+   * Never throws; the audit and alert writes are deferred to `flush` (see {@link StartCapacityOutcome}).
+   */
+  async runStartCapacity(run: StartCapacityRun): Promise<StartCapacityOutcome> {
+    const deferred: Array<() => Promise<void>> = [];
+    const flush = async () => {
+      for (const task of deferred) await task().catch(() => undefined);
+    };
+    const audited = {
+      resourceId: run.resourceId,
+      userId: run.userId,
+      origin: run.origin,
+    };
+    for (const { plugin, hook } of this.registry.startCapacityHooks()) {
+      const confirmedStepKeys = [...(run.satisfied.get(plugin) ?? [])];
+      const { result, transition, error } = await this.runner.run(
+        startCapacityKey(plugin),
+        () =>
+          hook({
+            resourceId: run.resourceId,
+            userId: run.userId,
+            principal: run.principal,
+            manager: run.manager,
+            action: run.action,
+            origin: run.origin,
+            sessionLimit: run.sessionLimit,
+            occupiedSlots: run.occupiedSlots,
+            confirmedStepKeys,
+            language: run.language,
+            now: new Date(),
+          }),
+        (raw) => this.normalizeCapacity(raw, run),
+      );
+      deferred.push(() => this.breakerChanged(plugin, transition, audited));
+      if (result.kind === 'failure') {
+        this.logger.warn(
+          `Start-capacity hook of plugin ${plugin} failed (${result.code}): ${(error as Error)?.message}`,
+        );
+        if ((await this.settings.failurePolicy(run.resourceId, plugin)) === 'fail-open') {
+          deferred.push(() => this.record(audited, plugin, 'ui.fail_open_used', 'allow', result.code));
+          continue;
+        }
+        deferred.push(() => this.record(audited, plugin, 'ui.hook_decision', 'block', result.code));
+        return { refusal: { plugin, reason: hostReason('HOOK_UNAVAILABLE', run.language) }, flush };
+      }
+      const { heldSlots, reason, auditCode } = result.value;
+      if (run.occupiedSlots + heldSlots >= run.sessionLimit) {
+        deferred.push(() => this.record(audited, plugin, 'ui.hook_decision', 'block', auditCode ?? reason.code));
+        return { refusal: { plugin, reason }, flush };
+      }
+    }
+    return { refusal: null, flush };
+  }
+
+  /** null = invalid result (counts as a failure). A refusal without a valid reason shows the host text. */
+  private normalizeCapacity(
+    raw: StartCapacityResult,
+    run: StartCapacityRun,
+  ): { heldSlots: number; reason: PluginBlockReason; auditCode?: string } | null {
+    if (!raw || typeof raw !== 'object' || !Number.isInteger(raw.heldSlots) || raw.heldSlots < 0) return null;
+    const reason = raw.reason === undefined ? null : validBlockReason(raw.reason);
+    if (reason) return { heldSlots: raw.heldSlots, reason };
+    const refuses = run.occupiedSlots + raw.heldSlots >= run.sessionLimit;
+    return {
+      heldSlots: raw.heldSlots,
+      reason: hostReason('HOOK_UNAVAILABLE', run.language),
+      ...(refuses ? { auditCode: 'invalid-result' } : {}),
+    };
   }
 
   /**
@@ -228,7 +335,7 @@ export class ReaderUiHooksService {
     };
   }
 
-  private async breakerChanged(plugin: string, transition: BreakerTransition, run: PreStartRun) {
+  private async breakerChanged(plugin: string, transition: BreakerTransition, run: { resourceId: number }) {
     if (!transition) return;
     if (transition === 'open') {
       await this.alerts
@@ -279,7 +386,8 @@ export class ReaderUiHooksService {
   }
 
   private async record(
-    run: PreStartRun,
+    run: Pick<PreStartRun, 'resourceId' | 'userId' | 'origin'> &
+      Partial<Pick<PreStartRun, 'readerId' | 'cardSessionId'>>,
     plugin: string,
     action: 'ui.hook_decision' | 'ui.fail_open_used',
     decision: 'allow' | 'confirm' | 'block',

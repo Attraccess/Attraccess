@@ -3,6 +3,7 @@ import { ReservationNotifications } from '../notifications/notifier.service';
 import { PendingDecisionStore } from '../hooks/pending-decisions';
 import { ReaderUiService } from '../reader-ui/reader-ui.service';
 import { PreStartService } from '../hooks/pre-start.service';
+import { StartCapacityService } from '../hooks/start-capacity.service';
 import { SessionEndService } from '../hooks/session-end.service';
 import { ReservationEventHandlers } from '../events/event-handlers.service';
 import { ReservationScheduler } from '../scheduler/scheduler.service';
@@ -35,8 +36,17 @@ export function createBackgroundServices(h: Harness) {
     h.clock,
   );
   const decisions = new PendingDecisionStore();
+  const preStart = new PreStartService(
+    h.settings,
+    h.globalSettings,
+    h.store,
+    h.access,
+    h.directory,
+    h.visibility,
+    h.clock,
+  );
   const newScheduler = () =>
-    new ReservationScheduler(h.context, h.store, h.reservations, h.settings, notifications, h.clock);
+    new ReservationScheduler(h.context, h.store, h.reservations, h.settings, notifications, h.clock, h.directory);
   const newEvents = () =>
     new ReservationEventHandlers(
       h.context,
@@ -58,7 +68,8 @@ export function createBackgroundServices(h: Harness) {
     newScheduler,
     events: newEvents(),
     newEvents,
-    preStart: new PreStartService(h.settings, h.globalSettings, h.store, h.access, h.directory, h.visibility, h.clock),
+    preStart,
+    startCapacity: new StartCapacityService(h.settings, h.store, preStart),
     sessionEnd: new SessionEndService(h.settings, h.globalSettings, h.store, h.reservations, decisions, h.clock),
     readerUi: new ReaderUiService(h.settings, h.globalSettings, h.store, h.access, h.directory, h.clock),
     /** Creates a confirmed booking directly through the service. */
