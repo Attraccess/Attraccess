@@ -142,12 +142,18 @@ describe('MatterFabricService', () => {
       const held = new Promise<void>((resolve) => (release = resolve));
       const request = h.connection.request.bind(h.connection);
       let snapshots = 0;
+      let reached: () => void = () => undefined;
+      const snapshotReached = new Promise<void>((resolve) => (reached = resolve));
       jest.spyOn(h.connection, 'request').mockImplementation(async (operation, options) => {
-        if (operation === 'backup.snapshot' && snapshots++ === 0) await held;
+        if (operation === 'backup.snapshot' && snapshots++ === 0) {
+          reached();
+          await held;
+        }
         return request(operation, options);
       });
       const running = h.backups.backup('manual', ADMIN);
-      await new Promise((resolve) => setImmediate(resolve));
+      // Rotate only once the first backup is really held inside the sidecar snapshot, not after a guessed delay.
+      await snapshotReached;
       const oldKeyId = (await h.keys.current())?.keyId;
       const rotating = h.fabric.rotateRecoveryKey(ADMIN);
       await new Promise((resolve) => setImmediate(resolve));
