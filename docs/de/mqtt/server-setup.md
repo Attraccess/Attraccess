@@ -105,22 +105,7 @@ Die Server-Seite zeigt den aktuellen Verbindungsstatus fuer jeden Broker:
 
 ## RabbitMQ aus Attraccess verwalten
 
-Mit dem installierten **RabbitMQ-Plugin** zeigt ein MQTT-Server, den Attraccess als RabbitMQ-Broker erkennt, auf seiner Detailseite (Seitenleiste **Geräte → MQTT-Server**, dann den Server auswählen) zusätzliche Bereiche. Attraccess nutzt dafür die RabbitMQ-Management-API (Port `15672`, mit TLS `15671`, sofern kein Management-Port konfiguriert ist) mit Benutzername und Passwort des MQTT-Servers.
-
-| Bereich | Funktion | RabbitMQ-Benutzer-Tag | Attraccess-Berechtigung |
-|---------|----------|-----------------------|-------------------------|
-| **RabbitMQ** (Status) | Erreichbarkeit, Prüfung der Zugangsdaten, Versionen | `monitoring` | `resources.update` |
-| **RabbitMQ-Benutzer** | Benutzer und ihre Vhost-Berechtigungen anzeigen | `administrator` | `resources.update` |
-| **RabbitMQ-Benutzer** (ändern) | Benutzer anlegen, bearbeiten, löschen; Berechtigungen setzen oder entfernen | `administrator` | `system.settings.manage` |
-| **Verbindungen** | Aktive Client-Verbindungen (Aktualisierung alle 10 s) | `monitoring` | `resources.update` |
-| **Verbindungen** (schließen) | Verbindung zwangsweise trennen, optional mit Grund | `administrator` | `system.settings.manage` |
-| **Broker-Statistiken** | Überblick, Knoten und Queues (Aktualisierung alle 15 s) | `monitoring` | `resources.update` |
-
-Hinweise:
-
-- Der am MQTT-Server konfigurierte Benutzer benötigt das Tag aus der Tabelle (`administrator` deckt alles ab, was `monitoring` kann). Fehlt es, zeigen die Bereiche eine Fehlermeldung, die die fehlende Berechtigung nennt.
-- Benutzer ohne `system.settings.manage` sehen nur die lesenden Bereiche; Schreibaktionen sind ausgeblendet und werden auch vom Server abgelehnt.
-- Live-MQTT-Nachrichten beobachten und senden gehört nicht zum RabbitMQ-Plugin. Das geht für jeden MQTT-Server und braucht nur `resources.update` -- siehe [MQTT-Nachrichten-Explorer](mqtt/message-explorer.md).
+Mit dem installierten **RabbitMQ-Plugin** zeigt ein MQTT-Server, den Attraccess als RabbitMQ-Broker erkennt, auf seiner Detailseite zusätzliche Bereiche. Die Bereiche, die nötigen RabbitMQ-Benutzer-Tags und Attraccess-Berechtigungen stehen unter [RabbitMQ](plugins/rabbitmq/overview.md).
 
 ## Fehlerbehebung
 

@@ -20,7 +20,7 @@ Attraccess enthält Standardvorlagen für:
 
 ## Plugin-Vorlagen
 
-Plugins können eigene E-Mail-Vorlagen mitbringen (das Reservierungs-Plugin etwa für Buchungsbestätigungen und
+Plugins können eigene E-Mail-Vorlagen mitbringen (das [Reservierungs-Plugin](plugins/reservations/overview.md) etwa für Buchungsbestätigungen und
 Erinnerungen). Sie stehen in derselben Liste nach den Kernvorlagen, mit einem Chip **Plugin: &lt;Name&gt;**
 gekennzeichnet, und werden genauso bearbeitet und übersetzt. Ist eine Plugin-Vorlage einmal gespeichert, gehört sie
 Ihnen: Plugin-Upgrades lassen Ihre Fassung unverändert, neue Standardtexte eines Plugin-Updates überschreiben sie also

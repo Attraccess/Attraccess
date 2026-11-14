@@ -20,7 +20,7 @@ Attraccess includes default templates for:
 
 ## Plugin Templates
 
-Plugins can bring their own email templates (the reservations plugin, for example, for booking confirmations and
+Plugins can bring their own email templates (the [reservations plugin](plugins/reservations/overview.md), for example, for booking confirmations and
 reminders). They appear in the same list after the core templates, marked with a **Plugin: &lt;name&gt;** chip, and
 are edited and translated the same way. Once a plugin template is stored, it is yours: plugin upgrades leave your
 version unchanged, so new default texts of a plugin update do not overwrite it. Use **Reset to Default** to switch to

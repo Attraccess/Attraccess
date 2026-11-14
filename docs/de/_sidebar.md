@@ -36,7 +36,6 @@
   - [Dokumentation](resources/documentation.md)
   - [Einweisungen](resources/introductions.md)
   - [Wartung](resources/maintenance.md)
-  - [Reservierungen](resources/reservations.md)
   - [Nutzungsverfolgung](resources/usage-tracking.md)
   - [CSV-Export](resources/csv-export.md)
 
@@ -74,12 +73,6 @@
   - [Nachrichten-Explorer](mqtt/message-explorer.md)
   - [Beispiele](mqtt/examples.md)
 
-- **Geräte**
-  - [Matter: Architektur](devices/matter/architecture.md)
-  - [Matter: Betriebsanleitung](devices/matter/operator.md)
-  - [Matter: Datenmodell und Lebenszyklus](devices/matter/data-model.md)
-  - [Matter: Backup und Wiederherstellung](devices/matter/backup-restore.md)
-
 - **Abrechnung**
   - [Überblick](billing/overview.md)
   - [Konfiguration](billing/configuration.md)
@@ -89,6 +82,29 @@
   - [Überblick](plugins/overview.md)
   - [Plugins installieren](plugins/installing-plugins.md)
   - [Plugins entwickeln](plugins/developing-plugins.md)
+  - **Reservierungen**
+    - [Überblick](plugins/reservations/overview.md)
+    - [Reservierungen nutzen](plugins/reservations/using-reservations.md)
+    - [Reservierungen verwalten](plugins/reservations/administration.md)
+    - [Reservierungen-API](plugins/reservations/api.md)
+  - **WAGO**
+    - [Überblick](plugins/wago/overview.md)
+    - [Geführte WAGO-CC100-Inbetriebnahme](plugins/wago/cc100-commissioning.md)
+    - [WAGO-CC100-Docker-Laufzeit](plugins/wago/cc100-runtime.md)
+    - [WAGO-Produktionssupport](plugins/wago/production-support.md)
+    - [WAGO-Wiederherstellungs-Runbooks](plugins/wago/recovery-runbooks.md)
+    - [WAGO-Bedrohungsmodell und Pen-Test-Brief](plugins/wago/threat-model.md)
+    - [WAGO-Sicherheitsgrenze](plugins/wago/safety-boundary.md)
+  - **Matter**
+    - [Überblick](plugins/matter/overview.md)
+    - [Matter: Architektur](plugins/matter/architecture.md)
+    - [Matter: Betriebsanleitung](plugins/matter/operator.md)
+    - [Matter: Datenmodell und Lebenszyklus](plugins/matter/data-model.md)
+    - [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md)
+  - **RabbitMQ**
+    - [Überblick](plugins/rabbitmq/overview.md)
+  - **Shelly**
+    - [Überblick](plugins/shelly/overview.md)
 
 - **Monitoring & Metriken**
   - [Überblick](monitoring/overview.md)

@@ -202,7 +202,7 @@ siehe [Reader-Anzeige](attractap/reader-ui.md).
 | Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`    |
 
 Ein Plugin, das `readerUi` oder einen Hook ohne die passende Berechtigung deklariert, **wird nicht geladen** und
-unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](resources/reservations.md) nutzt beide Hooks in der Praxis: Sein Pre-Start-Hook blockiert oder bestätigt Starts rund um Buchungen, sein Session-End-Hook fragt die buchende Person, ob sie den Rest einer Buchung behalten oder freigeben möchte. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
+unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](plugins/reservations/overview.md) nutzt beide Hooks in der Praxis: Sein Pre-Start-Hook blockiert oder bestätigt Starts rund um Buchungen, sein Session-End-Hook fragt die buchende Person, ob sie den Rest einer Buchung behalten oder freigeben möchte. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
 
 ### Slots
 
@@ -670,7 +670,7 @@ Die Warteschlange teilt sich `runSerialized` mit jedem Sitzungsstart und -ende d
 
 Die Serialisierung gilt pro Host-Prozess. Plugins, die Ausschluss über mehrere API-Instanzen brauchen, benötigen eine
 eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
-[Reservierungen](resources/reservations.md#betrieb-mit-einer-instanz)).
+[Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 ### Flow-Knoten
 
