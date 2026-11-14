@@ -4,13 +4,7 @@ import { Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import request from 'supertest';
-import {
-  BillingTransaction,
-  Resource,
-  ResourceOperatingInterval,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+import { BillingTransaction, Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { DualAuthGuard, EffectivePermissionsGuard } from '@attraccess/plugins-backend-sdk';
 import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
@@ -58,7 +52,6 @@ describe('email exposure (HTTP integration, with the global ClassSerializerInter
         { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         { provide: getRepositoryToken(ResourceUsage), useValue: { findAndCount: async () => [[usage], 1] } },
         { provide: getRepositoryToken(BillingTransaction), useValue: { findAndCount: async () => [[transaction], 1] } },
-        { provide: getRepositoryToken(ResourceOperatingInterval), useValue: {} },
         { provide: getRepositoryToken(Resource), useValue: {} },
         { provide: ResourceOperatingAttributionService, useValue: {} },
         { provide: UsersService, useValue: usersService },

@@ -1,7 +1,7 @@
 {
   "columns": {
     "resourceId": "Ressourcen-ID",
-    "resourceName": "Ressourcenname",
+    "resourceName": "Ressourcen-Name",
     "sessions": "Sitzungen",
     "personHours": "Personenstunden",
     "machineHours": "Maschinenstunden mit Sitzung",

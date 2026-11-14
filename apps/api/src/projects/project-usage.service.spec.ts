@@ -5,7 +5,7 @@ import { BillingTransaction, ResourceUsage, Setting } from '@attraccess/database
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { GetProjectUsageHistoryQueryDto } from './dto/get-project-usage-history-query.dto';
 import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
-import { mergeSessionsIntoRuns } from './project-usage-statistics';
+import { mergeSessionsIntoRuns, sumMachineMinutes } from './project-usage-statistics';
 import { ProjectAccessService } from './project-access.service';
 
 type MockedQueryBuilder = {
@@ -140,7 +140,7 @@ describe('ProjectUsageService', () => {
   });
 
   describe('getProjectUsageStats', () => {
-    it('aggregates summary, time series, and top resources', async () => {
+    it('aggregates summary, time series, and top resources; without overlaps machine minutes equal person minutes', async () => {
       projectAccessService.getAccessOrThrow.mockResolvedValue(undefined);
       const usageQb = createMockQueryBuilder<ResourceUsage>({
         many: [
@@ -148,15 +148,15 @@ describe('ProjectUsageService', () => {
           usage(2, 1, '2024-01-02T10:00:00Z', '2024-01-02T10:30:00Z'),
           usage(3, 2, '2024-01-02T11:00:00Z', '2024-01-02T11:15:00Z'),
         ],
-        rawOnes: [{ totalSessions: '2', totalMinutes: '45' }],
+        rawOnes: [{ totalSessions: '3', totalMinutes: '60' }],
         rawMany: [
           [
-            { resourceId: '1', resourceName: 'Laser Cutter', sessions: '2', minutes: '30' },
+            { resourceId: '1', resourceName: 'Laser Cutter', sessions: '2', minutes: '45' },
             { resourceId: '2', resourceName: 'CNC', sessions: '1', minutes: '15' },
           ],
           [
             { usageDate: '2024-01-01', sessions: '1', minutes: '15' },
-            { usageDate: '2024-01-02', sessions: '1', minutes: '30' },
+            { usageDate: '2024-01-02', sessions: '2', minutes: '45' },
           ],
         ],
       });
@@ -182,8 +182,8 @@ describe('ProjectUsageService', () => {
       const result = await service.getProjectUsageStats(1, 5, {} as ProjectUsageStatsQueryDto);
 
       expect(result.summary).toEqual({
-        totalSessions: 2,
-        totalMinutes: 45,
+        totalSessions: 3,
+        totalMinutes: 60,
         totalMachineMinutes: 60,
         totalSpend: 300,
         currency: 'EUR',
@@ -194,13 +194,13 @@ describe('ProjectUsageService', () => {
         resourceId: 1,
         resourceName: 'Laser Cutter',
         sessions: 2,
-        minutes: 30,
+        minutes: 45,
         machineMinutes: 45,
         spend: 200,
       });
       expect(result.timeSeries).toEqual([
         { date: '2024-01-01', sessions: 1, minutes: 15, machineMinutes: 15, spend: 120 },
-        { date: '2024-01-02', sessions: 1, minutes: 30, machineMinutes: 45, spend: 180 },
+        { date: '2024-01-02', sessions: 2, minutes: 45, machineMinutes: 45, spend: 180 },
       ]);
     });
 
@@ -273,5 +273,25 @@ describe('mergeSessionsIntoRuns', () => {
     const runs = mergeSessionsIntoRuns([session(1, '10:00', '14:00'), session(1, '11:00', '12:00')]);
 
     expect(runs.map((run) => run.minutes)).toEqual([240]);
+  });
+});
+
+describe('sumMachineMinutes', () => {
+  const session = (resourceId: number, start: string, end: string) => ({
+    resourceId,
+    startTime: new Date(start),
+    endTime: new Date(end),
+  });
+
+  it('counts a run crossing midnight UTC toward the day of its earliest session, so the days add up', () => {
+    const { machineMinutesByDate, machineMinutesByResource, totalMachineMinutes } = sumMachineMinutes([
+      session(1, '2024-01-03T23:00:00Z', '2024-01-04T01:00:00Z'),
+      session(1, '2024-01-04T00:30:00Z', '2024-01-04T02:00:00Z'),
+      session(2, '2024-01-04T10:00:00Z', '2024-01-04T11:00:00Z'),
+    ]);
+
+    expect(Object.fromEntries(machineMinutesByDate)).toEqual({ '2024-01-03': 180, '2024-01-04': 60 });
+    expect(Object.fromEntries(machineMinutesByResource)).toEqual({ 1: 180, 2: 60 });
+    expect(totalMachineMinutes).toBe(240);
   });
 });

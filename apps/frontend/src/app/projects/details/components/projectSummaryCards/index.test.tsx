@@ -19,7 +19,9 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
   ...(await (() => ({
     useTranslations: () => ({ t: (key: string) => key }),
-    useNumberFormatter: () => (value: number) => value.toFixed(2),
+    // honours the options, so the hours cards are checked for their one-decimal format
+    useNumberFormatter: (options?: Intl.NumberFormatOptions) => (value: number) =>
+      new Intl.NumberFormat('en', options).format(value),
   }))()),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
@@ -45,24 +47,24 @@ it('shows skeletons while loading instead of an empty result', () => {
   expect(screen.queryByText('summary.empty')).toBeNull();
   expect(document.querySelectorAll('.skeleton')).toHaveLength(4);
 });
-it('formats sessions, person and machine hours and database currency amounts', () => {
+it('formats sessions, person and machine hours (one decimal) and database currency amounts', () => {
   state.summary = {
     totalSessions: 4,
-    totalMinutes: 90,
-    totalMachineMinutes: 60,
+    totalMinutes: 100,
+    totalMachineMinutes: 45,
     totalSpend: 12345,
     currency: 'EUR',
     minorUnit: 2,
   };
   render(<ProjectSummaryCards projectId={7} />);
-  expect(screen.getByText('4.00')).toBeTruthy();
-  expect(screen.getByText('1.50')).toBeTruthy();
-  expect(screen.getByText('1.00')).toBeTruthy();
+  expect(screen.getByText('4')).toBeTruthy();
+  expect(screen.getByText('1.7')).toBeTruthy();
+  expect(screen.getByText('0.8')).toBeTruthy();
   expect(screen.getByText('EUR 123.45')).toBeTruthy();
 });
 it('defaults omitted totals to zero and respects currencies without fractional units', () => {
   state.summary = { totalSpend: 123, currency: 'JPY', minorUnit: 0 };
   render(<ProjectSummaryCards projectId={7} />);
-  expect(screen.getAllByText('0.00')).toHaveLength(3);
-  expect(screen.getByText('JPY 123.00')).toBeTruthy();
+  expect(screen.getAllByText('0')).toHaveLength(3);
+  expect(screen.getByText('JPY 123')).toBeTruthy();
 });

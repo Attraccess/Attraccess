@@ -29,6 +29,7 @@ import { EmptyState, useDateTimeFormatter, useNumberFormatter, useTranslations }
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
 import en from './en.json';
 import de from './de.json';
+import { HOURS_FORMAT, MINUTES_PER_HOUR } from '../hours';
 import type { Payload as TooltipPayload } from 'recharts/types/component/DefaultTooltipContent';
 import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
 
@@ -47,8 +48,6 @@ export const CHART_COLORS = {
   spend: 'var(--chart-spend)',
 };
 
-export const MINUTES_PER_HOUR = 60;
-
 export const TOOLTIP_CONTAINER_CLASS =
   'rounded-lg border border-border bg-surface/95 px-3 py-2 text-foreground shadow-xl backdrop-blur-md';
 
@@ -61,7 +60,7 @@ export const TOOLTIP_VALUE_CLASS = 'ml-auto font-semibold text-foreground';
 export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProps) {
   const { t } = useTranslations({ en, de });
   const formatNumber = useNumberFormatter();
-  const formatHours = useNumberFormatter({ maximumFractionDigits: 1 });
+  const formatHours = useNumberFormatter(HOURS_FORMAT);
   const formatDate = useDateTimeFormatter({ showTime: false });
   const { data, isLoading } = useProjectsServiceGetProjectUsageStats({ id: projectId });
   const [canRenderCharts, setCanRenderCharts] = useState(false);
@@ -229,6 +228,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 <YAxis
                   yAxisId="hours"
                   stroke="var(--muted)"
+                  tickFormatter={formatHours}
                   label={{ value: t('tooltip.hours'), angle: -90, position: 'insideLeft', fill: 'var(--muted)' }}
                 />
                 <YAxis
@@ -241,6 +241,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 <Legend labelStyle={{ color: 'var(--foreground)' }} inactiveColor="var(--muted)" />
                 <Line
                   type="monotone"
+                  legendType="plainline"
                   dataKey="personHours"
                   stroke={CHART_COLORS.personHours.base}
                   yAxisId="hours"
@@ -251,16 +252,21 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 />
                 <Line
                   type="monotone"
+                  legendType="plainline"
                   dataKey="machineHours"
                   stroke={CHART_COLORS.machineHours.base}
                   yAxisId="hours"
                   name={t('tooltip.machineHours')}
                   strokeWidth={2}
+                  // dashed, so it stays visible when it equals person hours (single-user resources);
+                  // the plainline legend icons repeat each line's dash pattern
+                  strokeDasharray="2 3"
                   dot={false}
                   activeDot={{ fill: CHART_COLORS.machineHours.active, stroke: 'var(--surface)' }}
                 />
                 <Line
                   type="monotone"
+                  legendType="plainline"
                   dataKey="spend"
                   stroke={CHART_COLORS.spend}
                   yAxisId="spend"
@@ -300,7 +306,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                     <BarChart data={topResources}>
                       <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                       <XAxis dataKey="resourceName" stroke="var(--muted)" />
-                      <YAxis stroke="var(--muted)" />
+                      <YAxis stroke="var(--muted)" tickFormatter={formatHours} />
                       <Tooltip content={renderTopResourcesTooltip} cursor={{ fill: 'var(--surface-secondary)' }} />
                       <Legend labelStyle={{ color: 'var(--foreground)' }} inactiveColor="var(--muted)" />
                       <Bar

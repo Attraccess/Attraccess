@@ -5,8 +5,7 @@ import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import en from './en.json';
 import de from './de.json';
-
-const MINUTES_PER_HOUR = 60;
+import { HOURS_FORMAT, MINUTES_PER_HOUR } from '../hours';
 
 type ProjectSummaryCardsProps = {
   projectId: number;
@@ -19,7 +18,7 @@ const IconWrapper = ({ children }: { children: React.ReactNode }) => (
 export function ProjectSummaryCards({ projectId }: ProjectSummaryCardsProps) {
   const { t } = useTranslations({ en, de });
   const formatNumber = useNumberFormatter();
-  const formatHours = useNumberFormatter({ maximumFractionDigits: 1 });
+  const formatHours = useNumberFormatter(HOURS_FORMAT);
   const { data, isLoading } = useProjectsServiceGetProjectUsageStats({ id: projectId });
   const summary = data?.summary;
 

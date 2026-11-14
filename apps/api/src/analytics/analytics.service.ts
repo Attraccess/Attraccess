@@ -9,14 +9,31 @@ import {
   ResourceUsageAction,
 } from '@attraccess/database-entities';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, FindManyOptions, In, Repository } from 'typeorm';
+import { Between, Brackets, FindManyOptions, In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { ResourceHoursSummaryRowDto } from './dtos/resourceHoursSummary.dto';
+import { MAX_REPORT_DURATION_MS, MAX_RESOURCE_IDS_PER_REPORT } from './dtos/resourceOperatingDurations.dto';
 import {
   ResourceOperatingAttributionService,
   ResourceOperatingAttributionSummary,
 } from '../resources/operating-intervals/resource-operating-attribution.service';
 
-const RESOURCES_PER_ATTRIBUTION_BATCH = 150;
+type ResourceHoursRangeParams = { start: Date; asOf: Date; action: ResourceUsageAction; pending: boolean };
+type ResourceHours = Pick<
+  ResourceHoursSummaryRowDto,
+  | 'personDurationMs'
+  | 'sessionDurationMs'
+  | 'operatingDataAvailable'
+  | 'operatingDurationMs'
+  | 'unattributedOperatingDurationMs'
+>;
+
+const NO_HOURS: ResourceHours = {
+  personDurationMs: 0,
+  sessionDurationMs: 0,
+  operatingDataAvailable: false,
+  operatingDurationMs: null,
+  unattributedOperatingDurationMs: null,
+};
 
 @Injectable()
 export class AnalyticsService {
@@ -25,8 +42,6 @@ export class AnalyticsService {
     private resourceUsageRepository: Repository<ResourceUsage>,
     @InjectRepository(BillingTransaction)
     private billingTransactionRepository: Repository<BillingTransaction>,
-    @InjectRepository(ResourceOperatingInterval)
-    private resourceOperatingIntervalRepository: Repository<ResourceOperatingInterval>,
     @InjectRepository(Resource)
     private resourceRepository: Repository<Resource>,
     private readonly operatingAttributionService: ResourceOperatingAttributionService,
@@ -104,73 +119,149 @@ export class AnalyticsService {
   ): Promise<readonly [ResourceHoursSummaryRowDto[], number]> {
     const now = new Date();
     const asOf = new Date(Math.min(dateRange.end.getTime(), now.getTime()));
+    if (asOf <= dateRange.start) {
+      return [[], 0] as const;
+    }
+
     const params = { start: dateRange.start, asOf, action: ResourceUsageAction.Usage, pending: false };
-
-    const [usageResourceIds, intervalResourceIds] = await Promise.all([
-      this.resourceUsageRepository
-        .createQueryBuilder('usage')
-        .select('DISTINCT usage.resourceId', 'resourceId')
-        .where('usage.usageAction = :action AND usage.lifecyclePending = :pending', params)
-        .andWhere('usage.startTime < :asOf AND (usage.endTime IS NULL OR usage.endTime > :start)', params)
-        .getRawMany<{ resourceId: number }>(),
-      this.resourceOperatingIntervalRepository
-        .createQueryBuilder('interval')
-        .select('DISTINCT interval.resourceId', 'resourceId')
-        .where('interval.startTime < :asOf AND (interval.endTime IS NULL OR interval.endTime > :start)', params)
-        .getRawMany<{ resourceId: number }>(),
-    ]);
-    const allResourceIds = [
-      ...new Set([...usageResourceIds, ...intervalResourceIds].map(({ resourceId }) => Number(resourceId))),
-    ].sort((a, b) => a - b);
-    const resourceIds = allResourceIds.slice((page - 1) * limit, page * limit);
+    const [resources, total] = await this.findResourcesActiveInRange(params, page, limit);
+    const resourceIds = resources.map(({ id }) => id);
     if (resourceIds.length === 0) {
-      return [[], allResourceIds.length] as const;
+      return [[], total] as const;
     }
 
-    const [resources, sessionCounts] = await Promise.all([
-      this.resourceRepository.find({ where: { id: In(resourceIds) }, select: ['id', 'name', 'metadata'] }),
-      this.resourceUsageRepository
-        .createQueryBuilder('usage')
-        .select('usage.resourceId', 'resourceId')
-        .addSelect('COUNT(*)', 'sessions')
-        .where('usage.resourceId IN (:...resourceIds)', { resourceIds })
-        .andWhere('usage.usageAction = :action AND usage.lifecyclePending = :pending', params)
-        .andWhere('usage.startTime < :asOf AND (usage.endTime IS NULL OR usage.endTime > :start)', params)
-        .groupBy('usage.resourceId')
-        .getRawMany<{ resourceId: number; sessions: string }>(),
-    ]);
-    const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
-    const sessionsByResourceId = new Map(sessionCounts.map((row) => [Number(row.resourceId), Number(row.sessions)]));
+    const sessionsByResourceId = await this.countSessionsInRange(resourceIds, params);
+    const hoursByResourceId = await this.sumHoursInRange(resourceIds, dateRange.start, asOf);
+    // a range that has not ended yet can still gain sessions, even if none is open right now
+    const isProvisional = dateRange.end.getTime() >= now.getTime();
 
-    const liveValuesMayChange = dateRange.end.getTime() >= now.getTime();
-    const summaries = new Map<number, ResourceOperatingAttributionSummary>();
-    for (let offset = 0; offset < resourceIds.length; offset += RESOURCES_PER_ATTRIBUTION_BATCH) {
-      const batch = await this.operatingAttributionService.getForResources(
-        resourceIds.slice(offset, offset + RESOURCES_PER_ATTRIBUTION_BATCH),
-        dateRange.start,
-        asOf,
-        liveValuesMayChange,
-      );
-      batch.forEach((summary, resourceId) => summaries.set(resourceId, summary));
-    }
-
-    const rows = resourceIds.map((resourceId): ResourceHoursSummaryRowDto => {
-      const resource = resourcesById.get(resourceId);
-      const summary = summaries.get(resourceId);
-      return {
-        resourceId,
-        resourceName: resource?.name ?? '',
-        metadata: resource?.metadata ?? null,
-        sessionCount: sessionsByResourceId.get(resourceId) ?? 0,
-        personDurationMs: summary?.personDurationMs ?? 0,
-        sessionDurationMs: summary?.sessionDurationMs ?? 0,
-        operatingDataAvailable: summary?.operatingDataAvailable ?? false,
-        operatingDurationMs: summary?.operatingDurationMs ?? null,
-        unattributedOperatingDurationMs: summary?.unattributedOperatingDurationMs ?? null,
-        // a range that has not ended yet can still gain sessions, even if none is open right now
-        isProvisional: (summary?.isProvisional ?? false) || liveValuesMayChange,
-      };
-    });
-    return [rows, allResourceIds.length] as const;
+    const rows = resources.map((resource): ResourceHoursSummaryRowDto => ({
+      resourceId: resource.id,
+      resourceName: resource.name,
+      metadata: resource.metadata ?? null,
+      sessionCount: sessionsByResourceId.get(resource.id) ?? 0,
+      ...(hoursByResourceId.get(resource.id) ?? NO_HOURS),
+      isProvisional,
+    }));
+    return [rows, total] as const;
   }
+
+  private findResourcesActiveInRange(params: ResourceHoursRangeParams, page: number, limit: number) {
+    // deleted resources keep their history, so a past range reports the same hours after a deletion
+    const query = this.resourceRepository
+      .createQueryBuilder('resource')
+      .withDeleted()
+      .select(['resource.id', 'resource.name', 'resource.metadata']);
+    const sources = [
+      {
+        entity: ResourceUsage,
+        alias: 'usage',
+        condition: 'usage.usageAction = :action AND usage.lifecyclePending = :pending AND usage.startTime < :asOf',
+      },
+      { entity: ResourceOperatingInterval, alias: 'interval', condition: 'interval.startTime < :asOf' },
+    ];
+    // Open and closed records are checked apart so SQLite can search the (resourceId, endTime) indexes.
+    const exists = sources.flatMap(({ entity, alias, condition }) =>
+      [`${alias}.endTime IS NULL`, `${alias}.endTime > :start`].map(
+        (end) =>
+          `EXISTS ${query
+            .subQuery()
+            .select('1')
+            .from(entity, alias)
+            .where(`${alias}.resourceId = resource.id AND ${condition} AND ${end}`)
+            .getQuery()}`,
+      ),
+    );
+
+    return query
+      .where(new Brackets((qb) => exists.forEach((condition) => qb.orWhere(condition))))
+      .setParameters(params)
+      .orderBy('resource.id', 'ASC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+  }
+
+  private async countSessionsInRange(resourceIds: number[], params: ResourceHoursRangeParams) {
+    const sessionCounts = await this.resourceUsageRepository
+      .createQueryBuilder('usage')
+      .select('usage.resourceId', 'resourceId')
+      .addSelect('COUNT(*)', 'sessions')
+      .where('usage.resourceId IN (:...resourceIds)', { resourceIds })
+      .andWhere('usage.usageAction = :action AND usage.lifecyclePending = :pending', params)
+      .andWhere('usage.startTime < :asOf AND (usage.endTime IS NULL OR usage.endTime > :start)', params)
+      .groupBy('usage.resourceId')
+      .getRawMany<{ resourceId: number; sessions: string }>();
+    return new Map(sessionCounts.map((row) => [Number(row.resourceId), Number(row.sessions)]));
+  }
+
+  /**
+   * Derives the hours with the same bounds per call as the operating durations report (100 resources, 31 days), so
+   * memory stays bounded for long ranges. Durations clipped to disjoint windows add up to the clipped total.
+   */
+  private async sumHoursInRange(resourceIds: number[], start: Date, asOf: Date) {
+    const hoursByResourceId = new Map<number, ResourceHours>();
+    for (let offset = 0; offset < resourceIds.length; offset += MAX_RESOURCE_IDS_PER_REPORT) {
+      const batch = resourceIds.slice(offset, offset + MAX_RESOURCE_IDS_PER_REPORT);
+      const firstActivity = await this.firstActivityInRange(batch, start, asOf);
+      for (
+        let windowStart = firstActivity.getTime();
+        windowStart < asOf.getTime();
+        windowStart += MAX_REPORT_DURATION_MS
+      ) {
+        const windowEnd = new Date(Math.min(windowStart + MAX_REPORT_DURATION_MS, asOf.getTime()));
+        // isProvisional is decided for the whole range by the caller
+        const summaries = await this.operatingAttributionService.getForResources(
+          batch,
+          new Date(windowStart),
+          windowEnd,
+          false,
+        );
+        summaries.forEach((summary, resourceId) =>
+          hoursByResourceId.set(resourceId, addHours(hoursByResourceId.get(resourceId) ?? NO_HOURS, summary)),
+        );
+      }
+    }
+    return hoursByResourceId;
+  }
+
+  /** Where the batch's first session or interval overlapping the range starts: the windows before it are empty. */
+  private async firstActivityInRange(resourceIds: number[], start: Date, asOf: Date): Promise<Date> {
+    const overlapping = { resourceId: In(resourceIds), startTime: LessThan(asOf) };
+    const usage = { ...overlapping, usageAction: ResourceUsageAction.Usage, lifecyclePending: false };
+    const [firstUsage, firstInterval] = await Promise.all([
+      this.resourceUsageRepository.findOne({
+        where: [
+          { ...usage, endTime: IsNull() },
+          { ...usage, endTime: MoreThan(start) },
+        ],
+        order: { startTime: 'ASC' },
+        select: ['id', 'startTime'],
+      }),
+      this.resourceRepository.manager.getRepository(ResourceOperatingInterval).findOne({
+        where: [
+          { ...overlapping, endTime: IsNull() },
+          { ...overlapping, endTime: MoreThan(start) },
+        ],
+        order: { startTime: 'ASC' },
+        select: ['id', 'startTime'],
+      }),
+    ]);
+    const firstStarts = [firstUsage, firstInterval].flatMap((record) => (record ? [record.startTime.getTime()] : []));
+    return new Date(Math.max(start.getTime(), Math.min(asOf.getTime(), ...firstStarts)));
+  }
+}
+
+function addHours(hours: ResourceHours, summary: ResourceOperatingAttributionSummary): ResourceHours {
+  const add = (total: number | null, value: number | null) => (value === null ? null : (total ?? 0) + value);
+  return {
+    personDurationMs: hours.personDurationMs + summary.personDurationMs,
+    sessionDurationMs: hours.sessionDurationMs + summary.sessionDurationMs,
+    operatingDataAvailable: summary.operatingDataAvailable,
+    operatingDurationMs: add(hours.operatingDurationMs, summary.operatingDurationMs),
+    unattributedOperatingDurationMs: add(
+      hours.unattributedOperatingDurationMs,
+      summary.unattributedOperatingDurationMs,
+    ),
+  };
 }

@@ -39,7 +39,7 @@ export class ResourceHoursSummaryRowDto {
   })
   unattributedOperatingDurationMs: number | null;
 
-  @ApiProperty({ description: 'The values may still change: the range ends in the future or a session is open' })
+  @ApiProperty({ description: 'The values may still change: the range has not ended yet' })
   isProvisional: boolean;
 }
 

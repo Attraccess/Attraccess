@@ -77,6 +77,23 @@ export function mergeSessionsIntoRuns(
   return runs;
 }
 
+/**
+ * Adds up the machine minutes of the runs per resource, per day and in total. A run counts toward the UTC date of its
+ * earliest session, the same day SQLite's DATE(startTime) gives that session, so the days add up to the total.
+ */
+export function sumMachineMinutes(sessions: Parameters<typeof mergeSessionsIntoRuns>[0]) {
+  const machineMinutesByResource = new Map<number, number>();
+  const machineMinutesByDate = new Map<string, number>();
+  let totalMachineMinutes = 0;
+  for (const run of mergeSessionsIntoRuns(sessions)) {
+    const date = run.startTime.toISOString().slice(0, 10);
+    machineMinutesByResource.set(run.resourceId, (machineMinutesByResource.get(run.resourceId) ?? 0) + run.minutes);
+    machineMinutesByDate.set(date, (machineMinutesByDate.get(date) ?? 0) + run.minutes);
+    totalMachineMinutes += run.minutes;
+  }
+  return { machineMinutesByResource, machineMinutesByDate, totalMachineMinutes };
+}
+
 interface ProjectUsageServiceProjectUsageStatisticsContext {
   projectAccessService: ProjectUsageService['projectAccessService'];
   getBillingConfiguration: ProjectUsageService['getBillingConfiguration'];
@@ -135,15 +152,7 @@ export async function getProjectUsageStats(
     .clone()
     .select(['usage.id', 'usage.resourceId', 'usage.startTime', 'usage.endTime'])
     .getMany();
-  const machineMinutesByResource = new Map<number, number>();
-  const machineMinutesByDate = new Map<string, number>();
-  let totalMachineMinutes = 0;
-  for (const run of mergeSessionsIntoRuns(sessions)) {
-    const date = run.startTime.toISOString().slice(0, 10);
-    machineMinutesByResource.set(run.resourceId, (machineMinutesByResource.get(run.resourceId) ?? 0) + run.minutes);
-    machineMinutesByDate.set(date, (machineMinutesByDate.get(date) ?? 0) + run.minutes);
-    totalMachineMinutes += run.minutes;
-  }
+  const { machineMinutesByResource, machineMinutesByDate, totalMachineMinutes } = sumMachineMinutes(sessions);
 
   const billingBaseQb = context.billingTransactionRepository
     .createQueryBuilder('tx')
