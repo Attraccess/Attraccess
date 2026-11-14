@@ -28,6 +28,8 @@ For Authentik, Keycloak or other OpenID-compatible providers, you can use auto-d
 
 All URL fields are filled in automatically.
 
+If discovery fails, the "Auto-discovery failed" message shows the reason reported by the API. Behind a reverse proxy (nginx, Traefik, Cloudflare, …) the proxy may replace the API's error response with its own "Bad Gateway" page, and the message then shows a general hint instead of the reason. The API log always records the exact cause (for example a DNS failure, a refused connection, a timeout or a TLS error) as a warning. To see the reason in the message, let the proxy pass the API's error responses through: for nginx, do not set `proxy_intercept_errors on` or a custom `error_page` for the API location.
+
 ### Manual Configuration
 
 | Field | Description | Example |
