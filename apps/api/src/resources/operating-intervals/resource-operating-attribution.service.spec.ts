@@ -346,6 +346,7 @@ describe('ResourceOperatingAttributionService', () => {
       asOf: fixture.asOf,
       windowStart: null,
       sessionDurationMs: 60 * 60_000,
+      personDurationMs: 60 * 60_000,
       operatingDataAvailable: false,
       operatingDurationMs: null,
       attributedOperatingDurationMs: null,
@@ -353,6 +354,70 @@ describe('ResourceOperatingAttributionService', () => {
       isOperating: false,
       isProvisional: false,
       attributions: [],
+    });
+  });
+
+  describe('person duration', () => {
+    const HOUR = 60 * 60_000;
+
+    it('sums overlapping sessions while the machine duration counts them once', () => {
+      const result = fixture.service.derive(
+        [],
+        [fixture.usage(1, '10:00:00', '12:00:00'), fixture.usage(2, '11:00:00', '13:00:00')],
+        fixture.at('14:00:00'),
+      );
+
+      expect(result.personDurationMs).toBe(4 * HOUR);
+      expect(result.sessionDurationMs).toBe(3 * HOUR);
+    });
+
+    it('equals the machine duration for touching sessions', () => {
+      const result = fixture.service.derive(
+        [],
+        [fixture.usage(1, '10:00:00', '11:00:00'), fixture.usage(2, '11:00:00', '12:00:00')],
+        fixture.at('14:00:00'),
+      );
+
+      expect(result.personDurationMs).toBe(2 * HOUR);
+      expect(result.sessionDurationMs).toBe(2 * HOUR);
+    });
+
+    it('counts open sessions up to the snapshot time', () => {
+      const result = fixture.service.derive(
+        [],
+        [fixture.usage(1, '10:00:00', null), fixture.usage(2, '10:30:00', null)],
+        fixture.at('11:00:00'),
+      );
+
+      expect(result.personDurationMs).toBe(HOUR + HOUR / 2);
+      expect(result.sessionDurationMs).toBe(HOUR);
+    });
+
+    it('clips every session to the window start and the snapshot time', () => {
+      const result = fixture.service.derive(
+        [],
+        [fixture.usage(1, '08:00:00', '10:00:00'), fixture.usage(2, '09:30:00', '13:00:00')],
+        fixture.at('11:00:00'),
+        fixture.at('09:00:00'),
+      );
+
+      // 09:00-10:00 and 09:30-11:00
+      expect(result.personDurationMs).toBe(HOUR + 1.5 * HOUR);
+      expect(result.sessionDurationMs).toBe(2 * HOUR);
+    });
+
+    it('ignores non-usage actions and sessions that are still pending their lifecycle', () => {
+      const result = fixture.service.derive(
+        [],
+        [
+          fixture.usage(1, '10:00:00', '11:00:00'),
+          { ...fixture.usage(2, '10:00:00', '11:00:00'), usageAction: ResourceUsageAction.DoorUnlock },
+          { ...fixture.usage(3, '10:00:00', '11:00:00'), lifecyclePending: true },
+        ],
+        fixture.asOf,
+      );
+
+      expect(result.personDurationMs).toBe(HOUR);
     });
   });
 

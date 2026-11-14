@@ -7,6 +7,7 @@ import { PaginatedResourceUsageResponseDto } from './dtos/paginatedResourceUsage
 import { PaginatedBillingTransactionsResponseDto } from './dtos/paginatedBillingTransactionsResponse.dto';
 import { BILLING_EXPORT_EMAIL_PERMISSIONS } from './dtos/analyticsExportRows.dto';
 import { computeNextPage } from '../types/response';
+import { PaginatedResourceHoursSummaryResponseDto } from './dtos/resourceHoursSummary.dto';
 import { ResourceOperatingDurationsDto } from './dtos/resourceOperatingDurations.dto';
 import { ResourceOperatingAttributionSummary } from '../resources/operating-intervals/resource-operating-attribution.service';
 
@@ -31,6 +32,26 @@ export class AnalyticsController {
   ): Promise<PaginatedResourceUsageResponseDto> {
     const { start, end, page, limit } = query;
     const [data, total] = await this.analyticsService.getResourceUsageHoursInDateRange({ start, end }, page, limit);
+    return { data, total, page, limit, nextPage: computeNextPage(page, limit, total) };
+  }
+
+  @Get('resource-hours-summary')
+  @Auth('resources.reports.export')
+  @ApiResponse({
+    status: 200,
+    description:
+      'One row per resource with person hours, machine hours with a session and machine running time in the date range',
+    type: PaginatedResourceHoursSummaryResponseDto,
+  })
+  @ApiOperation({
+    summary: 'Get the person and machine hours per resource in the date range',
+    operationId: 'getResourceHoursSummaryInDateRange',
+  })
+  public async getResourceHoursSummaryInDateRange(
+    @Query() query: AnalyticsQueryDto,
+  ): Promise<PaginatedResourceHoursSummaryResponseDto> {
+    const { start, end, page, limit } = query;
+    const [data, total] = await this.analyticsService.getResourceHoursSummaryInDateRange({ start, end }, page, limit);
     return { data, total, page, limit, nextPage: computeNextPage(page, limit, total) };
   }
 

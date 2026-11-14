@@ -35,7 +35,10 @@ export interface ResourceOperatingAttribution {
 export interface ResourceOperatingAttributionSummary {
   asOf: Date;
   windowStart: Date | null;
+  /** Machine hours with a session: the union of the session ranges (overlapping sessions count once). */
   sessionDurationMs: number;
+  /** Person hours: the sum of every session's duration (overlapping sessions count each). */
+  personDurationMs: number;
   operatingDataAvailable: boolean;
   operatingDurationMs: number | null;
   attributedOperatingDurationMs: number | null;
@@ -180,6 +183,7 @@ export class ResourceOperatingAttributionService {
       asOf,
       windowStart: windowStart ?? null,
       sessionDurationMs: this.unionDuration(usageRanges.map(({ range }) => range)),
+      personDurationMs: usageRanges.reduce((total, { range }) => total + this.duration(range), 0),
       operatingDataAvailable,
       operatingDurationMs,
       attributedOperatingDurationMs: operatingDataAvailable ? attributedOperatingDurationMs : null,
