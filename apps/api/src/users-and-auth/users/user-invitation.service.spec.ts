@@ -108,6 +108,22 @@ describe('CSV invitations', () => {
     expect(auth.generateEmailVerificationToken).toHaveBeenCalledWith(result[0], manager);
     expect(email.sendUserInvitationEmail).toHaveBeenCalledWith(result[0], 'verification-token', manager);
   });
+  it('flags CSV rows whose emails differ only by case', async () => {
+    const { service, users } = setup();
+    await expect(
+      service.inviteUsersFromCsv(
+        file('email,username,role\nAlex@example.com,alex,\nalex@EXAMPLE.com,alex2,\n'),
+        config,
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        errors: expect.arrayContaining([
+          expect.objectContaining({ row: 2, field: 'email', message: 'DUPLICATE_IN_CSV' }),
+        ]),
+      },
+    });
+    expect(users.createMany).not.toHaveBeenCalled();
+  });
   it('reports database email and username collisions at their source row', async () => {
     const { service, users } = setup();
     users.findByEmailsOrUsernames.mockResolvedValue([{ email: 'ALEX@example.com', username: 'Alex' }]);
@@ -205,12 +221,14 @@ describe('single invitations', () => {
     expect(email.sendUserInvitationEmail).not.toHaveBeenCalled();
   });
 
-  it('does not treat an email that differs only in case as taken', async () => {
+  it('treats an email that differs only in case as taken', async () => {
     const { service, users } = setup();
-    users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'alex', email: 'Alex@Example.com' }]);
-    await expect(service.inviteUser({ username: 'alex', email: 'alex@example.com' })).rejects.toThrow(
-      'Username already exists',
+    users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'someone', email: 'qa-alice@example.test' }]);
+    await expect(service.inviteUser({ username: 'alice', email: ' QA-Alice@Example.test ' })).rejects.toThrow(
+      'Email already exists',
     );
+    expect(users.findByEmailsOrUsernames).toHaveBeenCalledWith(['qa-alice@example.test'], ['alice']);
+    expect(users.createMany).not.toHaveBeenCalled();
   });
 
   it('invites a user whose email and username are free', async () => {

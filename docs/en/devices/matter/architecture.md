@@ -2,14 +2,14 @@
 
 <!-- llms-description: Architecture of the Matter integration: a plugin plus a sidecar, versioned REST and WebSocket contract, errors and events. -->
 
-> **Connectivity and data model.** This release provides the foundation for Matter support: a versioned contract, a standalone sidecar with health, version and event-stream endpoints, a plugin that connects to it securely, and the plugin's [device data model](devices/matter/data-model.md) (nodes, endpoints, state and lifecycle, with admin REST endpoints). The sidecar does **not** yet commission devices, list devices, send commands, manage Thread or install firmware updates, so the data model stays empty against it, and there is no device UI. Do not plan equipment control around it. Those features follow in later tickets (see [What comes later](#what-comes-later)).
+> **Connectivity, data model and fabric persistence.** This release provides the foundation for Matter support: a versioned contract, a standalone sidecar with health, version and event-stream endpoints, a plugin that connects to it securely, the plugin's [device data model](devices/matter/data-model.md) (nodes, endpoints, state and lifecycle, with admin REST endpoints), and a persistent Matter fabric with encrypted [backup and recovery](devices/matter/backup-restore.md). The sidecar does **not** yet commission devices, list devices, send commands, manage Thread or install firmware updates, so the data model stays empty against it, and there is no device UI. Do not plan equipment control around it. Those features follow in later tickets (see [What comes later](#what-comes-later)).
 
 ## Plugin plus sidecar
 
 Matter ships as two cooperating parts, not as built-in Attraccess code:
 
-- **The Matter plugin** (`apps/plugins/matter`) is an installable Attraccess plugin. In this release it connects to the sidecar and offers an admin page (**Devices → Matter**) for the connection settings. It keeps the [device data model](devices/matter/data-model.md) (nodes, endpoints, state, lifecycle) and reconciles it with the sidecar once the sidecar can list nodes; there is no device UI yet. It needs the `DATABASE_ACCESS` and `MANAGE_SECRETS` permissions.
-- **The Matter sidecar** (`apps/matter-sidecar`) is a separate Node.js process. It is the only code that loads [matter.js](https://github.com/project-chip/matter.js) (`@matter/main`, pinned to one exact release). It can start and run without the Attraccess API, a database, a Matter fabric or any commissioned device.
+- **The Matter plugin** (`apps/plugins/matter`) is an installable Attraccess plugin. In this release it connects to the sidecar and offers an admin page (**Devices → Matter**) for the connection settings and for the fabric, its encrypted backups and recovery. It keeps the [device data model](devices/matter/data-model.md) (nodes, endpoints, state, lifecycle) and reconciles it with the sidecar once the sidecar can list nodes; there is no device UI yet. It needs the `DATABASE_ACCESS` and `MANAGE_SECRETS` permissions.
+- **The Matter sidecar** (`apps/matter-sidecar`) is a separate Node.js process. It is the only code that loads [matter.js](https://github.com/project-chip/matter.js) (`@matter/main`, pinned to one exact release). It can start and run without the Attraccess API, a database, a Matter fabric or any commissioned device. Once an administrator creates the fabric, the sidecar persists it in its own storage directory (`MATTER_SIDECAR_STORAGE_DIR`) and opens Matter networking (mDNS and UDP). It never creates, restores or overwrites a fabric on its own.
 
 A shared library, `libs/matter-contract`, defines every request, response and event once, with runtime validation (Zod). The sidecar and the plugin both use it. It never imports matter.js, core code, database entities or plugins.
 
@@ -25,8 +25,8 @@ A matching wire version is not enough. Attraccess, the Matter plugin and the sid
 | -------------- | ---------------------------------------------------------- |
 | Wire version   | `1`                                                        |
 | Attraccess     | `^1.11.0` (prereleases of a matching version are accepted) |
-| Matter plugin  | exactly `0.3.0-alpha.0`                                    |
-| Matter sidecar | exactly `0.3.0-alpha.0`                                    |
+| Matter plugin  | exactly `0.4.0-alpha.0`                                    |
+| Matter sidecar | exactly `0.4.0-alpha.0`                                    |
 | matter.js      | exactly `0.18.0` (plugin and sidecar share one release)    |
 
 The plugin's `attraccess.host` (`package.json`) and `attraccessVersion.min` (`plugin.json`) are derived from the same table, and a test checks that they match. Every new plugin or sidecar release needs a table update; otherwise the sidecar rejects it. The Attraccess range is deliberately a range, so a new Attraccess 1.x release does not by itself require a sidecar release.
@@ -35,7 +35,7 @@ Release headers are compatibility information, **not authentication**; authentic
 
 ## Versioned REST and WebSocket contract
 
-The contract covers eight feature families: `health`, `fabric`, `commissioning`, `inventory`, `commands`, `subscriptions`, `thread` and `ota`. Operations for families that are not implemented yet are still defined and validate their input, so later tickets only fill in behavior.
+The contract covers nine feature families: `health`, `fabric`, `backup`, `commissioning`, `inventory`, `commands`, `subscriptions`, `thread` and `ota`. Operations for families that are not implemented yet are still defined and validate their input, so later tickets only fill in behavior.
 
 Unversioned endpoints (`/health/live`, `/health/ready`, `/version`) need no compatibility headers, so operators can troubleshoot (all but the two health probes still need the token). Everything under `/v1/` needs the token and these headers:
 
@@ -59,19 +59,54 @@ Every error uses one envelope: `{ "error": { "code", "message", "correlationId",
 | `validation_failed`                | 400       | Invalid path parameters or body (for WebSocket messages, see [Events](#events-ordering-replay-and-duplicates)) |
 | `unauthorized`                     | 401       | Missing, malformed or wrong service token (checked before any version check)                                   |
 | `forbidden_origin`                 | 403       | Browser `Origin`, or a `Host` that is neither loopback nor in `MATTER_SIDECAR_ALLOWED_HOSTS`                   |
+| `insecure_transport`               | 403       | The sidecar serves plain HTTP on a non-loopback address and was asked for a backup or restore                  |
 | `not_found` / `method_not_allowed` | 404 / 405 | Unknown path or method                                                                                         |
 | `incompatible_release`             | 409       | Unsupported release combination                                                                                |
+| `fabric_exists`                    | 409       | A fabric already exists, so `fabric.create` is refused                                                         |
+| `recovery_required`                | 409       | The fabric storage needs an administrator's recovery decision (see [Fabric states](#fabric-states))            |
+| `busy`                             | 409       | A snapshot or restore is already running                                                                       |
+| `restore_failed`                   | 409       | The restore commit failed verification; the sidecar swapped its previous storage back                          |
 | `reconciliation_required`          | 409       | Reserved; in this release an impossible replay arrives as a WebSocket message (see below)                      |
 | `payload_too_large`                | 413       | Body over the limit                                                                                            |
+| `invalid_backup`                   | 422       | A staged backup payload is corrupt or incompatible                                                             |
 | `unsupported_wire_version`         | 426       | Wire version missing, malformed or not `1`                                                                     |
 | `internal_error`                   | 500       | Unexpected failure; no internal text is returned                                                               |
 | `unsupported_capability`           | 501       | The family is defined but not available                                                                        |
 | `sidecar_unavailable`              | 503       | The sidecar is shutting down, or (WebSocket only) 64 event stream clients are already connected                |
 | `timeout`                          | 504       | The request deadline passed                                                                                    |
 
-`GET /v1/capabilities` lists each family with `defined`, `available` and, when unavailable, a `reason`. In this release only `health` is available. A request for an unavailable family is validated and then answered with `unsupported_capability`. Placeholders never fake success: no fake commissioning, no empty inventory presented as authoritative, no fake completed command.
+`GET /v1/capabilities` lists each family with `defined`, `available` and, when unavailable, a `reason`. In this release `health`, `fabric` and `backup` are available. A request for an unavailable family is validated and then answered with `unsupported_capability`. Placeholders never fake success: no fake commissioning, no empty inventory presented as authoritative, no fake completed command.
 
 **Timeouts and physical commands.** Requested, accepted and reported outcomes are distinct values. When a request for a physical operation times out, the result is reported as `uncertain` with `retryable: false`. An ambiguous physical command is never retried automatically.
+
+## Fabric states
+
+The sidecar reports its fabric with `fabricStatus`: `state`, `reason`, `fabricId`, `fabricGeneration`, `rootCertFingerprint`, `storageInstanceId` and `storageSchemaVersion`.
+
+| State               | Meaning                                                                                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `uninitialized`     | No fabric exists. `fabric.create` creates the single controller fabric (409 `fabric_exists` if there already is one).         |
+| `initialized`       | A fabric exists and its storage is healthy.                                                                                   |
+| `recovery_required` | The storage is unusable or inconsistent; `reason` says why. The sidecar refuses `fabric.create` with 409 `recovery_required`. |
+
+`fabricGeneration` increases with every fabric change (creation `0 → 1`, restore). The sidecar emits `fabric.changed` (`fabricGeneration`, `fabricId`, `state`) whenever it changes. The `storageInstanceId` identifies one storage directory, so a swapped or wiped volume is detectable.
+
+The plugin keeps its own record of the fabric (ID, root certificate fingerprint, generation, storage instance) and compares it with what the sidecar reports. A difference puts the plugin into a **recovery** state, which blocks every plugin action that changes the fabric until an administrator decides. The recorded mismatch is one of `sidecar_uninitialized`, `fabric_changed`, `generation_behind`, `generation_ahead`, `storage_instance_changed` or `sidecar_recovery_required`. The administrator can restore a backup, accept the sidecar's fabric, or start a new fabric (see [Backup and Recovery](devices/matter/backup-restore.md#degraded-states-and-recovery)).
+
+## Backup and two-phase restore
+
+The `backup` family has six operations (all under `/v1/backup/`): `snapshot`, `restore.stage`, `restore.commit`, `restore.rollback`, `restore.finalize` and `restore.abort`. They require a sidecar that serves HTTPS or listens on loopback (`insecure_transport` otherwise). `snapshot` and `restore.stage` accept a request body up to 64 MiB; the others use the general limit.
+
+- **`snapshot`** returns the sidecar's storage as a header plus a base64 payload. The header carries the storage schema version, the sidecar and matter.js versions, the fabric facts, a payload SHA-256 and its size, and the creation time. It needs an initialized fabric.
+- **Restore is two-phase** so that the sidecar and the plugin database never end up half-restored:
+  1. `restore.stage` validates the payload and returns a `stageId` plus the fabric facts. Nothing live changes (422 `invalid_backup` for a corrupt or incompatible payload).
+  2. `restore.commit` swaps the storage in, keeps the previous one as a rollback copy and verifies the result. If verification fails, the sidecar swaps back by itself and answers 409 `restore_failed`. On success it sets `fabricGeneration` to `max(staged, live) + 1`, advances counters and the node ID allocator by a safe margin and emits `fabric.changed`.
+  3. The plugin then replaces its tables in **one database transaction**.
+  4. `restore.finalize` deletes the rollback copy, or `restore.rollback` swaps the previous storage back if the plugin step failed. `restore.abort` discards staged data before a commit.
+- **Consistency check.** The plugin compares `fabricGeneration` (plus fabric ID and storage instance) with its record on every connect. A sidecar whose generation is behind or ahead of the plugin's record, for example because only one side was restored, is a mismatch and triggers the recovery state above.
+- A restore onto a sidecar in `recovery_required` or `uninitialized` is allowed. The sidecar never creates a fabric during a restore.
+
+The plugin wraps these operations in an encrypted backup file with a recovery key; see [Backup and Recovery](devices/matter/backup-restore.md) for the file, the key and the administrator workflow.
 
 ## Events, ordering, replay and duplicates
 
@@ -98,7 +133,7 @@ The sidecar controls physical equipment, so it never trusts a caller by network 
 - **Browsers.** A request with a browser `Origin` header is always refused with 403, and the sidecar offers no CORS. Browsers talk to Attraccess, never to the sidecar.
 - **Bind address and Host allow-list.** By default the sidecar binds to `127.0.0.1` and accepts only loopback `Host` names. `MATTER_SIDECAR_BIND_HOST` opts into another address; then `MATTER_SIDECAR_ALLOWED_HOSTS` (a comma-separated list of the host names clients use) is required, and any other `Host` is refused with 403.
 - **TLS.** `MATTER_SIDECAR_TLS_CERT_FILE` and `MATTER_SIDECAR_TLS_KEY_FILE` (both or neither) make the sidecar serve HTTPS and WSS. A non-loopback bind **without** TLS is refused at startup unless `MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true` is set explicitly, which is meant only for a trusted container network or a TLS-terminating reverse proxy; the sidecar logs a warning when it is used. Certificates are read at start-up; renewing them needs a restart. Mutual TLS is not supported.
-- Commissioning secrets (setup codes), Thread dataset material and fabric secrets appear only in requests, never in responses, events, health output or logs.
+- Commissioning secrets (setup codes), Thread dataset material and fabric secrets appear only in requests, never in responses, events, health output or logs. The one exception is a backup snapshot, which carries fabric storage by design; it is refused over plain HTTP from a remote address, and the plugin encrypts it before storing it.
 - A generic Matter "On" cannot authorize operating a machine. Unlock, unbolt or power-on of equipment will require a dedicated permission plus explicit confirmation. Enforcement belongs to the later feature tickets.
 
 ## The plugin connects to the sidecar
@@ -132,7 +167,6 @@ The plugin starts the connection without waiting for the sidecar. **A missing, r
 ## What comes later
 
 - [ATT-1000](https://linear.app/attraccess/issue/ATT-1000): production packaging and deployment.
-- [ATT-998](https://linear.app/attraccess/issue/ATT-998): fabric persistence, encrypted backup and recovery.
 - Later Matter feature tickets: commissioning, the sidecar's device inventory, commands and subscriptions, device UI and flow nodes, Thread, OTA and a dedicated permission. The contract already defines the shapes of the inventory, `device.state` and `command.outcome`, and the plugin stores and reconciles them (see the [data model](devices/matter/data-model.md)), but the sidecar still answers `unsupported_capability` for those families.
 
 See also the [operator guide](devices/matter/operator.md).

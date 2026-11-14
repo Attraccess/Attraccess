@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { MatterConnectionService } from '../connection/connection.service';
 import { MatterSettingsService } from '../connection/settings.service';
-import { FakeSidecar, TOKEN } from '../testing/fake-sidecar';
+import { FakeSidecar, TOKEN } from '../testing/fake-sidecar.test-utils';
 import { createHarness, endpoint, node, type Harness } from '../testing/devices-harness.test-utils';
+import { MatterFabricGuard } from '../fabric/guard';
 import { DeviceAuditService } from './audit.service';
 import { MatterEndpoint, MatterEndpointState } from './entities';
 import { MAX_PENDING_EVENTS, MatterIngestionService } from './ingestion.service';
@@ -33,7 +34,12 @@ describe('Matter device ingestion over a real sidecar connection', () => {
     await settings.save({ url: fake.url, credential: TOKEN }, 1);
     connection = new MatterConnectionService(h.context, settings);
     state = new MatterStateService(h.context);
-    reconciliation = new MatterReconciliationService(h.context, connection, new DeviceAuditService(h.context));
+    reconciliation = new MatterReconciliationService(
+      h.context,
+      connection,
+      new DeviceAuditService(h.context),
+      new MatterFabricGuard(),
+    );
     ingestion = new MatterIngestionService(h.context, connection, reconciliation, state);
     ingestion.onModuleInit();
     await connection.onModuleInit();

@@ -18,7 +18,7 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
-    include: ['src/**/*.spec.tsx'],
+    include: ['src/**/*.spec.{ts,tsx}'],
     testTimeout: 20_000,
     coverage: {
       // Unit coverage feeds the project's crap-score target.

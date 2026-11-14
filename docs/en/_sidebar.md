@@ -83,6 +83,7 @@
   - [Matter: Architecture](devices/matter/architecture.md)
   - [Matter: Operator Guide](devices/matter/operator.md)
   - [Matter: Data Model and Lifecycle](devices/matter/data-model.md)
+  - [Matter: Backup and Recovery](devices/matter/backup-restore.md)
 
 - **Billing**
   - [Overview](billing/overview.md)

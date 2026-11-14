@@ -26,8 +26,8 @@ export const COMPATIBILITY_TABLE: readonly SupportedCombination[] = [
   {
     wireVersion: WIRE_VERSION,
     attraccess: '^1.11.0',
-    plugin: '0.3.0-alpha.0',
-    sidecar: '0.3.0-alpha.0',
+    plugin: '0.4.0-alpha.0',
+    sidecar: '0.4.0-alpha.0',
     matterJs: '0.18.0',
   },
 ];

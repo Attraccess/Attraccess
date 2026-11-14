@@ -144,7 +144,12 @@ export class SidecarHttpClient {
         throw new SidecarRequestError('The request does not match the contract.', { code: 'validation_failed' });
       payload = JSON.stringify(checked.data);
     }
-    const raw = await this.send(operation.method, path, payload, options, operation.physical === true);
+    // The general message limit applies unless the operation has its own (backups carry whole snapshots).
+    const limit = operation.bodyLimitBytes ?? MAX_MESSAGE_BYTES;
+    if (payload !== undefined && Buffer.byteLength(payload) > limit) {
+      throw new SidecarRequestError('The request is larger than the sidecar accepts.', { code: 'payload_too_large' });
+    }
+    const raw = await this.send(operation.method, path, payload, options, operation.physical === true, limit);
     let json: unknown;
     try {
       json = JSON.parse(raw);
@@ -169,7 +174,14 @@ export class SidecarHttpClient {
     return checked.data as Record<string, string>;
   }
 
-  private send(method: string, path: string, payload: string | undefined, options: RequestControl, physical: boolean) {
+  private send(
+    method: string,
+    path: string,
+    payload: string | undefined,
+    options: RequestControl,
+    physical: boolean,
+    responseLimit: number,
+  ) {
     const timeoutMs = options.timeoutMs ?? this.defaultTimeoutMs;
     const correlationId = options.correlationId ?? randomUUID();
     const headers: Record<string, string> = this.headers(correlationId, timeoutMs);
@@ -200,7 +212,7 @@ export class SidecarHttpClient {
         `${this.endpoint.origin}${this.endpoint.prefix}${path}`,
         { method, headers, agent: false, ...this.tlsOptions },
         (res) => {
-          readLimited(res, MAX_MESSAGE_BYTES).then(
+          readLimited(res, responseLimit).then(
             (text) => {
               const status = res.statusCode ?? 0;
               if (status >= 200 && status < 300) return finish(() => resolve(text));

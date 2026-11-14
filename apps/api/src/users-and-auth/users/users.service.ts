@@ -33,6 +33,7 @@ import { addDays } from 'date-fns';
 import { UserDirectory } from './directory/user-directory';
 
 import { UserAccounts } from './accounts/user-accounts';
+import { normalizeEmail } from './accounts/normalize-email';
 
 import {
   DeleteAccountTokenExpiredException,
@@ -209,7 +210,7 @@ export class UsersService {
 
     const normalized = users.map((userData) => ({
       username: this.accounts.cleanupUsername(userData.username),
-      email: userData.email.trim(),
+      email: normalizeEmail(userData.email),
       locale: userData.locale,
       roleKey: userData.roleKey,
     }));
@@ -328,7 +329,7 @@ export class UsersService {
   async confirmSelfDeletion(email: string, token: string): Promise<void> {
     const expected = this.tokenHashService.hashToken(token);
     let user = await this.userRepository.findOne({
-      where: { email },
+      where: { email: normalizeEmail(email) },
       withDeleted: true,
     });
 
@@ -395,7 +396,7 @@ export class UsersService {
 
       const suffix = randomBytes(6).toString('base64url').slice(0, 8);
       const anonymizedUsername = `deleted-user-${user.id}-${suffix}`;
-      const anonymizedEmail = `deleted-user-${user.id}-${suffix}@deleted.local`;
+      const anonymizedEmail = normalizeEmail(`deleted-user-${user.id}-${suffix}@deleted.local`);
 
       await authRepo.delete({ userId: user.id });
       await sessionRepo.delete({ userId: user.id });

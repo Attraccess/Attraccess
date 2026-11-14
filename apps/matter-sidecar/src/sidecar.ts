@@ -13,7 +13,8 @@ import type { SidecarConfig } from './config';
 import { EventStream } from './event-stream';
 import { correlationIdFrom, sendError } from './http-utils';
 import { createLogger, type Logger } from './logger';
-import { loadMatterPlatform, type MatterPlatform } from './matter-platform';
+import { fabricHandlers } from './fabric/handlers';
+import { loadMatterPlatform, type MatterPlatform, type PlatformContext } from './matter-platform';
 import { handleRequest, type FeatureHandlers, type PipelineDeps } from './request-pipeline';
 import { SIDECAR_VERSION, versionInfo } from './version';
 import { WebSocketHub } from './websocket-hub';
@@ -23,7 +24,7 @@ export type SidecarOptions = {
   logger?: Logger;
   /** Simulated or real feature handlers, keyed by operation ID. Families without a handler are unavailable. */
   features?: FeatureHandlers;
-  loadPlatform?: () => Promise<MatterPlatform>;
+  loadPlatform?: (context: PlatformContext) => Promise<MatterPlatform>;
   now?: () => number;
   commit?: string;
 };
@@ -81,7 +82,7 @@ export function createSidecar(options: SidecarOptions): Sidecar {
           transport: state.transport,
           shuttingDown: state.draining,
         },
-        fabric: { state: 'uninitialized' as const },
+        fabric: { state: platform?.fabric?.status().state ?? ('uninitialized' as const) },
       },
     };
   };
@@ -125,13 +126,23 @@ export function createSidecar(options: SidecarOptions): Sidecar {
   }
 
   async function startUnsafe() {
-    const loaded = await (options.loadPlatform ?? loadMatterPlatform)();
+    const loaded = await (options.loadPlatform ?? loadMatterPlatform)({
+      config,
+      logger,
+      onFabricChanged: (payload) => stream.publish('fabric.changed', payload),
+    });
     if (state.draining) {
       // stop() ran while this platform was loading and never saw it; it waits for this start, so close it here.
       await loaded.close();
       assertNotStopping();
     }
     platform = loaded;
+    // Explicit handlers win, so tests can still simulate features. Families without a handler stay unavailable.
+    if (loaded.fabric) {
+      for (const [id, handler] of Object.entries(fabricHandlers(loaded.fabric))) {
+        (features as Record<string, unknown>)[id] ??= handler;
+      }
+    }
     running.matterJs = loaded.version;
     state.matterPlatform = true;
     hub = new WebSocketHub(config, stream, running, () => state.draining, logger, auth);
