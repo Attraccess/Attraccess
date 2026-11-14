@@ -1,0 +1,6 @@
+{
+  "error": {
+    "title": "Automatische Erkennung fehlgeschlagen",
+    "unreachable": "Der Identitätsanbieter war nicht erreichbar, oder die Antwort enthielt keine verwertbare Fehlermeldung. Prüfen Sie den Host und den Realm bzw. Anwendungsnamen und sehen Sie für die Ursache im API-Log von Attraccess nach."
+  }
+}

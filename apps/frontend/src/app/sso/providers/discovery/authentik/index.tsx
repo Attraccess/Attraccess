@@ -14,9 +14,10 @@ import { useCallback, useState } from 'react';
 import { useToastMessage } from '../../../../../components/toastProvider';
 import de from './de.json';
 import en from './en.json';
-import API_ERROR_TRANSLATIONS_DE from '../../../../../global-translations/api-errors.de.json';
-import API_ERROR_TRANSLATIONS_EN from '../../../../../global-translations/api-errors.en.json';
-import { ApiError, useAuthenticationServiceDiscoverAuthentikOidc } from '@attraccess/react-query-client';
+import discoveryDe from '../de.json';
+import discoveryEn from '../en.json';
+import { getDiscoveryErrorMessage } from '../discoveryError';
+import { useAuthenticationServiceDiscoverAuthentikOidc } from '@attraccess/react-query-client';
 
 interface Props {
   onDiscovery: (settings: OpenIDConfiguration) => void;
@@ -30,15 +31,9 @@ export function AuthentikDiscoveryDialog(props: Props) {
   const [applicationName, setApplicationName] = useState('');
   const [isDiscovering, setIsDiscovering] = useState(false);
 
-  const { t, tExists } = useTranslations({
-    en: {
-      ...en,
-      api: API_ERROR_TRANSLATIONS_EN,
-    },
-    de: {
-      ...de,
-      api: API_ERROR_TRANSLATIONS_DE,
-    },
+  const { t } = useTranslations({
+    en: { ...discoveryEn, ...en },
+    de: { ...discoveryDe, ...de },
   });
 
   const toast = useToastMessage();
@@ -63,16 +58,11 @@ export function AuthentikDiscoveryDialog(props: Props) {
       close();
       toast.success({ title: t('success.title'), description: t('success.description') });
     } catch (error) {
-      toast.apiError({
-        error: error as ApiError,
-        t,
-        tExists,
-        baseTranslationKey: 'api',
-      });
+      toast.error({ title: t('error.title'), description: getDiscoveryErrorMessage(error) ?? t('error.unreachable') });
     } finally {
       setIsDiscovering(false);
     }
-  }, [host, applicationName, toast, t, tExists, onDiscovery, close, discoverAuthentik]);
+  }, [host, applicationName, toast, t, onDiscovery, close, discoverAuthentik]);
 
   return (
     <>
