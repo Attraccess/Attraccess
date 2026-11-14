@@ -7,7 +7,7 @@
 
 ## Vor jeder Hardware-Sitzung
 
-Verwenden Sie einen CC100 `751-9301`, Firmware `31`, sichere Niederspannungs-Aufbauten und, wo erforderlich, qualifizierte Verdrahtung. Halten Sie Not-Halt- und Personenschutz-Schaltkreise unabhängig. Betriebliche Schutzfunktionen, Trennungsrichtlinien und Bestätigungen sind nicht sicherheitsbewertete Funktionen.
+Verwenden Sie einen CC100 `751-9301`, Firmware `31`, sichere Kleinspannungs-Aufbauten (SELV/PELV) und, wo erforderlich, qualifizierte Verdrahtung. Halten Sie Not-Halt- und Personenschutz-Schaltkreise unabhängig. Betriebliche Freigabebedingungen, Trennungsrichtlinien und Bestätigungen sind keine sicherheitsbewerteten Funktionen.
 
 Halten Sie den Ausgangszustand des Controllers und die ausdrückliche Freigabe der destruktiven Installation fest. Stand 2026-09-06 kann die Inbetriebnahme vorhandene Anwendungen und Daten stoppen oder löschen; Attraccess erhält bereits vorhandenes CODESYS oder andere Workloads nicht, erstellt keine Sicherungskopie davon und stellt sie nicht wieder her. Ein Backup der vorherigen Workload ist keine Voraussetzung für die Inbetriebnahme. Prüfen Sie vor jeglicher E/A, dass CODESYS gestoppt und dauerhaft deaktiviert ist, und wiederholen Sie diese Prüfung nach einem Neustart. Behalten Sie bei Änderungen an bestehenden Attraccess-Zugangsdaten den unterstützten Wiederherstellungsweg für den Verwaltungszugang bei: Ein Server-Backup allein enthält **nicht** die geräteseitigen MQTT-Zugangsdaten, den SSH-Zugang oder den Laufzeitzustand. Nicht verfügbare Hardware oder eine ungeklärte Wiederherstellung der Zugangsdaten bleibt ein Abnahmehindernis. Hängen Sie niemals Zugangsdaten-Dateien, rohe Broker-Payloads, vollständige Konfigurationsdumps oder ungeprüfte Logs an Tickets an.
 
@@ -21,7 +21,7 @@ Halten Sie für jede erforderliche Prüfung das beobachtete Verhalten fest und v
 
 ## Erforderliche Nachweise
 
-Der Offline-Vollständigkeitsprüfer exportiert die maßgebliche Liste als `requiredChecks` in `apps/plugins/wago/scripts/check-acceptance.mjs`. Sie umfasst Inbetriebnahme/Härtung, dauerhafte Registrierung/Widerruf, visuelle digitale E/A und Modbus, Konfigurationsbereitschaft, den ersten Flow mit Bestätigung, Unabhängigkeit gepackter Bits und gleichzeitige Ausgänge, Neustart/Reboot, Ablehnung/Rollback, abgelaufene/doppelte Befehle, betriebliche Richtlinien/Schutzfunktionen, unterbrochene Inbetriebnahme und Wiederherstellung der Zugangsdaten, erneute Registrierung, Modbus-Fehler und veraltete Wartezeiten, Desktop/Mobil, gemeinsame Konformität und Audit-Schwärzung.
+Der Offline-Vollständigkeitsprüfer exportiert die maßgebliche Liste als `requiredChecks` in `apps/plugins/wago/scripts/check-acceptance.mjs`. Sie umfasst Inbetriebnahme/Härtung, dauerhafte Registrierung/Widerruf, visuelle digitale E/A und Modbus, Konfigurationsbereitschaft, den ersten Flow mit Bestätigung, Unabhängigkeit gepackter Bits und gleichzeitige Ausgänge, Neustart/Reboot, Ablehnung/Rollback, abgelaufene/doppelte Befehle, betriebliche Richtlinien/Freigabebedingungen, unterbrochene Inbetriebnahme und Wiederherstellung der Zugangsdaten, erneute Registrierung, Modbus-Fehler und veraltete Wartezeiten, Desktop/Mobil, gemeinsame Konformität und Audit-Schwärzung.
 
 Für die aktuelle geführte Bereitstellung müssen die Nachweise zu Neustart/Reboot und unterbrochener Installation
 das Host-Gate mit der Docker-Neustartrichtlinie `no` abdecken: Deaktivierung von CODESYS, enge Berechtigungen,
@@ -64,4 +64,4 @@ Der Prüfer verbindet sich nie mit Hardware, ändert nichts in Linear, signiert 
 
 ATT-985 bleibt durch die physische/nicht technische Abnahme und die Audit-Abdeckung ATT-983 blockiert. Hängen Sie die geprüften Nachweise an diese Tickets an. Veröffentlichen Sie nur die tatsächlich qualifizierten Kombinationen aus Gerät/Profil/Transport, kompatibles Frontend/Backend und per Prüfsumme verifizierte ARMv7-Laufzeitartefakte sowie Dokumentation, die gegen die getesteten Ansichten geprüft wurde. Die normale Installation durch Bediener muss das Laufzeit-Bundle über Paketierung oder visuellen Import bereitstellen, nicht über Server-Umgebungsvariablen oder Shell- bzw. Dateipfad-Anweisungen.
 
-Eine breitere Qualifizierung mit vier Baugruppen, Abrechnung, Telemetrie-Historie und Arbitrierung sind zurückgestellt. Sie dürfen nicht als bewiesene Fähigkeiten dieses ersten Schnitts beworben werden.
+Eine breitere Qualifizierung mit vier Baugruppen, Abrechnung, Telemetrie-Historie und Arbitrierung sind zurückgestellt. Sie dürfen nicht als bewiesene Fähigkeiten dieser ersten Ausbaustufe beworben werden.

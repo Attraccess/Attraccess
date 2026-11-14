@@ -19,6 +19,7 @@
 | `READ_USERS`         | Names and languages of holders and managers.                                       |
 | `READ_SETTINGS`      | The public application URL for calendar feed links, and the default language.      |
 | `SEND_NOTIFICATIONS` | In-app, push and email notifications.                                              |
+| `READER_UI`          | Booking notes and follow-up questions on Attractap reader displays.                |
 
 3. The plugin needs Attraccess 1.11.0 or newer.
 

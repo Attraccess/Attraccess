@@ -239,16 +239,16 @@ The documentation pages are plain Markdown files. English pages live under https
 ## Deutsch: Reservierungen
 - [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.
 - [Reservierungen nutzen](https://docs.attraccess.org/de/plugins/reservations/using-reservations.md): Wie Mitglieder mit dem Plugin Reservierungen Ressourcen buchen, einchecken, Genehmigungen abwickeln und Kalender-Feeds nutzen.
-- [Reservierungen verwalten](https://docs.attraccess.org/de/plugins/reservations/administration.md): Wie Administratoren das Plugin Reservierungen installieren, konfigurieren und betreiben: Zeitzone, E-Mail-Vorlagen, Startprüfung und Audit-Log.
-- [Reservierungen-API](https://docs.attraccess.org/de/plugins/reservations/api.md): Referenz der API des Plugins Reservierungen, einschließlich Fehlercodes.
+- [Reservierungen administrieren](https://docs.attraccess.org/de/plugins/reservations/administration.md): Wie Administratoren das Plugin Reservierungen installieren, konfigurieren und betreiben: Zeitzone, E-Mail-Vorlagen, Startprüfung und Audit-Log.
+- [Reservierungs-API](https://docs.attraccess.org/de/plugins/reservations/api.md): Referenz der API des Plugins Reservierungen, einschließlich Fehlercodes.
 
 ## Deutsch: WAGO
 - [Überblick](https://docs.attraccess.org/de/plugins/wago/overview.md): Das Plugin WAGO verbindet WAGO-CC100-Controller über MQTT, um Ausgänge zu schalten, Eingänge und Modbus-Zähler zu lesen und Flows auszulösen; Überblick und Voraussetzungen.
 - [Geführte WAGO-CC100-Inbetriebnahme](https://docs.attraccess.org/de/plugins/wago/cc100-commissioning.md): Anleitung zur Inbetriebnahme eines WAGO-CC100-Controllers in einer lokalen, vom Internet getrennten Installation, einschließlich MQTT-Claim und Wiederherstellung.
 - [WAGO-CC100-Docker-Laufzeit](https://docs.attraccess.org/de/plugins/wago/cc100-runtime.md): WAGO-CC100-Docker-Laufzeitumgebung konfigurieren: Klemmen und Live-Steuerung, Wechsel von MQTT-Server oder SSH-Adresse sowie Bereitstellungswege.
-- [WAGO-Produktionssupport](https://docs.attraccess.org/de/plugins/wago/production-support.md): Nennt die getestete WAGO-CC100-Kompatibilität, Broker-Einstellungen, erzwungene und gemessene Grenzen, Runbooks und was nicht zugesagt wird.
+- [WAGO-Produktivbetrieb und Kompatibilität](https://docs.attraccess.org/de/plugins/wago/production-support.md): Nennt die getestete WAGO-CC100-Kompatibilität, Broker-Einstellungen, erzwungene und gemessene Grenzen, Runbooks und was nicht zugesagt wird.
 - [WAGO-Wiederherstellungs-Runbooks](https://docs.attraccess.org/de/plugins/wago/recovery-runbooks.md): Sechs Runbooks für den Betrieb der WAGO-CC100-Integration, etwa bei Zugangsdaten-Kompromittierung, Broker-Ausfall und Controller-Austausch.
-- [WAGO-Bedrohungsmodell und Pen-Test-Brief](https://docs.attraccess.org/de/plugins/wago/threat-model.md): Bedrohungsmodell und Pen-Test-Briefing für die WAGO-CC100-Integration mit Akteuren, Vertrauensgrenzen und Angriffsflächen.
+- [WAGO-Bedrohungsmodell und Pen-Test-Briefing](https://docs.attraccess.org/de/plugins/wago/threat-model.md): Bedrohungsmodell und Pen-Test-Briefing für die WAGO-CC100-Integration mit Akteuren, Vertrauensgrenzen und Angriffsflächen.
 - [WAGO-Sicherheitsgrenze](https://docs.attraccess.org/de/plugins/wago/safety-boundary.md): Legt fest, dass die WAGO-Integration der betrieblichen Steuerung und keiner Sicherheitsfunktion dient, mit einer Formulierungs-Checkliste für Prüfer.
 
 ## Deutsch: Matter
@@ -262,7 +262,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Überblick](https://docs.attraccess.org/de/plugins/rabbitmq/overview.md): Das Plugin RabbitMQ ergänzt die Detailseite eines MQTT-Servers um Status-, Benutzer-, Verbindungs- und Statistik-Bereiche für RabbitMQ-Broker; Voraussetzungen und Berechtigungen.
 
 ## Deutsch: Shelly
-- [Überblick](https://docs.attraccess.org/de/plugins/shelly/overview.md): Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Geräteinfo, Admin-Passwort-Verwaltung und Firmware-Updates.
+- [Überblick](https://docs.attraccess.org/de/plugins/shelly/overview.md): Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Geräteinformationen, Admin-Passwort-Verwaltung und Firmware-Updates.
 
 ## Deutsch: Monitoring & Metriken
 - [Überblick](https://docs.attraccess.org/de/monitoring/overview.md): Überblick über integrierte Prometheus-Metriken und Grafana-Dashboards zur Überwachung von Attraccess, inklusive Sicherheitshinweisen.

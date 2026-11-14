@@ -3,7 +3,7 @@
 > [!NOTE]
 > Nur verfügbar, wenn das Plugin **WAGO** installiert ist. Siehe [Plugins installieren](plugins/installing-plugins.md).
 
-Der WAGO-HTTP-Controller und die gesperrten Konfigurationsdienste geben über
+Der WAGO-HTTP-Controller und die sperrgeschützten Konfigurationsdienste geben über
 `PluginContext.audit` Audit-Lebenszyklen auf einer Positivliste aus. Der Host bindet die Plugin-Identität aus seinem geladenen Manifest.
 Der Controller bezieht die Benutzeridentität aus dem durch den Guard authentifizierten `request.user`
 mittels `wagoAuditPrincipal`; Request-Bodys, JWT-Werte und Zugangsdaten werden nie
@@ -61,8 +61,8 @@ den Trigger für unveränderliche Zeilen und `system.audit.read`. Die Berechtigu
 der integrierten Administratorrolle gewährt. Bestehende Rollen, Controller-Daten und
 spezialisierte Audit-Tabellen bleiben unangetastet. Der normale Migrations-Runner des Hosts wendet sie
 vor dem Modulstart an; es wird keine Schema-Synchronisierung zur Laufzeit verwendet. Ihre `down`-Migration
-entfernt die Audit-Tabelle samt Historie und ihre Berechtigung; exportieren oder sichern Sie daher
-die Datenbank vor einem beabsichtigten Downgrade, das diese Historie benötigt.
+entfernt die Audit-Tabelle samt Historie und ihre Berechtigung; exportieren Sie daher
+die Datenbank oder bewahren Sie sie auf, bevor Sie ein beabsichtigtes Downgrade durchführen, das diese Historie benötigt.
 
 `GET /api/admin/audit-log` erfordert `system.audit.read`. Sitzungsberechtigungen und
 Berechtigungsobergrenzen von API-Tokens nutzen die vorhandenen Authentifizierungs-/RBAC-Guards; allein
@@ -167,15 +167,15 @@ Wiederholte attempt-/finish-Aufrufe auf demselben Handle geben höchstens ein At
 und ein Abschlussereignis aus; der erste Abschlussaufruf gewinnt. Finish wartet implizit auf
 das Attempt. Das Handle ist prozesslokal, kein persistierter Korrelationszustand.
 
-| Verantwortlicher für den Vorgang      | Aktion und erforderliche Integrationsdaten                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Automatisches Claim der Inbetriebnahme | Rufen Sie den Lebenszyklus `claim` um das tatsächliche automatische Claim auf und führen Sie den authentifizierten auslösenden Principal durch Sitzung/Job mit. Der dienstinterne Aufruf umgeht den HTTP-Claim-Hook. Synthetisieren Sie nie einen Akteur aus Controller-Daten.                                                                                                                                      |
-| Zugangsdatenrotation/manuelle Registrierung | `credential_rotation` / `manual_credential_fallback`; mit der persistierten Controller-ID und dem authentifizierten Principal beginnen, erst nach tatsächlichem Abschluss der Rotation bzw. des Fallbacks abschließen. Ein `Promise<void>`-Vorgang braucht keinen Abschluss-Projektor. Übergeben Sie nie bereitgestellte Zugangsdaten oder manuelle Anweisungen.                                                    |
-| Erzwungene Veröffentlichung           | `forced_publication`; der Vorgang gibt `WagoRevisionAuditResult` (`{ revision: number }`) zurück.                                                                                                                                                                                                                                                                                                                  |
-| Bestätigung einer Ablehnung           | `rejection_acknowledgement`; mit `{ revision }` beginnen, abschließen, wenn die Bestätigung durch den Bediener persistiert ist. Dies ist eine authentifizierte Bedieneraktion, kein roher MQTT-Rejection-/Telemetrie-Callback.                                                                                                                                                                                       |
-| Vorlage anwenden/erneut anwenden      | Wählen Sie `preset_application` oder `preset_reapplication` anhand der tatsächlich persistierten Herkunft unter der Konfigurationssperre. Geben Sie `WagoPresetAuditResult` (`presetId`, `channelId`, `before`, `after`) zurück und projizieren Sie diese Felder.                                                                                                                                                  |
-| Hardwareprofil erstellen/ändern       | `profile_creation` / `profile_change`; geben Sie `WagoProfileAuditResult` (`profileId: string`, `profileVersion: number`, `before`, `after`) zurück. Erfassen Sie die Identität aus dem validierten Profil, das in `snapshot.modbus.profiles` eingebettet ist, an der Persistenzgrenze des zuständigen Konfigurationsentwurfs bzw. der Veröffentlichung, nicht aus einem separaten Profildatensatz oder einer lokalen Vorschau. |
-| Manueller Befehl                      | `manual_command`; weisen Sie die echte Befehls-UUID vor `begin` zu, übergeben Sie `{ channelId, operation, commandId }` und schließen Sie mit einem Ergebnis aus `WagoManualCommandAuditResult` ab. Für reine Dispatch-Semantik verwenden Sie `dispatched`; für Bestätigungssemantik warten Sie auf `acknowledged`, `rejected`, `timeout` oder `transport_failure`. Die letzten drei schließen als `failed` ab. Zeichnen Sie nie Befehlswerte oder Broker-Payloads auf. |
+| Verantwortlicher für den Vorgang            | Aktion und erforderliche Integrationsdaten                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Automatisches Claim der Inbetriebnahme      | Rufen Sie den Lebenszyklus `claim` um das tatsächliche automatische Claim auf und führen Sie den authentifizierten auslösenden Principal durch Sitzung/Job mit. Der vorhandene dienstinterne Aufruf umgeht den HTTP-Claim-Hook. Synthetisieren Sie nie einen Akteur aus Controller-Daten.                                                                                                                                                                               |
+| Zugangsdatenrotation/manuelle Registrierung | `credential_rotation` / `manual_credential_fallback`; mit der persistierten Controller-ID und dem authentifizierten Principal beginnen, erst nach tatsächlichem Abschluss der Rotation bzw. des Fallbacks abschließen. Ein `Promise<void>`-Vorgang braucht keinen Abschluss-Projektor. Übergeben Sie nie bereitgestellte Zugangsdaten oder manuelle Anweisungen.                                                                                                        |
+| Erzwungene Veröffentlichung                 | `forced_publication`; der Vorgang gibt `WagoRevisionAuditResult` (`{ revision: number }`) zurück.                                                                                                                                                                                                                                                                                                                                                                       |
+| Bestätigung einer Ablehnung                 | `rejection_acknowledgement`; mit `{ revision }` beginnen, abschließen, wenn die Bestätigung durch den Bediener persistiert ist. Dies ist eine authentifizierte Bedieneraktion, kein roher MQTT-Rejection-/Telemetrie-Callback.                                                                                                                                                                                                                                          |
+| Vorlage anwenden/erneut anwenden            | Wählen Sie `preset_application` oder `preset_reapplication` anhand der tatsächlich persistierten Herkunft unter der Konfigurationssperre. Geben Sie `WagoPresetAuditResult` (`presetId`, `channelId`, `before`, `after`) zurück und projizieren Sie diese Felder.                                                                                                                                                                                                       |
+| Hardwareprofil erstellen/ändern             | `profile_creation` / `profile_change`; geben Sie `WagoProfileAuditResult` (`profileId: string`, `profileVersion: number`, `before`, `after`) zurück. Erfassen Sie die Identität aus dem validierten Profil, das in `snapshot.modbus.profiles` eingebettet ist, an der Persistenzgrenze des zuständigen Konfigurationsentwurfs bzw. der Veröffentlichung, nicht aus einem separaten Profildatensatz oder einer lokalen Vorschau.                                         |
+| Manueller Befehl                            | `manual_command`; weisen Sie die echte Befehls-UUID vor `begin` zu, übergeben Sie `{ channelId, operation, commandId }` und schließen Sie mit einem Ergebnis aus `WagoManualCommandAuditResult` ab. Für reine Dispatch-Semantik verwenden Sie `dispatched`; für Bestätigungssemantik warten Sie auf `acknowledged`, `rejected`, `timeout` oder `transport_failure`. Die letzten drei schließen als `failed` ab. Zeichnen Sie nie Befehlswerte oder Broker-Payloads auf. |
 
 `before` und `after` verwenden `WagoAuditSummary`: nur `physicalPointCount` und
 `logicalChannelCount`. Berechnen Sie beide innerhalb der Änderungssperre des Verantwortlichen aus den
@@ -196,13 +196,13 @@ IDs müssen aus validierten Domänenidentitäten stammen, nie aus beliebigem Req
 Fehlerzeichenfolgen. Vollständige Profile, Transporteinstellungen, Zugangsdaten, Messwert-/Aktions-
 Zuordnungen und rohe Fehler dürfen nicht als Identitätsfelder geliefert werden.
 
-### Integration von gesperrten Vorlagen und Revisionen
+### Vorlagen- und Revisionsintegration unter Konfigurationssperre
 
 `WagoPresetAuditResult` ist genau `{ presetId, channelId, before, after }`;
 `presetId` ist eine Katalog-ID, und beide Zusammenfassungen sind `WagoAuditSummary`.
 Lesen Sie im vorhandenen Callback `withConfigurationLock` die persistierte Herkunft,
 wählen Sie `preset_application` oder `preset_reapplication` und berechnen Sie `before`
-aus dem gesperrten persistierten Schnappschuss. Rufen Sie `audit.run` innerhalb derselben Sperre mit
+aus dem unter der Sperre gelesenen persistierten Schnappschuss. Rufen Sie `audit.run` innerhalb derselben Sperre mit
 dem authentifizierten Principal, der Controller-ID, der gewählten Aktion und
 `{ presetId, channelId, before }` auf. Der Operations-Callback muss die
 Änderung persistieren und `WagoPresetAuditResult` zurückgeben und dabei `after` aus dem tatsächlich
@@ -248,7 +248,7 @@ Der authentifizierte auslösende Principal wird in den Inbetriebnahme-Sitzungen 
 Legacy-Sitzungen ohne gültigen Auslöser dürfen keinen erfinden.
 
 Dieser Inbetriebnahme-Stack ist älter als die zusammengesetzten Konfigurations-Hooks. Der Integrator
-muss die HTTP-Claim- und gesperrten Konfigurations-Hooks des Integrationszweigs erhalten
+muss die HTTP-Claim- und sperrgeschützten Konfigurations-Hooks des Integrationszweigs erhalten
 und nicht durch den älteren Controller-/Dienst-Schnappschuss des Inbetriebnahme-Zweigs ersetzen.
 Erhalten Sie beim Unclaim die Besitzprüfungen der Inbetriebnahme und setzen Sie den vorhandenen Audit-
 Wrapper in deren Callback für sicheres Entfernen:
@@ -277,8 +277,8 @@ Lebenszyklus, nicht sowohl den Inbetriebnahme-Helfer als auch einen weiteren `Wa
   Fehler. Bilden Sie Timeout, Ablehnung und Transport-/Shutdown-Fehler auf die vorhandenen
   Ergebnis-Enums ab. Bezeichnen Sie die automatische Flow-Ausführung nie als manuell und persistieren Sie keine Werte.
 - Verantwortlicher für die Konfiguration: Behalten Sie eine zugewiesene/wiederverwendete Revisionsnummer im
-  Fehlerpfad bei. Die aktuelle Veröffentlichung/das aktuelle Rollback kann eine ausstehende Revision persistieren und dann den
-  Dispatch nicht ausführen; `run` erhält die Revision nur bei Erfolg. Verwenden Sie einen vom Verantwortlichen verwalteten Lebenszyklus
+  Fehlerpfad bei. Die aktuelle Veröffentlichung/das aktuelle Rollback kann eine ausstehende Revision persistieren und dann beim
+  Dispatch fehlschlagen; `run` erhält die Revision nur bei Erfolg. Verwenden Sie einen vom Verantwortlichen verwalteten Lebenszyklus
   innerhalb der vorhandenen Sperre, fügen Sie nach der Zuweisung `{ revision }` zum fehlgeschlagenen Abschluss hinzu und erhalten Sie
   die `sourceRevision` des Rollbacks ohne einen inneren doppelten Veröffentlichungs-
   Lebenszyklus. Validierungsfehler vor der Zulassung des Lebenszyklus geben derzeit

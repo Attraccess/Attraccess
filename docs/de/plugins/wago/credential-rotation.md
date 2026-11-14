@@ -42,7 +42,7 @@ sofort trennen, können die Übergabe verhindern. Sie erfordern eine ausdrückli
 Wiederherstellung des Controllers statt der Behauptung einer erfolgreichen Rotation.
 
 Eine Unterbrechung zwischen der Änderung am Broker und dem Speichern der zurückgegebenen Zugangsdaten
-hinterlässt einen Wiederherstellungsdatensatz `provisioning`. Das Ergebnis am Broker ist unsicher, und eine automatische
+hinterlässt einen Wiederherstellungsdatensatz `provisioning`. Das Ergebnis am Broker ist ungewiss, und eine automatische
 erneute Rotation wird abgelehnt. Das ausdrückliche Entfernen des Controllers kann diesen Zustand beheben: Validieren Sie den ursprünglichen Broker, widerrufen Sie seine
 Zugangsdaten mit dem vorhandenen Entfernen-Ablauf und löschen Sie dann seine Registrierung.
 Die Wiederherstellungszeile wird durch die Foreign-Key-Kaskade des Controllers gelöscht. Manuelle Broker-Anweisungen
@@ -59,5 +59,5 @@ Rotationshistorie zu löschen, solange die Registrierung des Controllers besteht
 nutzen die vorhandene Schnittstelle des Hosts für verschlüsselte Geheimnisse; Audit-Ereignisse enthalten nie
 Zugangsdaten, Broker-Payloads oder manuelle Anweisungen.
 
-Die Abnahme mit Software-Fixtures qualifiziert weder einen physischen Controller, noch ein Broker-Deployment
+Die Abnahme mit Software-Fixtures qualifiziert weder einen physischen Controller noch ein Broker-Deployment
 oder ein unterstütztes Hardware-Release.

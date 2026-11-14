@@ -8,9 +8,11 @@ The **WAGO** plugin connects WAGO CC100 PLC controllers to Attraccess through an
 controller from the browser, name its inputs and outputs, read Modbus meters, and use the controller in flows (switch
 an output, react to an input or an event).
 
+> [!WARNING]
 > **Not a safety function.** The WAGO integration controls outputs for operational purposes only. It is not safety
 > rated, not an emergency stop and not personnel protection. Read the [safety boundary](plugins/wago/safety-boundary.md)
-> before connecting any equipment. Physical use is unqualified until ATT-984.
+> before connecting any equipment. Physical use is unqualified until
+> [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies).
 
 ## Prerequisites
 

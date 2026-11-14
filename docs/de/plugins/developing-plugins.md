@@ -849,7 +849,7 @@ erhalten frische Werte. Der Host stellt die Verbindung bei gültigem
 Sitzungswechsel desselben Benutzers ohne Löschen des Abfragecaches wieder her und
 behält sie bei Abmelden/Anmelden im selben React-Batch. Plugin-Ereignisse werden
 lokal nicht erneut zugestellt.
-Der [Vertrag mit Beispielen](../../development/live-updates.md#plugin-live-updates)
+Der [Vertrag mit Beispielen](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#plugin-live-updates)
 beschreibt auch Wiederverbindung und Freigabe von Abonnements.
-Die [WAGO-Abfrageintervalle](../../development/live-updates.md#wago-sampling-schedule)
+Die [WAGO-Abfrageintervalle](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#wago-sampling-schedule)
 listen die gemeinsamen Backend-Intervalle für alle neun WAGO-Themen auf.

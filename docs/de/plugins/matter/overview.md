@@ -7,7 +7,8 @@
 Das Plugin **Matter** ist die Grundlage für die Unterstützung von Matter-Smart-Home-Geräten in Attraccess. Es verbindet
 sich mit einem separaten **Matter-Sidecar**-Prozess, der als Einziger den Matter-Stack ausführt. Ein Administrator
 erstellt und verwaltet in Attraccess die Matter-Fabric, ihre verschlüsselten Backups und die Wiederherstellung. Im
-aktuellen Release steuert und listet der Sidecar noch keine Geräte, daher gibt es noch keine Geräte-Oberfläche.
+aktuellen Release steuert der Sidecar noch keine Geräte und listet auch keine auf, daher gibt es noch keine
+Geräte-Oberfläche.
 
 ## Voraussetzungen
 

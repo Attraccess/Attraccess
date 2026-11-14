@@ -75,7 +75,7 @@ docker compose start attraccess
 
 ## Matter Sidecar Storage
 
-With the Matter plugin installed, its data lives in a separate sidecar storage volume that is **not** part of the Attraccess volume. See [Matter: Backup and Recovery](plugins/matter/backup-restore.md).
+With the Matter plugin installed, the Matter fabric lives in the **sidecar's own storage volume** (`MATTER_SIDECAR_STORAGE_DIR`), which is **not** part of the Attraccess volume. Back it up through the Matter plugin's encrypted backups, and keep the recovery key off the server. See [Matter: Backup and Recovery](plugins/matter/backup-restore.md).
 
 ## Tips
 

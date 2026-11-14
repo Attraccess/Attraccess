@@ -139,11 +139,6 @@ Zeiten. Welche Regel gilt, legt die Einstellung
 
 ## Attractap-Reader
 
-Auf einem Attractap Touch mit aktueller Firmware wird eine Uhrzeit wie „14:25“ nie auf zwei Zeilen verteilt. Jede Zeile
-enthält einen Teil eines Hinweises, zum Beispiel „Frei bis 13:55,“ über „dann reserviert von bea bis 14:25“ und den
-Check-in-Hinweis „(Check-in bis 14:10)“ unter der Buchung. Bei einem langen Namen stehen die Zeiten in einer eigenen
-Zeile.
-
 Auf einem Attractap-Touch-Reader mit aktueller Firmware zeigt das Plugin Reservierungsinformationen auf dem
 Bildschirm an, fragt vor einem Start nach, der mit einer Buchung kollidiert, und wertet einen Start am Reader als
 Check-in. Für die Reader-Widgets braucht das Plugin die Berechtigung, Widgets auf Attractap-Reader-Bildschirmen anzuzeigen, die eine
@@ -178,6 +173,11 @@ denen Reservierungen aktiviert sind; für andere Ressourcen gilt die Zeitzone de
 [Uhrzeit und Zeitzone](attractap/reader-ui.md#uhrzeit-und-zeitzone).
 
 Die Zeiten sind Beginn und Ende der Buchung ohne Puffer. Die Texte folgen der Standardsprache der Installation.
+
+Auf einem Attractap Touch mit aktueller Firmware wird eine Uhrzeit wie „14:25“ nie auf zwei Zeilen verteilt. Jede Zeile
+enthält einen Teil eines Hinweises, zum Beispiel „Frei bis 13:55,“ über „dann reserviert von bea bis 14:25“ und den
+Check-in-Hinweis „(Check-in bis 14:10)“ unter der Buchung. Bei einem langen Namen stehen die Zeiten in einer eigenen
+Zeile.
 
 **Nach dem Auflegen einer Karte.** Die Texte folgen der Sprache der Person, die die Karte aufgelegt hat. Endet die
 Kartensitzung, kehrt der Reader zu den Texten oben zurück.

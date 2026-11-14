@@ -22,10 +22,11 @@ are not enabled, nothing changes.
 ## Where it appears
 
 - A booking card on the resource detail page and a **My reservations** list for members.
+- A **Manage reservations** page in the sidebar for resource managers (approvals and all bookings).
 - A **Reservations** section in the resource settings and in the system settings (timezone) for administrators.
 - Attractap readers with a display, which show booking notes and ask follow-up questions (see
   [Reader Display](attractap/reader-ui.md)).
-- Calendar feeds (iCal), notifications and email links.
+- **Calendar feeds (iCal)** on the user's account page, plus notifications and email links.
 
 ## In this section
 

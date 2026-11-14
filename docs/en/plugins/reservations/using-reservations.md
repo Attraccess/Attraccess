@@ -157,11 +157,11 @@ reservation times always agree, even when the server runs in another zone; chang
 readers at once. The plugin proposes its timezone only for resources that have reservations enabled; for other
 resources the server's timezone applies. See [Time and time zone](attractap/reader-ui.md#time-and-time-zone).
 
+The times are the booking's start and end without buffers. Texts follow the installation's default language.
+
 On an Attractap Touch with current firmware, a time such as "14:25" is never split across two lines. Each line holds
 one part of a note, for example "Free until 13:55," above "then reserved by bea until 14:25", and the check-in note
 "(check in by 14:10)" under the booking. With a long name, the times get a line of their own.
-
-The times are the booking's start and end without buffers. Texts follow the installation's default language.
 
 **After a card tap.** The texts follow the language of the person who tapped. When the card session ends, the reader
 returns to the texts above.

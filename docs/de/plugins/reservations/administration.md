@@ -1,4 +1,4 @@
-# Reservierungen verwalten
+# Reservierungen administrieren
 <!-- llms-description: Wie Administratoren das Plugin Reservierungen installieren, konfigurieren und betreiben: Zeitzone, E-Mail-Vorlagen, Startprüfung und Audit-Log. -->
 
 > [!NOTE]
@@ -19,6 +19,7 @@
 | `READ_USERS`         | Namen und Sprachen von Buchenden und Verwaltenden.                                                    |
 | `READ_SETTINGS`      | Die öffentliche Anwendungs-URL für Kalender-Feed-Links und die Standardsprache.                       |
 | `SEND_NOTIFICATIONS` | Benachrichtigungen in der App, per Push und per E-Mail.                                               |
+| `READER_UI`          | Buchungshinweise und Rückfragen auf den Bildschirmen der Attractap-Reader.                            |
 
 3. Das Plugin benötigt Attraccess 1.11.0 oder neuer.
 

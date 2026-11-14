@@ -934,7 +934,7 @@ route props (`path`, `element`, ...) with an `authRequired` field:
 | `"resources.update"`                       | A single required RBAC permission key.   |
 | `["resources.update", "resources.create"]` | Any one of several RBAC permission keys. |
 
-See [Permissions](../user-management/permissions.md) for the full list of available permission keys.
+See [Permissions](user-management/permissions.md) for the full list of available permission keys.
 
 The host wraps each plugin route in an error boundary and merges it with the
 core routes, so a route that throws cannot take down the rest of the app.
@@ -1388,7 +1388,7 @@ even after final unsubscribe; recreated consumers receive fresh samples.
 The host recovers valid same-user credential rotation without clearing queries
 and retains the stream across same-batch cleanup/setup. Plugin event payloads
 have no local replay.
-See [Plugin live updates](../../development/live-updates.md#plugin-live-updates)
+See [Plugin live updates](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#plugin-live-updates)
 for the contract and examples, including reconnection and cleanup.
-The [WAGO sampling schedule](../../development/live-updates.md#wago-sampling-schedule)
+The [WAGO sampling schedule](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#wago-sampling-schedule)
 lists the shared backend intervals for all nine WAGO topics.

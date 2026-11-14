@@ -5,9 +5,9 @@
 
 Seit dem **2026-09-06** ist die Inbetriebnahme destruktiv. Vorhandene Anwendungen und
 Workloads können aufhören zu funktionieren oder gelöscht werden. Attraccess bewahrt vorhandene CODESYS-Anwendungen,
-gespeicherte SPS-Daten, andere Workloads oder deren Host-Einstellungen nicht auf, erstellt keine Sicherungskopie davon
+remanente SPS-Daten (Retain-Daten), andere Workloads oder deren Host-Einstellungen nicht auf, erstellt keine Sicherungskopie davon
 und stellt sie nicht wieder her. Die [frühere Entscheidung zur Bewahrung und die Befunde zur Herstellerquelle](plugins/wago/fw31-support.md)
-bleiben als Historie bestehen. Tests verwenden temporäre Dateien und gefälschte
+bleiben als Historie bestehen. Tests verwenden temporäre Dateien und simulierte
 Geräte-Transporte; **es wird keine Abnahme für physische E/A, Firmware-Neustart oder
 Management-Härtung behauptet**. ATT-984 bleibt ein Release-Gate.
 
@@ -17,28 +17,28 @@ Die bestehende Bereitstellungsanfrage enthält `confirmInstall: true` und frisch
 SSH-Zugangsdaten. Eine einzige Bestätigung der Folgen autorisiert die destruktive Vorbereitung;
 es gibt kein separates Gate für Workload-Bewahrung, Docker oder ein obligatorisches WBM.
 
-Die Bereitstellung prüft die angeheftete SSH-Identität, die Offline-Prüfsumme der Laufzeit und die Broker-Anforderungen
+Die Bereitstellung prüft die gepinnte SSH-Identität, die Offline-Prüfsumme der Laufzeit und die Broker-Anforderungen
 und bereitet dann den Controller unter seiner Operationssperre vor:
 
-1. Prüfen Sie die Identität des CC100 `751-9301` FW31, die erforderlichen von der Firmware installierten Werkzeuge
+1. Die Bereitstellung prüft die Identität des CC100 `751-9301` FW31, die erforderlichen von der Firmware installierten Werkzeuge
    und die erwarteten Ergebnisse der Hersteller-Getter.
-   Lesen Sie `/etc/os-release` als Text; lehnen Sie doppelte/widersprüchliche Felder ab.
+   Sie liest `/etc/os-release` als Text und lehnt doppelte/widersprüchliche Felder ab.
    BSP `VERSION_ID="2024.12.0"` allein genügt nicht.
-2. Stoppen Sie CODESYS immer und deaktivieren Sie es dauerhaft, einschließlich einer aktiven SPS oder einer
-   gestoppten SPS, die beim Booten aktiviert ist. Prüfen Sie Prozess- und Boot-Zustand, bevor E/A gewährt wird.
-   Ein Fehler stoppt die Inbetriebnahme vor der Einrichtung oder dem Start der Laufzeit.
-3. Bereiten Sie die von der Firmware installierte Hersteller-Docker-Laufzeit vor und aktivieren Sie sie bei Bedarf.
-   Ziehen Sie keine Ersatz-Engine und kein Ersatz-Image aus einer externen Registry.
+2. Sie stoppt CODESYS immer und deaktiviert es dauerhaft, einschließlich einer aktiven SPS oder einer
+   gestoppten SPS, die beim Booten aktiviert ist. Sie prüft Prozess- und Boot-Zustand, bevor E/A gewährt wird.
+   Ein Fehler stoppt die Inbetriebnahme vor der Registrierung oder dem Start der Laufzeit.
+3. Sie bereitet die von der Firmware installierte Hersteller-Docker-Laufzeit vor und aktiviert sie bei Bedarf.
+   Sie zieht nie eine Ersatz-Engine oder ein Ersatz-Image aus einer externen Registry.
    Nicht unterstützte Pakete, fehlende Werkzeuge und mehrdeutige Dienstzustände schlagen geschlossen fehl (fail closed).
-4. Richten Sie einen dauerhaften Zugriff ein, der auf die erforderlichen digitalen Register beschränkt ist, und prüfen Sie
+4. Sie richtet einen dauerhaften Zugriff ein, der auf die erforderlichen digitalen Register beschränkt ist, und prüft
    die Ausgangs-Eigentümerschaft und die Berechtigungen des Laufzeit-Kontos erneut.
-5. Schließen Sie die eingeschränkte Einrichtung und die gesperrte Laufzeit-Bereitstellung ab und warten Sie dann
+5. Sie schließt die eingeschränkte Registrierung und die gesperrte Laufzeit-Bereitstellung ab und wartet dann
    auf die dauerhafte Erkennung und die unabhängige Bereitschaftsprüfung.
 
 `codesysState=disabled` wird nur nach erfolgreich verifizierter Vorbereitung festgehalten.
 Fehler bei der Vorbereitung führen zu `delivery_failed`; Zugangsdaten und Einwilligung werden nicht
 wiederverwendet. Ein erneuter Versuch erfordert frische Zugangsdaten und die Freigabe der destruktiven Installation.
-Die Prüfung der Voraussetzungen bleibt schreibgeschützt und optional; gespeicherte Berichte
+Die Prüfung der Voraussetzungen bleibt rein lesend und optional; gespeicherte Berichte
 autorisieren die Vorbereitung nie ohne die aktuelle Anfrage und ihre serverseitigen Prüfungen.
 
 Der aktuelle Pfad erfordert lokale Docker-Client-/Daemon-Binärdateien und die Docker-/Laufzeit-Werkzeuge der Firmware.
@@ -88,17 +88,17 @@ eigene Sperre hält; der Start eines Hintergrundprozesses allein ist keine erfol
 
 Ein Neustart des Docker-Daemons startet den Container nicht von selbst. Solange die Freigabe der Laufzeit
 besteht, kann der Supervisor oder der geprüfte Hook ihn über das vollständige Gate und innerhalb seiner Grenzen fortsetzen.
-Eine fehlgeschlagene Beobachtung während eines Daemon-Ausfalls kann stattdessen die Eindämmung verriegeln, indem
+Eine fehlgeschlagene Beobachtung während eines Daemon-Ausfalls kann stattdessen eine dauerhaft gesperrte Eindämmung auslösen, indem
 `/etc/attraccess-wago/runtime-enabled` entfernt wird.
-Nach dieser Verriegelung aktiviert weder der Hook-Start noch ein Neustart des Controllers die Laufzeit erneut.
+Nach dieser Sperre aktiviert weder der Hook-Start noch ein Neustart des Controllers die Laufzeit erneut.
 Der Hook-`start` beendet sich derzeit mit `0`, ohne zu starten, wenn die Freigabe fehlt; das
 ist ein deaktivierter No-op, kein erfolgreicher Start der Laufzeit.
 
 Beheben Sie die Ursache und nutzen Sie die bestehende
-[Bereinigungs-/Wiederinbetriebnahme-Route des Assistenten](plugins/wago/cc100-commissioning.md#wiederherstellung-nach-verriegelter-eindämmung).
+[Bereinigungs-/Wiederinbetriebnahme-Route des Assistenten](plugins/wago/cc100-commissioning.md#wiederherstellung-nach-dauerhaft-gesperrter-eindämmung).
 Bei aktuellen geführten Sitzungen bietet die Oberfläche die Bereinigung nur bei erhaltener Laufzeit-
-Eigentümerschaft an; `/recover` gleicht sein Journal mit Token und die Zugangsdaten ab. Eine nicht beanspruchte
-Sitzung kann dann die Bereitstellung wiederholen, während eine beanspruchte Sitzung die Entfernung der Registrierung
+Eigentümerschaft an; `/recover` gleicht sein Journal mit Token und die Zugangsdaten ab. Eine nicht registrierte
+Sitzung kann dann die Bereitstellung wiederholen, während eine registrierte Sitzung die Entfernung der Registrierung
 und eine neue Sitzung erfordert. Nur eine frische freigegebene Installation erzeugt die Freigabe neu.
 Es gibt keine Schaltfläche zum erneuten Aktivieren und keinen Schritt zum Bearbeiten der Markierung. Fehlende Eigentümerschaft oder eine fehlgeschlagene
 Bereinigung bleibt ein Blocker. Die Boot-Reihenfolge und Fixture-Erfolge belegen
@@ -147,9 +147,9 @@ Die Laufzeit steuert die RUN-LED des CC100 (grüne und rote Diode; beide leuchte
 | Muster                                  | Bedeutung                                                |
 | --------------------------------------- | -------------------------------------------------------- |
 | Dauerhaft gelb                          | Laufzeitprozess startet                                  |
-| Gelbes Blinken                          | Verbunden, wartet auf Beanspruchung (Kopplung)           |
+| Gelbes Blinken                          | Verbunden, wartet auf Registrierung (Kopplung)           |
 | Rotes Blinken                           | MQTT-Broker nicht erreichbar                             |
-| Abwechselnd grün/gelb                   | Beansprucht, noch keine Konfiguration akzeptiert         |
+| Abwechselnd grün/gelb                   | Registriert, noch keine Konfiguration akzeptiert         |
 | Überwiegend rot, kurze Lücke            | Hardware- oder Konfigurationsfehler; Bereitschaft prüfen |
 | Grüner Heartbeat, periodische Lichtshow | Bereit                                                   |
 | Aus                                     | Laufzeit gestoppt (oder LED-Zugriff nicht verfügbar)     |
@@ -194,7 +194,7 @@ keine Skripte, internen Token oder vertrauenswürdigen Prüfberichte.
 
 **Fehlgeschlagene Installation bereinigen** nutzt den bestehenden Wiederherstellungsendpunkt mit frischen
 SSH-Zugangsdaten und ausdrücklicher Bereinigungsfreigabe. Es gleicht die Laufzeit-
-Installation, die Zugangsdaten und das Vorbereitungsjournal ab. **Controller-Vorbereitung
+Installation, die Zugangsdaten und das Vorbereitungsjournal ab. **Steuerungsvorbereitung
 bereinigen** behandelt Fehler, die nur die Vorbereitung betreffen; die Bereinigung der Laufzeit hat Vorrang,
 wenn die Laufzeitinstallation begonnen hat. Keine der beiden Aktionen stellt vorhandene SPS-Programme,
 Workloads, Daten oder Docker-Host-Einstellungen wieder her, noch aktiviert sie CODESYS erneut. Fremde oder
@@ -209,14 +209,14 @@ Container gestoppt oder nicht vorhanden ist, bevor der Erfolg festgehalten wird.
 verifiziert anschließend ebenfalls die Abwesenheit. Ein fehlender/nicht erreichbarer Daemon oder eine fehlgeschlagene Docker-Abfrage
 ist kein Beweis für einen gestoppten Schreiber; der Fehler und die Wiederherstellungs-Eigentümerschaft bleiben erhalten.
 
-Angeheftetes SSH, Prüfungen von Laufzeit-Prüfsumme/Manifest, TLS und der Widerruf der Einrichtung bleiben erzwungen.
-Die Einrichtung des Management-Schlüssels und **Gespeicherten Zugriff wiederherstellen** behalten ihren eigenen
+Gepinntes SSH, Prüfungen von Laufzeit-Prüfsumme/Manifest, TLS und der Widerruf der Registrierung bleiben erzwungen.
+Die Registrierung des Management-Schlüssels und **Gespeicherten Zugriff wiederherstellen** behalten ihren eigenen
 Sicherheits-/Wiederherstellungsvertrag. Die vollständige Management-Härtung bleibt nicht unterstützt, wo
-ihre Herstellerabhängigkeit und die Anforderungen an eine aussperrsichere Wiederherstellung nicht erfüllt sind; dieser
-Status macht die unterstützte Docker-/E/A-Vorbereitung nicht nicht verfügbar.
+ihre Herstellerabhängigkeit und die Anforderungen an eine aussperrungssichere Wiederherstellung nicht erfüllt sind; dieser
+Status ändert nichts daran, dass die unterstützte Docker-/E/A-Vorbereitung verfügbar ist.
 
 Der Start des Containers, die Bereinigung oder `codesysState=disabled` allein ist kein Abschluss.
-Verlangen Sie einen frischen dauerhaften Heartbeat, den Widerruf der Einrichtung, die passende angewendete
+Verlangen Sie einen frischen dauerhaften Heartbeat, den Widerruf der Registrierung, die passende angewendete
 Konfiguration und die aktuelle Laufzeit-`state.readiness`. Die physische Qualifizierung und
 die verbleibende Management-Basis müssen zutreffend dargestellt werden.
 

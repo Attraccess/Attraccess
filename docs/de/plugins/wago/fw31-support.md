@@ -8,9 +8,9 @@
 Die Produktentscheidung vom **2026-09-06** löst die unten aufgeführten Anforderungen zur Erhaltung
 und Wiederherstellung früherer Workloads ab. Die Inbetriebnahme übernimmt den CC100: Vorhandene
 Anwendungen und Workloads funktionieren möglicherweise nicht mehr oder werden gelöscht. Attraccess
-erhält vorhandene CODESYS-Programme, gespeicherte PLC-Daten, andere Workloads
+erhält vorhandene CODESYS-Programme, remanente SPS-Daten (Retain-Daten), andere Workloads
 oder deren Host-Einstellungen nicht, erstellt keine Sicherungskopie davon und stellt sie nicht wieder her. Es gibt eine einzige Bestätigung der destruktiven
-Installationsfolgen; keine separate Freigabe einer PLC-Sicherung und keine verpflichtende WBM-Schranke.
+Installationsfolgen; keine separate Freigabe eines SPS-Backups und keine verpflichtende WBM-Schranke.
 
 Der aktuelle Übertragungsvertrag stoppt und deaktiviert CODESYS immer dauerhaft und
 verifiziert Prozess- und Boot-Zustand, **bevor digitale E/A freigegeben wird**. Schlägt die
@@ -22,7 +22,7 @@ fehlende Register und unabhängige Ausgangsschreiber schlagen weiterhin geschlos
 [Anleitung für Betreiber](plugins/wago/cc100-commissioning.md).
 
 Die Bereinigung gleicht die fehlgeschlagene Installation und ihre Zugangsdaten ab; sie macht die
-destruktive Übernahme nicht rückgängig und aktiviert CODESYS nicht wieder. Integritätsjournale, fest hinterlegtes SSH,
+destruktive Übernahme nicht rückgängig und aktiviert CODESYS nicht wieder. Integritätsjournale, gepinntes SSH,
 prüfsummengeprüfte Offline-Artefakte, TLS-Registrierung, frische Zugangsdaten/Zustimmung bei Wiederholung und
 die Wiederherstellung des Verwaltungszugangs bleiben erforderlich. Vollständige Härtung der Verwaltung und physische
 Abnahme sind getrennt und sind **nicht abgeschlossen**, nur weil Installation oder
@@ -49,15 +49,15 @@ Die spätere Korrektur der Spezifikation löst außerdem die zwischenzeitliche A
 nach jedem Supervisor-Fehler aufzurufen. Ein gewöhnlicher Neustart nur des Daemons erlaubt einen geprüften Start
 nur, solange die Aktivierung vorhanden bleibt. Die Eindämmung entfernt diese
 Aktivierung; der Hook-Aufruf `start` endet derzeit mit `0`, ohne neu zu starten, und ein Neustart
-löst die Verriegelung nicht. Aktuelle geführte Sitzungen behalten die mit Token versehene
-[Bereinigungs-/Neuinbetriebnahmeroute des Assistenten](plugins/wago/cc100-commissioning.md#wiederherstellung-nach-verriegelter-eindämmung):
-Bereinigung, dann eine nicht registrierte Installation wiederholen oder die registrierte Registrierung
+hebt die Sperre nicht auf. Aktuelle geführte Sitzungen behalten die mit Token versehene
+[Bereinigungs-/Neuinbetriebnahmeroute des Assistenten](plugins/wago/cc100-commissioning.md#wiederherstellung-nach-dauerhaft-gesperrter-eindämmung):
+Bereinigung, dann eine noch nicht registrierte Installation erneut versuchen oder die bestehende Registrierung
 entfernen und neu in Betrieb nehmen. Nur die Installation stellt die Aktivierung wieder her; es wird weder
 eine manuelle Marker-Erstellung noch ein neuer UI-/API-Vorgang zum erneuten Aktivieren behauptet. Fehlender Wiederherstellungsbesitz
 oder eine nicht verifizierte Bereinigung bleibt ein Hindernis.
 
 Der Host-Schutz lehnt Kollisionen von Konten/Gruppen mit UID/GID 10001, fremde Prozesse
-mit dieser Identität, nicht verifizierte Namespace-Zuordnungen und nicht zugeordnete beschreibbare DOUT-
+mit dieser Identität, nicht verifizierte Namespace-Zuordnungen und nicht der Laufzeit gehörende (fremde) beschreibbare DOUT-
 Deskriptoren ab, einschließlich Inode-Aliasen. Ausnahmen für die eigene Laufzeit erfordern vollständige Docker-
 ID-, Namespace- und cgroup-Prüfungen. Konfigurations-/Sperrpfade und die bereitgestellte Boot-Veröffentlichung
 müssen die Prüfungen auf Root-Besitz, Berechtigungen und Dateityp bestehen. Dies ist Software-
@@ -112,8 +112,8 @@ auf dem Gerät fehlen. Die aktuelle Software prüft Release-Identität, erforder
 Werkzeuge, Getter-Ergebnisse und Nachbedingungen, nicht jedoch eine vollständige Byte-/Build-Attestierung von FW31.
 Der aktuelle Vorbereitungs-Quellcode stoppt ausdrücklich beide Laufzeitauswahlen des Herstellers
 und ruft dann `config_runtime --wait runtime-version=0 force-new-version=yes restart-server=NO` auf.
-Er prüft, dass keine PLC-Prozesse laufen, dass eine reguläre Datei `rtsversion` genau `0` enthält, dass
-`S98_runtime` fehlt und dass alternative aktivierte Boot-Einträge nicht auf bekannte PLC-
+Er prüft, dass keine SPS-Prozesse laufen, dass eine reguläre Datei `rtsversion` genau `0` enthält, dass
+`S98_runtime` fehlt und dass alternative aktivierte Boot-Einträge nicht auf bekannte SPS-
 Programmdateien auflösen, und wiederholt die Deaktivierungsprüfungen nach `sync`. Er prüft unabhängig
 das Boot-Medium vor der Herstellerinstallation/-aktivierung, lehnt leere oder `sd-card`-
 Ergebnisse ab und verlangt, dass das ausführbare `S99_docker` zu `/etc/init.d/dockerd` auflöst,
@@ -136,11 +136,11 @@ Host- und Shell-Prüfungen erfordern eine eindeutige CC100-FW31-Identität. Ein 
 genügt nicht. Die Übertragung der Laufzeit behält die Wiederherstellung nach unterbrochener Übertragung, minimale
 Container-Rechte, exakte Mounts digitaler Register und Prüfungen auf konkurrierende Container bei.
 Sowohl ein laufender CODESYS-Prozess als auch sein gespeicherter Boot-Link `S98_runtime` blockieren
-die Installation, ohne PLC-Daten zu verändern.
+die Installation, ohne SPS-Daten zu verändern.
 
 Die Verwaltungsoberfläche unterstützt additive Schlüssel für ein vorhandenes Nicht-Root-OpenSSH-Konto
 oder einen **Dropbear-2025.88**-Peer, der auf derselben erfolgreich authentifizierten,
-fest hinterlegten SSH-Verbindung identifiziert wurde. Der Identifikationsdatensatz von OpenSSH wird im Speicher geparst
+gepinnten SSH-Verbindung identifiziert wurde. Der Identifikationsdatensatz von OpenSSH wird im Speicher geparst
 und verworfen; fehlende, doppelte oder widersprüchliche Datensätze bleiben unbekannt. Der Zugriff auf die ausführbare Datei von Root-Prozessen
 ist nicht erforderlich. Unbekannte Versionen, gemischte Daemons und Root-Konten
 werden abgelehnt. Anderen Dropbear-Prozessen wird nicht die Version des verbundenen Peers zugewiesen.
@@ -149,11 +149,11 @@ Es wird nur verwendet, nachdem derselbe SSH-Client erfolgreich mit strikter Host
 und Authentifizierung beendet wurde. Die Verbindungsfreigabe ist deaktiviert.
 Jeder neue Schlüssel deaktiviert Agent-, Port- und X11-Weiterleitung sowie die PTY-Zuweisung. Das
 Journal sorgt für atomares Hinzufügen, Ablauf, Wiederherstellung nach Unterbrechung und Ablehnung
-gleichzeitiger Bearbeitung. Eine frische fest hinterlegte Verbindung muss sich nur mit dem neuen Schlüssel
+gleichzeitiger Bearbeitung. Eine frische gepinnte Verbindung muss sich nur mit dem neuen Schlüssel
 authentifizieren. Ein eigenes Verzeichnis für autorisierte Schlüssel oder eine PAM-Ablehnung lässt die Verifizierung
 fehlschlagen und löst die Wiederherstellung aus. Dies belegt den Befehlszugriff des Kontos, keinen
 Ausführer mit minimalen Rechten; Shell-Befehle behalten die Rechte dieses Kontos. Die Unterstützung der vollständigen Baseline
-ist ausdrücklich `UNSUPPORTED`; die Registrierung beansprucht keine Root-/Passwort- oder WBM-Einschränkungen.
+ist ausdrücklich `UNSUPPORTED`; die Registrierung behauptet keine Root-/Passwort- oder WBM-Einschränkungen.
 
 Die alte Start-Aktion für installiertes Docker ist deaktiviert. Der angenommene LSB-Vertrag `status=3`
 wird durch den Herstellerquellcode widerlegt, und das Daemon-only-Journal kann
@@ -183,16 +183,16 @@ der obersten Ebene allein kann das nicht. Die
 identifizieren das Release 04.09.01(31) des 751-9301 und CODESYS 3.5.21.5, nicht jedoch die vollständige
 installierte Menge an Skript-/Build-Abhängigkeiten.
 
-| Vorgang | Vertrag laut tatsächlichem Quellcode | Exakte ungeklärte Grenze |
-| --- | --- | --- |
-| Docker-Aktivierung | Die [Home-Variante](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_docker_home) entpackt das Hersteller-Archiv nach `/home/wago-docker`; die [Root-Variante](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_docker_root) setzt als root installierte Binärdateien voraus. `activate` verschiebt `S99_docker`, aktiviert Routing, falls deaktiviert, und aktiviert bzw. fügt eine Docker-MAC-Whitelist-Regel hinzu. | Erforderlich sind ein passendes Werkzeug-/Getter-Paar, Archiv-/Build-Identität, Hilfsskripte/Ereignisse sowie der vorherige Boot-/Routing-/Firewall-Zustand. `deactivate` lässt die Weiterleitung aktiviert und kann eine zuvor aktivierte Regel deaktivieren; `remove` löscht Docker-Daten. Keines von beiden ist eine Umkehrung. |
-| Daemon-Lebenszyklus | Das [Init-Skript](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/init.d/dockerd) implementiert start/stop/restart. Start ändert `WAGO_DOCKER_IPT`; Stopp löst jedes Netzwerkereignis aus. Abschließende Echo-Ausgaben können einen Fehler verdecken. | Vollständige Ereignisidentität und Wiederherstellung fehlen. Das byte-identische ausführbare Fixture belegt diese Effekte; gemockte LSB-Semantik kann die Aktivierung nicht autorisieren. |
-| Boot und Berechtigungen | [rcS](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/init.d/rcS) führt `run-parts -a start /etc/rc.d` aus. Der [mitgelieferte Kernel](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/src/linux-6.6.94-rt56-w05.08.01-gaa7927dc8052.tgz) definiert DOUT 0644 und DIN schreibgeschützt. | Eine dauerhafte Freigabe erfordert numerische GID-Vergabe, exakte Attribute, geschützte Pfade und Boot-Identität, mit einer ausdrücklichen Schranke für Fehler beim Containerstart. Ein Hook vor Docker stoppt spätere Hooks nach einem Fehler nicht. Code zum Gewähren/Wiederherstellen ist nicht implementiert. |
-| CODESYS-Erhaltung | [config_runtime](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_runtime) kann `/home/codesys/*` löschen, wenn Laufzeit 0 gewählt wird. Das Stoppen über das [Laufzeit-Init](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/init.d/runtime) vermeidet dieses Zurücksetzen, kann aber SIGKILL senden. | Es wurde kein konsistenter Vertrag für Checkpoints des Retain-Speichers ermittelt. Das eingesetzte Init hat Build-Ersetzungen; ein Template-Hash genügt nicht. Anwendungsziel, Auswahl und Boot-Link erhalten. |
-| Sichern/Wiederherstellen | [save_partition.sh](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/usr/sbin/save_partition.sh) sichert große Teile von `/home`, ausgenommen Docker; [restore_partition.sh](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/usr/sbin/restore_partition.sh) löscht `/home/*`, einschließlich ausgenommener Verzeichnisse. | Dies ist weder ein ruhender PLC-Checkpoint noch ein eng begrenzter Docker-Rollback. `reboot=0` unterdrückt nur den abschließenden Neustart. |
-| Eindeutige Schlüssel | [Mitgeliefertes Dropbear 2025.88](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/src/dropbear-2025.88.tar.bz2): `svr-authpubkey.c` löst das Home-Verzeichnis auf; `svr-authpubkeyoptions.c` implementiert Einschränkungen; `svr-runopts.c` und `common-runopts.c` implementieren `-V`. | Die implementierte additive Teilmenge erfordert eine erfolgreiche Authentifizierung mit dem neuen Schlüssel. Sie erstellt kein Konto und schränkt keine Host-Rechte ein. |
-| Root-/Passwort-Einschränkung | [config_ssh](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_ssh) dokumentiert `root-access-state=disabled password-request-state=disabled`. Das [Dropbear-Init](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/init.d/dropbear) bildet diese auf `-w`/`-s` ab. | Das Init bindet eine Shell-Konfiguration/ein Hilfsskript ein, kann Host-Schlüssel erzeugen und führt SSH-Ereignisse aus. Deren FW31-Identität, neustartsicherer Rollback, frische negative Authentifizierungsprüfungen und ein eng begrenzter privilegierter Ausführer fehlen. Die Standard-[CC100-sudoers](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot.cc100/etc/sudoers) erlaubt kein beliebiges `sudo sh -c`. |
-| WBM/Dienste | [config_port](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_port) delegiert HTTP/FTP/FTPS an `config_ssl`, SNMP an `config_snmp`; [config_iocheckport](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_iocheckport) bearbeitet/startet inetd neu. | Das Deaktivieren von HTTP schaltet Lighttpd auf HTTPS um; das WBM bleibt verfügbar. Separate Dienstkonfiguration, Reload/Ereignisse und Wiederherstellung sind erforderlich; diese Befehle allein begründen keine vollständige Baseline der Exposition. |
+| Vorgang                      | Vertrag laut tatsächlichem Quellcode                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Exakte ungeklärte Grenze                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Docker-Aktivierung           | Die [Home-Variante](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_docker_home) entpackt das Hersteller-Archiv nach `/home/wago-docker`; die [Root-Variante](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_docker_root) setzt als root installierte Binärdateien voraus. `activate` verschiebt `S99_docker`, aktiviert Routing, falls deaktiviert, und aktiviert bzw. fügt eine Docker-MAC-Whitelist-Regel hinzu. | Erforderlich sind ein passendes Werkzeug-/Getter-Paar, Archiv-/Build-Identität, Hilfsskripte/Ereignisse sowie der vorherige Boot-/Routing-/Firewall-Zustand. `deactivate` lässt die Weiterleitung aktiviert und kann eine zuvor aktivierte Regel deaktivieren; `remove` löscht Docker-Daten. Keines von beiden ist eine Umkehrung.                                                                                                                                                |
+| Daemon-Lebenszyklus          | Das [Init-Skript](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/init.d/dockerd) implementiert start/stop/restart. Start ändert `WAGO_DOCKER_IPT`; Stopp löst jedes Netzwerkereignis aus. Abschließende Echo-Ausgaben können einen Fehler verdecken.                                                                                                                                                                                                                                                                         | Vollständige Ereignisidentität und Wiederherstellung fehlen. Das byte-identische ausführbare Fixture belegt diese Effekte; gemockte LSB-Semantik kann die Aktivierung nicht autorisieren.                                                                                                                                                                                                                                                                                         |
+| Boot und Berechtigungen      | [rcS](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/init.d/rcS) führt `run-parts -a start /etc/rc.d` aus. Der [mitgelieferte Kernel](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/src/linux-6.6.94-rt56-w05.08.01-gaa7927dc8052.tgz) definiert DOUT 0644 und DIN schreibgeschützt.                                                                                                                                                                                      | Eine dauerhafte Freigabe erfordert numerische GID-Vergabe, exakte Attribute, geschützte Pfade und Boot-Identität, mit einer ausdrücklichen Schranke für Fehler beim Containerstart. Ein Hook vor Docker stoppt spätere Hooks nach einem Fehler nicht. Code zum Gewähren/Wiederherstellen ist nicht implementiert.                                                                                                                                                                 |
+| CODESYS-Erhaltung            | [config_runtime](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_runtime) kann `/home/codesys/*` löschen, wenn Laufzeit 0 gewählt wird. Das Stoppen über das [Laufzeit-Init](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/init.d/runtime) vermeidet dieses Zurücksetzen, kann aber SIGKILL senden.                                                                                                                                    | Es wurde kein konsistenter Vertrag für Checkpoints des Retain-Speichers ermittelt. Das eingesetzte Init hat Build-Ersetzungen; ein Template-Hash genügt nicht. Anwendungsziel, Auswahl und Boot-Link erhalten.                                                                                                                                                                                                                                                                    |
+| Backup/Wiederherstellung     | [save_partition.sh](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/usr/sbin/save_partition.sh) erstellt eine Sicherungskopie großer Teile von `/home`, ausgenommen Docker; [restore_partition.sh](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/usr/sbin/restore_partition.sh) löscht `/home/*`, einschließlich ausgenommener Verzeichnisse.                                                                                                                      | Dies ist weder ein ruhender SPS-Checkpoint noch ein eng begrenzter Docker-Rollback. `reboot=0` unterdrückt nur den abschließenden Neustart.                                                                                                                                                                                                                                                                                                                                       |
+| Eindeutige Schlüssel         | [Mitgeliefertes Dropbear 2025.88](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/src/dropbear-2025.88.tar.bz2): `svr-authpubkey.c` löst das Home-Verzeichnis auf; `svr-authpubkeyoptions.c` implementiert Einschränkungen; `svr-runopts.c` und `common-runopts.c` implementieren `-V`.                                                                                                                                                                                                                                                       | Die implementierte additive Teilmenge erfordert eine erfolgreiche Authentifizierung mit dem neuen Schlüssel. Sie erstellt kein Konto und schränkt keine Host-Rechte ein.                                                                                                                                                                                                                                                                                                          |
+| Root-/Passwort-Einschränkung | [config_ssh](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_ssh) dokumentiert `root-access-state=disabled password-request-state=disabled`. Das [Dropbear-Init](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/init.d/dropbear) bildet diese auf `-w`/`-s` ab.                                                                                                                                                                         | Das Init bindet eine Shell-Konfiguration/ein Hilfsskript ein, kann Host-Schlüssel erzeugen und führt SSH-Ereignisse aus. Deren FW31-Identität, neustartsicherer Rollback, frische negative Authentifizierungsprüfungen und ein eng begrenzter privilegierter Ausführer fehlen. Die Standard-[CC100-sudoers](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot.cc100/etc/sudoers) erlaubt kein beliebiges `sudo sh -c`. |
+| WBM/Dienste                  | [config_port](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_port) delegiert HTTP/FTP/FTPS an `config_ssl`, SNMP an `config_snmp`; [config_iocheckport](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/projectroot/etc/config-tools/config_iocheckport) bearbeitet/startet inetd neu.                                                                                                                                                                  | Das Deaktivieren von HTTP schaltet Lighttpd auf HTTPS um; das WBM bleibt verfügbar. Separate Dienstkonfiguration, Reload/Ereignisse und Wiederherstellung sind erforderlich; diese Befehle allein begründen keine vollständige Baseline der Exposition.                                                                                                                                                                                                                           |
 
 Die Docker-Untersuchung erreichte auch kompilierte Abhängigkeiten:
 [GetActivePartitionMedium](https://github.com/WAGO/cc100-firmware-sdk/blob/b2a09cc66ad07af54a34701d6cfc90f31aca5cd0/ptxproj/local_src/config-tools/get_filesystem_data_common.c#L740)
@@ -201,7 +201,7 @@ Skripte und Ereignisse. Die CC100-Datei `board_specific_defines` enthält die Bu
 `@CT_EXTENSION_PREFIX@`. Hashes von Quell-Templates und unbekannte Hashes der kompilierten FW31-Binärdateien
 können keine übereinstimmenden installierten Implementierungen belegen.
 
-### Minimale zusätzliche schreibgeschützte Erfassung (historisch)
+### Minimale zusätzliche rein lesende Erfassung (historisch)
 
 Die kleinste Offline-Eingabe ist das offizielle `Firmware_CC100_040901_31.zip`,
 277551981 Bytes, SHA-256 des Herausgebers
@@ -242,7 +242,7 @@ spezifiziert werden kann. Sie behaupten weder, dass die Befehle grundsätzlich u
 noch dass Hardwaretests der Software vorausgehen müssen. Der aktuelle Code
 implementiert diese Transaktionen für Lebenszyklus, Berechtigungen oder Einschränkungen noch nicht.
 
-Nur für eine gesondert autorisierte SSH-Sitzung mit fest hinterlegtem Schlüssel; es wurde auf keinen Controller zugegriffen.
+Nur für eine gesondert autorisierte SSH-Sitzung mit gepinntem Host-Schlüssel; es wurde auf keinen Controller zugegriffen.
 Beginnen Sie mit der Identität und diesen Abhängigkeits-Fingerabdrücken. Bei einer Abweichung benötigen Sie nur den
 Quellcode des betreffenden Herstellerskripts und neu identifizierte Abhängigkeiten, keinen vollständigen Dump.
 
@@ -283,7 +283,7 @@ Lesen Sie nur `ROOT_LOGIN`, `ROOT_PASSWORD_LOGIN`, `PASSWORD_LOGIN`,
 das Home-Verzeichnis/die Shell und die wirksamen sudo-Regeln des vorgesehenen Kontos, ohne Passwortfelder.
 Erfassen Sie für CODESYS die Hashes von Laufzeitskripten und `runtimes.conf`, die Auswahl
 in `/etc/specific/rtsversion` und die Link-Metadaten. `get_runtime_config` ist keine
-schreibgeschützte Erfassung: Sein gemeinsamer Helfer kann `runtimes.conf` erzeugen.
+rein lesende Erfassung: Sein gemeinsamer Helfer kann `runtimes.conf` erzeugen.
 
 Es werden keine Schlüssel, Passwörter, Anwendungsarchive, Prozessargumente, Umgebungen oder umfangreiche
 Protokolle benötigt. Diese Erfassungen belegen Implementierungs- und Zustandsidentität. Hardware-

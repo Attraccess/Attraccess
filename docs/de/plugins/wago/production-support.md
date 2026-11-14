@@ -7,7 +7,7 @@
 
 > **Der physische Einsatz ist unqualifiziert, bis [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies) abgeschlossen ist.**
 > Nichts auf dieser Seite ist eine Sicherheitsaussage oder eine Hardware-Qualifizierung. Lesen Sie zuerst die
-> [Sicherheitsgrenze](plugins/wago/safety-boundary.md). Ein Penetrationstest und eine externe Sicherheitsprüfung wurden **nicht**
+> [Sicherheitsgrenze](plugins/wago/safety-boundary.md). Ein Penetrationstest und eine externe Prüfung der funktionalen Sicherheit (Safety-Review) wurden **nicht**
 > durchgeführt ([Bedrohungsmodell](plugins/wago/threat-model.md)).
 
 Diese Seite beschreibt, was getestet wurde, was zu konfigurieren ist, was gemessen wurde und was nicht zugesagt wird.
@@ -27,11 +27,11 @@ Diese Seite beschreibt, was getestet wurde, was zu konfigurieren ist, was gemess
 
 ### Modbus-Profile
 
-| Profil                                                                                                                                                          | Status                                                                                                                                                                                       |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WAGO 879-3020 (4PS) — Modbus RTU** (`wago-879-3020`)                                                                                                          | Schreibgeschützte Messwerte; vollständige lesbare Registerzuordnung; Verbindungseinstellungen unter [879-3020 über RS-485](plugins/wago/879-3020-modbus-rtu.md). Nicht hardware-qualifiziert |
-| **WAGO 879-3000 — Modbus RTU** (`wago-879-3000`)                                                                                                                | Integriertes Legacy-Profil; schreibgeschützte Messwerte; bleibt ladbar. Nicht hardware-qualifiziert                                                                                          |
-| **WAGO 879-3000 — UNQUALIFIED / map unverified** (`wago-879-3000-unverified`) und **WAGO 879-1300 — UNQUALIFIED / map unverified** (`wago-879-1300-unverified`) | Legacy-Referenzen mit nicht verifizierter Registerzuordnung, im Editor entsprechend benannt; bleiben ladbar                                                                                  |
+| Profil                                                                                                                                                          | Status                                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **WAGO 879-3020 (4PS) — Modbus RTU** (`wago-879-3020`)                                                                                                          | Nur lesende Messwerterfassung; vollständige lesbare Registerzuordnung; Verbindungseinstellungen unter [879-3020 über RS-485](plugins/wago/879-3020-modbus-rtu.md). Nicht hardware-qualifiziert |
+| **WAGO 879-3000 — Modbus RTU** (`wago-879-3000`)                                                                                                                | Integriertes Legacy-Profil; nur lesende Messwerterfassung; bleibt ladbar. Nicht hardware-qualifiziert                                                                                          |
+| **WAGO 879-3000 — UNQUALIFIED / map unverified** (`wago-879-3000-unverified`) und **WAGO 879-1300 — UNQUALIFIED / map unverified** (`wago-879-1300-unverified`) | Legacy-Referenzen mit nicht verifizierter Registerzuordnung, im Editor entsprechend benannt; bleiben ladbar                                                                                    |
 
 ### Gemischte Versionen
 
@@ -48,7 +48,7 @@ Updates eingerichtet) bleibt im Failsafe, bis sie von Hand aktualisiert wird
 
 ## Broker-Einstellungen
 
-- **Ein Konto pro Controller**, mit der Topic-Richtlinie, die der Einrichtungsablauf anfordert (Veröffentlichen unter dem
+- **Ein Konto pro Controller**, mit der Topic-Richtlinie, die der Registrierungsablauf anfordert (Veröffentlichen unter dem
   eigenen `controllers/<hardwareId>/#`; Abonnieren nur der eigenen Sollkonfiguration, der Befehle und der Zugangsdaten-Rotation).
 - **QoS 1** für Veröffentlichen und Abonnieren des Controllers; die Standardwerte des in Attraccess konfigurierten
   MQTT-Servereintrags dürfen bei QoS 0 bleiben.
@@ -109,7 +109,7 @@ Antwortverzögerung des Messgeräts von 25 ms pro Anfrage. Der größte Kostenfa
 für jede RTU-Anfrage einen Python-Prozess und öffnet die serielle Schnittstelle, das sind bei zehn Messgeräten mit den
 empfohlenen Messwerten 30 Prozessstarts pro Abfragerunde. Auf dem CC100 kann eine Runde dadurch länger dauern als das
 Standard-Abfrageintervall von 5 s, sodass das Abfrageintervall möglicherweise erhöht werden muss. Nicht verifiziert: die
-Prozessstartzeit auf dem CC100, die RS-485-Buslast von zehn Messgeräten an einem CC100-Segment, die Antwortverzögerung des
+Prozessstartzeit auf dem CC100, die RS-485-Lasteinheiten (Unit Loads) von zehn Messgeräten an einem CC100-Segment, die Antwortverzögerung des
 Messgeräts und welche Baudraten die RS-485-Schnittstelle des CC100 über die auf dem Entwicklungsgerät verwendeten 9600 Baud
 hinaus unterstützt.
 
@@ -155,7 +155,7 @@ Wiederaufbau der Verbindung, nicht eine Änderung des Broker-Passworts.
 
 [Wiederherstellungs-Runbooks](plugins/wago/recovery-runbooks.md): Wiederherstellung von Konfiguration und Laufzeit,
 kompromittierte Zugangsdaten, Broker-Ausfall, Controller-Austausch, Laufzeit-Upgrade und Rollback, Disaster Recovery.
-Die Inbetriebnahme ist destruktiv, und es gibt keine Sicherung oder Wiederherstellung der Workloads.
+Die Inbetriebnahme ist destruktiv, und es gibt keine Sicherungskopie und keine Wiederherstellung der Workloads.
 
 ## Laborübungen
 
@@ -168,14 +168,14 @@ und im Beisein einer Person ausgeführt.
 > festgehalten, bevor die Integration als produktionsreif beschrieben wird.
 
 **Voraussetzungen.** Ein CC100, der gelöscht werden darf, ohne angeschlossene Geräte (oder nur mit sicheren
-Niederspannungs-Fixtures), eine erreichbare private IPv4-Adresse, der Werks- oder bekannte SSH-Zugang und ein RabbitMQ-4-Broker
+SELV/PELV-Kleinspannungs-Aufbauten), eine erreichbare private IPv4-Adresse, der Werks- oder bekannte SSH-Zugang und ein RabbitMQ-4-Broker
 mit einem Administratorkonto. Halten Sie den Commit, die Laufzeitversion, die Firmware, die Broker-Version und die
 ausführende Person fest.
 
 | #   | Übung                                        | Schritte                                                                                         | Bestanden, wenn                                                                                                        | Ergebnis         | Nachweis |
 | --- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ---------------- | -------- |
-| L1  | Destruktive Inbetriebnahme                   | Führen Sie den [geführten Ablauf](plugins/wago/cc100-commissioning.md) auf dem Gerät aus         | Frischer Heartbeat, Konfiguration angewendet, Einrichtung widerrufen; CODESYS gestoppt und deaktiviert                 | nicht ausgeführt |          |
-| L2  | Laufzeit-Upgrade                             | Die vorherige Laufzeit installieren, dann das verwaltete Update die aktuelle installieren lassen | Ausgänge aus, bis bestätigt; danach bereit vom selben Boot aus                                                         | nicht ausgeführt |          |
+| L1  | Destruktive Inbetriebnahme                   | Führen Sie den [geführten Ablauf](plugins/wago/cc100-commissioning.md) auf dem Gerät aus         | Frischer Heartbeat, Konfiguration angewendet, Registrierung widerrufen; CODESYS gestoppt und deaktiviert               | nicht ausgeführt |          |
+| L2  | Laufzeit-Upgrade                             | Die vorherige Laufzeit installieren, dann das verwaltete Update die aktuelle installieren lassen | Ausgänge aus, bis bestätigt; danach im selben Boot-Vorgang bereit                                                      | nicht ausgeführt |          |
 | L3  | Laufzeit-Rollback                            | Ein fehlschlagendes Kandidaten-Image erzwingen                                                   | Vorheriges Image wiederhergestellt; Status zeigt den klassifizierten Grund                                             | nicht ausgeführt |          |
 | L4  | Nicht verwaltete Laufzeit nach Server-Update | Ein nicht verwaltetes Gerät auf der alten Laufzeit belassen                                      | Ausgänge aus, Befehle abgelehnt, bis es von Hand aktualisiert wird                                                     | nicht ausgeführt |          |
 | L5  | Broker-Ausfall                               | Den Broker für 30 s, dann für 5 min stoppen                                                      | Trennungsrichtlinie angewendet; Wiederherstellung innerhalb von 180 s nach Rückkehr des Brokers; Status stimmt überein | nicht ausgeführt |          |
@@ -191,10 +191,10 @@ abwich.
 
 - Dies ist eine Beta-Integration. Es gibt **keine festen Reaktionszeiten, Verfügbarkeitsziele oder Wartungsfenster**.
 - Unterstützt bedeutet: die unter getestete Kompatibilität aufgeführte Kombination, installiert über den geführten
-  Inbetriebnahme-Ablauf, mit Sicherheitskreisen, die unabhängig von Attraccess sind.
+  Inbetriebnahme-Ablauf, mit Sicherheitsschaltkreisen, die unabhängig von Attraccess sind.
 - Nicht unterstützt: andere CC100-Modelle oder Firmware, die manuelle Docker-Installation als Produktivpfad, die
   Bereitstellung ohne den geführten Ablauf, die Verwendung der Integration als Sicherheitsfunktion und die
   Wiederherstellung der vorherigen Workload eines Controllers.
 - Zurückgestellt und nicht beworben: die Qualifizierung aller vier Paketbaugruppen, Abrechnung, Telemetrie-Verlauf und
   Arbitrierung.
-- Offen: der Penetrationstest, die externe Sicherheitsprüfung, der 8-Stunden-Lauf und die Hardware-Abnahme (ATT-984).
+- Offen: der Penetrationstest, die externe Prüfung der funktionalen Sicherheit (Safety-Review), der 8-Stunden-Lauf und die Hardware-Abnahme (ATT-984).

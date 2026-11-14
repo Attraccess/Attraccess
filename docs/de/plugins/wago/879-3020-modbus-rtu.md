@@ -3,7 +3,7 @@
 > [!NOTE]
 > Nur verfügbar, wenn das Plugin **WAGO** installiert ist. Siehe [Plugins installieren](plugins/installing-plugins.md).
 
-Die CC100-Laufzeit unterstützt schreibgeschützte Messwerte des WAGO 879-3020 (4PS) über ihre
+Die CC100-Laufzeit unterstützt die nur lesende Messwerterfassung am WAGO 879-3020 (4PS) über ihre
 zweidrahtige RS-485-Schnittstelle. Wählen Sie das Geräteprofil **WAGO 879-3020 (4PS) — Modbus RTU**.
 
 ## Verbindung
@@ -55,7 +55,7 @@ Richtungssteuerung der Firmware; er schaltet keine GPIOs und benötigt keinen pr
    die frischen Messwerte unter **Diagnose**.
 
 Das Profil stellt alle 131 dokumentierten, nicht reservierten FC03-Werte aus Anhang
-A3.2, Seiten 34–38, bereit. Das Bedienfeld des Controllers gruppiert sie in aufklappbare Bereiche:
+A3.2, Seiten 34–38, bereit. Die Frontplatte des Controllers gruppiert sie in aufklappbare Bereiche:
 
 - Elektrische Messwerte: Spannung, Strom, Wirk-/Blind-/Scheinleistung und
   Leistungsfaktor für L1, L2 und L3, Summen, Frequenz und verkettete Spannungen.
@@ -96,10 +96,10 @@ Profilversion und eigene Kopien davon unverändert.
 Um Messwerte auszuwählen, öffnen Sie die Einstellungen des Messgeräts (Zahnradsymbol auf seiner Karte). Jedes Register hat einen
 Schalter, nach Bereich gruppiert. **Bereich aktivieren** und **Bereich deaktivieren** schalten einen ganzen Bereich um;
 **Nur empfohlene Messwerte** stellt die 11 Messwerte oben wieder her. Ein Messgerät mit einer eigenen Kopie der
-Zuordnung hat stattdessen **Alle ungenutzten Messwerte deaktivieren**: Das deaktiviert jeden Messwert, den kein Guard, keine
-Rückmeldung und kein Flow verwendet. Ein Messwert, den ein Guard oder eine Rückmeldung verwendet, kann nicht
-ausgeschaltet werden; die Seitenleiste nennt den Ausgang, der ihn verwendet, und die Bereichs- und Sammelaktionen
-überspringen ihn. Die Seitenleiste zeigt, wie viele Kanäle der gesamte Controller aktiviert hätte, zum Beispiel
+Zuordnung hat stattdessen **Alle ungenutzten Messwerte deaktivieren**: Das deaktiviert jeden Messwert, den keine Freigabebedingung, keine
+Rückmeldung und kein Flow verwendet. Ein Messwert, den eine Freigabebedingung oder eine Rückmeldung verwendet, kann nicht
+ausgeschaltet werden; das Seitenpanel nennt den Ausgang, der ihn verwendet, und die Bereichs- und Sammelaktionen
+überspringen ihn. Das Seitenpanel zeigt, wie viele Kanäle der gesamte Controller aktiviert hätte, zum Beispiel
 „21 von 256 Kanälen auf diesem Controller aktiviert“. Speichern Sie, dann wenden Sie an. Eine Karte zeigt
 **Deaktiviert** für einen Messwert, dessen Kanal deaktiviert ist, und **Nicht konfiguriert** für ein
 Register, das keinen Kanal hat.
@@ -114,7 +114,7 @@ Regeln:
   empfohlenen Messwerte hinzugefügt, und zwar aktiviert; bei einem Messgerät, das nur die ursprünglichen fünf
   Kanäle hat, sind das die sechs anderen empfohlenen Messwerte, und die übrigen 120 Register erhalten gar
   keinen Kanal.
-- Nur Modbus-Messwertkanäle ohne Aktion können deaktiviert werden. Ein Guard oder eine Rückmeldung kann
+- Nur Modbus-Messwertkanäle ohne Aktion können deaktiviert werden. Eine Freigabebedingung oder eine Rückmeldung kann
   keinen deaktivierten Kanal verwenden.
 - Das Deaktivieren eines Kanals, den Flows lesen, wird vor dem Anwenden als Flow-Auswirkung aufgeführt: Diese Flows sehen den
   Messwert als nicht verfügbar.
@@ -135,7 +135,7 @@ Regeln:
 
 Die folgenden Zahlen sind aus den Modbus-RTU-Rahmengrößen **berechnet**. Sie sind nicht auf
 Hardware gemessen: Die Antwortverzögerung des Messgeräts ist im Handbuch nicht angegeben und wurde nicht gemessen,
-und weder die RS-485-Buslast von zehn Messgeräten an einem CC100-Segment noch der unterstützte Baudratenbereich des CC100
+und weder die RS-485-Lasteinheiten (Unit Loads) von zehn Messgeräten an einem CC100-Segment noch der unterstützte Baudratenbereich des CC100
 wurde verifiziert.
 
 Annahmen: 9600 Baud mit der werkseitigen 8E1-Rahmung (11 Bit pro Byte, etwa 1,15 ms pro Byte), ein

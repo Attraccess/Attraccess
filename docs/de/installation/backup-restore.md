@@ -75,7 +75,7 @@ docker compose start attraccess
 
 ## Speicher des Matter-Sidecars
 
-Mit installiertem Matter-Plugin liegen seine Daten in einem eigenen Sidecar-Speicher-Volume, das **nicht** zum Attraccess-Volume gehört. Siehe [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md).
+Ist das Matter-Plugin installiert, liegt die Matter-Fabric im **eigenen Speicher-Volume des Sidecars** (`MATTER_SIDECAR_STORAGE_DIR`), das **nicht** zum Attraccess-Volume gehört. Sichern Sie sie über die verschlüsselten Backups des Matter-Plugins und bewahren Sie den Wiederherstellungsschlüssel außerhalb des Servers auf. Siehe [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md).
 
 ## Tipps
 

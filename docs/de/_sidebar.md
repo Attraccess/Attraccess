@@ -85,15 +85,15 @@
   - **Reservierungen**
     - [Überblick](plugins/reservations/overview.md)
     - [Reservierungen nutzen](plugins/reservations/using-reservations.md)
-    - [Reservierungen verwalten](plugins/reservations/administration.md)
-    - [Reservierungen-API](plugins/reservations/api.md)
+    - [Reservierungen administrieren](plugins/reservations/administration.md)
+    - [Reservierungs-API](plugins/reservations/api.md)
   - **WAGO**
     - [Überblick](plugins/wago/overview.md)
     - [Geführte WAGO-CC100-Inbetriebnahme](plugins/wago/cc100-commissioning.md)
     - [WAGO-CC100-Docker-Laufzeit](plugins/wago/cc100-runtime.md)
-    - [WAGO-Produktionssupport](plugins/wago/production-support.md)
+    - [WAGO-Produktivbetrieb und Kompatibilität](plugins/wago/production-support.md)
     - [WAGO-Wiederherstellungs-Runbooks](plugins/wago/recovery-runbooks.md)
-    - [WAGO-Bedrohungsmodell und Pen-Test-Brief](plugins/wago/threat-model.md)
+    - [WAGO-Bedrohungsmodell und Pen-Test-Briefing](plugins/wago/threat-model.md)
     - [WAGO-Sicherheitsgrenze](plugins/wago/safety-boundary.md)
   - **Matter**
     - [Überblick](plugins/matter/overview.md)

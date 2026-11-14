@@ -8,9 +8,11 @@ Das Plugin **WAGO** verbindet WAGO-CC100-SPS-Controller über einen MQTT-Server 
 im Browser in Betrieb, benennen seine Ein- und Ausgänge, lesen Modbus-Zähler und nutzen den Controller in Flows
 (Ausgang schalten, auf einen Eingang oder ein Ereignis reagieren).
 
+> [!WARNING]
 > **Keine Sicherheitsfunktion.** Die WAGO-Integration steuert Ausgänge nur für betriebliche Zwecke. Sie ist nicht
 > sicherheitsbewertet, kein Not-Halt und kein Personenschutz. Lesen Sie die [Sicherheitsgrenze](plugins/wago/safety-boundary.md),
-> bevor Sie Anlagen anschließen. Der physische Einsatz ist bis ATT-984 unqualifiziert.
+> bevor Sie Anlagen anschließen. Der physische Einsatz ist bis
+> [ATT-984](https://linear.app/attraccess/issue/ATT-984/validate-the-four-wago-package-assemblies) unqualifiziert.
 
 ## Voraussetzungen
 
@@ -19,7 +21,7 @@ im Browser in Betrieb, benennen seine Ein- und Ausgänge, lesen Modbus-Zähler u
   `ACCESS_MQTT_SERVERS`, `TRIGGER_FLOWS` und `MANAGE_SECRETS`.
 - Ein in Attraccess eingerichteter [MQTT-Server](mqtt/server-setup.md), den der Controller erreichen kann.
 - WAGO-CC100-Hardware (`751-9301`, Firmware 31) im selben privaten Netzwerk wie Attraccess. Die getestete Kompatibilität
-  steht unter [Produktionssupport](plugins/wago/production-support.md).
+  steht unter [Produktivbetrieb und Kompatibilität](plugins/wago/production-support.md).
 - Optional: Modbus-Geräte an der RS-485-Schnittstelle des Controllers, zum Beispiel ein WAGO-879-3020-Zähler.
 
 ## Wo es erscheint
@@ -31,14 +33,14 @@ im Browser in Betrieb, benennen seine Ein- und Ausgänge, lesen Modbus-Zähler u
 
 ## Hier beginnen
 
-| Seite                                                                      | Inhalt                                                              |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [Geführte CC100-Inbetriebnahme](plugins/wago/cc100-commissioning.md)       | Einen Controller Schritt für Schritt in Betrieb nehmen              |
-| [CC100-Docker-Laufzeit](plugins/wago/cc100-runtime.md)                     | Frontpanel-Konfiguration, Live-Steuerung, Laufzeit-Bereitstellung   |
-| [Produktionssupport](plugins/wago/production-support.md)                   | Getestete Kompatibilität, Broker-Einstellungen, Grenzwerte          |
-| [Wiederherstellungs-Runbooks](plugins/wago/recovery-runbooks.md)           | Kompromittierte Zugangsdaten, Broker-Ausfall, Controller-Austausch  |
-| [Bedrohungsmodell und Pen-Test-Brief](plugins/wago/threat-model.md)        | Akteure, Vertrauensgrenzen, Angriffsflächen                         |
-| [Sicherheitsgrenze](plugins/wago/safety-boundary.md)                       | Was die Integration nicht ist, mit Formulierungs-Checkliste         |
+| Seite                                                                     | Inhalt                                                              |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [Geführte CC100-Inbetriebnahme](plugins/wago/cc100-commissioning.md)      | Einen Controller Schritt für Schritt in Betrieb nehmen              |
+| [CC100-Docker-Laufzeit](plugins/wago/cc100-runtime.md)                    | Frontplatten-Konfiguration, Live-Steuerung, Laufzeit-Bereitstellung |
+| [Produktivbetrieb und Kompatibilität](plugins/wago/production-support.md) | Getestete Kompatibilität, Broker-Einstellungen, Grenzwerte          |
+| [Wiederherstellungs-Runbooks](plugins/wago/recovery-runbooks.md)          | Kompromittierte Zugangsdaten, Broker-Ausfall, Controller-Austausch  |
+| [Bedrohungsmodell und Pen-Test-Briefing](plugins/wago/threat-model.md)    | Akteure, Vertrauensgrenzen, Angriffsflächen                         |
+| [Sicherheitsgrenze](plugins/wago/safety-boundary.md)                      | Was die Integration nicht ist, mit Formulierungs-Checkliste         |
 
 ## Referenzseiten
 

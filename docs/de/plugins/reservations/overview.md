@@ -16,26 +16,28 @@ Ressource aktiviert. Bei Ressourcen ohne aktivierte Reservierungen ändert sich 
 
 - Attraccess 1.11.0 oder neuer.
 - Das Plugin `reservations`, installiert wie unter [Plugins installieren](plugins/installing-plugins.md) beschrieben.
-  Die angeforderten Berechtigungen stehen unter [Reservierungen verwalten](plugins/reservations/administration.md#plugin-installieren).
+  Die angeforderten Berechtigungen stehen unter [Reservierungen administrieren](plugins/reservations/administration.md#plugin-installieren).
 - Optional: eine funktionierende [SMTP-Konfiguration](setup/smtp-email.md) für E-Mail-Hinweise. Ohne sie funktionieren
   In-App- und Push-Benachrichtigungen weiterhin.
 
 ## Wo es erscheint
 
 - Eine Buchungskarte auf der Detailseite der Ressource und eine Liste **Meine Reservierungen** für Mitglieder.
+- Eine Seite **Reservierungen verwalten** in der Seitenleiste für Verwaltende einer Ressource (Genehmigungen und alle
+  Buchungen).
 - Ein Bereich **Reservierungen** in den Ressourceneinstellungen und in den Systemeinstellungen (Zeitzone) für
   Administratoren.
 - Attractap-Reader mit Bildschirm, die Buchungshinweise zeigen und Rückfragen stellen (siehe
   [Reader-Anzeige](attractap/reader-ui.md)).
-- Kalender-Feeds (iCal), Benachrichtigungen und Links in E-Mails.
+- **Kalender-Feeds (iCal)** auf der Kontoseite des Benutzers, dazu Benachrichtigungen und Links in E-Mails.
 
 ## In diesem Bereich
 
-| Seite                                                                | Für               | Inhalt                                                                         |
-| -------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------ |
-| [Reservierungen nutzen](plugins/reservations/using-reservations.md)  | Mitglieder        | Buchen, Check-in, Genehmigung, Startschutz, Reader, Feeds                      |
-| [Reservierungen verwalten](plugins/reservations/administration.md)   | Administratoren   | Installation, Einstellungen pro Ressource, Zeitzone, E-Mail-Vorlagen, Audit-Log |
-| [Reservierungen-API](plugins/reservations/api.md)                    | Integrationen     | REST-Endpunkte und Fehlercodes                                                 |
+| Seite                                                                   | Für             | Inhalt                                                                          |
+| ----------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------- |
+| [Reservierungen nutzen](plugins/reservations/using-reservations.md)     | Mitglieder      | Buchen, Check-in, Genehmigung, Startschutz, Reader, Feeds                       |
+| [Reservierungen administrieren](plugins/reservations/administration.md) | Administratoren | Installation, Einstellungen pro Ressource, Zeitzone, E-Mail-Vorlagen, Audit-Log |
+| [Reservierungs-API](plugins/reservations/api.md)                        | Integratoren    | REST-Endpunkte und Fehlercodes                                                  |
 
 ## Siehe auch
 

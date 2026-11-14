@@ -1,10 +1,10 @@
 # Shelly
-<!-- llms-description: Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Geräteinfo, Admin-Passwort-Verwaltung und Firmware-Updates. -->
+<!-- llms-description: Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Geräteinformationen, Admin-Passwort-Verwaltung und Firmware-Updates. -->
 
 > [!NOTE]
 > Nur verfügbar, wenn das Plugin **Shelly** installiert ist. Siehe [Plugins installieren](plugins/installing-plugins.md).
 
-Das Plugin **Shelly** führt ein Register der Shelly-Geräte in Ihrem Netzwerk und lässt Sie sie aus Attraccess verwalten.
+Das Plugin **Shelly** führt ein Register der Shelly-Geräte in Ihrem Netzwerk; Sie verwalten die Geräte direkt in Attraccess.
 Das Hinzufügen oder Entfernen eines Eintrags im Register verändert die Geräte selbst nicht.
 
 ## Voraussetzungen
@@ -28,12 +28,13 @@ Authentifizierungsstatus und Firmware.
 - **Suchen:** Der Bereich **Geräte suchen** lauscht auf Geräte, die sich per mDNS melden, und prüft danach jede Adresse
   eines Subnetzes. Lassen Sie das Subnetz leer, um die eigenen Netze des Servers zu durchsuchen. Erlaubt sind nur
   private Bereiche bis höchstens /22. Alles Gefundene wird ins Register übernommen.
-- **Geräteinfo anzeigen:** Name, Generation, Zeitzone, Laufzeit, Netzwerk und WLAN-Signal sowie der Ausgangszustand mit
-  Leistung, Spannung und Strom. Ein Gerät mit Authentifizierung fragt zuerst nach seinem Admin-Passwort.
+- **Geräteinformationen anzeigen:** Name, Generation, Zeitzone, Betriebszeit, Netzwerk und WLAN-Signal sowie der
+  Ausgangszustand mit Leistung, Spannung und Stromstärke. Ein Gerät mit Authentifizierung fragt zuerst nach seinem Admin-Passwort.
 - **Admin-Passwort festlegen:** Legen Sie das Admin-Passwort fest oder ändern Sie es; es schützt die lokale
-  Weboberfläche und API des Geräts. Hat das Gerät bereits Authentifizierung, geben Sie zusätzlich das aktuelle Passwort
-  ein.
-- **Firmware verwalten:** Prüfen Sie auf Updates im Stable- und Beta-Kanal und installieren Sie sie. Das Gerät startet
+  Weboberfläche und API des Geräts. Ist für das Gerät bereits die Authentifizierung aktiviert, geben Sie zusätzlich das
+  aktuelle Passwort ein.
+- **Firmware verwalten:** Prüfen Sie, ob im stabilen oder im Beta-Kanal Firmware-Aktualisierungen
+  verfügbar sind, und installieren Sie sie. Das Gerät startet
   beim Update neu und ist kurz offline.
 - **Gerät erneut prüfen** aktualisiert Generation, Modell und Authentifizierungsstatus, **Gerät löschen** entfernt es aus
   dem Register.

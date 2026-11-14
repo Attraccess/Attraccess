@@ -1,4 +1,4 @@
-# Reservierungen-API
+# Reservierungs-API
 <!-- llms-description: Referenz der API des Plugins Reservierungen, einschließlich Fehlercodes. -->
 
 > [!NOTE]

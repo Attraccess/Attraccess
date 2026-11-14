@@ -12,9 +12,13 @@ The **RabbitMQ** plugin lets you manage a RabbitMQ broker from Attraccess. It ad
 - An [MQTT server](devices/mqtt/server-setup.md) configured in Attraccess that points to a RabbitMQ broker. For the MQTT protocol, enable the `rabbitmq_mqtt` plugin on the broker, see [RabbitMQ with MQTT Plugin](devices/mqtt/server-setup.md#rabbitmq-with-mqtt-plugin).
 - The RabbitMQ management plugin and its HTTP API, reachable from Attraccess.
 
+## Where it appears
+
+On the detail page of an MQTT server that Attraccess detects as a RabbitMQ broker (sidebar **Devices → MQTT Servers**, then select the server).
+
 ## Managing RabbitMQ from Attraccess
 
-An MQTT server that Attraccess detects as a RabbitMQ broker shows extra panels on its detail page (sidebar **Devices → MQTT Servers**, then select the server). Attraccess talks to the RabbitMQ management API (port `15672`, or `15671` with TLS, unless you configured a management port) using the MQTT server's username and password.
+Attraccess talks to the RabbitMQ management API (port `15672`, or `15671` with TLS, unless you configured a management port) using the MQTT server's username and password.
 
 | Panel | What it offers | RabbitMQ user tag | Attraccess permission |
 |-------|----------------|-------------------|-----------------------|
