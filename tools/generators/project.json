@@ -12,6 +12,7 @@
         "^production",
         "{workspaceRoot}/jest.preset.js",
         "{workspaceRoot}/tools/eslint-rules/**/*",
+        "{workspaceRoot}/.github/workflows/*.yml",
         { "externalDependencies": ["jest"] }
       ]
     },
