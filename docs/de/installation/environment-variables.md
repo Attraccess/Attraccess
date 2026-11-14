@@ -91,6 +91,9 @@ In Containern benötigt die API Schreibrechte für den Pfad. Mounten Sie das Ver
 > [!NOTE]
 > Die mitgelieferten Docker-Compose-Varianten (Balena, Coolify) enthalten einen `valkey/valkey:8-alpine`-Sidecar und setzen `VALKEY_URL` automatisch. Für externe Deployments muss `VALKEY_URL` auf die eigene Valkey/Redis-Instanz zeigen.
 
+> [!NOTE]
+> Ist `VALKEY_URL` gesetzt, startet die API auch dann, wenn Valkey nicht erreichbar ist (etwa während der Valkey-Container noch startet), und protokolliert eine Warnung. Sitzungen werden nicht nach SQLite verlagert: Bis Valkey wieder erreichbar ist, beantworten Anmeldungen und Anfragen angemeldeter Benutzer mit `503 Service Unavailable`, öffentliche Seiten funktionieren weiter. Sobald Valkey wieder erreichbar ist, funktioniert die Anmeldung wieder, und die Invalidierung des Berechtigungs-Caches sowie die Sperren für Starts und Enden von Maschinen über API-Instanzen hinweg laufen von selbst wieder an, ohne Neustart der API.
+
 ## Plugins
 
 | Variable | Standard | Beschreibung |
