@@ -65,7 +65,7 @@ describe('CsvInvite', () => {
       inviteFromCsvOptions?.onError?.({
         body: {
           errors: [
-            { row: 0, field: 'user', message: 'REQUIRED' },
+            { row: 0, field: 'email', message: 'REQUIRED' },
             { row: 2, field: 'email', message: 'DUPLICATE_IN_DB', value: 'a@example.com' },
             { row: 3, field: 'Mail Column', message: 'SOMETHING_NEW', value: 'b' },
             { row: 4, field: 'username', message: 'Invalid username format', value: 'bad name!' },
@@ -81,7 +81,7 @@ describe('CsvInvite', () => {
       .map((row) => Array.from(row.querySelectorAll('td, th'), (cell) => cell.textContent));
 
     expect(rows).toEqual([
-      ['#0', 'user', en.errors.reasons.COLUMN_MISSING, '-'],
+      ['#0', 'email', en.errors.reasons.COLUMN_MISSING, '-'],
       ['#2', en.inputs.fieldMapping.email, en.errors.reasons.DUPLICATE_IN_DB, 'a@example.com'],
       ['#3', 'Mail Column', 'SOMETHING_NEW', 'b'],
       ['#4', en.inputs.fieldMapping.username, en.errors.reasons.INVALID_USERNAME_FORMAT, 'bad name!'],
@@ -92,7 +92,7 @@ describe('CsvInvite', () => {
   it.each([
     ['English', en],
     ['German', de],
-  ])('has a %s translation for every CSV row error reason', (_locale, translations) => {
+  ])('provides %s translations for every CSV row error reason', (_locale, translations) => {
     const missingColumn: CsvRowError = { row: 0, field: 'email', message: 'REQUIRED' };
     const keys = [
       ...Object.keys(CSV_ROW_ERROR_REASON_KEYS).map((message) => getCsvRowErrorReasonKey({ row: 1, message })),
@@ -102,6 +102,9 @@ describe('CsvInvite', () => {
     ];
 
     keys.forEach((key) => expect(translate(translations, key as string), key).toBeTruthy());
-    expect(Object.keys(translations.errors.reasons).sort()).toEqual(Object.keys(en.errors.reasons).sort());
+  });
+
+  it('keeps the English and German CSV row error reasons in parity', () => {
+    expect(Object.keys(de.errors.reasons).sort()).toEqual(Object.keys(en.errors.reasons).sort());
   });
 });
