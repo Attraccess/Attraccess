@@ -113,6 +113,8 @@ describe('SSO discovery HTTP boundaries', () => {
       } else if (req.url === '/large-chunks') {
         res.write('"' + 'x'.repeat(64 * 1024));
         res.end('x'.repeat(64 * 1024) + '"');
+      } else if (req.url === '/upgrade') {
+        req.socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n');
       } else if (req.url === '/invalid') {
         res.end('{');
       } else if (req.url === '/unavailable') {
@@ -252,6 +254,11 @@ describe('SSO discovery HTTP boundaries', () => {
     },
   );
 
+  it('reports a protocol switch as a bad gateway without upgrading', async () => {
+    const url = new URL('/upgrade', origin);
+    await expectBadGateway(requestDiscoveryJson(url), `Discovery URL answered with status 101: ${url.href}`);
+  });
+
   it('reports an upstream 404 from both discovery routes as a bad gateway', async () => {
     await expectBadGateway(
       routes.discoverKeycloak(`${origin}`, 'missing'),
@@ -288,11 +295,14 @@ describe('SSO discovery HTTP boundaries', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(`Discovery response from ${origin} is not valid JSON`));
   });
 
-  it('stops handling an oversized response after the size limit', async () => {
+  it.each([
+    ['/large', 32],
+    ['/large-chunks', 1024],
+  ])('stops handling the oversized response %s after the size limit', async (path, maxBytes) => {
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    await expectBadGateway(requestDiscoveryJson(new URL('/large-chunks', origin), 5000, 1024), 'size limit');
+    await expectBadGateway(requestDiscoveryJson(new URL(path, origin), 5000, maxBytes), 'size limit');
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(warn.mock.calls).toEqual([[`Discovery response from ${origin} exceeds 1024 bytes`]]);
+    expect(warn.mock.calls).toEqual([[`Discovery response from ${origin} exceeds ${maxBytes} bytes`]]);
   });
 
   it('reports a refused connection as an unreachable discovery URL', async () => {

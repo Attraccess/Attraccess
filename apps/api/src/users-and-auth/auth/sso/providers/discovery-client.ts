@@ -130,13 +130,16 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
     // Node's HTTP client never follows redirects. A 3xx response is rejected.
     // The requested URL holds no secrets; the upstream reason, headers and body
     // are never echoed.
+    const rejectStatus = (statusCode: number | undefined) => {
+      const status = statusCode || 'unknown';
+      logger.warn(`Discovery request to ${url.href} answered with status ${status}`);
+      reject(new BadGatewayException(`Discovery URL answered with status ${status}: ${url.href}`));
+    };
     const request = get(url, options, (response) => {
       const { statusCode } = response;
       if (!statusCode || statusCode < 200 || statusCode >= 300) {
         response.destroy();
-        const status = statusCode ?? 'unknown';
-        logger.warn(`Discovery request to ${url.href} answered with status ${status}`);
-        reject(new BadGatewayException(`Discovery URL answered with status ${status}: ${url.href}`));
+        rejectStatus(statusCode);
         return;
       }
       let bytes = 0;
@@ -145,7 +148,6 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
       // request has already failed, so those events must not log again.
       let oversized = false;
       response.on('data', (chunk: Buffer) => {
-        if (oversized) return;
         bytes += chunk.length;
         if (bytes > maxBytes) {
           oversized = true;
@@ -169,6 +171,12 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
           reject(new BadGatewayException('Invalid discovery JSON'));
         }
       });
+    });
+    // A 101 with an Upgrade header skips the response callback, and without
+    // this listener Node closes the socket without settling the request.
+    request.on('upgrade', (response, socket) => {
+      socket.destroy();
+      rejectStatus(response.statusCode);
     });
     request.on('error', fail);
   });
