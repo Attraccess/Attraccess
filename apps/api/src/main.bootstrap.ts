@@ -16,6 +16,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import { SqliteReadonlyFilter } from './exceptions/sqlite-readonly.filter';
+import { ValkeyUnavailableFilter } from './exceptions/valkey-unavailable.filter';
 import { isValidTrustProxyValue, resolveTrustProxySetting } from './trust-proxy';
 import { HttpsOptions } from '@nestjs/common/interfaces/external/https-options.interface';
 import { existsSync } from 'fs';
@@ -104,7 +105,7 @@ export function configureBootstrapHttp(app: NestExpressApplication, appConfig: A
     app.set('trust proxy', false);
   }
 
-  app.useGlobalFilters(new SqliteReadonlyFilter(app.get(HttpAdapterHost)));
+  app.useGlobalFilters(new ValkeyUnavailableFilter(new SqliteReadonlyFilter(app.get(HttpAdapterHost))));
 
   app.use(cookieParser());
 

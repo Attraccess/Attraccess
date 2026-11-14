@@ -91,6 +91,9 @@ In containers, give the API write access to the file path and mount its director
 > [!NOTE]
 > The bundled Docker Compose variants (Balena, Coolify) include a `valkey/valkey:8-alpine` sidecar and set `VALKEY_URL` automatically. For external deployments, point `VALKEY_URL` at your own Valkey/Redis instance.
 
+> [!NOTE]
+> When `VALKEY_URL` is set, the API also starts while Valkey cannot be reached (for example while the Valkey container is still starting) and logs a warning. Sessions are not moved to SQLite: until Valkey is back, signing in and requests from signed-in users answer `503 Service Unavailable`, while public pages keep working. Once Valkey is reachable again, sign-in works and authorization cache invalidation and the locking of machine starts and stops across API instances resume on their own, without restarting the API.
+
 ## Plugins
 
 | Variable | Default | Description |
