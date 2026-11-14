@@ -355,7 +355,7 @@ describe('compatibility table', () => {
   it('lists exactly one combination for wire version 1', () => {
     expect(COMPATIBILITY_TABLE).toHaveLength(1);
     expect(COMPATIBILITY_TABLE[0].wireVersion).toBe(WIRE_VERSION);
-    expect(minimumAttraccessVersion()).toBe('1.11.0');
+    expect(minimumAttraccessVersion()).toBe('1.11.0-0');
     expect(minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '>=1.12.0 <2' })).toBe('1.12.0');
     expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: 'not a range' })).toThrow();
     expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '<0.0.0' })).toThrow();
@@ -377,6 +377,7 @@ describe('client helpers', () => {
     expect(expectedSidecarVersion(entry.plugin)).toBe(entry.sidecar);
     expect(expectedSidecarVersion('9.9.9')).toBeUndefined();
     expect(isHostSupported(entry.plugin, '1.11.0')).toBe(true);
+    expect(isHostSupported(entry.plugin, '1.11.0-beta.0')).toBe(true);
     expect(isHostSupported(entry.plugin, '1.10.0')).toBe(false);
     expect(isHostSupported('9.9.9', '1.11.0')).toBe(false);
   });
