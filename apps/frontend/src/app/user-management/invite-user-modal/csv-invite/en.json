@@ -36,9 +36,10 @@
       "REQUIRED": "Required value missing",
       "INVALID": "Invalid value",
       "ROW_IS_EMPTY": "Row is empty",
-      "INVALID_USERNAME_FORMAT": "Only letters, numbers, underscores, hyphens and dots are allowed",
+      "INVALID_USERNAME_FORMAT": "Only letters, numbers, underscores, hyphens, and dots are allowed",
       "INVALID_USERNAME_LENGTH": "Must be between 3 and 32 characters",
-      "NO_VALID_ROWS_FOUND_IN_CSV": "The file contains no valid rows"
+      "NO_VALID_ROWS_FOUND_IN_CSV": "The file contains no valid rows",
+      "COLUMN_MISSING": "Column not found in the file"
     }
   },
   "success": {

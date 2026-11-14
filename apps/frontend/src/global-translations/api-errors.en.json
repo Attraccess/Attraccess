@@ -228,15 +228,15 @@
     "description": "An account with this username already exists. Choose a different username."
   },
   "DUPLICATE_IN_DB": {
-    "title": "Users already exist",
-    "description": "Some rows use an email address or username that already belongs to an account. See the import errors below, then fix the file or invite while skipping the failed rows."
+    "title": "Email or username already in use",
+    "description": "Some rows use an email address or username that already belongs to an account. Check the rows under \"Import errors\", then fix the file or use \"Invite skipping failed rows\"."
   },
   "NO_CANDIDATES_IN_CSV": {
     "title": "No users to invite",
-    "description": "The CSV file contains no valid rows to invite. Check the file and the column mapping."
+    "description": "No rows are left to invite because all rows were skipped. Check the file and the column mapping."
   },
   "MISSING_HEADER_ROW": {
     "title": "CSV file has no data",
-    "description": "The CSV file has no header row or no rows below it. The first line must contain the column names, followed by one row per user."
+    "description": "The CSV file has no header row or no rows below it. The first row must contain the column names, followed by one row per user."
   }
 }

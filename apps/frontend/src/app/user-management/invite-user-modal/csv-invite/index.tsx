@@ -34,7 +34,7 @@ export type CsvRowError = {
   value?: string;
 };
 
-const CSV_ROW_ERROR_REASON_KEYS: Record<string, string> = {
+export const CSV_ROW_ERROR_REASON_KEYS: Record<string, string> = {
   DUPLICATE_IN_DB: 'DUPLICATE_IN_DB',
   DUPLICATE_IN_CSV: 'DUPLICATE_IN_CSV',
   REQUIRED: 'REQUIRED',
@@ -44,6 +44,23 @@ const CSV_ROW_ERROR_REASON_KEYS: Record<string, string> = {
   'Invalid username length': 'INVALID_USERNAME_LENGTH',
   NO_VALID_ROWS_FOUND_IN_CSV: 'NO_VALID_ROWS_FOUND_IN_CSV',
 };
+
+// Row 0 errors refer to the file itself: REQUIRED there means a mapped column is missing from the header.
+const isMissingColumnError = (error: CsvRowError) => error.row === 0 && error.message === 'REQUIRED';
+
+/** Translation key for a row error reason, or undefined to show the API message unchanged. */
+export function getCsvRowErrorReasonKey(error: CsvRowError): string | undefined {
+  if (isMissingColumnError(error)) return 'errors.reasons.COLUMN_MISSING';
+  return Object.hasOwn(CSV_ROW_ERROR_REASON_KEYS, error.message)
+    ? `errors.reasons.${CSV_ROW_ERROR_REASON_KEYS[error.message]}`
+    : undefined;
+}
+
+/** Translation key for a row error field, or undefined to show the field (a CSV column name) unchanged. */
+export function getCsvRowErrorFieldKey(error: CsvRowError): string | undefined {
+  if (isMissingColumnError(error)) return undefined;
+  return error.field === 'email' || error.field === 'username' ? `inputs.fieldMapping.${error.field}` : undefined;
+}
 
 export interface Props {
   onSuccess?: () => void;
@@ -233,16 +250,15 @@ export function CsvInvite({ onSuccess, onError }: Props) {
     submit,
   } = useCsvInviteState({ onSuccess, onError });
 
-  const translateErrorField = (field?: string) => {
-    if (!field) return '-';
-    return field === 'email' || field === 'username' ? t(`inputs.fieldMapping.${field}`) : field;
+  const translateErrorField = (error: CsvRowError) => {
+    if (!error.field) return '-';
+    const fieldKey = getCsvRowErrorFieldKey(error);
+    return fieldKey ? t(fieldKey) : error.field;
   };
 
-  const translateErrorReason = (message: string) => {
-    const reasonKey = Object.hasOwn(CSV_ROW_ERROR_REASON_KEYS, message)
-      ? CSV_ROW_ERROR_REASON_KEYS[message]
-      : undefined;
-    return reasonKey ? t(`errors.reasons.${reasonKey}`) : message;
+  const translateErrorReason = (error: CsvRowError) => {
+    const reasonKey = getCsvRowErrorReasonKey(error);
+    return reasonKey ? t(reasonKey) : error.message;
   };
 
   return (
@@ -325,8 +341,8 @@ export function CsvInvite({ onSuccess, onError }: Props) {
                   {(error) => (
                     <TableRow key={`${error.row}-${error.field ?? 'general'}`}>
                       <TableCell>#{error.row}</TableCell>
-                      <TableCell>{translateErrorField(error.field)}</TableCell>
-                      <TableCell>{translateErrorReason(error.message)}</TableCell>
+                      <TableCell>{translateErrorField(error)}</TableCell>
+                      <TableCell>{translateErrorReason(error)}</TableCell>
                       <TableCell>{error.value ?? '-'}</TableCell>
                     </TableRow>
                   )}

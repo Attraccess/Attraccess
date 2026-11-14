@@ -33,12 +33,13 @@
     "reasons": {
       "DUPLICATE_IN_DB": "Wird bereits von einem bestehenden Konto verwendet",
       "DUPLICATE_IN_CSV": "Kommt mehrfach in der Datei vor",
-      "REQUIRED": "Pflichtwert fehlt",
+      "REQUIRED": "Pflichtangabe fehlt",
       "INVALID": "Ungültiger Wert",
       "ROW_IS_EMPTY": "Zeile ist leer",
-      "INVALID_USERNAME_FORMAT": "Nur Buchstaben, Zahlen, Unterstriche, Bindestriche und Punkte sind erlaubt",
+      "INVALID_USERNAME_FORMAT": "Nur Buchstaben, Zahlen, Unterstrich, Bindestrich und Punkt sind erlaubt",
       "INVALID_USERNAME_LENGTH": "Muss zwischen 3 und 32 Zeichen lang sein",
-      "NO_VALID_ROWS_FOUND_IN_CSV": "Die Datei enthält keine gültigen Zeilen"
+      "NO_VALID_ROWS_FOUND_IN_CSV": "Die Datei enthält keine gültigen Zeilen",
+      "COLUMN_MISSING": "Spalte nicht in der Datei gefunden"
     }
   },
   "success": {
