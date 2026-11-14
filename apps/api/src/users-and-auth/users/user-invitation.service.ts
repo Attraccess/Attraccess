@@ -62,6 +62,17 @@ export class UserInvitationService {
   }
 
   public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {
+    // createMany does not check for taken identities and the unique constraints would surface as a 500
+    const email = body.email.trim();
+    const username = this.usersService.cleanupUsername(body.username);
+    const existingUsers = await this.usersService.findByEmailsOrUsernames([email], [username]);
+    if (existingUsers.some((user) => user.email === email)) {
+      throw new BadRequestException('Email already exists');
+    }
+    if (existingUsers.some((user) => user.username === username)) {
+      throw new BadRequestException('Username already exists');
+    }
+
     try {
       const [invited] = await this.inviteUsersTransactional(
         [{ username: body.username, email: body.email, locale: adminLocale }],
@@ -76,15 +87,22 @@ export class UserInvitationService {
 
   public async inviteUsersFromCsv(
     file: FileUpload | undefined,
-    rawConfig: string | CsvInviteConfigDto,
+    rawConfig: string | CsvInviteConfigDto | undefined,
     adminLocale?: string,
     actorId?: number,
   ): Promise<User[]> {
-    let configPayload: CsvInviteConfigDto | string;
+    let configPayload: unknown;
     try {
       configPayload = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
     } catch {
       throw new BadRequestException('Invalid config payload');
+    }
+    // class-validator throws a TypeError for null/undefined, so reject anything that is not an object first
+    if (configPayload === undefined || configPayload === null) {
+      throw new BadRequestException('config is required');
+    }
+    if (typeof configPayload !== 'object' || Array.isArray(configPayload)) {
+      throw new BadRequestException('config must be a JSON object');
     }
     const config = plainToInstance(CsvInviteConfigDto, configPayload);
     const validationErrors = await validate(config, { whitelist: true, forbidNonWhitelisted: true });
