@@ -356,11 +356,11 @@ export class UserDirectory {
   }
 
   async changeEmail(targetUserId: number, newEmail: string, executingUser: User): Promise<User> {
-    const trimmedEmail = normalizeEmail(newEmail ?? '');
-    if (!trimmedEmail) {
+    const normalizedEmail = normalizeEmail(newEmail ?? '');
+    if (!normalizedEmail) {
       throw new BadRequestException('Email cannot be empty');
     }
-    if (!isEmail(trimmedEmail)) {
+    if (!isEmail(normalizedEmail)) {
       throw new BadRequestException('Invalid email');
     }
 
@@ -376,11 +376,11 @@ export class UserDirectory {
       throw new ForbiddenException("You do not have permission to change this user's email");
     }
 
-    if (normalizeEmail(targetUser.email) === trimmedEmail) {
+    if (normalizeEmail(targetUser.email) === normalizedEmail) {
       return targetUser;
     }
 
-    const existingEmail = await this.accounts.findOne({ email: trimmedEmail });
+    const existingEmail = await this.accounts.findOne({ email: normalizedEmail });
     if (existingEmail && existingEmail.id !== targetUserId) {
       throw new BadRequestException('Email already exists');
     }
@@ -393,7 +393,7 @@ export class UserDirectory {
         const userRepo = manager.getRepository(User);
 
         await userRepo.update(targetUserId, {
-          email: trimmedEmail,
+          email: normalizedEmail,
           isEmailVerified: false,
           emailVerificationToken: token,
           emailVerificationTokenExpiresAt: expiresAt,

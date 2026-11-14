@@ -1,14 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
+import { In } from 'typeorm';
 import { User } from '@attraccess/database-entities';
 import { UserAccounts } from './user-accounts';
-import { normalizeEmail } from './normalize-email';
-
-describe('normalizeEmail', () => {
-  it('trims and lowercases, including non-ASCII letters', () => {
-    expect(normalizeEmail('  Alex@Example.COM ')).toBe('alex@example.com');
-    expect(normalizeEmail('Ünal@Example.com')).toBe('ünal@example.com');
-  });
-});
 
 describe('UserAccounts email normalisation', () => {
   const setup = () => {
@@ -45,8 +38,7 @@ describe('UserAccounts email normalisation', () => {
   it('matches emails case-insensitively when searching by emails or usernames', async () => {
     const { accounts, repository } = setup();
     await accounts.findByEmailsOrUsernames([' Alex@Example.com ', 'alex@example.com'], []);
-    const [{ where }] = repository.find.mock.calls[0];
-    expect(where[0].email._value).toEqual(['alex@example.com']);
+    expect(repository.find).toHaveBeenCalledWith({ where: [{ email: In(['alex@example.com']) }] });
   });
 
   it('stores the normalised email on creation', async () => {

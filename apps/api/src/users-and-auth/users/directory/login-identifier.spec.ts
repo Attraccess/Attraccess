@@ -38,7 +38,6 @@ describe('UsersService', () => {
           { id: 8, email: 'a_btag@example.com' },
         ]);
         fixture.userRepository.findOne.mockImplementation((options) => repo.findOne(options));
-        fixture.userRepository.find.mockImplementation((options) => repo.find(options));
       });
 
       afterEach(async () => {

@@ -21,17 +21,21 @@ export class LowercaseEmails1792900000000 implements MigrationInterface {
     const groups = new Map<string, UserEmailRow[]>();
     for (const row of rows) {
       const key = normalizeEmail(row.email);
-      groups.set(key, [...(groups.get(key) ?? []), row]);
+      const group = groups.get(key);
+      if (group) group.push(row);
+      else groups.set(key, [row]);
     }
 
-    const parked: Array<{ id: number }> = [];
-    const keep: Array<{ id: number; email: string; current: string }> = [];
+    // Every address held after the migration; parked placeholders must not collide with any of them.
+    const taken = new Set(groups.keys());
+    const parked: Array<{ id: number; email: string }> = [];
+    const renamed: Array<{ id: number; email: string }> = [];
     for (const [email, group] of groups) {
-      const [kept, ...others] = [...group].sort(
+      const [kept, ...others] = group.sort(
         (a, b) => Number(!!b.isEmailVerified) - Number(!!a.isEmailVerified) || a.id - b.id,
       );
       if (kept.email !== email) {
-        keep.push({ id: kept.id, email, current: kept.email });
+        renamed.push({ id: kept.id, email });
       }
       if (others.length) {
         this.logger.warn(
@@ -40,20 +44,25 @@ export class LowercaseEmails1792900000000 implements MigrationInterface {
             .sort((a, b) => a - b)
             .join(', ')}`,
         );
-        parked.push(...others);
+        for (const { id } of others) {
+          parked.push({ id, email: this.placeholder(id, taken) });
+        }
       }
     }
 
     // Park first so lowercasing never collides with a not yet renamed duplicate.
-    for (const { id } of parked) {
-      await queryRunner.query(`UPDATE "user" SET "email" = ? WHERE "id" = ?`, [
-        `duplicate-${id}@duplicate-email.invalid`,
-        id,
-      ]);
-    }
-    for (const { id, email } of keep) {
+    for (const { id, email } of [...parked, ...renamed]) {
       await queryRunner.query(`UPDATE "user" SET "email" = ? WHERE "id" = ?`, [email, id]);
     }
+  }
+
+  private placeholder(id: number, taken: Set<string>): string {
+    let email = `duplicate-${id}@duplicate-email.invalid`;
+    for (let attempt = 2; taken.has(email); attempt++) {
+      email = `duplicate-${id}-${attempt}@duplicate-email.invalid`;
+    }
+    taken.add(email);
+    return email;
   }
 
   public async down(): Promise<void> {
