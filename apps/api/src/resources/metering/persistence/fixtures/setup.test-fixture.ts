@@ -22,11 +22,11 @@ import { DataSource, EntityManager } from 'typeorm';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ResourceUsageService } from '../../../usage/sessions/resource-usage.service';
 import { ResourceOperatingAttributionService } from '../../../operating-intervals/resource-operating-attribution.service';
 import { MeteringReport } from '../../../flows/node-executors';
 import { ResourceMeteringService } from '../../resource-metering.service';
 import { FlowDefinedMeteringTestScope } from '../flow-defined-meters.spec';
+import { composeResourceUsageService } from '../../../usage/sessions/fixtures/compose.test-fixture';
 export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
   for (const method of ['debug', 'log', 'warn', 'error'] as const) {
     jest.spyOn(Logger.prototype, method).mockImplementation(() => undefined);
@@ -81,7 +81,7 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
       },
     ),
   };
-  scope.audit = { recordBillingTransaction: jest.fn(), recordResource: jest.fn() };
+  scope.audit = { record: jest.fn() };
   scope.liveNotifications = { notifyTransactionUpdate: jest.fn().mockResolvedValue(undefined) };
   await scope.source
     .getRepository(ResourceMeter)
@@ -125,7 +125,7 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
     }),
     notifyResourceUsageCharge: jest.fn().mockResolvedValue(undefined),
   };
-  scope.usage = new ResourceUsageService(
+  scope.usage = composeResourceUsageService(
     scope.source.getRepository(Resource),
     scope.source.getRepository(ResourceUsage),
     scope.source.getRepository(User),
@@ -158,7 +158,7 @@ export async function resetTestFixture(scope: FlowDefinedMeteringTestScope) {
     { isResourceUnhealthy: jest.fn().mockResolvedValue(false) } as never,
     { emit: jest.fn() } as never,
     {} as never,
-    { recordResource: jest.fn().mockResolvedValue(undefined) } as never,
+    { record: jest.fn().mockResolvedValue(undefined) } as never,
     null,
     scope.metering,
   );

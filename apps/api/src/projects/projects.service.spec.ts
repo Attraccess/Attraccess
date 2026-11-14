@@ -1,3 +1,4 @@
+import { AuditRecorder } from '../audit/recorder/audit-event';
 import { registerProjectsServiceFixture } from './projects.service.projects-service.test-fixture';
 import {
   Project,
@@ -18,7 +19,6 @@ import { EmailService } from './../email/email.service';
 import { NotFoundException } from '@nestjs/common';
 import { MetricsService } from './../metrics/metrics.service';
 import { NotificationDispatchService } from './../notifications/notification-dispatch.service';
-import { AuditService } from './../audit/audit.service';
 import { UpdateProjectDto } from './dto/update.dto';
 
 describe('ProjectsService', () => {
@@ -135,13 +135,11 @@ describe('ProjectsService', () => {
       expect(fixture.projectRepository.save).toHaveBeenCalledWith(expect.objectContaining(payload));
       expect(created).toEqual(expect.objectContaining({ id: 1, name: 'New' }));
       expect(fixture.fileStorageService.saveFile).not.toHaveBeenCalled();
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith({
+      expect(fixture.audit.record).toHaveBeenCalledWith({
+        domain: 'project',
         action: 'project.created',
-        actorId: 2,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project',
-        subjectId: 1,
+        actor: { id: 2, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project', id: 1 },
         details: { projectId: 1, 'after.name': 'New', 'after.hasLogo': 0 },
       });
     });
@@ -154,15 +152,16 @@ describe('ProjectsService', () => {
 
       await fixture.service.deleteOne(7, 99);
 
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith(
+      expect(fixture.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'project',
           action: 'project.deleted',
           details: { projectId: 99, 'before.hasLogo': 0, 'before.nameOmitted': 1 },
         }),
         expect.anything(),
       );
       expect(transaction.manager).toBeDefined();
-      expect(fixture.audit.recordProject.mock.calls[0][1]).toBe(transaction.manager);
+      expect(fixture.audit.record.mock.calls[0][1]).toBe(transaction.manager);
     });
 
     it('stores the logo when provided', async () => {
@@ -179,13 +178,14 @@ describe('ProjectsService', () => {
 
       expect(fixture.fileStorageService.saveFile).toHaveBeenCalledWith(payload.logo, 'projects/4');
       expect(created.logo).toBe('logo.png');
-      expect(fixture.audit.recordProject).toHaveBeenNthCalledWith(
+      expect(fixture.audit.record).toHaveBeenNthCalledWith(
         1,
-        expect.objectContaining({ action: 'project.created' }),
+        expect.objectContaining({ domain: 'project', action: 'project.created' }),
       );
-      expect(fixture.audit.recordProject).toHaveBeenNthCalledWith(
+      expect(fixture.audit.record).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({
+          domain: 'project',
           action: 'project.updated',
           details: expect.objectContaining({ changedFields: '["logo"]' }),
         }),
@@ -203,10 +203,11 @@ describe('ProjectsService', () => {
 
       await expect(fixture.service.create(2, payload)).rejects.toThrow('storage unavailable');
 
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith(
+      expect(fixture.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'project',
           action: 'project.created',
-          subjectId: 4,
+          subject: expect.objectContaining({ id: 4 }),
           details: { projectId: 4, 'after.name': 'New', 'after.hasLogo': 0 },
         }),
       );
@@ -228,21 +229,19 @@ describe('ProjectsService', () => {
 
       expect(fixture.resourceUsageRepository.update).toHaveBeenCalledWith({ projectId: 99 }, { projectId: null });
       expect(fixture.projectRepository.delete).toHaveBeenCalledWith(99);
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith(
+      expect(fixture.audit.record).toHaveBeenCalledWith(
         {
+          domain: 'project',
           action: 'project.deleted',
-          actorId: 7,
-          authenticationMethod: 'session',
-          apiTokenId: undefined,
-          subjectType: 'project',
-          subjectId: 99,
+          actor: { id: 7, authenticationMethod: 'session', apiTokenId: undefined },
+          subject: { type: 'project', id: 99 },
           details: { projectId: 99, 'before.name': 'Deleted', 'before.hasLogo': 0 },
         },
         expect.anything(),
       );
       // The audit row is written with the delete's transaction manager, so it rolls back with the delete.
       expect(transaction.manager).toBeDefined();
-      expect(fixture.audit.recordProject.mock.calls[0][1]).toBe(transaction.manager);
+      expect(fixture.audit.record.mock.calls[0][1]).toBe(transaction.manager);
     });
 
     it('rolls back usage detachment when the project delete affects no row', async () => {
@@ -256,7 +255,7 @@ describe('ProjectsService', () => {
 
       await expect(fixture.service.deleteOne(7, 99)).rejects.toBeInstanceOf(NotFoundException);
 
-      expect(fixture.audit.recordProject).not.toHaveBeenCalled();
+      expect(fixture.audit.record).not.toHaveBeenCalled();
       expect(fixture.mockMetricsService.projectsTotal.dec).not.toHaveBeenCalled();
     });
 
@@ -279,7 +278,7 @@ describe('ProjectsService', () => {
         const auditedInOpenTransaction: boolean[] = [];
         const transactionManagers: EntityManager[] = [];
         const sqliteAudit = {
-          recordProject: jest.fn(async (_event: unknown, manager?: EntityManager) => {
+          record: jest.fn(async (_event: unknown, manager?: EntityManager) => {
             auditedInOpenTransaction.push(manager?.queryRunner?.isTransactionActive === true);
           }),
         };
@@ -307,7 +306,7 @@ describe('ProjectsService', () => {
           {} as EmailService,
           sqliteMetrics as MetricsService,
           {} as NotificationDispatchService,
-          sqliteAudit as unknown as AuditService,
+          sqliteAudit as unknown as AuditRecorder,
         );
         await source.query(
           "CREATE TRIGGER abort_project_delete BEFORE DELETE ON project BEGIN SELECT RAISE(ABORT, 'delete aborted'); END",
@@ -315,19 +314,19 @@ describe('ProjectsService', () => {
 
         await expect(sqliteService.deleteOne(1, 1)).rejects.toThrow('delete aborted');
         expect((await source.query('SELECT projectId FROM resource_usage WHERE id = 1'))[0].projectId).toBe(1);
-        expect(sqliteAudit.recordProject).not.toHaveBeenCalled();
+        expect(sqliteAudit.record).not.toHaveBeenCalled();
         expect(sqliteMetrics.projectsTotal.dec).not.toHaveBeenCalled();
 
         await source.query('DROP TRIGGER abort_project_delete');
         await sqliteService.deleteOne(1, 1);
         expect((await source.query('SELECT projectId FROM resource_usage WHERE id = 1'))[0].projectId).toBeNull();
-        expect(sqliteAudit.recordProject).toHaveBeenCalledTimes(1);
+        expect(sqliteAudit.record).toHaveBeenCalledTimes(1);
         // Written with the delete's own (still open) transaction manager.
-        expect(sqliteAudit.recordProject.mock.calls[0][1]).toBe(transactionManagers[1]);
+        expect(sqliteAudit.record.mock.calls[0][1]).toBe(transactionManagers[1]);
         expect(auditedInOpenTransaction).toEqual([true]);
         expect(sqliteMetrics.projectsTotal.dec).toHaveBeenCalledTimes(1);
         await expect(sqliteService.deleteOne(1, 1)).rejects.toBeInstanceOf(NotFoundException);
-        expect(sqliteAudit.recordProject).toHaveBeenCalledTimes(1);
+        expect(sqliteAudit.record).toHaveBeenCalledTimes(1);
       } finally {
         await source.destroy();
       }
@@ -349,13 +348,11 @@ describe('ProjectsService', () => {
 
       expect(fixture.projectRepository.save).toHaveBeenCalledWith(expect.objectContaining({ id: 3, name: 'New' }));
       expect(updated.name).toBe('New');
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith({
+      expect(fixture.audit.record).toHaveBeenCalledWith({
+        domain: 'project',
         action: 'project.updated',
-        actorId: 1,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project',
-        subjectId: 3,
+        actor: { id: 1, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project', id: 3 },
         details: {
           projectId: 3,
           'before.name': 'Old',
@@ -379,13 +376,11 @@ describe('ProjectsService', () => {
       expect(fixture.fileStorageService.deleteFile).toHaveBeenCalledWith('projects/3', 'old.png');
       expect(fixture.fileStorageService.saveFile).toHaveBeenCalledWith(payload.logo, 'projects/3');
       expect(result.logo).toBe('new.png');
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith({
+      expect(fixture.audit.record).toHaveBeenCalledWith({
+        domain: 'project',
         action: 'project.updated',
-        actorId: 1,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project',
-        subjectId: 3,
+        actor: { id: 1, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project', id: 3 },
         details: {
           projectId: 3,
           'before.name': 'Old',
@@ -407,8 +402,9 @@ describe('ProjectsService', () => {
       await fixture.service.updateOne(1, 3, payload);
 
       expect(fixture.projectRepository.save).toHaveBeenCalledTimes(1);
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith(
+      expect(fixture.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'project',
           action: 'project.updated',
           details: expect.objectContaining({ changedFields: '["name","logo"]' }),
         }),
@@ -422,7 +418,7 @@ describe('ProjectsService', () => {
 
       await fixture.service.updateOne(1, 3, { name: 'Same', description: 'Same' } as UpdateProjectDto);
 
-      expect(fixture.audit.recordProject).not.toHaveBeenCalled();
+      expect(fixture.audit.record).not.toHaveBeenCalled();
     });
 
     it('does not record an unchanged legacy long-name update', async () => {
@@ -433,7 +429,7 @@ describe('ProjectsService', () => {
 
       await fixture.service.updateOne(1, 3, { name: longName } as UpdateProjectDto);
 
-      expect(fixture.audit.recordProject).not.toHaveBeenCalled();
+      expect(fixture.audit.record).not.toHaveBeenCalled();
     });
 
     it('records archive lifecycle changes with the initiating actor', async () => {
@@ -444,22 +440,18 @@ describe('ProjectsService', () => {
       await fixture.service.archiveOne(2, 3);
       await fixture.service.unarchiveOne(2, 3);
 
-      expect(fixture.audit.recordProject).toHaveBeenNthCalledWith(1, {
+      expect(fixture.audit.record).toHaveBeenNthCalledWith(1, {
+        domain: 'project',
         action: 'project.archived',
-        actorId: 2,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project',
-        subjectId: 3,
+        actor: { id: 2, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project', id: 3 },
         details: { projectId: 3, 'after.name': 'Project', 'after.hasLogo': 0, 'after.archived': 1 },
       });
-      expect(fixture.audit.recordProject).toHaveBeenNthCalledWith(2, {
+      expect(fixture.audit.record).toHaveBeenNthCalledWith(2, {
+        domain: 'project',
         action: 'project.unarchived',
-        actorId: 2,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project',
-        subjectId: 3,
+        actor: { id: 2, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project', id: 3 },
         details: { projectId: 3, 'after.name': 'Project', 'after.hasLogo': 0, 'after.archived': 0 },
       });
     });
@@ -484,7 +476,7 @@ describe('ProjectsService', () => {
       expect(fixture.projectRepository.update).toHaveBeenCalledTimes(2);
       expect(fixture.projectRepository.findOneByOrFail).toHaveBeenNthCalledWith(1, { id: 3 });
       expect(fixture.projectRepository.findOneByOrFail).toHaveBeenNthCalledWith(2, { id: 4 });
-      expect(fixture.audit.recordProject).not.toHaveBeenCalled();
+      expect(fixture.audit.record).not.toHaveBeenCalled();
     });
   });
 
@@ -508,22 +500,18 @@ describe('ProjectsService', () => {
       await fixture.service.createProjectInvitation(2, 3, 9);
       await fixture.service.cancelProjectInvitation(2, 3, 7);
 
-      expect(fixture.audit.recordProject).toHaveBeenNthCalledWith(1, {
+      expect(fixture.audit.record).toHaveBeenNthCalledWith(1, {
+        domain: 'project',
         action: 'project.invitation.sent',
-        actorId: 2,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project.invitation',
-        subjectId: 7,
+        actor: { id: 2, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project.invitation', id: 7 },
         details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
       });
-      expect(fixture.audit.recordProject).toHaveBeenNthCalledWith(2, {
+      expect(fixture.audit.record).toHaveBeenNthCalledWith(2, {
+        domain: 'project',
         action: 'project.invitation.revoked',
-        actorId: 2,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project.invitation',
-        subjectId: 7,
+        actor: { id: 2, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project.invitation', id: 7 },
         details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
       });
     });
@@ -547,10 +535,11 @@ describe('ProjectsService', () => {
 
       await fixture.service.createProjectInvitation(2, 3, 9);
 
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith(
+      expect(fixture.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'project',
           action: 'project.invitation.sent',
-          subjectId: 7,
+          subject: expect.objectContaining({ id: 7 }),
           details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
         }),
       );
@@ -566,13 +555,11 @@ describe('ProjectsService', () => {
 
       await fixture.service.removeMember(2, 3, 8);
 
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith({
+      expect(fixture.audit.record).toHaveBeenCalledWith({
+        domain: 'project',
         action: 'project.member.removed',
-        actorId: 2,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project.member',
-        subjectId: 8,
+        actor: { id: 2, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project.member', id: 8 },
         details: { projectId: 3, memberId: 8, userId: 9, role: 'viewer' },
       });
     });
@@ -587,7 +574,7 @@ describe('ProjectsService', () => {
 
       await fixture.service.removeMember(2, 3, 8);
 
-      expect(fixture.audit.recordProject).not.toHaveBeenCalled();
+      expect(fixture.audit.record).not.toHaveBeenCalled();
     });
 
     it('records accepted invitations and the membership role using the accepting user as actor', async () => {
@@ -610,22 +597,18 @@ describe('ProjectsService', () => {
 
       await fixture.service.acceptInvitation(9, 7);
 
-      expect(fixture.audit.recordProject).toHaveBeenNthCalledWith(1, {
+      expect(fixture.audit.record).toHaveBeenNthCalledWith(1, {
+        domain: 'project',
         action: 'project.invitation.accepted',
-        actorId: 9,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project.invitation',
-        subjectId: 7,
+        actor: { id: 9, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project.invitation', id: 7 },
         details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
       });
-      expect(fixture.audit.recordProject).toHaveBeenNthCalledWith(2, {
+      expect(fixture.audit.record).toHaveBeenNthCalledWith(2, {
+        domain: 'project',
         action: 'project.member.added',
-        actorId: 9,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project.member',
-        subjectId: 8,
+        actor: { id: 9, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project.member', id: 8 },
         details: { projectId: 3, memberId: 8, userId: 9, role: 'viewer' },
       });
     });
@@ -643,13 +626,11 @@ describe('ProjectsService', () => {
 
       await fixture.service.declineInvitation(9, 7);
 
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith({
+      expect(fixture.audit.record).toHaveBeenCalledWith({
+        domain: 'project',
         action: 'project.invitation.rejected',
-        actorId: 9,
-        authenticationMethod: 'session',
-        apiTokenId: undefined,
-        subjectType: 'project.invitation',
-        subjectId: 7,
+        actor: { id: 9, authenticationMethod: 'session', apiTokenId: undefined },
+        subject: { type: 'project.invitation', id: 7 },
         details: { projectId: 3, invitationId: 7, userId: 9, role: 'viewer' },
       });
     });
@@ -669,10 +650,11 @@ describe('ProjectsService', () => {
 
       await expect(fixture.service.acceptInvitation(9, 7)).rejects.toThrow('membership unavailable');
 
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith(
+      expect(fixture.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'project',
           action: 'project.invitation.accepted',
-          subjectId: 7,
+          subject: expect.objectContaining({ id: 7 }),
         }),
       );
     });
@@ -683,8 +665,9 @@ describe('ProjectsService', () => {
 
       await fixture.service.create(2, { name: longName, description: 'Desc' } as CreateProjectDto);
 
-      expect(fixture.audit.recordProject).toHaveBeenCalledWith(
+      expect(fixture.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'project',
           details: expect.objectContaining({ 'after.nameTruncated': 1, 'after.hasLogo': 0 }),
         }),
       );

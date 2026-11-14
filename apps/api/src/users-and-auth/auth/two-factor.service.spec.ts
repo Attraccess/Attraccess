@@ -19,6 +19,8 @@ describe('TwoFactorService enrollment and login', () => {
   };
   const metrics = { auth2faUsageTotal: { inc: jest.fn() } };
   const user = { id: 7, username: 'fixture', email: 'user@example.test' } as User;
+  const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+  const origin = { actor: { id: 7, authenticationMethod: 'session' as const }, request: { ipAddress: '127.0.0.1' } };
   let service: TwoFactorService;
   beforeEach(() => {
     jest.clearAllMocks();
@@ -30,11 +32,15 @@ describe('TwoFactorService enrollment and login', () => {
       settings as unknown as SettingsService,
       encryption as unknown as EncryptionService,
       metrics as unknown as MetricsService,
+      audit as never,
     );
   });
   it('stores an encrypted setup secret without enabling two-factor authentication prematurely', async () => {
     repository.findOne.mockResolvedValue(null);
-    expect(await service.createSetup(user)).toEqual({ secret: 'TOTP-FIXTURE', otpauthUrl: 'otpauth://fixture' });
+    expect(await service.createSetup(user, origin)).toEqual({
+      secret: 'TOTP-FIXTURE',
+      otpauthUrl: 'otpauth://fixture',
+    });
     expect(repository.save).toHaveBeenCalledWith(
       expect.objectContaining({ userId: 7, totpSecret: 'encrypted:TOTP-FIXTURE', totpEnabledAt: null }),
     );
@@ -47,13 +53,13 @@ describe('TwoFactorService enrollment and login', () => {
   });
   it('enables only initialized factors after validating a normalized code', async () => {
     repository.findOne.mockResolvedValueOnce(null);
-    await expect(service.enable(user, '123456')).rejects.toThrow('TwoFactorNotInitialized');
+    await expect(service.enable(user, '123456', origin)).rejects.toThrow('TwoFactorNotInitialized');
     const detail = { id: 9, totpSecret: 'encrypted:TOTP-FIXTURE', totpEnabledAt: null };
     repository.findOne.mockResolvedValue(detail);
     otp.verify.mockResolvedValueOnce({ valid: false });
-    await expect(service.enable(user, '000000')).rejects.toThrow('TwoFactorInvalidCode');
+    await expect(service.enable(user, '000000', origin)).rejects.toThrow('TwoFactorInvalidCode');
     expect(repository.save).not.toHaveBeenCalled();
-    await service.enable(user, '123 456');
+    await service.enable(user, '123 456', origin);
     expect(otp.verify).toHaveBeenLastCalledWith({
       secret: 'TOTP-FIXTURE',
       token: '123456',
@@ -61,7 +67,7 @@ describe('TwoFactorService enrollment and login', () => {
       epochTolerance: 30,
     });
     expect(repository.save).toHaveBeenCalledWith(expect.objectContaining({ totpEnabledAt: expect.any(Date) }));
-    await expect(service.enable(user, '123456')).rejects.toThrow('TwoFactorAlreadyEnabled');
+    await expect(service.enable(user, '123456', origin)).rejects.toThrow('TwoFactorAlreadyEnabled');
   });
   it('requires and validates a code for enabled factors while allowing unconfigured users through this check', async () => {
     repository.findOne.mockResolvedValueOnce(null);
@@ -74,12 +80,12 @@ describe('TwoFactorService enrollment and login', () => {
   });
   it('disables only enabled factors after successful verification', async () => {
     repository.findOne.mockResolvedValueOnce(null);
-    await expect(service.disable(user, '123456')).rejects.toThrow('TwoFactorNotEnabled');
+    await expect(service.disable(user, '123456', origin)).rejects.toThrow('TwoFactorNotEnabled');
     repository.findOne.mockResolvedValue({ id: 9, totpSecret: 'encrypted:TOTP-FIXTURE', totpEnabledAt: new Date() });
     otp.verify.mockResolvedValueOnce({ valid: false });
-    await expect(service.disable(user, '000000')).rejects.toThrow('TwoFactorInvalidCode');
+    await expect(service.disable(user, '000000', origin)).rejects.toThrow('TwoFactorInvalidCode');
     expect(repository.delete).not.toHaveBeenCalled();
-    await service.disable(user, '123456');
+    await service.disable(user, '123456', origin);
     expect(repository.delete).toHaveBeenCalledWith(9);
     expect(metrics.auth2faUsageTotal.inc).toHaveBeenCalledWith({ action: 'disable' });
   });

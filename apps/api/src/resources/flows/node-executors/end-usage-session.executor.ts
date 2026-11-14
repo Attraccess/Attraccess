@@ -1,11 +1,12 @@
 import { ResourceFlowNode, ResourceUsageEndSessionNodeDataSchema } from '@attraccess/database-entities';
-import { SessionEndTarget } from '../../usage/sessions/usage-session-changes';
+import { SessionEndTarget } from '../../usage/sessions/usage-session-ends';
 import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NoUsageSessionError } from '../errors/no-usage-session.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 import { resolveTriggeringUsage } from './triggering-usage';
 import { requireRunMachineId } from './flow.utils';
+import { SYSTEM_AUDIT_ACTOR } from '../../../audit/recorder/audit-event';
 
 export class EndUsageSessionExecutor implements NodeExecutor {
   constructor(private readonly resourceUsageService: ResourceUsageService) {}
@@ -81,7 +82,7 @@ export class EndUsageSessionExecutor implements NodeExecutor {
       {
         skipFormSubmissions: true,
         skipNoteNotification: true,
-        auditOrigin: { actorId: null },
+        auditOrigin: SYSTEM_AUDIT_ACTOR,
         // Its stop flow runs on behalf of the user who caused this run.
         triggeredByUserId: ctx.actorUserId,
       },

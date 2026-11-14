@@ -20,13 +20,9 @@ import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 
 import { buildSamlSessionContext } from './saml-session-context';
 
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
-
 import { RbacService } from '../../../rbac/rbac.service';
 
 import { resolveSsoRoleAssignments } from '../permission-mapping';
-
-import { recordSsoProvisioningAudit } from '../audit/provider-audit';
 
 import { SSOService } from '../sso.service';
 
@@ -217,14 +213,11 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
   ): Promise<void> {
     try {
       const ssoService = this.moduleRef.get(SSOService, { strict: false });
-      const audit = this.moduleRef.get(SsoAuditService, { strict: false });
-      const provider = await ssoService?.getProviderByTypeAndIdWithConfiguration(SSOProviderType.SAML, providerId);
-      if (!audit || !provider) return;
-      await recordSsoProvisioningAudit(
-        audit,
-        action,
+      await ssoService?.recordSignInProvisioning(
+        SSOProviderType.SAML,
+        providerId,
         userId,
-        provider,
+        action,
         action === 'user_created' ? { userCreated: true } : changes,
       );
     } catch (error) {

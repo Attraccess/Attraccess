@@ -15,7 +15,7 @@ function setup(queries: Record<string, StartBlockedQuery>, preStart: Record<stri
     raise: jest.fn().mockResolvedValue({}),
     clearWhere: jest.fn().mockResolvedValue(undefined),
   };
-  const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const service = new ReaderUiHooksService(
     registry as never,
     { failurePolicy: jest.fn().mockResolvedValue('fail-closed') } as never,
@@ -91,7 +91,7 @@ describe('ReaderUiHooksService.queryStartBlocked', () => {
       service.runPreStart({ ...run, action: 'start', origin: 'web', satisfied: new Map() }),
     ).resolves.toEqual({ decision: 'allow' });
     expect(preStart).toHaveBeenCalled();
-    expect(audit.recordAttractap).toHaveBeenCalledTimes(1); // the pre-start decision only
+    expect(audit.record).toHaveBeenCalledTimes(1); // the pre-start decision only
   });
 
   it('opens its own breaker after repeated failures and closes it again on the first valid answer', async () => {

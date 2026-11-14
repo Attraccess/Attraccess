@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 // Regression test for ATT-496: a plugin-supplied REST controller must actually
 // mount into the host API. After a plugin loaded successfully, its POST routes
 // still 404'd — so this proves a plugin-supplied @Controller (returned from
@@ -18,7 +19,6 @@ import { build } from 'esbuild';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import request from 'supertest';
-import { AuditService } from '../audit/audit.service';
 import { PluginService } from './plugin.service';
 import { PluginModule } from './plugin.module';
 import { MqttClientService } from '../mqtt/mqtt-client.service';
@@ -29,10 +29,10 @@ let hostDataSource: DataSource;
 @Global()
 @Module({
   providers: [
-    { provide: AuditService, useValue: { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
+    { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
     { provide: DataSource, useFactory: () => hostDataSource },
   ],
-  exports: [AuditService, DataSource],
+  exports: [AUDIT_RECORDER, DataSource],
 })
 class HostModule {}
 

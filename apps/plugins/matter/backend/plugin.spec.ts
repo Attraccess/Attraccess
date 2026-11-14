@@ -4,16 +4,18 @@ import { join } from 'node:path';
 import plugin from './plugin';
 import { MATTER_AUDIT_DOMAIN } from './connection/audit';
 import { MatterConnectionController } from './connection/controller';
+import { MatterDevicesController } from './devices/controller';
+import { DEVICE_ENTITIES } from './devices/entities';
 import { MatterConnection } from './connection/entity';
 
 const read = (name: string) => JSON.parse(readFileSync(join(__dirname, '..', name), 'utf8'));
 
 describe('matter plugin backend', () => {
-  it('registers the settings controller, its services, the entity and the audit domain', () => {
+  it('registers the controllers, the services, the entities and the audit domain', () => {
     const module = plugin.register({} as never);
-    expect(module.controllers).toEqual([MatterConnectionController]);
-    expect(module.providers).toHaveLength(3);
-    expect(plugin.entities).toEqual([MatterConnection]);
+    expect(module.controllers).toEqual([MatterConnectionController, MatterDevicesController]);
+    expect(module.providers).toHaveLength(8);
+    expect(plugin.entities).toEqual([MatterConnection, ...DEVICE_ENTITIES]);
     expect(plugin.auditDomains).toEqual([MATTER_AUDIT_DOMAIN]);
   });
 
@@ -30,7 +32,35 @@ describe('matter plugin backend', () => {
 
   it('declares an audit policy with no free-form detail fields', () => {
     const details = MATTER_AUDIT_DOMAIN.actions.flatMap((action) => Object.values(action.details ?? {}));
-    expect(details.every((field) => field.type === 'boolean' || field.oneOf !== undefined)).toBe(true);
+    // Flags, closed value sets, bounded numbers, or an ID shape: never free text from a device or a user.
+    const bounded = (field: (typeof details)[number]) =>
+      field.type === 'boolean' ||
+      field.oneOf !== undefined ||
+      (field.type === 'number' && field.integer === true) ||
+      (field.type === 'string' && /^\[(0-9a-f-|0-9)\]/.test(field.pattern ?? ''));
+    expect(details.every(bounded)).toBe(true);
+  });
+
+  it('audits every device lifecycle action on a node, endpoint or fabric subject', () => {
+    const actions = MATTER_AUDIT_DOMAIN.actions.map((entry) => entry.action);
+    expect(actions).toEqual(
+      expect.arrayContaining([
+        'matter.node_quarantined',
+        'matter.node_detached',
+        'matter.node_reattached',
+        'matter.node_claimed',
+        'matter.node_relinked',
+        'matter.node_repaired',
+        'matter.node_archived',
+        'matter.node_restored',
+        'matter.node_force_removed',
+        'matter.node_metadata_updated',
+        'matter.endpoint_metadata_updated',
+        'matter.fabric_mismatch_detected',
+      ]),
+    );
+    const subjects = new Set(MATTER_AUDIT_DOMAIN.actions.flatMap((entry) => entry.subjectTypes));
+    expect(subjects).toEqual(new Set(['matter.connection', 'matter.node', 'matter.endpoint', 'matter.fabric']));
   });
 });
 
@@ -43,7 +73,7 @@ describe('host-version declarations', () => {
   });
 
   it('use the plugin release listed in the table', () => {
-    expect(combination.plugin).toBe('0.2.0-alpha.0');
+    expect(combination.plugin).toBe('0.3.0-alpha.0');
     expect(read('package.json').version).toBe(combination.plugin);
     expect(read('plugin.json').version).toBe(combination.plugin);
   });

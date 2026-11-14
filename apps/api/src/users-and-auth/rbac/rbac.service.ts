@@ -1,5 +1,4 @@
 import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
-
 import {
   Inject,
   Injectable,
@@ -10,30 +9,21 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-
 import { EventEmitter2 } from '@nestjs/event-emitter';
-
 import { InjectRepository } from '@nestjs/typeorm';
-
 import { type Redis } from 'ioredis';
-
 import { EntityManager, Repository, QueryFailedError, In } from 'typeorm';
-
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
-
+import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
+import { roleAuditEvent } from './role-audit';
 import {
   AUTHORIZATION_CACHE_INVALIDATION_CHANNEL,
   authorizationCacheInvalidationSource,
 } from './authorization-cache-invalidation';
-
 import { UserPermissionsChangedEvent } from './events/user-permissions-changed.event';
-
 import { UserNotFoundException } from '../../exceptions/user.notFound.exception';
-
 import { RoleWithUsageDto } from './dtos/role-with-usage.dto';
-
 import { CreateRoleDto } from './dtos/create-role.dto';
-
 import { UpdateRoleDto } from './dtos/update-role.dto';
 
 @Injectable()
@@ -52,6 +42,7 @@ export class RbacService {
     protected readonly eventEmitter: EventEmitter2,
     // optional: Valkey is an optional deployment component; the service works without a cache
     @Optional() @Inject(VALKEY_CLIENT) protected readonly valkeyClient: Redis | null,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(RbacService.name);
@@ -452,7 +443,7 @@ export class RbacService {
     return candidate;
   }
 
-  async createRole(dto: CreateRoleDto, actorPermissions: Set<string>): Promise<Role> {
+  async createRole(dto: CreateRoleDto, actorPermissions: Set<string>, origin: AuditOrigin): Promise<Role> {
     const permissionKeys = await this.resolvePermissionKeys(dto.permissionKeys ?? []);
     this.assertActorHolds(actorPermissions, permissionKeys, 'grant');
 
@@ -471,10 +462,16 @@ export class RbacService {
       );
     }
     const created = await this.roleRepository.findOne({ where: { id: role.id }, relations: ['rolePermissions'] });
+    await this.audit.record(roleAuditEvent('role_created', created as Role, origin));
     return created as Role;
   }
 
-  async updateRole(roleId: number, dto: UpdateRoleDto, actorPermissions: Set<string>): Promise<Role> {
+  async updateRole(
+    roleId: number,
+    dto: UpdateRoleDto,
+    actorPermissions: Set<string>,
+    origin: AuditOrigin,
+  ): Promise<Role> {
     const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
     if (!role) throw new NotFoundException(`Role ${roleId} not found`);
     if (role.isSystemManaged) {
@@ -517,10 +514,16 @@ export class RbacService {
     }
 
     const updated = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
+    await this.audit.record(roleAuditEvent('role_updated', updated as Role, origin));
     return updated as Role;
   }
 
-  async deleteRole(roleId: number, actorPermissions: Set<string>, reassignToRoleId?: number): Promise<void> {
+  async deleteRole(
+    roleId: number,
+    actorPermissions: Set<string>,
+    origin: AuditOrigin,
+    reassignToRoleId?: number,
+  ): Promise<void> {
     const role = await this.roleRepository.findOne({ where: { id: roleId }, relations: ['rolePermissions'] });
     if (!role) throw new NotFoundException(`Role ${roleId} not found`);
     if (role.isSystemManaged) {
@@ -581,6 +584,7 @@ export class RbacService {
     });
     this.permissionsCache.clear();
     await this.permissionsChanged();
+    await this.audit.record(roleAuditEvent('role_deleted', role, origin));
   }
 
   protected assertActorHolds(actorPermissions: Set<string>, keys: string[], action: 'grant' | 'revoke'): void {

@@ -145,6 +145,7 @@ export class PluginManifest {
   permissions: PluginPermission[];
 }
 
+// inheritance: data shape; a loaded manifest is the declared manifest plus runtime fields.
 export class LoadedPluginManifest extends PluginManifest {
   @ApiProperty({
     description: 'The directory of the plugin',

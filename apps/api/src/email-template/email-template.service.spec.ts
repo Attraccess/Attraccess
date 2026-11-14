@@ -4,6 +4,9 @@ import { EmailTemplateType, EmailTemplateTranslation } from '@attraccess/databas
 import { MjmlService } from './mjml.service';
 import { readDefaultTemplateBody } from './email-defaults';
 
+const ACTOR = { id: 1, authenticationMethod: 'session' as const };
+const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+
 jest.mock('./email-defaults', () => ({
   EMAIL_TEMPLATE_DEFAULTS: { 'verify-email': { subject: 'Default subject', variables: [] } },
   readDefaultTemplateBody: jest.fn(() => '<mjml></mjml>'),
@@ -28,7 +31,12 @@ const setup = () => {
   const translationRepo = makeRepo();
   const mjmlService = { validateAndConvert: jest.fn() } as unknown as MjmlService;
 
-  const service = new EmailTemplateService(emailTemplateRepo as never, translationRepo as never, mjmlService);
+  const service = new EmailTemplateService(
+    emailTemplateRepo as never,
+    translationRepo as never,
+    mjmlService,
+    audit as never,
+  );
 
   return { service, emailTemplateRepo, translationRepo, mjmlService };
 };
@@ -103,7 +111,7 @@ describe('EmailTemplateService — translation CRUD', () => {
       emailTemplateRepo.findOneBy.mockResolvedValue(null);
 
       await expect(
-        service.setTranslations('nonexistent' as EmailTemplateType, 'de', { greeting: 'Hallo' }),
+        service.setTranslations('nonexistent' as EmailTemplateType, 'de', { greeting: 'Hallo' }, ACTOR),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -119,7 +127,7 @@ describe('EmailTemplateService — translation CRUD', () => {
         await fn(manager);
       });
 
-      await service.setTranslations(EmailTemplateType.VERIFY_EMAIL, 'de', { greeting: 'Hallo' });
+      await service.setTranslations(EmailTemplateType.VERIFY_EMAIL, 'de', { greeting: 'Hallo' }, ACTOR);
 
       expect(translationRepo.manager.transaction).toHaveBeenCalled();
       expect(capturedFn).toBeDefined();
@@ -138,7 +146,7 @@ describe('EmailTemplateService — translation CRUD', () => {
         fn(manager),
       );
 
-      await service.setTranslations(EmailTemplateType.VERIFY_EMAIL, 'de', {});
+      await service.setTranslations(EmailTemplateType.VERIFY_EMAIL, 'de', {}, ACTOR);
 
       expect(manager.delete).toHaveBeenCalled();
       expect(manager.insert).not.toHaveBeenCalled();
@@ -156,7 +164,7 @@ describe('EmailTemplateService — translation CRUD', () => {
       );
 
       (readDefaultTemplateBody as jest.Mock).mockClear();
-      await service.resetToDefault(EmailTemplateType.VERIFY_EMAIL);
+      await service.resetToDefault(EmailTemplateType.VERIFY_EMAIL, ACTOR);
 
       expect(readDefaultTemplateBody).toHaveBeenCalledWith('verify-email');
       expect(emailTemplateRepo.update).toHaveBeenCalledWith(
@@ -188,7 +196,7 @@ describe('EmailTemplateService — translation CRUD', () => {
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: key });
       (readDefaultTemplateBody as jest.Mock).mockClear();
 
-      await expect(service.resetToDefault(key as never)).rejects.toBeInstanceOf(NotFoundException);
+      await expect(service.resetToDefault(key as never, ACTOR)).rejects.toBeInstanceOf(NotFoundException);
 
       expect(readDefaultTemplateBody).not.toHaveBeenCalled();
       expect(emailTemplateRepo.update).not.toHaveBeenCalled();
@@ -200,7 +208,7 @@ describe('EmailTemplateService — translation CRUD', () => {
       const { service, emailTemplateRepo } = setup();
       emailTemplateRepo.findOneBy.mockResolvedValue(null);
 
-      await expect(service.deleteTranslations('nonexistent' as EmailTemplateType, 'de')).rejects.toThrow(
+      await expect(service.deleteTranslations('nonexistent' as EmailTemplateType, 'de', ACTOR)).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -210,7 +218,7 @@ describe('EmailTemplateService — translation CRUD', () => {
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
       translationRepo.delete.mockResolvedValue({ affected: 3 });
 
-      await service.deleteTranslations(EmailTemplateType.VERIFY_EMAIL, 'de');
+      await service.deleteTranslations(EmailTemplateType.VERIFY_EMAIL, 'de', ACTOR);
 
       expect(translationRepo.delete).toHaveBeenCalledWith({
         templateType: EmailTemplateType.VERIFY_EMAIL,
@@ -227,7 +235,7 @@ describe('EmailTemplateService — translation CRUD', () => {
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
       emailTemplateRepo.update.mockResolvedValue({});
 
-      await service.update(EmailTemplateType.VERIFY_EMAIL, { subject: 'S', body: FRAGMENT });
+      await service.update(EmailTemplateType.VERIFY_EMAIL, { subject: 'S', body: FRAGMENT }, ACTOR);
 
       expect(mjmlService.validateAndConvert).toHaveBeenCalledWith(`<mjml><mj-body>${FRAGMENT}</mj-body></mjml>`);
       expect(emailTemplateRepo.update).toHaveBeenCalledWith(
@@ -246,7 +254,7 @@ describe('EmailTemplateService — translation CRUD', () => {
       const { service, emailTemplateRepo } = setup();
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
 
-      await expect(service.update(EmailTemplateType.VERIFY_EMAIL, edit)).rejects.toThrow(BadRequestException);
+      await expect(service.update(EmailTemplateType.VERIFY_EMAIL, edit, ACTOR)).rejects.toThrow(BadRequestException);
       expect(emailTemplateRepo.update).not.toHaveBeenCalled();
     });
 
@@ -256,10 +264,14 @@ describe('EmailTemplateService — translation CRUD', () => {
       emailTemplateRepo.update.mockResolvedValue({});
 
       await expect(
-        service.update(EmailTemplateType.VERIFY_EMAIL, {
-          subject: '{{#if a}}{{t "s" "Hi {x}" x=a}}{{else}}no{{/if}}',
-          body: '<mj-raw>{{#if a}}</mj-raw><mj-section><mj-column><mj-text>{{t "k" "Hi"}}</mj-text></mj-column></mj-section><mj-raw>{{/if}}</mj-raw>',
-        }),
+        service.update(
+          EmailTemplateType.VERIFY_EMAIL,
+          {
+            subject: '{{#if a}}{{t "s" "Hi {x}" x=a}}{{else}}no{{/if}}',
+            body: '<mj-raw>{{#if a}}</mj-raw><mj-section><mj-column><mj-text>{{t "k" "Hi"}}</mj-text></mj-column></mj-section><mj-raw>{{/if}}</mj-raw>',
+          },
+          ACTOR,
+        ),
       ).resolves.toBeDefined();
     });
 
@@ -268,10 +280,14 @@ describe('EmailTemplateService — translation CRUD', () => {
       emailTemplateRepo.findOneBy.mockResolvedValue({ type: EmailTemplateType.VERIFY_EMAIL });
 
       await expect(
-        service.update(EmailTemplateType.VERIFY_EMAIL, {
-          subject: 'S',
-          body: `<mjml><mj-body>${FRAGMENT}</mj-body></mjml>`,
-        }),
+        service.update(
+          EmailTemplateType.VERIFY_EMAIL,
+          {
+            subject: 'S',
+            body: `<mjml><mj-body>${FRAGMENT}</mj-body></mjml>`,
+          },
+          ACTOR,
+        ),
       ).rejects.toThrow(BadRequestException);
 
       expect(mjmlService.validateAndConvert).not.toHaveBeenCalled();
@@ -284,7 +300,7 @@ describe('EmailTemplateService — translation CRUD', () => {
       (mjmlService.validateAndConvert as jest.Mock).mockRejectedValue(new BadRequestException('bad mjml'));
 
       await expect(
-        service.update(EmailTemplateType.VERIFY_EMAIL, { subject: 'S', body: '<mj-bogus>' }),
+        service.update(EmailTemplateType.VERIFY_EMAIL, { subject: 'S', body: '<mj-bogus>' }, ACTOR),
       ).rejects.toThrow(BadRequestException);
 
       expect(emailTemplateRepo.update).not.toHaveBeenCalled();

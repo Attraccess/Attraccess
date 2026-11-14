@@ -1,6 +1,7 @@
 import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 import { randomUUID } from 'node:crypto';
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
+import { isDeepStrictEqual } from 'node:util';
+import { AuditActor, AuditEvent, AuditRecorder } from '../../../../audit/recorder/audit-event';
 
 const MAX_INLINE_ROLE_MAPPINGS_BYTES = 180;
 const MAX_INLINE_FIELD_BYTES = 96;
@@ -143,18 +144,117 @@ export function ssoAuditSnapshot(provider: SSOProvider): string {
 
 /** Records a committed `sso.provisioning.*` change for a user; callers decide how to handle failures. */
 export async function recordSsoProvisioningAudit(
-  audit: SsoAuditService,
-  action: 'user_created' | 'permissions_synced' | 'sessions_revoked',
+  audit: AuditRecorder,
+  action: 'user_created' | 'user_deleted' | 'permissions_synced' | 'sessions_revoked',
   userId: number,
   provider: SSOProvider,
   changes: unknown,
 ): Promise<void> {
   await audit.record({
+    domain: 'sso',
     action: `sso.provisioning.${action}`,
     operationId: randomUUID(),
-    actorId: null,
-    authenticationMethod: null,
+    actor: { id: null, authenticationMethod: null },
     subject: { type: 'user', id: userId },
     details: { provider: ssoAuditSnapshot(provider), changes: JSON.stringify(changes) },
   });
+}
+
+/** Names of the provider fields an update changed, plus the secrets it rotated; never their values. */
+export function ssoProviderChanges(before: SSOProvider, after: SSOProvider, rotated: string[]): string {
+  const beforeConfiguration = (before.type === SSOProviderType.OIDC
+    ? before.oidcConfiguration
+    : before.samlConfiguration) as unknown as Record<string, unknown> | undefined;
+  const afterConfiguration = (after.type === SSOProviderType.OIDC
+    ? after.oidcConfiguration
+    : after.samlConfiguration) as unknown as Record<string, unknown> | undefined;
+  const fields =
+    before.type === SSOProviderType.OIDC
+      ? [
+          'issuer',
+          'authorizationURL',
+          'tokenURL',
+          'userInfoURL',
+          'clientId',
+          'scopes',
+          'usernameClaimPaths',
+          'emailClaimPaths',
+          'roleClaimPaths',
+          'roleMappings',
+          'permissionSyncTtlMinutes',
+        ]
+      : [
+          'entryPoint',
+          'issuer',
+          'audience',
+          'signRequest',
+          'wantAssertionsSigned',
+          'wantAuthnResponseSigned',
+          'forceAuthn',
+          'emailAttributeKeys',
+          'roleAttributeKeys',
+          'roleMappings',
+        ];
+  const changed = [
+    ...(before.name === after.name ? [] : ['name']),
+    ...fields
+      .filter((key) => !isDeepStrictEqual(beforeConfiguration?.[key], afterConfiguration?.[key]))
+      .map((key) => `configuration.${key}`),
+  ];
+  return JSON.stringify({ changed, rotated });
+}
+
+/** The provider secrets and key material an update replaced. */
+export function ssoProviderRotations(before: SSOProvider, after: SSOProvider): string[] {
+  const rotated: string[] = [];
+  if (before.oidcConfiguration?.clientSecret !== after.oidcConfiguration?.clientSecret) rotated.push('clientSecret');
+  if (before.samlConfiguration?.provisioningSecret !== after.samlConfiguration?.provisioningSecret)
+    rotated.push('provisioningSecret');
+  if (before.samlConfiguration?.certificate !== after.samlConfiguration?.certificate)
+    rotated.push('identityProviderCertificate');
+  if (before.samlConfiguration?.spSigningCertificate !== after.samlConfiguration?.spSigningCertificate)
+    rotated.push('signingCertificate');
+  if (before.samlConfiguration?.spSigningKeyEncrypted !== after.samlConfiguration?.spSigningKeyEncrypted)
+    rotated.push('signingPrivateKey');
+  return rotated;
+}
+
+/**
+ * The `sso.provider.*` event for a provider lifecycle change, with before/after snapshots. Null for an update
+ * that changed nothing.
+ */
+export function ssoProviderAuditEvent(
+  action: 'created' | 'deleted',
+  actor: AuditActor,
+  provider: SSOProvider,
+): AuditEvent<'sso'>;
+export function ssoProviderAuditEvent(
+  action: 'updated',
+  actor: AuditActor,
+  provider: SSOProvider,
+  before: SSOProvider,
+): AuditEvent<'sso'> | null;
+export function ssoProviderAuditEvent(
+  action: 'created' | 'updated' | 'deleted',
+  actor: AuditActor,
+  provider: SSOProvider,
+  before?: SSOProvider,
+): AuditEvent<'sso'> | null {
+  const snapshot = ssoAuditSnapshot(provider);
+  const previous = before ?? provider;
+  const changes = ssoProviderChanges(previous, provider, before ? ssoProviderRotations(before, provider) : []);
+  if (action === 'updated' && changes === '{"changed":[],"rotated":[]}') return null;
+  return {
+    domain: 'sso',
+    action: `sso.provider.${action}`,
+    operationId: randomUUID(),
+    actor,
+    subject: { type: 'sso.provider', id: provider.id },
+    details:
+      action === 'created'
+        ? { before: 'null', after: snapshot }
+        : action === 'deleted'
+          ? { before: snapshot, after: 'null' }
+          : { before: ssoAuditSnapshot(previous), after: snapshot, changes },
+  };
 }

@@ -396,7 +396,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         notes: 'Ended by bob',
         usageId: 'ru-1',
       },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
     );
   });
 

@@ -73,8 +73,8 @@ describe('Matter plugin bundle', () => {
       return { plugin: (loaded as NonNullable<typeof loaded>).default, requested };
     }
     const expectUsable = (plugin: ReturnType<typeof loadWith>['plugin']) => {
-      expect(plugin.register({}).controllers).toHaveLength(1);
-      expect((plugin as unknown as { entities: unknown[] }).entities).toHaveLength(1);
+      expect(plugin.register({}).controllers).toHaveLength(2);
+      expect((plugin as unknown as { entities: unknown[] }).entities).toHaveLength(9);
       expect((plugin as unknown as { auditDomains: { domain: string }[] }).auditDomains[0].domain).toBe('matter');
     };
 

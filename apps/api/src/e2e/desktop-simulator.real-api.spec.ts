@@ -104,7 +104,9 @@ describe('desktop simulator against an isolated real API', () => {
       // Approving needs exactly resources.update.
       const rbac = api().get(RbacService);
       const granted = new Set(['resources.update']);
-      const role = await rbac.createRole({ name: 'Desktop reader pairing', permissionKeys: [...granted] }, granted);
+      const role = await rbac.createRole({ name: 'Desktop reader pairing', permissionKeys: [...granted] }, granted, {
+        actor: { id: null, authenticationMethod: null },
+      });
       await rbac.assignRole(pairingAdmin.id, role.id, granted);
     }
     const token = await api().get(SessionService).createSession(pairingAdmin);

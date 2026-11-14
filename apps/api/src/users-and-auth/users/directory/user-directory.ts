@@ -1,6 +1,16 @@
 import { User, AuthenticationDetail, AuthenticationType, UserRole } from '@attraccess/database-entities';
 
-import { Brackets, FindOptionsWhere, ILike, In, Raw, SelectQueryBuilder, EntityManager } from 'typeorm';
+import {
+  Brackets,
+  DataSource,
+  FindOptionsWhere,
+  ILike,
+  In,
+  Raw,
+  Repository,
+  SelectQueryBuilder,
+  EntityManager,
+} from 'typeorm';
 
 import { PaginationOptionsSchema } from '../../../types/request';
 
@@ -10,7 +20,9 @@ import { UserListOptions, UpdateUserData, FindOneOptionsSchema } from '../accoun
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+
+import { InjectRepository } from '@nestjs/typeorm';
 
 import { isEmail } from 'class-validator';
 
@@ -24,7 +36,21 @@ import { SSOUsernameChangeForbiddenException } from '../errors/ssoUsernameChange
 
 import { UserAccounts } from '../accounts/user-accounts';
 
-export abstract class UserDirectory extends UserAccounts {
+import { EmailService } from '../../../email/email.service';
+
+/** Listing and searching users, and changes to an existing account's identity. */
+@Injectable()
+export class UserDirectory {
+  private readonly logger = new Logger('UsersService');
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly accounts: UserAccounts,
+    private readonly emailService: EmailService,
+    private readonly dataSource: DataSource,
+  ) {}
+
   /** Resolve the identifier accepted by local login without ambiguous username/email queries. */
   async findByLoginIdentifier(identifier: string): Promise<User | null> {
     const value = identifier.trim();
@@ -49,7 +75,7 @@ export abstract class UserDirectory extends UserAccounts {
       });
       return matches.length === 1 ? matches[0] : null;
     }
-    return this.findOne(parsed.data);
+    return this.accounts.findOne(parsed.data);
   }
 
   async findMany(options: UserListOptions): Promise<PaginatedResponse<User>> {
@@ -149,7 +175,7 @@ export abstract class UserDirectory extends UserAccounts {
     };
   }
 
-  protected applyRoleFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
+  private applyRoleFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
     const requestedRoleIds = options.roleIds ?? (options.roleId === undefined ? undefined : [options.roleId]);
     const roleIds = requestedRoleIds ? [...new Set(requestedRoleIds)] : undefined;
     if (roleIds?.length) {
@@ -179,7 +205,7 @@ export abstract class UserDirectory extends UserAccounts {
     }
   }
 
-  protected applySsoFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
+  private applySsoFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
     const ssoProviderIds = options.ssoProviderIds ? [...new Set(options.ssoProviderIds)] : undefined;
     if (ssoProviderIds?.length || options.ssoProviderNone) {
       const noSsoProvider = query
@@ -275,7 +301,7 @@ export abstract class UserDirectory extends UserAccounts {
     await userRepo.update(id, updates);
 
     this.logger.debug(`Fetching updated user from database, ID: ${id}`);
-    const updatedUser = await this.findOne({ id }, undefined, manager);
+    const updatedUser = await this.accounts.findOne({ id }, undefined, manager);
     if (!updatedUser) {
       this.logger.error(`User not found after update, ID: ${id}`);
       throw new UserNotFoundException(id);
@@ -286,22 +312,22 @@ export abstract class UserDirectory extends UserAccounts {
   }
 
   async changeUsername(targetUserId: number, newUsername: string, executingUser: User): Promise<User> {
-    const isSSOUser = await this.isSSOUser(targetUserId);
+    const isSSOUser = await this.accounts.isSSOUser(targetUserId);
     if (isSSOUser) {
       throw new SSOUsernameChangeForbiddenException();
     }
 
-    newUsername = this.cleanupUsername(newUsername);
+    newUsername = this.accounts.cleanupUsername(newUsername);
     if (newUsername.length === 0) {
       throw new BadRequestException('Username cannot be empty');
     }
 
-    const targetUser = await this.findOne({ id: targetUserId });
+    const targetUser = await this.accounts.findOne({ id: targetUserId });
     if (!targetUser) {
       throw new UserNotFoundException(targetUserId);
     }
 
-    this.validateUsernameOrThrow(newUsername);
+    this.accounts.validateUsernameOrThrow(newUsername);
 
     const isSelf = executingUser.id === targetUserId;
     const canUpdateUsers = !!(executingUser as AuthenticatedUser).effectivePermissions?.has('users.update');
@@ -331,7 +357,7 @@ export abstract class UserDirectory extends UserAccounts {
       ...(lastUsernameChangeAt ? { lastUsernameChangeAt } : {}),
     });
 
-    const updated = await this.findOne({ id: targetUserId });
+    const updated = await this.accounts.findOne({ id: targetUserId });
     if (!updated) {
       throw new UserNotFoundException(targetUserId);
     }
@@ -353,7 +379,7 @@ export abstract class UserDirectory extends UserAccounts {
       throw new BadRequestException('Invalid email');
     }
 
-    const targetUser = await this.findOne({ id: targetUserId });
+    const targetUser = await this.accounts.findOne({ id: targetUserId });
     if (!targetUser) {
       throw new UserNotFoundException(targetUserId);
     }
@@ -369,7 +395,7 @@ export abstract class UserDirectory extends UserAccounts {
       return targetUser;
     }
 
-    const existingEmail = await this.findOne({ email: trimmedEmail });
+    const existingEmail = await this.accounts.findOne({ email: trimmedEmail });
     if (existingEmail && existingEmail.id !== targetUserId) {
       throw new BadRequestException('Email already exists');
     }
@@ -388,7 +414,7 @@ export abstract class UserDirectory extends UserAccounts {
           emailVerificationTokenExpiresAt: expiresAt,
         });
 
-        const updated = await this.findOne({ id: targetUserId }, undefined, manager);
+        const updated = await this.accounts.findOne({ id: targetUserId }, undefined, manager);
         if (!updated) {
           throw new UserNotFoundException(targetUserId);
         }
@@ -397,7 +423,7 @@ export abstract class UserDirectory extends UserAccounts {
         return updated;
       });
     } catch (error) {
-      if (this.isEmailUniqueConstraintViolation(error)) {
+      if (this.accounts.isEmailUniqueConstraintViolation(error)) {
         throw new BadRequestException('Email already exists');
       }
       throw error;
@@ -405,7 +431,7 @@ export abstract class UserDirectory extends UserAccounts {
   }
 
   async changeBillingFactor(targetUserId: number, newBillingFactor: number): Promise<User> {
-    const targetUser = await this.findOne({ id: targetUserId });
+    const targetUser = await this.accounts.findOne({ id: targetUserId });
     if (!targetUser) {
       throw new UserNotFoundException(targetUserId);
     }
@@ -416,7 +442,7 @@ export abstract class UserDirectory extends UserAccounts {
 
     await this.userRepository.update(targetUserId, { billingFactor: newBillingFactor });
 
-    const updatedUser = await this.findOne({ id: targetUserId });
+    const updatedUser = await this.accounts.findOne({ id: targetUserId });
     if (!updatedUser) {
       throw new UserNotFoundException(targetUserId);
     }

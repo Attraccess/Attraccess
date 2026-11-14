@@ -1,5 +1,5 @@
 import {
-  AdministrationAuditEvent,
+  AdministrationAuditInput as AdministrationAuditEvent,
   projectAdministrationAuditEvent,
   safeAuditOrigin,
   safeRequestedSpec,

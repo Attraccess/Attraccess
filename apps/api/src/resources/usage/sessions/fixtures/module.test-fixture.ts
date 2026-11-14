@@ -1,8 +1,8 @@
+import { AUDIT_RECORDER } from '../../../../audit/recorder/audit-event';
 import { Resource, ResourceUsage, User } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuditService } from '../../../../audit/audit.service';
 import { BillingService } from '../../../../billing/charges/billing.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { PluginEventsService } from '../../../../plugin-system/plugin-events.service';
@@ -20,6 +20,7 @@ import { ResourcesService } from '../../../resources.service';
 import { ResourceRetrainingService } from '../../../retraining/resourceRetraining.service';
 import { createResourceUsageMocks } from './mocks.test-fixture';
 import { ResourceUsageService } from '../resource-usage.service';
+import { RESOURCE_USAGE_COLLABORATORS } from '../../resource-usage.collaborators';
 export function createResourceUsageTestingModule(mocks: ReturnType<typeof createResourceUsageMocks>) {
   const {
     mockRbacService,
@@ -44,6 +45,7 @@ export function createResourceUsageTestingModule(mocks: ReturnType<typeof create
   return Test.createTestingModule({
     providers: [
       ResourceUsageService,
+      ...RESOURCE_USAGE_COLLABORATORS,
       {
         provide: getRepositoryToken(Resource),
         useFactory: mockRepository,
@@ -131,7 +133,7 @@ export function createResourceUsageTestingModule(mocks: ReturnType<typeof create
         provide: RbacService,
         useValue: mockRbacService,
       },
-      { provide: AuditService, useValue: mockAuditService },
+      { provide: AUDIT_RECORDER, useValue: mockAuditService },
     ],
   }).compile();
 }

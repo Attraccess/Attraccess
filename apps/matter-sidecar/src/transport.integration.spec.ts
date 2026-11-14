@@ -15,7 +15,7 @@ describe('transport', () => {
       { maxMessageBytes: 2_048, requestDeadlineMs: 2_000 },
       {
         features: {
-          'inventory.list': async () => ({ authoritative: false, nodes: [] }),
+          'inventory.list': async () => ({ authoritative: false, fabricId: null, nodes: [] }),
           'commands.invoke': () => new Promise(() => undefined),
           'fabric.get': async () => ({ unexpected: true }),
           'thread.get': async () => {
@@ -126,7 +126,7 @@ describe('transport', () => {
   });
 
   it('serves simulated features and checks their responses', async () => {
-    expect((await get('/v1/nodes')).body).toEqual({ authoritative: false, nodes: [] });
+    expect((await get('/v1/nodes')).body).toEqual({ authoritative: false, fabricId: null, nodes: [] });
     const bad = await get('/v1/fabric');
     expect(bad.status).toBe(500);
     expect(bad.body.error.code).toBe('internal_error');

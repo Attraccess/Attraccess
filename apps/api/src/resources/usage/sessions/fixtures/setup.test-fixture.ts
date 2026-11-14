@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ResourceUsageService } from '../resource-usage.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
@@ -26,12 +27,13 @@ import { MetricsService } from '../../../../metrics/metrics.service';
 import { PluginEventsService } from '../../../../plugin-system/plugin-events.service';
 import { RbacService } from '../../../../users-and-auth/rbac/rbac.service';
 import { VALKEY_CLIENT } from '../../../../valkey/valkey.module';
-import { AuditService } from '../../../../audit/audit.service';
 import { ResourceUsageServiceTestScope } from '../resource-usage.service.spec';
+import { RESOURCE_USAGE_COLLABORATORS } from '../../resource-usage.collaborators';
 export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       ResourceUsageService,
+      ...RESOURCE_USAGE_COLLABORATORS,
       {
         provide: getRepositoryToken(Resource),
         useFactory: scope.mockRepository,
@@ -119,7 +121,7 @@ export async function resetTestFixture(scope: ResourceUsageServiceTestScope) {
         provide: RbacService,
         useValue: scope.mockRbacService,
       },
-      { provide: AuditService, useValue: scope.mockAuditService },
+      { provide: AUDIT_RECORDER, useValue: scope.mockAuditService },
     ],
   }).compile();
 

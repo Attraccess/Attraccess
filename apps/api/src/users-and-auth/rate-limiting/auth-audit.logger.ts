@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 export type AuthAuditType =
   | 'login'
@@ -36,11 +36,15 @@ export interface AuthAuditFields {
   reason?: string;
 }
 
+/**
+ * The one way guards, interceptors and Passport strategies record authentication events: a log line plus an
+ * identity-domain audit event. Nothing at the HTTP edge injects the audit recorder directly.
+ */
 @Injectable()
 export class AuthAuditLogger {
   private readonly logger = new Logger('AuthAudit');
 
-  constructor(private readonly identityAudit: IdentityAuditService) {}
+  constructor(@Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder) {}
 
   async log(fields: AuthAuditFields): Promise<void> {
     const line = formatLine(fields);
@@ -53,12 +57,13 @@ export class AuthAuditLogger {
     const action = actionFor(fields.type);
     if (!action) return;
     const reason = fields.outcome === 'success' ? undefined : fields.outcome;
-    await this.identityAudit.record({
-      action,
+    await this.audit.record({
+      domain: 'identity',
+      action: `identity.${action}`,
       operationId: randomUUID(),
       outcome: fields.outcome === 'success' ? 'succeeded' : 'failed',
-      actorId: fields.userId ?? undefined,
-      subjectId: fields.userId ?? undefined,
+      actor: { id: fields.userId ?? null, authenticationMethod: null },
+      subject: { type: 'identity.user', id: fields.userId ?? null },
       details: reason ? { reason } : {},
       request: { ipAddress: fields.ip },
     });

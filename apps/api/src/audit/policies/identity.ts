@@ -1,4 +1,6 @@
 import { isIP } from 'node:net';
+import { randomUUID } from 'node:crypto';
+import type { AuditDetails, AuditEvent, AuditOrigin } from '../recorder/audit-event';
 import { dataFields, positive, uuid, oneOf } from './projection';
 
 export const identityPolicies = {
@@ -107,7 +109,8 @@ export const policySnapshotFields: Record<string, (value: unknown) => boolean> =
 
 export type IdentityAuditAction = keyof typeof identityPolicies;
 
-export interface IdentityAuditEvent {
+/** Projection input of an identity-domain event: the action without its `identity.` prefix. */
+export interface IdentityAuditInput {
   action: IdentityAuditAction;
   operationId: string;
   outcome: 'attempted' | 'succeeded' | 'failed';
@@ -123,11 +126,11 @@ export interface IdentityAuditEvent {
 export interface ProjectedIdentityAuditEvent {
   action: `identity.${IdentityAuditAction}`;
   operationId: string;
-  outcome: IdentityAuditEvent['outcome'];
+  outcome: IdentityAuditInput['outcome'];
   actorId: number | null;
   authenticationMethod: 'session' | 'api-token' | null;
   apiTokenId: number | null;
-  subjectType: NonNullable<IdentityAuditEvent['subjectType']>;
+  subjectType: NonNullable<IdentityAuditInput['subjectType']>;
   subjectId: number | null;
   details: Record<string, string | number | boolean | null>;
   ipAddress: string | null;
@@ -204,11 +207,11 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
     return {
       action: `identity.${action}`,
       operationId: event.operationId,
-      outcome: event.outcome as IdentityAuditEvent['outcome'],
+      outcome: event.outcome as IdentityAuditInput['outcome'],
       actorId: (event.actorId as number | undefined) ?? null,
       authenticationMethod: (authenticationMethod as 'session' | 'api-token' | undefined) ?? null,
       apiTokenId: (apiTokenId as number | undefined) ?? null,
-      subjectType: (event.subjectType as IdentityAuditEvent['subjectType'] | undefined) ?? 'identity.user',
+      subjectType: (event.subjectType as IdentityAuditInput['subjectType'] | undefined) ?? 'identity.user',
       subjectId: (event.subjectId as number | undefined) ?? null,
       details,
       ...identityRequestMetadata(event.request),
@@ -219,3 +222,23 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
 }
 
 export const IDENTITY_AUDIT_ACTIONS = Object.keys(identityPolicies).map((action) => `identity.${action}`);
+
+/** An identity envelope for a change `origin` made to `subject` (default: the identity.user with that id). */
+export function identityAuditEvent(
+  action: IdentityAuditAction,
+  origin: AuditOrigin,
+  subject: { type?: NonNullable<IdentityAuditInput['subjectType']>; id: number | null },
+  details: AuditDetails = {},
+  outcome: IdentityAuditInput['outcome'] = 'succeeded',
+): AuditEvent<'identity'> {
+  return {
+    domain: 'identity',
+    action: `identity.${action}`,
+    operationId: randomUUID(),
+    outcome,
+    actor: origin.actor,
+    subject: { type: subject.type ?? 'identity.user', id: subject.id },
+    details,
+    ...(origin.request ? { request: origin.request } : {}),
+  };
+}

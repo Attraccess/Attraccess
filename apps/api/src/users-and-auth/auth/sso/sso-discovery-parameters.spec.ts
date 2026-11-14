@@ -1,11 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import * as discovery from './providers/discovery-client';
-import { SsoProviderRoutes } from './providers/provider-routes';
+import { SSOController } from './sso.controller';
 
 describe('SSO discovery parameters', () => {
-  const routes: Pick<SsoProviderRoutes, 'discoverAuthentik' | 'discoverKeycloak'> = Object.create(
-    SsoProviderRoutes.prototype,
-  );
+  const routes: Pick<SSOController, 'discoverAuthentik' | 'discoverKeycloak'> = Object.create(SSOController.prototype);
   const fetchMock = jest.spyOn(discovery, 'requestDiscoveryJson');
 
   afterEach(() => fetchMock.mockReset());

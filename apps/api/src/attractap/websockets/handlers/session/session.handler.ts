@@ -388,7 +388,7 @@ export class AttractapSessionHandler {
           { projectId, formSubmissions, forceTakeOver },
           {
             ...(supervisorUserId ? { supervisorUserId } : {}),
-            auditOrigin: { actorId: user.id, authenticationMethod: null },
+            auditOrigin: { id: user.id, authenticationMethod: null },
           },
         );
       } finally {
@@ -475,7 +475,7 @@ export class AttractapSessionHandler {
           user,
           { formSubmissions, ...(Number.isInteger(usageId) ? { usageId } : {}) },
           {
-            auditOrigin: { actorId: user.id, authenticationMethod: null },
+            auditOrigin: { id: user.id, authenticationMethod: null },
           },
         )
         .finally(releaseCardSession);

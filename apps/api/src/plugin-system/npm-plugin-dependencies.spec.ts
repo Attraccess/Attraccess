@@ -21,7 +21,7 @@ describe('npm plugin dependency lifecycle', () => {
     ]);
     expect(plan.plugins[0].permissions).toEqual(['READ_USERS']);
     await expect(fixture.service.install('provider', '1.0.0')).rejects.toThrow('requires confirmation');
-    expect(fixture.internals.download).not.toHaveBeenCalled();
+    expect(fixture.internals.registry.download).not.toHaveBeenCalled();
     await fixture.service.install('provider', '1.0.0', undefined, undefined, plan.token);
     expect(fixture.service.listInstalled().map(({ name }) => name)).toEqual(['core', 'adapter', 'provider']);
     expect(PluginService.prototype.requestRestart).toHaveBeenCalledTimes(1);
@@ -38,9 +38,9 @@ describe('npm plugin dependency lifecycle', () => {
     const existing = fixture.service.listInstalled()[0];
     const plan = await fixture.service.installPlan('provider', '1.0.0');
     expect(plan.plugins[0].action).toBe('reuse');
-    (fixture.internals.download as jest.Mock).mockClear();
+    (fixture.internals.registry.download as jest.Mock).mockClear();
     await fixture.service.install('provider', '1.0.0', undefined, undefined, plan.token);
-    expect(fixture.internals.download).toHaveBeenCalledTimes(1);
+    expect(fixture.internals.registry.download).toHaveBeenCalledTimes(1);
     expect(fixture.service.listInstalled().find(({ name }) => name === 'core')).toEqual(existing);
   });
 
@@ -95,7 +95,7 @@ describe('npm plugin dependency lifecycle', () => {
       ['core', '1.1.0'],
       ['provider', '1.0.0'],
     ]);
-    expect((fixture.internals.download as jest.Mock).mock.calls.map(([url]) => url)).toEqual(['core/1.1.0']);
+    expect((fixture.internals.registry.download as jest.Mock).mock.calls.map(([url]) => url)).toEqual(['core/1.1.0']);
   });
 
   it('inspects alternative tarball releases lazily when backtracking changes dependency ranges', async () => {
@@ -113,7 +113,7 @@ describe('npm plugin dependency lifecycle', () => {
       ['adapter', '1.0.0'],
       ['provider', '1.0.0'],
     ]);
-    expect((fixture.internals.download as jest.Mock).mock.calls.map(([url]) => url)).toEqual([
+    expect((fixture.internals.registry.download as jest.Mock).mock.calls.map(([url]) => url)).toEqual([
       'core/2.0.0',
       'core/1.0.0',
     ]);
@@ -130,7 +130,7 @@ describe('npm plugin dependency lifecycle', () => {
       'plan changed',
     );
     expect(fixture.service.listInstalled()).toEqual([]);
-    expect(fixture.internals.download).not.toHaveBeenCalled();
+    expect(fixture.internals.registry.download).not.toHaveBeenCalled();
   });
 
   it('rejects registry and tarball dependency mismatches without installing anything', async () => {
@@ -155,7 +155,7 @@ describe('npm plugin dependency lifecycle', () => {
     await fixture.publish(fixture.pkg('provider', [fixture.dep('core')]));
     const plan = await fixture.service.installPlan('provider', '1.0.0');
     if (failure === 'download') fixture.archives.delete('provider/1.0.0');
-    else jest.spyOn(fixture.internals, 'writeRecords').mockRejectedValue(new Error('state failed'));
+    else jest.spyOn(fixture.internals.state, 'writeRecords').mockRejectedValue(new Error('state failed'));
     await expect(fixture.service.install('provider', '1.0.0', undefined, undefined, plan.token)).rejects.toThrow(
       'failed',
     );
@@ -220,7 +220,7 @@ describe('npm plugin dependency lifecycle', () => {
     await fixture.publish(fixture.pkg('provider', [fixture.dep('core')]));
     await fixture.install('provider');
     const before = fixture.service.listInstalled();
-    jest.spyOn(fixture.internals, 'writeRecords').mockRejectedValue(new Error('state failed'));
+    jest.spyOn(fixture.internals.state, 'writeRecords').mockRejectedValue(new Error('state failed'));
     await expect(fixture.service.removeInstalled('core', false, ['provider'])).rejects.toThrow('state failed');
     expect(fixture.service.listInstalled()).toEqual(before);
     expect(PluginService.getPlugins()).toHaveLength(2);

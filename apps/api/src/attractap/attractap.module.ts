@@ -67,7 +67,6 @@ import { MassIntroductionModule } from '../resources/mass-introductions/mass-int
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ResourceMeteringModule } from '../resources/metering/resource-metering.module';
 import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
-import { AuditModule } from '../audit/audit.module';
 import { DeviceEnrollmentModule } from '../device-enrollment/device-enrollment.module';
 import { SettingsModule } from '../settings/settings.module';
 import { CardConversationService } from './websockets/card-conversation.service';
@@ -117,7 +116,6 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     SupervisionModule,
     MassIntroductionModule,
     NotificationsModule,
-    AuditModule,
     DeviceEnrollmentModule,
     SettingsModule,
     EncryptionModule,

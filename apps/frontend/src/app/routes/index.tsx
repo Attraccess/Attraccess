@@ -157,6 +157,8 @@ const coreRoutes: RouteConfig[] = [
     path: '/confirm-delete-account',
     element: <ConfirmDeleteAccount />,
     authRequired: false,
+    // The layout swaps its tree when a deletion signs the user out, which would reset the dialog's state.
+    noLayout: true,
   },
   {
     path: '/resources',

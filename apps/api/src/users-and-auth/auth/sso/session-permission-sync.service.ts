@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { SSOProvider, SsoSessionContext } from '@attraccess/database-entities';
 import { MetricsService } from '../../../metrics/metrics.service';
-import { SsoAuditService } from '../../../audit/sso-audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../../audit/recorder/audit-event';
 import { SessionService } from '../session.service';
 import { LogoutSession } from '../session-store/session-store';
 import { recordSsoProvisioningAudit } from './audit/provider-audit';
@@ -35,7 +35,7 @@ export class SsoSessionPermissionSyncService implements SessionPermissionSync {
     private readonly sessionService: SessionService,
     private readonly metricsService: MetricsService,
     @Inject(SESSION_PERMISSION_RESYNCERS) private readonly resyncers: SessionPermissionResyncer[],
-    private readonly ssoAudit: SsoAuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   /**
@@ -162,7 +162,7 @@ export class SsoSessionPermissionSyncService implements SessionPermissionSync {
     changes: RoleDelta | { sessionsRevoked: true },
   ): Promise<void> {
     try {
-      await recordSsoProvisioningAudit(this.ssoAudit, action, userId, provider, changes);
+      await recordSsoProvisioningAudit(this.audit, action, userId, provider, changes);
     } catch (error) {
       this.logger.warn(
         `Failed to record SSO permission re-sync audit: ${error instanceof Error ? error.message : String(error)}`,

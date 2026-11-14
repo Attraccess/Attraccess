@@ -134,7 +134,7 @@ export function createServices() {
       decryptIfEncrypted: (v: string) => v.replace('encrypted:', ''),
     },
     usersService: { findOne: jest.fn().mockResolvedValue(user) },
-    audit: { recordAttractap: jest.fn().mockResolvedValue(undefined) },
+    audit: { record: jest.fn().mockResolvedValue(undefined) },
   });
   // Mirrors the real service: stored card keys come back decrypted.
   const originalGet = attractapService.getNFCCardByUID;

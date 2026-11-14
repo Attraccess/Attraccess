@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { DocumentationType, Resource, ResourceType } from '@attraccess/database-entities';
@@ -8,13 +9,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { getRepositoryToken } from '@nestjs/typeorm';
 
-import { randomUUID } from 'node:crypto';
-
 import { Repository } from 'typeorm';
 
-import { projectResourceAuditEvent } from './../audit/audit-policy';
-
-import { AuditService } from './../audit/audit.service';
+import { projectAuditRow } from './../audit/recorder/audit-row';
 
 import { ResourceNotFoundException } from './../exceptions/resource.notFound.exception';
 
@@ -38,7 +35,7 @@ export type ResourcesServiceTestScope = {
   resourceRepository: jest.Mocked<Repository<Resource>>;
   mockResourceImageService: { saveImage: any; deleteImage: any; getPublicPath: any };
   service: ResourcesService;
-  audit: { recordResource: any };
+  audit: { record: any };
   mockResourceRepository: () => {
     find: any;
     findOne: any;
@@ -57,7 +54,7 @@ describe('ResourcesService', () => {
 
   let resourceRepository: jest.Mocked<Repository<Resource>>;
 
-  const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
 
   // ResourceImageService is injected but not directly used in these tests
 
@@ -140,13 +137,13 @@ describe('ResourcesService', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
-        { provide: AuditService, useValue: audit },
+        { provide: AUDIT_RECORDER, useValue: audit },
       ],
     }).compile();
 
     service = module.get<ResourcesService>(ResourcesService);
     resourceRepository = module.get(getRepositoryToken(Resource)) as jest.Mocked<Repository<Resource>>;
-    audit.recordResource.mockClear();
+    audit.record.mockClear();
     // ResourceImageService is available but not directly used in tests
   });
 
@@ -232,8 +229,9 @@ describe('ResourcesService', () => {
         { id: 9 },
       );
 
-      expect(updateResourceScope.audit.recordResource).toHaveBeenCalledWith(
+      expect(updateResourceScope.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'resource',
           action: 'resource.updated',
           details: {
             'before.name': 'Old',
@@ -254,8 +252,9 @@ describe('ResourcesService', () => {
 
       await updateResourceScope.service.updateResource(1, { name: 'New', metadata: {} }, undefined, { id: 9 });
 
-      expect(updateResourceScope.audit.recordResource).toHaveBeenCalledWith(
+      expect(updateResourceScope.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'resource',
           action: 'resource.updated',
           details: { 'before.name': 'Old', 'after.name': 'New', changedFields: '["name"]' },
         }),
@@ -270,14 +269,9 @@ describe('ResourcesService', () => {
 
       await updateResourceScope.service.updateResource(1, { name: updatedResource.name }, undefined, { id: 9 });
 
-      const details = updateResourceScope.audit.recordResource.mock.calls[0][0].details;
+      const details = updateResourceScope.audit.record.mock.calls[0][0].details;
       expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
-      expect(
-        projectResourceAuditEvent({
-          ...updateResourceScope.audit.recordResource.mock.calls[0][0],
-          operationId: randomUUID(),
-        }),
-      ).not.toBeNull();
+      expect(projectAuditRow(updateResourceScope.audit.record.mock.calls[0][0])).not.toBeNull();
     });
 
     it('audits a non-name update without recording its value', async () => {
@@ -288,8 +282,9 @@ describe('ResourcesService', () => {
 
       await updateResourceScope.service.updateResource(1, { allowTakeOver: true }, undefined, { id: 9 });
 
-      expect(updateResourceScope.audit.recordResource).toHaveBeenCalledWith(
+      expect(updateResourceScope.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'resource',
           action: 'resource.updated',
           details: { changedFields: '["allowTakeOver"]' },
         }),
@@ -303,7 +298,7 @@ describe('ResourcesService', () => {
 
       await updateResourceScope.service.updateResource(1, { allowTakeOver: false }, undefined, { id: 9 });
 
-      expect(updateResourceScope.audit.recordResource).not.toHaveBeenCalled();
+      expect(updateResourceScope.audit.record).not.toHaveBeenCalled();
     });
 
     it('audits an image-only update without persisting the filename', async () => {
@@ -315,8 +310,9 @@ describe('ResourcesService', () => {
 
       await updateResourceScope.service.updateResource(1, {}, {} as never, { id: 9 });
 
-      expect(updateResourceScope.audit.recordResource).toHaveBeenCalledWith(
+      expect(updateResourceScope.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'resource',
           action: 'resource.updated',
           details: { changedFields: '["image"]' },
         }),
@@ -381,10 +377,11 @@ describe('ResourcesService', () => {
 
       await deleteResourceScope.service.deleteResource(1, { id: 9 });
 
-      expect(deleteResourceScope.audit.recordResource).toHaveBeenCalledWith(
+      expect(deleteResourceScope.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'resource',
           action: 'resource.deleted',
-          actorId: 9,
+          actor: expect.objectContaining({ id: 9 }),
           details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine },
         }),
       );
@@ -401,15 +398,10 @@ describe('ResourcesService', () => {
 
       await deleteResourceScope.service.deleteResource(1, { id: 9 });
 
-      const details = deleteResourceScope.audit.recordResource.mock.calls[0][0].details;
+      const details = deleteResourceScope.audit.record.mock.calls[0][0].details;
       expect(details['before.name']).toMatch(/\.\.\.$/);
       expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
-      expect(
-        projectResourceAuditEvent({
-          ...deleteResourceScope.audit.recordResource.mock.calls[0][0],
-          operationId: randomUUID(),
-        }),
-      ).not.toBeNull();
+      expect(projectAuditRow(deleteResourceScope.audit.record.mock.calls[0][0])).not.toBeNull();
     });
 
     it('should throw ResourceNotFoundException if resource not found', async () => {

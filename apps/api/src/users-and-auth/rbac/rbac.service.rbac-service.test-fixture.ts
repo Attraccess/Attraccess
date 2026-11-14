@@ -1,9 +1,12 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Permission, Role, RolePermission, User, UserRole, UserRoleSource } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RbacService } from './rbac.service';
+
+const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -134,6 +137,7 @@ export function registerRbacServiceFixture() {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AUDIT_RECORDER, useValue: audit },
         RbacService,
         { provide: getRepositoryToken(UserRole), useValue: userRoleRepo },
         { provide: getRepositoryToken(Role), useValue: roleRepo },
@@ -159,6 +163,9 @@ export function registerRbacServiceFixture() {
       updatedAt: new Date(),
     }) as Permission;
   return {
+    get audit() {
+      return audit;
+    },
     get createMockQueryBuilder() {
       return createMockQueryBuilder;
     },

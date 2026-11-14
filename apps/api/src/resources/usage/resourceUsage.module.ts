@@ -27,6 +27,7 @@ import { ReaderUiModule } from '../../plugin-system/reader-ui/reader-ui.module';
 import { PreStartService } from './pre-start/pre-start.service';
 import { SessionEndNotifier } from './pre-start/session-end-notifier.service';
 import { WebStartStepStore } from './pre-start/web-start-step.store';
+import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { WebStartStepStore } from './pre-start/web-start-step.store';
   controllers: [ResourceUsageController],
   providers: [
     ResourceUsageService,
+    ...RESOURCE_USAGE_COLLABORATORS,
     ResourceUsageNoteNotificationListener,
     ResourceSessionNotificationListener,
     SupervisedUsageAutoPromotionListener,

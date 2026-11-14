@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { SettingsStoreService } from '../../settings/settings-store.service';
 import { ATTRACTAP_KEYS, ATTRACTAP_PARENT } from '../../settings/constants';
 import { CardWriterPolicyService, READER_NOT_ALLOWED_TO_WRITE_CARDS } from './card-writer-policy.service';
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 
 describe('CardWriterPolicyService', () => {
   let stored: Map<string, string | null>;
@@ -15,6 +16,7 @@ describe('CardWriterPolicyService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         CardWriterPolicyService,
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         {
           provide: SettingsStoreService,
           useValue: {

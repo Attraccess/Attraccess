@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import * as migrations from '../../../database/migrations';
 import { UserProfileController } from '../../../users-and-auth/users/user-profile.controller';
 import { UsersService } from '../../../users-and-auth/users/users.service';
+import { composeUsersService } from '../../../users-and-auth/users/fixtures/compose.test-fixture';
 import { getSupportedDeviceLanguage } from '@attraccess/shared';
 import { SettingsService } from '../../../settings/settings.service';
 import { AttractapService } from '../../attractap.service';
@@ -43,13 +44,22 @@ describe('persisted web UI locale at card authentication', () => {
     });
 
     // Keep production persistence and lookup methods; stub only unrelated collaborators.
-    const usersService: UsersService = Object.assign(Object.create(UsersService.prototype), {
+    const usersService: UsersService = composeUsersService(
       userRepository,
-      metricsService: {
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
         usersLocaleSyncsTotal: { inc: jest.fn() },
         usersPerLocale: { inc: jest.fn(), dec: jest.fn() },
       },
-    });
+      undefined,
+      undefined,
+    );
     const profile = new UserProfileController(usersService);
     const attractapService: AttractapService = Object.assign(Object.create(AttractapService.prototype), {
       nfcCardRepository: cardRepository,

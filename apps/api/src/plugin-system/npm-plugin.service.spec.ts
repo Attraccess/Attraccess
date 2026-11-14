@@ -1,12 +1,13 @@
 import { createHash, randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { projectAdministrationAuditEvent } from '../audit/policies/administration';
+import { projectAuditRow } from '../audit/recorder/audit-row';
 import { recordNpmBootMigrationOutcome } from './npm/audit-state';
 import { NpmPluginService } from './npm-plugin.service';
-import type { ServiceInternals, SettingsMock } from './npm-plugin.test-fixture';
+import type { SettingsMock } from './npm-plugin.test-fixture';
 import { setupNpmPluginFixture } from './npm-plugin.test-fixture';
 import { PluginService } from './plugin.service';
+import { npmInternals } from './npm/fixtures/compose.test-fixture';
 jest.mock('dns/promises', () => ({ lookup: jest.fn() }));
 describe('NpmPluginService', () => {
   const fixture = setupNpmPluginFixture();
@@ -21,14 +22,11 @@ describe('NpmPluginService', () => {
           async (_parent, key) => ({ enabled: 'true', domains: '["administration"]', retention_days: '90' })[key],
         ),
       };
-      const audit = {
-        list: jest.fn().mockResolvedValue({ items: [] }),
-        recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }),
-      };
-      const service = new NpmPluginService(settings as never, undefined, audit as never);
-      const internals = service as unknown as ServiceInternals;
-      jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-      jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+      const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+      const query = { list: jest.fn().mockResolvedValue({ items: [] }) };
+      const service = new NpmPluginService(settings as never, undefined, audit as never, query as never);
+      jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+      jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
         versions: {
           '1.2.3': {
             version: '1.2.3',
@@ -39,7 +37,7 @@ describe('NpmPluginService', () => {
           },
         },
       });
-      jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+      jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
       const state = fixture.auditState();
       state.context = { operationId: randomUUID(), actorId: 42, authenticationMethod: 'api-token', apiTokenId: 9 };
       await service.install(name, '1.2.3', undefined, state);
@@ -55,16 +53,15 @@ describe('NpmPluginService', () => {
         .spyOn(PluginService, 'getPluginsWithLoadStatus')
         .mockReturnValue([{ ...manifest, status: migrationOutcome === 'succeeded' ? 'loaded' : 'error' }]);
       jest.spyOn(PluginService, 'isPluginQuarantined').mockReturnValue(migrationOutcome === 'failed');
-      const restarted = new NpmPluginService(settings as never, undefined, audit as never);
+      const restarted = new NpmPluginService(settings as never, undefined, audit as never, query as never);
       await restarted.onApplicationBootstrap();
-      const recorded = audit.recordAdministration.mock.calls[0][0];
-      expect(projectAdministrationAuditEvent(recorded)).not.toBeNull();
+      const recorded = audit.record.mock.calls[0][0];
+      expect(projectAuditRow(recorded)).not.toBeNull();
       expect(recorded).toMatchObject({
+        domain: 'administration',
         operationId: state.context.operationId,
         action: 'plugin.activation_completed',
-        actorId: 42,
-        authenticationMethod: 'api-token',
-        apiTokenId: 9,
+        actor: { id: 42, authenticationMethod: 'api-token', apiTokenId: 9 },
         outcome: migrationOutcome,
         details: {
           migrationOutcome,
@@ -72,7 +69,7 @@ describe('NpmPluginService', () => {
         },
       });
       await restarted.onApplicationBootstrap();
-      expect(audit.recordAdministration).toHaveBeenCalledTimes(1);
+      expect(audit.record).toHaveBeenCalledTimes(1);
       expect(JSON.parse(readFileSync(join(fixture.root, '.npm-plugin-state.json'), 'utf8'))[0]).not.toHaveProperty(
         'pendingAudit',
       );
@@ -81,14 +78,13 @@ describe('NpmPluginService', () => {
 
   it('installs standard package-prefixed tarballs without losing concurrent state updates', async () => {
     const service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    const internals = service as unknown as ServiceInternals;
     const packages = await Promise.all(
       ['@attraccess/one', '@attraccess/two'].map(async (name) => [name, await fixture.packageTarball(name)] as const),
     );
     const tarballs = new Map(packages);
 
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => {
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockImplementation(async (name) => {
       const tarball = tarballs.get(name);
       if (!tarball) throw new Error(`Unexpected package ${name}`);
       return {
@@ -100,7 +96,7 @@ describe('NpmPluginService', () => {
         },
       };
     });
-    jest.spyOn(internals, 'download').mockImplementation(async (name) => {
+    jest.spyOn(npmInternals(service).registry, 'download').mockImplementation(async (name) => {
       const tarball = tarballs.get(name);
       if (!tarball) throw new Error(`Unexpected tarball ${name}`);
       return tarball;
@@ -129,9 +125,8 @@ describe('NpmPluginService', () => {
       setSecretSetting: jest.fn(),
     };
     const service = new NpmPluginService(settings as unknown as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
           version: '1.2.3',
@@ -139,7 +134,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
 
     await service.install(name, '1.2.3', 'private');
 
@@ -152,10 +147,9 @@ describe('NpmPluginService', () => {
     const name = '@attraccess/plugin-example';
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
-    const internals = service as unknown as ServiceInternals;
 
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       maintainers: [{ name: 'attraccess' }],
       versions: {
         '1.2.3': {
@@ -165,7 +159,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
 
     await expect(service.install(name, '1.2.3')).resolves.toMatchObject({
       classification: 'official',
@@ -177,10 +171,9 @@ describe('NpmPluginService', () => {
     const name = '@attraccess/plugin';
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
-    const internals = service as unknown as ServiceInternals;
 
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
           version: '1.2.3',
@@ -188,7 +181,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
 
     const results = await Promise.allSettled([service.install(name, '1.2.3'), service.install(name, '1.2.3')]);
 
@@ -205,9 +198,8 @@ describe('NpmPluginService', () => {
     const name = '@attraccess/plugin';
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
-    const internals = service as unknown as ServiceInternals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.0.0': {
           version: '1.0.0',
@@ -219,7 +211,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
 
     await expect(service.install(name, '^1.0.0')).resolves.toMatchObject({ version: '1.2.3', requestedSpec: '^1.0.0' });
   });
@@ -315,7 +307,10 @@ describe('NpmPluginService', () => {
     PluginService.quarantinePlugin(plugin, new Error('prior crash'));
     const service = new NpmPluginService({} as never);
     jest
-      .spyOn(service as unknown as { writeStateWithout(name: string): Promise<void> }, 'writeStateWithout')
+      .spyOn(
+        npmInternals(service).state as unknown as { writeStateWithout(name: string): Promise<void> },
+        'writeStateWithout',
+      )
       .mockRejectedValue(new Error('state write failed'));
 
     await expect(service.removeInstalled(name)).rejects.toThrow('state write failed');
@@ -339,10 +334,9 @@ describe('NpmPluginService', () => {
       }),
     );
     const service = new NpmPluginService({} as never);
-    const internals = service as unknown as ServiceInternals;
 
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
           version: '1.2.3',
@@ -350,8 +344,8 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
-    jest.spyOn(internals, 'removeBackup').mockRejectedValue(new Error('cleanup failed'));
+    jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
+    jest.spyOn(npmInternals(service).state, 'removeBackup').mockRejectedValue(new Error('cleanup failed'));
 
     await expect(service.install(name, '1.2.3')).resolves.toMatchObject({ name, version: '1.2.3' });
 
@@ -369,10 +363,9 @@ describe('NpmPluginService', () => {
     const audit = fixture.auditState();
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
-    const internals = service as unknown as ServiceInternals;
 
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
           version: '1.2.3',
@@ -380,7 +373,7 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
     jest.spyOn(PluginService, 'clearPluginQuarantine').mockImplementation(() => {
       throw new Error('quarantine write failed');
     });
@@ -413,10 +406,9 @@ describe('NpmPluginService', () => {
     const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
-    const internals = service as unknown as ServiceInternals;
 
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
           version: '1.2.3',
@@ -424,10 +416,10 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
-    const writeState = internals.writeState.bind(service);
+    jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
+    const writeState = npmInternals(service).state.writeState.bind(npmInternals(service).state);
     jest
-      .spyOn(internals, 'writeState')
+      .spyOn(npmInternals(service).state, 'writeState')
       .mockImplementationOnce(writeState)
       .mockRejectedValueOnce(new Error('final state write failed'));
 
@@ -444,10 +436,9 @@ describe('NpmPluginService', () => {
     const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
-    const internals = service as unknown as ServiceInternals;
 
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
           version: '1.2.3',
@@ -455,10 +446,10 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
-    const writeState = internals.writeState.bind(service);
+    jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
+    const writeState = npmInternals(service).state.writeState.bind(npmInternals(service).state);
     jest
-      .spyOn(internals, 'writeState')
+      .spyOn(npmInternals(service).state, 'writeState')
       .mockImplementationOnce(writeState)
       .mockRejectedValueOnce(new Error('final state write failed'));
     jest.spyOn(PluginService, 'quarantinePluginDirectory').mockImplementation(() => {
@@ -482,12 +473,9 @@ describe('NpmPluginService', () => {
     const installPath = `npm-${Buffer.from(name).toString('base64url')}`;
     const tarball = await fixture.packageTarball(name);
     const service = new NpmPluginService({} as never);
-    const internals = service as unknown as ServiceInternals & {
-      rollbackActivation(activation: { target: string; backup: string }): Promise<void>;
-    };
 
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
-    jest.spyOn(service, 'packageMetadata').mockResolvedValue({
+    jest.spyOn(npmInternals(service).catalog, 'hostVersion').mockReturnValue('1.9.0');
+    jest.spyOn(npmInternals(service).catalog, 'packageMetadata').mockResolvedValue({
       versions: {
         '1.2.3': {
           version: '1.2.3',
@@ -495,17 +483,17 @@ describe('NpmPluginService', () => {
         },
       },
     });
-    jest.spyOn(internals, 'download').mockResolvedValue(tarball);
+    jest.spyOn(npmInternals(service).registry, 'download').mockResolvedValue(tarball);
     jest
-      .spyOn(internals, 'writeState')
+      .spyOn(npmInternals(service).state, 'writeState')
       .mockResolvedValueOnce()
       .mockRejectedValueOnce(new Error('final state write failed'));
     jest.spyOn(PluginService, 'quarantinePluginDirectory').mockImplementation(() => {
       throw new Error('quarantine write failed');
     });
-    const rollbackActivation = internals.rollbackActivation.bind(service);
+    const rollbackActivation = npmInternals(service).state.rollbackActivation.bind(npmInternals(service).state);
     const rollback = jest
-      .spyOn(internals, 'rollbackActivation')
+      .spyOn(npmInternals(service).state, 'rollbackActivation')
       .mockRejectedValueOnce(new Error('rollback failed'))
       .mockImplementation(rollbackActivation);
 

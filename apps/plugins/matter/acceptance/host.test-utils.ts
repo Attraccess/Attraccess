@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { AuditService } from '../../../api/src/audit/audit.service';
+import { PluginAuditHost } from '../../../api/src/audit/plugin-audit-host';
 import { createTestAuditMetrics } from '../../../api/src/audit/audit.test-fixture';
 import * as coreMigrations from '../../../api/src/database/migrations';
 import { EncryptionService } from '../../../api/src/encryption/encryption.service';
@@ -20,6 +21,8 @@ import {
   resetPluginAuditRegistry,
 } from '../../../api/src/plugin-system/audit/audit-registry';
 import { createPluginAuditContext } from '../../../api/src/plugin-system/runtime/audit-context';
+import { createPluginRunSerialized } from '../../../api/src/plugin-system/runtime/plugin-serialized';
+import { closeResourceTransactionConnection } from '../../../api/src/database/run-serialized-transaction';
 import { SettingsStoreService } from '../../../api/src/settings/settings-store.service';
 import { Setting } from '@attraccess/database-entities';
 import * as sourceMigrations from '../backend/migrations';
@@ -104,7 +107,8 @@ export async function bootHost(
     manifest: { id: PLUGIN_ID, name: 'matter', version: COMPATIBILITY_TABLE[0].plugin, pluginDirectory: 'matter' },
     dataSource: db,
     getRepository: (entity) => db.getRepository(entity),
-    audit: createPluginAuditContext(PLUGIN_ID, () => audit),
+    runSerialized: createPluginRunSerialized(PLUGIN_ID, () => db.manager),
+    audit: createPluginAuditContext(PLUGIN_ID, () => new PluginAuditHost(audit)),
     events: new EventEmitter2(),
     logger: { log: sink('log'), debug: sink('debug'), warn: sink('warn'), error: sink('error') },
     secrets: {
@@ -143,6 +147,7 @@ export async function bootHost(
     logs,
     close: async () => {
       await app.close();
+      await closeResourceTransactionConnection(db);
       await db.destroy();
       await rm(directory, { recursive: true, force: true });
       resetPluginAuditRegistry();

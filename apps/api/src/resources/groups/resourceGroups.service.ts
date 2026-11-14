@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository, EntityManager } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { MetricsService } from '../../metrics/metrics.service';
 
@@ -45,7 +45,7 @@ export class ResourceGroupsService {
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
     protected readonly metricsService: MetricsService,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   /**
@@ -141,13 +141,11 @@ export class ResourceGroupsService {
     );
     this.metricsService.resourceGroupsTotal.inc();
     if (actor) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'resource_group.created',
-        actorId: actor.id,
-        authenticationMethod: actor.authenticationMethod,
-        apiTokenId: actor.apiTokenId,
-        subjectType: 'resource_group',
-        subjectId: savedResourceGroup.id,
+        actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+        subject: { type: 'resource_group', id: savedResourceGroup.id },
         details: { 'after.name': savedResourceGroup.name, 'after.isHidden': Number(savedResourceGroup.isHidden) },
       });
     }
@@ -215,14 +213,12 @@ export class ResourceGroupsService {
       ];
       if (changedFields.length) details.changedFields = JSON.stringify(changedFields);
       if (Object.keys(details).length) {
-        await this.audit.recordResource({
+        await this.audit.record({
+          domain: 'resource',
           action: 'resource_group.updated',
-          actorId: actor.id,
-          authenticationMethod: actor.authenticationMethod,
-          apiTokenId: actor.apiTokenId,
-          subjectType: 'resource_group',
-          subjectId: savedResourceGroup.id,
-          details,
+          actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+          subject: { type: 'resource_group', id: savedResourceGroup.id },
+          details: details,
         });
       }
     }
@@ -247,13 +243,11 @@ export class ResourceGroupsService {
     );
     this.metricsService.resourceGroupsTotal.dec();
     if (actor) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'resource_group.deleted',
-        actorId: actor.id,
-        authenticationMethod: actor.authenticationMethod,
-        apiTokenId: actor.apiTokenId,
-        subjectType: 'resource_group',
-        subjectId: groupId,
+        actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+        subject: { type: 'resource_group', id: groupId },
         details: { 'before.name': resourceGroup.name, 'before.isHidden': Number(resourceGroup.isHidden) },
       });
     }
@@ -319,13 +313,11 @@ export class ResourceGroupsService {
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id, [resourceId]),
     );
     if (actor) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'resource_group.resource_added',
-        actorId: actor.id,
-        authenticationMethod: actor.authenticationMethod,
-        apiTokenId: actor.apiTokenId,
-        subjectType: 'resource_group',
-        subjectId: groupId,
+        actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+        subject: { type: 'resource_group', id: groupId },
         details: { resourceId },
       });
     }
@@ -350,13 +342,11 @@ export class ResourceGroupsService {
       new ResourceGroupIntroductionChangedEvent(savedResourceGroup.id, [resourceId]),
     );
     if (actor) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'resource_group.resource_removed',
-        actorId: actor.id,
-        authenticationMethod: actor.authenticationMethod,
-        apiTokenId: actor.apiTokenId,
-        subjectType: 'resource_group',
-        subjectId: groupId,
+        actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+        subject: { type: 'resource_group', id: groupId },
         details: { resourceId },
       });
     }

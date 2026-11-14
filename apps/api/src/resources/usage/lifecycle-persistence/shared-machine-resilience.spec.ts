@@ -14,6 +14,7 @@ import { MachineBusyError } from '../errors/machine-busy.error';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { SessionChangeInterruptedError } from '../errors/session-change-interrupted.error';
 import { FakeValkey } from '../sessions/fake-valkey.test-fixture';
+import { forkUsageInstance, usageInternals } from '../sessions/fixtures/compose.test-fixture';
 import {
   SessionChangeCoordination,
   SWEEP_EVERY_MS,
@@ -59,10 +60,11 @@ describe('Shared machines: restart, waiting and audit', () => {
 
   /** The API process restarts: its memory (queue, running changes) is gone, the database stays. */
   const restartApi = () => {
-    Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', undefined);
-    Reflect.set(scope.usage, 'sessionChangeQueue', new (Reflect.get(scope.usage, 'sessionChangeQueue').constructor)());
+    Reflect.set(usageInternals(scope.usage).turns, 'sessionChangeCoordinationInstance', undefined);
+    const turns = usageInternals(scope.usage).turns;
+    Reflect.set(turns, 'sessionChangeQueue', new (Reflect.get(turns, 'sessionChangeQueue').constructor)());
   };
-  const setWaitMs = (ms: number) => Reflect.set(scope.usage, 'sessionChangeWaitMs', ms);
+  const setWaitMs = (ms: number) => Reflect.set(usageInternals(scope.usage).turns, 'sessionChangeWaitMs', ms);
   const payloads = (type: ResourceFlowNodeType) =>
     scope.flow.runFlow.mock.calls
       .filter((call) => call[1] === type)
@@ -139,7 +141,7 @@ describe('Shared machines: restart, waiting and audit', () => {
     /** This API instance with Valkey; `host` names the instance (host and port), each call is a new boot. */
     const bootOnValkey = (valkey: FakeValkey, host: string, bootWaitMs = 0) =>
       Reflect.set(
-        scope.usage,
+        usageInternals(scope.usage).turns,
         'sessionChangeCoordinationInstance',
         new ValkeySessionChangeCoordination(valkey as never, host, bootWaitMs),
       );
@@ -154,12 +156,12 @@ describe('Shared machines: restart, waiting and audit', () => {
       const [attempt] = await attempts();
 
       // A second instance (another host) boots; the first one's heartbeat is visible in Valkey.
-      const first = Reflect.get(scope.usage, 'sessionChangeCoordinationInstance');
+      const first = Reflect.get(usageInternals(scope.usage).turns, 'sessionChangeCoordinationInstance');
       bootOnValkey(valkey, 'host-b:3000');
       await scope.usage.recoverInterruptedLifecycles();
       expect((await attempts()).map((a) => a.id)).toEqual([attempt.id]);
 
-      Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', first);
+      Reflect.set(usageInternals(scope.usage).turns, 'sessionChangeCoordinationInstance', first);
       parked.release();
       await expect(start).resolves.toMatchObject({ userId: 1 });
       expect(await sessionOwners()).toEqual([1]);
@@ -192,7 +194,7 @@ describe('Shared machines: restart, waiting and audit', () => {
       const start = scope.usage.startSession(1, scope.users[0], {});
       start.catch(() => undefined);
       await parked.entered;
-      Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', otherInstance(false));
+      Reflect.set(usageInternals(scope.usage).turns, 'sessionChangeCoordinationInstance', otherInstance(false));
       await scope.usage.recoverInterruptedLifecycles();
       expect(await attempts()).toHaveLength(0);
       parked.release();
@@ -258,14 +260,16 @@ describe('Shared machines: restart, waiting and audit', () => {
           expect(sweeps()).toHaveLength(0);
           scope.usage.onModuleDestroy();
 
-          Reflect.set(scope.usage, 'valkeyClient', {
+          const valkeyClient = {
             duplicate: () => ({ on: jest.fn(), subscribe: jest.fn(), disconnect: jest.fn() }),
-          });
+          };
+          Reflect.set(usageInternals(scope.usage).turns, 'valkeyClient', valkeyClient);
+          Reflect.set(usageInternals(scope.usage).access, 'valkeyClient', valkeyClient);
           await scope.usage.onModuleInit();
           expect(sweeps()).toHaveLength(1);
           let finish!: () => void;
           const sweep = jest
-            .spyOn(scope.usage, 'recoverInterruptedLifecycles')
+            .spyOn(usageInternals(scope.usage).lifecycle, 'recoverInterruptedLifecycles')
             .mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
           const [tick] = sweeps()[0] as unknown as [() => void];
           tick();
@@ -278,9 +282,10 @@ describe('Shared machines: restart, waiting and audit', () => {
           expect(sweep).toHaveBeenCalledTimes(2);
           finish();
           scope.usage.onModuleDestroy();
-          expect(Reflect.get(scope.usage, 'lifecycleSweepInterval')).toBeNull();
+          expect(Reflect.get(usageInternals(scope.usage).lifecycle, 'lifecycleSweepInterval')).toBeNull();
         } finally {
-          Reflect.set(scope.usage, 'valkeyClient', undefined);
+          Reflect.set(usageInternals(scope.usage).turns, 'valkeyClient', undefined);
+          Reflect.set(usageInternals(scope.usage).access, 'valkeyClient', undefined);
           interval.mockRestore();
         }
       });
@@ -352,17 +357,14 @@ describe('Shared machines: restart, waiting and audit', () => {
       const twoInstances = () => {
         const valkey = new FakeValkey();
         bootOnValkey(valkey, 'host-a:3000');
-        const instanceB = Object.create(scope.usage) as typeof scope.usage;
-        Reflect.set(
-          instanceB,
-          'sessionChangeQueue',
-          new (Reflect.get(scope.usage, 'sessionChangeQueue').constructor)(),
-        );
-        Reflect.set(
-          instanceB,
-          'sessionChangeCoordinationInstance',
-          new ValkeySessionChangeCoordination(valkey as never, 'host-b:3000'),
-        );
+        const instanceB = forkUsageInstance(scope.usage, (turns) => {
+          Reflect.set(turns, 'sessionChangeQueue', new (Reflect.get(turns, 'sessionChangeQueue').constructor)());
+          Reflect.set(
+            turns,
+            'sessionChangeCoordinationInstance',
+            new ValkeySessionChangeCoordination(valkey as never, 'host-b:3000'),
+          );
+        });
         return { a: scope.usage, b: instanceB };
       };
 
@@ -409,7 +411,7 @@ describe('Shared machines: restart, waiting and audit', () => {
       await setLimit(3);
       setWaitMs(80);
       const heldElsewhere = jest.fn();
-      Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', {
+      Reflect.set(usageInternals(scope.usage).turns, 'sessionChangeCoordinationInstance', {
         ...otherInstance(false),
         acquire: async (_id: number, timeoutMs: number) => {
           heldElsewhere(timeoutMs);
@@ -425,7 +427,10 @@ describe('Shared machines: restart, waiting and audit', () => {
     it('keeps limit 1 on its immediate conflict without waiting for any lock', async () => {
       await setLimit(1);
       const acquire = jest.fn();
-      Reflect.set(scope.usage, 'sessionChangeCoordinationInstance', { ...otherInstance(false), acquire });
+      Reflect.set(usageInternals(scope.usage).turns, 'sessionChangeCoordinationInstance', {
+        ...otherInstance(false),
+        acquire,
+      });
       const parked = parkFlows();
       const first = scope.usage.startSession(1, scope.users[0], {});
       await parked.entered;
@@ -494,7 +499,7 @@ describe('Shared machines: restart, waiting and audit', () => {
 
   describe('supervisors in the session counts', () => {
     beforeEach(() => {
-      jest.spyOn(scope.usage, 'validateSupervisedStart').mockResolvedValue(undefined);
+      jest.spyOn(usageInternals(scope.usage).gate, 'validateSupervisedStart').mockResolvedValue(undefined);
     });
 
     it('never counts the supervisor: a supervised session is one session, the supervisee`s', async () => {
@@ -533,8 +538,8 @@ describe('Shared machines: restart, waiting and audit', () => {
 
   describe('audit of sessions ended by a flow', () => {
     const auditCalls = () =>
-      (Reflect.get(scope.usage, 'audit').recordResource as jest.Mock).mock.calls
-        .map(([event]) => event as { action: string; actorId: number | null; details: Record<string, unknown> })
+      (Reflect.get(usageInternals(scope.usage).ends, 'audit').record as jest.Mock).mock.calls
+        .map(([event]) => event as { action: string; actor: { id: number | null }; details: Record<string, unknown> })
         .filter((event) => event.action === 'usage_session.ended');
 
     it('records the user whose action triggered the flow on every ended session', async () => {
@@ -545,7 +550,10 @@ describe('Shared machines: restart, waiting and audit', () => {
       await scope.usage.endSessionsOfTarget(1, { kind: 'all' }, 'closing', undefined, second.id);
       expect(auditCalls()).toHaveLength(2);
       for (const event of auditCalls()) {
-        expect(event).toMatchObject({ actorId: null, details: { triggeredByUserId: second.id } });
+        expect(event).toMatchObject({
+          actor: { id: null, authenticationMethod: null },
+          details: { triggeredByUserId: second.id },
+        });
       }
     });
 
@@ -566,7 +574,7 @@ describe('Shared machines: restart, waiting and audit', () => {
       await scope.usage.startSession(1, scope.users[0], {});
       expect(auditCalls()).toEqual([
         expect.objectContaining({
-          actorId: null,
+          actor: { id: null, authenticationMethod: null },
           details: expect.objectContaining({ usageUserId: other.id, triggeredByUserId: 1 }),
         }),
       ]);

@@ -131,7 +131,7 @@ describe.each(BROKERS)('MQTT message explorer against $name (e2e)', (broker) => 
     );
     connections = new MqttExplorerConnectionsService(repository as never, shared);
     explorer = new MqttExplorerService(repository as never, connections, shared, {
-      recordAdministration: jest.fn(),
+      record: jest.fn(),
     } as never);
   });
 

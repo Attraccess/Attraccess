@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { In, Repository, Brackets } from 'typeorm';
 
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../audit/recorder/audit-event';
 
 import { ResourceNotFoundException } from '../exceptions/resource.notFound.exception';
 
@@ -164,7 +164,7 @@ export class ResourcesService {
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
     protected readonly metricsService: MetricsService,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(ResourcesService.name);
@@ -408,12 +408,11 @@ export class ResourcesService {
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(resource.id));
     this.metricsService.resourcesTotal.inc();
     if (actor) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'resource.created',
-        actorId: actor.id,
-        authenticationMethod: actor.authenticationMethod,
-        apiTokenId: actor.apiTokenId,
-        subjectId: resource.id,
+        actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+        subject: { type: 'resource', id: resource.id },
         details: {
           ...auditResourceNames({ 'after.name': resource.name }, { 'after.type': resource.type }),
           'after.type': resource.type,
@@ -457,13 +456,12 @@ export class ResourcesService {
     if (actor) {
       const details = resourceUpdateAuditDetails(before, updatedResource);
       if (Object.keys(details).length) {
-        await this.audit.recordResource({
+        await this.audit.record({
+          domain: 'resource',
           action: 'resource.updated',
-          actorId: actor.id,
-          authenticationMethod: actor.authenticationMethod,
-          apiTokenId: actor.apiTokenId,
-          subjectId: updatedResource.id,
-          details,
+          actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+          subject: { type: 'resource', id: updatedResource.id },
+          details: details,
         });
       }
     }
@@ -483,12 +481,11 @@ export class ResourcesService {
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(id));
     this.metricsService.resourcesTotal.dec();
     if (actor && resource) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'resource.deleted',
-        actorId: actor.id,
-        authenticationMethod: actor.authenticationMethod,
-        apiTokenId: actor.apiTokenId,
-        subjectId: id,
+        actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+        subject: { type: 'resource', id: id },
         details: {
           ...auditResourceNames({ 'before.name': resource.name }, { 'before.type': resource.type }),
           'before.type': resource.type,

@@ -1,12 +1,19 @@
-import { Project, ProjectInvitation, ProjectMember, ResourceUsage, User } from '@attraccess/database-entities';
+import {
+  Project,
+  ProjectInvitation,
+  ProjectMember,
+  ProjectMemberRole,
+  ResourceUsage,
+  User,
+} from '@attraccess/database-entities';
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { IsNull, Not, Repository, SelectQueryBuilder } from 'typeorm';
 
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../audit/recorder/audit-event';
 
 import { FileStorageService } from '../common/services/file-storage.service';
 
@@ -31,26 +38,36 @@ import { UpdateProjectDto } from './dto/update.dto';
 import { ProjectInvitations } from './invitations/project-invitations';
 
 @Injectable()
-export class ProjectsService extends ProjectInvitations {
+export class ProjectsService {
+  private readonly invitations: ProjectInvitations;
+
   constructor(
     @InjectRepository(Project)
-    protected readonly projectRepository: Repository<Project>,
+    private readonly projectRepository: Repository<Project>,
     @InjectRepository(ProjectMember)
-    protected readonly projectMemberRepository: Repository<ProjectMember>,
+    private readonly projectMemberRepository: Repository<ProjectMember>,
     @InjectRepository(ProjectInvitation)
-    protected readonly projectInvitationRepository: Repository<ProjectInvitation>,
+    private readonly projectInvitationRepository: Repository<ProjectInvitation>,
     @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
     @InjectRepository(ResourceUsage)
-    protected readonly resourceUsageRepository: Repository<ResourceUsage>,
-    protected readonly fileStorageService: FileStorageService,
-    protected readonly projectAccessService: ProjectAccessService,
-    protected readonly emailService: EmailService,
-    protected readonly metricsService: MetricsService,
-    protected readonly notifications: NotificationDispatchService,
-    protected readonly audit: AuditService,
+    private readonly resourceUsageRepository: Repository<ResourceUsage>,
+    private readonly fileStorageService: FileStorageService,
+    private readonly projectAccessService: ProjectAccessService,
+    private readonly emailService: EmailService,
+    private readonly metricsService: MetricsService,
+    private readonly notifications: NotificationDispatchService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {
-    super();
+    this.invitations = new ProjectInvitations(
+      this.audit,
+      this.projectAccessService,
+      this.userRepository,
+      this.projectMemberRepository,
+      this.projectInvitationRepository,
+      this.notifications,
+      this.emailService,
+    );
   }
 
   public async findMany(userId: number, query: FindManyProjectsQueryDto): Promise<ProjectWithAccessDto[]> {
@@ -117,13 +134,11 @@ export class ProjectsService extends ProjectInvitations {
     const result = await this.projectRepository.update({ id, archivedAt: IsNull() }, { archivedAt });
     if (result.affected !== 1) return await this.projectRepository.findOneByOrFail({ id });
     project.archivedAt = archivedAt;
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.archived',
-      actorId: ownerUserId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project',
-      subjectId: project.id,
+      actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project', id: project.id },
       details: { ...this.projectDetails(project, 'after'), 'after.archived': 1 },
     });
     return project;
@@ -139,13 +154,11 @@ export class ProjectsService extends ProjectInvitations {
     const result = await this.projectRepository.update({ id, archivedAt: Not(IsNull()) }, { archivedAt: null });
     if (result.affected !== 1) return await this.projectRepository.findOneByOrFail({ id });
     project.archivedAt = null;
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.unarchived',
-      actorId: ownerUserId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project',
-      subjectId: project.id,
+      actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project', id: project.id },
       details: { ...this.projectDetails(project, 'after'), 'after.archived': 0 },
     });
     return project;
@@ -177,13 +190,11 @@ export class ProjectsService extends ProjectInvitations {
 
     const result = await this.projectMemberRepository.delete(member.id);
     if (result.affected !== 1) return;
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.member.removed',
-      actorId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project.member',
-      subjectId: member.id,
+      actor: { id: actorId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project.member', id: member.id },
       details: { projectId, memberId: member.id, userId: member.userId, role: member.role },
     });
   }
@@ -196,7 +207,7 @@ export class ProjectsService extends ProjectInvitations {
     });
   }
 
-  protected projectDetails(project: Project, state: 'before' | 'after'): Record<string, string | number> {
+  private projectDetails(project: Project, state: 'before' | 'after'): Record<string, string | number> {
     const details: Record<string, string | number> = {
       projectId: project.id,
       [`${state}.hasLogo`]: project.logo ? 1 : 0,
@@ -215,16 +226,7 @@ export class ProjectsService extends ProjectInvitations {
     };
   }
 
-  protected invitationDetails(invitation: ProjectInvitation): Record<string, string | number> {
-    return {
-      projectId: invitation.projectId,
-      invitationId: invitation.id,
-      userId: invitation.invitedUserId,
-      role: invitation.requestedRole,
-    };
-  }
-
-  protected async setLogo(project: Project, logo: FileUpload) {
+  private async setLogo(project: Project, logo: FileUpload) {
     const logoFilename = await this.fileStorageService.saveFile(logo, `projects/${project.id}`);
     project.logo = logoFilename;
   }
@@ -241,13 +243,11 @@ export class ProjectsService extends ProjectInvitations {
       description: data.description,
     });
 
-    await this.audit.recordProject({
+    await this.audit.record({
+      domain: 'project',
       action: 'project.created',
-      actorId: ownerUserId,
-      authenticationMethod,
-      apiTokenId,
-      subjectType: 'project',
-      subjectId: project.id,
+      actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'project', id: project.id },
       details: this.projectDetails(project, 'after'),
     });
     this.metricsService.projectsTotal.inc();
@@ -256,13 +256,11 @@ export class ProjectsService extends ProjectInvitations {
       const before = this.projectDetails(project, 'before');
       await this.setLogo(project, data.logo);
       await this.projectRepository.save(project);
-      await this.audit.recordProject({
+      await this.audit.record({
+        domain: 'project',
         action: 'project.updated',
-        actorId: ownerUserId,
-        authenticationMethod,
-        apiTokenId,
-        subjectType: 'project',
-        subjectId: project.id,
+        actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+        subject: { type: 'project', id: project.id },
         details: { ...before, ...this.projectDetails(project, 'after'), changedFields: JSON.stringify(['logo']) },
       });
     }
@@ -281,15 +279,13 @@ export class ProjectsService extends ProjectInvitations {
       await manager.getRepository(ResourceUsage).update({ projectId: id }, { projectId: null });
       const result = await manager.getRepository(Project).delete(id);
       if (result.affected !== 1) throw new NotFoundException('Project not found');
-      await this.audit.recordProject(
+      await this.audit.record(
         {
+          domain: 'project',
           action: 'project.deleted',
-          actorId: ownerUserId,
-          authenticationMethod,
-          apiTokenId,
-          subjectType: 'project',
-          subjectId: id,
-          details,
+          actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+          subject: { type: 'project', id: id },
+          details: details,
         },
         manager,
       );
@@ -336,13 +332,11 @@ export class ProjectsService extends ProjectInvitations {
       ...(beforeLogo !== saved.logo ? ['logo'] : []),
     ];
     if (changedFields.length) {
-      await this.audit.recordProject({
+      await this.audit.record({
+        domain: 'project',
         action: 'project.updated',
-        actorId: ownerUserId,
-        authenticationMethod,
-        apiTokenId,
-        subjectType: 'project',
-        subjectId: saved.id,
+        actor: { id: ownerUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+        subject: { type: 'project', id: saved.id },
         details: {
           ...before,
           ...this.projectDetails(saved, 'after'),
@@ -354,5 +348,65 @@ export class ProjectsService extends ProjectInvitations {
       });
     }
     return saved;
+  }
+
+  async listPendingInvitationsForUser(userId: number): Promise<ProjectInvitation[]> {
+    return this.invitations.listPendingInvitationsForUser(userId);
+  }
+
+  async acceptInvitation(
+    userId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.acceptInvitation(userId, invitationId, authenticationMethod, apiTokenId);
+  }
+
+  async declineInvitation(
+    userId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.declineInvitation(userId, invitationId, authenticationMethod, apiTokenId);
+  }
+
+  async createProjectInvitation(
+    ownerId: number,
+    projectId: number,
+    invitedUserId: number,
+    role: ProjectMemberRole = ProjectMemberRole.VIEWER,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.createProjectInvitation(
+      ownerId,
+      projectId,
+      invitedUserId,
+      role,
+      authenticationMethod,
+      apiTokenId,
+    );
+  }
+
+  async resendProjectInvitation(
+    ownerId: number,
+    projectId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.resendProjectInvitation(ownerId, projectId, invitationId, authenticationMethod, apiTokenId);
+  }
+
+  async cancelProjectInvitation(
+    ownerId: number,
+    projectId: number,
+    invitationId: number,
+    authenticationMethod: 'session' | 'api-token' = 'session',
+    apiTokenId?: number,
+  ): Promise<ProjectInvitation> {
+    return this.invitations.cancelProjectInvitation(ownerId, projectId, invitationId, authenticationMethod, apiTokenId);
   }
 }

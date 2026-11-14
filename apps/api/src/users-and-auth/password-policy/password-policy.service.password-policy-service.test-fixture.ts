@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import {
   AuthenticationDetail,
   PasswordHistory,
@@ -8,7 +9,6 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { RbacService } from '../rbac/rbac.service';
 import { HibpClient } from './hibp.client';
 import { PasswordPolicyService, type AuditContext } from './password-policy.service';
@@ -148,7 +148,7 @@ export function registerPasswordPolicyServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasswordPolicyService,
-        { provide: IdentityAuditService, useValue: identityAudit },
+        { provide: AUDIT_RECORDER, useValue: identityAudit },
         { provide: getRepositoryToken(PasswordPolicy), useValue: repo },
         { provide: getRepositoryToken(PasswordPolicyOverride), useValue: overrideRepo },
         { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },

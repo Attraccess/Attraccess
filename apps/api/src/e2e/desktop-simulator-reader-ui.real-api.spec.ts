@@ -95,7 +95,9 @@ describe('reader UI against an isolated real API and the desktop simulator', () 
       });
       const rbac = app.get(RbacService);
       const granted = new Set(['resources.update']);
-      const role = await rbac.createRole({ name: 'Reader UI pairing', permissionKeys: [...granted] }, granted);
+      const role = await rbac.createRole({ name: 'Reader UI pairing', permissionKeys: [...granted] }, granted, {
+        actor: { id: null, authenticationMethod: null },
+      });
       await rbac.assignRole(admin.id, role.id, granted);
     }
     const token = await app.get(SessionService).createSession(admin);

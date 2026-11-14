@@ -1,10 +1,10 @@
+import { AuditRecorder } from '../../../audit/recorder/audit-event';
 import { Logger } from '@nestjs/common';
 import { SSOProvider, SSOProviderType, SsoSessionContext } from '@attraccess/database-entities';
 import { SsoSessionPermissionSyncService } from './session-permission-sync.service';
 import { SessionPermissionResyncer, SessionRejectedError } from './session-permission-sync';
 import { SessionService } from '../session.service';
 import { MetricsService } from '../../../metrics/metrics.service';
-import { SsoAuditService } from '../../../audit/sso-audit.service';
 import { LogoutSession } from '../session-store/session-store';
 
 const now = new Date('2026-10-27T12:00:00Z').getTime();
@@ -26,7 +26,7 @@ const noDelta = { added: [], removed: [], updated: [] };
 describe('SsoSessionPermissionSyncService', () => {
   let sessionService: jest.Mocked<Pick<SessionService, 'compareAndSetSsoContext' | 'revokeLogoutSession'>>;
   let resyncer: jest.Mocked<SessionPermissionResyncer>;
-  let audit: jest.Mocked<Pick<SsoAuditService, 'record'>>;
+  let audit: jest.Mocked<Pick<AuditRecorder, 'record'>>;
   let metrics: { authSsoPermissionResyncTotal: { inc: jest.Mock } };
   let providerTtl: number | null;
   let service: SsoSessionPermissionSyncService;
@@ -37,7 +37,7 @@ describe('SsoSessionPermissionSyncService', () => {
       sessionService as unknown as SessionService,
       metrics as unknown as MetricsService,
       resyncers,
-      audit as unknown as SsoAuditService,
+      audit as unknown as AuditRecorder,
     );
 
   beforeEach(() => {
@@ -131,8 +131,9 @@ describe('SsoSessionPermissionSyncService', () => {
     );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
+        domain: 'sso',
         action: 'sso.provisioning.permissions_synced',
-        actorId: null,
+        actor: expect.objectContaining({ id: null }),
         subject: { type: 'user', id: 7 },
         details: expect.objectContaining({ changes: JSON.stringify(delta) }),
       }),
@@ -203,6 +204,7 @@ describe('SsoSessionPermissionSyncService', () => {
     expect(sessionService.revokeLogoutSession).toHaveBeenCalledWith('11');
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
+        domain: 'sso',
         action: 'sso.provisioning.sessions_revoked',
         details: expect.objectContaining({ changes: JSON.stringify({ sessionsRevoked: true }) }),
       }),

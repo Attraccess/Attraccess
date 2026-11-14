@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -12,7 +13,6 @@ import {
   ResourceMaintenanceScheduleUsageHoursConfig,
 } from '@attraccess/database-entities';
 import { MaintenanceScheduleService } from './maintenance-schedule.service';
-import { AuditService } from '../../audit/audit.service';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 
 describe('MaintenanceScheduleService', () => {
@@ -45,7 +45,7 @@ describe('MaintenanceScheduleService', () => {
   };
   const resourceRepository = { findOne: jest.fn() };
   const evaluator = { evaluateResource: jest.fn().mockResolvedValue(undefined) };
-  const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -89,7 +89,7 @@ describe('MaintenanceScheduleService', () => {
           useValue: timeIntervalConfigRepository,
         },
         { provide: getRepositoryToken(Resource), useValue: resourceRepository },
-        { provide: AuditService, useValue: audit },
+        { provide: AUDIT_RECORDER, useValue: audit },
       ],
     }).compile();
 
@@ -133,19 +133,20 @@ describe('MaintenanceScheduleService', () => {
     expect(usageCountConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
     expect(timeIntervalConfigRepository.delete).toHaveBeenCalledWith({ scheduleId: 10 });
     expect(transactionalScheduleRepository.remove).toHaveBeenCalledWith(scheduleToDelete);
-    expect(audit.recordResource).toHaveBeenCalledWith(
+    expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
+        domain: 'resource',
         action: 'maintenance_schedule.deleted',
-        actorId: 7,
-        subjectId: 1,
+        actor: expect.objectContaining({ id: 7 }),
+        subject: expect.objectContaining({ id: 1 }),
         details: expect.objectContaining({ scheduleId: 10, enabled: 1, usageThreshold: 12 }),
       }),
       expect.anything(),
     );
     // Written with the delete's transaction manager, so the row rolls back with the delete.
     expect(transactionManager).toBeDefined();
-    expect(audit.recordResource).toHaveBeenCalledTimes(1);
-    expect(audit.recordResource.mock.calls[0][1]).toBe(transactionManager);
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(audit.record.mock.calls[0][1]).toBe(transactionManager);
   });
 
   it('records the intended state when creating a schedule', async () => {
@@ -165,11 +166,12 @@ describe('MaintenanceScheduleService', () => {
 
     expect(usageCountConfigRepository.save).toHaveBeenCalledWith({ scheduleId: 11, thresholdSessions: 12 });
     expect(evaluator.evaluateResource).toHaveBeenCalledWith(1);
-    expect(audit.recordResource).toHaveBeenCalledWith(
+    expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
+        domain: 'resource',
         action: 'maintenance_schedule.created',
-        actorId: 7,
-        subjectId: 1,
+        actor: expect.objectContaining({ id: 7 }),
+        subject: expect.objectContaining({ id: 1 }),
         details: expect.objectContaining({ scheduleId: 11, enabled: 1, usageThreshold: 12 }),
       }),
     );
@@ -182,11 +184,12 @@ describe('MaintenanceScheduleService', () => {
 
     await service.update(1, 10, { enabled: false }, 7);
 
-    expect(audit.recordResource).toHaveBeenCalledWith(
+    expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
+        domain: 'resource',
         action: 'maintenance_schedule.updated',
-        actorId: 7,
-        subjectId: 1,
+        actor: expect.objectContaining({ id: 7 }),
+        subject: expect.objectContaining({ id: 1 }),
         details: expect.objectContaining({ scheduleId: 10, enabled: 0, usageThreshold: 12 }),
       }),
     );

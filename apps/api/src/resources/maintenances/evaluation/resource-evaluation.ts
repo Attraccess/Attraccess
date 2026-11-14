@@ -1,21 +1,6 @@
 import { MaintenanceSnapshotReader, captureDurationState } from './snapshot-reader';
 
 import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
-
-import { OnEvent } from '@nestjs/event-emitter';
-
-import { Cron, CronExpression } from '@nestjs/schedule';
-
-import { ResourceOperatingStateChangedEvent } from '../../operating-intervals/events/resource-operating-state-changed.event';
-
-import {
-  ResourceSessionStartedEvent,
-  ResourceUsageLifecycleAbortedEvent,
-  ResourceUsageSessionEndedEvent,
-} from '../../usage/events/resource-usage.events';
-
-import { ResourceMaintenanceChangedEvent } from '../events/resource-maintenance-changed.event';
-
 import {
   ResourceMaintenanceSchedule,
   ResourceMaintenanceScheduleTriggerType,
@@ -34,131 +19,48 @@ import {
 } from '../../operating-intervals/resource-operating-attribution.service';
 
 import { Logger } from '@nestjs/common';
-
-import { CronTimer } from '../../../metrics/instrumentation/cron/cron.helper';
-
-import { MetricsService } from '../../../metrics/metrics.service';
-
 import { ResourceMaintenanceService } from '../maintenance.service';
 
-export abstract class MaintenanceResourceEvaluation {
+/**
+ * Evaluates the maintenance schedules of one resource and creates the maintenance a triggered schedule asks for.
+ * Tracks running evaluations so shutdown can wait for them.
+ */
+export class MaintenanceResourceEvaluation {
   private snapshotReader?: MaintenanceSnapshotReader;
   private readonly activeEvaluations = new Set<Promise<void>>();
-  private stopping = false;
-  /** Drop pending debounce timers so shutdown isn't held up (and they don't fire against a closed DB). */
-  async onModuleDestroy(): Promise<void> {
-    this.stopping = true;
-    for (const timer of this.pendingUsageEvals.values()) clearTimeout(timer);
-    this.pendingUsageEvals.clear();
-    this.usageEvalFirstEventAt.clear();
+  private stopped = false;
+
+  constructor(
+    private readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>,
+    private readonly maintenanceRepository: Repository<ResourceMaintenance>,
+    private readonly resourceRepository: Repository<Resource>,
+    private readonly usageRepository: Repository<ResourceUsage>,
+    private readonly maintenanceService: ResourceMaintenanceService,
+    private readonly operatingAttributionService: ResourceOperatingAttributionService,
+    private readonly logger: Logger,
+    /** Evaluates the resource again later, debounced; used when a snapshot went stale while it was evaluated. */
+    private readonly requeue: (resourceId: number) => void,
+  ) {}
+
+  get stopping(): boolean {
+    return this.stopped;
+  }
+
+  /** Refuses new evaluations; {@link drain} then waits for the running ones. */
+  beginStop(): void {
+    this.stopped = true;
+  }
+
+  async drain(): Promise<void> {
     await Promise.allSettled(this.activeEvaluations);
     await this.snapshotReader?.close();
-  }
-
-  /**
-   * Cron: run schedule evaluation every 5 minutes. Only one active maintenance per resource; idempotent when already in maintenance.
-   */
-  @Cron(CronExpression.EVERY_5_MINUTES)
-  async runScheduledEvaluation(): Promise<void> {
-    await this.cronTimer.time('maintenance_evaluator', async () => {
-      await this.evaluateAll();
-    });
-  }
-
-  /**
-   * On usage events (session started or ended): evaluate schedules for that resource so USAGE_HOURS and USAGE_COUNT
-   * triggers take effect immediately instead of waiting for the next cron run.
-   *
-   * Debounced per resource with a maximum wait: rapid session end/start bursts collapse into a single
-   * evaluation, but evaluation is guaranteed to fire within usageEvalMaxWaitMs regardless of how
-   * frequently events arrive (preventing indefinite starvation under sustained load).
-   *
-   * Starts (and door actions) arrive as ResourceSessionStartedEvent, every session end as
-   * ResourceUsageSessionEndedEvent; a take-over is followed by the new session's start event.
-   */
-  @OnEvent(ResourceSessionStartedEvent.EVENT_NAME)
-  onResourceUsage(event: ResourceSessionStartedEvent): void {
-    const resourceId = event.usage?.resource?.id;
-    if (resourceId == null) return;
-    this.queueEvaluation(resourceId);
-  }
-
-  @OnEvent(ResourceUsageSessionEndedEvent.EVENT_NAME)
-  onResourceUsageEnded(event: ResourceUsageSessionEndedEvent): void {
-    const resourceId = event.usage?.resourceId ?? event.usage?.resource?.id;
-    if (resourceId == null) return;
-    this.queueEvaluation(resourceId);
-  }
-
-  @OnEvent(ResourceOperatingStateChangedEvent.EVENT_NAME)
-  onOperatingStateChanged(event: ResourceOperatingStateChangedEvent): void {
-    this.queueEvaluation(event.resourceId);
-  }
-
-  @OnEvent(ResourceUsageLifecycleAbortedEvent.EVENT_NAME)
-  onUsageLifecycleAborted(event: ResourceUsageLifecycleAbortedEvent): void {
-    this.queueEvaluation(event.resourceId);
-  }
-
-  protected queueEvaluation(resourceId: number): void {
-    if (this.stopping) return;
-    const now = Date.now();
-
-    // Record the timestamp of the first event in the current debounce window
-    if (!this.usageEvalFirstEventAt.has(resourceId)) {
-      this.usageEvalFirstEventAt.set(resourceId, now);
-    }
-
-    const firstEventAt = this.usageEvalFirstEventAt.get(resourceId) ?? now;
-    const msUntilMaxWait = this.usageEvalMaxWaitMs - (now - firstEventAt);
-    // Fire after the debounce window, but no later than the maxWait deadline
-    const delay = Math.min(this.usageEvalDebounceMs, Math.max(0, msUntilMaxWait));
-
-    const existing = this.pendingUsageEvals.get(resourceId);
-    if (existing) clearTimeout(existing);
-
-    const timer = setTimeout(() => {
-      this.pendingUsageEvals.delete(resourceId);
-      this.usageEvalFirstEventAt.delete(resourceId);
-      this.evaluateResource(resourceId).catch((err) => {
-        this.logger.error(
-          `Error evaluating schedules for resource ${resourceId} after duration event: ${err}`,
-          (err as Error)?.stack,
-        );
-      });
-    }, delay);
-
-    this.pendingUsageEvals.set(resourceId, timer);
-  }
-
-  /**
-   * On maintenance changed (created or marked done): re-evaluate schedules for that resource.
-   * When maintenance is marked done, this allows the next schedule to trigger immediately
-   * instead of waiting for the next cron run (up to 5 minutes).
-   *
-   * Deferred via setImmediate to avoid nested transaction / SQLite savepoint errors when the
-   * event is emitted from within evaluateResource's transaction (e.g. createMaintenanceFromSchedule).
-   */
-  @OnEvent(ResourceMaintenanceChangedEvent.EVENT_NAME)
-  onMaintenanceChanged(event: ResourceMaintenanceChangedEvent): void {
-    const resourceId = event.resourceId;
-    if (resourceId == null) return;
-
-    setImmediate(() => {
-      this.evaluateResource(resourceId).catch((err) => {
-        this.logger.error(
-          `Error evaluating schedules for resource ${resourceId} after maintenance changed: ${err}`,
-          (err as Error)?.stack,
-        );
-      });
-    });
   }
 
   /**
    * Evaluate all enabled schedules for a resource. If any triggers and there is no active maintenance, create one (first trigger wins).
    */
   async evaluateResource(resourceId: number): Promise<void> {
-    if (this.stopping) return;
+    if (this.stopped) return;
     const evaluation = this.evaluateResourceInternal(resourceId);
     this.activeEvaluations.add(evaluation);
     try {
@@ -278,7 +180,7 @@ export abstract class MaintenanceResourceEvaluation {
     });
     if (created) this.maintenanceService.emitScheduledMaintenanceCreated(resourceId, created.id);
     // Recompute changed resources outside the queue; unrelated resource writes never invalidate this work.
-    else if (stale) this.queueEvaluation(resourceId);
+    else if (stale) this.requeue(resourceId);
   }
 
   /**
@@ -287,7 +189,7 @@ export abstract class MaintenanceResourceEvaluation {
    * Frontend keys: name.auto.usageHours, name.auto.usageCount, name.auto.intervalDays,
    * name.auto.thresholdHours, name.auto.fallback
    */
-  protected buildMaintenanceReasonFromScheduleDefinition(schedule: ResourceMaintenanceSchedule): string {
+  buildMaintenanceReasonFromScheduleDefinition(schedule: ResourceMaintenanceSchedule): string {
     const scheduleName = schedule.name ?? undefined;
     const withParams = (details: Record<string, number | string | undefined>) => ({
       i18nKey: '' as string,
@@ -341,7 +243,7 @@ export abstract class MaintenanceResourceEvaluation {
   /**
    * Convert duration + unit to exact milliseconds (for usage threshold comparison).
    */
-  protected durationToMs(duration: number, unit: UsageDurationUnit): number {
+  durationToMs(duration: number, unit: UsageDurationUnit): number {
     switch (unit) {
       case UsageDurationUnit.MINUTES:
         return duration * 60_000;
@@ -359,7 +261,7 @@ export abstract class MaintenanceResourceEvaluation {
    * threshold is met. Both individual and bulk evaluation delegate here so the
    * switch-on-triggerType logic lives in exactly one place.
    */
-  protected evaluateTriggerThreshold(
+  evaluateTriggerThreshold(
     schedule: ResourceMaintenanceSchedule,
     baseline: Date,
     now: Date,
@@ -416,7 +318,7 @@ export abstract class MaintenanceResourceEvaluation {
     return this.evaluateTriggerThreshold(schedule, baseline, now, durationMs, usageCount);
   }
 
-  protected selectedDuration(schedule: ResourceMaintenanceSchedule, durations?: ResourceDurations): number {
+  selectedDuration(schedule: ResourceMaintenanceSchedule, durations?: ResourceDurations): number {
     return schedule.durationBasis === ResourceMaintenanceScheduleDurationBasis.ATTRIBUTABLE_OPERATING_DURATION
       ? (durations?.operatingDurationMs ?? 0)
       : (durations?.sessionDurationMs ?? 0);
@@ -452,7 +354,7 @@ export abstract class MaintenanceResourceEvaluation {
   /**
    * Count usage sessions for the resource since baseline (completed sessions only).
    */
-  protected async getUsageSessionCountSince(resourceId: number, since: Date, manager?: EntityManager): Promise<number> {
+  async getUsageSessionCountSince(resourceId: number, since: Date, manager?: EntityManager): Promise<number> {
     return (manager?.getRepository(ResourceUsage) ?? this.usageRepository)
       .createQueryBuilder('usage')
       .where('usage.resourceId = :resourceId', { resourceId })
@@ -461,79 +363,4 @@ export abstract class MaintenanceResourceEvaluation {
       .andWhere('usage.endTime >= :since', { since })
       .getCount();
   }
-
-  protected abstract readonly pendingUsageEvals: Map<number, NodeJS.Timeout>;
-
-  protected abstract readonly usageEvalFirstEventAt: Map<number, number>;
-
-  protected abstract readonly maintenanceRepository: Repository<ResourceMaintenance>;
-
-  protected abstract readonly resourceRepository: Repository<Resource>;
-
-  protected abstract readonly usageRepository: Repository<ResourceUsage>;
-
-  protected abstract readonly operatingAttributionService: ResourceOperatingAttributionService;
-
-  protected abstract readonly scheduleRepository: Repository<ResourceMaintenanceSchedule>;
-
-  protected abstract readonly maintenanceService: ResourceMaintenanceService;
-
-  protected abstract readonly logger: Logger;
-
-  protected abstract readonly cronTimer: CronTimer;
-
-  public abstract evaluateAll(): Promise<void>;
-
-  protected abstract readonly usageEvalMaxWaitMs: 30000;
-
-  protected abstract readonly usageEvalDebounceMs: 5000;
-
-  protected abstract readonly metricsService: MetricsService;
-
-  protected abstract evaluationLock: boolean;
-
-  protected abstract loadScheduleResources(
-    allSchedules: ResourceMaintenanceSchedule[],
-  ): Promise<{ resourceCreatedAtMap: Map<number, Date>; knownResourceIds: Set<number> }>;
-
-  protected abstract loadScheduleState(
-    allSchedules: ResourceMaintenanceSchedule[],
-    knownResourceIds: Set<number>,
-    resourceCreatedAtMap: Map<number, Date>,
-    now: Date,
-  ): Promise<{
-    pairs: {
-      resourceId: number;
-      scheduleId: number;
-      createdAt: Date;
-      triggerType: ResourceMaintenanceScheduleTriggerType;
-    }[];
-    usageCountBySchedule: Map<string, number>;
-    baselineMap: Map<string, Date>;
-    activeResourceIds: Set<number>;
-    getBaseline: (resourceId: number, scheduleId: number) => Date;
-  }>;
-
-  protected abstract loadScheduleDurations(
-    allSchedules: ResourceMaintenanceSchedule[],
-    pairs: Array<{ resourceId: number; scheduleId: number; triggerType: ResourceMaintenanceScheduleTriggerType }>,
-    activeResourceIds: Set<number>,
-    getBaseline: (resourceId: number, scheduleId: number) => Date,
-    baselineMap: Map<string, Date>,
-    now: Date,
-  ): Promise<Map<string, ResourceDurations>>;
-
-  protected abstract selectTriggeringSchedules(
-    allSchedules: ResourceMaintenanceSchedule[],
-    knownResourceIds: Set<number>,
-    activeResourceIds: Set<number>,
-    getBaseline: (resourceId: number, scheduleId: number) => Date,
-    durations: Map<string, ResourceDurations>,
-    usageCountBySchedule: Map<string, number>,
-    now: Date,
-  ): Promise<{ resourceId: number; schedule: ResourceMaintenanceSchedule }[]>;
-
-  protected abstract persistTriggeredSchedules(
-    toCreate: Array<{ resourceId: number; schedule: ResourceMaintenanceSchedule }>,
-  ): Promise<void>;
 }

@@ -6,6 +6,7 @@ import * as tar from 'tar';
 import { NpmPluginService } from './npm-plugin.service';
 import { PluginDependency } from './runtime/dependencies';
 import { PluginService } from './plugin.service';
+import { npmInternals } from './npm/fixtures/compose.test-fixture';
 
 function pkg(name: string, dependencies: PluginDependency[] = [], version = '1.0.0') {
   return {
@@ -26,12 +27,6 @@ function pkg(name: string, dependencies: PluginDependency[] = [], version = '1.0
 
 const dep = (name: string, version = '^1.0.0') => ({ name, version, required: true });
 
-type Internals = {
-  hostVersion(): string;
-  download(url: string): Promise<Buffer>;
-  writeRecords(records: unknown[]): Promise<void>;
-};
-
 async function archive(value: ReturnType<typeof pkg>) {
   const root = mkdtempSync(join(tmpdir(), 'plugin-graph-package-'));
   try {
@@ -50,7 +45,7 @@ export function registerNpmPluginDependencyLifecycleFixture() {
 
   let service: NpmPluginService;
 
-  let internals: Internals;
+  let internals: ReturnType<typeof npmInternals>;
 
   let metadata: Record<string, { versions: Record<string, unknown> }>;
 
@@ -61,12 +56,14 @@ export function registerNpmPluginDependencyLifecycleFixture() {
     PluginService.configure({ PLUGIN_DIR: root, RESTART_BY_EXIT: true });
     jest.spyOn(PluginService.prototype, 'requestRestart').mockImplementation(() => undefined);
     service = new NpmPluginService({ getPlainSetting: jest.fn().mockResolvedValue(null) } as never);
-    internals = service as unknown as Internals;
-    jest.spyOn(internals, 'hostVersion').mockReturnValue('1.9.0');
+    internals = npmInternals(service);
+    jest.spyOn(internals.catalog, 'hostVersion').mockReturnValue('1.9.0');
     metadata = {};
     archives = new Map();
-    jest.spyOn(service, 'packageMetadata').mockImplementation(async (name) => metadata[name] ?? { versions: {} });
-    jest.spyOn(internals, 'download').mockImplementation(async (url) => {
+    jest
+      .spyOn(npmInternals(service).catalog, 'packageMetadata')
+      .mockImplementation(async (name) => metadata[name] ?? { versions: {} });
+    jest.spyOn(internals.registry, 'download').mockImplementation(async (url) => {
       if (!archives.has(url)) throw new Error('download failed');
       return archives.get(url);
     });

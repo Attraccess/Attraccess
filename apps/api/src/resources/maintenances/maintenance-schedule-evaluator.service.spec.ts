@@ -7,6 +7,7 @@ import {
   ResourceMaintenanceScheduleTriggerType,
 } from '@attraccess/database-entities';
 import { formatDbDate } from './maintenance-schedule-evaluator.service';
+import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 describe('MaintenanceScheduleEvaluatorService', () => {
   const fixture = registerMaintenanceScheduleEvaluatorServiceFixture();
@@ -79,7 +80,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
         .mockResolvedValue([
           { id: fixture.scheduleId, resourceId: fixture.resourceId, enabled: true } as ResourceMaintenanceSchedule,
         ]);
-      jest.spyOn(fixture.service, 'shouldTrigger').mockResolvedValue(true);
+      jest
+        .spyOn(Reflect.get(fixture.service, 'evaluation') as MaintenanceResourceEvaluation, 'shouldTrigger')
+        .mockResolvedValue(true);
       // The resource has an active record, but it does not belong to the schedule being evaluated.
       jest
         .spyOn(fixture.maintenanceService, 'hasActiveMaintenance')
@@ -542,7 +545,9 @@ describe('MaintenanceScheduleEvaluatorService', () => {
           new Map([[`${fixture.scheduleId}:1`, { sessionDurationMs: 0, operatingDurationMs: 0 }]]),
         );
       const completedAt = new Date();
-      jest.spyOn(fixture.service, 'getBaselineDate').mockResolvedValue(completedAt);
+      jest
+        .spyOn(Reflect.get(fixture.service, 'evaluation') as MaintenanceResourceEvaluation, 'getBaselineDate')
+        .mockResolvedValue(completedAt);
 
       await fixture.service.evaluateAll();
 

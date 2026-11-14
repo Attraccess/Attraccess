@@ -12,8 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { AuditService } from '../../audit/audit.service';
-import { AttractapAuditEvent } from '../../audit/policies/domain-events';
+import { auditActorOf } from '../../audit/recorder/audit-event';
 import { LicenseModuleType } from '../../license/license.service';
 import { RequiresLicense } from '../../license/require-license.decorator';
 import {
@@ -27,37 +26,12 @@ import {
 } from '../dtos/secure-boot-keys.dto';
 import { SecureBootKeyService } from './secure-boot-key.service';
 
-/** The installation has one Secure Boot key set; audit events use this subject id. */
-const INSTALLATION_SUBJECT_ID = 1;
-
 @ApiTags('Attractap')
 @Controller('attractap/secure-boot')
 @UseInterceptors(ClassSerializerInterceptor)
 @RequiresLicense(LicenseModuleType.ATTRACTAP)
 export class AttractapSecureBootKeysController {
-  constructor(
-    @Inject(SecureBootKeyService) private readonly keys: SecureBootKeyService,
-    @Inject(AuditService) private readonly audit: AuditService,
-  ) {}
-
-  private async record(
-    req: AuthenticatedRequest,
-    action: AttractapAuditEvent['action'],
-    details: AttractapAuditEvent['details'],
-  ): Promise<void> {
-    const method = req.user.authenticationMethod ?? 'session';
-    await this.audit
-      .recordAttractap({
-        action,
-        subjectType: 'attractap.installation',
-        subjectId: INSTALLATION_SUBJECT_ID,
-        actorId: req.user.id,
-        authenticationMethod: method,
-        ...(method === 'api-token' ? { apiTokenId: req.user.apiTokenId } : {}),
-        details,
-      })
-      .catch(() => undefined);
-  }
+  constructor(@Inject(SecureBootKeyService) private readonly keys: SecureBootKeyService) {}
 
   @Get('keys')
   @Auth('system.settings.manage')
@@ -73,9 +47,7 @@ export class AttractapSecureBootKeysController {
   @ApiResponse({ status: 201, type: SecureBootKeyFingerprintsDto })
   @ApiResponse({ status: 409, description: 'Keys exist and readers have digests burned with them' })
   async createKeys(@Req() req: AuthenticatedRequest): Promise<SecureBootKeyFingerprintsDto> {
-    const result = await this.keys.createKeys();
-    await this.record(req, 'reader.secure_keys_created', result);
-    return result;
+    return await this.keys.createKeys(auditActorOf(req.user));
   }
 
   @Post('recovery-key/download')
@@ -91,9 +63,7 @@ export class AttractapSecureBootKeysController {
     @Body() body: PassphraseDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<KeyFileDownloadDto> {
-    const result = await this.keys.downloadRecoveryKey(body.passphrase);
-    await this.record(req, 'reader.recovery_key_downloaded', { recoveryFingerprint: result.fingerprint });
-    return result;
+    return await this.keys.downloadRecoveryKey(body.passphrase, auditActorOf(req.user));
   }
 
   @Post('recovery-key/check')
@@ -105,9 +75,7 @@ export class AttractapSecureBootKeysController {
   })
   @ApiResponse({ status: 200, type: RecoveryCheckResultDto })
   async checkRecoveryKey(@Body() body: KeyFileDto, @Req() req: AuthenticatedRequest): Promise<RecoveryCheckResultDto> {
-    const result = await this.keys.checkRecoveryKey(body.pem, body.passphrase);
-    await this.record(req, 'reader.recovery_key_verified', { recoveryFingerprint: result.fingerprint });
-    return result;
+    return await this.keys.checkRecoveryKey(body.pem, body.passphrase, auditActorOf(req.user));
   }
 
   @Post('signing-key/backup')
@@ -123,9 +91,7 @@ export class AttractapSecureBootKeysController {
     @Body() body: PassphraseDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<KeyFileDownloadDto> {
-    const result = await this.keys.downloadSigningKeyBackup(body.passphrase);
-    await this.record(req, 'reader.signing_key_backup_downloaded', { signingFingerprint: result.fingerprint });
-    return result;
+    return await this.keys.downloadSigningKeyBackup(body.passphrase, auditActorOf(req.user));
   }
 
   @Post('restore')
@@ -138,8 +104,6 @@ export class AttractapSecureBootKeysController {
   @ApiResponse({ status: 200, type: SecureBootKeyFingerprintsDto })
   @ApiResponse({ status: 409, description: 'Readers are secured with the current signing key' })
   async restore(@Body() body: RestoreKeysDto, @Req() req: AuthenticatedRequest): Promise<SecureBootKeyFingerprintsDto> {
-    const result = await this.keys.restore(body.source, body.pem, body.passphrase);
-    await this.record(req, 'reader.secure_keys_restored', { ...result, source: body.source });
-    return result;
+    return await this.keys.restore(body.source, body.pem, body.passphrase, auditActorOf(req.user));
   }
 }

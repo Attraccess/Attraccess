@@ -1,45 +1,41 @@
-import {
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-  OnModuleInit,
-  Optional,
-  BadRequestException,
-} from '@nestjs/common';
+import { Inject, Injectable, OnApplicationBootstrap, OnModuleInit, Optional } from '@nestjs/common';
 
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER, auditActorOf, AuditRecorder } from '../audit/recorder/audit-event';
+import { AuditQueryService } from '../audit/audit-query.service';
+
+import { readAuditSettings } from '../audit/audit.config';
+
+import { AuditQueryDto } from '../audit/dto/audit-query.dto';
+
+import { auditSubjectKeyId } from '../audit/policies/administration';
 
 import { SettingsStoreService } from '../settings/settings-store.service';
 
+import { NpmInstallation } from './npm/installation';
+
+import { NpmInstallationPlan } from './npm/installation-plan';
+
+import { NpmPackageCatalog } from './npm/package-catalog';
+
+import { NpmPackagePreparation } from './npm/package-preparation';
+
 import { PluginClassificationService } from './plugin-classification.service';
-
-import { randomUUID, createHash } from 'crypto';
-
-import { existsSync } from 'fs';
-
-import { rename, rm, writeFile, mkdir } from 'fs/promises';
-
-import { join } from 'path';
-
-import { PendingNpmPluginAudit } from './npm/audit-state';
 
 import {
   InstalledNpmPlugin,
-  PluginFileMove,
-  STATE_FILE,
-  TRANSACTION_FILE,
-  readInstalledNpmPlugins,
-  BACKUP_DIRECTORY,
+  InstalledNpmPluginVersion,
+  MarketplacePlugin,
   NpmPluginAuditState,
-  backupDirectoryName,
-  pluginDirectory,
+  PluginInstallPlan,
+  PluginUpdatePolicy,
+  readInstalledNpmPlugins,
 } from './npm/package-models';
 
+import { NpmPluginState, recoverNpmPluginBackups } from './npm/plugin-state';
+
+import { NpmRegistryAccess } from './npm/registry-access';
+
 import { PluginService } from './plugin.service';
-
-import { safeAuditOrigin, safeRequestedSpec } from '../audit/policies/administration';
-
-import { NpmInstallation } from './npm/installation';
 
 export {
   DEFAULT_PLUGIN_UPDATE_POLICY,
@@ -53,169 +49,213 @@ export {
   StoredRegistry,
 } from './npm/package-models';
 
+/**
+ * Plugins installed from npm registries: registries, marketplace, installs, updates and removal. The work is done by
+ * the npm collaborators it composes; it finishes activation audits after a restart.
+ */
 @Injectable()
-export class NpmPluginService extends NpmInstallation implements OnModuleInit, OnApplicationBootstrap {
+export class NpmPluginService implements OnModuleInit, OnApplicationBootstrap {
+  private readonly state: NpmPluginState;
+
+  private readonly registries: NpmRegistryAccess;
+
+  private readonly catalog: NpmPackageCatalog;
+
+  private readonly plan: NpmInstallationPlan;
+
+  private readonly installation: NpmInstallation;
+
   constructor(
-    protected readonly settings: SettingsStoreService,
+    private readonly settings: SettingsStoreService,
     @Optional() classification?: PluginClassificationService,
-    @Optional() protected readonly audit?: AuditService,
+    @Optional() @Inject(AUDIT_RECORDER) private readonly audit?: AuditRecorder,
+    @Optional() private readonly auditQuery?: AuditQueryService,
   ) {
-    super();
-    this.classification = classification ?? new PluginClassificationService();
+    this.state = new NpmPluginState(classification);
+    this.registries = new NpmRegistryAccess(settings);
+    this.catalog = new NpmPackageCatalog(this.registries, this.state);
+    const preparation = new NpmPackagePreparation(this.registries, this.catalog, this.state);
+    this.plan = new NpmInstallationPlan(this.registries, this.catalog, this.state, preparation);
+    this.installation = new NpmInstallation(settings, this.registries, this.state, preparation, this.plan);
   }
 
-  protected readonly logger = new Logger(NpmPluginService.name);
-
-  protected registryMutation = Promise.resolve();
-
-  protected installMutation = Promise.resolve();
-
-  protected readonly classification: PluginClassificationService;
-
-  protected async writeState(
-    installed: InstalledNpmPlugin,
-    pendingAudit?: PendingNpmPluginAudit | null,
-  ): Promise<void> {
-    const previous = readInstalledNpmPlugins();
-    const records = previous.filter(({ name }) => name !== installed.name);
-    const pending =
-      pendingAudit === undefined
-        ? previous.find((plugin) => plugin.name === installed.name)?.pendingAudit
-        : pendingAudit;
-    const stored = { ...installed, ...(pending ? { pendingAudit: pending } : {}) };
-    const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
-    const temporaryPath = `${statePath}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporaryPath, JSON.stringify([...records, stored]));
-      await rename(temporaryPath, statePath);
-    } catch (error) {
-      await rm(temporaryPath, { force: true });
-      throw error;
-    }
+  static async recoverBackups(): Promise<void> {
+    await recoverNpmPluginBackups();
   }
 
-  protected async writeTransaction(
-    records: ReturnType<typeof readInstalledNpmPlugins>,
-    moves: PluginFileMove[],
-  ): Promise<void> {
-    const journalPath = join(PluginService.PLUGIN_PATH, TRANSACTION_FILE);
-    // Refuse to overwrite an unfinished transaction, including cleanup failures.
-    if (existsSync(journalPath))
-      throw new BadRequestException('An unfinished plugin transaction must be recovered by restarting first.');
-    const temporaryPath = `${journalPath}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporaryPath, JSON.stringify({ after: JSON.stringify(records), moves }), { flag: 'wx' });
-      await rename(temporaryPath, journalPath);
-    } finally {
-      await rm(temporaryPath, { force: true });
-    }
+  async onModuleInit(): Promise<void> {
+    await recoverNpmPluginBackups();
   }
 
-  protected async writeRecords(records: ReturnType<typeof readInstalledNpmPlugins>): Promise<void> {
-    const statePath = join(PluginService.PLUGIN_PATH, STATE_FILE);
-    const temporaryPath = `${statePath}.${randomUUID()}.tmp`;
-    try {
-      await writeFile(temporaryPath, JSON.stringify(records));
-      await rename(temporaryPath, statePath);
-    } finally {
-      await rm(temporaryPath, { force: true });
-    }
-  }
-
-  protected async mutateInstalls<T>(operation: () => Promise<T>): Promise<T> {
-    const mutation = this.installMutation.then(async () => {
-      // Recovery compares the state with the journal's commit point. Any later
-      // state change could make a committed tree look like an interrupted one.
-      if (existsSync(join(PluginService.PLUGIN_PATH, TRANSACTION_FILE)))
-        throw new BadRequestException('An unfinished plugin transaction must be recovered by restarting first.');
-      return operation();
-    });
-    this.installMutation = mutation.then(
-      () => undefined,
-      () => undefined,
-    );
-    return mutation;
-  }
-
-  protected async activate(
-    source: string,
-    name: string,
-    audit?: NpmPluginAuditState,
-    backupName?: string,
-  ): Promise<{ target: string; backup: string }> {
-    const target = join(PluginService.PLUGIN_PATH, pluginDirectory(name));
-    const backupDirectory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
-    const backup = join(backupDirectory, backupName ?? backupDirectoryName(pluginDirectory(name)));
-    await mkdir(backupDirectory, { recursive: true });
-    if (existsSync(target)) await rename(target, backup);
-    try {
-      await rename(source, target);
-      return { target, backup };
-    } catch (error) {
-      if (existsSync(backup) && !existsSync(target)) {
-        try {
-          await rename(backup, target);
-          if (audit) audit.rollbackOutcome = 'succeeded';
-        } catch (rollbackError) {
-          if (audit) audit.rollbackOutcome = 'failed';
-          throw rollbackError;
+  async onApplicationBootstrap(): Promise<void> {
+    if (!this.audit || !this.auditQuery) return;
+    const manifests = PluginService.getPluginsWithLoadStatus();
+    for (const installed of readInstalledNpmPlugins()) {
+      const pending = installed.pendingAudit;
+      if (!pending) continue;
+      const manifest = manifests.find((entry) => entry.name === installed.name && entry.version === installed.version);
+      const quarantined =
+        installed.state === 'quarantined' || (manifest && PluginService.isPluginQuarantined(manifest));
+      const loaded = manifest?.status === 'loaded' && !quarantined;
+      if (!loaded && !quarantined && manifest?.status !== 'error') continue;
+      try {
+        const config = await readAuditSettings(this.settings);
+        if (config.enabled && config.domains.includes('administration')) {
+          const existing = await this.auditQuery.list(
+            Object.assign(new AuditQueryDto(), {
+              action: 'plugin.activation_completed',
+              operationId: pending.operationId,
+              limit: 1,
+            }),
+          );
+          if (!existing.items.length) {
+            const receipt = await this.audit.record({
+              domain: 'administration',
+              action: 'plugin.activation_completed',
+              operationId: pending.operationId,
+              actor: auditActorOf({ ...pending, id: pending.actorId }),
+              subject: { type: 'plugin-package', id: auditSubjectKeyId(installed.name) },
+              outcome: loaded ? 'succeeded' : 'failed',
+              details: {
+                ...pending.details,
+                migrationOutcome: pending.migrationOutcome,
+                activationOutcome: loaded ? 'succeeded' : 'quarantined',
+                restartRequested: 1,
+              },
+            });
+            if (receipt.status !== 'recorded') continue;
+          }
         }
+        // Clear only the operation observed above; a newer installation must retain its context.
+        await this.state.mutateInstalls(async () => {
+          const current = readInstalledNpmPlugins().find((item) => item.name === installed.name);
+          if (current?.pendingAudit?.operationId !== pending.operationId) return;
+          const { pendingAudit: completed, ...record } = current;
+          void completed;
+          await this.state.writeState(record, null);
+        });
+      } catch {
+        /* Keep the correlation for a later startup if storage was unavailable. */
       }
-      throw error;
     }
   }
 
-  protected async rollbackActivation({ target, backup }: { target: string; backup: string }): Promise<void> {
-    await rm(target, { recursive: true, force: true });
-    if (existsSync(backup)) await rename(backup, target);
+  listRegistries(): ReturnType<NpmRegistryAccess['listRegistries']> {
+    return this.registries.listRegistries();
   }
 
-  protected async isolateActivation(target: string): Promise<void> {
-    if (!existsSync(target)) return;
-    const directory = join(PluginService.PLUGIN_PATH, BACKUP_DIRECTORY);
-    await mkdir(directory, { recursive: true });
-    await rename(target, join(directory, `failed-${randomUUID()}`));
+  addRegistry(input: Parameters<NpmRegistryAccess['addRegistry']>[0]): ReturnType<NpmRegistryAccess['addRegistry']> {
+    return this.registries.addRegistry(input);
   }
 
-  protected removeBackup(backup: string): Promise<void> {
-    return rm(backup, { recursive: true, force: true });
+  async removeRegistry(id: string): Promise<void> {
+    return this.registries.removeRegistry(id);
   }
 
-  protected pendingAudit(state?: NpmPluginAuditState): PendingNpmPluginAudit | undefined {
-    if (!state?.context) return undefined;
-    const { context, ...details } = state;
-    return {
-      ...context,
-      migrationOutcome: 'pending-restart',
-      details: {
-        ...details,
-        requestedSpec: safeRequestedSpec(state.requestedSpec),
-        ...(state.registryUrl ? { registryUrl: safeAuditOrigin(state.registryUrl) } : {}),
-      },
-    };
+  async testRegistry(id: string): Promise<void> {
+    return this.registries.testRegistry(id);
   }
 
-  protected async rollbackForAudit(activation: { target: string; backup: string }, audit?: NpmPluginAuditState) {
-    try {
-      await this.rollbackActivation(activation);
-      if (audit) audit.rollbackOutcome = 'succeeded';
-    } catch (error) {
-      if (audit) audit.rollbackOutcome = 'failed';
-      throw error;
-    }
+  removalPlan(name: string): InstalledNpmPlugin[] {
+    return this.catalog.removalPlan(name);
+  }
+
+  async removeInstalled(name: string, deferRestart = false, approvedDependants: string[] = []): Promise<void> {
+    return this.catalog.removeInstalled(name, deferRestart, approvedDependants);
+  }
+
+  async packageMetadata(name: string, registryId?: string): Promise<unknown> {
+    return this.catalog.packageMetadata(name, registryId);
+  }
+
+  async packageVersions(name: string, registryId?: string): Promise<string[]> {
+    return this.catalog.packageVersions(name, registryId);
+  }
+
+  searchMarketplace(query: string, registryId?: string): ReturnType<NpmPackageCatalog['searchMarketplace']> {
+    return this.catalog.searchMarketplace(query, registryId);
+  }
+
+  async marketplacePackage(name: string, registryId?: string): Promise<MarketplacePlugin> {
+    return this.catalog.marketplacePackage(name, registryId);
+  }
+
+  async installedVersionCandidates(name: string): Promise<InstalledNpmPluginVersion[]> {
+    return this.plan.installedVersionCandidates(name);
+  }
+
+  async installPlan(name: string, spec: string, registryId?: string): Promise<PluginInstallPlan> {
+    return this.plan.installPlan(name, spec, registryId);
+  }
+
+  async install(
+    name: string,
+    spec: string,
+    registryId?: string,
+    audit?: NpmPluginAuditState,
+    planToken?: string,
+  ): Promise<InstalledNpmPlugin> {
+    return this.installation.install(name, spec, registryId, audit, planToken);
+  }
+
+  async checkInstalled(name: string): Promise<InstalledNpmPlugin> {
+    return this.installation.checkInstalled(name);
+  }
+
+  async checkAllInstalled(): Promise<InstalledNpmPlugin[]> {
+    return this.installation.checkAllInstalled();
+  }
+
+  async replaceInstalled(
+    name: string,
+    version: string,
+    approvedPermissionAdditions: string[] = [],
+    approvedMajorVersion = false,
+    audit?: NpmPluginAuditState,
+    planToken?: string,
+  ): Promise<InstalledNpmPlugin> {
+    return this.installation.replaceInstalled(
+      name,
+      version,
+      approvedPermissionAdditions,
+      approvedMajorVersion,
+      audit,
+      planToken,
+    );
+  }
+
+  async updateRequestedSpec(name: string, requestedSpec: string): Promise<InstalledNpmPlugin> {
+    return this.installation.updateRequestedSpec(name, requestedSpec);
+  }
+
+  async updateOverride(
+    name: string,
+    updateOverride: InstalledNpmPlugin['updateOverride'],
+  ): Promise<InstalledNpmPlugin> {
+    return this.installation.updateOverride(name, updateOverride);
+  }
+
+  async updateVersionPolicy(
+    name: string,
+    requestedSpec: string,
+    updateOverride: InstalledNpmPlugin['updateOverride'],
+  ): Promise<InstalledNpmPlugin> {
+    return this.installation.updateVersionPolicy(name, requestedSpec, updateOverride);
+  }
+
+  async getUpdatePolicy(): Promise<PluginUpdatePolicy> {
+    return this.installation.getUpdatePolicy();
+  }
+
+  async setUpdatePolicy(patch: Partial<PluginUpdatePolicy>): Promise<PluginUpdatePolicy> {
+    return this.installation.setUpdatePolicy(patch);
   }
 
   listInstalled(): InstalledNpmPlugin[] {
-    return readInstalledNpmPlugins().map(({ pendingAudit, ...plugin }) => {
-      void pendingAudit;
-      const classification = this.classification.classify(plugin.name, plugin.registryUrl);
-      return { ...plugin, classification: classification.kind, classificationReason: classification.reason };
-    });
+    return this.state.listInstalled();
   }
 
   findInstalledByPluginId(pluginId: string): InstalledNpmPlugin | undefined {
-    return this.listInstalled().find(
-      ({ installPath }) => createHash('sha256').update(installPath).digest('base64url').slice(0, 21) === pluginId,
-    );
+    return this.state.findInstalledByPluginId(pluginId);
   }
 }

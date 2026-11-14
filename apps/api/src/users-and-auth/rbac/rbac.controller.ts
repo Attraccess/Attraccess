@@ -6,16 +6,12 @@ import { RbacService } from './rbac.service';
 import { CreateRoleDto } from './dtos/create-role.dto';
 import { UpdateRoleDto } from './dtos/update-role.dto';
 import { RoleWithUsageDto } from './dtos/role-with-usage.dto';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
-import { randomUUID } from 'node:crypto';
+import { auditOriginOf } from '../../audit/recorder/audit-event';
 
 @ApiTags('RBAC')
 @Controller('rbac')
 export class RbacController {
-  constructor(
-    private readonly rbacService: RbacService,
-    private readonly identityAudit: IdentityAuditService,
-  ) {}
+  constructor(private readonly rbacService: RbacService) {}
 
   @Get('roles')
   @AuthAny('users.roles.manage', 'system.sso.manage', 'system.settings.manage')
@@ -39,9 +35,7 @@ export class RbacController {
   @ApiResponse({ status: 201, type: Role })
   async createRole(@Body() body: CreateRoleDto, @Req() request: AuthenticatedRequest): Promise<Role> {
     const actor = request.user as AuthenticatedUser;
-    const role = await this.rbacService.createRole(body, actor.effectivePermissions ?? new Set());
-    await this.record('role_created', role, request);
-    return role;
+    return this.rbacService.createRole(body, actor.effectivePermissions ?? new Set(), auditOriginOf(request));
   }
 
   @Patch('roles/:id')
@@ -54,9 +48,7 @@ export class RbacController {
     @Req() request: AuthenticatedRequest,
   ): Promise<Role> {
     const actor = request.user as AuthenticatedUser;
-    const role = await this.rbacService.updateRole(id, body, actor.effectivePermissions ?? new Set());
-    await this.record('role_updated', role, request);
-    return role;
+    return this.rbacService.updateRole(id, body, actor.effectivePermissions ?? new Set(), auditOriginOf(request));
   }
 
   @Delete('roles/:id')
@@ -78,27 +70,11 @@ export class RbacController {
     @Query('reassignToRoleId', new ParseIntPipe({ optional: true })) reassignToRoleId?: number,
   ): Promise<void> {
     const actor = request.user as AuthenticatedUser;
-    const role = (await this.rbacService.getRoles()).find((candidate) => candidate.id === id);
-    await this.rbacService.deleteRole(id, actor.effectivePermissions ?? new Set(), reassignToRoleId);
-    if (role) await this.record('role_deleted', role, request);
-  }
-
-  private record(
-    action: 'role_created' | 'role_updated' | 'role_deleted',
-    role: Role,
-    request: AuthenticatedRequest,
-  ): Promise<void> {
-    return Promise.resolve(this.identityAudit.record({
-      action,
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      actorId: request.user.id,
-      authenticationMethod: request.user.authenticationMethod ?? 'session',
-      apiTokenId: request.user.apiTokenId,
-      subjectType: 'identity.role',
-      subjectId: role.id,
-      details: { role: role.key },
-      request: { ipAddress: request.ip, userAgent: request.headers['user-agent'] },
-    })).then(() => undefined);
+    await this.rbacService.deleteRole(
+      id,
+      actor.effectivePermissions ?? new Set(),
+      auditOriginOf(request),
+      reassignToRoleId,
+    );
   }
 }

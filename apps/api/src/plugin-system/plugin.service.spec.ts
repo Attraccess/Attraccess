@@ -3,6 +3,7 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
+import { PluginBootGuard } from './runtime/boot-guard';
 import { zipFileUpload } from './__test__/make-zip';
 
 describe('PluginService', () => {
@@ -130,7 +131,7 @@ describe('PluginService', () => {
       });
       const [plugin] = PluginService.getPlugins();
       jest
-        .spyOn(PluginService as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .spyOn(PluginBootGuard as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
         .mockImplementation(() => {
           throw new Error('read-only plugin directory');
         });
@@ -165,7 +166,7 @@ describe('PluginService', () => {
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
       jest
-        .spyOn(PluginService as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .spyOn(PluginBootGuard as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
         .mockImplementation(() => {
           throw new Error('read-only plugin directory');
         });

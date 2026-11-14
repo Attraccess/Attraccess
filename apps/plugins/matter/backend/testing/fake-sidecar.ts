@@ -20,14 +20,20 @@ export const TOKEN = 'plugin-test-token-0123456789abcdef0123456789';
 export const entry = COMPATIBILITY_TABLE[0];
 export const HOST_VERSION = '1.11.0';
 
-const reportBody = {
-  capabilities: FEATURE_FAMILIES.map((family) => ({
-    family,
-    defined: true as const,
-    available: family === 'health',
-    ...(family === 'health' ? {} : { reason: 'Not implemented in this sidecar release.' }),
-  })),
-};
+const reportBody = (inventoryAvailable: boolean) => ({
+  capabilities: FEATURE_FAMILIES.map((family) => {
+    const available = family === 'health' || (family === 'inventory' && inventoryAvailable);
+    return {
+      family,
+      defined: true as const,
+      available,
+      ...(available ? {} : { reason: 'Not implemented in this sidecar release.' }),
+    };
+  }),
+});
+
+/** What the fake serves for `GET /v1/nodes`. Nodes are contract `nodeSchema` objects. */
+export type FakeInventory = { authoritative: boolean; fabricId: string | null; nodes: unknown[] };
 
 export type FakeOptions = {
   tokens?: string[];
@@ -67,6 +73,11 @@ export class FakeSidecar {
   /** Called after each resume message, so a test can replay or refuse. */
   onResume: ((socket: WebSocket, message: { cursor?: string }) => void) | null = null;
   answerPings = true;
+  /**
+   * Serve this inventory (`/v1/nodes`, `/v1/nodes/{id}`, `/v1/fabric`) and advertise the inventory family. Like the
+   * real sidecar today, `null` answers `unsupported_capability`.
+   */
+  inventory: FakeInventory | null = null;
   /** Replaces the sidecar's 401 message, such as with one that echoes a credential. */
   unauthorizedMessage = UNAUTHORIZED_MESSAGE;
   private readonly server: Server;
@@ -190,8 +201,25 @@ export class FakeSidecar {
       res.writeHead(refused.status, { 'content-type': 'application/json' });
       return void res.end(refused.body);
     }
-    if (path === '/v1/capabilities') return json(reportBody);
+    if (path === '/v1/capabilities') return json(reportBody(this.inventory !== null));
+    if (path === '/v1/nodes' || path === '/v1/fabric' || path.startsWith('/v1/nodes/')) {
+      return this.serveInventory(path, res, json);
+    }
     error(res, 404, 'not_found', 'Unknown path.');
+  }
+
+  private serveInventory(path: string, res: ServerResponse, json: (body: unknown) => void): void {
+    const inventory = this.inventory;
+    if (!inventory) return error(res, 501, 'unsupported_capability', 'Not implemented in this sidecar release.');
+    if (path === '/v1/nodes') return json(inventory);
+    if (path === '/v1/fabric') {
+      return json({
+        state: inventory.fabricId === null ? 'uninitialized' : 'initialized',
+        fabricId: inventory.fabricId,
+      });
+    }
+    const node = (inventory.nodes as { nodeId: string }[]).find((entry) => `/v1/nodes/${entry.nodeId}` === path);
+    return node ? json(node) : error(res, 404, 'not_found', 'Unknown node.');
   }
 
   private accept(ws: WebSocket): void {
@@ -234,6 +262,16 @@ export class FakeSidecar {
       payload: { phase: 'started' },
       ...overrides,
     } as EventEnvelope;
+  }
+
+  /** A `device.state` event for the next sequence number. */
+  deviceState(payload: Record<string, unknown>): EventEnvelope {
+    return this.nextEvent({ type: 'device.state', payload } as Partial<EventEnvelope>);
+  }
+
+  /** A `command.outcome` event for the next sequence number. */
+  commandOutcome(payload: Record<string, unknown>): EventEnvelope {
+    return this.nextEvent({ type: 'command.outcome', payload } as Partial<EventEnvelope>);
   }
 
   send(socket: WebSocket, event: EventEnvelope): void {

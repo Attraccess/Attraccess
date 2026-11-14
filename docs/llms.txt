@@ -89,6 +89,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [WAGO Safety Boundary](https://docs.attraccess.org/en/devices/wago-safety-boundary.md): States that the WAGO integration is for operational control, not a safety function, with a wording checklist for reviewers.
 - [Matter: Architecture](https://docs.attraccess.org/en/devices/matter/architecture.md): Architecture of the Matter integration: a plugin plus a sidecar, versioned REST and WebSocket contract, errors and events.
 - [Matter: Operator Guide](https://docs.attraccess.org/en/devices/matter/operator.md): Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation.
+- [Matter: Data Model and Lifecycle](https://docs.attraccess.org/en/devices/matter/data-model.md): Matter device data model: terminology, nodes, endpoints, lifecycle, state semantics, reconciliation, admin actions and data retention.
 
 ## English: Billing
 - [Overview](https://docs.attraccess.org/en/billing/overview.md): Introduces billing: how credits are deducted for resource usage, the credit system, payment integration and required permission.
@@ -211,6 +212,7 @@ The documentation pages are plain Markdown files. English pages live under https
 ## Deutsch: Geräte
 - [Matter: Architektur](https://docs.attraccess.org/de/devices/matter/architecture.md): Architektur der Matter-Integration: Plugin plus Sidecar, versionierter REST- und WebSocket-Vertrag, Fehler und Events.
 - [Matter: Betriebsanleitung](https://docs.attraccess.org/de/devices/matter/operator.md): Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation.
+- [Matter: Datenmodell und Lebenszyklus](https://docs.attraccess.org/de/devices/matter/data-model.md): Matter-Gerätedatenmodell: Begriffe, Nodes, Endpoints, Lebenszyklus, Zustandssemantik, Abgleich, Admin-Aktionen und Datenaufbewahrung.
 
 ## Deutsch: Abrechnung
 - [Überblick](https://docs.attraccess.org/de/billing/overview.md): Stellt die Abrechnung vor: Credits werden bei Ressourcennutzung abgezogen; Credit-System, Zahlungsintegration und nötige Berechtigung.

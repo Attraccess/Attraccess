@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -15,7 +16,6 @@ import { ResourceFlowsService } from '../../../resources/flows/resource-flows.se
 import { EmailService } from '../../../email/email.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MetricsService } from '../../../metrics/metrics.service';
-import { AuditService } from '../../../audit/audit.service';
 import { BillingServiceTestScope } from '../billing.service.spec';
 export async function resetTestFixture(scope: BillingServiceTestScope) {
   const module: TestingModule = await Test.createTestingModule({
@@ -87,8 +87,8 @@ export async function resetTestFixture(scope: BillingServiceTestScope) {
         useValue: scope.mockMetricsService,
       },
       {
-        provide: AuditService,
-        useValue: { recordBillingTransaction: jest.fn() },
+        provide: AUDIT_RECORDER,
+        useValue: { record: jest.fn() },
       },
     ],
   }).compile();
@@ -107,5 +107,5 @@ export async function resetTestFixture(scope: BillingServiceTestScope) {
   scope.billingTransactionItemRepository = module.get(getRepositoryToken(BillingTransactionItem)) as jest.Mocked<
     Repository<BillingTransactionItem>
   >;
-  scope.auditService = module.get(AuditService);
+  scope.auditService = module.get(AUDIT_RECORDER);
 }

@@ -77,6 +77,7 @@
 - **Geräte**
   - [Matter: Architektur](devices/matter/architecture.md)
   - [Matter: Betriebsanleitung](devices/matter/operator.md)
+  - [Matter: Datenmodell und Lebenszyklus](devices/matter/data-model.md)
 
 - **Abrechnung**
   - [Überblick](billing/overview.md)

@@ -7,9 +7,14 @@ import type { EncryptionService } from '../../encryption/encryption.service';
 import type { MetricsService } from '../../metrics/metrics.service';
 import { MqttServerService } from './mqtt-server.service';
 
+const ACTOR = { id: 1, authenticationMethod: 'session' as const };
+const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+
 // Keep the service's runtime imports isolated from application configuration and plugins.
 jest.mock('@attraccess/database-entities', () => ({
   MqttServer: jest.requireActual('../../../../../libs/database-entities/src/lib/entities/mqttServer.entity').MqttServer,
+  // The audit policy's template vocabulary, read when the service's audit sanitizers load.
+  EmailTemplateType: {},
 }));
 jest.mock('../../encryption/encryption.service', () => ({ EncryptionService: class {} }));
 jest.mock('../../metrics/metrics.service', () => ({ MetricsService: class {} }));
@@ -71,6 +76,7 @@ describe('MQTT managementPort migration, persistence and service', () => {
       encryption as unknown as EncryptionService,
       metrics as unknown as MetricsService,
       { emit: jest.fn() } as never,
+      audit as never,
     );
   });
 
@@ -108,13 +114,16 @@ describe('MQTT managementPort migration, persistence and service', () => {
     { label: 'null', input: { managementPort: null }, expected: null },
     { label: 'omitted', input: {}, expected: null },
   ])('creates, reloads and serializes $label managementPort', async ({ input, expected }) => {
-    const created = await service.create({
-      name: 'Fixture',
-      host: 'broker.invalid',
-      port: 28883,
-      password: 'test-password',
-      ...input,
-    });
+    const created = await service.create(
+      {
+        name: 'Fixture',
+        host: 'broker.invalid',
+        port: 28883,
+        password: 'test-password',
+        ...input,
+      },
+      ACTOR,
+    );
     const loaded = await repository.findOneByOrFail({ id: created.id });
 
     expect(created.managementPort).toBe(expected);
@@ -135,16 +144,19 @@ describe('MQTT managementPort migration, persistence and service', () => {
     { label: 'omission preserves', update: { name: 'Renamed fixture' }, expected: 25671 },
     { label: 'null clears', update: { managementPort: null }, expected: null },
   ])('updates managementPort: $label', async ({ update, expected }) => {
-    const created = await service.create({
-      name: 'Fixture',
-      host: 'broker.invalid',
-      port: 28883,
-      password: 'test-password',
-      managementPort: 25671,
-    });
+    const created = await service.create(
+      {
+        name: 'Fixture',
+        host: 'broker.invalid',
+        port: 28883,
+        password: 'test-password',
+        managementPort: 25671,
+      },
+      ACTOR,
+    );
     jest.clearAllMocks();
 
-    const updated = await service.update(created.id, update);
+    const updated = await service.update(created.id, update, ACTOR);
     const loaded = await repository.findOneByOrFail({ id: created.id });
 
     expect(updated.managementPort).toBe(expected);

@@ -100,6 +100,7 @@ html[data-theme='dark'] {
   --base-background-color: #172125;
   --link-color--hover: #a1d2db;
   --blockquote-color: #b2c1c5;
+  --blockquote-background: #1e2a2f;
 
   /* Code */
   --code-inline-background: #26363c;

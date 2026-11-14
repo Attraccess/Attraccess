@@ -4,6 +4,7 @@ import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceHealthService } from './resource-health.service';
 import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
 import { CanManageMaintenance } from '../maintenances/canManageMaintenance.decorator';
+import { auditActorOf } from '../../audit/recorder/audit-event';
 
 @ApiTags('Resource Health')
 @Controller('resources/:resourceId/health')
@@ -21,9 +22,7 @@ export class ResourceHealthController {
   @ApiParam({ name: 'resourceId', type: Number })
   @ApiResponse({ status: 200, description: 'Health summary', type: ResourceHealthSummaryDto })
   @ApiResponse({ status: 404, description: 'Resource not found' })
-  async getResourceHealth(
-    @Param('resourceId', ParseIntPipe) resourceId: number,
-  ): Promise<ResourceHealthSummaryDto> {
+  async getResourceHealth(@Param('resourceId', ParseIntPipe) resourceId: number): Promise<ResourceHealthSummaryDto> {
     return await this.healthService.getSummary(resourceId);
   }
 
@@ -46,10 +45,6 @@ export class ResourceHealthController {
     @Param('entryId', ParseIntPipe) entryId: number,
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    await this.healthService.clearEntry(resourceId, entryId, {
-      actorId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-    });
+    await this.healthService.clearEntry(resourceId, entryId, auditActorOf(req.user));
   }
 }

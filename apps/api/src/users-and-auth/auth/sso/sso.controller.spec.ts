@@ -9,6 +9,7 @@ import { UsersService } from './../../users/users.service';
 import { SessionService } from './../session.service';
 import type { Response, Request } from 'express';
 import { SSO_OIDC_REDIRECT_FROM_STATE_REQUEST_KEY } from './oidc/oidc-cookie-state-store';
+import { ssoProviderAuditEvent } from './audit/provider-audit';
 import { RbacService } from './../../rbac/rbac.service';
 import { UpdateSSOProviderDto } from './dto/update-sso-provider.dto';
 
@@ -40,8 +41,10 @@ describe('SsoController', () => {
     });
   });
 
+  const ACTOR = { id: 1, authenticationMethod: 'session' };
+
   describe('createProvider', () => {
-    it('should create a new provider when user has permission', async () => {
+    it('should create a new provider when user has permission, as the signed-in admin', async () => {
       const createDto: CreateSSOProviderDto = {
         name: 'New Provider',
         type: SSOProviderType.OIDC,
@@ -58,27 +61,7 @@ describe('SsoController', () => {
       const result = await fixture.controller.createOne(createDto, { user: { id: 1 } } as AuthenticatedRequest);
 
       expect(result).toEqual(fixture.mockSSOProvider);
-      expect(fixture.ssoService.createProvider).toHaveBeenCalledWith(createDto);
-      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'sso.provider.created',
-          actorId: 1,
-          details: { before: 'null', after: expect.not.stringContaining('test-client-secret') },
-        }),
-      );
-    });
-
-    it('keeps provider creation successful when the awaited audit receipt fails', async () => {
-      fixture.ssoAudit.record.mockRejectedValueOnce(new Error('audit unavailable'));
-
-      await expect(
-        fixture.controller.createOne(
-          { name: 'New Provider', type: SSOProviderType.OIDC } as CreateSSOProviderDto,
-          {
-            user: { id: 1 },
-          } as AuthenticatedRequest,
-        ),
-      ).resolves.toEqual(fixture.mockSSOProvider);
+      expect(fixture.ssoService.createProvider).toHaveBeenCalledWith(createDto, ACTOR);
     });
   });
 
@@ -100,13 +83,7 @@ describe('SsoController', () => {
       const result = await fixture.controller.updateOne('1', updateDto, mockReq);
 
       expect(result).toEqual(fixture.mockSSOProvider);
-      expect(fixture.ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto);
-      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'sso.provider.updated',
-          details: expect.objectContaining({ before: expect.any(String), after: expect.any(String) }),
-        }),
-      );
+      expect(fixture.ssoService.updateProvider).toHaveBeenCalledWith(1, updateDto, ACTOR);
     });
 
     it('gates explicit null roleMappings behind users.roles.manage', async () => {
@@ -119,71 +96,55 @@ describe('SsoController', () => {
       await expect(fixture.controller.updateOne('1', updateDto, mockReq)).rejects.toThrow(ForbiddenException);
       expect(fixture.ssoService.updateProvider).not.toHaveBeenCalled();
     });
+  });
 
-    it('does not audit a provider update that fails before commit', async () => {
-      jest.spyOn(fixture.ssoService, 'updateProvider').mockRejectedValueOnce(new Error('configuration write failed'));
-      const request = {
-        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
-      } as unknown as AuthenticatedRequest;
+  describe('deleteProvider', () => {
+    it('should delete a provider when user has permission', async () => {
+      await fixture.controller.deleteOne('1', { user: { id: 1 } } as AuthenticatedRequest);
 
-      await expect(fixture.controller.updateOne('1', { name: 'Updated Provider' }, request)).rejects.toThrow(
-        'configuration write failed',
-      );
+      expect(fixture.ssoService.deleteProvider).toHaveBeenCalledWith(1, ACTOR);
+    });
+  });
 
-      expect(fixture.ssoAudit.record).not.toHaveBeenCalled();
+  // SSOService records these inside its create/update/delete transaction.
+  describe('provider lifecycle audit event', () => {
+    const actor = { id: 1, authenticationMethod: 'session' as const };
+
+    it('snapshots a created and a deleted provider without its secrets', () => {
+      expect(ssoProviderAuditEvent('created', actor, fixture.mockSSOProvider)).toMatchObject({
+        domain: 'sso',
+        action: 'sso.provider.created',
+        actor,
+        subject: { type: 'sso.provider', id: fixture.mockSSOProvider.id },
+        details: { before: 'null', after: expect.not.stringContaining('test-client-secret') },
+      });
+      expect(ssoProviderAuditEvent('deleted', actor, fixture.mockSSOProvider)).toMatchObject({
+        action: 'sso.provider.deleted',
+        details: expect.objectContaining({ after: 'null' }),
+      });
     });
 
-    it('suppresses a true no-op but records a safe secret rotation flag', async () => {
-      const request = {
-        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
-      } as unknown as AuthenticatedRequest;
-
-      await fixture.controller.updateOne('1', {}, request);
-      expect(fixture.ssoAudit.record).not.toHaveBeenCalled();
-
-      await fixture.controller.updateOne(
-        '1',
-        {
-          oidcConfiguration: { clientSecret: fixture.mockSSOProvider.oidcConfiguration?.clientSecret },
-        } as UpdateSSOProviderDto,
-        request,
-      );
-      expect(fixture.ssoAudit.record).not.toHaveBeenCalled();
-
-      jest.spyOn(fixture.ssoService, 'updateProvider').mockResolvedValueOnce({
-        ...fixture.mockSSOProvider,
-        oidcConfiguration: { ...fixture.mockSSOProvider.oidcConfiguration, clientSecret: 'replacement' },
-      } as SSOProvider);
-      await fixture.controller.updateOne(
-        '1',
-        { oidcConfiguration: { clientSecret: 'replacement' } } as UpdateSSOProviderDto,
-        request,
-      );
-      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'sso.provider.updated',
-          details: expect.objectContaining({ changes: JSON.stringify({ changed: [], rotated: ['clientSecret'] }) }),
-        }),
-      );
+    it('suppresses a true no-op but records a safe secret rotation flag', () => {
+      const provider = fixture.mockSSOProvider;
+      expect(ssoProviderAuditEvent('updated', actor, provider, provider)).toBeNull();
+      const rotated = {
+        ...provider,
+        oidcConfiguration: { ...provider.oidcConfiguration, clientSecret: 'replacement' },
+      } as SSOProvider;
+      expect(ssoProviderAuditEvent('updated', actor, rotated, provider)).toMatchObject({
+        action: 'sso.provider.updated',
+        details: expect.objectContaining({ changes: JSON.stringify({ changed: [], rotated: ['clientSecret'] }) }),
+      });
+      expect(JSON.stringify(ssoProviderAuditEvent('updated', actor, rotated, provider))).not.toContain('replacement');
     });
 
-    it('does not report rotation when a SAML form resubmits its unchanged certificate', async () => {
-      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce(fixture.mockSamlProvider);
-      jest.spyOn(fixture.ssoService, 'updateProvider').mockResolvedValueOnce(fixture.mockSamlProvider);
-      const request = {
-        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
-      } as unknown as AuthenticatedRequest;
-      await fixture.controller.updateOne(
-        '2',
-        {
-          samlConfiguration: { certificate: fixture.mockSamlProvider.samlConfiguration?.certificate },
-        } as UpdateSSOProviderDto,
-        request,
-      );
-      expect(fixture.ssoAudit.record).not.toHaveBeenCalled();
+    it('does not report rotation when a SAML form resubmits its unchanged certificate', () => {
+      const provider = fixture.mockSamlProvider;
+      const resubmitted = { ...provider, samlConfiguration: { ...provider.samlConfiguration } } as SSOProvider;
+      expect(ssoProviderAuditEvent('updated', actor, resubmitted, provider)).toBeNull();
     });
 
-    it('uses the authoritative configuration to detect same-count mapping and query-only URL changes', async () => {
+    it('uses the authoritative configuration to detect same-count mapping and query-only URL changes', () => {
       const before = {
         ...fixture.mockSSOProvider,
         oidcConfiguration: {
@@ -200,78 +161,27 @@ describe('SsoController', () => {
           roleMappings: { 'billing-manager': ['billing'] },
         },
       } as SSOProvider;
-      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce(before);
-      jest.spyOn(fixture.ssoService, 'updateProvider').mockResolvedValueOnce(after);
-      jest
-        .spyOn(fixture.module.get(RbacService), 'getRoles')
-        .mockResolvedValue([{ key: 'billing-manager', rolePermissions: [] }] as never);
-      const request = {
-        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
-      } as unknown as AuthenticatedRequest;
 
-      await fixture.controller.updateOne(
-        '1',
-        {
-          oidcConfiguration: {
-            authorizationURL: after.oidcConfiguration?.authorizationURL,
-            roleMappings: after.oidcConfiguration?.roleMappings,
-          },
-        },
-        request,
-      );
-
-      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          details: expect.objectContaining({
-            changes: JSON.stringify({
-              changed: ['configuration.authorizationURL', 'configuration.roleMappings'],
-              rotated: [],
-            }),
-          }),
+      expect(ssoProviderAuditEvent('updated', actor, after, before)?.details).toMatchObject({
+        changes: JSON.stringify({
+          changed: ['configuration.authorizationURL', 'configuration.roleMappings'],
+          rotated: [],
         }),
-      );
+      });
     });
 
-    it('records certificate replacement as a rotation without retaining certificate material', async () => {
+    it('records certificate replacement as a rotation without retaining certificate material', () => {
       const before = fixture.mockSamlProvider;
       const after = {
         ...before,
         samlConfiguration: { ...before.samlConfiguration, certificate: 'REPLACEMENT' },
       } as SSOProvider;
-      jest.spyOn(fixture.ssoService, 'getProviderById').mockResolvedValueOnce(before);
-      jest.spyOn(fixture.ssoService, 'updateProvider').mockResolvedValueOnce(after);
-      const request = {
-        user: { id: 1, effectivePermissions: new Set(['users.roles.manage']) },
-      } as unknown as AuthenticatedRequest;
 
-      await fixture.controller.updateOne(
-        '2',
-        { samlConfiguration: { certificate: 'REPLACEMENT' } } as UpdateSSOProviderDto,
-        request,
-      );
-
-      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          details: expect.objectContaining({
-            changes: JSON.stringify({ changed: [], rotated: ['identityProviderCertificate'] }),
-          }),
-        }),
-      );
-    });
-  });
-
-  describe('deleteProvider', () => {
-    it('should delete a provider when user has permission', async () => {
-      await fixture.controller.deleteOne('1', { user: { id: 1 } } as AuthenticatedRequest);
-
-      expect(fixture.ssoService.deleteProvider).toHaveBeenCalledWith(1);
-      expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'sso.provider.deleted',
-          actorId: 1,
-          details: expect.objectContaining({ after: 'null' }),
-        }),
-      );
+      const event = ssoProviderAuditEvent('updated', actor, after, before);
+      expect(event?.details).toMatchObject({
+        changes: JSON.stringify({ changed: [], rotated: ['identityProviderCertificate'] }),
+      });
+      expect(JSON.stringify(event)).not.toContain('REPLACEMENT');
     });
   });
 
@@ -604,10 +514,11 @@ describe('SsoController', () => {
 
       expect(fixture.identityAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
-          action: 'sso_login',
+          domain: 'identity',
+          action: 'identity.sso_login',
+          actor: expect.objectContaining({ id: 1 }),
+          subject: expect.objectContaining({ id: 1 }),
           outcome: 'succeeded',
-          actorId: 1,
-          subjectId: 1,
           details: { providerId: 1 },
           request: { ipAddress: '127.0.0.1', userAgent: mockRequest.headers['user-agent'] },
         }),
@@ -769,8 +680,9 @@ describe('SsoController', () => {
       expect(sessionService.revokeAllUserSessions).toHaveBeenCalledWith(55);
       expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'sso',
           action: 'sso.provisioning.sessions_revoked',
-          actorId: null,
+          actor: expect.objectContaining({ id: null }),
           subject: { type: 'user', id: 55 },
         }),
       );
@@ -793,8 +705,9 @@ describe('SsoController', () => {
       expect(usersService.deleteOne).toHaveBeenCalledWith(77);
       expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'sso',
           action: 'sso.provisioning.user_deleted',
-          actorId: null,
+          actor: expect.objectContaining({ id: null }),
           subject: { type: 'user', id: 77 },
         }),
       );
@@ -843,8 +756,9 @@ describe('SsoController', () => {
       );
       expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'sso',
           action: 'sso.provisioning.permissions_synced',
-          actorId: null,
+          actor: expect.objectContaining({ id: null }),
           subject: { type: 'user', id: 99 },
           details: expect.objectContaining({
             changes: JSON.stringify({ added: ['user-manager'], removed: [], updated: [] }),
@@ -874,8 +788,9 @@ describe('SsoController', () => {
       expect(sessionService.revokeAllUserSessions).toHaveBeenCalledWith(101);
       expect(fixture.ssoAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'sso',
           action: 'sso.provisioning.sessions_revoked',
-          actorId: null,
+          actor: expect.objectContaining({ id: null }),
           subject: { type: 'user', id: 101 },
         }),
       );

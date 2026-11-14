@@ -1,7 +1,6 @@
 import { approvedOriginsFor, registerAuthControllerFixture } from './auth.controller.auth-controller.test-fixture';
 import { SsoLogoutService } from './sso/sso-logout.service';
 import { SessionPermissionSync } from './sso/session-permission-sync';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { AuthController } from './auth.controller';
 import { Response } from 'express';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
@@ -136,7 +135,12 @@ describe('AuthController', () => {
     expect(fixture.sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
     expect(fixture.cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
     expect(fixture.identityAudit.record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'logout', actorId: 1, subjectId: 1 }),
+      expect.objectContaining({
+        domain: 'identity',
+        action: 'identity.logout',
+        actor: expect.objectContaining({ id: 1 }),
+        subject: expect.objectContaining({ id: 1 }),
+      }),
     );
     if (!resolveAudit) throw new Error('audit receipt was not requested');
     resolveAudit();
@@ -299,7 +303,6 @@ describe('AuthController', () => {
     const controller = new AuthController(
       fixture.sessionService,
       fixture.cookieConfigService,
-      fixture.identityAudit as unknown as IdentityAuditService,
       {
         prepare: async () => {
           throw new Error('Provider unavailable');

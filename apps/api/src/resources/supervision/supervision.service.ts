@@ -7,9 +7,10 @@ import {
   BadRequestException,
   ConflictException,
   ServiceUnavailableException,
+  Inject,
 } from '@nestjs/common';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 
@@ -45,7 +46,7 @@ export class SupervisionService {
     protected readonly resourceUsageService: ResourceUsageService,
     protected readonly resourceIntroducersService: ResourceIntroducersService,
     protected readonly supervisionLive: SupervisionLiveService,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
     protected readonly preStart: PreStartService,
   ) {}
 
@@ -148,18 +149,17 @@ export class SupervisionService {
       const session = await this.resourceUsageService.startSession(request.resourceId, request.requester, request.dto, {
         supervisorUserId: supervisor.id,
         auditOrigin: {
-          actorId: supervisor.id,
-          authenticationMethod,
+          id: supervisor.id,
+          authenticationMethod: authenticationMethod ?? 'session',
           ...(apiTokenId === undefined ? {} : { apiTokenId }),
         },
       });
       this.fulfil(request, session);
-      void this.audit.recordResource({
+      void this.audit.record({
+        domain: 'resource',
         action: 'supervision.approved',
-        actorId: supervisor.id,
-        authenticationMethod,
-        apiTokenId,
-        subjectId: request.resourceId,
+        actor: { id: supervisor.id, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+        subject: { type: 'resource', id: request.resourceId },
         details: {
           requestId: request.id,
           requesterUserId: request.requester.id,
@@ -192,12 +192,11 @@ export class SupervisionService {
     this.clear(request);
     const error = new ForbiddenException('The supervision request was rejected by the supervisor');
     this.fail(request, error);
-    void this.audit.recordResource({
+    void this.audit.record({
+      domain: 'resource',
       action: 'supervision.rejected',
-      actorId: supervisor.id,
-      authenticationMethod,
-      apiTokenId,
-      subjectId: request.resourceId,
+      actor: { id: supervisor.id, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'resource', id: request.resourceId },
       details: {
         requestId: request.id,
         requesterUserId: request.requester.id,

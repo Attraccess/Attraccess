@@ -7,7 +7,7 @@ import {
   ResourceHealthSource,
 } from '@attraccess/database-entities';
 
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Inject } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -15,9 +15,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { In, Repository } from 'typeorm';
 
-import { ResourceAuditOrigin } from '../../audit/audit-policy';
+import { AuditActor } from '../../audit/recorder/audit-event';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../audit/recorder/audit-event';
 
 import { ResourceHealthSummaryDto } from './dtos/resource-health-state.dto';
 
@@ -32,7 +32,7 @@ export interface ReportInput {
   reason?: string | null;
   source: ResourceHealthSource;
   reportedAt?: Date;
-  auditOrigin?: ResourceAuditOrigin;
+  auditOrigin?: AuditActor;
 }
 
 @Injectable()
@@ -45,7 +45,7 @@ export class ResourceHealthService {
     @InjectRepository(Resource)
     private readonly resourceRepository: Repository<Resource>,
     private readonly eventEmitter: EventEmitter2,
-    private readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   private normalizeIdentifier(identifier?: string | null): string {
@@ -91,10 +91,11 @@ export class ResourceHealthService {
     }
 
     if (previousStatus !== input.status) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'health.transition',
-        ...(input.auditOrigin ?? { actorId: null }),
-        subjectId: input.resourceId,
+        actor: input.auditOrigin ?? SYSTEM_AUDIT_ACTOR,
+        subject: { type: 'resource', id: input.resourceId },
         details: {
           previousStatus: previousStatus ?? 'none',
           status: input.status,
@@ -160,13 +161,7 @@ export class ResourceHealthService {
     return count > 0;
   }
 
-  async clearEntry(
-    resourceId: number,
-    entryId: number,
-    auditOrigin: ResourceAuditOrigin = {
-      actorId: null,
-    },
-  ): Promise<void> {
+  async clearEntry(resourceId: number, entryId: number, auditOrigin: AuditActor = SYSTEM_AUDIT_ACTOR): Promise<void> {
     const getContextOwner = () => this;
     return clearEntryImplementation(
       {

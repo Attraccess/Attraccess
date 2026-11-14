@@ -1,6 +1,6 @@
 import { Subject } from 'rxjs';
 import { In } from 'typeorm';
-import { projectAdministrationAuditEvent } from '../../audit/policies/administration';
+import { projectAuditRow } from '../../audit/recorder/audit-row';
 import { MqttServerChangedEvent } from '../mqtt-server-changed.event';
 import { ExplorerConnectionReset, ExplorerViewer } from './mqtt-explorer-connections.service';
 import { auditText, MqttExplorerService } from './mqtt-explorer.service';
@@ -22,7 +22,7 @@ describe('MqttExplorerService', () => {
   const find = jest.fn();
   const subscribe = jest.fn();
   const publish = jest.fn();
-  const recordAdministration = jest.fn();
+  const record = jest.fn();
   let service: MqttExplorerService;
 
   beforeEach(() => {
@@ -30,20 +30,20 @@ describe('MqttExplorerService', () => {
     jest.resetAllMocks();
     findOneBy.mockResolvedValue({ id: 1, name: 'Broker', defaultPublishQos: 0, defaultPublishRetain: false });
     publish.mockResolvedValue(undefined);
-    recordAdministration.mockResolvedValue(undefined);
+    record.mockResolvedValue(undefined);
     subscribe.mockResolvedValue({ unsubscribe: jest.fn() });
     service = new MqttExplorerService(
       { findOneBy, find } as never,
       { subscribe } as never,
       { publish } as never,
-      { recordAdministration } as never,
+      { record } as never,
     );
   });
   afterEach(() => jest.useRealTimers());
 
   const streams = () => (service as unknown as { streams: Map<string, unknown> }).streams;
   const audited = (action: string) =>
-    recordAdministration.mock.calls.map(([event]) => event).filter((event) => event.action === action);
+    record.mock.calls.map(([event]) => event).filter((event) => event.action === action);
   const settle = async () => {
     for (let i = 0; i < 5; i += 1) await Promise.resolve();
   };
@@ -238,7 +238,7 @@ describe('MqttExplorerService', () => {
         (await service.subscribe(user, 1, '#')).subscribe({ error });
         await settle();
         expect(error).toHaveBeenCalled();
-        recordAdministration.mockClear();
+        record.mockClear();
         subscribe.mockClear();
       };
 
@@ -249,7 +249,7 @@ describe('MqttExplorerService', () => {
         await expect(service.subscribe(user, 1, '#')).rejects.toMatchObject({ status: 503 });
         await expect(service.subscribe(otherUser, 1, '#')).rejects.toMatchObject({ status: 503 });
         expect(subscribe).not.toHaveBeenCalled();
-        expect(recordAdministration).not.toHaveBeenCalled();
+        expect(record).not.toHaveBeenCalled();
 
         // Other filters and servers are not affected.
         (await service.subscribe(user, 1, 'a')).subscribe().unsubscribe();
@@ -291,13 +291,11 @@ describe('MqttExplorerService', () => {
     describe('audit', () => {
       it('records the subscribed topic only, with the session identity', async () => {
         (await service.subscribe(user, 1, 'a/+/b')).subscribe().unsubscribe();
-        expect(recordAdministration.mock.calls[0][0]).toEqual({
+        expect(record.mock.calls[0][0]).toEqual({
+          domain: 'administration',
           action: 'mqtt_server.message_subscribe',
-          actorId: 7,
-          authenticationMethod: 'session',
-          apiTokenId: undefined,
-          subjectType: 'mqtt-server',
-          subjectId: 1,
+          actor: { id: 7, authenticationMethod: 'session' },
+          subject: { type: 'mqtt-server', id: 1 },
           details: { serverName: 'Broker', topic: 'a/+/b' },
         });
       });
@@ -305,12 +303,10 @@ describe('MqttExplorerService', () => {
       it('passes an API token identity through', async () => {
         const tokenUser = { id: 9, authenticationMethod: 'api-token', apiTokenId: 3 } as never;
         (await service.subscribe(tokenUser, 1, '#')).subscribe().unsubscribe();
-        expect(recordAdministration.mock.calls[0][0]).toMatchObject({
-          actorId: 9,
-          authenticationMethod: 'api-token',
-          apiTokenId: 3,
+        expect(record.mock.calls[0][0]).toMatchObject({
+          actor: { id: 9, authenticationMethod: 'api-token', apiTokenId: 3 },
         });
-        expect(projectAdministrationAuditEvent(recordAdministration.mock.calls[0][0])).not.toBeNull();
+        expect(projectAuditRow(record.mock.calls[0][0])).not.toBeNull();
       });
 
       it('records a subscription once per user, server and filter within the window', async () => {
@@ -330,8 +326,8 @@ describe('MqttExplorerService', () => {
         expect(audited('mqtt_server.message_subscribe')).toHaveLength(5);
       });
 
-      it('still returns the stream when the audit sink fails', async () => {
-        recordAdministration.mockRejectedValue(new Error('down'));
+      it('still returns the stream when the audit record is dropped', async () => {
+        record.mockResolvedValue({ status: 'unavailable' });
         const events: MqttExplorerEvent[] = [];
         let viewer!: ExplorerViewer;
         subscribe.mockImplementation(async (_id, _filter, v: ExplorerViewer) => {
@@ -351,10 +347,10 @@ describe('MqttExplorerService', () => {
         const topic = `${'😀'.repeat(60)}/#`;
         (await service.subscribe(user, 1, topic)).subscribe().unsubscribe();
         await service.publish(user, 1, { topic: `x/${'😀'.repeat(200)}` });
-        const events = recordAdministration.mock.calls.map(([event]) => event);
+        const events = record.mock.calls.map(([event]) => event);
         expect(events).toHaveLength(2);
         for (const event of events) {
-          expect(projectAdministrationAuditEvent(event)).not.toBeNull();
+          expect(projectAuditRow(event)).not.toBeNull();
           expect(event.details.serverName).toMatch(/^Work\uFFFDshop é+$/);
           expect(event.details.serverName).toHaveLength(256);
         }
@@ -369,11 +365,11 @@ describe('MqttExplorerService', () => {
         for (let i = 0; i < MAX_VIEWS_PER_USER; i += 1) {
           views.push((await service.subscribe(user, 1, `t/${i}`)).subscribe());
         }
-        recordAdministration.mockClear();
+        record.mockClear();
         await expect(service.subscribe(user, 1, 't/x')).rejects.toMatchObject({ status: 429 });
         // The same filter again is another view too.
         await expect(service.subscribe(user, 1, 't/0')).rejects.toMatchObject({ status: 429 });
-        expect(recordAdministration).not.toHaveBeenCalled();
+        expect(record).not.toHaveBeenCalled();
         // Another user has their own allowance.
         (await service.subscribe(otherUser, 1, 't/x')).subscribe().unsubscribe();
 
@@ -425,7 +421,7 @@ describe('MqttExplorerService', () => {
     it('publishes through the shared client and audits topic and size only', async () => {
       await service.publish(user, 1, { topic: 'a/b', payload: 'héllo', qos: 1, retain: true });
       expect(publish).toHaveBeenCalledWith(1, 'a/b', 'héllo', { qos: 1, retain: true }, completion);
-      const event = recordAdministration.mock.calls[0][0];
+      const event = record.mock.calls[0][0];
       expect(event).toMatchObject({
         action: 'mqtt_server.message_publish',
         details: { serverName: 'Broker', topic: 'a/b', size: 6, qos: 1, retain: 1 },
@@ -437,11 +433,11 @@ describe('MqttExplorerService', () => {
       findOneBy.mockResolvedValue({ id: 1, name: 'Broker', defaultPublishQos: 2, defaultPublishRetain: true });
       await service.publish(user, 1, { topic: 't' });
       expect(publish).toHaveBeenCalledWith(1, 't', '', { qos: 2, retain: true }, completion);
-      expect(recordAdministration.mock.calls[0][0].details).toMatchObject({ qos: 2, retain: 1, size: 0 });
+      expect(record.mock.calls[0][0].details).toMatchObject({ qos: 2, retain: 1, size: 0 });
 
       await service.publish(user, 1, { topic: 't', qos: 0, retain: false });
       expect(publish).toHaveBeenLastCalledWith(1, 't', '', { qos: 0, retain: false }, completion);
-      expect(recordAdministration.mock.calls[1][0].details).toMatchObject({ qos: 0, retain: 0 });
+      expect(record.mock.calls[1][0].details).toMatchObject({ qos: 0, retain: 0 });
     });
 
     it('falls back to QoS 0 without retain when the server has no usable defaults', async () => {
@@ -474,7 +470,7 @@ describe('MqttExplorerService', () => {
       await service.publish(user, 1, { topic: 'x'.repeat(1024), payload: 'ä'.repeat(128 * 1024) });
       await service.publish(user, 1, { topic: 'ä'.repeat(512) });
       expect(publish).toHaveBeenCalledTimes(2);
-      expect(recordAdministration.mock.calls[0][0].details.size).toBe(256 * 1024);
+      expect(record.mock.calls[0][0].details.size).toBe(256 * 1024);
     });
 
     it('answers 404 for an unknown server and hides broker errors', async () => {
@@ -486,11 +482,11 @@ describe('MqttExplorerService', () => {
         status: 502,
         message: 'Publishing the message failed.',
       });
-      expect(recordAdministration).not.toHaveBeenCalled();
+      expect(record).not.toHaveBeenCalled();
     });
 
-    it('does not fail when the audit sink throws', async () => {
-      recordAdministration.mockRejectedValue(new Error('down'));
+    it('does not fail when the audit record is dropped', async () => {
+      record.mockResolvedValue({ status: 'unavailable' });
       await expect(service.publish(user, 1, { topic: 'a' })).resolves.toBeUndefined();
     });
   });

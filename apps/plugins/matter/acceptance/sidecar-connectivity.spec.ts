@@ -195,7 +195,7 @@ describe('Matter plugin against the real sidecar', () => {
     const received: number[] = [];
     host.service.connection.onEvent(({ event }) => received.push(event.sequence));
     const publish = (count: number) => {
-      for (let i = 0; i < count; i += 1) sidecar?.stream.publish('device.state', { n: i });
+      for (let i = 0; i < count; i += 1) sidecar?.stream.publish('fabric.changed', { n: i });
     };
     publish(3);
     await until(() => received.length >= 3);
@@ -219,7 +219,7 @@ describe('Matter plugin against the real sidecar', () => {
     const delivered = new Set<string>();
     host.service.connection.onEvent(({ event }) => delivered.add(event.eventId));
     // The plugin holds a cursor of this run only once it has received an event from it.
-    const published = sidecar?.stream.publish('device.state', {});
+    const published = sidecar?.stream.publish('fabric.changed', {});
     await until(() => published !== undefined && delivered.has(published.eventId));
     await sidecar?.stop();
     await startSidecar({ authTokens: [NEW_TOKEN], port });

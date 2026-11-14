@@ -100,7 +100,7 @@ describe.each<CardKind>(['desfire', 'ntag424'])('recovery records (%s)', (kind) 
     card.keys[1] = Buffer.alloc(16);
     card.keyVersions[1] = 0;
     pending.push({ id: 99, uid: UID, kind: 'reset', cardId, keyNo: 1, key: null, actorId: 42 });
-    const audit = operations['audit'].recordAttractap;
+    const audit = (operations as unknown as { audit: { record: jest.Mock } }).audit.record;
     audit.mockClear();
     const reader = createRelayReader(card, conversations);
 
@@ -109,10 +109,10 @@ describe.each<CardKind>(['desfire', 'ntag424'])('recovery records (%s)', (kind) 
     expect(cards).toHaveLength(0);
     expect(audit).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'card.unlinked',
-        actorId: 42,
-        authenticationMethod: 'session',
-        subjectId: cardId,
+        domain: 'attractap',
+        action: 'attractap.card.unlinked',
+        actor: expect.objectContaining({ id: 42, authenticationMethod: 'session' }),
+        subject: expect.objectContaining({ id: cardId }),
         details: expect.objectContaining({ source: 'reader-recovery' }),
       }),
     );

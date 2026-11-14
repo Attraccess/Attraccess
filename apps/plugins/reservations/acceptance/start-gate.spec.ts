@@ -99,13 +99,13 @@ describe.each([['session' as const], ['api-token' as const]])('host start gate w
       registry as never,
       { failurePolicy: async () => failurePolicy } as never,
       { onCleared: () => undefined, raise: async () => ({}), clearWhere: async () => undefined } as never,
-      { recordAttractap: async () => undefined } as never,
+      { record: async () => undefined } as never,
       { get: () => ({}) } as never,
     );
     const hostPreStart = new HostPreStartService(
       { precheckStart: async () => undefined } as never,
       hooks,
-      new WebStartStepStore({ recordAttractap: async () => undefined, record: async () => undefined } as never),
+      new WebStartStepStore({ record: async () => undefined } as never),
       { resolveLanguage: async () => 'en' } as never,
     );
     startSession.mockReset().mockResolvedValue({ id: 500 });

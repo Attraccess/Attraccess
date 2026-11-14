@@ -1,6 +1,18 @@
-import { AttractapAuditEvent } from './domain-events';
 import { dataFields, oneOf, positive } from './projection';
-export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet<string>> = {
+
+/** Projection input: the attractap action without its `attractap.` prefix. */
+export interface AttractapAuditInput {
+  action: AttractapAuditAction;
+  /** Defaults to attractap.reader. `ui.*` events may use the resource or an alert as subject. */
+  subjectType?: 'attractap.reader' | 'attractap.installation' | 'resource' | 'attractap.ui-alert';
+  actorId: number | null;
+  authenticationMethod: 'session' | 'api-token' | null;
+  apiTokenId?: number;
+  subjectId: number;
+  details: Record<string, string | number | boolean>;
+}
+
+export const attractapDetails = {
   'reader.registered': new Set(['source']),
   'reader.deregistered': new Set(['source']),
   'card.linked': new Set(['readerId', 'source']),
@@ -104,7 +116,9 @@ export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet
   'ui.breaker_changed': new Set(['plugin', 'state', 'reasonCode']),
   'ui.alert_changed': new Set(['plugin', 'kind', 'state', 'readerId']),
   'ui.setting_changed': new Set(['setting', 'resourceId', 'readerId', 'plugin', 'value']),
-};
+} satisfies Record<string, ReadonlySet<string>>;
+
+export type AttractapAuditAction = keyof typeof attractapDetails;
 export const attractapResetReasons = new Set([
   'POWERON',
   'EXT',
@@ -162,19 +176,16 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   reason: (value) => typeof value === 'string' && /^[a-z0-9-]{1,40}$/.test(value),
 };
 
-export function validAttractapDetails(
-  action: AttractapAuditEvent['action'],
-  details: Record<string, unknown>,
-): boolean {
+export function validAttractapDetails(action: AttractapAuditAction, details: Record<string, unknown>): boolean {
   return Object.entries(details).every(
     ([key, value]) =>
-      attractapDetails[action].has(key) &&
+      (attractapDetails[action] as ReadonlySet<string>).has(key) &&
       (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') &&
       (detailValidators[key]?.(value) ?? true),
   );
 }
 
-export function projectAttractapAuditEvent(input: AttractapAuditEvent): AttractapAuditEvent | null {
+export function projectAttractapAuditEvent(input: AttractapAuditInput): AttractapAuditInput | null {
   if (!positive(input.subjectId) || !attractapDetails[input.action]) return null;
   const deviceActor = input.authenticationMethod === null;
   if (deviceActor ? input.actorId !== null || input.apiTokenId !== undefined : !positive(input.actorId)) return null;
@@ -224,4 +235,4 @@ export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.ui.breaker_changed',
   'attractap.ui.alert_changed',
   'attractap.ui.setting_changed',
-];
+] as const satisfies readonly `attractap.${AttractapAuditAction}`[];

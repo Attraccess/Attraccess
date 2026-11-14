@@ -82,18 +82,18 @@ describe('event stream', () => {
   it('keeps replay metadata stable and switches from replay to live without gaps or duplicates', async () => {
     running = await startSidecar();
     const { stream } = running.sidecar;
-    stream.publish('device.state', { n: 1 });
+    stream.publish('fabric.changed', { n: 1 });
     const first = await WsClient.connect(running.port);
     first.send(resume(formatCursor(stream.streamInstanceId, 0)));
     await first.until(() => first.events().length === 3);
     const replayed = first.events()[2].event;
-    stream.publish('device.state', { n: 2 });
+    stream.publish('fabric.changed', { n: 2 });
     await first.until(() => first.events().length === 4);
 
     const second = await WsClient.connect(running.port);
     second.send(resume(formatCursor(stream.streamInstanceId, 2)));
     await second.until(() => second.events().length === 2);
-    stream.publish('device.state', { n: 3 });
+    stream.publish('fabric.changed', { n: 3 });
     await second.until(() => second.events().length === 3);
     const sequences = second.events().map((message) => message.event.sequence);
     expect(sequences).toEqual([3, 4, 5]);
@@ -110,7 +110,7 @@ describe('event stream', () => {
     client.send({ type: 'ping', wireVersion: 1 });
     await client.until(() => client.messages.some((message) => message.type === 'pong'));
     expect(client.events()).toHaveLength(0);
-    running.sidecar.stream.publish('device.state', {});
+    running.sidecar.stream.publish('fabric.changed', {});
     await client.until(() => client.events().length === 1);
     client.close();
   });
@@ -135,7 +135,7 @@ describe('event stream', () => {
     const clock = { now: Date.now() };
     running = await startSidecar({ replayMaxEvents: 3, replayMaxAgeMs: 1_000 }, { now: () => clock.now });
     const { stream } = running.sidecar;
-    for (let i = 0; i < 5; i += 1) stream.publish('device.state', { i });
+    for (let i = 0; i < 5; i += 1) stream.publish('fabric.changed', { i });
     const evicted = await WsClient.connect(running.port);
     evicted.send(resume(formatCursor(stream.streamInstanceId, 1)));
     await evicted.until(() => evicted.closed !== null);
@@ -208,7 +208,7 @@ describe('event stream', () => {
     client.send(resume());
     client.send({ type: 'ping', wireVersion: 1 });
     await client.until(() => client.messages.some((message) => message.type === 'pong'));
-    for (let i = 0; i < 100; i += 1) running.sidecar.stream.publish('device.state', { pad: 'x'.repeat(200) });
+    for (let i = 0; i < 100; i += 1) running.sidecar.stream.publish('fabric.changed', { pad: 'x'.repeat(200) });
     await client.until(() => client.closed !== null);
     expect(client.closed).toMatchObject({ code: CLOSE_CODES.tryAgainLater });
     expect(client.closed?.reason).toMatch(/reconnect with the last cursor/);
@@ -256,7 +256,7 @@ describe('event stream', () => {
     client.send(resume());
     client.socket.terminate();
     await new Promise((resolve) => setTimeout(resolve, 50));
-    running.sidecar.stream.publish('device.state', {});
+    running.sidecar.stream.publish('fabric.changed', {});
     expect((await fetchLive(running.port)).status).toBe(200);
   });
 

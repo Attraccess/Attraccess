@@ -3,7 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { PreStartService } from './pre-start.service';
 import { StartBlockedException, StartConfirmationRequiredException } from './start-confirmation.errors';
 import { MAX_OPEN_WEB_STEPS, MAX_OPEN_WEB_STEPS_PER_PRINCIPAL, WebStartStepStore } from './web-start-step.store';
-import { projectAttractapAuditEvent } from '../../../audit/policies/attractap';
+import { projectAuditRow } from '../../../audit/recorder/audit-row';
 
 const user = { id: 7 } as any;
 const confirmOutcome = {
@@ -19,7 +19,7 @@ function setup(outcome: any = { decision: 'allow' }, precheck: jest.Mock = jest.
     queryStartBlocked: jest.fn().mockResolvedValue(null),
   };
   const usage = { precheckStart: precheck };
-  const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const store = new WebStartStepStore(audit as never);
   const settings = { resolveLanguage: jest.fn(async (locale?: string) => (locale === 'de' ? 'de' : 'en')) };
   const service = new PreStartService(usage as never, hooks as never, store, settings as never);
@@ -279,19 +279,19 @@ describe('PreStartService', () => {
         const late = (await catchError(service.gateHttp(3, user, {}, web))).getResponse().stepId;
         jest.advanceTimersByTime(36_000);
         await catchError(service.gateHttp(3, user, { confirmedStepIds: [late] }, web));
-        const actions = audit.recordAttractap.mock.calls.map(([event]) => [
+        const actions = audit.record.mock.calls.map(([event]) => [
           event.action,
           event.details.origin,
-          event.authenticationMethod,
+          event.actor.authenticationMethod,
         ]);
         expect(actions).toEqual([
-          ['ui.step_issued', 'api', 'api-token'],
-          ['ui.step_answered', 'api', 'api-token'],
-          ['ui.step_issued', 'web', 'session'],
-          ['ui.step_expired', 'web', 'session'],
+          ['attractap.ui.step_issued', 'api', 'api-token'],
+          ['attractap.ui.step_answered', 'api', 'api-token'],
+          ['attractap.ui.step_issued', 'web', 'session'],
+          ['attractap.ui.step_expired', 'web', 'session'],
         ]);
-        for (const [event] of audit.recordAttractap.mock.calls) {
-          expect(projectAttractapAuditEvent(event)).not.toBeNull();
+        for (const [event] of audit.record.mock.calls) {
+          expect(projectAuditRow(event)).not.toBeNull();
         }
       } finally {
         jest.useRealTimers();
