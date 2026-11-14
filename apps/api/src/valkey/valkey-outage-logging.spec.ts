@@ -6,6 +6,7 @@ describe('describeValkeyError', () => {
     expect(describeValkeyError(Object.assign(new Error('NOAUTH'), { code: 'ECONNREFUSED' }))).toBe('NOAUTH');
     expect(describeValkeyError(Object.assign(new Error(''), { code: 'ECONNREFUSED' }))).toBe('ECONNREFUSED');
     expect(describeValkeyError(new Error(''))).toBe('unknown error');
+    expect(describeValkeyError(undefined)).toBe('unknown error');
   });
 });
 

@@ -14,8 +14,9 @@ export interface ValkeyOutageMessages {
  * Describes an ioredis error by its message, or its code when the message is empty. Never log the error object:
  * AUTH errors carry the password in `error.command.args`.
  */
-export function describeValkeyError(error: NodeJS.ErrnoException): string {
-  return error.message || error.code || 'unknown error';
+export function describeValkeyError(error: unknown): string {
+  const { message, code } = (error ?? {}) as Partial<NodeJS.ErrnoException>;
+  return message || code || 'unknown error';
 }
 
 /**

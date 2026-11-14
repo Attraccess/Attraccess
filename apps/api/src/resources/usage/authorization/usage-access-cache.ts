@@ -257,9 +257,7 @@ export class UsageAccessCache {
     try {
       await this.authorizationCacheSubscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL);
     } catch (error) {
-      this.logger.error(
-        `Failed to subscribe to authorization cache invalidations (${describeValkeyError(error as NodeJS.ErrnoException)})`,
-      );
+      this.logger.error(`Failed to subscribe to authorization cache invalidations (${describeValkeyError(error)})`);
       this.authorizationCacheSubscriber.disconnect();
       this.authorizationCacheSubscriber = null;
     }
