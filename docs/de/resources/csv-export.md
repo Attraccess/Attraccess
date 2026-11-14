@@ -1,14 +1,16 @@
 # CSV-Export
-<!-- llms-description: Nutzungs- und Abrechnungsdaten als CSV exportieren: Berechtigungen, Spalten, Vorlagen, verfügbare Felder und Dateiformat. -->
 
-Exportieren Sie Nutzungs- und Abrechnungsdaten als CSV-Datei zur Analyse, für Berichte, die Buchhaltung oder den Upload in andere Systeme. Sie legen fest, welche Spalten die Datei enthält, wie ihre Überschriften heißen und in welcher Reihenfolge sie stehen. Gespeicherte **Vorlagen** machen dieselbe Konfiguration wiederverwendbar.
+<!-- llms-description: Nutzungs-, Stunden- und Abrechnungsdaten als CSV exportieren: Berechtigungen, Spalten, Vorlagen, verfügbare Felder und Dateiformat. -->
+
+Exportieren Sie Nutzungs-, Stunden- und Abrechnungsdaten als CSV-Datei zur Analyse, für Berichte, die Buchhaltung oder den Upload in andere Systeme. Sie legen fest, welche Spalten die Datei enthält, wie ihre Überschriften heißen und in welcher Reihenfolge sie stehen. Gespeicherte **Vorlagen** machen dieselbe Konfiguration wiederverwendbar.
 
 ## Berechtigungen
 
-| Export                       | Erforderliche Berechtigung                  |
-| ---------------------------- | ------------------------------------------- |
-| **Ressourcen-Nutzung**       | `resources.reports.export`                  |
-| **Abrechnungstransaktionen** | `billing.manage` (und das Abrechnungsmodul) |
+| Export                          | Erforderliche Berechtigung                  |
+| ------------------------------- | ------------------------------------------- |
+| **Ressourcen-Nutzung**          | `resources.reports.export`                  |
+| **Ressourcen-Stundenübersicht** | `resources.reports.export`                  |
+| **Abrechnungstransaktionen**    | `billing.manage` (und das Abrechnungsmodul) |
 
 Die Seite **CSV-Export** steht zur Verfügung, wenn Sie mindestens eine dieser Berechtigungen haben. Die Startseite zeigt nur die Export-Typen, die Sie verwenden dürfen. Zum Laden der Abrechnungsdaten ist zusätzlich `resources.update` nötig; ohne diese Berechtigung zeigt die Konfigurationsseite der Abrechnungen, dass die Daten nicht geladen werden konnten.
 
@@ -16,7 +18,7 @@ Die Seite **CSV-Export** steht zur Verfügung, wenn Sie mindestens eine dieser B
 
 1. Öffnen Sie die Seite **CSV-Export** über die Seitenleisten-Navigation.
 2. Wählen Sie einen Zeitraum über eine Voreinstellung (z. B. _Letzte 30 Tage_) oder einen eigenen Zeitraum.
-3. Klicken Sie auf die Karte des gewünschten Export-Typs. Damit öffnet sich die Konfigurationsseite dieses Exports (`/csv-export/resource-usage-hours` oder `/csv-export/billing-transactions`).
+3. Klicken Sie auf die Karte des gewünschten Export-Typs. Damit öffnet sich die Konfigurationsseite dieses Exports (`/csv-export/resource-usage-hours`, `/csv-export/resource-hours-summary` oder `/csv-export/billing-transactions`).
 4. Wählen Sie eine Vorlage oder konfigurieren Sie die Spalten (siehe unten). Die Vorschau zeigt die ersten Zeilen genau so, wie sie in der Datei stehen werden.
 5. Klicken Sie auf **CSV herunterladen**. Die Datei wird auf Ihren Computer heruntergeladen, sobald alle Daten geladen sind.
 
@@ -73,6 +75,31 @@ Nach dem Laden einer Vorlage können Sie weiter bearbeiten, ohne zu speichern. D
 | Aufsicht-ID / Aufsicht-Name             | Der beaufsichtigende Benutzer, falls vorhanden                                              |
 | **Aufsicht-E-Mail**                     | E-Mail-Adresse des beaufsichtigenden Benutzers                                              |
 | **Ressourcen-Metadaten: \<Schlüssel\>** | Ein Feld für jeden Metadatenschlüssel, der bei den Ressourcen der geladenen Zeilen vorkommt |
+
+### Ressourcen-Stundenübersicht
+
+Eine Zeile pro Ressource: jede Ressource mit mindestens einer Nutzungssitzung oder einem aufgezeichneten Betriebsintervall, das den gewählten Zeitraum überlappt. Damit vergleichen Sie **Personenstunden** mit **Maschinenstunden** (siehe [Maschinenstunden und Personenstunden](resources/usage-tracking.md#maschinenstunden-und-personenstunden)).
+
+| Feld                                       | Beschreibung                                                                                                                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ressourcen-ID / Ressourcenname             | Die Ressource                                                                                                                                                                     |
+| Sitzungen                                  | Anzahl der Nutzungssitzungen, die den Zeitraum überlappen                                                                                                                         |
+| Personenstunden                            | Die Dauern aller Sitzungen addiert. Gleichzeitige Sitzungen zählen jeweils einzeln                                                                                                |
+| Maschinenstunden mit Sitzung               | Zeit, in der mindestens eine Sitzung lief. Überlappende Sitzungen zählen einmal                                                                                                   |
+| Maschinenlaufzeit (Stunden)                | Zeit, in der die Maschine als laufend aufgezeichnet wurde, mit oder ohne Sitzung. Leer, wenn die Ressource keine Betriebsdaten hat                                                |
+| Laufzeit außerhalb einer Sitzung (Stunden) | Der Teil der Laufzeit ohne Sitzung (standardmäßig nicht ausgewählt). Leer, wenn die Ressource keine Betriebsdaten hat                                                             |
+| Status der Betriebsdaten                   | _Vorläufig_, wenn sich die Werte noch ändern können (der Zeitraum endet in der Zukunft oder eine Sitzung bzw. ein Intervall ist noch offen), _Nicht verfügbar_ ohne Betriebsdaten |
+| **Ressourcen-Metadaten: \<Schlüssel\>**    | Ein Feld für jeden Metadatenschlüssel, der bei den Ressourcen der geladenen Zeilen vorkommt                                                                                       |
+
+Die Stunden sind Dezimalzahlen, passend zu Ihrer Sprache formatiert. Der Export ist auf `resources.reports.export` beschränkt; ohne diese Berechtigung wird die Anfrage abgelehnt.
+
+> [!IMPORTANT]
+> **Die beiden Ressourcen-Exporte behandeln den Zeitraum unterschiedlich; ihre Summen sind daher nicht direkt vergleichbar.**
+>
+> - **Ressourcen-Nutzung** enthält die Sitzungen, die im Zeitraum **beginnen**, jeweils mit ihrer **vollen** Dauer, auch wenn sie nach dem Zeitraum enden.
+> - **Ressourcen-Stundenübersicht** **beschneidet** jede Sitzung und jedes Betriebsintervall auf den Zeitraum (und bei Zeiträumen, die in der Zukunft enden, auf die aktuelle Zeit). Eine Sitzung, die vor dem Zeitraum begann, zählt erst ab dem Beginn des Zeitraums.
+>
+> Eine Sitzung, die über das Ende des Zeitraums hinausgeht, wird im Nutzungs-Export daher vollständig, in der Übersicht aber nur teilweise gezählt. Der Nutzungs-Export enthält immer Personenzeit; eine Zeile pro Sitzung, parallele Sitzungen werden nicht zusammengefasst.
 
 ### Abrechnungstransaktionen
 

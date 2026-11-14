@@ -45,7 +45,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Maintenance](https://docs.attraccess.org/en/resources/maintenance.md): Track resource maintenance with manual records and automated maintenance schedules, including the required permissions.
 - [Reservations](https://docs.attraccess.org/en/resources/reservations.md): The Reservations plugin lets members book a resource for a time window; covers member use, administration and the API.
 - [Usage Tracking](https://docs.attraccess.org/en/resources/usage-tracking.md): How usage sessions are started, ended, shared between users, linked to projects and reviewed in the usage history.
-- [CSV Export](https://docs.attraccess.org/en/resources/csv-export.md): Export resource usage and billing data as CSV: permissions, choosing columns, templates, available fields and file format.
+- [CSV Export](https://docs.attraccess.org/en/resources/csv-export.md): Export resource usage, resource hours and billing data as CSV: permissions, choosing columns, templates, available fields and file format.
 
 ## English: Flows & Automation
 - [Overview](https://docs.attraccess.org/en/flows/overview.md): Introduces flows, visual automations for resources, with use cases, resource versus global flows and creating a first flow.
@@ -173,7 +173,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Wartung](https://docs.attraccess.org/de/resources/maintenance.md): Wartung von Ressourcen mit manuellen Einträgen und automatisierten Wartungsplänen nachverfolgen, inklusive nötiger Berechtigungen.
 - [Reservierungen](https://docs.attraccess.org/de/resources/reservations.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; behandelt Nutzung, Administration und API.
 - [Nutzungsverfolgung](https://docs.attraccess.org/de/resources/usage-tracking.md): Wie Nutzungssitzungen gestartet, beendet, gemeinsam genutzt, mit Projekten verknüpft und in der Nutzungshistorie eingesehen werden.
-- [CSV-Export](https://docs.attraccess.org/de/resources/csv-export.md): Nutzungs- und Abrechnungsdaten als CSV exportieren: Berechtigungen, Spalten, Vorlagen, verfügbare Felder und Dateiformat.
+- [CSV-Export](https://docs.attraccess.org/de/resources/csv-export.md): Nutzungs-, Stunden- und Abrechnungsdaten als CSV exportieren: Berechtigungen, Spalten, Vorlagen, verfügbare Felder und Dateiformat.
 
 ## Deutsch: Flows & Automatisierung
 - [Überblick](https://docs.attraccess.org/de/flows/overview.md): Stellt Flows als visuelle Automatisierungen vor, mit Anwendungsfällen, Ressourcen- und globalen Flows und dem ersten Flow.

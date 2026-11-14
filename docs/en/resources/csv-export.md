@@ -1,14 +1,16 @@
 # CSV Export
-<!-- llms-description: Export resource usage and billing data as CSV: permissions, choosing columns, templates, available fields and file format. -->
 
-Export resource usage and billing data as a CSV file for analysis, reporting, accounting, or upload into other systems. You decide which columns the file contains, what their headers are called, and in which order they appear. Saved **templates** make the same setup reusable.
+<!-- llms-description: Export resource usage, resource hours and billing data as CSV: permissions, choosing columns, templates, available fields and file format. -->
+
+Export resource usage, resource hours and billing data as a CSV file for analysis, reporting, accounting, or upload into other systems. You decide which columns the file contains, what their headers are called, and in which order they appear. Saved **templates** make the same setup reusable.
 
 ## Permissions
 
-| Export                   | Required permission                       |
-| ------------------------ | ----------------------------------------- |
-| **Resource usage**       | `resources.reports.export`                |
-| **Billing transactions** | `billing.manage` (and the billing module) |
+| Export                     | Required permission                       |
+| -------------------------- | ----------------------------------------- |
+| **Resource usage**         | `resources.reports.export`                |
+| **Resource hours summary** | `resources.reports.export`                |
+| **Billing transactions**   | `billing.manage` (and the billing module) |
 
 The **CSV Export** page is available if you have at least one of these permissions. The landing page only shows the export types you may use. Loading the billing data additionally requires `resources.update`; without it the billing configuration page shows that the data could not be loaded.
 
@@ -16,7 +18,7 @@ The **CSV Export** page is available if you have at least one of these permissio
 
 1. Open the **CSV Export** page from the sidebar navigation.
 2. Pick a date range with a preset (e.g. _Last 30 days_) or choose a custom range.
-3. Click the card of the export type you want. This opens the configuration page of that export (`/csv-export/resource-usage-hours` or `/csv-export/billing-transactions`).
+3. Click the card of the export type you want. This opens the configuration page of that export (`/csv-export/resource-usage-hours`, `/csv-export/resource-hours-summary` or `/csv-export/billing-transactions`).
 4. Choose a template or configure the columns (see below). The preview shows the first rows exactly as they will appear in the file.
 5. Click **Download CSV**. The file is downloaded to your computer once all data is loaded.
 
@@ -73,6 +75,31 @@ You can keep editing after loading a template without saving. The download alway
 | Supervisor ID / Supervisor Name  | The supervising user, if any                                               |
 | **Supervisor Email**             | Email address of the supervising user                                      |
 | **Resource metadata: \<key\>**   | One field for every metadata key found on the resources in the loaded rows |
+
+### Resource hours summary
+
+One row per resource: every resource with at least one usage session or one recorded operating interval that overlaps the selected range. Use it to compare **person hours** with **machine hours** (see [Machine hours and person hours](resources/usage-tracking.md#machine-hours-and-person-hours)).
+
+| Field                             | Description                                                                                                                                               |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Resource ID / Resource Name       | The resource                                                                                                                                              |
+| Sessions                          | Number of usage sessions that overlap the range                                                                                                           |
+| Person Hours                      | The durations of all sessions added up. Sessions that run at the same time count each                                                                     |
+| Machine Hours with a Session      | Time in which at least one session was running. Overlapping sessions count once                                                                           |
+| Machine Running Time (Hours)      | Time the machine was recorded as running, with or without a session. Empty if the resource has no operating data                                          |
+| Running Outside a Session (Hours) | Part of the running time without any session (not selected by default). Empty if the resource has no operating data                                       |
+| Operating Data Status             | _Provisional_ if the values can still change (the range ends in the future, or a session or interval is still open), _Unavailable_ without operating data |
+| **Resource metadata: \<key\>**    | One field for every metadata key found on the resources in the loaded rows                                                                                |
+
+The hours are decimal numbers formatted for your locale. The export is limited to `resources.reports.export`; without it the request is refused.
+
+> [!IMPORTANT]
+> **The two resource exports treat the date range differently, so their totals are not directly comparable.**
+>
+> - **Resource usage** contains the sessions that **start** within the range, each with its **full** duration, even if it ends after the range.
+> - **Resource hours summary** **clips** every session and operating interval to the range (and to the current time for ranges that end in the future). A session that started before the range counts only from the start of the range.
+>
+> A session that spans the end of the range is therefore counted completely in the usage export, but only partly in the summary. The usage export always contains person time; one row per session, parallel sessions are not merged.
 
 ### Billing transactions
 
