@@ -5,11 +5,7 @@ import { User } from '@attraccess/database-entities';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { AuthRateLimitInterceptor } from '../rate-limiting/auth-rate-limit.interceptor';
 import { InviteUserDto } from './dtos/inviteUser.dto';
-import {
-  CsvInviteConfigDto,
-  CsvInviteErrorResponseDto,
-  CsvInviteUploadDto,
-} from './dtos/csvInvite.dto';
+import { CsvInviteConfigDto, CsvInviteErrorResponseDto, CsvInviteUploadDto } from './dtos/csvInvite.dto';
 import { FileUpload } from '../../common/types/file-upload.types';
 import { UserInvitationService } from './user-invitation.service';
 
@@ -29,6 +25,10 @@ export class UserInvitationsController {
   @ApiResponse({
     status: 400,
     description: 'Invalid input data.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'The license does not allow another user, e.g. the licensed user limit is reached.',
   })
   @Auth('users.create')
   async inviteUser(@Req() request: AuthenticatedRequest, @Body() body: InviteUserDto): Promise<User> {
@@ -51,6 +51,11 @@ export class UserInvitationsController {
     status: 400,
     description: 'Invalid CSV or input data.',
     type: CsvInviteErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 403,
+    description:
+      'The license does not allow the invited users (e.g. the licensed user limit would be exceeded), or users.roles.manage is missing to assign roles via CSV.',
   })
   async inviteUsersFromCsv(
     @Req() request: AuthenticatedRequest,

@@ -1,10 +1,12 @@
 import { User } from '@attraccess/database-entities';
 
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 
 import { EntityManager } from 'typeorm';
 
 import { EmailService } from '../../email/email.service';
+
+import { LicenseError } from '../../license/license.service';
 
 import { AuthService } from '../auth/auth.service';
 
@@ -40,7 +42,15 @@ export class UserInvitationService {
     candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
     options?: { grantAllPermissionsToFirst?: boolean; actorId?: number },
   ): Promise<User[]> {
-    await this.usersService.ensureLicenseForNewUsers(candidates.length);
+    try {
+      await this.usersService.ensureLicenseForNewUsers(candidates.length);
+    } catch (error) {
+      if (error instanceof LicenseError) {
+        this.logger.warn(`Blocking user invitation due to license: ${error.reason}`);
+        throw new ForbiddenException(error.reason);
+      }
+      throw error;
+    }
 
     return this.usersService
       .withTransaction(async (manager: EntityManager) => {

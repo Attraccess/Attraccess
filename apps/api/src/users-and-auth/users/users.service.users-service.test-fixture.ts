@@ -39,6 +39,8 @@ export function registerUsersServiceFixture() {
 
   let dataSource: jest.Mocked<DataSource>;
 
+  let licenseService: jest.Mocked<Pick<LicenseService, 'verifyLicense'>>;
+
   let emailService: { sendUsernameChangedEmail: jest.Mock; sendVerificationEmail: jest.Mock };
 
   let accounts: UserAccounts;
@@ -132,6 +134,7 @@ export function registerUsersServiceFixture() {
     accounts = module.get(UserAccounts);
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
     dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
+    licenseService = module.get(LicenseService);
     emailService = module.get(EmailService) as unknown as {
       sendUsernameChangedEmail: jest.Mock;
       sendVerificationEmail: jest.Mock;
@@ -158,6 +161,9 @@ export function registerUsersServiceFixture() {
     },
     get dataSource() {
       return dataSource;
+    },
+    get licenseService() {
+      return licenseService;
     },
     get emailService() {
       return emailService;

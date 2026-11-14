@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
+import { LicenseError } from '../../license/license.service';
 import { UserInvitationService } from './user-invitation.service';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
@@ -107,6 +109,24 @@ describe('CSV invitations', () => {
     );
     expect(auth.generateEmailVerificationToken).toHaveBeenCalledWith(result[0], manager);
     expect(email.sendUserInvitationEmail).toHaveBeenCalledWith(result[0], 'verification-token', manager);
+  });
+  it('maps a LicenseError to a ForbiddenException with the reason', async () => {
+    const { service, users } = setup();
+    users.ensureLicenseForNewUsers.mockRejectedValue(
+      new LicenseError('Trying to use more than the allowed amount of users'),
+    );
+    const promise = service.inviteUsersFromCsv(file('email,username,role\nalex@example.com,Alex,\n'), config);
+    await expect(promise).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(promise).rejects.toMatchObject({ message: 'Trying to use more than the allowed amount of users' });
+    expect(users.createMany).not.toHaveBeenCalled();
+  });
+  it('re-throws non-license errors from the license check unchanged', async () => {
+    const { service, users } = setup();
+    const failure = new Error('database down');
+    users.ensureLicenseForNewUsers.mockRejectedValue(failure);
+    await expect(
+      service.inviteUsersFromCsv(file('email,username,role\nalex@example.com,Alex,\n'), config),
+    ).rejects.toBe(failure);
   });
   it('reports database email and username collisions at their source row', async () => {
     const { service, users } = setup();
