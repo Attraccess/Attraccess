@@ -9,7 +9,7 @@ import {
   FlowScope,
 } from '@attraccess/database-entities';
 
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -20,6 +20,10 @@ import { EntityManager, In, Repository } from 'typeorm';
 import { ResourceNotFoundException } from '../../exceptions/resource.notFound.exception';
 
 import { MqttClientService } from '../../mqtt/mqtt-client.service';
+
+import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../audit/recorder/audit-event';
+
+import { canvasSaveDetails, diffCanvas } from './flow-audit';
 
 import { ResourceFlowResponseDto, ResourceFlowSaveDto } from './dto/index';
 
@@ -62,6 +66,7 @@ export class ResourceFlowsService {
     protected readonly eventEmitter: EventEmitter2,
     @InjectRepository(Flow)
     protected readonly flowRepository: Repository<Flow>,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(ResourceFlowsService.name);
@@ -239,7 +244,11 @@ export class ResourceFlowsService {
     return map;
   }
 
-  async saveResourceFlow(resourceId: number, flowData: ResourceFlowSaveDto): Promise<ResourceFlowResponseDto> {
+  async saveResourceFlow(
+    resourceId: number,
+    flowData: ResourceFlowSaveDto,
+    actor: AuditActor,
+  ): Promise<ResourceFlowResponseDto> {
     // Verify resource exists
     const resource = await this.resourceRepository.findOne({
       where: { id: resourceId },
@@ -261,14 +270,16 @@ export class ResourceFlowsService {
 
     // Start transaction to ensure data consistency
     const result = await this.flowNodeRepository.manager.transaction(async (transactionalEntityManager) => {
-      const [oldMqttMessageReceivedNodes, oldMqttWaitForMessageNodes] = await Promise.all([
-        transactionalEntityManager.find(ResourceFlowNode, {
-          where: { resource: { id: resourceId }, type: ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED },
-        }),
-        transactionalEntityManager.find(ResourceFlowNode, {
-          where: { resource: { id: resourceId }, type: ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE },
-        }),
-      ]);
+      const previousCanvas = {
+        nodes: await transactionalEntityManager.find(ResourceFlowNode, { where: { resource: { id: resourceId } } }),
+        edges: await transactionalEntityManager.find(ResourceFlowEdge, { where: { resource: { id: resourceId } } }),
+      };
+      const oldMqttMessageReceivedNodes = previousCanvas.nodes.filter(
+        (node) => node.type === ResourceFlowNodeType.INPUT_MQTT_MESSAGE_RECEIVED,
+      );
+      const oldMqttWaitForMessageNodes = previousCanvas.nodes.filter(
+        (node) => node.type === ResourceFlowNodeType.PROCESSING_MQTT_WAIT_FOR_MESSAGE,
+      );
 
       const newOrChangedMqttMessageReceivedNodes = [] as typeof flowData.nodes;
       const newOrChangedMqttWaitForMessageNodes = [] as typeof flowData.nodes;
@@ -368,6 +379,20 @@ export class ResourceFlowsService {
               error.stack,
             );
           });
+      }
+
+      const diff = diffCanvas(previousCanvas, flowData);
+      if (diff) {
+        await this.audit.record(
+          {
+            domain: 'resource',
+            action: 'resource_flow.updated',
+            actor,
+            subject: { type: 'resource', id: resourceId },
+            details: canvasSaveDetails(previousCanvas, flowData, diff),
+          },
+          transactionalEntityManager,
+        );
       }
 
       return { nodes: savedNodes, edges: savedEdges };
