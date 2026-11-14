@@ -28,6 +28,11 @@ For Authentik, Keycloak or other OpenID-compatible providers, you can use auto-d
 
 All URL fields are filled in automatically.
 
+**If discovery fails**, Attraccess shows the reason as a message:
+
+- A message with a status (for example `answered with status 404`) usually means the host, realm or application name is wrong.
+- A message about the TLS certificate means the Attraccess API server does not trust the provider's certificate. Add the issuing CA to the server's trust store, for example with Node's `NODE_EXTRA_CA_CERTS` environment variable.
+
 ### Manual Configuration
 
 | Field | Description | Example |

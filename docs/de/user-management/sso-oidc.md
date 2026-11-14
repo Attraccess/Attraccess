@@ -28,6 +28,11 @@ Für Authentik, Keycloak oder andere OpenID-kompatible Anbieter können Sie die 
 
 Alle URL-Felder werden automatisch ausgefüllt.
 
+**Wenn die Erkennung fehlschlägt**, zeigt Attraccess den Grund als Meldung an:
+
+- Eine Meldung mit einem Status (zum Beispiel `answered with status 404`) bedeutet meist, dass Host, Realm oder Anwendungsname falsch sind.
+- Eine Meldung zum TLS-Zertifikat bedeutet, dass der Attraccess-API-Server dem Zertifikat des Anbieters nicht vertraut. Fügen Sie die ausstellende CA dem Trust Store des Servers hinzu, zum Beispiel über die Node-Umgebungsvariable `NODE_EXTRA_CA_CERTS`.
+
 ### Manuelle Konfiguration
 
 | Feld | Beschreibung | Beispiel |
