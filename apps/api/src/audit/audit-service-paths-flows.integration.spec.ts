@@ -138,7 +138,6 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
       new FlowLogRecorderService(),
       { publish: jest.fn(), subscribe: jest.fn() } as never,
       {} as never,
-      {} as never,
       new EventEmitter2(),
       health,
       { getAll: async () => ({ resource: {}, global: {} }), getMany: async () => ({}) } as never,
@@ -147,7 +146,6 @@ describe('audit recorded through flows, MQTT and the plugin context', () => {
         timeFlow: (_t: string, run: () => unknown) => run(),
         timeNode: (_n: string, run: () => unknown) => run(),
       } as never,
-      {} as never,
       {} as never,
       {} as never,
     );

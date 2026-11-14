@@ -1,6 +1,6 @@
 import { AuthenticationType, User } from '@attraccess/database-entities';
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EmailService } from '../../email/email.service';
 
