@@ -166,7 +166,7 @@ Type: `input.resource.metering.start` · Machines · Resource flows only
 
 Select a predefined **Meter**, or create one with a name. Prepares that meter before a tracked session starts or is taken over. **Timeout (seconds)** is 1–600, default **30**. The branch must reach **Metering Ready**. A priced meter that cannot initialize prevents the session from starting.
 
-Payload contains `metering: { sessionId, meterId, operationId, resourceId, usageId, kind, requestedAt }`, with `kind: "start"`. Example: read a lifetime counter with HTTP, then submit its baseline. See [Meters](flows/energy-metering.md).
+Payload contains `metering: { sessionId, meterId, operationId, resourceId, usageId, userId, kind, requestedAt }`, with `kind: "start"`. `userId` is the person of the session. Example: read a lifetime counter with HTTP, then submit its baseline. See [Meters](flows/energy-metering.md).
 
 ### Metering Collection
 
@@ -180,7 +180,7 @@ Type: `input.resource.metering.collect` · Machines · Resource flows only
 | **Final attempts**              | 1–10 / **3**                                   |
 | **Final retry delay (seconds)** | 0–120 / **5**                                  |
 
-Runs for periodic readings, including while idle, and final readings at session end. Payload has the same metering fields as **Metering Start**, with `kind: "interim"` or `"final"`. While idle, `sessionId` and `usageId` are null. Connect the branch to **Report Meter** for the same meter. Periodic readings update lifetime and active-session totals; only session consumption is billed. See [Meters](flows/energy-metering.md) for freshness and pending charges.
+Runs for periodic readings, including while idle, and final readings at session end. Payload has the same metering fields as **Metering Start**, with `kind: "interim"`, `"final"` or `"boundary"` (a shared-meter reading at a session start or stop on a shared machine). While idle, `sessionId` and `usageId` are null. Connect the branch to **Report Meter** for the same meter. Periodic readings update lifetime and active-session totals; only session consumption is billed. See [Meters](flows/energy-metering.md) for freshness and pending charges.
 
 ## Processing Nodes
 
@@ -425,8 +425,11 @@ Type: `output.resource.metering.report` · Resource flows only
 | **Value**       | Required non-negative numeric value or template                   |
 | **Observed at** | Optional ISO timestamp template; defaults to reporting time       |
 | **Source**      | Optional template naming the meter                                |
+| **Usage ID**    | Optional template rendering the session ID the reading belongs to |
 
 Reports values in collection branches and ordinary flows, including outside sessions. A reply in a collection branch must match the requested meter. No unit is required. The first unsolicited cumulative reading establishes a baseline; subsequent increases update lifetime consumption. Increments directly increase consumption. During an active session, accepted increases also update that session's total. A configured observed-at template that renders empty fails; final readings must be fresh. The catalog exposes no outgoing connection.
+
+On a machine with more than one running session, a reading pushed outside a metering run must name its session: inside a session lifecycle flow (start, stop, takeover) the lifecycle's own session is used, otherwise set **Usage ID** to a template that renders a session ID, such as `{{ usageId }}` of the flow payload. A reading that cannot be tied to exactly one active session is rejected with a flow error and never guessed. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines).
 
 Example after **Wait for MQTT Message** returning `{"heartbeats":1500}` in its content: choose **Heartbeats**, mode **total**, value `{{payload.heartbeats}}`. See [Meters](flows/energy-metering.md) for baselines and retries.
 

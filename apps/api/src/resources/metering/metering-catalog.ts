@@ -5,12 +5,17 @@ import {
   ResourceMeter,
   ResourceFlowNode,
   ResourceFlowEdge,
+  ResourceMeteringSegment,
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
+  ResourceMeterAllocation,
+  ResourceUsage,
 } from '@attraccess/database-entities';
 import { meterDefinitionFromFlow } from './metering-definition';
 import { meterCharge, formatMeterValue } from './quantity';
-import { findMeterHolders, type MeterHolder } from './meter-holder';
+import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessions';
+import { ClosedSegment, sessionShare } from './segment-charges';
+import { IsNull, MoreThanOrEqual } from 'typeorm';
 
 export async function requireMeter(manager: EntityManager, resourceId: number, meterId: number) {
   const meter = await manager.findOne(ResourceMeter, { where: { id: meterId, resourceId } });
@@ -41,51 +46,112 @@ export class MeteringCatalog {
     return { allNodes, edges };
   }
 
+  /**
+   * What a session of the machine owes for a meter so far. A session that shares the meter owes its share of the
+   * segments closed so far plus its share of the open one, which is provisional until the next reading.
+   */
+  private async liveShare(
+    manager: EntityManager,
+    meter: ResourceMeter,
+    usage: ResourceUsage,
+    session: ResourceMeteringSession,
+  ) {
+    const segments = await manager.find(ResourceMeteringSegment, {
+      where: [
+        { meterId: meter.id, endedAt: MoreThanOrEqual(usage.startTime) },
+        { meterId: meter.id, endedAt: IsNull() },
+      ],
+      order: { startedAt: 'ASC' },
+    });
+    const mine = segments.filter(
+      (segment) =>
+        segment.status !== 'abandoned' && segment.participants.some((participant) => participant.usageId === usage.id),
+    );
+    const closed: ClosedSegment[] = mine.filter((segment) => segment.status === 'closed');
+    const open = mine.find((segment) => segment.status === 'open');
+    const now = new Date();
+    const counter = meter.counterValue ?? open?.startValue ?? '0';
+    const soFar: ClosedSegment[] = open ? [...closed, { ...open, endedAt: now, endValue: counter }] : closed;
+    if (!soFar.length) return null;
+    const share = sessionShare(soFar, usage.id);
+    return {
+      session,
+      shared: !share.solo,
+      provisional: Boolean(open),
+      participants: open?.participants.length ?? null,
+      quantity: share.quantity,
+      credits: share.credits,
+      breakdown: share.breakdown,
+    };
+  }
+
   async listMeters(resourceId: number) {
+    const manager = this.sessions.manager;
     const meters = await this.meters.find({ where: { resourceId }, order: { id: 'ASC' } });
-    const holders = await findMeterHolders(
-      this.sessions.manager,
+    const { byMeter } = await findActiveMeterSessions(
+      manager,
       resourceId,
       meters.map((meter) => meter.id),
     );
-    return meters.map((meter) => {
-      const { usage, session: held } = holders.get(meter.id) as MeterHolder;
-      const captured = usage?.meterRates?.find((rate) => rate.meterId === meter.id);
-      const session = held && (usage?.meterRates == null || captured != null) ? held : undefined;
-      const sessionRate = captured?.creditsPerUnit ?? session?.creditsPerUnit ?? 0;
-      return {
+    const result = [];
+    for (const meter of meters) {
+      const sessions = [];
+      for (const { usage, session: held } of byMeter.get(meter.id) ?? []) {
+        const captured = usage.meterRates?.find((rate) => rate.meterId === meter.id);
+        const session = held && (usage.meterRates == null || captured != null) ? held : undefined;
+        const sessionRate = captured?.creditsPerUnit ?? session?.creditsPerUnit ?? 0;
+        if (session) {
+          const live = session.accounting === 'segmented' ? await this.liveShare(manager, meter, usage, session) : null;
+          sessions.push({
+            sessionId: session.id,
+            usageId: session.usageId,
+            meterName: captured?.name ?? session.meterName,
+            creditsPerUnit: sessionRate,
+            latestValue: live
+              ? formatMeterValue(live.quantity)
+              : session.latestValue == null
+                ? null
+                : formatMeterValue(BigInt(session.latestValue)),
+            chargeCredits: live
+              ? live.credits
+              : session.latestValue == null
+                ? null
+                : meterCharge(BigInt(session.latestValue), sessionRate),
+            latestObservedAt: session.latestObservedAt ?? (live ? meter.latestObservedAt : null),
+            source: session.source,
+            // Only a session that shares the meter with others has a share and segments to show.
+            ...(live
+              ? { shared: live.shared, provisional: live.provisional, participants: live.participants, segments: live.breakdown }
+              : {}),
+          });
+        } else if (captured) {
+          // Free-meter initialization may be skipped; its captured terms still belong to this usage.
+          sessions.push({
+            sessionId: null,
+            usageId: usage.id,
+            meterName: captured.name,
+            creditsPerUnit: captured.creditsPerUnit,
+            latestValue: null,
+            chargeCredits: null,
+            latestObservedAt: null,
+            source: null,
+          });
+        }
+      }
+      result.push({
         id: meter.id,
         name: meter.name,
         creditsPerUnit: meter.creditsPerUnit,
+        allocation: meter.allocation,
         lifetimeValue: formatMeterValue(BigInt(meter.lifetimeValue)),
         counterValue: meter.counterValue == null ? null : formatMeterValue(BigInt(meter.counterValue)),
         latestObservedAt: meter.latestObservedAt,
-        session: session
-          ? {
-              sessionId: session.id,
-              usageId: session.usageId,
-              meterName: captured?.name ?? session.meterName,
-              creditsPerUnit: sessionRate,
-              latestValue: session.latestValue == null ? null : formatMeterValue(BigInt(session.latestValue)),
-              chargeCredits: session.latestValue == null ? null : meterCharge(BigInt(session.latestValue), sessionRate),
-              latestObservedAt: session.latestObservedAt,
-              source: session.source,
-            }
-          : captured && usage
-            ? {
-                // Free-meter initialization may be skipped; its captured terms still belong to this usage.
-                sessionId: null,
-                usageId: usage.id,
-                meterName: captured.name,
-                creditsPerUnit: captured.creditsPerUnit,
-                latestValue: null,
-                chargeCredits: null,
-                latestObservedAt: null,
-                source: null,
-              }
-            : null,
-      };
-    });
+        // The earliest running session, for clients that show one session per meter.
+        session: sessions[0] ?? null,
+        sessions,
+      });
+    }
+    return result;
   }
 
   async createMeter(resourceId: number, name: string) {
@@ -118,6 +184,12 @@ export class MeteringCatalog {
     return this.getMeterDto(resourceId, meterId);
   }
 
+  async setAllocation(resourceId: number, meterId: number, allocation: ResourceMeterAllocation) {
+    const meter = await requireMeter(this.meters.manager, resourceId, meterId);
+    await this.meters.update(meter.id, { allocation });
+    return this.getMeterDto(resourceId, meterId);
+  }
+
   private async getMeterDto(resourceId: number, meterId: number) {
     const meter = (await this.listMeters(resourceId)).find((m) => m.id === meterId);
     if (!meter) throw new BadRequestException('METER_NOT_FOUND');
@@ -131,14 +203,18 @@ export class MeteringCatalog {
   async getStatus(resourceId: number) {
     const meters = await this.meters.find({ where: { resourceId } });
     const flow = await this.getDefinitionFlow(resourceId);
+    const sharedMachine = (await getMeteringSessionLimit(this.sessions.manager, resourceId)) > 1;
     const definitions = meters.map((meter) => {
       const definition = meterDefinitionFromFlow(meter.id, flow);
+      // Splitting a shared meter needs a reading at every start and stop.
+      const unreadable = sharedMachine && meter.allocation === 'shared' && (definition.incrementOnly || !definition.hasCollection);
       return {
         meterId: meter.id,
         name: meter.name,
         creditsPerUnit: meter.creditsPerUnit,
+        allocation: meter.allocation,
         configured: definition.configured,
-        problems: definition.problems,
+        problems: unreadable ? [...definition.problems, 'shared-needs-collect' as const] : definition.problems,
         interimIntervalMinutes: definition.hasCollection ? definition.collect.interimIntervalMinutes : 0,
       };
     });

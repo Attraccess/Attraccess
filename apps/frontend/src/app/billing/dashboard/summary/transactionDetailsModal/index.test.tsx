@@ -230,3 +230,51 @@ it('distinguishes unavailable final evidence from a free zero reading and system
   expect(freeRow?.querySelectorAll('td')[2].textContent).toBe('0');
   expect(freeRow?.querySelectorAll('td')[3].textContent).toBe('0');
 });
+
+it('shows the shared marker and breakdown only for allocated items', async () => {
+  state.transaction = {
+    id: 9,
+    createdAt: '2026-01-02',
+    status: 'completed',
+    amount: -36,
+    resourceUsageId: 8,
+    resourceUsage: { id: 8, resource: { name: 'Lathe' } },
+    items: [
+      {
+        id: 1,
+        name: 'Energy',
+        quantity: 1,
+        unitPrice: 12,
+        meterQuantity: '0.4',
+        meterCreditsPerUnit: 30,
+        allocation: {
+          kind: 'meter',
+          segments: [
+            {
+              startedAt: '2026-01-01T10:00:00Z',
+              endedAt: '2026-01-01T11:00:00Z',
+              participants: 3,
+              totalQuantity: '1.2',
+              totalCredits: 36,
+              shareQuantity: '0.4',
+              shareCredits: 12,
+            },
+          ],
+        },
+      },
+      {
+        id: 2,
+        name: 'Solo meter',
+        quantity: 1,
+        unitPrice: 24,
+        meterQuantity: '0.8',
+        meterCreditsPerUnit: 30,
+        allocation: null,
+      },
+    ],
+  };
+  render(<TransactionDetailsModal transactionId={9} isOpen />);
+  expect(await screen.findByText('items.allocation.shared')).toBeTruthy();
+  expect(screen.getAllByText('items.allocation.shared')).toHaveLength(1);
+  expect(document.querySelectorAll('[data-cy="allocation-segment"]')).toHaveLength(1);
+});

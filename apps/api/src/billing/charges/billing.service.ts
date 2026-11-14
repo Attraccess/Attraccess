@@ -34,6 +34,7 @@ import { LiveNotificationsService } from '../live-notifications/live-notificatio
 import { BillingLedger } from '../accounting/billing-ledger';
 
 import { applyBillingFactor, toExactCredits } from '@attraccess/shared';
+import { OperatingShare, operatingBreakdown } from '../../resources/operating-intervals/operating-share';
 import { PaginationOptions } from '../../types/request';
 import { BillingConfigurationDto } from '../dto/configuration.dto';
 import { RefundTransactionDto } from '../dto/refund-transaction.dto';
@@ -161,6 +162,8 @@ export class BillingService {
   public async chargeForResourceUsage(
     usage: ResourceUsage,
     transactionManager?: EntityManager,
+    /** The running time split among the sessions that shared the machine; sessions that never did bill by the minute. */
+    operatingShare?: OperatingShare | null,
   ): Promise<BillingTransaction> {
     let existingTransaction: BillingTransaction | null;
     if (transactionManager) {
@@ -188,11 +191,15 @@ export class BillingService {
       const operatingDurationMs = Math.round((usage.attributedOperatingDurationInMinutes ?? 0) * 60_000);
       const roundedMinutes = Math.ceil(sessionDurationMs / 60_000);
       const roundedOperatingMinutes = Math.ceil(operatingDurationMs / 60_000);
+      // Rounding a shared session's time up per person would create credit, so it is charged on exact shares.
+      const sharedOperating = operatingShare?.shared ? operatingShare : null;
       // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
       const creditsForSession = usage.creditsPerUsage ?? configuration.creditsPerUsage;
       let grossCredits =
         toExactCredits(sessionDurationRate) * toExactCredits(roundedMinutes) +
-        toExactCredits(operatingDurationRate) * toExactCredits(roundedOperatingMinutes) +
+        (sharedOperating
+          ? toExactCredits(operatingDurationRate > 0 ? sharedOperating.credits : 0)
+          : toExactCredits(operatingDurationRate) * toExactCredits(roundedOperatingMinutes)) +
         toExactCredits(creditsForSession);
 
       let transaction = await manager.findOne(BillingTransaction, {
@@ -270,7 +277,16 @@ export class BillingService {
         quantity: roundedMinutes,
       });
 
-      if (operatingDurationRate > 0) {
+      if (operatingDurationRate > 0 && sharedOperating) {
+        await manager.save(BillingTransactionItem, {
+          billingTransactionId: transaction.id,
+          name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+          durationMs: sharedOperating.shareMs,
+          unitPrice: sharedOperating.credits,
+          quantity: 1,
+          allocation: { kind: 'operating-time', segments: operatingBreakdown(sharedOperating) },
+        });
+      } else if (operatingDurationRate > 0) {
         await manager.save(BillingTransactionItem, {
           billingTransactionId: transaction.id,
           name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',

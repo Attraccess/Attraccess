@@ -25,7 +25,8 @@ export enum ResourceMeteringSessionStatus {
   Waived = 'waived',
 }
 
-export type ResourceMeteringOperationKind = 'start' | 'interim' | 'final';
+/** `boundary` is a reading at a session start or stop of a shared meter: it closes a time segment without resetting the meter. */
+export type ResourceMeteringOperationKind = 'start' | 'interim' | 'final' | 'boundary';
 export type ResourceMeteringOperationStatus = 'pending' | 'completed' | 'failed' | 'expired';
 
 /** Logical metering session: one per usage and meter. Meter values are integer billionths stored as text. */
@@ -70,6 +71,14 @@ export class ResourceMeteringSession {
   /** Rate captured when the session started. */
   @Column({ type: 'integer' })
   creditsPerUnit!: number;
+
+  /**
+   * `own`: the session accumulates its own total on the meter, because it never overlapped another session.
+   * `segmented`: its consumption is the sum of its shares of the meter's shared time segments.
+   * `per-session`: a measuring point of its own, read and settled independently of other sessions.
+   */
+  @Column({ type: 'varchar', default: 'own' })
+  accounting!: 'own' | 'segmented' | 'per-session';
 
   /** Set when the start branch reported a lifetime-counter reading to subtract from later totals. */
   @Column({ type: 'varchar', nullable: true })
@@ -165,6 +174,62 @@ export class ResourceMeteringOperation {
 
   @Column({ type: 'text', nullable: true })
   error!: string | null;
+
+  @CreateDateColumn()
+  createdAt!: Date;
+}
+
+export type ResourceMeteringSegmentStatus = 'open' | 'closed' | 'abandoned';
+
+/** A session taking part in a shared segment, with the rate it captured for the meter. Earliest started first. */
+export interface ResourceMeteringSegmentParticipant {
+  usageId: number;
+  creditsPerUnit: number;
+}
+
+/**
+ * A time span of a shared meter in which the same sessions were active. Its consumption is the difference between
+ * the readings at its two boundaries and is split equally among the participants. A segment whose closing reading
+ * failed stays open and absorbs the next one, so its participants are everyone who was active at any point in it.
+ */
+@Entity()
+@Index('IDX_resource_metering_segment_meter', ['meterId', 'status'])
+export class ResourceMeteringSegment {
+  @PrimaryColumn({ type: 'varchar' })
+  id!: string;
+
+  @Column({ type: 'integer' })
+  resourceId!: number;
+
+  @ManyToOne(() => Resource, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'resourceId' })
+  resource!: Resource;
+
+  @Column({ type: 'integer' })
+  meterId!: number;
+
+  @ManyToOne(() => ResourceMeter, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'meterId' })
+  meter!: ResourceMeter;
+
+  @Column({ type: 'varchar' })
+  status!: ResourceMeteringSegmentStatus;
+
+  @Column({ type: 'datetime' })
+  startedAt!: Date;
+
+  @Column({ type: 'datetime', nullable: true })
+  endedAt!: Date | null;
+
+  /** Meter counter at the opening boundary. Fixed-point billionths as text. */
+  @Column({ type: 'varchar' })
+  startValue!: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  endValue!: string | null;
+
+  @Column({ type: 'simple-json' })
+  participants!: ResourceMeteringSegmentParticipant[];
 
   @CreateDateColumn()
   createdAt!: Date;

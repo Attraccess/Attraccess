@@ -34,6 +34,15 @@ Pauschale, beide zeitabhängigen Tarife und der Abrechnungsfaktor des Benutzers 
 
 Jeder benannte Zähler kann in den Abrechnungseinstellungen einen Preis pro Messwert erhalten. Mehrere Zähler können gemeinsam abgerechnet werden. Namen und Preise werden beim Sitzungsstart gespeichert. Nur Sitzungsverbrauch wird berechnet; Leerlaufverbrauch erhöht den Gesamtverbrauch. Ein Preis von null deaktiviert nur die Abrechnung.
 
+### Gemeinsam genutzte Maschinen
+
+Bei Maschinen mit mehreren parallelen Sitzungen hat jeder Zähler in seinen Zählereinstellungen die Einstellung **Zuordnung**:
+
+- **Geteilt und aufgeteilt** (Standard): Verbrauch und Betriebszeit der Maschine werden zu gleichen Teilen auf die gleichzeitig aktiven Personen verteilt. Anteile werden exakt geführt und einmal pro Zeitsegment und Gebührenart auf ganze Credits gerundet, sodass die berechneten Anteile immer die Segmentsumme ergeben.
+- **Pro Sitzung gemessen**: Jede Sitzung erhält ihren eigenen Messpunkt und wird eigenständig abgerechnet.
+
+Der Modus wird beim Sitzungsstart gespeichert; Änderungen werden im Audit-Log protokolliert. Nutzungsgebühr und Sitzungszeit werden nie aufgeteilt. Zähler, die sich nicht bei Bedarf lesen lassen, benötigen auf gemeinsam genutzten Maschinen **Pro Sitzung gemessen** oder einen Preis von 0. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen) für Segmente, Rundung, fehlgeschlagene Messungen und Beispiele.
+
 Siehe [Zähler und verbrauchsbasierte Abrechnung](flows/energy-metering.md) für Einrichtung, Meldemodi, Migration und Abrechnung.
 
 ## Beispielkonfigurationen

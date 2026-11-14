@@ -67,4 +67,31 @@ export class BillingTransactionItem {
   @Column({ type: 'integer', nullable: true })
   @ApiProperty({ nullable: true, required: false, description: 'Captured price per measured value' })
   meterCreditsPerUnit!: number | null;
+
+  @Column({ type: 'simple-json', nullable: true })
+  @ApiProperty({
+    nullable: true,
+    required: false,
+    type: () => Object,
+    description:
+      'Set when this charge is a share of a machine used by several people at once: the segments the person took part in',
+  })
+  allocation!: BillingItemAllocation | null;
+}
+
+export interface BillingItemAllocationSegment {
+  startedAt: string;
+  endedAt: string;
+  participants: number;
+  /** Total of the whole segment in meter units, or milliseconds for running time. */
+  totalQuantity: string;
+  totalCredits: number;
+  /** This person's share of the quantity and the whole credits charged for it. */
+  shareQuantity: string;
+  shareCredits: number;
+}
+
+export interface BillingItemAllocation {
+  kind: 'meter' | 'operating-time';
+  segments: BillingItemAllocationSegment[];
 }

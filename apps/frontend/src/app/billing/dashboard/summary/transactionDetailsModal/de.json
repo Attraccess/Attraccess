@@ -47,7 +47,13 @@
     "total": "Summe Positionen",
     "meterDescription": "{{value}} zu {{rate}} pro Messwert",
     "unavailable": "Nicht verfügbar",
-    "meterUnavailable": "Endwert nicht verfügbar; keine Zählergebühr enthalten. Erfasster Preis: {{rate}} pro Messwert."
+    "meterUnavailable": "Endwert nicht verfügbar; keine Zählergebühr enthalten. Erfasster Preis: {{rate}} pro Messwert.",
+    "allocation": {
+      "shared": "Geteilt",
+      "shareLine": "{{share}} — dein Anteil an {{total}}",
+      "breakdown": "Aufschlüsselung anzeigen",
+      "segment": "{{people}} Personen: gesamt {{total}} ({{totalCredits}}), dein Anteil {{share}} ({{shareCredits}})"
+    }
   },
   "actions": {
     "refund": "Erstattung",

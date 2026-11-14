@@ -47,7 +47,13 @@
     "total": "Items total",
     "meterDescription": "{{value}} at {{rate}} per measured value",
     "unavailable": "Unavailable",
-    "meterUnavailable": "Final reading unavailable; no meter charge included. Captured rate: {{rate}} per measured value."
+    "meterUnavailable": "Final reading unavailable; no meter charge included. Captured rate: {{rate}} per measured value.",
+    "allocation": {
+      "shared": "Shared",
+      "shareLine": "{{share}} — your share of {{total}}",
+      "breakdown": "Show breakdown",
+      "segment": "{{people}} people: total {{total}} ({{totalCredits}}), your share {{share}} ({{shareCredits}})"
+    }
   },
   "actions": {
     "refund": "Refund",

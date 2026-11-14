@@ -25,6 +25,10 @@ Für neue Nutzungssitzungen speichern abgeschlossene zeitabhängige Abrechnungsp
 
 Bei einer Gesamtsumme ungleich null zeigt der Standardbeleg per E-Mail getrennte Berechnungen für Sitzungs- und Betriebsdauer sowie den gespeicherten Abrechnungsfaktor. Bei einer Gesamtsumme von null wird keine Abrechnungs-E-Mail versendet. Angepasste E-Mail-Vorlagen bleiben beim Aktualisieren des Standardbelegs erhalten; Administratoren können die Vorlage auf den Standard zurücksetzen, um das neue Layout zu übernehmen. Historische Transaktionen werden nicht umgeschrieben.
 
+### Geteilte Sitzungen
+
+Bei einer Maschine mit parallelen Sitzungen zeigen die Zähler- und Laufzeitzeilen einer geteilten Sitzung den Anteil der Person (zum Beispiel „0,8 kWh - Ihr Anteil an 2,4 kWh“) und ihre Credits mit der Markierung **geteilt**. Eine Aufschlüsselung listet alle Segmente, an denen die Person beteiligt war: Zeitraum, Anzahl der Personen, Gesamtmenge und Credits des Segments sowie den Anteil der Person. Sie erscheint in den Transaktionsdetails, im Beleg per E-Mail und in der Abrechnungsansicht der Sitzung. Ist beim Beenden einer Sitzung eine Zählermessung fehlgeschlagen, wird die Zeile als ausstehend angezeigt, bis das zusammengeführte Segment geschlossen ist; der Anteil wird dann als Korrekturbuchung zur ursprünglichen Abrechnung berechnet. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen).
+
 ## Transaktionen filtern
 
 Sie koennen die Transaktionsliste filtern, um bestimmte Eintraege zu finden:

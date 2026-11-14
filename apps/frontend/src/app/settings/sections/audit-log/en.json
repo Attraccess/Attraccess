@@ -220,6 +220,7 @@
     "plugin.retry_requested": "Plugin retry requested",
     "billing.transaction.updated": "Billing transaction updated",
     "meter_charge.waived": "Meter charge waived",
+    "meter.updated": "Meter changed",
     "resource_flow.updated": "Resource flow updated",
     "flow.created": "Global flow created",
     "flow.updated": "Global flow updated",

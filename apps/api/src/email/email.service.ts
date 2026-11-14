@@ -28,6 +28,8 @@ import { MetricsService } from '../metrics/metrics.service';
 
 import { SettingsService } from '../settings/settings.service';
 
+import { describeAllocation } from './usage-receipt-allocation';
+
 import * as Handlebars from 'handlebars';
 
 import { createTransport } from 'nodemailer';
@@ -112,6 +114,7 @@ export class EmailService {
     }
 
     const items = (transaction.items ?? []).map((item) => ({
+      ...describeAllocation(item, secondsFormatter, currencyMinorUnit),
       name: item.name,
       description: item.description,
       quantity:
@@ -132,6 +135,7 @@ export class EmailService {
         item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
       isBillingFactor: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'BILLING_FACTOR',
       isDuration:
+        item.allocation == null &&
         item.meterQuantity == null &&
         item.meterCreditsPerUnit == null &&
         (item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE'),

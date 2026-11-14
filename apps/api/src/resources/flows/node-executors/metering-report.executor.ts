@@ -23,6 +23,9 @@ export class MeteringReportExecutor implements NodeExecutor {
       observedAt,
       source: render(data.source),
     };
+    const usageId = render(data.usageId);
+    if (usageId !== undefined && !/^[1-9]\d{0,15}$/.test(usageId))
+      throw new FlowExecutionError(`The usage ID "${usageId}" is not a session ID`);
     if (ctx.metering) {
       if (data.meterId !== ctx.metering.meterId)
         throw new FlowExecutionError('The selected meter does not match the metering request');
@@ -35,6 +38,7 @@ export class MeteringReportExecutor implements NodeExecutor {
         ctx.transactionManager,
         ctx.lifecycleAttemptId,
         ctx.flowRunId ? `flow:${ctx.flowRunId}:${node.id}` : undefined,
+        usageId === undefined ? undefined : Number(usageId),
       );
     }
     return { payload: input };

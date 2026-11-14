@@ -804,6 +804,10 @@
                 "label": "Gemessen am",
                 "helpText": "Optionale ISO-Zeit der Messung. Werte von vor dem Sitzungsende werden als veraltet abgelehnt. Standard: jetzt."
               },
+              "usageId": {
+                "label": "Nutzungs-ID",
+                "helpText": "Sitzung, zu der die Messung gehört (Template). Nur nötig für einen pro Sitzung gemessenen Zähler, wenn der Flow nicht im Sitzungsablauf läuft. Sonst leer lassen."
+              },
               "source": {
                 "label": "Quelle",
                 "helpText": "Optionale Bezeichnung des physischen Zählers (Templates erlaubt)."

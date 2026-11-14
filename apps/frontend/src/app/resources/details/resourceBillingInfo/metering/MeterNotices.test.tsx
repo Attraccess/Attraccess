@@ -96,6 +96,33 @@ describe('meter notices', () => {
     expect(screen.getByRole('link', { name: en.setup.action })).toHaveAttribute('href', '/resources/7/flows');
   });
 
+  it('warns that a shared meter without an on-demand reading cannot be split between sessions', () => {
+    mockStatus({
+      meters: [
+        {
+          meterId: 1,
+          name: 'Heartbeats',
+          creditsPerUnit: 30,
+          allocation: 'shared',
+          configured: true,
+          problems: ['shared-needs-collect'],
+        },
+        {
+          meterId: 2,
+          name: 'Per session',
+          creditsPerUnit: 30,
+          allocation: 'per-session',
+          configured: true,
+          problems: ['shared-needs-collect'],
+        },
+      ],
+      unsettled: [],
+    });
+    render(<MeterSetupNotice resourceId={7} />);
+    expect(screen.getByText('Heartbeats: ' + en.setup.problems['shared-needs-collect'])).toBeInTheDocument();
+    expect(screen.queryByText(/Per session/)).not.toBeInTheDocument();
+  });
+
   it('stays silent for a complete meter or when energy billing is off', () => {
     mockStatus({ configured: true, problems: [], unsettled: [] });
     const { container } = render(<MeterSetupNotice resourceId={7} />);

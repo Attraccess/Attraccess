@@ -11,6 +11,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository, EntityManager, In, IsNull, LessThan, MoreThan, Not } from 'typeorm';
 
+import { computeOperatingShare, OperatingShare, ShareUsage } from './operating-share';
+
 export const ATTRIBUTION_LOOKBACK_MS = 31 * 24 * 60 * 60_000;
 
 export const groupByResourceId = <T extends { resourceId: number }>(items: T[]): Map<number, T[]> => {
@@ -61,6 +63,10 @@ export interface ResourceDurations {
   operatingDurationMs: number;
 }
 
+export interface SessionSegments {
+  spans: { start: number; end: number; sessions: number; before: number }[];
+}
+
 export interface OperatingRange {
   interval: ResourceOperatingInterval;
   range: TimeRange;
@@ -70,10 +76,6 @@ export interface UsageRange {
   usage: ResourceUsage;
   range: TimeRange;
 }
-
-export type SweepEvent =
-  | { type: 'operatingStart' | 'operatingEnd'; range: OperatingRange }
-  | { type: 'usageStart' | 'usageEnd'; range: UsageRange };
 
 @Injectable()
 export class ResourceOperatingAttributionService {
@@ -104,71 +106,32 @@ export class ResourceOperatingAttributionService {
       .filter((usage) => usage.usageAction === ResourceUsageAction.Usage && !usage.lifecyclePending)
       .map((usage) => ({ usage, range: this.toUsageRange(usage, asOf, windowStart, pendingSessionEnds) }))
       .filter((entry): entry is UsageRange => entry.range !== null);
-    // Interim rule for parallel sessions (ATT-1191 splits fairly): every operating moment is attributed to
-    // exactly one session, the earliest-started one. Without overlapping sessions this changes nothing.
-    const attributableUsageRanges = this.withoutOverlaps(usageRanges);
-    const events: SweepEvent[] = [
-      ...operatingRanges.flatMap((range) => [
-        { type: 'operatingStart' as const, range },
-        { type: 'operatingEnd' as const, range },
-      ]),
-      ...attributableUsageRanges.flatMap((range) => [
-        { type: 'usageStart' as const, range },
-        { type: 'usageEnd' as const, range },
-      ]),
-    ].sort((left, right) => {
-      const leftTime = left.type.endsWith('Start') ? left.range.range.startTime : left.range.range.endTime;
-      const rightTime = right.type.endsWith('Start') ? right.range.range.startTime : right.range.range.endTime;
-      return (
-        leftTime.getTime() - rightTime.getTime() ||
-        Number(left.type.endsWith('Start')) - Number(right.type.endsWith('Start'))
-      );
-    });
-    const activeOperatingRanges = new Set<OperatingRange>();
-    const activeUsageRanges = new Set<UsageRange>();
+    // Sessions running at the same time split the running time they share equally (ATT-1191): every start and end
+    // of a session closes a segment, and each operating interval's part inside it is shared by the segment's sessions.
+    const segments = this.sessionSegments(usageRanges);
     let isProvisional =
       usages.some((usage) => usage.endTime === null && pendingSessionEnds.has(usage.id) && usage.startTime < asOf) ||
       operatingRanges.some(({ interval }) => this.isOpenAt(interval, asOf)) ||
       usageRanges.some(({ usage }) => this.isOpenAt(usage, asOf));
-
-    const addAttribution = (operatingRange: OperatingRange, usageRange: UsageRange) => {
-      const intersection = this.intersection(operatingRange.range, usageRange.range);
-      if (!intersection) {
-        return;
-      }
-
-      const provisional = this.isOpenAt(operatingRange.interval, asOf) || this.isOpenAt(usageRange.usage, asOf);
-      attributions.push({
-        operatingIntervalId: operatingRange.interval.id,
-        usageId: usageRange.usage.id,
-        ...intersection,
-        durationMs: this.duration(intersection),
-        isProvisional: provisional,
-      });
-      attributedRanges.push(intersection);
-      isProvisional ||= provisional;
-    };
-
-    for (const event of events) {
-      switch (event.type) {
-        case 'operatingStart':
-          for (const usageRange of activeUsageRanges) {
-            addAttribution(event.range, usageRange);
-          }
-          activeOperatingRanges.add(event.range);
-          break;
-        case 'operatingEnd':
-          activeOperatingRanges.delete(event.range);
-          break;
-        case 'usageStart':
-          for (const operatingRange of activeOperatingRanges) {
-            addAttribution(operatingRange, event.range);
-          }
-          activeUsageRanges.add(event.range);
-          break;
-        case 'usageEnd':
-          activeUsageRanges.delete(event.range);
-          break;
+    const sortedUsageRanges = [...usageRanges].sort(
+      (left, right) => left.range.startTime.getTime() - right.range.startTime.getTime(),
+    );
+    for (const operatingRange of operatingRanges) {
+      for (const usageRange of sortedUsageRanges) {
+        if (usageRange.range.startTime >= operatingRange.range.endTime) break;
+        if (usageRange.range.endTime <= operatingRange.range.startTime) continue;
+        const intersection = this.intersection(operatingRange.range, usageRange.range);
+        if (!intersection) continue;
+        const provisional = this.isOpenAt(operatingRange.interval, asOf) || this.isOpenAt(usageRange.usage, asOf);
+        attributions.push({
+          operatingIntervalId: operatingRange.interval.id,
+          usageId: usageRange.usage.id,
+          ...intersection,
+          durationMs: this.sharedDuration(segments, intersection),
+          isProvisional: provisional,
+        });
+        attributedRanges.push(intersection);
+        isProvisional ||= provisional;
       }
     }
 
@@ -193,26 +156,48 @@ export class ResourceOperatingAttributionService {
   }
 
   /**
-   * Gives each time span to the earliest-started session covering it (ties by id). Sessions that never
-   * overlap an earlier one are returned untouched; others keep only the part after every earlier session.
-   * Linear after sorting: every earlier range starts no later, so together they cover one span up to the
-   * furthest end seen so far, and a later range can only keep what lies beyond that frontier.
+   * The spans in which the same sessions are active, with how many are, covering every moment any is. `shared` holds
+   * the time each span's sessions would be charged for it so far, as a running sum of each span's length per session.
    */
-  protected withoutOverlaps(usageRanges: UsageRange[]): UsageRange[] {
-    if (usageRanges.length < 2) return usageRanges;
-    const ordered = [...usageRanges].sort(
-      (left, right) =>
-        left.usage.startTime.getTime() - right.usage.startTime.getTime() || left.usage.id - right.usage.id,
-    );
-    const result: UsageRange[] = [];
-    let frontier: Date | null = null;
-    for (const entry of ordered) {
-      const { startTime, endTime } = entry.range;
-      if (frontier === null || startTime >= frontier) result.push(entry);
-      else if (endTime > frontier) result.push({ usage: entry.usage, range: { startTime: frontier, endTime } });
-      if (frontier === null || endTime > frontier) frontier = endTime;
+  protected sessionSegments(usageRanges: UsageRange[]): SessionSegments {
+    const changes = new Map<number, number>();
+    for (const { range } of usageRanges) {
+      changes.set(range.startTime.getTime(), (changes.get(range.startTime.getTime()) ?? 0) + 1);
+      changes.set(range.endTime.getTime(), (changes.get(range.endTime.getTime()) ?? 0) - 1);
     }
-    return result;
+    const times = [...changes.keys()].sort((left, right) => left - right);
+    const spans: SessionSegments['spans'] = [];
+    let sessions = 0;
+    let shared = 0;
+    times.forEach((time, index) => {
+      sessions += changes.get(time) ?? 0;
+      if (sessions > 0 && index + 1 < times.length) {
+        spans.push({ start: time, end: times[index + 1], sessions, before: shared });
+        shared += (times[index + 1] - time) / sessions;
+      }
+    });
+    return { spans };
+  }
+
+  /** A session's equal share of the time inside `range`, which lies within the sessions' span. */
+  protected sharedDuration({ spans }: SessionSegments, range: TimeRange): number {
+    const position = (time: number): number => {
+      let low = 0;
+      let high = spans.length;
+      while (low < high) {
+        const middle = (low + high) >> 1;
+        if (spans[middle].end <= time) low = middle + 1;
+        else high = middle;
+      }
+      const span = spans[low];
+      if (!span)
+        return spans.length
+          ? spans[spans.length - 1].before +
+              (spans[spans.length - 1].end - spans[spans.length - 1].start) / spans[spans.length - 1].sessions
+          : 0;
+      return span.before + Math.max(0, time - span.start) / span.sessions;
+    };
+    return position(range.endTime.getTime()) - position(range.startTime.getTime());
   }
 
   protected toRange(
@@ -374,9 +359,20 @@ export class ResourceOperatingAttributionService {
     );
   }
 
+  /**
+   * The running time charged to a usage when it ends, in minutes. A session that never overlapped another is
+   * charged exactly its operating time. A session that shared the machine is charged its equal share of each
+   * segment, so `getShareForUsage` carries the rest of the story.
+   */
   async getForUsage(usage: ResourceUsage, manager: EntityManager): Promise<number> {
+    const share = await this.getShareForUsage(usage, manager);
+    return share ? share.shareMs / 60_000 : 0;
+  }
+
+  /** The usage's running time split among the sessions it shared the machine with; null until it has ended. */
+  async getShareForUsage(usage: ResourceUsage, manager: EntityManager): Promise<OperatingShare | null> {
     if (!usage.endTime) {
-      return 0;
+      return null;
     }
 
     const intervals = await manager.getRepository(ResourceOperatingInterval).find({
@@ -386,7 +382,6 @@ export class ResourceOperatingAttributionService {
       ],
       order: { startTime: 'ASC' },
     });
-    // Other sessions running alongside take precedence when they started earlier (parallel sessions).
     const overlapping = await manager.getRepository(ResourceUsage).find({
       where: [
         {
@@ -407,22 +402,12 @@ export class ResourceOperatingAttributionService {
         },
       ],
     });
-    if (overlapping.length === 0) {
-      const { attributedOperatingDurationMs } = this.derive(intervals, [usage], usage.endTime, usage.startTime);
-      return (attributedOperatingDurationMs ?? 0) / 60_000;
-    }
-    // An earlier session whose end is still in progress only owns the time up to its requested end.
-    const summary = this.derive(
+    return computeOperatingShare(
+      usage as ShareUsage & { endTime: Date },
+      overlapping,
       intervals,
-      [usage, ...overlapping],
-      usage.endTime,
-      usage.startTime,
-      undefined,
-      undefined,
-      await this.getPendingSessionEnds([usage.resourceId], manager),
+      overlapping.length ? await this.getPendingSessionEnds([usage.resourceId], manager) : undefined,
     );
-    const own = summary.attributions.filter((attribution) => attribution.usageId === usage.id);
-    return this.unionDuration(own) / 60_000;
   }
 
   protected async getPendingSessionEnds(resourceIds: number[], manager?: EntityManager): Promise<Map<number, Date>> {

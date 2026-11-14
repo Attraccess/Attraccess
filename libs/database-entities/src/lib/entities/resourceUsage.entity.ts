@@ -68,7 +68,7 @@ export class ResourceUsage {
     nullable: true,
     required: false,
   })
-  meterRates!: { meterId: number; name: string; creditsPerUnit: number }[] | null;
+  meterRates!: { meterId: number; name: string; creditsPerUnit: number; allocation?: 'shared' | 'per-session' }[] | null;
 
   @Column({ type: 'float', nullable: true })
   @ApiProperty({

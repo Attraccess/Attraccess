@@ -43,7 +43,10 @@ vi.mock('@attraccess/react-query-client', () => ({
   useBillingServiceGetResourceBillingConfiguration: () => ({ data: undefined }),
   useResourceMeteringServiceListResourceMeters: () => ({ data: state.meters }),
   useResourceMeteringServiceSetResourceMeterRate: () => ({ mutateAsync: state.setMeterRate }),
+  useResourceMeteringServiceSetResourceMeterAllocation: () => ({ mutateAsync: vi.fn() }),
   UseResourceMeteringServiceListResourceMetersKeyFn: (input: unknown) => ['meters', input],
+  UseResourceMeteringServiceGetResourceMeteringStatusKeyFn: (input: unknown) => ['status', input],
+  ResourceMeterAllocation: { SHARED: 'shared', PER_SESSION: 'per-session' },
   UseBillingServiceGetResourceBillingConfigurationKeyFn: (input: unknown) => ['resource-billing', input],
   useBillingServiceUpdateResourceBillingConfiguration: (callbacks: (typeof state.callbacks)[string]) => {
     state.callbacks.resource = callbacks;

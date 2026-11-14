@@ -1,8 +1,9 @@
-import { EntityManager, LessThan, MoreThan } from 'typeorm';
+import { EntityManager, In, LessThan, MoreThan, Not } from 'typeorm';
 
 import {
   ResourceMeter,
   ResourceMeteringOperation,
+  ResourceMeteringSegment,
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
   ResourceUsage,
@@ -17,7 +18,7 @@ import { requireMeter } from './metering-catalog';
 
 import { toMeterValue, MeteringValueError, meterCharge } from './quantity';
 
-import { findMeterHolder, isMeterLifecycleBusy } from './meter-holder';
+import { findActiveMeterSessions, getMeteringSessionLimit } from './meter-sessions';
 import { ConflictException } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
@@ -47,7 +48,13 @@ function readingDelta(
   // Honor the strategy captured at start even when the flow definition changes mid-session.
   if (session?.collectionMode === 'increment' && !increment)
     throw new MeteringOperationError('An increment-only session requires incremental readings');
-  const previous = meter.counterValue == null ? null : BigInt(meter.counterValue);
+  // A session with a measuring point of its own counts from that device's last reading, not from the meter's.
+  const previous =
+    session?.accounting === 'per-session'
+      ? BigInt(session.baselineValue ?? '0') + BigInt(session.latestValue ?? '0')
+      : meter.counterValue == null
+        ? null
+        : BigInt(meter.counterValue);
   if (!increment && previous !== null && value < previous)
     throw new MeteringValueError(
       'counter_decreased',
@@ -107,6 +114,19 @@ export class MeteringReadings {
       throw new MeteringOperationError('The start request was already answered or has expired');
     }
     if (!session) throw new MeteringOperationError('A start request requires a session');
+    if (session.accounting === 'per-session') {
+      // Only this session's own measuring point restarts; the meter and the other sessions are not touched.
+      await manager.update(ResourceMeteringSession, session.id, {
+        baselineValue: baseline,
+        source: report.source ?? session.source,
+      });
+      await manager.update(ResourceMeteringOperation, operation.id, {
+        status: 'completed',
+        completedAt: new Date(),
+        source: report.source ?? null,
+      });
+      return;
+    }
     // Baseline readings count consumption since the previous observation, outside this new session.
     const previous = meter.counterValue == null ? null : BigInt(meter.counterValue);
     const delta =
@@ -120,6 +140,7 @@ export class MeteringReadings {
         meterId: meter.id,
         usageId: LessThan(session.usageId),
         status: ResourceMeteringSessionStatus.Pending,
+        accounting: Not('per-session'),
       },
       {
         status: ResourceMeteringSessionStatus.Failed,
@@ -163,7 +184,7 @@ export class MeteringReadings {
     else if (session.status === ResourceMeteringSessionStatus.Pending)
       await this.assertEndBoundaryRetry(manager, session, report);
     const freshAfter =
-      operation.kind === 'final'
+      operation.kind === 'final' || operation.kind === 'boundary'
         ? this.freshAfter.get(operation.id)
         : new Date(operation.requestedAt.getTime() - INTERIM_MAX_AGE_MS);
     const reading = await this.acceptReading(manager, meter, session, report, freshAfter);
@@ -183,9 +204,8 @@ export class MeteringReadings {
     operation: ResourceMeteringOperation,
     meter: ResourceMeter,
   ): Promise<void> {
-    const holder = await findMeterHolder(manager, operation.resourceId, meter.id);
-    const attempt = await isMeterLifecycleBusy(manager, operation.resourceId, holder);
-    const activeUsage = holder.usage;
+    const { usages } = await findActiveMeterSessions(manager, operation.resourceId, [meter.id]);
+    const attempt = await manager.existsBy(ResourceUsageLifecycleAttempt, { resourceId: operation.resourceId });
     // Free meters may skip initialization or lose their session after a failed start.
     // Their fresh lifetime polls are valid while usage stays unchanged, but a
     // reply must not cross a usage boundary or bypass an active meter session.
@@ -194,8 +214,8 @@ export class MeteringReadings {
       .leftJoin(ResourceMeteringSession, 's', 's.usageId = u.id AND s.meterId = :meterId', { meterId: meter.id })
       .where('u.resourceId = :resourceId', { resourceId: operation.resourceId })
       .andWhere(
-        '(u.startTime >= :requestedAt OR u.endTime >= :requestedAt OR (u.id = :activeUsageId AND s.id IS NOT NULL))',
-        { requestedAt: operation.requestedAt, activeUsageId: activeUsage?.id ?? null },
+        '(u.startTime >= :requestedAt OR u.endTime >= :requestedAt OR (u.id IN (:...activeUsageIds) AND s.id IS NOT NULL))',
+        { requestedAt: operation.requestedAt, activeUsageIds: usages.length ? usages.map((u) => u.id) : [-1] },
       )
       .getExists();
     if (attempt || conflictingUsage) throw new MeteringOperationError('The idle collection crossed a session boundary');
@@ -207,11 +227,33 @@ export class MeteringReadings {
     report: Extract<MeteringReport, { kind: 'reading' }>,
   ): Promise<void> {
     const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId } });
+    if (session.accounting === 'segmented') return this.assertSegmentBoundaryRetry(manager, session, report);
     // A current counter cannot distinguish consumption at session end from later idle use.
     // Only a device reading explicitly captured at the persisted end boundary may reconcile it.
     if (!report.observedAt || !usage.endTime || new Date(report.observedAt).getTime() !== usage.endTime.getTime())
       throw new MeteringOperationError('A retry requires a reading captured at the session end boundary');
     await this.assertMeterStillOwned(session, manager);
+  }
+
+  /**
+   * A segment that nobody is in any more ends when the last of its sessions ended; only a device reading captured
+   * at that moment can close it. While a session still runs, a reading is an ordinary boundary.
+   */
+  protected async assertSegmentBoundaryRetry(
+    manager: EntityManager,
+    session: ResourceMeteringSession,
+    report: Extract<MeteringReport, { kind: 'reading' }>,
+  ): Promise<void> {
+    const open = await manager.findOne(ResourceMeteringSegment, { where: { meterId: session.meterId, status: 'open' } });
+    if (!open) return;
+    const usages = await manager.find(ResourceUsage, {
+      where: { id: In(open.participants.map((participant) => participant.usageId)) },
+      select: { id: true, endTime: true },
+    });
+    if (usages.some((usage) => usage.endTime === null)) return;
+    const lastEnd = Math.max(...usages.map((usage) => usage.endTime?.getTime() ?? 0));
+    if (!report.observedAt || new Date(report.observedAt).getTime() !== lastEnd)
+      throw new MeteringOperationError('A retry requires a reading captured when the last session ended');
   }
 
   protected async acceptReading(
@@ -223,23 +265,33 @@ export class MeteringReadings {
   ): Promise<{ total: string; observedAt: Date }> {
     const observedAt = observationTime(report);
     await this.assertFreshObservation(manager, meter, session, observedAt, freshAfter);
-    const { value, increment, previous, delta } = readingDelta(meter, session, report);
+    const { value, increment, delta } = readingDelta(meter, session, report);
     if (!session && delta > BigInt(0))
       await manager.update(
         ResourceMeteringSession,
-        { meterId: meter.id, status: ResourceMeteringSessionStatus.Pending },
+        { meterId: meter.id, status: ResourceMeteringSessionStatus.Pending, accounting: Not('per-session') },
         {
           status: ResourceMeteringSessionStatus.Failed,
           failureReason:
             'The meter advanced outside the ended session; its final consumption can no longer be distinguished from idle consumption',
         },
       );
-    const sessionTotal = session ? acceptedSessionTotal(session, delta) : null;
+    // Sessions that share the meter have no total of their own: their segments are told apart by boundary readings.
+    const sessionTotal = session && session.accounting !== 'segmented' ? acceptedSessionTotal(session, delta) : null;
     await manager.update(ResourceMeter, meter.id, {
       lifetimeValue: (BigInt(meter.lifetimeValue) + delta).toString(),
-      // Keep an established cumulative counter aligned when increments report the same consumption.
-      counterValue: increment ? (previous === null ? null : (previous + delta).toString()) : value.toString(),
-      latestObservedAt: observedAt,
+      // A measuring point of a session does not move the meter's own counter, which other sessions read.
+      ...(session?.accounting === 'per-session'
+        ? {}
+        : {
+            // Keep an established cumulative counter aligned when increments report the same consumption.
+            counterValue: increment
+              ? meter.counterValue == null
+                ? null
+                : (BigInt(meter.counterValue) + delta).toString()
+              : value.toString(),
+          }),
+      latestObservedAt: meter.latestObservedAt && meter.latestObservedAt > observedAt ? meter.latestObservedAt : observedAt,
     });
     if (session && sessionTotal !== null)
       await manager.update(ResourceMeteringSession, session.id, {
@@ -265,7 +317,8 @@ export class MeteringReadings {
     if (
       (usage && observedAt < usage.startTime) ||
       (freshAfter && observedAt < freshAfter) ||
-      (meter.latestObservedAt && observedAt < meter.latestObservedAt)
+      (session?.accounting !== 'per-session' && meter.latestObservedAt && observedAt < meter.latestObservedAt) ||
+      (session?.accounting === 'per-session' && session.latestObservedAt && observedAt < session.latestObservedAt)
     )
       throw new MeteringValueError(
         'stale_reading',
@@ -293,10 +346,11 @@ export class MeteringReadings {
     transactionManager?: EntityManager,
     lifecycleAttemptId?: string,
     reportId?: string,
+    usageId?: number,
   ): Promise<void> {
     const work = async (manager: EntityManager) => {
       const meter = await requireMeter(manager, resourceId, meterId);
-      const session = await this.findReportSession(manager, resourceId, meterId, lifecycleAttemptId);
+      const session = await this.findReportSession(manager, resourceId, meter, lifecycleAttemptId, usageId);
       const id = reportId ?? randomUUID();
       const existing = await manager.findOne(ResourceMeteringOperation, { where: { id } });
       if (existing) {
@@ -331,47 +385,59 @@ export class MeteringReadings {
   }
 
   /**
-   * The meter session a pushed reading belongs to. Within a lifecycle flow that is its own usage's session;
-   * otherwise the meter holder's. A lifecycle that may change the meter's owner makes the reading ambiguous.
+   * The meter session a pushed reading belongs to.
+   * - A meter measured per session needs the session named: the usage of the lifecycle the flow runs in, or the
+   *   usage the Report meter node names. With several active sessions a reading that names none is rejected
+   *   rather than guessed; with at most one the reading belongs to that session, as before parallel sessions.
+   * - A shared meter's readings belong to the meter: its segments are told apart by boundary readings. Only a
+   *   session on its own total (it never overlapped another) takes the reading, and while a lifecycle that may
+   *   change who uses the meter is in progress on a machine of one session, the reading is ambiguous.
    */
   protected async findReportSession(
     manager: EntityManager,
     resourceId: number,
-    meterId: number,
+    meter: ResourceMeter,
     lifecycleAttemptId?: string,
+    usageId?: number,
   ): Promise<ResourceMeteringSession | null> {
-    const holder = await findMeterHolder(manager, resourceId, meterId);
-    if (!holder.shared) {
-      const attempt = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } });
-      if (attempt && attempt.id !== lifecycleAttemptId) throw new ConflictException('METER_LIFECYCLE_BUSY');
-      if (!attempt) return holder.session;
-      const usageId = attempt.candidateUsageId ?? attempt.previousUsageId;
-      return usageId == null
-        ? null
-        : manager.findOne(ResourceMeteringSession, {
-            where: { resourceId, meterId, usageId, status: ResourceMeteringSessionStatus.Active },
-          });
-    }
-    // Parallel sessions: several lifecycles may run at once. Each flow targets its own attempt, and only one
-    // touching the meter holder (or claiming a free meter) makes the reading ambiguous.
-    const own = lifecycleAttemptId
+    const { usages, byMeter } = await findActiveMeterSessions(manager, resourceId, [meter.id]);
+    const attempt = lifecycleAttemptId
       ? await manager.findOne(ResourceUsageLifecycleAttempt, { where: { id: lifecycleAttemptId, resourceId } })
       : null;
-    const ownUsageId = own ? (own.candidateUsageId ?? own.previousUsageId) : null;
-    const ownSession =
-      ownUsageId == null
-        ? null
-        : await manager.findOne(ResourceMeteringSession, {
-            where: { resourceId, meterId, usageId: ownUsageId, status: ResourceMeteringSessionStatus.Active },
-          });
-    if (ownSession) return ownSession;
-    if (await isMeterLifecycleBusy(manager, resourceId, holder, own?.id))
-      throw new ConflictException('METER_LIFECYCLE_BUSY');
-    return holder.session;
+    const ownUsageId = attempt ? (attempt.candidateUsageId ?? attempt.previousUsageId) : null;
+    const sessionOf = (id: number) =>
+      manager.findOne(ResourceMeteringSession, {
+        where: { resourceId, meterId: meter.id, usageId: id, status: ResourceMeteringSessionStatus.Active },
+      });
+    if (meter.allocation === 'per-session') {
+      const named = usageId ?? ownUsageId;
+      if (named != null) {
+        const session = await sessionOf(named);
+        if (!session) throw new MeteringOperationError(`Session ${named} has no running metering session for this meter`);
+        return session;
+      }
+      if (usages.length > 1)
+        throw new MeteringOperationError(
+          'Several sessions are running and this reading names none of them. Run the flow in a session lifecycle or set the usage ID on the Report meter node.',
+        );
+      return byMeter.get(meter.id)?.[0]?.session ?? null;
+    }
+    if ((await getMeteringSessionLimit(manager, resourceId)) > 1 || usages.length > 1) {
+      const only = usages.length === 1 ? byMeter.get(meter.id)?.[0]?.session : null;
+      return only?.accounting === 'own' ? only : null;
+    }
+    // One session at a time: a lifecycle that may change the meter's owner makes the reading ambiguous.
+    const busy = await manager.findOne(ResourceUsageLifecycleAttempt, { where: { resourceId } });
+    if (busy && busy.id !== lifecycleAttemptId) throw new ConflictException('METER_LIFECYCLE_BUSY');
+    if (!busy) return byMeter.get(meter.id)?.[0]?.session ?? null;
+    const usage = busy.candidateUsageId ?? busy.previousUsageId;
+    return usage == null ? null : sessionOf(usage);
   }
 
   async assertMeterStillOwned(session: ResourceMeteringSession, manager = this.manager): Promise<void> {
     if (session.compromisedReason) throw new MeteringOperationError(session.compromisedReason);
+    // Sessions with a measuring point of their own, or shared segments, are never taken over by a later session.
+    if (session.accounting !== 'own') return;
     const newer = await manager.count(ResourceMeteringSession, {
       where: { resourceId: session.resourceId, meterId: session.meterId, usageId: MoreThan(session.usageId) },
     });

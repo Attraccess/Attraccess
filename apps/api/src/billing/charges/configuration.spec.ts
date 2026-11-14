@@ -125,6 +125,112 @@ describe('BillingService', () => {
     });
   });
 
+  describe('shared running time', () => {
+    const sharedScope = inheritTestScope(
+      {
+        get service() {
+          return scope.service;
+        },
+        set service(value: typeof scope.service) {
+          scope.service = value;
+        },
+      },
+      scope,
+    );
+    const usage = {
+      id: 31,
+      startTime: new Date('2026-09-20T09:00:00.000Z'),
+      endTime: new Date('2026-09-20T09:10:00.000Z'),
+      attributedOperatingDurationInMinutes: 3.75,
+      sessionDurationCreditsPerMinute: 2,
+      operatingDurationCreditsPerMinute: 6,
+      creditsPerUsage: 5,
+      resource: { id: 205 },
+      userId: 25,
+      user: { id: 25, billingFactor: 100 } as User,
+    } as ResourceUsage;
+    const share = {
+      shared: true,
+      shareMs: 225_000,
+      credits: 23,
+      shareCredits: 0,
+      segments: [
+        {
+          startedAt: new Date('2026-09-20T09:00:00.000Z'),
+          endedAt: new Date('2026-09-20T09:05:00.000Z'),
+          participants: [
+            { usageId: 31, rate: 6, startedAt: 1 },
+            { usageId: 32, rate: 6, startedAt: 2 },
+          ],
+          operatingMs: 300_000,
+          totalCredits: 30,
+          shareCredits: 15,
+        },
+      ],
+    };
+
+    it('keeps the fee and session minutes personal and charges the exact whole-credit share of running time', async () => {
+      jest
+        .spyOn(sharedScope.service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 99, creditsPerUsage: 0 } as ResourceBillingConfiguration);
+      const manager = {
+        findOneBy: jest.fn().mockResolvedValue(null),
+        findOne: jest.fn().mockResolvedValue(null),
+        save: jest.fn(async (_entity: unknown, data: Record<string, unknown>) =>
+          'amount' in data ? { id: 1006, ...data } : data,
+        ),
+      } as unknown as never;
+
+      const transaction = await sharedScope.service.chargeForResourceUsage(usage, manager, share as never);
+
+      // 5 per use + 10 minutes at 2 per minute + the 23 credits of running time; no per-minute round-up of the share.
+      expect(transaction).toEqual(expect.objectContaining({ amount: -(5 + 20 + 23) }));
+      const saved = (manager as { save: jest.Mock }).save;
+      expect(saved).toHaveBeenCalledWith(
+        BillingTransactionItem,
+        expect.objectContaining({ name: 'PER_SESSION', unitPrice: 5 }),
+      );
+      expect(saved).toHaveBeenCalledWith(
+        BillingTransactionItem,
+        expect.objectContaining({ name: 'PER_MINUTE', unitPrice: 2, quantity: 10 }),
+      );
+      expect(saved).toHaveBeenCalledWith(
+        BillingTransactionItem,
+        expect.objectContaining({
+          name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+          unitPrice: 23,
+          quantity: 1,
+          durationMs: 225_000,
+          allocation: {
+            kind: 'operating-time',
+            segments: [expect.objectContaining({ participants: 2, totalCredits: 30, shareCredits: 15 })],
+          },
+        }),
+      );
+    });
+
+    it('bills a session that did not share exactly as before even when a share is passed', async () => {
+      jest
+        .spyOn(sharedScope.service, 'getResourceBillingConfiguration')
+        .mockResolvedValue({ creditsPerMinute: 99, creditsPerUsage: 0 } as ResourceBillingConfiguration);
+      const manager = {
+        findOneBy: jest.fn().mockResolvedValue(null),
+        findOne: jest.fn().mockResolvedValue(null),
+        save: jest.fn(async (_entity: unknown, data: Record<string, unknown>) =>
+          'amount' in data ? { id: 1007, ...data } : data,
+        ),
+      } as unknown as never;
+
+      const transaction = await sharedScope.service.chargeForResourceUsage(usage, manager, {
+        ...share,
+        shared: false,
+      } as never);
+
+      // 3.75 operating minutes round up to 4 at 6 credits.
+      expect(transaction).toEqual(expect.objectContaining({ amount: -(5 + 20 + 24) }));
+    });
+  });
+
   describe('handleResourceUsageStart', () => {
     const handleResourceUsageStartScope = inheritTestScope(
       {

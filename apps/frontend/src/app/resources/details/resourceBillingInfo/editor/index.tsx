@@ -9,6 +9,8 @@ import {
   DrawerHeading,
   Form,
   Label,
+  Radio,
+  RadioGroup,
   NumberField,
   NumberFieldDecrementButton,
   NumberFieldGroup,
@@ -23,6 +25,9 @@ import {
   UseResourceMeteringServiceListResourceMetersKeyFn,
   useResourceMeteringServiceListResourceMeters,
   useResourceMeteringServiceSetResourceMeterRate,
+  useResourceMeteringServiceSetResourceMeterAllocation,
+  UseResourceMeteringServiceGetResourceMeteringStatusKeyFn,
+  ResourceMeterAllocation,
   useBillingServiceGetBillingConfiguration,
   useBillingServiceGetResourceBillingConfiguration,
   UseBillingServiceGetResourceBillingConfigurationKeyFn,
@@ -105,10 +110,14 @@ export function useResourceBillingInfoEditorStateInputs(props: Props) {
 
   const { data: meters = [] } = useResourceMeteringServiceListResourceMeters({ resourceId });
   const { mutateAsync: setMeterRate, isPending: ratesPending } = useResourceMeteringServiceSetResourceMeterRate();
+  const { mutateAsync: setMeterAllocation, isPending: allocationsPending } =
+    useResourceMeteringServiceSetResourceMeterAllocation();
   const [rates, setRates] = useState<Record<number, string>>({});
+  const [allocations, setAllocations] = useState<Record<number, ResourceMeterAllocation>>({});
   useEffect(() => {
     if (!isOpen) {
       setRates((current) => (Object.keys(current).length ? {} : current));
+      setAllocations((current) => (Object.keys(current).length ? {} : current));
       return;
     }
     if (!configuration) return;
@@ -148,9 +157,12 @@ export function useResourceBillingInfoEditorStateInputs(props: Props) {
     setCreditsPerOperatingMinute,
     meters,
     setMeterRate,
-    ratesPending,
+    ratesPending: ratesPending || allocationsPending,
     rates,
     setRates,
+    setMeterAllocation,
+    allocations,
+    setAllocations,
     props,
   } as const;
 }
@@ -210,9 +222,23 @@ export function useResourceBillingInfoEditorStateOutput(
           meterId: rate.meterId,
           requestBody: { creditsPerUnit: rate.creditsPerUnit },
         });
-      await model.queryClient.invalidateQueries({
-        queryKey: UseResourceMeteringServiceListResourceMetersKeyFn({ resourceId: model.resourceId }),
-      });
+      for (const meter of model.meters) {
+        const allocation = model.allocations[meter.id];
+        if (allocation && allocation !== meter.allocation)
+          await model.setMeterAllocation({
+            resourceId: model.resourceId,
+            meterId: meter.id,
+            requestBody: { allocation },
+          });
+      }
+      await Promise.all([
+        model.queryClient.invalidateQueries({
+          queryKey: UseResourceMeteringServiceListResourceMetersKeyFn({ resourceId: model.resourceId }),
+        }),
+        model.queryClient.invalidateQueries({
+          queryKey: UseResourceMeteringServiceGetResourceMeteringStatusKeyFn({ resourceId: model.resourceId }),
+        }),
+      ]);
     } catch (error) {
       model.toast.apiError({ error: error as Error, t: model.t, tExists: model.tExists, baseTranslationKey: 'api' });
       return;
@@ -237,6 +263,8 @@ export function useResourceBillingInfoEditorStateOutput(
     model.meters,
     model.rates,
     model.setMeterRate,
+    model.setMeterAllocation,
+    model.allocations,
     model.queryClient,
     model.toast,
     model.t,
@@ -263,6 +291,8 @@ export function useResourceBillingInfoEditorStateOutput(
     ratesPending: model.ratesPending,
     rates: model.rates,
     setRates: model.setRates,
+    allocations: model.allocations,
+    setAllocations: model.setAllocations,
     onSubmit,
     hasPermission,
     props: model.props,
@@ -293,6 +323,8 @@ export function ResourceBillingInfoEditor(props: Props) {
     ratesPending,
     rates,
     setRates,
+    allocations,
+    setAllocations,
     onSubmit,
     hasPermission,
   } = useResourceBillingInfoEditorState(props);
@@ -362,20 +394,44 @@ export function ResourceBillingInfoEditor(props: Props) {
               } catch {
                 invalid = true;
               }
+              const allocation = allocations[meter.id] ?? meter.allocation ?? ResourceMeterAllocation.SHARED;
               return (
-                <TextField
-                  key={meter.id}
-                  value={value}
-                  onChange={(value) => setRates((previous) => ({ ...previous, [meter.id]: value }))}
-                  isInvalid={invalid}
-                >
-                  <Label>
-                    {meter.name} — {t('inputs.meterRate.label', { currency: configuration.currency })}
-                  </Label>
-                  <Input inputMode="decimal" />
-                  <Description>{t('inputs.meterRate.description')}</Description>
-                  <FieldError>{t('inputs.meterRate.invalid', { digits: configuration.minorUnit })}</FieldError>
-                </TextField>
+                <div key={meter.id} className="flex flex-col gap-3">
+                  <TextField
+                    value={value}
+                    onChange={(value) => setRates((previous) => ({ ...previous, [meter.id]: value }))}
+                    isInvalid={invalid}
+                  >
+                    <Label>
+                      {meter.name} — {t('inputs.meterRate.label', { currency: configuration.currency })}
+                    </Label>
+                    <Input inputMode="decimal" />
+                    <Description>{t('inputs.meterRate.description')}</Description>
+                    <FieldError>{t('inputs.meterRate.invalid', { digits: configuration.minorUnit })}</FieldError>
+                  </TextField>
+                  <RadioGroup
+                    value={allocation}
+                    onChange={(next) =>
+                      setAllocations((previous) => ({ ...previous, [meter.id]: next as ResourceMeterAllocation }))
+                    }
+                    data-cy={`meter-allocation-${meter.id}`}
+                  >
+                    <Label>
+                      {meter.name} — {t('inputs.meterAllocation.label')}
+                    </Label>
+                    <Description>{t(`inputs.meterAllocation.description.${allocation}`)}</Description>
+                    {Object.values(ResourceMeterAllocation).map((option) => (
+                      <Radio key={option} value={option}>
+                        <Radio.Control>
+                          <Radio.Indicator />
+                        </Radio.Control>
+                        <Radio.Content>
+                          <Label>{t(`inputs.meterAllocation.options.${option}`)}</Label>
+                        </Radio.Content>
+                      </Radio>
+                    ))}
+                  </RadioGroup>
+                </div>
               );
             })}
             <MeterNameEditor resourceId={resourceId} />

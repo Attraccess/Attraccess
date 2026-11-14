@@ -7,7 +7,12 @@ import {
 } from '@attraccess/database-entities';
 
 export type MeterProblem =
-  'start-trigger-missing' | 'ready-unreachable' | 'collect-trigger-missing' | 'report-unreachable';
+  | 'start-trigger-missing'
+  | 'ready-unreachable'
+  | 'collect-trigger-missing'
+  | 'report-unreachable'
+  /** Several sessions share the machine, but the meter cannot be read on demand to split its consumption. */
+  | 'shared-needs-collect';
 
 export function meterDefinitionFromFlow(
   meterId: number,

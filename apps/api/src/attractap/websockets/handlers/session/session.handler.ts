@@ -131,15 +131,20 @@ export class AttractapSessionHandler {
           isOperating: operating.operatingDataAvailable ? operating.isOperating : null,
           // Catalog entries include captured terms with unavailable values for skipped free meters.
           // Never attach a new session's meter reading to an earlier usage snapshot.
-          meters: meter.meters
-            .filter((entry) => entry.session?.usageId === usage.id)
-            .map((entry) => ({
-              id: entry.id,
-              name: entry.session.meterName,
-              creditsPerUnit: entry.session.creditsPerUnit,
-              formattedRate: this.formatMeterRate(entry.session.creditsPerUnit, billingConfiguration),
-              value: entry.session.latestValue,
-            })),
+          meters: meter.meters.flatMap((entry) => {
+            const own = (entry.sessions ?? [entry.session]).find((session) => session?.usageId === usage.id);
+            return own
+              ? [
+                  {
+                    id: entry.id,
+                    name: own.meterName,
+                    creditsPerUnit: own.creditsPerUnit,
+                    formattedRate: this.formatMeterRate(own.creditsPerUnit, billingConfiguration),
+                    value: own.latestValue,
+                  },
+                ]
+              : [];
+          }),
         },
       } satisfies ResourceUsageStatsPayload);
     } catch (error) {

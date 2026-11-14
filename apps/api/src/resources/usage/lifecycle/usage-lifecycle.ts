@@ -41,6 +41,8 @@ import { FinalCollection, ResourceMeteringService } from '../../metering/resourc
 
 import { ResourceOperatingAttributionService } from '../../operating-intervals/resource-operating-attribution.service';
 
+import { OperatingShare } from '../../operating-intervals/operating-share';
+
 import { LOCK_TTL_MS, SWEEP_EVERY_MS } from '../sessions/session-change-coordination';
 import { SessionChangeTurns } from '../sessions/session-change-turns';
 import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
@@ -154,9 +156,12 @@ export class UsageLifecycle {
     endedSession: ResourceUsage,
     final: FinalCollection,
   ): Promise<number | undefined> {
-    await this.persistAttributedOperatingDuration(endedSession, manager);
+    const operatingShare = await this.persistAttributedOperatingDuration(endedSession, manager);
     await this.metering?.settleInTransaction(manager, endedSession.id, final);
-    return (await this.billingService.chargeForResourceUsage(endedSession, manager))?.id;
+    const charge = operatingShare?.shared
+      ? await this.billingService.chargeForResourceUsage(endedSession, manager, operatingShare)
+      : await this.billingService.chargeForResourceUsage(endedSession, manager);
+    return charge?.id;
   }
 
   async applyLifecycleDrafts(manager: EntityManager, attempt: ResourceUsageLifecycleAttempt): Promise<void> {
@@ -195,6 +200,8 @@ export class UsageLifecycle {
         await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
         await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
       }
+      // The session a stop or takeover was about to end keeps running, so it still shares the meter.
+      if (attempt.previousUsageId !== null) await this.metering?.restoreParticipant(manager, attempt.previousUsageId);
       await manager.delete(ResourceUsageLifecycleAttempt, { id: attemptId, resourceId });
       return true;
     });
@@ -297,6 +304,7 @@ export class UsageLifecycle {
           await this.metering?.discardCandidate(manager, attempt.candidateUsageId);
           await manager.delete(ResourceUsage, { id: attempt.candidateUsageId, lifecyclePending: true });
         }
+        if (attempt.previousUsageId !== null) await this.metering?.restoreParticipant(manager, attempt.previousUsageId);
         await manager.delete(ResourceUsageLifecycleAttempt, attempt.id);
       }
       return attempts.map((attempt) => attempt.resourceId);
@@ -351,12 +359,16 @@ export class UsageLifecycle {
     }
   }
 
-  private async persistAttributedOperatingDuration(usage: ResourceUsage, manager: EntityManager): Promise<void> {
-    const attributedOperatingDurationInMinutes = this.operatingAttributionService
-      ? await this.operatingAttributionService.getForUsage(usage, manager)
-      : 0;
+  /** Stores the running time attributed to the session and returns how it was split with the sessions it shared the machine with. */
+  private async persistAttributedOperatingDuration(
+    usage: ResourceUsage,
+    manager: EntityManager,
+  ): Promise<OperatingShare | null> {
+    const share = (await this.operatingAttributionService?.getShareForUsage(usage, manager)) ?? null;
+    const attributedOperatingDurationInMinutes = share ? share.shareMs / 60_000 : 0;
     await manager.update(ResourceUsage, usage.id, { attributedOperatingDurationInMinutes });
     usage.attributedOperatingDurationInMinutes = attributedOperatingDurationInMinutes;
+    return share;
   }
 
   /** Effective number of parallel sessions. Doors and unknown resources behave like a limit of 1. */

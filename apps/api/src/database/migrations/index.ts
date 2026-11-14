@@ -197,3 +197,5 @@ export * from './1792500000000-global-flows';
 export * from './1792600000000-nfc-card-pending-change';
 export * from './1792700000000-attractap-card-relay-capability';
 export * from './1792800000000-attractap-secure-boot-keys';
+export * from './1792900000000-shared-machine-billing';
+export * from './1793000000000-refresh-shared-machine-receipt';

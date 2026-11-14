@@ -318,4 +318,52 @@ describe('LiveSessionBilling', () => {
     );
     expect(screen.queryByText(en.live.meter)).not.toBeInTheDocument();
   });
+
+  describe('shared meters', () => {
+    function shared(own: object) {
+      vi.mocked(useResourcesServiceResourceUsageGetActiveSession).mockReturnValue({
+        data: {
+          usage: { id: 5, userId: 2, startTime: '2026-09-28T10:00:00Z' },
+          usages: [
+            { id: 5, userId: 2, startTime: '2026-09-28T10:00:00Z' },
+            { id: 10, userId: 1, user: { id: 1, username: 'Alex' }, startTime: '2026-09-28T10:01:00Z' },
+          ],
+          maxParallelSessions: 3,
+        },
+      } as unknown as ReturnType<typeof useResourcesServiceResourceUsageGetActiveSession>);
+      const base = { sessionId: 's', meterName: 'Energy', creditsPerUnit: 30 };
+      vi.mocked(useResourceMeteringServiceGetResourceMeteringLive).mockReturnValue({
+        data: {
+          meters: [
+            {
+              id: 1,
+              name: 'Energy',
+              creditsPerUnit: 30,
+              session: { ...base, usageId: 5, latestValue: '2.4', chargeCredits: 72 },
+              sessions: [
+                { ...base, usageId: 5, latestValue: '2.4', chargeCredits: 72 },
+                { ...base, usageId: 10, ...own },
+              ],
+            },
+          ],
+        },
+      } as unknown as ReturnType<typeof useResourceMeteringServiceGetResourceMeteringLive>);
+    }
+
+    it('shows my share of the meter, marked provisional while a segment is open', () => {
+      shared({ latestValue: '0.8', chargeCredits: 24, shared: true, provisional: true });
+      render(<LiveSessionBilling {...props} />);
+      expect(screen.getByText(/0\.8 — your share|0,8 — your share/)).toBeInTheDocument();
+      expect(screen.getByText(en.live.provisional)).toBeInTheDocument();
+      expect(screen.getByText('Energy: your share of the cost so far')).toBeInTheDocument();
+      expect(screen.getAllByText('0.24 EUR').length).toBeGreaterThan(0);
+    });
+
+    it('drops the provisional marker once the share is final', () => {
+      shared({ latestValue: '0.8', chargeCredits: 24, shared: true, provisional: false });
+      render(<LiveSessionBilling {...props} />);
+      expect(screen.getByText(/ — your share/)).toBeInTheDocument();
+      expect(screen.queryByText(en.live.provisional)).not.toBeInTheDocument();
+    });
+  });
 });

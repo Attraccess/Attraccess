@@ -244,6 +244,38 @@ export const resourceUsageBillingTransactionSummaryTranslations: ShippedTranslat
     key: 'quantity_unavailable',
     value: 'Nicht verfügbar',
   },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'shared_marker',
+    value: 'Geteilt',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'share_of_meter',
+    value: '{share} — dein Anteil an {total}',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'share_of_time',
+    value: '{share} s — dein Anteil an {total} s',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'segment_meter',
+    value:
+      '{start} – {end}: {people} Personen, gesamt {total} ({totalCredits} Credits), dein Anteil {share} ({shareCredits} Credits)',
+  },
+  {
+    templateType: EmailTemplateType.RESOURCE_USAGE_BILLING_TRANSACTION_SUMMARY,
+    locale: 'de',
+    key: 'segment_time',
+    value:
+      '{start} – {end}: {people} Personen, gesamt {total} s ({totalCredits} Credits), dein Anteil {share} s ({shareCredits} Credits)',
+  },
 ];
 
 export const userRetrainingRequiredTranslations: ShippedTranslation[] = [

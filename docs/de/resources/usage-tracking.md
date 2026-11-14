@@ -44,15 +44,22 @@ Eine Maschine kann über **Maximale parallele Sitzungen** von mehreren Personen 
 Jede Person beendet ihre eigene Sitzung. Ressourcenverwalter, Einweiser, Wartende und die Aufsicht einer Sitzung können die gewählte Sitzung einer anderen Person beenden, indem sie diese auf der [Detailseite](resources/resource-details.md) aus der Liste der aktiven Sitzungen auswählen und auf **Sitzung beenden** klicken.
 
 > [!WARNING]
-> **Flows und Abrechnung bei gemeinsam genutzten Maschinen (Limit über 1).** Die Abrechnung berücksichtigt nicht, wie viele Sitzungen laufen; Flows müssen die Anzahl selbst prüfen. Bei einem Limit von 1 gilt dieser Abschnitt nicht.
->
-> - **Flows** laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab, sofern er nicht `activeSessions` prüft (siehe [Aktive Sitzungen auf gemeinsam genutzten Maschinen](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen)). Die Ressourceneinstellungen listen im Abschnitt **Ressourcentyp und Verhalten** die Flows auf, die das nicht prüfen.
-> - **Nutzungsgebühren** pro Nutzung werden pro Sitzung berechnet.
-> - **Abrechnung nach Sitzungszeit** erfolgt pro Sitzung.
-> - **Zähler (zum Beispiel Energie):** Die am frühesten gestartete, noch laufende Sitzung besitzt den Zähler und wird mit ihrem Verbrauch belastet. Später überlappende Sitzungen werden für bereits belegte Zähler weder gemessen noch berechnet. Endet diese Sitzung, während andere weiterlaufen, wird der Zähler wie üblich abgelesen, und den noch laufenden Sitzungen wird kein weiterer Zählerverbrauch berechnet. Der Zähler ist dann wieder frei: Die nächste Sitzung, die startet, während er frei ist, erhält den Zähler und wird mit seinem Verbrauch belastet.
-> - **Laufzeit (Betriebszeit)** wird zu jedem Zeitpunkt genau einer Sitzung zugerechnet, der am frühesten gestarteten aktiven. Die insgesamt berechnete Zeit übersteigt daher nie die Betriebszeit der Maschine.
->
-> Eine faire Aufteilung von Zählern und Laufzeit auf gleichzeitige Sitzungen ist geplant.
+> **Flows bei gemeinsam genutzten Maschinen (Limit über 1).** [Flows](flows/overview.md) laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab, sofern er nicht `activeSessions` prüft (siehe [Aktive Sitzungen auf gemeinsam genutzten Maschinen](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen)). Die Ressourceneinstellungen listen im Abschnitt **Ressourcentyp und Verhalten** die Flows auf, die das nicht prüfen. Bei einem Limit von 1 gilt das nicht.
+
+### Abrechnung bei gemeinsam genutzten Maschinen
+
+Jede Person wird für ihre eigene Sitzung abgerechnet. Die Gebühren jeder Person stehen auf ihrer eigenen Abrechnungstransaktion und zählen für ihr eigenes [Projekt](#sitzungen-mit-projekten-verknüpfen).
+
+- **Nutzungsgebühr und Sitzungszeit** bleiben pro Person und werden nie aufgeteilt. Die Sitzungszeit ist die eigene Sitzungsdauer der Person, aufgerundet auf volle Minuten.
+- **Zähler (zum Beispiel Energie) und Laufzeit** werden fair aufgeteilt. Jeder Start und jedes Ende einer Sitzung auf der Maschine schließt das aktuelle Zeitsegment und eröffnet ein neues. Jedes Segment speichert seinen Zeitraum, den zwischen den beiden Grenzmessungen gemessenen Verbrauch, die Betriebszeit der Maschine darin und welche Sitzungen aktiv waren. Verbrauch und Betriebszeit eines Segments werden zu gleichen Teilen auf die in diesem Segment aktiven Sitzungen verteilt. Insgesamt wird also nie mehr berechnet, als die Maschine tatsächlich verbraucht hat oder gelaufen ist.
+- Eine Sitzung, die nie ein Segment mit einer anderen Sitzung geteilt hat, wird genau wie bei einer Einzelnutzung abgerechnet (Laufzeit auf volle Minuten aufgerundet). Sobald eine Sitzung ein Segment geteilt hat, wird ihre Laufzeit nach exakten Anteilen berechnet, da ein Aufrunden pro Person Guthaben aus dem Nichts erzeugen würde.
+- Jeder Zähler hat die Einstellung **Zuordnung**, mit der er stattdessen auf **Pro Sitzung gemessen** umgestellt werden kann. Details, Rundung, fehlgeschlagene Messungen und nicht teilbare Zähler siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen).
+
+Beispiel: Eine Maschine verbraucht 8 kWh zu 30 Credits pro kWh. Person A ist allein für 2 kWh aktiv, A und B zusammen für 2 kWh und B allein für 4 kWh. A zahlt 2 + 1 = 3 kWh = 90 Credits, B zahlt 1 + 4 = 5 kWh = 150 Credits.
+
+Auf Belegen, im Abrechnungsverlauf und in der laufenden Sitzungsabrechnung zeigt eine geteilte Sitzung den Anteil der Person (zum Beispiel „0,8 kWh - Ihr Anteil an 2,4 kWh“) mit der Markierung **geteilt** sowie eine Aufschlüsselung aller Segmente, an denen die Person beteiligt war. Siehe [Abrechnungstransaktionen](billing/transactions.md#geteilte-sitzungen).
+
+Bei einem Limit von 1 ändert sich nichts. Wird ein Limit gesenkt, während Sitzungen laufen, werden überlappende Sitzungen weiterhin fair aufgeteilt. Wird es während einer Einzelsitzung erhöht, nimmt diese Sitzung ab dem Moment an den Segmenten teil, in dem andere starten.
 
 ## Sitzungen mit Projekten verknüpfen
 

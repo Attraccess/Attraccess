@@ -26,7 +26,7 @@ The starting data depends on the trigger. For object payloads, Attraccess adds `
 | **MQTT Message Received**              | `serverId`, `topic`, `payload`                                                                                                                                                         |
 | **Variable Changed**                   | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; watched values under `variables.resource` / `variables.global` |
 | **Companion events**                   | Event fields at the root, such as `idleSeconds`, `appName` or `vendorId`; see the [node reference](flows/node-types.md)                                                                |
-| **Metering Start / Collection**        | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.kind`, `metering.requestedAt`                                                       |
+| **Metering Start / Collection**        | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.userId`, `metering.kind`, `metering.requestedAt`                                                       |
 
 Usage form answers are addressed by form ID and field ID, for example `formSubmissions.12.answers.34.value`. Only submitted forms are present. Notes, end times and optional user fields may be empty or absent. Usage and door triggers have different shapes; inspect the actual run before choosing paths.
 

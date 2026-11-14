@@ -25,6 +25,10 @@ For new usage sessions, completed duration charges retain the measured duration,
 
 For nonzero totals, the default email receipt shows separate session and operating-duration calculations and the saved billing factor. A zero-total transaction does not send a billing email. Customized email templates are preserved when the default receipt is upgraded; administrators can reset the template to its default to adopt the updated layout. Historical transactions are not rewritten.
 
+### Shared sessions
+
+On a machine with parallel sessions, meter and running-time lines of a shared session show the person's share (for example "0.8 kWh - your share of 2.4 kWh") and their credits with a **shared** marker. A breakdown lists each segment the person was in: time range, number of people, the segment's total quantity and credits, and the person's share. It appears in the transaction details, the session receipt email and the session's billing view. If a meter reading failed when someone stopped, the line shows as pending until the merged segment closes; the share is then charged as a correction transaction on the original charge. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines).
+
 ## Filtering Transactions
 
 You can filter the transaction list to find specific entries:

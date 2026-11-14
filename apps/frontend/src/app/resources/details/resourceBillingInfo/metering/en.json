@@ -14,7 +14,10 @@
     "estimateWaiting": "Waiting for session meter data",
     "estimate": "Estimated bill so far",
     "estimateNote": "Estimate without attributable operating minutes and additional flow items.",
-    "billingValue": "{{credits}} {{currency}}"
+    "billingValue": "{{credits}} {{currency}}",
+    "meterShare": "{{value}} — your share",
+    "provisional": "so far, may change until the next reading",
+    "meterShareCost": "{{name}}: your share of the cost so far"
   },
   "setup": {
     "title": "Meter not set up",
@@ -23,7 +26,8 @@
       "start-trigger-missing": "Add a \"Metering start\" trigger.",
       "ready-unreachable": "Connect \"Metering start\" to a \"Metering ready\" node.",
       "collect-trigger-missing": "Add a \"Metering collection\" trigger.",
-      "report-unreachable": "Connect \"Metering collection\" to a \"Report meter\" node."
+      "report-unreachable": "Connect \"Metering collection\" to a \"Report meter\" node.",
+      "shared-needs-collect": "This meter cannot be read on demand, so it cannot be split between sessions running at the same time. Switch its allocation to \"Measured per session\" or set the rate to 0 (tracking only)."
     },
     "action": "Open flows"
   },

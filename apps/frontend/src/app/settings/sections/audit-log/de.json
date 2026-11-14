@@ -220,6 +220,7 @@
     "plugin.retry_requested": "Erneuter Plugin-Versuch angefordert",
     "billing.transaction.updated": "Abrechnung geändert",
     "meter_charge.waived": "Zählerkosten erlassen",
+    "meter.updated": "Zähler geändert",
     "resource_flow.updated": "Ressourcen-Flow geändert",
     "flow.created": "Globaler Flow erstellt",
     "flow.updated": "Globaler Flow geändert",

@@ -14,7 +14,10 @@
     "estimateWaiting": "Warte auf Zählerdaten der Sitzung",
     "estimate": "Voraussichtliche Kosten bisher",
     "estimateNote": "Schätzung ohne zugeordnete Betriebsminuten und zusätzliche Flow-Positionen.",
-    "billingValue": "{{credits}} {{currency}}"
+    "billingValue": "{{credits}} {{currency}}",
+    "meterShare": "{{value}} — dein Anteil",
+    "provisional": "bisher, kann sich bis zur nächsten Messung ändern",
+    "meterShareCost": "{{name}}: dein Kostenanteil bisher"
   },
   "setup": {
     "title": "Zähler nicht eingerichtet",
@@ -23,7 +26,8 @@
       "start-trigger-missing": "Fügen Sie einen Auslöser „Messung starten“ hinzu.",
       "ready-unreachable": "Verbinden Sie „Messung starten“ mit einem Knoten „Messung bereit“.",
       "collect-trigger-missing": "Fügen Sie einen Auslöser „Messwert abfragen“ hinzu.",
-      "report-unreachable": "Verbinden Sie „Messwert abfragen“ mit einem Knoten „Verbrauch melden“."
+      "report-unreachable": "Verbinden Sie „Messwert abfragen“ mit einem Knoten „Verbrauch melden“.",
+      "shared-needs-collect": "Dieser Zähler kann nicht bei Bedarf gelesen werden und lässt sich daher nicht auf gleichzeitig laufende Sitzungen aufteilen. Stelle die Zuordnung auf \"Pro Sitzung gemessen\" oder setze den Preis auf 0 (nur erfassen)."
     },
     "action": "Flows öffnen"
   },

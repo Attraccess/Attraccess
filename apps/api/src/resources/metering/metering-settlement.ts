@@ -1,7 +1,7 @@
 import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import { Logger, ConflictException, Inject } from '@nestjs/common';
 
-import { Repository, In, EntityManager, MoreThan } from 'typeorm';
+import { Repository, In, EntityManager, IsNull, MoreThan, MoreThanOrEqual } from 'typeorm';
 
 import {
   ResourceMeteringSession,
@@ -10,6 +10,7 @@ import {
   BillingTransactionItem,
   BillingTransactionStatus,
   ResourceMeteringOperation,
+  ResourceMeteringSegment,
   ResourceUsage,
 } from '@attraccess/database-entities';
 
@@ -20,6 +21,8 @@ import { LiveNotificationsService } from '../../billing/live-notifications/live-
 import { meterCharge, meterDiscount, formatMeterValue } from './quantity';
 
 import { runSerializedTransaction } from '../../database/run-serialized-transaction';
+
+import { sessionShare } from './segment-charges';
 
 export type MeterFinal = { status: 'ready'; operationId: string } | { status: 'unavailable'; reason: string };
 
@@ -130,6 +133,171 @@ export class MeteringSettlement {
     }
   }
 
+
+  /** The closed or open segments a usage took part in, oldest first. Segments that were abandoned are no longer billable. */
+  protected async segmentsOf(manager: EntityManager, session: ResourceMeteringSession, usage: ResourceUsage) {
+    const candidates = await manager.find(ResourceMeteringSegment, {
+      where: [
+        { meterId: session.meterId, endedAt: MoreThanOrEqual(usage.startTime) },
+        { meterId: session.meterId, endedAt: IsNull() },
+      ],
+      order: { startedAt: 'ASC' },
+    });
+    return candidates.filter(
+      (segment) =>
+        segment.status !== 'abandoned' && segment.participants.some((participant) => participant.usageId === usage.id),
+    );
+  }
+
+  /** The item a session's shares of its shared segments become. Null while a segment it took part in is still open. */
+  protected async segmentedItem(manager: EntityManager, session: ResourceMeteringSession) {
+    const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId } });
+    const segments = await this.segmentsOf(manager, session, usage);
+    if (!segments.length || segments.some((segment) => segment.status !== 'closed')) return null;
+    const share = sessionShare(segments, usage.id);
+    return {
+      share,
+      item: {
+        name: session.meterName,
+        description: null,
+        externalReference: `metering:${session.id}:segments`,
+        unitPrice: share.credits,
+        quantity: 1,
+        meterQuantity: formatMeterValue(share.quantity),
+        meterCreditsPerUnit: session.creditsPerUnit,
+        allocation: share.solo ? null : { kind: 'meter' as const, segments: share.breakdown },
+      },
+    };
+  }
+
+  /**
+   * A session that shared the meter is billed its shares once every segment it took part in is closed. A segment
+   * whose closing reading failed keeps the meter line pending until a later reading closes it.
+   */
+  protected async settleSegmentedSession(
+    manager: EntityManager,
+    session: ResourceMeteringSession,
+    final: MeterFinal,
+  ): Promise<void> {
+    const billed = await this.segmentedItem(manager, session);
+    if (!billed) {
+      await this.addUnavailableItem(
+        manager,
+        session.usageId,
+        session.meterName,
+        session.creditsPerUnit,
+        `metering:${session.id}:unavailable`,
+      );
+      await manager.update(ResourceMeteringSession, session.id, {
+        status: ResourceMeteringSessionStatus.Pending,
+        failureReason:
+          final.status === 'unavailable'
+            ? final.reason
+            : 'The meter could not be read when the session ended; its share is billed once a later reading succeeds',
+      });
+      return;
+    }
+    const transaction = await manager.findOneOrFail(BillingTransaction, { where: { resourceUsageId: session.usageId } });
+    if (
+      !(await manager.exists(BillingTransactionItem, {
+        where: { billingTransactionId: transaction.id, externalReference: billed.item.externalReference },
+      }))
+    )
+      await manager.save(BillingTransactionItem, { billingTransactionId: transaction.id, ...billed.item });
+    await manager.update(ResourceMeteringSession, session.id, {
+      status: ResourceMeteringSessionStatus.Settled,
+      consumedValue: billed.share.quantity.toString(),
+      chargeCredits: billed.share.credits,
+      failureReason: null,
+      settledAt: new Date(),
+    });
+  }
+
+  /** A closed segment makes its share known to sessions that already ended: they are billed as a correction. */
+  async settleClosedSegment(segmentId: string): Promise<void> {
+    const segment = await this.sessions.manager.findOne(ResourceMeteringSegment, { where: { id: segmentId } });
+    if (segment?.status !== 'closed') return;
+    for (const participant of segment.participants) {
+      const pending = await this.sessions.find({
+        where: {
+          usageId: participant.usageId,
+          meterId: segment.meterId,
+          accounting: 'segmented',
+          status: ResourceMeteringSessionStatus.Pending,
+        },
+      });
+      for (const session of pending) {
+        await this.settleSegmentedLate(session.id).catch((error) =>
+          this.logger.warn(`Billing the share of meter session ${session.id} failed: ${String(error)}`),
+        );
+      }
+    }
+  }
+
+  /** The bill of an ended usage is completed and immutable: its share goes onto a correction, once. */
+  async settleSegmentedLate(sessionId: string, initiatorId?: number): Promise<void> {
+    const correction = await runSerializedTransaction(this.sessions.manager, async (manager) => {
+      const session = await manager.findOneOrFail(ResourceMeteringSession, { where: { id: sessionId } });
+      if (session.status !== ResourceMeteringSessionStatus.Pending) return null;
+      const usage = await manager.findOneOrFail(ResourceUsage, { where: { id: session.usageId }, relations: ['user'] });
+      if (!usage.endTime) return null;
+      const billed = await this.segmentedItem(manager, session);
+      if (!billed) return null;
+      const settled = {
+        status: ResourceMeteringSessionStatus.Settled,
+        consumedValue: billed.share.quantity.toString(),
+        chargeCredits: billed.share.credits,
+        failureReason: null,
+        settledAt: new Date(),
+      };
+      if (billed.share.credits === 0) {
+        await manager.update(ResourceMeteringSession, session.id, settled);
+        return null;
+      }
+      const original = await manager.findOneOrFail(BillingTransaction, {
+        where: { resourceUsageId: usage.id, status: BillingTransactionStatus.Completed },
+      });
+      const factor = usage.billingFactor ?? usage.user.billingFactor;
+      const discount = meterDiscount(billed.share.credits, factor);
+      const correction = await manager.save(BillingTransaction, {
+        userId: original.userId,
+        initiatorId: initiatorId ?? null,
+        correctionOfId: original.id,
+        amount: -(billed.share.credits - discount),
+        status: BillingTransactionStatus.Completed,
+      });
+      await manager.save(BillingTransactionItem, { billingTransactionId: correction.id, ...billed.item });
+      if (discount !== 0) {
+        await manager.save(BillingTransactionItem, {
+          billingTransactionId: correction.id,
+          name: 'BILLING_FACTOR',
+          description: `${factor}%`,
+          externalReference: `metering:${session.id}:segments:discount`,
+          unitPrice: -discount,
+          quantity: 1,
+        });
+      }
+      await manager.update(ResourceMeteringSession, session.id, settled);
+      await this.audit.record(
+        billingTransactionAuditEvent({
+          transactionId: correction.id,
+          userId: correction.userId,
+          initiatorId,
+          amount: correction.amount,
+          status: correction.status,
+          source: 'meter-correction',
+        }),
+        manager,
+      );
+      return correction;
+    });
+    if (correction) {
+      this.liveNotifications
+        .notifyTransactionUpdate(correction.id)
+        .catch((error) => this.logger.warn(`Failed to publish meter correction ${correction.id}`, error));
+    }
+  }
+
   protected async addMeterItem(
     manager: EntityManager,
     transaction: BillingTransaction,
@@ -164,6 +332,7 @@ export class MeteringSettlement {
     final: MeterFinal,
   ): Promise<void> {
     const usageId = session.usageId;
+    if (session.accounting === 'segmented') return this.settleSegmentedSession(manager, session, final);
     const operation =
       final.status === 'ready'
         ? await manager.findOne(ResourceMeteringOperation, {
@@ -178,9 +347,13 @@ export class MeteringSettlement {
         session.creditsPerUnit,
         `metering:${session.id}:unavailable`,
       );
-      const superseded = await manager.count(ResourceMeteringSession, {
-        where: { resourceId: session.resourceId, meterId: session.meterId, usageId: MoreThan(usageId) },
-      });
+      // A measuring point of its own is never taken over by a later session.
+      const superseded =
+        session.accounting === 'per-session'
+          ? 0
+          : await manager.count(ResourceMeteringSession, {
+              where: { resourceId: session.resourceId, meterId: session.meterId, usageId: MoreThan(usageId) },
+            });
       const unrecoverable = superseded > 0 || !!session.compromisedReason;
       await manager.update(ResourceMeteringSession, session.id, {
         status: unrecoverable ? ResourceMeteringSessionStatus.Failed : ResourceMeteringSessionStatus.Pending,

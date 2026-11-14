@@ -26,7 +26,7 @@ Die Anfangsdaten hängen vom Trigger ab. Bei Objekt-Payloads ergänzt Attraccess
 | **MQTT-Nachricht empfangen**                     | `serverId`, `topic`, `payload`                                                                                                                                                           |
 | **Variable geändert**                            | `change.scope`, `change.key`, `change.previousValue`, `change.newValue`, `change.changedAt`, `change.sourceResourceId`; überwachte Werte unter `variables.resource` / `variables.global` |
 | **Companion-Ereignisse**                         | Ereignisfelder an der Wurzel, etwa `idleSeconds`, `appName`, `vendorId`; siehe [Knotentypen](flows/node-types.md)                                                                        |
-| **Messung starten / Messwert abfragen**          | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.kind`, `metering.requestedAt`                                                         |
+| **Messung starten / Messwert abfragen**          | `metering.sessionId`, `metering.operationId`, `metering.resourceId`, `metering.usageId`, `metering.userId`, `metering.kind`, `metering.requestedAt`                                                         |
 
 Formularantworten einer Nutzung werden über Formular-ID und Feld-ID adressiert, etwa `formSubmissions.12.answers.34.value`. Nur eingereichte Formulare sind enthalten. Notizen, Endzeiten und optionale Benutzerfelder können leer sein oder fehlen. Nutzungs- und Tür-Trigger liefern unterschiedliche Strukturen; prüfen Sie den tatsächlichen Durchlauf, bevor Sie Pfade wählen.
 

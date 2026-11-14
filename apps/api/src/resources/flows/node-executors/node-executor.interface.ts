@@ -23,7 +23,7 @@ export type MeteringReport =
 export interface MeteringRunContext {
   meterId: number;
   operationId: string;
-  kind: 'start' | 'interim' | 'final';
+  kind: 'start' | 'interim' | 'final' | 'boundary';
   complete(report: MeteringReport): Promise<void>;
 }
 

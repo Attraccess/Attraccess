@@ -53,6 +53,7 @@ describe('metering completion nodes', () => {
       undefined,
       undefined,
       undefined,
+      undefined,
     );
   });
 

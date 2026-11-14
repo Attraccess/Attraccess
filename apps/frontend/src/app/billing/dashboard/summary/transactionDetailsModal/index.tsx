@@ -18,7 +18,8 @@ import {
 import { AttraccessUser, DateTimeDisplay, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RefundModal } from './refund/index';
 import { UsageNotesModal } from '../../../../resources/usage/components/UsageNotesModal/index';
-import { toExactCredits } from '@attraccess/shared';
+import { formatDurationMs, toExactCredits } from '@attraccess/shared';
+import { AllocationBreakdown, getItemAllocation } from './AllocationBreakdown';
 import { useMeterValueFormatter } from '../../../../../hooks/useMeterValueFormatter';
 import { useCreditsFormatter } from '../../../../../hooks/useCreditsFormatter';
 import de from './de.json';
@@ -152,6 +153,7 @@ export function TransactionDetailsModalItemsTitle({
             <TableBody renderEmptyState={() => t('items.empty')}>
               {(transaction.items ?? []).map((item) => {
                 const isMeter = item.meterCreditsPerUnit != null || item.meterQuantity != null;
+                const allocation = getItemAllocation(item);
                 const value =
                   item.meterQuantity == null ? t('items.unavailable') : formatMeterValue(item.meterQuantity);
                 return (
@@ -170,6 +172,19 @@ export function TransactionDetailsModalItemsTitle({
                       {item.externalReference && !isMeter && (
                         <div className="text-tiny text-default-400">{item.externalReference}</div>
                       )}
+                      {allocation && (
+                        <AllocationBreakdown
+                          allocation={allocation}
+                          t={t}
+                          formatMeterValue={formatMeterValue}
+                          formatCredits={formatCredits}
+                          shareValue={
+                            allocation.kind === 'operating-time'
+                              ? String(item.durationMs ?? '') || null
+                              : item.meterQuantity
+                          }
+                        />
+                      )}
                     </TableCell>
                     <TableCell className="hidden min-w-0 whitespace-normal wrap-anywhere sm:table-cell">
                       {isMeter
@@ -180,7 +195,11 @@ export function TransactionDetailsModalItemsTitle({
                         : item.description}
                     </TableCell>
                     <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
-                      {isMeter ? value : item.quantity}
+                      {isMeter
+                        ? value
+                        : allocation?.kind === 'operating-time' && item.durationMs != null
+                          ? formatDurationMs(item.durationMs)
+                          : item.quantity}
                     </TableCell>
                     <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
                       {isMeter ? formatCredits(item.meterCreditsPerUnit ?? 0) : formatCredits(item.unitPrice)}

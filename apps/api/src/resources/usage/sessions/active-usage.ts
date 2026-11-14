@@ -19,9 +19,9 @@ export function isActiveUsage(usage: ResourceUsage): boolean {
 }
 
 /**
- * The session that owns metering: the only active one. With parallel sessions the earliest started
- * (interim rule, see ATT-1191); on a machine limited to one session, legacy duplicates resolve to the newest.
- * Select it before resolving optional related records such as meter sessions.
+ * The machine's one active session. With parallel sessions the earliest started; on a machine limited to one
+ * session, legacy duplicates resolve to the newest. Select it before resolving optional related records such as
+ * meter sessions.
  */
 export async function findActiveUsage(manager: EntityManager, resourceId: number): Promise<ResourceUsage | null> {
   const sessions = await manager.find(ResourceUsage, {
@@ -44,7 +44,7 @@ export function activeUsageSql(alias: string): string {
     .join(' AND ')}`;
 }
 
-/** All published sessions of a machine, earliest first: the earliest session is the interim payer (ATT-1189). */
+/** All published sessions of a machine, earliest first. */
 export function findActiveUsages(manager: EntityManager, resourceId: number): Promise<ResourceUsage[]> {
   return manager.find(ResourceUsage, {
     where: { resourceId, ...activeUsageWhere() },

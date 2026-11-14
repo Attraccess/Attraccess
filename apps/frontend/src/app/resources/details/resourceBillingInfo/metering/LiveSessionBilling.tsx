@@ -54,19 +54,25 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
   const money = (credits: number) => t('live.billingValue', { credits: formatMoney(credits), currency });
 
   const elapsedMs = Math.max(0, now - new Date(usage.startTime).getTime());
-  // Interim rule for parallel sessions: the earliest running session alone holds a meter, later ones are not charged
-  // for it. A meter session of another running session is therefore expected here, not stale data to wait for.
+  // With parallel sessions every running session has its own meter session. One that belongs to another running
+  // session is expected in the list, not stale data to wait for.
   const parallel = (active?.maxParallelSessions ?? 1) > 1;
   const otherRunningIds = new Set(parallel ? (usages ?? []).filter((u) => u.id !== usage.id).map((u) => u.id) : []);
   const heldElsewhere = (session: { usageId: number } | null | undefined) =>
     !!session && otherRunningIds.has(session.usageId);
+  // A machine's sessions can share a meter: the viewer's own entry is looked up by usage, `session` is only the earliest.
+  const ownSession = (meter: NonNullable<typeof live>['meters'][number]) =>
+    meter.sessions?.find((session) => session.usageId === usage.id) ??
+    (meter.session?.usageId === usage.id ? meter.session : undefined);
   const mismatchedUsage = live?.meters.some(
-    (meter) => meter.session && meter.session.usageId !== usage.id && !heldElsewhere(meter.session),
+    (meter) =>
+      meter.session && meter.session.usageId !== usage.id && !heldElsewhere(meter.session) && !ownSession(meter),
   );
   const meters =
-    live?.meters.flatMap((meter) =>
-      meter.session?.usageId === usage.id ? [{ id: meter.id, ...meter.session }] : [],
-    ) ?? [];
+    live?.meters.flatMap((meter) => {
+      const own = ownSession(meter);
+      return own ? [{ id: meter.id, ...own }] : [];
+    }) ?? [];
   // Without a meter session of its own (parallel sessions) nothing is metered for this session, so nothing is awaited.
   const awaitsCharge = (meter: (typeof meters)[number]) =>
     meter.chargeCredits == null && !(parallel && meter.sessionId === null);
@@ -114,7 +120,14 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
                 ? meter.sessionId === null
                   ? t('live.meterUnavailable')
                   : t('live.meterWaiting')
-                : formatValue(meter.latestValue)}
+                : meter.shared
+                  ? t('live.meterShare', { value: formatValue(meter.latestValue) })
+                  : formatValue(meter.latestValue)}
+              {meter.shared && meter.provisional && meter.latestValue != null && (
+                <small className="ml-1 text-foreground-500" data-cy="live-meter-provisional">
+                  {t('live.provisional')}
+                </small>
+              )}
             </dd>
             <dt>{t('live.meterRate', { name: meter.meterName })}</dt>
             <dd className={valueClass} data-cy="live-meter-rate">
@@ -122,7 +135,7 @@ export function LiveSessionBilling({ resourceId, currency, minorUnit, dlClass, v
             </dd>
             {(meter.creditsPerUnit ?? 0) > 0 && (
               <>
-                <dt>{t('live.meterCost', { name: meter.meterName })}</dt>
+                <dt>{t(meter.shared ? 'live.meterShareCost' : 'live.meterCost', { name: meter.meterName })}</dt>
                 <dd className={valueClass}>{meter.chargeCredits == null ? '-' : money(meter.chargeCredits)}</dd>
               </>
             )}

@@ -1,4 +1,4 @@
-import { BillingTransactionStatus } from '@attraccess/database-entities';
+import { BillingTransactionStatus, ResourceUsage } from '@attraccess/database-entities';
 import { ProjectUsageStatsQueryDto } from './dto/project-usage-stats-query.dto';
 import { ProjectUsageStatsDto } from './dto/project-usage-stats.dto';
 import type { ProjectUsageService } from './project-usage.service';
@@ -87,9 +87,11 @@ export async function getProjectUsageStats(
     .orderBy('usageDate', 'ASC')
     .getRawMany()) as TimeSeriesUsageRaw[];
 
+  // A correction (a meter share billed after the session ended) counts toward the project of the session it corrects.
   const billingBaseQb = context.billingTransactionRepository
     .createQueryBuilder('tx')
-    .innerJoin('tx.resourceUsage', 'usage')
+    .leftJoin('tx.correctionOf', 'original')
+    .innerJoin(ResourceUsage, 'usage', 'usage.id = COALESCE(tx.resourceUsageId, original.resourceUsageId)')
     .where('usage.projectId = :projectId', { projectId })
     .andWhere('tx.status = :status', { status: BillingTransactionStatus.Completed });
 

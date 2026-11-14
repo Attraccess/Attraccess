@@ -805,6 +805,10 @@
                 "label": "Observed at",
                 "helpText": "Optional ISO time the source took the reading. Readings from before the session ended are rejected as stale. Defaults to now."
               },
+              "usageId": {
+                "label": "Usage ID",
+                "helpText": "Session the reading belongs to (template). Only needed for a meter measured per session when the flow does not run in a session lifecycle. Leave empty otherwise."
+              },
               "source": {
                 "label": "Source",
                 "helpText": "Optional name of the physical meter (templates allowed)."
