@@ -45,7 +45,9 @@ export class PluginService {
 
   /** Marks active plugins only while Nest is running their lifecycle hooks. */
   public static beginBootGuard(): void {
-    return PluginBootGuard.beginBootGuard(getImplementationClass().PLUGIN_PATH, getImplementationClass().getPlugins());
+    return PluginBootGuard.beginBootGuard(getImplementationClass().PLUGIN_PATH, () =>
+      getImplementationClass().getPlugins(),
+    );
   }
 
   /**

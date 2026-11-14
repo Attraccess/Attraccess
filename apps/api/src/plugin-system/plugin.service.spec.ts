@@ -131,7 +131,10 @@ describe('PluginService', () => {
       });
       const [plugin] = PluginService.getPlugins();
       jest
-        .spyOn(PluginBootGuard as unknown as { writeFailures(pluginPath: string, failures: unknown[]): void }, 'writeFailures')
+        .spyOn(
+          PluginBootGuard as unknown as { writeFailures(pluginPath: string, failures: unknown[]): void },
+          'writeFailures',
+        )
         .mockImplementation(() => {
           throw new Error('read-only plugin directory');
         });
@@ -166,7 +169,10 @@ describe('PluginService', () => {
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
       jest
-        .spyOn(PluginBootGuard as unknown as { writeFailures(pluginPath: string, failures: unknown[]): void }, 'writeFailures')
+        .spyOn(
+          PluginBootGuard as unknown as { writeFailures(pluginPath: string, failures: unknown[]): void },
+          'writeFailures',
+        )
         .mockImplementation(() => {
           throw new Error('read-only plugin directory');
         });
@@ -209,6 +215,10 @@ describe('PluginService', () => {
 
       const [plugin] = PluginService.getPlugins();
       expect(PluginService.isPluginQuarantined(plugin)).toBe(true);
+      expect(PluginService.getPluginsWithLoadStatus()[0]).toMatchObject({
+        status: 'error',
+        error: 'Plugin was disabled after an incomplete startup with no attributable stack frame.',
+      });
     });
 
     it.each(['SIGINT', 'SIGTERM'] as const)('does not quarantine plugins when startup is stopped by %s', (signal) => {

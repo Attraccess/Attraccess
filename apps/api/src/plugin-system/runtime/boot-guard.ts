@@ -38,8 +38,11 @@ export class PluginBootGuard {
     );
   }
 
-  /** Marks active plugins only while Nest is running their lifecycle hooks. */
-  static beginBootGuard(pluginPath: string, plugins: LoadedPluginManifest[]): void {
+  /**
+   * Marks active plugins only while Nest is running their lifecycle hooks. Plugins are discovered only after the
+   * previous startup's plugins are quarantined, so discovery reports them as failed with their quarantine message.
+   */
+  static beginBootGuard(pluginPath: string, discoverPlugins: () => LoadedPluginManifest[]): void {
     PluginBootGuard.removeBootGuardSignalHandlers();
     const previous = PluginBootGuard.readBootGuard(pluginPath);
     if (previous.length > 0) {
@@ -55,7 +58,7 @@ export class PluginBootGuard {
       PluginBootGuard.logger.error(`Disabled ${previous.length} plugin(s) after an incomplete previous startup.`);
     }
 
-    const active = plugins
+    const active = discoverPlugins()
       .filter((manifest) => !PluginBootGuard.pluginFailures.has(manifest.pluginDirectory))
       .map((manifest) => manifest.pluginDirectory);
     PluginBootGuard.writeBootGuard(pluginPath, active);
@@ -83,9 +86,7 @@ export class PluginBootGuard {
 
     const message = error instanceof Error ? error.message : String(error);
     const stack = error instanceof Error ? (error.stack ?? '') : '';
-    const affected = active.filter((pluginDirectory) =>
-      stack.includes(join(pluginPath, pluginDirectory)),
-    );
+    const affected = active.filter((pluginDirectory) => stack.includes(join(pluginPath, pluginDirectory)));
     if (affected.length === 0) {
       PluginBootGuard.logger.error('Could not attribute the startup failure to a plugin; no plugins were quarantined.');
       return;
