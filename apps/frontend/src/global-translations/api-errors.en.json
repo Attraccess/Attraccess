@@ -234,5 +234,9 @@
   "NO_CANDIDATES_IN_CSV": {
     "title": "No users to invite",
     "description": "The CSV file contains no valid rows to invite. Check the file and the column mapping."
+  },
+  "MISSING_HEADER_ROW": {
+    "title": "CSV file has no data",
+    "description": "The CSV file has no header row or no rows below it. The first line must contain the column names, followed by one row per user."
   }
 }

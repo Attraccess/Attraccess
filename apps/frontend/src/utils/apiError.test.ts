@@ -51,7 +51,13 @@ describe('getTranslationKeyForApiError', () => {
         ['German', API_ERROR_TRANSLATIONS_DE, API_ERROR_TRANSLATIONS_DE.generic.title],
       ] as const
     ).flatMap(([locale, translations, genericTitle]) =>
-      ['Email already exists', 'Username already exists', 'DUPLICATE_IN_DB', 'NO_CANDIDATES_IN_CSV'].map(
+      [
+        'Email already exists',
+        'Username already exists',
+        'DUPLICATE_IN_DB',
+        'NO_CANDIDATES_IN_CSV',
+        'MISSING_HEADER_ROW',
+      ].map(
         (message) => [locale, translations, genericTitle, message] as const,
       ),
     ),

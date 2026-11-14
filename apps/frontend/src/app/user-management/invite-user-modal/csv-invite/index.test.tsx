@@ -25,6 +25,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
           'errors.columns.message': 'Reason',
           'errors.columns.value': 'Value',
           'errors.reasons.DUPLICATE_IN_DB': 'Already used by an existing account',
+          'errors.reasons.INVALID_USERNAME_FORMAT': 'Only letters, numbers, underscores, hyphens and dots are allowed',
           'actions.invite': 'Invite',
           'actions.inviteIgnore': 'Invite skipping failed rows',
         })[key] ?? key,
@@ -80,6 +81,7 @@ describe('CsvInvite', () => {
           errors: [
             { row: 2, field: 'email', message: 'DUPLICATE_IN_DB', value: 'a@example.com' },
             { row: 3, field: 'Mail Column', message: 'SOMETHING_NEW', value: 'b' },
+            { row: 4, field: 'username', message: 'Invalid username format', value: 'bad name!' },
           ],
         },
       });
@@ -90,5 +92,7 @@ describe('CsvInvite', () => {
     expect(screen.getAllByText('Email').length).toBeGreaterThan(0);
     expect(screen.getByText('Mail Column')).toBeInTheDocument();
     expect(screen.getByText('SOMETHING_NEW')).toBeInTheDocument();
+    expect(screen.getByText('Only letters, numbers, underscores, hyphens and dots are allowed')).toBeInTheDocument();
+    expect(screen.queryByText('Invalid username format')).not.toBeInTheDocument();
   });
 });

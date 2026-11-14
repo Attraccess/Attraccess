@@ -234,5 +234,9 @@
   "NO_CANDIDATES_IN_CSV": {
     "title": "Keine Nutzer zum Einladen",
     "description": "Die CSV-Datei enthält keine gültigen Zeilen zum Einladen. Prüfe die Datei und die Spaltenzuordnung."
+  },
+  "MISSING_HEADER_ROW": {
+    "title": "CSV-Datei ohne Daten",
+    "description": "Die CSV-Datei hat keine Kopfzeile oder keine Zeilen darunter. Die erste Zeile muss die Spaltennamen enthalten, danach folgt eine Zeile pro Nutzer."
   }
 }

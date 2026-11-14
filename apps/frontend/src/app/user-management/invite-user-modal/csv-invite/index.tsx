@@ -40,6 +40,8 @@ const CSV_ROW_ERROR_REASON_KEYS: Record<string, string> = {
   REQUIRED: 'REQUIRED',
   INVALID: 'INVALID',
   'Row is empty': 'ROW_IS_EMPTY',
+  'Invalid username format': 'INVALID_USERNAME_FORMAT',
+  'Invalid username length': 'INVALID_USERNAME_LENGTH',
   NO_VALID_ROWS_FOUND_IN_CSV: 'NO_VALID_ROWS_FOUND_IN_CSV',
 };
 
