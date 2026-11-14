@@ -110,6 +110,9 @@ describe('SSO discovery HTTP boundaries', () => {
         // The absolute request deadline must include waiting for headers.
       } else if (req.url === '/large') {
         res.end(JSON.stringify('x'.repeat(1000)));
+      } else if (req.url === '/large-chunks') {
+        res.write('"' + 'x'.repeat(64 * 1024));
+        res.end('x'.repeat(64 * 1024) + '"');
       } else if (req.url === '/invalid') {
         res.end('{');
       } else if (req.url === '/unavailable') {
@@ -283,6 +286,13 @@ describe('SSO discovery HTTP boundaries', () => {
     await expectBadGateway(requestDiscoveryJson(new URL('/invalid', origin)), 'Invalid discovery JSON');
     expect(warn).toHaveBeenCalledWith(`Discovery response from ${origin} exceeds 32 bytes`);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining(`Discovery response from ${origin} is not valid JSON`));
+  });
+
+  it('stops handling an oversized response after the size limit', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    await expectBadGateway(requestDiscoveryJson(new URL('/large-chunks', origin), 5000, 1024), 'size limit');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(warn.mock.calls).toEqual([[`Discovery response from ${origin} exceeds 1024 bytes`]]);
   });
 
   it('reports a refused connection as an unreachable discovery URL', async () => {

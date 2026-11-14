@@ -141,9 +141,14 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
       }
       let bytes = 0;
       const chunks: Buffer[] = [];
+      // Destroying an oversized response can still emit 'error' or 'end'; the
+      // request has already failed, so those events must not log again.
+      let oversized = false;
       response.on('data', (chunk: Buffer) => {
+        if (oversized) return;
         bytes += chunk.length;
         if (bytes > maxBytes) {
+          oversized = true;
           const error = new BadGatewayException('Discovery response exceeds size limit');
           logger.warn(`Discovery response from ${url.origin} exceeds ${maxBytes} bytes`);
           reject(error);
@@ -152,8 +157,11 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
         }
         chunks.push(chunk);
       });
-      response.on('error', fail);
+      response.on('error', (error) => {
+        if (!oversized) fail(error);
+      });
       response.on('end', () => {
+        if (oversized) return;
         try {
           resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
         } catch (error) {
