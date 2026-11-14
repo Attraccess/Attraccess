@@ -134,7 +134,7 @@ export function registerUsersServiceFixture() {
     accounts = module.get(UserAccounts);
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
     dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
-    licenseService = module.get(LicenseService);
+    licenseService = module.get(LicenseService) as jest.Mocked<Pick<LicenseService, 'verifyLicense'>>;
     emailService = module.get(EmailService) as unknown as {
       sendUsernameChangedEmail: jest.Mock;
       sendVerificationEmail: jest.Mock;

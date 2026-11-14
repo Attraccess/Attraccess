@@ -28,7 +28,8 @@ export class UserInvitationsController {
   })
   @ApiResponse({
     status: 403,
-    description: 'The license does not allow another user, e.g. the licensed user limit is reached.',
+    description:
+      'Forbidden - missing users.create permission, or the license does not allow another user (e.g. the licensed user limit is reached; the message carries the license reason).',
   })
   @Auth('users.create')
   async inviteUser(@Req() request: AuthenticatedRequest, @Body() body: InviteUserDto): Promise<User> {
@@ -55,7 +56,7 @@ export class UserInvitationsController {
   @ApiResponse({
     status: 403,
     description:
-      'The license does not allow the invited users (e.g. the licensed user limit would be exceeded), or users.roles.manage is missing to assign roles via CSV.',
+      'Forbidden - missing users.create permission; a role column without users.roles.manage; a role whose permissions exceed your own; or the license does not allow the invited users (e.g. the licensed user limit would be exceeded; the message carries the license reason).',
   })
   async inviteUsersFromCsv(
     @Req() request: AuthenticatedRequest,

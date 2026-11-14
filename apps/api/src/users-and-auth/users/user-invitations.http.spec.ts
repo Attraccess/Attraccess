@@ -118,6 +118,16 @@ describe('user invitation endpoints (HTTP)', () => {
     expect(users.createMany).not.toHaveBeenCalled();
   });
 
+  it('reports database duplicates before the license refusal', async () => {
+    users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'alex', email: 'alex@example.com' }]);
+    users.ensureLicenseForNewUsers.mockRejectedValue(
+      new LicenseError('Trying to use more than the allowed amount of users'),
+    );
+    const response = await post().attach('file', csv, 'users.csv').field('config', JSON.stringify(config)).expect(400);
+    expect(response.body.message).toBe('DUPLICATE_IN_DB');
+    expect(users.ensureLicenseForNewUsers).not.toHaveBeenCalled();
+  });
+
   it('requires users.roles.manage to assign roles from a column', async () => {
     await post()
       .attach('file', csv, 'users.csv')
@@ -139,6 +149,16 @@ describe('user invitation endpoints (HTTP)', () => {
       const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(400);
       expect(response.body.message).toBe('Email already exists');
       expect(users.createMany).not.toHaveBeenCalled();
+    });
+
+    it('reports a taken email before the license refusal', async () => {
+      users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'someone', email: 'alex@example.com' }]);
+      users.ensureLicenseForNewUsers.mockRejectedValue(
+        new LicenseError('Trying to use more than the allowed amount of users'),
+      );
+      const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(400);
+      expect(response.body.message).toBe('Email already exists');
+      expect(users.ensureLicenseForNewUsers).not.toHaveBeenCalled();
     });
 
     it('returns 400 when the username is already taken', async () => {
