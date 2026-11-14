@@ -1,7 +1,7 @@
 import { promises as dns } from 'node:dns';
 import { createServer, Server } from 'node:http';
 import { AddressInfo } from 'node:net';
-import { BadRequestException, HttpException } from '@nestjs/common';
+import { BadRequestException, HttpException, Logger } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { ExecutionContextHost } from '@nestjs/core/helpers/execution-context-host';
@@ -233,6 +233,14 @@ describe('SSO discovery HTTP boundaries', () => {
     );
     await expectBadGateway(requestDiscoveryJson(new URL('/invalid', origin)), 'Invalid discovery JSON');
     await expect(requestDiscoveryJson(new URL('/unavailable', origin))).rejects.toThrow('503');
+  });
+
+  it('logs oversized and malformed upstream responses for operators', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    await expectBadGateway(requestDiscoveryJson(new URL('/large', origin), 5000, 32), 'size limit');
+    await expectBadGateway(requestDiscoveryJson(new URL('/invalid', origin)), 'Invalid discovery JSON');
+    expect(warn).toHaveBeenCalledWith(`Discovery response from ${origin} exceeds 32 bytes`);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`Discovery response from ${origin} is not valid JSON`));
   });
 
   it('reports a refused connection as an unreachable discovery URL', async () => {

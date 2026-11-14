@@ -111,6 +111,7 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
         bytes += chunk.length;
         if (bytes > maxBytes) {
           const error = new BadGatewayException('Discovery response exceeds size limit');
+          logger.warn(`Discovery response from ${url.origin} exceeds ${maxBytes} bytes`);
           reject(error);
           request.destroy(error);
           return;
@@ -121,7 +122,8 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
       response.on('end', () => {
         try {
           resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-        } catch {
+        } catch (error) {
+          logger.warn(`Discovery response from ${url.origin} is not valid JSON: ${String(error)}`);
           reject(new BadGatewayException('Invalid discovery JSON'));
         }
       });
