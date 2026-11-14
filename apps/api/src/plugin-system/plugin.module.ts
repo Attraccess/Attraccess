@@ -532,10 +532,6 @@ export class PluginModule {
     getImplementationClass().logger.log(`PluginModule configured. DisablePlugins: ${arePluginsDisabled()}`);
   }
 
-  public static arePluginsDisabled(): boolean {
-    return arePluginsDisabled();
-  }
-
   protected static pluginEvents(): PluginEventsService {
     return getImplementationClass()
       .requireRef(getImplementationClass().moduleRef, 'ModuleRef')
