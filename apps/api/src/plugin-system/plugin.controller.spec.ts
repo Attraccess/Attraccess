@@ -6,6 +6,7 @@ import { join } from 'path';
 import { PluginController } from './plugin.controller';
 import { PluginAdministrationService } from './plugin-administration.service';
 import { PluginService } from './plugin.service';
+import { PluginUninstallService } from './plugin-uninstall.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { FileUpload } from '../common/types/file-upload.types';
@@ -53,7 +54,12 @@ describe('PluginController', () => {
     audit = { record: jest.fn() };
     controller = new PluginController(
       npmService as never,
-      new PluginAdministrationService(service as unknown as PluginService, npmService as never, audit as never),
+      new PluginAdministrationService(
+        service as unknown as PluginService,
+        service as unknown as PluginUninstallService,
+        npmService as never,
+        audit as never,
+      ),
     );
   });
 

@@ -11,7 +11,7 @@ import { WagoCommissioningSession } from './sessions/session.entity';
 import { WagoCommissioningService } from './service';
 import { WagoController } from '../controllers/entity';
 import { WagoManagementEntity } from '../management/entity';
-import { WagoRuntimeArtifactsService } from '../runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../runtime/artifacts/service';
 import { runtimeBundlePreflightScript, runtimeBundleStagingCapacityPreflightScript } from '../runtime/install';
 import { WagoService } from '../controllers/service';
 

@@ -19,6 +19,8 @@ import { InstalledNpmPlugin, NpmPluginAuditState, NpmPluginService } from './npm
 
 import { PluginService } from './plugin.service';
 
+import { PluginUninstallService } from './plugin-uninstall.service';
+
 type PluginAuditAction = Extract<AdministrationAuditAction, `plugin.${string}`>;
 
 type PackageOverride = NonNullable<InstalledNpmPlugin['updateOverride']>;
@@ -31,6 +33,7 @@ type PackageOverride = NonNullable<InstalledNpmPlugin['updateOverride']>;
 export class PluginAdministrationService {
   constructor(
     private readonly pluginService: PluginService,
+    private readonly pluginUninstall: PluginUninstallService,
     private readonly npmPluginService: NpmPluginService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
@@ -194,7 +197,7 @@ export class PluginAdministrationService {
       if (actor) this.pluginService.requestRestart();
       return;
     }
-    await this.pluginService.deletePlugin(pluginId, Boolean(actor));
+    await this.pluginUninstall.deletePlugin(pluginId, Boolean(actor));
     await this.record(actor, 'plugin.zip_deleted', auditSubjectKeyId(plugin?.name ?? pluginId), 'plugin-package', {
       pluginId,
       restartRequested: 1,

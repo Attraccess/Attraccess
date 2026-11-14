@@ -63,10 +63,11 @@ directories and the generated API clients are not checked.
 To break a cycle, move the shared type, constant, context or helper into a leaf
 file that both sides import, pass the dependency in as a prop or callback, or use
 `import type` when only types are needed. Do not add NestJS `forwardRef`: extract
-the shared provider into its own module instead. A deferred `require()` inside a
-function hides a cycle from the check rather than removing it; use it only where
-the cycle cannot be split, as `plugin.service.ts` does to reach
-`plugin-migration.service.ts`, and say why in a comment.
+the shared provider into its own module instead. Do not defer one side to a
+`require()` or `import()` inside a function either: that hides the cycle from the
+check rather than removing it. Move the code that needs both sides into a third
+file that imports them, as `plugin-uninstall.service.ts` does for
+`plugin.service.ts` and `plugin-migration.service.ts`.
 
 ## Commit Messages
 

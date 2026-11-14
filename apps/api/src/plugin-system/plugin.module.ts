@@ -73,6 +73,8 @@ import { PluginSandboxService } from './plugin-sandbox.service';
 import { PluginController } from './plugin.controller';
 import { PluginAdministrationService } from './plugin-administration.service';
 
+import { PluginUninstallService } from './plugin-uninstall.service';
+
 import { LoadedPluginManifest } from './plugin.manifest';
 
 import { PluginService } from './plugin.service';
@@ -142,6 +144,7 @@ export class PluginModule {
           PluginMqttService,
           NpmPluginService,
           PluginAdministrationService,
+          PluginUninstallService,
           PluginClassificationService,
           PluginLiveUpdatesService,
           PluginSystemEventsBridge,
@@ -219,6 +222,7 @@ export class PluginModule {
         PluginMqttService,
         NpmPluginService,
         PluginAdministrationService,
+        PluginUninstallService,
         PluginClassificationService,
         PluginLiveUpdatesService,
         PluginSystemEventsBridge,

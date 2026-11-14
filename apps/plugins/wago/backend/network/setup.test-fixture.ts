@@ -10,7 +10,7 @@ import { WagoCommissioningSession } from '../commissioning/sessions/session.enti
 import { WagoCredentialRotationEntity } from '../credentials/service';
 import { WagoManagedRuntimeService } from '../runtime/managed/service';
 import { WagoService } from '../controllers/service';
-import { WagoRuntimeArtifactsService } from '../runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../runtime/artifacts/service';
 import { WagoCommissioningReadiness } from '../commissioning/readiness/readiness';
 import { RuntimeUpdateError } from '../runtime/update/coordinator';
 import { managedSsh } from '../runtime/managed/transport/ssh';
