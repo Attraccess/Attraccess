@@ -132,8 +132,8 @@ export const TEMPLATE_SPECS = [
   {
     id: 'removed',
     label: {
-      en: 'Booking removed (reservations switched off)',
-      de: 'Reservierung entfernt (Reservierungen deaktiviert)',
+      en: 'Booking removed (reservations switched off or machine capacity reduced)',
+      de: 'Reservierung entfernt (Reservierungen deaktiviert oder Maschinenplätze reduziert)',
     },
     subject: { en: 'Booking removed: {resource}', de: 'Reservierung entfernt: {resource}' },
     paragraphs: [
@@ -141,6 +141,13 @@ export const TEMPLATE_SPECS = [
         'body',
         'Reservations were switched off for <strong>{resource}</strong>, so your booking ({when}) was cancelled.',
         'Reservierungen wurden für <strong>{resource}</strong> deaktiviert, daher wurde deine Reservierung ({when}) storniert.',
+        'unless:removal.capacity',
+      ],
+      [
+        'body_capacity',
+        '<strong>{resource}</strong> now has fewer slots, so your booking ({when}) was cancelled because the time is fully booked.',
+        '<strong>{resource}</strong> hat jetzt weniger Plätze, daher wurde deine Reservierung ({when}) storniert, weil der Zeitraum voll belegt ist.',
+        'if:removal.capacity',
       ],
     ],
   },

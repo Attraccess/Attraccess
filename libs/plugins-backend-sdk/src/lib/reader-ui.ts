@@ -7,6 +7,7 @@
  * parity test keeps both in sync.
  */
 
+import type { EntityManager } from 'typeorm';
 import type { PluginAccessPrincipal } from './plugin-resource-access';
 
 export type ReaderUiTone = 'primary' | 'success' | 'warning' | 'danger';
@@ -295,6 +296,47 @@ export interface PluginStartBlockedApi {
   /** Open resource pages ask again. Call it when bookings or rules that decide the block change. */
   invalidate(scope: { resourceId: number }): void;
 }
+
+export interface StartCapacityContext {
+  resourceId: number;
+  /** The starter. */
+  userId: number;
+  /** The starter as a `resourceAccess` principal (see {@link PreStartContext.principal}). */
+  principal: PluginAccessPrincipal;
+  /**
+   * The host's serialized start transaction. Read through it and never start `runSerialized` inside the hook: the
+   * transaction would wait for itself.
+   */
+  manager: EntityManager;
+  /** Always `start` for now: the hook only runs when a start adds a session. */
+  action: 'start' | 'takeover';
+  origin: PreStartOrigin;
+  /** Effective session limit of the machine (always above 1 here). */
+  sessionLimit: number;
+  /** Slots taken by sessions and by starts that are in progress, read in the same transaction. */
+  occupiedSlots: number;
+  /** Only this plugin's step keys confirmed in the same start attempt. */
+  confirmedStepKeys: string[];
+  /** Language for texts: the card user's on a reader, the user's preferred language elsewhere. */
+  language: 'en' | 'de';
+  now: Date;
+}
+
+export interface StartCapacityResult {
+  /** Slots the plugin holds back from this starter (a non-negative integer). */
+  heldSlots: number;
+  /** Shown when the host refuses the start because `occupiedSlots + heldSlots` reaches the limit. */
+  reason?: PluginBlockReason;
+}
+
+/**
+ * Atomic capacity counterpart of `preStartHook`: on machines with more than one parallel session the host calls it
+ * INSIDE the serialized start transaction, after its own capacity check. The host refuses the start with the plugin's
+ * block reason when `occupiedSlots + heldSlots >= sessionLimit`, so simultaneous starts can never take a held slot.
+ * Keep it to one indexed query on `ctx.manager`. Failure, timeout and an open breaker follow the per-resource failure
+ * policy of the plugin, like `preStartHook`. Requires ACCESS_HOOKS.
+ */
+export type StartCapacityHook = (ctx: StartCapacityContext) => StartCapacityResult | Promise<StartCapacityResult>;
 
 export interface SessionEndContext {
   resourceId: number;

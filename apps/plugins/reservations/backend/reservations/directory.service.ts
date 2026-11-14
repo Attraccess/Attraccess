@@ -1,7 +1,10 @@
 import { Resource, User } from '@attraccess/plugins-backend-sdk';
+import type { PluginActiveSession } from '@attraccess/plugins-backend-sdk';
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable } from '@nestjs/common';
+import type { EntityManager } from 'typeorm';
 import { PLUGIN_CONTEXT } from '../constants';
+import { sessionLimitOf } from './capacity';
 
 export interface ResourceSummary {
   id: number;
@@ -18,6 +21,20 @@ export class DirectoryService {
       .getRepository(Resource)
       .findOne({ where: { id: resourceId }, select: { id: true, name: true } });
     return row ? { id: row.id, name: row.name } : null;
+  }
+
+  /** Effective session limit (core's rule): 1 for doors, unknown resources and machines without parallel sessions. */
+  async getSessionLimit(resourceId: number, manager?: EntityManager): Promise<number> {
+    const row = await (manager ? manager.getRepository(Resource) : this.context.getRepository(Resource)).findOne({
+      where: { id: resourceId },
+      select: { id: true, type: true, maxParallelSessions: true },
+    });
+    return sessionLimitOf(row);
+  }
+
+  /** Running sessions on the resource, earliest first. */
+  getActiveSessions(resourceId: number): Promise<PluginActiveSession[]> {
+    return this.context.resourceAccess.getActiveSessions(resourceId);
   }
 
   async getResourceNames(resourceIds: number[]): Promise<Map<number, string>> {

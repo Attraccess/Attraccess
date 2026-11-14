@@ -48,6 +48,49 @@ const context = (extra: Partial<SlotContext> = {}): SlotContext => ({
   ...extra,
 });
 
+describe('checkWindow on shared resources', () => {
+  const shared = (slots: number, reservations: Reservation[]) => context({ slots, reservations });
+  const book = (sh: number, eh: number, extra: Partial<Reservation> = {}) => reservation(at(2, sh), at(2, eh), extra);
+
+  it('allows overlap until all slots are taken', () => {
+    const two = [book(10, 12, { id: 1 }), book(10, 12, { id: 2 })];
+    expect(checkWindow(shared(3, two), at(2, 10), at(2, 11))).toBeNull();
+    expect(checkWindow(shared(2, two), at(2, 10), at(2, 11))).toBe('OVERLAP');
+  });
+
+  it('counts the peak concurrency, not the number of overlapping bookings', () => {
+    const sequential = [book(10, 11, { id: 1 }), book(11, 12, { id: 2 })];
+    expect(checkWindow(shared(2, sequential), at(2, 10), at(2, 12))).toBeNull();
+    expect(checkWindow(shared(1, sequential), at(2, 10), at(2, 12))).toBe('OVERLAP');
+    const staggered = [book(10, 11, { id: 1 }), book(10, 12, { id: 2 }), book(11, 12, { id: 3 })];
+    expect(checkWindow(shared(2, staggered), at(2, 10), at(2, 12))).toBe('OVERLAP');
+  });
+
+  it('ignores inactive bookings and respects buffers', () => {
+    const cancelled = [book(10, 12, { status: 'cancelled' })];
+    expect(checkWindow(shared(1, cancelled), at(2, 10), at(2, 11))).toBeNull();
+    const buffered = [book(10, 11, { bufferAfterMinutes: 30 })];
+    expect(checkWindow(shared(1, buffered), at(2, 11), at(2, 12))).toBe('OVERLAP');
+    expect(checkWindow(shared(2, buffered), at(2, 11), at(2, 12))).toBeNull();
+  });
+
+  it('rejects overlap with an own booking even when a slot is free', () => {
+    const own = [book(10, 12, { mine: true })];
+    expect(checkWindow(shared(3, own), at(2, 11), at(2, 13))).toBe('OWN_OVERLAP');
+    expect(checkWindow(shared(3, own), at(2, 12), at(2, 13))).toBeNull();
+    expect(checkWindow(shared(1, own), at(2, 11), at(2, 13))).toBe('OVERLAP');
+  });
+
+  it('offers only windows with a free slot', () => {
+    const full = [book(10, 11, { id: 1 }), book(10, 11, { id: 2 })];
+    const ctx = shared(2, full);
+    expect(validDurations(ctx, at(2, 9))).toEqual([30, 45, 60]);
+    expect(validStarts(ctx, { year: 2030, month: 6, day: 2 }).some((d) => d.getTime() === at(2, 10).getTime())).toBe(
+      false,
+    );
+  });
+});
+
 describe('checkWindow', () => {
   it('accepts a free, on-grid window and reports each violated rule', () => {
     expect(checkWindow(context(), at(2, 10), at(2, 11))).toBeNull();

@@ -32,6 +32,7 @@ const availability: Availability = {
   },
   reservations: [],
   maintenance: [],
+  slots: 1,
 };
 
 vi.setConfig({ testTimeout: 30_000 });

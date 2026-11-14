@@ -10,6 +10,7 @@ import { Clock, READER_HORIZON_MS, RESERVATION_CLOCK } from '../constants';
 import type { ReservationEntity } from '../entities/reservation.entity';
 import { hookDeadline, waitUntil } from '../hooks/runtime';
 import { AccessService } from '../reservations/access.service';
+import { heldBookings } from '../reservations/capacity';
 import { DirectoryService } from '../reservations/directory.service';
 import { ReservationStore } from '../reservations/reservation.store';
 import { GlobalSettingsService } from '../settings/global-settings.service';
@@ -80,19 +81,27 @@ export class ReaderUiService {
     const early = settings.earlyCheckInMinutes * MINUTE_MS;
     const running = bookings.find((r) => r.startTime.getTime() <= nowMs);
     const upcoming = bookings.filter((r) => r.startTime.getTime() > nowMs);
+    const limit = await this.directory.getSessionLimit(ctx.resourceId);
+    const shared = limit > 1 ? await this.sharedSlots(ctx, bookings, limit, now) : null;
 
     // The booking the details are about: your own running one, else the running one, else the next one.
     const own = userId === undefined ? undefined : this.ownBooking(userId, running, upcoming, nowMs, early);
-    const subject = own ?? running ?? upcoming[0];
-    if (!subject) return [];
+    // On a shared machine a running booking only shows as a warning when it holds the last free slot; while slots
+    // remain, a short count replaces it, and an upcoming booking shows only if it would lack its slot.
+    const subject = this.subjectOf(own, running, upcoming, shared);
+    if (!subject && !(shared && shared.reserved > 0)) return [];
 
     const nameOf = this.nameResolver(ctx);
-    const holder = own ? undefined : await nameOf(subject);
-    const state = this.describe(subject, running === subject, settings, clock, holder, own !== undefined);
+    const holder = !subject || own ? undefined : await nameOf(subject);
+    const state = subject
+      ? this.describe(subject, subject.startTime.getTime() <= nowMs, settings, clock, holder, own !== undefined)
+      : this.reservedCount(shared?.reserved ?? 0, limit, bookings, nowMs, clock);
     // The next start changes the state even when the details are about another booking (your own one in
     // the early check-in window), and local midnight changes the weekday prefix of the times.
     const boundaries = [state.boundary, nextLocalMidnight(now, clock.timeZone).getTime()];
     if (upcoming[0]) boundaries.push(upcoming[0].startTime.getTime());
+    // Every start and end changes the number of reserved slots on a shared machine.
+    if (shared) boundaries.push(...bookings.flatMap((r) => [r.startTime.getTime(), r.endTime.getTime()]));
     const contributions: ReaderSlotContribution[] = [];
 
     const add = (
@@ -113,22 +122,14 @@ export class ReaderUiService {
 
     // Session area (card session while a usage runs): another user's booking starts within the confirm window.
     // The reader shows that slot only while a usage is active, so an idle resource keeps the text in the body.
-    let sessionBooking: ReservationEntity | undefined;
-    if (ctx.sessionActive === true && userId !== undefined && settings.confirmWindowMinutes > 0) {
-      const window = settings.confirmWindowMinutes * MINUTE_MS;
-      const next = upcoming.find((r) => r.userId !== userId && r.startTime.getTime() - nowMs <= window);
-      if (next) sessionBooking = next;
-      else {
-        // The confirm window opens later: re-evaluate then.
-        const opens = upcoming.find((r) => r.userId !== userId);
-        if (opens) boundaries.push(opens.startTime.getTime() - window);
-      }
-    }
+    const countdown = this.sessionCountdown(ctx, settings, upcoming, shared, nowMs);
+    const sessionBooking = countdown.next;
+    if (countdown.opensAt !== undefined) boundaries.push(countdown.opensAt);
 
     // One fact, one block: a booking appears in exactly one details slot. While a usage runs the session slot is
     // the most specific, so when it shows the subject booking the body stays silent; idle, the body carries it
     // (there is no header at all).
-    if (subject !== sessionBooking) {
+    if (subject !== sessionBooking || !subject) {
       // One text node per clause: the reader wraps each on its own, so a time or the check-in note never dangles.
       const lines = state.body.map((text): ReaderUiNode => ({ t: 'text', text, style: 'body' }));
       add(
@@ -141,21 +142,8 @@ export class ReaderUiService {
     if (sessionBooking) {
       const next = sessionBooking;
       const sessionHolder = next === subject ? holder : await nameOf(next);
-      const texts = readerTexts.sessionReserved(next.startTime, next.endTime, clock, sessionHolder);
-      const lines = texts.map((text): ReaderUiNode => ({ t: 'text', text, style: 'small', fill: true }));
-      add(
-        SLOT.RESOURCE_DETAILS_SESSION,
-        'reserved-soon',
-        {
-          t: 'row',
-          c: [
-            lines.length === 1 ? lines[0] : { t: 'col', gap: 0, fill: true, c: lines },
-            { t: 'countdown', to: next.startTime, tone: 'warning' },
-          ],
-        },
-        texts.join(' '),
-        'warning',
-      );
+      const { tree, text } = this.sessionTree(next, clock, sessionHolder);
+      add(SLOT.RESOURCE_DETAILS_SESSION, 'reserved-soon', tree, text, 'warning');
       boundaries.push(next.startTime.getTime());
     }
     if (userId !== undefined && upcoming.length > 0 && !own) {
@@ -165,6 +153,125 @@ export class ReaderUiService {
 
     const expiresAt = new Date(Math.min(...boundaries.filter((at) => at > nowMs)));
     return contributions.map((c) => ({ ...c, expiresAt }));
+  }
+
+  /**
+   * The slot picture of a shared machine: sessions and the bookings that hold slots for the viewer's disadvantage.
+   * `blocker`: the running booking to name when no free slot is left for the viewer (a signed-out reader counts as
+   * nobody); `reserved`: running bookings (one per person); `nextLacking`: the next booking that would find no slot
+   * at its start; `lacksSlotWith`: whether a booking would lack its slot if the viewer's session keeps running.
+   */
+  private async sharedSlots(
+    ctx: ReaderUiContext,
+    bookings: ReservationEntity[],
+    limit: number,
+    now: Date,
+  ): Promise<{
+    blocker: ReservationEntity | undefined;
+    reserved: number;
+    nextLacking: ReservationEntity | undefined;
+    lacksSlotWith: (booking: ReservationEntity, viewerId: number | undefined) => boolean;
+  }> {
+    const nowMs = now.getTime();
+    const sessions = await this.directory.getActiveSessions(ctx.resourceId);
+    const inSession = new Set(sessions.map((session) => session.userId));
+    const running = bookings.filter((r) => r.startTime.getTime() <= nowMs);
+    const viewerId = ctx.userId ?? -1;
+    const held = heldBookings({ confirmed: running, starterId: viewerId, inSession, at: now });
+    const ownRunning = running.some((r) => r.userId === viewerId);
+    const free = limit - sessions.length - held.length;
+    const lacksSlotWith = (booking: ReservationEntity, viewer: number | undefined) =>
+      sessions.length +
+        heldBookings({ confirmed: bookings, starterId: viewer ?? -1, inSession, at: booking.startTime }).length >
+      limit;
+    return {
+      blocker: !ownRunning && held.length > 0 && free <= 0 ? held[0] : undefined,
+      reserved: new Set(running.map((r) => r.userId)).size,
+      nextLacking: bookings.find(
+        (r) =>
+          r.startTime.getTime() > nowMs &&
+          r.userId !== ctx.userId &&
+          // Starting now takes one more slot (a signed-out reader has no starter yet).
+          sessions.length +
+            (ctx.userId === undefined ? 0 : 1) +
+            heldBookings({ confirmed: bookings, starterId: viewerId, inSession, at: r.startTime }).length >
+            limit,
+      ),
+      lacksSlotWith,
+    };
+  }
+
+  /** Bookings run but slots remain: a short success text with the count (Latin-1, within the row limit). */
+  private reservedCount(
+    reserved: number,
+    limit: number,
+    bookings: ReservationEntity[],
+    nowMs: number,
+    clock: ReaderClock,
+  ): { row: string; body: string[]; tone: ReaderUiTone; boundary: number } {
+    const ends = bookings.filter((r) => r.startTime.getTime() <= nowMs).map((r) => r.endTime.getTime());
+    return {
+      row: readerTexts.rowSlotsReserved(reserved, limit, clock),
+      body: [readerTexts.slotsReserved(reserved, limit, clock)],
+      tone: 'success',
+      boundary: Math.min(...ends),
+    };
+  }
+
+  /**
+   * The booking the details are about. On a shared machine a running booking only shows as a warning when it holds
+   * the last free slot; while slots remain a short count replaces it (no subject), and an upcoming booking shows only
+   * if it would lack its slot.
+   */
+  private subjectOf(
+    own: ReservationEntity | undefined,
+    running: ReservationEntity | undefined,
+    upcoming: ReservationEntity[],
+    shared: { blocker?: ReservationEntity; reserved: number; nextLacking?: ReservationEntity } | null,
+  ): ReservationEntity | undefined {
+    if (!shared) return own ?? running ?? upcoming[0];
+    return own ?? shared.blocker ?? (shared.reserved > 0 ? undefined : shared.nextLacking);
+  }
+
+  /**
+   * Session area: another user's booking that starts within the confirm window (on a shared machine only one the
+   * viewer's session would leave without a slot), or when the window opens for the next one.
+   */
+  private sessionCountdown(
+    ctx: ReaderUiContext,
+    settings: ResourceSettings,
+    upcoming: ReservationEntity[],
+    shared: { lacksSlotWith(booking: ReservationEntity, viewerId: number | undefined): boolean } | null,
+    nowMs: number,
+  ): { next?: ReservationEntity; opensAt?: number } {
+    const userId = ctx.userId;
+    if (ctx.sessionActive !== true || userId === undefined || settings.confirmWindowMinutes <= 0) return {};
+    const window = settings.confirmWindowMinutes * MINUTE_MS;
+    const needsSlot = (r: ReservationEntity) => r.userId !== userId && (!shared || shared.lacksSlotWith(r, userId));
+    const next = upcoming.find((r) => needsSlot(r) && r.startTime.getTime() - nowMs <= window);
+    if (next) return { next };
+    const opens = upcoming.find(needsSlot);
+    return opens ? { opensAt: opens.startTime.getTime() - window } : {};
+  }
+
+  /** The session-area row: the booking's range and a countdown to its start. */
+  private sessionTree(
+    next: ReservationEntity,
+    clock: ReaderClock,
+    holder: string | undefined,
+  ): { tree: ReaderUiNode; text: string } {
+    const texts = readerTexts.sessionReserved(next.startTime, next.endTime, clock, holder);
+    const lines = texts.map((text): ReaderUiNode => ({ t: 'text', text, style: 'small', fill: true }));
+    return {
+      tree: {
+        t: 'row',
+        c: [
+          lines.length === 1 ? lines[0] : { t: 'col', gap: 0, fill: true, c: lines },
+          { t: 'countdown', to: next.startTime, tone: 'warning' },
+        ],
+      },
+      text: texts.join(' '),
+    };
   }
 
   /** Your own booking while it runs or within the early check-in window before it starts. */

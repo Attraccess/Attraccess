@@ -5,7 +5,7 @@ import type { MqttCredentialProvisioningProviderFactory } from './mqtt-credentia
 import type { PluginAuditDomainDeclaration } from './plugin-audit';
 import type { PluginFlowNodeDefinition } from './plugin-flow-node';
 import type { PluginEmailTemplate, PluginNotificationCategory } from './plugin-notifications';
-import type { PreStartHook, ReaderUiProvider, SessionEndHook, StartBlockedQuery } from './reader-ui';
+import type { PreStartHook, ReaderUiProvider, SessionEndHook, StartBlockedQuery, StartCapacityHook } from './reader-ui';
 
 /**
  * Shape every backend plugin's default export must satisfy. The host calls
@@ -57,6 +57,12 @@ export interface PluginBackendModule {
    * shows in place of the start button. Informational; the pre-start hook stays the gate. Requires ACCESS_HOOKS.
    */
   startBlockedQuery?: StartBlockedQuery;
+
+  /**
+   * Optional atomic capacity hook: tells the host how many slots of a shared machine the plugin holds back from the
+   * starter. The host evaluates it inside its serialized start transaction. Requires ACCESS_HOOKS.
+   */
+  startCapacityHook?: StartCapacityHook;
 
   /** Optional advisory hook after a session ended. Requires ACCESS_HOOKS. */
   sessionEndHook?: SessionEndHook;

@@ -67,6 +67,7 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
       on(SystemEvent.RESOURCE_USAGE_SESSION_ENDED, (p) => this.onSessionEnded(p)),
       on(SystemEvent.MAINTENANCE_CHANGED, (p) => this.onMaintenance(p)),
       on(SystemEvent.RESOURCE_HEALTH_CHANGED, (p) => this.onHealth(p)),
+      on(SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED, (p) => this.onSessionLimitChanged(p)),
     ];
   }
 
@@ -131,6 +132,17 @@ export class ReservationEventHandlers implements OnModuleInit, OnModuleDestroy {
     if (event.reason !== 'ended') return;
     const own = (await this.store.findActiveForResource(event.resourceId, now)).find((r) => r.userId === event.userId);
     if (own) this.decisions.record(event.userId, event.resourceId, own.id, now.getTime());
+  }
+
+  // ------------------------------------------------------------ session limit
+
+  /**
+   * The machine lost slots: cancel the newest not-yet-started bookings that no longer fit (see
+   * `ReservationService.cancelExcessBookings`). A higher limit cancels nothing.
+   */
+  async onSessionLimitChanged(event: SystemEventPayload[SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED]): Promise<void> {
+    if (event.newLimit >= event.previousLimit) return;
+    await this.reservations.cancelExcessBookings(event.resourceId, event.actorUserId);
   }
 
   // ------------------------------------------------------------- maintenance

@@ -13,6 +13,7 @@ export const BOOKING_CONFLICT_CODES = [
   'OUTSIDE_BOOKABLE_HOURS',
   'USER_BOOKING_LIMIT',
   'OVERLAP',
+  'OWN_OVERLAP',
   'MAINTENANCE',
 ] as const;
 export type BookingConflictCode = (typeof BOOKING_CONFLICT_CODES)[number];

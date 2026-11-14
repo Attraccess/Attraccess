@@ -48,6 +48,7 @@
     "OUTSIDE_BOOKABLE_HOURS": "Der Zeitraum liegt außerhalb der buchbaren Zeiten.",
     "USER_BOOKING_LIMIT": "Du hast die maximale Anzahl aktiver Buchungen für diese Ressource erreicht.",
     "OVERLAP": "Der Zeitraum überschneidet sich mit einer anderen Buchung. Bitte wähle eine andere Zeit.",
+    "OWN_OVERLAP": "Du hast in diesem Zeitraum bereits eine Buchung. Bitte wähle eine andere Zeit.",
     "MAINTENANCE": "Die Ressource ist in dieser Zeit in Wartung.",
     "NOT_PENDING": "Diese Buchung wartet nicht mehr auf Genehmigung.",
     "NOT_ACTIVE": "Diese Buchung ist nicht aktiv.",
@@ -86,6 +87,7 @@
     "free": "Keine Buchungen",
     "reserved": "Reserviert",
     "reservedPending": "Reserviert (wartet auf Genehmigung)",
+    "slotsBooked": "{{booked}} von {{total}} belegt",
     "yours": "Deine Buchung",
     "maintenance": "Wartung",
     "openEnd": "offenes Ende"

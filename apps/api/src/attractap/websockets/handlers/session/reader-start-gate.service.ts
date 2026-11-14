@@ -14,7 +14,7 @@ import { UiStepService } from '../ui/ui-step.service';
 import type { CardSessionState } from '../ui/ui-socket-state';
 
 export type StartGateResult =
-  | { kind: 'proceed'; warning?: boolean }
+  | { kind: 'proceed'; warning?: boolean; satisfied: Record<string, string[]>; language?: 'en' | 'de' }
   /** Reply to the START with this payload (the session does not start). */
   | { kind: 'reply'; payload: Record<string, unknown> }
   /** A step is open: the START stays unanswered until it is answered, cancelled or expires. */
@@ -63,7 +63,7 @@ export class ReaderStartGate {
       if ('error' in used) return blocked(hostReason(used.error, card?.language));
       satisfied = used.satisfied;
     }
-    if (!this.preStart.hasHooks()) return { kind: 'proceed' };
+    if (!this.preStart.hasHooks()) return { kind: 'proceed', satisfied, language: card?.language };
 
     const outcome = await this.preStart.evaluate({
       resourceId: input.resourceId,
@@ -77,7 +77,7 @@ export class ReaderStartGate {
       language: card?.language,
       satisfied,
     });
-    if (outcome.decision === 'allow') return { kind: 'proceed' };
+    if (outcome.decision === 'allow') return { kind: 'proceed', satisfied, language: card?.language };
     if (outcome.decision === 'block') return blocked(outcome.reason);
     return this.confirm(socket, input, { ...outcome, action, satisfied, card });
   }
@@ -134,7 +134,9 @@ export class ReaderStartGate {
       reasonCode: usable ? 'no-screen' : 'no-ui',
       policy,
     });
-    if (policy === 'allow-with-warning') return { kind: 'proceed', warning: true };
+    if (policy === 'allow-with-warning') {
+      return { kind: 'proceed', warning: true, satisfied: ctx.satisfied, language: card?.language };
+    }
     if (policy === 'card-confirm' && usable && caps.steps.includes('card-confirm')) {
       if (this.steps.issueStart(socket, { ...spec, cardConfirm: true })) return { kind: 'held' };
     }
@@ -167,7 +169,9 @@ export class ReaderStartGate {
   }
 
   /** Validated on READER_FIRMWARE_INFO; the stored firmware info only before that message arrived. */
-  private async capabilities(socket: AuthenticatedWebSocket): Promise<{ schemaVersion: number; steps: string[] } | null> {
+  private async capabilities(
+    socket: AuthenticatedWebSocket,
+  ): Promise<{ schemaVersion: number; steps: string[] } | null> {
     if (socket.state.uiSlots) return socket.state.uiSlots.capabilities;
     const reader = await this.attractapService.findReaderById(socket.readerId as number);
     const ui = reader?.firmware?.capabilities?.ui as { schemaVersion: number; steps: string[] } | null | undefined;

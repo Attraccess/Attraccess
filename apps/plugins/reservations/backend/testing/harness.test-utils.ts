@@ -44,6 +44,7 @@ interface AccessState {
   introduced: Map<number, number[]>; // userId -> resourceIds
   maintained: Map<number, number[]>; // extra maintained ids (besides makeManager)
   attribution: Map<number, Set<number>>; // userId -> resourceIds whose users' names they may see
+  limits: Map<number, number>; // effective session limit per resource (default 1)
   hidden: Set<number>; // resourceIds only in hidden groups (invisible to everyone in these tests)
 }
 
@@ -70,6 +71,7 @@ export async function createHarness() {
     introduced: new Map(),
     maintained: new Map(),
     attribution: new Map(),
+    limits: new Map(),
     hidden: new Set(),
   };
   const dispatch = jest.fn(async (_request: unknown) => undefined);
@@ -161,6 +163,8 @@ export async function createHarness() {
   const directory = {
     getResource: async (id: number) => (knownResources.has(id) ? { id, name: `Resource ${id}` } : null),
     getResourceNames: async (ids: number[]) => new Map(ids.map((id) => [id, `Resource ${id}`])),
+    getSessionLimit: async (id: number) => state.limits.get(id) ?? 1,
+    getActiveSessions: async (id: number) => state.sessions.filter((session) => session.resourceId === id),
     getUserNames: async (ids: number[]) => new Map(ids.map((id) => [id, `user${id}`])),
   } as unknown as DirectoryService;
 
@@ -231,6 +235,10 @@ export async function createHarness() {
     /** Enables reservations for the resource with `can-start` replaced by any-user unless overridden. */
     async enable(resourceId: number, patch: Partial<ResourceSettingsValues> = {}) {
       await settings.update(resourceId, { enabled: true, whoCanBook: 'any-user', ...patch });
+    },
+    /** Effective session limit of the resource (what core's `sessionLimitOf` answers). */
+    setLimit(resourceId: number, limit: number) {
+      state.limits.set(resourceId, limit);
     },
     makeManager(userId: number, resourceId: number) {
       state.maintainers.set(userId, new Set([...(state.maintainers.get(userId) ?? []), resourceId]));

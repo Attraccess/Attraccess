@@ -28,6 +28,8 @@ import { CreateResourceDto } from './dtos/createResource.dto';
 
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 
+import { ResourceSessionLimitChangedEvent } from './events/resource-session-limit-changed.event';
+import { sessionLimitOf } from './usage/sessions/active-usage';
 import { ResourceChangedEvent } from './events/resource-changed.event';
 
 import { AUDIT_DETAILS_BYTE_LIMIT, fitAuditText, fitAuditTexts } from '../audit/policies/projection';
@@ -436,6 +438,14 @@ export class ResourcesService {
 
     const updatedResource = await this.resourceRepository.save(resource);
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(updatedResource.id));
+    const previousLimit = sessionLimitOf(before);
+    const newLimit = sessionLimitOf(updatedResource);
+    if (previousLimit !== newLimit) {
+      this.eventEmitter.emit(
+        ResourceSessionLimitChangedEvent.EVENT_NAME,
+        new ResourceSessionLimitChangedEvent(updatedResource.id, previousLimit, newLimit, actor?.id ?? null),
+      );
+    }
     if (actor) {
       const details = resourceUpdateAuditDetails(before, updatedResource);
       if (Object.keys(details).length) {
