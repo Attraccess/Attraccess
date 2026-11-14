@@ -2,7 +2,7 @@
   "charts": {
     "title": "Nutzungstrends",
     "timeSeries": {
-      "title": "Minuten vs. Ausgaben",
+      "title": "Stunden vs. Ausgaben",
       "empty": "Nicht genug Historie für ein Diagramm"
     },
     "topResources": {
@@ -14,14 +14,17 @@
       "columns": {
         "resource": "Ressource",
         "sessions": "Sitzungen",
-        "minutes": "Minuten",
+        "personHours": "Personenstunden",
+        "machineHours": "Maschinenstunden",
         "spend": "Ausgaben"
       }
     }
   },
   "tooltip": {
     "sessions": "Sitzungen",
-    "minutes": "Minuten",
+    "hours": "Stunden",
+    "personHours": "Personenstunden",
+    "machineHours": "Maschinenstunden",
     "spend": "Ausgaben"
   }
 }

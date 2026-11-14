@@ -17,7 +17,7 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.11.0"
+    "min": "1.11.0-0"
   },
   "permissions": ["DATABASE_ACCESS", "MANAGE_SECRETS"]
 }

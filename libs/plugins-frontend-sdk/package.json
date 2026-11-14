@@ -25,6 +25,6 @@
     "lib"
   ],
   "peerDependencies": {
-    "@attraccess/plugins-frontend-ui": "^1.11.0"
+    "@attraccess/plugins-frontend-ui": "^1.11.0-0"
   }
 }

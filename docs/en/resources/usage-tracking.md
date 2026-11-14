@@ -1,4 +1,5 @@
 # Usage Tracking
+
 <!-- llms-description: How usage sessions are started, ended, shared between users, linked to projects and reviewed in the usage history. -->
 
 Attraccess tracks who uses which resource and when. Every usage session is recorded in the resource's usage history.
@@ -60,6 +61,18 @@ For example, a machine uses 8 kWh at 30 credits per kWh. Person A is alone for 2
 On receipts and in the billing history, a shared session shows the person's share against the total (for example "0.8 — your share of 2.4") with a **Shared** marker and a breakdown of every segment the person was in. See [Billing transactions](billing/transactions.md#shared-sessions). While the session runs, the live session billing view shows the meter share so far (for example "0.8 — your share of 1.2 so far"), marked "provisional until the next reading", and the same breakdown with the open segment marked provisional; it shows no **Shared** marker.
 
 With a limit of 1, nothing changes. If a limit is lowered while sessions are running, overlapping sessions are still split fairly. If it is raised during a solo session, that session joins the segments from the moment others start.
+
+### Machine hours and person hours
+
+Reports show these figures separately, so that people using a shared machine at the same time are not counted as extra machine time:
+
+- **Person hours**: the duration of every session added up. If A uses the machine from 10:00 to 12:00 and B from 11:00 to 13:00, this is 4 hours.
+- **Machine hours with a session**: the time in which at least one session was running on the machine. Overlapping sessions count once, so the example gives 3 hours.
+- **Machine running time**: the time the machine was recorded as running (see [Flows](flows/node-types.md)), where operating data exists. It also includes time without a session.
+
+On a machine with **Max parallel sessions** of 1, person hours and machine hours with a session are equal. The project statistics call machine hours with a session simply **Machine hours**.
+
+You find the figures in the **Operating duration** card on the resource [detail page](resources/resource-details.md), on the statistics of a [project](projects/overview.md#usage-statistics), and in the [Resource hours summary export](resources/csv-export.md#resource-hours-summary). This only changes what is reported: how running time is attributed to individual sessions, and billing, stay as described above.
 
 ## Linking Sessions to Projects
 

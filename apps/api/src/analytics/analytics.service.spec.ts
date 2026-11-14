@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsService } from './analytics.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BillingTransaction, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
+import { BillingTransaction, Resource, ResourceUsage, ResourceUsageAction } from '@attraccess/database-entities';
 import { Between, Repository } from 'typeorm';
 import { DateRangeValue } from './dtos/dateRangeValue';
 import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
@@ -32,6 +32,7 @@ describe('AnalyticsService', () => {
           provide: getRepositoryToken(BillingTransaction),
           useValue: mockBillingRepository,
         },
+        { provide: getRepositoryToken(Resource), useValue: {} },
         {
           provide: ResourceOperatingAttributionService,
           useValue: operatingAttributionService,

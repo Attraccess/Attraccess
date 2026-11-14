@@ -1,0 +1,17 @@
+{
+  "columns": {
+    "resourceId": "Ressourcen-ID",
+    "resourceName": "Ressourcen-Name",
+    "sessions": "Sitzungen",
+    "personHours": "Personenstunden",
+    "machineHours": "Maschinenstunden mit Sitzung",
+    "machineRunningHours": "Maschinenlaufzeit (Stunden)",
+    "outsideSessionHours": "Laufzeit außerhalb einer Sitzung (Stunden)",
+    "durationStatus": "Status der Betriebsdaten"
+  },
+  "status": {
+    "provisional": "Vorläufig",
+    "unavailable": "Nicht verfügbar"
+  },
+  "metadataField": "Ressourcen-Metadaten: {{key}}"
+}

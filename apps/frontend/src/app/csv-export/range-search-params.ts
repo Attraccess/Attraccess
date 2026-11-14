@@ -6,6 +6,7 @@ import { computeRange, DateBounds, rangeToDateBounds } from './date-range-sectio
 
 export const EXPORT_PATHS = {
   resourceUsageHours: '/csv-export/resource-usage-hours',
+  resourceHoursSummary: '/csv-export/resource-hours-summary',
   billingTransactions: '/csv-export/billing-transactions',
 } as const;
 
