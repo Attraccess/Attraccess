@@ -119,7 +119,9 @@ export class DesktopFixture {
     const digest = createHash('sha256');
     for (const file of files) {
       digest.update(file).update('\0');
-      if (existsSync(join(repositoryRoot, file))) digest.update(readFileSync(join(repositoryRoot, file)));
+      // A submodule is listed as its directory; only file contents count.
+      const path = join(repositoryRoot, file);
+      if (existsSync(path) && statSync(path).isFile()) digest.update(readFileSync(path));
       digest.update('\0');
     }
     writeFileSync(join(this.screenshots, 'revision.txt'), `${revision}\nworking-tree-sha256 ${digest.digest('hex')}\n`);

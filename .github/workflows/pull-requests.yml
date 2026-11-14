@@ -170,6 +170,20 @@ jobs:
           esp-idf: 'false'
       - name: Enforce file size limits
         run: pnpm lint:files
+      # apps/cesentry may only hold the pointer to the private submodule (CONTRIBUTING.md, "Private submodule").
+      - name: Check the private submodule pointer
+        run: node scripts/check-private-submodule.mjs
+      # Public clones have no access to it: `update = none` must make them skip it, with this runner's git.
+      - name: Clone with submodules, without access to the private submodule
+        run: |
+          git --version
+          clone="$RUNNER_TEMP/public-clone"
+          GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+            git -c protocol.file.allow=always clone --quiet --depth 1 --recurse-submodules "file://$PWD" "$clone" 2>&1 \
+            | tee "$RUNNER_TEMP/public-clone.log"
+          grep -q "Skipping submodule 'apps/cesentry'" "$RUNNER_TEMP/public-clone.log"
+          test -z "$(ls -A "$clone/apps/cesentry")"
+          rm -rf "$clone"
       # Every project, not just the affected ones: a change can break a project it
       # does not touch (e.g. plugins-frontend-sdk re-exports plugins-frontend-ui
       # through an edge `implicitDependencies` hides from the project graph).
