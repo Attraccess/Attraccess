@@ -23,6 +23,9 @@ env:
   # any other ref reads but cannot plant artifacts.
   NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
   NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ github.ref == 'refs/heads/main' && secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
+  # nx release publish falls back to npm's `tag` config, which defaults to `latest`. Prereleases
+  # ("1.11.0-beta.0", "prerelease", "preminor", ...) go to `next` so `latest` stays on the newest stable.
+  npm_config_tag: ${{ (contains(inputs.specifier, '-') || startsWith(inputs.specifier, 'pre')) && 'next' || 'latest' }}
 
 jobs:
   release:

@@ -24,12 +24,12 @@
   "peerDependencies": {
     "@attraccess/plugins-backend-sdk": "^1.9.0",
     "@attraccess/plugins-frontend-sdk": "^1.9.0",
-    "@attraccess/plugins-frontend-ui": "^1.11.0"
+    "@attraccess/plugins-frontend-ui": "^1.11.0-0"
   },
   "attraccess": {
     "displayName": "Matter",
     "description": "Matter device support for Attraccess. Secure connection to the Matter sidecar; device features follow.",
-    "host": "^1.11.0",
+    "host": "^1.11.0-0",
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "migrations": "dist/migrations.js",
