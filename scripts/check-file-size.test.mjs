@@ -258,3 +258,27 @@ test('an oversized working copy fails even when the index is compliant', (t) => 
   fails(check(), '"code.ts": 601 lines (maximum 600)');
   succeeds(check('--staged'));
 });
+
+test('submodule gitlinks are skipped whether or not they are checked out', (t) => {
+  const { cwd, git, check } = repository(t);
+  // Gitlink paths with a code extension prove the skip does not depend on the name.
+  const nested = path.join(cwd, 'apps/private.ts');
+  mkdirSync(nested, { recursive: true });
+  const env = fixtureGitEnv();
+  const nestedGit = (...args) => execFileSync('git', args, { cwd: nested, env, stdio: 'pipe' });
+  nestedGit('init', '--quiet');
+  writeFileSync(path.join(nested, 'big.ts'), lines(700));
+  nestedGit('add', '.');
+  nestedGit('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '--quiet', '-m', 'nested');
+  git('add', 'apps/private.ts');
+  git('update-index', '--add', '--cacheinfo', `160000,${git('rev-parse', 'HEAD')},apps/absent.ts`);
+  mkdirSync(path.join(cwd, 'apps/absent.ts'));
+  assert.equal(
+    git('ls-files', '--stage', 'apps')
+      .split('\n')
+      .filter((line) => line.startsWith('160000 ')).length,
+    2,
+  );
+  succeeds(check());
+  succeeds(check('--staged'));
+});
