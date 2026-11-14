@@ -4,9 +4,13 @@
       "title": "Sessions",
       "description": "Completed usage sessions"
     },
-    "minutes": {
-      "title": "Minutes",
-      "description": "Total machine time"
+    "personHours": {
+      "title": "Person hours",
+      "description": "Total duration of all sessions added up"
+    },
+    "machineHours": {
+      "title": "Machine hours",
+      "description": "Time with at least one session running"
     },
     "spend": {
       "title": "Spend",

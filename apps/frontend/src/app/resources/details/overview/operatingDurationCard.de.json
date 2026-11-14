@@ -1,6 +1,7 @@
 {
   "title": "Betriebsdauer",
-  "session": "Gesamte Sitzungszeit",
+  "session": "Maschinenstunden mit Sitzung",
+  "person": "Personenstunden",
   "operating": "Maschinenlaufzeit",
   "unattributedOperating": "Laufzeit außerhalb einer Sitzung",
   "running": "Maschine läuft gerade",

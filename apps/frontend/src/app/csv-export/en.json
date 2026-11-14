@@ -45,6 +45,10 @@
       "title": "Resource Usage",
       "description": "Bookings and usage hours per resource."
     },
+    "resourceHoursSummary": {
+      "title": "Resource Hours Summary",
+      "description": "Person hours, machine hours and running time per resource."
+    },
     "billingTransactions": {
       "title": "Billing Transactions",
       "description": "Payments, refunds and status per user."

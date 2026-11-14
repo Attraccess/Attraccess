@@ -45,6 +45,10 @@
       "title": "Ressourcennutzung",
       "description": "Buchungen und Nutzungsstunden je Ressource."
     },
+    "resourceHoursSummary": {
+      "title": "Ressourcen-Stundenübersicht",
+      "description": "Personenstunden, Maschinenstunden und Laufzeit je Ressource."
+    },
     "billingTransactions": {
       "title": "Zahlungen",
       "description": "Zahlungen, Gutschriften und Status je Nutzer."

@@ -13,6 +13,7 @@ describe('AnalyticsController', () => {
     getResourceUsageHoursInDateRange: jest.fn(),
     getBillingTransactionsInDateRange: jest.fn(),
     getResourceOperatingDurations: jest.fn(),
+    getResourceHoursSummaryInDateRange: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -135,6 +136,28 @@ describe('AnalyticsController', () => {
     expect(service.getResourceOperatingDurations).toHaveBeenCalledWith(body.resourceIds, {
       start: body.start,
       end: body.end,
+    });
+  });
+
+  describe('getResourceHoursSummaryInDateRange', () => {
+    it('returns the summary rows with pagination info', async () => {
+      const query = Object.assign(new AnalyticsQueryDto(), {
+        start: new Date('2023-01-01'),
+        end: new Date('2023-01-31'),
+        page: 1,
+        limit: 2,
+      });
+      const rows = [{ resourceId: 1 }, { resourceId: 2 }];
+      mockAnalyticsService.getResourceHoursSummaryInDateRange.mockResolvedValue([rows, 3]);
+
+      const result = await controller.getResourceHoursSummaryInDateRange(query);
+
+      expect(service.getResourceHoursSummaryInDateRange).toHaveBeenCalledWith(
+        { start: query.start, end: query.end },
+        1,
+        2,
+      );
+      expect(result).toEqual({ data: rows, total: 3, page: 1, limit: 2, nextPage: 2 });
     });
   });
 });

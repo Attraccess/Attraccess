@@ -2,11 +2,20 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CsvExport } from './index';
-import { BillingTransactionsExportPage, ResourceUsageExportPage } from './configure-page';
+import {
+  BillingTransactionsExportPage,
+  ResourceHoursSummaryExportPage,
+  ResourceUsageExportPage,
+} from './configure-page';
 
 vi.mock('./resource-usage', () => ({
   ResourceUsageExport: ({ start, end }: { start: Date; end: Date }) => (
     <div data-testid="usage">{`${start.toISOString()}|${end.toISOString()}`}</div>
+  ),
+}));
+vi.mock('./resource-hours-summary', () => ({
+  ResourceHoursSummaryExport: ({ start, end }: { start: Date; end: Date }) => (
+    <div data-testid="hours">{`${start.toISOString()}|${end.toISOString()}`}</div>
   ),
 }));
 vi.mock('./billing-transactions', () => ({
@@ -19,6 +28,7 @@ vi.mock('./export-type-section', () => ({
   ExportTypeSection: ({ onOpen }: { onOpen: (key: string) => void }) => (
     <>
       <button onClick={() => onOpen('resourceUsageHours')}>open usage</button>
+      <button onClick={() => onOpen('resourceHoursSummary')}>open hours</button>
       <button onClick={() => onOpen('billingTransactions')}>open billing</button>
     </>
   ),
@@ -37,6 +47,7 @@ const renderAt = (url: string) =>
       <Routes>
         <Route path="/csv-export" element={<CsvExport />} />
         <Route path="/csv-export/resource-usage-hours" element={<ResourceUsageExportPage />} />
+        <Route path="/csv-export/resource-hours-summary" element={<ResourceHoursSummaryExportPage />} />
         <Route path="/csv-export/billing-transactions" element={<BillingTransactionsExportPage />} />
       </Routes>
       <Location />
@@ -97,4 +108,13 @@ it('the back button returns to the landing page and keeps the range', () => {
   expect(screen.getByTestId('location').textContent).toBe(
     `/csv-export?${new URLSearchParams({ start: START, end: END }).toString()}`,
   );
+});
+
+it('opens the resource hours summary page with the range in the URL', () => {
+  renderAt('/csv-export');
+  fireEvent.click(screen.getByText('open hours'));
+  expect(screen.getByTestId('location').textContent ?? '').toMatch(
+    /^\/csv-export\/resource-hours-summary\?start=.+&end=.+$/,
+  );
+  expect(screen.getByTestId('hours')).toBeInTheDocument();
 });

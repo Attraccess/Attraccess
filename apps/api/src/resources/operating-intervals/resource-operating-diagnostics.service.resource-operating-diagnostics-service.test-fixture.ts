@@ -17,6 +17,7 @@ function summary(overrides: Partial<ResourceOperatingAttributionSummary> = {}): 
     asOf: at(20, '12:00:00'),
     windowStart: at(1, '00:00:00'),
     sessionDurationMs: 0,
+    personDurationMs: 0,
     operatingDataAvailable: true,
     operatingDurationMs: 0,
     attributedOperatingDurationMs: 0,
