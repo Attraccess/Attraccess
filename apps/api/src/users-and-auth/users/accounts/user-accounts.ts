@@ -103,7 +103,9 @@ export class UserAccounts {
   ) {}
 
   async findOne(options: FindOneOptions, relations?: string[], manager?: EntityManager): Promise<User | null> {
-    const validatedOptions = FindOneOptionsSchema.parse(options);
+    const validatedOptions = FindOneOptionsSchema.parse(
+      options.email === undefined ? options : { ...options, email: normalizeEmail(options.email) },
+    );
 
     // Build a where condition that uses case-insensitive comparison for username
     const whereCondition: TypeormFindOneOptions<User>['where'] = {};
@@ -117,7 +119,7 @@ export class UserAccounts {
     }
 
     if (validatedOptions.email !== undefined) {
-      whereCondition.email = normalizeEmail(validatedOptions.email);
+      whereCondition.email = validatedOptions.email;
     }
 
     const userRepo = manager ? manager.getRepository(User) : this.userRepository;

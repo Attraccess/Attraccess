@@ -31,13 +31,25 @@ describe('UserAccounts email normalisation', () => {
 
   it('looks users up by the normalised email', async () => {
     const { accounts, repository } = setup();
-    await accounts.findOne({ email: 'ALEX@Example.com' });
+    const stored = { id: 1, email: 'alex@example.com' };
+    repository.findOne.mockResolvedValueOnce(stored);
+    await expect(accounts.findOne({ email: 'ALEX@Example.com' })).resolves.toBe(stored);
+    expect(repository.findOne).toHaveBeenCalledWith(expect.objectContaining({ where: { email: 'alex@example.com' } }));
+  });
+
+  it('trims a padded email before validating the lookup', async () => {
+    const { accounts, repository } = setup();
+    await accounts.findOne({ email: '  Alex@Example.com ' });
     expect(repository.findOne).toHaveBeenCalledWith(expect.objectContaining({ where: { email: 'alex@example.com' } }));
   });
 
   it('matches emails case-insensitively when searching by emails or usernames', async () => {
     const { accounts, repository } = setup();
-    await accounts.findByEmailsOrUsernames([' Alex@Example.com ', 'alex@example.com'], []);
+    const matches = [{ id: 1, email: 'alex@example.com' }];
+    repository.find.mockResolvedValueOnce(matches);
+    await expect(accounts.findByEmailsOrUsernames([' Alex@Example.com ', 'alex@example.com'], [])).resolves.toBe(
+      matches,
+    );
     expect(repository.find).toHaveBeenCalledWith({ where: [{ email: In(['alex@example.com']) }] });
   });
 

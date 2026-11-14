@@ -5,7 +5,7 @@ jest.mock('crypto', () => {
 
 import { registerUsersServiceFixture } from './users.service.users-service.test-fixture';
 import { Role, User, AuthenticationDetail, ResourceUsage } from '@attraccess/database-entities';
-import { EntityManager, UpdateResult } from 'typeorm';
+import { EntityManager, ILike, UpdateResult } from 'typeorm';
 import { ForbiddenException, BadRequestException } from '@nestjs/common';
 import { UserNotFoundException } from './../../exceptions/user.notFound.exception';
 import { SSOUsernameChangeForbiddenException } from './errors/ssoUsernameChangeForbidden.exception';
@@ -323,6 +323,20 @@ describe('UsersService', () => {
       expect(fixture.userRepository.findAndCount).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.arrayContaining([expect.objectContaining({ userRoles: { roleId: 42 } })]),
+        }),
+      );
+    });
+
+    it('should fold the email search term to lowercase in JS, including non-ASCII letters', async () => {
+      fixture.userRepository.findAndCount.mockResolvedValue([[], 0]);
+
+      await fixture.service.findMany({ page: 1, limit: 10, search: 'ÄRGER@Example.com' });
+
+      expect(fixture.userRepository.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.arrayContaining([
+            expect.objectContaining({ email: ILike('%ärger@example.com%') }),
+          ]),
         }),
       );
     });

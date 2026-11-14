@@ -112,9 +112,12 @@ export class UserDirectory {
         this.logger.debug(`Searching for users with query: ${search}`);
         query.andWhere(
           new Brackets((where) =>
-            where.where('LOWER(user.username) LIKE LOWER(:search)').orWhere('LOWER(user.email) LIKE LOWER(:search)'),
+            where
+              .where('LOWER(user.username) LIKE LOWER(:search)')
+              .orWhere('LOWER(user.email) LIKE :emailSearch'),
           ),
-          { search: `%${search}%` },
+          // SQLite LOWER() only folds ASCII, so fold the email term in JS like the stored value.
+          { search: `%${search}%`, emailSearch: `%${normalizeEmail(search)}%` },
         );
       }
 
@@ -136,7 +139,7 @@ export class UserDirectory {
       this.logger.debug(`Searching for users with query: ${search}`);
       whereCondition = [
         { ...whereCondition, username: ILike(`%${search}%`) },
-        { ...whereCondition, email: ILike(`%${search}%`) },
+        { ...whereCondition, email: ILike(`%${normalizeEmail(search)}%`) },
       ];
     }
 
