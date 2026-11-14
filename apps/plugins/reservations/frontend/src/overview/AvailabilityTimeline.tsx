@@ -2,6 +2,7 @@
 // entries listed underneath. Others' bookings read "Reserved"; names only appear when the API sent them.
 import { Chip } from '@heroui/react';
 import { useReservationsTranslations } from '../i18n';
+import { blockedSpanOf, peakConcurrency } from '../lib/slots';
 import { addLocalDays, formatDayHeading, startOfLocalDay, type LocalDate } from '../lib/time';
 import type { Availability, Reservation } from '../lib/types';
 import { useFormatters } from '../lib/useFormatters';
@@ -41,12 +42,30 @@ function entriesOf(availability: Availability): Entry[] {
   return [...reservations, ...maintenance].sort((a, b) => a.start - b.start);
 }
 
+/**
+ * Peak number of occupying bookings (incl. this one) per reservation entry, swept over the entry's buffered span
+ * with the buffered spans the booking picker uses. That window is what a new booking at the same time has to fit
+ * into, so "N of N" means the picker refuses that time, even when the overlap only starts later in the period.
+ */
+function bookedCounts(entries: Entry[]): Map<string, number> {
+  const spans = entries.flatMap((entry) => (entry.reservation ? [blockedSpanOf(entry.reservation)] : []));
+  return new Map(
+    entries.flatMap((entry) => {
+      if (!entry.reservation) return [];
+      const own = blockedSpanOf(entry.reservation);
+      return [[entry.key, peakConcurrency(spans, own.start, own.end)] as const];
+    }),
+  );
+}
+
 export function AvailabilityTimeline(props: Readonly<{ availability: Availability; days: LocalDate[] }>) {
   const { availability, days } = props;
   const { t } = useReservationsTranslations();
   const format = useFormatters(availability.timezone);
   const zone = availability.timezone;
   const entries = entriesOf(availability);
+  const slots = availability.slots ?? 1;
+  const booked = slots > 1 ? bookedCounts(entries) : new Map<string, number>();
 
   return (
     <div className="rv:flex rv:flex-col rv:gap-4" data-cy="reservations-timeline">
@@ -97,6 +116,7 @@ export function AvailabilityTimeline(props: Readonly<{ availability: Availabilit
                     ) : (
                       <span>{entry.kind === 'pending' ? t('card.reservedPending') : t('card.reserved')}</span>
                     )}
+                    {booked.has(entry.key) && <SlotsChip booked={booked.get(entry.key) ?? 0} total={slots} />}
                   </li>
                 ))}
               </ul>
@@ -105,5 +125,20 @@ export function AvailabilityTimeline(props: Readonly<{ availability: Availabilit
         );
       })}
     </div>
+  );
+}
+
+function SlotsChip(props: Readonly<{ booked: number; total: number }>) {
+  const { t } = useReservationsTranslations();
+  return (
+    <Chip
+      size="sm"
+      variant="soft"
+      color={props.booked >= props.total ? 'danger' : 'default'}
+      className="rv:whitespace-nowrap"
+      data-cy="reservations-timeline-slots"
+    >
+      {t('card.slotsBooked', { booked: props.booked, total: props.total })}
+    </Chip>
   );
 }

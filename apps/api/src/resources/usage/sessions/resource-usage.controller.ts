@@ -235,12 +235,15 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    await this.preStart.gateHttp(resourceId, req.user, dto, {
-      origin: req.user.authenticationMethod === 'api-token' ? 'api' : 'web',
+    const origin = req.user.authenticationMethod === 'api-token' ? 'api' : 'web';
+    const confirmedStepKeys = await this.preStart.gateHttp(resourceId, req.user, dto, {
+      origin,
       ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
     });
     return this.resourceUsageService.startSession(resourceId, req.user, dto, {
       auditOrigin: auditActorOf(req.user),
+      origin,
+      confirmedStepKeys,
     });
   }
 

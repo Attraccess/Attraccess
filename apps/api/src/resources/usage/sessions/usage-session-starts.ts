@@ -79,7 +79,14 @@ export class UsageSessionStarts {
     let takeoverEndedUser: User | null = null;
 
     let chargeTransactionId: number | undefined;
-    const prepared = await this.preparation.prepareSessionStart(resourceId, user, dto, supervisorUserId, attemptId);
+    const prepared = await this.preparation.prepareSessionStart(
+      resourceId,
+      user,
+      dto,
+      supervisorUserId,
+      attemptId,
+      options,
+    );
     takeoverEndedUser = prepared.existingActiveSession?.user ?? null;
 
     let newSession: ResourceUsage;

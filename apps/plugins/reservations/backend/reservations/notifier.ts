@@ -15,6 +15,9 @@ export interface ReservationNotifier {
   onCancelled(reservation: ReservationEntity, context: { byUserId: number; byHolder: boolean }): Promise<void> | void;
   /** Ended early by the holder or, when `byUserId` differs from the holder, by a manager. */
   onEndedEarly(reservation: ReservationEntity, context: { byUserId: number }): Promise<void> | void;
-  /** Cancelled because the plugin was disabled for the resource (reason `reservations disabled`). */
-  onRemoved(reservation: ReservationEntity, context: { byUserId: number; reason: string }): Promise<void> | void;
+  /**
+   * Cancelled by the system: the plugin was disabled for the resource (reason `reservations disabled`) or the
+   * machine lost slots (reason `machine capacity reduced`, `byUserId` null when no user changed the limit).
+   */
+  onRemoved(reservation: ReservationEntity, context: { byUserId: number | null; reason: string }): Promise<void> | void;
 }

@@ -101,6 +101,26 @@ describe('POST /resources/:id/usage/start through the pre-start gate', () => {
     });
   });
 
+  it.each([
+    ['web for a session', { authenticationMethod: 'session' }, 'web', { id: 7, authenticationMethod: 'session' }],
+    [
+      'api for an API token',
+      { authenticationMethod: 'api-token', apiTokenId: 31 },
+      'api',
+      { id: 7, authenticationMethod: 'api-token', apiTokenId: 31 },
+    ],
+  ])('starts with the step keys the gate confirmed and origin %s', async (_label, user, origin, auditOrigin) => {
+    principal = user;
+    gateHttp.mockResolvedValue({ reservations: ['override-4'] });
+    const response = await request(app.getHttpServer()).post('/resources/5/usage/start').send({});
+    expect(response.status).toBe(201);
+    expect(startSession).toHaveBeenCalledWith(5, expect.objectContaining({ id: 7 }), expect.anything(), {
+      auditOrigin,
+      origin,
+      confirmedStepKeys: { reservations: ['override-4'] },
+    });
+  });
+
   it('applies the session-end default for an API stop in the user language, never through the start gate', async () => {
     principal = { authenticationMethod: 'api-token', apiTokenId: 31 };
     const response = await request(app.getHttpServer()).put('/resources/5/usage/end').send({});

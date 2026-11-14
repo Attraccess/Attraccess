@@ -13,6 +13,22 @@ export enum SystemEvent {
   RESOURCE_USAGE_SESSION_TAKEN_OVER = 'RESOURCE_USAGE_SESSION_TAKEN_OVER',
   /** A session ended, either explicitly or because it was taken over. */
   RESOURCE_USAGE_SESSION_ENDED = 'RESOURCE_USAGE_SESSION_ENDED',
+  /**
+   * The effective session limit of a resource changed (`maxParallelSessions`, or a type change that changes the
+   * limit). Fires after commit. See {@link ResourceSessionLimitChangedPayload}.
+   */
+  RESOURCE_SESSION_LIMIT_CHANGED = 'RESOURCE_SESSION_LIMIT_CHANGED',
+}
+
+/** Emitted after the effective session limit of a resource changed (committed to the database). */
+export interface ResourceSessionLimitChangedPayload {
+  resourceId: number;
+  /** Effective limit before the change (1 for doors and other non-machine types). */
+  previousLimit: number;
+  /** Effective limit after the change. */
+  newLimit: number;
+  /** The user who made the change, or null when the change was not made by a user. */
+  actorUserId: number | null;
 }
 
 /** Emitted after a maintenance window was created, updated or finished (committed to the database). */
@@ -77,6 +93,7 @@ export type SystemEventPayload = {
   [SystemEvent.RESOURCE_USAGE_SESSION_STARTED]: ResourceUsageSessionStartedPayload;
   [SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER]: ResourceUsageSessionTakenOverPayload;
   [SystemEvent.RESOURCE_USAGE_SESSION_ENDED]: ResourceUsageSessionEndedPayload;
+  [SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED]: ResourceSessionLimitChangedPayload;
 };
 
 export type SystemEventResponse = {
@@ -89,7 +106,7 @@ export type SystemEventResponse = {
  * errors are isolated by the host and never propagate into the core flow.
  */
 export type SystemEventHandler<E extends SystemEvent> = (
-  payload: SystemEventPayload[E]
+  payload: SystemEventPayload[E],
 ) => SystemEventResponse[E] | void | Promise<SystemEventResponse[E] | void>;
 
 /**
@@ -177,7 +194,7 @@ export class PluginPermissionError extends Error {
   constructor(pluginName: string, capability: string, requiredPermission: PluginPermission) {
     super(
       `Plugin "${pluginName}" attempted to use "${capability}", which requires the ` +
-        `"${requiredPermission}" permission. Declare it in the "permissions" array of the plugin manifest.`
+        `"${requiredPermission}" permission. Declare it in the "permissions" array of the plugin manifest.`,
     );
     this.name = 'PluginPermissionError';
     this.pluginName = pluginName;

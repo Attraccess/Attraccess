@@ -159,6 +159,25 @@ export class ReservationStore {
       .getMany();
   }
 
+  /** Confirmed bookings running at `now` ([start, end)), read through the host's transaction (start capacity hook). */
+  findRunningConfirmed(manager: EntityManager, resourceId: number, now: Date): Promise<ReservationEntity[]> {
+    return manager
+      .getRepository(ReservationEntity)
+      .createQueryBuilder('r')
+      .where('r.resourceId = :resourceId AND r.status = :status', { resourceId, status: 'confirmed' })
+      .andWhere('r.startTime <= :now AND r.endTime > :now', { now })
+      .orderBy('r.startTime', 'ASC')
+      .getMany();
+  }
+
+  /**
+   * Pending + confirmed bookings of the resource whose buffer-aware span can still matter at or after `now`
+   * (the capacity reconciliation after a lowered limit).
+   */
+  findOccupyingFrom(resourceId: number, now: Date): Promise<ReservationEntity[]> {
+    return this.findLiveOverlapping(resourceId, new Date(now.getTime() - MAX_BUFFER_MINUTES * 60_000), null);
+  }
+
   countLiveForUser(manager: EntityManager, userId: number, resourceId: number, now: Date): Promise<number> {
     return manager
       .getRepository(ReservationEntity)
