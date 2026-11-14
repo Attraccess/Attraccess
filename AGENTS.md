@@ -20,8 +20,10 @@ script from the new worktree before reporting a missing dependency.
 
 `apps/cesentry` is a private, optional submodule (`update = none`), so new
 worktrees and public clones leave it empty. With access to the private
-repository, fill it with `git submodule update --init --checkout apps/cesentry`.
-Public code never references it (see `CONTRIBUTING.md`, "Private submodule").
+repository, fill it with `git submodule update --init --checkout apps/cesentry`,
+then follow its README's Checkout section (commit hook). Rerun the command after
+the pointer moves. Public code never references it (see `CONTRIBUTING.md`,
+"Private submodule").
 
 ## Committing
 

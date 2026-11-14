@@ -49,7 +49,16 @@ in `scripts/check-file-size.mjs`.
 optional: `.gitmodules` sets `update = none`, so `git clone
 --recurse-submodules` and `git submodule update` skip it, the directory stays
 empty, and every command, hook and CI job works without it. Public CI never
-checks it out.
+checks it out. `git clone --recurse-submodules` prints `Skipping submodule
+'apps/cesentry'`, and `git submodule status` lists it with a leading `-`. Both
+are expected.
+
+If you have no access and set `submodule.recurse=true`, pulls and checkouts that
+move the pointer try to fetch it and fail. Mark it inactive once per clone:
+
+```sh
+git config submodule.apps/cesentry.active false
+```
 
 Maintainers with access fill it in each checkout or worktree with:
 
@@ -57,7 +66,10 @@ Maintainers with access fill it in each checkout or worktree with:
 git submodule update --init --checkout apps/cesentry
 ```
 
-Nx then picks up its projects like any other. Its own README covers the rest.
+Rerun that command after pulling a commit that moves the pointer: plain `git
+submodule update` skips it. Before committing, check `git diff --submodule`, so
+that a stale checkout does not move the pointer back. Nx picks up its projects
+like any other. Its own README covers the rest, including its commit hook.
 
 Rules for this repository:
 
