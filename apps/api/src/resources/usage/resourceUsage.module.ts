@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ResourceUsageController } from './sessions/resource-usage.controller';
 import { ResourceUsageService } from './sessions/resource-usage.service';
 import { ResourceActivityVisibilityService } from './authorization/resource-activity-visibility.service';
@@ -28,6 +28,7 @@ import { PreStartService } from './pre-start/pre-start.service';
 import { SessionEndNotifier } from './pre-start/session-end-notifier.service';
 import { WebStartStepStore } from './pre-start/web-start-step.store';
 import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
+import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge';
 
 @Module({
   imports: [
@@ -41,10 +42,10 @@ import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
     ResourceGroupsModule,
     ResourceRetrainingModule,
     ResourceMaintenanceModule,
-    forwardRef(() => BillingModule),
-    forwardRef(() => ResourceFlowsModule),
-    forwardRef(() => ResourceMeteringModule),
-    forwardRef(() => ProjectsModule),
+    BillingModule,
+    ResourceFlowsModule,
+    ResourceMeteringModule,
+    ProjectsModule,
     ResourceFormsModule,
     ResourceHealthModule,
     ResourceOperatingIntervalModule,
@@ -61,6 +62,7 @@ import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
     PreStartService,
     WebStartStepStore,
     SessionEndNotifier,
+    ResourceUsageFlowsBridge,
   ],
   exports: [ResourceUsageService, ResourceActivityVisibilityService, PreStartService, SessionEndNotifier],
 })

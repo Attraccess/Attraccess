@@ -17,7 +17,7 @@ import { NodeExecutor, NodeProcessingResult } from '../node-executors/index';
 
 import { FlowExecutionContext, getFlowRepository } from './flow-execution-context';
 
-import { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
+import type { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
 import { ResourceFlowLogType } from '../dto/flow-log.dto';
 
 import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
@@ -59,13 +59,15 @@ function sameOwnerWhere(
   return node.flowId != null ? { flowId: node.flowId } : { resourceId: node.resourceId as number, flowId: IsNull() };
 }
 
+const CORE_NODE_TYPES: ReadonlySet<string> = new Set(Object.values(ResourceFlowNodeType));
+
 export class FlowExecutionEngine {
   public constructor(
     protected readonly flowNodeRepository: Repository<ResourceFlowNode>,
     protected readonly flowEdgeRepository: Repository<ResourceFlowEdge>,
     protected readonly flowLogs: FlowLogRecorderService,
     protected readonly flowTimer: FlowTimer,
-    protected readonly nodeExecutors: Record<ResourceFlowNodeType, NodeExecutor>,
+    protected readonly nodeExecutors: Partial<Record<ResourceFlowNodeType, NodeExecutor>>,
     protected readonly context: FlowExecutionContext,
     protected readonly logger: Logger,
   ) {}
@@ -264,7 +266,7 @@ export class FlowExecutionEngine {
     options: FlowExecutionOptions = {},
     runResourceId: number | null = this.context.resolveRunResourceId(node, options),
   ): Promise<NodeProcessingResult> {
-    // Core node types are looked up in the exhaustive record.
+    // Core node types are looked up in the executor record.
     const executor = this.nodeExecutors[node.type as ResourceFlowNodeType];
     if (executor) {
       return executor.execute(
@@ -272,6 +274,11 @@ export class FlowExecutionEngine {
         input,
         this.context.buildExecutionContext(flowRunId, transactionManager, options, runResourceId),
       );
+    }
+
+    // A core node without an executor means usage or metering was never attached; never hand it to a plugin.
+    if (CORE_NODE_TYPES.has(node.type)) {
+      throw new Error(`No executor attached for core flow node type: ${node.type}`);
     }
 
     // Plugin-contributed node types fall through to the plugin registry.

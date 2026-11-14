@@ -27,6 +27,7 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await (() => ({ useTranslations: () => ({ t: (key: string) => key }) }))()),
 }));
 vi.mock('./Auth', () => ({ useAttractapSerialComm: () => state }));
+vi.mock('./Auth/context', () => ({ useAttractapSerialComm: () => state }));
 vi.mock('../../../../utils/esp-tools', () => ({
   ESPTools: { getInstance: () => ({ sendCommand: state.sendCommand }) },
 }));

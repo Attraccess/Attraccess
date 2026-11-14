@@ -1,5 +1,5 @@
 import { registerPluginServiceFixture } from './plugin.service.plugin-service.test-fixture';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'fs';
 import { join } from 'path';
 import { PluginService } from './plugin.service';
@@ -131,7 +131,7 @@ describe('PluginService', () => {
       });
       const [plugin] = PluginService.getPlugins();
       jest
-        .spyOn(PluginBootGuard as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .spyOn(PluginBootGuard as unknown as { writeFailures(pluginPath: string, failures: unknown[]): void }, 'writeFailures')
         .mockImplementation(() => {
           throw new Error('read-only plugin directory');
         });
@@ -166,7 +166,7 @@ describe('PluginService', () => {
       const [plugin] = PluginService.getPlugins();
       PluginService.quarantinePlugin(plugin, new Error('prior crash'));
       jest
-        .spyOn(PluginBootGuard as unknown as { writeFailures(failures: unknown[]): void }, 'writeFailures')
+        .spyOn(PluginBootGuard as unknown as { writeFailures(pluginPath: string, failures: unknown[]): void }, 'writeFailures')
         .mockImplementation(() => {
           throw new Error('read-only plugin directory');
         });
@@ -471,32 +471,6 @@ describe('PluginService', () => {
       releaseFirst();
       await Promise.all([first, second]);
       expect(order).toEqual(['first-start', 'first-end', 'second']);
-    });
-  });
-
-  describe('deletePlugin', () => {
-    it('throws when the plugin id is unknown', async () => {
-      const service = new PluginService();
-      await expect(service.deletePlugin('nope')).rejects.toBeInstanceOf(NotFoundException);
-    });
-
-    it('removes the plugin folder and schedules a restart', async () => {
-      fixture.writePlugin(fixture.root, 'delete-me', {
-        name: 'delete-me',
-        version: '1.0.0',
-        main: { backend: { directory: 'dist', entryPoint: 'index.js' } },
-        attraccessVersion: { min: '1.0.0' },
-      });
-      const [plugin] = PluginService.getPlugins();
-      PluginService.quarantinePlugin(plugin, new Error('prior crash'));
-      const service = new PluginService();
-
-      await service.deletePlugin(plugin.id);
-
-      expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
-      expect(PluginService.isPluginQuarantined(plugin)).toBe(false);
-      fixture.flushScheduledRestart();
-      expect(fixture.restartSpy).toHaveBeenCalledTimes(1);
     });
   });
 

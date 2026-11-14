@@ -4,7 +4,7 @@ import { useWagoTranslations } from '../../i18n';
 import { DEFAULT_SSH } from '../model';
 import { canRecover } from '../model';
 import { CredentialFields } from './Steps';
-import { CommissioningModel } from '../CommissioningModal';
+import type { CommissioningModel } from '../CommissioningModal';
 
 export function RecoveryFields({ model }: { model: CommissioningModel }) {
   const { t } = useWagoTranslations();

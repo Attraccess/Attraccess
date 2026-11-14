@@ -8,7 +8,7 @@ import {
   configurationDesiredTopic,
 } from '../protocol/index';
 
-import { WagoService } from './service';
+import type { WagoService } from './service';
 
 import { WagoController } from './entity';
 

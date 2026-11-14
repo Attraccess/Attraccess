@@ -275,7 +275,6 @@ describe('ResourceFlowsExecutorService MQTT', () => {
       resourceRepository as Repository<Resource>,
       flowLogs,
       mqttClientService,
-      resourceUsageService,
       billingItemRepoMock,
       eventEmitter,
       resourceHealthService,
@@ -290,8 +289,9 @@ describe('ResourceFlowsExecutorService MQTT', () => {
         sendUnlockCommand: jest.fn(() => true),
       } as unknown as CompanionGatewayService,
       { transition: jest.fn() } as never,
-      { report: jest.fn() } as never,
     );
+    service.attachUsage(resourceUsageService);
+    service.attachMetering({ report: jest.fn() } as never);
   });
 
   it('matches INPUT_MQTT_MESSAGE_RECEIVED nodes using wildcards', async () => {

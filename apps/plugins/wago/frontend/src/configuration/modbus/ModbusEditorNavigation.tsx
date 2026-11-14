@@ -1,5 +1,5 @@
 import { Button } from '@heroui/react';
-import { Choice } from './ConfigurationForm';
+import { Choice } from './FormFields';
 import type { ModbusConfigurationFormProps } from './ConfigurationForm';
 import type { useModbusConfigurationFormState } from './useModbusConfigurationFormState';
 export function ModbusEditorNavigation({

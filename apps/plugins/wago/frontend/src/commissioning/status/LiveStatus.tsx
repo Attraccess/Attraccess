@@ -2,7 +2,7 @@ import { AlertStatusIcon, Button } from '@attraccess/plugins-frontend-ui';
 import { Alert } from '@heroui/react';
 import { useEffect, useState } from 'react';
 import { useWagoTranslations } from '../../i18n';
-import { CommissioningModel } from '../CommissioningModal';
+import type { CommissioningModel } from '../CommissioningModal';
 
 export function CommissioningLiveStatus({ model }: { model: CommissioningModel }) {
   const { t } = useWagoTranslations();

@@ -1,6 +1,6 @@
 import { StatusAlert } from '@attraccess/plugins-frontend-ui';
 import { useWagoTranslations } from '../../i18n';
-import { CommissioningModel } from '../CommissioningModal';
+import type { CommissioningModel } from '../CommissioningModal';
 
 export function CommissioningErrors({ model }: { model: CommissioningModel }) {
   const { t } = useWagoTranslations();

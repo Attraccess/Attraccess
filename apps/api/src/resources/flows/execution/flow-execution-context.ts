@@ -2,7 +2,7 @@ import { Resource } from '@attraccess/database-entities';
 import { EntityManager, EntityTarget, ObjectLiteral, Repository } from 'typeorm';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { compileFlowTemplate } from './flow-template';
-import { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
+import type { FlowExecutionOptions, FlowResourceContext } from './flow-execution.types';
 import { NodeExecutionContext, TemplateVariables } from '../node-executors';
 
 export function getFlowRepository<T extends ObjectLiteral>(

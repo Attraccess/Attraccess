@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { PluginContext, PluginLiveTopic } from '@attraccess/plugins-backend-sdk';
 import plugin from '../plugin';
-import { WagoRuntimeArtifactsService } from '../runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../runtime/artifacts/service';
 import { WagoCommissioningService } from './service';
 
 it('boots the commissioning plugin and empty artifact catalog without privileged host-provider resolution', async () => {

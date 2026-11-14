@@ -12,7 +12,8 @@ import { assertCommissioningBroker } from './delivery/preflight';
 
 import { CommissioningPrincipal } from './audit';
 
-import { WagoRuntimeArtifactsService, WagoRuntimeArtifactCatalog } from '../runtime/artifacts/catalog';
+import { WagoRuntimeArtifactCatalog } from '../runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../runtime/artifacts/service';
 
 import { WagoCommissioningReadiness } from './readiness/readiness';
 

@@ -5,10 +5,10 @@ import { parseWagoCodesysClassification, wagoCodesysClassificationShell } from '
 import {
   parseWagoHardwareDeploymentReport,
   WAGO_DOUT,
-  wagoCommissioningPreparationScript,
   wagoHardwareDeploymentReportScript,
-  wagoRuntimeBootScript,
 } from './hardware-deployment';
+import { wagoRuntimeBootScript } from '../runtime/boot';
+import { wagoCommissioningPreparationScript } from './commissioning-preparation';
 
 describe('source-only CODESYS classification', () => {
   let fixture: ReturnType<typeof fw31ShellFixture>;

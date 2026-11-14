@@ -18,7 +18,7 @@ import {
   heartbeatKey,
   parseGlobalHeartbeatKey,
 } from '../node-executors';
-import { FlowExecutionOptions } from './flow-execution.types';
+import type { FlowExecutionOptions } from './flow-execution.types';
 import { activeUsageSql } from '../../usage/sessions/active-usage';
 import { enabledGlobalNodesWhere, isGlobalFlowNode } from './flow-node-queries';
 

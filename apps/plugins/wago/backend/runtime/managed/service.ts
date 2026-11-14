@@ -16,7 +16,7 @@ import { managedWatchdogScript } from './provisioning/provision';
 
 import { type ManagedSetupStage, managedSetupFailure } from './setup-error';
 
-import { WagoRuntimeArtifactsService } from '../artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../artifacts/service';
 
 import { WagoService } from '../../controllers/service';
 

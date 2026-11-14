@@ -1,6 +1,6 @@
 import { AuthenticationType, User } from '@attraccess/database-entities';
 
-import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
 import { EmailService } from '../../email/email.service';
 
@@ -30,7 +30,6 @@ import { AUDIT_RECORDER, AuditOrigin, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '
 export class UserRegistrationService {
   constructor(
     protected readonly usersService: UsersService,
-    @Inject(forwardRef(() => AuthService))
     protected readonly authService: AuthService,
     protected readonly emailService: EmailService,
     protected readonly passwordPolicyService: PasswordPolicyService,

@@ -5,7 +5,7 @@ import {
   User,
   BillingTransactionItem,
 } from '@attraccess/database-entities';
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BillingController } from './billing.controller';
 import { BillingService } from './charges/billing.service';
@@ -21,7 +21,7 @@ import { BillingLiveTopicsProvider } from './live-notifications/billing-live-top
 @Module({
   imports: [
     TypeOrmModule.forFeature([BillingTransaction, User, ResourceBillingConfiguration, Setting, BillingTransactionItem]),
-    forwardRef(() => ResourceFlowsModule),
+    ResourceFlowsModule,
     EmailModule,
     SettingsModule,
     LicenseModule,

@@ -46,7 +46,7 @@ jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm')
 
 jest.mock('../../../controllers/service', () => ({ WagoService: class {} }));
 
-jest.mock('../../artifacts/catalog', () => ({ WagoRuntimeArtifactsService: class {} }));
+jest.mock('../../artifacts/service', () => ({ WagoRuntimeArtifactsService: class {} }));
 
 jest.mock('../../../commissioning/readiness/readiness', () => ({ WagoCommissioningReadiness: class {} }));
 

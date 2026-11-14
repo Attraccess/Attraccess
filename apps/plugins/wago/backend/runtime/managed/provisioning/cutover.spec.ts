@@ -13,7 +13,7 @@ import { MANAGED_HELPER_PROTOCOL, signInstaller } from './installer';
 import { WagoManagedRuntimeService } from '../service';
 import { resetTestFixture } from '../setup.test-fixture';
 import { managedSsh } from '../transport/ssh';
-import { WagoRuntimeArtifactsService } from '../../artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../../artifacts/service';
 import { RuntimeUpdateError } from '../../update/coordinator';
 import { WagoService } from '../../../controllers/service';
 
@@ -44,7 +44,7 @@ jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm')
 
 jest.mock('../../../controllers/service', () => ({ WagoService: class {} }));
 
-jest.mock('../../artifacts/catalog', () => ({ WagoRuntimeArtifactsService: class {} }));
+jest.mock('../../artifacts/service', () => ({ WagoRuntimeArtifactsService: class {} }));
 
 jest.mock('../../../commissioning/readiness/readiness', () => ({ WagoCommissioningReadiness: class {} }));
 

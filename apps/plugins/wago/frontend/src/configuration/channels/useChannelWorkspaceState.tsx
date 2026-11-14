@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from '../../api/client';
 import { useWagoTranslations } from '../../i18n';
-import { channelAssignment } from './ChannelWorkspace';
+import { channelAssignment } from './channelWorkspaceModel';
 
 export function useChannelWorkspaceState({
   snapshot,

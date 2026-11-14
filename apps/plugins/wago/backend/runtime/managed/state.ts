@@ -6,7 +6,7 @@ import { WagoManagedAccess, WagoRuntimeUpdateEntity } from './access.entity';
 
 import { WagoDeviceOperations } from '../device-operations';
 
-import { WagoRuntimeArtifactsService } from '../artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../artifacts/service';
 
 import {
   WagoRuntimeUpdateCoordinator,

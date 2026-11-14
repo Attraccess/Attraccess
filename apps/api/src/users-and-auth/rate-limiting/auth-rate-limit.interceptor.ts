@@ -11,7 +11,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import { catchError, from, mergeMap, Observable, throwError } from 'rxjs';
 import { Request, Response } from 'express';
-import { BruteForceProtectionService, RateLimitScope } from './brute-force.service';
+import { BruteForceProtectionService } from './brute-force.service';
+import type { RateLimitScope } from './brute-force-policy';
 import { AuthAuditLogger, AuthAuditOutcome, AuthAuditType } from './auth-audit.logger';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
 import {

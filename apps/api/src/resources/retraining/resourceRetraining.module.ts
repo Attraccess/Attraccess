@@ -1,4 +1,4 @@
-import { forwardRef, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   Resource,
@@ -7,7 +7,7 @@ import {
   ResourceIntroductionHistoryItem,
   ResourceUsage,
 } from '@attraccess/database-entities';
-import { ResourceGroupsModule } from '../groups/resourceGroups.module';
+import { ResourceGroupsCoreModule } from '../groups/resourceGroupsCore.module';
 import { EmailModule } from '../../email/email.module';
 import { ResourceRetrainingService } from './resourceRetraining.service';
 import { ResourceRetrainingController } from './resourceRetraining.controller';
@@ -21,7 +21,7 @@ import { ResourceRetrainingController } from './resourceRetraining.controller';
       ResourceIntroduction,
       ResourceIntroductionHistoryItem,
     ]),
-    forwardRef(() => ResourceGroupsModule),
+    ResourceGroupsCoreModule,
     EmailModule,
   ],
   controllers: [ResourceRetrainingController],
