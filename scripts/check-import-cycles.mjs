@@ -59,30 +59,22 @@ function compilerOptions() {
     .options;
 }
 
-function requireCall(expression) {
-  return expression &&
-    ts.isCallExpression(expression) &&
-    ts.isIdentifier(expression.expression) &&
-    expression.expression.text === 'require' &&
-    expression.arguments.length === 1 &&
-    ts.isStringLiteralLike(expression.arguments[0])
-    ? expression.arguments[0].text
-    : undefined;
+// `require('./x')` and `import('./x')` anywhere in a file. A load deferred into a
+// function still needs the other module at runtime, so it closes a cycle as well;
+// deferring it only hides the cycle.
+function loadCalls(node, specifiers) {
+  if (
+    ts.isCallExpression(node) &&
+    (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+      (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
+    node.arguments.length === 1 &&
+    ts.isStringLiteralLike(node.arguments[0])
+  ) {
+    specifiers.push(node.arguments[0].text);
+  }
+  ts.forEachChild(node, (child) => loadCalls(child, specifiers));
 }
 
-// `const x = require('./x')` and `require('./x')` at the top level run at module load.
-function topLevelRequires(statement) {
-  const expressions = ts.isExpressionStatement(statement)
-    ? [statement.expression]
-    : ts.isVariableStatement(statement)
-      ? statement.declarationList.declarations.map((declaration) => declaration.initializer)
-      : [];
-  return expressions.map(requireCall).filter(Boolean);
-}
-
-// Only imports evaluated at module load count: type-only imports are erased, and
-// dynamic `import()` and a `require()` inside a function run after both modules have
-// finished initialising.
 function runtimeSpecifiers(file, content) {
   const kind = file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, false, kind);
@@ -116,7 +108,7 @@ function runtimeSpecifiers(file, content) {
     ) {
       specifiers.push(statement.moduleReference.expression.text);
     } else {
-      specifiers.push(...topLevelRequires(statement));
+      loadCalls(statement, specifiers);
     }
   }
   return specifiers;
@@ -141,7 +133,8 @@ function importGraph(sources) {
       const { resolvedModule } = ts.resolveModuleName(specifier, path.join(root, file), options, host, cache);
       if (!resolvedModule) continue;
       const target = path.relative(root, resolvedModule.resolvedFileName).split(path.sep).join('/');
-      if (sources.has(target)) targets.add(target);
+      // A module that loads itself (the `getImplementationClass()` idiom) is not a cycle.
+      if (target !== file && sources.has(target)) targets.add(target);
     }
     graph.set(file, [...targets].sort());
   }
@@ -194,7 +187,7 @@ function stronglyConnectedComponents(graph) {
           onStack.delete(member);
           component.push(member);
         } while (member !== node);
-        if (component.length > 1 || targets.includes(node)) components.push(new Set(component));
+        if (component.length > 1) components.push(new Set(component));
       }
     }
   }

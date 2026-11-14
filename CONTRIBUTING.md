@@ -50,12 +50,12 @@ TypeScript files in `apps/` and `libs/`, tests included, and prints each cycle
 as a file chain. It always checks the whole repository and resolves relative
 imports and the `@attraccess/*` aliases from `tsconfig.base.json`.
 
-Only imports that run at module load count, including a top-level `require()`.
-`import type`, `export type`, imports whose specifiers are all inline `type`,
-dynamic `import()` and a `require()` inside a function are ignored. Cycles made
-only of entity files (files in `libs/database-entities/src/lib/entities` that
-declare an `@Entity`, `@ChildEntity` or `@ViewEntity` class) are allowed, because
-TypeORM relations resolve through lazy `() => Entity` thunks. A cycle that also
+Every runtime import counts, including `require()` and dynamic `import()`, even
+inside a function. `import type`, `export type`, imports whose specifiers are all
+inline `type`, and a module loading itself are ignored. Cycles made only of
+entity files (files in `libs/database-entities/src/lib/entities` that declare an
+`@Entity`, `@ChildEntity` or `@ViewEntity` class) are allowed, because TypeORM
+relations resolve through lazy `() => Entity` thunks. A cycle that also
 passes through any other file, including a helper in the entities directory, is
 reported. Declaration files, build output (`dist`, `build`), `generated`
 directories and the generated API clients are not checked.
@@ -63,11 +63,11 @@ directories and the generated API clients are not checked.
 To break a cycle, move the shared type, constant, context or helper into a leaf
 file that both sides import, pass the dependency in as a prop or callback, or use
 `import type` when only types are needed. Do not add NestJS `forwardRef`: extract
-the shared provider into its own module instead. Do not defer one side to a
-`require()` or `import()` inside a function either: that hides the cycle from the
-check rather than removing it. Move the code that needs both sides into a third
-file that imports them, as `plugin-uninstall.service.ts` does for
-`plugin.service.ts` and `plugin-migration.service.ts`.
+the shared provider into its own module instead. Deferring one side to a
+`require()` or `import()` inside a function does not break a cycle either. Move
+the code that needs both sides into a third file that imports them, as
+`plugin-uninstall.service.ts` does for `plugin.service.ts` and
+`plugin-migration.service.ts`.
 
 ## Commit Messages
 

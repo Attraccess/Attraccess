@@ -54,10 +54,13 @@ describe('PluginUninstallService', () => {
 
   it('still removes the plugin when reverting its migrations fails', async () => {
     const plugin = writeDeletablePlugin({ directory: 'dist', entryPoint: 'migrations.js' });
-    jest.spyOn(PluginMigrationService, 'runDownMigrations').mockRejectedValue(new Error('migration failed'));
+    const runDown = jest
+      .spyOn(PluginMigrationService, 'runDownMigrations')
+      .mockRejectedValue(new Error('migration failed'));
 
     await uninstaller().deletePlugin(plugin.id, true);
 
+    expect(runDown).toHaveBeenCalled();
     expect(existsSync(join(fixture.root, 'delete-me'))).toBe(false);
   });
 });

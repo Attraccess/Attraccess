@@ -55,7 +55,7 @@ test('a two-file runtime cycle fails and is printed as a file chain', (t) => {
   fails(check(), 'apps/web/src/a.ts', 'apps/web/src/b.tsx', 'apps/web/src/a.ts');
 });
 
-test('side-effect imports, re-exports, import-equals and top-level require count as runtime edges', (t) => {
+test('side-effect imports, re-exports, import-equals, require and import() count as runtime edges', (t) => {
   for (const back of [
     "import './a';\n",
     "export { a } from './a';\n",
@@ -63,6 +63,10 @@ test('side-effect imports, re-exports, import-equals and top-level require count
     "import a = require('./a');\n",
     "const { a } = require('./a');\n",
     "require('./a');\n",
+    "const a = require('./a').a;\n",
+    "if (process.env.A) require('./a');\n",
+    "export const lazy = () => require('./a').a;\n",
+    "export const lazy = () => import('./a');\n",
   ]) {
     const { check } = repository(t, {
       'apps/web/src/a.ts': "import { b } from './b';\nexport const a = b;\n",
@@ -80,8 +84,7 @@ test('type-only imports and exports never form a cycle', (t) => {
     "export type { A } from './a';\n",
     "export { type A } from './a';\n",
     "import type * as a from './a';\nexport type B = a.A;\n",
-    "const lazy = () => import('./a');\nexport { lazy };\n",
-    "export const lazy = () => require('./a').a;\n",
+    "export type Lazy = typeof import('./a');\n",
   ]) {
     const { check } = repository(t, {
       'apps/web/src/a.ts':
@@ -90,6 +93,13 @@ test('type-only imports and exports never form a cycle', (t) => {
     });
     succeeds(check());
   }
+});
+
+test('a module that requires itself is not a cycle', (t) => {
+  const { check } = repository(t, {
+    'apps/web/src/a.ts': "export const self = () => require('./a');\n",
+  });
+  succeeds(check());
 });
 
 test('a default import beside an inline type specifier is still a runtime edge', (t) => {
