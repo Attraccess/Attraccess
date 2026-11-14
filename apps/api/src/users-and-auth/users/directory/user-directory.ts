@@ -6,7 +6,6 @@ import {
   FindOptionsWhere,
   ILike,
   In,
-  Raw,
   Repository,
   SelectQueryBuilder,
   EntityManager,
@@ -35,6 +34,7 @@ import { UserNotFoundException } from '../../../exceptions/user.notFound.excepti
 import { SSOUsernameChangeForbiddenException } from '../errors/ssoUsernameChangeForbidden.exception';
 
 import { UserAccounts } from '../accounts/user-accounts';
+import { normalizeEmail } from '../accounts/normalize-email';
 
 import { EmailService } from '../../../email/email.service';
 
@@ -60,21 +60,6 @@ export class UserDirectory {
     const parsed = FindOneOptionsSchema.safeParse(options);
     if (!parsed.success) return null;
 
-    if (parsed.data.email !== undefined) {
-      // Preserve distinct existing accounts whose addresses differ only by case.
-      const exactMatch = await this.userRepository.findOne({ where: { email: parsed.data.email } });
-      if (exactMatch) return exactMatch;
-
-      // Fall back only when case-insensitive matching identifies one account.
-      // Equality keeps underscores literal, unlike a LIKE query.
-      const matches = await this.userRepository.find({
-        where: {
-          email: Raw((alias) => `LOWER(${alias}) = :loginEmail`, { loginEmail: parsed.data.email.toLowerCase() }),
-        },
-        take: 2,
-      });
-      return matches.length === 1 ? matches[0] : null;
-    }
     return this.accounts.findOne(parsed.data);
   }
 
@@ -127,9 +112,12 @@ export class UserDirectory {
         this.logger.debug(`Searching for users with query: ${search}`);
         query.andWhere(
           new Brackets((where) =>
-            where.where('LOWER(user.username) LIKE LOWER(:search)').orWhere('LOWER(user.email) LIKE LOWER(:search)'),
+            where
+              .where('LOWER(user.username) LIKE LOWER(:search)')
+              .orWhere('LOWER(user.email) LIKE :emailSearch'),
           ),
-          { search: `%${search}%` },
+          // SQLite LOWER() only folds ASCII, so fold the email term in JS like the stored value.
+          { search: `%${search}%`, emailSearch: `%${normalizeEmail(search)}%` },
         );
       }
 
@@ -151,7 +139,7 @@ export class UserDirectory {
       this.logger.debug(`Searching for users with query: ${search}`);
       whereCondition = [
         { ...whereCondition, username: ILike(`%${search}%`) },
-        { ...whereCondition, email: ILike(`%${search}%`) },
+        { ...whereCondition, email: ILike(`%${normalizeEmail(search)}%`) },
       ];
     }
 
@@ -371,11 +359,11 @@ export class UserDirectory {
   }
 
   async changeEmail(targetUserId: number, newEmail: string, executingUser: User): Promise<User> {
-    const trimmedEmail = (newEmail ?? '').trim();
-    if (!trimmedEmail) {
+    const normalizedEmail = normalizeEmail(newEmail ?? '');
+    if (!normalizedEmail) {
       throw new BadRequestException('Email cannot be empty');
     }
-    if (!isEmail(trimmedEmail)) {
+    if (!isEmail(normalizedEmail)) {
       throw new BadRequestException('Invalid email');
     }
 
@@ -391,11 +379,11 @@ export class UserDirectory {
       throw new ForbiddenException("You do not have permission to change this user's email");
     }
 
-    if (targetUser.email.trim() === trimmedEmail) {
+    if (normalizeEmail(targetUser.email) === normalizedEmail) {
       return targetUser;
     }
 
-    const existingEmail = await this.accounts.findOne({ email: trimmedEmail });
+    const existingEmail = await this.accounts.findOne({ email: normalizedEmail });
     if (existingEmail && existingEmail.id !== targetUserId) {
       throw new BadRequestException('Email already exists');
     }
@@ -408,7 +396,7 @@ export class UserDirectory {
         const userRepo = manager.getRepository(User);
 
         await userRepo.update(targetUserId, {
-          email: trimmedEmail,
+          email: normalizedEmail,
           isEmailVerified: false,
           emailVerificationToken: token,
           emailVerificationTokenExpiresAt: expiresAt,

@@ -295,7 +295,7 @@ export async function main(
   }
 
   const username = String(args.username || 'admin').toLowerCase();
-  const email = String(args.email || 'admin@local');
+  const email = String(args.email || 'admin@local').trim().toLowerCase();
   const password = String(args.password || 'password');
   const fixture = args.fixture ? loadFixture(path.resolve(String(args.fixture))) : null;
   const db = new sqlite3.Database(dbPath);
