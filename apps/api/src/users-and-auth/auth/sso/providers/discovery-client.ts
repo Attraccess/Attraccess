@@ -3,7 +3,7 @@ import { get as httpGet, RequestOptions } from 'node:http';
 import { get as httpsGet } from 'node:https';
 import { isIP, LookupFunction } from 'node:net';
 import ipaddr from 'ipaddr.js';
-import { BadGatewayException, BadRequestException, HttpException, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, HttpException, Logger } from '@nestjs/common';
 
 const logger = new Logger('SsoDiscovery');
 
@@ -67,6 +67,32 @@ export const discoveryLookup: LookupFunction = (hostname, options, callback) => 
   );
 };
 
+// Node's codes for a peer certificate that failed verification. Other TLS
+// errors, such as handshake failures, are reported as unreachable.
+export const DISCOVERY_CERTIFICATE_ERROR_CODES: ReadonlySet<string> = new Set([
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'CERT_HAS_EXPIRED',
+  'CERT_NOT_YET_VALID',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+  'HOSTNAME_MISMATCH',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_SIGNATURE_FAILURE',
+  'CERT_UNTRUSTED',
+  'CERT_REJECTED',
+  'CERT_REVOKED',
+  'INVALID_CA',
+  'CERT_CHAIN_TOO_LONG',
+  'PATH_LENGTH_EXCEEDED',
+  'INVALID_PURPOSE',
+  'UNABLE_TO_DECRYPT_CERT_SIGNATURE',
+  'UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY',
+  'ERROR_IN_CERT_NOT_BEFORE_FIELD',
+  'ERROR_IN_CERT_NOT_AFTER_FIELD',
+]);
+
 // Policy rejections keep their status. Anything else failed on the way to the
 // upstream; report only the admin-supplied origin and an error code, because
 // deeper messages can contain resolved addresses. Operators get the full cause.
@@ -74,6 +100,11 @@ export function toDiscoveryError(error: unknown, url: URL, timedOut: boolean, ti
   if (error instanceof HttpException) return error;
   logger.warn(`Discovery request to ${url.origin} failed: ${String(error)}`);
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  if (!timedOut && code && DISCOVERY_CERTIFICATE_ERROR_CODES.has(code)) {
+    return new BadGatewayException(
+      `TLS certificate of the discovery URL could not be verified: ${url.origin} (${code})`,
+    );
+  }
   const reason = timedOut ? `timed out after ${timeoutMs} ms` : code;
   return new BadGatewayException(`Discovery URL could not be reached: ${url.origin}${reason ? ` (${reason})` : ''}`);
 }
@@ -97,12 +128,15 @@ export function requestDiscoveryJson(url: URL, timeoutMs = 5000, maxBytes = 1024
       headers: { Accept: 'application/json' },
     };
     // Node's HTTP client never follows redirects. A 3xx response is rejected.
+    // The requested URL holds no secrets; the upstream reason, headers and body
+    // are never echoed.
     const request = get(url, options, (response) => {
-      if (!response.statusCode || response.statusCode < 200 || response.statusCode >= 300) {
+      const { statusCode } = response;
+      if (!statusCode || statusCode < 200 || statusCode >= 300) {
         response.destroy();
-        reject(
-          new UnauthorizedException(`Failed to fetch discovery: ${response.statusCode} ${response.statusMessage}`),
-        );
+        const status = statusCode ?? 'unknown';
+        logger.warn(`Discovery request to ${url.href} answered with status ${status}`);
+        reject(new BadGatewayException(`Discovery URL answered with status ${status}: ${url.href}`));
         return;
       }
       let bytes = 0;
