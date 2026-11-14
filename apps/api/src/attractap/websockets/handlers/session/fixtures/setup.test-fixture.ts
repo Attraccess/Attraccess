@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the original handler test policy for partial protocol mocks. */
 import { AttractapSessionHandler } from '../session.handler';
-import { AttractapSessionHandlerSessionFlowButtonTestScope } from '../session.handler.spec';
+import type { AttractapSessionHandlerSessionFlowButtonTestScope } from '../session.handler.spec';
 export function resetTestFixture(scope: AttractapSessionHandlerSessionFlowButtonTestScope) {
   scope.handler = Object.create(AttractapSessionHandler.prototype);
   (scope.handler as any).logger = {

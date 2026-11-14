@@ -12,7 +12,7 @@ import {
   Project,
 } from '@attraccess/database-entities';
 
-import { ConflictException, forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, Optional } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -122,10 +122,8 @@ export class UsageLifecycle {
     private readonly billingService: BillingService,
     private readonly turns: SessionChangeTurns,
     @Optional() private readonly operatingAttributionService: ResourceOperatingAttributionService | undefined,
-    @Inject(forwardRef(() => ResourceFlowsExecutorService))
     private readonly flowExecutorService: ResourceFlowsExecutorService,
     @Optional()
-    @Inject(forwardRef(() => ResourceMeteringService))
     private readonly metering?: ResourceMeteringService,
   ) {}
 

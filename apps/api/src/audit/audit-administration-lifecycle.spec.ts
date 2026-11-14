@@ -39,7 +39,7 @@ const pluginController = (
 ) =>
   new PluginController(
     npm as never,
-    new PluginAdministrationService(pluginService as never, npm as never, audit as never),
+    new PluginAdministrationService(pluginService as never, pluginService as never, npm as never, audit as never),
   );
 
 function recorded(audit: ReturnType<typeof recorder>) {

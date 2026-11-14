@@ -168,7 +168,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      - name: Enforce file size limits
+      # Always repo-wide: an import cycle can close through a project the change does not touch.
+      - name: Enforce file size limits and reject import cycles
         run: pnpm lint:files
       # Every project, not just the affected ones: a change can break a project it
       # does not touch (e.g. plugins-frontend-sdk re-exports plugins-frontend-ui

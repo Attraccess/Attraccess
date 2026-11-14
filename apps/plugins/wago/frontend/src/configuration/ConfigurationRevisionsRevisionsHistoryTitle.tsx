@@ -1,6 +1,6 @@
 import { Button, EmptyState, TableDataLoadingIndicator, useDateTimeFormatter } from '@attraccess/plugins-frontend-ui';
-import { RejectionErrors } from './ConfigurationRevisions';
-import { RollbackReview } from './ConfigurationRevisions';
+import { RejectionErrors } from './ConfigurationRevisionReview';
+import { RollbackReview } from './ConfigurationRevisionReview';
 import { useConfigurationRevisionsState } from './useConfigurationRevisionsState';
 type Props = Pick<
   ReturnType<typeof useConfigurationRevisionsState>,

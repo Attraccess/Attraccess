@@ -1,5 +1,4 @@
-import { ResourceMeteringModule } from '../metering/resource-metering.module';
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   ResourceFlowNode,
@@ -22,7 +21,6 @@ import { ResourceFlowVariablesController } from './variables/resource-flow-varia
 import { ResourceFlowVariablesService } from './variables/resource-flow-variables.service';
 import { ResourceFlowVariableTriggerService } from './variables/resource-flow-variable-trigger.service';
 import { MqttModule } from '../../mqtt/mqtt.module';
-import { ResourceUsageModule } from '../usage/resourceUsage.module';
 import { ResourceHealthModule } from '../health/resource-health.module';
 import { CompanionModule } from '../../companion/companion.module';
 import { ResourceOperatingIntervalModule } from '../operating-intervals/resource-operating-interval.module';
@@ -40,8 +38,6 @@ import { ResourceOperatingIntervalModule } from '../operating-intervals/resource
       ResourceMaintenanceRequest,
     ]),
     MqttModule,
-    forwardRef(() => ResourceUsageModule),
-    forwardRef(() => ResourceMeteringModule),
     ResourceHealthModule,
     CompanionModule,
     ResourceOperatingIntervalModule,

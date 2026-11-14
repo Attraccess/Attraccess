@@ -1,4 +1,4 @@
-import { ResourceMeteringService } from '../../metering/resource-metering.service';
+import type { ResourceMeteringService } from '../../metering/resource-metering.service';
 import { MeteringReportNodeDataSchema, ResourceFlowNode } from '@attraccess/database-entities';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
