@@ -20,3 +20,5 @@ fi
 # One task at a time: test runners start their own workers, and parallel Nx tasks on top of
 # them exhaust memory on developer machines.
 env -u GIT_INDEX_FILE pnpm nx affected --uncommitted --nxBail --parallel=1 --targets=lint,typecheck,test,crap-score --exclude="$exclude"
+# The Nx tasks above read the worktree; confirm it still matches what is being committed.
+node scripts/crap-score/check-staged.mjs
