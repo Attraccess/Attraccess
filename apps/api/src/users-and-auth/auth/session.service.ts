@@ -29,7 +29,19 @@ export class SessionService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    const count = await this.store.countActive();
+    let count: number;
+    try {
+      count = await this.store.countActive();
+    } catch (error) {
+      // The API starts without Valkey; sign-ins answer 503 until it is reachable. Log only the message: Valkey AUTH
+      // errors carry the password in `error.command.args`.
+      const { message, code } = error as NodeJS.ErrnoException;
+      this.logger.warn(
+        `Could not count active sessions in the session store (${message || code}); if Valkey is unreachable, ` +
+          'sign-in and signed-in requests fail until it is back',
+      );
+      return;
+    }
     this.metricsService.authActiveSessions.set(count);
   }
 

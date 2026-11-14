@@ -5,6 +5,7 @@ jest.mock('crypto', () => ({
   randomBytes: mockRandomBytes,
 }));
 
+import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { SessionService, SessionMetadata } from './session.service';
 import { User } from '@attraccess/database-entities';
@@ -93,6 +94,24 @@ describe('SessionService', () => {
       store.countActive.mockResolvedValue(7);
       await service.onModuleInit();
       expect(metrics.authActiveSessions.set).toHaveBeenCalledWith(7);
+    });
+
+    it('starts when the store is unreachable, warning with the message only (ATT-1244)', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      store.countActive.mockRejectedValue(
+        Object.assign(new Error('Reached the max retries per request limit (which is 3).'), {
+          name: 'MaxRetriesPerRequestError',
+          command: { name: 'auth', args: ['default', 'secret-password'] },
+        }),
+      );
+
+      await expect(service.onModuleInit()).resolves.toBeUndefined();
+
+      expect(metrics.authActiveSessions.set).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/max retries per request[\s\S]*Valkey/));
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('secret-password');
+      warn.mockRestore();
     });
   });
 

@@ -13,8 +13,11 @@ import { ResourceRetrainingService } from '../../retraining/resourceRetraining.s
 import { RESOURCE_USAGE_LOG_CONTEXT } from '../lifecycle/usage-lifecycle';
 import { UsageAccessCache } from './usage-access-cache';
 import { UsageAccessRules } from './usage-access-rules';
+import { unreachableValkeyUrl } from '../../../valkey/unreachable-valkey.test-fixture';
 
 // A bare EventEmitter throws on an `error` nobody listens to, like ioredis' "Unhandled error event" (ATT-1230).
+const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
+
 class FakeSubscriber extends EventEmitter {
   subscribe = jest.fn().mockResolvedValue(1);
   disconnect = jest.fn();
@@ -49,8 +52,8 @@ describe('UsageAccessCache authorization cache invalidation subscriber', () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it('does nothing without Valkey', async () => {
-    await expect(createCache(null).subscribe()).resolves.toBeUndefined();
+  it('does nothing without Valkey', () => {
+    expect(createCache(null).subscribe()).toBeUndefined();
     expect(warn).not.toHaveBeenCalled();
     expect(log).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
@@ -67,6 +70,12 @@ describe('UsageAccessCache authorization cache invalidation subscriber', () => {
 
     expect(subscriber.subscribe).toHaveBeenCalledWith(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL);
     expect(errorListeners).toBe(1);
+  });
+
+  it('lets the subscription wait for Valkey instead of failing after a few reconnects (ATT-1244)', () => {
+    createCache(valkeyClient as unknown as Redis).subscribe();
+
+    expect(valkeyClient.duplicate).toHaveBeenCalledWith({ maxRetriesPerRequest: null });
   });
 
   it('logs one warning per outage and one line when it reconnects', async () => {
@@ -151,22 +160,99 @@ describe('UsageAccessCache authorization cache invalidation subscriber', () => {
     );
   });
 
-  it('gives up and disconnects when the initial subscribe fails, logging only the message', async () => {
-    subscriber.subscribe.mockRejectedValue(
+  it('subscribes again once Valkey is ready when the first subscribe fails, logging only the message (ATT-1244)', async () => {
+    subscriber.subscribe.mockRejectedValueOnce(
       Object.assign(new Error('WRONGPASS invalid username-password pair'), {
         command: { name: 'auth', args: ['default', 'secret-password'] },
       }),
     );
     const cache = createCache(valkeyClient as unknown as Redis);
 
-    await cache.subscribe();
+    cache.subscribe();
+    await flushPromises();
+
+    expect(subscriber.disconnect).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('Could not subscribe to authorization cache invalidations (WRONGPASS'),
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('secret-password');
+
+    subscriber.emit('ready');
+    await flushPromises();
+    expect(subscriber.subscribe).toHaveBeenCalledTimes(2);
+    subscriber.emit(
+      'message',
+      AUTHORIZATION_CACHE_INVALIDATION_CHANNEL,
+      JSON.stringify({ source: 'other', userId: 3 }),
+    );
+    expect(eventEmitter.emit).toHaveBeenCalledWith(
+      UserPermissionsChangedEvent.EVENT_NAME,
+      new UserPermissionsChangedEvent(3),
+    );
+
+    subscriber.emit('ready');
+    expect(subscriber.subscribe).toHaveBeenCalledTimes(2);
+    cache.unsubscribe();
+  });
+
+  it('stops trying when it is unsubscribed while the subscription waits for Valkey', async () => {
+    let rejectSubscribe: (error: Error) => void = () => undefined;
+    subscriber.subscribe.mockImplementationOnce(() => new Promise((_, reject) => (rejectSubscribe = reject)));
+    const cache = createCache(valkeyClient as unknown as Redis);
+    cache.subscribe();
+
+    cache.unsubscribe();
+    rejectSubscribe(new Error('Connection is closed.'));
+    await flushPromises();
+    subscriber.emit('ready');
 
     expect(subscriber.disconnect).toHaveBeenCalledTimes(1);
-    expect(error).toHaveBeenCalledWith(
-      'Failed to subscribe to authorization cache invalidations (WRONGPASS invalid username-password pair)',
+    expect(subscriber.subscribe).toHaveBeenCalledTimes(1);
+    expect(warn).not.toHaveBeenCalled();
+    expect(error).not.toHaveBeenCalled();
+  });
+});
+
+describe('UsageAccessCache subscriber with a real ioredis client and Valkey down (ATT-1244)', () => {
+  let client: Redis;
+
+  beforeEach(async () => {
+    jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    client = new Redis(await unreachableValkeyUrl('secret-password'), { maxRetriesPerRequest: 3 });
+    client.on('error', () => undefined);
+  });
+
+  afterEach(() => {
+    client.disconnect();
+    jest.restoreAllMocks();
+  });
+
+  it('keeps waiting past the retry limit with one outage warning, and stops cleanly on unsubscribe', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const cache = new UsageAccessCache(
+      {} as UsageAccessRules,
+      {} as ResourceRetrainingService,
+      {} as MetricsService,
+      {} as RbacService,
+      { emit: jest.fn() } as unknown as EventEmitter2,
+      client,
     );
-    expect(JSON.stringify(error.mock.calls)).not.toContain('secret-password');
+
+    cache.subscribe();
+    // The shared client's own commands give up after three reconnects (about 300 ms); SUBSCRIBE must not.
+    await expect(client.get('probe')).rejects.toThrow('max retries per request');
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('lost its Valkey connection'));
+    expect(error).not.toHaveBeenCalled();
+
     cache.unsubscribe();
-    expect(subscriber.disconnect).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('secret-password');
   });
 });
