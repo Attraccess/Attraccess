@@ -28,6 +28,8 @@ Für Authentik, Keycloak oder andere OpenID-kompatible Anbieter können Sie die 
 
 Alle URL-Felder werden automatisch ausgefüllt.
 
+Schlägt die Erkennung fehl, zeigt die Meldung „Automatische Erkennung fehlgeschlagen“ den Grund, den die API meldet. Hinter einem Reverse Proxy (nginx, Traefik, Cloudflare, …) kann der Proxy die Fehlerantwort der API durch eine eigene „Bad Gateway“-Seite ersetzen; die Meldung zeigt dann statt des Grundes einen allgemeinen Hinweis. Die genaue Ursache (zum Beispiel DNS-Fehler, abgelehnte Verbindung, Zeitüberschreitung oder TLS-Fehler) steht immer als Warnung im API-Log. Damit der Grund in der Meldung erscheint, lassen Sie den Proxy die Fehlerantworten der API durchreichen: Setzen Sie bei nginx für die API-Location weder `proxy_intercept_errors on` noch eine eigene `error_page`.
+
 ### Manuelle Konfiguration
 
 | Feld | Beschreibung | Beispiel |

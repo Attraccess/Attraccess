@@ -1,0 +1,6 @@
+{
+  "error": {
+    "title": "Auto-discovery failed",
+    "unreachable": "The identity provider could not be reached, or the response did not contain a usable error. Check the host and the realm or application name, then look at the Attraccess API log for the cause."
+  }
+}
