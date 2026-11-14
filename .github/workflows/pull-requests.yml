@@ -176,6 +176,8 @@ jobs:
       # Public clones have no access to it: `update = none` must make them skip it, with this runner's git.
       - name: Clone with submodules, without access to the private submodule
         run: |
+          # The default `bash -e` would ignore the clone's exit status behind `tee`.
+          set -o pipefail
           git --version
           clone="$RUNNER_TEMP/public-clone"
           GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \

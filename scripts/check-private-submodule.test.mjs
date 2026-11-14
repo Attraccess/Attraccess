@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -71,4 +72,30 @@ test('requires an HTTPS url and a declaration', (t) => {
   const problems = checkPrivateSubmodule(repository(t, { modules: '' }).cwd).join('\n');
   assert.match(problems, /must declare/);
   assert.match(problems, /update = none/);
+});
+
+test('the CI clone step fails when the clone fails, even after skipping the submodule', (t) => {
+  const require = createRequire(import.meta.url);
+  const { parse } = createRequire(path.join(path.dirname(require.resolve('nx/package.json')), 'package.json'))('yaml');
+  const workflow = parse(
+    readFileSync(fileURLToPath(new URL('../.github/workflows/pull-requests.yml', import.meta.url)), 'utf8'),
+  );
+  const step = workflow.jobs['lint-and-typecheck'].steps.find((s) => s.name?.startsWith('Clone with submodules'));
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'private-submodule-step-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // A git that prints the skip notice but then fails the clone.
+  writeFileSync(
+    path.join(dir, 'git'),
+    `#!/bin/sh\necho "Skipping submodule 'apps/cesentry'"\n[ "$1" = --version ] || exit 1\n`,
+    {
+      mode: 0o755,
+    },
+  );
+  // GitHub runs `run:` blocks without an explicit shell as `bash -e {0}`.
+  const result = spawnSync('bash', ['-e', '-c', step.run], {
+    cwd: dir,
+    env: { ...process.env, PATH: `${dir}${path.delimiter}${process.env.PATH}`, RUNNER_TEMP: dir },
+    encoding: 'utf8',
+  });
+  assert.notEqual(result.status, 0, result.stdout);
 });
