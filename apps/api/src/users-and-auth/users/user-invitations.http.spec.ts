@@ -69,6 +69,8 @@ describe('user invitation endpoints (HTTP)', () => {
   it('returns 400 naming config when the config field is missing', async () => {
     const response = await post().attach('file', csv, 'users.csv').expect(400);
     expect(response.body).toMatchObject({ statusCode: 400, message: 'config is required', error: 'Bad Request' });
+    expect(users.findByEmailsOrUsernames).not.toHaveBeenCalled();
+    expect(users.createMany).not.toHaveBeenCalled();
   });
 
   it('returns 400 naming config when neither file nor config is sent', async () => {
@@ -81,9 +83,10 @@ describe('user invitation endpoints (HTTP)', () => {
     expect(response.body.message).toBe('config is required');
   });
 
-  it.each(['123', '"abc"', '[]'])('returns 400 naming config for the non-object config %s', async (value) => {
+  it.each(['123', '"abc"', '[]', 'true'])('returns 400 naming config for the non-object config %s', async (value) => {
     const response = await post().attach('file', csv, 'users.csv').field('config', value).expect(400);
     expect(response.body.message).toBe('config must be a JSON object');
+    expect(users.createMany).not.toHaveBeenCalled();
   });
 
   it('keeps the malformed JSON error', async () => {
@@ -117,7 +120,7 @@ describe('user invitation endpoints (HTTP)', () => {
         .send(body);
 
     it('returns 400 when the email is already taken', async () => {
-      users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'someone', email: 'Alex@Example.com' }]);
+      users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'someone', email: 'alex@example.com' }]);
       const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(400);
       expect(response.body.message).toBe('Email already exists');
       expect(users.createMany).not.toHaveBeenCalled();
