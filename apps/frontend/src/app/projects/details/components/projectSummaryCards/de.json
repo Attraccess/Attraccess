@@ -4,9 +4,13 @@
       "title": "Sitzungen",
       "description": "Abgeschlossene Nutzungssitzungen"
     },
-    "minutes": {
-      "title": "Minuten",
-      "description": "Gesamte Maschinenzeit"
+    "personHours": {
+      "title": "Personenstunden",
+      "description": "Dauer aller Sitzungen addiert"
+    },
+    "machineHours": {
+      "title": "Maschinenstunden",
+      "description": "Zeit mit mindestens einer laufenden Sitzung"
     },
     "spend": {
       "title": "Ausgaben",

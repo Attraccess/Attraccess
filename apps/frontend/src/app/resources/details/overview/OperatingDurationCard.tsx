@@ -48,6 +48,10 @@ export function OperatingDurationCard({ resourceId, className }: OperatingDurati
             <dd className="font-medium">{formatDuration(data.sessionDurationMs, t('unavailable'))}</dd>
           </div>
           <div>
+            <dt className="text-foreground-500">{t('person')}</dt>
+            <dd className="font-medium">{formatDuration(data.personDurationMs, t('unavailable'))}</dd>
+          </div>
+          <div>
             <dt className="text-foreground-500">{t('operating')}</dt>
             <dd className="font-medium">{formatDuration(data.operatingDurationMs, t('unavailable'))}</dd>
           </div>

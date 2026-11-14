@@ -7,8 +7,15 @@ const state = vi.hoisted(() => ({
     | undefined
     | {
         summary: { currency: string; minorUnit: number };
-        timeSeries: { date: string; minutes: number; sessions: number; spend: number }[];
-        topResources: { resourceId: number; resourceName: string; minutes: number; sessions: number; spend: number }[];
+        timeSeries: { date: string; minutes: number; machineMinutes: number; sessions: number; spend: number }[];
+        topResources: {
+          resourceId: number;
+          resourceName: string;
+          minutes: number;
+          machineMinutes: number;
+          sessions: number;
+          spend: number;
+        }[];
       },
   loading: false,
   active: true,
@@ -43,7 +50,7 @@ vi.mock('recharts', () => ({
       label: 'Selected point',
       payload: [
         { dataKey: 'spend', name: 'Money', value: '125', color: 'red' },
-        { dataKey: 'minutes', name: 'Duration', value: 12 },
+        { dataKey: 'personHours', name: 'Duration', value: 12 },
         { name: 'Missing', value: null },
       ],
     }),
@@ -77,17 +84,19 @@ it('converts minor currency units, preserves invalid date labels and displays re
   state.data = {
     summary: { currency: 'EUR', minorUnit: 2 },
     timeSeries: [
-      { date: '2026-01-02', minutes: 20, sessions: 2, spend: 1234 },
-      { date: 'Unknown', minutes: 0, sessions: 0, spend: 0 },
+      { date: '2026-01-02', minutes: 120, machineMinutes: 90, sessions: 2, spend: 1234 },
+      { date: 'Unknown', minutes: 0, machineMinutes: 0, sessions: 0, spend: 0 },
     ],
-    topResources: [{ resourceId: 1, resourceName: 'Lathe', minutes: 20, sessions: 2, spend: 1234 }],
+    topResources: [
+      { resourceId: 1, resourceName: 'Lathe', minutes: 120, machineMinutes: 90, sessions: 2, spend: 1234 },
+    ],
   };
   render(<ProjectUsageCharts projectId={7} />);
   expect(state.lineData).toEqual([
-    { date: '2026-01-02', minutes: 20, sessions: 2, spend: 12.34 },
-    { date: 'Unknown', minutes: 0, sessions: 0, spend: 0 },
+    { date: '2026-01-02', personHours: 2, machineHours: 1.5, sessions: 2, spend: 12.34 },
+    { date: 'Unknown', personHours: 0, machineHours: 0, sessions: 0, spend: 0 },
   ]);
-  expect(state.barData).toEqual(state.data.topResources);
+  expect(state.barData).toEqual([{ ...state.data.topResources[0], personHours: 2, machineHours: 1.5 }]);
   expect(screen.getByText('Lathe')).toBeTruthy();
   expect(screen.getByText('EUR 12.34')).toBeTruthy();
   expect(screen.getByText('EUR 125.00')).toBeTruthy();
@@ -99,8 +108,8 @@ it('hides tooltips when no point is active', () => {
   state.active = false;
   state.data = {
     summary: { currency: 'JPY', minorUnit: 0 },
-    timeSeries: [{ date: '2026-01-02', minutes: 1, sessions: 1, spend: 100 }],
-    topResources: [{ resourceId: 1, resourceName: 'Saw', minutes: 1, sessions: 1, spend: 100 }],
+    timeSeries: [{ date: '2026-01-02', minutes: 1, machineMinutes: 1, sessions: 1, spend: 100 }],
+    topResources: [{ resourceId: 1, resourceName: 'Saw', minutes: 1, machineMinutes: 1, sessions: 1, spend: 100 }],
   };
   render(<ProjectUsageCharts projectId={7} />);
   expect(screen.queryByText('Selected point')).toBeNull();

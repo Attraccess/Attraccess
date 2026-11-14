@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { BillingTransactionsExport } from './billing-transactions';
 import { SelectedRangePill } from './date-range-section/selected-range-pill';
 import { boundsToRange, boundsToSearch, parseRangeSearchParams, ExportTypeKey } from './range-search-params';
+import { ResourceHoursSummaryExport } from './resource-hours-summary';
 import { ResourceUsageExport } from './resource-usage';
 import de from './de.json';
 import en from './en.json';
@@ -27,7 +28,11 @@ export function CsvExportConfigurePage({ exportKey }: Props) {
   );
   const range = useMemo(() => boundsToRange(bounds), [bounds]);
 
-  const Export = exportKey === 'resourceUsageHours' ? ResourceUsageExport : BillingTransactionsExport;
+  const Export = {
+    resourceUsageHours: ResourceUsageExport,
+    resourceHoursSummary: ResourceHoursSummaryExport,
+    billingTransactions: BillingTransactionsExport,
+  }[exportKey];
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8" data-cy="csv-export-page">
@@ -56,4 +61,8 @@ export function ResourceUsageExportPage() {
 
 export function BillingTransactionsExportPage() {
   return <CsvExportConfigurePage exportKey="billingTransactions" />;
+}
+
+export function ResourceHoursSummaryExportPage() {
+  return <CsvExportConfigurePage exportKey="resourceHoursSummary" />;
 }

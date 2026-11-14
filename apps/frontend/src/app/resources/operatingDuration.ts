@@ -5,7 +5,10 @@ import { getBaseUrl } from '../../api';
 import { useLiveUpdates } from '../../utils/live-updates';
 
 export interface OperatingDurationSummary {
+  /** Machine hours with a session: overlapping sessions count once. */
   sessionDurationMs: number;
+  /** Person hours: every session's duration added up. */
+  personDurationMs: number;
   operatingDataAvailable: boolean;
   operatingDurationMs: number | null;
   unattributedOperatingDurationMs: number | null;

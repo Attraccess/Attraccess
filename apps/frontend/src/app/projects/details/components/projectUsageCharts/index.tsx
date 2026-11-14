@@ -42,9 +42,12 @@ export type ProjectUsageChartsProps = {
 
 export const CHART_COLORS = {
   sessions: { base: 'var(--chart-sessions)', active: 'var(--chart-sessions-active)' },
-  minutes: { base: 'var(--chart-minutes)', active: 'var(--chart-minutes-active)' },
+  personHours: { base: 'var(--chart-minutes)', active: 'var(--chart-minutes-active)' },
+  machineHours: { base: 'var(--chart-machine)', active: 'var(--chart-machine-active)' },
   spend: 'var(--chart-spend)',
 };
+
+export const MINUTES_PER_HOUR = 60;
 
 export const TOOLTIP_CONTAINER_CLASS =
   'rounded-lg border border-border bg-surface/95 px-3 py-2 text-foreground shadow-xl backdrop-blur-md';
@@ -58,6 +61,7 @@ export const TOOLTIP_VALUE_CLASS = 'ml-auto font-semibold text-foreground';
 export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProps) {
   const { t } = useTranslations({ en, de });
   const formatNumber = useNumberFormatter();
+  const formatHours = useNumberFormatter({ maximumFractionDigits: 1 });
   const formatDate = useDateTimeFormatter({ showTime: false });
   const { data, isLoading } = useProjectsServiceGetProjectUsageStats({ id: projectId });
   const [canRenderCharts, setCanRenderCharts] = useState(false);
@@ -78,13 +82,28 @@ export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProp
         }
         return formatDate(parsed);
       })(),
-      minutes: point.minutes,
+      personHours: point.minutes / MINUTES_PER_HOUR,
+      machineHours: point.machineMinutes / MINUTES_PER_HOUR,
       sessions: point.sessions,
       spend: dbCurrencyToUserCurrency(point.spend, data.summary.minorUnit),
     }));
   }, [data, formatDate]);
 
-  const topResources = data?.topResources ?? [];
+  const topResources = useMemo(
+    () =>
+      (data?.topResources ?? []).map((resource) => ({
+        ...resource,
+        personHours: resource.minutes / MINUTES_PER_HOUR,
+        machineHours: resource.machineMinutes / MINUTES_PER_HOUR,
+      })),
+    [data],
+  );
+
+  const formatTooltipValue = useCallback(
+    (dataKey: unknown, value: number) =>
+      dataKey === 'personHours' || dataKey === 'machineHours' ? formatHours(value) : formatNumber(value),
+    [formatHours, formatNumber],
+  );
 
   const renderTimeSeriesTooltip = useCallback(
     (tooltipProps: ChartTooltipProps) => {
@@ -103,7 +122,9 @@ export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProp
               const numericValue = typeof entry.value === 'number' ? entry.value : Number(entry.value ?? 0);
               const isSpend = entry.dataKey === 'spend';
               const formattedValue =
-                isSpend && data ? `${data.summary.currency} ${formatNumber(numericValue)}` : formatNumber(numericValue);
+                isSpend && data
+                  ? `${data.summary.currency} ${formatNumber(numericValue)}`
+                  : formatTooltipValue(entry.dataKey, numericValue);
 
               return (
                 <div key={String(entry.dataKey ?? index)} className="flex items-center gap-2 text-sm">
@@ -117,7 +138,7 @@ export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProp
         </div>
       );
     },
-    [data, formatNumber],
+    [data, formatNumber, formatTooltipValue],
   );
 
   const renderTopResourcesTooltip = useCallback(
@@ -140,7 +161,7 @@ export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProp
                   ? `${data.summary.currency} ${formatNumber(
                       dbCurrencyToUserCurrency(numericValue, data.summary.minorUnit),
                     )}`
-                  : formatNumber(numericValue);
+                  : formatTooltipValue(entry.dataKey, numericValue);
 
               return (
                 <div key={String(entry.dataKey ?? index)} className="flex items-center gap-2 text-sm">
@@ -154,11 +175,12 @@ export function useProjectUsageChartsState({ projectId }: ProjectUsageChartsProp
         </div>
       );
     },
-    [data, formatNumber],
+    [data, formatNumber, formatTooltipValue],
   );
   return {
     t,
     formatNumber,
+    formatHours,
     data,
     isLoading,
     canRenderCharts,
@@ -173,6 +195,7 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
   const {
     t,
     formatNumber,
+    formatHours,
     data,
     isLoading,
     canRenderCharts,
@@ -204,9 +227,9 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
                 <XAxis dataKey="date" stroke="var(--muted)" />
                 <YAxis
-                  yAxisId="minutes"
+                  yAxisId="hours"
                   stroke="var(--muted)"
-                  label={{ value: t('tooltip.minutes'), angle: -90, position: 'insideLeft', fill: 'var(--muted)' }}
+                  label={{ value: t('tooltip.hours'), angle: -90, position: 'insideLeft', fill: 'var(--muted)' }}
                 />
                 <YAxis
                   yAxisId="spend"
@@ -218,13 +241,23 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                 <Legend labelStyle={{ color: 'var(--foreground)' }} inactiveColor="var(--muted)" />
                 <Line
                   type="monotone"
-                  dataKey="minutes"
-                  stroke={CHART_COLORS.minutes.base}
-                  yAxisId="minutes"
-                  name={t('tooltip.minutes')}
+                  dataKey="personHours"
+                  stroke={CHART_COLORS.personHours.base}
+                  yAxisId="hours"
+                  name={t('tooltip.personHours')}
                   strokeWidth={2}
                   dot={false}
-                  activeDot={{ fill: CHART_COLORS.minutes.active, stroke: 'var(--surface)' }}
+                  activeDot={{ fill: CHART_COLORS.personHours.active, stroke: 'var(--surface)' }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="machineHours"
+                  stroke={CHART_COLORS.machineHours.base}
+                  yAxisId="hours"
+                  name={t('tooltip.machineHours')}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ fill: CHART_COLORS.machineHours.active, stroke: 'var(--surface)' }}
                 />
                 <Line
                   type="monotone"
@@ -283,13 +316,25 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                         }
                       />
                       <Bar
-                        dataKey="minutes"
-                        fill={CHART_COLORS.minutes.base}
-                        name={t('tooltip.minutes')}
+                        dataKey="personHours"
+                        fill={CHART_COLORS.personHours.base}
+                        name={t('tooltip.personHours')}
                         activeBar={
                           <Rectangle
-                            fill={CHART_COLORS.minutes.active}
-                            stroke={CHART_COLORS.minutes.base}
+                            fill={CHART_COLORS.personHours.active}
+                            stroke={CHART_COLORS.personHours.base}
+                            strokeWidth={2}
+                          />
+                        }
+                      />
+                      <Bar
+                        dataKey="machineHours"
+                        fill={CHART_COLORS.machineHours.base}
+                        name={t('tooltip.machineHours')}
+                        activeBar={
+                          <Rectangle
+                            fill={CHART_COLORS.machineHours.active}
+                            stroke={CHART_COLORS.machineHours.base}
                             strokeWidth={2}
                           />
                         }
@@ -306,7 +351,8 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                     <TableHeader>
                       <TableColumn isRowHeader>{t('charts.topResources.columns.resource')}</TableColumn>
                       <TableColumn>{t('charts.topResources.columns.sessions')}</TableColumn>
-                      <TableColumn>{t('charts.topResources.columns.minutes')}</TableColumn>
+                      <TableColumn>{t('charts.topResources.columns.personHours')}</TableColumn>
+                      <TableColumn>{t('charts.topResources.columns.machineHours')}</TableColumn>
                       <TableColumn>{t('charts.topResources.columns.spend')}</TableColumn>
                     </TableHeader>
                     <TableBody>
@@ -314,7 +360,8 @@ export function ProjectUsageCharts({ projectId }: ProjectUsageChartsProps) {
                         <TableRow key={resource.resourceId} id={resource.resourceId}>
                           <TableCell>{resource.resourceName}</TableCell>
                           <TableCell>{formatNumber(resource.sessions)}</TableCell>
-                          <TableCell>{formatNumber(resource.minutes)}</TableCell>
+                          <TableCell>{formatHours(resource.personHours)}</TableCell>
+                          <TableCell>{formatHours(resource.machineHours)}</TableCell>
                           <TableCell>
                             {data
                               ? `${data.summary.currency} ${formatNumber(

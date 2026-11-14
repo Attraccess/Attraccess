@@ -52,6 +52,7 @@ describe('ResourceDiagnosticsTab', () => {
     useOperatingDurationMock.mockReturnValue({
       data: {
         sessionDurationMs: 100 * MINUTE,
+        personDurationMs: 100 * MINUTE,
         operatingDataAvailable: true,
         operatingDurationMs: 120 * MINUTE,
         unattributedOperatingDurationMs: 30 * MINUTE,
@@ -104,6 +105,7 @@ describe('ResourceDiagnosticsTab', () => {
     useOperatingDurationMock.mockReturnValue({
       data: {
         sessionDurationMs: 60 * MINUTE,
+        personDurationMs: 60 * MINUTE,
         operatingDataAvailable: false,
         operatingDurationMs: null,
         unattributedOperatingDurationMs: null,

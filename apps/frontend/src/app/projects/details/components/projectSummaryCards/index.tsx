@@ -1,10 +1,12 @@
 import { Card, Skeleton } from '@heroui/react';
 import { useTranslations, useNumberFormatter } from '@attraccess/plugins-frontend-ui';
-import { ActivityIcon, CircleDollarSignIcon, Clock3Icon } from 'lucide-react';
+import { ActivityIcon, CircleDollarSignIcon, Clock3Icon, UsersIcon } from 'lucide-react';
 import { useProjectsServiceGetProjectUsageStats } from '@attraccess/react-query-client';
 import { dbCurrencyToUserCurrency } from '@attraccess/shared';
 import en from './en.json';
 import de from './de.json';
+
+const MINUTES_PER_HOUR = 60;
 
 type ProjectSummaryCardsProps = {
   projectId: number;
@@ -17,6 +19,7 @@ const IconWrapper = ({ children }: { children: React.ReactNode }) => (
 export function ProjectSummaryCards({ projectId }: ProjectSummaryCardsProps) {
   const { t } = useTranslations({ en, de });
   const formatNumber = useNumberFormatter();
+  const formatHours = useNumberFormatter({ maximumFractionDigits: 1 });
   const { data, isLoading } = useProjectsServiceGetProjectUsageStats({ id: projectId });
   const summary = data?.summary;
 
@@ -29,10 +32,17 @@ export function ProjectSummaryCards({ projectId }: ProjectSummaryCardsProps) {
       icon: <ActivityIcon className="size-5" />,
     },
     {
-      key: 'minutes',
-      title: t('summary.minutes.title'),
-      description: t('summary.minutes.description'),
-      value: summary ? formatNumber(summary.totalMinutes ?? 0) : undefined,
+      key: 'personHours',
+      title: t('summary.personHours.title'),
+      description: t('summary.personHours.description'),
+      value: summary ? formatHours((summary.totalMinutes ?? 0) / MINUTES_PER_HOUR) : undefined,
+      icon: <UsersIcon className="size-5" />,
+    },
+    {
+      key: 'machineHours',
+      title: t('summary.machineHours.title'),
+      description: t('summary.machineHours.description'),
+      value: summary ? formatHours((summary.totalMachineMinutes ?? 0) / MINUTES_PER_HOUR) : undefined,
       icon: <Clock3Icon className="size-5" />,
     },
     {
@@ -47,7 +57,7 @@ export function ProjectSummaryCards({ projectId }: ProjectSummaryCardsProps) {
   ];
 
   return (
-    <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
         <Card key={card.key}>
           <Card.Header className="flex items-center gap-4">

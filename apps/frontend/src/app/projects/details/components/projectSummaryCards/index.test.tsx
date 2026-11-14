@@ -5,7 +5,14 @@ const state = vi.hoisted(() => ({
   loading: false,
   summary: undefined as
     | undefined
-    | { totalSessions?: number; totalMinutes?: number; totalSpend?: number; currency: string; minorUnit: number },
+    | {
+        totalSessions?: number;
+        totalMinutes?: number;
+        totalMachineMinutes?: number;
+        totalSpend?: number;
+        currency: string;
+        minorUnit: number;
+      },
   query: vi.fn(),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
@@ -30,24 +37,32 @@ beforeEach(() => {
 it('shows empty results and loads the requested project', () => {
   render(<ProjectSummaryCards projectId={7} />);
   expect(state.query).toHaveBeenCalledWith({ id: 7 });
-  expect(screen.getAllByText('summary.empty')).toHaveLength(3);
+  expect(screen.getAllByText('summary.empty')).toHaveLength(4);
 });
 it('shows skeletons while loading instead of an empty result', () => {
   state.loading = true;
   render(<ProjectSummaryCards projectId={7} />);
   expect(screen.queryByText('summary.empty')).toBeNull();
-  expect(document.querySelectorAll('.skeleton')).toHaveLength(3);
+  expect(document.querySelectorAll('.skeleton')).toHaveLength(4);
 });
-it('formats sessions, minutes and database currency amounts', () => {
-  state.summary = { totalSessions: 4, totalMinutes: 90, totalSpend: 12345, currency: 'EUR', minorUnit: 2 };
+it('formats sessions, person and machine hours and database currency amounts', () => {
+  state.summary = {
+    totalSessions: 4,
+    totalMinutes: 90,
+    totalMachineMinutes: 60,
+    totalSpend: 12345,
+    currency: 'EUR',
+    minorUnit: 2,
+  };
   render(<ProjectSummaryCards projectId={7} />);
   expect(screen.getByText('4.00')).toBeTruthy();
-  expect(screen.getByText('90.00')).toBeTruthy();
+  expect(screen.getByText('1.50')).toBeTruthy();
+  expect(screen.getByText('1.00')).toBeTruthy();
   expect(screen.getByText('EUR 123.45')).toBeTruthy();
 });
 it('defaults omitted totals to zero and respects currencies without fractional units', () => {
   state.summary = { totalSpend: 123, currency: 'JPY', minorUnit: 0 };
   render(<ProjectSummaryCards projectId={7} />);
-  expect(screen.getAllByText('0.00')).toHaveLength(2);
+  expect(screen.getAllByText('0.00')).toHaveLength(3);
   expect(screen.getByText('JPY 123.00')).toBeTruthy();
 });
