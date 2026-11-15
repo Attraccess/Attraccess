@@ -32,12 +32,11 @@ from route_grid import (
     MARGIN,
     POUR_NETS,
     ZONES,
-    add_path,
-    anchor,
     board_items,
     build_raster,
     class_of,
     clusters,
+    connect,
     group_box,
     kicad_clusters,
     search,
@@ -77,9 +76,7 @@ def route_pours(board, pads, tracks, vias):
                 print('  %-10s FAILED at %s.%s' % (short(net), it.get('ref'), it.get('num')), flush=True)
                 groups.pop(g)
                 continue
-            nt, nv = add_path(board, netinfo, cells, w)
-            anchor(board, netinfo, groups[g], cells[0][1:], cells[0][0], w, nt)
-            anchor(board, netinfo, groups[hit - 1], cells[-1][1:], cells[-1][0], w, nt)
+            nt, nv = connect(board, netinfo, R, groups, g, hit, cells, w)
             tracks += nt; vias += nv
             merged = groups[g] + groups[hit - 1] + [('t', t) for t in nt] + [('v', v) for v in nv]
             keep = [grp for k, grp in enumerate(groups) if k not in (g, hit - 1)]
@@ -139,55 +136,15 @@ def drop_orphans(board, net, pads, tracks, vias):
     return n
 
 
-def prune(board, pads, tracks, vias, only=None):
-    """Remove unlocked tracks with an open end and unlocked vias that join nothing (left over after
-    a rip-up or by the autorouter). ``only``: look at this net alone. Returns how many items went."""
-    removed = 0
-
-    def near_seg(x, y, t, tol=None):
-        dx, dy = t['x2'] - t['x1'], t['y2'] - t['y1']
-        L2 = dx * dx + dy * dy
-        u = 0 if L2 == 0 else max(0, min(1, ((x - t['x1']) * dx + (y - t['y1']) * dy) / L2))
-        return math.hypot(x - t['x1'] - u * dx, y - t['y1'] - u * dy) <= (t['w'] / 2 + 0.01 if tol is None else tol)
-
-    while True:
-        by_net = {}
-        for t in tracks:
-            by_net.setdefault(t['net'], []).append(t)
-        gone = []
-        for t in tracks:
-            if t['locked'] or short(t['net']) in POUR_NETS or (only and t['net'] != only):
-                continue
-            for x, y in ((t['x1'], t['y1']), (t['x2'], t['y2'])):
-                held = any(p['net'] == t['net'] and t['layer'] in p['layers'] and p['x1'] - 0.01 <= x <= p['x2'] + 0.01 and
-                           p['y1'] - 0.01 <= y <= p['y2'] + 0.01 for p in pads)
-                held = held or any(v['net'] == t['net'] and math.hypot(x - v['x'], y - v['y']) <= v['d'] / 2 + 0.01 for v in vias)
-                held = held or any(o is not t and o['layer'] == t['layer'] and near_seg(x, y, o, JOIN) for o in by_net[t['net']])
-                if not held:
-                    gone.append(t)
-                    break
-        for v in vias:
-            if v['locked'] or short(v['net']) in ('GND', '+3V3') or (only and v['net'] != only):
-                continue
-            layers = {t['layer'] for t in by_net.get(v['net'], []) if near_seg(v['x'], v['y'], t)}
-            on_pad = any(p['net'] == v['net'] and p['x1'] <= v['x'] <= p['x2'] and p['y1'] <= v['y'] <= p['y2'] for p in pads)
-            if len(layers) + (1 if on_pad else 0) < 2:
-                gone.append(v)
-        if not gone:
-            return removed
-        for it in gone:
-            board.Remove(it['obj'])
-            GRAVE.append(it['obj'])
-            (tracks if 'layer' in it else vias).remove(it)
-            removed += 1
-
-
-def tidy(board, pads, tracks, vias):
-    """Remove vias that join nothing and cut tracks with a loose end back to their last junction,
-    fixed ones included (a fan-out via the routers did not need). Nets with a pour are left alone:
-    there a via or a track end may connect to the pour. Returns the number of items changed."""
+def tidy(board, pads, tracks, vias, only=None, fixed=False):
+    """Remove vias that join nothing and cut tracks with a loose end back to their last junction.
+    ``only``: look at this net alone. ``fixed``: also treat the locked routes this way (a fan-out via
+    the routers did not need); that is for the very end. Nets with a pour are left alone: there a via
+    or a track end may connect to the pour. Returns the number of items changed."""
     poured = {z[0] for z in ZONES if z[0]}
     changed = 0
+    skip = lambda it: (it['net'] in poured or not it['net'] or (only and it['net'] != only) or
+                       (it['locked'] and not fixed))
 
     def dist(x, y, t):
         dx, dy = t['x2'] - t['x1'], t['y2'] - t['y1']
@@ -209,7 +166,7 @@ def tidy(board, pads, tracks, vias):
         for t in tracks:
             by_net.setdefault(t['net'], []).append(t)
         for v in list(vias):
-            if v['net'] in poured or not v['net']:
+            if skip(v):
                 continue
             layers = {t['layer'] for t in by_net.get(v['net'], []) if dist(v['x'], v['y'], t)[0] <= JOIN}
             for q in pads:
@@ -219,7 +176,7 @@ def tidy(board, pads, tracks, vias):
                 drop(v, vias)
                 changed += 1
         for t in list(tracks):
-            if t['net'] in poured or not t['net'] or id(t) in gone:
+            if skip(t) or id(t) in gone:
                 continue
             others = [o for o in by_net[t['net']] if o is not t and o['layer'] == t['layer'] and id(o) not in gone]
             length = math.hypot(t['x2'] - t['x1'], t['y2'] - t['y1'])
@@ -237,13 +194,15 @@ def tidy(board, pads, tracks, vias):
                 if held:
                     continue
                 # junctions along this track: ends of other tracks and vias on its centre line
-                taps = [(dist(px, py, t), (px, py)) for o in others for px, py in ((o['x1'], o['y1']), (o['x2'], o['y2']))]
-                taps += [(dist(v['x'], v['y'], t), (v['x'], v['y'])) for v in vias if v['net'] == t['net']]
-                taps = [(u if end else 1 - u, pt) for (d, u), pt in taps if d <= JOIN]     # 1 = at the loose end
+                taps = [dist(px, py, t) for o in others for px, py in ((o['x1'], o['y1']), (o['x2'], o['y2']))]
+                taps += [dist(v['x'], v['y'], t) for v in vias if v['net'] == t['net']]
+                taps = [u if end else 1 - u for d, u in taps if d <= JOIN]                  # 1 = at the loose end
                 if not taps:
                     drop(t, tracks)
                 else:
-                    px, py = max(taps)[1]
+                    # the new end stays on this track's own line, so its clearances do not change
+                    u = max(taps) if end else 1 - max(taps)
+                    px, py = t['x1'] + u * (t['x2'] - t['x1']), t['y1'] + u * (t['y2'] - t['y1'])
                     if end:
                         t['x2'], t['y2'] = px, py
                         t['obj'].SetEnd(BD.V(px, py))
@@ -265,7 +224,7 @@ def main():
     pads, tracks, vias = board_items(board)
     if '--pours' in sys.argv:
         done, failed = route_pours(board, pads, tracks, vias)
-        print('tidied %d unused vias and loose track ends' % tidy(board, pads, tracks, vias))
+        print('tidied %d unused vias and loose track ends' % tidy(board, pads, tracks, vias, fixed=True))
         pcbnew.SaveBoard(path, board)
         print('linked %d connections, failed: %s' % (done, ', '.join(failed) or 'none'))
         return
@@ -296,7 +255,7 @@ def main():
         while True:
             groups = clusters(net, pads, tracks, vias)
             if len(groups) < 2:
-                prune(board, pads, tracks, vias, only=net)        # stubs left at a cut
+                tidy(board, pads, tracks, vias, only=net)         # stubs left at a cut
                 break
             if last is not None and len(groups) >= last:
                 print('  %-22s no progress, giving up' % short(net), flush=True)
@@ -350,15 +309,13 @@ def main():
                 print('  %-22s FAILED (%s)' % (short(net), why), flush=True)
                 failed.append(net)
                 break
-            nt, nv = add_path(board, netinfo, cells, w)
-            anchor(board, netinfo, groups[g], cells[0][1:], cells[0][0], w, nt)
-            anchor(board, netinfo, groups[hit - 1], cells[-1][1:], cells[-1][0], w, nt)
+            nt, nv = connect(board, netinfo, R, groups, g, hit, cells, w)
             tracks += nt; vias += nv
             done += 1
             print('  %-22s %2d vias  %5.1f mm  width %.2f' % (short(net), len(nv), len(cells) * CELL, w), flush=True)
             if done % 6 == 0:                             # checkpoint: a later run continues from here
                 pcbnew.SaveBoard(path, board)
-    print('removed %d loose track ends and vias' % prune(board, pads, tracks, vias))
+    print('removed %d loose track ends and vias' % tidy(board, pads, tracks, vias))
     pcbnew.SaveBoard(path, board)
     failed = [n for n in dict.fromkeys(failed) if len(clusters(n, pads, tracks, vias)) > 1]   # some were closed later
     print('routed %d connections, failed: %s' % (done, ' '.join(short(n) for n in failed) or 'none'))

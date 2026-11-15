@@ -7,6 +7,7 @@ Usage (see README for the environment):
     python3 build_pcb.py finish    # after the last round: fill the zones
 """
 
+import math
 import os
 import sys
 
@@ -16,7 +17,7 @@ import design
 import geometry as G
 import libs
 import placement
-from board import B_, Board, F, IN1, IN2, NAME, PCB, PROJECT, mm, rect, schematic_net_names
+from board import B_, Board, F, IN1, IN2, NAME, PCB, PROJECT, mm, rect, schematic_net_names, unV
 from board_setup import documentation, outline, setup, write_project, zones
 from routes_board import (
     dc_route,
@@ -83,6 +84,42 @@ def build():
     print('wrote', PCB, len(B.fp), 'footprints', len(B.nets), 'nets')
 
 
+def drop_edge_violations(board, clearance=0.3):
+    """Remove the autorouter's tracks and vias that come closer than the edge clearance to the board edge
+    or a cut-out (it keeps a slightly smaller distance of its own). finish_route.py routes them again."""
+    w, h = G.LED_WINDOW
+    holes = [(G.NOTCH_X, G.NOTCH_Y, G.BOARD_W + 9, G.BOARD_H + 9), (-9, G.POCKET_Y, G.POCKET_X, G.BOARD_H + 9), G.SLOT]
+    holes += [(x - w / 2, y - h / 2, x + w / 2, y + h / 2) for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
+    # outside the board outline: four half planes as wide rectangles
+    holes += [(-9, -9, 0, G.BOARD_H + 9), (G.BOARD_W, -9, G.BOARD_W + 9, G.BOARD_H + 9), (-9, -9, G.BOARD_W + 9, 0),
+              (-9, G.BOARD_H, G.BOARD_W + 9, G.BOARD_H + 9)]
+
+    def near(x, y, r):
+        return any(math.hypot(max(x1 - x, 0, x - x2), max(y1 - y, 0, y - y2)) < r for x1, y1, x2, y2 in holes)
+
+    gone = []
+    for t in board.GetTracks():
+        if t.IsLocked():
+            continue
+        if t.GetClass() == 'PCB_VIA':
+            x, y = unV(t.GetPosition())
+            bad = near(x, y, clearance + pcbnew.ToMM(t.GetWidth(F)) / 2 - 1e-4)
+        else:
+            (xa, ya), (xb, yb) = unV(t.GetStart()), unV(t.GetEnd())
+            n = int(math.hypot(xb - xa, yb - ya) / 0.05) + 1
+            r = clearance + pcbnew.ToMM(t.GetWidth()) / 2 - 1e-4
+            bad = any(near(xa + (xb - xa) * k / n, ya + (yb - ya) * k / n, r) for k in range(n + 1))
+        if bad:
+            gone.append(t)
+    for t in gone:
+        board.Remove(t)
+    _KEEP.extend(gone)                 # the bindings must not free removed items while the board lives
+    return len(gone)
+
+
+_KEEP = []
+
+
 if __name__ == '__main__':
     cmd = sys.argv[1] if len(sys.argv) > 1 else 'place'
     if cmd == 'place':
@@ -97,6 +134,8 @@ if __name__ == '__main__':
                   for y in (G.LED_Y_TOP, G.LED_Y_BOT) for x in G.LED_X]
         x1, y1, x2, y2 = G.SLOT
         boxes.append((x1 - 0.3, y1 - 0.3, x2 + 0.3, y2 + 0.3))
+        boxes.append((G.NOTCH_X - 0.35, G.NOTCH_Y - 0.35, G.BOARD_W + 1, G.BOARD_H + 1))      # Ethernet cut-away
+        boxes.append((-1, G.POCKET_Y - 0.35, G.POCKET_X + 0.35, G.BOARD_H + 1))               # DC plug cut-away
         for x1, y1, x2, y2 in boxes:
             helper.keepout(rect(x1, y1, x2, y2), (F, IN1, IN2, B_), 'router only', tracks=True, vias=True,
                            pours=False)
@@ -109,6 +148,7 @@ if __name__ == '__main__':
         for t in thin:                            # the autorouter's neck-downs go below the board minimum
             t.SetWidth(mm(0.11))
         print('widened %d tracks to 0.11 mm' % len(thin))
+        print('removed %d tracks and vias too close to the board edge' % drop_edge_violations(b))
         pcbnew.SaveBoard(PCB, b)
     elif cmd == 'finish':
         b = pcbnew.LoadBoard(sys.argv[2] if len(sys.argv) > 2 else PCB)

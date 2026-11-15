@@ -173,10 +173,14 @@ crystal, the PHY drives the 50 MHz RMII clock, PHY address 1. The transformer
 centre taps go to ground through 100 nF (voltage-mode PHY, no termination
 resistors).
 
-Open point: the jack datasheet does not label the polarity within each pair.
-The assignment used (pin 1 RD-, 2 RD+, 5 TD-, 6 TD+) is the one that routes
-without crossing. 10BASE-T receivers correct a swapped pair and 100BASE-TX does
-not depend on polarity, so the link comes up either way.
+The jack datasheet prints no + and - at the transformer pins. The polarity
+follows from the winding dots in its schematic and the standard contacts of the
+jack (1 TX+, 2 TX-, 3 RX+, 6 RX-): pin 1 is RD+, pin 2 RD-, pin 5 TD+, pin 6
+TD-. At the PHY the positive pin of each pair leads to the outer of the two
+tracks, at the jack it is the inner pin. The negative line of each pair
+therefore changes to the back layer through one via and reaches its jack pin
+there. (A swapped pair would still link: 10BASE-T receivers correct it and
+100BASE-TX does not depend on polarity.)
 
 ## Layout rules used
 
@@ -272,12 +276,10 @@ Lengths of the fast buses on the routed board: the six SDIO lines to the Wi-Fi
 module are 39 to 47 mm, the RMII lines to the PHY 35 to 51 mm with two to four
 vias each. Both are well inside what these interfaces tolerate.
 
-Known compromise: RMII_TXD1 is GPIO35, which is also the boot-mode pin. The
-BOOT button and its test point hang on this net as a branch of about 70 mm.
-At 50 MHz that is short enough to work, but it is a stub on a fast line. In
-firmware, set the drive strength of the RMII transmit pins to the lowest value
-that works. For a revision B, put a series resistor (470 ohm) into the branch
-close to where it leaves the main track.
+RMII_TXD1 is GPIO35, which is also the boot-mode pin. The BOOT button and its
+test point are about 70 mm away. They hang behind a 1 kohm resistor (R217) that
+sits at the line, next to the strap resistor, so the 50 MHz line has no long
+open branch. With the button pressed the pin sees 0.3 V.
 
 The silkscreen carries only functional labels (test points, buttons, polarity
 marks). Reference designators are on the assembly drawing layer

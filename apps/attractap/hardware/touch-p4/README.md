@@ -69,18 +69,25 @@ Open `kicad/attractap-touch-p4.kicad_pro` in KiCad 10 and edit there. After a
 schematic change use *Tools > Update PCB from Schematic* as usual. The board's
 net names already match what KiCad derives from the schematic.
 
-Checks before ordering:
+The board is the Nx project `attractap-touch-p4-pcb`. Every operation is a target:
 
-```bash
-kicad-cli sch erc --severity-all kicad/attractap-touch-p4.kicad_sch
-kicad-cli pcb drc --severity-all --schematic-parity --refill-zones kicad/attractap-touch-p4.kicad_pcb
-```
+| Command | What it does |
+|---|---|
+| `pnpm nx run attractap-touch-p4-pcb:setup-toolchain` | Checks KiCad 10 and its Python, downloads the autorouter into `.tools/kicad`. Run once. |
+| `pnpm nx run attractap-touch-p4-pcb:check` | All checks below. Run before ordering. |
+| `pnpm nx run attractap-touch-p4-pcb:test` | Checks of the circuit description and of the I2C address check. Needs no KiCad. |
+| `pnpm nx run attractap-touch-p4-pcb:erc` | Electrical rules check of the schematic. |
+| `pnpm nx run attractap-touch-p4-pcb:check-netlist` | Schematic against the circuit description; devices and addresses on each I2C bus. |
+| `pnpm nx run attractap-touch-p4-pcb:drc` | Design rules check of the board, including schematic parity. |
+| `pnpm nx run attractap-touch-p4-pcb:build` | Manufacturing files into `fab/` (ignored by git). Runs `erc` and `drc` first. |
+| `pnpm nx run attractap-touch-p4-pcb:render` | `fab/render-top.png` and `fab/render-bottom.png`. |
 
-Manufacturing files:
-
-```bash
-python3 scripts/export_fab.py      # writes fab/ (ignored by git)
-```
+Reports go to `fab/reports/`. The targets find KiCad on the PATH, in the macOS app bundle or, on
+NixOS, in nixpkgs; set `KICAD_CLI` and `KICAD_PYTHON` to use another installation. They run KiCad
+with a configuration of their own under `.tools/kicad`, so they do not depend on your KiCad settings.
+The targets `generate-library`, `generate-schematic`, `place` and `route` rebuild the project from
+the circuit description and overwrite the KiCad files; see
+[scripts/bootstrap/README.md](scripts/bootstrap/README.md).
 
 `fab/gerbers/` goes to the PCB order (zip it). `fab/board-front.pdf` is the
 assembly drawing with the reference designators (the silkscreen has none). `fab/wifi/` and `fab/lan/` each

@@ -111,7 +111,7 @@ address or when a device has no entry in its address table.
    (`EMAC_CLK_EXT_IN`), MDC 31, MDIO 36, data pins as in the table. Release
    the PHY reset through expander P4 before starting the driver. Set the
    drive strength of the transmit pins (GPIO33 to 35) to the lowest value
-   that works: GPIO35 also carries the BOOT button on a long branch. On the wifi
+   that works; that keeps the emissions down. On the wifi
    version the PHY is not fitted: probe it and fall back to Wi-Fi.
 6. **NFC**: unchanged PN532 protocol, now on its own I2C bus, with IRQ and a
    reset line the MCU controls.

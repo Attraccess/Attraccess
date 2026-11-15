@@ -290,6 +290,8 @@ def mcu_top(B):
     B.track([a, (a[0], a[1] - 0.53), (a[0] + (a[1] - 0.53 - yk), yk), (c220[0] - 0.9, yk), c220], 'VDD_HP_1', 0.2)
     xk = (r203[0] + c220[0]) / 2 + 0.005
     B.track([c220, (xk, c220[1]), (xk, r203[1]), r203], 'VDD_HP_1', w)
+    # GPIO35 strap resistor to the BOOT branch resistor above it
+    B.track([p('R212', '2'), p('R217', '1')], 'RMII_TXD1', w)
     # UART0 RX: under the flash regulator's capacitor, up beside it to a via
     rx, c223 = m(70), p('C223', '1')
     yh = c223[1] + 0.49

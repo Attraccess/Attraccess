@@ -42,7 +42,9 @@ def eth(d):
     d.R('33R', 'PHY_CRS_DV', 'RMII_CRS_DV', **V)
     d.group('RJ45 jack with magnetics')
     d.add('J', 'HY931147C', 'attractap:HY931147C', 'attractap:RJ45-TH_HY931147C', {
-        '1': 'MDI_RN', '2': 'MDI_RP', '3': 'ETH_CT_RX', '4': 'ETH_CT_TX', '5': 'MDI_TN', '6': 'MDI_TP',
+        # Polarity from the winding dots in the datasheet and the standard jack contacts
+        # (J1 TX+, J2 TX-, J3 RX+, J6 RX-): P1 goes to J3, P2 to J6, P5 to J1, P6 to J2.
+        '1': 'MDI_RP', '2': 'MDI_RN', '3': 'ETH_CT_RX', '4': 'ETH_CT_TX', '5': 'MDI_TP', '6': 'MDI_TN',
         '9': 'POE_VP', '10': 'POE_VN',
         '11': '+3V3', '12': 'ETH_LED_Y_K', '13': 'PHY_LED3', '14': 'ETH_LED_G_K',
         'GND1': 'ETH_SHIELD', 'GND2': 'ETH_SHIELD',
@@ -220,7 +222,7 @@ def mech(d):
     for net, label, sheet in (
         ('+5V', '5V', 'power'), ('+3V3', '3V3', 'power'), ('VDD_HP', 'VDD_HP', 'mcu_power'),
         ('GND', 'GND', 'power'), ('GND', 'GND', 'power'),
-        ('CHIP_PU', 'EN', 'mcu'), ('RMII_TXD1', 'BOOT', 'mcu'), ('UART0_TX', 'TX0', 'mcu'),
+        ('CHIP_PU', 'EN', 'mcu'), ('BOOT', 'BOOT', 'mcu'), ('UART0_TX', 'TX0', 'mcu'),
         ('UART0_RX', 'RX0', 'mcu'),
         ('C6_EN', 'C6_EN', 'wifi'), ('C6_IO9', 'C6_BOOT', 'wifi'), ('C6_TXD0', 'C6_TX', 'wifi'),
         ('C6_RXD0', 'C6_RX', 'wifi'),

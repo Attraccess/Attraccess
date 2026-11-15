@@ -29,49 +29,36 @@ edited by hand, treat the KiCad files as the source of truth and do not run
 
 ## Requirements
 
-- KiCad 10 (`kicad-cli` and the `pcbnew` Python module)
-- [Freerouting](https://github.com/freerouting/freerouting) 2.5.0 or newer (the jar from the releases page, run with
-  `java -jar`). Version 2.2.4 hangs on this board.
-- numpy and Pillow (both come with KiCad's Python)
+- KiCad 10 (`kicad-cli` and the `pcbnew` Python module, with numpy and Pillow)
+- Java 25 or newer and [Freerouting](https://github.com/freerouting/freerouting) 2.5.0 for the `route`
+  target. Version 2.2.4 hangs on this board.
 - Python 3 with [easyeda2kicad](https://github.com/uPesy/easyeda2kicad.py) for fetching parts
 
-On NixOS: `nix shell nixpkgs#kicad nixpkgs#freerouting`. Set `KICAD` to the
-KiCad install prefix, `KICAD10_SYMBOL_DIR` and `KICAD10_FOOTPRINT_DIR` to the
-standard libraries, and run the scripts with KiCad's Python packages on
-`PYTHONPATH` (the `kicad` wrapper script shows the paths).
+`pnpm nx run attractap-touch-p4-pcb:setup-toolchain` checks KiCad and downloads Freerouting into
+`.tools/kicad`. `tools/kicad-env.sh` finds KiCad (PATH, macOS app bundle, or nixpkgs on NixOS) and
+`tools/pcb.sh` holds the commands behind the targets.
 
 ## Steps
 
 ```bash
-# 1. fetch the LCSC parts once (symbols, footprints) into a scratch folder
+# 1. fetch the LCSC parts once (symbols, footprints) into a scratch folder, then build kicad/lib
 easyeda2kicad --lcsc_id C54540373 C5736265 ... --full --output /tmp/lcsc/lcsc
-python3 make_lib.py /tmp/lcsc              # -> kicad/lib, lib tables
+pnpm nx run attractap-touch-p4-pcb:generate-library -- /tmp/lcsc
 
-# 2. schematic
-python3 build_sch.py
-kicad-cli sch erc --severity-all ../../kicad/attractap-touch-p4.kicad_sch
-kicad-cli sch export netlist --format kicadsexpr -o /tmp/sch.net ../../kicad/attractap-touch-p4.kicad_sch
-python3 check_netlist.py /tmp/sch.net
+# 2. schematic from the circuit description, then ERC and the netlist check
+pnpm nx run attractap-touch-p4-pcb:generate-schematic
 
-# 3. board
-python3 build_pcb.py place                 # parts, zones, fixed vias and routes
-python3 check_overlap.py
-# 4. autorouter: repeat these three lines for one or two rounds (about 12 minutes each)
-python3 build_pcb.py dsn                   # -> kicad/attractap-touch-p4.dsn
-timeout 30m java -jar freerouting-2.5.0.jar -de attractap-touch-p4.dsn -do attractap-touch-p4.ses \
-    --router.autorouter.max_passes=4 --router.fanout.enabled=false --router.optimizer.enabled=false \
-    --router.automatic_neckdown=true --gui.enabled=false
-python3 build_pcb.py ses                   # import the routes (locked tracks from step 3 stay)
+# 3. board: parts, zones, fixed vias and routes; reports overlapping parts
+pnpm nx run attractap-touch-p4-pcb:place
 
-# 5. close what the autorouter left open (it stops at 20 to 40 open connections on this board)
-python3 finish_route.py                    # signals and small supply nets
-python3 build_pcb.py finish                # fill the zones
-python3 finish_route.py --pours            # ground and 3.3 V pads that are cut off from their pours
-python3 build_pcb.py finish
-
-# 6. check
-kicad-cli pcb drc --severity-all --schematic-parity ../../kicad/attractap-touch-p4.kicad_pcb
+# 4. routing: autorouter (about 10 minutes), grid router for what it leaves open (it stops at 15 to 25
+#    open connections on this board), zone fill, pour links and clean-up, DRC
+pnpm nx run attractap-touch-p4-pcb:route
 ```
+
+`route` runs these steps (`tools/pcb.sh`): `build_pcb.py dsn`, Freerouting, `build_pcb.py ses`,
+`finish_route.py`, `build_pcb.py finish`, `finish_route.py --pours`, `build_pcb.py finish`, DRC.
+The autorouter does not give the same result twice, so neither does `route`.
 
 Lessons from revision A, in case the generator is used again:
 
@@ -80,10 +67,10 @@ Lessons from revision A, in case the generator is used again:
   with an open end or an odd angle.
 - Run one autorouter at a time. Two instances block each other.
 - `finish_route.py` takes minutes to an hour. When two nets keep cutting each other in its log, that
-  spot has too little room: look at it and fix the placement or add a fixed route in `build_pcb.py`
-  (`flash_routes`, `nfc_host`, `uart_escape`, `lcd_fanout`, `mcu_top` and `mcu_left` came about that way). Running it again does not help.
+  spot has too little room: look at it and fix the placement or add a fixed route (the fan-outs in
+  `routes_mcu.py` came about that way). Running it again does not help.
 - A supply fan-out via in front of a pad row can cost one escape track. `plane_fanout` runs last and
   has a short list of pads that are fed another way.
 
-The autorouter writes its result only after the last pass of a run. Short
-rounds with a time limit keep the result of every round.
+The autorouter writes its result only after the last pass of a run, so `route` puts a time limit
+on it.

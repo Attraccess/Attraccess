@@ -48,6 +48,7 @@ def place(B):
     m('R215', 7.4, -5.7, 180)      # USB D-
     # straps: GPIO35, GPIO34, MDIO pull-ups, to the right of the RMII pins' way out
     m('R212', 6.0, -12.4, 90)
+    m('R217', 6.0, -14.4, 90)      # BOOT branch resistor, in line with the GPIO35 strap
     m('R213', 7.1, -12.4, 90)
     m('R214', 8.2, -12.4, 90)
 

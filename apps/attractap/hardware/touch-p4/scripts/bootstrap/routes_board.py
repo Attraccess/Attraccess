@@ -101,11 +101,18 @@ def mdi_routes(B):
     w = 0.2
     p = B.pad
     tp, tn, reg, rp, rn, iset = (p('U401', n) for n in ('30', '29', '28', '27', '26', '25'))
-    nets = B.d.parts['J401'].nets
-    jack = {nets[n]: p('J401', n) for n in ('1', '2', '5', '6')}
-    for start, net, d in ((tp, 'MDI_TP', 0.83), (tn, 'MDI_TN', 0.4), (rp, 'MDI_RP', 0.25), (rn, 'MDI_RN', 0.28)):
-        jx, jy = jack[net]
-        B.track([start, (jx - d, start[1]), (jx, start[1] + d), (jx, jy)], net, w)
+    # At the PHY the positive pin of each pair is the upper one and so takes the outer lane; at the jack
+    # the positive pin is the inner one. The pairs therefore swap lanes on the way: the negative line
+    # changes to the back layer and runs to its (through-hole) jack pin there.
+    for pos, neg, name, jp, jn, d_pos, d_neg, drop in ((tp, tn, 'MDI_T', '5', '6', 0.83, 0.4, 3.0),
+                                                       (rp, rn, 'MDI_R', '1', '2', 0.25, 0.28, 2.8)):
+        (xi, yp), (xo, yn) = p('J401', jp), p('J401', jn)       # inner lane and jack pin +, outer lane and pin -
+        yc = pos[1] + drop
+        B.track([pos, (xo - d_pos, pos[1]), (xo, pos[1] + d_pos), (xo, yc + 0.6), (xi, yc + 0.6 + (xo - xi)), (xi, yp)],
+                name + 'P', w)
+        B.track([neg, (xi - d_neg, neg[1]), (xi, neg[1] + d_neg), (xi, yc)], name + 'N', w)
+        B.via(xi, yc, name + 'N')
+        B.track([(xi, yc), (xo, yc + (xo - xi)), (xo, yn)], name + 'N', w, layer=B_)
     c405, c404, r401 = p('C405', '1'), p('C404', '1'), p('R401', '1')
     B.track([reg, (c405[0] - 0.42, reg[1]), c405, c404], 'PHY_REG', 0.25)
     B.track([iset, (iset[0], iset[1] + 0.9), (r401[0], r401[1] - 0.42), r401], 'PHY_ISET', 0.15)

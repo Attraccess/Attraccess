@@ -14,7 +14,7 @@ Ethernet/PoE version. Symbols marked DNP are never fitted. A symbol with the fie
 ``Alt_MPN`` / ``Alt_LCSC`` has a second part that fits the same footprint; it replaces the
 normal part in bom-external-antenna.csv.
 
-Usage: python3 export_fab.py        (kicad-cli must be on PATH, or set $KICAD to the install prefix)
+Usage: tools/pcb.sh export          (or python3 export_fab.py with kicad-cli on PATH or in $KICAD_CLI)
 """
 import csv
 import os
@@ -26,7 +26,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT = os.path.normpath(os.path.join(HERE, '..', 'kicad'))
 FAB = os.path.normpath(os.path.join(HERE, '..', 'fab'))
 NAME = 'attractap-touch-p4'
-CLI = os.path.join(os.environ['KICAD'], 'bin', 'kicad-cli') if os.environ.get('KICAD') else 'kicad-cli'
+CLI = os.environ.get('KICAD_CLI') or (
+    os.path.join(os.environ['KICAD'], 'bin', 'kicad-cli') if os.environ.get('KICAD') else 'kicad-cli')
 VARIANTS = {'wifi': {''}, 'lan': {'', 'lan'}}
 NOT_ASSEMBLED = ('TP', 'H', 'FID', 'ANT')          # bare copper / holes, nothing to place
 COPPER = 'F.Cu,In1.Cu,In2.Cu,B.Cu'

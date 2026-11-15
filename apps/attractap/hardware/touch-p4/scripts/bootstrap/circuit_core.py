@@ -216,8 +216,12 @@ def mcu(d):
     d.add('SW', 'RESET', 'attractap:TS-1187A-B-A-B', 'attractap:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5',
           {'1': 'CHIP_PU', '4': 'GND'}, nc=('2', '3'), lcsc='C318884', mpn='TS-1187A-B-A-B')
     d.add('SW', 'BOOT', 'attractap:TS-1187A-B-A-B', 'attractap:SW-SMD_4P-L5.1-W5.1-P3.70-LS6.5-TL_H1.5',
-          {'1': 'RMII_TXD1', '4': 'GND'}, nc=('2', '3'), lcsc='C318884', mpn='TS-1187A-B-A-B')
+          {'1': 'BOOT', '4': 'GND'}, nc=('2', '3'), lcsc='C318884', mpn='TS-1187A-B-A-B')
     d.R('10k', '+3V3', 'RMII_TXD1', desc='GPIO35 boot strap: high = boot from flash')
+    # GPIO35 is also an RMII transmit line. The button and its test point are far away, so they hang
+    # behind this resistor, which sits at the line: no long open branch on a 50 MHz signal. Pressed,
+    # the pin sees 3.3 V x 1k / 11k = 0.3 V.
+    d.R('1k', 'RMII_TXD1', 'BOOT', ref='R217', desc='decouples the BOOT button branch from RMII_TXD1')
     d.R('10k', '+3V3', 'RMII_TXD0', desc='GPIO34 strap')
     d.R('1.5k', '+3V3', 'ETH_MDIO', desc='MDIO pull-up, also the GPIO36 strap. Fit on every variant')
 

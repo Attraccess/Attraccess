@@ -1,0 +1,113 @@
+{
+  "name": "attractap-touch-p4-pcb",
+  "$schema": "../../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/attractap/hardware/touch-p4",
+  "projectType": "application",
+  "tags": ["scope:hardware", "type:pcb"],
+  "targets": {
+    "setup-toolchain": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/setup-toolchain.sh"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["{projectRoot}/scripts/**/*"],
+      "options": {
+        "command": "python3 -I apps/attractap/hardware/touch-p4/scripts/bootstrap/test_design.py"
+      }
+    },
+    "erc": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "parallelism": false,
+      "inputs": ["{projectRoot}/kicad/**/*", "{projectRoot}/tools/**/*"],
+      "outputs": ["{projectRoot}/fab/reports/erc.rpt"],
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh erc"
+      }
+    },
+    "check-netlist": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "parallelism": false,
+      "inputs": ["{projectRoot}/kicad/**/*", "{projectRoot}/tools/**/*", "{projectRoot}/scripts/bootstrap/**/*"],
+      "outputs": ["{projectRoot}/fab/reports/schematic.net"],
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh check-netlist"
+      }
+    },
+    "drc": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "parallelism": false,
+      "inputs": ["{projectRoot}/kicad/**/*", "{projectRoot}/tools/**/*"],
+      "outputs": ["{projectRoot}/fab/reports/drc.rpt"],
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh drc"
+      }
+    },
+    "check": {
+      "executor": "nx:noop",
+      "dependsOn": ["test", "erc", "check-netlist", "drc"]
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "parallelism": false,
+      "dependsOn": ["erc", "drc"],
+      "inputs": ["{projectRoot}/kicad/**/*", "{projectRoot}/tools/**/*", "{projectRoot}/scripts/export_fab.py"],
+      "outputs": [
+        "{projectRoot}/fab/gerbers",
+        "{projectRoot}/fab/wifi",
+        "{projectRoot}/fab/lan",
+        "{projectRoot}/fab/*.pdf",
+        "{projectRoot}/fab/*.csv"
+      ],
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh export"
+      }
+    },
+    "render": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "parallelism": false,
+      "inputs": ["{projectRoot}/kicad/**/*", "{projectRoot}/tools/**/*"],
+      "outputs": ["{projectRoot}/fab/render-top.png", "{projectRoot}/fab/render-bottom.png"],
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh render"
+      }
+    },
+    "generate-library": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh generate-library"
+      }
+    },
+    "generate-schematic": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh generate-schematic"
+      }
+    },
+    "place": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh place"
+      }
+    },
+    "route": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh route"
+      }
+    }
+  }
+}

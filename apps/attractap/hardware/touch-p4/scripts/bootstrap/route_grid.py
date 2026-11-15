@@ -155,7 +155,7 @@ def clusters(net, pads, tracks, vias, plane_all_vias=False):
         dx, dy = it['x2'] - it['x1'], it['y2'] - it['y1']
         L2 = dx * dx + dy * dy
         t = 0 if L2 == 0 else max(0, min(1, ((x - it['x1']) * dx + (y - it['y1']) * dy) / L2))
-        return math.hypot(x - it['x1'] - t * dx, y - it['y1'] - t * dy) <= it['w'] / 2 + 0.01
+        return math.hypot(x - it['x1'] - t * dx, y - it['y1'] - t * dy) <= JOIN
 
     first_via = None
     for a, (ka, ia) in enumerate(items):
@@ -432,18 +432,60 @@ def add_path(board, netinfo, path, width):
     return new_t, new_v
 
 
-def anchor(board, netinfo, grp_items, cell, layer, width, new_t):
-    """Join the end of a path (a grid cell) to the exact centre of the pad or via it ended on."""
-    x, y = cell[1] * CELL, cell[0] * CELL
-    best = None
-    for kind, it in grp_items:
-        if kind == 'p' and layer in it['layers'] and it['x1'] <= x <= it['x2'] and it['y1'] <= y <= it['y2']:
-            best = (it['cx'], it['cy'])
-        elif kind == 'v' and math.hypot(x - it['x'], y - it['y']) < 0.08:
-            best = (it['x'], it['y'])
-    if best and math.hypot(best[0] - x, best[1] - y) > 0.002:
+def connect(board, netinfo, R, groups, g, hit, cells, width):
+    """Lay a found path as tracks and vias and join both ends exactly to the copper they start and end on.
+    Returns the new tracks and vias as dictionaries.
+
+    A path ends on a cell of the other group. On a pad or via the end is joined to its centre. On a
+    track, the end is joined to the nearest point of that track's centre line; if the track runs where
+    the new width has no room (it was necked down there), the last step is made as narrow as that track."""
+    name = netinfo.GetNetname()
+    new_t, new_v = [], []
+
+    def track(l, a, b, w):
+        if math.hypot(a[0] - b[0], a[1] - b[1]) < 0.002:
+            return
         t = pcbnew.PCB_TRACK(board)
-        t.SetStart(BD.V(x, y)); t.SetEnd(BD.V(*best)); t.SetWidth(pcbnew.FromMM(width)); t.SetLayer(LAYERS[layer])
-        t.SetNet(netinfo); board.Add(t)
-        new_t.append(dict(net=netinfo.GetNetname(), layer=layer, w=width, x1=x, y1=y, x2=best[0], y2=best[1],
-                          locked=False, obj=t))
+        t.SetStart(BD.V(*a)); t.SetEnd(BD.V(*b)); t.SetWidth(pcbnew.FromMM(w)); t.SetLayer(LAYERS[l]); t.SetNet(netinfo)
+        board.Add(t)
+        new_t.append(dict(net=name, layer=l, w=w, x1=a[0], y1=a[1], x2=b[0], y2=b[1], locked=False, obj=t))
+
+    def landing(grp, cell):
+        """(point to join to, width there or None for a pad or via)"""
+        l, x, y = cell[0], cell[2] * CELL, cell[1] * CELL
+        best = None
+        for kind, it in grp:
+            if kind == 'p' and l in it['layers'] and it['x1'] <= x <= it['x2'] and it['y1'] <= y <= it['y2']:
+                return (it['cx'], it['cy']), None
+            if kind == 'v' and math.hypot(x - it['x'], y - it['y']) < 0.08:
+                return (it['x'], it['y']), None
+            if kind == 't' and it['layer'] == l:
+                dx, dy = it['x2'] - it['x1'], it['y2'] - it['y1']
+                L2 = dx * dx + dy * dy
+                u = 0 if L2 == 0 else max(0, min(1, ((x - it['x1']) * dx + (y - it['y1']) * dy) / L2))
+                q = (it['x1'] + u * dx, it['y1'] + u * dy)
+                d = math.hypot(x - q[0], y - q[1])
+                if best is None or d < best[0]:
+                    best = (d, q, it['w'])
+        return (best[1], best[2]) if best and best[0] <= 2 * CELL else (None, None)
+
+    body = list(cells)
+    joins = []                                           # (layer, grid point, landing point, width)
+    for grp, last in ((groups[g], False), (groups[hit - 1], True)):
+        cell = body[-1] if last else body[0]
+        point, w_there = landing(grp, cell)
+        if point is None:
+            continue
+        w_join = width if w_there is None else min(width, w_there)
+        inner = (body[-2] if last else body[1]) if len(body) > 1 else None
+        if (w_there is not None and w_join < width and R.block[cell[0]][cell[1], cell[2]] and inner is not None and
+                inner[0] == cell[0]):
+            body = body[:-1] if last else body[1:]       # no room for the full width on this cell
+            cell = inner
+        joins.append((cell[0], (cell[2] * CELL, cell[1] * CELL), point, w_join))
+    if len(body) > 1:
+        nt, nv = add_path(board, netinfo, body, width)
+        new_t += nt; new_v += nv
+    for l, a, b, w in joins:
+        track(l, a, b, w)
+    return new_t, new_v

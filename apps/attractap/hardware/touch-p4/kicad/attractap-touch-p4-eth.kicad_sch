@@ -3435,35 +3435,35 @@
 		(effects (font (size 1.27 1.27)) (justify right bottom))
 		(uuid "7de585b4-e1b6-506b-9dac-16723e742042")
 	)
-	(label "MDI_RP"
+	(label "MDI_RN"
 		(at 33.02 201.93 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "2fe33b47-7284-5319-89db-a03e1fe9f43e")
+		(uuid "fe4f6c4c-9771-59d3-9437-95c6d29a0b80")
 	)
 	(label "ETH_CT_RX"
 		(at 33.02 204.47 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
 		(uuid "acd352f3-3271-5744-aee7-7f07ccffe06f")
 	)
-	(label "MDI_RN"
+	(label "MDI_RP"
 		(at 33.02 207.01 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "bae73084-324e-5ed6-98bd-f1d6b3d0f8b1")
+		(uuid "28edd61d-a4d6-58d9-9aee-2366cd5e5520")
 	)
-	(label "MDI_TP"
+	(label "MDI_TN"
 		(at 33.02 212.09 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "bbaab6b0-24f4-53e1-a523-38f281cd1dab")
+		(uuid "8df34104-aa70-5240-b045-41916402736d")
 	)
 	(label "ETH_CT_TX"
 		(at 33.02 214.63 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
 		(uuid "68cf0322-8d71-5eb0-a365-ff9511b5073f")
 	)
-	(label "MDI_TN"
+	(label "MDI_TP"
 		(at 33.02 217.17 180)
 		(effects (font (size 1.27 1.27)) (justify right bottom))
-		(uuid "eb587b34-9d69-5ca0-bc47-c60a41fd2e3f")
+		(uuid "e4d61c34-1f58-554e-ad87-e2d51ba02192")
 	)
 	(hierarchical_label "POE_VP"
 		(shape passive)
