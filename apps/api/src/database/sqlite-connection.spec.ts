@@ -232,6 +232,37 @@ describe('main SQLite connection', () => {
     expect(await source.query('SELECT value FROM counter WHERE id = 1')).toEqual([{ value: 3 }]);
   });
 
+  it('rolls a failed outermost commit back before a transaction waiting for it begins', async () => {
+    let second: Promise<void> | undefined;
+    source.subscribers.push({
+      beforeTransactionCommit: () => {
+        if (second) return;
+        second = source.transaction((manager) => manager.query('UPDATE counter SET value = 20 WHERE id = 2'));
+        // Stands in for a COMMIT that fails, e.g. with SQLITE_BUSY while another connection still reads.
+        throw new Error('Commit refused');
+      },
+    });
+
+    await expect(
+      source.transaction((manager) => manager.query('UPDATE counter SET value = 10 WHERE id = 1')),
+    ).rejects.toThrow('Commit refused');
+    await second;
+
+    const runner = source.createQueryRunner();
+    expect([runner.isTransactionActive, (runner as unknown as { transactionDepth: number }).transactionDepth]).toEqual([
+      false,
+      0,
+    ]);
+    expect(await source.query('SELECT id, value FROM counter ORDER BY id')).toEqual([
+      { id: 1, value: 0 },
+      { id: 2, value: 20 },
+    ]);
+    // No transaction is left open on the main connection: the serialized writer gets the lock.
+    await runSerializedTransaction(source.manager, (manager) =>
+      manager.query('UPDATE counter SET value = 1 WHERE id = 1'),
+    );
+  });
+
   it.each(['all', 'each'] as const)('runs migrations in %s-transaction mode', async (transaction) => {
     const statements: string[] = [];
     class CreateA1700000000001 implements MigrationInterface {

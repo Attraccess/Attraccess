@@ -35,7 +35,9 @@ export function createDataSource(options: DataSourceOptions): DataSource {
  * - A transaction that starts while another flow's BEGIN is pending waits for it, then nests as a savepoint. The
  *   outermost COMMIT or ROLLBACK waits for such a start, and a start waits for it, so neither acts on a stale depth.
  *   Without that, a savepoint lands outside the committed transaction and leaves the runner in one that never ends.
- * Query and transaction subscribers must not run queries on this connection: they would wait for themselves.
+ *   A failed outermost COMMIT rolls back before the gate opens, for the same reason.
+ * Subscribers must not start a transaction on this connection (including save()) from a transaction event, nor run
+ * a query from a query event: they would wait for themselves.
  */
 function guardSharedRunner(runner: QueryRunner): QueryRunner {
   if (guardedRunners.has(runner)) return runner;
@@ -114,7 +116,19 @@ function guardSharedRunner(runner: QueryRunner): QueryRunner {
     if (internals.transactionDepth !== 1) return end();
     return gated((gate) => (ending = gate), end);
   };
-  runner.commitTransaction = () => endTransaction(commitTransaction);
+  // If the outermost COMMIT fails, roll back while the gate is still closed. The caller's own rollback then finds no
+  // transaction, and TypeORM's callers ignore that error.
+  const commitOrRollBack = async () => {
+    try {
+      await commitTransaction();
+    } catch (error) {
+      if (internals.isTransactionActive && internals.transactionDepth === 1) {
+        await rollbackTransaction().catch(() => undefined);
+      }
+      throw error;
+    }
+  };
+  runner.commitTransaction = () => endTransaction(commitOrRollBack);
   // A rejected BEGIN leaves TypeORM at depth 0 without a SQLite transaction. Its ROLLBACK would fail, or end the
   // transaction another flow began meanwhile, so only reset the state. If another flow's BEGIN is pending, its
   // startTransaction already set isTransactionActive, so leave it. This skips the rollback subscriber events.
