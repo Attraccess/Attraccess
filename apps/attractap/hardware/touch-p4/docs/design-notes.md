@@ -13,7 +13,7 @@ Why the board looks the way it does, and what is still an assumption.
 | LAN/PoE | same PCB, parts not fitted on the wifi version | One design to maintain and certify. |
 | PoE | ready-made isolated module | No transformer design; the footprint takes SDAPO DP9900M-5V or Silvertel Ag9905M. |
 | Supply | DC 12 to 24 V, PoE or USB-C, each through its own Schottky diode onto one 5 V rail | Any combination may be connected; no source feeds another. |
-| DC connectors | barrel jack (5.5 / 2.1 mm) and WAGO 2601 lever terminal in parallel | Plug-in supplies and bare wires from an existing installation both work. |
+| DC connectors | barrel jack (5.5 / 2.1 mm) and WAGO 250 push-button terminal in parallel | Plug-in supplies and bare wires from an existing installation both work. The terminal footprint also takes the WAGO 2601 lever terminal, which costs 13 times as much. |
 | USB-C | service port at the board edge next to the MCU | Only used for flashing and debugging, never offered to users. |
 | Wi-Fi antenna | PCB antenna of the module, or external antenna | The ESP32-C6-MINI-1U (U.FL connector) fits the same pads. |
 | Assembly | all parts on one side | The display is taped to the other side; cheaper assembly. |
@@ -41,7 +41,7 @@ board, x right, y down, millimetres. The user looks at the other side.
 | LEDs | x 29.5, 39.5, 49.5, 59.5 at y 95.6 and y 139.0, each in a 3.4 x 3.0 window |
 | Mounting holes (3.2 mm) | (4, 3.5), (82, 3.5), (17.9, 139.4), (66.3, 117) |
 | DC jack | x 1.2 to 10.2, y 93.6 to 108, opens downwards into the DC cut-away |
-| DC lever terminal | centre (16.7, 100.2), next to the jack, wires enter from the back |
+| DC terminal | centre (16.7, 100.2), next to the jack, wires enter from below at 40 degrees |
 | USB-C | right board edge at y 13.5 to 22.5, opens sideways |
 
 ### Display mounting and flex
@@ -101,9 +101,13 @@ new display section, not a part swap.
   board outline there and can go down or straight back into the wall.
 - The DC cut-away is sized for a straight 5.5 mm barrel plug up to 11 mm
   thick. Check it with the plug of the supply you plan to ship.
-- The lever terminal sits next to the DC jack. Its wires enter at a right
-  angle to the board: straight out of the wall, or up through the DC cut-away.
-  `+` and `-` are printed at the terminal.
+- The DC terminal (WAGO 250-202, push-button) sits next to the DC jack. Its
+  wires enter from the bottom edge side at 40 degrees to the board: out of
+  the wall, or up through the DC cut-away. `+` and `-` are printed at the
+  terminal. It has one pin per pole and uses two diagonal holes of the
+  footprint (+ upper left, - lower right). The same four holes take the WAGO
+  2601-3102 lever terminal (C20252913), whose wires enter at a right angle to
+  the board.
 - There is no screw next to the DC jack. Support the board there in the
   housing, so that pushing the plug in does not bend it.
 - USB-C is on the side edge behind the display. It needs no opening in the
@@ -171,7 +175,7 @@ decides whether this is sufficient for the intended installation.
 - Loop: 4 turns, 35 x 37 mm, 0.5 mm track, 0.9 mm pitch, on the display side.
   The matching values below were calculated for a 40 x 37 mm loop (about
   1.35 uH with the display nearby); the 35 mm loop is roughly 10 % lower.
-  One mounting screw sits about 3 mm beside the loop and the DC lever terminal
+  One mounting screw sits about 3 mm beside the loop and the DC terminal
   6 mm, which shifts it further, so tuning on an assembled unit is required
   anyway.
 - Damping: 1.5 ohm in each leg, giving a quality factor of about 27.
@@ -308,11 +312,43 @@ The silkscreen carries only functional labels (test points, buttons, polarity
 marks). Reference designators are on the assembly drawing layer
 (`fab/board-front.pdf`): on a board this dense they would overlap.
 
+## Cost
+
+Parts at JLCPCB per board, in USD, prices of November 2026:
+
+| | 5 boards | 100 boards |
+|---|---|---|
+| Wi-Fi version | 27.90 | 19.80 |
+| Ethernet/PoE version | 38.70 | 27.60 |
+
+Once per order JLCPCB adds 3 USD for every extended part line (32 lines on the
+Wi-Fi version, 37 on the Ethernet/PoE version), the setup and stencil fees, the
+bare boards and shipping. On five boards the extended-part fees alone are about
+20 USD per board, so a small prototype order costs far more per board than the
+table shows.
+
+The largest lines are the ESP32-P4 (6.15), the PN532 (5.89), the Wi-Fi module
+(4.09) and the flash (2.26); on the Ethernet/PoE version also the PoE module
+(6.70), the jack (2.60) and the PHY (1.03).
+
+Savings that were looked at and not taken:
+
+| Change | Saves per board | Why not now |
+|---|---|---|
+| 16 MB flash GD25Q128ESIG (C2758105) instead of the Winbond part | 0.5 to 0.8 | It is an extended part, so the fee eats the saving below about ten boards. Same footprint: a change of the LCSC number. |
+| DC jack DC-005C-20A (C84007, 24 V, 3 A) instead of the CUI PJ-002A | 0.8 | Its pins are 6.65 mm apart instead of 6.0 mm, so the footprint needs wider slots. |
+| Generic 40-pin display connector instead of the Hirose FH12 | about 0.4 | Different solder tabs: a footprint change at the densest connector of the board. |
+| Reader chip of the RC522 family (FM17580, Si522, MFRC522 second sources, 0.3 to 1 USD) instead of the PN532 | about 5 | These chips are only the radio front end. The firmware would need a new driver that includes the ISO 14443-4 protocol, which the PN532 runs itself, and the board a new matching network. |
+
+Where a part has an equivalent in JLCPCB's basic or preferred list, the design
+uses that one (the TVS diodes, 1 uF / 50 V, and 510 k instead of 499 k in the
+core converter's divider, where only the ratio counts).
+
 ## Sourcing risks
 
 | Part | Risk |
 |---|---|
 | ESP32-P4NRW32X | LCSC showed no stock in November 2026. Use the X part (silicon v3.x); the part without X is end of life. |
-| PN532 | About 13 USD at LCSC; NXP steers new designs to the PN7160. A clone (Tokmas, C53457895) exists but is untested. |
+| PN532 | Fitted is the Tokmas PN5321A3HN (C53457895, about 6 USD): same package and pinout as the NXP part, but not yet proven with our firmware. If it misbehaves, the NXP original (C28925, about 13 USD) fits without any other change. NXP steers new designs to the PN7160. |
 | DP9900M-5V | Low stock at LCSC; Silvertel Ag9905M fits the same footprint. |
 | Display panel | Commodity part without a guaranteed part number. Agree on a fixed type with the supplier. |

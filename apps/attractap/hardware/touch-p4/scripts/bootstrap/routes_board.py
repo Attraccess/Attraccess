@@ -119,7 +119,7 @@ def mdi_routes(B):
 
 
 def nfc_feeds(B):
-    """Antenna feeds: straight up from the two damping resistors, under the lever terminal, then right.
+    """Antenna feeds: straight up from the two damping resistors, under the DC terminal, then right.
     The upper one ends on the outer end of the loop, the lower one crosses the turns through the gap
     in the keep-out to the inner end."""
     a1, a2 = B.pad('ANT501', '1'), B.pad('ANT501', '2')
@@ -202,7 +202,7 @@ def phy_fanout(B):
 
 
 def dc_route(B):
-    """DC input: lever terminal and jack joined, then up through the board bridge to the fuse, diode and
+    """DC input: terminal and jack joined, then up through the board bridge to the fuse, diode and
     TVS beside the converter."""
     w = 0.6
     p = B.pad

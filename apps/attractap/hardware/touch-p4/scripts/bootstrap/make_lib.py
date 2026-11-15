@@ -138,9 +138,30 @@ def multi_unit_symbol(name, src_symbol, units, footprint, lcsc, half_width=15.24
     return sym
 
 
+# The DC terminal footprint is the one of the WAGO 2601 lever terminal: four holes, two per pole. The
+# WAGO 250 push-button terminal has one pin per pole on the same grid and sits in two diagonal holes
+# (+ back left, - front right). Its body reaches 0.75 mm further to the left. Body x1, y1, x2, y2:
+WAGO_250_BODY = (-5.0, -4.8, 3.5, 7.2)
+
+
+def fits_wago_250(tree):
+    """Courtyard around both terminal bodies, outline of the 250 body on the fabrication layer."""
+    x1, y1, x2, y2 = WAGO_250_BODY
+    for line in find(tree, 'fp_line'):
+        if first(line, 'layer')[1] == 'F.CrtYd':
+            for end in (first(line, 'start'), first(line, 'end')):
+                if float(end[1]) < 0:
+                    end[1] = x1 - 0.25
+    for a, b in (((x1, y1), (x2, y1)), ((x2, y1), (x2, y2)), ((x2, y2), (x1, y2)), ((x1, y2), (x1, y1))):
+        tree.append([Sym('fp_line'), [Sym('start'), *a], [Sym('end'), *b], [Sym('layer'), Sym('F.Fab')],
+                     [Sym('width'), 0.1]])
+
+
 def fix_footprint(name, text):
     """Repair two habits of the converter: mechanical holes as plated pads, thermal vias without a number."""
     tree = loads(text)
+    if name == 'CONN-TH_4P-P3.5-2601-3102':
+        fits_wago_250(tree)
     ep = None
     for pad in find(tree, 'pad'):
         if str(pad[1]) and first(pad, 'size') and float(first(pad, 'size')[1]) > 2.5 and pad[2] == 'smd':

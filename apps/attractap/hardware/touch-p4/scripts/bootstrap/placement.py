@@ -60,9 +60,9 @@ def place(B):
     m('L201', -8.3, -10.6, 90)
     m('C234', -8.8, -13.9, 0)      # 22u output
     m('C235', -5.2, -13.9, 0)      # 22u output
-    m('R204', -11.9, -5.65, 0)     # 499k VDD_HP - FB
+    m('R204', -11.9, -5.65, 0)     # 510k VDD_HP - FB
     m('C236', -11.9, -4.65, 0)     # 22p feed-forward
-    m('R205', -9.7, -4.65, 0)      # 499k FB - GND
+    m('R205', -9.7, -4.65, 0)      # 510k FB - GND
 
     # USB PHY supply (right edge, upper part: neighbours there are unused MIPI pins)
     m('R202', 7.0, -3.6, 0)
@@ -186,7 +186,7 @@ def place(B):
     # ===== DC input: both connectors at the top of the tongue's left margin. The jack opens downwards
     # into the second cut-away (see geometry.POCKET_X / POCKET_Y), so its plug stays inside the outline.
     put('J102', 8.05, 97.3, 90)    # barrel jack
-    put('J103', 16.7, 100.2, 0)    # lever terminal, wires enter from the back; pole 1 (+) on the left
+    put('J103', 16.7, 100.2, 0)    # DC terminal, wires enter from below at 40 degrees; + on the left
     # fuse, reverse-polarity diode and TVS next to the converter, in the left column behind the display
     put('F102', 5.5, 85.5, 0)
     put('D105', 5.5, 81.4, 0)

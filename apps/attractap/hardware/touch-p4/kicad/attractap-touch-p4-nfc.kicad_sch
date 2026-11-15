@@ -1099,12 +1099,12 @@
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
 		(property "Datasheet" "" (at 57.15 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "Description" "NFC reader IC (PN532)"
+		(property "Description" "NFC reader IC (PN532). Tokmas part with the pinout of the NXP original (C28925), half the price"
 			(at 57.15 97.79 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)
-		(property "LCSC" "C28925" (at 57.15 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
-		(property "MPN" "PN5321A3HN/C106,55"
+		(property "LCSC" "C53457895" (at 57.15 97.79 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "MPN" "PN5321A3HN (Tokmas)"
 			(at 57.15 97.79 0)
 			(effects (font (size 1.27 1.27)) (hide yes))
 		)

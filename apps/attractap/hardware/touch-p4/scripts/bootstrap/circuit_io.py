@@ -73,7 +73,8 @@ def nfc(d):
     d.group('PN532')
     d.add('U', 'PN5321A3HN/C106', 'attractap:PN5321A3HN_C106,55', 'attractap:QFN-40_L6.0-W6.0-P0.50-BL-EP',
           {'@' + k: v for k, v in pn.items()}, nc=tuple('@' + n for n in pn_nc),
-          lcsc='C28925', mpn='PN5321A3HN/C106,55', desc='NFC reader IC (PN532)')
+          lcsc='C53457895', mpn='PN5321A3HN (Tokmas)',
+          desc='NFC reader IC (PN532). Tokmas part with the pinout of the NXP original (C28925), half the price')
     d.group('Supplies')
     d.FB('+5V', 'NFC_VBAT')
     d.C('10u', 'NFC_VBAT', size='0603')

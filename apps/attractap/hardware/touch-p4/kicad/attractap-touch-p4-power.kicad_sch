@@ -1611,11 +1611,11 @@
 		(effects (font (size 2 2)) (justify left bottom))
 		(uuid "deebbde7-b41f-5cd3-a426-7e4c368617be")
 	)
-	(text "Supply: USB-C 5 V, DC 12 to 24 V (barrel jack or lever terminal) or PoE (802.3af, isolated module)."
+	(text "Supply: USB-C 5 V, DC 12 to 24 V (barrel jack or spring terminal) or PoE (802.3af, isolated module)."
 		(exclude_from_sim no)
 		(at 12 27 0)
 		(effects (font (size 1.5 1.5)) (justify left bottom))
-		(uuid "f3cb273f-f2cd-5c2e-b9ef-2aa0b288cca0")
+		(uuid "baea8ba9-6202-599e-8d5f-530231e224fc")
 	)
 	(text "All three end on the +5V rail through Schottky diodes, so any combination may be connected."
 		(exclude_from_sim no)
@@ -2053,7 +2053,7 @@
 			(at 147.32 67.31 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
-		(property "LCSC" "C83329" (at 147.32 67.31 90) (effects (font (size 1 1)) (hide yes)))
+		(property "LCSC" "C19077523" (at 147.32 67.31 90) (effects (font (size 1 1)) (hide yes)))
 		(property "MPN" "SMAJ5.0A" (at 147.32 67.31 90) (effects (font (size 1 1)) (hide yes)))
 		(pin "1" (uuid "144c39e3-bedb-5728-8c0c-70f87a3dcd7b"))
 		(pin "2" (uuid "70fb41dd-c571-5c7f-95d8-14b83009ed4b"))
@@ -2449,7 +2449,7 @@
 			(at 226.06 73.66 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
-		(property "LCSC" "C151246" (at 226.06 73.66 90) (effects (font (size 1 1)) (hide yes)))
+		(property "LCSC" "C19077554" (at 226.06 73.66 90) (effects (font (size 1 1)) (hide yes)))
 		(property "MPN" "SMAJ58A" (at 226.06 73.66 90) (effects (font (size 1 1)) (hide yes)))
 		(property "Variant" "lan" (at 226.06 73.66 90) (effects (font (size 1 1)) (hide yes)))
 		(pin "1" (uuid "ba59f0d8-3497-57ca-9b7f-d277d982663c"))
@@ -3656,18 +3656,18 @@
 		(dnp no)
 		(uuid "b0f0be12-4863-5db3-96ae-afb3f7add734")
 		(property "Reference" "J103" (at 185.42 135.83 90) (effects (font (size 1 1))))
-		(property "Value" "DC lever terminal" (at 185.42 141.33 90) (effects (font (size 1 1))))
+		(property "Value" "DC terminal" (at 185.42 141.33 90) (effects (font (size 1 1))))
 		(property "Footprint" "attractap:CONN-TH_4P-P3.5-2601-3102"
 			(at 185.42 138.43 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
 		(property "Datasheet" "" (at 185.42 138.43 90) (effects (font (size 1 1)) (hide yes)))
-		(property "Description" "WAGO lever terminal for bare wires up to 1.5 mm2: pole 1 = +, pole 2 = -"
+		(property "Description" "WAGO push-button terminal for bare wires up to 1.5 mm2, in the two diagonal holes: left pole = +, right pole = -"
 			(at 185.42 138.43 90)
 			(effects (font (size 1 1)) (hide yes))
 		)
-		(property "LCSC" "C20252913" (at 185.42 138.43 90) (effects (font (size 1 1)) (hide yes)))
-		(property "MPN" "2601-3102" (at 185.42 138.43 90) (effects (font (size 1 1)) (hide yes)))
+		(property "LCSC" "C2765061" (at 185.42 138.43 90) (effects (font (size 1 1)) (hide yes)))
+		(property "MPN" "250-202" (at 185.42 138.43 90) (effects (font (size 1 1)) (hide yes)))
 		(pin "1" (uuid "104dadf6-ab8b-5260-aa85-2d3952be8459"))
 		(pin "2" (uuid "09935c44-47e6-5b45-b654-7299b61a5efd"))
 		(instances

@@ -40,7 +40,7 @@ SHEETS = [
 ]
 NOTES = {
     'power': [
-        'Supply: USB-C 5 V, DC 12 to 24 V (barrel jack or lever terminal) or PoE (802.3af, isolated module).',
+        'Supply: USB-C 5 V, DC 12 to 24 V (barrel jack or spring terminal) or PoE (802.3af, isolated module).',
         'All three end on the +5V rail through Schottky diodes, so any combination may be connected.',
         'Do not add capacitance across the PoE input (POE_VPF / POE_VNF): it would break PoE detection.',
         'The PoE module needs a minimum load: 100 mA (DP9900M) or 200 mA (Ag9905M).',

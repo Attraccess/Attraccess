@@ -18,7 +18,7 @@ def power(d):
     d.add('F', '2A PTC', 'Device:Polyfuse', 'attractap:F1812', {'1': 'VBUS', '2': 'VBUS_F'},
           lcsc='C89650', mpn='MF-MSMF200L-2', desc='Resettable fuse 2 A hold')
     d.add('D', 'SMAJ5.0A', 'Device:D_Zener', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VBUS_F', '2': 'GND'},
-          lcsc='C83329', mpn='SMAJ5.0A', desc='TVS, USB supply')
+          lcsc='C19077523', mpn='SMAJ5.0A', desc='TVS, USB supply')
     d.add('U', 'USBLC6-2SC6', 'attractap:USBLC6-2SC6', 'attractap:SOT-23-6_L2.9-W1.6-P0.95-LS2.8-BL', {
         '1': 'USB_DN', '6': 'USB_DN', '3': 'USB_DP', '4': 'USB_DP', '2': 'GND', '5': 'VBUS_F',
     }, lcsc='C7519', mpn='USBLC6-2SC6', desc='USB ESD protection')
@@ -32,7 +32,7 @@ def power(d):
     d.FB('POE_VP', 'POE_VPF', big=True, variant='lan')
     d.FB('POE_VN', 'POE_VNF', big=True, variant='lan')
     d.add('D', 'SMAJ58A', 'Device:D_Zener', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'POE_VPF', '2': 'POE_VNF'},
-          lcsc='C151246', mpn='SMAJ58A', variant='lan', desc='TVS, PoE input')
+          lcsc='C19077554', mpn='SMAJ58A', variant='lan', desc='TVS, PoE input')
     d.add('U', 'DP9900M-5V', 'attractap:DP9900M-5V', 'attractap:PWRM-SMD_DP9900M-5V', {
         '5': 'POE_VPF', '6': 'POE_VPF', '7': 'POE_VNF', '8': 'POE_VNF',
         '1': '+5V_POE', '2': '+5V_POE', '3': 'GND',
@@ -62,14 +62,16 @@ def power(d):
     d.C('100n', '+3V3')
 
     # DC input for 12 V / 24 V supplies with its own 5 V converter. Two connectors in parallel:
-    # a barrel jack for a plug-in supply and a lever terminal for bare wires.
+    # a barrel jack for a plug-in supply and a spring terminal for bare wires. The terminal footprint
+    # takes two WAGO parts: 250-202 (push-button, fitted) or 2601-3102 (lever, C20252913, 13 times the price).
     d.group('DC input (12 to 24 V)')
     d.add('J', 'DC jack 5.5/2.1', 'attractap:PJ-002A', 'attractap:DC-IN-TH_PJ-002A',
           {'1': 'VDC_IN', '2': 'GND', '3': 'GND'}, lcsc='C3096082', mpn='PJ-002A',
           desc='DC jack 5.5 x 2.1 mm, centre pin positive, rated 24 V')
-    d.add('J', 'DC lever terminal', 'attractap:2601-3102', 'attractap:CONN-TH_4P-P3.5-2601-3102',
-          {'1': 'VDC_IN', '2': 'GND'}, lcsc='C20252913', mpn='2601-3102',
-          desc='WAGO lever terminal for bare wires up to 1.5 mm2: pole 1 = +, pole 2 = -')
+    d.add('J', 'DC terminal', 'attractap:2601-3102', 'attractap:CONN-TH_4P-P3.5-2601-3102',
+          {'1': 'VDC_IN', '2': 'GND'}, lcsc='C2765061', mpn='250-202',
+          desc='WAGO push-button terminal for bare wires up to 1.5 mm2, in the two diagonal holes: '
+               'left pole = +, right pole = -')
     d.add('F', '1.1A PTC 33V', 'Device:Polyfuse', 'attractap:F1812', {'1': 'VDC_IN', '2': 'VDC_F'},
           lcsc='C21000', mpn='SMD1812P110TF/33', desc='Resettable fuse 1.1 A hold, 33 V')
     d.add('D', 'SS34', 'Device:D_Schottky', 'attractap:SMA_L4.3-W2.6-LS5.2-RD', {'1': 'VDC', '2': 'VDC_F'},
@@ -184,9 +186,9 @@ def mcu(d):
           lcsc='C354540', mpn='CKCSA252012-2.2uH/M')
     d.C('22u', 'VDD_HP', size='0805')
     d.C('22u', 'VDD_HP', size='0805')
-    d.R('499k', 'VDD_HP', 'FB_DCDC')
+    d.R('510k', 'VDD_HP', 'FB_DCDC')
     d.C('22p', 'VDD_HP', 'FB_DCDC')
-    d.R('499k', 'FB_DCDC', 'GND')
+    d.R('510k', 'FB_DCDC', 'GND')
     d.R('100k', 'EN_DCDC', 'GND', desc='keeps the converter off while the chip is in reset')
 
     # flash

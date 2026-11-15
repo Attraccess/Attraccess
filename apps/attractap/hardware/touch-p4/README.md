@@ -18,7 +18,7 @@ plus PN532 module of the current readers with one board.
 | NFC | PN532 + PCB loop antenna | same chip and I2C protocol as today |
 | Ethernet (LAN version) | IP101GRI PHY + HY931147C jack | 10/100, RMII |
 | PoE (LAN version) | DP9900M-5V isolated module | 802.3af; footprint also takes a Silvertel Ag9905M |
-| Power | DC 12 to 24 V (barrel jack or WAGO lever terminal), PoE, or USB-C 5 V | each source feeds the 5 V rail through its own diode; 3.3 V buck AP63203. USB-C is the service port for flashing and debugging |
+| Power | DC 12 to 24 V (barrel jack or WAGO push-button terminal), PoE, or USB-C 5 V | each source feeds the 5 V rail through its own diode; 3.3 V buck AP63203. USB-C is the service port for flashing and debugging |
 | Feedback | 8 RGB LEDs (SK6812MINI-E), buzzer | LEDs shine through the board above and below the NFC area |
 
 Two assembly versions come from the same PCB:
@@ -49,7 +49,7 @@ The root sheet is a block diagram. Each block is one sheet:
 
 | Sheet | Content |
 |---|---|
-| Power | USB-C input, DC input (jack and lever terminal) with its 5 V converter, PoE input, supply OR-ing, 3.3 V buck |
+| Power | USB-C input, DC input (jack and terminal) with its 5 V converter, PoE input, supply OR-ing, 3.3 V buck |
 | MCU | ESP32-P4 GPIO and system units, flash, crystal, reset/boot, USB |
 | MCU_Power | ESP32-P4 supply unit, decoupling, 1.1 V core converter |
 | WiFi | ESP32-C6 module, SDIO |
@@ -117,13 +117,20 @@ What the board needs, for the order form:
 | Surface finish | ENIG is the safe choice for the 0.35 mm pitch MCU and the 0.5 mm display connector |
 | Impedance control | not needed |
 | Assembly | top side only: 193 parts in 68 lines (Wi-Fi version), 228 parts in 78 lines (Ethernet/PoE version) |
-| Through-hole parts | DC jack J102, lever terminal J103, and on the Ethernet/PoE version the jack J401 |
+| Through-hole parts | DC jack J102, DC terminal J103 (two pins in a four-hole footprint, see below), and on the Ethernet/PoE version the jack J401 |
 | Not assembled by JLCPCB | the display panel (taped on, flex plugged into J601) |
+
+What the parts cost, what JLCPCB charges once per order, and which cheaper parts were considered:
+[docs/design-notes.md](docs/design-notes.md#cost).
 
 Check before paying:
 
 - Stock. JLCPCB's parts list shows what it does not have. The ESP32-P4 (U201) had no stock at LCSC
   in November 2026; see the sourcing risks in [docs/design-notes.md](docs/design-notes.md).
+- DC terminal J103. The WAGO 250-202 has two pins and the footprint four holes (it also takes the
+  WAGO 2601-3102 lever terminal). Write in the order remark: pins in the upper left and the lower
+  right hole, wire entry towards the board edge with the two cut-away corners. The fabrication
+  drawing shows the body outline.
 - Rotation. Look at every polarised part in JLCPCB's placement preview, in particular the diodes D101
   to D107, C103, Q701, the LEDs and the ICs. KiCad and JLCPCB do not always agree on what 0 degrees is.
 

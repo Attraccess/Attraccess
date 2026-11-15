@@ -3078,7 +3078,7 @@
 		)
 		(property "Datasheet" "" (at 97.79 190.5 90) (effects (font (size 1 1)) (hide yes)))
 		(property "Description" "" (at 97.79 190.5 90) (effects (font (size 1 1)) (hide yes)))
-		(property "LCSC" "C5199872" (at 97.79 190.5 90) (effects (font (size 1 1)) (hide yes)))
+		(property "LCSC" "C15849" (at 97.79 190.5 90) (effects (font (size 1 1)) (hide yes)))
 		(pin "1" (uuid "d9c3d548-9e57-536a-8bca-e6e40d3b579d"))
 		(pin "2" (uuid "fda064be-439c-58e7-94d7-d08dff563176"))
 		(instances
@@ -3135,7 +3135,7 @@
 		)
 		(property "Datasheet" "" (at 123.19 190.5 90) (effects (font (size 1 1)) (hide yes)))
 		(property "Description" "" (at 123.19 190.5 90) (effects (font (size 1 1)) (hide yes)))
-		(property "LCSC" "C5199872" (at 123.19 190.5 90) (effects (font (size 1 1)) (hide yes)))
+		(property "LCSC" "C15849" (at 123.19 190.5 90) (effects (font (size 1 1)) (hide yes)))
 		(pin "1" (uuid "34b2c0d1-5386-54b1-94f0-bb6a00c8f12f"))
 		(pin "2" (uuid "f9c9bda9-bd35-519f-a42c-861fd3bf093a"))
 		(instances
