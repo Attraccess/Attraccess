@@ -3,13 +3,13 @@
 // Usage: node scripts/crap-score/node-test.mjs <project root> <coverage directory> <test files...>
 // Node's own coverage has no Istanbul function ranges, so a module hook instruments
 // the project's JavaScript sources in the test processes and their children.
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import istanbulCoverage from 'istanbul-lib-coverage';
-import { isSource, ownedFiles, workspace } from './sources.mjs';
+import { isSource, ownedFiles, workspace, workspaceFiles } from './sources.mjs';
 
 const loader = fileURLToPath(new URL('./node-coverage.mjs', import.meta.url));
 
@@ -48,12 +48,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error('Usage: node scripts/crap-score/node-test.mjs <project root> <coverage directory> <test files...>');
     process.exit(1);
   }
-  const tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
-    cwd: workspace,
-    encoding: 'utf8',
-  })
-    .split('\0')
-    .filter((file) => file && existsSync(path.resolve(workspace, file)));
-  const files = ownedFiles(root, tracked).filter((file) => isSource(file) && /\.[cm]?js$/.test(file));
+  const { files: tracked, submodules } = workspaceFiles();
+  const files = ownedFiles(root, tracked, submodules).filter((file) => isSource(file) && /\.[cm]?js$/.test(file));
   process.exitCode = nodeCoverage(files, tests, path.resolve(workspace, output));
 }

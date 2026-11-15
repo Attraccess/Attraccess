@@ -18,6 +18,13 @@ project-local ESP-IDF v6.0.2 toolchain at `.tools/esp-idf`. The completion
 marker is created only after setup succeeds. If bootstrap fails, rerun that
 script from the new worktree before reporting a missing dependency.
 
+`apps/cesentry` is a private, optional submodule (`update = none`), so new
+worktrees and public clones leave it empty. With access to the private
+repository, fill it with `git submodule update --init --checkout apps/cesentry`,
+then follow its README's Checkout section (commit hook). Rerun the command after
+the pointer moves. Public code never references it (see `CONTRIBUTING.md`,
+"Private submodule").
+
 ## Committing
 
 The Husky pre-commit hook runs `pnpm precommit` (lint, typecheck, test and CRAP
