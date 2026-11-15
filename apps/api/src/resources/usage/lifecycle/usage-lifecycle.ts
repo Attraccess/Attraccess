@@ -45,6 +45,8 @@ import { LOCK_TTL_MS, SWEEP_EVERY_MS } from '../sessions/session-change-coordina
 import { SessionChangeTurns } from '../sessions/session-change-turns';
 import { activeUsageWhere, sessionLimitOf } from '../sessions/active-usage';
 import { AuditActor } from '../../../audit/recorder/audit-event';
+import type { PreStartOrigin } from '@attraccess/plugins-backend-sdk';
+import type { ReaderUiLanguage } from '../../../plugin-system/reader-ui/host-texts';
 import { usageFlowPayload } from './usage-flow-payload';
 
 /** Log context shared by the usage collaborators, so their log lines read as before the split. */
@@ -69,6 +71,15 @@ export interface StartSessionOptions {
    */
   supervisorUserId?: number;
   auditOrigin?: AuditActor;
+  /**
+   * Where the start came from, for the plugins' atomic capacity hook. Defaults to `supervision` for a supervised
+   * start and `web` otherwise.
+   */
+  origin?: PreStartOrigin;
+  /** Language of the refusal text on a reader (the card session's); otherwise the user's language is resolved. */
+  language?: ReaderUiLanguage;
+  /** plugin -> step keys the user confirmed in this start attempt (from the pre-start gate). */
+  confirmedStepKeys?: Record<string, string[]>;
 }
 
 /** Published usage sessions on the machine around a start, stop or takeover, handed to flows as `activeSessions`. */

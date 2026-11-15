@@ -107,7 +107,7 @@ reservations":
 | Booking request awaiting approval                                                                             | A booking waits for approval (to the managers).                            |
 | Booking confirmed                                                                                             | A booking is confirmed or approved, with the check-in rules.               |
 | Booking rejected / Booking request expired                                                                    | A request was rejected, or nobody decided before its start.                |
-| Booking cancelled by a manager / Running booking ended early / Booking removed (reservations switched off)    | A manager changed or removed a booking, or reservations were switched off. |
+| Booking cancelled by a manager / Running booking ended early / Booking removed (reservations switched off or machine capacity reduced) | A manager changed or removed a booking, reservations were switched off, or a machine lost slots. |
 | Not checked in, booking released                                                                              | A booking was released as a no-show.                                       |
 | Reminder 48 h before: still needed? / Reminder 24 h before                                                    | The reminders before a booking.                                            |
 | Maintenance affects a booking / Resource has a problem / Resource works again                                 | Maintenance or the health of the resource affects a booking.               |

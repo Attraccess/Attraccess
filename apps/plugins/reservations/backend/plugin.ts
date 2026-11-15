@@ -12,7 +12,8 @@ import { PendingDecisionService } from './hooks/pending-decision.service';
 import { PendingDecisionStore } from './hooks/pending-decisions';
 import { PreStartService } from './hooks/pre-start.service';
 import { HookServicePublisher } from './hooks/publisher';
-import { preStartHook, readerUiProvider, sessionEndHook, startBlockedQuery } from './hooks/runtime';
+import { preStartHook, readerUiProvider, sessionEndHook, startBlockedQuery, startCapacityHook } from './hooks/runtime';
+import { StartCapacityService } from './hooks/start-capacity.service';
 import { ReaderUiService } from './reader-ui/reader-ui.service';
 import { SessionEndService } from './hooks/session-end.service';
 import { IcalFeedsController, IcalPublicController } from './ical/ical.controller';
@@ -50,6 +51,7 @@ const plugin: PluginBackendModule = {
   preStartHook,
   sessionEndHook,
   startBlockedQuery,
+  startCapacityHook,
   readerUi: readerUiProvider,
   register(context: PluginContext): DynamicModule {
     return {
@@ -74,6 +76,7 @@ const plugin: PluginBackendModule = {
         PendingDecisionStore,
         PendingDecisionService,
         PreStartService,
+        StartCapacityService,
         SessionEndService,
         ReaderUiService,
         HookServicePublisher,

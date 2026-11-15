@@ -88,6 +88,8 @@ import { resolveIp, setRetryAfter } from '../../rate-limiting/login.rate-limit.g
 
 const CLIENT_SECRET = 'SSO client secret';
 const PROVISIONING_SECRET = 'SSO provisioning secret';
+const DISCOVERY_BAD_GATEWAY =
+  'Discovery URL could not be reached, has an untrusted TLS certificate, answered with a non-success status or returned an invalid response';
 
 @ApiTags('Authentication')
 @Controller('auth/sso')
@@ -264,7 +266,7 @@ export class SSOController {
   @ApiQuery({ name: 'applicationName', required: true, description: 'Authentik application slug' })
   @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
   @ApiBadRequestResponse({ description: 'Invalid host or applicationName' })
-  @ApiBadGatewayResponse({ description: 'Discovery URL could not be reached or returned an invalid response' })
+  @ApiBadGatewayResponse({ description: DISCOVERY_BAD_GATEWAY })
   async discoverAuthentik(@Query('host') host: string, @Query('applicationName') applicationName: string) {
     if (typeof host !== 'string' || typeof applicationName !== 'string' || !host || !applicationName) {
       throw new BadRequestException('Missing required parameters');
@@ -284,7 +286,7 @@ export class SSOController {
   @ApiQuery({ name: 'realm', required: true, description: 'Keycloak realm name' })
   @ApiResponse({ status: 200, description: 'OIDC configuration JSON' })
   @ApiBadRequestResponse({ description: 'Invalid host or realm' })
-  @ApiBadGatewayResponse({ description: 'Discovery URL could not be reached or returned an invalid response' })
+  @ApiBadGatewayResponse({ description: DISCOVERY_BAD_GATEWAY })
   async discoverKeycloak(@Query('host') host: string, @Query('realm') realm: string) {
     if (typeof host !== 'string' || typeof realm !== 'string' || !host || !realm) {
       throw new BadRequestException('Missing required parameters');

@@ -118,6 +118,9 @@ export const readerTexts = {
   },
   rowReservedUntil: (end: Date, c: ReaderClock) =>
     fit(pick(c.lang, `Reserved until ${readerTime(end, c)}`, `Reserviert bis ${readerTime(end, c)}`), ROW_MAX),
+  /** Shared machine, bookings run but slots remain: "2/3 reserved" (≤ 24 characters). */
+  rowSlotsReserved: (reserved: number, slots: number, c: ReaderClock) =>
+    fit(pick(c.lang, `${reserved}/${slots} reserved`, `${reserved}/${slots} reserviert`), ROW_MAX),
   rowOwnUntil: (end: Date, c: ReaderClock) => {
     const until = readerTime(end, c);
     const long = pick(c.lang, `Your booking until ${until}`, `Deine Buchung bis ${until}`);
@@ -146,6 +149,8 @@ export const readerTexts = {
     holder
       ? named(pick(c.lang, `Reserved by ${holder}`, `Reserviert von ${holder}`), range(start, end, c))
       : [pick(c.lang, `Reserved ${range(start, end, c)}`, `Reserviert ${range(start, end, c)}`)],
+  slotsReserved: (reserved: number, slots: number, c: ReaderClock) =>
+    pick(c.lang, `${reserved} of ${slots} slots reserved`, `${reserved} von ${slots} Plätzen reserviert`),
   own: (start: Date, end: Date, c: ReaderClock) =>
     pick(c.lang, `Your booking ${range(start, end, c)}`, `Deine Buchung ${range(start, end, c)}`),
   /** Its own line under the booking, so the parenthesis never starts a wrapped line by itself. */

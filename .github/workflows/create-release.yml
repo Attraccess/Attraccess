@@ -12,6 +12,11 @@ on:
         required: false
         type: boolean
         default: false
+      publish-only:
+        description: 'Only publish the libraries of an existing release; specifier must be its exact version'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -29,9 +34,10 @@ env:
   # any other ref reads but cannot plant artifacts.
   NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ${{ secrets.NX_CACHE_TOKEN_RO && vars.NX_CACHE_URL || '' }}
   NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ${{ github.ref == 'refs/heads/main' && secrets.NX_CACHE_TOKEN_RW || secrets.NX_CACHE_TOKEN_RO }}
-  # nx release publish falls back to npm's `tag` config, which defaults to `latest`. Prereleases
-  # ("1.11.0-beta.0", "prerelease", "preminor", ...) go to `next` so `latest` stays on the newest stable.
-  npm_config_tag: ${{ (contains(inputs.specifier, '-') || startsWith(inputs.specifier, 'pre')) && 'next' || 'latest' }}
+  # Prereleases ("1.11.0-beta.0", "prerelease", "preminor", ...) go to the `next` dist-tag so `latest` stays on the
+  # newest stable. Passed to `nx release publish --tag`; setting npm's `tag` config instead also redirects the
+  # `npm view` nx runs before publishing, which then fails with E404 for a missing `next`.
+  RELEASE_NPM_TAG: ${{ (contains(inputs.specifier, '-') || startsWith(inputs.specifier, 'pre')) && 'next' || 'latest' }}
 
 jobs:
   release:
@@ -52,6 +58,7 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ inputs.publish-only && format('refs/tags/v{0}', inputs.specifier) || '' }}
 
       - uses: ./.github/actions/setup
 
@@ -86,14 +93,59 @@ jobs:
           echo "Excluding: $exclude"
           pnpm nx run-many -t build --exclude="$exclude"
 
+      # A dry run writes no versions, so publishing would re-pack the already released version; it stops before.
+      # `--skip-publish` answers nx's only prompt (publish confirmation), so no `--yes` is needed.
       - name: Run NX Release (dry run)
-        if: inputs.dry-run
+        if: ${{ inputs.dry-run && !inputs.publish-only }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: pnpm nx release ${{ inputs.specifier }} --dry-run --yes
+          SPECIFIER: ${{ inputs.specifier }}
+        run: pnpm nx release "$SPECIFIER" --dry-run --skip-publish
 
       - name: Run NX Release
-        if: ${{ !inputs.dry-run }}
+        if: ${{ !inputs.dry-run && !inputs.publish-only }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: pnpm nx release ${{ inputs.specifier }} --yes
+          SPECIFIER: ${{ inputs.specifier }}
+        run: pnpm nx release "$SPECIFIER" --skip-publish
+
+      # nx release publish packs dist/ as it is; rebuild so the packages carry the version just written.
+      - name: Rebuild publishable libraries with the release version
+        if: ${{ !inputs.dry-run && !inputs.publish-only }}
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs build)"
+          pnpm nx run-many -t build --exclude="$exclude"
+
+      # A late publish-only run must not move a dist-tag back from a newer release.
+      - name: Refuse to move dist-tags backwards
+        if: inputs.publish-only
+        env:
+          SPECIFIER: ${{ inputs.specifier }}
+        run: |
+          node -e '
+            const { execFileSync } = require("node:child_process");
+            const semver = require("semver");
+            const { SPECIFIER: version, RELEASE_NPM_TAG: tag } = process.env;
+            const projects = require("./nx.json").release.projects;
+            const ahead = [];
+            for (const project of projects) {
+              const { root } = JSON.parse(execFileSync("pnpm", ["-s", "nx", "show", "project", project, "--json"]));
+              const pkg = require(`./${root}/package.json`);
+              if (pkg.private) continue;
+              let current = "";
+              try {
+                current = execFileSync("npm", ["view", pkg.name, `dist-tags.${tag}`], { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+              } catch {}
+              if (current && semver.gt(current, version)) ahead.push(`${pkg.name}@${tag} is ${current}`);
+            }
+            if (ahead.length) {
+              console.error(`Not publishing ${version} to "${tag}": ${ahead.join(", ")}`);
+              process.exit(1);
+            }
+          '
+
+      - name: Publish libraries
+        if: ${{ !inputs.dry-run || inputs.publish-only }}
+        env:
+          DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+        run: pnpm nx release publish --tag "$RELEASE_NPM_TAG" $DRY_RUN

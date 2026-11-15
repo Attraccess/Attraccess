@@ -5,6 +5,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
 import { ResourceHealthChangedEvent } from '../resources/health/events/resource-health-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../resources/maintenances/events/resource-maintenance-changed.event';
+import { ResourceSessionLimitChangedEvent } from '../resources/events/resource-session-limit-changed.event';
 import { PluginEventsService } from './plugin-events.service';
 
 /**
@@ -51,6 +52,20 @@ export class PluginSystemEventsBridge {
       });
     } catch (error) {
       this.logger.error(`Failed to emit ${SystemEvent.MAINTENANCE_CHANGED}`, (error as Error).stack);
+    }
+  }
+
+  @OnEvent(ResourceSessionLimitChangedEvent.EVENT_NAME)
+  public onSessionLimitChanged(event: ResourceSessionLimitChangedEvent): void {
+    try {
+      this.pluginEvents.emit(SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED, {
+        resourceId: event.resourceId,
+        previousLimit: event.previousLimit,
+        newLimit: event.newLimit,
+        actorUserId: event.actorUserId,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to emit ${SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED}`, (error as Error).stack);
     }
   }
 }

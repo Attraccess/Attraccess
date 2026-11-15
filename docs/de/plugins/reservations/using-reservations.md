@@ -34,7 +34,31 @@ Eine Buchung wird (mit Begründung) abgelehnt, wenn sie eine andere Buchung samt
 zu weit in der Zukunft, zu spät oder in der Vergangenheit liegt oder wenn Sie bereits die Höchstzahl aktiver
 Buchungen für diese Ressource haben.
 
-Bei einer Maschine mit `maxParallelSessions > 1` reserviert eine Buchung die **gesamte** Ressource.
+#### Maschinen mit mehreren parallelen Sitzungen
+
+Bei einer Maschine mit `maxParallelSessions` von N > 1 belegt eine Buchung **einen Platz**, nicht die ganze Maschine.
+Maschinen mit Limit 1 und Türen funktionieren wie oben beschrieben.
+
+- Bis zu N Buchungen (ausstehende und bestätigte, samt Puffern) dürfen sich überschneiden. Die (N+1)-te
+  überschneidende Buchung wird mit „Zu dieser Zeit sind alle Plätze belegt“ abgelehnt (Code `OVERLAP`).
+- Sie können nicht zwei sich überschneidende Buchungen auf derselben Maschine halten (Code `OWN_OVERLAP`).
+- Solange eine Buchung läuft, zählt ihr Platz gegen spontane Starts. Ein Start wird nur dann mit dem Text
+  „Reserviert“ abgelehnt, wenn laufende Sitzungen plus die für **andere** Personen reservierten Plätze das Limit
+  erreichen. Die buchende Person darf ihren eigenen Platz immer nutzen. Verwaltende können nach einer Bestätigung
+  übersteuern.
+- Die Frage „Bald reserviert“ erscheint nur, wenn ein Start dazu führen würde, dass eine bevorstehende Buchung
+  innerhalb des Bestätigungsfensters keinen Platz mehr hätte.
+- **Wird das Limit gesenkt** (oder der Typ so geändert, dass das Limit sinkt), werden die zuletzt angelegten,
+  noch nicht begonnenen Buchungen storniert, die nicht mehr passen, mit der Begründung `machine capacity reduced`
+  (so gespeichert und angezeigt). Die buchenden Personen erhalten die E-Mail „Reservierung entfernt: {Ressource}“,
+  und die Stornierungen stehen im [Audit-Log](settings/audit-log.md). Laufende Buchungen werden nie storniert. Wird
+  das Limit erhöht, wird nichts storniert.
+- Übergabe- und Überzugs-Hinweise werden auf solchen Maschinen nur versendet, wenn der buchenden Person ein Platz
+  fehlen würde.
+- Die Karte **Reservierungen** zeigt zu jeder Buchung, wie viele Plätze im vollsten Moment ihres Zeitraums (samt
+  Puffern) reserviert sind, zum Beispiel „2 von 3 Plätzen reserviert“. Sind alle Plätze belegt, wird die Zählung rot.
+- Ein Reader zeigt „Reserviert“ nur, wenn kein freier Platz mehr übrig ist; sonst zeigt er eine Zählung wie
+  „2 von 3 Plätzen reserviert“ (in der kurzen Statuszeile „2/3 reserviert“).
 
 ## Meine Reservierungen
 

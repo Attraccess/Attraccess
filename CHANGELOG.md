@@ -1,3 +1,184 @@
+## 1.11.0-beta.0 (2026-11-14)
+
+### 🚀 Features
+
+- add independent date and time formatting locale (ATT-1109) ([#1986](https://github.com/Attraccess/Attraccess/pull/1986))
+- add mass introduction QR codes and reader scan (ATT-1151) ([#2021](https://github.com/Attraccess/Attraccess/pull/2021))
+- parallel sessions on one machine (ATT-1189) ([#2047](https://github.com/Attraccess/Attraccess/pull/2047))
+- MQTT message explorer in core + RabbitMQ connections and stats (ATT-523/524/525) ([#2101](https://github.com/Attraccess/Attraccess/pull/2101))
+- **ATT-37:** add configurable CSV export templates ([#1353](https://github.com/Attraccess/Attraccess/pull/1353))
+- **api:** add configurable log destinations (ATT-1119) ([#1910](https://github.com/Attraccess/Attraccess/pull/1910))
+- **api:** require sign-in for activity and access-list reads and add resource activity visibility (ATT-1149) ([#2028](https://github.com/Attraccess/Attraccess/pull/2028))
+- ⚠️  **api:** only approved websites may use a browser session (ATT-1167) ([#2029](https://github.com/Attraccess/Attraccess/pull/2029))
+- **api:** make auth security and audit collaborators required (ATT-1222) ([#2168](https://github.com/Attraccess/Attraccess/pull/2168))
+- **attractap:** show live usage statistics (ATT-1126) ([#1918](https://github.com/Attraccess/Attraccess/pull/1918))
+- **attractap:** allow admins to manage user RFID cards (ATT-1128) ([#1939](https://github.com/Attraccess/Attraccess/pull/1939))
+- **attractap:** add full-screen session completion summary ([#1987](https://github.com/Attraccess/Attraccess/pull/1987))
+- **attractap:** show a wall clock on idle reader screens ([#1994](https://github.com/Attraccess/Attraccess/pull/1994))
+- **attractap:** add project search on readers (ATT-1136) ([#2017](https://github.com/Attraccess/Attraccess/pull/2017))
+- **attractap:** add configurable NFC card emulator (ATT-894) ([#1705](https://github.com/Attraccess/Attraccess/pull/1705))
+- **attractap:** one reader pairing and enrollment flow (ATT-1165, ATT-1168, ATT-1170, ATT-1171) ([#2040](https://github.com/Attraccess/Attraccess/pull/2040))
+- **attractap:** plugin-provided UI, start confirmation hooks and Lite feedback on readers (ATT-1187) ([#2050](https://github.com/Attraccess/Attraccess/pull/2050))
+- **attractap:** secure firmware profile, build gates and lab secure reader (ATT-1166, slice 1) ([#2030](https://github.com/Attraccess/Attraccess/pull/2030), [#2060](https://github.com/Attraccess/Attraccess/issues/2060))
+- **attractap:** lab-signed parking image for secure lab readers (ATT-1166) ([#2061](https://github.com/Attraccess/Attraccess/pull/2061), [#2060](https://github.com/Attraccess/Attraccess/issues/2060))
+- **attractap:** card checks on the server (ATT-1145 part 1) ([#2039](https://github.com/Attraccess/Attraccess/pull/2039), [#2090](https://github.com/Attraccess/Attraccess/issues/2090))
+- **attractap:** server Secure Boot keys, signed images, secure image packaging and Reader security page (ATT-1206) ([#2100](https://github.com/Attraccess/Attraccess/pull/2100))
+- **attractap-lab:** add reusable headless hardware lab ([#2012](https://github.com/Attraccess/Attraccess/pull/2012))
+- **attractap-lab:** show live camera views on dashboard place pages ([#2020](https://github.com/Attraccess/Attraccess/pull/2020))
+- **attractap-lab:** erase and park readers as soon as they are released ([#2022](https://github.com/Attraccess/Attraccess/pull/2022))
+- **attractap-lab:** make lab dashboard usable on phones ([#2041](https://github.com/Attraccess/Attraccess/pull/2041))
+- **attractap-lab:** power the Touch V1 with its NFC emulator and test both readers in CI ([#2043](https://github.com/Attraccess/Attraccess/pull/2043))
+- **attractap-lab:** park secure lab readers with a lab-signed image (ATT-1166) ([#2060](https://github.com/Attraccess/Attraccess/pull/2060))
+- **attractap-lab:** power-cycle the Touch V2 through a USB power switch the lab host controls ([#2171](https://github.com/Attraccess/Attraccess/pull/2171))
+- **audit:** record every flow change in the audit log (ATT-1228) ([#2178](https://github.com/Attraccess/Attraccess/pull/2178), [#1](https://github.com/Attraccess/Attraccess/issues/1))
+- **auth:** support central logout for OIDC and SAML ([#1989](https://github.com/Attraccess/Attraccess/pull/1989))
+- **auth:** rate-limit SSO account linking and make link tokens single-use (ATT-1223) ([#2158](https://github.com/Attraccess/Attraccess/pull/2158))
+- **billing:** flow-defined energy meters with automatic per-kWh billing (ATT-1101) ([#1895](https://github.com/Attraccess/Attraccess/pull/1895))
+- **billing:** show billing summary when a session ends ([#1908](https://github.com/Attraccess/Attraccess/pull/1908))
+- **crap:** enforce the CRAP score limit ([#1887](https://github.com/Attraccess/Attraccess/pull/1887))
+- **flows:** show plugin-supplied summaries on flow canvas nodes ([#1898](https://github.com/Attraccess/Attraccess/pull/1898), [#1890](https://github.com/Attraccess/Attraccess/issues/1890), [#1895](https://github.com/Attraccess/Attraccess/issues/1895))
+- **flows:** add template arithmetic and document core nodes ([#1915](https://github.com/Attraccess/Attraccess/pull/1915))
+- **flows:** flows for shared machines (ATT-1190) ([#2054](https://github.com/Attraccess/Attraccess/pull/2054))
+- **flows:** global flows (ATT-175) ([#2098](https://github.com/Attraccess/Attraccess/pull/2098))
+- **frontend:** simplify password strength indicator to a colored meter ([#2018](https://github.com/Attraccess/Attraccess/pull/2018))
+- **frontend:** align all confirm/alert/status dialogs on StatusDialog and share UI between core and plugins (ATT-1162) ([#2023](https://github.com/Attraccess/Attraccess/pull/2023))
+- **frontend:** PWA update indicator (ATT-1198) ([#2096](https://github.com/Attraccess/Attraccess/pull/2096))
+- **history:** link billing and usage details (ATT-1108) ([#1917](https://github.com/Attraccess/Attraccess/pull/1917))
+- **i18n:** add system language defaults and Attractap translations ([#1886](https://github.com/Attraccess/Attraccess/pull/1886))
+- **lint:** extend no-service-inheritance to undecorated classes (ATT-1235) ([#2180](https://github.com/Attraccess/Attraccess/pull/2180))
+- **lint:** reject import cycles and break the existing ones (ATT-1214) ([#2172](https://github.com/Attraccess/Attraccess/pull/2172))
+- **live-updates:** bundle core and plugin UI streams ([#1919](https://github.com/Attraccess/Attraccess/pull/1919))
+- **matter:** versioned sidecar contract, sidecar app and Matter plugin (ATT-999) ([#2027](https://github.com/Attraccess/Attraccess/pull/2027), [#1997](https://github.com/Attraccess/Attraccess/issues/1997))
+- **matter:** secure plugin-to-sidecar connectivity and compatibility (ATT-1001) ([#2058](https://github.com/Attraccess/Attraccess/pull/2058))
+- **matter:** device endpoint profile and state model (ATT-996) ([#2173](https://github.com/Attraccess/Attraccess/pull/2173))
+- **matter:** persist fabric identity and encrypted backup/restore (ATT-998) ([#2176](https://github.com/Attraccess/Attraccess/pull/2176))
+- **meters:** replace energy metering with generic consumption billing ([#1928](https://github.com/Attraccess/Attraccess/pull/1928))
+- **monitoring:** separate Attractap power-on resets from crash alerts (ATT-1148) ([#2038](https://github.com/Attraccess/Attraccess/pull/2038))
+- **plugins:** share core i18n and translate plugin UIs (ATT-1104) ([#1901](https://github.com/Attraccess/Attraccess/pull/1901))
+- **plugins:** support marketplace plugin dependencies (ATT-1117) ([#1913](https://github.com/Attraccess/Attraccess/pull/1913))
+- **plugins:** support sidebar groups (ATT-1131) ([#1936](https://github.com/Attraccess/Attraccess/pull/1936))
+- **plugins:** publish every plugin change from npm state (ATT-1221) ([#2160](https://github.com/Attraccess/Attraccess/pull/2160))
+- **reports:** machine hours and person hours (ATT-1196) ([#2192](https://github.com/Attraccess/Attraccess/pull/2192))
+- **reservations:** resource reservations plugin and core plugin hooks (ATT-881) ([#2094](https://github.com/Attraccess/Attraccess/pull/2094))
+- **reservations:** Attractap reader integration, footer clock and lock-screen status (ATT-1188, ATT-1225) ([#2097](https://github.com/Attraccess/Attraccess/pull/2097), [#2094](https://github.com/Attraccess/Attraccess/issues/2094))
+- **sso:** re-sync OIDC permissions during long-lived sessions ([#2019](https://github.com/Attraccess/Attraccess/pull/2019))
+- **sso:** configurable role claim paths for OIDC and SAML (ATT-233) ([#2053](https://github.com/Attraccess/Attraccess/pull/2053))
+- **wago:** replace configuration editor with live front panel (ATT-1106) ([#1903](https://github.com/Attraccess/Attraccess/pull/1903))
+- **wago:** add build-owned runtime and managed SSH updates ([#1900](https://github.com/Attraccess/Attraccess/pull/1900))
+- **wago:** harden commissioning and add managed network changes ([#1912](https://github.com/Attraccess/Attraccess/pull/1912))
+- **wago:** add production assurance for the WAGO CC100 integration (ATT-988) ([#2031](https://github.com/Attraccess/Attraccess/pull/2031))
+
+### 🩹 Fixes
+
+- rename NFC cards and source paths to RFID ([#1907](https://github.com/Attraccess/Attraccess/pull/1907))
+- preserve localized Intl durations with second precision ([#1972](https://github.com/Attraccess/Attraccess/pull/1972))
+- return 502 when OIDC discovery cannot reach the provider (ATT-1231) ([#2183](https://github.com/Attraccess/Attraccess/pull/2183))
+- **a11y:** give modals and drawers accessible titles (ATT-720) ([#1951](https://github.com/Attraccess/Attraccess/pull/1951))
+- **api:** prevent SQLite contention during resource operations ([#2015](https://github.com/Attraccess/Attraccess/pull/2015))
+- **api:** unify SSO account linking and bind SAML users to their provider (ATT-232) ([#2045](https://github.com/Attraccess/Attraccess/pull/2045))
+- **api:** handle Valkey invalidation subscriber errors (ATT-1230) ([#2181](https://github.com/Attraccess/Attraccess/pull/2181))
+- **api:** return 400 instead of 500 for invalid CSV invite config and taken single-invite identities (ATT-1232) ([#2182](https://github.com/Attraccess/Attraccess/pull/2182))
+- **attractap:** restore complete introducer lists (ATT-1113) ([#1906](https://github.com/Attraccess/Attraccess/pull/1906))
+- **attractap:** silence desktop simulator tests ([#1946](https://github.com/Attraccess/Attraccess/pull/1946))
+- **attractap:** suspend NFC throughout firmware updates ([#2000](https://github.com/Attraccess/Attraccess/pull/2000))
+- **attractap:** turn off the V2 backlight on parked lab readers ([#2035](https://github.com/Attraccess/Attraccess/pull/2035))
+- **attractap:** finish card key changes whose confirmation was lost; steady the CI hardware tests ([#2037](https://github.com/Attraccess/Attraccess/pull/2037))
+- **attractap:** replace popups with full-screen layouts ([#2044](https://github.com/Attraccess/Attraccess/pull/2044), [#2047](https://github.com/Attraccess/Attraccess/issues/2047), [#2050](https://github.com/Attraccess/Attraccess/issues/2050))
+- **attractap-lab:** capture per-place camera views without a placeholder crop ([#2016](https://github.com/Attraccess/Attraccess/pull/2016))
+- **attractap-lab:** let the janitor actually park readers on the lab host ([#2025](https://github.com/Attraccess/Attraccess/pull/2025))
+- **attractap-lab:** wait for the exporter before the janitor claims a reader ([#2026](https://github.com/Attraccess/Attraccess/pull/2026))
+- **audit:** stop audit records from being dropped silently (ATT-1212) ([#2159](https://github.com/Attraccess/Attraccess/pull/2159))
+- **audit:** retry an audit insert that waited out the SQLite busy timeout (ATT-1212) ([#2170](https://github.com/Attraccess/Attraccess/pull/2170))
+- **auth:** sequence 2FA and accept email login ([#1988](https://github.com/Attraccess/Attraccess/pull/1988))
+- **auth:** clarify authentication labels in English and German ([#1991](https://github.com/Attraccess/Attraccess/pull/1991))
+- **billing:** widen transaction modal and show real kWh/rate for energy items ([#1902](https://github.com/Attraccess/Attraccess/pull/1902))
+- **build:** get main's nightly typecheck and build jobs passing again ([#2049](https://github.com/Attraccess/Attraccess/pull/2049), [#2023](https://github.com/Attraccess/Attraccess/issues/2023))
+- **ci:** narrow the WAGO runtime version gate so dependency PRs can merge (ATT-1078, ATT-1147) ([#2057](https://github.com/Attraccess/Attraccess/pull/2057))
+- **ci:** reduce Renovate memory use on the Mend-hosted job ([#2091](https://github.com/Attraccess/Attraccess/pull/2091))
+- **ci:** cancel a pull request's superseded run when it is pushed again ([#2161](https://github.com/Attraccess/Attraccess/pull/2161))
+- **ci:** decide the WAGO runtime-version gate from the built runtime bundle (ATT-1156) ([#2166](https://github.com/Attraccess/Attraccess/pull/2166))
+- **deps:** update dependency @internationalized/date to v3.12.4 ([#1954](https://github.com/Attraccess/Attraccess/pull/1954))
+- **deps:** update dependency react-router-dom to v7.18.4 ([#1956](https://github.com/Attraccess/Attraccess/pull/1956))
+- **deps:** update dependency express to v4.22.3 ([#1955](https://github.com/Attraccess/Attraccess/pull/1955))
+- **deps:** update nx monorepo to v22.7.12 ([#1957](https://github.com/Attraccess/Attraccess/pull/1957))
+- **deps:** update dependency ipaddr.js to v2.5.0 ([#2093](https://github.com/Attraccess/Attraccess/pull/2093), [#2092](https://github.com/Attraccess/Attraccess/issues/2092), [#1971](https://github.com/Attraccess/Attraccess/issues/1971))
+- **email:** restore full-height visual editors ([#1904](https://github.com/Attraccess/Attraccess/pull/1904))
+- **flows:** fall back to schema labels in flow logs (ATT-1125) ([#1916](https://github.com/Attraccess/Attraccess/pull/1916))
+- **frontend:** respect output handle order in flow auto-align ([#1889](https://github.com/Attraccess/Attraccess/pull/1889))
+- **frontend:** Approve works after an ?enroll= link or the web flasher found the reader ([#2046](https://github.com/Attraccess/Attraccess/pull/2046))
+- **frontend:** top-align unauthorized form on mobile so auth CTA is reachable ([#2052](https://github.com/Attraccess/Attraccess/pull/2052))
+- **frontend:** confirm-delete-account must not delete on load (ATT-1233) ([#2179](https://github.com/Attraccess/Attraccess/pull/2179))
+- **frontend:** translate invite and registration user errors (ATT-1248) ([#2187](https://github.com/Attraccess/Attraccess/pull/2187))
+- **matter:** add plugin publish target and deflake sidecar lifecycle test (ATT-1001) ([#2095](https://github.com/Attraccess/Attraccess/pull/2095))
+- **monitoring:** clean up legacy Pushover receivers (ATT-597) ([#1953](https://github.com/Attraccess/Attraccess/pull/1953))
+- **nfc-emulator:** keep the card session while the reader relays to the server ([#2169](https://github.com/Attraccess/Attraccess/pull/2169))
+- **printables:** triple the wall around the keychain card's keyring hole ([#2177](https://github.com/Attraccess/Attraccess/pull/2177))
+- **rabbitmq:** remove standalone page and sidebar entry (ATT-1130) ([#1934](https://github.com/Attraccess/Attraccess/pull/1934))
+- **release:** allow prerelease versions to be cut and installed ([#2196](https://github.com/Attraccess/Attraccess/pull/2196))
+- **resources:** show inherited introductions in People tab ([#1905](https://github.com/Attraccess/Attraccess/pull/1905))
+- **security:** update Companion to Node 24 and share runtime build version ([#2011](https://github.com/Attraccess/Attraccess/pull/2011))
+- **tooling:** reliable pre-commit hook with CRAP scoring as plain Nx targets ([#2090](https://github.com/Attraccess/Attraccess/pull/2090))
+- **tooling:** re-anchor cached coverage paths in crap-score ([#2162](https://github.com/Attraccess/Attraccess/pull/2162))
+- **ui:** align checkbox controls with their labels ([#1909](https://github.com/Attraccess/Attraccess/pull/1909))
+- **usage:** prevent orphan sessions from blocking resources (ATT-1111) ([#1938](https://github.com/Attraccess/Attraccess/pull/1938))
+- **users:** make email uniqueness case-insensitive (ATT-1246) ([#2188](https://github.com/Attraccess/Attraccess/pull/2188))
+- **wago:** recover plugin loading and simplify commissioning ([#1881](https://github.com/Attraccess/Attraccess/pull/1881), [#1894](https://github.com/Attraccess/Attraccess/issues/1894))
+- **wago:** hide finished commissioning progress, explain runtime updates ([#1896](https://github.com/Attraccess/Attraccess/pull/1896))
+- **wago:** self-heal the RTU bus after a failed read ([#1897](https://github.com/Attraccess/Attraccess/pull/1897))
+- **wago:** replace resource diagnostics dump with a focused warning card ([#1899](https://github.com/Attraccess/Attraccess/pull/1899))
+- **wago:** keep output card contents visible on hover (ATT-1129) ([#1935](https://github.com/Attraccess/Attraccess/pull/1935))
+- **wago:** recover CC100 MQTT and clean up OTA images ([#1973](https://github.com/Attraccess/Attraccess/pull/1973))
+- **wago:** consolidate CC100 runtime into plugin project ([#1884](https://github.com/Attraccess/Attraccess/pull/1884))
+- **wago:** remove two plugin-wago test flakes at their production root causes ([#2059](https://github.com/Attraccess/Attraccess/pull/2059))
+
+### ⚠️  Breaking Changes
+
+- **api:** only approved websites may use a browser session (ATT-1167)  ([#2029](https://github.com/Attraccess/Attraccess/pull/2029))
+  `GET /api/auth/session/refresh` was removed, use `POST`.
+  Scripts that send the browser session cookie must send an approved `Origin`
+  header on writes. Behind a reverse proxy that rewrites the host or terminates
+  TLS, set ATTRACCESS_URL (or TRUST_PROXY with forwarded headers) before
+  upgrading, or browser writes, including sign-in, are refused.
+  Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+  * fix(api): close review findings in the cross-site write check (ATT-1167)
+  - Only a usable `Bearer` token skips the check. Basic/Negotiate headers that a
+    browser or proxy adds on its own no longer let a cookie write through, and
+    the unused x-api-key skip is gone.
+  - Use Express 5 `req.host` for the served address instead of re-implementing
+    its X-Forwarded-Host handling, and drop the second Settings cache (the
+    settings store already caches and updates on save). A failed Settings read
+    backs off for 5 s instead of hitting the database on every request.
+  - Refusal logs show the address Attraccess thinks it was opened at and how to
+    approve a website; caller-controlled headers are truncated.
+  - logout-everywhere uses the shared check only (the return-URL allowance could
+    never add anything).
+  - Dev: the Vite proxy keeps the browser's Host, so the dev frontend is
+    approved at any port or address and `pnpm serve` no longer needs to pass it.
+  - CI: the browser test gates merges and caches Chromium.
+  - Tests: fresh session per browser test, an authenticated live-updates stream,
+    an approved third website, exempt routes and device websocket through the
+    full app, a check over the real exempt handlers, and tighter unit cases.
+  - Docs: TLS-terminating proxies as an upgrade check, a sample refusal log line,
+    and the ATTRACCESS_URL default fixed.
+  Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+  * fix(api): bound browser test teardown, sync proxy spec, note x-api-key in docs (ATT-1167)
+  Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+  * chore(wago): bump CC100 runtime to 0.2.11 for the Playwright lockfile change (ATT-1167)
+  The root package.json and pnpm-lock.yaml changed (Playwright for the
+  cross-site browser test), which the runtime release gate counts as
+  runtime input.
+  Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+### ❤️ Thank You
+
+- Bob @bobs-factory
+- Claude Opus 5.5
+- Claude Opus 5.5 (1M context)
+- Claude Sonnet 5.5
+- Giesela-Bot @Giesela-Bot
+- Jan Jaap @jappyjan
+- Rocky
+
 ## 1.10.0 (2026-09-24)
 
 ### 🚀 Features

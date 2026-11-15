@@ -118,18 +118,24 @@ export function endedEarlyByManager(m: MessageContext, r: ReservationEntity): No
   };
 }
 
-/** Reservations were switched off for the resource; future bookings were cancelled. */
-export function removed(m: MessageContext, r: ReservationEntity): NoticeText {
+/** A future booking was cancelled by the system: reservations were switched off, or fewer parallel bookings are allowed. */
+export function removed(m: MessageContext, r: ReservationEntity, capacityReduced = false): NoticeText {
   const { lang, resourceName } = m;
   return {
-    email: { template: 'removed', variables: bookingVariables(m, r) },
+    email: { template: 'removed', variables: { ...bookingVariables(m, r), removal: { capacity: capacityReduced } } },
     title: pick(lang, `Booking removed: ${resourceName}`, `Reservierung entfernt: ${resourceName}`),
     lines: [
-      pick(
-        lang,
-        `Reservations were switched off for ${resourceName}, so your booking (${when(m, r)}) was cancelled.`,
-        `Reservierungen wurden für ${resourceName} deaktiviert, daher wurde deine Reservierung (${when(m, r)}) storniert.`,
-      ),
+      capacityReduced
+        ? pick(
+            lang,
+            `${resourceName} now allows fewer parallel bookings, so your booking (${when(m, r)}) no longer fit and was cancelled.`,
+            `Für ${resourceName} sind jetzt weniger parallele Buchungen möglich, daher passte deine Reservierung (${when(m, r)}) nicht mehr und wurde storniert.`,
+          )
+        : pick(
+            lang,
+            `Reservations were switched off for ${resourceName}, so your booking (${when(m, r)}) was cancelled.`,
+            `Reservierungen wurden für ${resourceName} deaktiviert, daher wurde deine Reservierung (${when(m, r)}) storniert.`,
+          ),
     ],
     severity: 'warning',
   };

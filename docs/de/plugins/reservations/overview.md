@@ -7,6 +7,8 @@
 Mit dem Plugin **Reservierungen** buchen Mitglieder eine Ressource im Voraus für ein bestimmtes Zeitfenster. Solange
 eine Buchung aktiv ist, kann niemand sonst die Ressource starten. Wer kurz vor der Buchung einer anderen Person
 startet, wird um eine Bestätigung gebeten.
+Bei Maschinen mit mehreren parallelen Sitzungen belegt eine Buchung nur einen Platz (siehe
+[Maschinen mit mehreren parallelen Sitzungen](plugins/reservations/using-reservations.md#maschinen-mit-mehreren-parallelen-sitzungen)).
 
 Das Plugin beendet, sperrt oder übernimmt niemals eine laufende Sitzung. Es blockiert oder fragt nur vor dem
 **Start** einer Sitzung und versendet Benachrichtigungen. Reservierungen sind standardmäßig deaktiviert und werden pro

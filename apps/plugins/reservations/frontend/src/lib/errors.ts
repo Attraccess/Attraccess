@@ -12,6 +12,7 @@ const KNOWN_CODES = new Set([
   'OUTSIDE_BOOKABLE_HOURS',
   'USER_BOOKING_LIMIT',
   'OVERLAP',
+  'OWN_OVERLAP',
   'MAINTENANCE',
   'NOT_PENDING',
   'NOT_ACTIVE',
@@ -33,16 +34,25 @@ const KNOWN_CODES = new Set([
 
 type Translate = (key: string, data?: Record<string, unknown>) => string;
 
+/** What the caller knows about the resource the code refers to. */
+export interface ErrorHints {
+  /** Effective session limit; above 1 an OVERLAP means every slot is booked, not "another booking". */
+  slots?: number;
+}
+
+const keyOf = (code: string, hints?: ErrorHints) =>
+  code === 'OVERLAP' && (hints?.slots ?? 1) > 1 ? 'errors.OVERLAP_FULL' : `errors.${code}`;
+
 /** Localised text for a known error code (e.g. the reason a booking is not possible), else the raw text. */
-export function describeCode(code: string, t: Translate): string {
-  return KNOWN_CODES.has(code) ? t(`errors.${code}`, { count: 0 }) : code;
+export function describeCode(code: string, t: Translate, hints?: ErrorHints): string {
+  return KNOWN_CODES.has(code) ? t(keyOf(code, hints), { count: 0 }) : code;
 }
 
 /** Localised text for an API failure: a typed code wins, then the HTTP status, then the raw message. */
-export function describeError(error: unknown, t: Translate): string {
+export function describeError(error: unknown, t: Translate, hints?: ErrorHints): string {
   if (error instanceof ReservationsApiError) {
     if (error.code && KNOWN_CODES.has(error.code)) {
-      return t(`errors.${error.code}`, { count: error.count ?? 0 });
+      return t(keyOf(error.code, hints), { count: error.count ?? 0 });
     }
     if (error.status === 403) return t('errors.FORBIDDEN');
     if (error.status === 404) return t('errors.NOT_FOUND');

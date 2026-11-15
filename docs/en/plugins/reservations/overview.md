@@ -6,6 +6,8 @@
 
 The **Reservations** plugin lets members book a resource for a specific time window in advance. While a booking is
 active, nobody else can start the resource. Starting shortly before someone else's booking asks for a confirmation.
+On machines with several parallel sessions a booking holds only one slot (see
+[Machines with several parallel sessions](plugins/reservations/using-reservations.md#machines-with-several-parallel-sessions)).
 
 The plugin never ends, locks or takes over a running session. It only blocks or asks before a session **starts**
 and sends notifications. Reservations are disabled by default and are enabled per resource. On resources where they

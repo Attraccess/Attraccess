@@ -33,6 +33,8 @@ import { UpdateResourceDto } from './dtos/updateResource.dto';
 
 import { ResourceImageService } from './resourceImage.service';
 
+import { ResourceSessionLimitChangedEvent } from './events/resource-session-limit-changed.event';
+
 import { ResourcesService } from './resources.service';
 
 import { mockMetricsService } from './resources.service.spec.mock-metrics-service';
@@ -248,6 +250,48 @@ describe('ResourcesService', () => {
           },
         }),
       );
+    });
+
+    describe('session limit event', () => {
+      const emitted = () =>
+        ((updateResourceScope.service as any).eventEmitter.emit as jest.Mock).mock.calls.filter(
+          ([name]: [string]) => name === ResourceSessionLimitChangedEvent.EVENT_NAME,
+        );
+      const update = async (before: Partial<Resource>, after: Partial<Resource>, actor?: { id: number }) => {
+        ((updateResourceScope.service as any).eventEmitter.emit as jest.Mock).mockClear();
+        jest
+          .spyOn(updateResourceScope.service, 'getResourceById')
+          .mockResolvedValue(createMockResource({ id: 1, ...before }));
+        updateResourceScope.resourceRepository.save.mockResolvedValue(createMockResource({ id: 1, ...after }));
+        await updateResourceScope.service.updateResource(1, {}, undefined, actor);
+      };
+
+      it('announces a lowered limit with the actor', async () => {
+        await update(
+          { type: ResourceType.Machine, maxParallelSessions: 3 },
+          { type: ResourceType.Machine, maxParallelSessions: 2 },
+          { id: 9 },
+        );
+        expect(emitted()).toEqual([
+          [ResourceSessionLimitChangedEvent.EVENT_NAME, new ResourceSessionLimitChangedEvent(1, 3, 2, 9)],
+        ]);
+      });
+
+      it('announces a type change that changes the effective limit, without an actor', async () => {
+        await update(
+          { type: ResourceType.Machine, maxParallelSessions: 3 },
+          { type: ResourceType.Lock, maxParallelSessions: 3 },
+        );
+        expect(emitted()[0][1]).toMatchObject({ previousLimit: 3, newLimit: 1, actorUserId: null });
+      });
+
+      it('stays quiet when the effective limit is unchanged', async () => {
+        await update(
+          { type: ResourceType.Lock, maxParallelSessions: 3 },
+          { type: ResourceType.Lock, maxParallelSessions: 5 },
+        );
+        expect(emitted()).toEqual([]);
+      });
     });
 
     it('does not audit metadata that only normalized from absent to empty', async () => {
