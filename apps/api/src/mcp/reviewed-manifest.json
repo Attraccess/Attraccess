@@ -72,12 +72,12 @@
   "inviteUser": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "9c8cdbf5"
+    "shape": "b30305d2"
   },
   "inviteUsersFromCsv": {
     "decision": "deny",
     "reason": "Non-JSON request: multipart/form-data CSV upload.",
-    "shape": "885ab9d9"
+    "shape": "596d94f9"
   },
   "getCurrent": {
     "decision": "allow",
