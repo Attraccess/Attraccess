@@ -2,12 +2,12 @@ import { BillingTransactionItem, ResourceFlowNodeType } from '@attraccess/databa
 import { Repository } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
-import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
+import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { ResourceFlowVariablesService } from '../variables/resource-flow-variables.service';
 import { ResourceOperatingIntervalService } from '../../operating-intervals/resource-operating-interval.service';
 import { CompanionGatewayService } from '../../../companion/companion-gateway.service';
-import { ResourceMeteringService } from '../../metering/resource-metering.service';
+import type { ResourceMeteringService } from '../../metering/resource-metering.service';
 import {
   ActivityTrackExecutor,
   BillingSetAdditionalItemsExecutor,
@@ -36,20 +36,31 @@ interface ExecutorDependencies {
   resourceActivity: Map<number, Date>;
   heartbeatLastSeen: Map<string, Date>;
   resourceHealthService: ResourceHealthService;
-  resourceUsageService: ResourceUsageService;
-  billingTransactionItemRepository: Repository<BillingTransactionItem>;
   mqttClientService: MqttClientService;
   operatingIntervals: ResourceOperatingIntervalService;
   eventEmitter: EventEmitter2;
   variablesService: ResourceFlowVariablesService;
   companionGatewayService: CompanionGatewayService;
-  metering: ResourceMeteringService;
 }
 
-/** Exhaustive core-node registry; each strategy receives only the collaborators it needs. */
+/** Nodes that call back into usage. */
+export type UsageNodeType =
+  | ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS
+  | ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION;
+
+/** Nodes that call back into metering. */
+export type MeteringNodeType = ResourceFlowNodeType.OUTPUT_METERING_REPORT;
+
+/**
+ * Nodes that call back into usage or metering. Those modules depend on flows, so their executors are attached by
+ * `ResourceUsageFlowsBridge` and `ResourceMeteringFlowsBridge` instead of being built here.
+ */
+export type AttachedNodeType = UsageNodeType | MeteringNodeType;
+
+/** Core-node registry except the attached nodes; each strategy receives only the collaborators it needs. */
 export function buildNodeExecutorRegistry(
   dependencies: ExecutorDependencies,
-): Record<ResourceFlowNodeType, NodeExecutor> {
+): Omit<Record<ResourceFlowNodeType, NodeExecutor>, AttachedNodeType> {
   const passthrough = new PassthroughExecutor();
 
   return {
@@ -73,15 +84,8 @@ export function buildNodeExecutorRegistry(
       dependencies.heartbeatLastSeen,
     ),
     [ResourceFlowNodeType.OUTPUT_RESOURCE_HEALTH_SET]: new HealthSetExecutor(dependencies.resourceHealthService),
-    [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS]: new BillingSetAdditionalItemsExecutor(
-      dependencies.resourceUsageService,
-      dependencies.billingTransactionItemRepository,
-    ),
     [ResourceFlowNodeType.OUTPUT_HTTP_SEND_REQUEST]: new HttpSendRequestExecutor(),
     [ResourceFlowNodeType.OUTPUT_MQTT_SEND_MESSAGE]: new MqttSendMessageExecutor(dependencies.mqttClientService),
-    [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: new EndUsageSessionExecutor(
-      dependencies.resourceUsageService,
-    ),
     [ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_TRACK_ACTIVITY]: new ActivityTrackExecutor(
       dependencies.resourceActivity,
     ),
@@ -118,6 +122,24 @@ export function buildNodeExecutorRegistry(
     [ResourceFlowNodeType.INPUT_METERING_START]: passthrough,
     [ResourceFlowNodeType.INPUT_METERING_COLLECT]: passthrough,
     [ResourceFlowNodeType.OUTPUT_METERING_READY]: new MeteringReadyExecutor(),
-    [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: new MeteringReportExecutor(dependencies.metering),
   };
+}
+
+export function usageNodeExecutors(
+  resourceUsageService: ResourceUsageService,
+  billingTransactionItemRepository: Repository<BillingTransactionItem>,
+): Pick<Record<ResourceFlowNodeType, NodeExecutor>, UsageNodeType> {
+  return {
+    [ResourceFlowNodeType.OUTPUT_RESOURCE_BILLING_SET_ADDITIONAL_ITEMS]: new BillingSetAdditionalItemsExecutor(
+      resourceUsageService,
+      billingTransactionItemRepository,
+    ),
+    [ResourceFlowNodeType.OUTPUT_RESOURCE_USAGE_END_SESSION]: new EndUsageSessionExecutor(resourceUsageService),
+  };
+}
+
+export function meteringNodeExecutors(
+  metering: ResourceMeteringService,
+): Pick<Record<ResourceFlowNodeType, NodeExecutor>, MeteringNodeType> {
+  return { [ResourceFlowNodeType.OUTPUT_METERING_REPORT]: new MeteringReportExecutor(metering) };
 }

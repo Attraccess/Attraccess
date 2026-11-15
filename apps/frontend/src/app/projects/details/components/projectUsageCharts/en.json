@@ -2,7 +2,7 @@
   "charts": {
     "title": "Usage trends",
     "timeSeries": {
-      "title": "Minutes vs spend",
+      "title": "Hours vs spend",
       "empty": "Not enough history to display the chart"
     },
     "topResources": {
@@ -14,14 +14,17 @@
       "columns": {
         "resource": "Resource",
         "sessions": "Sessions",
-        "minutes": "Minutes",
+        "personHours": "Person hours",
+        "machineHours": "Machine hours",
         "spend": "Spend"
       }
     }
   },
   "tooltip": {
     "sessions": "Sessions",
-    "minutes": "Minutes",
+    "hours": "Hours",
+    "personHours": "Person hours",
+    "machineHours": "Machine hours",
     "spend": "Spend"
   }
 }

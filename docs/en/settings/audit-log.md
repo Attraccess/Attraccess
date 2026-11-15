@@ -28,6 +28,27 @@ Audit records are historical and cannot be edited from the application. An event
 
 Changes to the system default language use the existing `settings.updated` event in the administration domain. Its details identify `app.defaultLanguage` and record the previous and new canonical values (`de` or `en`). When recording is enabled for this domain, successful language changes appear under that event; a failed settings write does not record a successful change.
 
+## Flow changes
+
+Every change to a flow is recorded in the **Resources** domain (`resource`), with the acting user (or API token), the time and what changed:
+
+| Event                                                                                    | Recorded when                                                                                                                                   |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resource_flow.updated` (Resource flow updated)                                          | A resource's flow canvas is saved with a change. Target: the resource.                                                                          |
+| `flow.created`, `flow.updated`, `flow.deleted` (Global flow created / updated / deleted) | A global flow is created, its name, description or on/off switch changes, or it is deleted. Target type: `flow`.                                |
+| `flow.canvas_updated` (Global flow canvas updated)                                       | A global flow's canvas is saved with a change. Target type: `flow`.                                                                             |
+| `flow_variable.set`, `flow_variable.deleted` (Flow variable set / deleted)               | A user or API token sets a flow variable to a new value, or deletes an existing one, through a resource's flow variables. Target: the resource. |
+
+Canvas events list the node and connection counts before and after, the added, removed and changed nodes (ID and type) and the added and removed connections. A node counts as changed when its type or settings change; merely moving a node does not. A save that changes nothing, including one that only moves nodes, is not recorded. Saving an empty canvas over a filled one is always recorded.
+
+The details also hold the previous canvas as JSON (**Previous flow (JSON)**), so a flow that was lost can be rebuilt by hand from the entry or the CSV export. Details are limited to 4,096 bytes. When an event would be larger, the previous canvas is reduced first, step by step: first without node positions, then without node settings (only IDs, types and connections remain), and finally left out. The **Previous flow detail level** field shows which step applied (`full`, `no_positions`, `no_data`, `omitted`). Only if the details are still too large after that are the lists shortened: long lists of added, removed and changed nodes and connections are shortened; the counts stay complete.
+
+Credentials are masked: they are recorded as `[redacted]`. This covers all HTTP header values; every setting whose name looks like a credential (password, token, secret, API key, authorization, credential); in key/value lists (for example the **Set Variables** and **Set Payload** nodes), the value of an entry whose key looks like a credential or is a header; the password and credential-like query parameters in URLs; and flow variable values whose key looks like a credential, as well as credential-like fields inside object-valued variables. This is best effort: credentials inside free text, such as a request body or an MQTT payload, are recorded as entered. Do not keep secrets in free-form node settings.
+
+Everyone who can read the audit log sees the masked node settings and variable values recorded with these events.
+
+Deleting a global flow records the flow and its nodes and connections as they were before deletion. Deleting a resource keeps its flow in the database, but the `resource.deleted` event notes how many flow nodes (`flowNodeCount`) and connections (`flowEdgeCount`) it had. Values that a running flow writes to flow variables are not recorded.
+
 ## Export
 
 **Export CSV** downloads all retained events matching the applied filters, including pages you have not opened. It includes stable identifiers, event/outcome, timestamps, operation IDs, and recorded details. Changing a filter without applying it does not change the export. Spreadsheet formula-like text is escaped so it is treated as data.

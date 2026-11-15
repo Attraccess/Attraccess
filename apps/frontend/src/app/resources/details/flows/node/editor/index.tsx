@@ -5,7 +5,7 @@ import { isValueValid, initializeValue } from './property-input/schema-values';
 import { ResourceFlowNodeSchemaDto } from '@attraccess/react-query-client';
 import { useResolveFlowNodeSchema } from '../../flowOwner';
 import { useNodeId, useNodesData } from '@xyflow/react';
-import { useFlowContext } from '../../context/index';
+import { useFlowContext } from '../../context/flowContext';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StandardDrawer, TExists, TFunction } from '@attraccess/plugins-frontend-ui';
 

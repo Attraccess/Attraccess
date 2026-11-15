@@ -13,8 +13,8 @@ import { validateModbus, validateModbusBindings } from '../../../modbus/model';
 import { useWagoDiagnostics } from '../diagnostics/diagnostics';
 import { useWagoTranslations } from '../i18n';
 
-import { WorkingCopy } from './ConfigurationEditor';
-import { draftIdentity } from './ConfigurationEditor';
+import type { WorkingCopy } from './configurationSession';
+import { draftIdentity } from './configurationSession';
 
 export function useConfigurationSessionState({ controllerId, onClose }: { controllerId: number; onClose: () => void }) {
   const { t } = useWagoTranslations();

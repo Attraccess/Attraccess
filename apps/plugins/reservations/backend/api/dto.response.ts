@@ -319,6 +319,13 @@ export class AvailabilityDto {
   rules!: PublicBookingRulesDto;
 
   @ApiProperty({
+    type: Number,
+    description:
+      'Effective session limit N of the resource: how many bookings may overlap (each takes one slot). 1 for doors, machines without parallel sessions and while reservations are disabled',
+  })
+  slots!: number;
+
+  @ApiProperty({
     type: () => [ReservationDto],
     description:
       'Pending and confirmed bookings whose blocked span [startTime - their bufferBeforeMinutes, endTime + their bufferAfterMinutes) overlaps [from - rules.bufferBeforeMinutes, to + rules.bufferAfterMinutes): every booking a new booking inside [from, to) can collide with, including ones just outside the range',

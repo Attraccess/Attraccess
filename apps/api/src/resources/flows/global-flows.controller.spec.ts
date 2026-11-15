@@ -99,4 +99,17 @@ describe('GlobalFlowsController permissions', () => {
     permissions.add('resources.update');
     await send(route).expect(route.status);
   });
+
+  it('passes the signed-in user as the audit actor to every change, and the controller never records itself', async () => {
+    permissions.add('resources.update');
+    const actor = { id: 9, authenticationMethod: 'session' };
+    await send(routes[1]).expect(201);
+    await send(routes[4]).expect(200);
+    await send(routes[5]).expect(200);
+    await send(routes[7]).expect(200);
+    expect(globalFlows.create).toHaveBeenCalledWith({ name: 'Notify' }, actor);
+    expect(globalFlows.update).toHaveBeenCalledWith(5, { enabled: false }, actor);
+    expect(globalFlows.delete).toHaveBeenCalledWith(5, actor);
+    expect(globalFlows.saveCanvas).toHaveBeenCalledWith(5, { nodes: [], edges: [] }, actor);
+  });
 });

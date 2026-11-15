@@ -3,7 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar';
+import { FakeSidecar, HOST_VERSION, TOKEN, entry } from '../testing/fake-sidecar.test-utils';
 import { selfSignedCertificate } from '../testing/certs';
 import { MatterConnectionController } from './controller';
 import { MatterConnectionService } from './connection.service';

@@ -3,6 +3,8 @@ import { createLogger } from './logger';
 import { createSidecar } from './sidecar';
 import { isOperational, startupFailure } from './startup-failure';
 
+// matter.js creates and rewrites its storage files with the process umask, and they hold the fabric keys: owner-only.
+process.umask(0o077);
 // A supervisor that closes our stdout must not crash the sidecar with EPIPE; the log lines are simply lost.
 process.stdout.on('error', () => undefined);
 let logger = createLogger();

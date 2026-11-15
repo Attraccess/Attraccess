@@ -28,6 +28,27 @@ Protokolleinträge sind historische Aufzeichnungen und lassen sich in der Anwend
 
 Änderungen an der Standardsprache des Systems verwenden das bestehende Ereignis `settings.updated` im Administrationsbereich. Die Details nennen `app.defaultLanguage` sowie den vorherigen und neuen Wert (`de` oder `en`). Ist die Erfassung für diesen Bereich aktiviert, erscheinen erfolgreiche Sprachänderungen unter diesem Ereignis. Ein fehlgeschlagener Speichervorgang erzeugt keinen Eintrag für eine erfolgreiche Änderung.
 
+## Flow-Änderungen
+
+Jede Änderung an einem Flow wird im Bereich **Ressourcen** (`resource`) erfasst, mit dem ausführenden Benutzer (oder API-Token), dem Zeitpunkt und dem, was sich geändert hat:
+
+| Ereignis                                                                                      | Erfasst, wenn                                                                                                                                    |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `resource_flow.updated` (Ressourcen-Flow geändert)                                            | Die Flow-Arbeitsfläche einer Ressource mit einer Änderung gespeichert wird. Ziel: die Ressource.                                                 |
+| `flow.created`, `flow.updated`, `flow.deleted` (Globaler Flow erstellt / geändert / gelöscht) | Ein globaler Flow angelegt wird, sich Name, Beschreibung oder Ein/Aus-Schalter ändern oder er gelöscht wird. Zieltyp: `flow`.                    |
+| `flow.canvas_updated` (Canvas eines globalen Flows geändert)                                  | Die Arbeitsfläche eines globalen Flows mit einer Änderung gespeichert wird. Zieltyp: `flow`.                                                     |
+| `flow_variable.set`, `flow_variable.deleted` (Flow-Variable gesetzt / gelöscht)               | Ein Benutzer oder API-Token über die Flow-Variablen einer Ressource einen Wert ändert oder eine vorhandene Variable löscht. Ziel: die Ressource. |
+
+Ereignisse zur Arbeitsfläche nennen die Anzahl der Knoten und Verbindungen vorher und nachher, die hinzugefügten, entfernten und geänderten Knoten (ID und Typ) sowie die hinzugefügten und entfernten Verbindungen. Ein Knoten gilt als geändert, wenn sich Typ oder Einstellungen ändern; ein bloßes Verschieben zählt nicht. Ein Speichern ohne Änderung, auch wenn nur Knoten verschoben wurden, wird nicht erfasst. Wird eine gefüllte Arbeitsfläche durch eine leere ersetzt, wird das immer erfasst.
+
+Die Details enthalten außerdem die vorherige Arbeitsfläche als JSON (**Vorheriger Flow (JSON)**). Damit lässt sich ein verlorener Flow aus dem Eintrag oder dem CSV-Export von Hand wiederherstellen. Details sind auf 4.096 Byte begrenzt. Wäre ein Ereignis größer, wird zuerst die vorherige Arbeitsfläche schrittweise reduziert: zuerst ohne Knotenpositionen, dann ohne Knoteneinstellungen (nur IDs, Typen und Verbindungen bleiben) und zuletzt ganz weggelassen. Das Feld **Detailgrad des vorherigen Flows** zeigt die Stufe (`full`, `no_positions`, `no_data`, `omitted`). Erst wenn die Details danach noch zu groß sind, werden die Listen gekürzt: Lange Listen hinzugefügter, entfernter und geänderter Knoten und Verbindungen werden gekürzt; die Anzahlen bleiben vollständig.
+
+Zugangsdaten werden maskiert und als `[redacted]` erfasst. Das betrifft alle HTTP-Header-Werte; jede Einstellung, deren Name nach Zugangsdaten klingt (Passwort, Token, Secret, API-Schlüssel, Authorization, Credential); in Schlüssel/Wert-Listen (zum Beispiel in den Knoten **Variablen setzen** und **Payload setzen**) den Wert eines Eintrags, dessen Schlüssel nach Zugangsdaten klingt oder ein Header ist; das Passwort und zugangsdatenähnliche Query-Parameter in URLs; sowie Werte von Flow-Variablen, deren Schlüssel nach Zugangsdaten klingt, und zugangsdatenähnliche Felder in Variablen mit Objektwerten. Dieser Schutz ist nicht lückenlos: Zugangsdaten in freiem Text, etwa in einem Request-Body oder einer MQTT-Payload, werden so erfasst, wie sie eingegeben wurden. Legen Sie Geheimnisse nicht in frei formulierten Knoteneinstellungen ab.
+
+Wer das Audit-Protokoll lesen darf, sieht die maskierten Knoteneinstellungen und Variablenwerte dieser Ereignisse.
+
+Beim Löschen eines globalen Flows werden der Flow sowie seine Knoten und Verbindungen so erfasst, wie sie vor dem Löschen waren. Das Löschen einer Ressource lässt deren Flow in der Datenbank, aber das Ereignis `resource.deleted` nennt, wie viele Flow-Knoten (`flowNodeCount`) und Verbindungen (`flowEdgeCount`) sie hatte. Werte, die ein laufender Flow in Flow-Variablen schreibt, werden nicht erfasst.
+
 ## Exportieren
 
 **CSV exportieren** lädt alle aufbewahrten Ereignisse herunter, die zu den angewendeten Filtern passen – einschließlich noch nicht geöffneter Ergebnisseiten. Enthalten sind IDs, Ereignis und Ergebnis, Zeitstempel, Vorgangs-IDs sowie erfasste Details. Noch nicht angewendete Filteränderungen beeinflussen den Export nicht. Formelähnliche Texte werden für Tabellenkalkulationen als Daten maskiert.

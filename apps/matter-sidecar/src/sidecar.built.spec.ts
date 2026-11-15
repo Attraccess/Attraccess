@@ -1,9 +1,9 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { COMPATIBILITY_TABLE } from '@attraccess/matter-contract';
-import { http } from './testing/harness';
+import { http, validHeaders } from './testing/harness';
 
 const root = resolve(__dirname, '../../..');
 const TOKEN = 'built-test-token-0123456789abcdef0123456789';
@@ -19,7 +19,8 @@ type Started = {
   exited: Promise<number | null>;
 };
 
-// Only PATH is passed on: no Attraccess API, database, fabric or Matter storage configuration exists.
+// Only PATH is passed on: no Attraccess API, database, fabric or Matter storage configuration exists, so the default
+// storage directory (./matter-storage in the working directory) applies.
 function start(env: Record<string, string>, cwd: string, nodeArgs: string[] = []): Started {
   const child = spawn(process.execPath, [...nodeArgs, entry], { cwd, env: { PATH: process.env.PATH ?? '', ...env } });
   const stdout: string[] = [];
@@ -70,7 +71,39 @@ describe('built sidecar process', () => {
     expect(version).toMatchObject({ wireVersion: 1, storageSchemaVersion: 1 });
     const readiness = await http(port, 'GET', '/health/ready');
     expect(readiness.body).toMatchObject({ status: 'ready', fabric: { state: 'uninitialized' } });
-    expect(readdirSync(cwd)).toEqual([]); // no Matter storage was written, no fabric was created
+    // The storage directory exists (owner-only) but stays empty: no Matter state was written and no fabric was created.
+    expect(readdirSync(cwd)).toEqual(['matter-storage']);
+    expect(readdirSync(join(cwd, 'matter-storage'))).toEqual([]);
+    started.child.kill('SIGTERM');
+    expect(await started.exited).toBe(0);
+  });
+
+  it('keeps every file and directory of the fabric storage owner-only, also after matter.js rewrote them', async () => {
+    const started = launch();
+    const port = await ready(started);
+    const created = await http(port, 'POST', '/v1/fabric', {
+      headers: { ...validHeaders(), ...authorized, 'content-type': 'application/json' },
+      body: JSON.stringify({ label: 'Permissions' }),
+    });
+    expect(created.status).toBe(200);
+    const loose: string[] = [];
+    // matter.js writes through temporary files that it renames while the sidecar runs: one that vanished is not loose.
+    const walk = (directory: string) => {
+      for (const name of readdirSync(directory)) {
+        const path = join(directory, name);
+        let stat;
+        try {
+          stat = statSync(path);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+          throw error;
+        }
+        if ((stat.mode & 0o077) !== 0) loose.push(path);
+        if (stat.isDirectory()) walk(path);
+      }
+    };
+    walk(join(cwd, 'matter-storage'));
+    expect(loose).toEqual([]);
     started.child.kill('SIGTERM');
     expect(await started.exited).toBe(0);
   });

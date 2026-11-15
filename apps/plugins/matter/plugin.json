@@ -1,6 +1,6 @@
 {
   "name": "matter",
-  "version": "0.3.0-alpha.0",
+  "version": "0.4.0-alpha.0",
   "main": {
     "backend": {
       "directory": "dist",
@@ -17,7 +17,7 @@
     }
   },
   "attraccessVersion": {
-    "min": "1.11.0"
+    "min": "1.11.0-0"
   },
   "permissions": ["DATABASE_ACCESS", "MANAGE_SECRETS"]
 }

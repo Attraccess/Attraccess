@@ -1,6 +1,6 @@
-import { Button, Description, Input, Label, ListBox, Select, TextField } from '@heroui/react';
-import { useState, type ReactNode } from 'react';
-import type { ModbusPoint, RegisterFormat } from '../../../../modbus/model';
+import { Button, Description, Label, ListBox, Select } from '@heroui/react';
+import { type ReactNode } from 'react';
+import type { ModbusPoint } from '../../../../modbus/model';
 import {
   BUILTIN_MODBUS_PROFILES,
   duplicateProfile,
@@ -16,6 +16,7 @@ import { ModbusProfileForm } from './ProfileForm';
 import { renderModbusConfigurationFormConnections } from './Connections';
 import { renderModbusConfigurationFormDevices } from './Devices';
 import { useModbusConfigurationFormState } from './useModbusConfigurationFormState';
+import { Choice } from './FormFields';
 
 export interface ModbusConfigurationFormProps {
   value: ModbusConfiguration;
@@ -26,135 +27,6 @@ export interface ModbusConfigurationFormProps {
   showValidationErrors?: boolean;
   focused?: boolean;
   deviceChannels?: (deviceId: string) => ReactNode;
-}
-
-export function Choice({
-  label,
-  value,
-  options,
-  onChange,
-  disabled = false,
-  labels = {},
-}: {
-  label: string;
-  value: string | number;
-  labels?: Record<string, string>;
-  options: readonly (string | number)[];
-  onChange: (value: string) => void;
-  disabled?: boolean;
-}) {
-  const { t, tExists } = useWagoTranslations();
-  const optionLabel = (option: string | number) =>
-    labels[String(option)] ?? (tExists(`modbus.options.${option}`) ? t(`modbus.options.${option}`) : String(option));
-  return (
-    <Select isDisabled={disabled} value={String(value)} onChange={(key) => key !== null && onChange(String(key))}>
-      <Label>{label}</Label>
-      <Select.Trigger>
-        <Select.Value />
-        <Select.Indicator />
-      </Select.Trigger>
-      <Select.Popover>
-        <ListBox>
-          {options.map((option) => (
-            <ListBox.Item id={String(option)} key={option} textValue={optionLabel(option)}>
-              {optionLabel(option)}
-              <ListBox.ItemIndicator />
-            </ListBox.Item>
-          ))}
-        </ListBox>
-      </Select.Popover>
-    </Select>
-  );
-}
-
-export function Field({
-  label,
-  value,
-  onChange,
-  numeric = false,
-  allowEmpty = false,
-  disabled = false,
-}: {
-  label: string;
-  value: string | number;
-  onChange: (value: string) => void;
-  numeric?: boolean;
-  allowEmpty?: boolean;
-  disabled?: boolean;
-}) {
-  const display = Number.isNaN(value) ? '' : String(value);
-  // Keep incomplete numeric text only while it still represents our own emitted value.
-  // An authoritative replacement must take precedence, including while focused.
-  const [edit, setEdit] = useState<{ text: string; value: string | number } | null>(null);
-  const currentEdit = edit && Object.is(edit.value, value) ? edit : null;
-  if (edit && !currentEdit) setEdit(null);
-  return (
-    <TextField
-      isDisabled={disabled}
-      isInvalid={numeric && Number.isNaN(value)}
-      value={currentEdit?.text ?? display}
-      onBlur={() => setEdit(null)}
-      onChange={(text) => {
-        const emitted = numeric && !allowEmpty && text.trim() === '' ? 'NaN' : text;
-        setEdit({ text, value: numeric && !(allowEmpty && text === '') ? Number(emitted) : emitted });
-        onChange(emitted);
-      }}
-    >
-      <Label>{label}</Label>
-      <Input type="text" inputMode={numeric ? 'decimal' : undefined} />
-    </TextField>
-  );
-}
-
-export function FormatFields({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: RegisterFormat;
-  onChange: (value: RegisterFormat) => void;
-  disabled: boolean;
-}) {
-  const { t } = useWagoTranslations();
-  return (
-    <div className="wg:grid wg:gap-3 wg:md:grid-cols-2">
-      {(['address', 'scale', 'offset'] as const).map((key) => (
-        <Field
-          key={key}
-          label={t(`modbus.${key}`)}
-          value={value[key]}
-          numeric
-          disabled={disabled}
-          onChange={(v) => onChange({ ...value, [key]: Number(v) })}
-        />
-      ))}
-      <Choice
-        label={t('modbus.addressConvention')}
-        value={value.addressBase}
-        options={[0, 1]}
-        disabled={disabled}
-        onChange={(v) => onChange({ ...value, addressBase: Number(v) as 0 | 1 })}
-      />
-      <Choice
-        label={t('modbus.dataType')}
-        value={value.dataType}
-        options={['uint16', 'int16', 'uint32', 'int32', 'float32']}
-        disabled={disabled}
-        onChange={(v) => onChange({ ...value, dataType: v as RegisterFormat['dataType'] })}
-      />
-      {(['byteOrder', 'wordOrder'] as const).map((key) => (
-        <Choice
-          key={key}
-          label={t(`modbus.${key}`)}
-          value={value[key]}
-          options={['big', 'little']}
-          disabled={disabled}
-          onChange={(v) => onChange({ ...value, [key]: v })}
-        />
-      ))}
-      <Description>{t('modbus.formatHint')}</Description>
-    </div>
-  );
 }
 
 /** Host editor sets hardwareProfile=modbus and channel=0; binding uses names, not channel offsets. */
@@ -230,28 +102,6 @@ export function ModbusPointForm({
       </Select>
       <Description>{t('modbus.scalingHint')}</Description>
     </div>
-  );
-}
-
-export function SignalDisclosure({
-  label,
-  defaultExpanded,
-  children,
-}: {
-  label: string;
-  defaultExpanded: boolean;
-  children: ReactNode;
-}) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  return (
-    <details
-      open={expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}
-      className="wg:rounded-lg wg:border wg:border-border wg:p-3"
-    >
-      <summary className="wg:cursor-pointer wg:font-medium">{label}</summary>
-      {expanded && children}
-    </details>
   );
 }
 
@@ -417,13 +267,3 @@ export function ModbusConfigurationForm({
 }
 
 export { ModbusProfileForm } from './ProfileForm';
-
-export const emptyFormat: RegisterFormat = {
-  address: 0,
-  addressBase: 0,
-  dataType: 'uint16',
-  byteOrder: 'big',
-  wordOrder: 'big',
-  scale: 1,
-  offset: 0,
-};

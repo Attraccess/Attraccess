@@ -1,3 +1,4 @@
+import type { AuditActor } from '../../audit/recorder/audit-event';
 import {
   entities,
   Flow,
@@ -25,6 +26,7 @@ export async function openFlowCanvasDatabase() {
   const nodes = source.getRepository(ResourceFlowNode);
   const edges = source.getRepository(ResourceFlowEdge);
   const resources = source.getRepository(Resource);
+  const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
   const resourceFlows = new ResourceFlowsService(
     nodes,
     edges,
@@ -32,12 +34,16 @@ export async function openFlowCanvasDatabase() {
     { subscribe: jest.fn().mockResolvedValue(undefined) } as never,
     new EventEmitter2(),
     flows,
+    audit as never,
   );
-  const globalFlows = new GlobalFlowsService(flows, nodes, edges, resourceFlows);
+  const globalFlows = new GlobalFlowsService(flows, nodes, edges, resourceFlows, audit as never);
   const resource = await resources.save(resources.create({ name: 'Laser', type: ResourceType.Machine }));
   const flow = await flows.save(flows.create({ name: 'Notify', enabled: true, scope: 'global' }));
-  return { source, flows, nodes, edges, resource, flow, resourceFlows, globalFlows };
+  return { source, flows, nodes, edges, resource, flow, resourceFlows, globalFlows, audit };
 }
+
+/** The signed-in user of a canvas save. */
+export const testActor: AuditActor = { id: 7, authenticationMethod: 'session' };
 
 /** A start trigger wired to an HTTP request; ids are prefixed so two canvases can share or avoid ids. */
 export function startToHttpCanvas(prefix: string): ResourceFlowSaveDto {

@@ -78,6 +78,7 @@
   - [Matter: Architektur](devices/matter/architecture.md)
   - [Matter: Betriebsanleitung](devices/matter/operator.md)
   - [Matter: Datenmodell und Lebenszyklus](devices/matter/data-model.md)
+  - [Matter: Backup und Wiederherstellung](devices/matter/backup-restore.md)
 
 - **Abrechnung**
   - [Überblick](billing/overview.md)

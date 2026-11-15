@@ -17,7 +17,7 @@ import { WagoCommissioningSession } from '../../backend/commissioning/sessions/s
 import { WagoCommissioningService } from '../../backend/commissioning/service';
 import { WagoController } from '../../backend/controllers/entity';
 import { WagoCredentialRotationService, WagoCredentialRotationEntity } from '../../backend/credentials/service';
-import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/service';
 import { WagoControllerApi } from '../../backend/controllers/controller';
 import { WagoService } from '../../backend/controllers/service';
 import type { WagoConfigurationSnapshot } from '../../backend/configuration/model';

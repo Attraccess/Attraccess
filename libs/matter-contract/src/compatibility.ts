@@ -25,14 +25,14 @@ export type SupportedCombination = z.infer<typeof supportedCombinationSchema>;
 export const COMPATIBILITY_TABLE: readonly SupportedCombination[] = [
   {
     wireVersion: WIRE_VERSION,
-    attraccess: '^1.11.0',
-    plugin: '0.3.0-alpha.0',
-    sidecar: '0.3.0-alpha.0',
+    attraccess: '^1.11.0-0',
+    plugin: '0.4.0-alpha.0',
+    sidecar: '0.4.0-alpha.0',
     matterJs: '0.18.0',
   },
 ];
 
-/** Minimum Attraccess version implied by the table's range (`^1.11.0` -> `1.11.0`). */
+/** Minimum Attraccess version implied by the table's range (`^1.11.0-0` -> `1.11.0-0`). */
 export function minimumAttraccessVersion(combination: SupportedCombination = COMPATIBILITY_TABLE[0]): string {
   const minimum = validRange(combination.attraccess) ? minVersion(combination.attraccess) : null;
   if (!minimum) throw new Error(`Unsupported Attraccess range in compatibility table: ${combination.attraccess}`);

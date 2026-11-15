@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DeviceInfoCards } from './info/DeviceInfoDrawer';
-import { RowActions } from './DevicesPage';
+import { RowActions } from './DeviceRowParts';
 
 // Vitest runs without globals here, so testing-library's auto-cleanup is off.
 afterEach(() => {

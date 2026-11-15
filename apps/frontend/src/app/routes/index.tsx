@@ -14,7 +14,11 @@ import { BillingDashboardPage } from '../billing/dashboard/index';
 import ChangelogPage from '../changelog/ChangelogPage';
 import { ConfirmDeleteAccount } from '../confirm-delete-account/index';
 import { CsvExport } from '../csv-export/index';
-import { BillingTransactionsExportPage, ResourceUsageExportPage } from '../csv-export/configure-page';
+import {
+  BillingTransactionsExportPage,
+  ResourceHoursSummaryExportPage,
+  ResourceUsageExportPage,
+} from '../csv-export/configure-page';
 import { Dependencies } from '../dependencies/index';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
 import FirstTimeSetupPage from '../first-time-setup/index';
@@ -341,6 +345,11 @@ const coreRoutes: RouteConfig[] = [
     path: '/csv-export/resource-usage-hours',
     element: <ResourceUsageExportPage />,
     authRequired: ['billing.manage', 'resources.reports.export'],
+  },
+  {
+    path: '/csv-export/resource-hours-summary',
+    element: <ResourceHoursSummaryExportPage />,
+    authRequired: 'resources.reports.export',
   },
   {
     path: '/csv-export/billing-transactions',

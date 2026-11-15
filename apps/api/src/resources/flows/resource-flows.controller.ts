@@ -8,6 +8,8 @@ import { Observable } from 'rxjs';
 
 import { finalize } from 'rxjs/operators';
 
+import { auditActorOf } from '../../audit/recorder/audit-event';
+
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 
 import {
@@ -350,7 +352,8 @@ export class ResourceFlowsController {
   async saveResourceFlow(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() flowData: ResourceFlowSaveDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceFlowResponseDto> {
-    return await this.resourceFlowsService.saveResourceFlow(resourceId, flowData);
+    return await this.resourceFlowsService.saveResourceFlow(resourceId, flowData, auditActorOf(req.user));
   }
 }

@@ -71,7 +71,8 @@
       "executor": "nx:run-commands",
       "cache": false,
       "options": {
-        "command": "node scripts/check-file-size.mjs"
+        "commands": ["node scripts/check-file-size.mjs", "node scripts/check-import-cycles.mjs"],
+        "parallel": false
       }
     },
     "check-balena-compose": {

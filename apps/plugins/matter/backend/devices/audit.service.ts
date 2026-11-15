@@ -4,7 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { MatterConnection, CONNECTION_ROW_ID } from '../connection/entity';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 
-export type DeviceAuditSubject = { type: 'matter.node' | 'matter.endpoint' | 'matter.fabric'; ref: string };
+export type DeviceAuditSubject = {
+  type: 'matter.node' | 'matter.endpoint' | 'matter.fabric' | 'matter.backup' | 'matter.recovery_key';
+  ref: string;
+};
+export type AuditOutcome = 'succeeded' | 'failed';
 
 /**
  * The host wants a positive safe-integer subject ID. The plugin's stable IDs are UUIDs, so the subject carries a 52-bit
@@ -49,6 +53,7 @@ export class DeviceAuditService {
     principal: PluginAuditPrincipal | AuditActor | null,
     subject: DeviceAuditSubject,
     details: Record<string, string | number | boolean> = {},
+    outcome: AuditOutcome = 'succeeded',
   ): Promise<void> {
     const audit = this.context.audit;
     if (!audit) return;
@@ -61,7 +66,7 @@ export class DeviceAuditService {
         action,
         operationId: randomUUID(),
         principal: actor.principal,
-        outcome: 'succeeded',
+        outcome,
         subject: { type: subject.type, id: auditSubjectId(subject.ref) },
         details,
       });

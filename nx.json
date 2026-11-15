@@ -15,12 +15,7 @@
       "!{projectRoot}/**/*.cy.[jt]s?(x)",
       "!{projectRoot}/cypress.config.[jt]s"
     ],
-    "sharedGlobals": [
-      "{workspaceRoot}/.github/workflows/pull-requests.yml",
-      "{workspaceRoot}/.github/workflows/release.yml",
-      "{workspaceRoot}/.github/workflows/docker-nightly-latest.yml",
-      "{workspaceRoot}/.github/workflows/hardware.yml"
-    ],
+    "sharedGlobals": [],
     "testing": ["default", "{workspaceRoot}/jest.preset.js"],
     "swagger": ["default", "{projectRoot}/webpack.config.swagger.js"],
     "typeorm": ["default", "{projectRoot}/src/database/**/*"]
@@ -246,7 +241,8 @@
     },
     "version": {
       "conventionalCommits": true,
-      "fallbackCurrentVersionResolver": "disk"
+      "fallbackCurrentVersionResolver": "disk",
+      "preserveMatchingDependencyRanges": false
     },
     "changelog": {
       "workspaceChangelog": {

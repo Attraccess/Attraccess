@@ -10,9 +10,20 @@ import {
   SupervisionMode,
 } from '@attraccess/database-entities';
 
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 
-import { IsNull } from 'typeorm';
+import { EntityManager, IsNull } from 'typeorm';
+
+import { SettingsService } from '../../../settings/settings.service';
+
+import {
+  ReaderUiHooksService,
+  type StartCapacityOutcome,
+} from '../../../plugin-system/reader-ui/reader-ui-hooks.service';
+
+import { hookPrincipal } from '../pre-start/hook-principal';
+
+import { StartBlockedException } from '../pre-start/start-confirmation.errors';
 
 import { runSerializedTransaction } from '../../../database/run-serialized-transaction';
 
@@ -35,9 +46,14 @@ import { ResourceFullError } from '../errors/resource-full.error';
 import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { MachineBusyError } from '../errors/machine-busy.error';
 
-import { ActiveSessionCounts, RESOURCE_USAGE_LOG_CONTEXT, UsageLifecycle } from '../lifecycle/usage-lifecycle';
+import {
+  ActiveSessionCounts,
+  RESOURCE_USAGE_LOG_CONTEXT,
+  StartSessionOptions,
+  UsageLifecycle,
+} from '../lifecycle/usage-lifecycle';
 
-import { activeUsageWhere, countOccupiedSlots } from './active-usage';
+import { activeUsageWhere, countOccupiedSlots, findOccupyingUserIds, sessionLimitOf } from './active-usage';
 
 import { UsageSessionRecords } from './usage-session-records';
 
@@ -56,6 +72,9 @@ export class UsageSessionStartPreparation {
     private readonly billingService: BillingService,
     private readonly projectsService: ProjectsService,
     private readonly resourceFormsService: ResourceFormsService,
+    // Optional: without the plugin system (unit-test modules) no capacity hook exists.
+    @Optional() private readonly pluginHooks?: ReaderUiHooksService,
+    @Optional() private readonly settings?: SettingsService,
   ) {}
 
   async prepareSessionStart(
@@ -64,7 +83,13 @@ export class UsageSessionStartPreparation {
     dto: StartUsageSessionDto,
     supervisorUserId: number | null,
     attemptId: string,
+    options: StartSessionOptions = {},
   ) {
+    // Runs after the transaction ended (commit or rollback): audit rows inside it would wait for the transaction.
+    let flushCapacityAudit: (() => Promise<void>) | undefined;
+    const capacityLanguage = this.pluginHooks?.hasStartCapacityHooks()
+      ? (options.language ?? (await this.settings?.resolveLanguage(user.locale)) ?? 'en')
+      : null;
     return runSerializedTransaction(this.lifecycle.manager, async (transactionalEntityManager) => {
       const sessionLimit = await this.lifecycle.getSessionLimit(transactionalEntityManager, resourceId);
       const sharedMachine = sessionLimit > 1;
@@ -119,8 +144,18 @@ export class UsageSessionStartPreparation {
         });
         // A pending own session within this turn is a start cut off by a crash that is not cleaned up yet.
         if (ownSession) throw ownSession.lifecyclePending ? new MachineBusyError() : new AlreadyHasActiveSessionError();
-        const occupied = await countOccupiedSlots(transactionalEntityManager, resourceId);
+        const usersInSession = await findOccupyingUserIds(transactionalEntityManager, resourceId);
+        const occupied = usersInSession.length;
         if (occupied >= sessionLimit) throw new ResourceFullError(occupied, sessionLimit);
+        // Slots plugins hold back (reservations) are decided here too, so simultaneous starts cannot take them.
+        if (capacityLanguage) {
+          const outcome = await this.runCapacityHooks(
+            { resourceId, user, options, supervisorUserId },
+            { language: capacityLanguage, sessionLimit, usersInSession, manager: transactionalEntityManager },
+          );
+          flushCapacityAudit = outcome?.flush;
+          if (outcome?.refusal) throw new StartBlockedException(outcome.refusal.reason);
+        }
       } else {
         const activeSessions = await this.records.getActiveSessionsForResource(resourceId, transactionalEntityManager);
         publishedSessions = activeSessions.length;
@@ -260,6 +295,33 @@ export class UsageSessionStartPreparation {
         formSubmissions,
         activeSessions: activeSessionCounts,
       };
+    }).finally(() => flushCapacityAudit?.());
+  }
+
+  /**
+   * Asks the plugins' capacity hooks how many slots they hold back for others; the caller refuses the start on a
+   * refusal. The outcome's `flush` writes the audit rows and must run after the transaction ended.
+   */
+  private runCapacityHooks(
+    start: { resourceId: number; user: User; options: StartSessionOptions; supervisorUserId: number | null },
+    state: { language: 'en' | 'de'; sessionLimit: number; usersInSession: number[]; manager: EntityManager },
+  ): Promise<StartCapacityOutcome> | undefined {
+    const { resourceId, user, options, supervisorUserId } = start;
+    return this.pluginHooks?.runStartCapacity({
+      resourceId,
+      userId: user.id,
+      principal: hookPrincipal(user),
+      // A shared machine has no takeover: a forceTakeOver there adds a session like any other start.
+      action: 'start',
+      origin: options.origin ?? (supervisorUserId === null ? 'web' : 'supervision'),
+      language: state.language,
+      sessionLimit: state.sessionLimit,
+      occupiedSlots: state.usersInSession.length,
+      usersInSession: state.usersInSession,
+      manager: state.manager,
+      satisfied: new Map(
+        Object.entries(options.confirmedStepKeys ?? {}).map(([plugin, keys]) => [plugin, new Set(keys)]),
+      ),
     });
   }
 
@@ -273,7 +335,9 @@ export class UsageSessionStartPreparation {
     dto: { forceTakeOver?: boolean },
     supervisorUserId: number | null = null,
   ): Promise<void> {
-    await this.lifecycle.assertLifecycleAvailable(this.lifecycle.manager, resourceId);
+    // A shared machine lets other people's starts run alongside, as in the start itself.
+    const limit = await this.lifecycle.getSessionLimit(this.lifecycle.manager, resourceId);
+    await this.lifecycle.assertLifecycleAvailable(this.lifecycle.manager, resourceId, limit > 1);
     const resource = await this.gate.getResource(resourceId, user, {
       checkMaintenance: true,
       checkControlPermission: false,
@@ -289,6 +353,15 @@ export class UsageSessionStartPreparation {
       await this.gate.validateSupervisedStart(resourceId, user, supervisorUserId, undefined, resource);
     }
     if (resource.type !== ResourceType.Machine) throw new BadRequestException('Resource is not a machine');
+    const sessionLimit = sessionLimitOf(resource);
+    if (sessionLimit > 1) {
+      // Several sessions may run: only the caller's own session and a full machine refuse (as in the start).
+      const sessions = await this.records.getActiveSessionsForResource(resourceId);
+      if (sessions.some((session) => session.userId === user.id)) throw new AlreadyHasActiveSessionError();
+      const occupied = await countOccupiedSlots(this.lifecycle.manager, resourceId);
+      if (occupied >= sessionLimit) throw new ResourceFullError(occupied, sessionLimit);
+      return;
+    }
     const active = await this.records.getActiveSession(resourceId);
     if (!active) return;
     if (!dto.forceTakeOver) throw new ResourceInUseError();

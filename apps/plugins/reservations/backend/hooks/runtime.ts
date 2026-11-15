@@ -8,6 +8,9 @@ import type {
   SessionEndResult,
   StartBlockedContext,
   StartBlockedState,
+  StartCapacityContext,
+  StartCapacityHook,
+  StartCapacityResult,
 } from '@attraccess/plugins-backend-sdk';
 
 /** The services the host-called hooks delegate to; `deadline` is an epoch-ms bound for their waits. */
@@ -16,6 +19,8 @@ export interface HookServices {
     evaluate(ctx: PreStartContext, deadline?: number): Promise<PreStartResult>;
     evaluateStartBlocked(ctx: StartBlockedContext, deadline?: number): Promise<StartBlockedState | null>;
   };
+  /** Optional so a partial publication (tests, older wiring) simply holds no slots. */
+  startCapacity?: { evaluate(ctx: StartCapacityContext, deadline?: number): Promise<StartCapacityResult> };
   sessionEnd: { evaluate(ctx: SessionEndContext, deadline?: number): Promise<SessionEndResult> };
   readerUi: {
     getSlotContributions(ctx: ReaderUiContext, deadline?: number): Promise<ReaderSlotContribution[]>;
@@ -104,6 +109,13 @@ export async function startBlockedQuery(ctx: StartBlockedContext): Promise<Start
   const deadline = hookDeadline();
   return (await resolveHookServices(deadline)).preStart.evaluateStartBlocked(ctx, deadline);
 }
+
+/** `PluginBackendModule.startCapacityHook`: the atomic held-slot answer inside the host's start transaction. */
+export const startCapacityHook: StartCapacityHook = async (ctx) => {
+  const deadline = hookDeadline();
+  const { startCapacity } = await resolveHookServices(deadline);
+  return startCapacity ? startCapacity.evaluate(ctx, deadline) : { heldSlots: 0 };
+};
 
 /** `PluginBackendModule.readerUi`: slot contributions for Attractap readers (same shared deadline). */
 export const readerUiProvider: ReaderUiProvider = {

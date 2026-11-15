@@ -3,11 +3,8 @@ import { chmodSync, linkSync, mkdtempSync, readFileSync, rmSync, statSync, symli
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fw31ShellFixture } from '../../fixtures/fw31-shell-fixture';
-import {
-  wagoCommissioningPreparationScript,
-  wagoDockerProvisionRecoveryScript,
-  wagoHardwareDeploymentReportScript,
-} from '../hardware-deployment';
+import { wagoDockerProvisionRecoveryScript, wagoHardwareDeploymentReportScript } from '../hardware-deployment';
+import { wagoCommissioningPreparationScript } from '../commissioning-preparation';
 import { wagoHostIoGuardShell } from '../host-io-guard';
 import {
   runtimeBundleInstallScript,

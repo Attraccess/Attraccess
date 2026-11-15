@@ -364,6 +364,30 @@ describe('audit authorization and query validation', () => {
       subjectType: 'billing.transaction',
       domain: 'billing',
     });
+    for (const eventPrefix of ['resource_flow.', 'flow.', 'flow_variable.']) {
+      await expect(
+        pipe.transform({ domain: 'resource', eventPrefix }, { type: 'query', metatype: AuditQueryDto }),
+      ).resolves.toMatchObject({ domain: 'resource', eventPrefix });
+    }
+    await expect(
+      pipe.transform(
+        { domain: 'resource', subjectType: 'flow', action: 'flow.canvas_updated' },
+        { type: 'query', metatype: AuditQueryDto },
+      ),
+    ).resolves.toMatchObject({ domain: 'resource', subjectType: 'flow', action: 'flow.canvas_updated' });
+    const meta = new AuditQueryService({} as never, {} as never, {} as never).meta();
+    expect(meta.subjectTypes).toContain('flow');
+    expect(meta.actions).toEqual(
+      expect.arrayContaining([
+        'resource_flow.updated',
+        'flow.created',
+        'flow.updated',
+        'flow.deleted',
+        'flow.canvas_updated',
+        'flow_variable.set',
+        'flow_variable.deleted',
+      ]),
+    );
     for (const subjectType of ['project', 'project.member', 'project.invitation']) {
       await expect(
         pipe.transform({ domain: 'project', subjectType }, { type: 'query', metatype: AuditQueryDto }),

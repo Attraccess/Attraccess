@@ -1,7 +1,13 @@
 import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { DocumentationType, Resource, ResourceType } from '@attraccess/database-entities';
+import {
+  DocumentationType,
+  Resource,
+  ResourceFlowEdge,
+  ResourceFlowNode,
+  ResourceType,
+} from '@attraccess/database-entities';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -26,6 +32,8 @@ import { createMockResource } from './../test-utils/resource.fixtures';
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 
 import { ResourceImageService } from './resourceImage.service';
+
+import { ResourceSessionLimitChangedEvent } from './events/resource-session-limit-changed.event';
 
 import { ResourcesService } from './resources.service';
 
@@ -244,6 +252,48 @@ describe('ResourcesService', () => {
       );
     });
 
+    describe('session limit event', () => {
+      const emitted = () =>
+        ((updateResourceScope.service as any).eventEmitter.emit as jest.Mock).mock.calls.filter(
+          ([name]: [string]) => name === ResourceSessionLimitChangedEvent.EVENT_NAME,
+        );
+      const update = async (before: Partial<Resource>, after: Partial<Resource>, actor?: { id: number }) => {
+        ((updateResourceScope.service as any).eventEmitter.emit as jest.Mock).mockClear();
+        jest
+          .spyOn(updateResourceScope.service, 'getResourceById')
+          .mockResolvedValue(createMockResource({ id: 1, ...before }));
+        updateResourceScope.resourceRepository.save.mockResolvedValue(createMockResource({ id: 1, ...after }));
+        await updateResourceScope.service.updateResource(1, {}, undefined, actor);
+      };
+
+      it('announces a lowered limit with the actor', async () => {
+        await update(
+          { type: ResourceType.Machine, maxParallelSessions: 3 },
+          { type: ResourceType.Machine, maxParallelSessions: 2 },
+          { id: 9 },
+        );
+        expect(emitted()).toEqual([
+          [ResourceSessionLimitChangedEvent.EVENT_NAME, new ResourceSessionLimitChangedEvent(1, 3, 2, 9)],
+        ]);
+      });
+
+      it('announces a type change that changes the effective limit, without an actor', async () => {
+        await update(
+          { type: ResourceType.Machine, maxParallelSessions: 3 },
+          { type: ResourceType.Lock, maxParallelSessions: 3 },
+        );
+        expect(emitted()[0][1]).toMatchObject({ previousLimit: 3, newLimit: 1, actorUserId: null });
+      });
+
+      it('stays quiet when the effective limit is unchanged', async () => {
+        await update(
+          { type: ResourceType.Lock, maxParallelSessions: 3 },
+          { type: ResourceType.Lock, maxParallelSessions: 5 },
+        );
+        expect(emitted()).toEqual([]);
+      });
+    });
+
     it('does not audit metadata that only normalized from absent to empty', async () => {
       const existingResource = createMockResource({ id: 1, name: 'Old', metadata: null });
       const updatedResource = createMockResource({ id: 1, name: 'New', metadata: {} });
@@ -370,7 +420,13 @@ describe('ResourcesService', () => {
       expect(deleteResourceScope.resourceRepository.softDelete).toHaveBeenCalledWith(1);
     });
 
-    it('audits deletion with the pre-delete safe projection', async () => {
+    beforeEach(() => {
+      (deleteResourceScope.resourceRepository as { manager: unknown }).manager = {
+        count: jest.fn().mockResolvedValueOnce(3).mockResolvedValueOnce(2),
+      };
+    });
+
+    it('audits deletion with the pre-delete safe projection and the flow it had', async () => {
       const resource = createMockResource({ id: 1, name: 'Lathe', type: ResourceType.Machine });
       jest.spyOn(deleteResourceScope.service, 'getResourceById').mockResolvedValue(resource);
       deleteResourceScope.resourceRepository.softDelete.mockResolvedValue({ affected: 1 } as never);
@@ -382,9 +438,15 @@ describe('ResourcesService', () => {
           domain: 'resource',
           action: 'resource.deleted',
           actor: expect.objectContaining({ id: 9 }),
-          details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine },
+          details: { 'before.name': 'Lathe', 'before.type': ResourceType.Machine, flowNodeCount: 3, flowEdgeCount: 2 },
         }),
       );
+      const { count } = (deleteResourceScope.resourceRepository as unknown as { manager: { count: jest.Mock } })
+        .manager;
+      expect(count.mock.calls).toEqual([
+        [ResourceFlowNode, { where: { resourceId: 1 } }],
+        [ResourceFlowEdge, { where: { resourceId: 1 } }],
+      ]);
     });
 
     it('bounds an oversized resource name in a deletion audit projection', async () => {

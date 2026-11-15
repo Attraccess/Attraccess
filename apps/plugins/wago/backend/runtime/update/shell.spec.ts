@@ -4,7 +4,8 @@ import { existsSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fw31ShellFixture } from '../../fixtures/fw31-shell-fixture';
 import { BuildRuntimeArtifact } from '../artifacts/build';
-import { WAGO_DIN, WAGO_DOUT, wagoRuntimeBootScript } from '../../host/hardware-deployment';
+import { WAGO_DIN, WAGO_DOUT } from '../../host/hardware-deployment';
+import { wagoRuntimeBootScript } from '../boot';
 import { runtimeBundleInstallScript } from '../install';
 import {
   runtimeUpdateAcceptScript,

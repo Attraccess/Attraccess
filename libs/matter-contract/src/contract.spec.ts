@@ -2,6 +2,8 @@ import {
   COMPATIBILITY_TABLE,
   ERROR_STATUS,
   FEATURE_FAMILIES,
+  MAX_BACKUP_BODY_BYTES,
+  MAX_MESSAGE_BYTES,
   OPERATIONS,
   SERVICE_TOKEN_PATTERN,
   WIRE_VERSION,
@@ -84,8 +86,8 @@ describe('errors', () => {
 });
 
 describe('capabilities and operations', () => {
-  it('covers all eight families', () => {
-    expect(FEATURE_FAMILIES).toHaveLength(8);
+  it('covers all nine families', () => {
+    expect(FEATURE_FAMILIES).toHaveLength(9);
     for (const family of FEATURE_FAMILIES) {
       expect(OPERATIONS.some((operation) => operation.family === family)).toBe(true);
     }
@@ -190,6 +192,24 @@ describe('families', () => {
     expect(subscriptionRequestSchema.safeParse({ ...base, minIntervalSec: 6 }).success).toBe(false);
   });
 
+  it('adds the backup family with its own body limit and secrets-on-wire marking', () => {
+    const backupOperations = OPERATIONS.filter((operation) => operation.family === 'backup');
+    expect(backupOperations.map((operation) => operation.id)).toEqual([
+      'backup.snapshot',
+      'backup.restore.stage',
+      'backup.restore.commit',
+      'backup.restore.rollback',
+      'backup.restore.finalize',
+      'backup.restore.abort',
+    ]);
+    for (const operation of backupOperations) expect(operation.secretsOnWire).toBe(true);
+    expect(MAX_BACKUP_BODY_BYTES).toBeGreaterThan(MAX_MESSAGE_BYTES);
+    expect(OPERATIONS.find((operation) => operation.id === 'backup.snapshot')?.bodyLimitBytes).toBe(
+      MAX_BACKUP_BODY_BYTES,
+    );
+    expect(MAX_MESSAGE_BYTES).toBe(1024 * 1024);
+  });
+
   it('keeps requested, accepted and reported outcomes distinct', () => {
     const request = { requestId: id, endpointId: 1, clusterId: 6, commandId: 1 };
     expect(commandRequestSchema.parse(request).payload).toEqual({});
@@ -202,7 +222,19 @@ describe('families', () => {
   });
 
   it.each([
-    ['fabric', families.fabricStatusSchema, { state: 'uninitialized', fabricId: null }],
+    [
+      'fabric',
+      families.fabricStatusSchema,
+      {
+        state: 'uninitialized',
+        reason: null,
+        fabricId: null,
+        fabricGeneration: 0,
+        rootCertFingerprint: null,
+        storageInstanceId: null,
+        storageSchemaVersion: 1,
+      },
+    ],
     ['inventory', families.nodeListSchema, { authoritative: false, fabricId: null, nodes: [] }],
     ['subscription', families.subscriptionSchema, { subscriptionId: id, nodeId: '1', state: 'active' }],
     ['ota', families.otaUpdateSchema, { updateId: id, nodeId: '1', state: 'queued', outcome: 'requested' }],
@@ -323,7 +355,7 @@ describe('compatibility table', () => {
   it('lists exactly one combination for wire version 1', () => {
     expect(COMPATIBILITY_TABLE).toHaveLength(1);
     expect(COMPATIBILITY_TABLE[0].wireVersion).toBe(WIRE_VERSION);
-    expect(minimumAttraccessVersion()).toBe('1.11.0');
+    expect(minimumAttraccessVersion()).toBe('1.11.0-0');
     expect(minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '>=1.12.0 <2' })).toBe('1.12.0');
     expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: 'not a range' })).toThrow();
     expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '<0.0.0' })).toThrow();
@@ -345,6 +377,7 @@ describe('client helpers', () => {
     expect(expectedSidecarVersion(entry.plugin)).toBe(entry.sidecar);
     expect(expectedSidecarVersion('9.9.9')).toBeUndefined();
     expect(isHostSupported(entry.plugin, '1.11.0')).toBe(true);
+    expect(isHostSupported(entry.plugin, '1.11.0-beta.0')).toBe(true);
     expect(isHostSupported(entry.plugin, '1.10.0')).toBe(false);
     expect(isHostSupported('9.9.9', '1.11.0')).toBe(false);
   });
@@ -352,15 +385,15 @@ describe('client helpers', () => {
   it('builds the full header set with a bearer token only when given', () => {
     const base = {
       attraccessVersion: '1.11.0',
-      pluginVersion: '0.3.0-alpha.0',
-      sidecarVersion: '0.3.0-alpha.0',
+      pluginVersion: '0.4.0-alpha.0',
+      sidecarVersion: '0.4.0-alpha.0',
       correlationId: id,
     };
     expect(buildRequestHeaders({ ...base, deadlineMs: 1500.2, token: 'x'.repeat(32) })).toEqual({
       'x-matter-wire-version': '1',
       'x-attraccess-version': '1.11.0',
-      'x-matter-plugin-version': '0.3.0-alpha.0',
-      'x-matter-sidecar-version': '0.3.0-alpha.0',
+      'x-matter-plugin-version': '0.4.0-alpha.0',
+      'x-matter-sidecar-version': '0.4.0-alpha.0',
       'x-correlation-id': id,
       'x-request-deadline-ms': '1501',
       authorization: `Bearer ${'x'.repeat(32)}`,

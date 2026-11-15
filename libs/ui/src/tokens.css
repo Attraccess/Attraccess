@@ -31,6 +31,8 @@
     --chart-sessions-active: #7a4300;
     --chart-minutes: #256d7b;
     --chart-minutes-active: #1c5260;
+    --chart-machine: #3f7a2e;
+    --chart-machine-active: #305f23;
     --chart-spend: #775799;
 
     --border: #d5dede;
@@ -83,6 +85,8 @@
     --chart-sessions-active: #f5cd95;
     --chart-minutes: #82c4ce;
     --chart-minutes-active: #a1d5dc;
+    --chart-machine: #a3d48f;
+    --chart-machine-active: #bee3ad;
     --chart-spend: #c3a0e0;
   }
 }

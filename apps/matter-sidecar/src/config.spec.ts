@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 import { ConfigError, isLoopbackHost, loadConfig, normaliseAllowedHost } from './config';
 import { TEST_TOKEN, configWith } from './testing/config';
 
@@ -27,6 +29,8 @@ describe('loadConfig', () => {
       allowedHosts: [],
       tls: null,
       insecureRemote: false,
+      storageDir: resolve('./matter-storage'),
+      matterPort: 0,
       maxMessageBytes: 1024 * 1024,
       requestDeadlineMs: 10_000,
       shutdownGraceMs: 5_000,
@@ -36,6 +40,16 @@ describe('loadConfig', () => {
       maxClients: 64,
       firstMessageTimeoutMs: 30_000,
     });
+  });
+
+  it('resolves MATTER_SIDECAR_STORAGE_DIR and reads the Matter port', () => {
+    expect(
+      loadConfig({ ...base, MATTER_SIDECAR_STORAGE_DIR: 'data/matter', MATTER_SIDECAR_MATTER_PORT: '5540' }),
+    ).toMatchObject({
+      storageDir: resolve('data/matter'),
+      matterPort: 5540,
+    });
+    expect(loadConfig({ ...base, MATTER_SIDECAR_STORAGE_DIR: '  ' }).storageDir).toBe(resolve('./matter-storage'));
   });
 
   it('reads overrides from the environment and ignores the old MATTER_SIDECAR_HOST', () => {
@@ -66,6 +80,13 @@ describe('loadConfig', () => {
 
   it('configWith binds an ephemeral port and carries the test token', () => {
     expect(configWith({ replayMaxEvents: 3 })).toMatchObject({ port: 0, replayMaxEvents: 3, authTokens: [TOKEN] });
+  });
+
+  it('configWith gives every test sidecar its own storage directory', () => {
+    const [first, second] = [configWith().storageDir, configWith().storageDir];
+    expect(first).not.toBe(second);
+    expect(first.startsWith(tmpdir())).toBe(true);
+    expect(configWith({ storageDir: '/data' }).storageDir).toBe('/data');
   });
 });
 

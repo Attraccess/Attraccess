@@ -2,7 +2,7 @@ import { Resource, ResourceUsage, ResourceUsageAction, User } from '@attraccess/
 
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
@@ -49,7 +49,6 @@ export class UsageSessionNotifications {
     private readonly billingService: BillingService,
     private readonly metricsService: MetricsService,
     private readonly pluginEvents: PluginEventsService,
-    @Inject(forwardRef(() => ResourceFlowsExecutorService))
     private readonly flowExecutorService: ResourceFlowsExecutorService,
   ) {}
 

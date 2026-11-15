@@ -18,6 +18,7 @@ import { SSEModule } from './sse/sse.module';
 import { ResourceGroupsModule } from './groups/resourceGroups.module';
 import { ResourcesService } from './resources.service';
 import { ResourceUsageModule } from './usage/resourceUsage.module';
+import { ResourceMeteringApiModule } from './metering/resource-metering-api.module';
 import { SupervisionModule } from './supervision/supervision.module';
 import { MassIntroductionModule } from './mass-introductions/mass-introduction.module';
 import { ResourceImageService } from './resourceImage.service';
@@ -56,6 +57,7 @@ import { ResourceLiveTopicsProvider } from './resource-live-topics.provider';
     SupervisionModule,
     MassIntroductionModule,
     ResourceFlowsModule,
+    ResourceMeteringApiModule,
     ResourceMaintenanceModule,
     ResourceFormsModule,
     ResourceHealthModule,

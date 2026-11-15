@@ -1,4 +1,5 @@
 # Projekte
+
 <!-- llms-description: Stellt Projekte vor, die Nutzungssitzungen über Ressourcen hinweg unter einem gemeinsamen Zweck bündeln und Teams zusammenbringen. -->
 
 Projekte helfen Ihnen, Arbeit über mehrere Ressourcen hinweg zu organisieren. Sie ermöglichen es, Nutzungssitzungen unter einem gemeinsamen Zweck zu gruppieren und Teams von Personen zu verwalten, die an gemeinsamen Aufgaben zusammenarbeiten.
@@ -30,6 +31,15 @@ Beim Starten einer Nutzungssitzung an einer Ressource können Benutzer ein Proje
 
 > [!TIP]
 > Ermutigen Sie Ihre Teammitglieder, beim Starten einer Sitzung immer ein Projekt auszuwählen. So erhalten Sie einen vollständigen Überblick über die Ressourcennutzung pro Projekt.
+
+## Nutzungsstatistiken
+
+Die Projektseite zeigt die Nutzung des Projekts in Übersichtskarten, einem Tagesdiagramm und einer Tabelle der meistgenutzten Ressourcen. Dauern werden in Stunden angezeigt:
+
+- **Personenstunden**: die Dauer aller Sitzungen des Projekts addiert.
+- **Maschinenstunden**: die Zeit, in der mindestens eine Sitzung des Projekts auf einer Ressource lief. Sich überlappende Sitzungen des Projekts auf einer gemeinsam genutzten Maschine zählen einmal. Sitzungen anderer Projekte auf derselben Maschine sind nicht enthalten.
+
+Bei einer Maschine, die nur eine Sitzung gleichzeitig erlaubt, sind beide Werte gleich. Siehe [Maschinenstunden und Personenstunden](resources/usage-tracking.md#maschinenstunden-und-personenstunden).
 
 ## Siehe auch
 

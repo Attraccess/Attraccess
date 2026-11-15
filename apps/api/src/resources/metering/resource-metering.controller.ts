@@ -1,16 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Inject,
-  Patch,
-  Param,
-  ParseUUIDPipe,
-  ParseIntPipe,
-  Post,
-  Req,
-  forwardRef,
-} from '@nestjs/common';
+import { Body, Controller, Get, Patch, Param, ParseUUIDPipe, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceMeteringSession } from '@attraccess/database-entities';
@@ -31,7 +19,6 @@ import { ResourceActivityVisibilityService } from '../usage/authorization/resour
 export class ResourceMeteringController {
   constructor(
     private readonly metering: ResourceMeteringService,
-    @Inject(forwardRef(() => ResourceActivityVisibilityService))
     private readonly activityVisibility: ResourceActivityVisibilityService,
   ) {}
 

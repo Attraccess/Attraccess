@@ -2,6 +2,7 @@ import { ResourceHealthStatus, ResourceMaintenance } from '@attraccess/database-
 import { SystemEvent } from '@attraccess/plugins-backend-sdk';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DataSource } from 'typeorm';
+import { ResourceSessionLimitChangedEvent } from '../resources/events/resource-session-limit-changed.event';
 import { ResourceHealthChangedEvent } from '../resources/health/events/resource-health-changed.event';
 import { ResourceMaintenanceChangedEvent } from '../resources/maintenances/events/resource-maintenance-changed.event';
 import { PluginEventsService } from './plugin-events.service';
@@ -25,7 +26,13 @@ describe('PluginSystemEventsBridge', () => {
     pluginEvents.onEvent(SystemEvent.RESOURCE_HEALTH_CHANGED, handler);
 
     bridge.onHealthChanged(
-      new ResourceHealthChangedEvent(4, 'mqtt', ResourceHealthStatus.UNHEALTHY, 'offline', ResourceHealthStatus.HEALTHY),
+      new ResourceHealthChangedEvent(
+        4,
+        'mqtt',
+        ResourceHealthStatus.UNHEALTHY,
+        'offline',
+        ResourceHealthStatus.HEALTHY,
+      ),
     );
 
     expect(handler).toHaveBeenCalledWith({
@@ -35,6 +42,15 @@ describe('PluginSystemEventsBridge', () => {
       reason: 'offline',
       identifier: 'mqtt',
     });
+  });
+
+  it('forwards a changed session limit to plugins', () => {
+    const handler = jest.fn();
+    pluginEvents.onEvent(SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED, handler);
+
+    bridge.onSessionLimitChanged(new ResourceSessionLimitChangedEvent(4, 3, 2, 7));
+
+    expect(handler).toHaveBeenCalledWith({ resourceId: 4, previousLimit: 3, newLimit: 2, actorUserId: 7 });
   });
 
   it.each(['created', 'finished'] as const)('forwards %s maintenance with its persisted window', async (action) => {
@@ -57,7 +73,9 @@ describe('PluginSystemEventsBridge', () => {
     await bridge.onMaintenanceChanged(new ResourceMaintenanceChangedEvent(4, 9, 'created'));
     findOne.mockRejectedValueOnce(new Error('db down'));
     jest.spyOn((bridge as unknown as { logger: { error: () => void } }).logger, 'error').mockImplementation();
-    await expect(bridge.onMaintenanceChanged(new ResourceMaintenanceChangedEvent(4, 9, 'created'))).resolves.toBeUndefined();
+    await expect(
+      bridge.onMaintenanceChanged(new ResourceMaintenanceChangedEvent(4, 9, 'created')),
+    ).resolves.toBeUndefined();
     expect(handler).not.toHaveBeenCalled();
   });
 });

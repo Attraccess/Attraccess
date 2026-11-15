@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { In, IsNull, Repository } from 'typeorm';
@@ -7,6 +7,9 @@ import {
   ResourceFlowVariableScope,
   ResourceFlowVariableValueType,
 } from '@attraccess/database-entities';
+import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/recorder/audit-event';
+import { fitAuditTexts } from '../../../audit/policies/projection';
+import { REDACTED, isSecretKey, redactFlowData } from '../flow-audit';
 import { ResourceFlowVariableChangedEvent } from '../events/flow-variable-changed.event';
 
 function classifyValueType(value: unknown): ResourceFlowVariableValueType {
@@ -29,6 +32,7 @@ export class ResourceFlowVariablesService {
     @InjectRepository(ResourceFlowVariable)
     private readonly repository: Repository<ResourceFlowVariable>,
     private readonly eventEmitter: EventEmitter2,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   private resolveResourceId(scope: ResourceFlowVariableScope, resourceId: number | null): number | null {
@@ -80,6 +84,7 @@ export class ResourceFlowVariablesService {
     value: unknown,
     sourceResourceId: number | null,
     sourceFlowId: number | null = null,
+    actor?: AuditActor,
   ): Promise<void> {
     const ownerId = this.resolveResourceId(scope, resourceId);
     const existing = await this.repository.findOne({
@@ -114,14 +119,58 @@ export class ResourceFlowVariablesService {
         sourceFlowId,
       ),
     );
+
+    if (actor && resourceId !== null) {
+      await this.recordVariable('flow_variable.set', actor, resourceId, scope, key, row.valueType, {
+        'before.value': existing ? previousValue : undefined,
+        'after.value': value,
+      });
+    }
   }
 
-  async delete(scope: ResourceFlowVariableScope, resourceId: number | null, key: string): Promise<void> {
-    await this.repository.delete({
-      scope,
-      resourceId: this.resolveResourceId(scope, resourceId),
-      key,
+  /** Records a user's change of a variable. `resourceId` is the resource whose flow page was used. */
+  private async recordVariable(
+    action: 'flow_variable.set' | 'flow_variable.deleted',
+    actor: AuditActor,
+    resourceId: number,
+    scope: ResourceFlowVariableScope,
+    key: string,
+    valueType: ResourceFlowVariableValueType,
+    values: Record<'before.value' | 'after.value', unknown>,
+  ): Promise<void> {
+    const secret = isSecretKey(key);
+    const serialized = Object.fromEntries(
+      Object.entries(values)
+        .filter(([, value]) => value !== undefined)
+        .map(([field, value]) => [field, secret ? REDACTED : (JSON.stringify(redactFlowData(value)) ?? '')]),
+    );
+    await this.audit.record({
+      domain: 'resource',
+      action,
+      actor,
+      subject: { type: 'resource', id: resourceId },
+      details: { scope, valueType, ...fitAuditTexts({ key, ...serialized }, { scope, valueType }) },
     });
+  }
+
+  async delete(
+    scope: ResourceFlowVariableScope,
+    resourceId: number | null,
+    key: string,
+    actor?: AuditActor,
+  ): Promise<void> {
+    const ownerId = this.resolveResourceId(scope, resourceId);
+    const existing = actor
+      ? await this.repository.findOne({ where: { scope, resourceId: ownerId ?? IsNull(), key } })
+      : null;
+    // A plain `null` would compare `resourceId = NULL`, which matches no global variable.
+    const result = await this.repository.delete({ scope, resourceId: ownerId ?? IsNull(), key });
+    if (actor && existing && resourceId !== null && result.affected) {
+      await this.recordVariable('flow_variable.deleted', actor, resourceId, scope, key, existing.valueType, {
+        'before.value': this.deserialize(existing),
+        'after.value': undefined,
+      });
+    }
   }
 
   async listForResource(resourceId: number): Promise<ResourceFlowVariable[]> {

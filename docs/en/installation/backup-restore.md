@@ -1,4 +1,5 @@
 # Backup & Restore
+
 <!-- llms-description: Explains what Attraccess data to back up, how to create a backup and how to restore it. -->
 
 Attraccess stores all data in a single directory, making backups straightforward.
@@ -7,12 +8,12 @@ Attraccess stores all data in a single directory, making backups straightforward
 
 All data is stored in the **storage directory** (default: `/app/storage` in the container):
 
-| File/Folder | Contents |
-|-------------|----------|
+| File/Folder         | Contents                                     |
+| ------------------- | -------------------------------------------- |
 | `attraccess.sqlite` | Database with all settings, users, resources |
-| `cache/` | Cached images (can be regenerated) |
-| `cdn/` | Uploaded files (images, documents) |
-| `plugins/` | Installed plugins |
+| `cache/`            | Cached images (can be regenerated)           |
+| `cdn/`              | Uploaded files (images, documents)           |
+| `plugins/`          | Installed plugins                            |
 
 > [!NOTE]
 > The database (`attraccess.sqlite`) is the most important file. Without it, all configuration and data is lost.
@@ -72,6 +73,10 @@ docker compose start attraccess
 > [!WARNING]
 > Restoring overwrites all current data. Create a backup of the current state first.
 
+## Matter Sidecar Storage
+
+If you use the Matter integration, the Matter fabric lives in the **sidecar's own storage volume** (`MATTER_SIDECAR_STORAGE_DIR`), which is **not** part of the Attraccess volume. Back it up through the Matter plugin's encrypted backups, and keep the recovery key off the server. See the [Matter backup and recovery guide](devices/matter/backup-restore.md).
+
 ## Tips
 
 - Store backups on a separate server or cloud storage
@@ -80,5 +85,6 @@ docker compose start attraccess
 
 ## See Also
 
+- [Matter: Backup and Recovery](devices/matter/backup-restore.md)
 - [Updating](installation/updating.md)
 - [Docker Compose Installation](installation/docker-compose.md)

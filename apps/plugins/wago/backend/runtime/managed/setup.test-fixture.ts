@@ -7,7 +7,7 @@ import { WagoNetworkChange, WagoMqttCredentialRetirement } from '../../network/e
 import { WagoController } from '../../controllers/entity';
 import { WagoCommissioningSession } from '../../commissioning/sessions/session.entity';
 import { WagoService } from '../../controllers/service';
-import { WagoRuntimeArtifactsService } from '../artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../artifacts/service';
 import { WagoCommissioningReadiness } from '../../commissioning/readiness/readiness';
 import { managedSsh } from './transport/ssh';
 import type { BuildRuntimeArtifact } from '../artifacts/build';

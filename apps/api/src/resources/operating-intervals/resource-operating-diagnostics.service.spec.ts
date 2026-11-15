@@ -1,7 +1,8 @@
 import { registerResourceOperatingDiagnosticsServiceFixture } from './resource-operating-diagnostics.service.resource-operating-diagnostics-service.test-fixture';
 import { ResourceType } from '@attraccess/database-entities';
 import { In } from 'typeorm';
-import { TRACKING_NODE_TYPES, unionDurationMs } from './resource-operating-diagnostics.service';
+import { TRACKING_NODE_TYPES } from './resource-operating-diagnostics.service';
+import { unionDurationMs } from './operating-duration-union';
 
 describe('ResourceOperatingDiagnosticsService', () => {
   const fixture = registerResourceOperatingDiagnosticsServiceFixture();

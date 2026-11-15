@@ -1,6 +1,6 @@
 import { User } from '@attraccess/database-entities';
 
-import { Inject, Injectable, Logger, forwardRef, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 
 import { EntityManager } from 'typeorm';
 
@@ -13,6 +13,7 @@ import { InviteUserDto } from './dtos/inviteUser.dto';
 import { mapEmailSendError } from './email-send-error.util';
 
 import { UsersService } from './users.service';
+import { normalizeEmail } from './accounts/normalize-email';
 
 import { plainToInstance } from 'class-transformer';
 
@@ -30,7 +31,6 @@ import { Readable } from 'stream';
 export class UserInvitationService {
   constructor(
     protected readonly usersService: UsersService,
-    @Inject(forwardRef(() => AuthService))
     protected readonly authService: AuthService,
     protected readonly emailService: EmailService,
   ) {}
@@ -63,7 +63,7 @@ export class UserInvitationService {
 
   public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {
     // createMany does not check for taken identities and the unique constraints would surface as a 500
-    const email = body.email.trim();
+    const email = normalizeEmail(body.email);
     const username = this.usersService.cleanupUsername(body.username);
     const existingUsers = await this.usersService.findByEmailsOrUsernames([email], [username]);
     if (existingUsers.some((user) => user.email === email)) {
@@ -132,7 +132,7 @@ export class UserInvitationService {
 
     const duplicateErrors: CsvInviteRowErrorDto[] = [];
     existingUsers.forEach((user) => {
-      const emailRows = emailRowMap.get(user.email.trim().toLowerCase());
+      const emailRows = emailRowMap.get(normalizeEmail(user.email));
       if (emailRows?.length) {
         emailRows.forEach((row) =>
           duplicateErrors.push({ row, field: 'email', message: 'DUPLICATE_IN_DB', value: user.email }),
@@ -234,7 +234,7 @@ export class UserInvitationService {
 
         const { email, normalizedUsername } = this.validateCsvIdentity(rowData, config, rowNumber, rowErrors);
 
-        const emailKey = email.toLowerCase();
+        const emailKey = normalizeEmail(email);
         if (email && seenEmails.has(emailKey)) {
           rowErrors.push({ row: rowNumber, field: 'email', message: 'DUPLICATE_IN_CSV', value: email });
         } else if (email) {
