@@ -17,6 +17,7 @@ import { LicenseService } from '../../license/license.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { AuthService, UserEmailInvalidVerificationTokenException } from '../auth/auth.service';
 import { HibpClient } from '../password-policy/hibp.client';
+import { PasswordPolicyViolationException } from '../password-policy/password-policy.errors';
 import { PasswordPolicyService } from '../password-policy/password-policy.service';
 import { ZxcvbnService } from '../password-policy/zxcvbn.service';
 import { RbacService } from '../rbac/rbac.service';
@@ -27,6 +28,7 @@ import { UsersService } from './users.service';
 const INITIAL_PASSWORD = 'Initial-Hummingbird-9!plate';
 const FIRST_RESET_PASSWORD = 'Tr0ub4dor-Hummingbird-9!plate';
 const SECOND_RESET_PASSWORD = 'Diff3rent-Hummingbird-9!plate';
+const TOO_SHORT_PASSWORD = 'a1!';
 
 describe('single-use reset and verification tokens (integration)', () => {
   let source: DataSource;
@@ -88,6 +90,10 @@ describe('single-use reset and verification tokens (integration)', () => {
     await passwordPolicy.updatePolicy({ historySize: 3, checkHIBP: false });
     passwords = new UserPasswordService(users, auth, emailService, tokenHash, passwordPolicy);
   }, 60_000);
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   afterAll(async () => {
     if (source?.isInitialized) await source.destroy();
@@ -218,9 +224,13 @@ describe('single-use reset and verification tokens (integration)', () => {
       const token = await auth.generatePasswordResetToken(user.email);
       await source.getRepository(User).update(user.id, { passwordResetTokenExpiresAt: new Date(Date.now() - 1000) });
 
+      // A password the policy rejects proves the expiry check runs first.
+      await expect(
+        passwords.changePasswordViaResetToken(user.id, { token, password: TOO_SHORT_PASSWORD }),
+      ).rejects.toThrow(new ForbiddenException('Invalid token'));
       await expect(
         passwords.changePasswordViaResetToken(user.id, { token, password: FIRST_RESET_PASSWORD }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toThrow(new ForbiddenException('Invalid token'));
       expect(await passwordMatches(user.id, INITIAL_PASSWORD)).toBe(true);
       expect(await historyCount(user.id)).toBe(0);
     });
@@ -232,9 +242,33 @@ describe('single-use reset and verification tokens (integration)', () => {
 
       await expect(
         passwords.changePasswordViaResetToken(user.id, { token, password: FIRST_RESET_PASSWORD }),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      ).rejects.toThrow(new ForbiddenException('Invalid token'));
       expect(await passwordMatches(user.id, INITIAL_PASSWORD)).toBe(true);
       expect(await historyCount(user.id)).toBe(0);
+    });
+
+    it('keeps the reset token usable when the new password violates the policy', async () => {
+      const user = await createLocalUser();
+      const token = await auth.generatePasswordResetToken(user.email);
+
+      await expect(
+        passwords.changePasswordViaResetToken(user.id, { token, password: TOO_SHORT_PASSWORD }),
+      ).rejects.toBeInstanceOf(PasswordPolicyViolationException);
+      expect((await persisted(user.id)).passwordResetToken).not.toBeNull();
+
+      await passwords.changePasswordViaResetToken(user.id, { token, password: FIRST_RESET_PASSWORD });
+      expect(await passwordMatches(user.id, FIRST_RESET_PASSWORD)).toBe(true);
+      expect(await historyCount(user.id)).toBe(1);
+    });
+
+    it('accepts a reset token shortly before its expiry', async () => {
+      const user = await createLocalUser();
+      const token = await auth.generatePasswordResetToken(user.email);
+      await source.getRepository(User).update(user.id, { passwordResetTokenExpiresAt: new Date(Date.now() + 60_000) });
+
+      await passwords.changePasswordViaResetToken(user.id, { token, password: FIRST_RESET_PASSWORD });
+
+      expect(await passwordMatches(user.id, FIRST_RESET_PASSWORD)).toBe(true);
     });
   });
 

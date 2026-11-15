@@ -100,8 +100,8 @@ export function VerifyEmail() {
         cancelled = true;
       };
     } else {
-      setError(t('apiErrors.invalidLink'));
-      didSendRequest.current = true;
+      // This effect reruns on every render; keep a resend error that is already showing.
+      setError((current) => current ?? t('apiErrors.invalidLink'));
     }
   }, [activateEmail, token, email, t]);
 
@@ -177,19 +177,21 @@ export function VerifyEmail() {
           )}
 
           <div className="flex flex-col gap-2">
-            <Button
-              variant="primary"
-              className="w-full"
-              onPress={() => {
-                didSendRequest.current = false;
-                activateEmail();
-              }}
-              isPending={verifyEmail.isPending}
-              isDisabled={verifyEmail.isPending}
-              data-cy="verify-email-error-try-again-button"
-            >
-              {t('error.tryAgain')}
-            </Button>
+            {token && email && (
+              <Button
+                variant="primary"
+                className="w-full"
+                onPress={() => {
+                  didSendRequest.current = false;
+                  activateEmail();
+                }}
+                isPending={verifyEmail.isPending}
+                isDisabled={verifyEmail.isPending}
+                data-cy="verify-email-error-try-again-button"
+              >
+                {t('error.tryAgain')}
+              </Button>
+            )}
             <Button
               variant="outline"
               className="w-full"
