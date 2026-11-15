@@ -12,7 +12,7 @@ import { ResourceUsageSession } from '../resources/usage/components/ResourceUsag
 import { SessionTimer } from '../resources/usage/components/SessionTimer';
 import { DashboardPin } from './pins';
 import { PinnablePage } from './pinnablePagesContext';
-import { SortablePinCard } from './SortablePinCard';
+import { SortablePinCard, SortablePinSection } from './SortablePinCard';
 import de from './de.json';
 import en from './en.json';
 
@@ -144,18 +144,20 @@ export function ResourcePinCard({ id, pin, onUnpin }: Readonly<PinCardProps & { 
     activeSession?.usage && activeSession.usage.userId !== user?.id ? activeSession.usage : undefined;
 
   return (
-    <SortablePinCard id={id} dragLabel={t('card.dragHandle', { title })}>
+    <SortablePinSection id={id} dragLabel={t('card.dragHandle', { title })}>
       {(dragHandle) => (
         <>
-          <CardHeading dragHandle={dragHandle} title={<Card.Title className="truncate">{title}</Card.Title>}>
+          <header className="flex flex-row items-center gap-3">
+            {dragHandle}
+            <h3 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h3>
             <StatusChip resourceId={resourceId} />
             <UnpinButton label={t('card.unpin', { title })} onUnpin={onUnpin} />
-          </CardHeading>
-          <Card.Content className="flex flex-col gap-4">
+          </header>
+          <div className="flex flex-col gap-4">
             {otherSession && <SessionTimer startTime={otherSession.startTime} />}
             {resource ? <ResourceUsageSession resourceId={resourceId} resource={resource} /> : <Spinner size="sm" />}
-          </Card.Content>
-          <Card.Footer className="justify-end">
+          </div>
+          <footer className="flex justify-end">
             <Link
               href={`/resources/${resourceId}`}
               aria-label={t('card.openResource', { title })}
@@ -164,9 +166,9 @@ export function ResourcePinCard({ id, pin, onUnpin }: Readonly<PinCardProps & { 
               {t('card.open')}
               <ArrowRightIcon className="w-4 h-4" />
             </Link>
-          </Card.Footer>
+          </footer>
         </>
       )}
-    </SortablePinCard>
+    </SortablePinSection>
   );
 }

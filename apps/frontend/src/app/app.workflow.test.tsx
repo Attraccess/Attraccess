@@ -60,6 +60,10 @@ vi.mock('./reset-password/resetPassword', () => ({ ResetPassword: () => null }))
 vi.mock('./accept-invitation', () => ({ AcceptInvitation: () => null }));
 vi.mock('./two-factor-gate', () => ({ TwoFactorGate: ({ children }: PropsWithChildren) => children }));
 vi.mock('./kiosk/KioskGuard', () => ({ KioskGuard: () => null }));
+vi.mock('./dashboard/pinnablePages', () => ({
+  PinnablePagesProvider: ({ children }: PropsWithChildren) => children,
+}));
+vi.mock('./dashboard/DashboardPinToggle', () => ({ DashboardPinHeaderAccessory: () => null }));
 vi.mock('./not-found', () => ({ NotFound: () => <p>Not found</p> }));
 vi.mock('react-simple-pull-to-refresh', () => ({
   default: ({ children, onRefresh }: PropsWithChildren<{ onRefresh: () => void }>) => (
