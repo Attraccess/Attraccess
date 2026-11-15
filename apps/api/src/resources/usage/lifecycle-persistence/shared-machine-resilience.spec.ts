@@ -261,7 +261,7 @@ describe('Shared machines: restart, waiting and audit', () => {
           scope.usage.onModuleDestroy();
 
           const valkeyClient = {
-            duplicate: () => ({ on: jest.fn(), subscribe: jest.fn(), disconnect: jest.fn() }),
+            duplicate: () => ({ on: jest.fn(), subscribe: jest.fn().mockResolvedValue(1), disconnect: jest.fn() }),
           };
           Reflect.set(usageInternals(scope.usage).turns, 'valkeyClient', valkeyClient);
           Reflect.set(usageInternals(scope.usage).access, 'valkeyClient', valkeyClient);
