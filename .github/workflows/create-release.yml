@@ -116,6 +116,10 @@ jobs:
             echo "HEAD is not the pushed release commit $RELEASE_SHA" >&2
             exit 1
           fi
+          # After a retry the release sits on a newer main; a PR merged meanwhile may have changed the dependencies.
+          if ! git diff --quiet "$GITHUB_SHA" HEAD -- pnpm-lock.yaml; then
+            pnpm install --frozen-lockfile
+          fi
           exclude="$(node scripts/ci-nx-exclude.mjs build)"
           pnpm nx run-many -t build --exclude="$exclude"
 

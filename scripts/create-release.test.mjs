@@ -14,11 +14,13 @@ import {
   optionsFromEnv,
   releaseCommitMessage,
   runRelease,
+  setOutputs,
 } from './create-release.mjs';
 import { fixtureGitEnv } from './test-utils/git-env.mjs';
 
 const MESSAGE = 'chore(release): {version} [skip ci]';
-const env = fixtureGitEnv();
+// The developer's global config may sign commits or set hooks; the fixtures must not depend on it.
+const env = { ...fixtureGitEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
 const roots = [];
 
 afterEach(() => {
@@ -115,6 +117,10 @@ test('pushes the release commit and tag and creates the GitHub release on the fi
   const f = fixture();
   const github = githubStub();
   const { prepare } = fakePrepare(f.ci);
+  // The release commit and push skip the workspace's hooks, which would re-run every check in CI.
+  for (const hook of ['pre-commit', 'commit-msg', 'pre-push']) {
+    writeFileSync(path.join(f.ci, '.git', 'hooks', hook), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+  }
 
   const result = await release(f, prepare, github);
 
@@ -183,12 +189,14 @@ test('stops when another release landed on main meanwhile', async () => {
     },
   });
 
+  // On the last attempt too: re-running would not help, so the cause must not read "main kept moving".
   await assert.rejects(
-    release(f, prepare, github),
+    release(f, prepare, github, { maxAttempts: 1 }),
     /Another release landed .*version 1\.0\.1, this run started from 1\.0\.0.*Nothing was pushed/,
   );
 
   assert.equal(calls.length, 1);
+  assert.equal(remoteRef(f, 'refs/heads/main'), sh(f.dev, 'rev-parse', 'HEAD'));
   assert.equal(remoteHasRef(f, 'refs/tags/v1.0.1'), false);
   assert.deepEqual(github.releases, []);
 });
@@ -206,6 +214,7 @@ test('stops when the release tag already exists on the remote', async () => {
 
   await assert.rejects(release(f, prepare, github), /Tag v1\.0\.1 already exists on origin.*Nothing was pushed/);
 
+  assert.equal(remoteRef(f, 'refs/heads/main'), sh(f.dev, 'rev-parse', 'HEAD'));
   assert.equal(remoteRef(f, 'refs/tags/v1.0.1^{commit}'), sh(f.dev, 'rev-parse', 'HEAD'));
   assert.deepEqual(github.releases, []);
 });
@@ -229,15 +238,49 @@ test('stops before committing when the version was released already', async () =
 test('does not retry a push that fails for another reason than main moving', async () => {
   const f = fixture();
   const github = githubStub();
-  const { prepare, calls } = fakePrepare(f.ci);
-  sh(f.ci, 'remote', 'set-url', 'origin', path.join(f.root, 'missing.git'));
+  // main moved too, so only the kind of failure keeps the run from retrying.
+  const { prepare, calls } = fakePrepare(f.ci, { beforeCommit: (n) => n === 1 && f.mergePr() });
+  sh(f.ci, 'remote', 'set-url', '--push', 'origin', path.join(f.root, 'missing.git'));
+  const logs = [];
 
-  await assert.rejects(release(f, prepare, github), (error) => {
+  await assert.rejects(release(f, prepare, github, { log: (line) => logs.push(line) }), (error) => {
     assert.ok(error instanceof ReleaseError);
-    assert.match(error.message, /Pushing v1\.0\.1 failed; not retrying:\n.*missing\.git/s);
+    assert.match(
+      error.message,
+      /Pushing v1\.0\.1 failed; not retrying\. If v1\.0\.1 reached origin anyway.*missing\.git/s,
+    );
+    assert.match(error.message, /publish-only and specifier 1\.0\.1/);
     return true;
   });
   assert.equal(calls.length, 1);
+  assert.equal(logs.filter((line) => line.startsWith('Pushing ')).length, 1);
+  assert.deepEqual(github.releases, []);
+});
+
+test('does not retry a rule or hook rejection after main moved', async () => {
+  const f = fixture();
+  const github = githubStub();
+  const { prepare, calls } = fakePrepare(f.ci, { beforeCommit: (n) => n === 1 && f.mergePr() });
+  const hook = path.join(f.remote, 'hooks', 'pre-receive');
+  // Installed after the PR merged, so it refuses only the release push.
+  const decline = () =>
+    writeFileSync(hook, '#!/bin/sh\necho "push declined due to repository rule violations" >&2\nexit 1\n', {
+      mode: 0o755,
+    });
+  const logs = [];
+
+  await assert.rejects(
+    release(f, prepare, github, {
+      log: (line) => {
+        logs.push(line);
+        if (line.includes('re-creating')) decline();
+      },
+    }),
+    /Pushing v1\.0\.1 was rejected; not retrying\. Nothing was pushed\.\n.*repository rule violations/s,
+  );
+  assert.equal(calls.length, 2);
+  assert.equal(remoteRef(f, 'refs/heads/main'), sh(f.dev, 'rev-parse', 'HEAD'));
+  assert.equal(remoteHasRef(f, 'refs/tags/v1.0.1'), false);
   assert.deepEqual(github.releases, []);
 });
 
@@ -252,7 +295,7 @@ test('does not retry a rejection when main did not move', async () => {
 
   await assert.rejects(
     release(f, prepare, github),
-    /rejected although main did not move; not retrying\. Nothing was pushed\.\n.*remote rejected/s,
+    /Pushing v1\.0\.1 was rejected; not retrying\. Nothing was pushed\.\n.*remote rejected/s,
   );
   assert.equal(calls.length, 1);
   assert.deepEqual(github.releases, []);
@@ -261,18 +304,33 @@ test('does not retry a rejection when main did not move', async () => {
 test('refuses to re-create the release over uncommitted changes', async () => {
   const f = fixture();
   const github = githubStub();
-  const { prepare } = fakePrepare(f.ci, {
-    beforeCommit: () => {
-      f.mergePr();
-      writeFileSync(path.join(f.ci, 'a.txt'), 'edited by a build');
-    },
-  });
+  const { prepare } = fakePrepare(f.ci, { beforeCommit: () => f.mergePr() });
+  // Something edits the checkout after the release commit; a reset would throw that away.
+  const log = (line) => line.startsWith('Pushing ') && writeFileSync(path.join(f.ci, 'a.txt'), 'edited by a build');
 
   await assert.rejects(
-    release(f, prepare, github),
+    release(f, prepare, github, { log }),
     /uncommitted changes; not re-creating v1\.0\.1\. Nothing was pushed/,
   );
   assert.equal(readFileSync(path.join(f.ci, 'a.txt'), 'utf8'), 'edited by a build');
+  assert.equal(remoteRef(f, 'refs/heads/main'), sh(f.dev, 'rev-parse', 'HEAD'));
+  assert.deepEqual(github.releases, []);
+});
+
+test('refuses to commit changes the prepare step did not stage', async () => {
+  const f = fixture();
+  const github = githubStub();
+  const { prepare: inner } = fakePrepare(f.ci);
+  const prepare = async (args) => {
+    writeFileSync(path.join(f.ci, 'a.txt'), 'changed but not staged');
+    return inner(args);
+  };
+  const head = sh(f.ci, 'rev-parse', 'HEAD');
+
+  await assert.rejects(release(f, prepare, github), /Preparing v1\.0\.1 left unstaged changes.*Nothing was pushed/);
+  assert.equal(sh(f.ci, 'rev-parse', 'HEAD'), head);
+  assert.equal(remoteRef(f, 'refs/heads/main'), head);
+  assert.deepEqual(github.releases, []);
 });
 
 test('stops when nx resolves a different version on the new base', async () => {
@@ -282,6 +340,7 @@ test('stops when nx resolves a different version on the new base', async () => {
   const prepare = async (args) => ({ ...(await inner(args)), ...(args.specifier !== 'patch' && { version: '1.0.2' }) });
 
   await assert.rejects(release(f, prepare, github), /resolved 1\.0\.2 instead of 1\.0\.1\. Nothing was pushed/);
+  assert.equal(remoteRef(f, 'refs/heads/main'), sh(f.dev, 'rev-parse', 'HEAD'));
   assert.deepEqual(github.releases, []);
 });
 
@@ -292,7 +351,7 @@ test('reports a pushed tag whose GitHub release could not be created', async () 
 
   await assert.rejects(
     release(f, prepare, failing),
-    /v1\.0\.1 is pushed \([0-9a-f]{40}\), but creating its GitHub release failed: GitHub answered 502\nCreate the GitHub release for v1\.0\.1 so release\.yml runs\./,
+    /v1\.0\.1 is pushed \([0-9a-f]{40}\), but creating its GitHub release failed: GitHub answered 502\nCreate the GitHub release for v1\.0\.1 so release\.yml runs, then run Create Release with publish-only and specifier 1\.0\.1\./,
   );
   assert.equal(remoteHasRef(f, 'refs/tags/v1.0.1'), true);
 });
@@ -372,7 +431,19 @@ test('reads the workflow inputs from the environment', () => {
     () => optionsFromEnv({ SPECIFIER: 'patch', DRY_RUN: 'false' }),
     /GITHUB_TOKEN and GITHUB_REPOSITORY are required/,
   );
-  assert.throws(() => optionsFromEnv({ ...full, RELEASE_PUSH_ATTEMPTS: '0' }), /positive integer, got "0"/);
+  for (const attempts of ['0', 'abc', '2.5']) {
+    assert.throws(() => optionsFromEnv({ ...full, RELEASE_PUSH_ATTEMPTS: attempts }), /positive integer/);
+  }
+});
+
+test('writes the version and pushed commit as step outputs', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'create-release-'));
+  roots.push(root);
+  const file = path.join(root, 'output');
+  setOutputs({ version: '1.0.1', sha: 'abc' }, file);
+  setOutputs({ version: '1.0.2', dryRun: true }, file);
+  setOutputs({ version: '1.0.3', sha: 'def' }, undefined);
+  assert.equal(readFileSync(file, 'utf8'), 'version=1.0.1\nsha=abc\nversion=1.0.2\nsha=\n');
 });
 
 test('formats the commit message and recognises prereleases', () => {

@@ -3,7 +3,7 @@
 // `nx release` does all of this in one step, so a PR merged while the release runs rejects its push. This script
 // re-creates the release commit on the moved branch with the same version and pushes again (ATT-1266).
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,8 +13,12 @@ export const DEFAULT_PUSH_ATTEMPTS = 5;
 
 export class ReleaseError extends Error {}
 
-// Git's wording for a push refused because the remote ref is not what we built on.
-const REJECTED_PUSH = /\[rejected\]|\[remote rejected\]|atomic push failed|stale info|fetch first|non-fast-forward/;
+// Git's wording for a push refused because the branch is not what we built on (locally, or a lost race on the
+// server). Other refusals, such as a ruleset or hook, are not retried.
+const BRANCH_MOVED =
+  /\[rejected\].*\((fetch first|non-fast-forward|stale info)\)|\[remote rejected\].*\((cannot lock ref|failed to update ref|incorrect old value)/;
+const REJECTED = /\[(remote )?rejected\]/;
+const PUBLISH_ONLY_HINT = 'then run Create Release with publish-only and specifier';
 
 export function createGit({ cwd, env } = {}) {
   const run = (...args) => {
@@ -29,7 +33,7 @@ export function createGit({ cwd, env } = {}) {
   return { run, out };
 }
 
-export function readVersion(git, ref) {
+function readVersion(git, ref) {
   return JSON.parse(git.out('show', `${ref}:package.json`)).version;
 }
 
@@ -42,7 +46,7 @@ export function releaseCommitMessage(template, version) {
 }
 
 /** Commits what `prepare` staged and tags it like nx release (annotated tag, message = tag name). */
-export function commitAndTag(git, { message, tag }) {
+function commitAndTag(git, { message, tag }) {
   // The release commit carries only versions and CHANGELOG.md; the hooks would re-run every check of the workspace.
   git.out('commit', '--no-verify', '--message', message);
   git.out('tag', '--annotate', tag, '--message', tag);
@@ -55,7 +59,7 @@ function fetchBranch(git, { remote, branch }) {
 }
 
 /** Refuses to re-create the release on a branch that cannot take it any more. */
-export function assertCanRecreate(git, { remote, remoteRef, tag, startVersion }) {
+function assertCanRecreate(git, { remote, remoteRef, tag, startVersion }) {
   if (git.out('status', '--porcelain', '--untracked-files=no')) {
     throw new ReleaseError(`The working tree has uncommitted changes; not re-creating ${tag}. Nothing was pushed.`);
   }
@@ -75,6 +79,10 @@ export function assertCanRecreate(git, { remote, remoteRef, tag, startVersion })
 async function createReleaseCommit({ git, prepare, specifier, messageTemplate }) {
   const { version, changelog } = await prepare({ specifier, dryRun: false });
   const tag = `v${version}`;
+  // Changes nx did not stage would be left out of the release commit.
+  if (!git.run('diff', '--quiet').ok) {
+    throw new ReleaseError(`Preparing ${tag} left unstaged changes; not committing. Nothing was pushed.`);
+  }
   // A version released before (or one lower than the latest) would otherwise fail at `git tag` after committing.
   if (git.run('rev-parse', '--verify', '--quiet', `refs/tags/${tag}`).ok) {
     throw new ReleaseError(`Tag ${tag} already exists; not creating it again. Nothing was pushed.`);
@@ -100,8 +108,19 @@ function pushRelease(git, { remote, branch, tag }) {
   return git.run('push', '--atomic', '--no-verify', remote, `HEAD:refs/heads/${branch}`, `refs/tags/${tag}`);
 }
 
+/** The error for a push that is not retried; an atomic rejection pushed nothing, other failures may have landed. */
+function pushFailure(tag, push) {
+  if (REJECTED.test(push.output)) {
+    return new ReleaseError(`Pushing ${tag} was rejected; not retrying. Nothing was pushed.\n${push.output}`);
+  }
+  return new ReleaseError(
+    `Pushing ${tag} failed; not retrying. If ${tag} reached origin anyway, create its GitHub release, ` +
+      `${PUBLISH_ONLY_HINT} ${tag.slice(1)}.\n${push.output}`,
+  );
+}
+
 /** Pushes the release commit and tag; re-creates them on the branch and retries while the branch keeps moving. */
-export async function pushWithRetry(options) {
+async function pushWithRetry(options) {
   const { git, remote, branch, maxAttempts, log } = options;
   let release = options.release;
   for (let attempt = 1; ; attempt += 1) {
@@ -111,22 +130,20 @@ export async function pushWithRetry(options) {
     );
     const push = pushRelease(git, { remote, branch, tag: release.tag });
     if (push.ok) return { ...release, attempts: attempt };
-    if (!REJECTED_PUSH.test(push.output)) {
-      throw new ReleaseError(`Pushing ${release.tag} failed; not retrying:\n${push.output}`);
-    }
+    if (!BRANCH_MOVED.test(push.output)) throw pushFailure(release.tag, push);
     const moved = fetchBranch(git, { remote, branch });
     if (moved === base) {
       throw new ReleaseError(
         `Pushing ${release.tag} was rejected although ${branch} did not move; not retrying. Nothing was pushed.\n${push.output}`,
       );
     }
-    if (attempt === maxAttempts) {
-      throw new ReleaseError(
-        `${branch} kept moving: ${maxAttempts} push attempts were rejected. Nothing was pushed; re-run Create Release.`,
-      );
-    }
     const remoteRef = `refs/remotes/${remote}/${branch}`;
     assertCanRecreate(git, { remote, remoteRef, tag: release.tag, startVersion: options.startVersion });
+    if (attempt === maxAttempts) {
+      throw new ReleaseError(
+        `${branch} kept moving: ${maxAttempts} push attempts were rejected. Nothing was pushed; re-run Create Release.\n${push.output}`,
+      );
+    }
     log(
       `${branch} moved, re-creating release commit on ${moved.slice(0, 7)} (attempt ${attempt + 1}/${maxAttempts}); ${base.slice(0, 7)} -> ${moved.slice(0, 7)} picked up:`,
     );
@@ -176,7 +193,7 @@ async function publishGithubRelease(createGithubRelease, release, log) {
   } catch (error) {
     throw new ReleaseError(
       `${release.tag} is pushed (${release.sha}), but creating its GitHub release failed: ${error.message}\n` +
-        `Create the GitHub release for ${release.tag} so release.yml runs.`,
+        `Create the GitHub release for ${release.tag} so release.yml runs, ${PUBLISH_ONLY_HINT} ${release.version}.`,
     );
   }
 }
@@ -236,7 +253,7 @@ export async function runRelease(options) {
 const SELF = fileURLToPath(import.meta.url);
 
 /** Runs nx's version and changelog steps in a child process, so an nx `process.exit` surfaces as a clear failure. */
-export function nxPrepare({ specifier, dryRun }) {
+function nxPrepare({ specifier, dryRun }) {
   const dir = mkdtempSync(join(tmpdir(), 'create-release-'));
   const out = join(dir, 'prepared.json');
   try {
@@ -280,9 +297,10 @@ async function runNxPrepare(env) {
   writeFileSync(env.RELEASE_PREPARE_OUT, JSON.stringify(prepared));
 }
 
-function setOutputs(release) {
-  if (!process.env.GITHUB_OUTPUT) return;
-  appendFileSync(process.env.GITHUB_OUTPUT, `version=${release.version}\nsha=${release.sha ?? ''}\n`);
+/** The rebuild step checks out nothing; it refuses to run unless HEAD is this `sha`. A dry run has none. */
+export function setOutputs(release, file = process.env.GITHUB_OUTPUT) {
+  if (!file) return;
+  appendFileSync(file, `version=${release.version}\nsha=${release.sha ?? ''}\n`);
 }
 
 /** The workflow's inputs, read from the step environment. */
@@ -314,6 +332,6 @@ function fail(error) {
   process.exit(1);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   (process.argv[2] === '--prepare' ? runNxPrepare(process.env) : main()).catch(fail);
 }
