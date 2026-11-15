@@ -154,7 +154,7 @@ derived from `AUTH_SESSION_SECRET`; the certificates themselves are not secret.
 **Back up the database and `AUTH_SESSION_SECRET` together.** If the secret is lost, or changed
 without converting the stored keys, the keys cannot be decrypted and every reader has to be paired
 again. To change the secret, follow the rotation steps in
-[Security settings](../settings/security.md), which convert these keys too.
+[Security settings](settings/security.md), which convert these keys too.
 
 ### Reverse proxies
 

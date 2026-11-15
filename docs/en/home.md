@@ -34,7 +34,7 @@ Attraccess is **source-available** under the [modified Prosperity Public License
 - **Qualifications & Access Control** – Documented safety briefings and permissions per resource or resource group
 - **Badge Access** – Physical access via Attractap RFID readers
 - **Maintenance Planning** – Schedule preventive maintenance by time, usage hours or session count
-- **Machine & PLC Integration** – Connect WAGO controllers and automate equipment via MQTT or HTTP
+- **Machine & PLC Integration** – Connect controllers such as [WAGO](plugins/wago/overview.md) (plugin) and automate equipment via MQTT or HTTP
 - **Projects & Usage Records** – Assign sessions to projects and export usage as CSV
 - **SSO Integration** – Login via OIDC or SAML with group-to-role mappings
 - **Audit Log & Monitoring** – Track sensitive changes and monitor operations with Prometheus and Grafana
