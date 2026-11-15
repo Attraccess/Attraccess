@@ -183,3 +183,12 @@ it('shows the RFID management action only with the dedicated permission', () => 
   fireEvent.click(screen.getByRole('button', { name: 'rfidCards.manage' }));
   expect(screen.getByText('/users/7/rfid-cards')).toBeInTheDocument();
 });
+
+it('shows the external ID subtitle only when the user has one', () => {
+  const view = show();
+  expect(screen.queryByText('details.externalIdentifier')).toBeNull();
+  view.unmount();
+  state.user = { ...state.user, externalIdentifier: 'EXT-1' };
+  show();
+  expect(screen.getByText('details.externalIdentifier')).toBeInTheDocument();
+});

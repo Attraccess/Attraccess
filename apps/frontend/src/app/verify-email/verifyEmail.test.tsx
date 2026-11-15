@@ -19,6 +19,7 @@ const mutationMode = vi.hoisted(() => ({ reactive: false }));
 let verifyOnError: ((error: unknown) => void) | undefined;
 let verifyOnSuccess: (() => void) | undefined;
 let resendOnSuccess: (() => void) | undefined;
+let resendOnError: ((error: unknown) => void) | undefined;
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -58,6 +59,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   },
   useUsersServiceResendVerificationEmail: (options: { onSuccess?: () => void; onError?: (e: unknown) => void }) => {
     resendOnSuccess = options?.onSuccess;
+    resendOnError = options?.onError;
     return { mutate: resendMutateMock, isPending: pending.resend };
   },
   useUsersServiceGetCurrentKey: 'useUsersServiceGetCurrentKey',
@@ -252,6 +254,34 @@ describe('VerifyEmail', () => {
     renderWithRoute('/verify-email');
 
     expect(verifyMutateMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['/verify-email', '/verify-email?email=test%40example.com', '/verify-email?token=abc'])(
+    'shows the invalid-link error instead of loading forever for %s',
+    async (url) => {
+      renderWithRoute(url);
+
+      await waitFor(() => {
+        expect(screen.getByText(en.apiErrors.invalidLink)).toBeInTheDocument();
+      });
+      expect(verifyMutateMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('offers no verify retry for an incomplete link and keeps a failed resend error visible', async () => {
+    const user = userEvent.setup();
+    renderWithRoute('/verify-email');
+
+    await waitFor(() => {
+      expect(screen.getByText(en.apiErrors.invalidLink)).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Verify email again' })).toBeNull();
+
+    act(() => resendOnError?.(new Error('down')));
+    await user.type(screen.getByTestId('resend-email-input'), 'a');
+
+    expect(screen.getByText(en.apiErrors.unexpectedError)).toBeInTheDocument();
+    expect(screen.queryByText(en.apiErrors.invalidLink)).toBeNull();
   });
 
   it('shows Try Again and Back to sign in buttons on error', async () => {
