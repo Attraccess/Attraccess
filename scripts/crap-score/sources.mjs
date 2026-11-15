@@ -26,8 +26,8 @@ const gitFiles = (args, cwd, env) =>
     .filter(Boolean);
 
 // A submodule is its own repository: variables such as GIT_INDEX_FILE (set inside Git hooks) name the outer one.
-function submoduleEnv() {
-  const env = { ...process.env };
+function submoduleEnv(inherited) {
+  const env = { ...inherited };
   for (const name of execFileSync('git', ['rev-parse', '--local-env-vars'], { encoding: 'utf8' }).split('\n'))
     delete env[name];
   return env;
@@ -35,7 +35,9 @@ function submoduleEnv() {
 
 // Existing tracked and untracked (not ignored) files below `cwd`. A gitlink (mode 160000) is a directory, not a
 // file: a checked-out submodule contributes its own files under its path, one that is not checked out contributes
-// nothing. `submodules` lists every gitlink path, checked out or not.
+// nothing. `submodules` lists every gitlink path, checked out or not. Like the root's files, a submodule is read as
+// checked out, even when its HEAD is not the commit the gitlink names: the tests that supply coverage run on those
+// files, and a submodule's own CI may check it out at another commit than the one this repository pins.
 export function workspaceFiles(cwd = workspace, env = process.env) {
   const submodules = gitFiles(['ls-files', '--stage', '-z'], cwd, env)
     .filter((entry) => entry.startsWith('160000 '))
@@ -45,7 +47,7 @@ export function workspaceFiles(cwd = workspace, env = process.env) {
   );
   for (const submodule of [...submodules]) {
     if (!existsSync(path.join(cwd, submodule, '.git'))) continue;
-    const nested = workspaceFiles(path.join(cwd, submodule), submoduleEnv());
+    const nested = workspaceFiles(path.join(cwd, submodule), submoduleEnv(env));
     files.push(...nested.files.map((file) => `${submodule}/${file}`));
     submodules.push(...nested.submodules.map((file) => `${submodule}/${file}`));
   }

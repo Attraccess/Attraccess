@@ -83,6 +83,18 @@ test('requires the repository url and a declaration', (t) => {
   assert.match(checkPrivateSubmodule(repository(t, { modules: otherPath }).cwd).join('\n'), /must declare/);
 });
 
+test('rejects any other submodule', (t) => {
+  const { cwd, git } = repository(t);
+  git('update-index', '--add', '--cacheinfo', '160000,0123456789abcdef0123456789abcdef01234567,vendor/other');
+  assert.match(checkPrivateSubmodule(cwd).join('\n'), /the only submodule; the index also has:\n {2}vendor\/other\n/);
+  const other = `${gitmodules()}[submodule "vendor/other"]\n\tpath = vendor/other\n\turl = https://example.invalid/x.git\n`;
+  const problems = checkPrivateSubmodule(repository(t, { modules: other }).cwd);
+  assert.deepEqual(problems, [
+    '.gitmodules may only declare [submodule "apps/cesentry"]; remove submodule.vendor/other.path, ' +
+      'submodule.vendor/other.url. See CONTRIBUTING.md, "Private submodule".',
+  ]);
+});
+
 const workflowsDir = fileURLToPath(new URL('../.github/workflows/', import.meta.url));
 function workflow(name) {
   const require = createRequire(import.meta.url);

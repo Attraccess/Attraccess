@@ -13,16 +13,18 @@ const HINT = 'See CONTRIBUTING.md, "Private submodule".';
 
 const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 
-function gitmodulesValue(key, cwd) {
+function gitmodules(args, cwd) {
   try {
-    return git(['config', '--file', '.gitmodules', '--get-all', `submodule.${SUBMODULE_PATH}.${key}`], cwd)
+    return git(['config', '--file', '.gitmodules', ...args], cwd)
       .split('\n')
       .filter(Boolean);
   } catch {
-    // `git config --get-all` exits 1 when the key (or the file) is missing.
+    // `git config` exits 1 when the key (or the file) is missing.
     return [];
   }
 }
+
+const gitmodulesValue = (key, cwd) => gitmodules(['--get-all', `submodule.${SUBMODULE_PATH}.${key}`], cwd);
 
 /** Returns the problems found in the index and in .gitmodules (empty when the pointer is intact). */
 export function checkPrivateSubmodule(start = process.cwd()) {
@@ -39,6 +41,24 @@ export function checkPrivateSubmodule(start = process.cwd()) {
         `Remove the others with \`git rm -r --cached <path>\`. ${HINT}`,
     );
   }
+  // CI clones this repository with --recurse-submodules, which would fetch any other submodule a PR declares.
+  const otherGitlinks = git(['ls-files', '--stage', '-z'], cwd)
+    .split('\0')
+    .filter((entry) => entry.startsWith('160000 '))
+    .map((entry) => entry.slice(entry.indexOf('\t') + 1))
+    .filter((file) => file !== SUBMODULE_PATH && !file.startsWith(`${SUBMODULE_PATH}/`));
+  if (otherGitlinks.length)
+    problems.push(
+      `${SUBMODULE_PATH} must be the only submodule; the index also has:\n` +
+        `${otherGitlinks.map((file) => `  ${file}`).join('\n')}\nRemove them with \`git rm --cached <path>\`. ${HINT}`,
+    );
+  const otherKeys = gitmodules(['--name-only', '--list'], cwd).filter(
+    (key) => !key.startsWith(`submodule.${SUBMODULE_PATH}.`),
+  );
+  if (otherKeys.length)
+    problems.push(
+      `.gitmodules may only declare [submodule "${SUBMODULE_PATH}"]; remove ${otherKeys.join(', ')}. ${HINT}`,
+    );
   const paths = gitmodulesValue('path', cwd);
   if (paths.length !== 1 || paths[0] !== SUBMODULE_PATH)
     problems.push(`.gitmodules must declare [submodule "${SUBMODULE_PATH}"] with path = ${SUBMODULE_PATH}. ${HINT}`);
