@@ -210,6 +210,22 @@ test('stops when the release tag already exists on the remote', async () => {
   assert.deepEqual(github.releases, []);
 });
 
+test('stops before committing when the version was released already', async () => {
+  const f = fixture();
+  const github = githubStub();
+  const { prepare, calls } = fakePrepare(f.ci);
+  const head = sh(f.ci, 'rev-parse', 'HEAD');
+
+  await assert.rejects(
+    release(f, prepare, github, { specifier: '1.0.0' }),
+    /: Tag v1\.0\.0 already exists; not creating it again\. Nothing was pushed\.$/,
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(sh(f.ci, 'rev-parse', 'HEAD'), head);
+  assert.equal(remoteRef(f, 'refs/heads/main'), head);
+  assert.deepEqual(github.releases, []);
+});
+
 test('does not retry a push that fails for another reason than main moving', async () => {
   const f = fixture();
   const github = githubStub();

@@ -75,6 +75,10 @@ export function assertCanRecreate(git, { remote, remoteRef, tag, startVersion })
 async function createReleaseCommit({ git, prepare, specifier, messageTemplate }) {
   const { version, changelog } = await prepare({ specifier, dryRun: false });
   const tag = `v${version}`;
+  // A version released before (or one lower than the latest) would otherwise fail at `git tag` after committing.
+  if (git.run('rev-parse', '--verify', '--quiet', `refs/tags/${tag}`).ok) {
+    throw new ReleaseError(`Tag ${tag} already exists; not creating it again. Nothing was pushed.`);
+  }
   const sha = commitAndTag(git, { message: releaseCommitMessage(messageTemplate, version), tag });
   return { version, tag, changelog, sha };
 }
