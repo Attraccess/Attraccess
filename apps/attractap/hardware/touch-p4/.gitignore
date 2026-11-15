@@ -1,0 +1,14 @@
+# manufacturing output (regenerate with scripts/export_fab.py)
+fab/
+# KiCad local state and backups
+*.kicad_prl
+*-backups/
+fp-info-cache
+*.lck
+_autosave-*
+\#auto_saved_files#
+# autorouter exchange files
+*.dsn
+*.ses
+*.rules
+__pycache__/
