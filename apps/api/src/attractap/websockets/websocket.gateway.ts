@@ -267,7 +267,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     readerId: number;
     userId: number;
     actorId?: number;
-    authenticationMethod?: 'session' | 'api-token';
+    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
     apiTokenId?: number;
   }) {
     return this.cardHandler.startEnrollOfNewNfcCard(data);
@@ -277,7 +277,7 @@ export class AttractapGateway implements OnGatewayConnection, OnGatewayDisconnec
     readerId: number;
     userId: number;
     cardId: number;
-    authenticationMethod?: 'session' | 'api-token';
+    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
     apiTokenId?: number;
   }) {
     return this.cardHandler.startResetOfNfcCard(data);

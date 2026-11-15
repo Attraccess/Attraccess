@@ -345,7 +345,7 @@ export class AttractapService {
 
   public async recordReaderDeregistration(
     readerId: number,
-    principal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number },
+    principal: { userId: number; authenticationMethod: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
   ): Promise<void> {
     await this.audit.record({
       domain: 'attractap',

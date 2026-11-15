@@ -31,7 +31,7 @@ export interface AuthAuditFields {
   ip: string;
   userId?: number | null;
   username?: string | null;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number | null;
   reason?: string;
 }

@@ -45,6 +45,11 @@ export default defineConfig(({ command }) => {
                 changeOrigin: false,
                 ws: true,
               },
+              // OAuth discovery for MCP clients is served by the API at the origin root.
+              '/.well-known': {
+                target: apiProxyTarget,
+                changeOrigin: false,
+              },
               '/cdn': {
                 target: apiProxyTarget,
                 changeOrigin: true,

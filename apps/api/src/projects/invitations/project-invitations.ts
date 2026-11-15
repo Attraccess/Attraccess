@@ -52,7 +52,7 @@ export class ProjectInvitations {
   public async acceptInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     return await this.respondToInvitation(
@@ -67,7 +67,7 @@ export class ProjectInvitations {
   public async declineInvitation(
     userId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     return await this.respondToInvitation(
@@ -83,7 +83,7 @@ export class ProjectInvitations {
     userId: number,
     invitationId: number,
     status: ProjectInvitationStatus,
-    authenticationMethod: 'session' | 'api-token',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     const invitation = await this.getInvitationWithRelations(invitationId);
@@ -182,7 +182,7 @@ export class ProjectInvitations {
     projectId: number,
     invitedUserId: number,
     role: ProjectMemberRole = ProjectMemberRole.VIEWER,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     const project = await this.projectAccessService.ensureOwner(ownerId, projectId);
@@ -241,7 +241,7 @@ export class ProjectInvitations {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);
@@ -273,7 +273,7 @@ export class ProjectInvitations {
     ownerId: number,
     projectId: number,
     invitationId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<ProjectInvitation> {
     await this.projectAccessService.ensureOwner(ownerId, projectId);

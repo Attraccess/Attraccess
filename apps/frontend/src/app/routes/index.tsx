@@ -25,6 +25,7 @@ import FirstTimeSetupPage from '../first-time-setup/index';
 import { KioskCompanionPage } from '../kiosk/companion/KioskCompanionPage';
 import { KioskLayout } from '../kiosk/layout/KioskLayout';
 import { KioskResourcePage } from '../kiosk/resources/KioskResourcePage';
+import { mcpOAuthRoutes } from '../mcp-oauth/routes';
 import { MessagesPage } from '../messaging/index';
 import { EditMqttServerPage, MqttServersPage } from '../mqtt/index';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
@@ -591,10 +592,7 @@ const coreRoutes: RouteConfig[] = [
 export function useAllRoutes() {
   const { plugins: pluginManifests } = usePluginState();
 
-  const pluginRoutes = useMemo(
-    () => pluginManifests.flatMap((pluginManifest) => getRoutesOfPlugin(pluginManifest)),
-    [pluginManifests],
-  );
+  const pluginRoutes = useMemo(() => pluginManifests.flatMap(getRoutesOfPlugin), [pluginManifests]);
 
-  return useMemo(() => [...coreRoutes, ...pluginRoutes], [pluginRoutes]);
+  return useMemo(() => [...coreRoutes, ...mcpOAuthRoutes, ...pluginRoutes], [pluginRoutes]);
 }
