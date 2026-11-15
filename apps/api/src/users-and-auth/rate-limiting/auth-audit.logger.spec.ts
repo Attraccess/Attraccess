@@ -77,6 +77,34 @@ describe('AuthAuditLogger', () => {
     );
   });
 
+  it('records verification email resends as their own identity audit action', () => {
+    logger.log({ type: 'verification_email_resend', outcome: 'success', ip: '2.2.2.2' });
+    logger.log({ type: 'verification_email_resend', outcome: 'rate_limited', ip: '2.2.2.2' });
+
+    expect(record).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        domain: 'identity',
+        action: 'identity.verification_email_resent',
+        outcome: 'succeeded',
+        details: {},
+      }),
+    );
+    expect(record).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        action: 'identity.verification_email_resent',
+        outcome: 'failed',
+        details: { reason: 'rate_limited' },
+        request: { ipAddress: '2.2.2.2' },
+      }),
+    );
+    expect(record).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'identity.password_reset_requested' }));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^auth\.failed type=verification_email_resend outcome=rate_limited ip=2\.2\.2\.2 /),
+    );
+  });
+
   it('logs SSO provisioning failures without an identity audit entry', () => {
     logger.log({
       type: 'sso_provisioning',

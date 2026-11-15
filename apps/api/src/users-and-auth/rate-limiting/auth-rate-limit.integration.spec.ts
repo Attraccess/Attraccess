@@ -32,6 +32,15 @@ class FakeController {
     return { ok: true };
   }
 
+  @Post('resend')
+  @AuthRateLimit('verification_email_resend')
+  resend(@Body() body: { fail?: boolean }) {
+    if (body?.fail) {
+      throw new UnauthorizedException('boom');
+    }
+    return { ok: true };
+  }
+
   @Post('delete-confirm')
   @AuthRateLimit('delete_account_confirm', { clearFailuresOnSuccess: false })
   confirmDelete(@Body() body: { fail?: boolean }) {
@@ -123,6 +132,16 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
 
       const blocked = await request(app.getHttpServer()).post('/delete-confirm').send({});
       expect(blocked.status).toBe(429);
+    });
+
+    it('counts verification email resends in their own scope, separate from register', async () => {
+      for (let i = 0; i < policy.maxAttempts; i += 1) {
+        await request(app.getHttpServer()).post('/resend').send({ fail: true });
+      }
+      expect((await request(app.getHttpServer()).post('/resend').send({})).status).toBe(429);
+      expect((await request(app.getHttpServer()).post('/register').send({})).status).toBe(201);
+      expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ type: 'verification_email_resend' }));
+      expect(audit.log).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'password_reset_request' }));
     });
 
     it('records a verification email outage as a dependency failure', async () => {
