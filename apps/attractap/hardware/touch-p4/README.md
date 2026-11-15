@@ -116,7 +116,7 @@ What the board needs, for the order form:
 | Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm, two cut-away corners, plated slots at the DC jack and USB-C |
 | Surface finish | ENIG is the safe choice for the 0.35 mm pitch MCU and the 0.5 mm display connector |
 | Impedance control | not needed |
-| Assembly | top side only: 193 parts in 68 lines (Wi-Fi version), 228 parts in 78 lines (Ethernet/PoE version) |
+| Assembly | top side only: 193 parts in 67 lines (Wi-Fi version), 228 parts in 77 lines (Ethernet/PoE version) |
 | Through-hole parts | DC jack J102, DC terminal J103 (two pins in a four-hole footprint, see below), and on the Ethernet/PoE version the jack J401 |
 | Not assembled by JLCPCB | the display panel (taped on, flex plugged into J601) |
 

@@ -99,17 +99,23 @@ def main():
     for variant, tags in VARIANTS.items():
         fitted = [r for r in rows if r['Variant'] in tags]
         for name, alt in (('bom-%s.csv' % variant, False), ('bom-%s-external-antenna.csv' % variant, True)):
+            # One line per LCSC part: JLCPCB warns when two lines name the same part (the RESET and
+            # BOOT buttons are one part with two values). The values become the comment.
             groups = {}
             for r in fitted:
                 swap = alt and r.get('Alt_LCSC')
-                key = (r['Alt_MPN'] if swap else r['Value'], r['Footprint'].split(':')[-1],
-                       r['Alt_LCSC'] if swap else r['LCSC'], r['Alt_MPN'] if swap else r['MPN'])
-                groups.setdefault(key, []).append(r['Reference'])
+                key = (r['Footprint'].split(':')[-1], r['Alt_LCSC'] if swap else r['LCSC'],
+                       r['Alt_MPN'] if swap else r['MPN'])
+                values, refs = groups.setdefault(key, ([], []))
+                value = r['Alt_MPN'] if swap else r['Value']
+                if value not in values:
+                    values.append(value)
+                refs.append(r['Reference'])
             with open(os.path.join(jlc, name), 'w', newline='') as f:
                 w = csv.writer(f)
                 w.writerow(['Comment', 'Designator', 'Footprint', 'LCSC Part #', 'Manufacturer Part'])
-                for (value, fp, lcsc, mpn), refs in sorted(groups.items(), key=lambda kv: kv[1][0]):
-                    w.writerow([value, ','.join(refs), fp, lcsc, mpn])
+                for (fp, lcsc, mpn), (values, refs) in sorted(groups.items(), key=lambda kv: kv[1][1][0]):
+                    w.writerow([' / '.join(values), ','.join(refs), fp, lcsc, mpn])
         with open(os.path.join(jlc, 'cpl-%s.csv' % variant), 'w', newline='') as f:
             w = csv.writer(f)
             w.writerow(['Designator', 'Mid X', 'Mid Y', 'Layer', 'Rotation'])
