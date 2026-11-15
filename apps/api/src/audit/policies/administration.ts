@@ -234,10 +234,13 @@ rules['plugin.zip_uploaded'] = {
   subject: 'plugin-package',
   fields: { pluginName: text, pluginVersion: text, restartRequested: flag },
 };
-rules['plugin.zip_deleted'] = { subject: 'plugin-package', fields: { pluginId: identifier, restartRequested: flag } };
+rules['plugin.zip_deleted'] = {
+  subject: 'plugin-package',
+  fields: { pluginId: identifier, pluginName: text, pluginVersion: text, restartRequested: flag },
+};
 rules['plugin.retry_requested'] = {
   subject: 'plugin-package',
-  fields: { pluginId: identifier, restartRequested: flag },
+  fields: { pluginId: identifier, pluginName: text, pluginVersion: text, restartRequested: flag },
 };
 
 export const ADMINISTRATION_AUDIT_ACTIONS = Object.keys(rules) as AdministrationAuditAction[];

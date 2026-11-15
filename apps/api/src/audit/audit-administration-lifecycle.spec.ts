@@ -274,6 +274,15 @@ describe('administration lifecycle hooks', () => {
         'plugin.zip_deleted',
         'plugin.retry_requested',
       ]);
+      const [, deleted, retried] = recorded(audit);
+      for (const event of [deleted, retried]) {
+        expect(event.details).toMatchObject({
+          pluginId: 'zip-plugin',
+          pluginName: 'Example',
+          pluginVersion: '1.0.0',
+          restartRequested: 1,
+        });
+      }
     } finally {
       get.mockRestore();
       quarantined.mockRestore();

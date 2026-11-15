@@ -167,6 +167,8 @@ export class PluginAdministrationService {
     PluginService.clearPluginQuarantine(plugin.pluginDirectory);
     await this.record(actor, 'plugin.retry_requested', auditSubjectKeyId(plugin.name), 'plugin-package', {
       pluginId,
+      pluginName: plugin.name,
+      pluginVersion: plugin.version,
       restartRequested: 1,
     });
     this.pluginService.requestRestart();
@@ -200,6 +202,8 @@ export class PluginAdministrationService {
     await this.pluginUninstall.deletePlugin(pluginId, Boolean(actor));
     await this.record(actor, 'plugin.zip_deleted', auditSubjectKeyId(plugin?.name ?? pluginId), 'plugin-package', {
       pluginId,
+      ...(plugin?.name ? { pluginName: plugin.name } : {}),
+      ...(plugin?.version ? { pluginVersion: plugin.version } : {}),
       restartRequested: 1,
     });
     if (actor) this.pluginService.requestRestart();
