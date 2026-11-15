@@ -62,10 +62,13 @@ function headingHtml(heading) {
 
 /** docsify 4.13.1 slugify: lowercases A-Z only, strips tags and ASCII punctuation, "_" before a leading digit. */
 function slugify(html) {
-  return html
-    .trim()
-    .replace(/[A-Z]+/g, (s) => s.toLowerCase())
-    .replace(/<[^>]+>/g, '')
+  let text = html.trim().replace(/[A-Z]+/g, (s) => s.toLowerCase());
+  // Strip tags until nothing changes, so a removal can never assemble a new tag.
+  for (let previous = ''; previous !== text; ) {
+    previous = text;
+    text = text.replace(/<[^>]+>/g, '');
+  }
+  return text
     .replace(/[\u2000-\u206F\u2E00-\u2E7F\\'!"#$%&()*+,./:;<=>?@[\]^`{|}~]/g, '')
     .replace(/\s/g, '-')
     .replace(/-+/g, '-')
