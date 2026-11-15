@@ -58,7 +58,11 @@ export function KeycloakDiscoveryDialog(props: Props) {
       close();
       toast.success({ title: t('success.title'), description: t('success.description') });
     } catch (error) {
-      toast.error({ title: t('error.title'), description: getDiscoveryErrorMessage(error) ?? t('error.unreachable') });
+      toast.error({
+        title: t('error.title'),
+        description: getDiscoveryErrorMessage(error) ?? t('error.unreachable'),
+        duration: 10000,
+      });
     } finally {
       setIsDiscovering(false);
     }

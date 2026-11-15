@@ -87,10 +87,12 @@ describe.each([
     await open();
     fill();
     fireEvent.click(screen.getByRole('button', { name: 'discover' }));
-    await waitFor(() => expect(state.error).toHaveBeenCalledWith({ title: 'error.title', description }));
+    await waitFor(() => expect(state.error).toHaveBeenCalledWith({ title: 'error.title', description, duration: 10000 }));
     expect(state.discovered).not.toHaveBeenCalled();
     expect(state.success).not.toHaveBeenCalled();
     expect(screen.getByLabelText('host')).toHaveValue('https://idp.example.test');
     expect(screen.getByRole('button', { name: 'discover' })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'discover' }));
+    await waitFor(() => expect(state.refetch).toHaveBeenCalledTimes(2));
   });
 });
