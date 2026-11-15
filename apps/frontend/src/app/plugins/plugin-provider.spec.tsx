@@ -82,7 +82,7 @@ function primeManifest(options: ManifestOptions = {}) {
 }
 
 beforeEach(() => {
-  usePluginState.setState({ plugins: [] });
+  usePluginState.setState({ plugins: [], isInitialized: false });
   hoisted.setRemoteMock.mockReset();
   hoisted.getRemoteMock.mockReset();
   hoisted.refetchMock.mockReset();
@@ -116,6 +116,30 @@ describe('PluginProvider', () => {
     );
 
     expect(screen.getByText('core route')).toBeInTheDocument();
+    expect(usePluginState.getState().isInitialized).toBe(false);
+  });
+
+  it('marks the plugins initialized only after the remote modules have loaded', async () => {
+    const { name } = primeManifest();
+    let finishRemote!: (module: { default: () => AttraccessFrontendPlugin }) => void;
+    hoisted.getRemoteMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishRemote = resolve;
+        }),
+    );
+
+    render(<PluginProvider />);
+    await waitFor(() => expect(hoisted.getRemoteMock).toHaveBeenCalled());
+    expect(usePluginState.getState().isInitialized).toBe(false);
+
+    finishRemote({
+      default: function () {
+        return createFakePlugin(name);
+      },
+    });
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
+    expect(usePluginState.getState().plugins).toHaveLength(1);
   });
 
   it('sets up the module-federation remote and loads the plugin into the store', async () => {
@@ -128,6 +152,7 @@ describe('PluginProvider', () => {
     );
 
     await waitFor(() => expect(usePluginState.getState().plugins).toHaveLength(1));
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
 
     expect(hoisted.setRemoteMock).toHaveBeenCalledWith(name, expect.objectContaining({ format: 'esm', from: 'vite' }));
     expect(hoisted.getRemoteMock).toHaveBeenCalledWith(name, './plugin');
@@ -284,6 +309,8 @@ describe('PluginProvider', () => {
     );
 
     await waitFor(() => expect(consoleError).toHaveBeenCalled());
+    // A failed plugin still ends the first load, so its pinned pages can be shown as inaccessible.
+    await waitFor(() => expect(usePluginState.getState().isInitialized).toBe(true));
     expect(usePluginState.getState().plugins).toHaveLength(0);
     expect(screen.getByText('app-shell')).toBeInTheDocument();
   });

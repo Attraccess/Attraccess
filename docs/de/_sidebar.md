@@ -130,6 +130,7 @@
   - [Anmeldung](end-user/login.md)
   - [Mein Konto](end-user/account.md)
   - [Ressourcen nutzen](end-user/using-resources.md)
+  - [Dashboard](end-user/dashboard.md)
   - [Mobile Nutzung (PWA)](end-user/mobile-pwa.md)
 
 - **FAQ & Hilfe**

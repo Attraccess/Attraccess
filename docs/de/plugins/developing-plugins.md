@@ -30,6 +30,28 @@ Ein Frontend-Plugin kann:
 > [!TIP]
 > Lesen Sie die SDK-Dokumentation, die mit `@attraccess/plugins-frontend-sdk` mitgeliefert wird, für eine detaillierte API-Referenz, Beispiele und Typdefinitionen.
 
+### Dashboard-Pins
+
+Benutzer können Seiten mit dem Stern in der Seitenkopfzeile an ihr persönliches
+Dashboard anheften. Plugin-Seiten sind nur anheftbar, wenn das Plugin es
+erlaubt: Listen Sie die Pfade der Seitenleiste in `attraccess.dashboardPaths`
+in `package.json` (bzw. `main.frontend.dashboardPaths` in `plugin.json`) auf:
+
+```json
+"dashboardPaths": ["/my-plugin/tools"]
+```
+
+Jeder Pfad muss auch von `getSidebarItems()` und `getRoutes()` geliefert
+werden, aus einfachen Segmenten bestehen und außerhalb von `/kiosk` und
+`/dashboard` liegen. Die API lehnt Pins für Pfade ab, die kein aktives Plugin
+auflistet. Der Host zeigt den Stern im ersten `PageHeader` aus
+`@attraccess/plugins-frontend-ui` auf der Seite; rendern Sie also einen als
+Seitentitel, weiterer Code ist nicht nötig. Die Dashboard-Karte verwendet
+Beschriftung und Symbol Ihres Seitenleisteneintrags, und die Berechtigungen der
+Route entscheiden, ob der Benutzer sie öffnen darf. Verliert ein Benutzer den
+Zugriff oder ist Ihr Plugin deaktiviert bzw. listet den Pfad nicht mehr, wird
+die Karte als nicht mehr zugänglich angezeigt, bis der Benutzer sie entfernt.
+
 ### Slots (eingebettete Erweiterungspunkte)
 
 Neben eigenen Routen kann ein Frontend-Plugin über `getSlotContributions()` UI **in** Host-Seiten einbetten. Jeder

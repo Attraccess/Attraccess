@@ -35,6 +35,10 @@
     "frontend": "frontend/remoteEntry.js",
     "migrations": "dist/migrations.js",
     "styles": "frontend/style.css",
+    "dashboardPaths": [
+      "/reservations",
+      "/reservations/manage"
+    ],
     "permissions": [
       "DATABASE_ACCESS",
       "ACCESS_HOOKS",

@@ -78,6 +78,36 @@ export function usePluginSidebarContributions() {
   return { pluginNavItems, pluginNavGroups };
 }
 
+/**
+ * Whether the user may open a navigation entry: the route behind its path is public, or the user meets the route's
+ * auth requirement. The dashboard uses the same check to decide whether a pinned page is still accessible.
+ */
+export function useShowNavItem() {
+  const { user, hasPermission } = useAuth();
+  const routes = useAllRoutes();
+
+  return useCallback(
+    (item: Pick<SidebarItem, 'path'>) => {
+      const routeOfItem = routes.find((route) => route.path === item.path);
+
+      if (!routeOfItem?.authRequired) {
+        return true;
+      }
+
+      if (!user) {
+        return false;
+      }
+
+      if (routeOfItem?.authRequired === true) {
+        return true;
+      }
+
+      return hasRequiredPermissions(routeOfItem.authRequired, hasPermission);
+    },
+    [user, hasPermission, routes],
+  );
+}
+
 export interface CollapsedGroupDropdownProps {
   label: string;
   icon: React.ReactNode;
@@ -122,7 +152,6 @@ export function useSidebarState({ isOpen, toggleSidebar, isCollapsed, toggleColl
     logoutPendingLabel,
     logoutProviderNotice,
     user,
-    hasPermission,
   } = useAuth();
   const { t, language, setLanguage } = useTranslations({
     en,
@@ -146,31 +175,11 @@ export function useSidebarState({ isOpen, toggleSidebar, isCollapsed, toggleColl
     setIsSettingsMenuOpen(isOpen);
   };
 
-  const routes = useAllRoutes();
   const sidebarItems = useSidebarItems();
 
   const { pluginNavItems, pluginNavGroups } = usePluginSidebarContributions();
 
-  const showNavItem = useCallback(
-    (item: Pick<SidebarItem, 'path'>) => {
-      const routeOfItem = routes.find((route) => route.path === item.path);
-
-      if (!routeOfItem?.authRequired) {
-        return true;
-      }
-
-      if (!user) {
-        return false;
-      }
-
-      if (routeOfItem?.authRequired === true) {
-        return true;
-      }
-
-      return hasRequiredPermissions(routeOfItem.authRequired, hasPermission);
-    },
-    [user, hasPermission, routes],
-  );
+  const showNavItem = useShowNavItem();
 
   // Get navigation items from routes that have sidebar config
   const navigationGroups: NavigationGroup[] = useMemo(() => {

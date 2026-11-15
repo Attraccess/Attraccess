@@ -13,7 +13,8 @@
     "frontend": {
       "directory": "frontend",
       "entryPoint": "remoteEntry.js",
-      "styles": "style.css"
+      "styles": "style.css",
+      "dashboardPaths": ["/shelly"]
     }
   },
   "attraccessVersion": {

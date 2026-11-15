@@ -18,6 +18,7 @@
   "groups": {
     "##default##": {
       "items": {
+        "dashboard": "Dashboard",
         "resources": "Resources",
         "projects": "Projects",
         "messages": "Messages",

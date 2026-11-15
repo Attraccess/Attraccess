@@ -66,6 +66,7 @@ keyword and an `attraccess` object:
     "backend": "dist/index.js",
     "frontend": "frontend/remoteEntry.js",
     "styles": "frontend/style.css",
+    "dashboardPaths": ["/hello-world"],
     "permissions": ["READ_USERS", "LISTEN_EVENTS"],
     "sdk": { "backend": "^1.9.0", "frontend": "^1.9.0" }
   }
@@ -78,6 +79,7 @@ keyword and an `attraccess` object:
 | `version`                                    | yes          | Your plugin's semantic version.                                                                        |
 | `attraccess.backend` / `attraccess.frontend` | at least one | Relative package entry point.                                                                          |
 | `attraccess.styles`                          | no           | Stylesheet alongside the frontend entry point.                                                         |
+| `attraccess.dashboardPaths`                  | no           | Sidebar paths users may pin to their dashboard. See [Dashboard pins](#dashboard-pins).                |
 | `attraccess.migrations`                      | no           | Module exporting TypeORM migration classes. See [Database Migrations](plugins/database-migrations.md). |
 | `attraccess.host`                            | yes          | Compatible Attraccess host semver range.                                                               |
 | `attraccess.permissions`                     | no           | Backend capabilities you need (see [Permissions](#backend-plugin-permissions)). Defaults to `[]`.      |
@@ -1055,6 +1057,27 @@ The host collects all group declarations before placing entries. A plugin may
 also reference a group declared only by another plugin, but should declare the
 group itself if it needs to work independently. Without any declaration, the
 existing root fallback applies.
+
+### Dashboard pins
+
+Users can pin pages to their personal dashboard with the star in the page
+header. Plugin pages are pinnable only when the plugin opts in: list the
+sidebar paths in `attraccess.dashboardPaths` in `package.json` (or
+`main.frontend.dashboardPaths` in `plugin.json`):
+
+```json
+"dashboardPaths": ["/my-plugin/tools"]
+```
+
+Each path must also be returned by `getSidebarItems()` and `getRoutes()`, made
+of plain segments, and outside `/kiosk` and `/dashboard`. The API refuses pins
+for paths no active plugin lists. The host shows the star in the first
+`PageHeader` from `@attraccess/plugins-frontend-ui` on that page, so render one
+as your page title; you need no other code. The dashboard card uses your
+sidebar entry's label and icon, and its route permissions decide whether the
+user may open it. When a user loses access, or your plugin is disabled or no
+longer lists the path, the card is shown as no longer accessible until the
+user removes it.
 
 ### Slots (embedded extension points)
 

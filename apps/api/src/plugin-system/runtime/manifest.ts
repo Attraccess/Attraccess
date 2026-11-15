@@ -22,6 +22,14 @@ export class PluginMainFrontend {
     required: false,
   })
   styles?: string;
+  @ApiProperty({
+    description:
+      'Sidebar route paths of the plugin that users may pin to their dashboard. Each must also be a path returned by getSidebarItems() and getRoutes().',
+    example: ['/hello-world'],
+    required: false,
+    type: [String],
+  })
+  dashboardPaths?: string[];
 }
 
 export class PluginMainBackend {

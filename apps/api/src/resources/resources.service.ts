@@ -1,4 +1,10 @@
-import { Resource, ResourceFlowEdge, ResourceFlowNode, SupervisionMode } from '@attraccess/database-entities';
+import {
+  DashboardPin,
+  Resource,
+  ResourceFlowEdge,
+  ResourceFlowNode,
+  SupervisionMode,
+} from '@attraccess/database-entities';
 
 import { Inject, Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 
@@ -477,6 +483,8 @@ export class ResourcesService {
     if (result.affected === 0) {
       throw new ResourceNotFoundException(id);
     }
+    // A soft delete keeps the row, so the database cannot cascade to the dashboard pins of the resource.
+    await this.resourceRepository.manager.delete(DashboardPin, { itemType: 'resource', itemId: String(id) });
 
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(id));
     this.metricsService.resourcesTotal.dec();

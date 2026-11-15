@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { PageHeader } from './index';
+import { PageHeader, PageHeaderAccessoryProvider } from './index';
 
 vi.mock('../../i18n', () => ({
   useTranslations: () => ({ t: (key: string) => (key === 'more' ? 'More actions' : key), language: 'en' }),
@@ -78,5 +78,56 @@ describe('PageHeader', () => {
 
     renderAt(<PageHeader title="Devices" actions={[{ key: 'add', label: 'Add device', onPress, isHidden: true }]} />);
     expect(screen.queryByRole('button', { name: 'Add device' })).toBeNull();
+  });
+});
+
+describe('PageHeader host accessory', () => {
+  const Pin = () => <button type="button">Pin page</button>;
+
+  it('shows the accessory once, in the first header of the page', () => {
+    renderAt(
+      <PageHeaderAccessoryProvider accessory={Pin}>
+        <PageHeader title="Devices" />
+        <section>
+          <PageHeader title="Active devices" noMargin />
+        </section>
+      </PageHeaderAccessoryProvider>,
+    );
+
+    const buttons = screen.getAllByRole('button', { name: 'Pin page' });
+    expect(buttons).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'Devices' }).closest('[class*="justify-between"]')).toContainElement(
+      buttons[0],
+    );
+  });
+
+  it('moves the accessory to the next header when the first one unmounts', () => {
+    const { rerender } = renderAt(
+      <PageHeaderAccessoryProvider accessory={Pin}>
+        <PageHeader title="Loading" />
+        <PageHeader title="Section" />
+      </PageHeaderAccessoryProvider>,
+    );
+    rerender(
+      <MemoryRouter initialEntries={['/current']}>
+        <Routes>
+          <Route
+            path="/current"
+            element={
+              <PageHeaderAccessoryProvider accessory={Pin}>
+                <PageHeader title="Section" />
+              </PageHeaderAccessoryProvider>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByRole('button', { name: 'Pin page' })).toHaveLength(1);
+  });
+
+  it('renders no accessory without a provider', () => {
+    renderAt(<PageHeader title="Devices" />);
+    expect(screen.queryByRole('button', { name: 'Pin page' })).toBeNull();
   });
 });

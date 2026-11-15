@@ -1,0 +1,30 @@
+{
+  "title": "Dashboard",
+  "subtitle": "Ihre angehefteten Seiten und Ressourcen",
+  "empty": {
+    "title": "Noch nichts angeheftet",
+    "description": "Öffnen Sie eine Seite oder eine Ressource und wählen Sie den Stern in ihrer Kopfzeile, um sie hier anzuheften. Sobald Sie etwas angeheftet haben, wird das Dashboard auch Ihre Startseite.",
+    "browseResources": "Ressourcen durchsuchen"
+  },
+  "loadError": {
+    "title": "Ihr Dashboard konnte nicht geladen werden",
+    "description": "Ihre angehefteten Seiten und Ressourcen konnten nicht geladen werden. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+    "retry": "Erneut versuchen"
+  },
+  "pin": {
+    "add": "An Dashboard anheften",
+    "remove": "Vom Dashboard lösen",
+    "saveError": "Ihr Dashboard konnte nicht gespeichert werden. Bitte versuchen Sie es erneut."
+  },
+  "card": {
+    "dragHandle": "{{title}} verschieben",
+    "unpin": "{{title}} lösen",
+    "open": "Öffnen",
+    "openResource": "{{title}} öffnen",
+    "unavailable": "Nicht mehr zugänglich",
+    "unavailableDescription": "Sie können diese Seite nicht mehr öffnen. Möglicherweise wurde die Berechtigung entzogen oder das Plugin ist nicht verfügbar.",
+    "remove": "Pin entfernen",
+    "removeLabel": "Pin {{title}} entfernen"
+  },
+  "reorderError": "Die neue Reihenfolge konnte nicht gespeichert werden. Ihr Dashboard zeigt wieder die gespeicherte Reihenfolge."
+}

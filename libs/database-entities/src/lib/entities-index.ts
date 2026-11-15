@@ -31,6 +31,7 @@ export { Form, FormField, FormFieldType, FormSubmission, ResourceFormAction } fr
 export { Message, MessageReferenceType } from './entities/message.entity';
 export { MqttServer } from './entities/mqttServer.entity';
 export { NotificationPreference } from './entities/notification-preference.entity';
+export { DashboardPin, type DashboardPinItemType } from './entities/dashboard-pin.entity';
 export { Passkey, PasskeyChallenge } from './entities/passkey.entity';
 export { PasswordHistory } from './entities/password-history.entity';
 export {
@@ -171,6 +172,7 @@ import { Form, FormField, FormSubmission } from './entities/form';
 import { Message } from './entities/message.entity';
 import { MqttServer } from './entities/mqttServer.entity';
 import { NotificationPreference } from './entities/notification-preference.entity';
+import { DashboardPin } from './entities/dashboard-pin.entity';
 import { Passkey, PasskeyChallenge } from './entities/passkey.entity';
 import { PasswordHistory } from './entities/password-history.entity';
 import { PasswordPolicyOverride } from './entities/password-policy-override.entity';
@@ -275,6 +277,7 @@ export const entities = {
   ConversationParticipant,
   Message,
   NotificationPreference,
+  DashboardPin,
   PushSubscription,
   Passkey,
   PasskeyChallenge,

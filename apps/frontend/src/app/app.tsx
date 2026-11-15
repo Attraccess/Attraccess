@@ -8,7 +8,7 @@ import { ToastProvider } from '../components/toastProvider';
 import { I18nProvider, RouterProvider, Spinner } from '@heroui/react';
 import PullToRefresh from 'react-simple-pull-to-refresh';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { PageHeaderAccessoryProvider, useTranslations } from '@attraccess/plugins-frontend-ui';
 import de from './app.de.json';
 import en from './app.en.json';
 import { usePtrStore } from '../stores/ptr.store';
@@ -21,6 +21,8 @@ import { PwaUpdateIndicator } from '../pwa-update/PwaUpdateIndicator';
 import { ThemeToggle } from '../components/themeToggle';
 import { SessionBillingSummary } from './billing/sessionSummary/index';
 import { Layout } from './layout/layout';
+import { DashboardPinHeaderAccessory } from './dashboard/DashboardPinToggle';
+import { PinnablePagesProvider } from './dashboard/pinnablePages';
 import { useAllRoutes } from './routes/index';
 import { VerifyEmail } from './verify-email/index';
 import { ResetPassword } from './reset-password/resetPassword';
@@ -132,7 +134,12 @@ export function AppRoutes() {
       <Route
         element={
           <Layout>
-            <Outlet />
+            {/* Page headers inside the app layout get the dashboard pin. Kiosk routes have no layout. */}
+            <PinnablePagesProvider>
+              <PageHeaderAccessoryProvider accessory={DashboardPinHeaderAccessory}>
+                <Outlet />
+              </PageHeaderAccessoryProvider>
+            </PinnablePagesProvider>
           </Layout>
         }
       >

@@ -16,6 +16,7 @@ const validPackage = {
     frontend: 'frontend/remoteEntry.js',
     migrations: 'dist/migrations.js',
     styles: 'frontend/style.css',
+    dashboardPaths: ['/plugin-report'],
     permissions: [PluginPermission.DATABASE_ACCESS],
     sdk: { backend: '^1.9.0', frontend: '^1.9.0' },
   },
@@ -30,9 +31,25 @@ describe('parseNpmPluginPackage', () => {
       permissions: [PluginPermission.DATABASE_ACCESS],
       main: {
         backend: { directory: 'dist', entryPoint: 'index.js' },
-        frontend: { directory: 'frontend', entryPoint: 'remoteEntry.js', styles: 'style.css' },
+        frontend: {
+          directory: 'frontend',
+          entryPoint: 'remoteEntry.js',
+          styles: 'style.css',
+          dashboardPaths: ['/plugin-report'],
+        },
       },
     });
+  });
+
+  it('rejects dashboard paths outside plain sidebar routes', () => {
+    for (const path of ['/kiosk/companion', '/dashboard', 'plugin-report', '/plugin/../admin']) {
+      expect(() =>
+        parseNpmPluginPackage(
+          { ...validPackage, attraccess: { ...validPackage.attraccess, dashboardPaths: [path] } },
+          '1.9.0',
+        ),
+      ).toThrow();
+    }
   });
 
   it('accepts unrelated standard npm package manifest fields', () => {

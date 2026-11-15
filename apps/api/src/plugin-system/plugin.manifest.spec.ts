@@ -30,7 +30,38 @@ describe('PluginManifestSchema migrations entry', () => {
       PluginManifestSchema.parse({
         ...BASE,
         main: { ...BASE.main, migrations: { directory: 'dist' } },
-      })
+      }),
     ).toThrow();
+  });
+});
+
+describe('PluginManifestSchema dashboard paths', () => {
+  const withDashboardPaths = (dashboardPaths: string[]) => ({
+    ...BASE,
+    main: { ...BASE.main, frontend: { ...BASE.main.frontend, dashboardPaths } },
+  });
+
+  it('accepts sidebar route paths', () => {
+    const parsed = PluginManifestSchema.parse(withDashboardPaths(['/plugin-report', '/reservations/manage']));
+    expect(parsed.main.frontend?.dashboardPaths).toEqual(['/plugin-report', '/reservations/manage']);
+  });
+
+  it('accepts a path that only starts like a reserved one', () => {
+    expect(PluginManifestSchema.parse(withDashboardPaths(['/kiosk-guide'])).main.frontend?.dashboardPaths).toEqual([
+      '/kiosk-guide',
+    ]);
+  });
+
+  it.each([
+    '/kiosk',
+    '/kiosk/companion',
+    '/dashboard',
+    '/dashboard/x',
+    'https://example.com',
+    '/foo/../bar',
+    '/',
+    '/a b',
+  ])('rejects %s', (path) => {
+    expect(() => PluginManifestSchema.parse(withDashboardPaths([path]))).toThrow();
   });
 });

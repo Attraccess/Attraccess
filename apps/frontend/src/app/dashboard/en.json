@@ -1,0 +1,30 @@
+{
+  "title": "Dashboard",
+  "subtitle": "Your pinned pages and resources",
+  "empty": {
+    "title": "Nothing pinned yet",
+    "description": "Open a page or a resource and select the star in its header to pin it here. Once you pin something, the dashboard also becomes your start page.",
+    "browseResources": "Browse resources"
+  },
+  "loadError": {
+    "title": "Could not load your dashboard",
+    "description": "Your pinned pages and resources could not be loaded. Check your connection and try again.",
+    "retry": "Retry"
+  },
+  "pin": {
+    "add": "Pin to dashboard",
+    "remove": "Unpin from dashboard",
+    "saveError": "Your dashboard could not be saved. Please try again."
+  },
+  "card": {
+    "dragHandle": "Reorder {{title}}",
+    "unpin": "Unpin {{title}}",
+    "open": "Open",
+    "openResource": "Open {{title}}",
+    "unavailable": "No longer accessible",
+    "unavailableDescription": "You can no longer open this page. Its permission may have been removed or its plugin is not available.",
+    "remove": "Remove pin",
+    "removeLabel": "Remove pin {{title}}"
+  },
+  "reorderError": "The new order could not be saved. Your dashboard shows the saved order again."
+}
