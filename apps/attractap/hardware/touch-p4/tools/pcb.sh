@@ -84,11 +84,29 @@ finish_routing() {
     drc
 }
 
+export_fab() { (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" export_fab.py); }
+
+# The JLCPCB package in git must be the one this board gives. The export leaves out dates, so an
+# unchanged board gives byte-identical files.
+check_package() {
+    export_fab >/dev/null
+    local stale
+    stale="$(git -C "$PCB_ROOT" diff --name-only -- fab/jlcpcb
+             git -C "$PCB_ROOT" ls-files --others --exclude-standard -- fab/jlcpcb)"
+    if [[ -n "$stale" ]]; then
+        echo "$stale" >&2
+        echo "pcb.sh: fab/jlcpcb did not match the board. Add and commit the files the export just wrote." >&2
+        return 1
+    fi
+    echo "fab/jlcpcb matches the board"
+}
+
 case "${1:-}" in
     erc) erc ;;
     drc) drc ;;
     check-netlist) check_netlist ;;
-    export) (cd "$PCB_ROOT/scripts" && "${KICAD_PYTHON:-python3}" export_fab.py) ;;
+    export) export_fab ;;
+    check-package) check_package ;;
     render) render ;;
     # The three generator steps overwrite the KiCad files. See scripts/bootstrap/README.md.
     generate-library) shift; bootstrap make_lib.py "$@" ;;
@@ -96,6 +114,6 @@ case "${1:-}" in
     place) bootstrap build_pcb.py place && bootstrap check_overlap.py ;;
     route) autoroute && finish_routing ;;
     route-finish) finish_routing ;;
-    *) echo "Usage: $0 erc|drc|check-netlist|export|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
+    *) echo "Usage: $0 erc|drc|check-netlist|check-package|export|render|generate-library <dir>|generate-schematic|place|route|route-finish" >&2
        exit 1 ;;
 esac

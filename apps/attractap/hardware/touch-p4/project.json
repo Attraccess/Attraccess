@@ -50,9 +50,17 @@
         "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh drc"
       }
     },
+    "check-package": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "parallelism": false,
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh check-package"
+      }
+    },
     "check": {
       "executor": "nx:noop",
-      "dependsOn": ["test", "erc", "check-netlist", "drc"]
+      "dependsOn": ["test", "erc", "check-netlist", "drc", "check-package"]
     },
     "build": {
       "executor": "nx:run-commands",
@@ -62,8 +70,7 @@
       "inputs": ["{projectRoot}/kicad/**/*", "{projectRoot}/tools/**/*", "{projectRoot}/scripts/export_fab.py"],
       "outputs": [
         "{projectRoot}/fab/gerbers",
-        "{projectRoot}/fab/wifi",
-        "{projectRoot}/fab/lan",
+        "{projectRoot}/fab/jlcpcb",
         "{projectRoot}/fab/*.pdf",
         "{projectRoot}/fab/*.csv"
       ],

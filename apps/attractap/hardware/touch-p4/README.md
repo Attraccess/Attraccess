@@ -74,12 +74,12 @@ The board is the Nx project `attractap-touch-p4-pcb`. Every operation is a targe
 | Command | What it does |
 |---|---|
 | `pnpm nx run attractap-touch-p4-pcb:setup-toolchain` | Checks KiCad 10 and its Python, downloads the autorouter into `.tools/kicad`. Run once. |
-| `pnpm nx run attractap-touch-p4-pcb:check` | All checks below. Run before ordering. |
+| `pnpm nx run attractap-touch-p4-pcb:check` | All checks below, and that `fab/jlcpcb/` matches the board. Run before ordering. |
 | `pnpm nx run attractap-touch-p4-pcb:test` | Checks of the circuit description and of the I2C address check. Needs no KiCad. |
 | `pnpm nx run attractap-touch-p4-pcb:erc` | Electrical rules check of the schematic. |
 | `pnpm nx run attractap-touch-p4-pcb:check-netlist` | Schematic against the circuit description; devices and addresses on each I2C bus. |
 | `pnpm nx run attractap-touch-p4-pcb:drc` | Design rules check of the board, including schematic parity. |
-| `pnpm nx run attractap-touch-p4-pcb:build` | Manufacturing files into `fab/` (ignored by git). Runs `erc` and `drc` first. |
+| `pnpm nx run attractap-touch-p4-pcb:build` | Manufacturing files into `fab/`, with the JLCPCB upload package in `fab/jlcpcb/`. Runs `erc` and `drc` first. |
 | `pnpm nx run attractap-touch-p4-pcb:render` | `fab/render-top.png` and `fab/render-bottom.png`. |
 
 Reports go to `fab/reports/`. The targets find KiCad on the PATH, in the macOS app bundle or, on
@@ -91,11 +91,41 @@ project from the circuit description and overwrite the KiCad files; see
 (`kicad/attractap-touch-p4.ses`) is committed, so `place` followed by `route-finish` gives the
 committed board again.
 
-`fab/gerbers/` goes to the PCB order (zip it). `fab/board-front.pdf` is the
-assembly drawing with the reference designators (the silkscreen has none). `fab/wifi/` and `fab/lan/` each
-hold `bom.csv`, `bom-external-antenna.csv` and `cpl.csv` in JLCPCB's format. Check part rotation in
-JLCPCB's placement preview, in particular the diodes D101 to D107, C103, Q701
-and the LEDs.
+### Ordering at JLCPCB
+
+`build` writes the upload package to `fab/jlcpcb/`. That folder is in git, so the files of an order
+can be found again; `check` fails when it does not match the board.
+
+| File | Use |
+|---|---|
+| `attractap-touch-p4-gerbers.zip` | The PCB order: Gerber and drill files. |
+| `bom-lan.csv`, `cpl-lan.csv` | Assembly of the Ethernet/PoE version: parts list and positions. |
+| `bom-wifi.csv`, `cpl-wifi.csv` | Assembly of the Wi-Fi version. |
+| `bom-*-external-antenna.csv` | The same parts lists with the Wi-Fi module that has an antenna connector. |
+
+`fab/board-front.pdf` (not in git) is the assembly drawing with the reference designators; the
+silkscreen has none.
+
+What the board needs, for the order form:
+
+| | |
+|---|---|
+| Board | 4 layers, 86 x 143.5 mm, 1.6 mm FR-4 |
+| Smallest track and gap | 0.11 mm and 0.127 mm |
+| Smallest via | 0.45 mm pad with 0.2 mm hole |
+| Milled openings | flex slot 3 mm wide, eight LED windows 3.4 x 3.0 mm, two cut-away corners, plated slots at the DC jack and USB-C |
+| Surface finish | ENIG is the safe choice for the 0.35 mm pitch MCU and the 0.5 mm display connector |
+| Impedance control | not needed |
+| Assembly | top side only: 193 parts in 68 lines (Wi-Fi version), 228 parts in 78 lines (Ethernet/PoE version) |
+| Through-hole parts | DC jack J102, lever terminal J103, and on the Ethernet/PoE version the jack J401 |
+| Not assembled by JLCPCB | the display panel (taped on, flex plugged into J601) |
+
+Check before paying:
+
+- Stock. JLCPCB's parts list shows what it does not have. The ESP32-P4 (U201) had no stock at LCSC
+  in November 2026; see the sourcing risks in [docs/design-notes.md](docs/design-notes.md).
+- Rotation. Look at every polarised part in JLCPCB's placement preview, in particular the diodes D101
+  to D107, C103, Q701, the LEDs and the ICs. KiCad and JLCPCB do not always agree on what 0 degrees is.
 
 ### Parts and library
 
