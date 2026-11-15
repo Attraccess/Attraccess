@@ -11,7 +11,7 @@ cd apps/attractap-lab/real-cards
 ```
 
 Needs ESP-IDF (found in `.tools/esp-idf` or already sourced), the labgrid client with the lab place
-(`LG_PLACE_NAME`, default `attractap-touch-v2-1`), Node 24 and a C++17 compiler. Options: `--cards
+(`LG_PLACE_NAME`, default `attractap-touch-v2-1`), Node 26 and a C++17 compiler. Options: `--cards
 EV3,NTAG424` (subset), `--speak` (macOS `say` for each prompt). `READER_IMAGE` / `EMULATOR_IMAGE` skip
 the builds. `KEEP_API=1` leaves the API and the wire proxy running afterwards (the script prints how to
 stop them); `API_START_TIMEOUT` (default 120 s) bounds the wait for the API. Cards must be factory

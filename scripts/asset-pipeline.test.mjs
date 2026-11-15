@@ -246,6 +246,10 @@ test('CI discovers specialized tests and avoids repeating shared dependencies', 
   assert.throws(() => selectTests(fixtures, 'unknown'), /Unknown test group/);
 });
 
+// Nx 24 lists task dependencies as { id } objects.
+const dependsOn = (taskGraph, task, dependency) =>
+  taskGraph.dependencies[task].some((entry) => (entry.id ?? entry) === dependency);
+
 test('WAGO frontend typechecks generate the API client before compiling shared plugin UI', () => {
   const selected = createTaskGraph(
     graph,
@@ -256,14 +260,14 @@ test('WAGO frontend typechecks generate the API client before compiling shared p
     {},
   );
   for (const target of ['typecheck-frontend-tests', 'test-typecheck-frontend-gate']) {
-    assert.ok(selected.dependencies[`plugin-wago:${target}`].includes('react-query-client:generate'));
+    assert.ok(dependsOn(selected, `plugin-wago:${target}`, 'react-query-client:generate'));
   }
 });
 
 // The SDK drops its graph edge to plugins-frontend-ui (see its project.json), so nothing else orders this.
 test('plugin SDK typecheck generates the API client before compiling shared plugin UI', () => {
   const selected = createTaskGraph(graph, {}, ['plugins-frontend-sdk'], ['typecheck'], undefined, {});
-  assert.ok(selected.dependencies['plugins-frontend-sdk:typecheck'].includes('react-query-client:generate'));
+  assert.ok(dependsOn(selected, 'plugins-frontend-sdk:typecheck', 'react-query-client:generate'));
 });
 
 test('ESP-IDF projects are scope:hardware, so toolchain-free CI runs skip them', () => {

@@ -40,6 +40,13 @@
       "enabled": false
     },
     {
+      "description": "Node 24 and later publish no linux/arm/v7 image, so the CC100 runtime stays on Node 22",
+      "matchDatasources": ["docker"],
+      "matchDepNames": ["node"],
+      "matchFileNames": ["apps/plugins/wago/cc100-runtime/Dockerfile"],
+      "allowedVersions": "<23"
+    },
+    {
       "description": "Auto-merge patch-level Docker updates",
       "matchDatasources": ["docker"],
       "matchUpdateTypes": ["patch", "digest"],

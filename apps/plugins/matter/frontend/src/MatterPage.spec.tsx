@@ -274,8 +274,10 @@ describe('MatterPage polling', () => {
     await screen.findByText('Connected');
     const initial = api.getStatus.mock.calls.length;
     api.getStatus.mockReturnValue(new Promise(() => undefined));
+    // The next tick starts the hung request and the one after it is skipped. Stop before the request's timeout,
+    // which falls due together with a later tick, so the result does not depend on timer ordering.
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 3);
+      await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 2 - 1);
     });
     expect(api.getStatus.mock.calls.length).toBe(initial + 1);
     // The hung request times out, so polling resumes instead of stopping for good.

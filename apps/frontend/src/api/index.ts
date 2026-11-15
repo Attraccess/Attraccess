@@ -11,7 +11,7 @@ function normalizeUrl<TUrl extends string | undefined>(url: TUrl): TUrl {
     normalizedUrl = `http://${normalizedUrl}`;
   }
 
-  const parsedUrl = new URL(url);
+  const parsedUrl = new URL(normalizedUrl);
 
   if (!parsedUrl.protocol) {
     parsedUrl.protocol = 'http:';

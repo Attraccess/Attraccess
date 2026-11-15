@@ -4,7 +4,7 @@ import * as path from 'path';
 
 const ROOT = path.resolve(__dirname, '..', '..', '..');
 
-const EXPECTED_NODE_MAJOR = 24;
+const EXPECTED_NODE_MAJOR = 26;
 
 function readFile(relativePath: string): string {
   return fs.readFileSync(path.join(ROOT, relativePath), 'utf-8').trim();

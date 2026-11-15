@@ -129,7 +129,7 @@ jobs:
           # shellcheck disable=SC2086
           pnpm nx run attractap-lab:hil -- $PYTEST_ARGS
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: attractap-lab-hil-${{ matrix.variant }}-${{ matrix.profile }}-${{ github.run_id }}

@@ -2,17 +2,16 @@ import { fileURLToPath } from 'node:url';
 import { configDefaults, coverageConfigDefaults, defineConfig } from 'vitest/config';
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
-import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 
 export default defineConfig({
   plugins: [
-    react(),
     // No React Compiler here: its source maps omit function columns, which the
     // crap-score target needs to match coverage to source complexity. The app
     // build still compiles with it.
-    nxViteTsPaths(),
+    react(),
   ],
   resolve: {
+    tsconfigPaths: true,
     alias: {
       'virtual:__federation__': path.join(__dirname, 'src/test-utils/federation-stub.ts'),
       'virtual:pwa-register': path.join(__dirname, 'src/test-utils/pwa-register-stub.ts'),

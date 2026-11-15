@@ -48,7 +48,7 @@ apps/cesentry
 apps/plugins/wago/runtime-assets
 !apps/plugins/wago/runtime-assets/cc100-build
 !apps/plugins/wago/runtime-assets/cc100-build/**
-!.npmrc
+!pnpm-workspace.yaml
 .cursor
 .github
 .husky

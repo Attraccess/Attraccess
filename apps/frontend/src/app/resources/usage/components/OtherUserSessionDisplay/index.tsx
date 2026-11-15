@@ -133,7 +133,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
 
   const runTakeover = useCallback(
     async (body: { notes?: string }) => {
-      let formSubmissions: FormSubmissionRequestDto[] = [];
+      let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('takeover');
       } catch (error) {
@@ -154,7 +154,7 @@ export function useOtherUserSessionDisplayState({ resourceId }: OtherUserSession
       // started next.
       const usageId = activeSession?.id;
       if (usageId === undefined) return;
-      let formSubmissions: FormSubmissionRequestDto[] = [];
+      let formSubmissions: FormSubmissionRequestDto[];
       try {
         formSubmissions = await requestForms('end');
       } catch (error) {

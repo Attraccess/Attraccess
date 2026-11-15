@@ -269,14 +269,20 @@ test('the CI affected command rejects and then accepts a controlled function', {
     spawnSync(command, args, {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...gitEnv, NX_DAEMON: 'false', NX_SKIP_NX_CACHE: 'true' },
+      // The assertions read failure output inline; Nx 24 only prints log file paths when it detects an AI agent.
+      env: {
+        ...gitEnv,
+        NX_DAEMON: 'false',
+        NX_SKIP_NX_CACHE: 'true',
+        NX_DEFAULT_OUTPUT_STYLE: 'static-failures-only',
+      },
     });
   try {
     cpSync(path.join(workspace, 'scripts/crap-score'), path.join(directory, 'scripts/crap-score'), {
       recursive: true,
     });
     symlinkSync(path.join(workspace, 'node_modules'), path.join(directory, 'node_modules'), 'dir');
-    writeFileSync(path.join(directory, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/*'\n");
+    writeFileSync(path.join(directory, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/*'\nverifyDepsBeforeRun: false\n");
     const rootPackage = JSON.parse(readFileSync(path.join(workspace, 'package.json'), 'utf8'));
     writeFileSync(
       path.join(directory, 'package.json'),
@@ -328,6 +334,9 @@ test('the CI affected command rejects and then accepts a controlled function', {
       "import test from 'node:test';\nimport './source.mjs';\ntest('controlled source loads', () => {});\n",
     );
     setComplex(1);
+    // pnpm 12 records the pinned packageManager in a stub pnpm-lock.yaml on first use, which Nx cannot parse;
+    // commit a full lockfile like the real workspace has.
+    invoke('pnpm', ['install', '--lockfile-only']);
     git('init', '-q');
     git('config', 'user.email', 'test@example.com');
     git('config', 'user.name', 'Test');

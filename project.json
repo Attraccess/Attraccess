@@ -3,10 +3,12 @@
   "$schema": "node_modules/nx/schemas/project-schema.json",
   "targets": {
     "lint": {
-      "executor": "@nx/eslint:lint",
+      "executor": "nx:run-commands",
+      "cache": true,
       "dependsOn": ["check-llms-txt"],
       "options": {
-        "lintFilePatterns": ["*.{js,ts}", "docs/**/*.md"]
+        "command": "eslint --max-warnings=0 --no-error-on-unmatched-pattern \"*.{js,ts}\" \"docs/**/*.md\"",
+        "cwd": "."
       }
     },
     "local-registry": {

@@ -28,6 +28,7 @@ export class ValkeyClientService implements OnApplicationShutdown {
       });
     } catch (error) {
       // The URL error carries the whole URL, password included, in `input`; rethrow without it.
+      // eslint-disable-next-line preserve-caught-error -- attaching the cause would leak the password.
       throw new Error(
         `VALKEY_URL is not a valid URL (${describeValkeyError(error)}); percent-encode reserved characters in the password`,
       );

@@ -44,6 +44,7 @@ export class MqttSendMessageExecutor implements NodeExecutor {
 
       throw new Error(
         `Failed to publish MQTT message to topic '${topic}' on server ${serverId}: no error details were provided`,
+        { cause: error },
       );
     }
 

@@ -42,7 +42,10 @@
       "dependsOn": ["generate"],
       "options": {
         "cwd": "libs/react-query-client",
-        "command": "jest"
+        "command": "jest",
+        "env": {
+          "NODE_OPTIONS": "--experimental-vm-modules"
+        }
       }
     },
     "typecheck": {

@@ -8,19 +8,19 @@ runs:
   using: composite
   steps:
     - name: Download Linux companion binaries
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: companion-linux-${{ github.run_id }}
         path: apps/companion/dist
 
     - name: Download macOS companion binary
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: companion-macos-${{ github.run_id }}
         path: apps/companion/dist
 
     - name: Download Windows companion binary
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: companion-windows-${{ github.run_id }}
         path: apps/companion/dist
