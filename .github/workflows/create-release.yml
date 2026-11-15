@@ -94,17 +94,20 @@ jobs:
           pnpm nx run-many -t build --exclude="$exclude"
 
       # A dry run writes no versions, so publishing would re-pack the already released version; it stops before.
+      # `--skip-publish` answers nx's only prompt (publish confirmation), so no `--yes` is needed.
       - name: Run NX Release (dry run)
-        if: inputs.dry-run
+        if: ${{ inputs.dry-run && !inputs.publish-only }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: pnpm nx release ${{ inputs.specifier }} --dry-run --skip-publish
+          SPECIFIER: ${{ inputs.specifier }}
+        run: pnpm nx release "$SPECIFIER" --dry-run --skip-publish
 
       - name: Run NX Release
         if: ${{ !inputs.dry-run && !inputs.publish-only }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: pnpm nx release ${{ inputs.specifier }} --skip-publish
+          SPECIFIER: ${{ inputs.specifier }}
+        run: pnpm nx release "$SPECIFIER" --skip-publish
 
       # nx release publish packs dist/ as it is; rebuild so the packages carry the version just written.
       - name: Rebuild publishable libraries with the release version
@@ -113,6 +116,36 @@ jobs:
           exclude="$(node scripts/ci-nx-exclude.mjs build)"
           pnpm nx run-many -t build --exclude="$exclude"
 
+      # A late publish-only run must not move a dist-tag back from a newer release.
+      - name: Refuse to move dist-tags backwards
+        if: inputs.publish-only
+        env:
+          SPECIFIER: ${{ inputs.specifier }}
+        run: |
+          node -e '
+            const { execFileSync } = require("node:child_process");
+            const semver = require("semver");
+            const { SPECIFIER: version, RELEASE_NPM_TAG: tag } = process.env;
+            const projects = require("./nx.json").release.projects;
+            const ahead = [];
+            for (const project of projects) {
+              const { root } = JSON.parse(execFileSync("pnpm", ["-s", "nx", "show", "project", project, "--json"]));
+              const pkg = require(`./${root}/package.json`);
+              if (pkg.private) continue;
+              let current = "";
+              try {
+                current = execFileSync("npm", ["view", pkg.name, `dist-tags.${tag}`], { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+              } catch {}
+              if (current && semver.gt(current, version)) ahead.push(`${pkg.name}@${tag} is ${current}`);
+            }
+            if (ahead.length) {
+              console.error(`Not publishing ${version} to "${tag}": ${ahead.join(", ")}`);
+              process.exit(1);
+            }
+          '
+
       - name: Publish libraries
-        if: ${{ !inputs.dry-run }}
-        run: pnpm nx release publish --tag "$RELEASE_NPM_TAG"
+        if: ${{ !inputs.dry-run || inputs.publish-only }}
+        env:
+          DRY_RUN: ${{ inputs.dry-run && '--dry-run' || '' }}
+        run: pnpm nx release publish --tag "$RELEASE_NPM_TAG" $DRY_RUN
