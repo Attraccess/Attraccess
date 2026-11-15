@@ -122,13 +122,13 @@ export function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate 
                 <div className="min-w-0">
                   <p className="mb-1 text-xs text-muted">{t('before')}</p>
                   <pre className="whitespace-pre-wrap break-words font-sans">
-                    {change.before === undefined ? t('notRecorded') : displayValue(change.before)}
+                    {change.before === undefined ? t('notRecorded') : auditValue(change.field, change.before, t)}
                   </pre>
                 </div>
                 <div className="min-w-0">
                   <p className="mb-1 text-xs text-muted">{t('after')}</p>
                   <pre className="whitespace-pre-wrap break-words font-sans">
-                    {change.after === undefined ? t('notRecorded') : displayValue(change.after)}
+                    {change.after === undefined ? t('notRecorded') : auditValue(change.field, change.after, t)}
                   </pre>
                 </div>
               </Card.Content>
@@ -143,7 +143,7 @@ export function EntryDetails({ entry, t }: { entry: AuditEntryDto; t: Translate 
             {metadata.map(([key, value]) => (
               <div key={key} className="space-y-1">
                 <dt className="text-xs text-muted">{auditLabel('fields', key, t)}</dt>
-                <dd className="whitespace-pre-wrap break-words text-sm">{displayValue(value)}</dd>
+                <dd className="whitespace-pre-wrap break-words text-sm">{auditValue(key, value, t)}</dd>
               </div>
             ))}
           </dl>
@@ -172,6 +172,15 @@ export function actor(entry: AuditEntryDto, t: Translate) {
 
 export function auditLabel(section: 'events' | 'targets' | 'fields' | 'settingNames', value: string, t: Translate) {
   return Object.hasOwn(en[section], value) ? t(`${section}[${JSON.stringify(value)}]`) : humanize(value);
+}
+
+/** A recorded value, with known enumeration values (such as a meter's allocation) in the viewer's language. */
+export function auditValue(field: string, value: unknown, t: Translate) {
+  const name = field.replace(/^(before|after)\./, '');
+  const known: Record<string, Record<string, string>> = en.fieldValues;
+  return typeof value === 'string' && Object.hasOwn(known, name) && Object.hasOwn(known[name], value)
+    ? t(`fieldValues.${name}[${JSON.stringify(value)}]`)
+    : displayValue(value);
 }
 
 export function AuditEntryDrawer({ selected, onClose }: { selected: AuditEntryDto | null; onClose: () => void }) {

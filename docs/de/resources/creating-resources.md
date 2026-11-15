@@ -35,7 +35,7 @@ Standardmäßig kann eine Maschine jeweils von einer Person genutzt werden. Wenn
 Das Limit kann jederzeit gesenkt werden. Laufende Sitzungen werden nie automatisch beendet; neue Starts sind blockiert, bis weniger Sitzungen als das Limit aktiv sind. Liegt das neue Limit unter der Zahl der aktuell aktiven Sitzungen, zeigt die Einstellungsseite einen Hinweis an. Wird das Limit über 1 erhöht, erscheint außerdem eine Warnung zu Flows.
 
 > [!WARNING]
-> [Flows](flows/overview.md) und Abrechnung berücksichtigen nicht, wie viele Sitzungen laufen. Flows laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab. Zähler und Laufzeit werden nur einer einzigen Sitzung berechnet. Lesen Sie [Gemeinsam genutzte Maschinen](resources/usage-tracking.md#gemeinsam-genutzte-maschinen-parallele-sitzungen), bevor Sie parallele Sitzungen an einer Maschine mit Stromsteuerung oder Zählerabrechnung aktivieren.
+> [Flows](flows/overview.md) laufen bei jedem Sitzungsstart und -ende. Ein Flow, der beim Sitzungsende den Strom abschaltet, schaltet ihn daher für alle Nutzenden der Maschine ab, sofern er nicht die Anzahl aktiver Sitzungen prüft. Zähler und Laufzeit werden fair auf die Personen aufgeteilt, die die Maschine gleichzeitig nutzen; Nutzungsgebühr und Sitzungszeit bleiben pro Person. Lesen Sie [Gemeinsam genutzte Maschinen](resources/usage-tracking.md#gemeinsam-genutzte-maschinen-parallele-sitzungen), bevor Sie parallele Sitzungen an einer Maschine mit Stromsteuerung oder Zählerabrechnung aktivieren.
 
 ## Ressource bearbeiten
 

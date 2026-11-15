@@ -220,6 +220,7 @@
     "plugin.retry_requested": "Plugin retry requested",
     "billing.transaction.updated": "Billing transaction updated",
     "meter_charge.waived": "Meter charge waived",
+    "meter.updated": "Meter updated",
     "resource_flow.updated": "Resource flow updated",
     "flow.created": "Global flow created",
     "flow.updated": "Global flow updated",
@@ -427,7 +428,21 @@
     "before.enabled": "Enabled before",
     "after.enabled": "Enabled after",
     "before.description": "Description before",
-    "after.description": "Description after"
+    "after.description": "Description after",
+    "meterId": "Meter ID",
+    "meterName": "Meter name",
+    "creditsPerUnit": "Rate per measured value",
+    "allocation": "Allocation",
+    "before.creditsPerUnit": "Rate per measured value before",
+    "after.creditsPerUnit": "Rate per measured value after",
+    "before.allocation": "Allocation before",
+    "after.allocation": "Allocation after"
+  },
+  "fieldValues": {
+    "allocation": {
+      "shared": "Shared and split",
+      "per-session": "Measured per session"
+    }
   },
   "eventType": "Event type",
   "pluginId": "Integration ID",

@@ -21,7 +21,7 @@ You can combine the following options per resource:
 | **Credits per Usage**            | A flat number of credits charged for each usage session. The duration does not matter.                             |
 | **Credits per Minute**           | Credits charged for each started minute of the usage session.                                                      |
 | **Credits per Operating Minute** | Credits charged for each started minute of recorded machine operation attributed to the session. Defaults to zero. |
-| **Price per measured value**              | Optional price for each named meter. Defaults to zero. |
+| **Price per measured value**     | Optional price for each named meter. Defaults to zero.                                                             |
 
 > [!TIP]
 > The charges add together. For example: 10 credits per usage + 2 credits per session minute for a 30-minute session + 3 credits per operating minute for 10 minutes of machine operation = 10 + 60 + 30 = 100 credits, before the user's billing factor.
@@ -33,6 +33,15 @@ The fixed fee, both duration rates and the user's billing factor are saved when 
 ## Meter consumption
 
 Each named meter can have an optional price per measured value in the resource's billing settings. Multiple meters can be billed in one session. Names and rates are captured at session start; only session consumption is charged, while idle consumption remains part of lifetime metrics. A rate of zero keeps tracking active without charging.
+
+### Shared machines
+
+On machines that allow several parallel sessions, each meter has an **Allocation** setting in its meter settings:
+
+- **Shared and split** (default): the meter's consumption is split equally between the people active at the same time. Shares are kept exact and rounded once per time segment to whole credits, so the charged shares always add up to the segment total.
+- **Measured per session**: every session gets its own measuring point and is settled on its own.
+
+The mode is captured when a session starts; changes are recorded in the audit log. Operating time is always split between the people active at the same time, the same way and independent of this setting. The per-use fee and session time are never split. A billed meter that cannot be read on demand (increment-only) can be used by only one session at a time unless it is set to **Measured per session**. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines) for segments, rounding, failed readings and examples.
 
 See [Meters and consumption billing](flows/energy-metering.md) for flow setup, reporting modes, migration and settlement.
 

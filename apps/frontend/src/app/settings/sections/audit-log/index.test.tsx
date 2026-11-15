@@ -289,6 +289,34 @@ describe('audit admin workflows', () => {
     expect(within(dialog).getByText('Workshop admin')).toBeInTheDocument();
   });
 
+  it('shows a meter allocation change with its labels and allocation names', async () => {
+    list.mockResolvedValue({
+      items: [
+        {
+          ...entry,
+          action: 'meter.updated',
+          details: {
+            meterId: 4,
+            meterName: 'Energy',
+            'before.allocation': 'shared',
+            'after.allocation': 'per-session',
+          },
+        },
+      ],
+      nextCursor: null,
+    });
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Meter updated')).toBeInTheDocument();
+    expect(within(dialog).getByText('Allocation')).toBeInTheDocument();
+    expect(within(dialog).getByText('Meter name')).toBeInTheDocument();
+    expect(within(dialog).getByText('Allocation before')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Shared and split')).toHaveLength(2);
+    expect(within(dialog).getAllByText('Measured per session')).toHaveLength(2);
+    expect(within(dialog).queryByText('per-session')).not.toBeInTheDocument();
+  });
+
   it('returns from the older page without sending the invalid zero cursor', async () => {
     list.mockImplementation(async ({ beforeId }) => ({
       items: [{ ...entry, id: beforeId ? 50 : 52 }],

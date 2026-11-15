@@ -43,6 +43,10 @@
     "title": "Meter did not start",
     "description": "The session was not started because a billed meter could not be initialized: {{error}}"
   },
+  "METER_SHARING_UNSUPPORTED": {
+    "title": "Meter cannot be shared",
+    "description": "The session was not started: the meter \"{{error}}\" cannot be read on demand, so it cannot be shared while another session is running."
+  },
   "METER_SETTLEMENT_FAILED": {
     "title": "Meter reading still unavailable",
     "description": "{{error}}"
