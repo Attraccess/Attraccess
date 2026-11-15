@@ -69,7 +69,11 @@ struct ReaderWorkflow
       setQuality(State::NETWORK_QUALITY_GOOD);
     }
     static void setQuality(State::NetworkQuality quality) {
-        State::setNetworkQualityState(quality, 0, 0, 0, 0, 0, 0, 20, 20, 0, 0, 0, 0);
+        State::NetworkQualityState state;
+        state.quality = quality;
+        state.lastPongRttMs = 20;
+        state.averagePongRttMs = 20;
+        State::setNetworkQualityState(state);
     }
     void pump(uint32_t duration = 60) {
         const auto end = millis() + duration;
@@ -192,6 +196,7 @@ struct ReaderWorkflow
     bool drawerOpen() { return lv_obj_is_visible(requireLabel(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage()))); }
     void tapCard() { nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump(); }
     void testLocalization();
+    void testNetworkStatusTab();
     void testButtonErrors();
     void testFormErrors();
     void testTransientRouting();

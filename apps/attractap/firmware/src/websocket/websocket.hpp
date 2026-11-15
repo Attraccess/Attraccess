@@ -156,6 +156,8 @@ private:
     uint8_t missedHeartbeatEventNextIndex = 0;
     uint8_t pongRttSampleNextIndex = 0;
     uint32_t lastPongRttMs = 0;
+    // Stays set across reconnects: stale samples still age out of the averages.
+    bool hasPongRttSample = false;
     uint32_t lastPongProbeTime = 0;
     uint32_t pendingPongProbeTime = 0;
     uint32_t pendingPongProbeToken = 0;

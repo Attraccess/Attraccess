@@ -72,18 +72,44 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots)
         shot("pending-approval-removed");
         State::clearEnrollment();
 
-        // Connection settings: each tab, and the PIN lock in front of them.
+        // Connection settings: each tab, and the PIN lock in front of them. The Status tab
+        // (tab 4) shows a good connection, then a degraded one after its 1 s refresh.
+        State::NetworkQualityState quality;
+        quality.quality = State::NETWORK_QUALITY_GOOD;
+        quality.lastInboundAgeMs = 820;
+        quality.hasInboundMessage = true;
+        quality.lastPongRttMs = 24;
+        quality.averagePongRttMs = 31;
+        quality.pongRttTrendMs = -7;
+        quality.hasPongRttSample = true;
+        quality.hasCompletedPongProbe = true;
+        State::setNetworkQualityState(quality);
         auto &settings = Display::connectionConfigurationScreen;
         settings.enablePinLock();
         show(&settings, "settings-pin-lock");
         settings.disablePinLock();
         auto *tabs = findWidget(settings.getScreen(), &lv_tabview_class);
         assert(tabs);
-        for (uint32_t tab = 0; tab < 3; ++tab)
+        for (uint32_t tab = 0; tab < 4; ++tab)
         {
             lv_tabview_set_active(tabs, tab, LV_ANIM_OFF);
             shot("settings-tab-" + std::to_string(tab + 1));
         }
+        quality.quality = State::NETWORK_QUALITY_DEGRADED;
+        quality.lastInboundAgeMs = 6400;
+        quality.lastPongRttMs = 2140;
+        quality.averagePongRttMs = 1870;
+        quality.pongRttTrendMs = 1650;
+        quality.reconnectsLastMinute = 2;
+        quality.pongTimeoutsLastMinute = 3;
+        quality.pongProbeLossPercentLastMinute = 50;
+        State::setNetworkQualityState(quality);
+        SDL_Delay(1000);
+        shot("settings-tab-4-degraded");
+        assert(findLabel(settings.getScreen(), german ? "Eingeschränkt" : "Degraded"));
+        quality = {};
+        quality.quality = State::NETWORK_QUALITY_OFFLINE;
+        State::setNetworkQualityState(quality);
         settings.enablePinLock();
 
         // Firmware update, before the version is known, while it loads and when it is done.

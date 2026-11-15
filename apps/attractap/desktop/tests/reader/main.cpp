@@ -23,6 +23,7 @@ void runJourney(ReaderWorkflow &workflow, bool timeKnown)
     workflow.testCardRelay();
     workflow.testIdentityAndPendingAuthentication();
     workflow.testLocalization();
+    workflow.testNetworkStatusTab();
     longReaderName();
     workflow.testSessionSummary();
     workflow.testScreenOwnedUi();

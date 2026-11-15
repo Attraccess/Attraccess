@@ -11,6 +11,7 @@
 //   _keyboard.cpp  on-screen keyboard + text-area focus
 //   _save.cpp      save widgets, validation, save flow
 //   _pinlock.cpp   PIN-lock overlay + callbacks
+//   _status.cpp    Status tab: live connection health
 
 void ConnectionConfigurationScreen::init()
 {
@@ -44,6 +45,8 @@ void ConnectionConfigurationScreen::init()
    this->createApiTab(apiConfig);
 
    this->createDeviceTab(deviceConfig);
+
+   this->createStatusTab();
 
    this->pinLockOverlay = this->pinInputPage.init(FirmwareI18n::Message::UnlockWithPin, this->screen);
    lv_obj_add_flag(this->pinLockOverlay, LV_OBJ_FLAG_IGNORE_LAYOUT);
@@ -100,6 +103,11 @@ void ConnectionConfigurationScreen::destroy()
    this->devicePin = nullptr;
    this->labelForDevicePin = nullptr;
    this->beeperEnabled = nullptr;
+   for (lv_obj_t *&value : this->statusValues)
+   {
+      value = nullptr;
+   }
+   this->lastStatusRefreshMs = 0;
    this->wifiScanRequested = false;
    this->wifiScanCompleted = false;
    this->wifiDropdownHasNetworks = false;
