@@ -33,6 +33,7 @@ describe('single-use reset and verification tokens (integration)', () => {
   let users: UsersService;
   let auth: AuthService;
   let passwords: UserPasswordService;
+  let emailService: EmailService;
   let userCount = 0;
 
   beforeAll(async () => {
@@ -45,7 +46,7 @@ describe('single-use reset and verification tokens (integration)', () => {
     await source.runMigrations();
 
     const rbac = createMock<RbacService>({ getEffectivePermissions: async () => new Set<string>() });
-    const emailService = createMock<EmailService>();
+    emailService = createMock<EmailService>();
     const tokenHash = new TokenHashService({
       get: () => ({ AUTH_SESSION_SECRET: 'single-use-token-secret' }),
     } as never);
@@ -193,6 +194,22 @@ describe('single-use reset and verification tokens (integration)', () => {
         passwords.changePasswordViaResetToken(user.id, { token, password: SECOND_RESET_PASSWORD }),
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(await passwordMatches(user.id, FIRST_RESET_PASSWORD)).toBe(true);
+      expect(await passwordMatches(user.id, SECOND_RESET_PASSWORD)).toBe(false);
+    });
+
+    it('consumes the reset token even when the password-changed email fails', async () => {
+      const user = await createLocalUser();
+      const token = await auth.generatePasswordResetToken(user.email);
+      jest.spyOn(emailService, 'sendPasswordChangedEmail').mockRejectedValueOnce(new Error('SMTP down'));
+
+      await expect(
+        passwords.changePasswordViaResetToken(user.id, { token, password: FIRST_RESET_PASSWORD }),
+      ).rejects.toThrow('SMTP down');
+
+      expect(await persisted(user.id)).toMatchObject({ passwordResetToken: null, passwordResetTokenExpiresAt: null });
+      await expect(
+        passwords.changePasswordViaResetToken(user.id, { token, password: SECOND_RESET_PASSWORD }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
       expect(await passwordMatches(user.id, SECOND_RESET_PASSWORD)).toBe(false);
     });
 

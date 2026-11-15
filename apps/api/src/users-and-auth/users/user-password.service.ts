@@ -85,13 +85,15 @@ export class UserPasswordService {
       throw new PasswordPolicyViolationException(policyResult.errors);
     }
 
-    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
-    await this.authService.changePassword(user, body.password);
-
+    // Consume the token before changing the password: changePassword sends a notification email afterwards, and a
+    // failed send must not leave the link usable again.
     await this.usersService.updateOne(userId, {
       passwordResetToken: null,
       passwordResetTokenExpiresAt: null,
     });
+
+    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
+    await this.authService.changePassword(user, body.password);
   }
 
   public async setUserPassword(
