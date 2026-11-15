@@ -100,6 +100,7 @@ describe('redactValkeyCommandErrors', () => {
     server.acceptPassword();
     await disconnect(duplicate);
 
+    expect(inspect(results, { showHidden: true, depth: null })).toContain('WRONGPASS');
     expect(inspect(results, { showHidden: true, depth: null })).not.toContain(PASSWORD);
     expectNoPassword(duplicateError);
   });
