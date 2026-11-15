@@ -26,5 +26,14 @@
     "remove": "Pin entfernen",
     "removeLabel": "Pin {{title}} entfernen"
   },
+  "drag": {
+    "instructions": "Um eine Karte aufzunehmen, drücken Sie die Leertaste oder Enter. Verschieben Sie sie mit den Pfeiltasten. Drücken Sie erneut die Leertaste oder Enter, um sie an der neuen Stelle abzulegen, oder Escape, um abzubrechen.",
+    "start": "{{title}} aufgenommen.",
+    "over": "{{title}} wurde über {{target}} bewegt.",
+    "outside": "{{title}} ist über keiner anderen Karte mehr.",
+    "end": "{{title}} wurde an der Stelle von {{target}} abgelegt.",
+    "endOutside": "{{title}} wurde abgelegt.",
+    "cancel": "Verschieben von {{title}} wurde abgebrochen."
+  },
   "reorderError": "Die neue Reihenfolge konnte nicht gespeichert werden. Ihr Dashboard zeigt wieder die gespeicherte Reihenfolge."
 }

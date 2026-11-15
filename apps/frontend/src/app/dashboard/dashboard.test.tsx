@@ -16,7 +16,7 @@ import { DashboardLanding, DashboardPage } from './index';
 import { DashboardPinHeaderAccessory, DashboardPinToggle } from './DashboardPinToggle';
 import { DashboardPinTargetContext, resourcePinTarget } from './pinTarget';
 import { PageHeader, PageHeaderAccessoryProvider } from '@attraccess/plugins-frontend-ui';
-import { usePinReorder } from './DashboardGrid';
+import { useDragAccessibility, usePinReorder } from './DashboardGrid';
 import { useDashboardPins } from './pins';
 import { PinnablePages } from './pinnablePagesContext';
 
@@ -334,5 +334,22 @@ describe('usePinReorder', () => {
       }),
     );
     await waitFor(() => expect(cached()).toEqual(stored));
+  });
+});
+
+describe('useDragAccessibility', () => {
+  it('names cards by their titles, not by their internal ids', () => {
+    const titles: Record<string, string> = { 'page:/projects': 'Projects', 'resource:1': 'Lathe' };
+    const { result } = renderHook(() => useDragAccessibility((id) => titles[String(id)]));
+    const { announcements, screenReaderInstructions } = result.current;
+    const card = (id: string) => ({ id, data: { current: undefined }, rect: { current: { initial: null, translated: null } } });
+    const active = card('page:/projects');
+    const over = { ...card('resource:1'), disabled: false };
+
+    expect(screenReaderInstructions?.draggable).toMatch(/^To pick up a card/);
+    expect(announcements?.onDragStart({ active } as never)).toBe('Picked up Projects.');
+    expect(announcements?.onDragOver({ active, over } as never)).toBe('Projects was moved over Lathe.');
+    expect(announcements?.onDragEnd({ active, over } as never)).toBe('Projects was dropped in the place of Lathe.');
+    expect(announcements?.onDragCancel({ active, over: null } as never)).toBe('Moving Projects was cancelled.');
   });
 });

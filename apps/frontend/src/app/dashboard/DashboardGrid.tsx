@@ -2,10 +2,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   closestCenter,
   DndContext,
+  DndContextProps,
   DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
+  UniqueIdentifier,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -62,6 +64,29 @@ export function usePinReorder(pins: DashboardPin[]) {
   };
 }
 
+/** Screen reader texts for dragging, naming cards by their titles instead of their internal ids. */
+export function useDragAccessibility(
+  titleOf: (id: UniqueIdentifier) => string,
+): NonNullable<DndContextProps['accessibility']> {
+  const { t } = useTranslations({ en, de });
+
+  return {
+    screenReaderInstructions: { draggable: t('drag.instructions') },
+    announcements: {
+      onDragStart: ({ active }) => t('drag.start', { title: titleOf(active.id) }),
+      onDragOver: ({ active, over }) =>
+        over
+          ? t('drag.over', { title: titleOf(active.id), target: titleOf(over.id) })
+          : t('drag.outside', { title: titleOf(active.id) }),
+      onDragEnd: ({ active, over }) =>
+        over
+          ? t('drag.end', { title: titleOf(active.id), target: titleOf(over.id) })
+          : t('drag.endOutside', { title: titleOf(active.id) }),
+      onDragCancel: ({ active }) => t('drag.cancel', { title: titleOf(active.id) }),
+    },
+  };
+}
+
 /** The pinned cards in the user's order. Dragging a card saves the new order at once. */
 export function DashboardGrid({ pins }: Readonly<{ pins: DashboardPin[] }>) {
   const { t } = useTranslations({ en, de });
@@ -81,6 +106,15 @@ export function DashboardGrid({ pins }: Readonly<{ pins: DashboardPin[] }>) {
       { onError: () => toast.error({ title: t('pin.saveError') }) },
     );
 
+  const pinTitle = (pin: DashboardPin) =>
+    pin.itemType === DashboardPinItemType.RESOURCE
+      ? (pin.resourceName ?? pin.itemId)
+      : (pages.find((page) => page.path === pin.itemId)?.title ?? titleOf(pin.itemId) ?? pin.itemId);
+  const accessibility = useDragAccessibility((id) => {
+    const pin = pins.find((candidate) => pinKey(candidate) === id);
+    return pin ? pinTitle(pin) : String(id);
+  });
+
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     if (over) reorder(String(active.id), String(over.id));
   };
@@ -98,7 +132,12 @@ export function DashboardGrid({ pins }: Readonly<{ pins: DashboardPin[] }>) {
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+      accessibility={accessibility}
+    >
       <SortableContext items={pins.map(pinKey)} strategy={rectSortingStrategy}>
         <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3" data-cy="dashboard-grid">
           {pins.map(renderCard)}

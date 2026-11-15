@@ -26,5 +26,14 @@
     "remove": "Remove pin",
     "removeLabel": "Remove pin {{title}}"
   },
+  "drag": {
+    "instructions": "To pick up a card, press space or enter. Use the arrow keys to move it. Press space or enter again to drop it in its new place, or press escape to cancel.",
+    "start": "Picked up {{title}}.",
+    "over": "{{title}} was moved over {{target}}.",
+    "outside": "{{title}} is no longer over another card.",
+    "end": "{{title}} was dropped in the place of {{target}}.",
+    "endOutside": "{{title}} was dropped.",
+    "cancel": "Moving {{title}} was cancelled."
+  },
   "reorderError": "The new order could not be saved. Your dashboard shows the saved order again."
 }
