@@ -1,4 +1,5 @@
 import { DataSource, EntityManager } from 'typeorm';
+import { createDataSource } from './sqlite-connection';
 
 const sqliteTransactions = new WeakMap<DataSource, Promise<unknown>>();
 const resourceConnections = new WeakMap<DataSource, Promise<DataSource>>();
@@ -10,13 +11,12 @@ async function getResourceConnection(source: DataSource): Promise<DataSource> {
   }
   let connection = resourceConnections.get(source);
   if (!connection) {
-    connection = new DataSource({
+    connection = createDataSource({
       ...source.options,
       name: 'resource-lifecycle',
       synchronize: false,
       migrationsRun: false,
       dropSchema: false,
-      busyTimeout: source.options.busyTimeout ?? 5000,
     }).initialize();
     resourceConnections.set(source, connection);
   }
@@ -56,22 +56,9 @@ export async function runSerializedTransaction<T>(
       const dedicated = await getResourceConnection(connection);
       // Refresh before each phase: Nest services may register commit observers after initialization.
       dedicated.subscribers.splice(0, dedicated.subscribers.length, ...connection.subscribers);
-      // TypeORM 0.3.x exposes isolation levels but not SQLite BEGIN modes. Reserve
-      // the writer before reading: a deferred read-to-write upgrade can fail
+      // createDataSource begins its transactions with BEGIN IMMEDIATE: a deferred read-to-write upgrade can fail
       // immediately with SQLITE_BUSY even when busyTimeout is configured.
-      // Keep TypeORM in charge of transaction depth, subscribers and rollback.
-      const runner = dedicated.createQueryRunner();
-      const originalQuery = runner.query;
-      const query = originalQuery.bind(runner);
-      runner.query = (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
-        const statement = sql === 'BEGIN TRANSACTION' ? 'BEGIN IMMEDIATE TRANSACTION' : sql;
-        return useStructuredResult ? query(statement, parameters, true) : query(statement, parameters);
-      };
-      try {
-        return await dedicated.transaction(work);
-      } finally {
-        runner.query = originalQuery;
-      }
+      return dedicated.transaction(work);
     });
   sqliteTransactions.set(connection, next);
   try {

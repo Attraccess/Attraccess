@@ -13,7 +13,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 
 import { AuditActor } from '../../audit/recorder/audit-event';
 
@@ -154,8 +154,10 @@ export class ResourceHealthService {
     };
   }
 
-  async isResourceUnhealthy(resourceId: number): Promise<boolean> {
-    const count = await this.healthRepository.count({
+  /** Pass the caller's transaction manager inside a serialized transaction: the main connection may wait for its lock. */
+  async isResourceUnhealthy(resourceId: number, manager?: EntityManager): Promise<boolean> {
+    const repository = manager ? manager.getRepository(ResourceHealthState) : this.healthRepository;
+    const count = await repository.count({
       where: { resourceId, status: ResourceHealthStatus.UNHEALTHY },
     });
     return count > 0;

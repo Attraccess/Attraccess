@@ -1,9 +1,10 @@
 // typeorm.config.ts
 
-import { DataSource, DataSourceOptions } from 'typeorm';
+import { DataSourceOptions } from 'typeorm';
 import { resolveDatabasePath } from '../config/storage-path';
 import { entities } from '@attraccess/database-entities';
 import * as migrations from './migrations';
+import { createDataSource } from './sqlite-connection';
 import { Logger } from '@nestjs/common';
 
 const dbFile = resolveDatabasePath();
@@ -23,4 +24,4 @@ const dbConfig: Partial<DataSourceOptions> = {
 
 export const dataSourceConfig = dbConfig;
 
-export default new DataSource(dataSourceConfig as DataSourceOptions);
+export default createDataSource(dataSourceConfig as DataSourceOptions);

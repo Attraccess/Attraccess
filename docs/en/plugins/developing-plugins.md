@@ -465,7 +465,11 @@ The queue is shared with every core session start and end, so:
 - do not nest calls. A `runSerialized` started inside `fn` would wait for `fn`
   itself, so the host rejects it with an error instead of hanging. Pass the
   `manager` down to helpers instead, and do not await core operations that write
-  through the same queue (such as starting or ending a session) inside `fn`.
+  through the same queue (such as starting or ending a session) inside `fn`;
+- read and write only through `manager` inside `fn`, not through
+  `context.getRepository(...)` or `context.dataSource`. Their connection waits
+  for the lock `fn` holds: a write there fails with `SQLITE_BUSY` after about
+  5 seconds, and it stalls other queries on that connection meanwhile.
 
 Serialization is per host process. Plugins that need exclusion across several API
 instances need a cross-instance lock of their own; the reservations plugin runs

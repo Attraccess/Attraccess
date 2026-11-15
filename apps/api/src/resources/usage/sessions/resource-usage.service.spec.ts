@@ -661,7 +661,11 @@ describe('ResourceUsageService', () => {
       await expect(startSessionScope.service.startSession(1, startSessionScope.mockUser, dto)).rejects.toBeInstanceOf(
         ResourceUnhealthyException,
       );
-      expect(startSessionScope.mockResourceHealthService.isResourceUnhealthy).toHaveBeenCalledWith(1);
+      // Reads through the start's transaction, not the main connection that may wait for its lock.
+      expect(startSessionScope.mockResourceHealthService.isResourceUnhealthy).toHaveBeenCalledWith(
+        1,
+        expect.anything(),
+      );
       expect(startSessionScope.resourceMaintenanceService.canManageMaintenance).toHaveBeenCalled();
     });
 

@@ -203,6 +203,14 @@ describe('ResourceHealthService', () => {
       });
       expect(await fixture.service.isResourceUnhealthy(1)).toBe(false);
     });
+
+    it('counts through the given transaction manager', async () => {
+      const count = jest.fn().mockResolvedValue(1);
+      const manager = { getRepository: jest.fn().mockReturnValue({ count }) };
+      expect(await fixture.service.isResourceUnhealthy(1, manager as never)).toBe(true);
+      expect(manager.getRepository).toHaveBeenCalledWith(ResourceHealthState);
+      expect(count).toHaveBeenCalledWith({ where: { resourceId: 1, status: ResourceHealthStatus.UNHEALTHY } });
+    });
   });
 
   describe('clearEntry', () => {

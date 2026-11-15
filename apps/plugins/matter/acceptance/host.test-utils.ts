@@ -23,6 +23,7 @@ import {
 import { createPluginAuditContext } from '../../../api/src/plugin-system/runtime/audit-context';
 import { createPluginRunSerialized } from '../../../api/src/plugin-system/runtime/plugin-serialized';
 import { closeResourceTransactionConnection } from '../../../api/src/database/run-serialized-transaction';
+import { createDataSource } from '../../../api/src/database/sqlite-connection';
 import { SettingsStoreService } from '../../../api/src/settings/settings-store.service';
 import { Setting } from '@attraccess/database-entities';
 import * as sourceMigrations from '../backend/migrations';
@@ -83,14 +84,13 @@ export async function bootHost(
   );
   // The audit service needs a file-backed database: it writes receipts on a separate connection.
   const directory = await mkdtemp(join(tmpdir(), 'matter-acceptance-'));
-  const db = await new DataSource({
+  // Built like the API's main connection: it shares the file with the resource-lifecycle and audit connections.
+  const db = await createDataSource({
     type: 'sqlite',
     database: join(directory, 'host.sqlite'),
     entities: [...Object.values(entities), ...(plugin.entities ?? [])],
     migrations: [...Object.values(coreMigrations), ...(Object.values(matterMigrations) as (new () => never)[])],
     synchronize: false,
-    // The audit service writes on a second connection; wait for its lock like the other file-backed fixtures do.
-    busyTimeout: 5000,
   }).initialize();
   await db.runMigrations();
   const audit = new AuditService(
