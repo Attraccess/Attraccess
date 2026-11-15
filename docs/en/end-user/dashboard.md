@@ -16,7 +16,7 @@ You can pin:
 - pages of plugins whose plugin offers them for the dashboard
 - any resource, from its detail page
 
-To unpin, select the filled star again, or the star on the item's card on the dashboard.
+To unpin, select the filled star again, or the crossed-out star on the item's card on the dashboard.
 
 ## Your start page
 
@@ -24,7 +24,7 @@ As long as you have pinned nothing, Attraccess still opens on the resource overv
 
 ## Cards on the dashboard
 
-- **Page cards** show the page's icon and name, plus a counter where the sidebar shows one (for example unread messages). Select the card to open the page.
+- **Page cards** show the page's icon and name, plus a counter where the sidebar shows one (for example unread messages). Select the page name to open the page.
 - **Resource cards** show the resource's status and its session controls. You can start and stop your own session right there, under the same rules as on the resource page: you need an introduction, supervised starts ask for a supervisor, and so on. A running session of someone else shows its timer. Select **Open** to go to the resource page.
 
 The cards update live while sessions start and end.
@@ -35,6 +35,6 @@ Drag a card by its handle (the dotted grip at its top left) to a new place. With
 
 ## Pins you can no longer open
 
-When you lose access to a pinned page, for example because a permission was removed or a plugin is no longer available, its card says **No longer accessible**. Select **Remove pin** to remove it. If you keep it and get access back, the normal card returns.
+When you lose access to a pinned page, for example because a permission was removed or a plugin is no longer available, its card says **No longer accessible**. Select **Remove from dashboard** to remove it. If you keep it and get access back, the normal card returns.
 
 When a pinned resource is deleted, its card disappears from every dashboard.

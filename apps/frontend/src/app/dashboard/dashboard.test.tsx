@@ -94,6 +94,25 @@ describe('DashboardLanding', () => {
     expect(await screen.findByRole('status', { name: 'Current URL' })).toHaveTextContent(to);
   });
 
+  it('shows a spinner, never the redirect, while the pins load', () => {
+    getPins().mockReturnValue(new Promise(() => undefined) as never);
+    const { container } = renderAt('/?enroll=K7P', <DashboardLanding />);
+
+    expect(container.querySelector('[data-cy="dashboard-loading"]')).not.toBeNull();
+    expect(screen.queryByRole('status', { name: 'Current URL' })).toBeNull();
+  });
+
+  it('keeps the dashboard when the last pin is removed on the start page', async () => {
+    getPins().mockResolvedValue([page('/projects')] as never);
+    updatePins().mockResolvedValue([] as never);
+    renderAt('/', <DashboardLanding />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove Projects from dashboard' }));
+
+    expect(await screen.findByRole('heading', { name: 'Nothing pinned yet' })).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Current URL' })).toBeNull();
+  });
+
   it('shows the dashboard to a user with pins', async () => {
     getPins().mockResolvedValue([page('/projects')] as never);
     renderAt('/', <DashboardLanding />);
@@ -145,10 +164,22 @@ describe('DashboardPage', () => {
     expect(screen.getByText('/uninstalled-plugin')).toBeInTheDocument();
     expect(screen.getAllByText('No longer accessible')).toHaveLength(2);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove pin Users' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Users from dashboard' }));
 
     expect(update).toHaveBeenCalledWith({ requestBody: { kind: 'remove', item: page('/users') } });
     await waitFor(() => expect(screen.queryByText('Users')).toBeNull());
+  });
+
+  it('keeps the cards when a later refetch fails', async () => {
+    const pins = getPins().mockResolvedValue([page('/projects')] as never);
+    renderAt('/dashboard', <DashboardPage />);
+    expect(await screen.findByRole('link', { name: /Projects/ })).toBeInTheDocument();
+
+    pins.mockRejectedValue(new Error('offline') as never);
+    await act(() => client.refetchQueries({ queryKey: UseDashboardServiceDashboardGetPinsKeyFn() }));
+
+    expect(screen.getByRole('link', { name: /Projects/ })).toBeInTheDocument();
+    expect(screen.queryByText('Could not load your dashboard')).toBeNull();
   });
 
   it('waits for the plugins before calling a page inaccessible', async () => {
@@ -176,6 +207,15 @@ describe('DashboardPage', () => {
       '/resources/5',
     );
   });
+});
+
+it('tells the user when a pinned resource cannot be loaded', async () => {
+  getPins().mockResolvedValue([{ itemType: DashboardPinItemType.RESOURCE, itemId: '5', resourceName: 'Lathe' }] as never);
+  vi.spyOn(ResourcesService, 'getOneResourceById').mockRejectedValue(new Error('gone') as never);
+  vi.spyOn(ResourcesService, 'resourceUsageGetActiveSession').mockResolvedValue({ usage: null } as never);
+  renderAt('/dashboard', <DashboardPage />);
+
+  expect(await screen.findByText('This resource could not be loaded.')).toBeInTheDocument();
 });
 
 describe('DashboardPinToggle', () => {
@@ -265,8 +305,9 @@ describe('DashboardPinHeaderAccessory', () => {
 
   it.each(['/dashboard', '/', '/kiosk/companion', '/projects/4'])('offers no pin toggle on %s', async (path) => {
     renderHeaderAt(path);
-    await waitFor(() => expect(DashboardService.dashboardGetPins).not.toHaveBeenCalled());
+    expect(await screen.findByRole('heading', { name: 'Page' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Pin to dashboard' })).toBeNull();
+    expect(DashboardService.dashboardGetPins).not.toHaveBeenCalled();
   });
 
   it('pins the resource of a resource page', async () => {
@@ -305,6 +346,19 @@ describe('usePinReorder', () => {
       expect(update).toHaveBeenCalledWith({
         requestBody: { kind: 'move', item: page('/c'), before: page('/a') },
       }),
+    );
+  });
+
+  it('moves a card down before the card that follows its new place', async () => {
+    client.setQueryData(UseDashboardServiceDashboardGetPinsKeyFn(), stored);
+    const update = updatePins().mockResolvedValue([page('/b'), page('/a'), page('/c')] as never);
+    const { result } = renderHook(() => usePinReorder(stored), { wrapper });
+
+    act(() => result.current('page:/a', 'page:/b'));
+
+    expect(cached()).toEqual([page('/b'), page('/a'), page('/c')]);
+    await waitFor(() =>
+      expect(update).toHaveBeenCalledWith({ requestBody: { kind: 'move', item: page('/a'), before: page('/c') } }),
     );
   });
 

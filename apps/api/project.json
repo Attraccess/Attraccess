@@ -154,6 +154,7 @@
         "{workspaceRoot}/apps/attractap/firmware/tests/pairing/vectors.json",
         "{workspaceRoot}/apps/attractap/firmware/src/display/ui/ui_schema.hpp",
         "{workspaceRoot}/apps/attractap/firmware/tests/ui-fixtures/*.json",
+        "{workspaceRoot}/apps/frontend/src/app/layout/sidebar/navigation.tsx",
         {
           "externalDependencies": ["jest"]
         }

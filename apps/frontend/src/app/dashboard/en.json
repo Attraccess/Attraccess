@@ -18,13 +18,14 @@
   },
   "card": {
     "dragHandle": "Reorder {{title}}",
-    "unpin": "Unpin {{title}}",
+    "unpin": "Remove {{title}} from dashboard",
     "open": "Open",
     "openResource": "Open {{title}}",
     "unavailable": "No longer accessible",
     "unavailableDescription": "You can no longer open this page. Its permission may have been removed or its plugin is not available.",
-    "remove": "Remove pin",
-    "removeLabel": "Remove pin {{title}}"
+    "remove": "Remove from dashboard",
+    "removeLabel": "Remove {{title}} from dashboard",
+    "resourceLoadError": "This resource could not be loaded."
   },
   "drag": {
     "instructions": "To pick up a card, press space or enter. Use the arrow keys to move it. Press space or enter again to drop it in its new place, or press escape to cancel.",

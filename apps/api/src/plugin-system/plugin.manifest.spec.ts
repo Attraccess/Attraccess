@@ -54,8 +54,10 @@ describe('PluginManifestSchema dashboard paths', () => {
 
   it.each([
     '/kiosk',
+    '/Kiosk',
     '/kiosk/companion',
     '/dashboard',
+    '/DASHBOARD',
     '/dashboard/x',
     'https://example.com',
     '/foo/../bar',

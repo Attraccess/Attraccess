@@ -12,8 +12,8 @@ import { StartSessionControls } from '../StartSessionControls';
 import {
   useAccessControlServiceResourceIntroducersGetNames,
   useResourcesServiceResourceUsageGetActiveSession,
-  useResourcesServiceResourceUsageGetActiveSessionKey,
-  useResourcesServiceResourceUsageCanControlKey,
+  UseResourcesServiceResourceUsageGetActiveSessionKeyFn,
+  UseResourcesServiceResourceUsageCanControlKeyFn,
   UseResourcesServiceResourceUsageStartBlockedKeyFn,
   Resource,
   useResourcesServiceResourceUsageCanControl,
@@ -62,10 +62,11 @@ export function ResourceUsageSession({
   }, [queryClient, resourceId]);
 
   const invalidateSessionQueries = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageGetActiveSessionKey] });
-    queryClient.invalidateQueries({ queryKey: [useResourcesServiceResourceUsageCanControlKey] });
+    // Only this resource: the dashboard renders one of these per pinned resource.
+    queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageGetActiveSessionKeyFn({ resourceId }) });
+    queryClient.invalidateQueries({ queryKey: UseResourcesServiceResourceUsageCanControlKeyFn({ resourceId }) });
     invalidateStartBlocked();
-  }, [queryClient, invalidateStartBlocked]);
+  }, [queryClient, resourceId, invalidateStartBlocked]);
 
   useLiveUpdates({
     topic: 'resource',

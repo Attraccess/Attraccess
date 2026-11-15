@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Button, Card, Chip, Link, Spinner } from '@heroui/react';
 import { ArrowRightIcon, CircleSlashIcon, StarOffIcon, Trash2Icon } from 'lucide-react';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   useResourcesServiceGetOneResourceById,
   useResourcesServiceResourceUsageGetActiveSession,
@@ -63,8 +63,9 @@ export function PagePinCard({ id, page, onUnpin }: Readonly<PinCardProps & { pag
           }
         >
           {!!page.badgeCount && (
-            <Chip size="sm" color="accent">
-              {page.badgeCount}
+            // Same badge as the sidebar entry.
+            <Chip size="sm" color="accent" variant="primary">
+              {page.badgeCount > 99 ? '99+' : page.badgeCount}
             </Chip>
           )}
           <UnpinButton label={t('card.unpin', { title: page.title })} onUnpin={onUnpin} />
@@ -135,12 +136,19 @@ export function ResourcePinCard({ id, pin, onUnpin }: Readonly<PinCardProps & { 
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
   const resourceId = Number(pin.itemId);
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource, isError } = useResourcesServiceGetOneResourceById({ id: resourceId });
   const { data: activeSession } = useResourcesServiceResourceUsageGetActiveSession({ resourceId });
   const title = resource?.name ?? pin.resourceName ?? pin.itemId;
-  // The user's own session shows its timer inside the session controls already.
-  const otherSession =
-    activeSession?.usage && activeSession.usage.userId !== user?.id ? activeSession.usage : undefined;
+  // The user's own session shows its timer inside the session controls already, and parallel sessions list their
+  // start times there; only a single session of someone else gets a timer here.
+  const sessions = activeSession?.usages ?? (activeSession?.usage ? [activeSession.usage] : []);
+  const otherSession = sessions.length === 1 && sessions[0].userId !== user?.id ? sessions[0] : undefined;
+
+  const renderSession = () => {
+    if (resource) return <ResourceUsageSession resourceId={resourceId} resource={resource} />;
+    if (isError) return <StatusAlert status="danger" title={t('card.resourceLoadError')} />;
+    return <Spinner size="sm" />;
+  };
 
   return (
     <SortablePinSection id={id} dragLabel={t('card.dragHandle', { title })}>
@@ -154,7 +162,7 @@ export function ResourcePinCard({ id, pin, onUnpin }: Readonly<PinCardProps & { 
           </header>
           <div className="flex flex-col gap-4">
             {otherSession && <SessionTimer startTime={otherSession.startTime} />}
-            {resource ? <ResourceUsageSession resourceId={resourceId} resource={resource} /> : <Spinner size="sm" />}
+            {renderSession()}
           </div>
           <footer className="flex justify-end">
             <Link

@@ -31,6 +31,8 @@ export interface PageHeaderAccessoryProviderProps {
 }
 
 /**
+ * Host only: plugins must not render this provider, or they replace the host's control on their pages.
+ *
  * Lets the host add a page-level control, such as the dashboard pin, to every PageHeader below it, including those
  * of plugin pages. Only the first header in document order shows it, so section headers on the same page never
  * repeat it. Without a provider, PageHeader renders exactly as before.

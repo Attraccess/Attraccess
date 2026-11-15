@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Button, Link, Spinner } from '@heroui/react';
 import { LayoutDashboardIcon } from 'lucide-react';
 import { PageHeader, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -17,11 +18,12 @@ function LoadingDashboard() {
 
 function DashboardContent() {
   const { t } = useTranslations({ en, de });
-  const { data: pins, isPending, isError, refetch, isRefetching } = useDashboardPins();
+  const { data: pins, isPending, refetch, isRefetching } = useDashboardPins();
 
   if (isPending) return <LoadingDashboard />;
 
-  if (isError) {
+  // A failed refetch keeps the list it already has; only a list that never loaded shows the error.
+  if (!pins) {
     return (
       <div className="flex flex-col items-start gap-3" data-cy="dashboard-load-error">
         <StatusAlert status="danger" title={t('loadError.title')}>
@@ -64,9 +66,12 @@ export function DashboardPage() {
  * with query and hash intact. A failed load shows the dashboard's retry instead of guessing "no pins".
  */
 export function DashboardLanding() {
-  const { data: pins, isPending, isError } = useDashboardPins();
+  const { data: pins, isPending } = useDashboardPins();
+  // Once shown, the dashboard stays: unpinning the last card shows its empty state instead of leaving the page.
+  const hasShownDashboard = useRef(false);
 
   if (isPending) return <LoadingDashboard />;
-  if (!isError && pins.length === 0) return <RootRedirect />;
+  if (pins?.length === 0 && !hasShownDashboard.current) return <RootRedirect />;
+  hasShownDashboard.current = true;
   return <DashboardPage />;
 }

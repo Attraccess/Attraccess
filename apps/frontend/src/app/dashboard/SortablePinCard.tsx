@@ -23,7 +23,7 @@ function useSortablePin(id: string, dragLabel: string) {
       {...attributes}
       {...listeners}
       aria-label={dragLabel}
-      className="cursor-grab touch-none text-muted"
+      className="cursor-grab touch-none rounded text-muted outline-none focus-visible:ring-2 focus-visible:ring-focus"
       data-cy="dashboard-card-drag-handle"
     >
       <GripVerticalIcon className="w-4 h-4" aria-hidden />

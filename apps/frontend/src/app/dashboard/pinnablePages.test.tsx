@@ -28,6 +28,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => ({
   useLicenseServiceGetLicenseInformation: () => ({ data: state.license }),
   useMessagingServiceMessagingGetUnreadCount: () => ({ data: { total: 4 } }),
 }));
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => ({ isAuthenticated: true }) }));
 vi.mock('../layout/sidebar/HelpfulLinks', () => ({
   useShowNavItem: () => (item: { path: string }) => !state.denied.has(item.path),
   usePluginSidebarContributions: () => ({ pluginNavItems: state.pluginItems, pluginNavGroups: [] }),

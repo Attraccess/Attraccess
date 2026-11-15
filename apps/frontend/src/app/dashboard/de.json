@@ -18,13 +18,14 @@
   },
   "card": {
     "dragHandle": "{{title}} verschieben",
-    "unpin": "{{title}} lösen",
+    "unpin": "{{title}} vom Dashboard entfernen",
     "open": "Öffnen",
     "openResource": "{{title}} öffnen",
     "unavailable": "Nicht mehr zugänglich",
     "unavailableDescription": "Sie können diese Seite nicht mehr öffnen. Möglicherweise wurde die Berechtigung entzogen oder das Plugin ist nicht verfügbar.",
-    "remove": "Pin entfernen",
-    "removeLabel": "Pin {{title}} entfernen"
+    "remove": "Vom Dashboard entfernen",
+    "removeLabel": "{{title}} vom Dashboard entfernen",
+    "resourceLoadError": "Diese Ressource konnte nicht geladen werden."
   },
   "drag": {
     "instructions": "Um eine Karte aufzunehmen, drücken Sie die Leertaste oder Enter. Verschieben Sie sie mit den Pfeiltasten. Drücken Sie erneut die Leertaste oder Enter, um sie an der neuen Stelle abzulegen, oder Escape, um abzubrechen.",

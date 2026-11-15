@@ -1,9 +1,12 @@
 import { PluginPermission } from '@attraccess/plugins-backend-sdk';
 import { z } from 'zod';
 import { PluginDependenciesSchema } from './dependencies';
-/** Sidebar route paths a plugin offers for dashboard pinning: plain segments, never kiosk or the dashboard itself. */
+/**
+ * Sidebar route paths a plugin offers for dashboard pinning: plain segments, never kiosk or the dashboard itself.
+ * Case-insensitive, because the router matches paths regardless of case.
+ */
 export const dashboardPathsSchema = z.array(
-  z.string().regex(/^\/(?!kiosk(?:\/|$)|dashboard(?:\/|$))[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/, {
+  z.string().regex(/^\/(?!(?:kiosk|dashboard)(?:\/|$))[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/i, {
     message: 'must be a route path of plain segments outside /kiosk and /dashboard',
   }),
 );

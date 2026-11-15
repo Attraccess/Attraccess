@@ -104,10 +104,12 @@ describe('PageHeader host accessory', () => {
   it('moves the accessory to the next header when the first one unmounts', () => {
     const { rerender } = renderAt(
       <PageHeaderAccessoryProvider accessory={Pin}>
-        <PageHeader title="Loading" />
-        <PageHeader title="Section" />
+        <PageHeader key="loading" title="Loading" />
+        <PageHeader key="section" title="Section" />
       </PageHeaderAccessoryProvider>,
     );
+    const sectionHeader = () => screen.getByRole('heading', { name: 'Section' }).closest('[class*="justify-between"]');
+    expect(sectionHeader()).not.toContainElement(screen.getByRole('button', { name: 'Pin page' }));
     rerender(
       <MemoryRouter initialEntries={['/current']}>
         <Routes>
@@ -115,7 +117,7 @@ describe('PageHeader host accessory', () => {
             path="/current"
             element={
               <PageHeaderAccessoryProvider accessory={Pin}>
-                <PageHeader title="Section" />
+                <PageHeader key="section" title="Section" />
               </PageHeaderAccessoryProvider>
             }
           />
@@ -124,10 +126,23 @@ describe('PageHeader host accessory', () => {
     );
 
     expect(screen.getAllByRole('button', { name: 'Pin page' })).toHaveLength(1);
+    expect(sectionHeader()).toContainElement(screen.getByRole('button', { name: 'Pin page' }));
   });
 
-  it('renders no accessory without a provider', () => {
+  it('renders exactly as before without a provider', () => {
     renderAt(<PageHeader title="Devices" />);
-    expect(screen.queryByRole('button', { name: 'Pin page' })).toBeNull();
+    const header = screen.getByRole('heading', { name: 'Devices' }).closest('[class*="justify-between"]');
+    // Only the title block: no (empty) action area.
+    expect(header?.children).toHaveLength(1);
+  });
+
+  it('shows the accessory before the actions', () => {
+    renderAt(
+      <PageHeaderAccessoryProvider accessory={Pin}>
+        <PageHeader title="Devices" actions={[{ key: 'add', label: 'Add device', onPress: vi.fn() }]} />
+      </PageHeaderAccessoryProvider>,
+    );
+    const buttons = screen.getAllByRole('button').map((button) => button.textContent);
+    expect(buttons.indexOf('Pin page')).toBeLessThan(buttons.indexOf('Add device'));
   });
 });

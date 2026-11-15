@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import {
   closestCenter,
   DndContext,
@@ -13,13 +12,16 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import {
-  DashboardPinItemType,
-  DashboardPinOperationKind,
-  UseDashboardServiceDashboardGetPinsKeyFn,
-} from '@attraccess/react-query-client';
+import { DashboardPinItemType, DashboardPinOperationKind } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
-import { DashboardPin, DashboardPinItem, pinKey, useSetDashboardPinsCache, useUpdateDashboardPins } from './pins';
+import {
+  DashboardPin,
+  DashboardPinItem,
+  pinKey,
+  useCancelDashboardPinsFetch,
+  useSetDashboardPinsCache,
+  useUpdateDashboardPins,
+} from './pins';
 import { usePinnablePages } from './pinnablePagesContext';
 import { PagePinCard, PendingPinCard, ResourcePinCard, UnavailablePinCard } from './PinCards';
 import de from './de.json';
@@ -34,16 +36,18 @@ const itemOf = ({ itemType, itemId }: DashboardPinItem): DashboardPinItem => ({ 
 export function usePinReorder(pins: DashboardPin[]) {
   const { t } = useTranslations({ en, de });
   const toast = useToastMessage();
-  const queryClient = useQueryClient();
+  const cancelPinsFetch = useCancelDashboardPinsFetch();
   const setPins = useSetDashboardPinsCache();
   const { mutate } = useUpdateDashboardPins();
 
+  // On failure the shared mutation reloads the stored order.
   return (activeId: string, overId: string) => {
     const from = pins.findIndex((pin) => pinKey(pin) === activeId);
     const to = pins.findIndex((pin) => pinKey(pin) === overId);
     if (from < 0 || to < 0 || from === to) return;
 
     const reordered = arrayMove(pins, from, to);
+    void cancelPinsFetch();
     setPins(reordered);
     const before = reordered[to + 1];
     mutate(
@@ -54,12 +58,7 @@ export function usePinReorder(pins: DashboardPin[]) {
           ...(before ? { before: itemOf(before) } : {}),
         },
       },
-      {
-        onError: () => {
-          toast.error({ title: t('reorderError') });
-          void queryClient.invalidateQueries({ queryKey: UseDashboardServiceDashboardGetPinsKeyFn() });
-        },
-      },
+      { onError: () => toast.error({ title: t('reorderError') }) },
     );
   };
 }

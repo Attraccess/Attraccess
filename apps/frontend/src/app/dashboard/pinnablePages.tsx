@@ -11,6 +11,7 @@ import {
 } from '../layout/sidebar/navigation';
 import { usePluginSidebarContributions, useShowNavItem } from '../layout/sidebar/HelpfulLinks';
 import usePluginState from '../plugins/plugin.state';
+import { useAuth } from '../../hooks/useAuth';
 import sidebarDe from '../layout/sidebar.de.json';
 import sidebarEn from '../layout/sidebar.en.json';
 import { PinnablePage, PinnablePages, PinnablePagesContext } from './pinnablePagesContext';
@@ -41,7 +42,9 @@ function builtInPages(items: (SidebarItem | SidebarItemGroup)[], prefix: string,
  */
 function useComputedPinnablePages(): PinnablePages {
   const { t } = useTranslations({ en: sidebarEn, de: sidebarDe });
-  const { data: license } = useLicenseServiceGetLicenseInformation();
+  const { isAuthenticated } = useAuth();
+  // The provider also wraps the logged-out pages of the layout, where the license cannot be read.
+  const { data: license } = useLicenseServiceGetLicenseInformation(undefined, { enabled: isAuthenticated });
   const licensedItems = useSidebarItems();
   const showNavItem = useShowNavItem();
   const { pluginNavItems } = usePluginSidebarContributions();
