@@ -1,4 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException, Logger } from '@nestjs/common';
+import { LicenseError } from '../../license/license.service';
 import { UserInvitationService } from './user-invitation.service';
 import { UsersService } from './users.service';
 import { AuthService } from '../auth/auth.service';
@@ -123,6 +125,29 @@ describe('CSV invitations', () => {
       },
     });
     expect(users.createMany).not.toHaveBeenCalled();
+  });
+  it('maps a LicenseError to a ForbiddenException with the reason', async () => {
+    const { service, users } = setup();
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    users.ensureLicenseForNewUsers.mockRejectedValue(
+      new LicenseError('Trying to use more than the allowed amount of users'),
+    );
+    const promise = service.inviteUsersFromCsv(file('email,username,role\nalex@example.com,Alex,\n'), config);
+    await expect(promise).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(promise).rejects.toMatchObject({ message: 'Trying to use more than the allowed amount of users' });
+    expect(users.createMany).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      'Blocking user invitation due to license: Trying to use more than the allowed amount of users',
+    );
+    warn.mockRestore();
+  });
+  it('re-throws non-license errors from the license check unchanged', async () => {
+    const { service, users } = setup();
+    const failure = new Error('database down');
+    users.ensureLicenseForNewUsers.mockRejectedValue(failure);
+    await expect(
+      service.inviteUsersFromCsv(file('email,username,role\nalex@example.com,Alex,\n'), config),
+    ).rejects.toBe(failure);
   });
   it('reports database email and username collisions at their source row', async () => {
     const { service, users } = setup();
