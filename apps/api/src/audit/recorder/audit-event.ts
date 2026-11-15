@@ -39,7 +39,7 @@ export type CoreAuditSubjectType = (typeof CORE_SUBJECT_TYPES)[number];
  */
 export interface AuditActor {
   id: number | null;
-  authenticationMethod: 'session' | 'api-token' | null;
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null;
   apiTokenId?: number | null;
 }
 
@@ -49,13 +49,13 @@ export const SYSTEM_AUDIT_ACTOR: AuditActor = Object.freeze({ id: null, authenti
 /** The actor of an authenticated HTTP or plugin request (session or API token). */
 export function auditActorOf(user: {
   id: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number | null;
 }): AuditActor {
   const viaToken = user.authenticationMethod === 'api-token';
   return {
     id: user.id,
-    authenticationMethod: viaToken ? 'api-token' : 'session',
+    authenticationMethod: viaToken ? 'api-token' : user.authenticationMethod === 'mcp-oauth' ? 'mcp-oauth' : 'session',
     ...(viaToken && user.apiTokenId != null ? { apiTokenId: user.apiTokenId } : {}),
   };
 }

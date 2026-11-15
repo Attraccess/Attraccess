@@ -115,7 +115,7 @@ export interface IdentityAuditInput {
   operationId: string;
   outcome: 'attempted' | 'succeeded' | 'failed';
   actorId?: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
   subjectType?: 'identity.user' | 'identity.role' | 'identity.password_policy';
   subjectId?: number;
@@ -128,7 +128,7 @@ export interface ProjectedIdentityAuditEvent {
   operationId: string;
   outcome: IdentityAuditInput['outcome'];
   actorId: number | null;
-  authenticationMethod: 'session' | 'api-token' | null;
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null;
   apiTokenId: number | null;
   subjectType: NonNullable<IdentityAuditInput['subjectType']>;
   subjectId: number | null;
@@ -154,7 +154,8 @@ export function validIdentityPrincipal(event: Record<string, unknown>): boolean 
   if (
     (authenticationMethod !== undefined &&
       authenticationMethod !== 'session' &&
-      authenticationMethod !== 'api-token') ||
+      authenticationMethod !== 'api-token' &&
+      authenticationMethod !== 'mcp-oauth') ||
     (apiTokenId !== undefined && !positive(apiTokenId)) ||
     (authenticationMethod === 'api-token' && !positive(apiTokenId)) ||
     (authenticationMethod !== 'api-token' && apiTokenId !== undefined)
@@ -209,7 +210,7 @@ export function projectIdentityAuditEvent(input: unknown): ProjectedIdentityAudi
       operationId: event.operationId,
       outcome: event.outcome as IdentityAuditInput['outcome'],
       actorId: (event.actorId as number | undefined) ?? null,
-      authenticationMethod: (authenticationMethod as 'session' | 'api-token' | undefined) ?? null,
+      authenticationMethod: (authenticationMethod as 'session' | 'api-token' | 'mcp-oauth' | undefined) ?? null,
       apiTokenId: (apiTokenId as number | undefined) ?? null,
       subjectType: (event.subjectType as IdentityAuditInput['subjectType'] | undefined) ?? 'identity.user',
       subjectId: (event.subjectId as number | undefined) ?? null,

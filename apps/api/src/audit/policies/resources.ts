@@ -40,7 +40,7 @@ export interface ResourceAuditInput {
   action: ResourceAuditAction;
   operationId: string;
   actorId: number | null;
-  authenticationMethod?: 'session' | 'api-token' | null;
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null;
   apiTokenId?: number | null;
   subjectId: number;
   subjectType?: 'resource' | 'resource_group' | 'flow';
@@ -158,7 +158,8 @@ export function validResourcePrincipal(input: ResourceAuditInput): boolean {
     (input.authenticationMethod !== undefined &&
       input.authenticationMethod !== null &&
       input.authenticationMethod !== 'session' &&
-      input.authenticationMethod !== 'api-token') ||
+      input.authenticationMethod !== 'api-token' &&
+      input.authenticationMethod !== 'mcp-oauth') ||
     ((input.authenticationMethod === undefined || input.authenticationMethod === null) &&
       input.apiTokenId !== undefined &&
       input.apiTokenId !== null) ||

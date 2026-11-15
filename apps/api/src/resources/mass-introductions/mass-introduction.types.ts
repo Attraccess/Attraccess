@@ -31,7 +31,7 @@ export interface ActiveMassIntroduction {
   introducer: {
     id: number;
     username: string;
-    authenticationMethod: 'session' | 'api-token' | null;
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null;
     apiTokenId: number | null;
     /**
      * Authorized through the `resources.access.manage` permission rather than an introducer role.

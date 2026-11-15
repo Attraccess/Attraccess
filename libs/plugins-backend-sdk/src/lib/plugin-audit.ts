@@ -127,7 +127,7 @@ export const PLUGIN_AUDIT_HOST_PROVIDER = Symbol.for('attraccess.plugin.auditHos
 
 export interface PluginAuditPrincipal {
   userId: number;
-  authenticationMethod: 'session' | 'api-token';
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
 }
 
