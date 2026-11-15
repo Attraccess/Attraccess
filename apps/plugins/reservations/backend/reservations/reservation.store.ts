@@ -290,8 +290,8 @@ export class ReservationStore {
     options: { notCheckedIn?: boolean } = {},
   ): Promise<boolean> {
     const where = `id = :id AND status IN (:...from)${options.notCheckedIn ? ' AND checkedInAt IS NULL' : ''}`;
-    // Writes run in the host's serialized transaction queue: on SQLite a second writer would otherwise fail with
-    // SQLITE_BUSY while another request (or a core write) holds the lock.
+    // Writes run in the host's serialized transaction queue: on SQLite a second writer would otherwise wait for, and
+    // after the busy timeout fail with SQLITE_BUSY on, the lock another request (or a core write) holds.
     const result = await this.context.runSerialized((manager) =>
       manager
         .getRepository(ReservationEntity)

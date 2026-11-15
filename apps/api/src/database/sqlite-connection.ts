@@ -3,14 +3,15 @@ import { DataSource, DataSourceOptions, QueryRunner } from 'typeorm';
 /** How long every connection to the SQLite file waits for another connection's write lock before SQLITE_BUSY. */
 export const SQLITE_BUSY_TIMEOUT_MS = 5000;
 
-/** TypeORM's SQLite query runner keeps its transaction depth protected; these helpers need to read it. */
-type SqliteQueryRunner = QueryRunner & { transactionDepth: number; isTransactionActive: boolean };
+/** TypeORM's SQLite query runner keeps its transaction state protected; the guard reads and resets it. */
+type RunnerInternals = QueryRunner & { transactionDepth: number; isTransactionActive: boolean };
 
-const immediateRunners = new WeakSet<QueryRunner>();
+const guardedRunners = new WeakSet<QueryRunner>();
 
 /**
  * Builds a DataSource whose SQLite connection waits for the write lock held by another connection to the same file
  * (the resource-lifecycle and audit connections) instead of failing with SQLITE_BUSY. Other drivers are unchanged.
+ * Not for read-only connections: they cannot begin IMMEDIATE transactions.
  */
 export function createDataSource(options: DataSourceOptions): DataSource {
   if (options.type !== 'sqlite') return new DataSource(options);
@@ -18,7 +19,7 @@ export function createDataSource(options: DataSourceOptions): DataSource {
   // The SQLite driver hands every caller the same query runner, so patching it covers all work on the connection.
   const driver = source.driver;
   const createQueryRunner = driver.createQueryRunner.bind(driver);
-  driver.createQueryRunner = (mode) => beginImmediately(createQueryRunner(mode));
+  driver.createQueryRunner = (mode) => guardSharedRunner(createQueryRunner(mode));
   return source;
 }
 
@@ -28,24 +29,46 @@ export function createDataSource(options: DataSourceOptions): DataSource {
  * connection holds a read lock. BEGIN IMMEDIATE reserves the writer up front and waits through the busy handler.
  * TypeORM stays in charge of transaction depth, savepoints, subscribers and rollback.
  *
- * Concurrent flows share the runner, and so the connection's locks. A statement still running for one flow holds a
- * read lock that makes another flow's BEGIN or autocommit write fail at once, so those run alone: they wait for the
- * running statements, and later statements wait for them. A flow that joins the active transaction therefore still
- * runs inside it, and a transaction another flow starts meanwhile nests as a savepoint instead of a second BEGIN.
+ * Concurrent flows share the runner, and so the connection and its locks:
+ * - A statement still running for one flow holds a read lock that makes another flow's BEGIN or write outside a
+ *   transaction fail at once. Those statements wait until no statement is running, and later statements wait for them.
+ * - A transaction that starts while another flow's BEGIN is pending waits for it, then nests as a savepoint. The
+ *   outermost COMMIT or ROLLBACK waits for such a start, and a start waits for it, so neither acts on a stale depth.
+ *   Without that, a savepoint lands outside the committed transaction and leaves the runner in one that never ends.
+ * Query and transaction subscribers must not run queries on this connection: they would wait for themselves.
  */
-function beginImmediately(runner: QueryRunner): QueryRunner {
-  if (immediateRunners.has(runner)) return runner;
-  immediateRunners.add(runner);
-  const sqlite = runner as SqliteQueryRunner;
+function guardSharedRunner(runner: QueryRunner): QueryRunner {
+  if (guardedRunners.has(runner)) return runner;
+  const internals = runner as RunnerInternals;
+  if (typeof internals.transactionDepth !== 'number') {
+    throw new Error('Unsupported TypeORM SQLite query runner: transactionDepth is not readable');
+  }
+  guardedRunners.add(runner);
   const query = runner.query.bind(runner);
   const startTransaction = runner.startTransaction.bind(runner);
+  const commitTransaction = runner.commitTransaction.bind(runner);
   const rollbackTransaction = runner.rollbackTransaction.bind(runner);
   let running = 0;
   let settled: Promise<void> = Promise.resolve();
   let settle: () => void = () => undefined;
   let exclusive: Promise<unknown> | undefined;
   let starting: Promise<void> | undefined;
+  let ending: Promise<void> | undefined;
+  let nesting = 0;
+  let nested: Promise<void> = Promise.resolve();
+  let nestedSettle: () => void = () => undefined;
 
+  // Closes the gate before `step` runs: TypeORM may broadcast to subscribers synchronously at its start.
+  const gated = async (close: (gate: Promise<void> | undefined) => void, step: () => Promise<void>) => {
+    let open!: () => void;
+    close(new Promise((resolve) => (open = resolve)));
+    try {
+      await step();
+    } finally {
+      close(undefined);
+      open();
+    }
+  };
   const run = (sql: string, parameters?: unknown[], useStructuredResult?: boolean) =>
     useStructuredResult ? query(sql, parameters, true) : query(sql, parameters);
   const runAlone = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
@@ -54,7 +77,7 @@ function beginImmediately(runner: QueryRunner): QueryRunner {
   };
   runner.query = async (sql: string, parameters?: unknown[], useStructuredResult?: boolean) => {
     while (exclusive) await exclusive.catch(() => undefined);
-    if (sql === 'BEGIN TRANSACTION' || (sqlite.transactionDepth === 0 && !/^\s*SELECT\b/i.test(sql))) {
+    if (sql === 'BEGIN TRANSACTION' || (internals.transactionDepth === 0 && !/^\s*SELECT\b/i.test(sql))) {
       const statement = sql === 'BEGIN TRANSACTION' ? 'BEGIN IMMEDIATE TRANSACTION' : sql;
       const alone = runAlone(statement, parameters, useStructuredResult);
       exclusive = alone;
@@ -72,20 +95,32 @@ function beginImmediately(runner: QueryRunner): QueryRunner {
     }
   };
   runner.startTransaction = async (isolationLevel) => {
-    while (starting) await starting.catch(() => undefined);
-    if (sqlite.transactionDepth > 0) return startTransaction(isolationLevel);
-    starting = startTransaction(isolationLevel);
+    while (starting || ending) await (starting ?? ending);
+    if (internals.transactionDepth === 0) {
+      return gated(
+        (gate) => (starting = gate),
+        () => startTransaction(isolationLevel),
+      );
+    }
+    if (nesting++ === 0) nested = new Promise((resolve) => (nestedSettle = resolve));
     try {
-      await starting;
+      await startTransaction(isolationLevel);
     } finally {
-      starting = undefined;
+      if (--nesting === 0) nestedSettle();
     }
   };
+  const endTransaction = async (end: () => Promise<void>) => {
+    while (nesting > 0) await nested;
+    if (internals.transactionDepth !== 1) return end();
+    return gated((gate) => (ending = gate), end);
+  };
+  runner.commitTransaction = () => endTransaction(commitTransaction);
   // A rejected BEGIN leaves TypeORM at depth 0 without a SQLite transaction. Its ROLLBACK would fail, or end the
-  // transaction another flow began meanwhile, so only reset the state.
+  // transaction another flow began meanwhile, so only reset the state. If another flow's BEGIN is pending, its
+  // startTransaction already set isTransactionActive, so leave it. This skips the rollback subscriber events.
   runner.rollbackTransaction = async () => {
-    if (!sqlite.isTransactionActive || sqlite.transactionDepth > 0) return rollbackTransaction();
-    if (!starting) sqlite.isTransactionActive = false;
+    if (!internals.isTransactionActive || internals.transactionDepth > 0) return endTransaction(rollbackTransaction);
+    if (!starting) internals.isTransactionActive = false;
   };
   return runner;
 }

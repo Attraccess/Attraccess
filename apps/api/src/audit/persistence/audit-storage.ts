@@ -20,9 +20,6 @@ import { AuditDropReason, AuditMetrics } from '../../metrics/definitions/audit.m
 
 import { SettingsStoreService } from '../../settings/settings-store.service';
 
-/** Same wait as the main and resource-lifecycle connections: an audit write waits for the SQLite lock instead of being dropped. */
-export { SQLITE_BUSY_TIMEOUT_MS } from '../../database/sqlite-connection';
-
 /**
  * Extra attempts for an audit insert that waited out the busy timeout (SQLITE_BUSY). The lock holder can stall for
  * seconds under CPU starvation; the insert is a single statement that did not apply, so repeating it is safe.

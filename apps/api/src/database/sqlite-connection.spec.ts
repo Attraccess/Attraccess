@@ -52,7 +52,7 @@ describe('main SQLite connection', () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  it('waits for the serialized writer as long as the shared busy timeout', async () => {
+  it('configures the shared busy timeout', async () => {
     expect(source.options).toMatchObject({ busyTimeout: SQLITE_BUSY_TIMEOUT_MS });
     expect(await source.query('PRAGMA busy_timeout')).toEqual([{ timeout: SQLITE_BUSY_TIMEOUT_MS }]);
   });
@@ -96,8 +96,10 @@ describe('main SQLite connection', () => {
   it('lets a save and a transaction that start while the serialized writer holds the lock both succeed', async () => {
     const { release, holder } = await holdSerializedWriteLock();
     const save = source.getRepository(CounterEntity).save({ id: 2, value: 5 });
+    // Reading first makes a deferred transaction fail at once, however soon the writer releases the lock.
     const write = source.manager.transaction(async (manager) => {
-      await manager.update(CounterEntity, { id: 1 }, { value: () => 'value + 10' });
+      const { value } = await manager.findOneByOrFail(CounterEntity, { id: 1 });
+      await manager.update(CounterEntity, { id: 1 }, { value: value + 10 });
     });
     const timer = setTimeout(release, 100);
     try {
@@ -147,9 +149,39 @@ describe('main SQLite connection', () => {
       release();
       await holder;
     }
-    // The failed BEGIN leaves the connection usable.
+    // The failed BEGIN leaves no transaction state behind: the next save begins and commits its own.
+    expect(source.createQueryRunner().isTransactionActive).toBe(false);
+    const statements: string[] = [];
+    source.subscribers.push({ beforeQuery: ({ query }) => void statements.push(query) });
     await source.getRepository(CounterEntity).save({ id: 2, value: 5 });
+    expect(statements).toEqual(expect.arrayContaining(['BEGIN IMMEDIATE TRANSACTION', 'COMMIT']));
     expect(await source.query('SELECT value FROM counter WHERE id = 2')).toEqual([{ value: 5 }]);
+  });
+
+  it('begins a transaction another flow starts during the outermost commit after that commit', async () => {
+    let second: Promise<void> | undefined;
+    source.subscribers.push({
+      beforeTransactionCommit: () => {
+        // Another request's transaction arrives while the first one commits.
+        second ??= source.transaction(async (manager) => {
+          await manager.query('UPDATE counter SET value = 20 WHERE id = 2');
+          await manager.query('UPDATE counter SET value = value + 1 WHERE id = 2');
+        });
+      },
+    });
+
+    await source.transaction((manager) => manager.query('UPDATE counter SET value = 10 WHERE id = 1'));
+    await second;
+
+    const runner = source.createQueryRunner();
+    expect([runner.isTransactionActive, (runner as unknown as { transactionDepth: number }).transactionDepth]).toEqual([
+      false,
+      0,
+    ]);
+    expect(await source.query('SELECT id, value FROM counter ORDER BY id')).toEqual([
+      { id: 1, value: 10 },
+      { id: 2, value: 21 },
+    ]);
   });
 
   it('begins outer transactions immediately and keeps savepoints, rollback and subscriber state', async () => {

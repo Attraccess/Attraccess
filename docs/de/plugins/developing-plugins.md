@@ -720,7 +720,10 @@ Die Warteschlange teilt sich `runSerialized` mit jedem Sitzungsstart und -ende d
   oder andere Nicht-Datenbank-Ein-/Ausgabe darin;
 - Aufrufe nicht verschachteln. Ein in `fn` gestartetes `runSerialized` würde auf `fn` selbst warten; der Host weist
   es deshalb mit einem Fehler ab, statt zu hängen. Geben Sie stattdessen den `manager` an Hilfsfunktionen weiter und
-  warten Sie in `fn` nicht auf Kern-Vorgänge, die über dieselbe Warteschlange schreiben (etwa Sitzungsstart oder -ende).
+  warten Sie in `fn` nicht auf Kern-Vorgänge, die über dieselbe Warteschlange schreiben (etwa Sitzungsstart oder -ende);
+- in `fn` nur über `manager` lesen und schreiben, nicht über `context.getRepository(...)` oder `context.dataSource`.
+  Deren Verbindung wartet auf die Sperre, die `fn` hält: Ein Schreibvorgang dort scheitert nach etwa 5 Sekunden mit
+  `SQLITE_BUSY` und hält währenddessen andere Abfragen auf dieser Verbindung auf.
 
 Die Serialisierung gilt pro Host-Prozess. Plugins, die Ausschluss über mehrere API-Instanzen brauchen, benötigen eine
 eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
