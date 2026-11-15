@@ -470,7 +470,7 @@ The queue is shared with every core session start and end, so:
 Serialization is per host process. Plugins that need exclusion across several API
 instances need a cross-instance lock of their own; the reservations plugin runs
 on a single instance for that reason (see
-[Reservations](resources/reservations.md#single-instance-operation)).
+[Reservations](plugins/reservations/administration.md#single-instance-operation)).
 
 ### Flow nodes
 
@@ -555,7 +555,7 @@ host validates, sanitizes and renders it. Admins configure this under **Reader d
 | Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`                          |
 
 A plugin that declares `readerUi` or a hook without the matching permission **fails to load** and is quarantined.
-The first-party [Reservations](resources/reservations.md) plugin is a real-world user of both hooks: its pre-start hook blocks or confirms starts around bookings, and its session-end hook asks the holder to keep or free the rest of a booking.
+The first-party [Reservations](plugins/reservations/overview.md) plugin is a real-world user of both hooks: its pre-start hook blocks or confirms starts around bookings, and its session-end hook asks the holder to keep or free the rest of a booking.
 See `examples/plugin-reader-ui` for a working example.
 
 ### Slots
@@ -983,7 +983,7 @@ route props (`path`, `element`, ...) with an `authRequired` field:
 | `"resources.update"`                       | A single required RBAC permission key.   |
 | `["resources.update", "resources.create"]` | Any one of several RBAC permission keys. |
 
-See [Permissions](../user-management/permissions.md) for the full list of available permission keys.
+See [Permissions](user-management/permissions.md) for the full list of available permission keys.
 
 The host wraps each plugin route in an error boundary and merges it with the
 core routes, so a route that throws cannot take down the rest of the app.
@@ -1437,7 +1437,7 @@ even after final unsubscribe; recreated consumers receive fresh samples.
 The host recovers valid same-user credential rotation without clearing queries
 and retains the stream across same-batch cleanup/setup. Plugin event payloads
 have no local replay.
-See [Plugin live updates](../../development/live-updates.md#plugin-live-updates)
+See [Plugin live updates](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#plugin-live-updates)
 for the contract and examples, including reconnection and cleanup.
-The [WAGO sampling schedule](../../development/live-updates.md#wago-sampling-schedule)
+The [WAGO sampling schedule](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#wago-sampling-schedule)
 lists the shared backend intervals for all nine WAGO topics.

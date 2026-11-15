@@ -664,11 +664,20 @@ also compares every raw eFuse block with the first dump recorded for the chip
 `SECURE_VERSION` bits of BLOCK0 are left out and may only grow (anti-rollback
 burns them when the reader boots an image with a higher secure version). A park image older than that version no
 longer boots, so rebuild it from a branch with the new version. A mismatch
-quarantines the reader immediately, also on a `power=switch` place; other
-failures retry, then quarantine after `janitor.attempts`. On a `power=switch`
-place the janitor power-cycles the reader before each retry (switch off for
-10 s, on, then it waits for the reader's port) and quarantines it only once an
-attempt after a power cycle failed as well. Quarantined readers stay claimed by the janitor without a
+quarantines the reader immediately, also on a `power=switch` or `power=button`
+place; other failures retry, then quarantine after `janitor.attempts`. On a
+`power=switch` or `power=button` place the janitor power-cycles the reader
+before each retry and quarantines it only once an attempt after a power cycle
+failed as well. A switch is off for 10 s. A button reader (Touch V1) is
+switched off with its power button through the NFC emulator and stays off for
+at least 30 s; one that already switched itself off is not pressed. Then the
+reader is switched on and the janitor waits for its port. If it does not come
+back, or the attempt is stopped during the cycle (job timeout or service
+stop), the janitor tries switching it on once more, logs the final state, and
+the attempt fails. The quarantine reason then names the failed cycle, for
+example `parking failed 3 times (last exit 1), also after a power cycle that
+failed: The place has no switchable reader power to cycle` when the place's NFC
+emulator is missing. Quarantined readers stay claimed by the janitor without a
 reservation, so sessions skip them and maintenance does not wait for them:
 
 ```sh
@@ -688,10 +697,13 @@ answer, for example `line=io-expander err=ESP_ERR_TIMEOUT sda=1 scl=0
 expander=ESP_ERR_TIMEOUT pn532=ESP_ERR_TIMEOUT`. An idle bus reads `sda=1
 scl=1`. A line still low after the bus clear is held by a slave (on the Touch
 V2 most likely the CH32 I/O expander MCU), which only lets go when the reader
-loses power for at least 10 s. On a `power=switch` place the janitor's power
-cycle does that. Elsewhere, unplug the reader's USB cable for at least 10 s,
-then `clear` the place. The janitor reaches the local exporter over SSH like any
-client, with a host-local key authorized only for the `labgrid` account.
+loses power for at least 10 s; a Touch V1's bus stuck with `scl=0` needed about
+30 s off. On a `power=switch` or `power=button` place the janitor's power cycle
+does that. On a place the janitor does not power-cycle (`power=always-on` or no
+`power` tag), unplug the reader's USB cable for at least 30 s, then `clear` the
+place.
+The janitor reaches the local exporter over SSH like any client, with a
+host-local key authorized only for the `labgrid` account.
 
 The parking image never deep-sleeps: that would power down USB-Serial-JTAG and
 make the reader unreachable until someone presses reset.

@@ -28,10 +28,12 @@ For Authentik, Keycloak or other OpenID-compatible providers, you can use auto-d
 
 All URL fields are filled in automatically.
 
-**If discovery fails**, Attraccess shows the reason as a message:
+**If discovery fails**, Attraccess shows the reason in an "Auto-discovery failed" message:
 
 - A message with a status shows what the provider answered. `answered with status 404` usually means the host, realm or application name is wrong. A 5xx status points to a problem on the provider.
 - `TLS certificate of the discovery URL could not be verified` means the Attraccess API server could not verify the provider's certificate. The code in brackets names the reason, for example `CERT_HAS_EXPIRED` or `ERR_TLS_CERT_ALTNAME_INVALID`. If the provider uses a certificate from a private CA, add that CA to the server's trust store, for example with Node.js's `NODE_EXTRA_CA_CERTS` environment variable, and restart the API server.
+
+Behind a reverse proxy (nginx, Traefik, Cloudflare, …) the proxy may replace the API's error response with its own "Bad Gateway" page, and the message then shows a general hint instead of the reason. Whenever discovery fails at the identity provider (it cannot be reached, answers with an error status, or sends an unreadable answer), the API log records the exact cause, for example a DNS failure, a refused connection, a timeout, a TLS error or the status code, as a warning. To see the reason in the message, let the proxy pass the API's error responses through: for nginx, leave `proxy_intercept_errors` off (the default) for the API location, so that an `error_page` does not replace them.
 
 ### Manual Configuration
 

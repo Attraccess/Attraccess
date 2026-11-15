@@ -52,7 +52,7 @@ Ein Trigger in einem globalen Flow löst **einmal pro passendem Ereignis** aus, 
 | MQTT-Nachricht empfangen                            | Passendes Topic und passender Server, wie in Ressourcen-Flows                                                     |
 | Companion-Eingaben                                  | Das gewählte Companion-Gerät                                                                                      |
 | Variable geändert                                   | Siehe unten                                                                                                       |
-| Plugin-Trigger (z. B. WAGO-Ereignis empfangen)      | Was das Plugin meldet                                                                                             |
+| Plugin-Trigger (z. B. [WAGO](plugins/wago/overview.md)-Ereignis empfangen)      | Was das Plugin meldet                                                                                             |
 
 Wissenswert:
 

@@ -45,4 +45,8 @@ export const MeteringReportNodeDataSchema = z.object({
     .meta({ helpText: 'Non-negative measured value (template). No unit or conversion is applied.' }),
   observedAt: z.string().optional(),
   source: z.string().optional(),
+  usageId: z.string().optional().meta({
+    helpText:
+      'Session the reading belongs to (template), for a meter measured per session when the flow does not run in a session lifecycle. Leave empty otherwise.',
+  }),
 });

@@ -10,13 +10,14 @@ chip, flashes the parking image for the place's `variant` tag (encrypted on a
 
 A reader whose eFuses were burned, or that fails to park repeatedly, stays
 claimed by the janitor (quarantine) until an operator runs `clear`. A reader
-on a place tagged `power=switch` is power-cycled before each retry, and only
-quarantined once an attempt after a power cycle failed too.
+on a place tagged `power=switch` or `power=button` is power-cycled before each
+retry, and only quarantined once an attempt after a power cycle failed too.
 Quarantined claims carry no reservation, which maintenance relies on.
 """
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -34,12 +35,14 @@ from labgrid.remote.common import Reservation, ReservationState
 from labgrid.remote.generated import labgrid_coordinator_pb2 as messages
 
 from . import efuse
-from .workflow import POWER_SWITCH, attached, park
+from .workflow import POWER_BUTTON, POWER_SWITCH, attached, park
 
 OWNER_HOST = "attractap-lab-janitor"
 OWNER_USER = "janitor"
 OWNER = f"{OWNER_HOST}/{OWNER_USER}"
 QUARANTINE_EXIT = 3
+# Places whose reader the lab can power-cycle before retrying a failed park.
+CYCLED_POWER = {POWER_SWITCH, POWER_BUTTON}
 # Pending reservations expire 60 s after their last poll.
 RESERVATION_POLL_SECONDS = 15
 # Acquiring waits for the exporter to lock each resource, which is slow while
@@ -57,6 +60,16 @@ log = logging.getLogger("attractap-lab-janitor")
 def quarantined(state_dir):
     directory = Path(state_dir) / "quarantine"
     return {path.stem: path for path in directory.glob("*.json")} if directory.is_dir() else {}
+
+
+def _cycle_failure(run):
+    """Say how a run's power cycle failed, from its power-cycle.log; empty if it did not."""
+    path = run / "power-cycle.log"
+    lines = path.read_text().splitlines() if path.exists() else []
+    # Lines are "TIMESTAMP MESSAGE"; the timestamp has no spaces.
+    messages = (line.split(" ", 1)[-1] for line in lines)
+    failed = next((message for message in messages if message.startswith("failed: ")), None)
+    return f" that {failed}" if failed else ""
 
 
 def is_quarantine_hold(place):
@@ -84,7 +97,7 @@ class Janitor:
         self.reserving = set()
         self.jobs = {}
         self.failures = {}
-        self.power_cycle = set()  # switched readers whose next attempt cuts their power first
+        self.power_cycle = set()  # readers whose next attempt cuts their power first
         self.retry_after = {}
         self.wake = asyncio.Event()
 
@@ -280,7 +293,8 @@ class Janitor:
 
     async def _park(self, name, variant, profile):
         try:
-            cycled = name in self.power_cycle
+            # A place retagged since its last attempt is no longer cycled.
+            cycled = name in self.power_cycle and self._place_power(name) in CYCLED_POWER
             async with self.slots:
                 code, run = await self._run_child(name, self.images[variant], profile, cycle_power=cycled)
             if code == 0:
@@ -295,20 +309,21 @@ class Janitor:
                 log.info("%s: parked and released", name)
                 return
             failures = self.failures[name] = self.failures.get(name, 0) + 1
-            # A Touch V2's I/O expander can hold the I2C bus until the reader
-            # loses power. A reader behind a power switch gets that before giving up;
+            # A stuck I2C bus (a Touch V2's I/O expander, or a Touch V1's as on
+            # 2026-11-14) can last until the reader loses power. A reader behind
+            # a power switch or with a power button gets that before giving up;
             # burned eFuses are never retried.
-            switched = self._place_power(name) == POWER_SWITCH
-            if code == QUARANTINE_EXIT or (failures >= self.attempts and (cycled or not switched)):
+            cyclable = self._place_power(name) in CYCLED_POWER
+            if code == QUARANTINE_EXIT or (failures >= self.attempts and (cycled or not cyclable)):
                 reason_file = run / "reason.txt"
                 reason = reason_file.read_text().strip() if reason_file.exists() else (
                     f"parking failed {failures} times (last exit {code})"
-                    + (", also after a power cycle" if cycled else ""))
+                    + (f", also after a power cycle{_cycle_failure(run)}" if cycled else ""))
                 self._quarantine(name, reason, run)
                 self.failures.pop(name, None)
                 self.power_cycle.discard(name)
                 await self._drop_reservation(name)
-            elif switched:
+            elif cyclable:
                 log.warning("%s: parking attempt %d failed (exit %s); power-cycling the reader before "
                             "the next attempt", name, failures, code)
                 self.power_cycle.add(name)
@@ -352,12 +367,18 @@ class Janitor:
             return 124, run
         finally:
             if process.returncode is None:
-                os.killpg(process.pid, signal.SIGTERM)
+                # The child first, alone: it switches a reader it is power-cycling
+                # on again (over SSH) before the rest of its group is stopped.
+                process.send_signal(signal.SIGTERM)
                 try:
                     await asyncio.wait_for(process.wait(), timeout=30)
                 except asyncio.TimeoutError:
                     os.killpg(process.pid, signal.SIGKILL)
                     await process.wait()
+                else:
+                    # macOS reports EPERM for a group of zombies.
+                    with contextlib.suppress(ProcessLookupError, PermissionError):
+                        os.killpg(process.pid, signal.SIGTERM)
 
     def _quarantine(self, name, reason, run):
         directory = self.state_dir / "quarantine"
@@ -406,6 +427,9 @@ def run_daemon(args):
 def run_park(args):
     """One parking attempt on a place the janitor identity already holds."""
     def terminate(signum, frame):
+        # Once: a second signal would cut short switching a power-cycled reader
+        # on. Not SIG_IGN, which the ssh commands started meanwhile would inherit.
+        signal.signal(signum, lambda *_: None)
         raise SystemExit(128 + signum)
 
     signal.signal(signal.SIGTERM, terminate)
@@ -459,7 +483,8 @@ def main(argv=None):
     daemon.add_argument("--priority", type=float, default=1000.0, help="reservation priority (sessions use 0)")
     daemon.add_argument("--max-parallel", type=int, default=2)
     daemon.add_argument("--attempts", type=int, default=3,
-                        help="failed attempts before quarantine (power=switch: at least one after a power cycle)")
+                        help="failed attempts before quarantine (power=switch or power=button: at least one "
+                             "after a power cycle)")
     daemon.add_argument("--job-seconds", type=float, default=900.0)
     daemon.add_argument("--marker-seconds", type=float, default=30.0)
     daemon.add_argument("--park-command", help="command prefix running this module (default: this interpreter)")
@@ -475,7 +500,8 @@ def main(argv=None):
     single.add_argument("--baseline-dir")
     single.add_argument("--marker-seconds", type=float, default=30.0)
     single.add_argument("--cycle-power", action="store_true",
-                        help="cut the reader's power first (power=switch places), logged to power-cycle.log")
+                        help="cut the reader's power first (power=switch and power=button places), logged to "
+                             "power-cycle.log")
     single.set_defaults(func=run_park)
 
     clear = commands.add_parser("clear", help="release a quarantined reader after fixing it")

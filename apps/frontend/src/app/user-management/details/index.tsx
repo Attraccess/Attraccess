@@ -264,7 +264,11 @@ export function UserDetails({ id, roleIdToAssign }: { id: number; roleIdToAssign
     <div>
       <PageHeader
         title={`${user?.username ?? ''} (ID: ${user?.id ?? ''})`}
-        subtitle={t('details.externalIdentifier', { identifier: user?.externalIdentifier })}
+        subtitle={
+          user?.externalIdentifier
+            ? t('details.externalIdentifier', { identifier: user.externalIdentifier })
+            : undefined
+        }
         backTo="/users"
         actions={[
           {

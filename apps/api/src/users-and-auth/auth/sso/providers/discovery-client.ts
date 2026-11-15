@@ -67,14 +67,18 @@ export const discoveryLookup: LookupFunction = (hostname, options, callback) => 
   );
 };
 
-// Node's codes for a peer certificate that failed verification. Other TLS
-// errors, such as handshake failures, are reported as unreachable.
+// Node's codes for a peer certificate that failed verification. Node reports
+// OpenSSL verify errors it has no name for, such as KEYUSAGE_NO_CERTSIGN, as
+// UNSPECIFIED. Other TLS errors, such as handshake failures, are reported as
+// unreachable.
 export const DISCOVERY_CERTIFICATE_ERROR_CODES: ReadonlySet<string> = new Set([
+  'UNSPECIFIED',
   'DEPTH_ZERO_SELF_SIGNED_CERT',
   'SELF_SIGNED_CERT_IN_CHAIN',
   'CERT_HAS_EXPIRED',
   'CERT_NOT_YET_VALID',
   'ERR_TLS_CERT_ALTNAME_INVALID',
+  'ERR_TLS_CERT_ALTNAME_FORMAT',
   'HOSTNAME_MISMATCH',
   'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
   'UNABLE_TO_GET_ISSUER_CERT',
@@ -91,6 +95,13 @@ export const DISCOVERY_CERTIFICATE_ERROR_CODES: ReadonlySet<string> = new Set([
   'UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY',
   'ERROR_IN_CERT_NOT_BEFORE_FIELD',
   'ERROR_IN_CERT_NOT_AFTER_FIELD',
+  'UNABLE_TO_GET_CRL',
+  'UNABLE_TO_DECRYPT_CRL_SIGNATURE',
+  'CRL_SIGNATURE_FAILURE',
+  'CRL_NOT_YET_VALID',
+  'CRL_HAS_EXPIRED',
+  'ERROR_IN_CRL_LAST_UPDATE_FIELD',
+  'ERROR_IN_CRL_NEXT_UPDATE_FIELD',
 ]);
 
 // Policy rejections keep their status. Anything else failed on the way to the

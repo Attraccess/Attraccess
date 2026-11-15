@@ -52,7 +52,7 @@ A trigger in a global flow fires **once per matching event**, for any resource o
 | MQTT message received                                      | Matching topic and server, as in resource flows                                                                   |
 | Companion inputs                                           | The selected Companion device                                                                                     |
 | Variable changed                                           | See below                                                                                                         |
-| Plugin trigger nodes (for example WAGO event received)     | Whatever the plugin reports                                                                                       |
+| Plugin trigger nodes (for example [WAGO](plugins/wago/overview.md) event received)     | Whatever the plugin reports                                                                                       |
 
 Details worth knowing:
 

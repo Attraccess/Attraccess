@@ -208,6 +208,7 @@ export class UsageSessionStartPreparation {
             meterId: meter.id,
             name: meter.name,
             creditsPerUnit: meter.creditsPerUnit,
+            allocation: meter.allocation,
           }))
         : [];
 

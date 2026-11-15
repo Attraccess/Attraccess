@@ -43,6 +43,10 @@
     "title": "Zähler nicht gestartet",
     "description": "Die Sitzung wurde nicht gestartet, weil ein kostenpflichtiger Zähler nicht initialisiert werden konnte: {{error}}"
   },
+  "METER_SHARING_UNSUPPORTED": {
+    "title": "Zähler nicht teilbar",
+    "description": "Die Sitzung wurde nicht gestartet: Der Zähler „{{error}}“ kann nicht bei Bedarf gelesen werden und lässt sich daher nicht teilen, solange eine andere Sitzung läuft."
+  },
   "METER_SETTLEMENT_FAILED": {
     "title": "Zählerstand weiterhin nicht verfügbar",
     "description": "{{error}}"

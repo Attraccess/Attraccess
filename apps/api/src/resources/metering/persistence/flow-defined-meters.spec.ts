@@ -123,7 +123,9 @@ describe('Flow-defined metering', () => {
       usageLifecycleScope.onCollect = usageLifecycleScope.reading('1.5');
       const ended = await usageLifecycleScope.end();
 
-      expect(session.meterRates).toEqual([{ meterId: 1, name: 'Energy (kWh)', creditsPerUnit: 30 }]);
+      expect(session.meterRates).toEqual([
+        { meterId: 1, name: 'Energy (kWh)', creditsPerUnit: 30, allocation: 'shared' },
+      ]);
       const { transaction, items: rows } = await usageLifecycleScope.items(ended.id);
       expect(transaction).toEqual(expect.objectContaining({ amount: -45, status: BillingTransactionStatus.Completed }));
       const energy = rows.find((item) => item.name === 'Energy (kWh)');

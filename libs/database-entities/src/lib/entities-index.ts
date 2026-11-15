@@ -15,7 +15,11 @@ export {
 export type { ReaderUiAlertKind } from './entities/reader-ui-settings.entity';
 export { AuditLog } from './entities/audit-log.entity';
 export { AuthenticationDetail } from './entities/authenticationDetail.entity';
-export { BillingTransactionItem } from './entities/billing-transaction-item.entity';
+export {
+  BillingTransactionItem,
+  BillingItemAllocation,
+  BillingItemAllocationSegment,
+} from './entities/billing-transaction-item.entity';
 export { BillingTransaction, BillingTransactionStatus } from './entities/billing-transaction.entity';
 export { CompanionDevice } from './entities/companion-device.entity';
 export { ConversationParticipant } from './entities/conversation-participant.entity';
@@ -50,7 +54,7 @@ export {
   ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
 } from './entities/resource-maintenance-schedule.entity';
-export { ResourceMeter } from './entities/resource-meter.entity';
+export { ResourceMeter, ResourceMeterAllocation } from './entities/resource-meter.entity';
 export {
   CsvExportTemplate,
   CsvExportTemplateColumn,
@@ -63,6 +67,9 @@ export {
   ResourceMeteringOperationStatus,
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
+  ResourceMeteringSegment,
+  ResourceMeteringSegmentParticipant,
+  ResourceMeteringSegmentStatus,
 } from './entities/resource-metering.entity';
 export { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
 export {
@@ -181,7 +188,11 @@ import { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource
 import { ResourceMaintenanceSchedule } from './entities/resource-maintenance-schedule.entity';
 import { ResourceMeter } from './entities/resource-meter.entity';
 import { CsvExportTemplate } from './entities/csv-export-template.entity';
-import { ResourceMeteringOperation, ResourceMeteringSession } from './entities/resource-metering.entity';
+import {
+  ResourceMeteringOperation,
+  ResourceMeteringSegment,
+  ResourceMeteringSession,
+} from './entities/resource-metering.entity';
 import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
 import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecycle-attempt.entity';
 import { Resource } from './entities/resource.entity';
@@ -278,6 +289,7 @@ export const entities = {
   ResourceUsageLifecycleAttempt,
   ResourceMeteringSession,
   ResourceMeteringOperation,
+  ResourceMeteringSegment,
   ResourceMeter,
   CsvExportTemplate,
 };

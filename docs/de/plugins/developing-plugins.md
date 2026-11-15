@@ -203,7 +203,7 @@ siehe [Reader-Anzeige](attractap/reader-ui.md).
 | Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`                          |
 
 Ein Plugin, das `readerUi` oder einen Hook ohne die passende Berechtigung deklariert, **wird nicht geladen** und
-unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](resources/reservations.md) nutzt beide Hooks in der Praxis: Sein Pre-Start-Hook blockiert oder bestätigt Starts rund um Buchungen, sein Session-End-Hook fragt die buchende Person, ob sie den Rest einer Buchung behalten oder freigeben möchte. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
+unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](plugins/reservations/overview.md) nutzt beide Hooks in der Praxis: Sein Pre-Start-Hook blockiert oder bestätigt Starts rund um Buchungen, sein Session-End-Hook fragt die buchende Person, ob sie den Rest einer Buchung behalten oder freigeben möchte. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
 
 ### Slots
 
@@ -724,7 +724,7 @@ Die Warteschlange teilt sich `runSerialized` mit jedem Sitzungsstart und -ende d
 
 Die Serialisierung gilt pro Host-Prozess. Plugins, die Ausschluss über mehrere API-Instanzen brauchen, benötigen eine
 eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
-[Reservierungen](resources/reservations.md#betrieb-mit-einer-instanz)).
+[Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
 
 ### Flow-Knoten
 
@@ -903,7 +903,7 @@ erhalten frische Werte. Der Host stellt die Verbindung bei gültigem
 Sitzungswechsel desselben Benutzers ohne Löschen des Abfragecaches wieder her und
 behält sie bei Abmelden/Anmelden im selben React-Batch. Plugin-Ereignisse werden
 lokal nicht erneut zugestellt.
-Der [Vertrag mit Beispielen](../../development/live-updates.md#plugin-live-updates)
+Der [Vertrag mit Beispielen](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#plugin-live-updates)
 beschreibt auch Wiederverbindung und Freigabe von Abonnements.
-Die [WAGO-Abfrageintervalle](../../development/live-updates.md#wago-sampling-schedule)
+Die [WAGO-Abfrageintervalle](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#wago-sampling-schedule)
 listen die gemeinsamen Backend-Intervalle für alle neun WAGO-Themen auf.

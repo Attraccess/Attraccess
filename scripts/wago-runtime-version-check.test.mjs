@@ -138,7 +138,7 @@ test('treats only files that can influence the bundle as build candidates', () =
     '.github/workflows/wago-cc100-runtime.yml',
     '.github/actions/build-cc100-runtime/action.yml',
     'apps/frontend/src/index.ts',
-    'docs/en/devices/wago-cc100-runtime.md',
+    'docs/en/plugins/wago/cc100-runtime.md',
     'apps/plugins/wago/backend/runtime/install.spec.ts',
     'apps/plugins/wago/README.md',
   ])

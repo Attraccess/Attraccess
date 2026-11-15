@@ -3,7 +3,7 @@
 This implementation provides configurable Modbus TCP and POSIX RTU acquisition and
 binary named actions. WAGO 879-3020 (4PS) is the only predefined device profile.
 Its complete read-only register map follows the WAGO meter manual. See
-[setup and evidence](../../../../docs/en/devices/wago-879-3020-modbus-rtu.md).
+[setup and evidence](../../../../docs/en/plugins/wago/879-3020-modbus-rtu.md).
 Communication evidence does not qualify loaded energy accuracy or every physical assembly.
 
 ## Configuration and shared editor integration

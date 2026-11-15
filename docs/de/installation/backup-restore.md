@@ -75,7 +75,7 @@ docker compose start attraccess
 
 ## Speicher des Matter-Sidecars
 
-Nutzen Sie die Matter-Integration, liegt die Matter-Fabric im **eigenen Speicher-Volume des Sidecars** (`MATTER_SIDECAR_STORAGE_DIR`), das **nicht** zum Attraccess-Volume gehört. Sichern Sie sie über die verschlüsselten Backups des Matter-Plugins und bewahren Sie den Wiederherstellungsschlüssel außerhalb des Servers auf. Siehe die Anleitung [Matter: Backup und Wiederherstellung](devices/matter/backup-restore.md).
+Ist das Matter-Plugin installiert, liegt die Matter-Fabric im **eigenen Speicher-Volume des Sidecars** (`MATTER_SIDECAR_STORAGE_DIR`), das **nicht** zum Attraccess-Volume gehört. Sichern Sie sie über die verschlüsselten Backups des Matter-Plugins und bewahren Sie den Wiederherstellungsschlüssel außerhalb des Servers auf. Siehe [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md).
 
 ## Tipps
 
@@ -85,6 +85,6 @@ Nutzen Sie die Matter-Integration, liegt die Matter-Fabric im **eigenen Speicher
 
 ## Siehe auch
 
-- [Matter: Backup und Wiederherstellung](devices/matter/backup-restore.md)
+- [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md)
 - [Aktualisierung](installation/updating.md)
 - [Docker Compose Installation](installation/docker-compose.md)

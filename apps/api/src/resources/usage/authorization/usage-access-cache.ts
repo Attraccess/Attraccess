@@ -18,6 +18,8 @@ import { UserPermissionsChangedEvent } from '../../../users-and-auth/rbac/events
 
 import { VALKEY_CLIENT } from '../../../valkey/valkey.module';
 
+import { describeValkeyError, logValkeyOutages } from '../../../valkey/valkey-outage-logging';
+
 import { ResourceChangedEvent } from '../../events/resource-changed.event';
 
 import { ResourceGroupIntroducerChangedEvent } from '../../groups/introducers/events/resource-group-introducer-changed.event';
@@ -237,26 +239,12 @@ export class UsageAccessCache {
     // Without a retry limit SUBSCRIBE waits in the offline queue until Valkey is reachable, instead of failing for
     // good when Valkey is down at startup. Once subscribed, ioredis subscribes again after every reconnect.
     this.authorizationCacheSubscriber = this.valkeyClient.duplicate({ maxRetriesPerRequest: null });
-    // ioredis emits `error` on every reconnect attempt; log each outage once. Log only error messages here: AUTH
-    // errors carry the password in `error.command.args`.
-    let disconnected = false;
-    this.authorizationCacheSubscriber.on('error', (error: NodeJS.ErrnoException) => {
-      if (disconnected) {
-        return;
-      }
-      disconnected = true;
-      this.logger.warn(
-        `Authorization cache invalidation subscriber lost its Valkey connection (${error.message || error.code}); ` +
-          'permission changes on other API instances are not seen until it reconnects (cached answers still expire ' +
-          `within ${this.ACCESS_CACHE_TTL_MS / 1000} s)`,
-      );
-    });
-    this.authorizationCacheSubscriber.on('ready', () => {
-      if (!disconnected) {
-        return;
-      }
-      disconnected = false;
-      this.logger.log('Authorization cache invalidation subscriber reconnected to Valkey');
+    logValkeyOutages(this.authorizationCacheSubscriber, this.logger, {
+      lost: (reason) =>
+        `Authorization cache invalidation subscriber lost its Valkey connection (${reason}); ` +
+        'permission changes on other API instances are not seen until it reconnects (cached answers still expire ' +
+        `within ${this.ACCESS_CACHE_TTL_MS / 1000} s)`,
+      reconnected: 'Authorization cache invalidation subscriber reconnected to Valkey',
     });
     this.authorizationCacheSubscriber.on('message', (channel, message) => {
       if (channel !== AUTHORIZATION_CACHE_INVALIDATION_CHANNEL) {
@@ -281,13 +269,13 @@ export class UsageAccessCache {
 
   /** Subscribes, and when Valkey rejects the subscription tries again the next time the connection is ready. */
   private listenForInvalidations(subscriber: Redis): void {
-    subscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL).catch((error: NodeJS.ErrnoException) => {
+    subscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL).catch((error: unknown) => {
       // After unsubscribe() the queued SUBSCRIBE either fails with "Connection is closed." or never settles.
       if (subscriber !== this.authorizationCacheSubscriber) {
         return;
       }
       this.logger.warn(
-        `Could not subscribe to authorization cache invalidations (${error.message || error.code}); ` +
+        `Could not subscribe to authorization cache invalidations (${describeValkeyError(error)}); ` +
           'trying again after the next reconnect to Valkey',
       );
       subscriber.once('ready', () => {

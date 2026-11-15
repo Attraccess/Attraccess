@@ -10,6 +10,7 @@ describe('ResourceMeteringController session visibility', () => {
     counterValue,
     latestObservedAt: counterValue === null ? null : new Date('2026-10-30T10:00:00Z'),
     session,
+    sessions: session ? [session] : [],
   });
   const running = { sessionId: 's1', usageId: 5, latestValue: '1.5' };
   const req = { user: { id: 10, effectivePermissions: new Set(['resources.read']) } } as never;

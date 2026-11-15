@@ -35,7 +35,7 @@ By default, a machine can be used by one person at a time. If a machine can safe
 You can lower the limit at any time. Running sessions are never ended automatically; new starts are blocked until fewer sessions than the limit are active. If the new limit is below the number of currently active sessions, the settings page shows a hint. Raising the limit above 1 also shows a warning about flows.
 
 > [!WARNING]
-> [Flows](flows/overview.md) and billing do not take the number of running sessions into account. Flows run for every session start and stop, so a flow that switches power off when a session ends cuts the power for everybody on the machine. Meters and running time are charged to a single session only. Read [Shared machines](resources/usage-tracking.md#shared-machines-parallel-sessions) before enabling parallel sessions on a machine with power control or metered billing.
+> [Flows](flows/overview.md) run for every session start and stop, so a flow that switches power off when a session ends cuts the power for everybody on the machine unless it checks the number of active sessions. Meters and running time are split fairly between the people using the machine at the same time; the per-use fee and session time stay per person. Read [Shared machines](resources/usage-tracking.md#shared-machines-parallel-sessions) before enabling parallel sessions on a machine with power control or metered billing.
 
 ## Editing a Resource
 

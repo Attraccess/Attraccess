@@ -43,7 +43,6 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Documentation](https://docs.attraccess.org/en/resources/documentation.md): How to attach documentation to a resource so users can operate it safely, including documentation types and viewing them.
 - [Introductions](https://docs.attraccess.org/en/resources/introductions.md): Explains introductions (safety briefings that grant access to a resource), their roles, and how to grant, revoke and manage them.
 - [Maintenance](https://docs.attraccess.org/en/resources/maintenance.md): Track resource maintenance with manual records and automated maintenance schedules, including the required permissions.
-- [Reservations](https://docs.attraccess.org/en/resources/reservations.md): The Reservations plugin lets members book a resource for a time window; covers member use, administration and the API.
 - [Usage Tracking](https://docs.attraccess.org/en/resources/usage-tracking.md): How usage sessions are started, ended, shared between users, linked to projects and reviewed in the usage history.
 - [CSV Export](https://docs.attraccess.org/en/resources/csv-export.md): Export resource usage, resource hours and billing data as CSV: permissions, choosing columns, templates, available fields and file format.
 
@@ -81,16 +80,6 @@ The documentation pages are plain Markdown files. English pages live under https
 - [MQTT Server Setup](https://docs.attraccess.org/en/devices/mqtt/server-setup.md): How to add and test an MQTT broker connection in Attraccess, including common brokers, multiple servers and connection status.
 - [MQTT Message Explorer](https://docs.attraccess.org/en/devices/mqtt/message-explorer.md): How to watch live MQTT messages and publish test messages for any configured MQTT server, who may use the explorer and where to find it.
 - [MQTT Examples](https://docs.attraccess.org/en/devices/mqtt/examples.md): Practical MQTT examples: relay power control, receiving sensor data and using MQTT in flows for resource usage events.
-- [Guided WAGO CC100 Commissioning](https://docs.attraccess.org/en/devices/wago-cc100-commissioning.md): Guide to commission a WAGO CC100 controller in an on-premises, air-gapped installation, including MQTT claim and recovery.
-- [WAGO CC100 Docker Runtime](https://docs.attraccess.org/en/devices/wago-cc100-runtime.md): Configure the WAGO CC100 Docker runtime: terminals and live controls, MQTT server or SSH address changes, and deployment paths.
-- [WAGO Production Support](https://docs.attraccess.org/en/devices/wago-production-support.md): States tested WAGO CC100 compatibility, broker settings, enforced and measured limits, runbooks and what is not promised.
-- [WAGO Recovery Runbooks](https://docs.attraccess.org/en/devices/wago-recovery-runbooks.md): Six runbooks for operating the WAGO CC100 integration, such as credential compromise, broker outage and controller replacement.
-- [WAGO Threat Model and Pen-Test Brief](https://docs.attraccess.org/en/devices/wago-threat-model.md): Threat model and pen-test brief for the WAGO CC100 integration, covering actors, trust boundaries and attack surfaces.
-- [WAGO Safety Boundary](https://docs.attraccess.org/en/devices/wago-safety-boundary.md): States that the WAGO integration is for operational control, not a safety function, with a wording checklist for reviewers.
-- [Matter: Architecture](https://docs.attraccess.org/en/devices/matter/architecture.md): Architecture of the Matter integration: a plugin plus a sidecar, versioned REST and WebSocket contract, errors and events.
-- [Matter: Operator Guide](https://docs.attraccess.org/en/devices/matter/operator.md): Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation.
-- [Matter: Data Model and Lifecycle](https://docs.attraccess.org/en/devices/matter/data-model.md): Matter device data model: terminology, nodes, endpoints, lifecycle, state semantics, reconciliation, admin actions and data retention.
-- [Matter: Backup and Recovery](https://docs.attraccess.org/en/devices/matter/backup-restore.md): Matter fabric backup and recovery: what a backup contains, automatic and manual backups, the recovery key, restore and disaster recovery, degraded states and safety guarantees.
 
 ## English: Billing
 - [Overview](https://docs.attraccess.org/en/billing/overview.md): Introduces billing: how credits are deducted for resource usage, the credit system, payment integration and required permission.
@@ -102,6 +91,34 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Installing Plugins](https://docs.attraccess.org/en/plugins/installing-plugins.md): How to upload, enable, disable and remove plugins in the web interface, with troubleshooting.
 - [Developing Plugins](https://docs.attraccess.org/en/plugins/developing-plugins.md): Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration.
 - [Database Migrations](https://docs.attraccess.org/en/plugins/database-migrations.md): How a plugin ships TypeORM migrations for its own tables: declaring, writing and bundling the migrations entry.
+
+## English: Reservations
+- [Overview](https://docs.attraccess.org/en/plugins/reservations/overview.md): The Reservations plugin lets members book a resource for a time window; overview, prerequisites and links to member, administrator and API pages.
+- [Using Reservations](https://docs.attraccess.org/en/plugins/reservations/using-reservations.md): How members book resources, check in, handle approvals and use calendar feeds with the Reservations plugin.
+- [Administering Reservations](https://docs.attraccess.org/en/plugins/reservations/administration.md): How administrators install, configure and operate the Reservations plugin: timezone, email templates, start checks and audit log.
+- [Reservations API](https://docs.attraccess.org/en/plugins/reservations/api.md): Reference for the Reservations plugin API, including error codes.
+
+## English: WAGO
+- [Overview](https://docs.attraccess.org/en/plugins/wago/overview.md): The WAGO plugin connects WAGO CC100 controllers over MQTT to switch outputs, read inputs and Modbus meters and trigger flows; overview and prerequisites.
+- [Guided WAGO CC100 Commissioning](https://docs.attraccess.org/en/plugins/wago/cc100-commissioning.md): Guide to commission a WAGO CC100 controller in an on-premises, air-gapped installation, including MQTT claim and recovery.
+- [WAGO CC100 Docker Runtime](https://docs.attraccess.org/en/plugins/wago/cc100-runtime.md): Configure the WAGO CC100 Docker runtime: terminals and live controls, MQTT server or SSH address changes, and deployment paths.
+- [WAGO Production Support](https://docs.attraccess.org/en/plugins/wago/production-support.md): States tested WAGO CC100 compatibility, broker settings, enforced and measured limits, runbooks and what is not promised.
+- [WAGO Recovery Runbooks](https://docs.attraccess.org/en/plugins/wago/recovery-runbooks.md): Six runbooks for operating the WAGO CC100 integration, such as credential compromise, broker outage and controller replacement.
+- [WAGO Threat Model and Pen-Test Brief](https://docs.attraccess.org/en/plugins/wago/threat-model.md): Threat model and pen-test brief for the WAGO CC100 integration, covering actors, trust boundaries and attack surfaces.
+- [WAGO Safety Boundary](https://docs.attraccess.org/en/plugins/wago/safety-boundary.md): States that the WAGO integration is for operational control, not a safety function, with a wording checklist for reviewers.
+
+## English: Matter
+- [Overview](https://docs.attraccess.org/en/plugins/matter/overview.md): The Matter plugin connects Attraccess to a separate Matter sidecar that holds the Matter fabric; overview, prerequisites and links to the guides.
+- [Matter: Architecture](https://docs.attraccess.org/en/plugins/matter/architecture.md): Architecture of the Matter integration: a plugin plus a sidecar, versioned REST and WebSocket contract, errors and events.
+- [Matter: Operator Guide](https://docs.attraccess.org/en/plugins/matter/operator.md): Operator guide for the Matter sidecar: build and start, configuration, connecting Attraccess, topologies and credential rotation.
+- [Matter: Data Model and Lifecycle](https://docs.attraccess.org/en/plugins/matter/data-model.md): Matter device data model: terminology, nodes, endpoints, lifecycle, state semantics, reconciliation, admin actions and data retention.
+- [Matter: Backup and Recovery](https://docs.attraccess.org/en/plugins/matter/backup-restore.md): Matter fabric backup and recovery: what a backup contains, automatic and manual backups, the recovery key, restore and disaster recovery, degraded states and safety guarantees.
+
+## English: RabbitMQ
+- [Overview](https://docs.attraccess.org/en/plugins/rabbitmq/overview.md): The RabbitMQ plugin adds status, user, connection and statistics panels for RabbitMQ brokers to an MQTT server's detail page; prerequisites and permissions.
+
+## English: Shelly
+- [Overview](https://docs.attraccess.org/en/plugins/shelly/overview.md): The Shelly plugin keeps a registry of Shelly devices on your network, with discovery, device info, admin password management and firmware updates.
 
 ## English: Monitoring & Metrics
 - [Overview](https://docs.attraccess.org/en/monitoring/overview.md): Overview of built-in Prometheus metrics and Grafana dashboards for monitoring Attraccess, with security notes.
@@ -172,7 +189,6 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Dokumentation](https://docs.attraccess.org/de/resources/documentation.md): Wie Sie einer Ressource Dokumentation für die sichere Bedienung hinzufügen, inklusive Dokumentationstypen und Anzeige.
 - [Einweisungen](https://docs.attraccess.org/de/resources/introductions.md): Erklärt Einweisungen (Sicherheitsunterweisungen für den Zugang zu einer Ressource), ihre Rollen sowie Erteilen, Entziehen und Verwalten.
 - [Wartung](https://docs.attraccess.org/de/resources/maintenance.md): Wartung von Ressourcen mit manuellen Einträgen und automatisierten Wartungsplänen nachverfolgen, inklusive nötiger Berechtigungen.
-- [Reservierungen](https://docs.attraccess.org/de/resources/reservations.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; behandelt Nutzung, Administration und API.
 - [Nutzungsverfolgung](https://docs.attraccess.org/de/resources/usage-tracking.md): Wie Nutzungssitzungen gestartet, beendet, gemeinsam genutzt, mit Projekten verknüpft und in der Nutzungshistorie eingesehen werden.
 - [CSV-Export](https://docs.attraccess.org/de/resources/csv-export.md): Nutzungs-, Stunden- und Abrechnungsdaten als CSV exportieren: Berechtigungen, Spalten, Vorlagen, verfügbare Felder und Dateiformat.
 
@@ -210,12 +226,6 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Nachrichten-Explorer](https://docs.attraccess.org/de/mqtt/message-explorer.md): Wie Sie MQTT-Nachrichten live ansehen und Testnachrichten für jeden eingerichteten MQTT-Server senden, wer den Explorer nutzen darf und wo Sie ihn finden.
 - [Beispiele](https://docs.attraccess.org/de/mqtt/examples.md): Praktische MQTT-Beispiele: Maschinensteuerung über Relais, Sensordaten empfangen und MQTT in Flows für Nutzungsereignisse.
 
-## Deutsch: Geräte
-- [Matter: Architektur](https://docs.attraccess.org/de/devices/matter/architecture.md): Architektur der Matter-Integration: Plugin plus Sidecar, versionierter REST- und WebSocket-Vertrag, Fehler und Events.
-- [Matter: Betriebsanleitung](https://docs.attraccess.org/de/devices/matter/operator.md): Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation.
-- [Matter: Datenmodell und Lebenszyklus](https://docs.attraccess.org/de/devices/matter/data-model.md): Matter-Gerätedatenmodell: Begriffe, Nodes, Endpoints, Lebenszyklus, Zustandssemantik, Abgleich, Admin-Aktionen und Datenaufbewahrung.
-- [Matter: Backup und Wiederherstellung](https://docs.attraccess.org/de/devices/matter/backup-restore.md): Backup und Wiederherstellung der Matter-Fabric: Inhalt, automatische und manuelle Backups, Wiederherstellungsschlüssel, Restore, Disaster Recovery, degradierte Zustände und Garantien.
-
 ## Deutsch: Abrechnung
 - [Überblick](https://docs.attraccess.org/de/billing/overview.md): Stellt die Abrechnung vor: Credits werden bei Ressourcennutzung abgezogen; Credit-System, Zahlungsintegration und nötige Berechtigung.
 - [Konfiguration](https://docs.attraccess.org/de/billing/configuration.md): So aktivieren Sie die Abrechnung pro Ressource, wählen Abrechnungsmodelle, rechnen Zählerverbrauch ab und verwalten Credit-Guthaben.
@@ -225,6 +235,34 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Überblick](https://docs.attraccess.org/de/plugins/overview.md): Stellt das Plugin-System vor, das Attraccess um Frontend-Seiten und Backend-Endpunkte erweitert, mit Verwaltung und SDKs.
 - [Plugins installieren](https://docs.attraccess.org/de/plugins/installing-plugins.md): Plugins über die Weboberfläche hochladen, aktivieren, deaktivieren und entfernen, mit Fehlerbehebung.
 - [Plugins entwickeln](https://docs.attraccess.org/de/plugins/developing-plugins.md): Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks.
+
+## Deutsch: Reservierungen
+- [Überblick](https://docs.attraccess.org/de/plugins/reservations/overview.md): Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; Überblick, Voraussetzungen und Links zu Mitglieder-, Administrations- und API-Seiten.
+- [Reservierungen nutzen](https://docs.attraccess.org/de/plugins/reservations/using-reservations.md): Wie Mitglieder mit dem Plugin Reservierungen Ressourcen buchen, einchecken, Genehmigungen abwickeln und Kalender-Feeds nutzen.
+- [Reservierungen administrieren](https://docs.attraccess.org/de/plugins/reservations/administration.md): Wie Administratoren das Plugin Reservierungen installieren, konfigurieren und betreiben: Zeitzone, E-Mail-Vorlagen, Startprüfung und Audit-Log.
+- [Reservierungs-API](https://docs.attraccess.org/de/plugins/reservations/api.md): Referenz der API des Plugins Reservierungen, einschließlich Fehlercodes.
+
+## Deutsch: WAGO
+- [Überblick](https://docs.attraccess.org/de/plugins/wago/overview.md): Das Plugin WAGO verbindet WAGO-CC100-Controller über MQTT, um Ausgänge zu schalten, Eingänge und Modbus-Zähler zu lesen und Flows auszulösen; Überblick und Voraussetzungen.
+- [Geführte WAGO-CC100-Inbetriebnahme](https://docs.attraccess.org/de/plugins/wago/cc100-commissioning.md): Anleitung zur Inbetriebnahme eines WAGO-CC100-Controllers in einer lokalen, vom Internet getrennten Installation, einschließlich MQTT-Claim und Wiederherstellung.
+- [WAGO-CC100-Docker-Laufzeit](https://docs.attraccess.org/de/plugins/wago/cc100-runtime.md): WAGO-CC100-Docker-Laufzeitumgebung konfigurieren: Klemmen und Live-Steuerung, Wechsel von MQTT-Server oder SSH-Adresse sowie Bereitstellungswege.
+- [WAGO-Produktivbetrieb und Kompatibilität](https://docs.attraccess.org/de/plugins/wago/production-support.md): Nennt die getestete WAGO-CC100-Kompatibilität, Broker-Einstellungen, erzwungene und gemessene Grenzen, Runbooks und was nicht zugesagt wird.
+- [WAGO-Wiederherstellungs-Runbooks](https://docs.attraccess.org/de/plugins/wago/recovery-runbooks.md): Sechs Runbooks für den Betrieb der WAGO-CC100-Integration, etwa bei Zugangsdaten-Kompromittierung, Broker-Ausfall und Controller-Austausch.
+- [WAGO-Bedrohungsmodell und Pen-Test-Briefing](https://docs.attraccess.org/de/plugins/wago/threat-model.md): Bedrohungsmodell und Pen-Test-Briefing für die WAGO-CC100-Integration mit Akteuren, Vertrauensgrenzen und Angriffsflächen.
+- [WAGO-Sicherheitsgrenze](https://docs.attraccess.org/de/plugins/wago/safety-boundary.md): Legt fest, dass die WAGO-Integration der betrieblichen Steuerung und keiner Sicherheitsfunktion dient, mit einer Formulierungs-Checkliste für Prüfer.
+
+## Deutsch: Matter
+- [Überblick](https://docs.attraccess.org/de/plugins/matter/overview.md): Das Plugin Matter verbindet Attraccess mit einem separaten Matter-Sidecar, der die Matter-Fabric hält; Überblick, Voraussetzungen und Links zu den Anleitungen.
+- [Matter: Architektur](https://docs.attraccess.org/de/plugins/matter/architecture.md): Architektur der Matter-Integration: Plugin plus Sidecar, versionierter REST- und WebSocket-Vertrag, Fehler und Events.
+- [Matter: Betriebsanleitung](https://docs.attraccess.org/de/plugins/matter/operator.md): Betriebsanleitung für den Matter-Sidecar: Bauen und starten, Konfiguration, Anbindung an Attraccess, Topologien und Token-Rotation.
+- [Matter: Datenmodell und Lebenszyklus](https://docs.attraccess.org/de/plugins/matter/data-model.md): Matter-Gerätedatenmodell: Begriffe, Nodes, Endpoints, Lebenszyklus, Zustandssemantik, Abgleich, Admin-Aktionen und Datenaufbewahrung.
+- [Matter: Backup und Wiederherstellung](https://docs.attraccess.org/de/plugins/matter/backup-restore.md): Backup und Wiederherstellung der Matter-Fabric: Inhalt, automatische und manuelle Backups, Wiederherstellungsschlüssel, Restore, Disaster Recovery, degradierte Zustände und Garantien.
+
+## Deutsch: RabbitMQ
+- [Überblick](https://docs.attraccess.org/de/plugins/rabbitmq/overview.md): Das Plugin RabbitMQ ergänzt die Detailseite eines MQTT-Servers um Status-, Benutzer-, Verbindungs- und Statistik-Bereiche für RabbitMQ-Broker; Voraussetzungen und Berechtigungen.
+
+## Deutsch: Shelly
+- [Überblick](https://docs.attraccess.org/de/plugins/shelly/overview.md): Das Plugin Shelly führt ein Register der Shelly-Geräte in Ihrem Netzwerk mit Suche, Geräteinformationen, Admin-Passwort-Verwaltung und Firmware-Updates.
 
 ## Deutsch: Monitoring & Metriken
 - [Überblick](https://docs.attraccess.org/de/monitoring/overview.md): Überblick über integrierte Prometheus-Metriken und Grafana-Dashboards zur Überwachung von Attraccess, inklusive Sicherheitshinweisen.

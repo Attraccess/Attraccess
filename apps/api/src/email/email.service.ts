@@ -28,6 +28,8 @@ import { MetricsService } from '../metrics/metrics.service';
 
 import { SettingsService } from '../settings/settings.service';
 
+import { describeAllocation, receiptFormatters } from './usage-receipt-allocation';
+
 import * as Handlebars from 'handlebars';
 
 import { createTransport } from 'nodemailer';
@@ -99,24 +101,17 @@ export class EmailService {
     const roundedMinutes = transaction.items?.find(
       (item) => item.name === 'PER_MINUTE' && item.meterQuantity == null && item.meterCreditsPerUnit == null,
     )?.quantity;
-    const secondsFormatOptions = { maximumFractionDigits: 3 };
-    let secondsFormatter: Intl.NumberFormat;
-    try {
-      secondsFormatter = new Intl.NumberFormat(
-        getSupportedDeviceLanguage(user.locale) ? user.locale : await this.settingsService.resolveLanguage(user.locale),
-        secondsFormatOptions,
-      );
-    } catch {
-      // Persisted locales are not restricted to valid Intl tags. Match the default email language.
-      secondsFormatter = new Intl.NumberFormat('en', secondsFormatOptions);
-    }
+    const { secondsFormatter, formatRange } = receiptFormatters(
+      getSupportedDeviceLanguage(user.locale) ? user.locale : await this.settingsService.resolveLanguage(user.locale),
+    );
 
     const items = (transaction.items ?? []).map((item) => ({
+      ...describeAllocation(item, secondsFormatter, currencyMinorUnit, formatRange),
       name: item.name,
       description: item.description,
       quantity:
         item.meterCreditsPerUnit != null && item.meterQuantity == null ? '—' : (item.meterQuantity ?? item.quantity),
-      isUnavailable: item.meterCreditsPerUnit != null && item.meterQuantity == null,
+      isUnavailable: item.meterCreditsPerUnit != null && item.meterQuantity == null && !item.allocation?.pending,
       unitPrice:
         item.meterCreditsPerUnit != null
           ? formatCredits(item.meterCreditsPerUnit, currencyMinorUnit, { useGrouping: false })
@@ -132,6 +127,7 @@ export class EmailService {
         item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
       isBillingFactor: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'BILLING_FACTOR',
       isDuration:
+        item.allocation == null &&
         item.meterQuantity == null &&
         item.meterCreditsPerUnit == null &&
         (item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE'),

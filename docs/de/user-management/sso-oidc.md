@@ -28,10 +28,12 @@ Für Authentik, Keycloak oder andere OpenID-kompatible Anbieter können Sie die 
 
 Alle URL-Felder werden automatisch ausgefüllt.
 
-**Wenn die Erkennung fehlschlägt**, zeigt Attraccess den Grund als Meldung an:
+**Wenn die Erkennung fehlschlägt**, zeigt Attraccess den Grund in der Meldung „Automatische Erkennung fehlgeschlagen“ an:
 
 - Eine Meldung mit einem Status zeigt, was der Anbieter geantwortet hat. `answered with status 404` bedeutet meist, dass Host, Realm oder Anwendungsname falsch sind. Ein 5xx-Status weist auf ein Problem beim Anbieter hin.
 - `TLS certificate of the discovery URL could not be verified` bedeutet, dass der Attraccess-API-Server das Zertifikat des Anbieters nicht prüfen konnte. Der Code in Klammern nennt den Grund, zum Beispiel `CERT_HAS_EXPIRED` oder `ERR_TLS_CERT_ALTNAME_INVALID`. Wenn der Anbieter ein Zertifikat einer privaten CA verwendet, fügen Sie diese CA dem Truststore des Servers hinzu, zum Beispiel über die Node.js-Umgebungsvariable `NODE_EXTRA_CA_CERTS`, und starten Sie den API-Server neu.
+
+Hinter einem Reverse Proxy (nginx, Traefik, Cloudflare, …) kann der Proxy die Fehlerantwort der API durch eine eigene „Bad Gateway“-Seite ersetzen; die Meldung zeigt dann statt des Grundes einen allgemeinen Hinweis. Scheitert die Erkennung am Identitätsanbieter (nicht erreichbar, Antwort mit Fehlerstatus oder unlesbare Antwort), steht die genaue Ursache, zum Beispiel DNS-Fehler, abgelehnte Verbindung, Zeitüberschreitung, TLS-Fehler oder der Statuscode, als Warnung im API-Log. Damit der Grund in der Meldung erscheint, lassen Sie den Proxy die Fehlerantworten der API durchreichen: Lassen Sie bei nginx `proxy_intercept_errors` für die API-Location ausgeschaltet (Standard), damit keine `error_page` sie ersetzt.
 
 ### Manuelle Konfiguration
 
