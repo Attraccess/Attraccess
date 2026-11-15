@@ -12,6 +12,7 @@ import { SessionPermissionSync } from '../auth/sso/session-permission-sync';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
 
@@ -38,6 +39,15 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
   }
 
   async validate(req: Request & { authSession?: LogoutSession }): Promise<User> {
+    try {
+      return await this.resolveUser(req);
+    } catch (error) {
+      // An unreachable Valkey is not a failed sign-in: answer 503 (the auth guard passes 5xx through) instead of 401.
+      throw isValkeyUnavailableError(error) ? valkeyUnavailableException(error as Error) : error;
+    }
+  }
+
+  private async resolveUser(req: Request & { authSession?: LogoutSession }): Promise<User> {
     const { token, fromAuthorizationHeader } = this.extractTokenFromRequest(req);
 
     if (!token) {
