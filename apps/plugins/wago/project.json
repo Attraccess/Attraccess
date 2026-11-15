@@ -395,7 +395,8 @@
         "{projectRoot}/backend/protocol/**/*",
         "{projectRoot}/backend/**/*.entity.ts",
         "{projectRoot}/shared/**/*",
-        "{projectRoot}/cc100-runtime/manifest.json"
+        "{projectRoot}/cc100-runtime/manifest.json",
+        "{workspaceRoot}/jest.preset.js"
       ],
       "executor": "@nx/jest:jest",
       "options": {

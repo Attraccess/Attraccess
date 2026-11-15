@@ -14,6 +14,7 @@ import {
   isBuildCandidate,
   isRuntimeSource,
   normalizeBundle,
+  projectConfigAffectsRuntime,
   readShippedRuntime,
 } from './check-wago-runtime-version.mjs';
 
@@ -27,7 +28,6 @@ test('covers shared contracts, runtime dependencies, image construction and acti
     manifest,
     'apps/plugins/wago/modbus/model.ts',
     'apps/plugins/wago/shared/hardware-profile.ts',
-    'apps/plugins/wago/project.json',
     'apps/plugins/wago/channel-behavior.ts',
     'apps/plugins/wago/measurement-contract.ts',
     'apps/plugins/wago/cc100-runtime/Dockerfile',
@@ -50,6 +50,8 @@ test('covers shared contracts, runtime dependencies, image construction and acti
     'apps/plugins/wago/cc100-runtime/src/simulator.ts',
     'apps/plugins/wago/cc100-runtime/src/simulator/device.ts',
     'apps/plugins/wago/cc100-runtime/Dockerfile.simulator',
+    // Decided by its content, see projectConfigAffectsRuntime.
+    'apps/plugins/wago/project.json',
     // Repo-root and CI files are decided by the built output, see the cases below.
     'pnpm-lock.yaml',
     'package.json',
@@ -501,4 +503,90 @@ test('buildRuntimeAt reports the failing command with its output tail and still 
       assert.equal(existsSync(checkout), false);
       assert.equal(worktreeCount(directory), 1);
     }),
+  ));
+
+const projectConfig = 'apps/plugins/wago/project.json';
+const projectJson = (targets, extra = {}) => JSON.stringify({ name: 'plugin-wago', ...extra, targets }, null, 2);
+const baseTargets = {
+  'build-cc100-runtime': { command: 'node write-package.mjs', dependsOn: ['build-cc100-runtime-esbuild'] },
+  'test-cc100-runtime': { executor: '@nx/jest:jest', inputs: ['default'] },
+  lint: { command: 'eslint .' },
+};
+
+test('project.json counts as runtime source unless only check targets (test, lint, typecheck, crap-score) change', () => {
+  const before = projectJson(baseTargets);
+  for (const targets of [
+    { ...baseTargets, 'test-cc100-runtime': { ...baseTargets['test-cc100-runtime'], inputs: ['default', 'x'] } },
+    { ...baseTargets, lint: { command: 'eslint . --max-warnings=0' } },
+    { ...baseTargets, 'typecheck-cc100-runtime': { command: 'tsc' } },
+    { ...baseTargets, 'crap-score-cc100-runtime': { command: 'node run.mjs' } },
+    { 'build-cc100-runtime': baseTargets['build-cc100-runtime'] },
+  ])
+    assert.equal(projectConfigAffectsRuntime(before, projectJson(targets)), false, JSON.stringify(targets));
+  // Whitespace and key order are not changes either.
+  assert.equal(projectConfigAffectsRuntime(before, JSON.stringify(JSON.parse(before))), false);
+
+  for (const after of [
+    projectJson({ ...baseTargets, 'build-cc100-runtime': { command: 'node other.mjs' } }),
+    projectJson({ ...baseTargets, 'build-runtime': { command: 'node build-owned-runtime.mjs' } }),
+    // Targets that merely start with a check word are not check targets.
+    projectJson({ ...baseTargets, testament: { command: 'deploy' } }),
+    projectJson(baseTargets, { tags: ['host:fhs'] }),
+    '{ not json',
+    null,
+  ])
+    assert.equal(projectConfigAffectsRuntime(before, after), true, String(after));
+  assert.equal(projectConfigAffectsRuntime(null, before), true);
+  assert.equal(projectConfigAffectsRuntime(null, null), false);
+});
+
+test('does not build or require a bump when only a project.json test target changes', () =>
+  withRepository(
+    {
+      baseline: { [projectConfig]: projectJson(baseTargets) },
+      files: {
+        [projectConfig]: projectJson({
+          ...baseTargets,
+          'test-cc100-runtime': { ...baseTargets['test-cc100-runtime'], inputs: ['default', '{workspaceRoot}/x'] },
+        }),
+      },
+    },
+    ({ base }) => {
+      const { build, calls } = fakeBuild(new Error('must not build'), new Error('must not build'));
+      assert.equal(check(base, build), 'No WAGO CC100 runtime source changes detected.');
+      assert.deepEqual(calls, []);
+    },
+  ));
+
+test('requires a bump without building when a project.json build target changes', () =>
+  withRepository(
+    {
+      baseline: { [projectConfig]: projectJson(baseTargets) },
+      files: {
+        [projectConfig]: projectJson({ ...baseTargets, 'build-cc100-runtime': { command: 'node other.mjs' } }),
+      },
+    },
+    ({ base }) => {
+      const { build, calls } = fakeBuild(new Error('must not build'), new Error('must not build'));
+      assert.throws(() => check(base, build), /increasing the version[\s\S]*apps\/plugins\/wago\/project\.json/);
+      assert.deepEqual(calls, []);
+    },
+  ));
+
+test('leaves a check-only project.json change out of the build candidates it names', () =>
+  withRepository(
+    {
+      baseline: { [projectConfig]: projectJson(baseTargets) },
+      files: {
+        [projectConfig]: projectJson({ ...baseTargets, lint: { command: 'eslint . --fix' } }),
+        'pnpm-lock.yaml': 'changed',
+      },
+    },
+    ({ base }) => {
+      const logged = [];
+      const { build, calls } = fakeBuild(shipped(), shipped());
+      checkRuntimeVersion(base, { build, log: (line) => logged.push(line) });
+      assert.deepEqual(calls, ['merge-base', 'HEAD']);
+      assert.match(logged[0], /because of: pnpm-lock\.yaml$/);
+    },
   ));

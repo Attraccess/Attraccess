@@ -33,6 +33,8 @@ function fakeContext(options: { audit?: boolean; hostVersion?: string | undefine
     manifest: { id: 'matter', name: 'matter', version: entry.plugin, pluginDirectory: 'matter' },
     logger: log,
     getRepository: () => repository,
+    // Settings writes go through the host's serialized queue; its manager reaches the same row.
+    runSerialized: async <T>(fn: (manager: unknown) => Promise<T>) => fn({ getRepository: () => repository }),
     // A reversible stand-in for the host's encryption, visibly not plaintext.
     secrets: {
       encrypt: (text: string) => `enc:${Buffer.from(text).toString('base64')}`,
