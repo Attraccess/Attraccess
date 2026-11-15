@@ -94,7 +94,7 @@
     machine.fail("grep -q 'power cycle' /var/lib/attractap-lab-janitor/quarantine/parking.json")
     # A reader with a power button gets one more, power-cycled attempt despite attempts = 1.
     machine.wait_until_succeeds("test -e /var/lib/attractap-lab-janitor/quarantine/parking-button.json", timeout=180)
-    machine.succeed("grep -q 'also after a power cycle' /var/lib/attractap-lab-janitor/quarantine/parking-button.json")
+    machine.succeed("grep -q 'also after a power cycle that failed: The place has no switchable reader power' /var/lib/attractap-lab-janitor/quarantine/parking-button.json")
     machine.succeed("test $(ls /var/lib/attractap-lab-janitor/runs/parking-button | wc -l) = 2")
     machine.succeed("test $(ls /var/lib/attractap-lab-janitor/runs/parking-button/*/power-cycle.log | wc -l) = 1")
     machine.succeed("labgrid-client -p parking-button show | grep 'acquired: attractap-lab-janitor/janitor'")

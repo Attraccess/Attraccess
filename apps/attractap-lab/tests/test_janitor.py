@@ -219,7 +219,9 @@ class FakeTarget:
         assert resources == [self.flash.device] and timeout > 0
 
     def _name(self, driver):
-        return {id(self.console): "serial", id(self.flash): "flash"}.get(id(driver), "power")
+        emulator = getattr(self.power, "emulator", None)
+        return {id(self.console): "serial", id(self.flash): "flash", id(emulator): "emulator"}.get(
+            id(driver), "power")
 
     def activate(self, driver):
         self.events.append(("activate", self._name(driver)))
@@ -301,7 +303,7 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
     assert sleep[1] >= 30
     assert events.index("power-off") < events.index(sleep) < events.index("power-on") < events.index("efuse")
     assert events.count("power-on") == 1 and button.power.get()
-    assert ("deactivate", "power") in events
+    assert ("deactivate", "emulator") in events
     log = (tmp_path / "button/power-cycle.log").read_text()
     assert "FakePower: off for 30s, then on" in log and "reader is off" in log and "reader is on again" in log
     # An always-on place has nothing to cycle with; the attempt fails before erasing.
@@ -312,6 +314,12 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
         park(always_on, tmp_path / "park.bin", tmp_path / "always-on", cycle_power=True)
     assert "efuse" not in events
     assert "failed: The place has no switchable reader power" in (tmp_path / "always-on/power-cycle.log").read_text()
+
+
+def test_manual_power_cycles_keep_their_off_time():
+    assert workflow.BUTTON_CYCLE_OFF_SECONDS >= 30
+    assert ReaderPowerDriver.__attrs_attrs__.delay.default == 2.0
+    assert SwitchPowerDriver.__attrs_attrs__.delay.default == 10.0
 
 
 def cycle_button(tmp_path, monkeypatch, power, name):
@@ -327,7 +335,7 @@ def test_power_cycle_switches_on_a_button_reader_that_was_already_off(tmp_path, 
     power = FakePower(events, powered=False)
     log = cycle_button(tmp_path, monkeypatch, power, "off.log")
     assert "power-off" not in events, "pressing a reader that is off would switch it on"
-    assert events == [("activate", "power"), ("sleep", 30.0), "power-on", ("deactivate", "power")]
+    assert events == [("activate", "power"), ("sleep", 30.0), "power-on", ("deactivate", "emulator")]
     assert power.get() and "reader is on again" in log
 
 
@@ -342,7 +350,7 @@ def test_power_cycle_retries_switching_on_once_and_still_fails(tmp_path, monkeyp
         cycle_button(tmp_path, monkeypatch, power, "failed.log")
     log = (tmp_path / "failed.log").read_text()
     assert events.count("power-on") == 2, "one best-effort switch on after the failed one"
-    assert events[-1] == ("deactivate", "power"), "the emulator connection is closed"
+    assert events[-1] == ("deactivate", "emulator"), "the emulator connection is closed"
     assert power.get() == (failing_ons == 1)
     lines = log.splitlines()
     assert "failed: The reader did not turn on" in lines[-2] and lines[-1].endswith(final)
@@ -359,7 +367,7 @@ def test_power_cycle_switches_a_reader_on_when_stopped_while_it_is_off(tmp_path,
     monkeypatch.setattr(workflow.time, "sleep", terminated)
     with pytest.raises(SystemExit):
         workflow.power_cycle(target, tmp_path / "stopped.log")
-    assert events == [("activate", "power"), "power-off", "power-on", ("deactivate", "power")]
+    assert events == [("activate", "power"), "power-off", "power-on", ("deactivate", "emulator")]
     lines = (tmp_path / "stopped.log").read_text().splitlines()
     assert lines[-2].endswith("interrupted: SystemExit(143)") and lines[-1].endswith("reader is on again")
 
@@ -647,7 +655,7 @@ def test_flash_reader_keeps_a_reader_with_a_power_button_on(tmp_path, monkeypatc
     flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
     assert power.powered
     assert events == [("activate", "flash"), ("deactivate", "flash"),
-                      ("activate", "power"), "power-on", ("deactivate", "power")]
+                      ("activate", "power"), "power-on", ("deactivate", "emulator")]
 
     # A flash that fails while the reader stays on is a real failure.
     events.clear()
@@ -702,6 +710,19 @@ def test_janitor_parks_again_when_variant_or_profile_changes(tmp_path):
     (None, [1], [False], "parking failed 1 times (last exit 1)"),
 ])
 def test_janitor_power_cycles_a_switchable_reader_before_giving_up(tmp_path, power, outcomes, runs, quarantined):
+    janitor, calls, released = park_attempts(tmp_path, power, outcomes)
+    assert calls == runs
+    hold = tmp_path / "quarantine/reader.json"
+    if quarantined is None:
+        assert released == ["reader"] and not hold.exists()
+    else:
+        assert json.loads(hold.read_text())["reason"] == quarantined
+        assert not released
+    assert not janitor.power_cycle
+
+
+def park_attempts(tmp_path, power, outcomes, *, attempts=1, cycle_log="reader is on again", retag=None):
+    """Run one janitor attempt per outcome; ``retag`` changes the power tag after the first."""
     from labgrid.remote.common import Place, ResourceMatch
     released, calls = [], []
 
@@ -716,7 +737,7 @@ def test_janitor_power_cycles_a_switchable_reader_before_giving_up(tmp_path, pow
     session = SimpleNamespace(stub=Stub(), sync_with_coordinator=sync_with_coordinator, places={
         "reader": Place(name="reader", tags=tags, matches=[ResourceMatch.fromstr("test/reader/*")])})
     janitor = Janitor(session, config=None, images={"touch-v2": "park.bin"}, state_dir=tmp_path,
-                      priority=1000, max_parallel=1, attempts=1, park_command=[], job_seconds=1,
+                      priority=1000, max_parallel=1, attempts=attempts, park_command=[], job_seconds=1,
                       marker_seconds=1)
 
     async def run_child(name, image, profile, *, cycle_power=False):
@@ -726,20 +747,94 @@ def test_janitor_power_cycles_a_switchable_reader_before_giving_up(tmp_path, pow
         code = outcomes[len(calls) - 1]
         if code == 3:
             (run / "reason.txt").write_text("eFuses burned\n")
+        if cycle_power:
+            (run / "power-cycle.log").write_text(f"2026-11-15T10:00:00+0100 {cycle_log}\n")
         return code, run
 
     janitor._run_child = run_child
 
-    async def attempts():
-        for _ in outcomes:
+    async def run():
+        for attempt in range(len(outcomes)):
+            if attempt == 1 and retag is not None:
+                tags.pop("power", None)
+                tags.update({"power": retag} if retag else {})
             await janitor._park("reader", "touch-v2", efuse.PLAIN)
 
-    asyncio.run(attempts())
-    assert calls == runs
-    hold = tmp_path / "quarantine/reader.json"
-    if quarantined is None:
-        assert released == ["reader"] and not hold.exists()
-    else:
-        assert json.loads(hold.read_text())["reason"] == quarantined
-        assert not released
-    assert not janitor.power_cycle
+    asyncio.run(run())
+    return janitor, calls, released
+
+
+@pytest.mark.parametrize("power", ["switch", "button"])
+def test_janitor_power_cycles_before_every_retry(tmp_path, power):
+    janitor, calls, released = park_attempts(tmp_path, power, [1, 1, 1], attempts=3)
+    assert calls == [False, True, True]
+    assert json.loads((tmp_path / "quarantine/reader.json").read_text())["reason"] == (
+        "parking failed 3 times (last exit 1), also after a power cycle")
+    assert not released and not janitor.power_cycle
+
+
+def test_janitor_names_a_power_cycle_that_failed(tmp_path):
+    # Without an NFC emulator nothing presses the button; the reason must not read like a real cycle.
+    park_attempts(tmp_path, "button", [1, 1],
+                  cycle_log="failed: The place has no switchable reader power to cycle")
+    assert json.loads((tmp_path / "quarantine/reader.json").read_text())["reason"] == (
+        "parking failed 2 times (last exit 1), also after a power cycle that failed: "
+        "The place has no switchable reader power to cycle")
+
+
+@pytest.mark.parametrize("retag", ["always-on", ""])
+def test_janitor_stops_power_cycling_a_retagged_place(tmp_path, retag):
+    janitor, calls, released = park_attempts(tmp_path, "button", [1, 1, 1], attempts=3, retag=retag)
+    assert calls == [False, False, False]
+    assert json.loads((tmp_path / "quarantine/reader.json").read_text())["reason"] == (
+        "parking failed 3 times (last exit 1)")
+
+
+STOPPED_PARK = textwrap.dedent("""
+    import os, signal, subprocess, sys, time
+    from pathlib import Path
+    root = Path(os.environ["FAKE_PARK_ROOT"])
+    # Stands in for labgrid's SSH connection, in the child's process group.
+    ssh = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    (root / "ssh.pid").write_text(str(ssh.pid))
+
+    def terminate(signum, frame):
+        try:
+            ssh.wait(timeout=1)
+            (root / "ssh-at-stop").write_text("gone")
+        except subprocess.TimeoutExpired:
+            (root / "ssh-at-stop").write_text("alive")
+        sys.exit(143)
+
+    signal.signal(signal.SIGTERM, terminate)
+    (root / "started").touch()
+    time.sleep(60)
+""")
+
+
+def test_janitor_stops_a_park_child_before_its_process_group(tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_PARK_ROOT", str(tmp_path))
+    (tmp_path / "stopped_park.py").write_text(STOPPED_PARK)
+    janitor = Janitor(SimpleNamespace(), config=tmp_path / "env.yaml", images={}, state_dir=tmp_path / "state",
+                      priority=1000, max_parallel=1, attempts=1,
+                      park_command=[sys.executable, str(tmp_path / "stopped_park.py")],
+                      job_seconds=5, marker_seconds=1)
+
+    async def stop():
+        job = asyncio.ensure_future(janitor._run_child("reader", tmp_path / "park.bin", efuse.PLAIN))
+        while not (tmp_path / "started").exists():
+            await asyncio.sleep(0.05)
+        job.cancel()
+        await asyncio.gather(job, return_exceptions=True)
+
+    asyncio.run(stop())
+    assert (tmp_path / "ssh-at-stop").read_text() == "alive", "the child switches the reader on first"
+    ssh = int((tmp_path / "ssh.pid").read_text())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(ssh, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.05)
+    pytest.fail("the rest of the child's process group was not stopped")

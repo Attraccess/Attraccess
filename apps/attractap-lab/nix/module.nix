@@ -364,6 +364,10 @@ in {
         ] ++ lib.concatMap (variant: [ "--image" "${variant}=${janitor.images.${variant}}" ]) (lib.attrNames janitor.images));
         Restart = "always";
         RestartSec = 5;
+        # Stopping signals the janitor only: it stops each park child before
+        # that child's labgrid SSH connections, so a power-cycled reader is
+        # switched on again first.
+        KillMode = "mixed";
       };
     };
   })

@@ -17,6 +17,7 @@ Quarantined claims carry no reservation, which maintenance relies on.
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -59,6 +60,14 @@ log = logging.getLogger("attractap-lab-janitor")
 def quarantined(state_dir):
     directory = Path(state_dir) / "quarantine"
     return {path.stem: path for path in directory.glob("*.json")} if directory.is_dir() else {}
+
+
+def _cycle_failure(run):
+    """Say how a run's power cycle failed, from its power-cycle.log; empty if it did not."""
+    path = run / "power-cycle.log"
+    lines = path.read_text().splitlines() if path.exists() else []
+    failed = next((line.split(" ", 1)[1] for line in lines if " failed: " in line), None)
+    return f" that {failed}" if failed else ""
 
 
 def is_quarantine_hold(place):
@@ -282,7 +291,8 @@ class Janitor:
 
     async def _park(self, name, variant, profile):
         try:
-            cycled = name in self.power_cycle
+            # A place retagged since its last attempt is no longer cycled.
+            cycled = name in self.power_cycle and self._place_power(name) in CYCLED_POWER
             async with self.slots:
                 code, run = await self._run_child(name, self.images[variant], profile, cycle_power=cycled)
             if code == 0:
@@ -306,7 +316,7 @@ class Janitor:
                 reason_file = run / "reason.txt"
                 reason = reason_file.read_text().strip() if reason_file.exists() else (
                     f"parking failed {failures} times (last exit {code})"
-                    + (", also after a power cycle" if cycled else ""))
+                    + (f", also after a power cycle{_cycle_failure(run)}" if cycled else ""))
                 self._quarantine(name, reason, run)
                 self.failures.pop(name, None)
                 self.power_cycle.discard(name)
@@ -355,12 +365,17 @@ class Janitor:
             return 124, run
         finally:
             if process.returncode is None:
-                os.killpg(process.pid, signal.SIGTERM)
+                # The child first, alone: a reader it is power-cycling is switched
+                # on again through the SSH connections in its group.
+                process.send_signal(signal.SIGTERM)
                 try:
                     await asyncio.wait_for(process.wait(), timeout=30)
                 except asyncio.TimeoutError:
                     os.killpg(process.pid, signal.SIGKILL)
                     await process.wait()
+                else:
+                    with contextlib.suppress(ProcessLookupError):
+                        os.killpg(process.pid, signal.SIGTERM)
 
     def _quarantine(self, name, reason, run):
         directory = self.state_dir / "quarantine"
@@ -409,6 +424,8 @@ def run_daemon(args):
 def run_park(args):
     """One parking attempt on a place the janitor identity already holds."""
     def terminate(signum, frame):
+        # Once: a second signal would cut short switching a power-cycled reader on.
+        signal.signal(signum, signal.SIG_IGN)
         raise SystemExit(128 + signum)
 
     signal.signal(signal.SIGTERM, terminate)
