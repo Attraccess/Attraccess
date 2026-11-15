@@ -14,6 +14,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { type Redis } from 'ioredis';
 import { EntityManager, Repository, QueryFailedError, In } from 'typeorm';
 import { VALKEY_CLIENT } from '../../valkey/valkey.module';
+import { describeValkeyError } from '../../valkey/valkey-outage-logging';
 import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
 import { roleAuditEvent } from './role-audit';
 import {
@@ -66,7 +67,7 @@ export class RbacService {
         JSON.stringify({ source: authorizationCacheInvalidationSource, userId }),
       );
     } catch (error) {
-      this.logger.error('Failed to publish authorization cache invalidation', error);
+      this.logger.error(`Failed to publish authorization cache invalidation (${describeValkeyError(error)})`);
     }
   }
 

@@ -2,7 +2,8 @@ import { Global, Injectable, Logger, Module, OnApplicationShutdown } from '@nest
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { ValkeyConfigType } from '../config/valkey.config';
-import { logValkeyOutages } from './valkey-outage-logging';
+import { redactValkeyCommandErrors } from './valkey-command-errors';
+import { describeValkeyError, logValkeyOutages } from './valkey-outage-logging';
 
 export const VALKEY_CLIENT = 'VALKEY_CLIENT';
 
@@ -18,11 +19,20 @@ export class ValkeyClientService implements OnApplicationShutdown {
       return;
     }
 
-    const client = new Redis(config.VALKEY_URL, {
-      lazyConnect: false,
-      enableReadyCheck: true,
-      maxRetriesPerRequest: 3,
-    });
+    let client: Redis;
+    try {
+      client = new Redis(config.VALKEY_URL, {
+        lazyConnect: false,
+        enableReadyCheck: true,
+        maxRetriesPerRequest: 3,
+      });
+    } catch (error) {
+      // The URL error carries the whole URL, password included, in `input`; rethrow without it.
+      throw new Error(
+        `VALKEY_URL is not a valid URL (${describeValkeyError(error)}); percent-encode reserved characters in the password`,
+      );
+    }
+    redactValkeyCommandErrors(client);
     logValkeyOutages(client, this.logger, {
       lost: (reason) => `Lost connection to Valkey (${reason}); retrying`,
       reconnected: 'Reconnected to Valkey',

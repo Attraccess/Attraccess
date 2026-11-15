@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { inspect } from 'node:util';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
@@ -7,7 +8,10 @@ import { ValkeyClientService } from './valkey.module';
 jest.mock('ioredis', () => ({ __esModule: true, default: jest.fn() }));
 
 // A bare EventEmitter throws on an `error` nobody listens to, like ioredis' "Unhandled error event".
-class FakeRedis extends EventEmitter {}
+class FakeRedis extends EventEmitter {
+  sendCommand = jest.fn();
+  duplicate = jest.fn();
+}
 
 const VALKEY_URL = 'redis://default:secret-password@valkey:6379';
 
@@ -57,6 +61,23 @@ describe('ValkeyClientService', () => {
     });
     expect(fake.listenerCount('error')).toBe(1);
     expect(() => fake.emit('error', new Error('connect ECONNREFUSED'))).not.toThrow();
+  });
+
+  it('fails startup on an invalid VALKEY_URL without printing the URL', () => {
+    const invalidUrl = 'redis://default:secret/password@valkey:6379';
+    RedisMock.mockImplementation(() => {
+      throw Object.assign(new TypeError('Invalid URL'), { code: 'ERR_INVALID_URL', input: invalidUrl });
+    });
+
+    let thrown: unknown;
+    try {
+      createService({ VALKEY_URL: invalidUrl });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect((thrown as Error).message).toContain('VALKEY_URL is not a valid URL (Invalid URL)');
+    expect(inspect(thrown, { showHidden: true, depth: null })).not.toContain('secret');
   });
 
   it('logs "Connected to Valkey" once on the initial ready and no reconnected line', () => {
