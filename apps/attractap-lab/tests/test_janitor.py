@@ -156,32 +156,43 @@ class FakeFlash:
 
 
 class FakePower:
-    """A Touch V1 that is off until its emulator presses the power button."""
+    """A Touch V1 that is off until its emulator presses the power button.
 
-    def __init__(self, events):
+    Like ReaderPowerDriver, it presses only when the reader is not already in
+    the requested state. ``failing_ons`` presses do not turn it on.
+    """
+
+    def __init__(self, events, powered=False, failing_ons=0):
         self.events = events
         self.emulator = SimpleNamespace(state=BindingState.bound)
-        self.powered = False
+        self.powered = powered
+        self.failing_ons = failing_ons
         self.delay = 2.0
 
     def get(self):
         return self.powered
 
     def on(self):
+        if self.powered:
+            return
         self.events.append("power-on")
+        if self.failing_ons:
+            self.failing_ons -= 1
+            raise TimeoutError("The reader did not turn on within 20s")
         self.powered = True
+
+    def off(self):
+        if self.powered:
+            self.events.append("power-off")
+            self.powered = False
 
 
 class FakeSwitch(FakePower):
     """A Touch V2 behind the lab host's USB power switch."""
 
     def __init__(self, events):
-        super().__init__(events)
-        self.powered = True
+        super().__init__(events, powered=True)
         self.delay = 10.0
-
-    def cycle(self):
-        self.events.append("power-cycle")
 
 
 class FakeTarget:
@@ -271,13 +282,28 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
 
     # The janitor's retry for a reader behind a power switch cuts its power first.
     events = []
+    monkeypatch.setattr(workflow.time, "sleep", lambda seconds: events.append(("sleep", seconds)))
     switched = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
                           FakeFlash(espefuse_output(), events), FakeSwitch(events), tags={"power": "switch"})
     park(switched, tmp_path / "park.bin", tmp_path / "switch", baseline_dir=tmp_path / "base", cycle_power=True)
-    assert events.index("power-cycle") < events.index("efuse")
-    assert "power-on" not in events, "the reader is on after the cycle"
+    assert events.index("power-off") < events.index(("sleep", 10.0)) < events.index("power-on") < events.index("efuse")
+    assert events.count("power-on") == 1, "the reader is on after the cycle"
     log = (tmp_path / "switch/power-cycle.log").read_text()
     assert "off for 10s, then on" in log and "reader is on again" in log
+
+    # A reader with a power button stays off for at least 30 s, then is on again.
+    events = []
+    button = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                        FakeFlash(espefuse_output(), events), FakePower(events, powered=True),
+                        tags={"power": "button"})
+    park(button, tmp_path / "park.bin", tmp_path / "button", baseline_dir=tmp_path / "base", cycle_power=True)
+    sleep = next(event for event in events if event[0] == "sleep")
+    assert sleep[1] >= 30
+    assert events.index("power-off") < events.index(sleep) < events.index("power-on") < events.index("efuse")
+    assert events.count("power-on") == 1 and button.power.get()
+    assert ("deactivate", "power") in events
+    log = (tmp_path / "button/power-cycle.log").read_text()
+    assert "FakePower: off for 30s, then on" in log and "reader is off" in log and "reader is on again" in log
     # An always-on place has nothing to cycle with; the attempt fails before erasing.
     events = []
     always_on = FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(), events), FakeSwitch(events),
@@ -285,6 +311,40 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="no switchable reader power"):
         park(always_on, tmp_path / "park.bin", tmp_path / "always-on", cycle_power=True)
     assert "efuse" not in events
+
+
+def cycle_button(tmp_path, monkeypatch, power, name):
+    events = power.events
+    monkeypatch.setattr(workflow.time, "sleep", lambda seconds: events.append(("sleep", seconds)))
+    target = FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(), events), power, tags={"power": "button"})
+    workflow.power_cycle(target, tmp_path / name)
+    return (tmp_path / name).read_text()
+
+
+def test_power_cycle_switches_on_a_button_reader_that_was_already_off(tmp_path, monkeypatch):
+    events = []
+    power = FakePower(events, powered=False)
+    log = cycle_button(tmp_path, monkeypatch, power, "off.log")
+    assert "power-off" not in events, "pressing a reader that is off would switch it on"
+    assert events == [("activate", "power"), ("sleep", 30.0), "power-on", ("deactivate", "power")]
+    assert power.get() and "reader is on again" in log
+
+
+@pytest.mark.parametrize("failing_ons,final", [
+    (1, "reader is on again"),
+    (2, "reader is still off: The reader did not turn on within 20s"),
+])
+def test_power_cycle_retries_switching_on_once_and_still_fails(tmp_path, monkeypatch, failing_ons, final):
+    events = []
+    power = FakePower(events, powered=True, failing_ons=failing_ons)
+    with pytest.raises(TimeoutError, match="did not turn on"):
+        cycle_button(tmp_path, monkeypatch, power, "failed.log")
+    log = (tmp_path / "failed.log").read_text()
+    assert events.count("power-on") == 2, "one best-effort switch on after the failed one"
+    assert events[-1] == ("deactivate", "power"), "the emulator connection is closed"
+    assert power.get() == (failing_ons == 1)
+    lines = log.splitlines()
+    assert "failed: The reader did not turn on" in lines[-2] and lines[-1].endswith(final)
 
 
 FAKE_PARK = textwrap.dedent("""
@@ -608,18 +668,23 @@ def test_janitor_parks_again_when_variant_or_profile_changes(tmp_path):
 
 
 @pytest.mark.parametrize("power,outcomes,runs,quarantined", [
-    # A reader behind a power switch is power-cycled before each retry...
-    ("switch", [1, 0], [False, True], None),
-    # ...and quarantined only once an attempt after a power cycle failed too.
-    ("switch", [1, 1], [False, True], "parking failed 2 times (last exit 1), also after a power cycle"),
-    # Burned eFuses quarantine at once; a power cycle must never retry them away.
-    ("switch", [3], [False], "eFuses burned"),
-    ("switch", [1, 3], [False, True], "eFuses burned"),
-    # Readers without a power switch keep the plain retry count.
-    ("button", [1], [False], "parking failed 1 times (last exit 1)"),
+    case
+    for kind in ("switch", "button")
+    for case in [
+        # A reader behind a power switch or with a power button is power-cycled before each retry...
+        (kind, [1, 0], [False, True], None),
+        # ...and quarantined only once an attempt after a power cycle failed too.
+        (kind, [1, 1], [False, True], "parking failed 2 times (last exit 1), also after a power cycle"),
+        # Burned eFuses quarantine at once; a power cycle must never retry them away.
+        (kind, [3], [False], "eFuses burned"),
+        (kind, [1, 3], [False, True], "eFuses burned"),
+    ]
+] + [
+    # Readers the lab cannot switch keep the plain retry count.
+    ("always-on", [1], [False], "parking failed 1 times (last exit 1)"),
     (None, [1], [False], "parking failed 1 times (last exit 1)"),
 ])
-def test_janitor_power_cycles_a_switched_reader_before_giving_up(tmp_path, power, outcomes, runs, quarantined):
+def test_janitor_power_cycles_a_switchable_reader_before_giving_up(tmp_path, power, outcomes, runs, quarantined):
     from labgrid.remote.common import Place, ResourceMatch
     released, calls = [], []
 

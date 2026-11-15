@@ -13,6 +13,8 @@
           reader-a = { matches = [ "smoke/reader-a/*" ]; tags.board = "attractap"; };
           reader-b.matches = [ "smoke/reader-b/*" ];
           parking = { matches = [ "smoke/parking/*" ]; tags.variant = "parking-test"; };
+          # No NFC emulator presses its button, so the power-cycled retry fails too.
+          parking-button = { matches = [ "smoke/parking-button/*" ]; tags = { variant = "parking-test"; power = "button"; }; };
         };
       };
       exporter = {
@@ -26,11 +28,14 @@
           reader-b.USBSerialPort.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-B"; };
           parking.USBSerialPort.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-P"; };
           parking.USBFlashableDevice.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-P"; };
+          parking-button.USBSerialPort.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-PB"; };
+          parking-button.USBFlashableDevice.match = { SUBSYSTEM = "tty"; ID_SERIAL_SHORT = "NOT-CONNECTED-PB"; };
         };
       };
       cameras.overview = { device = "/dev/video-not-connected"; port = 8080; };
       dashboard.enable = true;
-      # The absent reader cannot be parked, so the janitor must quarantine it.
+      # The absent readers cannot be parked, so the janitor must quarantine them:
+      # parking after one attempt, parking-button after one more, power-cycled.
       janitor = {
         enable = true;
         images.parking-test = pkgs.writeText "parking-test.bin" "not firmware";
@@ -86,6 +91,12 @@
     machine.succeed("labgrid-client -p parking show | grep 'acquired: attractap-lab-janitor/janitor'")
     machine.fail("labgrid-client -p parking acquire")
     machine.succeed("attractap-lab-janitor status | grep parking")
+    machine.fail("grep -q 'power cycle' /var/lib/attractap-lab-janitor/quarantine/parking.json")
+    # A reader with a power button gets one more, power-cycled attempt despite attempts = 1.
+    machine.wait_until_succeeds("test -e /var/lib/attractap-lab-janitor/quarantine/parking-button.json", timeout=180)
+    machine.succeed("grep -q 'also after a power cycle' /var/lib/attractap-lab-janitor/quarantine/parking-button.json")
+    machine.succeed("test $(ls /var/lib/attractap-lab-janitor/runs/parking-button | wc -l) = 2")
+    machine.succeed("labgrid-client -p parking-button show | grep 'acquired: attractap-lab-janitor/janitor'")
     # Places without a parking image are left alone.
     machine.succeed("labgrid-client -p reader-a acquire")
     machine.succeed("labgrid-client -p reader-a release")

@@ -169,7 +169,7 @@ in {
         description = "Reservation priority; must exceed every client's (labgrid sessions use 0) so released readers are parked before anyone else gets them.";
       };
       maxParallel = mkOption { type = types.ints.positive; default = 2; description = "Readers parked at the same time."; };
-      attempts = mkOption { type = types.ints.positive; default = 3; description = "Failed parking attempts before a reader is quarantined. A reader on a place tagged power=switch is power-cycled before each retry and quarantined only after an attempt following a power cycle failed too."; };
+      attempts = mkOption { type = types.ints.positive; default = 3; description = "Failed parking attempts before a reader is quarantined. A reader on a place tagged power=switch or power=button is power-cycled before each retry (a button reader stays off for at least 30 s) and quarantined only after an attempt following a power cycle failed too."; };
       markerSeconds = mkOption { type = types.ints.positive; default = 30; description = "Time for the parking image to report ATTRACTAP_PARKED after flashing."; };
     };
     cameras = mkOption {
