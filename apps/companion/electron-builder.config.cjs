@@ -11,7 +11,9 @@ module.exports = {
   directories: {
     output: 'dist',
   },
-  files: ['out/**/*', 'src/**/*', 'renderer/dist/**/*'],
+  // esbuild bundles everything into out/. The package declares no dependencies, so electron-builder 26 falls back to
+  // the workspace root's node_modules; keep them out of the app.
+  files: ['out/**/*', 'src/**/*', 'renderer/dist/**/*', '!**/node_modules/**/*'],
   extraMetadata: {
     main: 'out/main.js',
   },
