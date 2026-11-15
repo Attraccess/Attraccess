@@ -9,8 +9,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import federation from '@originjs/vite-plugin-federation';
 import tailwindcssImport from '@tailwindcss/vite';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { workspaceAliases } from '../../../tools/vite/workspace-aliases';
 import { fileURLToPath } from 'node:url';
 
 // Vite bundles this config to CJS, which wraps the ESM default export.
@@ -39,17 +39,6 @@ export const HOST_SHARED = {
   '@attraccess/plugins-frontend-ui': { ...hostOnly },
 };
 
-// Plugin frontend tsconfigs do not extend tsconfig.base.json, so Vite's native tsconfig path lookup never sees
-// the workspace aliases; map them explicitly, as nxViteTsPaths did before Nx 24.
-function workspacePathAliases() {
-  const root = fileURLToPath(new URL('../../../', import.meta.url));
-  const { paths } = JSON.parse(readFileSync(join(root, 'tsconfig.base.json'), 'utf8')).compilerOptions;
-  return Object.entries(paths).map(([find, [target]]) => ({
-    find: new RegExp(`^${find.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`),
-    replacement: join(root, target),
-  }));
-}
-
 /**
  * @param {object} opts
  * @param {string} opts.name plugin name (kebab-case); the federation remote is named `plugin-${name}`
@@ -60,8 +49,8 @@ export function createPluginFederationConfig({ name, dir }) {
     root: join(dir, 'frontend'),
     // In-repo plugins import `@attraccess/plugins-frontend-sdk` (for the API
     // client, not just types) from the workspace source rather than the
-    // published package — resolve the workspace tsconfig path aliases so that works.
-    resolve: { alias: workspacePathAliases() },
+    // published package — resolve the workspace path aliases so that works.
+    resolve: { alias: workspaceAliases() },
     plugins: [
       react(),
       // Compiles the plugin's own Tailwind utilities into a self-contained

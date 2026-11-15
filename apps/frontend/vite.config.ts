@@ -8,6 +8,7 @@ import siteWebManifest from './src/service-worker/site.webmanifest.json';
 import tailwindcss from '@tailwindcss/vite';
 import frontendPackage from './package.json';
 import { nxReadySignal } from '@nx/vite/plugins/nx-ready-signal.plugin';
+import { workspaceAliases } from '../../tools/vite/workspace-aliases';
 
 export function normalizeFederationFsUrlsPlugin(): Plugin {
   return {
@@ -30,7 +31,7 @@ export default defineConfig(({ command }) => {
 
   return {
     resolve: {
-      tsconfigPaths: true,
+      alias: workspaceAliases(),
     },
     root: __dirname,
     cacheDir: '../../node_modules/.vite/apps/frontend',
