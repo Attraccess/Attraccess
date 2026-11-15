@@ -28,6 +28,8 @@ module.exports = {
     target: [{ target: 'nsis', arch: ['x64'] }],
   },
   linux: {
+    // electron-builder 26 refuses the name it derives from the scoped package name (@attraccess/companion).
+    executableName: 'attraccess-companion',
     target: [{ target: 'AppImage', arch: ['x64', 'arm64'] }],
   },
 };
