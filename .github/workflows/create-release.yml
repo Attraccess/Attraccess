@@ -93,26 +93,33 @@ jobs:
           echo "Excluding: $exclude"
           pnpm nx run-many -t build --exclude="$exclude"
 
-      # A dry run writes no versions, so publishing would re-pack the already released version; it stops before.
-      # `--skip-publish` answers nx's only prompt (publish confirmation), so no `--yes` is needed.
-      - name: Run NX Release (dry run)
-        if: ${{ inputs.dry-run && !inputs.publish-only }}
+      # nx's version and changelog steps, then commit, tag, push and the GitHub release (scripts/create-release.mjs).
+      # A PR merged meanwhile rejects the push; the release commit is then re-created on the new main with the same
+      # version and pushed again, so the tag, main, the GitHub release and the packages share one commit.
+      # A dry run only previews: it writes no versions, so publishing would re-pack the already released version.
+      - name: Create release
+        id: release
+        if: ${{ !inputs.publish-only }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           SPECIFIER: ${{ inputs.specifier }}
-        run: pnpm nx release "$SPECIFIER" --dry-run --skip-publish
-
-      - name: Run NX Release
-        if: ${{ !inputs.dry-run && !inputs.publish-only }}
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          SPECIFIER: ${{ inputs.specifier }}
-        run: pnpm nx release "$SPECIFIER" --skip-publish
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: node scripts/create-release.mjs
 
       # nx release publish packs dist/ as it is; rebuild so the packages carry the version just written.
       - name: Rebuild publishable libraries with the release version
         if: ${{ !inputs.dry-run && !inputs.publish-only }}
+        env:
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
         run: |
+          if [ "$(git rev-parse HEAD)" != "$RELEASE_SHA" ]; then
+            echo "HEAD is not the pushed release commit $RELEASE_SHA" >&2
+            exit 1
+          fi
+          # After a retry the release sits on a newer main; a PR merged meanwhile may have changed the dependencies.
+          if ! git diff --quiet "$GITHUB_SHA" HEAD^ -- pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc; then
+            pnpm install --frozen-lockfile
+          fi
           exclude="$(node scripts/ci-nx-exclude.mjs build)"
           pnpm nx run-many -t build --exclude="$exclude"
 
