@@ -782,6 +782,17 @@ def test_janitor_names_a_power_cycle_that_failed(tmp_path):
         "The place has no switchable reader power to cycle")
 
 
+@pytest.mark.parametrize("cycle_log", [
+    "reader is on again",
+    # Only the cycle's own failure counts, not an error text quoted in a later line.
+    "interrupted: SystemExit(143)\n2026-11-15T10:00:30+0100 reader is still off: switching on failed: x",
+])
+def test_janitor_reports_other_power_cycles_plainly(tmp_path, cycle_log):
+    park_attempts(tmp_path, "switch", [1, 1], cycle_log=cycle_log)
+    assert json.loads((tmp_path / "quarantine/reader.json").read_text())["reason"] == (
+        "parking failed 2 times (last exit 1), also after a power cycle")
+
+
 @pytest.mark.parametrize("retag", ["always-on", ""])
 def test_janitor_stops_power_cycling_a_retagged_place(tmp_path, retag):
     janitor, calls, released = park_attempts(tmp_path, "button", [1, 1, 1], attempts=3, retag=retag)
@@ -794,7 +805,7 @@ STOPPED_PARK = textwrap.dedent("""
     import os, signal, subprocess, sys, time
     from pathlib import Path
     root = Path(os.environ["FAKE_PARK_ROOT"])
-    # Stands in for labgrid's SSH connection, in the child's process group.
+    # Stands in for an ssh or esptool command the child started, in its process group.
     ssh = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
     (root / "ssh.pid").write_text(str(ssh.pid))
 
@@ -823,6 +834,7 @@ def test_janitor_stops_a_park_child_before_its_process_group(tmp_path, monkeypat
     async def stop():
         job = asyncio.ensure_future(janitor._run_child("reader", tmp_path / "park.bin", efuse.PLAIN))
         while not (tmp_path / "started").exists():
+            assert not job.done(), job.result()
             await asyncio.sleep(0.05)
         job.cancel()
         await asyncio.gather(job, return_exceptions=True)

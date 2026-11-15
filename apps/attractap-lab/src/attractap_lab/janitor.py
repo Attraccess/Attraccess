@@ -66,7 +66,9 @@ def _cycle_failure(run):
     """Say how a run's power cycle failed, from its power-cycle.log; empty if it did not."""
     path = run / "power-cycle.log"
     lines = path.read_text().splitlines() if path.exists() else []
-    failed = next((line.split(" ", 1)[1] for line in lines if " failed: " in line), None)
+    # Lines are "TIMESTAMP MESSAGE"; the timestamp has no spaces.
+    messages = (line.split(" ", 1)[-1] for line in lines)
+    failed = next((message for message in messages if message.startswith("failed: ")), None)
     return f" that {failed}" if failed else ""
 
 
@@ -365,8 +367,8 @@ class Janitor:
             return 124, run
         finally:
             if process.returncode is None:
-                # The child first, alone: a reader it is power-cycling is switched
-                # on again through the SSH connections in its group.
+                # The child first, alone: it switches a reader it is power-cycling
+                # on again (over SSH) before the rest of its group is stopped.
                 process.send_signal(signal.SIGTERM)
                 try:
                     await asyncio.wait_for(process.wait(), timeout=30)
@@ -374,7 +376,8 @@ class Janitor:
                     os.killpg(process.pid, signal.SIGKILL)
                     await process.wait()
                 else:
-                    with contextlib.suppress(ProcessLookupError):
+                    # macOS reports EPERM for a group of zombies.
+                    with contextlib.suppress(ProcessLookupError, PermissionError):
                         os.killpg(process.pid, signal.SIGTERM)
 
     def _quarantine(self, name, reason, run):
@@ -424,8 +427,9 @@ def run_daemon(args):
 def run_park(args):
     """One parking attempt on a place the janitor identity already holds."""
     def terminate(signum, frame):
-        # Once: a second signal would cut short switching a power-cycled reader on.
-        signal.signal(signum, signal.SIG_IGN)
+        # Once: a second signal would cut short switching a power-cycled reader
+        # on. Not SIG_IGN, which the ssh commands started meanwhile would inherit.
+        signal.signal(signum, lambda *_: None)
         raise SystemExit(128 + signum)
 
     signal.signal(signal.SIGTERM, terminate)
