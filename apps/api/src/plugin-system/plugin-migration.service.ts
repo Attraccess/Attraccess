@@ -20,6 +20,8 @@ import { mkdirSync } from 'fs';
 
 import { dataSourceConfig } from '../database/datasource';
 
+import { createDataSource, SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
+
 function getImplementationClass(): typeof PluginMigrationService {
   return require('./plugin-migration.service').PluginMigrationService;
 }
@@ -209,7 +211,7 @@ export class PluginMigrationService {
       mkdirSync(dirname(databaseFile), { recursive: true });
     }
 
-    return new DataSource({
+    return createDataSource({
       ...base,
       entities: [],
       synchronize: false,
@@ -226,7 +228,7 @@ export class PluginMigrationService {
    */
   protected static async relaxBusyTimeout(dataSource: DataSource): Promise<void> {
     if (dataSource.options.type === 'sqlite') {
-      await dataSource.query('PRAGMA busy_timeout = 5000');
+      await dataSource.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
     }
   }
 

@@ -4,7 +4,9 @@ import { AuditModule } from '../audit/audit.module';
 import { AppService } from './app.service';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataSourceOptions } from 'typeorm';
 import { dataSourceConfig } from '../database/datasource';
+import { createDataSource } from '../database/sqlite-connection';
 import { ResourcesModule } from '../resources/resources.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import storageConfigObject, { StorageConfigType } from '../config/storage.config';
@@ -53,7 +55,11 @@ const logger = new Logger('AppModule');
     UsersAndAuthModule,
     SettingsModule,
     SecurityModule,
-    TypeOrmModule.forRoot(dataSourceConfig),
+    TypeOrmModule.forRootAsync({
+      useFactory: () => dataSourceConfig,
+      // The main connection shares the SQLite file with the resource-lifecycle and audit connections.
+      dataSourceFactory: async (options) => createDataSource(options as DataSourceOptions),
+    }),
     AuditModule,
     ResourcesModule,
     ServeStaticModule.forRootAsync({
