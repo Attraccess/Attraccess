@@ -101,7 +101,7 @@ describe('PreStartService', () => {
 
   it('allows', async () => {
     const { service } = setup({ decision: 'allow' });
-    await expect(service.gateHttp(3, user, {}, web)).resolves.toBeUndefined();
+    await expect(service.gateHttp(3, user, {}, web)).resolves.toEqual({});
   });
 
   it('answers a confirm with a typed 409 CONFIRMATION_REQUIRED and a stepId', async () => {
@@ -129,7 +129,9 @@ describe('PreStartService', () => {
     const { service, hooks } = setup(confirmOutcome);
     const stepId = (await catchError(service.gateHttp(3, user, {}, web))).getResponse().stepId;
     hooks.runPreStart.mockResolvedValue({ decision: 'allow' });
-    await expect(service.gateHttp(3, user, { confirmedStepIds: [stepId] }, web)).resolves.toBeUndefined();
+    await expect(service.gateHttp(3, user, { confirmedStepIds: [stepId] }, web)).resolves.toEqual({
+      reservations: ['k1'],
+    });
     const run = hooks.runPreStart.mock.calls.at(-1)?.[0];
     expect(run.satisfied.get('reservations')).toEqual(new Set(['k1']));
     expect(run.origin).toBe('web');
@@ -236,7 +238,9 @@ describe('PreStartService', () => {
       const fresh = setup(confirmOutcome);
       const id = (await catchError(fresh.service.gateHttp(3, user, {}, web))).getResponse().stepId;
       fresh.hooks.runPreStart.mockResolvedValue({ decision: 'allow' });
-      await expect(fresh.service.gateHttp(3, user, { confirmedStepIds: [id] }, web)).resolves.toBeUndefined();
+      await expect(fresh.service.gateHttp(3, user, { confirmedStepIds: [id] }, web)).resolves.toEqual({
+        reservations: ['k1'],
+      });
       expect(second).not.toBe(first);
     });
 

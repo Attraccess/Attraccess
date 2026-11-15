@@ -1,8 +1,11 @@
 # Reservations
+
 <!-- llms-description: The Reservations plugin lets members book a resource for a time window; covers member use, administration and the API. -->
 
 The **Reservations** plugin lets members book a resource for a specific time window in advance. While a booking is
 active, nobody else can start the resource. Starting shortly before someone else's booking asks for a confirmation.
+On machines with several parallel sessions a booking holds only one slot (see
+[Machines with several parallel sessions](#machines-with-several-parallel-sessions)).
 
 > [!NOTE]
 > Reservations are provided by the official `reservations` plugin. Install it first (see
@@ -42,7 +45,29 @@ A booking is refused (with a reason) if it overlaps another booking including it
 [maintenance](resources/maintenance.md) window, lies outside the bookable hours, is too short, too long, too far
 ahead, too late or in the past, or if you already have the maximum number of active bookings on that resource.
 
-On a machine with `maxParallelSessions > 1` a booking reserves the **whole** resource.
+#### Machines with several parallel sessions
+
+On a machine with `maxParallelSessions` of N > 1, a booking takes **one slot**, not the whole machine. Limit-1 machines
+and doors work as described above.
+
+- Up to N bookings (pending and confirmed, buffers included) may overlap. The (N+1)-th overlapping booking is refused
+  with "All slots are booked at this time" (code `OVERLAP`).
+- You cannot hold two overlapping bookings on the same machine (code `OWN_OVERLAP`).
+- While a booking is running, its slot counts against spontaneous starts. A start is refused with the "Reserved" text
+  only when the running sessions plus the slots reserved for **other** people reach the limit. The holder may always
+  use their own slot. A manager can override after a confirmation.
+- The "Reserved soon" question appears only if starting would leave an upcoming booking within the confirmation window
+  without a slot.
+- **Lowering the limit** (or changing the type so that the limit drops) cancels the newest-created bookings that have
+  not started yet and no longer fit, with the reason `machine capacity reduced` (stored and shown as is). Their
+  holders get the email "Booking removed: {resource}" and the cancellations are recorded in the
+  [audit log](settings/audit-log.md). Running bookings are never
+  cancelled. Raising the limit cancels nothing.
+- Handover and overrun notices on such machines are only sent when the holder would lack a slot.
+- The **Reservations** card shows for each booking how many slots are reserved at the busiest moment of its period,
+  buffers included, for example "2 of 3 slots reserved". The count turns red when every slot is taken.
+- A reader shows "Reserved" only when no free slot is left; otherwise it shows a count such as "2 of 3 slots reserved"
+  (in the short status row "2/3 reserved").
 
 ### My reservations
 
@@ -368,17 +393,17 @@ Every email of the plugin is an **email template** that you edit like the system
 **Settings → Email → Templates**. The plugin's templates are listed after the system templates, marked "Plugin:
 reservations":
 
-| Template                                                                                                      | Sent when                                                                  |
-| ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Booking request awaiting approval                                                                             | A booking waits for approval (to the managers).                            |
-| Booking confirmed                                                                                             | A booking is confirmed or approved, with the check-in rules.               |
-| Booking rejected / Booking request expired                                                                    | A request was rejected, or nobody decided before its start.                |
-| Booking cancelled by a manager / Running booking ended early / Booking removed (reservations switched off)    | A manager changed or removed a booking, or reservations were switched off. |
-| Not checked in, booking released                                                                              | A booking was released as a no-show.                                       |
-| Reminder 48 h before: still needed? / Reminder 24 h before                                                    | The reminders before a booking.                                            |
-| Maintenance affects a booking / Resource has a problem / Resource works again                                 | Maintenance or the health of the resource affects a booking.               |
-| Reserved soon (to the current user) / Booking started, resource still in use / Booking started, please finish | Handover and overrun notices.                                              |
-| Started during a booking (to the holder / to the managers)                                                    | A manager started during a booking.                                        |
+| Template                                                                                                                               | Sent when                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Booking request awaiting approval                                                                                                      | A booking waits for approval (to the managers).                                                  |
+| Booking confirmed                                                                                                                      | A booking is confirmed or approved, with the check-in rules.                                     |
+| Booking rejected / Booking request expired                                                                                             | A request was rejected, or nobody decided before its start.                                      |
+| Booking cancelled by a manager / Running booking ended early / Booking removed (reservations switched off or machine capacity reduced) | A manager changed or removed a booking, reservations were switched off, or a machine lost slots. |
+| Not checked in, booking released                                                                                                       | A booking was released as a no-show.                                                             |
+| Reminder 48 h before: still needed? / Reminder 24 h before                                                                             | The reminders before a booking.                                                                  |
+| Maintenance affects a booking / Resource has a problem / Resource works again                                                          | Maintenance or the health of the resource affects a booking.                                     |
+| Reserved soon (to the current user) / Booking started, resource still in use / Booking started, please finish                          | Handover and overrun notices.                                                                    |
+| Started during a booking (to the holder / to the managers)                                                                             | A manager started during a booking.                                                              |
 
 - Edit the subject and the body in the visual editor, and the German and English texts in the **Translations**
   dialog. **Variables** lists what you can use, for example `{{reservation.when}}` or `{{resource.name}}`.

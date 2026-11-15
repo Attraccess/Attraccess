@@ -5,6 +5,7 @@ import type {
   ReaderUiProvider,
   SessionEndHook,
   StartBlockedQuery,
+  StartCapacityHook,
 } from '@attraccess/plugins-backend-sdk';
 import { ReaderUiAlertsService } from './reader-ui-alerts.service';
 
@@ -13,6 +14,7 @@ export interface ReaderUiPluginEntry {
   preStartHook?: PreStartHook;
   sessionEndHook?: SessionEndHook;
   startBlockedQuery?: StartBlockedQuery;
+  startCapacityHook?: StartCapacityHook;
 }
 
 export interface ReaderUiInvalidation {
@@ -87,6 +89,13 @@ export class ReaderUiRegistry {
     return [...this.entries]
       .filter(([, entry]) => entry.startBlockedQuery)
       .map(([plugin, entry]) => ({ plugin, query: entry.startBlockedQuery as StartBlockedQuery }))
+      .sort((a, b) => a.plugin.localeCompare(b.plugin));
+  }
+
+  startCapacityHooks(): { plugin: string; hook: StartCapacityHook }[] {
+    return [...this.entries]
+      .filter(([, entry]) => entry.startCapacityHook)
+      .map(([plugin, entry]) => ({ plugin, hook: entry.startCapacityHook as StartCapacityHook }))
       .sort((a, b) => a.plugin.localeCompare(b.plugin));
   }
 }

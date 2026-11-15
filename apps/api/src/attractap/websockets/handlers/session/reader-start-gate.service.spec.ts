@@ -49,13 +49,13 @@ describe('ReaderStartGate', () => {
 
   it('lets a start through when no hook is registered', async () => {
     const { gate, socket, preStart } = setup(TOUCH, { decision: 'allow' }, { hooks: false });
-    await expect(gate.run(socket, input())).resolves.toEqual({ kind: 'proceed' });
+    await expect(gate.run(socket, input())).resolves.toEqual({ kind: 'proceed', satisfied: {}, language: 'en' });
     expect(preStart.evaluate).not.toHaveBeenCalled();
   });
 
   it('allows', async () => {
     const { gate, socket } = setup(TOUCH, { decision: 'allow' });
-    await expect(gate.run(socket, input())).resolves.toEqual({ kind: 'proceed' });
+    await expect(gate.run(socket, input())).resolves.toEqual({ kind: 'proceed', satisfied: {}, language: 'en' });
   });
 
   it('blocks with the literal plugin reason', async () => {
@@ -79,7 +79,11 @@ describe('ReaderStartGate', () => {
     await gate.run(socket, input());
     const stepId = lastSent(socket, 'UI_STEP_REQUEST').stepId;
     preStart.evaluate.mockResolvedValue({ decision: 'allow' });
-    await expect(gate.run(socket, input({ requestId: 78, stepId }))).resolves.toEqual({ kind: 'proceed' });
+    await expect(gate.run(socket, input({ requestId: 78, stepId }))).resolves.toEqual({
+      kind: 'proceed',
+      satisfied: { reservations: ['res-conflict'] },
+      language: 'en',
+    });
     expect(preStart.evaluate).toHaveBeenLastCalledWith(
       expect.objectContaining({ satisfied: { reservations: ['res-conflict'] }, origin: 'reader' }),
     );
@@ -176,7 +180,13 @@ describe('ReaderStartGate', () => {
       const { gate, socket, uiAudit } = setup(LITE, confirmOutcome({ noScreenPolicy: 'block' }), {
         override: 'allow-with-warning',
       });
-      await expect(gate.run(socket, input())).resolves.toEqual({ kind: 'proceed', warning: true });
+      // The policy accepted the step: it reaches the start (and its capacity hook) as confirmed.
+      await expect(gate.run(socket, input())).resolves.toEqual({
+        kind: 'proceed',
+        warning: true,
+        satisfied: { reservations: ['res-conflict'] },
+        language: 'en',
+      });
       expect(uiAudit.record).toHaveBeenCalledWith(
         'ui.no_screen_policy_applied',
         expect.objectContaining({ policy: 'allow-with-warning', plugin: 'reservations', userId: 7, readerId: 5 }),
@@ -185,7 +195,12 @@ describe('ReaderStartGate', () => {
 
     it('uses the plugin default when there is no override', async () => {
       const { gate, socket } = setup(LITE, confirmOutcome({ noScreenPolicy: 'allow-with-warning' }));
-      await expect(gate.run(socket, input())).resolves.toEqual({ kind: 'proceed', warning: true });
+      await expect(gate.run(socket, input())).resolves.toEqual({
+        kind: 'proceed',
+        warning: true,
+        satisfied: { reservations: ['res-conflict'] },
+        language: 'en',
+      });
     });
 
     it('card-confirm holds the START and the second tap of the same user starts it', async () => {
@@ -198,6 +213,8 @@ describe('ReaderStartGate', () => {
       preStart.evaluate.mockResolvedValue({ decision: 'allow' });
       await expect(gate.run(socket, input({ requestId: 78, stepId: sent.stepId }))).resolves.toEqual({
         kind: 'proceed',
+        satisfied: { reservations: ['res-conflict'] },
+        language: 'en',
       });
     });
 

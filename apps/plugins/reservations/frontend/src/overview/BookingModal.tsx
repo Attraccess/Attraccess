@@ -64,8 +64,9 @@ export function BookingModal(props: Readonly<Props>) {
       reservations: dayAvailability.data?.reservations ?? [],
       maintenance: dayAvailability.data?.maintenance ?? [],
       now: new Date(),
+      slots: dayAvailability.data?.slots ?? availability.slots,
     }),
-    [availability.rules, zone, dayAvailability.data],
+    [availability.rules, availability.slots, zone, dayAvailability.data],
   );
 
   const starts = useMemo(
@@ -104,7 +105,7 @@ export function BookingModal(props: Readonly<Props>) {
       setOpen(false);
     },
     onError: (failure) => {
-      setError(describeError(failure, t));
+      setError(describeError(failure, t, { slots: context.slots }));
       void invalidate();
     },
   });

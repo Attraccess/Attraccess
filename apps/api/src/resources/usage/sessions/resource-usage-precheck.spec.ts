@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { Resource, ResourceType, SupervisionMode, User } from '@attraccess/database-entities';
+import { AlreadyHasActiveSessionError } from '../errors/already-has-active-session.error';
 import { ResourceInUseError } from '../errors/resource-in-use.error';
 import { resetTestFixture } from './fixtures/setup.test-fixture';
 import { createResourceUsageServiceFixture } from './fixtures/service.test-fixture';
@@ -24,6 +25,7 @@ describe('ResourceUsageService.precheckStart', () => {
     validateSupervisedStart: jest.Mock;
     getActiveSession: jest.Mock;
     assertLifecycleAvailable: jest.Mock;
+    getSessionLimit: jest.Mock;
   };
   let internals: Internals;
 
@@ -44,6 +46,7 @@ describe('ResourceUsageService.precheckStart', () => {
       assertLifecycleAvailable: jest
         .spyOn(parts.lifecycle as never, 'assertLifecycleAvailable')
         .mockResolvedValue(undefined as never) as never,
+      getSessionLimit: jest.spyOn(parts.lifecycle as never, 'getSessionLimit').mockResolvedValue(1 as never) as never,
     };
   });
 
@@ -61,6 +64,19 @@ describe('ResourceUsageService.precheckStart', () => {
     internals.assertLifecycleAvailable.mockRejectedValue(new ConflictException('in progress'));
     await expect(scope.service.precheckStart(3, user, {})).rejects.toBeInstanceOf(ConflictException);
     expect(internals.getResource).not.toHaveBeenCalled();
+  });
+
+  it('tells the lifecycle check whether the machine is shared, like the real start', async () => {
+    await scope.service.precheckStart(3, user, {});
+    expect(internals.assertLifecycleAvailable).toHaveBeenLastCalledWith(expect.anything(), 3, false);
+    internals.getSessionLimit.mockResolvedValue(2);
+    internals.getResource.mockResolvedValue(machine({ maxParallelSessions: 2 }));
+    // The caller's own session ends the shared-machine precheck before any slot is counted.
+    jest
+      .spyOn(usageInternals(scope.service).records as never, 'getActiveSessionsForResource')
+      .mockResolvedValue([{ userId: 7 }] as never);
+    await expect(scope.service.precheckStart(3, user, {})).rejects.toBeInstanceOf(AlreadyHasActiveSessionError);
+    expect(internals.assertLifecycleAvailable).toHaveBeenLastCalledWith(expect.anything(), 3, true);
   });
 
   it('refuses a user who has not completed the introduction', async () => {

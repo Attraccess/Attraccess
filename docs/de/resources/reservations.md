@@ -1,9 +1,12 @@
 # Reservierungen
+
 <!-- llms-description: Das Plugin Reservierungen lässt Mitglieder eine Ressource für ein Zeitfenster buchen; behandelt Nutzung, Administration und API. -->
 
 Mit dem Plugin **Reservierungen** buchen Mitglieder eine Ressource im Voraus für ein bestimmtes Zeitfenster. Solange
 eine Buchung aktiv ist, kann niemand sonst die Ressource starten. Wer kurz vor der Buchung einer anderen Person
 startet, wird um eine Bestätigung gebeten.
+Bei Maschinen mit mehreren parallelen Sitzungen belegt eine Buchung nur einen Platz (siehe
+[Maschinen mit mehreren parallelen Sitzungen](#maschinen-mit-mehreren-parallelen-sitzungen)).
 
 > [!NOTE]
 > Reservierungen stellt das offizielle Plugin `reservations` bereit. Installieren Sie es zuerst (siehe
@@ -45,7 +48,31 @@ Eine Buchung wird (mit Begründung) abgelehnt, wenn sie eine andere Buchung samt
 zu weit in der Zukunft, zu spät oder in der Vergangenheit liegt oder wenn Sie bereits die Höchstzahl aktiver
 Buchungen für diese Ressource haben.
 
-Bei einer Maschine mit `maxParallelSessions > 1` reserviert eine Buchung die **gesamte** Ressource.
+#### Maschinen mit mehreren parallelen Sitzungen
+
+Bei einer Maschine mit `maxParallelSessions` von N > 1 belegt eine Buchung **einen Platz**, nicht die ganze Maschine.
+Maschinen mit Limit 1 und Türen funktionieren wie oben beschrieben.
+
+- Bis zu N Buchungen (ausstehende und bestätigte, samt Puffern) dürfen sich überschneiden. Die (N+1)-te
+  überschneidende Buchung wird mit „Zu dieser Zeit sind alle Plätze belegt“ abgelehnt (Code `OVERLAP`).
+- Sie können nicht zwei sich überschneidende Buchungen auf derselben Maschine halten (Code `OWN_OVERLAP`).
+- Solange eine Buchung läuft, zählt ihr Platz gegen spontane Starts. Ein Start wird nur dann mit dem Text
+  „Reserviert“ abgelehnt, wenn laufende Sitzungen plus die für **andere** Personen reservierten Plätze das Limit
+  erreichen. Die buchende Person darf ihren eigenen Platz immer nutzen. Verwaltende können nach einer Bestätigung
+  übersteuern.
+- Die Frage „Bald reserviert“ erscheint nur, wenn ein Start dazu führen würde, dass eine bevorstehende Buchung
+  innerhalb des Bestätigungsfensters keinen Platz mehr hätte.
+- **Wird das Limit gesenkt** (oder der Typ so geändert, dass das Limit sinkt), werden die zuletzt angelegten,
+  noch nicht begonnenen Buchungen storniert, die nicht mehr passen, mit der Begründung `machine capacity reduced`
+  (so gespeichert und angezeigt). Die buchenden Personen erhalten die E-Mail „Reservierung entfernt: {Ressource}“,
+  und die Stornierungen stehen im [Audit-Log](settings/audit-log.md). Laufende Buchungen werden nie storniert. Wird
+  das Limit erhöht, wird nichts storniert.
+- Übergabe- und Überzugs-Hinweise werden auf solchen Maschinen nur versendet, wenn der buchenden Person ein Platz
+  fehlen würde.
+- Die Karte **Reservierungen** zeigt zu jeder Buchung, wie viele Plätze im vollsten Moment ihres Zeitraums (samt
+  Puffern) reserviert sind, zum Beispiel „2 von 3 Plätzen reserviert“. Sind alle Plätze belegt, wird die Zählung rot.
+- Ein Reader zeigt „Reserviert“ nur, wenn kein freier Platz mehr übrig ist; sonst zeigt er eine Zählung wie
+  „2 von 3 Plätzen reserviert“ (in der kurzen Statuszeile „2/3 reserviert“).
 
 ### Meine Reservierungen
 
@@ -391,17 +418,17 @@ Jede E-Mail des Plugins ist eine **E-Mail-Vorlage**, die Sie wie die E-Mails des
 **Einstellungen → E-Mail → Vorlagen**. Die Vorlagen des Plugins stehen nach den Systemvorlagen und sind mit „Plugin:
 reservations“ gekennzeichnet:
 
-| Vorlage                                                                                                                        | Gesendet, wenn                                                                                |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Reservierungsanfrage wartet auf Genehmigung                                                                                    | Eine Buchung wartet auf Genehmigung (an die Verwaltenden).                                    |
-| Reservierung bestätigt                                                                                                         | Eine Buchung bestätigt oder genehmigt wurde, mit den Check-in-Regeln.                         |
-| Reservierung abgelehnt / Reservierungsanfrage abgelaufen                                                                       | Eine Anfrage abgelehnt wurde oder bis zu ihrem Beginn niemand entschied.                      |
-| Reservierung von Verwaltung storniert / Laufende Reservierung vorzeitig beendet / Reservierung entfernt                        | Verwaltende eine Buchung geändert oder entfernt haben oder Reservierungen deaktiviert wurden. |
-| Nicht eingecheckt, Reservierung verfallen                                                                                      | Eine Buchung als Nichterscheinen freigegeben wurde.                                           |
-| Erinnerung 48 Std. vorher: noch benötigt? / Erinnerung 24 Std. vorher                                                          | Die Erinnerungen vor einer Buchung.                                                           |
-| Wartung betrifft eine Reservierung / Ressource hat ein Problem / Ressource funktioniert wieder                                 | Wartung oder der Zustand der Ressource eine Buchung betrifft.                                 |
-| Bald reserviert (an die aktuelle Person) / Reservierung begonnen, Ressource noch belegt / Reservierung begonnen, bitte beenden | Übergabe- und Überschreitungshinweise.                                                        |
-| Start trotz Reservierung (an die Buchenden / an die Verwaltung)                                                                | Verwaltende während einer Buchung gestartet haben.                                            |
+| Vorlage                                                                                                                                                             | Gesendet, wenn                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Reservierungsanfrage wartet auf Genehmigung                                                                                                                         | Eine Buchung wartet auf Genehmigung (an die Verwaltenden).                                                                       |
+| Reservierung bestätigt                                                                                                                                              | Eine Buchung bestätigt oder genehmigt wurde, mit den Check-in-Regeln.                                                            |
+| Reservierung abgelehnt / Reservierungsanfrage abgelaufen                                                                                                            | Eine Anfrage abgelehnt wurde oder bis zu ihrem Beginn niemand entschied.                                                         |
+| Reservierung von Verwaltung storniert / Laufende Reservierung vorzeitig beendet / Reservierung entfernt (Reservierungen deaktiviert oder Maschinenplätze reduziert) | Verwaltende eine Buchung geändert oder entfernt haben, Reservierungen deaktiviert wurden oder eine Maschine Plätze verloren hat. |
+| Nicht eingecheckt, Reservierung verfallen                                                                                                                           | Eine Buchung als Nichterscheinen freigegeben wurde.                                                                              |
+| Erinnerung 48 Std. vorher: noch benötigt? / Erinnerung 24 Std. vorher                                                                                               | Die Erinnerungen vor einer Buchung.                                                                                              |
+| Wartung betrifft eine Reservierung / Ressource hat ein Problem / Ressource funktioniert wieder                                                                      | Wartung oder der Zustand der Ressource eine Buchung betrifft.                                                                    |
+| Bald reserviert (an die aktuelle Person) / Reservierung begonnen, Ressource noch belegt / Reservierung begonnen, bitte beenden                                      | Übergabe- und Überschreitungshinweise.                                                                                           |
+| Start trotz Reservierung (an die Buchenden / an die Verwaltung)                                                                                                     | Verwaltende während einer Buchung gestartet haben.                                                                               |
 
 - Bearbeiten Sie Betreff und Text im visuellen Editor und die deutschen und englischen Texte im Dialog
   **Übersetzungen**. **Variablen** zeigt, was Sie verwenden können, etwa `{{reservation.when}}` oder

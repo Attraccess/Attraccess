@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BadRequestException } from '@nestjs/common';
 import { ResourceInUseError } from '../../../../resources/usage/errors/resource-in-use.error';
+import { StartBlockedException } from '../../../../resources/usage/pre-start/start-confirmation.errors';
 import { AttractapEventType } from '../../websocket.types';
 import { CardSessionService } from '../ui/card-session.service';
 import { AttractapSessionHandler } from './session.handler';
@@ -66,6 +67,32 @@ describe('AttractapSessionHandler and the pre-start gate', () => {
       expect.objectContaining({ payload: { error: 'START_BLOCKED', reason, requestId: 4 } }),
     ]);
     expect(usage.startSession).not.toHaveBeenCalled();
+  });
+
+  it('answers a start a plugin refused inside the start transaction with START_BLOCKED and its reason', async () => {
+    const { handler, usage, socket, replies } = setup();
+    const reason = { code: 'RESERVED', title: 'Reserved', body: 'All free slots are reserved' };
+    usage.startSession.mockRejectedValueOnce(new StartBlockedException(reason));
+    await handler.handleStartResourceUsageSession(socket, start());
+    expect(replies(AttractapEventType.START_RESOURCE_USAGE_SESSION)).toEqual([
+      expect.objectContaining({ payload: { error: 'START_BLOCKED', reason, requestId: 4 } }),
+    ]);
+    expect((handler as any).formsHandler.clearFormDraft).not.toHaveBeenCalled();
+    expect((handler as any).resourceListService.sendResourceListToSocket).toHaveBeenCalledWith(socket, {
+      resourceIds: new Set([10]),
+    });
+  });
+
+  it("passes the gate's confirmed steps and the card language on to the start (the capacity hook reads them)", async () => {
+    const { handler, gate, usage, socket } = setup();
+    gate.run.mockResolvedValue({ kind: 'proceed', satisfied: { reservations: ['override-4'] }, language: 'de' });
+    await handler.handleStartResourceUsageSession(socket, start());
+    expect(usage.startSession).toHaveBeenCalledWith(10, user, expect.anything(), {
+      auditOrigin: { id: 1, authenticationMethod: null },
+      origin: 'reader',
+      confirmedStepKeys: { reservations: ['override-4'] },
+      language: 'de',
+    });
   });
 
   it('passes warning: true through to the success reply', async () => {

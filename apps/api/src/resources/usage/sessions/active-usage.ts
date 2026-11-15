@@ -54,13 +54,22 @@ export function findActiveUsages(manager: EntityManager, resourceId: number): Pr
 
 /** Published sessions plus pending starts occupy a slot. Supervisors never take one. */
 export function countOccupiedSlots(manager: EntityManager, resourceId: number): Promise<number> {
+  return occupiedSlotsQuery(manager, resourceId).getCount();
+}
+
+/** The users behind {@link countOccupiedSlots}, one entry per occupied slot. */
+export async function findOccupyingUserIds(manager: EntityManager, resourceId: number): Promise<number[]> {
+  const rows = await occupiedSlotsQuery(manager, resourceId).select('usage.userId', 'userId').getRawMany();
+  return rows.map((row: { userId: number }) => Number(row.userId));
+}
+
+function occupiedSlotsQuery(manager: EntityManager, resourceId: number) {
   return manager
     .createQueryBuilder(ResourceUsage, 'usage')
     .where('usage.resourceId = :resourceId', { resourceId })
     .andWhere('usage.usageAction = :action', { action: ResourceUsageAction.Usage })
     .andWhere('usage.endTime IS NULL')
-    .andWhere('(usage.isFinalized = 1 OR usage.lifecyclePending = 1)')
-    .getCount();
+    .andWhere('(usage.isFinalized = 1 OR usage.lifecyclePending = 1)');
 }
 
 /**

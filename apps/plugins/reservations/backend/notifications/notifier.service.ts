@@ -1,6 +1,6 @@
 import type { PluginContext } from '@attraccess/plugins-backend-sdk';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
+import { CAPACITY_REDUCED_REASON, Clock, PLUGIN_CONTEXT, RESERVATION_CLOCK } from '../constants';
 import type { ReservationEntity } from '../entities/reservation.entity';
 import { DirectoryService } from '../reservations/directory.service';
 import type { ReservationNotifier } from '../reservations/notifier';
@@ -144,10 +144,12 @@ export class ReservationNotifications implements ReservationNotifier {
     );
   }
 
-  async onRemoved(r: ReservationEntity, context: { byUserId: number }): Promise<void> {
-    if (context.byUserId === r.userId) return;
+  async onRemoved(r: ReservationEntity, context: { byUserId: number | null; reason?: string }): Promise<void> {
+    // A holder who switched reservations off themselves knows; a capacity cut always tells the holder.
+    const capacityReduced = context.reason === CAPACITY_REDUCED_REASON;
+    if (!capacityReduced && context.byUserId === r.userId) return;
     await this.send('bookings', r.resourceId, [r.userId], `reservations:removed:${r.id}`, (m) =>
-      lifecycle.removed(m, r),
+      lifecycle.removed(m, r, capacityReduced),
     );
   }
 

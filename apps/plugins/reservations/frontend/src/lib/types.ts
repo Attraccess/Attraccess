@@ -62,6 +62,8 @@ export interface Availability {
   rules: BookingRules;
   reservations: Reservation[];
   maintenance: MaintenanceSpan[];
+  /** Effective session limit: how many bookings may overlap; 1 for exclusive resources. */
+  slots: number;
 }
 
 export interface ManagedReservationList {

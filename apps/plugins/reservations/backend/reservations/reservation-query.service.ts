@@ -171,6 +171,7 @@ export class ReservationQueryService {
         isManager: false,
         canBook,
         rules,
+        slots: 1,
         reservations: [],
         maintenance: [],
       };
@@ -184,7 +185,8 @@ export class ReservationQueryService {
       end: new Date(to.getTime() + settings.bufferAfterMinutes * MINUTE_MS),
     };
     const margin = MAX_BUFFER_MINUTES * MINUTE_MS;
-    const [candidates, windows] = await Promise.all([
+    const [slots, candidates, windows] = await Promise.all([
+      this.directory.getSessionLimit(resourceId),
       this.store.findOccupying(
         resourceId,
         new Date(span.start.getTime() - margin),
@@ -200,6 +202,7 @@ export class ReservationQueryService {
       isManager,
       canBook,
       rules,
+      slots,
       reservations: await this.present(actor, rows, new Map([[resourceId, isManager]])),
       maintenance: windows.map((window) => ({
         startTime: window.startTime.toISOString(),
