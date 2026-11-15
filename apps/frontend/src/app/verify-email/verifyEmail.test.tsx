@@ -254,6 +254,18 @@ describe('VerifyEmail', () => {
     expect(verifyMutateMock).not.toHaveBeenCalled();
   });
 
+  it.each(['/verify-email', '/verify-email?email=test%40example.com', '/verify-email?token=abc'])(
+    'shows the invalid-link error instead of loading forever for %s',
+    async (url) => {
+      renderWithRoute(url);
+
+      await waitFor(() => {
+        expect(screen.getByText(en.apiErrors.invalidLink)).toBeInTheDocument();
+      });
+      expect(verifyMutateMock).not.toHaveBeenCalled();
+    },
+  );
+
   it('shows Try Again and Back to sign in buttons on error', async () => {
     renderWithRoute('/verify-email?email=test%40example.com&token=bad');
     act(() => verifyOnError?.(new Error('bad')));

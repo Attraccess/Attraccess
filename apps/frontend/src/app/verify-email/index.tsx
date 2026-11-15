@@ -99,7 +99,7 @@ export function VerifyEmail() {
       return () => {
         cancelled = true;
       };
-    } else if (token !== null && email !== null) {
+    } else {
       setError(t('apiErrors.invalidLink'));
       didSendRequest.current = true;
     }
@@ -107,7 +107,7 @@ export function VerifyEmail() {
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center px-4 py-8">
         <Card className="max-w-md w-full" data-cy="verify-email-success-card">
           <Card.Header className="text-center">
             <h2 className="text-3xl font-bold">{t('success.title')}</h2>
