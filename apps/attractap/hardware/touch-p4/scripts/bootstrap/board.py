@@ -38,7 +38,8 @@ def schematic_net_names(d):
     rename every net.
     """
     from sexpr import find, first, loads
-    cli = os.path.join(os.environ.get('KICAD', ''), 'bin', 'kicad-cli') if os.environ.get('KICAD') else 'kicad-cli'
+    cli = os.environ.get('KICAD_CLI') or (
+        os.path.join(os.environ['KICAD'], 'bin', 'kicad-cli') if os.environ.get('KICAD') else 'kicad-cli')
     with tempfile.TemporaryDirectory() as tmp:
         out = os.path.join(tmp, 'sch.net')
         subprocess.run([cli, 'sch', 'export', 'netlist', '--format', 'kicadsexpr', '-o', out,

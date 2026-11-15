@@ -160,7 +160,7 @@ def led_power(B):
 
 
 def phy_fanout(B):
-    """PHY pins on the left and bottom side to the parts next to them, in pin order."""
+    """PHY pins on the left and bottom side to the parts next to them, in pin order, and its upper right corner."""
     if 'U401' not in B.fp:
         return
     p = B.pad
@@ -183,6 +183,15 @@ def phy_fanout(B):
     B.track(dog(v1, v2), net(10), w, layer=B_)
     B.via(*v2, net(10))
     B.track(dog(v2, r407, 'd'), net(10), w)
+    # upper right corner: TXER (pin 1) to its pull-down, the supply pin 31 to its capacitor, and the reset
+    # pin 32 to a via between the two. Left to the router, these three block each other.
+    t1, r406 = p('U401', 1), p('R406', '1')
+    yk = t1[1] - 0.9
+    B.track([t1, (t1[0], yk + 0.3), (t1[0] + 0.3, yk), (r406[0] - (r406[1] - yk), yk), r406], net(1), w)
+    B.track(dog(p('U401', 31), p('C402', '1')), net(31), 0.2)
+    x, y = p('U401', 32)
+    B.track([(x, y), (x + 0.45, y), (x + 0.9, y - 0.45)], net(32), w)
+    B.via(x + 0.9, y - 0.45, net(32))
     # bottom side: pins 17 to 20 to R409, R408, R410, R403
     for num, ref, padnum in ((17, 'R409', '1'), (18, 'R408', '1'), (19, 'R410', '1'), (20, 'R403', '2')):
         x, y = p('U401', num)
