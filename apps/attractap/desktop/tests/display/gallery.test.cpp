@@ -72,8 +72,22 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots)
         shot("pending-approval-removed");
         State::clearEnrollment();
 
-        // Connection settings: each tab, and the PIN lock in front of them. The Status tab
-        // (tab 4) shows a good connection, then a degraded one after its 1 s refresh.
+        // Connection settings: each tab, and the PIN lock in front of them.
+        auto &settings = Display::connectionConfigurationScreen;
+        settings.enablePinLock();
+        show(&settings, "settings-pin-lock");
+        settings.disablePinLock();
+        auto *tabs = findWidget(settings.getScreen(), &lv_tabview_class);
+        assert(tabs);
+        for (uint32_t tab = 0; tab < 3; ++tab)
+        {
+            lv_tabview_set_active(tabs, tab, LV_ANIM_OFF);
+            shot("settings-tab-" + std::to_string(tab + 1));
+        }
+        settings.enablePinLock();
+
+        // Network status from the drawer: the PIN lock, a good connection, then a degraded one
+        // after its 1 s refresh, scrolled to the last row.
         State::NetworkQualityState quality;
         quality.quality = State::NETWORK_QUALITY_GOOD;
         quality.lastInboundAgeMs = 820;
@@ -84,17 +98,12 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots)
         quality.hasPongRttSample = true;
         quality.hasCompletedPongProbe = true;
         State::setNetworkQualityState(quality);
-        auto &settings = Display::connectionConfigurationScreen;
-        settings.enablePinLock();
-        show(&settings, "settings-pin-lock");
-        settings.disablePinLock();
-        auto *tabs = findWidget(settings.getScreen(), &lv_tabview_class);
-        assert(tabs);
-        for (uint32_t tab = 0; tab < 4; ++tab)
-        {
-            lv_tabview_set_active(tabs, tab, LV_ANIM_OFF);
-            shot("settings-tab-" + std::to_string(tab + 1));
-        }
+        auto &networkStatus = Display::networkStatusScreen;
+        networkStatus.lock();
+        show(&networkStatus, "network-status-pin-lock");
+        lv_textarea_set_text(findWidget(networkStatus.getScreen(), &lv_textarea_class), Settings::getDeviceConfig().passCode.c_str());
+        lv_obj_send_event(findWidget(networkStatus.getScreen(), &lv_keyboard_class), LV_EVENT_READY, nullptr);
+        shot("network-status-good");
         quality.quality = State::NETWORK_QUALITY_DEGRADED;
         quality.lastInboundAgeMs = 6400;
         quality.lastPongRttMs = 2140;
@@ -105,12 +114,14 @@ void testGallery(SdlDisplay &display, const std::filesystem::path &screenshots)
         quality.pongProbeLossPercentLastMinute = 50;
         State::setNetworkQualityState(quality);
         SDL_Delay(1000);
-        shot("settings-tab-4-degraded");
-        assert(findLabel(settings.getScreen(), german ? "Eingeschränkt" : "Degraded"));
+        shot("network-status-degraded");
+        assert(findLabel(networkStatus.getScreen(), german ? "Eingeschränkt" : "Degraded"));
+        auto *lastRow = lv_obj_get_parent(findLabel(networkStatus.getScreen(), german ? "Verpasste Heartbeats (1 Min.)" : "Missed heartbeats (1 min)"));
+        lv_obj_scroll_to_view_recursive(lastRow, LV_ANIM_OFF);
+        shot("network-status-degraded-end");
         quality = {};
         quality.quality = State::NETWORK_QUALITY_OFFLINE;
         State::setNetworkQualityState(quality);
-        settings.enablePinLock();
 
         // Firmware update, before the version is known, while it loads and when it is done.
         auto &update = Display::firmwareUpdateScreen;

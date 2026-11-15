@@ -39,32 +39,10 @@ public:
     void disablePinLock();
     void enablePinLock();
 
-    // Rows of the Status tab, top to bottom.
-    enum StatusRow
-    {
-        StatusQuality,
-        StatusLastMessageAge,
-        StatusLatestPing,
-        StatusAveragePing,
-        StatusPingTrend,
-        StatusReconnects,
-        StatusSendQueueDepth,
-        StatusSendQueueFull,
-        StatusSendFailures,
-        StatusConnectionTimeouts,
-        StatusPingTimeouts,
-        StatusPingLoss,
-        StatusMissedHeartbeats,
-        StatusRowCount
-    };
-
 private:
     void createWifiTab(const NetworkConfig &networkConfig);
     void createApiTab(const AttraccessApiConfig &apiConfig);
     void createDeviceTab(const DeviceConfig &deviceConfig);
-    void createStatusTab();
-    void refreshStatusTab();
-    void refreshStatusTabIfDue();
     std::function<void(const ConnectionConfig &)> onSaveCallback;
     std::function<void()> onResetCertificateCallback;
 #ifdef HAS_POWER_BUTTON
@@ -118,9 +96,6 @@ private:
     bool wifiScanCompleted = false;
     uint32_t wifiScanStartMs = 0;
     bool wifiDropdownHasNetworks = false;
-
-    lv_obj_t *statusValues[StatusRowCount] = {};
-    uint32_t lastStatusRefreshMs = 0;
 
     lv_obj_t *createSaveButton(lv_obj_t *parent);
     lv_obj_t *createSaveContainer(lv_obj_t *parent);

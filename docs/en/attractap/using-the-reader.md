@@ -1,5 +1,4 @@
 # Using the Attractap Reader
-
 <!-- llms-description: How to use an Attractap touch reader: sign in with a card, start or stop machines, open doors, view usage and complete forms. -->
 
 Use your RFID card and the Attractap touch display to start or stop a machine, open a door, or request supervision. The reader shows the machines and doors assigned to it and the actions available to you.
@@ -172,7 +171,7 @@ While the connection to the server is good, the reader shows no network badge. A
 | **! NET** | The connection is degraded: messages arrive late, pings are slow or lost, or sending failed. The reader keeps working but may react slowly. |
 | **x NET** | The reader is offline and cannot reach the server. It reconnects automatically.                                                             |
 
-For details, pull down the handle at the top edge, tap **Settings** and enter the device PIN. The **Status** tab shows the live connection health and refreshes every second:
+For details, pull down the handle at the top edge, tap **Network** and enter the device PIN. The **Network status** screen shows the live connection health and refreshes every second. The reader stays connected while it is open, so you can watch the connection change. The back arrow returns to the previous screen:
 
 | Value                       | Meaning                                                                                  |
 | --------------------------- | ---------------------------------------------------------------------------------------- |

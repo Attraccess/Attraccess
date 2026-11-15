@@ -1,5 +1,4 @@
 # Den Attractap-Leser benutzen
-
 <!-- llms-description: So bedienen Sie den Attractap-Touchleser: mit Karte anmelden, Maschinen starten oder beenden, Türen öffnen und Formulare ausfüllen. -->
 
 Mit Ihrer RFID-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
@@ -172,7 +171,7 @@ Solange die Verbindung zum Server gut ist, zeigt der Leser keinen Netzwerk-Hinwe
 | **! NET** | Die Verbindung ist eingeschränkt: Nachrichten kommen verspätet an, Pings sind langsam oder gehen verloren, oder das Senden ist fehlgeschlagen. Der Leser funktioniert weiter, reagiert aber eventuell langsam. |
 | **x NET** | Der Leser ist offline und erreicht den Server nicht. Er verbindet sich automatisch neu.                                                                                                                        |
 
-Für Details ziehen Sie den Griff am oberen Rand herunter, tippen auf **Einstellungen** und geben die Geräte-PIN ein. Der Reiter **Status** zeigt den aktuellen Verbindungszustand und aktualisiert sich jede Sekunde:
+Für Details ziehen Sie den Griff am oberen Rand herunter, tippen auf **Netzwerk** und geben die Geräte-PIN ein. Der Bildschirm **Netzwerkstatus** zeigt den aktuellen Verbindungszustand und aktualisiert sich jede Sekunde. Der Leser bleibt dabei verbunden, sodass Sie Änderungen der Verbindung direkt verfolgen können. Der Pfeil zurück führt zum vorherigen Bildschirm:
 
 | Wert                                   | Bedeutung                                                                                            |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------- |

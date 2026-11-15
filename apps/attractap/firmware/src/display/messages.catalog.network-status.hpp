@@ -2,11 +2,12 @@
 
 #include "messages.catalog.card-relay.hpp"
 
-// Texts for the Status tab of the connection configuration screen (ATT-1273). They follow the
+// Texts for the network status screen, opened from the maintenance drawer (ATT-1273). They follow the
 // card relay texts in the Message enum, in this order.
 namespace FirmwareI18n {
 inline constexpr Entry networkStatusCatalog[] = {
-    {Message::NetworkStatusTab, "Status", "Status"},
+    {Message::NetworkStatus, "Netzwerkstatus", "Network status"},
+    {Message::NetworkStatusShort, "Netzwerk", "Network"},
     {Message::ConnectionQuality, "Verbindungsqualität", "Connection quality"},
     {Message::ConnectionQualityGood, "Gut", "Good"},
     {Message::ConnectionQualityDegraded, "Eingeschränkt", "Degraded"},

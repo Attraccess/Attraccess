@@ -196,7 +196,7 @@ struct ReaderWorkflow
     bool drawerOpen() { return lv_obj_is_visible(requireLabel(lv_layer_top(), FirmwareI18n::messageText(FirmwareI18n::Message::Maintenance, State::getActiveLanguage()))); }
     void tapCard() { nfc.setPresent(0, false); pump(); nfc.setPresent(0, true); pump(); }
     void testLocalization();
-    void testNetworkStatusTab();
+    void testNetworkStatus();
     void testButtonErrors();
     void testFormErrors();
     void testTransientRouting();

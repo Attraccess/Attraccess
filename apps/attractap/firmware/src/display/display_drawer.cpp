@@ -6,9 +6,11 @@
 
 // Hidden maintenance drawer rendered on the LVGL top layer. It is revealed by a
 // pull-down gesture that starts at the very top edge of the screen and drags
-// downward (see handleGestureSample). The drawer exposes two admin actions:
+// downward (see handleGestureSample). The drawer exposes three admin actions:
 //   - "Settings": delegated to the application via onOpenSettingsCallback
 //                 (same path as the init screen's settings entry, incl. PIN lock)
+//   - "Network":  live connection health on NetworkStatusScreen, behind the
+//                 device PIN; the reader stays connected while it is open
 //   - "Reboot":   closes the drawer and asks for confirmation on a full-screen
 //                 ConfirmScreen, then esp_restart()
 //
@@ -28,7 +30,7 @@ namespace
                                lv_color_t color, lv_event_cb_t cb)
     {
         lv_obj_t *btn = lv_button_create(parent);
-        lv_obj_set_size(btn, lv_pct(44), 110);
+        lv_obj_set_size(btn, lv_pct(30), 110);
         DisplayTheme::button(btn, color);
         lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -79,6 +81,12 @@ void Display::updateDrawerAvailability()
     {
         Display::rebootConfirmShown = false;
         Display::logger.info("Drawer became unavailable: dismissing the reboot confirmation");
+        Display::returnFromTransient();
+    }
+    // The network status belongs to the drawer too.
+    else if (Display::isActive(&Display::networkStatusScreen))
+    {
+        Display::logger.info("Drawer became unavailable: closing the network status");
         Display::returnFromTransient();
     }
 }
@@ -144,6 +152,16 @@ void Display::initDrawer()
                          Display::closeDrawer();
                          if (Display::onOpenSettingsCallback)
                              Display::onOpenSettingsCallback();
+                     });
+
+    makeDrawerButton(row, LV_SYMBOL_WIFI, FirmwareI18n::Message::NetworkStatusShort, DisplayTheme::primary(),
+                     [](lv_event_t *e)
+                     {
+                         if (lv_event_get_code(e) != LV_EVENT_CLICKED || !Display::isDrawerAvailable())
+                             return;
+                         Display::logger.info("Drawer: network status requested");
+                         Display::closeDrawer();
+                         Display::showNetworkStatus();
                      });
 
     makeDrawerButton(row, LV_SYMBOL_POWER, FirmwareI18n::Message::Reboot, DisplayTheme::danger(),
@@ -225,6 +243,15 @@ void Display::requestReboot()
     };
     Display::showConfirm(std::move(config));
     Display::rebootConfirmShown = true;
+}
+
+void Display::showNetworkStatus()
+{
+    if (!Display::isDrawerAvailable() || Display::transientActive())
+        return;
+    Display::networkStatusScreen.setOnCloseCallback([] { Display::returnFromTransient(); });
+    Display::networkStatusScreen.lock();
+    Display::transitionToScreen(&Display::networkStatusScreen);
 }
 
 void Display::handleGestureSample(int16_t x, int16_t y, bool pressed)

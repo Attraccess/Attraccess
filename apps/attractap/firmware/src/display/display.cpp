@@ -77,6 +77,7 @@ MassIntroductionScreen Display::massIntroductionScreen;
 FirmwareUpdateScreen Display::firmwareUpdateScreen;
 StatusScreen Display::statusScreen;
 ConfirmScreen Display::confirmScreen;
+NetworkStatusScreen Display::networkStatusScreen;
 TopUpScreen Display::topUpScreen;
 FormsScreen Display::formsScreen;
 ProjectSelectScreen Display::projectSelectScreen;

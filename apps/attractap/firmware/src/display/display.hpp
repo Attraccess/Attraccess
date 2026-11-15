@@ -28,6 +28,7 @@
 #include "screens/firmwareUpdate/firmwareUpdateScreen.hpp"
 #include "screens/status/statusScreen.hpp"
 #include "screens/confirm/confirmScreen.hpp"
+#include "screens/networkStatus/networkStatusScreen.hpp"
 #include "screens/topUp/topUpScreen.hpp"
 #include "screens/forms/formsScreen.hpp"
 #include "screens/projectSelect/projectSelectScreen.hpp"
@@ -74,6 +75,7 @@ public:
     static FirmwareUpdateScreen firmwareUpdateScreen;
     static StatusScreen statusScreen;
     static ConfirmScreen confirmScreen;
+    static NetworkStatusScreen networkStatusScreen;
     static TopUpScreen topUpScreen;
     static FormsScreen formsScreen;
     static ProjectSelectScreen projectSelectScreen;
@@ -195,6 +197,7 @@ private:
     static void openDrawer();
     static void closeDrawer();
     static void requestReboot();
+    static void showNetworkStatus();
     static bool isDrawerAvailable();
     static void updateDrawerAvailability();
     // Fed every touch sample from touchpad_read to detect the top-edge pull-down
