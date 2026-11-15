@@ -81,6 +81,7 @@ panel type: 84.3 x 84.3 mm outline, 40-pin 0.5 mm flex, pins 16 to 33 are the
 | Elecrow DIS16804D, "4inch Square IPS Display 480*480 Capacitive SPI+RGB, ST7701S" | Outline, driver, and the printed 40-pin table is identical to the datasheet's. Comes with an HDMI driver board; the panel unplugs from it | Touch controller is not named |
 | Waveshare / Luckfox LF40-480480-ARK (SKU 27738) | Outline (84.2 x 84.2 mm), GT911 touch | Pin table and driver are not published; ask before buying in volume |
 | The panel on the Waveshare ESP32-S3-Touch-LCD-4 (the current readers) | Pinout (taken from that board's schematic) | Flex length against this layout |
+| AliExpress item 1005005675144653, SUNMAXIC store, "4.0 inch TFT LCD Square Screen 480*480 ST7701S 40Pin", variant "Capacitive touch" | Shows the same mechanical drawing as the datasheet (84.3 x 84.3 mm, flex 25 mm from the lens edge, 40 pins at 0.5 mm) and the identical pin table | Touch controller is not named. The "No touch" variant has no touch layer |
 
 Measure the flex of the panel you intend to buy in volume, not just any of
 these.
