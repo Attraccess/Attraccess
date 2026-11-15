@@ -58,7 +58,18 @@ pnpm nx run attractap-touch-p4-pcb:route
 
 `route` runs these steps (`tools/pcb.sh`): `build_pcb.py dsn`, Freerouting, `build_pcb.py ses`,
 `finish_route.py`, `build_pcb.py finish`, `finish_route.py --pours`, `build_pcb.py finish`, DRC.
-The autorouter does not give the same result twice, so neither does `route`.
+
+The autorouter does not give the same result twice, so its result is kept in git:
+`kicad/attractap-touch-p4.ses`. Everything after it is repeatable. To rebuild the committed board
+from the committed files:
+
+```bash
+pnpm nx run attractap-touch-p4-pcb:place
+pnpm nx run attractap-touch-p4-pcb:route-finish    # imports the .ses, finishes the routing, runs DRC
+```
+
+`route` replaces the `.ses` with a new autorouter result. Commit the new file together with the board
+it led to.
 
 Lessons from revision A, in case the generator is used again:
 

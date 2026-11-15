@@ -13,7 +13,9 @@ FREEROUTING_VERSION="2.5.0"
 FREEROUTING_JAR="${FREEROUTING_JAR:-$PCB_TOOLS/freerouting-$FREEROUTING_VERSION.jar}"
 
 cli() { "$KICAD_CLI" "$@"; }
-bootstrap() { (cd "$BOOTSTRAP" && kicad_python "$@"); }
+# A fixed hash seed: the routing scripts walk over sets of net names, and with Python's random seed
+# two runs on the same input could pick different, equally short paths.
+bootstrap() { (cd "$BOOTSTRAP" && PYTHONHASHSEED=0 kicad_python "$@"); }
 
 erc() {
     mkdir -p "$REPORTS"

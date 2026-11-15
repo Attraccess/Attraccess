@@ -7,8 +7,8 @@ fp-info-cache
 *.lck
 _autosave-*
 \#auto_saved_files#
-# autorouter exchange files
+# autorouter input and rules (regenerated from the placed board). The autorouter's result, the .ses
+# file, is committed: the autorouter gives a different result on every run.
 *.dsn
-*.ses
 *.rules
 __pycache__/

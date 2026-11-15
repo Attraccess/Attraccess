@@ -126,6 +126,11 @@ def board_items(board):
             tracks.append(dict(net=t.GetNetname(), layer=LAYERS.index(t.GetLayer()), w=mm(t.GetWidth()),
                                x1=mm(t.GetStart().x) - OX, y1=mm(t.GetStart().y) - OY,
                                x2=mm(t.GetEnd().x) - OX, y2=mm(t.GetEnd().y) - OY, locked=t.IsLocked(), obj=t))
+    # KiCad saves items in the order of their random ids. A fixed order here makes two runs on the same
+    # input take the same decisions.
+    pads.sort(key=lambda p: (p['ref'], p['num'], p['cx'], p['cy']))
+    tracks.sort(key=lambda t: (t['net'], t['layer'], t['x1'], t['y1'], t['x2'], t['y2'], t['w']))
+    vias.sort(key=lambda v: (v['net'], v['x'], v['y']))
     return pads, tracks, vias
 
 

@@ -69,6 +69,28 @@ Not verified with a real panel: the exact fold length. The connector sits about
 instead of being stretched. Check with a sample panel before ordering boards.
 Other panel suppliers with the same 40-pin pinout can differ in flex length.
 
+Where to get the panel. The drawing comes from the datasheet that Makerfabs
+publishes for its 4.0" display (maker: Shenzhen Hongxiangrui). The model number
+on it is the maker's own and no shop lists the panel under it. It is a common
+panel type: 84.3 x 84.3 mm outline, 40-pin 0.5 mm flex, pins 16 to 33 are the
+18 data lines DB0 to DB17. The board uses 16 of them; pin 16 (blue LSB) and pin
+28 (red LSB) are tied to ground. Shop listings checked in November 2026:
+
+| Listing | What matches | Not confirmed |
+|---|---|---|
+| Elecrow DIS16804D, "4inch Square IPS Display 480*480 Capacitive SPI+RGB, ST7701S" | Outline, driver, and the printed 40-pin table is identical to the datasheet's. Comes with an HDMI driver board; the panel unplugs from it | Touch controller is not named |
+| Waveshare / Luckfox LF40-480480-ARK (SKU 27738) | Outline (84.2 x 84.2 mm), GT911 touch | Pin table and driver are not published; ask before buying in volume |
+| The panel on the Waveshare ESP32-S3-Touch-LCD-4 (the current readers) | Pinout (taken from that board's schematic) | Flex length against this layout |
+
+Measure the flex of the panel you intend to buy in volume, not just any of
+these.
+
+LCSC had no panel of this type in November 2026. Its 4.0" 480 x 480 panel
+(C17496207, Focus E40RC-FS1000-C) has the same driver and touch controller but
+a MIPI DSI interface on a 20-pin flex and a 77 x 80 mm outline, so it does not
+fit this board. The ESP32-P4 has a MIPI DSI port; using such a panel would be a
+new display section, not a part swap.
+
 ### Enclosure hints
 
 - Wi-Fi antenna: keep metal and the display away from the top 7 mm strip.

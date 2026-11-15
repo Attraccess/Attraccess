@@ -85,9 +85,11 @@ The board is the Nx project `attractap-touch-p4-pcb`. Every operation is a targe
 Reports go to `fab/reports/`. The targets find KiCad on the PATH, in the macOS app bundle or, on
 NixOS, in nixpkgs; set `KICAD_CLI` and `KICAD_PYTHON` to use another installation. They run KiCad
 with a configuration of their own under `.tools/kicad`, so they do not depend on your KiCad settings.
-The targets `generate-library`, `generate-schematic`, `place` and `route` rebuild the project from
-the circuit description and overwrite the KiCad files; see
-[scripts/bootstrap/README.md](scripts/bootstrap/README.md).
+The targets `generate-library`, `generate-schematic`, `place`, `route` and `route-finish` rebuild the
+project from the circuit description and overwrite the KiCad files; see
+[scripts/bootstrap/README.md](scripts/bootstrap/README.md). The autorouter's result
+(`kicad/attractap-touch-p4.ses`) is committed, so `place` followed by `route-finish` gives the
+committed board again.
 
 `fab/gerbers/` goes to the PCB order (zip it). `fab/board-front.pdf` is the
 assembly drawing with the reference designators (the silkscreen has none). `fab/wifi/` and `fab/lan/` each

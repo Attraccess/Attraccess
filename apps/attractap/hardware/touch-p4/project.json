@@ -108,6 +108,13 @@
       "options": {
         "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh route"
       }
+    },
+    "route-finish": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "bash apps/attractap/hardware/touch-p4/tools/pcb.sh route-finish"
+      }
     }
   }
 }
