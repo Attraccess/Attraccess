@@ -139,8 +139,11 @@ export function DashboardGrid({ pins }: Readonly<{ pins: DashboardPin[] }>) {
       accessibility={accessibility}
     >
       <SortableContext items={pins.map(pinKey)} strategy={rectSortingStrategy}>
-        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3" data-cy="dashboard-grid">
-          {pins.map(renderCard)}
+        {/* Columns follow the space next to the sidebar, not the viewport, so cards never get too narrow. */}
+        <div className="@container">
+          <div className="grid grid-cols-1 items-start gap-4 @xl:grid-cols-2 @4xl:grid-cols-3" data-cy="dashboard-grid">
+            {pins.map(renderCard)}
+          </div>
         </div>
       </SortableContext>
     </DndContext>

@@ -90,12 +90,11 @@ export function UnavailablePinCard({ id, title, onUnpin }: Readonly<PinCardProps
                 <Card.Title className="truncate text-muted">{title}</Card.Title>
               </>
             }
-          >
+          />
+          <Card.Content className="flex flex-col items-start gap-2">
             <Chip size="sm" color="warning">
               {t('card.unavailable')}
             </Chip>
-          </CardHeading>
-          <Card.Content>
             <Card.Description>{t('card.unavailableDescription')}</Card.Description>
           </Card.Content>
           <Card.Footer>
