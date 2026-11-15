@@ -145,4 +145,21 @@ describe('getTranslationKeyForApiError', () => {
     expect(result.key).toBe('api.This website is not approved to make changes');
     expect(getTranslation(translations, 'This website is not approved to make changes.title')).toBe(expectedTitle);
   });
+
+  it.each([
+    ['English', API_ERROR_TRANSLATIONS_EN, 'Meter cannot be shared'],
+    ['German', API_ERROR_TRANSLATIONS_DE, 'Zähler nicht teilbar'],
+  ])('explains a meter that cannot be shared in %s', (_locale, translations, expectedTitle) => {
+    const result = getTranslationKeyForApiError({
+      error: { body: { message: 'METER_SHARING_UNSUPPORTED: Counter' } } as unknown as Error,
+      t: (key: string) => key,
+      tExists: (key: string) => getTranslation({ api: translations }, key) !== undefined,
+      baseTranslationKey: 'api',
+    });
+
+    expect(result.key).toBe('api.METER_SHARING_UNSUPPORTED');
+    expect(result.errorMessage).toBe('Counter');
+    expect(getTranslation(translations, 'METER_SHARING_UNSUPPORTED.title')).toBe(expectedTitle);
+    expect(getTranslation(translations, 'METER_SHARING_UNSUPPORTED.description')).toContain('{{error}}');
+  });
 });

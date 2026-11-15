@@ -2,7 +2,7 @@
 
 <!-- llms-description: Wie Plugins Hinweise und Abfragen auf Attractap-Bildschirmen anzeigen, welche Leser das können, sowie Admin-Einstellungen und Alarme. -->
 
-Plugins, zum Beispiel ein Reservierungs-Plugin, können kurze Hinweise auf dem Bildschirm von Attractap-Readern
+Plugins (zum Beispiel das Plugin [Reservierungen](plugins/reservations/overview.md)) können kurze Hinweise auf dem Bildschirm von Attractap-Readern
 anzeigen, Mitglieder vor dem Start einer Maschine um eine Bestätigung bitten, einen Start mit Begründung ablehnen
 und nach dem Stopp eine kurze Frage stellen. Diese Seite erklärt, was Mitglieder sehen, welche Reader was anzeigen
 können und welche Einstellungen Admins haben. In der Admin-Oberfläche heißt das alles **Reader-Anzeige**. Den
@@ -45,17 +45,14 @@ technischen Vertrag für Plugin-Entwickler finden Sie unter
 - **Reader offline:** Solange ein Reader keine Verbindung zum Server hat, startet nichts, und Plugin-Hinweise
   verschwinden.
 
-Auf einem Attractap Touch mit aktueller Firmware wird eine Uhrzeit wie „14:25“ nie auf zwei Zeilen verteilt. Jede
-Zeile enthält einen Teil eines Hinweises, zum Beispiel „Frei bis 13:55,“ über „dann reserviert von bea bis 14:25“
-und den Check-in-Hinweis „(Check-in bis 14:10)“ unter der Buchung. Bei einem langen Namen stehen die Zeiten in einer
-eigenen Zeile.
+Auf einem Attractap Touch mit aktueller Firmware wird eine Uhrzeit wie „14:25“ nie auf zwei Zeilen verteilt, und Plugins
+können jeden Teil eines Hinweises in eine eigene Zeile setzen. Das Plugin Reservierungen tut das; siehe
+[Reservierungen: Attractap-Reader](plugins/reservations/using-reservations.md#attractap-reader).
 
 ## Uhrzeit und Zeitzone
 
-Reader zeigen die Ortszeit im 24-Stunden-Format. Jeder Reader verwendet **eine** Zeitzone: die des Plugins, das
-Zeiten auf seinem Bildschirm schreibt (die Einstellung **Zeitzone** des Reservierungs-Plugins), sofern ein Plugin
-eine festlegt, sonst die des Servers (`TZ`). Das Reservierungs-Plugin schlägt seine Zone nur für Ressourcen vor,
-bei denen Reservierungen eingeschaltet sind; für alle anderen gilt die Zone des Servers. So passen Uhr und Texte wie
+Reader zeigen die Ortszeit im 24-Stunden-Format. Jeder Reader verwendet **eine** Zeitzone: die eines Plugins, das eine festlegt, sonst die des Servers (`TZ`). Ein Plugin entscheidet, für welche Ressourcen es seine Zone vorschlägt; für alle anderen gilt die Zone des Servers (ein Beispiel steht unter
+[Reservierungen: Attractap-Reader](plugins/reservations/using-reservations.md#attractap-reader)). So passen Uhr und Texte wie
 „Check-in bis 14:15“ immer zusammen, ebenso die Startzeiten von Sitzungen. Ändern Admins die Zeitzone des Plugins,
 wechseln die Reader sofort, die Startzeiten von Sitzungen eingeschlossen; die Sommerzeit wird automatisch
 berücksichtigt. Antwortet kein Plugin rechtzeitig, zum Beispiel direkt nach einem Neustart des Servers, behält der

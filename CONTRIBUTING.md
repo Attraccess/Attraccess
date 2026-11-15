@@ -69,6 +69,44 @@ the code that needs both sides into a third file that imports them, as
 `plugin-uninstall.service.ts` does for `plugin.service.ts` and
 `plugin-migration.service.ts`.
 
+## Private submodule
+
+`apps/cesentry` is a git submodule pointing at a private repository. It is
+optional: `.gitmodules` sets `update = none`, so `git clone
+--recurse-submodules` and `git submodule update` skip it, the directory stays
+empty, and every command, hook and CI job works without it. Public CI never
+checks it out. `git clone --recurse-submodules` prints `Skipping submodule
+'apps/cesentry'`, and `git submodule status` lists it with a leading `-`. Both
+are expected.
+
+If you have no access and set `submodule.recurse=true`, pulls and checkouts that
+move the pointer try to fetch it and fail. Mark it inactive once per clone:
+
+```sh
+git config submodule.apps/cesentry.active false
+```
+
+Maintainers with access fill it in each checkout or worktree with:
+
+```sh
+git submodule update --init --checkout apps/cesentry
+```
+
+Rerun that command after pulling a commit that moves the pointer: plain `git
+submodule update` skips it. Before committing, check `git diff --submodule`, so
+that a stale checkout does not move the pointer back. Nx picks up its projects
+like any other. Its own README covers the rest, including its commit hook.
+
+Rules for this repository:
+
+- Nothing public refers to the private projects: no imports, no
+  `tsconfig.base.json` paths, no `implicitDependencies`, and no project names in
+  workflows or scripts. Generic tag-based exclusions are fine.
+- `apps/cesentry` holds only the submodule pointer.
+  `node scripts/check-private-submodule.mjs` (run in PR CI) fails if files are
+  committed under it or `update = none` is removed.
+- Commit a new pointer only for a commit that exists in the private repository.
+
 ## Commit Messages
 
 This repository enforces [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) on every commit (locally via the `commit-msg` Husky hook) and on every pull request title (in CI).

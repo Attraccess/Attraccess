@@ -47,7 +47,10 @@
     "total": "Items total",
     "meterDescription": "{{value}} at {{rate}} per measured value",
     "unavailable": "Unavailable",
-    "meterUnavailable": "Final reading unavailable; no meter charge included. Captured rate: {{rate}} per measured value."
+    "meterUnavailable": "Final reading unavailable; no meter charge included. Captured rate: {{rate}} per measured value.",
+    "pending": "Pending",
+    "meterPending": "Pending: your share is charged separately once the meter can be read again. Captured rate: {{rate}} per measured value.",
+    "meterSharedDescription": "Your share, rounded per segment, at {{rate}} per measured value"
   },
   "actions": {
     "refund": "Refund",

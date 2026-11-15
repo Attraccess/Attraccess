@@ -34,7 +34,7 @@ Attraccess ist **source-available** unter der [modifizierten Prosperity Public L
 - **Qualifikationen & Zugangssteuerung** – Dokumentierte Einweisungen und Berechtigungen pro Ressource oder Ressourcengruppe
 - **Ausweiszugang** – Physischer Zugang über Attractap RFID-Leser
 - **Wartungsplanung** – Vorbeugende Wartung nach Zeit, Nutzungsstunden oder Sitzungsanzahl planen
-- **Maschinen- & SPS-Integration** – WAGO-Steuerungen anbinden und Geräte über MQTT oder HTTP automatisieren
+- **Maschinen- & SPS-Integration** – Steuerungen wie [WAGO](plugins/wago/overview.md) (Plugin) anbinden und Geräte über MQTT oder HTTP automatisieren
 - **Projekte & Nutzungsnachweise** – Sitzungen Projekten zuordnen und Nutzungsdaten als CSV exportieren
 - **SSO-Integration** – Anmeldung über OIDC oder SAML mit Zuordnung von Gruppen zu Rollen
 - **Audit-Protokoll & Monitoring** – Sensible Änderungen nachverfolgen und den Betrieb mit Prometheus und Grafana überwachen

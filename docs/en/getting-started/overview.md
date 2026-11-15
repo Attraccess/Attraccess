@@ -25,7 +25,7 @@ With the **Attractap RFID Reader**, you can control physical access to machines 
 
 ### Machine Integration & Automation
 
-Connect machines through the WAGO PLC plugin or build visual automations using the flow editor. Use MQTT or HTTP to link access decisions and usage sessions with equipment controls and status signals.
+Connect machines through the [WAGO PLC plugin](plugins/wago/overview.md) or build visual automations using the flow editor. Use MQTT or HTTP to link access decisions and usage sessions with equipment controls and status signals.
 
 ### Projects
 

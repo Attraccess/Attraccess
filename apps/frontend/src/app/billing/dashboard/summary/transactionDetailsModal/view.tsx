@@ -17,7 +17,12 @@ import {
 } from '@heroui/react';
 import { AttraccessUser, DateTimeDisplay, StandardModal, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RefundModal } from './refund/index';
-import { toExactCredits } from '@attraccess/shared';
+import { formatDurationMs, toExactCredits } from '@attraccess/shared';
+import {
+  AllocationBreakdown,
+  AllocationShareSummary,
+  getItemAllocation,
+} from '../../../../../components/allocationBreakdown';
 import { useMeterValueFormatter } from '../../../../../hooks/useMeterValueFormatter';
 import { useCreditsFormatter } from '../../../../../hooks/useCreditsFormatter';
 import de from './de.json';
@@ -139,6 +144,33 @@ export function TransactionDetailsModalItemsTitle({
   formatCredits,
   totalItemsAmount,
 }: Props) {
+  const items = (transaction.items ?? []).map((item) => {
+    const isMeter = item.meterCreditsPerUnit != null || item.meterQuantity != null;
+    const allocation = getItemAllocation(item);
+    // A pending share has no segments yet: it is charged later, so nothing is shown as shared.
+    const shared = allocation && !allocation.pending ? allocation : null;
+    const rate = formatCredits(item.meterCreditsPerUnit ?? 0);
+    return {
+      item,
+      isMeter,
+      allocation,
+      shared,
+      label: !isMeter && tExists('items.system.' + item.name) ? t('items.system.' + item.name) : item.name,
+      value: allocation?.pending
+        ? t('items.pending')
+        : item.meterQuantity == null
+          ? t('items.unavailable')
+          : formatMeterValue(item.meterQuantity),
+      notice: !isMeter
+        ? null
+        : allocation?.pending
+          ? t('items.meterPending', { rate })
+          : item.meterQuantity == null
+            ? t('items.meterUnavailable', { rate })
+            : null,
+      rate,
+    };
+  });
   return (
     <div>
       <div className="mb-2 font-semibold">{t('items.title')}</div>
@@ -161,47 +193,48 @@ export function TransactionDetailsModalItemsTitle({
               </TableColumn>
             </TableHeader>
             <TableBody renderEmptyState={() => t('items.empty')}>
-              {(transaction.items ?? []).map((item) => {
-                const isMeter = item.meterCreditsPerUnit != null || item.meterQuantity != null;
-                const value =
-                  item.meterQuantity == null ? t('items.unavailable') : formatMeterValue(item.meterQuantity);
-                return (
-                  <TableRow key={item.id} id={item.id}>
-                    <TableCell className="min-w-0 whitespace-normal wrap-anywhere">
-                      <div className="font-medium">
-                        {!isMeter && tExists('items.system.' + item.name) ? t('items.system.' + item.name) : item.name}
-                      </div>
-                      <div className="text-tiny text-default-500 sm:hidden">
-                        {isMeter && item.meterQuantity == null
-                          ? t('items.meterUnavailable', {
-                              rate: formatCredits(item.meterCreditsPerUnit ?? 0),
-                            })
-                          : item.description}
-                      </div>
-                      {item.externalReference && !isMeter && (
-                        <div className="text-tiny text-default-400">{item.externalReference}</div>
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden min-w-0 whitespace-normal wrap-anywhere sm:table-cell">
-                      {isMeter
-                        ? t(item.meterQuantity == null ? 'items.meterUnavailable' : 'items.meterDescription', {
-                            value,
-                            rate: formatCredits(item.meterCreditsPerUnit ?? 0),
-                          })
-                        : item.description}
-                    </TableCell>
-                    <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
-                      {isMeter ? value : item.quantity}
-                    </TableCell>
-                    <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
-                      {isMeter ? formatCredits(item.meterCreditsPerUnit ?? 0) : formatCredits(item.unitPrice)}
-                    </TableCell>
-                    <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
-                      {formatCredits(toExactCredits(item.unitPrice) * toExactCredits(item.quantity))}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {items.map(({ item, isMeter, shared, label, value, notice, rate }) => (
+                <TableRow key={item.id} id={item.id}>
+                  <TableCell className="min-w-0 whitespace-normal wrap-anywhere">
+                    <div className="font-medium">{label}</div>
+                    <div className="text-tiny text-default-500 sm:hidden">{notice ?? item.description}</div>
+                    {item.externalReference && !isMeter && (
+                      <div className="text-tiny text-default-400">{item.externalReference}</div>
+                    )}
+                    {shared && (
+                      <AllocationShareSummary
+                        allocation={shared}
+                        formatMeterValue={formatMeterValue}
+                        shareValue={
+                          shared.kind === 'operating-time' ? String(item.durationMs ?? '') || null : item.meterQuantity
+                        }
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell className="hidden min-w-0 whitespace-normal wrap-anywhere sm:table-cell">
+                    {notice ??
+                      (!isMeter
+                        ? item.description
+                        : shared
+                          ? t('items.meterSharedDescription', { rate })
+                          : t('items.meterDescription', { value, rate }))}
+                  </TableCell>
+                  <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
+                    {isMeter
+                      ? value
+                      : shared?.kind === 'operating-time' && item.durationMs != null
+                        ? formatDurationMs(item.durationMs)
+                        : item.quantity}
+                  </TableCell>
+                  <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
+                    {/* A shared running-time charge is a sum of rounded segment shares: it has no single rate. */}
+                    {isMeter ? rate : shared?.kind === 'operating-time' ? '—' : formatCredits(item.unitPrice)}
+                  </TableCell>
+                  <TableCell className="min-w-0 px-2 text-right whitespace-normal wrap-anywhere">
+                    {formatCredits(toExactCredits(item.unitPrice) * toExactCredits(item.quantity))}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </TableContent>
         </TableScrollContainer>
@@ -211,6 +244,13 @@ export function TransactionDetailsModalItemsTitle({
           {t('items.total')}: <span className="font-semibold text-foreground">{formatCredits(totalItemsAmount)}</span>
         </div>
       </div>
+      <AllocationBreakdown
+        entries={items.flatMap(({ item, shared, label }) =>
+          shared ? [{ id: item.id, name: label, allocation: shared }] : [],
+        )}
+        formatMeterValue={formatMeterValue}
+        formatCredits={formatCredits}
+      />
     </div>
   );
 }

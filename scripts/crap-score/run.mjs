@@ -1,12 +1,11 @@
 /* eslint-disable no-console -- CLI progress and diagnostics are intentional. */
 import { getCrapReport } from 'crap-score';
-import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import istanbulCoverage from 'istanbul-lib-coverage';
 import { createInstrumenter } from 'istanbul-lib-instrument';
-import { isSource, ownedFiles, workspace } from './sources.mjs';
+import { isSource, ownedFiles, workspace, workspaceFiles } from './sources.mjs';
 
 // Source-map remapping may leave end columns null (end of line). Restore exact
 // boundaries from the original source, without changing any execution counts.
@@ -88,7 +87,7 @@ export function fillMissingFunctions(measured, original) {
   }
 }
 
-export { isSource, ownedFiles, workspace };
+export { isSource, ownedFiles, workspace, workspaceFiles };
 export const CRAP_SCORE_LIMIT = 30;
 
 // Use complete source ranges, not names or just line numbers: anonymous
@@ -371,12 +370,8 @@ export async function run(root, outputDirectory) {
   const output = outputDirectory ?? path.join(workspace, 'coverage/crap', project.name.replaceAll('/', '__'));
   rmSync(output, { recursive: true, force: true });
   mkdirSync(output, { recursive: true });
-  const tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], {
-    encoding: 'utf8',
-  })
-    .split('\0')
-    .filter((file) => file && existsSync(path.resolve(workspace, file)));
-  const files = ownedFiles(root, tracked).filter(isSource);
+  const { files: tracked, submodules } = workspaceFiles();
+  const files = ownedFiles(root, tracked, submodules).filter(isSource);
   if (!files.length) throw new Error(`No JS/TS source files found for ${project.name}`);
   const reports = dependencyTargets(project).flatMap((target) => {
     const found = coverageReports(coverageDirectory(root, target));

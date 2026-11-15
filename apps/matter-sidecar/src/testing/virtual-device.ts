@@ -6,6 +6,7 @@ import { OnOffClient } from '@matter/main/behaviors';
 import { OnOffLightDevice } from '@matter/main/devices';
 import { NodeJsEnvironment } from '@matter/nodejs';
 import { randomInt } from 'node:crypto';
+import { networkInterfaces } from 'node:os';
 import type { MatterController } from '../fabric/controller';
 
 /** Setup passcodes the Matter specification forbids, besides 0 and 99999999, which are out of range. */
@@ -77,6 +78,34 @@ export async function startVirtualDevice(storageDir: string, port: number): Prom
     fabricIds: () => Object.values(node.state.operationalCredentials.fabrics).map((fabric) => String(fabric.fabricId)),
     isOn: () => light.state.onOff.onOff,
     stop: () => node.close(),
+  };
+}
+
+/**
+ * Puts the mDNS of every matter.js environment created afterwards in this process (the virtual device's and the
+ * controllers') on the loopback interface (`lo` on Linux, `lo0` on macOS), and returns a function that undoes it.
+ *
+ * By default matter.js advertises and scans on every non-loopback interface, and the controller opens its CASE
+ * sessions (commissioning step 18 "Reconnect" and every later connection) to whichever advertised address it
+ * prefers. Which interfaces exist and which of them carry multicast and the host's own traffic back to itself depends
+ * on the machine: Wi-Fi, VPN tunnels (e.g. Tailscale), AWDL, bridges. On a macOS developer machine the reconnect
+ * never succeeded and the test ran into its timeout, while Linux CI hosts passed. On loopback, device and controller
+ * advertise, discover and connect over 127.0.0.1/::1 only, on every host. `MATTER_MDNS_NETWORKINTERFACE` set by the
+ * caller wins.
+ */
+export function useLoopbackMdns(): () => void {
+  const variable = 'MATTER_MDNS_NETWORKINTERFACE';
+  const previous = process.env[variable];
+  if (previous === undefined) {
+    const loopback = Object.entries(networkInterfaces()).find(([, addresses]) =>
+      addresses?.some((address) => address.internal),
+    )?.[0];
+    if (loopback === undefined) throw new Error('No loopback network interface found.');
+    process.env[variable] = loopback;
+  }
+  return () => {
+    if (previous === undefined) delete process.env[variable];
+    else process.env[variable] = previous;
   };
 }
 

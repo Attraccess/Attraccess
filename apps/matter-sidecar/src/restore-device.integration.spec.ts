@@ -8,6 +8,7 @@ import {
   commissionVirtualDevice,
   startVirtualDevice,
   toggleDevice,
+  useLoopbackMdns,
   type VirtualDevice,
 } from './testing/virtual-device';
 
@@ -17,9 +18,15 @@ const post = (running: Running, path: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
-// Needs mDNS over the loopback interface. The device and both controllers run in this process on their own storage
-// and ports; only the setup waits for discovery, the assertions run once.
+// The device and both controllers run in this process on their own storage and ports and find each other over mDNS on
+// the loopback interface (see useLoopbackMdns); only the setup waits for discovery, the assertions run once.
 describe('restoring a snapshot keeps a commissioned device controllable', () => {
+  let restoreMdns: () => void;
+  beforeAll(() => {
+    restoreMdns = useLoopbackMdns();
+  });
+  afterAll(() => restoreMdns());
+
   const directories: string[] = [];
   const stoppers: (() => Promise<unknown>)[] = [];
   const tmp = () => {

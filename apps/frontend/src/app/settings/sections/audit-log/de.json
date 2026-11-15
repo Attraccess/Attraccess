@@ -220,6 +220,7 @@
     "plugin.retry_requested": "Erneuter Plugin-Versuch angefordert",
     "billing.transaction.updated": "Abrechnung geändert",
     "meter_charge.waived": "Zählerkosten erlassen",
+    "meter.updated": "Zähler geändert",
     "resource_flow.updated": "Ressourcen-Flow geändert",
     "flow.created": "Globaler Flow erstellt",
     "flow.updated": "Globaler Flow geändert",
@@ -427,7 +428,21 @@
     "before.enabled": "Aktiviert vorher",
     "after.enabled": "Aktiviert nachher",
     "before.description": "Beschreibung vorher",
-    "after.description": "Beschreibung nachher"
+    "after.description": "Beschreibung nachher",
+    "meterId": "Zähler-ID",
+    "meterName": "Zählername",
+    "creditsPerUnit": "Preis pro Messwert",
+    "allocation": "Zuordnung",
+    "before.creditsPerUnit": "Preis pro Messwert vorher",
+    "after.creditsPerUnit": "Preis pro Messwert nachher",
+    "before.allocation": "Zuordnung vorher",
+    "after.allocation": "Zuordnung nachher"
+  },
+  "fieldValues": {
+    "allocation": {
+      "shared": "Geteilt und aufgeteilt",
+      "per-session": "Pro Sitzung gemessen"
+    }
   },
   "eventType": "Ereignistyp",
   "pluginId": "Integrations-ID",
