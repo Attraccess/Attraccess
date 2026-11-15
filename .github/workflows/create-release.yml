@@ -117,7 +117,7 @@ jobs:
             exit 1
           fi
           # After a retry the release sits on a newer main; a PR merged meanwhile may have changed the dependencies.
-          if ! git diff --quiet "$GITHUB_SHA" HEAD -- pnpm-lock.yaml; then
+          if ! git diff --quiet "$GITHUB_SHA" HEAD^ -- pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc; then
             pnpm install --frozen-lockfile
           fi
           exclude="$(node scripts/ci-nx-exclude.mjs build)"

@@ -301,6 +301,44 @@ test('does not retry a rejection when main did not move', async () => {
   assert.deepEqual(github.releases, []);
 });
 
+test('retries when main moves on the server while the push is in flight', async () => {
+  const f = fixture();
+  const github = githubStub();
+  sh(f.dev, 'switch', '--quiet', '--create', 'side');
+  commitFile(f.dev, 'side.txt', 'side', 'fix: merged while the push ran');
+  sh(f.dev, 'push', '--quiet', 'origin', 'side');
+  // The ref advertisement still shows the old main, so the server, not the client, refuses the update.
+  const hook = path.join(f.remote, 'hooks', 'pre-receive');
+  writeFileSync(
+    hook,
+    `#!/bin/sh\ncat >/dev/null\nrm "$0"\nenv -u GIT_QUARANTINE_PATH git update-ref refs/heads/main refs/heads/side\n`,
+    { mode: 0o755 },
+  );
+  const { prepare } = fakePrepare(f.ci);
+
+  const result = await release(f, prepare, github);
+
+  assert.equal(result.attempts, 2);
+  assert.equal(remoteRef(f, 'refs/heads/main'), result.sha);
+  assert.equal(sh(f.ci, 'rev-parse', `${result.sha}^`), sh(f.dev, 'rev-parse', 'side'));
+  assert.equal(github.releases.length, 1);
+});
+
+test('does not retry a server-side failure when main did not move', async () => {
+  const f = fixture();
+  const github = githubStub();
+  const { prepare, calls } = fakePrepare(f.ci);
+  // A stale lock makes the server's atomic transaction fail although nobody moved main.
+  writeFileSync(path.join(f.remote, 'refs', 'tags', 'v1.0.1.lock'), '');
+
+  await assert.rejects(
+    release(f, prepare, github),
+    /rejected although main did not move; not retrying\. Nothing was pushed\.\n.*atomic transaction failed/s,
+  );
+  assert.equal(calls.length, 1);
+  assert.deepEqual(github.releases, []);
+});
+
 test('refuses to re-create the release over uncommitted changes', async () => {
   const f = fixture();
   const github = githubStub();

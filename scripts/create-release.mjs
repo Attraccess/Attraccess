@@ -16,7 +16,7 @@ export class ReleaseError extends Error {}
 // Git's wording for a push refused because the branch is not what we built on (locally, or a lost race on the
 // server). Other refusals, such as a ruleset or hook, are not retried.
 const BRANCH_MOVED =
-  /\[rejected\].*\((fetch first|non-fast-forward|stale info)\)|\[remote rejected\].*\((cannot lock ref|failed to update ref|incorrect old value)/;
+  /\[rejected\].*\((fetch first|non-fast-forward|stale info)\)|\[remote rejected\].*\((atomic transaction failed|cannot lock ref|failed to update ref|incorrect old value)/;
 const REJECTED = /\[(remote )?rejected\]/;
 const PUBLISH_ONLY_HINT = 'then run Create Release with publish-only and specifier';
 
@@ -332,6 +332,14 @@ function fail(error) {
   process.exit(1);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
+function isEntryPoint() {
+  try {
+    return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   (process.argv[2] === '--prepare' ? runNxPrepare(process.env) : main()).catch(fail);
 }
