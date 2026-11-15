@@ -376,7 +376,9 @@ describe('SSO discovery TLS certificates', () => {
     );
     const code = /\(([A-Z_]+)\)$/.exec((error as HttpException).message)?.[1];
     expect(DISCOVERY_CERTIFICATE_ERROR_CODES.has(code as string)).toBe(true);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`Discovery request to ${origin} failed:`));
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^Discovery request to ${origin} failed: Error: .*self[- ]signed certificate`)),
+    );
   });
 });
 
@@ -399,6 +401,9 @@ describe('toDiscoveryError', () => {
     'ERR_TLS_CERT_ALTNAME_INVALID',
     'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
     'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+    'CRL_HAS_EXPIRED',
+    'ERR_TLS_CERT_ALTNAME_FORMAT',
+    'UNSPECIFIED',
   ])('reports the certificate error %s without the upstream error message', (code) => {
     const error = toDiscoveryError(Object.assign(new Error('certificate for 10.0.0.1'), { code }), url, false, 50);
     expect(error.getStatus()).toBe(502);
