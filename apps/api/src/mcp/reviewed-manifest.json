@@ -592,7 +592,7 @@
   "getPasswordPolicyOverride": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "8fc880c9"
+    "shape": "f41c9397"
   },
   "upsertPasswordPolicyOverride": {
     "decision": "allow",
@@ -657,7 +657,7 @@
   "AuditController_list": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "a72063d8"
+    "shape": "32ef66b3"
   },
   "createOneResource": {
     "decision": "deny",
