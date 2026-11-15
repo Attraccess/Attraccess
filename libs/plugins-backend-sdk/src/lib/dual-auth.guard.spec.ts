@@ -1,10 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  ExecutionContext,
-  ForbiddenException,
-  ServiceUnavailableException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ExecutionContext, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { DualAuthGuard } from './dual-auth.guard';
 import { User } from '@attraccess/database-entities';
 
@@ -218,7 +213,7 @@ describe('DualAuthGuard', () => {
       mockRequest.headers.authorization = 'Bearer some-token';
 
       expect(() =>
-        guard.handleRequest(new ForbiddenException('TwoFactorSetupRequired'), null, null, mockContext),
+        guard.handleRequest(new UnauthorizedException('Invalid or expired session'), null, null, mockContext),
       ).toThrow(new UnauthorizedException('Invalid or expired authorization token'));
     });
 

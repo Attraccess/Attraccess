@@ -90,13 +90,23 @@ describe('SessionService', () => {
   });
 
   describe('onModuleInit', () => {
+    const settled = () => new Promise((resolve) => setImmediate(resolve));
+
+    afterEach(() => jest.restoreAllMocks());
+
     it('should set active sessions metric from store', async () => {
       store.countActive.mockResolvedValue(7);
-      await service.onModuleInit();
+      service.onModuleInit();
+      await settled();
       expect(metrics.authActiveSessions.set).toHaveBeenCalledWith(7);
     });
 
-    it('starts when the store is unreachable, warning with the message only (ATT-1244)', async () => {
+    it('does not wait for the store to count sessions (ATT-1244)', () => {
+      store.countActive.mockReturnValue(new Promise(() => undefined));
+      expect(service.onModuleInit()).toBeUndefined();
+    });
+
+    it('starts when the store is unreachable, warning that Valkey is unreachable without the error (ATT-1244)', async () => {
       const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
       store.countActive.mockRejectedValue(
         Object.assign(new Error('Reached the max retries per request limit (which is 3).'), {
@@ -105,13 +115,23 @@ describe('SessionService', () => {
         }),
       );
 
-      await expect(service.onModuleInit()).resolves.toBeUndefined();
+      service.onModuleInit();
+      await settled();
 
       expect(metrics.authActiveSessions.set).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/max retries per request[\s\S]*Valkey/));
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/Valkey is unreachable[\s\S]*503/));
       expect(JSON.stringify(warn.mock.calls)).not.toContain('secret-password');
-      warn.mockRestore();
+    });
+
+    it('warns with the message of any other store failure', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      store.countActive.mockRejectedValue(new Error('NOSCRIPT No matching script'));
+
+      service.onModuleInit();
+      await settled();
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('NOSCRIPT No matching script'));
     });
   });
 

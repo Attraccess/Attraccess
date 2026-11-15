@@ -282,13 +282,13 @@ export class UsageAccessCache {
   /** Subscribes, and when Valkey rejects the subscription tries again the next time the connection is ready. */
   private listenForInvalidations(subscriber: Redis): void {
     subscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL).catch((error: NodeJS.ErrnoException) => {
-      // unsubscribe() rejects the queued SUBSCRIBE with "Connection is closed."
+      // After unsubscribe() the queued SUBSCRIBE either fails with "Connection is closed." or never settles.
       if (subscriber !== this.authorizationCacheSubscriber) {
         return;
       }
       this.logger.warn(
         `Could not subscribe to authorization cache invalidations (${error.message || error.code}); ` +
-          'trying again when the Valkey connection is ready',
+          'trying again after the next reconnect to Valkey',
       );
       subscriber.once('ready', () => {
         if (subscriber === this.authorizationCacheSubscriber) {

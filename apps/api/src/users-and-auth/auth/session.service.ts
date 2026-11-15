@@ -8,6 +8,7 @@ import { CronTimer } from '../../metrics/instrumentation/cron/cron.helper';
 import { SESSION_STORE, SessionStore, SessionMetadata } from './session-store/session-store';
 import { identityAuditEvent } from '../../audit/policies/identity';
 import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../audit/recorder/audit-event';
+import { isValkeyUnavailableError } from '../../valkey/valkey-unavailable';
 
 import { SsoSessionSelector } from './session-store/sso-session-selector';
 
@@ -28,21 +29,20 @@ export class SessionService implements OnModuleInit {
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
-  async onModuleInit(): Promise<void> {
-    let count: number;
-    try {
-      count = await this.store.countActive();
-    } catch (error) {
-      // The API starts without Valkey; sign-ins answer 503 until it is reachable. Log only the message: Valkey AUTH
-      // errors carry the password in `error.command.args`.
-      const { message, code } = error as NodeJS.ErrnoException;
-      this.logger.warn(
-        `Could not count active sessions in the session store (${message || code}); if Valkey is unreachable, ` +
-          'sign-in and signed-in requests fail until it is back',
-      );
-      return;
-    }
-    this.metricsService.authActiveSessions.set(count);
+  onModuleInit(): void {
+    // The count only feeds a metric, so startup does not wait for Valkey, which may be slow or unreachable.
+    this.store.countActive().then(
+      (count) => this.metricsService.authActiveSessions.set(count),
+      (error: NodeJS.ErrnoException) => {
+        // Log only the message: Valkey AUTH errors carry the password in `error.command.args`.
+        this.logger.warn(
+          isValkeyUnavailableError(error)
+            ? 'Could not count active sessions: Valkey is unreachable. Sign-in and signed-in requests answer 503 ' +
+                'until it is back'
+            : `Could not count active sessions in the session store (${error.message || error.code})`,
+        );
+      },
+    );
   }
 
   async createSession(user: User, metadata?: SessionMetadata): Promise<string> {
