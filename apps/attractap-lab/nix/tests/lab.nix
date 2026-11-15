@@ -96,6 +96,7 @@
     machine.wait_until_succeeds("test -e /var/lib/attractap-lab-janitor/quarantine/parking-button.json", timeout=180)
     machine.succeed("grep -q 'also after a power cycle' /var/lib/attractap-lab-janitor/quarantine/parking-button.json")
     machine.succeed("test $(ls /var/lib/attractap-lab-janitor/runs/parking-button | wc -l) = 2")
+    machine.succeed("test $(ls /var/lib/attractap-lab-janitor/runs/parking-button/*/power-cycle.log | wc -l) = 1")
     machine.succeed("labgrid-client -p parking-button show | grep 'acquired: attractap-lab-janitor/janitor'")
     # Places without a parking image are left alone.
     machine.succeed("labgrid-client -p reader-a acquire")

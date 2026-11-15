@@ -311,6 +311,7 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match="no switchable reader power"):
         park(always_on, tmp_path / "park.bin", tmp_path / "always-on", cycle_power=True)
     assert "efuse" not in events
+    assert "failed: The place has no switchable reader power" in (tmp_path / "always-on/power-cycle.log").read_text()
 
 
 def cycle_button(tmp_path, monkeypatch, power, name):
@@ -345,6 +346,22 @@ def test_power_cycle_retries_switching_on_once_and_still_fails(tmp_path, monkeyp
     assert power.get() == (failing_ons == 1)
     lines = log.splitlines()
     assert "failed: The reader did not turn on" in lines[-2] and lines[-1].endswith(final)
+
+
+def test_power_cycle_switches_a_reader_on_when_stopped_while_it_is_off(tmp_path, monkeypatch):
+    # The janitor's job timeout and service stop send SIGTERM, which run_park turns into SystemExit.
+    def terminated(seconds):
+        raise SystemExit(143)
+
+    events = []
+    power = FakePower(events, powered=True)
+    target = FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(), events), power, tags={"power": "button"})
+    monkeypatch.setattr(workflow.time, "sleep", terminated)
+    with pytest.raises(SystemExit):
+        workflow.power_cycle(target, tmp_path / "stopped.log")
+    assert events == [("activate", "power"), "power-off", "power-on", ("deactivate", "power")]
+    lines = (tmp_path / "stopped.log").read_text().splitlines()
+    assert lines[-2].endswith("interrupted: SystemExit(143)") and lines[-1].endswith("reader is on again")
 
 
 FAKE_PARK = textwrap.dedent("""

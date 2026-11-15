@@ -195,22 +195,24 @@ def power_cycle(target, log):
     Touch V2's I/O expander, off for the driver's delay. A reader on a place
     tagged power=button is switched off with its button and stays off for at
     least BUTTON_CYCLE_OFF_SECONDS, counted from when it is off; one that is
-    already off is not pressed. If switching back on fails, the reader is
-    switched on once more before the error propagates, so a cycle never
-    leaves it off on purpose. Appends what happened, with times, to the file
-    ``log``, ending with the reader's final state.
+    already off is not pressed. If switching back on fails, or the janitor
+    stops the attempt (SIGTERM) meanwhile, the reader is switched on once more
+    before the error propagates, so a cycle never leaves it off on purpose.
+    Appends what happened, with times, to the file ``log``, ending with the
+    reader's final state.
     """
-    power = reader_power(target)
-    if power is None:
-        raise RuntimeError("The place has no switchable reader power to cycle")
-    off_seconds = power.delay
-    if place_power(target) == POWER_BUTTON:
-        off_seconds = max(off_seconds, BUTTON_CYCLE_OFF_SECONDS)
     with Path(log).open("a") as out:
         def note(message):
             out.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} {message}\n")
             out.flush()
 
+        power = reader_power(target)
+        if power is None:
+            note("failed: The place has no switchable reader power to cycle")
+            raise RuntimeError("The place has no switchable reader power to cycle")
+        off_seconds = power.delay
+        if place_power(target) == POWER_BUTTON:
+            off_seconds = max(off_seconds, BUTTON_CYCLE_OFF_SECONDS)
         note(f"{type(power).__name__}: off for {off_seconds:g}s, then on")
         with _switching(target, power):
             try:
@@ -218,8 +220,8 @@ def power_cycle(target, log):
                 note("reader is off")
                 time.sleep(off_seconds)
                 power.on()
-            except Exception as error:
-                note(f"failed: {error}")
+            except BaseException as error:
+                note(f"failed: {error}" if isinstance(error, Exception) else f"interrupted: {error!r}")
                 try:
                     power.on()
                 except Exception as retry:

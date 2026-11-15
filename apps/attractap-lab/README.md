@@ -672,7 +672,8 @@ failed as well. A switch is off for 10 s. A button reader (Touch V1) is
 switched off with its power button through the NFC emulator and stays off for
 at least 30 s; one that already switched itself off is not pressed. Then the
 reader is switched on and the janitor waits for its port. If it does not come
-back, the janitor tries switching it on once more, logs the final state, and
+back, or the attempt is stopped during the cycle (job timeout or service
+stop), the janitor tries switching it on once more, logs the final state, and
 the attempt fails. Quarantined readers stay claimed by the janitor without a
 reservation, so sessions skip them and maintenance does not wait for them:
 
@@ -696,8 +697,9 @@ V2 most likely the CH32 I/O expander MCU), which only lets go when the reader
 loses power for at least 10 s; a Touch V1's bus stuck with `scl=0` needed about
 30 s off. On a `power=switch` or `power=button` place the janitor's power cycle
 does that. On a place the lab cannot switch (`power=always-on` or no `power`
-tag), unplug the reader's USB cable for at least 30 s, then `clear` the place. The janitor reaches the local exporter over SSH like any
-client, with a host-local key authorized only for the `labgrid` account.
+tag), unplug the reader's USB cable for at least 30 s, then `clear` the place.
+The janitor reaches the local exporter over SSH like any client, with a
+host-local key authorized only for the `labgrid` account.
 
 The parking image never deep-sleeps: that would power down USB-Serial-JTAG and
 make the reader unreachable until someone presses reset.
