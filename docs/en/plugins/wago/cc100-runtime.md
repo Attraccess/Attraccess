@@ -36,7 +36,9 @@ Migration retains the previous broker association for credential cleanup. When t
 runtime version file. Increase `runtimeVersion` when changing
 runtime source, shared runtime contracts, the runtime Dockerfile, the manifest,
 host-side deployment code (installer, supervisor, update shell, hardware deployment)
-or the runtime build and packaging scripts and the plugin `project.json`.
+or the runtime build and packaging scripts, and any plugin `project.json` change
+outside its check targets (`test*`, `lint*`, `typecheck*`, `crap-score*`), so a
+test target's cache inputs can change without a bump.
 Discovery, permanent heartbeats and packaged assets all use this version. The
 required `wago-runtime-version` CI job rejects such changes without a strictly
 higher stable `major.minor.patch` version. Documentation, spec files and simulator-only

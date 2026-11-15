@@ -10,6 +10,9 @@ export function stableVersion(value, description) {
 /**
  * Check committed changes against the common ancestor, independently of the working tree.
  *
+ * `isSource(path, { ancestor, show })` decides per changed path; `show(rev, path)` returns the file's content at `rev`
+ * (null when it does not exist there), for checks that depend on what changed inside a file.
+ *
  * `inspectChanges` is optional and only runs when no changed path matched `isSource`. It receives
  * `{ ancestor, paths }` (all changed paths) and returns `{ reasons: string[], message?: string }`: any reason makes the
  * change count as source, otherwise `message` (if given) replaces the default "no changes" result.
@@ -27,7 +30,7 @@ export function checkReleaseVersion({ base, versionFile, isSource, readVersion, 
   const paths = git('diff', '--name-only', '--no-renames', '-z', `${ancestor}...HEAD`, '--')
     .split('\0')
     .filter(Boolean);
-  const changed = paths.filter(isSource);
+  const changed = paths.filter((path) => isSource(path, { ancestor, show }));
   let unchangedMessage;
   if (!changed.length && inspectChanges) {
     const { reasons, message } = inspectChanges({ ancestor, paths });

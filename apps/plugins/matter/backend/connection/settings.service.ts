@@ -2,6 +2,7 @@ import type { PluginAuditPrincipal, PluginContext } from '@attraccess/plugins-ba
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { SidecarClientConfig } from '../client/rest-client';
+import { runTransaction } from '../fabric/db';
 import { PLUGIN_CONTEXT } from '../plugin-context';
 import { CONNECTION_ROW_ID, MatterConnection } from './entity';
 import { normalizeUrl, type SettingsInput } from './validation';
@@ -61,32 +62,42 @@ export class MatterSettingsService {
     }
   }
 
-  async save(input: SettingsInput, userId: number | null): Promise<{ credentialChanged: boolean; caChanged: boolean }> {
-    const existing = await this.repository.findOneBy({ id: CONNECTION_ROW_ID });
-    if (!existing && input.credential === undefined) {
-      throw new MissingCredentialError('credential: The credential is required for the first configuration.');
-    }
-    const now = new Date().toISOString();
-    const url = normalizeUrl(input.url) as string;
-    const caCertificate = input.caCertificate === undefined ? (existing?.caCertificate ?? null) : input.caCertificate;
-    const credentialChanged = input.credential !== undefined;
-    await this.repository.save({
-      id: CONNECTION_ROW_ID,
-      url,
-      encryptedCredential: credentialChanged
-        ? this.context.secrets.encrypt(input.credential as string)
-        : (existing as MatterConnection).encryptedCredential,
-      caCertificate,
-      credentialUpdatedAt: credentialChanged || !existing ? now : existing.credentialUpdatedAt,
-      updatedAt: now,
-      updatedBy: userId,
+  /**
+   * Writes go through the host's serialized write queue like the plugin's other writes. A plain transaction here
+   * reads first and then has to upgrade its SQLite lock, which fails at once with SQLITE_BUSY (no busy wait) while
+   * the queue's connection holds the write lock, e.g. for the reconciliation that every reconnect starts.
+   */
+  save(input: SettingsInput, userId: number | null): Promise<{ credentialChanged: boolean; caChanged: boolean }> {
+    return runTransaction(this.context, async (manager) => {
+      const repository = manager.getRepository(MatterConnection);
+      const existing = await repository.findOneBy({ id: CONNECTION_ROW_ID });
+      if (!existing && input.credential === undefined) {
+        throw new MissingCredentialError('credential: The credential is required for the first configuration.');
+      }
+      const now = new Date().toISOString();
+      const url = normalizeUrl(input.url) as string;
+      const caCertificate = input.caCertificate === undefined ? (existing?.caCertificate ?? null) : input.caCertificate;
+      const credentialChanged = input.credential !== undefined;
+      await repository.save({
+        id: CONNECTION_ROW_ID,
+        url,
+        encryptedCredential: credentialChanged
+          ? this.context.secrets.encrypt(input.credential as string)
+          : (existing as MatterConnection).encryptedCredential,
+        caCertificate,
+        credentialUpdatedAt: credentialChanged || !existing ? now : existing.credentialUpdatedAt,
+        updatedAt: now,
+        updatedBy: userId,
+      });
+      return { credentialChanged, caChanged: caCertificate !== (existing?.caCertificate ?? null) };
     });
-    return { credentialChanged, caChanged: caCertificate !== (existing?.caCertificate ?? null) };
   }
 
-  async remove(): Promise<boolean> {
-    const result = await this.repository.delete({ id: CONNECTION_ROW_ID });
-    return (result.affected ?? 0) > 0;
+  remove(): Promise<boolean> {
+    return runTransaction(this.context, async (manager) => {
+      const result = await manager.getRepository(MatterConnection).delete({ id: CONNECTION_ROW_ID });
+      return (result.affected ?? 0) > 0;
+    });
   }
 
   /** Records a settings change. Details are flags only. A missing or failing audit sink never fails the request. */
