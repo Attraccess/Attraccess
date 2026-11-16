@@ -136,6 +136,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Architecture](https://docs.attraccess.org/en/developer/architecture.md): Describes the Attraccess NX monorepo: applications, libraries, database, authentication and NestJS API conventions.
 - [API Log Destinations](https://docs.attraccess.org/en/developer/logging.md): How the API routes logs to destinations with RoutedLogger, including registering a driver and startup ownership.
 - [API Reference](https://docs.attraccess.org/en/developer/api-reference.md): Describes the REST API and its OpenAPI docs, the generated API client and React Query hooks, authentication and key modules.
+- [MCP Server (AI Clients)](https://docs.attraccess.org/en/developer/mcp.md): Explains how to connect MCP clients to Attraccess with API tokens or OAuth, which tools are exposed, how permissions apply and how the reviewed manifest is maintained.
 - [AI Agents (llms.txt & WebMCP)](https://docs.attraccess.org/en/developer/ai-agents.md): Explains the llms.txt index and the experimental WebMCP tools of the docs site, how to try them in Chrome and how to add pages.
 - [Contributing](https://docs.attraccess.org/en/developer/contributing.md): How to contribute to Attraccess: forking, branching, code style, testing, issue tracking and reporting bugs.
 
@@ -280,6 +281,7 @@ The documentation pages are plain Markdown files. English pages live under https
 - [Architektur](https://docs.attraccess.org/de/developer/architecture.md): Beschreibt das Attraccess-NX-Monorepo: Anwendungen, Bibliotheken, Datenbank und Authentifizierung.
 - [API-Log-Ziele](https://docs.attraccess.org/de/developer/logging.md): Wie die API Logs mit RoutedLogger an Ziele leitet, inklusive Treiber-Registrierung und Start-Lebenszyklus.
 - [API-Referenz](https://docs.attraccess.org/de/developer/api-reference.md): Beschreibt die REST-API mit OpenAPI-Dokumentation, generiertem API-Client und React-Query-Hooks, Authentifizierung und wichtigen Modulen.
+- [MCP-Server (KI-Clients)](https://docs.attraccess.org/de/developer/mcp.md): Erklärt, wie MCP-Clients per API-Token oder OAuth mit Attraccess verbunden werden, welche Tools es gibt, wie Berechtigungen wirken und wie das geprüfte Manifest gepflegt wird.
 - [KI-Agenten (llms.txt & WebMCP)](https://docs.attraccess.org/de/developer/ai-agents.md): Erklärt den llms.txt-Index und die experimentellen WebMCP-Tools der Dokumentation, das Ausprobieren in Chrome und das Hinzufügen von Seiten.
 - [Mitwirken](https://docs.attraccess.org/de/developer/contributing.md): Wie Sie zu Attraccess beitragen: Fork, Branch, Code-Stil, Tests, Issue-Tracking und Fehlermeldungen.
 

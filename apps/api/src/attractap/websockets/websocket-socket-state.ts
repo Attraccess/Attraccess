@@ -271,14 +271,22 @@ export interface AuthenticatedWebSocket extends Omit<WebSocket, 'send'> {
     abortedDetectionId?: number | null;
     enrollment: {
       userId: number;
-      auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+      auditPrincipal: {
+        userId: number;
+        authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
+        apiTokenId?: number;
+      };
       /** When the enrollment was armed (ms since epoch); a card arriving much later is refused. */
       armedAt: number;
     } | null;
     /** Armed by an admin: the next card tapped on this reader is reset if it is this one. No key material here. */
     resetNfcCardData: {
       cardId: number;
-      auditPrincipal: { userId: number; authenticationMethod: 'session' | 'api-token'; apiTokenId?: number };
+      auditPrincipal: {
+        userId: number;
+        authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
+        apiTokenId?: number;
+      };
       /** When the reset was armed (ms since epoch); a card arriving much later is refused. */
       armedAt: number;
     } | null;

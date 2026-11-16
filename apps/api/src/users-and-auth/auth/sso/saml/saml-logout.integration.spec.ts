@@ -241,6 +241,13 @@ describe('SAML Single Logout using real node-saml 5.1.0 signatures and XML', () 
     expect(sessions.revokeSsoSessions).toHaveBeenLastCalledWith(expect.objectContaining({ sessionIndexes: [] }));
   });
 
+  it('lets an unreachable Valkey surface (503) instead of calling the exchange invalid', async () => {
+    const request = decodeRedirect(await provider.request(context, 'state'));
+    const unavailable = new Error('Connection is closed.');
+    sessions.revokeSsoSessions.mockRejectedValueOnce(unavailable);
+    await expect(service.samlMessage(2, request.values, request.query)).rejects.toBe(unavailable);
+  });
+
   it('rejects unsigned, tampered, misdirected, stale, wrong-provider and malformed requests before revocation', async () => {
     const xml = await requestXml();
     for (const changed of [

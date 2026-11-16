@@ -6,7 +6,7 @@ import { join } from 'path';
 export interface PendingNpmPluginAudit {
   operationId: string;
   actorId: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
   details: Record<string, string | number>;
   migrationOutcome: 'pending-restart' | 'succeeded' | 'failed' | 'not-applicable';

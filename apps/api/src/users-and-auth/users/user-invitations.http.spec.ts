@@ -2,6 +2,7 @@ import { ExecutionContext, INestApplication, UnauthorizedException, ValidationPi
 import { Test } from '@nestjs/testing';
 import { AuthenticatedRequest, DualAuthGuard, User } from '@attraccess/plugins-backend-sdk';
 import request from 'supertest';
+import { LicenseError } from '../../license/license.service';
 import { EmailService } from '../../email/email.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
@@ -55,6 +56,7 @@ describe('user invitation endpoints (HTTP)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    users.ensureLicenseForNewUsers.mockReset();
     users.findByEmailsOrUsernames.mockResolvedValue([]);
     users.createMany.mockResolvedValue([{ id: 7, username: 'alex', email: 'alex@example.com' }]);
   });
@@ -103,6 +105,29 @@ describe('user invitation endpoints (HTTP)', () => {
     );
   });
 
+  it('returns 403 with the license reason when the CSV invites exceed the license', async () => {
+    users.ensureLicenseForNewUsers.mockRejectedValue(
+      new LicenseError('Trying to use more than the allowed amount of users'),
+    );
+    const response = await post().attach('file', csv, 'users.csv').field('config', JSON.stringify(config)).expect(403);
+    expect(response.body).toEqual({
+      statusCode: 403,
+      message: 'Trying to use more than the allowed amount of users',
+      error: 'Forbidden',
+    });
+    expect(users.createMany).not.toHaveBeenCalled();
+  });
+
+  it('reports database duplicates before the license refusal', async () => {
+    users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'alex', email: 'alex@example.com' }]);
+    users.ensureLicenseForNewUsers.mockRejectedValue(
+      new LicenseError('Trying to use more than the allowed amount of users'),
+    );
+    const response = await post().attach('file', csv, 'users.csv').field('config', JSON.stringify(config)).expect(400);
+    expect(response.body.message).toBe('DUPLICATE_IN_DB');
+    expect(users.ensureLicenseForNewUsers).not.toHaveBeenCalled();
+  });
+
   it('requires users.roles.manage to assign roles from a column', async () => {
     await post()
       .attach('file', csv, 'users.csv')
@@ -126,10 +151,33 @@ describe('user invitation endpoints (HTTP)', () => {
       expect(users.createMany).not.toHaveBeenCalled();
     });
 
+    it('reports a taken email before the license refusal', async () => {
+      users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'someone', email: 'alex@example.com' }]);
+      users.ensureLicenseForNewUsers.mockRejectedValue(
+        new LicenseError('Trying to use more than the allowed amount of users'),
+      );
+      const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(400);
+      expect(response.body.message).toBe('Email already exists');
+      expect(users.ensureLicenseForNewUsers).not.toHaveBeenCalled();
+    });
+
     it('returns 400 when the username is already taken', async () => {
       users.findByEmailsOrUsernames.mockResolvedValue([{ id: 3, username: 'alex', email: 'other@example.com' }]);
       const response = await invite({ username: 'Alex', email: 'alex@example.com' }).expect(400);
       expect(response.body.message).toBe('Username already exists');
+      expect(users.createMany).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 with the license reason when the invite exceeds the license', async () => {
+      users.ensureLicenseForNewUsers.mockRejectedValue(
+        new LicenseError('Trying to use more than the allowed amount of users'),
+      );
+      const response = await invite({ username: 'alex', email: 'alex@example.com' }).expect(403);
+      expect(response.body).toEqual({
+        statusCode: 403,
+        message: 'Trying to use more than the allowed amount of users',
+        error: 'Forbidden',
+      });
       expect(users.createMany).not.toHaveBeenCalled();
     });
 

@@ -38,7 +38,7 @@ export interface AdministrationAuditInput {
   action: string;
   operationId?: string;
   actorId: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
   subjectType: string;
   subjectId: number;
@@ -323,9 +323,9 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditInput)
       return null;
     const method = input.authenticationMethod ?? 'session';
     if (
-      !['session', 'api-token'].includes(method) ||
+      !['session', 'api-token', 'mcp-oauth'].includes(method) ||
       (method === 'api-token' && !positive(input.apiTokenId)) ||
-      (method === 'session' && input.apiTokenId !== undefined) ||
+      (method !== 'api-token' && input.apiTokenId !== undefined) ||
       (input.outcome !== undefined && !['succeeded', 'failed'].includes(input.outcome))
     )
       return null;

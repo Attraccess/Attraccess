@@ -199,7 +199,7 @@ export class ResourceIntroductionsService {
     data?: UpdateResourceIntroductionDto,
     tutorUserId?: number,
     performedByUserId?: number | null,
-    authenticationMethod?: 'session' | 'api-token' | null,
+    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null,
     apiTokenId?: number | null,
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
@@ -280,7 +280,7 @@ export class ResourceIntroductionsService {
     options?: {
       tutorUserId?: number;
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | null;
+      authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null;
       apiTokenId?: number | null;
     },
   ): Promise<ResourceIntroductionHistoryItem> {
@@ -306,7 +306,7 @@ export class ResourceIntroductionsService {
     data?: UpdateResourceIntroductionDto,
     options?: {
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | null;
+      authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null;
       apiTokenId?: number | null;
     },
   ): Promise<ResourceIntroductionHistoryItem> {

@@ -265,7 +265,10 @@ describe('API bootstrap ordering and configuration', () => {
     expect(datasource.initialize).toHaveBeenCalled();
     expect(datasource.runMigrations).toHaveBeenCalled();
     expect(app.set).toHaveBeenCalledWith('trust proxy', 1);
-    expect(app.setGlobalPrefix).toHaveBeenCalledWith('api');
+    // OAuth discovery documents stay at the origin root, outside the API prefix.
+    expect(app.setGlobalPrefix).toHaveBeenCalledWith('api', {
+      exclude: expect.arrayContaining(['.well-known/oauth-authorization-server']),
+    });
     expect(SwaggerModule.setup).toHaveBeenCalledWith('api', app, expect.any(Function));
   });
   it('honors migration skips and disabled plugins without opening the database', async () => {

@@ -12,6 +12,8 @@ import { SessionPermissionSync } from '../auth/sso/session-permission-sync';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
+import { getMcpDelegation, McpDelegation } from '../../mcp/mcp-delegation';
 
 const TWO_FACTOR_SETUP_ALLOWED_PREFIXES = ['/auth/two-factor', '/auth/session', '/users/me'];
 
@@ -38,6 +40,19 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
   }
 
   async validate(req: Request & { authSession?: LogoutSession }): Promise<User> {
+    try {
+      return await this.resolveUser(req);
+    } catch (error) {
+      // An unreachable Valkey is not a failed sign-in: answer 503 (the auth guard passes 5xx through) instead of 401.
+      throw isValkeyUnavailableError(error) ? valkeyUnavailableException(error as Error) : error;
+    }
+  }
+
+  private async resolveUser(req: Request & { authSession?: LogoutSession }): Promise<User> {
+    // An MCP OAuth tool call: the principal was attached in-process after the access token was verified.
+    const delegation = getMcpDelegation(req);
+    if (delegation) return this.validateMcpDelegation(req, delegation);
+
     const { token, fromAuthorizationHeader } = this.extractTokenFromRequest(req);
 
     if (!token) {
@@ -93,15 +108,33 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
     );
     (user as AuthenticatedUser).authenticationMethod = 'session';
 
-    if (!this.isTwoFactorSetupAllowedPath(req)) {
-      const status = await this.twoFactorService.getStatus(user);
-      if (status.required && !status.enabled) {
-        this.logger.debug(`Blocked request for user ${user.id} due to missing 2FA setup`);
-        throw new ForbiddenException('TwoFactorSetupRequired');
-      }
-    }
+    await this.assertTwoFactorSetup(req, user);
 
     return user;
+  }
+
+  /**
+   * MCP OAuth principal: the permissions the user approved, intersected with what they hold right now, so a role
+   * removed in Attraccess disappears from MCP on the next call. No session exists for it.
+   */
+  private async validateMcpDelegation(req: Request, delegation: McpDelegation): Promise<User> {
+    const { user } = delegation;
+    const current = await this.rbacService.getEffectivePermissions(user.id, true);
+    (user as AuthenticatedUser).effectivePermissions = new SerializablePermissionSet(
+      delegation.permissionKeys.filter((permission) => current.has(permission)),
+    );
+    (user as AuthenticatedUser).authenticationMethod = 'mcp-oauth';
+    await this.assertTwoFactorSetup(req, user);
+    return user;
+  }
+
+  private async assertTwoFactorSetup(req: Request, user: User): Promise<void> {
+    if (this.isTwoFactorSetupAllowedPath(req)) return;
+    const status = await this.twoFactorService.getStatus(user);
+    if (status.required && !status.enabled) {
+      this.logger.debug(`Blocked request for user ${user.id} due to missing 2FA setup`);
+      throw new ForbiddenException('TwoFactorSetupRequired');
+    }
   }
 
   /**

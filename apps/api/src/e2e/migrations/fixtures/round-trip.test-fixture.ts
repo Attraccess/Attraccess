@@ -6,6 +6,7 @@ import type { DataSource } from 'typeorm';
 import { migrationCsvExportSeeds } from './seeds/csv-export.test-fixture';
 import { migrationFlowUsageSeeds } from './seeds/flow-usage.test-fixture';
 import { migrationIdentityNotificationSeeds } from './seeds/identity-notification.test-fixture';
+import { migrationMcpOAuthSeeds } from './seeds/mcp-oauth.test-fixture';
 import { migrationMaintenanceSeeds } from './seeds/maintenance.test-fixture';
 import { migrationMembershipFormSeeds } from './seeds/membership-form.test-fixture';
 import { migrationReaderSeeds } from './seeds/reader.test-fixture';
@@ -45,6 +46,7 @@ const seedDatabase = async (dataSource: DataSource) => {
   await migrationIdentityNotificationSeeds(dataSource, seedTag, primaryUser);
   await migrationCsvExportSeeds(dataSource, seedTag);
   await migrationSecureBootSeeds(dataSource, seedTag);
+  await migrationMcpOAuthSeeds(dataSource, seedTag, primaryUser);
 };
 
 const assertAllEntitiesHaveRows = async (dataSource: DataSource) => {

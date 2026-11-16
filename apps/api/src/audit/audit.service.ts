@@ -14,9 +14,10 @@ import {
   AuditStorage,
   AuditStorageState,
   hasPasswordPolicyOverflow,
-  SQLITE_BUSY_TIMEOUT_MS,
   sqliteErrorCode,
 } from './persistence/audit-storage';
+
+import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
 
 import { getRegisteredPluginAuditDomains } from '../plugin-system/audit/audit-registry';
 

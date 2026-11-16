@@ -18,7 +18,8 @@ import { AuditController } from './audit.controller';
 import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
 import { AuditService } from './audit.service';
-import { AUDIT_BUSY_RETRIES, MAX_PENDING_AUDIT_WRITES, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
+import { AUDIT_BUSY_RETRIES, MAX_PENDING_AUDIT_WRITES } from './persistence/audit-storage';
+import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
 import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
 import { createTestAuditMetrics, droppedRecords, setupAuditDatabase } from './audit.test-fixture';
 describe('durable audit SQLite', () => {

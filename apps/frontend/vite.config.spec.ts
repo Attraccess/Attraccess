@@ -32,6 +32,7 @@ it('configures development ports and proxies from the worktree launcher environm
     host: '0.0.0.0',
     proxy: {
       '/api': { target: 'http://localhost:3050', changeOrigin: false, ws: true },
+      '/.well-known': { target: 'http://localhost:3050', changeOrigin: false },
       '/cdn': { target: 'http://localhost:3050', changeOrigin: true },
     },
   });

@@ -228,12 +228,17 @@ export class UsageAccessCache {
     }
   }
 
-  /** Permission changes on other API instances arrive through Valkey and invalidate this cache too. */
-  async subscribe(): Promise<void> {
+  /**
+   * Permission changes on other API instances arrive through Valkey and invalidate this cache too. Returns at once:
+   * while Valkey is unreachable the subscription waits in the background and starts when Valkey is back.
+   */
+  subscribe(): void {
     if (!this.valkeyClient) {
       return;
     }
-    this.authorizationCacheSubscriber = this.valkeyClient.duplicate();
+    // Without a retry limit SUBSCRIBE waits in the offline queue until Valkey is reachable, instead of failing for
+    // good when Valkey is down at startup. Once subscribed, ioredis subscribes again after every reconnect.
+    this.authorizationCacheSubscriber = this.valkeyClient.duplicate({ maxRetriesPerRequest: null });
     logValkeyOutages(this.authorizationCacheSubscriber, this.logger, {
       lost: (reason) =>
         `Authorization cache invalidation subscriber lost its Valkey connection (${reason}); ` +
@@ -254,18 +259,31 @@ export class UsageAccessCache {
         this.logger.warn('Ignoring invalid authorization cache invalidation message', error);
       }
     });
-    try {
-      await this.authorizationCacheSubscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL);
-    } catch (error) {
-      this.logger.error(`Failed to subscribe to authorization cache invalidations (${describeValkeyError(error)})`);
-      this.authorizationCacheSubscriber.disconnect();
-      this.authorizationCacheSubscriber = null;
-    }
+    this.listenForInvalidations(this.authorizationCacheSubscriber);
   }
 
   unsubscribe(): void {
     this.authorizationCacheSubscriber?.disconnect();
     this.authorizationCacheSubscriber = null;
+  }
+
+  /** Subscribes, and when Valkey rejects the subscription tries again the next time the connection is ready. */
+  private listenForInvalidations(subscriber: Redis): void {
+    subscriber.subscribe(AUTHORIZATION_CACHE_INVALIDATION_CHANNEL).catch((error: unknown) => {
+      // After unsubscribe() the queued SUBSCRIBE either fails with "Connection is closed." or never settles.
+      if (subscriber !== this.authorizationCacheSubscriber) {
+        return;
+      }
+      this.logger.warn(
+        `Could not subscribe to authorization cache invalidations (${describeValkeyError(error)}); ` +
+          'trying again after the next reconnect to Valkey',
+      );
+      subscriber.once('ready', () => {
+        if (subscriber === this.authorizationCacheSubscriber) {
+          this.listenForInvalidations(subscriber);
+        }
+      });
+    });
   }
 
   private deleteAccessCacheEntry(key: string): void {

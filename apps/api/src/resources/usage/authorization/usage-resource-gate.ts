@@ -90,7 +90,7 @@ export class UsageResourceGate {
 
       // Health gate: block non-maintenance users when any health entry is unhealthy.
       // Users that can manage maintenance are intentionally allowed through so they can investigate/repair.
-      const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(resourceId);
+      const isUnhealthy = await this.resourceHealthService.isResourceUnhealthy(resourceId, transactionalEntityManager);
       if (isUnhealthy) {
         const canManageMaintenance = await this.resourceMaintenanceService.canManageMaintenance(
           user,
