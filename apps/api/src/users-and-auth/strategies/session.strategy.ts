@@ -12,6 +12,7 @@ import { SessionPermissionSync } from '../auth/sso/session-permission-sync';
 import { resolveIp } from '../rate-limiting/login.rate-limit.guard';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
+import { databaseBusyException, isSqliteBusyError } from '../../database/sqlite-errors';
 import { isValkeyUnavailableError, valkeyUnavailableException } from '../../valkey/valkey-unavailable';
 import { getMcpDelegation, McpDelegation } from './mcp-delegation';
 
@@ -44,7 +45,11 @@ export class SessionStrategy extends PassportStrategy(Strategy, 'session') {
       return await this.resolveUser(req);
     } catch (error) {
       // An unreachable Valkey is not a failed sign-in: answer 503 (the auth guard passes 5xx through) instead of 401.
-      throw isValkeyUnavailableError(error) ? valkeyUnavailableException(error as Error) : error;
+      if (isValkeyUnavailableError(error)) throw valkeyUnavailableException(error as Error);
+      // Neither is a busy database (a request that waited too long for another request's transaction): answering 401
+      // would make clients drop a valid session.
+      if (isSqliteBusyError(error)) throw databaseBusyException();
+      throw error;
     }
   }
 

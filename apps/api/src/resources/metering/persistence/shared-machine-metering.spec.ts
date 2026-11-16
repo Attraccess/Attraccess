@@ -463,21 +463,25 @@ describe('Metering on a shared machine', () => {
 
       const all = await segments();
       expect(all.every((segment) => segment.status === 'closed')).toBe(true);
-      all.slice(1).forEach((segment, index) => {
-        expect(segment.startValue).toBe(all[index].endValue);
+      // start(0) and end(2) race. If end(2) goes first, it is the last stop, and start(0) starts the meter over from a
+      // fresh baseline: the one reading taken while nobody used the machine falls between two segments.
+      const gaps = all.slice(1).map((segment, index) => {
         expect(segment.startedAt.getTime()).toBeGreaterThanOrEqual(all[index].startedAt.getTime());
+        return Number((BigInt(segment.startValue) - BigInt(all[index].endValue ?? 0)) / BigInt(1_000_000_000));
       });
+      expect(gaps.filter((gap) => gap !== 0)).toEqual(gaps.some((gap) => gap !== 0) ? [1] : []);
+      const counted = last - 100 - gaps.reduce((sum, gap) => sum + gap, 0);
       const consumed = all.reduce(
         (sum, segment) => sum + (BigInt(segment.endValue ?? 0) - BigInt(segment.startValue)),
         BigInt(0),
       );
-      expect(consumed).toBe(BigInt(last - 100) * BigInt(1_000_000_000));
+      expect(consumed).toBe(BigInt(counted) * BigInt(1_000_000_000));
       const total = (await Promise.all([...first, second].map((usage) => charged(usage.id)))).reduce(
         (sum, value) => sum + value,
         0,
       );
-      // Whole kWh per segment at 30 credits: the charges add up to what the meter counted.
-      expect(total).toBe((last - 100) * 30);
+      // Whole kWh per segment at 30 credits: the charges add up to what the meter counted in segments.
+      expect(total).toBe(counted * 30);
     });
 
     it('produces ordered, non-overlapping segments for simultaneous starts and stops', async () => {

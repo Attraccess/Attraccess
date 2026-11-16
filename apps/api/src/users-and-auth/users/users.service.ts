@@ -291,6 +291,17 @@ export class UsersService {
     return savedUsers;
   }
 
+  /**
+   * Removes invited users whose invitation email could not be sent, unless they already accepted it. They were created
+   * moments ago, so nothing else refers to them yet; their role assignments cascade.
+   */
+  async deleteUnacceptedInvitations(ids: number[]): Promise<void> {
+    if (!ids.length) {
+      return;
+    }
+    await this.userRepository.delete({ id: In(ids), isEmailVerified: false });
+  }
+
   async deleteOne(id: number): Promise<void> {
     this.logger.debug(`Deleting user with ID: ${id}`);
     await this.anonymizeAndSoftDelete(id);

@@ -16,6 +16,8 @@ import { auditDomainLabel, AuditRow, projectAuditRow } from '../recorder/audit-r
 
 import { DataSource, EntityManager } from 'typeorm';
 
+import { sqliteErrorCode } from '../../database/sqlite-errors';
+
 import { AuditDropReason, AuditMetrics } from '../../metrics/definitions/audit.metrics';
 
 import { SettingsStoreService } from '../../settings/settings-store.service';
@@ -69,14 +71,7 @@ export function finalSettingsChange(row: AuditRow, previous: PreviousAuditSettin
   );
 }
 
-/** Only the SQLite result code is safe to log; the driver message may contain SQL parameters. */
-export function sqliteErrorCode(error: unknown): string | undefined {
-  const candidates = [
-    (error as { code?: unknown })?.code,
-    (error as { driverError?: { code?: unknown } })?.driverError?.code,
-  ];
-  return candidates.find((code): code is string => typeof code === 'string' && /^SQLITE_[A-Z_]+$/.test(code));
-}
+export { sqliteErrorCode };
 
 export function auditCutoff(retentionDays: number): Date {
   return new Date(Date.now() - retentionDays * 86_400_000);

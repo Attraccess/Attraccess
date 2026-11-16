@@ -395,8 +395,9 @@ export class UserDirectory {
     const token = randomBytes(16).toString('base64url').slice(0, 21);
     const expiresAt = addDays(new Date(), 3);
 
+    let updated: User;
     try {
-      return await this.dataSource.transaction(async (manager) => {
+      updated = await this.dataSource.transaction(async (manager) => {
         const userRepo = manager.getRepository(User);
 
         await userRepo.update(targetUserId, {
@@ -406,13 +407,11 @@ export class UserDirectory {
           emailVerificationTokenExpiresAt: expiresAt,
         });
 
-        const updated = await this.accounts.findOne({ id: targetUserId }, undefined, manager);
-        if (!updated) {
+        const changed = await this.accounts.findOne({ id: targetUserId }, undefined, manager);
+        if (!changed) {
           throw new UserNotFoundException(targetUserId);
         }
-
-        await this.emailService.sendVerificationEmail(updated, token);
-        return updated;
+        return changed;
       });
     } catch (error) {
       if (this.accounts.isEmailUniqueConstraintViolation(error)) {
@@ -420,6 +419,28 @@ export class UserDirectory {
       }
       throw error;
     }
+
+    // SMTP can take seconds, and while a transaction is open every other request waits for the connection: send after
+    // the commit. A failed send takes the change back (unless a newer change replaced it), as the rollback did.
+    try {
+      await this.emailService.sendVerificationEmail(updated, token);
+    } catch (error) {
+      try {
+        await this.userRepository.update(
+          { id: targetUserId, emailVerificationToken: token },
+          {
+            email: targetUser.email,
+            isEmailVerified: targetUser.isEmailVerified,
+            emailVerificationToken: targetUser.emailVerificationToken,
+            emailVerificationTokenExpiresAt: targetUser.emailVerificationTokenExpiresAt,
+          },
+        );
+      } catch (revertError) {
+        this.logger.error('Failed to take back an email change after an email failure', (revertError as Error).stack);
+      }
+      throw error;
+    }
+    return updated;
   }
 
   async changeBillingFactor(targetUserId: number, newBillingFactor: number): Promise<User> {

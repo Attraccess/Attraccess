@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 import { SessionStrategy } from './session.strategy';
 import { SessionService } from '../auth/session.service';
@@ -255,6 +255,23 @@ describe('SessionStrategy', () => {
       await expect(strategy.validate(mockRequest)).rejects.toThrow('Database error');
 
       expect(sessionService.authenticateSession).toHaveBeenCalledWith('valid-token');
+    });
+
+    it.each([
+      ['a connection-guard timeout', Object.assign(new Error('SQLITE_BUSY: waited 5000 ms'), { code: 'SQLITE_BUSY' })],
+      [
+        'a driver busy error',
+        Object.assign(new Error('database is locked'), { driverError: { code: 'SQLITE_BUSY' } }),
+      ],
+    ])('answers 503, not 401, when %s hits the database during authentication', async (_name, busy) => {
+      const mockRequest = {
+        headers: { authorization: 'Bearer valid-token' },
+        cookies: {},
+        path: '/api/users/me',
+      } as Request;
+      sessionService.authenticateSession.mockRejectedValue(busy);
+
+      await expect(strategy.validate(mockRequest)).rejects.toBeInstanceOf(ServiceUnavailableException);
     });
 
     it('should block access when 2FA setup is required', async () => {
