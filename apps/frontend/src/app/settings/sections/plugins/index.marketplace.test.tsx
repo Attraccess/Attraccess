@@ -54,6 +54,24 @@ describe('PluginsSection marketplace', () => {
     expect(titled(REGISTRY_LOAD_ERROR)).toHaveLength(1);
   });
 
+  it('loads the installed packages and registries again on the next visit of the section', async () => {
+    hoisted.apiMock.mockImplementation((url: string) => {
+      if (url.endsWith('/api/plugins/registries')) return Promise.resolve({ ok: false });
+      return respond([]);
+    });
+    const firstVisit = renderWithQuery(<PluginsSection />);
+    await waitFor(() => expect(titled(REGISTRY_LOAD_ERROR)).toHaveLength(1));
+    expect(callsTo('/api/plugins/installed')).toHaveLength(1);
+    firstVisit.unmount();
+    // Let the dropped queries be garbage-collected before the next visit.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    renderWithQuery(<PluginsSection />);
+    await waitFor(() => expect(titled(REGISTRY_LOAD_ERROR)).toHaveLength(2));
+    expect(callsTo('/api/plugins/registries')).toHaveLength(2);
+    expect(callsTo('/api/plugins/installed')).toHaveLength(2);
+  });
+
   it('reports a failed search without a description when no package was found directly', async () => {
     hoisted.apiMock.mockImplementation((url: string) =>
       url.includes('/marketplace/search') ? Promise.resolve({ ok: false }) : respond([]),

@@ -8,13 +8,20 @@ module.exports = {
   },
   create(context) {
     const source = context.sourceCode;
-    const check = (node) => {
-      let exportToken = source.getFirstToken(node);
-      if (node.type === 'ExportDefaultDeclaration') exportToken = source.getTokenAfter(exportToken);
-      const next = source.getTokenAfter(exportToken, { includeComments: true });
+    const reportCommentAfter = (token) => {
+      const next = source.getTokenAfter(token, { includeComments: true });
       if (next && (next.type === 'Line' || next.type === 'Block')) {
         context.report({ loc: next.loc, messageId: 'exportComment' });
+        return true;
       }
+      return false;
+    };
+    // `export /* c */ …`, and also `export default /* c */ …` / `export type /* c */ { … }`.
+    const check = (node) => {
+      const exportToken = source.getFirstToken(node);
+      if (reportCommentAfter(exportToken)) return;
+      const keyword = source.getTokenAfter(exportToken);
+      if (keyword && (keyword.value === 'default' || keyword.value === 'type')) reportCommentAfter(keyword);
     };
     return {
       ExportNamedDeclaration: check,

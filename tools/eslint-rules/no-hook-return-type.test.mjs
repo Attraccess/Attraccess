@@ -13,7 +13,7 @@ tester.run('no-hook-return-type', rule, {
   valid: [
     'type Props = { items: string[] };',
     'type R = ReturnType<typeof setTimeout>;',
-    "type Q = UseQueryResult<Foo[]>;",
+    'type Q = UseQueryResult<Foo[]>;',
     'type Fn = ReturnType<typeof buildThing>;',
     'type B = typeof buildThing; type R = ReturnType<B>;',
     'type R = ReturnType<Handler>;',

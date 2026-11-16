@@ -16,10 +16,13 @@ tester.run('no-export-comment', rule, {
     '// note\nexport const a = 1;',
     'export const a = 1; // trailing',
     'export { a };',
+    'export type { A };',
+    'export type A = string;',
+    "export default 'type';",
     "export * from './x';",
     'export {};\n// a comment on the next line',
     'const s = "export // not a comment";',
-    "const el = <div>{/* export // c */}</div>;",
+    'const el = <div>{/* export // c */}</div>;',
     'export default function f() {}',
   ],
   invalid: [
@@ -32,5 +35,8 @@ tester.run('no-export-comment', rule, {
     { code: "export /* c */ * from './x';", errors: [{ messageId: 'exportComment' }] },
     { code: "export // c\n* as ns from './x';", errors: [{ messageId: 'exportComment' }] },
     { code: 'export /* c */ = a;', errors: [{ messageId: 'exportComment' }] },
+    { code: 'export /* c */ default function f() {}', errors: [{ messageId: 'exportComment' }] },
+    { code: 'export type /* c */ { A };', errors: [{ messageId: 'exportComment' }] },
+    { code: "export type // c\n* from './x';", errors: [{ messageId: 'exportComment' }] },
   ],
 });
