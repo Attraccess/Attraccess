@@ -20,7 +20,7 @@ export class DashboardPinsController {
   @Patch()
   @Auth()
   @ApiOperation({
-    summary: 'Add, remove or move one dashboard pin of the authenticated user',
+    summary: 'Add, remove, move or resize one dashboard pin of the authenticated user',
     operationId: 'dashboardUpdatePins',
   })
   @ApiResponse({ status: 200, type: DashboardPinDto, isArray: true })

@@ -1,20 +1,33 @@
 import { createContext, ReactNode, useContext } from 'react';
+import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
+import type { TileSizes } from '../sizes';
 
-/** A widget the user may put on the dashboard right now, built in or contributed by a plugin. */
-export interface DashboardWidget {
+/** A heading of the "Add widget" gallery. Built-in ids are fixed; plugin groups are `plugin:<manifest name>`. */
+export interface GalleryGroup {
   id: string;
   title: string;
-  /** One line for the "Add to dashboard" picker. */
+}
+
+/** A widget the user may put on the dashboard right now, built in or contributed by a plugin. */
+export interface DashboardWidget extends TileSizes {
+  id: string;
+  title: string;
+  /** One line for the "Add widget" gallery. */
   description: string;
   icon: ReactNode;
+  group: GalleryGroup;
+  /** Extra search terms for the gallery. */
+  keywords?: string[];
+  /** The page the header links to outside edit mode. */
+  href?: string;
   /**
    * The body holds form fields. Fields must not sit on a Card surface, where they take its colour and disappear
    * (ATT-294 / ATT-834), so such a widget renders on the outlined section instead.
    */
   hasFields?: boolean;
   /** Extra content for the card header, such as a count. */
-  renderHeaderExtra?: () => ReactNode;
-  renderBody: () => ReactNode;
+  renderHeaderExtra?: (props: DashboardWidgetRenderProps) => ReactNode;
+  renderBody: (props: DashboardWidgetRenderProps) => ReactNode;
   /** Set for plugin widgets: the plugin's name for error logs and its manifest name for live updates. */
   plugin?: { pluginName: string; manifestName: string };
 }

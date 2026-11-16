@@ -46,8 +46,10 @@ werden, aus einfachen Segmenten bestehen und außerhalb von `/kiosk` und
 `/dashboard` liegen. Die API lehnt Pins für Pfade ab, die kein aktives Plugin
 auflistet. Der Host zeigt den Stern im ersten `PageHeader` aus
 `@attraccess/plugins-frontend-ui` auf der Seite; rendern Sie also einen als
-Seitentitel, weiterer Code ist nicht nötig. Die Dashboard-Karte verwendet
-Beschriftung und Symbol Ihres Seitenleisteneintrags, und die Berechtigungen der
+Seitentitel, weiterer Code ist nicht nötig. Die Seite erscheint außerdem als
+kleine Verknüpfungskachel in der Gruppe Ihres Plugins in der Galerie „Widget
+hinzufügen“. Die Kachel verwendet Beschriftung und Symbol Ihres
+Seitenleisteneintrags, und die Berechtigungen der
 Route entscheiden, ob der Benutzer sie öffnen darf. Verliert ein Benutzer den
 Zugriff oder ist Ihr Plugin deaktiviert bzw. listet den Pfad nicht mehr, wird
 die Karte als nicht mehr zugänglich angezeigt, bis der Benutzer sie entfernt.
@@ -55,7 +57,8 @@ die Karte als nicht mehr zugänglich angezeigt, bis der Benutzer sie entfernt.
 ### Dashboard-Widgets
 
 Neben angehefteten Seiten können Benutzer **Widgets** zu ihrem Dashboard
-hinzufügen: Karten mit Live-Inhalten und Schnellaktionen. Ein Plugin bietet
+hinzufügen: Kacheln mit Live-Inhalten und Schnellaktionen, die sie in der
+Galerie „Widget hinzufügen“ auswählen. Ein Plugin bietet
 Widgets in zwei Schritten an.
 
 1. Listen Sie die Widget-IDs in `attraccess.dashboardWidgets` in
@@ -82,9 +85,14 @@ Widgets in zwei Schritten an.
          {
            id: 'my-plugin-summary',
            title: 'Zusammenfassung', // übersetzen: der Host fragt bei einem Sprachwechsel erneut
-           description: 'Was heute passiert ist', // eine Zeile in der Liste „Zum Dashboard hinzufügen“
+           description: 'Was heute passiert ist', // eine Zeile in der Galerie „Widget hinzufügen“
            icon: <ChartIcon />,
-           render: () => <SummaryWidget />,
+           href: '/my-plugin/summary', // dorthin führt die Kopfzeile außerhalb des Bearbeitungsmodus
+           sizes: ['small', 'medium'], // Standard: ['medium']
+           defaultSize: 'medium', // Standard: der erste Eintrag von sizes
+           group: 'Mein Plugin', // Gruppe in der Galerie; Standard: der Anzeigename Ihres Plugins
+           keywords: ['Bericht', 'Statistik'], // zusätzliche Suchbegriffe für die Galerie
+           render: ({ size, isPreview }) => <SummaryWidget size={size} isPreview={isPreview} />,
          },
        ];
      }
@@ -105,7 +113,43 @@ Inhalt. Wirft der Inhalt einen Fehler, zeigt seine Karte eine Fehlermeldung;
 der Rest des Dashboards funktioniert weiter. Setzen Sie `hasFields: true`, wenn
 der Inhalt Formularfelder enthält: Der Host rendert das Widget dann auf einem
 umrandeten Abschnitt statt auf einer Kartenfläche, auf der Felder verschwinden
-würden.
+würden. Außerhalb des Bearbeitungsmodus führt die Kopfzeile zu `href`;
+wiederholen Sie also keinen „Öffnen …“-Link im Inhalt.
+
+#### Größen
+
+Kacheln liegen in einem Raster mit fester Zeilenhöhe, wie Widgets auf dem
+Startbildschirm eines Smartphones. Es gibt drei Größen:
+
+| Größe    | Rasterzellen         |
+| -------- | -------------------- |
+| `small`  | 1 Spalte × 1 Zeile   |
+| `medium` | 2 Spalten × 1 Zeile  |
+| `large`  | 2 Spalten × 2 Zeilen |
+
+Listen Sie in `sizes` die Größen auf, die Ihr Widget unterstützt; Benutzer
+wählen eine beim Hinzufügen und können sie im Bearbeitungsmodus ändern.
+`render()` erhält die Größe der Kachel als `size`. Eine Kachel wächst nie mit
+ihrem Inhalt; zeigen Sie also je Größe eine feste Anzahl von Einträgen (zum
+Beispiel 1, 3 und 7), statt zu messen, und kürzen Sie lange Texte. Inhalt, der
+trotzdem nicht passt, wird abgeschnitten. Eine gespeicherte Größe, die Ihr
+Widget nicht mehr unterstützt, wird in `defaultSize` gezeigt.
+
+#### Vorschauen
+
+Die Galerie „Widget hinzufügen“ zeigt jedes Widget als Live-Vorschau in der
+gewählten Größe. Der Host ruft `render()` mit `isPreview: true` auf und setzt
+das Ergebnis in einen `inert`-Rahmen, der vor Hilfstechnologien verborgen ist:
+Nichts darin lässt sich fokussieren oder anklicken. Laden Sie Ihre Daten wie
+gewohnt, aber öffnen Sie keine Dialoge, navigieren Sie nicht und starten Sie
+nichts (zum Beispiel einen schreibenden Timer oder eine Anfrage, die Daten
+ändert), solange `isPreview` gesetzt ist.
+
+#### Ältere Widgets
+
+Alle neuen Felder sind optional. Ein Widget ohne `sizes` unterstützt nur
+`medium`, und ein `render()` ohne Parameter funktioniert weiter: Es wird in
+seiner Standardgröße gerendert.
 
 Ein Widget wird nur angeboten, solange Ihr Plugin aktiv ist, seine ID im
 Manifest auflistet und es aus `getDashboardWidgets()` zurückgibt. Die API lehnt

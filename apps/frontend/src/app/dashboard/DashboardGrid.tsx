@@ -12,7 +12,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
-import { DashboardPinItemType, DashboardPinOperationKind } from '@attraccess/react-query-client';
+import { DashboardPinItemType, DashboardPinOperationKind, DashboardPinSize } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../components/toastProvider';
 import {
   DashboardPin,
@@ -24,12 +24,15 @@ import {
 } from './pins';
 import { usePinnablePages } from './pinnablePagesContext';
 import { PagePinCard, PendingPinCard, ResourcePinCard, UnavailablePinCard } from './PinCards';
+import { DASHBOARD_GRID_CLASSES, PAGE_TILE_SIZES, resolveTileSize, RESOURCE_TILE_SIZES, TileSize } from './sizes';
 import { WidgetPinCard } from './WidgetPinCard';
 import { useDashboardWidgets } from './widgets/widgetsContext';
 import de from './de.json';
 import en from './en.json';
 
 const itemOf = ({ itemType, itemId }: DashboardPinItem): DashboardPinItem => ({ itemType, itemId });
+
+const UNKNOWN_WIDGET_SIZES = { sizes: ['small', 'medium', 'large'], defaultSize: 'medium' } as const;
 
 /**
  * Moves a pin onto the place of another. The new order shows at once and is saved right away; when saving fails, the
@@ -61,6 +64,30 @@ export function usePinReorder(pins: DashboardPin[]) {
         },
       },
       { onError: () => toast.error({ title: t('reorderError') }) },
+    );
+  };
+}
+
+/**
+ * Gives a pin another size. The tile changes at once and the size is saved right away; when saving fails, the stored
+ * size comes back and the user is told.
+ */
+export function usePinResize(pins: DashboardPin[]) {
+  const { t } = useTranslations({ en, de });
+  const toast = useToastMessage();
+  const cancelPinsFetch = useCancelDashboardPinsFetch();
+  const setPins = useSetDashboardPinsCache();
+  const { mutate } = useUpdateDashboardPins();
+
+  // On failure the shared mutation reloads the stored sizes.
+  return (pin: DashboardPin, tileSize: TileSize) => {
+    // The client's enum holds the same three values.
+    const size = tileSize as DashboardPinSize;
+    void cancelPinsFetch();
+    setPins(pins.map((candidate) => (pinKey(candidate) === pinKey(pin) ? { ...candidate, size } : candidate)));
+    mutate(
+      { requestBody: { kind: DashboardPinOperationKind.RESIZE, item: itemOf(pin), size } },
+      { onError: () => toast.error({ title: t('resizeError') }) },
     );
   };
 }
@@ -101,6 +128,7 @@ export function DashboardGrid({
   const toast = useToastMessage();
   const { mutate } = useUpdateDashboardPins();
   const reorder = usePinReorder(pins);
+  const resize = usePinResize(pins);
   const { pages, titleOf, isReady } = usePinnablePages();
   const widgets = useDashboardWidgets();
   // The sensors stay the same in both modes: DndContext uses them as effect dependencies, so their number must not
@@ -136,19 +164,25 @@ export function DashboardGrid({
 
   const renderCard = (pin: DashboardPin, index: number) => {
     const id = pinKey(pin);
-    const props = { id, isEditing, onRemove: () => remove(pin, index) };
-    if (pin.itemType === DashboardPinItemType.RESOURCE) return <ResourcePinCard key={id} {...props} pin={pin} />;
+    const props = { id, isEditing, onRemove: () => remove(pin, index), onResize: (size: TileSize) => resize(pin, size) };
+    if (pin.itemType === DashboardPinItemType.RESOURCE) {
+      return <ResourcePinCard key={id} {...props} size={resolveTileSize(pin.size, RESOURCE_TILE_SIZES)} pin={pin} />;
+    }
 
     const isWidget = pin.itemType === DashboardPinItemType.WIDGET;
     const widget = isWidget ? widgets.widgets.find((candidate) => candidate.id === pin.itemId) : undefined;
-    if (widget) return <WidgetPinCard key={id} {...props} widget={widget} />;
+    if (widget) return <WidgetPinCard key={id} {...props} size={resolveTileSize(pin.size, widget)} widget={widget} />;
     const page = isWidget ? undefined : pages.find((candidate) => candidate.path === pin.itemId);
-    if (page) return <PagePinCard key={id} {...props} page={page} />;
+    if (page) return <PagePinCard key={id} {...props} size="small" page={page} />;
 
+    // An unknown item keeps its stored size while it waits or is unavailable.
+    const size = resolveTileSize(pin.size, isWidget ? UNKNOWN_WIDGET_SIZES : PAGE_TILE_SIZES);
     const title = pinTitle(pin);
-    if (!(isWidget ? widgets.isReady : isReady)) return <PendingPinCard key={id} {...props} title={title} />;
+    if (!(isWidget ? widgets.isReady : isReady)) {
+      return <PendingPinCard key={id} {...props} size={size} title={title} />;
+    }
     const description = t(isWidget ? 'card.unavailableWidgetDescription' : 'card.unavailableDescription');
-    return <UnavailablePinCard key={id} {...props} title={title} description={description} />;
+    return <UnavailablePinCard key={id} {...props} size={size} title={title} description={description} />;
   };
 
   return (
@@ -159,9 +193,9 @@ export function DashboardGrid({
       accessibility={accessibility}
     >
       <SortableContext items={pins.map(pinKey)} strategy={rectSortingStrategy}>
-        {/* Columns follow the space next to the sidebar, not the viewport, so cards never get too narrow. */}
+        {/* Columns follow the space next to the sidebar, not the viewport, so tiles never get too narrow. */}
         <div className="@container">
-          <div className="grid grid-cols-1 items-start gap-4 @xl:grid-cols-2 @4xl:grid-cols-3" data-cy="dashboard-grid">
+          <div className={DASHBOARD_GRID_CLASSES} data-cy="dashboard-grid">
             {pins.map(renderCard)}
           </div>
         </div>

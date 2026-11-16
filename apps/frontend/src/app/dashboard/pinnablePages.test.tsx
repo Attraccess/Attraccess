@@ -75,6 +75,20 @@ describe('PinnablePagesProvider', () => {
     expect(messages?.icon).toBeTruthy();
   });
 
+  it('sorts pages into the gallery groups of their feature, else "Other pages", and plugin pages into their plugin', () => {
+    state.license = { modules: ['attractap', 'billing'] };
+    state.pluginItems = [{ path: '/plugin-report', label: 'Reports' }];
+    installPlugin(['/plugin-report']);
+    const groupOf = (path: string) => render().pages.find((page) => page.path === path)?.galleryGroup;
+
+    expect(groupOf('/messages')).toBe('messages');
+    expect(groupOf('/projects')).toBe('resources');
+    expect(groupOf('/billing')).toBe('billing');
+    expect(groupOf('/attractap/readers')).toBe('attractap');
+    expect(groupOf('/settings')).toBe('other');
+    expect(groupOf('/plugin-report')).toBe('plugin:report');
+  });
+
   it('offers a plugin page only when its plugin lists it in dashboardPaths', () => {
     state.pluginItems = [
       { path: '/plugin-report', label: 'Reports' },

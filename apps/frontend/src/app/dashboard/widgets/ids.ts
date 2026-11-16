@@ -11,6 +11,7 @@ export const BUILT_IN_WIDGET_IDS = [
   'my-sessions',
   'billing-balance',
   'readers',
+  'resources-in-use',
 ] as const;
 
 export type BuiltInWidgetId = (typeof BUILT_IN_WIDGET_IDS)[number];

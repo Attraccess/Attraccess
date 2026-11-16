@@ -5,6 +5,8 @@ export interface PinnablePage {
   title: string;
   icon: ReactNode;
   badgeCount?: number;
+  /** The "Add widget" gallery group it is listed in: a built-in group id, or `plugin:<manifest name>`. */
+  galleryGroup: string;
 }
 
 export interface PinnablePages {

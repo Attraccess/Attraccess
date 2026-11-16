@@ -3,7 +3,7 @@
   "subtitle": "Ihre Widgets, angehefteten Seiten und Ressourcen",
   "empty": {
     "title": "Noch nichts angeheftet",
-    "description": "Fügen Sie Widgets und Seiten über „Zum Dashboard hinzufügen“ hinzu, oder öffnen Sie eine Seite oder Ressource und wählen Sie den Stern in ihrer Kopfzeile. Sobald etwas darauf ist, wird das Dashboard auch Ihre Startseite.",
+    "description": "Fügen Sie Widgets über „Widget hinzufügen“ hinzu, oder öffnen Sie eine Seite oder Ressource und wählen Sie den Stern in ihrer Kopfzeile. Sobald etwas darauf ist, wird das Dashboard auch Ihre Startseite.",
     "browseResources": "Ressourcen durchsuchen"
   },
   "loadError": {
@@ -26,7 +26,8 @@
     "removeLabel": "{{title}} vom Dashboard entfernen",
     "resourceLoadError": "Diese Ressource konnte nicht geladen werden.",
     "unavailableWidgetDescription": "Sie können dieses Widget nicht mehr verwenden. Möglicherweise wurde die Berechtigung oder Lizenz entfernt, oder sein Plugin ist nicht verfügbar.",
-    "widgetLabel": "Widget {{title}}"
+    "widgetLabel": "Widget {{title}}",
+    "sizeLabel": "Größe von {{title}} ändern"
   },
   "drag": {
     "instructions": "Um eine Karte aufzunehmen, drücken Sie die Leertaste oder Enter. Verschieben Sie sie mit den Pfeiltasten. Drücken Sie erneut die Leertaste oder Enter, um sie an der neuen Stelle abzulegen, oder Escape, um abzubrechen.",
@@ -41,18 +42,35 @@
   "edit": {
     "start": "Dashboard bearbeiten",
     "done": "Fertig",
-    "add": "Zum Dashboard hinzufügen",
-    "hint": "Ziehen Sie eine Karte an ihrem Griff, um sie zu verschieben, oder entfernen Sie sie mit der Schaltfläche in ihrer Ecke. Änderungen werden sofort gespeichert."
+    "add": "Widget hinzufügen",
+    "hint": "Ziehen Sie eine Kachel an ihrem Griff, um sie zu verschieben, ändern Sie ihre Größe mit der Größen-Schaltfläche, oder entfernen Sie sie mit der Schaltfläche in ihrer Ecke. Änderungen werden sofort gespeichert."
   },
-  "picker": {
-    "title": "Zum Dashboard hinzufügen",
-    "widgets": "Widgets",
-    "pages": "Seiten",
+  "resizeError": "Die neue Größe konnte nicht gespeichert werden.",
+  "sizes": {
+    "small": "Klein",
+    "medium": "Mittel",
+    "large": "Groß"
+  },
+  "gallery": {
+    "title": "Widget hinzufügen",
+    "searchLabel": "Widgets durchsuchen",
+    "noMatch": "Keine Widgets passen zu „{{term}}“",
     "add": "Hinzufügen",
-    "addLabel": "{{title}} zum Dashboard hinzufügen",
-    "allAdded": "Alles ist bereits auf Ihrem Dashboard.",
+    "added": "Hinzugefügt",
+    "addWidgetLabel": "Widget {{title}} hinzufügen",
+    "addShortcutLabel": "Verknüpfung {{title}} hinzufügen",
+    "addResourceLabel": "Gewählte Ressource hinzufügen",
+    "sizeLabel": "Größe",
+    "loading": "Wird geladen…",
     "close": "Schließen",
-    "addWidgetLabel": "Widget {{title}} zum Dashboard hinzufügen",
-    "loading": "Wird geladen…"
+    "shortcutDescription": "Eine Verknüpfung zu dieser Seite",
+    "resource": {
+      "title": "Ressource",
+      "description": "Eine Ressource mit Status und Sitzungssteuerung anheften",
+      "choose": "Ressource wählen",
+      "sampleName": "Laserschneider",
+      "sampleStatus": "Verfügbar",
+      "sampleStart": "Sitzung starten"
+    }
   }
 }

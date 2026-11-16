@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Link, Spinner } from '@heroui/react';
+import { Button, Link } from '@heroui/react';
+import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useQueryClient } from '@tanstack/react-query';
 import { SquareIcon } from 'lucide-react';
 import { StatusDialog, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -22,11 +23,22 @@ import {
 } from '../../resourceOverview/activeUsageSessionsBanner/useEndOwnSession';
 import { SESSION_EVENTS } from '../../resources/usage/sessionEvents';
 import { SessionTimer } from '../../resources/usage/components/SessionTimer';
-import { WidgetEmpty, WidgetError, WidgetLinkButton, WidgetLoading } from './widgetParts';
+import { itemsPerSize, MoreLink, WidgetEmpty, WidgetError, WidgetList, WidgetLoading } from './widgetParts';
 import de from './de.json';
 import en from './en.json';
 
-function SessionRow({ resource }: Readonly<{ resource: { id: number; name: string } }>) {
+const SESSIONS_PER_SIZE = { small: 1, medium: 3, large: 7 };
+
+/**
+ * One running session: the resource name and the elapsed time on the left, Stop on the right. Stop never shrinks and
+ * the left side truncates, so the two cannot overlap. On small tiles, and in rows narrower than about 18rem, Stop
+ * shows only its icon.
+ */
+function SessionRow({
+  resource,
+  size,
+  isPreview,
+}: Readonly<{ resource: { id: number; name: string } } & DashboardWidgetRenderProps>) {
   const { t } = useTranslations({ en, de });
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -65,66 +77,78 @@ function SessionRow({ resource }: Readonly<{ resource: { id: number; name: strin
     }
   };
 
+  const isIconOnly = size === 'small';
   return (
-    <li className="flex items-center gap-3" data-cy="dashboard-my-sessions-row">
+    <li className="@container flex min-w-0 items-center gap-2" data-cy="dashboard-my-sessions-row">
       <div className="flex min-w-0 flex-1 flex-col">
-        <Link href={`/resources/${resource.id}`} className="truncate text-sm font-medium">
+        <Link href={`/resources/${resource.id}`} className="min-w-0 truncate text-sm font-medium leading-tight">
           {resource.name}
         </Link>
-        {ownSession && <SessionTimer startTime={ownSession.startTime} />}
+        {ownSession && <SessionTimer startTime={ownSession.startTime} variant="compact" />}
       </div>
       <Button
         size="sm"
         variant="danger-soft"
+        isIconOnly={isIconOnly}
+        className={isIconOnly ? 'shrink-0' : 'shrink-0 @max-[18rem]:px-2'}
         aria-label={t('my-sessions.stopLabel', { name: resource.name })}
-        onPress={() => setIsConfirmOpen(true)}
+        onPress={isPreview ? undefined : () => setIsConfirmOpen(true)}
         data-cy="dashboard-my-sessions-stop"
       >
         <SquareIcon className="w-4 h-4" />
-        {t('my-sessions.stop')}
+        {!isIconOnly && <span className="@max-[18rem]:sr-only">{t('my-sessions.stop')}</span>}
       </Button>
-      <StatusDialog
-        isOpen={isConfirmOpen}
-        onClose={() => setIsConfirmOpen(false)}
-        status="warning"
-        title={t('my-sessions.confirmTitle')}
-        action={{
-          label: t('my-sessions.stop'),
-          onPress: stop,
-          isPending: isStopping,
-          'data-cy': 'dashboard-my-sessions-confirm',
-        }}
-      >
-        {t('my-sessions.confirmDescription', { name: resource.name })}
-      </StatusDialog>
+      {!isPreview && (
+        <StatusDialog
+          isOpen={isConfirmOpen}
+          onClose={() => setIsConfirmOpen(false)}
+          status="warning"
+          title={t('my-sessions.confirmTitle')}
+          action={{
+            label: t('my-sessions.stop'),
+            onPress: stop,
+            isPending: isStopping,
+            'data-cy': 'dashboard-my-sessions-confirm',
+          }}
+        >
+          {t('my-sessions.confirmDescription', { name: resource.name })}
+        </StatusDialog>
+      )}
     </li>
   );
 }
 
-/** The user's running sessions, each with a live timer and a button to stop it. */
-export function MySessionsWidget() {
+/**
+ * The user's running sessions, each with a live timer and a button to stop it: 1 on small tiles, 3 on medium and 7 on
+ * large, with "+N more" beyond on small and large.
+ */
+export function MySessionsWidget({ size, isPreview }: Readonly<DashboardWidgetRenderProps>) {
   const { t } = useTranslations({ en, de });
-  const { data, isPending, isError, isFetching } = useResourcesServiceGetAllResources(MY_SESSIONS_QUERY);
+  const { data, isPending, isError } = useResourcesServiceGetAllResources(MY_SESSIONS_QUERY);
 
   if (isPending) return <WidgetLoading />;
   if (isError || !data) return <WidgetError title={t('loadError')} />;
   if (data.data.length === 0) {
     return (
-      <div className="flex flex-col items-start gap-3">
+      <div className="flex flex-col items-start gap-2">
         <WidgetEmpty>{t('my-sessions.empty')}</WidgetEmpty>
-        <WidgetLinkButton href="/resources">{t('my-sessions.browse')}</WidgetLinkButton>
+        <Link href="/resources" className="text-sm" data-cy="dashboard-my-sessions-browse">
+          {t('my-sessions.browse')}
+        </Link>
       </div>
     );
   }
 
+  const shown = data.data.slice(0, itemsPerSize(size, SESSIONS_PER_SIZE));
   return (
-    <div className="flex flex-col gap-2">
-      <ul className="flex flex-col gap-3">
-        {data.data.map((resource) => (
-          <SessionRow key={resource.id} resource={resource} />
+    <div className="flex min-w-0 flex-col gap-1">
+      <WidgetList>
+        {shown.map((resource) => (
+          <SessionRow key={resource.id} resource={resource} size={size} isPreview={isPreview} />
         ))}
-      </ul>
-      {isFetching && <Spinner size="sm" />}
+      </WidgetList>
+      {/* A medium tile has room for its three rows only; its header links to the resources. */}
+      {size !== 'medium' && <MoreLink count={(data.total ?? data.data.length) - shown.length} href="/resources" />}
     </div>
   );
 }

@@ -1,15 +1,16 @@
 import { Chip, Link } from '@heroui/react';
+import type { DashboardWidgetRenderProps } from '@attraccess/plugins-frontend-sdk';
 import { useDateTimeFormatter, useTranslations } from '@attraccess/plugins-frontend-ui';
 import {
   ConversationListItemDto,
   useMessagingServiceMessagingGetUnreadCount,
   useMessagingServiceMessagingListConversations,
 } from '@attraccess/react-query-client';
-import { WidgetEmpty, WidgetError, WidgetLinkButton, WidgetLoading } from './widgetParts';
+import { BigNumber, itemsPerSize, WidgetEmpty, WidgetError, WidgetList, WidgetLoading } from './widgetParts';
 import de from './de.json';
 import en from './en.json';
 
-const MAX_CONVERSATIONS = 5;
+const CONVERSATIONS_PER_SIZE = { medium: 3, large: 7 };
 
 const countLabel = (count: number) => (count > 99 ? '99+' : count);
 
@@ -25,9 +26,10 @@ function UnreadChip({ count }: Readonly<{ count: number }>) {
 }
 
 /** The total unread count, the same as the sidebar badge. GlobalMessagingLive keeps it current. */
-export function MessagesUnreadChip() {
+export function MessagesUnreadChip({ size }: Readonly<Partial<DashboardWidgetRenderProps>>) {
   const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
-  if (!unread?.total) return null;
+  // A small tile shows the count as its content already.
+  if (!unread?.total || size === 'small') return null;
 
   return <UnreadChip count={unread.total} />;
 }
@@ -41,10 +43,10 @@ function ConversationRow({ conversation }: Readonly<{ conversation: Conversation
     <li>
       <Link
         href={`/messages?conversation=${conversation.id}`}
-        className="flex w-full items-center gap-3 rounded-lg py-1 no-underline"
+        className="flex w-full min-w-0 items-center gap-2 rounded-lg no-underline"
         data-cy="dashboard-messages-conversation"
       >
-        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-default text-sm font-medium uppercase">
+        <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-default text-xs font-medium uppercase">
           <span aria-hidden>{name.charAt(0)}</span>
           {conversation.otherParticipantOnline && (
             <span
@@ -56,7 +58,7 @@ function ConversationRow({ conversation }: Readonly<{ conversation: Conversation
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-medium text-foreground">{name}</span>
+            <span className="truncate text-sm font-medium leading-tight text-foreground">{name}</span>
             {conversation.lastMessage && (
               <span className="shrink-0 text-xs text-muted">{formatDateTime(conversation.lastMessage.createdAt)}</span>
             )}
@@ -71,32 +73,37 @@ function ConversationRow({ conversation }: Readonly<{ conversation: Conversation
   );
 }
 
-/** The latest conversations, each opening its thread. The messaging caches keep the list live. */
-export function MessagesWidget() {
+/** Small: the unread count as a big number and who wrote last. */
+function UnreadSummary({ conversations }: Readonly<{ conversations: ConversationListItemDto[] }>) {
+  const { t } = useTranslations({ en, de });
+  const { data: unread } = useMessagingServiceMessagingGetUnreadCount();
+  const latest = conversations.find((conversation) => conversation.lastMessage)?.otherParticipant?.username;
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <BigNumber value={unread?.total ?? 0} label={t('messages.unreadLabel')} data-cy="dashboard-messages-unread" />
+      {latest && <span className="truncate text-xs text-muted">{t('messages.latestFrom', { name: latest })}</span>}
+    </div>
+  );
+}
+
+/**
+ * Small: the unread count and the latest sender. Medium and large: the latest 3 or 7 conversations, each opening its
+ * thread. The messaging caches keep both live.
+ */
+export function MessagesWidget({ size }: Readonly<DashboardWidgetRenderProps>) {
   const { t } = useTranslations({ en, de });
   const { data: conversations, isPending, isError } = useMessagingServiceMessagingListConversations();
 
-  const renderList = () => {
-    if (isPending) return <WidgetLoading />;
-    if (isError || !conversations) return <WidgetError title={t('loadError')} />;
-    if (conversations.length === 0) return <WidgetEmpty>{t('messages.empty')}</WidgetEmpty>;
-    return (
-      <ul className="flex flex-col gap-1">
-        {conversations.slice(0, MAX_CONVERSATIONS).map((conversation) => (
-          <ConversationRow key={conversation.id} conversation={conversation} />
-        ))}
-      </ul>
-    );
-  };
-
+  if (isPending) return <WidgetLoading />;
+  if (isError || !conversations) return <WidgetError title={t('loadError')} />;
+  if (size === 'small') return <UnreadSummary conversations={conversations} />;
+  if (conversations.length === 0) return <WidgetEmpty>{t('messages.empty')}</WidgetEmpty>;
   return (
-    <div className="flex flex-col gap-3">
-      {renderList()}
-      <div>
-        <WidgetLinkButton href="/messages" data-cy="dashboard-messages-open-inbox">
-          {t('messages.openInbox')}
-        </WidgetLinkButton>
-      </div>
-    </div>
+    <WidgetList>
+      {conversations.slice(0, itemsPerSize(size, CONVERSATIONS_PER_SIZE)).map((conversation) => (
+        <ConversationRow key={conversation.id} conversation={conversation} />
+      ))}
+    </WidgetList>
   );
 }

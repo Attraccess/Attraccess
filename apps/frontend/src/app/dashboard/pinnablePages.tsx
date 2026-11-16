@@ -15,6 +15,7 @@ import { useAuth } from '../../hooks/useAuth';
 import sidebarDe from '../layout/sidebar.de.json';
 import sidebarEn from '../layout/sidebar.en.json';
 import { PinnablePage, PinnablePages, PinnablePagesContext } from './pinnablePagesContext';
+import { GALLERY_GROUP_BY_SIDEBAR_KEY, pluginGalleryGroupId } from './widgets/groups';
 
 const DASHBOARD_PATH = '/dashboard';
 
@@ -32,6 +33,10 @@ function builtInPages(items: (SidebarItem | SidebarItemGroup)[], prefix: string,
           : t(prefix ? `${prefix}${entry.translationKey}` : `groups.##default##.items.${entry.translationKey}`),
         icon: <entry.icon size={20} aria-hidden />,
         badgeCount: entry.badgeCount,
+        galleryGroup:
+          GALLERY_GROUP_BY_SIDEBAR_KEY[entry.translationKey ?? ''] ??
+          (item.isGroup ? GALLERY_GROUP_BY_SIDEBAR_KEY[item.translationKey] : undefined) ??
+          'other',
       })),
   );
 }
@@ -53,14 +58,25 @@ function useComputedPinnablePages(): PinnablePages {
 
   return useMemo(() => {
     const endItems = buildSidebarEndItems('', '');
-    const pluginPaths = new Set(plugins.flatMap((manifest) => manifest.main.frontend?.dashboardPaths ?? []));
-    const pluginPages = pluginNavItems
-      .filter((item) => pluginPaths.has(item.path))
-      .map((item): PinnablePage => ({
-        path: item.path,
-        title: item.label,
-        icon: item.icon ?? <PuzzleIcon size={20} aria-hidden />,
-      }));
+    // The first plugin that lists a path owns it, as for widget ids.
+    const pluginOfPath = new Map<string, string>();
+    plugins.forEach((manifest) =>
+      (manifest.main.frontend?.dashboardPaths ?? []).forEach(
+        (path) => pluginOfPath.has(path) || pluginOfPath.set(path, manifest.name),
+      ),
+    );
+    const pluginPages = pluginNavItems.flatMap((item): PinnablePage[] => {
+      const pluginName = pluginOfPath.get(item.path);
+      if (!pluginName) return [];
+      return [
+        {
+          path: item.path,
+          title: item.label,
+          icon: item.icon ?? <PuzzleIcon size={20} aria-hidden />,
+          galleryGroup: pluginGalleryGroupId(pluginName),
+        },
+      ];
+    });
 
     const known = [...builtInPages(SIDEBAR_ITEMS, '', t), ...builtInPages(endItems, 'endItems.', t), ...pluginPages];
     const pages = [

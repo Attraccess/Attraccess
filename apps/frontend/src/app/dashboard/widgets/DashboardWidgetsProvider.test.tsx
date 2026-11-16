@@ -7,15 +7,16 @@ import type { AttraccessFrontendPlugin, PluginDashboardWidget } from '@attracces
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import usePluginState, { PluginManifestWithPlugin } from '../../plugins/plugin.state';
 import { DashboardWidgetsProvider } from './DashboardWidgetsProvider';
-import { useDashboardWidgets } from './widgetsContext';
+import { DashboardWidget, useDashboardWidgets } from './widgetsContext';
 
-const state = vi.hoisted(() => ({ openable: new Set<string>() }));
+const state = vi.hoisted(() => ({ openable: new Set<string>(), widgets: [] as DashboardWidget[] }));
 
 vi.mock('../../../hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 7 }, isAuthenticated: true }) }));
 vi.mock('./access', () => ({ useCanOpenPage: () => (path: string) => state.openable.has(path) }));
 
 function Probe() {
   const { widgets, titleOf, isReady } = useDashboardWidgets();
+  state.widgets = widgets;
   return (
     <>
       <output aria-label="widgets">{widgets.map((widget) => widget.id).join(',')}</output>
@@ -77,7 +78,7 @@ describe('DashboardWidgetsProvider', () => {
   it('offers the built-in widgets whose page the user may open', async () => {
     renderProvider();
     await waitFor(() => expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('true'));
-    expect(widgetIds()).toEqual(['messages', 'my-sessions', 'resources']);
+    expect(widgetIds()).toEqual(['messages', 'my-sessions', 'resources-in-use', 'resources']);
   });
 
   it.each([
@@ -122,7 +123,7 @@ describe('DashboardWidgetsProvider', () => {
     });
     renderProvider();
     await waitFor(() => expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('true'));
-    expect(widgetIds()).toEqual(['messages', 'my-sessions', 'resources']);
+    expect(widgetIds()).toEqual(['messages', 'my-sessions', 'resources-in-use', 'resources']);
   });
 
   it('asks plugins again once the plugin provider has passed them the user', async () => {
@@ -156,12 +157,99 @@ describe('DashboardWidgetsProvider', () => {
     expect(screen.getByRole('status', { name: 'title' })).toHaveTextContent('Upcoming reservations');
   });
 
+  const pluginWidget = (id: string) => state.widgets.find((widget) => widget.id === id);
+
+  it('gives a plugin widget the SDK defaults: medium only, in a group named after the plugin', async () => {
+    installPlugin(() => [reservations], ['reservations-upcoming']);
+    renderProvider();
+    await waitFor(() => expect(widgetIds()).toContain('reservations-upcoming'));
+
+    expect(pluginWidget('reservations-upcoming')).toMatchObject({
+      sizes: ['medium'],
+      defaultSize: 'medium',
+      group: { id: 'plugin:report', title: 'Report' },
+      href: undefined,
+      keywords: undefined,
+    });
+  });
+
+  it('passes the sizes, group, link and keywords a plugin widget declares', async () => {
+    const other = { ...reservations, id: 'reservations-manage', group: undefined };
+    installPlugin(
+      () => [
+        {
+          ...reservations,
+          sizes: ['large', 'small', 'huge' as never],
+          defaultSize: 'large',
+          group: 'Reservations',
+          href: '/reservations',
+          keywords: ['booking'],
+        },
+        other,
+        { ...reservations, id: 'reservations-stats', group: 'Statistics' },
+      ],
+      ['reservations-upcoming', 'reservations-manage', 'reservations-stats'],
+    );
+    renderProvider();
+    await waitFor(() => expect(widgetIds()).toContain('reservations-stats'));
+
+    expect(pluginWidget('reservations-upcoming')).toMatchObject({
+      sizes: ['small', 'large'],
+      defaultSize: 'large',
+      group: { id: 'plugin:report', title: 'Reservations' },
+      href: '/reservations',
+      keywords: ['booking'],
+    });
+    // A widget without a group joins the plugin's group, named by its first widget that names one.
+    expect(pluginWidget('reservations-manage')?.group).toEqual({ id: 'plugin:report', title: 'Reservations' });
+    expect(pluginWidget('reservations-stats')?.group).toEqual({ id: 'group:Statistics', title: 'Statistics' });
+  });
+
+  it('falls back to the first size when the default is not one of them', async () => {
+    installPlugin(() => [{ ...reservations, sizes: ['small', 'medium'], defaultSize: 'large' }], [
+      'reservations-upcoming',
+    ]);
+    renderProvider();
+    await waitFor(() => expect(widgetIds()).toContain('reservations-upcoming'));
+    expect(pluginWidget('reservations-upcoming')?.defaultSize).toBe('small');
+  });
+
+  it('renders plugin widgets with the tile size, also widgets whose render() takes no arguments', async () => {
+    const sized = vi.fn(() => 'sized');
+    const legacy = vi.fn(() => 'legacy');
+    installPlugin(
+      () => [
+        { ...reservations, render: sized },
+        { ...reservations, id: 'reservations-legacy', render: legacy },
+      ],
+      ['reservations-upcoming', 'reservations-legacy'],
+    );
+    renderProvider();
+    await waitFor(() => expect(widgetIds()).toContain('reservations-legacy'));
+
+    expect(pluginWidget('reservations-upcoming')?.renderBody({ size: 'large', isPreview: true })).toBe('sized');
+    expect(sized).toHaveBeenCalledWith({ size: 'large', isPreview: true });
+    expect(pluginWidget('reservations-legacy')?.renderBody({ size: 'medium', isPreview: false })).toBe('legacy');
+  });
+
+  it('describes built-in widgets with their page, group and sizes', async () => {
+    renderProvider();
+    await waitFor(() => expect(widgetIds()).toContain('messages'));
+    expect(pluginWidget('messages')).toMatchObject({
+      href: '/messages',
+      group: { id: 'messages', title: 'Messages' },
+      sizes: ['small', 'medium', 'large'],
+      defaultSize: 'medium',
+      keywords: ['inbox', 'chat', 'unread'],
+    });
+  });
+
   it('ignores a plugin widget missing from the manifest, or one claiming a built-in id', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     installPlugin(() => [reservations, { ...reservations, id: 'messages', title: 'Fake inbox' }], ['messages']);
     renderProvider();
     await waitFor(() => expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('true'));
-    expect(widgetIds()).toEqual(['messages', 'my-sessions', 'resources']);
+    expect(widgetIds()).toEqual(['messages', 'my-sessions', 'resources-in-use', 'resources']);
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('built-in widget id "messages"'));
   });
 
@@ -172,7 +260,7 @@ describe('DashboardWidgetsProvider', () => {
     }, ['reservations-upcoming']);
     renderProvider();
     await waitFor(() => expect(screen.getByRole('status', { name: 'ready' })).toHaveTextContent('true'));
-    expect(widgetIds()).toEqual(['messages', 'my-sessions', 'resources']);
+    expect(widgetIds()).toEqual(['messages', 'my-sessions', 'resources-in-use', 'resources']);
   });
 
   it('asks the plugin again when it reports a change, and keeps the title of a widget it withdrew', async () => {

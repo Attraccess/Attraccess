@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DashboardPin, Resource, User } from '@attraccess/database-entities';
+import { DashboardPin, DashboardPinSize, Resource, User } from '@attraccess/database-entities';
 import { EntityManager, In, Repository } from 'typeorm';
 import { runSerializedTransaction } from '../database/run-serialized-transaction';
 import { isPinnablePagePath, isPinnableWidgetId } from './dashboard-items';
@@ -10,22 +10,30 @@ export const MAX_DASHBOARD_PINS = 200;
 
 const keyOf = (item: DashboardPinItemDto) => `${item.itemType}:${item.itemId}`;
 
-/** The pin list after one operation. Unknown items make remove and move a no-op, so stale tabs cannot fail. */
+/** A stored pin as the operations see it: the item and its chosen size. */
+export type StoredDashboardPin = DashboardPinItemDto & { size: DashboardPinSize | null };
+
+/** The pin list after one operation. Unknown items make remove, move and resize a no-op, so stale tabs cannot fail. */
 export function applyDashboardPinOperation(
-  current: DashboardPinItemDto[],
-  { kind, item, before }: UpdateDashboardPinsDto,
-): DashboardPinItemDto[] {
-  const next = current.map(({ itemType, itemId }) => ({ itemType, itemId }));
+  current: StoredDashboardPin[],
+  { kind, item, before, size }: UpdateDashboardPinsDto,
+): StoredDashboardPin[] {
+  const next = current.map(({ itemType, itemId, size: storedSize }) => ({ itemType, itemId, size: storedSize }));
   const index = next.findIndex((pin) => keyOf(pin) === keyOf(item));
-  if (kind === 'add' && index < 0) next.push({ itemType: item.itemType, itemId: item.itemId });
+  if (kind === 'add' && index < 0) next.push({ itemType: item.itemType, itemId: item.itemId, size: size ?? null });
   if (kind === 'remove' && index >= 0) next.splice(index, 1);
   if (kind === 'move' && index >= 0) {
     const [moving] = next.splice(index, 1);
     const target = before ? next.findIndex((pin) => keyOf(pin) === keyOf(before)) : -1;
     next.splice(target < 0 ? next.length : target, 0, moving);
   }
+  if (kind === 'resize' && index >= 0 && size) next[index].size = size;
   return next;
 }
+
+const isUnchanged = (current: StoredDashboardPin[], next: StoredDashboardPin[]) =>
+  next.length === current.length &&
+  next.every((pin, position) => keyOf(pin) === keyOf(current[position]) && pin.size === current[position].size);
 
 @Injectable()
 export class DashboardPinsService {
@@ -54,8 +62,10 @@ export class DashboardPinsService {
 
     return pins
       .filter((pin) => !stale.includes(pin))
-      .map(({ itemType, itemId }) =>
-        itemType === 'resource' ? { itemType, itemId, resourceName: resourceNames.get(itemId) } : { itemType, itemId },
+      .map(({ itemType, itemId, size }) =>
+        itemType === 'resource'
+          ? { itemType, itemId, size: size ?? null, resourceName: resourceNames.get(itemId) }
+          : { itemType, itemId, size: size ?? null },
       );
   }
 
@@ -73,9 +83,7 @@ export class DashboardPinsService {
       if (next.length > MAX_DASHBOARD_PINS) {
         throw new BadRequestException(`A dashboard holds at most ${MAX_DASHBOARD_PINS} pins`);
       }
-      if (next.length === current.length && next.every((pin, position) => keyOf(pin) === keyOf(current[position]))) {
-        return;
-      }
+      if (isUnchanged(current, next)) return;
       await repository.delete({ userId });
       if (next.length) {
         await repository.insert(next.map((pin, position) => ({ userId, ...pin, position })));

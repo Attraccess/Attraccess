@@ -3,7 +3,7 @@ import { Button, Link, Spinner } from '@heroui/react';
 import { CheckIcon, LayoutDashboardIcon, PencilIcon, PlusIcon } from 'lucide-react';
 import { PageAction, PageHeader, StatusAlert, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { RootRedirect } from '../routes/RootRedirect';
-import { AddToDashboardModal } from './AddToDashboardModal';
+import { WidgetGallery } from './gallery/WidgetGallery';
 import { DashboardGrid } from './DashboardGrid';
 import { DashboardPin, useDashboardPins } from './pins';
 import de from './de.json';
@@ -20,7 +20,7 @@ function LoadingDashboard() {
 interface DashboardContentProps {
   isEditing: boolean;
   onRemoved: (index: number) => void;
-  /** Enters edit mode with the picker open. */
+  /** Enters edit mode with the gallery open. */
   onAdd: () => void;
 }
 
@@ -65,7 +65,7 @@ function DashboardContent({ isEditing, onAdd, onRemoved }: Readonly<DashboardCon
   return <DashboardGrid pins={pins} isEditing={isEditing} onRemoved={onRemoved} />;
 }
 
-/** "Add to dashboard" while editing, and the one Edit/Done toggle, which keeps focus as its label changes. */
+/** "Add widget" while editing, and the one Edit/Done toggle, which keeps focus as its label changes. */
 function useEditActions(
   pins: DashboardPin[] | undefined,
   isEditing: boolean,
@@ -109,8 +109,8 @@ const ADD_TARGETS = '[data-cy="dashboard-add"], [data-cy="dashboard-empty-add"]'
 
 /**
  * Keeps keyboard focus on the page when its focused element disappears: after removing a card, on the card that took
- * its place (else the previous one, else "Add to dashboard"); after closing the picker opened from the empty state,
- * whose button is gone once something was added, on "Add to dashboard".
+ * its place (else the previous one, else "Add widget"); after closing the gallery opened from the empty state,
+ * whose button is gone once something was added, on "Add widget".
  */
 function useDashboardFocus(pinCount: number | undefined) {
   const pageRef = useRef<HTMLDivElement>(null);
@@ -162,7 +162,7 @@ export function DashboardPage() {
           setIsPickerOpen(true);
         }}
       />
-      {pins && <AddToDashboardModal isOpen={isPickerOpen} onOpenChange={onPickerOpenChange} pins={pins} />}
+      {pins && <WidgetGallery isOpen={isPickerOpen} onOpenChange={onPickerOpenChange} pins={pins} />}
     </div>
   );
 }

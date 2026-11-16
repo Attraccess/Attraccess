@@ -45,9 +45,10 @@ vi.mock('../resourceOverview/resourceGroupCard/statusChip', () => ({
   StatusChip: ({ resourceId }: { resourceId: number }) => <div>Status {resourceId}</div>,
 }));
 
-const page = (itemId: string): DashboardPinDto => ({ itemType: DashboardPinItemType.PAGE, itemId });
-const projects = { path: '/projects', title: 'Projects', icon: null };
-const messages = { path: '/messages', title: 'Messages', icon: null, badgeCount: 3 };
+// Stored without a chosen size; requests carry only the item, so the same shape serves both.
+const page = (itemId: string) => ({ itemType: DashboardPinItemType.PAGE, itemId }) as DashboardPinDto;
+const projects = { path: '/projects', title: 'Projects', icon: null, galleryGroup: 'other' };
+const messages = { path: '/messages', title: 'Messages', icon: null, galleryGroup: 'other', badgeCount: 3 };
 
 let client: QueryClient;
 

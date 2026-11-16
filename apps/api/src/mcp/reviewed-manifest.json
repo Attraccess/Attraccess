@@ -1952,12 +1952,12 @@
   "dashboardGetPins": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "b183a7c6"
+    "shape": "a514cf61"
   },
   "dashboardUpdatePins": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "be0a0691"
+    "shape": "e078a73b"
   },
   "getMcpOAuthRequest": {
     "decision": "deny",

@@ -367,8 +367,11 @@
     "description": "Ihre nächsten Buchungen",
     "empty": "Keine anstehenden Reservierungen.",
     "unknownResource": "Unbekannte Ressource",
-    "mine": "Meine Reservierungen",
     "manage": "Verwalten",
-    "loadError": "Ihre Reservierungen konnten nicht geladen werden."
+    "loadError": "Ihre Reservierungen konnten nicht geladen werden.",
+    "next": "Als Nächstes",
+    "now": "Jetzt",
+    "group": "Reservierungen",
+    "keywords": ["Buchung", "Kalender"]
   }
 }

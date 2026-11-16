@@ -7,12 +7,20 @@ import { DataSource } from 'typeorm';
 import { closeResourceTransactionConnection } from '../database/run-serialized-transaction';
 import { PluginService } from '../plugin-system/plugin.service';
 import * as pluginsDisabled from '../plugin-system/plugins-disabled';
-import { DashboardPinsService, MAX_DASHBOARD_PINS, applyDashboardPinOperation } from './dashboard-pins.service';
-import { DashboardPinItemDto } from './dtos/dashboard-pin.dto';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import {
+  DashboardPinsService,
+  MAX_DASHBOARD_PINS,
+  StoredDashboardPin,
+  applyDashboardPinOperation,
+} from './dashboard-pins.service';
+import { UpdateDashboardPinsDto } from './dtos/dashboard-pin.dto';
 
-const page = (itemId: string): DashboardPinItemDto => ({ itemType: 'page', itemId });
-const resource = (itemId: string): DashboardPinItemDto => ({ itemType: 'resource', itemId });
-const widget = (itemId: string): DashboardPinItemDto => ({ itemType: 'widget', itemId });
+// Stored pins without a chosen size; as operation items the size is ignored.
+const page = (itemId: string): StoredDashboardPin => ({ itemType: 'page', itemId, size: null });
+const resource = (itemId: string): StoredDashboardPin => ({ itemType: 'resource', itemId, size: null });
+const widget = (itemId: string): StoredDashboardPin => ({ itemType: 'widget', itemId, size: null });
 
 describe('applyDashboardPinOperation', () => {
   const pins = [page('/a'), page('/b'), page('/c')];
@@ -39,6 +47,38 @@ describe('applyDashboardPinOperation', () => {
       page('/a'),
     ]);
     expect(applyDashboardPinOperation(pins, { kind: 'move', item: page('/x'), before: page('/a') })).toEqual(pins);
+  });
+
+  it('adds an item with a size and resizes a pinned one, ignoring an unknown one', () => {
+    expect(applyDashboardPinOperation(pins, { kind: 'add', item: page('/d'), size: 'small' })).toEqual([
+      ...pins,
+      { ...page('/d'), size: 'small' },
+    ]);
+    expect(applyDashboardPinOperation(pins, { kind: 'resize', item: page('/b'), size: 'large' })).toEqual([
+      page('/a'),
+      { ...page('/b'), size: 'large' },
+      page('/c'),
+    ]);
+    expect(applyDashboardPinOperation(pins, { kind: 'resize', item: page('/x'), size: 'large' })).toEqual(pins);
+  });
+});
+
+describe('UpdateDashboardPinsDto', () => {
+  const errorsOf = async (body: object) =>
+    (await validate(plainToInstance(UpdateDashboardPinsDto, body))).map((error) => error.property);
+  const item = { itemType: 'widget', itemId: 'messages' };
+
+  it('accepts the three sizes, and add without a size', async () => {
+    for (const size of ['small', 'medium', 'large']) {
+      expect(await errorsOf({ kind: 'resize', item, size })).toEqual([]);
+    }
+    expect(await errorsOf({ kind: 'add', item })).toEqual([]);
+  });
+
+  it('rejects an invalid size, and resize without one', async () => {
+    expect(await errorsOf({ kind: 'add', item, size: 'huge' })).toEqual(['size']);
+    expect(await errorsOf({ kind: 'resize', item, size: 'huge' })).toEqual(['size']);
+    expect(await errorsOf({ kind: 'resize', item })).toEqual(['size']);
   });
 });
 
@@ -158,6 +198,30 @@ describe('DashboardPinsService', () => {
     ).toEqual([widget('my-sessions'), page('/projects'), widget('messages')]);
     await service.updatePins(userId, { kind: 'remove', item: widget('messages') });
     expect(await ids()).toEqual(['my-sessions', '/projects']);
+  });
+
+  it('stores the size given on add or resize and returns it', async () => {
+    await service.updatePins(userId, { kind: 'add', item: widget('messages'), size: 'small' });
+    await service.updatePins(userId, { kind: 'add', item: widget('my-sessions') });
+    expect(await service.getPins(userId)).toEqual([{ ...widget('messages'), size: 'small' }, widget('my-sessions')]);
+
+    expect(await service.updatePins(userId, { kind: 'resize', item: widget('my-sessions'), size: 'large' })).toEqual([
+      { ...widget('messages'), size: 'small' },
+      { ...widget('my-sessions'), size: 'large' },
+    ]);
+    // Moving keeps the size.
+    await service.updatePins(userId, { kind: 'move', item: widget('my-sessions'), before: widget('messages') });
+    expect(await service.getPins(userId)).toEqual([
+      { ...widget('my-sessions'), size: 'large' },
+      { ...widget('messages'), size: 'small' },
+    ]);
+  });
+
+  it('ignores resizing an item that is not pinned', async () => {
+    await service.updatePins(userId, { kind: 'add', item: widget('messages') });
+    expect(await service.updatePins(userId, { kind: 'resize', item: widget('users'), size: 'large' })).toEqual([
+      widget('messages'),
+    ]);
   });
 
   it('rejects adding an unknown widget', async () => {

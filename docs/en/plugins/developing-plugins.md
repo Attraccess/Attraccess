@@ -1074,16 +1074,17 @@ Each path must also be returned by `getSidebarItems()` and `getRoutes()`, made
 of plain segments, and outside `/kiosk` and `/dashboard`. The API refuses pins
 for paths no active plugin lists. The host shows the star in the first
 `PageHeader` from `@attraccess/plugins-frontend-ui` on that page, so render one
-as your page title; you need no other code. The dashboard card uses your
-sidebar entry's label and icon, and its route permissions decide whether the
+as your page title; you need no other code. The page also appears as a small
+shortcut tile in your plugin's group of the "Add widget" gallery. The tile uses
+your sidebar entry's label and icon, and its route permissions decide whether the
 user may open it. When a user loses access, or your plugin is disabled or no
 longer lists the path, the card is shown as no longer accessible until the
 user removes it.
 
 ### Dashboard widgets
 
-Besides pinned pages, users can add **widgets** to their dashboard: cards with
-live content and quick actions. A plugin offers widgets in two steps.
+Besides pinned pages, users can add **widgets** to their dashboard: tiles with
+live content and quick actions, which they pick from the "Add widget" gallery. A plugin offers widgets in two steps.
 
 1. List the widget ids in `attraccess.dashboardWidgets` in `package.json` (or
    `main.frontend.dashboardWidgets` in `plugin.json`). Ids are lowercase
@@ -1107,9 +1108,14 @@ live content and quick actions. A plugin offers widgets in two steps.
          {
            id: 'my-plugin-summary',
            title: 'Summary', // translate it: the host asks again when the language changes
-           description: 'What happened today', // one line in the "Add to dashboard" list
+           description: 'What happened today', // one line in the "Add widget" gallery
            icon: <ChartIcon />,
-           render: () => <SummaryWidget />,
+           href: '/my-plugin/summary', // the header links here outside edit mode
+           sizes: ['small', 'medium'], // default ['medium']
+           defaultSize: 'medium', // default: the first entry of sizes
+           group: 'My plugin', // gallery group; default: your plugin's display name
+           keywords: ['report', 'statistics'], // extra search terms for the gallery
+           render: ({ size, isPreview }) => <SummaryWidget size={size} isPreview={isPreview} />,
          },
        ];
      }
@@ -1129,7 +1135,41 @@ controls and an error boundary. `render()` returns only the body. A body that
 throws shows an error inside its card; the rest of the dashboard keeps
 working. Set `hasFields: true` when the body holds form fields: the host then
 renders the widget on an outlined section instead of a card surface, where
-fields would disappear.
+fields would disappear. Outside edit mode the header links to `href`, so do not
+repeat an "Open …" link in the body.
+
+#### Sizes
+
+Tiles sit in a grid with a fixed row height, like widgets on a phone home
+screen. There are three sizes:
+
+| Size     | Grid cells         |
+| -------- | ------------------ |
+| `small`  | 1 column × 1 row   |
+| `medium` | 2 columns × 1 row  |
+| `large`  | 2 columns × 2 rows |
+
+List the sizes your widget supports in `sizes`; users pick one when they add
+it and can change it in edit mode. `render()` receives the tile's `size`. A
+tile never grows with its content, so show a fixed number of items per size
+(for example 1, 3 and 7) instead of measuring, and truncate long text. Content
+that still does not fit is clipped. A stored size your widget no longer
+supports renders at `defaultSize`.
+
+#### Previews
+
+The "Add widget" gallery shows a live preview of each widget at the selected
+size. The host calls `render()` with `isPreview: true` and places the result in
+an `inert` frame that is hidden from assistive technology: nothing in it can be
+focused or clicked. Load your data as usual, but do not open dialogs, navigate
+or start anything (for example a timer that writes, or a request that changes
+data) when `isPreview` is set.
+
+#### Older widgets
+
+All new fields are optional. A widget without `sizes` supports `medium` only,
+and a `render()` that takes no argument keeps working: it renders at its
+default size.
 
 A widget is offered only while your plugin is active, lists its id in the
 manifest and returns it from `getDashboardWidgets()`. The API refuses to add

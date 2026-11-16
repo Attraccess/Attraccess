@@ -35,7 +35,7 @@ export { Form, FormField, FormFieldType, FormSubmission, ResourceFormAction } fr
 export { Message, MessageReferenceType } from './entities/message.entity';
 export { MqttServer } from './entities/mqttServer.entity';
 export { NotificationPreference } from './entities/notification-preference.entity';
-export { DashboardPin, type DashboardPinItemType } from './entities/dashboard-pin.entity';
+export { DashboardPin, type DashboardPinItemType, type DashboardPinSize } from './entities/dashboard-pin.entity';
 export { Passkey, PasskeyChallenge } from './entities/passkey.entity';
 export { PasswordHistory } from './entities/password-history.entity';
 export {

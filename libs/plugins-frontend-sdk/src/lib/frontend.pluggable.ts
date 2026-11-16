@@ -38,19 +38,42 @@ export interface PluginSidebarGroup {
  * controls and an error boundary); `render()` returns only the card body. The `id` must be listed in the plugin
  * manifest's `dashboardWidgets`, and a built-in widget with the same id always wins.
  */
+/** Tile sizes, as on a phone home screen: small is 1×1 grid cells, medium 2×1, large 2×2. */
+export type DashboardWidgetSize = 'small' | 'medium' | 'large';
+
+export interface DashboardWidgetRenderProps {
+  /** The size of the tile the body fills. Show a fixed amount of content per size; the tile never grows. */
+  size: DashboardWidgetSize;
+  /**
+   * True in the "Add widget" gallery. The preview is inert: do not open dialogs, navigate or start anything from it.
+   */
+  isPreview: boolean;
+}
+
 export interface PluginDashboardWidget {
   /** Stable, lowercase kebab-case id, e.g. `reservations-upcoming`. It is stored in users' dashboards. */
   id: string;
   title: string;
-  /** One line shown in the "Add to dashboard" picker. */
+  /** One line shown in the "Add widget" gallery. */
   description: string;
   icon?: ReactNode;
+  /** The page the widget's header links to outside edit mode, e.g. `/reservations`. */
+  href?: string;
+  /** The sizes the widget supports. Defaults to `['medium']`. */
+  sizes?: DashboardWidgetSize[];
+  /** The size a new tile gets. Defaults to the first entry of `sizes`. */
+  defaultSize?: DashboardWidgetSize;
+  /** The gallery group the widget appears in. Defaults to the plugin's display name. */
+  group?: string;
+  /** Extra search terms for the gallery, besides title, description and group. */
+  keywords?: string[];
   /**
    * Set when the body holds form fields. Fields disappear on a card surface, so the host then renders the widget on
    * an outlined section instead.
    */
   hasFields?: boolean;
-  render(): ReactNode;
+  /** Renders the body. Widgets written before sizes existed take no argument and render at their default size. */
+  render(props?: DashboardWidgetRenderProps): ReactNode;
 }
 
 export const getPluginFunctionName = (pluginName: string, func: FRONTEND_FUNCTION) => {

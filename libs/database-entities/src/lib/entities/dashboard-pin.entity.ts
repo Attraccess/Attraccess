@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, Index } 
 import { User } from './user.entity';
 
 export type DashboardPinItemType = 'page' | 'resource' | 'widget';
+export type DashboardPinSize = 'small' | 'medium' | 'large';
 
 /** One entry on a user's personal dashboard: a page path, a resource id or a widget id, in the user's order. */
 @Entity()
@@ -23,6 +24,10 @@ export class DashboardPin {
 
   @Column({ type: 'integer' })
   position!: number;
+
+  /** The tile size the user chose. Null shows the item's default size. */
+  @Column({ type: 'text', nullable: true })
+  size!: DashboardPinSize | null;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })

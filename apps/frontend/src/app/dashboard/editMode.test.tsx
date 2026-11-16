@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import {
   DashboardPinDto,
   DashboardPinItemType,
+  DashboardPinSize,
   DashboardService,
   ResourcesService,
 } from '@attraccess/react-query-client';
@@ -39,18 +40,30 @@ vi.mock('../resources/usage/components/ResourceUsageSession', () => ({
 }));
 vi.mock('../resourceOverview/resourceGroupCard/statusChip', () => ({ StatusChip: () => null }));
 
-const page = (itemId: string): DashboardPinDto => ({ itemType: DashboardPinItemType.PAGE, itemId });
-const widget = (itemId: string): DashboardPinDto => ({ itemType: DashboardPinItemType.WIDGET, itemId });
+const page = (itemId: string): DashboardPinDto => ({ itemType: DashboardPinItemType.PAGE, itemId, size: null });
+const widget = (itemId: string, size: `${DashboardPinSize}` | null = null): DashboardPinDto => ({
+  itemType: DashboardPinItemType.WIDGET,
+  itemId,
+  size: size as DashboardPinSize | null,
+});
 const resource = (itemId: string, resourceName: string): DashboardPinDto => ({
   itemType: DashboardPinItemType.RESOURCE,
   itemId,
   resourceName,
+  size: null,
 });
+const layout = {
+  sizes: ['small', 'medium', 'large'] as const,
+  defaultSize: 'medium' as const,
+  group: { id: 'messages', title: 'Messages' },
+};
 const messagesWidget: DashboardWidget = {
   id: 'messages',
   title: 'Messages',
   description: 'Your latest conversations',
   icon: null,
+  ...layout,
+  href: '/messages',
   renderHeaderExtra: () => <span>2 unread</span>,
   renderBody: () => <p>Inbox body</p>,
 };
@@ -59,6 +72,9 @@ const usersWidget: DashboardWidget = {
   title: 'Users',
   description: 'Search users',
   icon: null,
+  ...layout,
+  sizes: ['medium', 'large'],
+  group: { id: 'users', title: 'Users' },
   hasFields: true,
   renderBody: () => <p>Users body</p>,
 };
@@ -83,8 +99,8 @@ beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   state.pinnable = {
     pages: [
-      { path: '/projects', title: 'Projects', icon: null },
-      { path: '/billing', title: 'Billing', icon: null },
+      { path: '/projects', title: 'Projects', icon: null, galleryGroup: 'other' },
+      { path: '/billing', title: 'Billing', icon: null, galleryGroup: 'other' },
     ],
     titleOf: () => undefined,
     isReady: true,
@@ -113,7 +129,7 @@ describe('dashboard edit mode', () => {
     expect(container.querySelector('[data-cy="dashboard-card-drag-handle"]')).toBeNull();
     expect(container.querySelector('[data-cy="dashboard-card-remove-control"]')).toBeNull();
     expect(container.querySelector('[aria-roledescription="sortable"]')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Add to dashboard' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add widget' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Remove /gone from dashboard' })).toBeInTheDocument();
     expect(await editToggle('Edit dashboard')).toHaveAttribute('aria-pressed', 'false');
   });
@@ -131,7 +147,7 @@ describe('dashboard edit mode', () => {
     for (const title of ['Projects', 'Lathe', 'Messages widget']) {
       expect(screen.getByRole('button', { name: `Remove ${title} from dashboard` })).toBeInTheDocument();
     }
-    expect(screen.getByRole('button', { name: 'Add to dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add widget' })).toBeInTheDocument();
     expect(container.querySelector('[data-cy="dashboard-edit-hint"]')).not.toBeNull();
 
     // The handle picks the card up from the keyboard.
@@ -142,7 +158,7 @@ describe('dashboard edit mode', () => {
     await userEvent.keyboard('{Escape}');
 
     await userEvent.click(screen.getByRole('button', { name: 'Remove Projects from dashboard' }));
-    expect(remove).toHaveBeenCalledWith({ requestBody: { kind: 'remove', item: page('/projects') } });
+    expect(remove).toHaveBeenCalledWith({ requestBody: { kind: 'remove', item: { itemType: 'page', itemId: '/projects' } } });
 
     await userEvent.click(done);
     expect(await editToggle('Edit dashboard')).toHaveFocus();
@@ -161,50 +177,13 @@ describe('dashboard edit mode', () => {
     expect(consoleError).not.toHaveBeenCalled();
   });
 
-  it('opens the picker from the empty state, already in edit mode', async () => {
+  it('opens the gallery from the empty state, already in edit mode', async () => {
     renderDashboard([]);
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Add to dashboard' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Add widget' }));
 
-    expect(await screen.findByRole('heading', { name: 'Add to dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Add widget' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute('aria-pressed', 'true');
-  });
-});
-
-describe('Add to dashboard picker', () => {
-  it('lists only what is not pinned yet and appends what the user adds', async () => {
-    const add = updatePins().mockResolvedValue([page('/projects'), widget('messages'), widget('users')] as never);
-    renderDashboard([page('/projects'), widget('messages')]);
-
-    await userEvent.click(await editToggle('Edit dashboard'));
-    await userEvent.click(screen.getByRole('button', { name: 'Add to dashboard' }));
-
-    const widgets = await screen.findByRole('region', { name: 'Widgets' });
-    const pages = screen.getByRole('region', { name: 'Pages' });
-    expect(within(widgets).queryByText('Messages')).toBeNull();
-    expect(within(widgets).getByText('Search users')).toBeInTheDocument();
-    expect(within(pages).queryByText('Projects')).toBeNull();
-    expect(within(pages).getByRole('button', { name: 'Add Billing to dashboard' })).toBeInTheDocument();
-
-    await userEvent.click(within(widgets).getByRole('button', { name: 'Add Users widget to dashboard' }));
-
-    expect(add).toHaveBeenCalledWith({ requestBody: { kind: 'add', item: widget('users') } });
-    expect(await within(widgets).findByText('Everything is already on your dashboard.')).toBeInTheDocument();
-    // The picker stays open for the next addition.
-    expect(within(pages).getByRole('button', { name: 'Add Billing to dashboard' })).toBeInTheDocument();
-  });
-
-  it('tells the user when an addition could not be saved', async () => {
-    updatePins().mockRejectedValue(new Error('offline') as never);
-    renderDashboard([page('/projects')]);
-
-    await userEvent.click(await editToggle('Edit dashboard'));
-    await userEvent.click(screen.getByRole('button', { name: 'Add to dashboard' }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Add Billing to dashboard' }));
-
-    await waitFor(() =>
-      expect(state.toastError).toHaveBeenCalledWith({ title: 'Your dashboard could not be saved. Please try again.' }),
-    );
   });
 });
 
@@ -291,6 +270,8 @@ describe('widget pins', () => {
           title: 'Report summary',
           description: 'From a plugin',
           icon: null,
+          ...layout,
+          group: { id: 'plugin:report', title: 'Report' },
           renderBody: () => <p>Plugin body</p>,
           plugin: { pluginName: 'report', manifestName: 'report' },
         },
@@ -305,7 +286,7 @@ describe('widget pins', () => {
   it('names widget controls apart from those of the page with the same title', async () => {
     state.pinnable = {
       ...state.pinnable,
-      pages: [...state.pinnable.pages, { path: '/messages', title: 'Messages', icon: null }],
+      pages: [...state.pinnable.pages, { path: '/messages', title: 'Messages', icon: null, galleryGroup: 'other' }],
     };
     renderDashboard([widget('messages'), page('/messages')]);
     await userEvent.click(await editToggle('Edit dashboard'));
@@ -317,7 +298,7 @@ describe('widget pins', () => {
   it('moves focus to the next card after removing one', async () => {
     state.pinnable = {
       ...state.pinnable,
-      pages: [...state.pinnable.pages, { path: '/messages', title: 'Messages', icon: null }],
+      pages: [...state.pinnable.pages, { path: '/messages', title: 'Messages', icon: null, galleryGroup: 'other' }],
     };
     const update = updatePins().mockResolvedValue([widget('messages')] as never);
     renderDashboard([page('/messages'), widget('messages')]);
@@ -329,5 +310,72 @@ describe('widget pins', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Remove Messages widget from dashboard' })).toHaveFocus(),
     );
+  });
+});
+
+const tileOf = (container: HTMLElement, title: string) =>
+  [...container.querySelectorAll<HTMLElement>('[data-cy="dashboard-card"]')].find((tile) =>
+    within(tile).queryByText(title),
+  ) as HTMLElement;
+
+describe('tile sizes', () => {
+  it('renders the stored size, and the default for a size the item does not offer', async () => {
+    const { container } = renderDashboard([widget('messages', 'large'), widget('users', 'small'), page('/projects')]);
+
+    await screen.findByText('Inbox body');
+    expect(tileOf(container, 'Messages')).toHaveAttribute('data-size', 'large');
+    expect(tileOf(container, 'Users')).toHaveAttribute('data-size', 'medium');
+    expect(tileOf(container, 'Projects')).toHaveAttribute('data-size', 'small');
+  });
+
+  it('offers the size control only in edit mode and only for items with several sizes', async () => {
+    const { container } = renderDashboard([widget('messages'), page('/projects')]);
+    await screen.findByText('Inbox body');
+    expect(screen.queryByRole('button', { name: 'Change size of Messages widget' })).toBeNull();
+
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    expect(screen.getByRole('button', { name: 'Change size of Messages widget' })).toBeInTheDocument();
+    expect(within(tileOf(container, 'Projects')).queryByRole('button', { name: /Change size/ })).toBeNull();
+  });
+
+  it('resizes at once and saves the new size', async () => {
+    const save = updatePins().mockResolvedValue([widget('messages', 'large')] as never);
+    const { container } = renderDashboard([widget('messages')]);
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Change size of Messages widget' }));
+    const options = await screen.findAllByRole('menuitemradio');
+    expect(options.map((option) => option.textContent)).toEqual(['Small', 'Medium', 'Large']);
+    await userEvent.click(screen.getByRole('menuitemradio', { name: 'Large' }));
+
+    expect(tileOf(container, 'Messages')).toHaveAttribute('data-size', 'large');
+    expect(save).toHaveBeenCalledWith({
+      requestBody: { kind: 'resize', item: { itemType: 'widget', itemId: 'messages' }, size: 'large' },
+    });
+  });
+
+  it('brings the stored size back and tells the user when the new size cannot be saved', async () => {
+    updatePins().mockRejectedValue(new Error('offline') as never);
+    const { container } = renderDashboard([widget('messages')]);
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Change size of Messages widget' }));
+    await userEvent.click(await screen.findByRole('menuitemradio', { name: 'Small' }));
+
+    await waitFor(() => expect(state.toastError).toHaveBeenCalledWith({ title: 'The new size could not be saved.' }));
+    await waitFor(() => expect(tileOf(container, 'Messages')).toHaveAttribute('data-size', 'medium'));
+  });
+});
+
+describe('header links', () => {
+  it('link a widget header to its page outside edit mode only', async () => {
+    renderDashboard([widget('messages')]);
+    await screen.findByText('Inbox body');
+    expect(screen.getByRole('link', { name: 'Messages' })).toHaveAttribute('href', '/messages');
+
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    expect(screen.queryByRole('link', { name: 'Messages' })).toBeNull();
   });
 });

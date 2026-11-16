@@ -3,60 +3,83 @@
   "crashed": "Dieses Widget funktioniert nicht mehr. Laden Sie die Seite neu, um es erneut zu versuchen.",
   "loading": "Wird geladen…",
   "search": "Suchen",
+  "more": "+{{count}} weitere",
+  "groups": {
+    "messages": "Nachrichten",
+    "resources": "Ressourcen",
+    "users": "Benutzer",
+    "billing": "Abrechnung",
+    "attractap": "Attractap",
+    "other": "Weitere Seiten"
+  },
   "messages": {
     "title": "Nachrichten",
     "description": "Ihre neuesten Unterhaltungen und ungelesenen Nachrichten",
+    "keywords": "Posteingang, Chat, ungelesen",
     "unread": "{{count}} ungelesen",
+    "unreadLabel": "ungelesen",
+    "latestFrom": "Zuletzt von {{name}}",
     "empty": "Noch keine Unterhaltungen.",
     "unknownUser": "Unbekannter Benutzer",
     "noMessages": "Noch keine Nachrichten",
-    "online": "Online",
-    "openInbox": "Posteingang öffnen"
+    "online": "Online"
   },
   "resources": {
-    "title": "Ressourcen",
-    "description": "Ressourcen suchen und zur Ressourcenverwaltung springen",
+    "title": "Ressource finden",
+    "description": "Ressourcen suchen und öffnen",
+    "keywords": "Suche, Maschinen, Geräte",
     "searchLabel": "Ressourcen suchen",
-    "all": "Alle Ressourcen",
-    "create": "Ressource erstellen",
-    "flows": "Flows",
-    "mqtt": "MQTT-Server",
-    "readers": "Lesegeräte",
-    "reports": "Nutzungsberichte"
+    "noMatch": "Keine passenden Ressourcen.",
+    "create": "Ressource erstellen"
+  },
+  "resources-in-use": {
+    "title": "Gerade in Benutzung",
+    "description": "Welche Ressourcen gerade belegt sind, und von wem",
+    "keywords": "belegt, laufend, Sitzungen",
+    "empty": "Gerade ist nichts in Benutzung.",
+    "countLabel": "in Benutzung"
   },
   "users": {
     "title": "Benutzer",
-    "description": "Benutzer suchen und Einladungen verwalten",
+    "description": "Benutzer suchen, jemanden einladen, unbestätigte E-Mail-Adressen sehen",
+    "keywords": "Personen, Mitglieder, Konten, einladen",
     "searchLabel": "Benutzer suchen",
-    "all": "Alle Benutzer",
+    "noMatch": "Keine passenden Benutzer.",
     "invite": "Benutzer einladen",
-    "unverified": "Unbestätigte E-Mail-Adressen",
-    "roles": "Rollen"
+    "unverified": "{{count}} unbestätigt"
   },
   "my-sessions": {
     "title": "Meine Sitzungen",
     "description": "Ihre laufenden Sitzungen, jeweils mit einer Schaltfläche zum Beenden",
-    "empty": "Keine laufende Sitzung.",
+    "keywords": "Timer, laufend, beenden",
+    "empty": "Keine laufenden Sitzungen",
     "browse": "Ressourcen durchsuchen",
     "stop": "Beenden",
-    "stopLabel": "Ihre Sitzung an {{name}} beenden",
+    "stopLabel": "{{name}} beenden",
     "confirmTitle": "Sitzung beenden?",
     "confirmDescription": "Ihre Sitzung an {{name}} endet jetzt.",
     "stopped": "Ihre Sitzung an {{name}} wurde beendet."
   },
   "billing-balance": {
     "title": "Guthaben",
-    "description": "Ihr Guthaben",
+    "description": "Ihr Guthaben und Ihre letzten Transaktionen",
+    "keywords": "Credits, Geld, Konto, Transaktionen",
     "balance": "{{balance}} {{currency}}",
-    "topUp": "Aufladen",
-    "transactions": "Transaktionen"
+    "noTransactions": "Noch keine Transaktionen.",
+    "transaction": {
+      "usage": "Nutzung von {{name}}",
+      "refund": "Erstattung",
+      "correction": "Korrektur",
+      "manual": "Manuelle Transaktion",
+      "topUp": "Aufladung",
+      "other": "Transaktion"
+    }
   },
   "readers": {
-    "title": "Lesegeräte",
-    "description": "Gekoppelte Lesegeräte und solche, die sich länger nicht verbunden haben",
-    "paired": "Gekoppelt",
-    "stale": "Seit 24 h nicht verbunden",
-    "allConnected": "Alle Lesegeräte waren in den letzten 24 Stunden verbunden.",
-    "all": "Alle Lesegeräte"
+    "title": "Leserstatus",
+    "description": "Lesegeräte, die sich seit 24 Stunden nicht verbunden haben",
+    "keywords": "Attractap, offline, NFC, Geräte",
+    "offlineLabel": "offline",
+    "allConnected": "Alle Lesegeräte verbunden"
   }
 }

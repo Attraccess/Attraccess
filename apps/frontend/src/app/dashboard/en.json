@@ -3,7 +3,7 @@
   "subtitle": "Your widgets, pinned pages and resources",
   "empty": {
     "title": "Nothing pinned yet",
-    "description": "Add widgets and pages with \"Add to dashboard\", or open a page or a resource and select the star in its header. Once something is on it, the dashboard also becomes your start page.",
+    "description": "Add widgets with \"Add widget\", or open a page or a resource and select the star in its header. Once something is on it, the dashboard also becomes your start page.",
     "browseResources": "Browse resources"
   },
   "loadError": {
@@ -26,7 +26,8 @@
     "removeLabel": "Remove {{title}} from dashboard",
     "resourceLoadError": "This resource could not be loaded.",
     "unavailableWidgetDescription": "You can no longer use this widget. Its permission or license may have been removed or its plugin is not available.",
-    "widgetLabel": "{{title}} widget"
+    "widgetLabel": "{{title}} widget",
+    "sizeLabel": "Change size of {{title}}"
   },
   "drag": {
     "instructions": "To pick up a card, press space or enter. Use the arrow keys to move it. Press space or enter again to drop it in its new place, or press escape to cancel.",
@@ -41,18 +42,35 @@
   "edit": {
     "start": "Edit dashboard",
     "done": "Done",
-    "add": "Add to dashboard",
-    "hint": "Drag a card by its handle to move it, or remove it with the button in its corner. Changes are saved right away."
+    "add": "Add widget",
+    "hint": "Drag a tile by its handle to move it, change its size with the size button, or remove it with the button in its corner. Changes are saved right away."
   },
-  "picker": {
-    "title": "Add to dashboard",
-    "widgets": "Widgets",
-    "pages": "Pages",
+  "resizeError": "The new size could not be saved.",
+  "sizes": {
+    "small": "Small",
+    "medium": "Medium",
+    "large": "Large"
+  },
+  "gallery": {
+    "title": "Add widget",
+    "searchLabel": "Search widgets",
+    "noMatch": "No widgets match \"{{term}}\"",
     "add": "Add",
-    "addLabel": "Add {{title}} to dashboard",
-    "allAdded": "Everything is already on your dashboard.",
+    "added": "Added",
+    "addWidgetLabel": "Add {{title}} widget",
+    "addShortcutLabel": "Add {{title}} shortcut",
+    "addResourceLabel": "Add the chosen resource",
+    "sizeLabel": "Size",
+    "loading": "Loading…",
     "close": "Close",
-    "addWidgetLabel": "Add {{title}} widget to dashboard",
-    "loading": "Loading…"
+    "shortcutDescription": "A shortcut to this page",
+    "resource": {
+      "title": "Resource",
+      "description": "Pin one resource with its status and session controls",
+      "choose": "Choose resource",
+      "sampleName": "Laser cutter",
+      "sampleStatus": "Available",
+      "sampleStart": "Start session"
+    }
   }
 }

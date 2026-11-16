@@ -37,6 +37,7 @@ export const BUILT_IN_DASHBOARD_WIDGET_IDS: readonly string[] = [
   'my-sessions',
   'billing-balance',
   'readers',
+  'resources-in-use',
 ];
 
 type FrontendManifestList = 'dashboardPaths' | 'dashboardWidgets';

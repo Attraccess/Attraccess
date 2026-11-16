@@ -136,7 +136,12 @@ export default class ReservationsPlugin implements AttraccessFrontendPlugin {
         title: text.title,
         description: text.description,
         icon: <CalendarDaysIcon className="rv:w-5 rv:h-5" />,
-        render: () => <UpcomingReservationsWidget />,
+        href: '/reservations',
+        group: text.group,
+        keywords: text.keywords,
+        sizes: ['small', 'medium', 'large'],
+        defaultSize: 'medium',
+        render: (props) => <UpcomingReservationsWidget {...props} />,
       },
     ];
   }
