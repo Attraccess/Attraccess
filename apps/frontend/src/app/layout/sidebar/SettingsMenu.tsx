@@ -1,4 +1,4 @@
-import { Settings, LogOut, User, Languages, Check, Moon, Sun, Monitor } from 'lucide-react';
+import { Settings, LogOut, User, Languages, Check, Moon, Sun, Monitor, Download } from 'lucide-react';
 import {
   Dropdown,
   DropdownTrigger,
@@ -10,6 +10,7 @@ import {
 } from '@heroui/react';
 import { buttonVariants } from '@heroui/styles';
 import { useSidebarState } from './HelpfulLinks';
+import { useInstallApp } from '../../../pwa-install';
 type Props = Pick<
   ReturnType<typeof useSidebarState>,
   | 'isCollapsed'
@@ -51,6 +52,8 @@ export function SettingsMenu({
   logoutPendingLabel,
   logoutProviderNotice,
 }: Props) {
+  const installApp = useInstallApp();
+
   return (
     <div className={isCollapsed ? 'p-2' : 'p-4'}>
       {user && (
@@ -118,6 +121,17 @@ export function SettingsMenu({
                   )}
                   {t('design', { variant: t(`designVariants.${theme}`) })}
                 </DropdownItem>
+                {installApp.mode && (
+                  <DropdownItem
+                    key="install-app"
+                    id="install-app"
+                    onPress={installApp.install}
+                    data-cy="sidebar-install-app"
+                  >
+                    <Download className="h-4 w-4" />
+                    {t('installApp')}
+                  </DropdownItem>
+                )}
                 <DropdownItem
                   key="logout"
                   id="logout"

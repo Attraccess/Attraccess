@@ -16,7 +16,7 @@ export function UnauthorizedLayout({ children }: UnauthorizedLayoutProps) {
   });
 
   return (
-    <div className="h-[var(--vvh,100dvh)] overflow-y-auto bg-background border-t-4 border-accent">
+    <div className="h-[var(--vvh,100dvh)] overflow-y-auto bg-background border-t-4 border-accent max-lg:[:root:has([data-install-banner])_&]:pb-[calc(10rem+env(safe-area-inset-bottom))]">
       <div className="flex min-h-full">
         <div className="dark relative isolate hidden lg:flex lg:w-1/2 flex-col justify-between bg-background text-foreground border-r border-separator p-12 xl:p-16">
           <img

@@ -33,6 +33,17 @@
         root.style.colorScheme = theme;
       })();
     </script>
+    <script id="pwa-install-init">
+      // Chrome can fire beforeinstallprompt while main.tsx still waits for its shared modules, and the event is not
+      // fired again on that page. Catch it here; registerInstallPrompt() (src/pwa-install) takes it over.
+      addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        window.__attraccessInstallPrompt = event;
+      });
+      addEventListener('appinstalled', () => {
+        window.__attraccessInstallPrompt = null;
+      });
+    </script>
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="stylesheet" href="/src/styles.css" />

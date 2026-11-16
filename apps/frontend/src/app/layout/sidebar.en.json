@@ -14,6 +14,7 @@
     "dark": "Dark",
     "system": "System"
   },
+  "installApp": "Install app",
   "userMenu": "User menu",
   "groups": {
     "##default##": {
