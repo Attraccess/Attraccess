@@ -1,14 +1,9 @@
 import { billingTransactionAuditEvent } from '../../audit/policies/billing';
-import { BillingTransaction, Setting } from '@attraccess/database-entities';
-import { BillingTransactionStatus } from '@attraccess/application-models';
+import { BillingTransactionRecord, BillingTransactionStatus } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger, Inject } from '@nestjs/common';
 
-import { InjectRepository } from '@nestjs/typeorm';
-
 import { SumUp } from '@sumup/sdk';
-
-import { Repository, DeepPartial } from 'typeorm';
 
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
@@ -31,18 +26,22 @@ import { LiveNotificationsService } from '../live-notifications/live-notificatio
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { SumupTransactionCallbackDto, SumupTransactionEventType } from '../dto/sumup/sumup-transaction-callback.dto';
+import { BILLING_LEDGER_STORE, BillingLedgerStore } from '../ports/billing-ledger.port';
+import { SUMUP_CREDENTIAL_STORE, SumUpCredentialStore } from '../ports/sumup-credentials.port';
+
+type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
 export const SUMUP_TOPUP_TRANSACTION_PREFIX = 'sumup_topup_transaction';
 
 @Injectable()
 export class SumUpService {
   constructor(
-    @InjectRepository(Setting)
-    protected readonly settingRepository: Repository<Setting>,
+    @Inject(SUMUP_CREDENTIAL_STORE)
+    protected readonly credentialStore: SumUpCredentialStore,
     protected readonly encryptionService: EncryptionService,
     protected readonly settingsService: SettingsService,
-    @InjectRepository(BillingTransaction)
-    protected readonly billingTransactionRepository: Repository<BillingTransaction>,
+    @Inject(BILLING_LEDGER_STORE)
+    protected readonly ledgerStore: BillingLedgerStore,
     protected readonly liveNotificationsService: LiveNotificationsService,
     protected readonly billingService: BillingService,
     protected readonly cronTimer: CronTimer,
@@ -72,30 +71,18 @@ export class SumUpService {
 
     const encryptedApiKey = this.encryptionService.encrypt(token);
 
-    const existingApiKey = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
-    if (existingApiKey) {
-      await this.settingRepository.update(existingApiKey.id, { value: encryptedApiKey });
-    } else {
-      await this.settingRepository.insert({ parent: 'sumup', key: 'apiKey', value: encryptedApiKey });
-    }
-
-    const existingMerchantCode = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'merchantCode' });
-    if (existingMerchantCode) {
-      await this.settingRepository.update(existingMerchantCode.id, { value: merchantCode });
-    } else {
-      await this.settingRepository.insert({ parent: 'sumup', key: 'merchantCode', value: merchantCode });
-    }
+    await this.credentialStore.saveCredentials({ encryptedApiKey, merchantCode });
   }
 
   async getIsEnabled(): Promise<boolean> {
-    const apiKey = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
+    const apiKey = await this.credentialStore.getEncryptedApiKey();
 
-    if (!apiKey) {
+    if (apiKey === null) {
       return false;
     }
 
     try {
-      this.encryptionService.decrypt(apiKey.value);
+      this.encryptionService.decrypt(apiKey);
       return true;
     } catch {
       return false;
@@ -103,8 +90,7 @@ export class SumUpService {
   }
 
   protected async getSumUp(): Promise<SumUp> {
-    const apiKeySetting = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'apiKey' });
-    const apiKeyEncrypted = apiKeySetting?.value;
+    const apiKeyEncrypted = await this.credentialStore.getEncryptedApiKey();
     if (!apiKeyEncrypted) {
       throw new BadRequestException('SumUp API key not found');
     }
@@ -114,11 +100,11 @@ export class SumUpService {
   }
 
   protected async getMerchantCode(): Promise<string> {
-    const setting = await this.settingRepository.findOneBy({ parent: 'sumup', key: 'merchantCode' });
-    if (!setting?.value) {
+    const merchantCode = await this.credentialStore.getMerchantCode();
+    if (!merchantCode) {
       throw new BadRequestException('SumUp merchant code not found');
     }
-    return setting.value;
+    return merchantCode;
   }
 
   async getMerchant(): Promise<SumUpMerchantDto> {
@@ -167,9 +153,9 @@ export class SumUpService {
   }
 
   protected async updateTransactionStatusBySumupServer(sumupTransactionId: string): Promise<void> {
-    const transaction = await this.billingTransactionRepository.findOneBy({
-      externalReference: `sumup_topup_transaction:${sumupTransactionId}`,
-    });
+    const transaction = await this.ledgerStore.findTransactionByExternalReference(
+      `sumup_topup_transaction:${sumupTransactionId}`,
+    );
 
     if (!transaction) {
       this.logger.error(`updateTransactionStatusBySumupServer: Sumup transaction not found, ${sumupTransactionId}`);
@@ -185,19 +171,20 @@ export class SumUpService {
     );
 
     const previousStatus = transaction.status;
+    let nextStatus: BillingTransactionStatus;
     switch (sumUpTransactionData.status) {
       case 'CANCELLED':
       case 'FAILED':
       case 'REFUNDED':
-        transaction.status = BillingTransactionStatus.Failed;
+        nextStatus = BillingTransactionStatus.Failed;
         break;
 
       case 'PENDING':
-        transaction.status = BillingTransactionStatus.Pending;
+        nextStatus = BillingTransactionStatus.Pending;
         break;
 
       case 'SUCCESSFUL':
-        transaction.status = BillingTransactionStatus.Completed;
+        nextStatus = BillingTransactionStatus.Completed;
         break;
 
       default: {
@@ -206,12 +193,12 @@ export class SumUpService {
       }
     }
 
-    if (transaction.status === previousStatus) return;
+    if (nextStatus === previousStatus) return;
 
     this.logger.debug(
-      `updateTransactionStatusBySumupServer: Updating transaction status of ${sumupTransactionId} to ${transaction.status}`,
+      `updateTransactionStatusBySumupServer: Updating transaction status of ${sumupTransactionId} to ${nextStatus}`,
     );
-    const updatedTransaction = await this.billingTransactionRepository.save(transaction);
+    const updatedTransaction = await this.ledgerStore.updateTransactionStatus(transaction.id, nextStatus);
     this.hasPendingTransactions = true;
     this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
     void this.auditService.record(
@@ -226,7 +213,7 @@ export class SumUpService {
     );
 
     this.logger.debug(
-      `updateTransactionStatusBySumupServer: Transaction status updated of ${sumupTransactionId} to ${transaction.status}`,
+      `updateTransactionStatusBySumupServer: Transaction status updated of ${sumupTransactionId} to ${nextStatus}`,
     );
   }
 
@@ -239,9 +226,7 @@ export class SumUpService {
 
       this.logger.debug('processPendingTransactions: starting');
 
-      const transactions = await this.billingTransactionRepository.findBy({
-        status: BillingTransactionStatus.Pending,
-      });
+      const transactions = await this.ledgerStore.listPendingTransactions();
 
       this.logger.debug(`processPendingTransactions: found ${transactions.length} pending transactions`);
 
@@ -255,8 +240,10 @@ export class SumUpService {
         const transactionId = transaction.externalReference.split(':')[1];
         if (!transactionId) {
           this.logger.error(`Stored sumup transaction ID is invalid, ${transaction.externalReference}`);
-          transaction.status = BillingTransactionStatus.Failed;
-          const updatedTransaction = await this.billingTransactionRepository.save(transaction);
+          const updatedTransaction = await this.ledgerStore.updateTransactionStatus(
+            transaction.id,
+            BillingTransactionStatus.Failed,
+          );
           this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
           void this.auditService.record(
             billingTransactionAuditEvent({
@@ -278,7 +265,7 @@ export class SumUpService {
     });
   }
 
-  async topUpWithReader(userId: number, readerId: string, amount: number): Promise<BillingTransaction> {
+  async topUpWithReader(userId: number, readerId: string, amount: number): Promise<BillingTransactionRecord> {
     if (amount % 1 !== 0) {
       throw new BadRequestException('Amount must be an integer (multiply by currency minor unit)');
     }
@@ -308,7 +295,7 @@ export class SumUpService {
         }),
       );
 
-      const transaction = await this.billingTransactionRepository.save({
+      const transaction = await this.ledgerStore.insertTransaction({
         userId,
         amount: amount,
         externalReference: `${SUMUP_TOPUP_TRANSACTION_PREFIX}:${checkout.data.client_transaction_id}`,
