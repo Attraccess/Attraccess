@@ -5,7 +5,7 @@ import { SessionStrategy } from './session.strategy';
 import { SessionService } from '../auth/session.service';
 import { TwoFactorService } from '../auth/two-factor.service';
 import { TwoFactorPolicy } from '../auth/two-factor.dto';
-import { User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser } from '@attraccess/application-models';
 import { RbacService } from '../rbac/rbac.service';
 import { ApiTokenService } from '../auth/api-token/api-token.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
@@ -20,11 +20,11 @@ describe('SessionStrategy', () => {
   let rbacService: jest.Mocked<RbacService>;
   let ssoPermissionSync: { syncIfDue: jest.Mock };
 
-  const mockUser: User = {
+  const mockUser: AuthenticatedSessionUser = {
     id: 1,
     username: 'testuser',
     email: 'test@example.com',
-  } as User;
+  } as AuthenticatedSessionUser;
 
   const buildModule = async () => {
     const mockSessionService = {
@@ -259,10 +259,7 @@ describe('SessionStrategy', () => {
 
     it.each([
       ['a connection-guard timeout', Object.assign(new Error('SQLITE_BUSY: waited 5000 ms'), { code: 'SQLITE_BUSY' })],
-      [
-        'a driver busy error',
-        Object.assign(new Error('database is locked'), { driverError: { code: 'SQLITE_BUSY' } }),
-      ],
+      ['a driver busy error', Object.assign(new Error('database is locked'), { driverError: { code: 'SQLITE_BUSY' } })],
     ])('answers 503, not 401, when %s hits the database during authentication', async (_name, busy) => {
       const mockRequest = {
         headers: { authorization: 'Bearer valid-token' },

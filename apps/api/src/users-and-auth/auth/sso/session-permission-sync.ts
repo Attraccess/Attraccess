@@ -1,4 +1,4 @@
-import type { SSOProvider } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
 import type { SsoSessionContext } from '@attraccess/application-models';
 import { LogoutSession } from '../session-store/session-store';
 
@@ -43,7 +43,9 @@ export class SessionRejectedError extends Error {}
 export interface SessionPermissionResyncer {
   readonly protocol: SsoSessionContext['protocol'];
   /** The provider and its own interval override, or null when it is gone or has no usable configuration. */
-  loadProvider(providerId: number): Promise<{ provider: SSOProvider; permissionSyncTtlMinutes?: number | null } | null>;
+  loadProvider(
+    providerId: number,
+  ): Promise<{ provider: SsoProviderRecord; permissionSyncTtlMinutes?: number | null } | null>;
   /** Whether the session holds what this protocol needs to re-sync (OIDC: a refresh token). */
   canResync(context: SsoSessionContext): boolean;
   /**
@@ -53,7 +55,7 @@ export interface SessionPermissionResyncer {
   resync(args: {
     context: SsoSessionContext;
     userId: number;
-    provider: SSOProvider;
+    provider: SsoProviderRecord;
     patchContext: (patch: Partial<SsoSessionContext>) => Promise<void>;
   }): Promise<RoleDelta>;
 }

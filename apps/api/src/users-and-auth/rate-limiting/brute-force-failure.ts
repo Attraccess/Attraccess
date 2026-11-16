@@ -9,7 +9,7 @@ interface BruteForceProtectionServiceBruteForceFailureContext {
   ipCounters: BruteForceProtectionService['ipCounters'];
   ipCoarseCounters: BruteForceProtectionService['ipCoarseCounters'];
   accountCounters: BruteForceProtectionService['accountCounters'];
-  userRepository: BruteForceProtectionService['userRepository'];
+  lockoutStore: BruteForceProtectionService['lockoutStore'];
 }
 type FailureContext = BruteForceProtectionServiceBruteForceFailureContext;
 type Policy = Awaited<ReturnType<FailureContext['settingsService']['getRateLimitPolicy']>>;
@@ -77,22 +77,12 @@ export async function recordFailure(
     accountEntry.lockoutCount += 1;
     accountEntry.count = 0;
     accountEntry.firstAt = now;
-    await context.userRepository.update(
-      { id: userId },
-      {
-        lockedUntil,
-        failedLoginAttempts: 0,
-        firstFailedLoginAt: null,
-      },
-    );
+    await context.lockoutStore.lockAccount(userId, lockedUntil);
     return;
   }
 
-  await context.userRepository.update(
-    { id: userId },
-    {
-      failedLoginAttempts: accountEntry.count,
-      firstFailedLoginAt: new Date(accountEntry.firstAt),
-    },
-  );
+  await context.lockoutStore.recordFailureStreak(userId, {
+    failedAttempts: accountEntry.count,
+    firstFailedAt: new Date(accountEntry.firstAt),
+  });
 }

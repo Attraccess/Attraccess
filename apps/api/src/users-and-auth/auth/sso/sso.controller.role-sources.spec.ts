@@ -1,5 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
-import { SSOProvider } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
 import { SSOProviderType } from '@attraccess/application-models';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { CreateSSOProviderDto } from './dto/create-sso-provider.dto';
@@ -55,7 +55,7 @@ describe('SsoController role source permissions', () => {
         ...fixture.mockSSOProvider.oidcConfiguration,
         roleClaimPaths: ['custom.roles'],
       },
-    } as SSOProvider);
+    } as SsoProviderRecord);
 
     // re-sent unchanged
     await expect(
@@ -87,7 +87,7 @@ describe('SsoController role source permissions', () => {
         ...fixture.mockSSOProvider.oidcConfiguration,
         roleClaimPaths: ['groups', 'realm_access.roles'],
       },
-    } as SSOProvider);
+    } as SsoProviderRecord);
 
     await expect(
       fixture.controller.updateOne(

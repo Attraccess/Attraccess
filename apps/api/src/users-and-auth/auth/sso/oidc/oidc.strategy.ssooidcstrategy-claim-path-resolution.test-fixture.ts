@@ -1,5 +1,5 @@
 import { AuditRecorder } from '../../../../audit/recorder/audit-event';
-import { SSOProvider, SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import type { SsoOidcConfigurationRecord, SsoProviderRecord } from '@attraccess/application-models';
 import { ModuleRef } from '@nestjs/core';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { RbacService } from '../../../rbac/rbac.service';
@@ -28,7 +28,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
   const mockStateStore = { store: jest.fn(), verify: jest.fn() } as unknown as OidcCookieStateStore;
 
   function createStrategy(
-    config: Partial<SSOProviderOIDCConfiguration>,
+    config: Partial<SsoOidcConfigurationRecord>,
     usersServiceMock: Partial<UsersService>,
     authServiceMock: Partial<AuthService>,
     rbacServiceMock?: Partial<RbacService>,
@@ -54,7 +54,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
       }),
     } as unknown as ModuleRef;
 
-    const baseConfig: SSOProviderOIDCConfiguration = {
+    const baseConfig: SsoOidcConfigurationRecord = {
       id: 1,
       ssoProviderId: 1,
       issuer: 'https://issuer',
@@ -68,7 +68,7 @@ export function registerSsooidcstrategyClaimPathResolutionFixture() {
       scopes: null,
       usernameClaimPaths: null,
       emailClaimPaths: null,
-      ssoProvider: {} as SSOProvider,
+      ssoProvider: {} as SsoProviderRecord,
     };
 
     return new SSOOIDCStrategy(moduleRef, { ...baseConfig, ...config }, callbackURL, mockStateStore);

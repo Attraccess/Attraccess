@@ -1,5 +1,5 @@
 import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
-import { SSOProvider } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
 import { SSOProviderType } from '@attraccess/application-models';
 import { ModuleRef } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -51,7 +51,7 @@ export function registerSsoControllerFixture() {
 
   const ssoAudit = identityAudit;
 
-  const mockSSOProvider: SSOProvider = {
+  const mockSSOProvider: SsoProviderRecord = {
     id: 1,
     name: 'Test Provider',
     type: SSOProviderType.OIDC,
@@ -73,9 +73,9 @@ export function registerSsoControllerFixture() {
       updatedAt: new Date(),
       ssoProvider: null,
     },
-  } as unknown as SSOProvider;
+  } as unknown as SsoProviderRecord;
 
-  const mockSamlProvider: SSOProvider = {
+  const mockSamlProvider: SsoProviderRecord = {
     id: 2,
     name: 'Test SAML Provider',
     type: SSOProviderType.SAML,
@@ -99,7 +99,7 @@ export function registerSsoControllerFixture() {
       updatedAt: new Date(),
       ssoProvider: null,
     },
-  } as unknown as SSOProvider;
+  } as unknown as SsoProviderRecord;
 
   beforeEach(async () => {
     module = await Test.createTestingModule({

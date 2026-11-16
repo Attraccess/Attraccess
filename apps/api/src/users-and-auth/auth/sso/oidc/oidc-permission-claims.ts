@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import { SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import type { SsoOidcConfigurationRecord } from '@attraccess/application-models';
 import { SSOProviderType } from '@attraccess/application-models';
 import { toPath } from 'lodash-es';
 import { DEFAULT_OIDC_ROLE_CLAIM_PATHS } from '@attraccess/shared';
@@ -94,7 +94,7 @@ export function resolveOidcRoleNames(claimValues: unknown[]): string[] {
 export async function syncOidcRolesFromClaims(
   rbacService: Pick<RbacService, 'syncSsoRoles'>,
   userId: number,
-  config: Pick<SSOProviderOIDCConfiguration, 'ssoProviderId' | 'clientId' | 'roleMappings' | 'roleClaimPaths'>,
+  config: Pick<SsoOidcConfigurationRecord, 'ssoProviderId' | 'clientId' | 'roleMappings' | 'roleClaimPaths'>,
   claimSources: unknown[],
 ): Promise<RoleDelta | undefined> {
   const claimValues = getOidcPermissionClaimValues(claimSources, config.clientId, config.roleClaimPaths);

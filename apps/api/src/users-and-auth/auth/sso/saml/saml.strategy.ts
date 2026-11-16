@@ -1,5 +1,5 @@
 import { SsoSessionRequest } from '../sso-session-request';
-import { User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser, SsoSamlConfigurationRecord } from '@attraccess/application-models';
 import { SSOProviderType } from '@attraccess/application-models';
 import { DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS } from '@attraccess/shared';
 
@@ -83,7 +83,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     throw error;
   }
 
-  async validate(req: SSOSamlRequest, profile: SamlProfile): Promise<User> {
+  async validate(req: SSOSamlRequest, profile: SamlProfile): Promise<AuthenticatedSessionUser> {
     const requestOptions = req?.ssoSamlOptions;
     if (!requestOptions?.samlConfiguration)
       this.rejectLogin('SAML configuration missing on request', new BadRequestException('Missing SAML configuration'));
@@ -136,7 +136,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
 
   protected getPermissionClaimValues(
     profile: SamlProfile,
-    config: Pick<SSOProviderSAMLConfiguration, 'roleAttributeKeys'>,
+    config: Pick<SsoSamlConfigurationRecord, 'roleAttributeKeys'>,
   ): unknown[] {
     const values: unknown[] = [];
     const profileRecord = profile as Record<string, unknown>;
@@ -180,10 +180,10 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
   }
 
   protected async syncPermissionsFromClaims(
-    user: User,
+    user: AuthenticatedSessionUser,
     profile: SamlProfile,
-    config: SSOProviderSAMLConfiguration,
-  ): Promise<User> {
+    config: SsoSamlConfigurationRecord,
+  ): Promise<AuthenticatedSessionUser> {
     const claimValues = this.getPermissionClaimValues(profile, config);
     const roleNames = this.resolveRoleNamesFromClaims(claimValues);
     const roleAssignments = resolveSsoRoleAssignments(roleNames, config.roleMappings);
@@ -293,7 +293,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     };
   }
 
-  protected resolveEmail(profile: SamlProfile, config: SSOProviderSAMLConfiguration): string | undefined {
+  protected resolveEmail(profile: SamlProfile, config: SsoSamlConfigurationRecord): string | undefined {
     const baseCandidates = [
       'email',
       'mail',

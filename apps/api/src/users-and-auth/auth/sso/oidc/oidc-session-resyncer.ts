@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { SSOProvider, SSOProviderOIDCConfiguration } from '@attraccess/database-entities';
+import type { SsoOidcConfigurationRecord, SsoProviderRecord } from '@attraccess/application-models';
 import { SSOProviderType, SsoSessionContext } from '@attraccess/application-models';
 import axios from 'axios';
 import { EncryptionService } from '../../../../encryption/encryption.service';
@@ -53,11 +53,11 @@ export class OidcSessionResyncer implements SessionPermissionResyncer {
   }: {
     context: SsoSessionContext;
     userId: number;
-    provider: SSOProvider;
+    provider: SsoProviderRecord;
     patchContext: (patch: Partial<OidcSessionContext>) => Promise<void>;
   }): Promise<RoleDelta> {
     const claimed = context as OidcSessionContext;
-    const config = provider.oidcConfiguration as SSOProviderOIDCConfiguration;
+    const config = provider.oidcConfiguration as SsoOidcConfigurationRecord;
     const refreshToken = this.encryptionService.decryptIfEncrypted(claimed.refreshTokenEncrypted) ?? '';
     const tokens = await this.refresh(config, refreshToken);
     // Persist a rotated refresh token before any further IdP call: the old one may already be invalid,
@@ -80,7 +80,7 @@ export class OidcSessionResyncer implements SessionPermissionResyncer {
   }
 
   private async refresh(
-    config: SSOProviderOIDCConfiguration,
+    config: SsoOidcConfigurationRecord,
     refreshToken: string,
   ): Promise<{ accessToken: string; refreshToken?: string; idToken?: string }> {
     // Same client authentication as the login code exchange (client_secret_post).
@@ -112,7 +112,7 @@ export class OidcSessionResyncer implements SessionPermissionResyncer {
   }
 
   private async userInfo(
-    config: SSOProviderOIDCConfiguration,
+    config: SsoOidcConfigurationRecord,
     subject: string,
     accessToken: string,
   ): Promise<Record<string, unknown>> {

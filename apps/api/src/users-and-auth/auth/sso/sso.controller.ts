@@ -33,18 +33,12 @@ import { CookieConfigService } from '../../../common/services/cookie-config.serv
 import { LicenseModuleType } from '../../../license/license.service';
 
 import { RequiresLicense, SkipLicenseCheck } from '../../../license/require-license.decorator';
-
 import { MetricsService } from '../../../metrics/metrics.service';
-
 import { SettingsService } from '../../../settings/settings.service';
-
-import { SSOProvider } from '@attraccess/database-entities';
+import { SsoProviderResponseDto, toSsoProviderResponse } from './dto/sso-provider-response.dto';
 import { SSOProviderType } from '@attraccess/application-models';
-
 import { Auth, AuthenticatedRequest, AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
-
 import { Request, Response } from 'express';
-
 import { SSOProvisioningPermissionsDto, SSOProvisioningUserDto } from './dto/sso-provisioning.dto';
 
 import { LinkUserToExternalAccountRequestDto } from './dto/link-user-to-external-account-request.dto';
@@ -115,11 +109,11 @@ export class SSOController {
   @ApiResponse({
     status: 200,
     description: 'The list of SSO providers',
-    type: SSOProvider,
+    type: SsoProviderResponseDto,
     isArray: true,
   })
-  async getAll(): Promise<SSOProvider[]> {
-    return this.providers.getAll();
+  async getAll(): Promise<SsoProviderResponseDto[]> {
+    return (await this.providers.getAll()).map(toSsoProviderResponse);
   }
 
   @Post('/link-account')
@@ -175,7 +169,7 @@ export class SSOController {
   @ApiResponse({
     status: 200,
     description: 'The SSO provider with full configuration',
-    type: SSOProvider,
+    type: SsoProviderResponseDto,
   })
   @ApiResponse({
     status: 403,
@@ -185,8 +179,8 @@ export class SSOController {
     status: 404,
     description: 'Provider not found',
   })
-  async getOneById(@Param('id') id: string): Promise<SSOProvider> {
-    return this.providers.getOneWithConfiguration(parseInt(id, 10));
+  async getOneById(@Param('id') id: string): Promise<SsoProviderResponseDto> {
+    return toSsoProviderResponse(await this.providers.getOneWithConfiguration(parseInt(id, 10)));
   }
 
   @Post('providers')
@@ -196,14 +190,17 @@ export class SSOController {
   @ApiResponse({
     status: 201,
     description: 'The SSO provider has been created',
-    type: SSOProvider,
+    type: SsoProviderResponseDto,
   })
   @ApiResponse({
     status: 403,
     description: 'Forbidden - Insufficient permissions',
   })
-  async createOne(@Body() createDto: CreateSSOProviderDto, @Req() request: AuthenticatedRequest): Promise<SSOProvider> {
-    return this.providers.create(createDto, request.user as AuthenticatedUser);
+  async createOne(
+    @Body() createDto: CreateSSOProviderDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<SsoProviderResponseDto> {
+    return toSsoProviderResponse(await this.providers.create(createDto, request.user as AuthenticatedUser));
   }
 
   @Put('providers/:id')
@@ -218,7 +215,7 @@ export class SSOController {
   @ApiResponse({
     status: 200,
     description: 'The SSO provider has been updated',
-    type: SSOProvider,
+    type: SsoProviderResponseDto,
   })
   @ApiResponse({
     status: 403,
@@ -232,8 +229,10 @@ export class SSOController {
     @Param('id') id: string,
     @Body() updateDto: UpdateSSOProviderDto,
     @Req() request: AuthenticatedRequest,
-  ): Promise<SSOProvider> {
-    return this.providers.update(parseInt(id, 10), updateDto, request.user as AuthenticatedUser);
+  ): Promise<SsoProviderResponseDto> {
+    return toSsoProviderResponse(
+      await this.providers.update(parseInt(id, 10), updateDto, request.user as AuthenticatedUser),
+    );
   }
 
   @Delete('providers/:id')

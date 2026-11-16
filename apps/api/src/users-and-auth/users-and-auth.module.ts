@@ -8,7 +8,7 @@ import { Module } from '@nestjs/common';
 
 import { PassportModule } from '@nestjs/passport';
 
-import { TypeOrmModule, getRepositoryToken } from '@nestjs/typeorm';
+import { TypeOrmModule } from '@nestjs/typeorm';
 
 // Services and Controllers
 import { AuthController } from './auth/auth.controller';
@@ -58,14 +58,8 @@ import {
   ApiToken,
   ApiTokenPermission,
   AuthenticationDetail,
-  Passkey,
-  PasskeyChallenge,
   Permission,
   ResourceUsage,
-  SSOProvider,
-  SSOProviderOIDCConfiguration,
-  SSOProviderSAMLConfiguration,
-  Session,
   Setting,
   User,
 } from '@attraccess/database-entities';
@@ -97,6 +91,8 @@ import { ApiTokenService } from './auth/api-token/api-token.service';
 import { PasskeyController } from './auth/passkey/passkey.controller';
 
 import { PasskeyService } from './auth/passkey/passkey.service';
+
+import type { SsoOidcConfigurationRecord } from '@attraccess/application-models';
 
 import { SSOLinkTokenService } from './auth/sso/link-token.service';
 
@@ -135,15 +131,20 @@ import { LoginRateLimitGuard } from './rate-limiting/login.rate-limit.guard';
 
 import type { Redis } from 'ioredis';
 
-import { Repository } from 'typeorm';
-
 import { TokenHashService } from '../encryption/token-hash.service';
 
 import { VALKEY_CLIENT } from '../valkey/valkey.module';
 
 import { SESSION_STORE, SessionStore } from './auth/session-store/session-store';
 
-import { SqliteSessionStore } from './auth/session-store/sqlite.session-store';
+import {
+  DATABASE_SESSION_STORE,
+  SessionsPersistenceModule,
+} from '../database/adapters/sessions/sessions-persistence.module';
+import { SsoPersistenceModule } from '../database/adapters/sso/sso-persistence.module';
+import { PasskeysPersistenceModule } from '../database/adapters/passkeys/passkeys-persistence.module';
+import { RateLimitingPersistenceModule } from '../database/adapters/rate-limiting/rate-limiting-persistence.module';
+import { SESSION_USER_DIRECTORY, SessionUserDirectory } from './auth/session-store/session-user-directory.port';
 
 import { ValkeySessionStore } from './auth/session-store/valkey.session-store';
 import { UserAccounts } from './users/accounts/user-accounts';
@@ -151,22 +152,17 @@ import { UserDirectory } from './users/directory/user-directory';
 
 export const sessionStoreProvider = {
   provide: SESSION_STORE,
-  inject: [
-    { token: VALKEY_CLIENT, optional: true },
-    getRepositoryToken(Session),
-    getRepositoryToken(User),
-    TokenHashService,
-  ],
+  inject: [{ token: VALKEY_CLIENT, optional: true }, DATABASE_SESSION_STORE, SESSION_USER_DIRECTORY, TokenHashService],
   useFactory: (
     valkeyClient: Redis | null,
-    sessionRepo: Repository<Session>,
-    userRepo: Repository<User>,
+    databaseStore: SessionStore,
+    users: SessionUserDirectory,
     tokenHashService: TokenHashService,
   ): SessionStore => {
     if (valkeyClient) {
-      return new ValkeySessionStore(valkeyClient, userRepo, tokenHashService);
+      return new ValkeySessionStore(valkeyClient, users, tokenHashService);
     }
-    return new SqliteSessionStore(sessionRepo, tokenHashService);
+    return databaseStore;
   },
 };
 
@@ -175,18 +171,16 @@ export const sessionStoreProvider = {
     TypeOrmModule.forFeature([
       User,
       AuthenticationDetail,
-      SSOProvider,
-      SSOProviderOIDCConfiguration,
-      SSOProviderSAMLConfiguration,
-      Session,
       ResourceUsage,
       Setting,
-      Passkey,
-      PasskeyChallenge,
       ApiToken,
       ApiTokenPermission,
       Permission,
     ]),
+    SessionsPersistenceModule,
+    SsoPersistenceModule,
+    PasskeysPersistenceModule,
+    RateLimitingPersistenceModule,
     PassportModule,
     EmailModule,
     EncryptionModule,
@@ -250,13 +244,14 @@ export const sessionStoreProvider = {
       provide: SSOOIDCStrategy,
       useFactory: async (moduleRef: ModuleRef, settingsService: SettingsService, stateStore: OidcCookieStateStore) => {
         // Placeholder config; actual OIDC providers are resolved at request time
-        const config = new SSOProviderOIDCConfiguration();
-        config.issuer = 'placeholder';
-        config.authorizationURL = 'placeholder';
-        config.tokenURL = 'placeholder';
-        config.userInfoURL = 'placeholder';
-        config.clientId = 'placeholder';
-        config.clientSecret = 'placeholder';
+        const config = {
+          issuer: 'placeholder',
+          authorizationURL: 'placeholder',
+          tokenURL: 'placeholder',
+          userInfoURL: 'placeholder',
+          clientId: 'placeholder',
+          clientSecret: 'placeholder',
+        } as SsoOidcConfigurationRecord;
 
         const appUrl = await settingsService.getUrl();
         // Use fallback during first-time setup when no settings exist; real callback is only needed when OIDC is used

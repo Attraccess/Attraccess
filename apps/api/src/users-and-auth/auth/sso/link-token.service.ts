@@ -1,11 +1,9 @@
 import { BadRequestException, Inject, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Setting } from '@attraccess/database-entities';
 import { SSOProviderType } from '@attraccess/application-models';
 import { EncryptionService } from '../../../encryption/encryption.service';
 import { SESSION_STORE, SessionStore } from '../session-store/session-store';
+import { SSO_LINK_SECRET_STORE, type SsoLinkSecretStore } from './link-token-secret.port';
 
 /** Wrong passwords a single link token tolerates before it is dead. */
 export const MAX_LINK_TOKEN_PASSWORD_ATTEMPTS = 3;
@@ -28,15 +26,13 @@ export interface SSOLinkTokenPayload {
 export class SSOLinkTokenService {
   private readonly logger = new Logger(SSOLinkTokenService.name);
   private readonly defaultTtlMs = 10 * 60 * 1000; // 10 minutes
-  private readonly secretParent = 'auth';
-  private readonly secretKey = 'sso_link_token_secret';
   private readonly secretRefreshMs = 5 * 60 * 1000; // 5 minutes
   private cachedSecret: string | null = null;
   private lastFetchedAt = 0;
 
   constructor(
-    @InjectRepository(Setting)
-    private readonly settingRepository: Repository<Setting>,
+    @Inject(SSO_LINK_SECRET_STORE)
+    private readonly secretStore: SsoLinkSecretStore,
     private readonly encryptionService: EncryptionService,
     @Inject(SESSION_STORE) private readonly sessionStore: SessionStore,
   ) {}
@@ -144,54 +140,39 @@ export class SSOLinkTokenService {
       return this.cachedSecret;
     }
 
-    const existing = await this.settingRepository.findOneBy({
-      parent: this.secretParent,
-      key: this.secretKey,
-    });
-
-    if (existing?.value) {
-      const decrypted = this.encryptionService.decryptIfEncrypted(existing.value) ?? existing.value;
-      if (!this.encryptionService.isEncrypted(existing.value)) {
-        const encrypted = this.encryptionService.encrypt(decrypted);
-        await this.settingRepository.update(existing.id, { value: encrypted });
-      }
-      this.cachedSecret = decrypted;
-      this.lastFetchedAt = now;
-      return decrypted;
-    }
+    const existing = await this.readStoredSecret(now);
+    if (existing) return existing;
 
     const generated = randomBytes(64).toString('base64url');
     const encrypted = this.encryptionService.encrypt(generated);
 
     try {
-      await this.settingRepository.insert({
-        parent: this.secretParent,
-        key: this.secretKey,
-        value: encrypted,
-      });
-      this.cachedSecret = generated;
-      this.lastFetchedAt = now;
-      return generated;
+      if (await this.secretStore.createIfAbsent(encrypted)) {
+        this.cachedSecret = generated;
+        this.lastFetchedAt = now;
+        return generated;
+      }
+      this.logger.warn('Race detected when creating SSO link token secret, retrying fetch');
     } catch (error) {
       this.logger.warn('Race detected when creating SSO link token secret, retrying fetch', error as Error);
-      const afterInsert = await this.settingRepository.findOneBy({
-        parent: this.secretParent,
-        key: this.secretKey,
-      });
-
-      if (afterInsert?.value) {
-        const decrypted = this.encryptionService.decryptIfEncrypted(afterInsert.value) ?? afterInsert.value;
-        if (!this.encryptionService.isEncrypted(afterInsert.value)) {
-          const encryptedAfter = this.encryptionService.encrypt(decrypted);
-          await this.settingRepository.update(afterInsert.id, { value: encryptedAfter });
-        }
-        this.cachedSecret = decrypted;
-        this.lastFetchedAt = now;
-        return decrypted;
-      }
-
-      this.logger.error('SSO link token secret could not be created or retrieved', error as Error);
-      throw new UnauthorizedException('Server misconfiguration');
     }
+    const afterInsert = await this.readStoredSecret(now);
+    if (afterInsert) return afterInsert;
+
+    this.logger.error('SSO link token secret could not be created or retrieved');
+    throw new UnauthorizedException('Server misconfiguration');
+  }
+
+  /** Reads the stored secret; a secret stored in plain text is encrypted in place. */
+  private async readStoredSecret(now: number): Promise<string | null> {
+    const stored = await this.secretStore.read();
+    if (!stored) return null;
+    const decrypted = this.encryptionService.decryptIfEncrypted(stored) ?? stored;
+    if (!this.encryptionService.isEncrypted(stored)) {
+      await this.secretStore.replace(this.encryptionService.encrypt(decrypted));
+    }
+    this.cachedSecret = decrypted;
+    this.lastFetchedAt = now;
+    return decrypted;
   }
 }

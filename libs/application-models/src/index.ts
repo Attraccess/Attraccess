@@ -29,3 +29,6 @@ export * from './lib/user-role';
 export * from './lib/operating-interval';
 export * from './lib/usage-session';
 export * from './lib/billing-ledger';
+export * from './lib/passkey';
+export * from './lib/session';
+export * from './lib/sso-provider-record';

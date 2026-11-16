@@ -1,7 +1,7 @@
 import { SsoSessionRequest } from '../sso-session-request';
 import { OidcTokenVerifier, OidcVerificationUnavailableError } from './oidc-token-verifier.service';
 import { EncryptionService } from '../../../../encryption/encryption.service';
-import { SSOProviderOIDCConfiguration, User } from '@attraccess/database-entities';
+import type { AuthenticatedSessionUser, SsoOidcConfigurationRecord } from '@attraccess/application-models';
 import { SSOProviderType } from '@attraccess/application-models';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
@@ -40,7 +40,7 @@ export const SSO_OIDC_STATE_REQUEST_KEY = '_ssoOidcState';
 export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) {
   constructor(
     protected moduleRef: ModuleRef,
-    config: SSOProviderOIDCConfiguration,
+    config: SsoOidcConfigurationRecord,
     callbackURL: string,
     stateStore: OidcCookieStateStore,
   ) {
@@ -71,7 +71,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) 
 
   protected readonly logger = new Logger(SSOOIDCStrategy.name);
 
-  protected readonly config: SSOProviderOIDCConfiguration;
+  protected readonly config: SsoOidcConfigurationRecord;
 
   /**
    * Use per-request callback URL and state from the guard when set (so frontend/backend URL changes apply without restart).
@@ -117,7 +117,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) 
     idToken: string,
     _accessToken?: string,
     refreshToken?: string,
-  ): Promise<User> {
+  ): Promise<AuthenticatedSessionUser> {
     const userinfo = (uiProfile as { _json?: Record<string, unknown> } | undefined)?._json;
     // Keep today's merged profile; the userinfo response is handed over separately, for `email_verified` only.
     const profile = { ...idProfile, ...uiProfile, _json: undefined, _raw: undefined } as Profile;
@@ -176,7 +176,7 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) 
     _context?: unknown,
     idTokenClaims?: Record<string, unknown>,
     userinfoClaims?: Record<string, unknown>,
-  ): Promise<User> {
+  ): Promise<AuthenticatedSessionUser> {
     this.logger.log(`Validating OIDC profile for issuer: ${_issuer}`);
 
     const oidcUserId = profile.id;
@@ -254,7 +254,11 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) 
     return states.includes(true) ? true : undefined;
   }
 
-  protected async syncPermissionsFromClaims(user: User, claimSources: unknown[], userCreated = false): Promise<User> {
+  protected async syncPermissionsFromClaims(
+    user: AuthenticatedSessionUser,
+    claimSources: unknown[],
+    userCreated = false,
+  ): Promise<AuthenticatedSessionUser> {
     const rbacService = this.moduleRef.get(RbacService, { strict: false });
     let changes: { added: string[]; removed: string[]; updated: string[] } | undefined;
     if (!rbacService) {

@@ -6,7 +6,7 @@ import { SSOService } from '../sso.service';
 import { LicenseService } from '../../../../license/license.service';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { ModuleRef } from '@nestjs/core';
-import { SSOProvider } from '@attraccess/database-entities';
+import type { SsoProviderRecord } from '@attraccess/application-models';
 import { MetricsService } from '../../../../metrics/metrics.service';
 
 // Mock the strategy module so `new SSOOIDCStrategy(...)` doesn't invoke
@@ -181,7 +181,7 @@ describe('SSOOIDCGuard', () => {
       ...mockOidcProvider,
       id: 42,
       oidcConfiguration: provider42Config,
-    } as unknown as SSOProvider);
+    } as unknown as SsoProviderRecord);
 
     const req: Record<string, unknown> = {
       url: '/api/auth/sso/OIDC/42/login?redirectTo=/home',

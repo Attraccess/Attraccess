@@ -1,7 +1,7 @@
 import { Repository } from 'typeorm';
 import { Session, User } from '@attraccess/database-entities';
 import { TokenHashService } from '../../../encryption/token-hash.service';
-import { SqliteSessionStore } from './sqlite.session-store';
+import { SqliteSessionStore } from './sqlite-session-store';
 
 describe('SqliteSessionStore', () => {
   let store: SqliteSessionStore;

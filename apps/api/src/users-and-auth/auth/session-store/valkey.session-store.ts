@@ -1,9 +1,14 @@
-import { Repository } from 'typeorm';
-import { Session, User } from '@attraccess/database-entities';
-import { SsoSessionContext } from '@attraccess/application-models';
+import type {
+  AuthenticatedSessionUser,
+  SessionStats,
+  SsoLogoutReceipt,
+  SsoSessionContext,
+  UserSessionSummary,
+} from '@attraccess/application-models';
 import type { Redis } from 'ioredis';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SessionStore, SessionMetadata, LogoutSession, AuthenticatedSession } from './session-store';
+import type { SessionUserDirectory } from './session-user-directory.port';
 
 import { createHash } from 'node:crypto';
 import { SsoSessionSelector } from './sso-session-selector';
@@ -23,7 +28,7 @@ const USER_SESSIONS_PREFIX = 'user_sessions:';
 export class ValkeySessionStore implements SessionStore {
   constructor(
     private readonly client: Redis,
-    private readonly userRepository: Repository<User>,
+    private readonly users: SessionUserDirectory,
     private readonly tokenHashService: TokenHashService,
   ) {}
 
@@ -70,7 +75,7 @@ export class ValkeySessionStore implements SessionStore {
     );
   }
 
-  async validateSession(token: string): Promise<User | null> {
+  async validateSession(token: string): Promise<AuthenticatedSessionUser | null> {
     return (await this.authenticateSession(token))?.user ?? null;
   }
 
@@ -88,7 +93,7 @@ export class ValkeySessionStore implements SessionStore {
 
     const remaining = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
     await this.client.expire(key, remaining);
-    const user = await this.userRepository.findOne({ where: { id: parseInt(data['userId'], 10) } });
+    const user = await this.users.findSessionUser(parseInt(data['userId'], 10));
     return user
       ? {
           user,
@@ -182,7 +187,7 @@ export class ValkeySessionStore implements SessionStore {
 
   async revokeSsoSessionsOnce(
     selector: SsoSessionSelector,
-    receipt: { key: string; expiresAt: number; requireMatch?: boolean },
+    receipt: SsoLogoutReceipt,
   ): Promise<{ fresh: boolean; count: number }> {
     const kind = selector.protocol === 'OIDC' && selector.sid ? 'sid' : 'subject';
     const identity = selector.protocol === 'OIDC' ? selector.sid || selector.subject : selector.nameID;
@@ -244,10 +249,10 @@ export class ValkeySessionStore implements SessionStore {
     return null;
   }
 
-  async getUserSessions(userId: number): Promise<Session[]> {
+  async getUserSessions(userId: number): Promise<UserSessionSummary[]> {
     const hashedTokens = await this.client.smembers(`${USER_SESSIONS_PREFIX}${userId}`);
     const now = new Date();
-    const sessions: Session[] = [];
+    const sessions: UserSessionSummary[] = [];
     for (const ht of hashedTokens) {
       const data = await this.client.hgetall(`${SESSION_PREFIX}${ht}`);
       if (!data?.['userId']) {
@@ -257,21 +262,18 @@ export class ValkeySessionStore implements SessionStore {
       const expiresAt = new Date(data['expiresAt'] ?? 0);
       if (expiresAt < now) continue;
       sessions.push({
-        id: 0,
-        token: ht,
         userId: parseInt(data['userId'], 10),
         userAgent: data['userAgent'] || null,
         ipAddress: data['ipAddress'] || null,
         expiresAt,
         createdAt: new Date(data['createdAt'] ?? 0),
         lastAccessedAt: expiresAt,
-        user: null as unknown as User,
       });
     }
     return sessions.sort((a, b) => b.lastAccessedAt.getTime() - a.lastAccessedAt.getTime());
   }
 
-  async getStats(): Promise<{ totalActiveSessions: number; expiredSessions: number }> {
+  async getStats(): Promise<SessionStats> {
     return { totalActiveSessions: await this.countActive(), expiredSessions: 0 };
   }
 

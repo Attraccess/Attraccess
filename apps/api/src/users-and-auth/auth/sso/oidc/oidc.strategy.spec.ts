@@ -2,7 +2,11 @@ import { ModuleRef } from '@nestjs/core';
 import { OidcCookieStateStore } from './oidc-cookie-state-store';
 import { registerSsooidcstrategyClaimPathResolutionFixture } from './oidc.strategy.ssooidcstrategy-claim-path-resolution.test-fixture';
 import { Profile, Strategy } from 'passport-openidconnect';
-import { SSOProvider, SSOProviderOIDCConfiguration, User } from '@attraccess/database-entities';
+import type {
+  AuthenticatedSessionUser,
+  SsoOidcConfigurationRecord,
+  SsoProviderRecord,
+} from '@attraccess/application-models';
 import { AuthenticationType, SSOProviderType } from '@attraccess/application-models';
 import { SSOOIDCStrategy, SSO_OIDC_CALLBACK_URL_REQUEST_KEY } from './oidc.strategy';
 
@@ -27,7 +31,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
   });
 
   it('maps role strings, arrays and object-valued claims while ignoring non-string entries', async () => {
-    const user = { id: 7 } as User;
+    const user = { id: 7 } as AuthenticatedSessionUser;
     const users = { findOne: jest.fn().mockResolvedValue(user) };
     const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(7) };
     const rbac = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
@@ -73,7 +77,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
             username,
             email,
             externalIdentifier,
-          }) as unknown as User,
+          }) as unknown as AuthenticatedSessionUser,
       ),
     };
 
@@ -122,7 +126,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
             username,
             email,
             externalIdentifier,
-          }) as unknown as User,
+          }) as unknown as AuthenticatedSessionUser,
       ),
     };
 
@@ -175,7 +179,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
         emailClaimPaths: null,
         roleMappings: { 'user-manager': ['admins'] },
       },
-    } as SSOProvider;
+    } as SsoProviderRecord;
     const strategy = fixture.createStrategy(
       { roleMappings: { 'user-manager': ['admins'] } },
       usersService,
@@ -232,7 +236,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
         emailClaimPaths: null,
         roleMappings: { 'user-manager': ['admins'] },
       },
-    } as SSOProvider;
+    } as SsoProviderRecord;
     const strategy = fixture.createStrategy(
       { roleMappings: { 'user-manager': ['admins'] } },
       usersService,
@@ -287,7 +291,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
         emailClaimPaths: null,
         roleMappings: null,
       },
-    } as SSOProvider;
+    } as SsoProviderRecord;
     const strategy = fixture.createStrategy(
       {},
       usersService,
@@ -320,7 +324,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
             username,
             email,
             externalIdentifier,
-          }) as unknown as User,
+          }) as unknown as AuthenticatedSessionUser,
       ),
     };
 
@@ -356,7 +360,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
   });
 
   it('syncs with zero assignments when no roleMappings configured (no-op for fresh providers)', async () => {
-    const existingUser = { id: 222, username: 'existing', email: 'existing@example.com' } as User;
+    const existingUser = { id: 222, username: 'existing', email: 'existing@example.com' } as AuthenticatedSessionUser;
 
     const usersService = {
       findOne: jest.fn(async () => existingUser),
@@ -385,7 +389,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
   });
 
   it('revokes previously granted SSO roles after the mapping has been cleared', async () => {
-    const existingUser = { id: 223, username: 'existing', email: 'existing@example.com' } as User;
+    const existingUser = { id: 223, username: 'existing', email: 'existing@example.com' } as AuthenticatedSessionUser;
 
     const usersService = {
       findOne: jest.fn(async () => existingUser),
@@ -403,7 +407,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     // Admin emptied the mapping table → stored config is {} — sync must still run so roles
     // granted under the old mapping get revoked at next login.
     const strategy = fixture.createStrategy(
-      { roleMappings: {} } as Partial<SSOProviderOIDCConfiguration>,
+      { roleMappings: {} } as Partial<SsoOidcConfigurationRecord>,
       usersService,
       authService,
       rbacService,
@@ -421,7 +425,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
   });
 
   it('honors configured permission mappings and revokes absent roles', async () => {
-    const existingUser = { id: 333, username: 'existing', email: 'existing@example.com' } as User;
+    const existingUser = { id: 333, username: 'existing', email: 'existing@example.com' } as AuthenticatedSessionUser;
 
     const usersService = {
       findOne: jest.fn(async () => existingUser),
@@ -439,7 +443,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
     const strategy = fixture.createStrategy(
       {
         roleMappings: { 'user-manager': ['attraccess_admin'] },
-      } as Partial<SSOProviderOIDCConfiguration>,
+      } as Partial<SsoOidcConfigurationRecord>,
       usersService,
       authService,
       rbacService,
@@ -458,14 +462,14 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
   });
 
   it('passes the external claim value that granted each role to the sync', async () => {
-    const existingUser = { id: 334, username: 'existing', email: 'existing@example.com' } as User;
+    const existingUser = { id: 334, username: 'existing', email: 'existing@example.com' } as AuthenticatedSessionUser;
 
     const usersService = { findOne: jest.fn(async () => existingUser), updateOne: jest.fn(), createOne: jest.fn() };
     const authService = { findUserIdBySSO: jest.fn(async () => existingUser.id), addAuthenticationDetails: jest.fn() };
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
     const strategy = fixture.createStrategy(
-      { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SSOProviderOIDCConfiguration>,
+      { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SsoOidcConfigurationRecord>,
       usersService,
       authService,
       rbacService,
@@ -488,14 +492,14 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
   });
 
   it('revokes provider roles when the token contains an explicitly empty role claim', async () => {
-    const existingUser = { id: 335, username: 'existing', email: 'existing@example.com' } as User;
+    const existingUser = { id: 335, username: 'existing', email: 'existing@example.com' } as AuthenticatedSessionUser;
 
     const usersService = { findOne: jest.fn(async () => existingUser), updateOne: jest.fn(), createOne: jest.fn() };
     const authService = { findUserIdBySSO: jest.fn(async () => existingUser.id), addAuthenticationDetails: jest.fn() };
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
     const strategy = fixture.createStrategy(
-      { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SSOProviderOIDCConfiguration>,
+      { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SsoOidcConfigurationRecord>,
       usersService,
       authService,
       rbacService,
@@ -513,14 +517,14 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
   });
 
   it('does not sync when the token contains no role/group claims at all', async () => {
-    const existingUser = { id: 336, username: 'existing', email: 'existing@example.com' } as User;
+    const existingUser = { id: 336, username: 'existing', email: 'existing@example.com' } as AuthenticatedSessionUser;
 
     const usersService = { findOne: jest.fn(async () => existingUser), updateOne: jest.fn(), createOne: jest.fn() };
     const authService = { findUserIdBySSO: jest.fn(async () => existingUser.id), addAuthenticationDetails: jest.fn() };
     const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
 
     const strategy = fixture.createStrategy(
-      { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SSOProviderOIDCConfiguration>,
+      { roleMappings: { 'user-manager': ['attraccess_admin'] } } as Partial<SsoOidcConfigurationRecord>,
       usersService,
       authService,
       rbacService,
@@ -538,8 +542,8 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
   });
 
   describe('configured roleClaimPaths', () => {
-    async function syncWith(config: Partial<SSOProviderOIDCConfiguration>, claims: Record<string, unknown>) {
-      const existingUser = { id: 337, username: 'existing', email: 'existing@example.com' } as User;
+    async function syncWith(config: Partial<SsoOidcConfigurationRecord>, claims: Record<string, unknown>) {
+      const existingUser = { id: 337, username: 'existing', email: 'existing@example.com' } as AuthenticatedSessionUser;
       const usersService = { findOne: jest.fn(async () => existingUser), updateOne: jest.fn(), createOne: jest.fn() };
       const authService = {
         findUserIdBySSO: jest.fn(async () => existingUser.id),
@@ -547,7 +551,7 @@ describe('SSOOIDCStrategy - claim path resolution', () => {
       };
       const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
       const strategy = fixture.createStrategy(
-        { roleMappings: { 'user-manager': ['admins'] }, ...config } as Partial<SSOProviderOIDCConfiguration>,
+        { roleMappings: { 'user-manager': ['admins'] }, ...config } as Partial<SsoOidcConfigurationRecord>,
         usersService,
         authService,
         rbacService,
@@ -751,9 +755,9 @@ describe('OIDC Passport callback authentication context', () => {
       clientId: 'client',
       clientSecret: 'secret',
       jwksURL: 'https://issuer/jwks',
-    } as SSOProviderOIDCConfiguration;
+    } as SsoOidcConfigurationRecord;
     const strategy = new SSOOIDCStrategy(moduleRef, config, 'https://app.example/callback', {} as OidcCookieStateStore);
-    const user = { id: 7 } as User;
+    const user = { id: 7 } as AuthenticatedSessionUser;
     jest.spyOn(strategy, 'validateProfile').mockResolvedValue(user);
     const req = {};
     const verify = (strategy as unknown as { _verify: (...args: unknown[]) => void })._verify;
@@ -769,7 +773,7 @@ describe('OIDC Passport callback authentication context', () => {
         'access-token',
         'refresh-token',
         {},
-        (error: Error | null, principal: User) => {
+        (error: Error | null, principal: AuthenticatedSessionUser) => {
           if (error) return reject(error);
           expect(principal).toBe(user);
           resolve();
@@ -865,9 +869,9 @@ describe('OIDC login without a refresh token', () => {
       clientId: 'client',
       clientSecret: 'secret',
       permissionSyncTtlMinutes: providerTtl,
-    } as SSOProviderOIDCConfiguration;
+    } as SsoOidcConfigurationRecord;
     const strategy = new SSOOIDCStrategy(moduleRef, config, 'https://app.example/callback', {} as OidcCookieStateStore);
-    jest.spyOn(strategy, 'validateProfile').mockResolvedValue({ id: 7 } as User);
+    jest.spyOn(strategy, 'validateProfile').mockResolvedValue({ id: 7 } as AuthenticatedSessionUser);
     const warn = jest.spyOn(strategy['logger'], 'warn').mockImplementation();
     const login = (refreshToken?: string) =>
       strategy.validate(
