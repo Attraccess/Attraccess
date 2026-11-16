@@ -18,7 +18,7 @@ Ressource aktiviert. Bei Ressourcen ohne aktivierte Reservierungen ändert sich 
 
 - Eine bezahlte Attraccess-Lizenz, die das Lizenzmodul **`reservations`** enthält. Das Plugin Reservierungen ist ein
   kommerzielles Add-on: Der Schlüssel für gemeinnützige Nutzung schaltet es **nicht** frei, eine kostenlose Nutzung
-  gibt es nicht. Ohne das Modul wird das Plugin nicht geladen und erscheint in **Einstellungen > Plugins** als
+  gibt es nicht. Ohne das Modul wird das Plugin nicht geladen und erscheint in **Einstellungen → Plugins** als
   **Lizenz fehlt**. Speichern Sie einen gültigen Lizenzschlüssel mit dem Modul, startet Attraccess neu und lädt das
   Plugin. Siehe [Plugins installieren](plugins/installing-plugins.md#lizenz-fehlt). Lizenzen:
   [contact@attraccess.org](mailto:contact@attraccess.org).

@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import * as semver from 'semver';
 import { PluginModule } from '../plugin.module';
 import { PluginService } from '../plugin.service';
 import { PluginMigrationService } from '../plugin-migration.service';
@@ -60,8 +61,9 @@ describe('plugin license gate', () => {
       expect(manifest.license).toEqual({ required: true, modules: [name] });
       expect(pkg.attraccess.license).toEqual(manifest.license);
       expect(pkg.license).toBe('SEE LICENSE IN LICENSE.md');
-      expect(manifest.attraccessVersion.min).toBe('1.11.0-beta.1');
-      expect(pkg.attraccess.host).toBe('^1.11.0-beta.1');
+      // Hosts before 1.11.0-beta.1 ignore the license block, so they must not install the plugin.
+      expect(semver.gte(manifest.attraccessVersion.min, '1.11.0-beta.1')).toBe(true);
+      expect(pkg.attraccess.host).toBe(`^${manifest.attraccessVersion.min}`);
       expect(readFileSync(join(__dirname, '../../../../plugins', name, 'LICENSE.md'), 'utf8')).toContain(`\`${name}\``);
     });
 
@@ -76,11 +78,8 @@ describe('plugin license gate', () => {
       PluginService.setLicenseSnapshot({ valid: true, modules });
       PluginModule.forRoot();
       expect(loaded().sort()).toEqual(expected);
-      if (!expected.includes('reservations')) {
-        expect(status('reservations')).toMatchObject({
-          status: 'license_missing',
-          error: 'Requires license module: reservations',
-        });
+      for (const name of ['wago', 'reservations'].filter((plugin) => !expected.includes(plugin))) {
+        expect(status(name)).toMatchObject({ status: 'license_missing', error: `Requires license module: ${name}` });
       }
     });
   });
@@ -237,6 +236,25 @@ describe('plugin license gate', () => {
       PluginService.setLicenseSnapshot(nonProfit);
       expect(PluginService.licenseDecisionChanges({ valid: true, modules: ['sso'] })).toBe(false);
       expect(PluginService.licenseDecisionChanges(nonProfit)).toBe(false);
+    });
+
+    it('is true when the key switches between two paid modules', () => {
+      fixture('reservations', { required: true, modules: ['reservations'] });
+      PluginService.setLicenseSnapshot({ valid: true, modules: ['reservations'] });
+      expect(PluginService.licenseDecisionChanges({ valid: true, modules: ['wago'] })).toBe(true);
+      PluginService.setLicenseSnapshot({ valid: true, modules: ['wago'] });
+      expect(PluginService.licenseDecisionChanges({ valid: true, modules: ['reservations'] })).toBe(true);
+    });
+
+    it('ignores a quarantined plugin, because a restart would not load it', () => {
+      fixture('reservations', { required: true, modules: ['reservations'] });
+      PluginService.setLicenseSnapshot(wagoLicense);
+      const reservations = PluginService.getPlugins().find((plugin) => plugin.name === 'reservations');
+      PluginService.quarantinePluginDirectory(reservations.pluginDirectory, new Error('crashed'));
+      expect(
+        PluginService.licenseDecisionChanges({ ...wagoLicense, modules: [...wagoLicense.modules, 'reservations'] }),
+      ).toBe(false);
+      expect(PluginService.licenseDecisionChanges(nonProfit)).toBe(true);
     });
 
     it('is false without a startup evaluation (plugins disabled)', () => {

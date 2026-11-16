@@ -8,7 +8,7 @@
 
 > [!NOTE]
 > The plugin needs a paid license with the `reservations` module. The key for non-profit use does not include it.
-> Without it, **Settings → Plugins** shows **License missing**, the plugin is not loaded and existing reservations
+> Without the module, **Settings → Plugins** shows **License missing**, the plugin is not loaded and existing reservations
 > are not enforced. See [Installing Plugins](plugins/installing-plugins.md#license-missing).
 
 1. Open **Settings → Plugins** and install the `reservations` plugin as described in

@@ -129,7 +129,7 @@ Add an optional `license` block. In a ZIP plugin it belongs in `plugin.json`; in
 
 Anything declared here is a hard requirement. The host evaluates the license **once at startup**, before it loads any
 plugin. If the requirement is not met, the plugin is not loaded at all: no backend, migrations, flow nodes, audit
-domains, reader UI, hooks or frontend. Settings > Plugins shows it as **License missing**, with the missing modules.
+domains, reader UI, hooks or frontend. **Settings → Plugins** shows it as **License missing**, with the missing modules.
 If the license cannot be determined (no key, a key that does not verify, unreadable settings), a gated plugin counts as
 unlicensed. On a fresh install, the host uses the `LICENSE_KEY` environment variable. A plugin that has a required
 dependency on an unlicensed plugin does not load either; it shows the usual dependency error.

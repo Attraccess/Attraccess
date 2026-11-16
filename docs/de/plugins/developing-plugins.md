@@ -101,11 +101,11 @@ der `package.json` unter `attraccess` (daraus baut der Host das Manifest):
 
 Alles, was hier steht, ist eine harte Anforderung. Der Host prüft die Lizenz **einmal beim Start**, bevor er ein Plugin
 lädt. Ist die Anforderung nicht erfüllt, wird das Plugin gar nicht geladen: kein Backend, keine Migrationen, keine
-Flow-Knoten, Audit-Domänen, Reader-UI, Hooks oder Frontend. In Einstellungen > Plugins steht es als **Lizenz fehlt**,
+Flow-Knoten, Audit-Domänen, Reader-UI, Hooks oder Frontend. In **Einstellungen → Plugins** steht es als **Lizenz fehlt**,
 mit den fehlenden Modulen. Lässt sich die Lizenz nicht ermitteln (kein Schlüssel, ein Schlüssel, der sich nicht prüfen
 lässt, nicht lesbare Einstellungen), gilt ein geschütztes Plugin als nicht lizenziert. Bei einer Neuinstallation nutzt
-der Host die Umgebungsvariable `LICENSE_KEY`. Ein Plugin mit einer erforderlichen Abhängigkeit auf ein nicht
-lizenziertes Plugin wird ebenfalls nicht geladen; es zeigt den üblichen Abhängigkeitsfehler.
+der Host die Umgebungsvariable `LICENSE_KEY`. Ein Plugin mit einer erforderlichen Abhängigkeit von einem nicht
+lizenzierten Plugin wird ebenfalls nicht geladen; es zeigt den üblichen Abhängigkeitsfehler.
 
 Das Nichtladen aus Lizenzgründen ist kein Fehler: Das Plugin wird nicht unter Quarantäne gestellt und lädt nach dem
 nächsten Neustart, sobald die Lizenz es abdeckt. Ein ungültiger `license`-Block (falsche Typen, unbekannte Schlüssel) ist

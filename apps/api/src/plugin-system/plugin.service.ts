@@ -169,12 +169,15 @@ export class PluginService {
   /**
    * Whether `next` would change the load decision of at least one license-gated plugin compared to the license
    * the process started with. Without a startup evaluation (plugins disabled) nothing is gated, so nothing changes.
+   * Quarantined plugins do not count: they stay unloaded after a restart.
    */
   public static licenseDecisionChanges(next: PluginLicenseSnapshot): boolean {
     const gate = getImplementationClass().licenseGate;
     if (!gate) return false;
+    // A quarantined plugin stays unloaded after a restart whatever the license says.
     return getImplementationClass()
       .getPlugins()
+      .filter((manifest) => !getImplementationClass().isPluginQuarantined(manifest))
       .some(
         (manifest) =>
           (missingLicenseReason(manifest.license, gate.snapshot) === null) !==

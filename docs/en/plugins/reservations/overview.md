@@ -17,7 +17,7 @@ are not enabled, nothing changes.
 
 - A paid Attraccess license that includes the **`reservations`** license module. The Reservations plugin is a
   commercial add-on: the key for non-profit use does **not** unlock it, and there is no free use. Without the module
-  the plugin is not loaded and appears in **Settings > Plugins** as **License missing**. After you save a valid license
+  the plugin is not loaded and appears in **Settings → Plugins** as **License missing**. After you save a valid license
   key with the module, Attraccess restarts and loads the plugin. See
   [Installing Plugins](plugins/installing-plugins.md#license-missing). Licenses:
   [contact@attraccess.org](mailto:contact@attraccess.org).

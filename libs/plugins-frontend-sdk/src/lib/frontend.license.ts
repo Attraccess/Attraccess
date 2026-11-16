@@ -87,11 +87,12 @@ export function usePluginLicense(): UsePluginLicenseResult {
     };
   }, [load]);
 
-  return {
-    license,
-    isLoading,
-    error,
-    hasModule: (module) => Boolean(license?.valid && license.modules.includes(module)),
-    refetch: () => load(() => true, true),
-  };
+  // Stable identities, so plugins can list them in effect dependencies without re-running the effect every render.
+  const hasModule = useCallback(
+    (module: string) => Boolean(license?.valid && license.modules.includes(module)),
+    [license],
+  );
+  const refetch = useCallback(() => load(() => true, true), [load]);
+
+  return { license, isLoading, error, hasModule, refetch };
 }

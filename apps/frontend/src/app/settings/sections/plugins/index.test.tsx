@@ -711,7 +711,8 @@ describe('PluginsSection', () => {
     hoisted.plugins = [
       makePlugin({
         status: 'license_missing',
-        error: 'Requires license module: other',
+        // The row renders its own translated text from missingLicenseModules, not the server's English error.
+        error: 'server message',
         license: { required: true, modules: ['wago', 'other'] },
         missingLicenseModules: ['other'],
       }),
@@ -720,7 +721,22 @@ describe('PluginsSection', () => {
 
     expect(screen.getByText('License missing')).toBeInTheDocument();
     expect(screen.getByText('Requires license module: other')).toBeInTheDocument();
+    expect(screen.queryByText('server message')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'View load error for Cool Plugin' })).not.toBeInTheDocument();
+  });
+
+  it('names every missing module when several are missing', () => {
+    hoisted.plugins = [
+      makePlugin({
+        status: 'license_missing',
+        error: 'server message',
+        license: { required: true, modules: ['wago', 'reservations'] },
+        missingLicenseModules: ['wago', 'reservations'],
+      }),
+    ];
+    render(<PluginsSection />);
+
+    expect(screen.getByText('Requires license modules: wago, reservations')).toBeInTheDocument();
   });
 
   it('names a valid license when a plugin needs no specific module', () => {

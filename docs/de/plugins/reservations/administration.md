@@ -8,7 +8,7 @@
 
 > [!NOTE]
 > Das Plugin braucht eine bezahlte Lizenz mit dem Modul `reservations`. Der Schlüssel für gemeinnützige Nutzung
-> enthält es nicht. Ohne es zeigt **Einstellungen → Plugins** den Status **Lizenz fehlt**, das Plugin wird nicht
+> enthält es nicht. Ohne das Modul zeigt **Einstellungen → Plugins** den Status **Lizenz fehlt**, das Plugin wird nicht
 > geladen und bestehende Reservierungen werden nicht durchgesetzt. Siehe [Plugins installieren](plugins/installing-plugins.md#lizenz-fehlt).
 
 1. Öffnen Sie **Einstellungen → Plugins** und installieren Sie das Plugin `reservations` wie unter

@@ -118,7 +118,10 @@ describe('evaluateStartupLicense', () => {
     const destroy = jest.spyOn(DataSource.prototype, 'destroy');
     await expect(evaluateStartupLicense(appConfig, logger, 20)).resolves.toBeNull();
     finish({ valid: true, payload: { cfg: { modules: { wago: true } } } });
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    // The connection closes once the abandoned check settles; wait for it instead of a fixed delay.
+    for (let attempt = 0; attempt < 200 && destroy.mock.calls.length === 0; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
     expect(destroy).toHaveBeenCalled();
   });
 

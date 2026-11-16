@@ -204,6 +204,8 @@ docker run -e LICENSE_KEY="I AM USING THIS SOFTWARE ONLY FOR NON-PROFIT AND COMP
 
 Licensed features require a valid configured key. Qualifying non-commercial users can enter the special key above in the setup wizard or application settings.
 
+Plugins fall under the core license unless they ship their own `LICENSE.md`. The WAGO and Reservations plugins have their own commercial license and need a paid license module (`wago`, `reservations`); the non-profit key does not unlock them.
+
 ## Contributing
 
 Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
@@ -226,6 +228,10 @@ Dieses Projekt ist **source-available** und steht unter einer modifizierten Vers
 ### 🛡️ Schutz vor Fork-Missbrauch
 
 Alle Forks und abgeleiteten Projekte unterliegen denselben Lizenzbedingungen. Kommerzielle Nutzung ist auch in Forks **nicht erlaubt**, es sei denn, es liegt eine gültige Lizenz des ursprünglichen Autors vor.
+
+### 🔌 Plugins
+
+Plugins stehen unter der Lizenz des Kerns, sofern sie keine eigene `LICENSE.md` mitbringen. Die Plugins WAGO und Reservierungen haben eine eigene kommerzielle Lizenz und brauchen ein bezahltes Lizenzmodul (`wago`, `reservations`); der Schlüssel für gemeinnützige Nutzung schaltet sie nicht frei.
 
 ### 🔍 MIT-lizenzierte Bestandteile
 

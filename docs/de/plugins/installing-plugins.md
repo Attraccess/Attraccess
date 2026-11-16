@@ -62,20 +62,21 @@ Plugins koennen ein- oder ausgeschaltet werden, ohne sie zu entfernen:
 
 ## Lizenz fehlt
 
-Einige Plugins brauchen ein bezahltes Lizenzmodul. Das Plugin **WAGO** braucht das Modul `wago`, das Plugin **Reservierungen** das Modul `reservations`. Der
-Schluessel fuer gemeinnuetzige Nutzung enthaelt es nicht.
+Einige Plugins brauchen ein bezahltes Lizenzmodul: Das Plugin **WAGO** braucht das Modul `wago`, das Plugin
+**Reservierungen** das Modul `reservations`. Die kostenlose Community-Lizenz für Privatpersonen und gemeinnützige
+Organisationen (der Schlüssel für gemeinnützige Nutzung) enthält keines der beiden Module.
 
-Deckt die Lizenz ein Plugin nicht ab, zeigt **Einstellungen > Plugins** es mit dem Status **Lizenz fehlt** und nennt, was
-es braucht, zum Beispiel "Benötigt das Lizenzmodul: wago". Das Plugin wird nicht geladen: Es hat keine Menueeintraege,
-Seiten, Flow-Knoten oder Hintergrundaktivitaet, und Attraccess zeigt dafuer keine Fehlermeldung. Ein Plugin, das es als
-Abhaengigkeit braucht, wird ebenfalls nicht geladen und zeigt den ueblichen Abhaengigkeitsfehler.
+Deckt die Lizenz ein Plugin nicht ab, zeigt **Einstellungen → Plugins** es mit dem Status **Lizenz fehlt** und nennt,
+was es braucht, zum Beispiel "Benötigt das Lizenzmodul: wago". Das Plugin wird nicht geladen: Es hat keine
+Menüeinträge, Seiten, Flow-Knoten oder Hintergrundaktivität, und Attraccess zeigt dafür keine Fehlermeldung. Ein
+Plugin, das es als Abhängigkeit braucht, wird ebenfalls nicht geladen und zeigt den üblichen Abhängigkeitsfehler.
 
-Speichern Sie unter **Einstellungen > Allgemein** einen gueltigen Lizenzschluessel, der aendert, welche Plugins geladen
-werden duerfen, startet Attraccess automatisch neu und das Plugin wird geladen (oder nicht mehr geladen). Das Entfernen
-des Schluessels wirkt genauso. Betrifft die Aenderung kein Plugin, gibt es keinen Neustart. Ein ungueltiger, abgelaufener oder nicht pruefbarer Schluessel loest nie
-einen Neustart aus, weil Attraccess damit nicht starten wuerde: Korrigieren Sie zuerst den Schluessel. Eine Lizenz, die
-waehrend des Betriebs ablaeuft, wirkt ab dem naechsten Start. Zeigt ein Plugin trotz gueltiger Lizenz **Lizenz fehlt**,
-konnte die Lizenz beim Start nicht geprueft werden: Starten Sie Attraccess neu.
+Speichern Sie unter **Einstellungen → Allgemein** einen gültigen Lizenzschlüssel, der ändert, welche Plugins geladen
+werden dürfen, startet Attraccess automatisch neu und das Plugin wird geladen (oder nicht mehr geladen). Das Entfernen
+des Schlüssels wirkt genauso. Betrifft die Änderung kein Plugin, gibt es keinen Neustart. Ein ungültiger, abgelaufener
+oder nicht prüfbarer Schlüssel löst nie einen Neustart aus, weil Attraccess damit nicht starten würde: Korrigieren Sie
+zuerst den Schlüssel. Eine Lizenz, die während des Betriebs abläuft, wirkt ab dem nächsten Start. Zeigt ein Plugin
+trotz gültiger Lizenz **Lizenz fehlt**, konnte die Lizenz beim Start nicht geprüft werden: Starten Sie Attraccess neu.
 
 ## Plugin entfernen
 
@@ -92,7 +93,7 @@ konnte die Lizenz beim Start nicht geprueft werden: Starten Sie Attraccess neu.
 Wenn ein Plugin nicht wie erwartet funktioniert:
 
 - Pruefen Sie, ob das Plugin in der Plugin-Liste **aktiviert** ist
-- Pruefen Sie, ob sein Status nicht **Lizenz fehlt** lautet (siehe [Lizenz fehlt](#lizenz-fehlt))
+- Prüfen Sie, dass der Status nicht **Lizenz fehlt** lautet (siehe [Lizenz fehlt](#lizenz-fehlt))
 - Stellen Sie sicher, dass die Umgebungsvariable `DISABLE_PLUGINS` nicht auf `true` gesetzt ist
 - Pruefen Sie die Server-Logs auf Fehlermeldungen im Zusammenhang mit dem Plugin
 - Kontaktieren Sie den Plugin-Entwickler fuer Unterstuetzung
