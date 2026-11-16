@@ -106,8 +106,10 @@
     "loaded": "Geladen",
     "error": "Laden fehlgeschlagen",
     "licenseMissing": "Lizenz fehlt",
-    "licenseMissingModules_one": "Benötigt das Lizenzmodul: {{modules}}",
-    "licenseMissingModules_other": "Benötigt die Lizenzmodule: {{modules}}",
+    "licenseMissingModules": {
+      "one": "Benötigt das Lizenzmodul: {{modules}}",
+      "many": "Benötigt die Lizenzmodule: {{modules}}"
+    },
     "licenseMissingRequired": "Benötigt eine gültige Attraccess-Lizenz",
     "licenseMissingTooltip": "Nicht geladen: Die Lizenz deckt dieses Plugin nicht ab. Nach dem Speichern eines passenden Lizenzschlüssels startet der Server neu und lädt es.",
     "unknown": "Nur Frontend",

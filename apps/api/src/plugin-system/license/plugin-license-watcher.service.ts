@@ -25,13 +25,19 @@ export class PluginLicenseWatcher {
   async onLicenseKeyChanged(): Promise<void> {
     if (arePluginsDisabled()) return;
 
-    let snapshot: PluginLicenseSnapshot = null;
+    let snapshot: PluginLicenseSnapshot;
     try {
       const data = await this.moduleRef.get(LicenseService, { strict: false }).getLicenseData();
       snapshot = { valid: data.valid, modules: data.modules };
+      if (!data.valid) {
+        // AppModule.onModuleInit aborts startup for a stored key that does not verify. Restarting into that would take
+        // the API down, so keep running and let the admin correct the key; the next startup applies it.
+        this.logger.warn(`The new license key is not valid (${data.reason ?? 'unknown reason'}); not restarting.`);
+        return;
+      }
     } catch (error) {
-      // An unverifiable key grants nothing, exactly as at startup.
-      this.logger.warn(`Could not verify the new license key: ${String(error)}`);
+      this.logger.warn(`Could not verify the new license key (${String(error)}); not restarting.`);
+      return;
     }
 
     if (PluginService.licenseDecisionChanges(snapshot)) {

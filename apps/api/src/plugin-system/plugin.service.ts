@@ -205,7 +205,14 @@ export class PluginService {
 
       // validate manifest
       PluginService.logger.debug(`Validating manifest`, manifestContent);
-      const manifest = PluginManifestSchema.parse(manifestContent);
+      const parsedManifest = PluginManifestSchema.safeParse(manifestContent);
+      if (!parsedManifest.success) {
+        const problems = parsedManifest.error.issues
+          .map((issue) => `${issue.path.join('.') || 'plugin.json'}: ${issue.message}`)
+          .join('; ');
+        throw new BadRequestException(`Invalid plugin.json: ${problems}`);
+      }
+      const manifest = parsedManifest.data;
 
       const pluginName = PluginService.safePluginName(manifest.name);
       await PluginService.withPluginUploadLock(pluginName, async () => {

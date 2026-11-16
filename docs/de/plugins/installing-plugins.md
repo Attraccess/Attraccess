@@ -69,10 +69,11 @@ Deckt die Lizenz ein Plugin nicht ab, zeigt **Einstellungen > Plugins** es mit d
 es braucht, zum Beispiel "Benoetigt das Lizenzmodul: wago". Das Plugin wird nicht geladen: Es hat keine Menueeintraege,
 Seiten, Flow-Knoten oder Hintergrundaktivitaet, und Attraccess zeigt dafuer keine Fehlermeldung.
 
-Speichern Sie unter **Einstellungen > Allgemein** einen Lizenzschluessel, der aendert, welche Plugins geladen werden
-duerfen, startet Attraccess automatisch neu und das Plugin wird geladen (oder nicht mehr geladen). Betrifft die
-Aenderung kein Plugin, gibt es keinen Neustart. Eine Lizenz, die waehrend des Betriebs ablaeuft, wirkt ab dem naechsten
-Start.
+Speichern Sie unter **Einstellungen > Allgemein** einen gueltigen Lizenzschluessel, der aendert, welche Plugins geladen
+werden duerfen, startet Attraccess automatisch neu und das Plugin wird geladen (oder nicht mehr geladen). Betrifft die
+Aenderung kein Plugin, gibt es keinen Neustart. Ein ungueltiger, abgelaufener oder nicht pruefbarer Schluessel loest nie
+einen Neustart aus, weil Attraccess damit nicht starten wuerde: Korrigieren Sie zuerst den Schluessel. Eine Lizenz, die
+waehrend des Betriebs ablaeuft, wirkt ab dem naechsten Start.
 
 ## Plugin entfernen
 

@@ -85,7 +85,7 @@
       "executor": "nx:run-commands",
       "cache": true,
       "dependsOn": ["build-backend", "build-frontend"],
-      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json"],
+      "inputs": ["{projectRoot}/package.json", "{projectRoot}/plugin.json", "{projectRoot}/LICENSE.md"],
       "outputs": ["{projectRoot}/package"],
       "options": {
         "cwd": "apps/plugins/rabbitmq",

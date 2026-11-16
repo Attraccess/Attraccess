@@ -201,16 +201,20 @@ describe('plugin license gate', () => {
       expect(pluginService.requestRestart).not.toHaveBeenCalled();
     });
 
-    it('treats an unverifiable key as no license: restarts only if wago was loaded before', async () => {
+    it('does not restart for a key that cannot be verified, because startup would abort on it', async () => {
       PluginService.setLicenseSnapshot(wagoLicense);
       const failing = make(jest.fn().mockRejectedValue(new Error('licenso down')));
       await failing.watcher.onLicenseKeyChanged();
-      expect(failing.pluginService.requestRestart).toHaveBeenCalledTimes(1);
+      expect(failing.pluginService.requestRestart).not.toHaveBeenCalled();
+    });
 
-      PluginService.setLicenseSnapshot(nonProfit);
-      const idle = make(jest.fn().mockRejectedValue(new Error('licenso down')));
-      await idle.watcher.onLicenseKeyChanged();
-      expect(idle.pluginService.requestRestart).not.toHaveBeenCalled();
+    it('does not restart for an invalid (for example expired) key', async () => {
+      PluginService.setLicenseSnapshot(wagoLicense);
+      const { watcher, pluginService } = make(
+        jest.fn().mockResolvedValue({ valid: false, reason: 'Expired', modules: [], usageLimits: {} }),
+      );
+      await watcher.onLicenseKeyChanged();
+      expect(pluginService.requestRestart).not.toHaveBeenCalled();
     });
 
     it('never restarts while plugins are disabled', async () => {

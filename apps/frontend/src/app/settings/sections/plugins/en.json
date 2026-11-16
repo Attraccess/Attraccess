@@ -106,8 +106,10 @@
     "loaded": "Loaded",
     "error": "Failed to load",
     "licenseMissing": "License missing",
-    "licenseMissingModules_one": "Requires license module: {{modules}}",
-    "licenseMissingModules_other": "Requires license modules: {{modules}}",
+    "licenseMissingModules": {
+      "one": "Requires license module: {{modules}}",
+      "many": "Requires license modules: {{modules}}"
+    },
     "licenseMissingRequired": "Requires a valid Attraccess license",
     "licenseMissingTooltip": "Not loaded: the license does not cover this plugin. After you save a matching license key, the server restarts and loads it.",
     "unknown": "Frontend only",

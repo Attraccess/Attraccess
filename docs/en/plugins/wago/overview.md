@@ -19,8 +19,8 @@ an output, react to an input or an event).
 
 - A paid Attraccess license that includes the **`wago`** license module. The WAGO plugin is a commercial add-on: the key
   for non-profit use does **not** unlock it, and there is no free use. Without the module the plugin is not loaded and
-  appears in **Settings > Plugins** as **License missing**. After you save a license key with the module, Attraccess
-  restarts and loads the plugin. See [Installing Plugins](plugins/installing-plugins.md#license-missing). Licenses:
+  appears in **Settings > Plugins** as **License missing**. After you save a valid license key with the module,
+  Attraccess restarts and loads the plugin. See [Installing Plugins](plugins/installing-plugins.md#license-missing). Licenses:
   [contact@attraccess.org](mailto:contact@attraccess.org).
 - Attraccess 1.11.0 or newer and the `wago` plugin, installed as described in
   [Installing Plugins](plugins/installing-plugins.md). It needs the `DATABASE_ACCESS`, `ACCESS_MQTT_SERVERS`,

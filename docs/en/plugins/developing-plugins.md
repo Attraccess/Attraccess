@@ -134,11 +134,14 @@ A plugin that has a required dependency on an unlicensed plugin does not load ei
 
 Not loading for license reasons is not a failure: the plugin is not quarantined, and it loads after the next restart
 once the license covers it. An invalid `license` block (wrong types, unknown keys) is a manifest error: the plugin does
-not load, and a ZIP upload is rejected with HTTP 400. Hosts older than the plugin license support ignore the block, so
-raise `attraccessVersion.min` (`attraccess.host` for npm plugins) to the first version that enforces it.
+not load, and a ZIP upload is rejected with HTTP 400. Hosts older than the plugin license support ignore the block. For
+npm plugins, set `attraccess.host` to the first version that enforces it; the host checks that range on install. A ZIP
+plugin's `attraccessVersion` is not compared with the host version, so an old host loads a ZIP plugin without the
+gate.
 
-When an administrator saves a different license key, the host checks the plugins again. It restarts automatically
-exactly when that changes whether at least one gated plugin loads. There is no periodic re-check: an expired license is
+When an administrator saves a different, valid license key, the host checks the plugins again. It restarts
+automatically exactly when that changes whether at least one gated plugin loads. An invalid, expired or unverifiable
+key never restarts, because the host refuses to start with it. There is no periodic re-check: an expired license is
 noticed at the next startup.
 
 ### Deciding at runtime

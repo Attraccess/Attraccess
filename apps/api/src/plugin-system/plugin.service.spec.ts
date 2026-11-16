@@ -336,6 +336,22 @@ describe('PluginService', () => {
       await expect(service.uploadPlugin(file)).rejects.toBeInstanceOf(BadRequestException);
     });
 
+    it.each([
+      ['a wrong type', { modules: 'wago' }, 'license.modules'],
+      ['an unknown key', { foo: true }, 'Unrecognized key'],
+    ])(
+      'rejects a ZIP with an invalid license block (%s) as a 400 and writes nothing',
+      async (_name, license, message) => {
+        const service = new PluginService();
+        const file = zipFileUpload({ 'plugin.json': JSON.stringify({ ...fixture.VALID_MANIFEST, license }) });
+
+        const rejection = service.uploadPlugin(file);
+        await expect(rejection).rejects.toBeInstanceOf(BadRequestException);
+        await expect(rejection).rejects.toThrow(message);
+        expect(existsSync(join(fixture.root, 'uploaded-plugin'))).toBe(false);
+      },
+    );
+
     it('unpacks a valid plugin, moves it into place and schedules a restart', async () => {
       const service = new PluginService();
       const file = zipFileUpload({ 'plugin.json': JSON.stringify(fixture.VALID_MANIFEST) });
