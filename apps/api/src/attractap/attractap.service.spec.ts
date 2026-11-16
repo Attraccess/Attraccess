@@ -302,6 +302,19 @@ describe('AttractapService reader maintenance and crash reports', () => {
     expect(reports.save).toHaveBeenCalledWith(expect.objectContaining({ coredump: null }));
     expect(symbolication.symbolicate).not.toHaveBeenCalled();
   });
+  it('records a refused coredump as rejected with its announced size', async () => {
+    const { service, symbolication } = setup();
+    const report = await service.createCrashReport(4, { resetReason: 'PANIC', coredumpSize: 140000 } as never, null, {
+      size: 140000,
+    });
+    expect(report).toMatchObject({
+      coredumpStatus: 'rejected',
+      coredumpExpectedSize: 140000,
+      coredumpExpectedCrc32: null,
+      coredumpSize: null,
+    });
+    expect(symbolication.symbolicate).not.toHaveBeenCalled();
+  });
   it('keeps an inline coredump stored even when a size is announced as well', async () => {
     const { service } = setup();
     const report = await service.createCrashReport(

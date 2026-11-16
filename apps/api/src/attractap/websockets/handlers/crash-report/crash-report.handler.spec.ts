@@ -134,14 +134,14 @@ describe('AttractapCrashReportHandler', () => {
 
       await handler.handleCrashReport(mockSocket as any, data);
 
-      expect(mockAttractapService.createCrashReport).toHaveBeenCalledWith(42, payload, null);
+      expect(mockAttractapService.createCrashReport).toHaveBeenCalledWith(42, payload, null, null);
       expect(mockMetricsService.attractapCrashReportsTotal.inc).toHaveBeenCalled();
       expect(mockAudit.record).toHaveBeenCalledWith({
         domain: 'attractap',
         action: 'attractap.reader.crash_reported',
         actor: { id: null, authenticationMethod: null },
         subject: { type: 'attractap.reader', id: 42 },
-        details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
+        details: { source: 'reader-websocket', reportId: 'report-7', resetReason: 'PANIC', hasCoredump: false },
       });
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -162,7 +162,7 @@ describe('AttractapCrashReportHandler', () => {
 
       await handler.handleCrashReport(mockSocket as any, data);
 
-      expect(mockAttractapService.createCrashReport).toHaveBeenCalledWith(42, payload, null);
+      expect(mockAttractapService.createCrashReport).toHaveBeenCalledWith(42, payload, null, null);
       expect(mockMetricsService.attractapCrashReportsTotal.inc).toHaveBeenCalledTimes(1);
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -195,7 +195,12 @@ describe('AttractapCrashReportHandler', () => {
       expect(mockAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           domain: 'attractap',
-          details: { source: 'reader-websocket', resetReason: 'UNKNOWN', hasCoredump: false },
+          details: {
+            source: 'reader-websocket',
+            reportId: 'report-unknown',
+            resetReason: 'UNKNOWN',
+            hasCoredump: false,
+          },
         }),
       );
     });
@@ -209,7 +214,7 @@ describe('AttractapCrashReportHandler', () => {
 
       await handler.handleCrashReport(mockSocket as any, data);
 
-      expect(mockAttractapService.createCrashReport).toHaveBeenCalledWith(42, { resetReason: 'PANIC' }, null);
+      expect(mockAttractapService.createCrashReport).toHaveBeenCalledWith(42, { resetReason: 'PANIC' }, null, null);
       expect(mockMetricsService.attractapCrashReportsTotal.inc).not.toHaveBeenCalled();
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
         expect.objectContaining({

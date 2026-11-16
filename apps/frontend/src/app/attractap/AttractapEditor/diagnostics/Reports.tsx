@@ -82,6 +82,11 @@ export function renderAttractapDiagnosticsReports(
               {t('coredumpPending')}
             </Chip>
           )}
+          {report.coredumpStatus === 'rejected' && (
+            <Chip color="default" variant="soft" size="sm" data-cy="attractap-diagnostics-coredump-rejected">
+              {t('coredumpRejected')}
+            </Chip>
+          )}
           {report.symbolicationStatus && (
             <Chip
               color={symbolicationChipColor(report.symbolicationStatus)}
@@ -132,6 +137,12 @@ export function renderAttractapDiagnosticsReports(
           </span>
         </span>
       </div>
+      {report.rebootReason === ORPHAN_COREDUMP_REBOOT_REASON && (
+        <p className="text-xs text-default-500" data-cy="attractap-diagnostics-orphan-hint">
+          {t('orphanCoredumpHint')}
+        </p>
+      )}
+
       {report.coredumpBuildId && (
         <div className="flex items-center gap-2 flex-wrap text-sm">
           <span className="font-mono text-xs text-default-500">
@@ -173,12 +184,6 @@ export function renderAttractapDiagnosticsReports(
         </div>
       )}
 
-      {report.rebootReason === ORPHAN_COREDUMP_REBOOT_REASON && (
-        <p className="text-xs text-default-500" data-cy="attractap-diagnostics-orphan-hint">
-          {t('orphanCoredumpHint')}
-        </p>
-      )}
-
       {report.symbolicationStatus === 'unavailable' && (
         <p className="text-xs text-warning" data-cy="attractap-diagnostics-symbolication-hint">
           {t('symbolicationUnavailableHint')}
@@ -198,6 +203,10 @@ export function renderAttractapDiagnosticsReports(
         ) : report.coredumpStatus === 'awaiting' ? (
           <span className="text-xs text-warning" data-cy="attractap-diagnostics-coredump-pending-hint">
             {t('coredumpPendingHint', { size: formatBytes(report.coredumpExpectedSize, fallback) })}
+          </span>
+        ) : report.coredumpStatus === 'rejected' ? (
+          <span className="text-xs text-default-500" data-cy="attractap-diagnostics-coredump-rejected-hint">
+            {t('coredumpRejectedHint', { size: formatBytes(report.coredumpExpectedSize, fallback) })}
           </span>
         ) : (
           <span className="text-xs text-default-400">{t('noCoredump')}</span>

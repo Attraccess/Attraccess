@@ -86,17 +86,21 @@ export class AttractapService {
   /**
    * Stores a crash report. A legacy reader sends its dump inline; a newer one announces `expectedCoredump`
    * and uploads it in chunks afterwards (ATT-1144), so the report waits for it (`coredumpStatus: awaiting`).
+   * A dump the server refused is recorded as `rejected` (with its announced size, if valid) so admins know
+   * the reader still holds one.
    */
   public async createCrashReport(
     readerId: number,
     payload: ReaderCrashReportPayload,
     expectedCoredump: { size: number; crc32: number } | null = null,
+    rejectedCoredump: { size: number | null } | null = null,
   ): Promise<AttractapCrashReport> {
     const coredump =
       typeof payload.coredumpBase64 === 'string' && payload.coredumpBase64.length > 0
         ? Buffer.from(payload.coredumpBase64, 'base64')
         : null;
     const awaiting = !coredump && expectedCoredump !== null;
+    const rejected = !coredump && !awaiting && rejectedCoredump !== null;
 
     const report = await this.crashReportRepository.save({
       attractapId: readerId,
@@ -110,8 +114,8 @@ export class AttractapService {
       firmwareVersion: payload.firmwareVersion ?? null,
       coredumpSize: coredump ? coredump.length : null,
       coredump,
-      coredumpStatus: coredump ? 'stored' : awaiting ? 'awaiting' : null,
-      coredumpExpectedSize: awaiting ? expectedCoredump.size : null,
+      coredumpStatus: coredump ? 'stored' : awaiting ? 'awaiting' : rejected ? 'rejected' : null,
+      coredumpExpectedSize: awaiting ? expectedCoredump.size : rejected ? rejectedCoredump.size : null,
       coredumpExpectedCrc32: awaiting ? expectedCoredump.crc32 : null,
       symbolicationStatus: coredump ? 'pending' : null,
     });

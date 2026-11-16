@@ -76,15 +76,16 @@ export class AttractapCrashReportDto {
 
   @ApiProperty({
     description:
-      'Coredump upload state: awaiting while the reader still owes its chunked upload (or it never arrived), stored once the whole dump was verified and saved',
+      'Coredump upload state: awaiting while the reader still owes its chunked upload (or it never arrived), stored once the whole dump was verified and saved, rejected when the server refused the announced dump (too large or invalid)',
     example: 'awaiting',
-    enum: ['awaiting', 'stored'],
+    enum: ['awaiting', 'stored', 'rejected'],
     nullable: true,
   })
-  coredumpStatus!: 'awaiting' | 'stored' | null;
+  coredumpStatus!: 'awaiting' | 'stored' | 'rejected' | null;
 
   @ApiProperty({
-    description: 'Size in bytes of the coredump the reader announced, while its upload is awaited',
+    description:
+      'Size in bytes of the coredump the reader announced, while its upload is awaited or after it was rejected',
     example: 43776,
     nullable: true,
   })

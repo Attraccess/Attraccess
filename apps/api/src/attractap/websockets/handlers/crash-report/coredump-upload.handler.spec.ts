@@ -160,7 +160,9 @@ describe('AttractapCrashReportHandler chunked coredump upload', () => {
   it('keeps metadata but refuses an announced dump larger than the partition', async () => {
     const socket = reader();
     await report(socket, { resetReason: 'PANIC', coredumpSize: COREDUMP_MAX_BYTES + 1, coredumpCrc32: 1 });
-    expect(service.createCrashReport).toHaveBeenCalledWith(42, expect.anything(), null);
+    expect(service.createCrashReport).toHaveBeenCalledWith(42, expect.anything(), null, {
+      size: COREDUMP_MAX_BYTES + 1,
+    });
     const ack = lastAck(socket);
     expect(ack).toEqual({ received: true, id: ack.id, coredumpRejected: 'COREDUMP_TOO_LARGE' });
 
@@ -178,6 +180,14 @@ describe('AttractapCrashReportHandler chunked coredump upload', () => {
     await report(socket, { resetReason: 'PANIC', coredumpSize: 'big', coredumpCrc32: 1 });
     expect(lastAck(socket)).toMatchObject({ received: true, coredumpRejected: 'INVALID_COREDUMP' });
     expect(lastAck(socket).coredumpUpload).toBeUndefined();
+    expect(service.createCrashReport).toHaveBeenCalledWith(42, expect.anything(), null, { size: null });
+  });
+
+  it('keeps the announced size of a dump refused for an invalid checksum', async () => {
+    const socket = reader();
+    await report(socket, { resetReason: 'PANIC', coredumpSize: 1000, coredumpCrc32: -1 });
+    expect(lastAck(socket)).toMatchObject({ received: true, coredumpRejected: 'INVALID_COREDUMP' });
+    expect(service.createCrashReport).toHaveBeenCalledWith(42, expect.anything(), null, { size: 1000 });
   });
 
   it('keeps the legacy inline coredump path for firmware before ATT-1144', async () => {
@@ -187,7 +197,7 @@ describe('AttractapCrashReportHandler chunked coredump upload', () => {
     const ack = lastAck(socket);
     expect(ack).toEqual({ received: true, id: ack.id });
     expect(reports.get(ack.id)?.coredump?.equals(dump)).toBe(true);
-    expect(service.createCrashReport).toHaveBeenCalledWith(42, expect.anything(), null);
+    expect(service.createCrashReport).toHaveBeenCalledWith(42, expect.anything(), null, null);
   });
 
   it("refuses an upload to another reader's report like a missing one", async () => {

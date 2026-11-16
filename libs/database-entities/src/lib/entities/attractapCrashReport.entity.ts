@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { Attractap } from './attractap.entity';
 
-export type CoredumpStatus = 'awaiting' | 'stored';
+export type CoredumpStatus = 'awaiting' | 'stored' | 'rejected';
 
 @Entity('attractap_crash_report')
 @Index(['attractapId', 'createdAt'])
@@ -92,9 +92,9 @@ export class AttractapCrashReport {
   @Column({ type: 'text', nullable: true })
   @ApiProperty({
     description:
-      'Upload state of the coredump: awaiting while a chunked upload is owed (or never arrived), stored once the whole dump was verified and saved. Null for reports without a dump.',
+      'Upload state of the coredump: awaiting while a chunked upload is owed (or never arrived), stored once the whole dump was verified and saved, rejected when the server refused the announced dump (too large or invalid). Null for reports without a dump.',
     example: 'stored',
-    enum: ['awaiting', 'stored'],
+    enum: ['awaiting', 'stored', 'rejected'],
     nullable: true,
   })
   coredumpStatus!: CoredumpStatus | null;

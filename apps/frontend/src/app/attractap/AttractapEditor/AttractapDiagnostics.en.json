@@ -26,6 +26,8 @@
   "noCoredump": "No coredump",
   "coredumpPending": "Coredump upload pending",
   "coredumpPendingHint": "The reader has not finished uploading its {{size}} coredump yet. It keeps the dump and retries after reconnecting; if this stays, the dump was lost before it could be uploaded.",
+  "coredumpRejected": "Coredump refused",
+  "coredumpRejectedHint": "The reader announced a {{size}} coredump that the server refused because it is too large or its details are invalid. The reader keeps it in flash; read it out over USB if you need it.",
   "orphanCoredump": "Recovered coredump",
   "orphanCoredumpHint": "The reader found this coredump in its flash without the matching crash record, so the reset reason, heap values and crash firmware are unknown. The build id and backtrace come from the dump itself.",
   "downloadFailed": "Failed to download coredump",

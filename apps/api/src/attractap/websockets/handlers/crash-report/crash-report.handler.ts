@@ -57,9 +57,17 @@ export class AttractapCrashReportHandler {
     if (!hasInlineDump && payload.coredumpSize != null && !announced) coredumpRejected = 'INVALID_COREDUMP';
     if (announced && announced.size > COREDUMP_MAX_BYTES) coredumpRejected = 'COREDUMP_TOO_LARGE';
     const expectedCoredump = coredumpRejected ? null : announced;
+    const rejectedCoredump = coredumpRejected
+      ? { size: isUint32(payload.coredumpSize) ? payload.coredumpSize : null }
+      : null;
 
     try {
-      const report = await this.attractapService.createCrashReport(socket.readerId, payload, expectedCoredump);
+      const report = await this.attractapService.createCrashReport(
+        socket.readerId,
+        payload,
+        expectedCoredump,
+        rejectedCoredump,
+      );
       await this.audit.record({
         domain: 'attractap',
         action: 'attractap.reader.crash_reported',
@@ -67,6 +75,7 @@ export class AttractapCrashReportHandler {
         subject: { type: 'attractap.reader', id: socket.readerId },
         details: {
           source: 'reader-websocket',
+          reportId: report.id,
           resetReason: this.normalizeResetReason(report.resetReason),
           // Includes a dump that is still being uploaded: the event is recorded once, at the report.
           hasCoredump: !!report.coredumpSize || report.coredumpStatus === 'awaiting',
@@ -170,7 +179,9 @@ export class AttractapCrashReportHandler {
       crc32: payload.crc32,
     });
     if ('error' in result) {
-      this.logger.warn(`Coredump upload of reader ${socket.readerId} discarded: ${result.error}`);
+      // Without an upload in progress there is nothing to discard.
+      const outcome = result.error === 'COREDUMP_NO_UPLOAD' ? 'refused' : 'discarded';
+      this.logger.warn(`Coredump upload of reader ${socket.readerId} ${outcome}: ${result.error}`);
       return reply({ error: result.error });
     }
 

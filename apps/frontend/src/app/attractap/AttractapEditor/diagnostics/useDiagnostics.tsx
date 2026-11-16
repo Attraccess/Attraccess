@@ -4,6 +4,9 @@ import { OpenAPI, useAttractapServiceGetReaderCrashReports } from '@attraccess/r
 import { useToastMessage } from '../../../../components/toastProvider';
 import de from '../AttractapDiagnostics.de.json';
 import en from '../AttractapDiagnostics.en.json';
+/** How often the list refreshes while a coredump upload is still owed, so a finished upload shows up. */
+export const PENDING_COREDUMP_POLL_INTERVAL_MS = 10_000;
+
 export interface Props {
   readerId?: number;
 }
@@ -24,6 +27,10 @@ export function useAttractapDiagnosticsState(props: Readonly<Props>) {
     isError,
   } = useAttractapServiceGetReaderCrashReports({ readerId: props.readerId as number }, undefined, {
     enabled: props.readerId !== undefined,
+    refetchInterval: (query) =>
+      query.state.data?.some((report) => report.coredumpStatus === 'awaiting')
+        ? PENDING_COREDUMP_POLL_INTERVAL_MS
+        : false,
   });
 
   const downloadCoredump = useCallback(

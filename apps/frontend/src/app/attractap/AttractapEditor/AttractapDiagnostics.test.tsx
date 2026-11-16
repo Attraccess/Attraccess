@@ -63,7 +63,11 @@ it('distinguishes loading, errors, and a reader without reports', () => {
   state.error = false;
   view.rerender(<AttractapDiagnostics />);
   expect(screen.getByText('empty')).toBeTruthy();
-  expect(state.query).toHaveBeenLastCalledWith({ readerId: undefined }, undefined, { enabled: false });
+  expect(state.query).toHaveBeenLastCalledWith(
+    { readerId: undefined },
+    undefined,
+    expect.objectContaining({ enabled: false }),
+  );
 });
 it('renders firmware mismatches, formatted telemetry, heap trend, and expandable backtraces', () => {
   state.reports = [
@@ -164,4 +168,33 @@ it('tells a coredump that is still being uploaded and a recovered one apart from
   expect(reports[1].querySelector('[data-cy="attractap-diagnostics-download-coredump"]')).toBeTruthy();
   expect(reports[2].textContent).toContain('noCoredump');
   expect(reports[2].querySelector('[data-cy="attractap-diagnostics-coredump-pending"]')).toBeNull();
+});
+it('shows a coredump the server refused instead of claiming there was none', () => {
+  state.reports = [
+    {
+      id: 14,
+      createdAt: report.createdAt,
+      resetReason: 'PANIC',
+      coredumpStatus: 'rejected',
+      coredumpExpectedSize: 140000,
+      coredumpSize: null,
+    },
+  ];
+  const { container } = render(<AttractapDiagnostics readerId={7} />);
+  expect(container.querySelector('[data-cy="attractap-diagnostics-coredump-rejected"]')?.textContent).toBe(
+    'coredumpRejected',
+  );
+  expect(container.querySelector('[data-cy="attractap-diagnostics-coredump-rejected-hint"]')).toBeTruthy();
+  expect(container.textContent).not.toContain('noCoredump');
+});
+it('refreshes the reports only while a coredump upload is still owed', () => {
+  render(<AttractapDiagnostics readerId={7} />);
+  const { refetchInterval } = state.query.mock.calls[0][2] as {
+    refetchInterval: (query: { state: { data?: unknown[] } }) => number | false;
+  };
+  expect(refetchInterval({ state: { data: [{ coredumpStatus: 'awaiting' }, { coredumpStatus: 'stored' }] } })).toBe(
+    10_000,
+  );
+  expect(refetchInterval({ state: { data: [{ coredumpStatus: 'stored' }] } })).toBe(false);
+  expect(refetchInterval({ state: {} })).toBe(false);
 });
