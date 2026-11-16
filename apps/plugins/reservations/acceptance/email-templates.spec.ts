@@ -6,6 +6,8 @@ import { validate } from 'class-validator';
 import { DataSource } from 'typeorm';
 import { UpdateEmailTemplateDto } from '../../../api/src/email-template/dto/update-email-template.dto';
 import { EmailTemplateService } from '../../../api/src/email-template/email-template.service';
+import { TypeOrmEmailTemplateStore } from '../../../api/src/database/adapters/email/typeorm-email-template-store';
+import { TransactionHandles } from '../../../api/src/database/adapters/common/transaction-handles';
 import { MjmlService } from '../../../api/src/email-template/mjml.service';
 import {
   registerPluginEmailTemplates,
@@ -50,8 +52,11 @@ describe('reservations email templates in the host template store', () => {
       entities: [EmailTemplate, EmailTemplateTranslation],
     }).initialize();
     service = new EmailTemplateService(
-      dataSource.getRepository(EmailTemplate),
-      dataSource.getRepository(EmailTemplateTranslation),
+      new TypeOrmEmailTemplateStore(
+        dataSource.getRepository(EmailTemplate),
+        dataSource.getRepository(EmailTemplateTranslation),
+        new TransactionHandles(undefined as never),
+      ),
       new MjmlService(),
       { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } as never,
     );

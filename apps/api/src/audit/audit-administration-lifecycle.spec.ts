@@ -120,13 +120,14 @@ describe('administration lifecycle hooks', () => {
 
   it('records template and layout edits, resets and translations without body content', async () => {
     const audit = recorder();
-    const manager = { delete: jest.fn(), insert: jest.fn(), create: jest.fn((_entity, value) => value) };
     const templates = new EmailTemplateService(
-      { findOneBy: jest.fn(async () => ({ body: secret })), update: jest.fn() } as never,
       {
-        create: jest.fn((value) => value),
-        delete: jest.fn(),
-        manager: { transaction: jest.fn(async (work: (m: typeof manager) => unknown) => work(manager)) },
+        findTemplate: jest.fn(async () => ({ body: secret })),
+        updateContent: jest.fn(),
+        restoreDefaults: jest.fn(),
+        findTranslations: jest.fn(async () => []),
+        replaceTranslations: jest.fn(async (_type, _locale, _entries, inTransaction) => inTransaction?.({})),
+        deleteTranslations: jest.fn(),
       } as never,
       { validateAndConvert: jest.fn() } as never,
       audit as never,

@@ -1,6 +1,5 @@
 import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../audit/recorder/audit-event';
-import { EmailTemplate } from '@attraccess/database-entities';
 import { UpdateEmailLayoutDto } from './dto/update-email-layout.dto';
 import { EmailLayoutResponseDto } from './dto/email-layout-response.dto';
 import { SettingsStoreService } from '../settings/settings-store.service';
@@ -41,7 +40,7 @@ export class EmailLayoutService {
     return this.mjmlService.convertToHtml(fullMjml);
   }
 
-  async renderWithTemplate(template: Pick<EmailTemplate, 'body'>): Promise<string> {
+  async renderWithTemplate(template: { body: string }): Promise<string> {
     const layout = await this.findGlobal();
     const fullMjml = this.injectContentIntoLayout(layout.body, template.body);
     return this.mjmlService.validateAndConvert(fullMjml);

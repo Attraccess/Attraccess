@@ -1,6 +1,13 @@
 import { ArgumentsHost, Catch, Logger } from '@nestjs/common';
 import { BaseExceptionFilter, HttpAdapterHost } from '@nestjs/core';
-import { QueryFailedError } from 'typeorm';
+import { persistenceErrorCode } from '../database/persistence-errors';
+
+/** A failed database statement as drivers report it: the driver's own error sits in `driverError`. */
+function driverMessage(exception: unknown): string | undefined {
+  const failure = exception as { driverError?: { message?: string }; message?: string } | null;
+  if (!failure || typeof failure !== 'object' || !('driverError' in failure)) return undefined;
+  return failure.driverError?.message ?? failure.message;
+}
 
 @Catch()
 export class SqliteReadonlyFilter extends BaseExceptionFilter {
@@ -11,18 +18,12 @@ export class SqliteReadonlyFilter extends BaseExceptionFilter {
   }
 
   catch(exception: unknown, host: ArgumentsHost) {
-    if (exception instanceof QueryFailedError) {
-      const driverError = (exception as QueryFailedError & { driverError?: { code?: string; message?: string } })
-        .driverError;
-      const errorCode = driverError?.code;
-      const errorMessage = driverError?.message ?? exception.message;
-
-      if (errorCode === 'SQLITE_READONLY' || errorMessage?.includes('SQLITE_READONLY')) {
-        this.logger.error(
-          'SQLite database is read-only. If you upgraded from a root-based container, ' +
-            'fix storage ownership by running as root: chown -R appuser:appuser /app/storage'
-        );
-      }
+    const message = driverMessage(exception);
+    if (persistenceErrorCode(exception) === 'SQLITE_READONLY' || message?.includes('SQLITE_READONLY')) {
+      this.logger.error(
+        'SQLite database is read-only. If you upgraded from a root-based container, ' +
+          'fix storage ownership by running as root: chown -R appuser:appuser /app/storage',
+      );
     }
 
     super.catch(exception, host);

@@ -1,7 +1,12 @@
 import { DataSource } from 'typeorm';
 import { AttractapCrashReport, entities } from '@attraccess/database-entities';
 import { MetricsService } from './metrics.service';
-import { COUNT_SQL, RESET_REPORT_COUNT_DEADLINE_MS, ResetReportMetricsCollector } from './reset-report-metrics.collector';
+import { RESET_REPORT_COUNT_DEADLINE_MS, ResetReportMetricsCollector } from './reset-report-metrics.collector';
+import {
+  TypeOrmResetReportCountReader,
+  resetReportCountSql,
+  sqliteResetReportBounds,
+} from '../database/adapters/metrics/typeorm-metrics-readers';
 import {
   CRASH_WATCHDOG_REASONS,
   MAX_READERS_TEXT_LENGTH,
@@ -50,7 +55,12 @@ describe('ResetReportMetricsCollector', () => {
     await source.query(`INSERT INTO attractap VALUES (1, 'Door'), (2, 'Laser')`);
     registry.clear();
     gauges = {
-      attractapResetReportsLastHour: new Gauge({ name: 'a', help: 'a', labelNames: ['category'], registers: [registry] }),
+      attractapResetReportsLastHour: new Gauge({
+        name: 'a',
+        help: 'a',
+        labelNames: ['category'],
+        registers: [registry],
+      }),
       attractapResetReportReadersLastHour: new Gauge({
         name: 'b',
         help: 'b',
@@ -60,7 +70,7 @@ describe('ResetReportMetricsCollector', () => {
     };
     collector = new ResetReportMetricsCollector(
       { ...gauges, registerRefresher: jest.fn() } as unknown as MetricsService,
-      source.getRepository(AttractapCrashReport),
+      new TypeOrmResetReportCountReader(source.getRepository(AttractapCrashReport)),
     );
     nextId = 1;
   });
@@ -148,7 +158,7 @@ describe('ResetReportMetricsCollector', () => {
     const repo = { query: jest.fn().mockReturnValue(new Promise((resolve) => (finish = resolve))) };
     const slow = new ResetReportMetricsCollector(
       { ...gauges, registerRefresher: jest.fn() } as unknown as MetricsService,
-      repo as never,
+      new TypeOrmResetReportCountReader(repo as never),
     );
     jest.useFakeTimers({ now: NOW });
     const first = slow.refresh();
@@ -175,7 +185,10 @@ describe('ResetReportMetricsCollector', () => {
   it('runs one count at a time', async () => {
     const query = jest.spyOn(source.getRepository(AttractapCrashReport), 'query');
     const repo = source.getRepository(AttractapCrashReport);
-    const shared = new ResetReportMetricsCollector({ ...gauges, registerRefresher: jest.fn() } as unknown as MetricsService, repo);
+    const shared = new ResetReportMetricsCollector(
+      { ...gauges, registerRefresher: jest.fn() } as unknown as MetricsService,
+      new TypeOrmResetReportCountReader(repo),
+    );
     await Promise.all([shared.refresh(), shared.refresh()]);
     expect(query).toHaveBeenCalledTimes(1);
   });
@@ -215,12 +228,12 @@ describe('reset report count query on the migrated schema', () => {
   });
 
   it('uses the createdAt index for the real hourly count query', async () => {
-    const { from, to } = hourWindow(NOW);
-    const plan = (await source.query(`EXPLAIN QUERY PLAN ${COUNT_SQL}`, [
+    const { from, to } = sqliteResetReportBounds(hourWindow(NOW));
+    const reasons = [...CRASH_WATCHDOG_REASONS, ...POWER_ON_REASONS];
+    const plan = (await source.query(`EXPLAIN QUERY PLAN ${resetReportCountSql(reasons.length)}`, [
       from,
       to,
-      ...CRASH_WATCHDOG_REASONS,
-      ...POWER_ON_REASONS,
+      ...reasons,
     ])) as Array<{ detail: string }>;
     const details = plan.map((p) => p.detail).join(' ');
     expect(details).toContain('SEARCH r USING INDEX IDX_attractap_crash_report_created_at');

@@ -29,6 +29,7 @@ import { Setting } from '@attraccess/database-entities';
 import * as sourceMigrations from '../backend/migrations';
 import { MatterConnectionService } from '../backend/connection/connection.service';
 import sourcePlugin from '../backend/plugin';
+import { TypeOrmSettingsRows } from '../../../api/src/database/adapters/settings/typeorm-settings-rows';
 
 export const PLUGIN_ID = 'MatterAcceptance21chr';
 export const HOST_VERSION = '2.0.0';
@@ -95,7 +96,7 @@ export async function bootHost(
   await db.runMigrations();
   const audit = new AuditService(
     db,
-    new SettingsStoreService(db.getRepository(Setting), null),
+    new SettingsStoreService(TypeOrmSettingsRows.forRepository(db.getRepository(Setting)), null),
     createTestAuditMetrics(),
   );
   await audit.onModuleInit();

@@ -22,6 +22,7 @@ import { AUDIT_BUSY_RETRIES, MAX_PENDING_AUDIT_WRITES } from './persistence/audi
 import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite/sqlite-connection';
 import { AUDIT_DROP_REASONS } from '../metrics/definitions/audit.metrics';
 import { createTestAuditMetrics, droppedRecords, setupAuditDatabase } from './audit.test-fixture';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 describe('durable audit SQLite', () => {
   const fixture = setupAuditDatabase();
   it('upgrades additively, survives connection restart and principal deletion, prevents updates, and reverts', async () => {
@@ -38,7 +39,7 @@ describe('durable audit SQLite', () => {
     await fixture.source.query(
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
-    fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
+    fixture.store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)), null);
     fixture.service = new AuditService(fixture.source, fixture.store, fixture.metrics);
     await fixture.service.onModuleInit();
     expect((await fixture.query.list(new AuditQueryDto())).items).toEqual([
@@ -447,7 +448,7 @@ describe('durable audit SQLite', () => {
     await expect(settings.updateAuditSettings({ secret: 'never' } as never)).rejects.toThrow();
     await settings.updateAuditSettings({ enabled: false, domains: [], retention_days: 2 });
     await fixture.service.onModuleDestroy();
-    fixture.store = new SettingsStoreService(fixture.source.getRepository(Setting), null);
+    fixture.store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(fixture.source.getRepository(Setting)), null);
     expect(await readAuditSettings(fixture.store)).toEqual({
       enabled: false,
       domains: [],
@@ -734,7 +735,7 @@ it('upgrades the full registered schema, reverts the audit migration, and reappl
         }),
       },
     ]);
-    const migratedStore = new SettingsStoreService(source.getRepository(Setting), null);
+    const migratedStore = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     const migratedAudit = new AuditService(source, migratedStore, createTestAuditMetrics());
     await migratedAudit.onModuleInit();
     const migratedList = await new AuditController(new AuditQueryService(migratedAudit, source, migratedStore)).list({

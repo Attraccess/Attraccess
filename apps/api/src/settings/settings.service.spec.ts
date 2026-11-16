@@ -2,10 +2,9 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { validate } from 'class-validator';
 import { UpdateAppSettingsDto } from './dto/update-app-settings.dto';
 import { Test } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { User } from '@attraccess/database-entities';
 import { SettingsService } from './settings.service';
 import { SettingsStoreService } from './settings-store.service';
+import { SETUP_ACCOUNT_STATS } from './settings-rows.port';
 import { SmtpSettingsService } from './smtp-settings.service';
 import {
   APP_PARENT,
@@ -34,7 +33,7 @@ describe('SettingsService', () => {
     setSecretSetting: jest.Mock;
   };
   let smtpSettings: { getSettings: jest.Mock };
-  let userRepository: { count: jest.Mock };
+  let accounts: { countAccounts: jest.Mock; countVerifiedAccounts: jest.Mock };
   let invalidator: { refresh: jest.Mock };
 
   beforeEach(async () => {
@@ -46,7 +45,7 @@ describe('SettingsService', () => {
       setSecretSetting: jest.fn().mockResolvedValue(undefined),
     };
     smtpSettings = { getSettings: jest.fn() };
-    userRepository = { count: jest.fn() };
+    accounts = { countAccounts: jest.fn(), countVerifiedAccounts: jest.fn() };
     invalidator = { refresh: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
@@ -55,7 +54,7 @@ describe('SettingsService', () => {
         { provide: EventEmitter2, useValue: events },
         { provide: SettingsStoreService, useValue: store },
         { provide: SmtpSettingsService, useValue: smtpSettings },
-        { provide: getRepositoryToken(User), useValue: userRepository },
+        { provide: SETUP_ACCOUNT_STATS, useValue: accounts },
         { provide: METRICS_TOGGLE_INVALIDATOR, useValue: invalidator },
       ],
     }).compile();
@@ -214,7 +213,8 @@ describe('SettingsService', () => {
         passConfigured: false,
         from: 'noreply@attraccess.example',
       });
-      userRepository.count.mockResolvedValue(0);
+      accounts.countAccounts.mockResolvedValue(0);
+      accounts.countVerifiedAccounts.mockResolvedValue(0);
 
       const status = await service.getFirstTimeSetupStatus();
 

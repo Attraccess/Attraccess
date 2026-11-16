@@ -52,7 +52,9 @@ describe('CronTimer.time', () => {
     ).rejects.toThrow('x');
 
     const text = await registry.metrics();
-    const match = text.match(/attraccess_cron_job_last_run_timestamp_seconds\{job_name="maintenance_evaluator"\} (\d+(?:\.\d+)?)/);
+    const match = text.match(
+      /attraccess_cron_job_last_run_timestamp_seconds\{job_name="maintenance_evaluator"\} (\d+(?:\.\d+)?)/,
+    );
     expect(match).not.toBeNull();
     expect(Number(match?.[1])).toBeGreaterThanOrEqual(beforeUnix);
   });

@@ -32,7 +32,9 @@ describe('WsMetricsInterceptor', () => {
         expect(text).toContain(
           'attraccess_ws_messages_total{gateway="attractap",event="HEARTBEAT",status="success"} 1',
         );
-        expect(text).toContain('attraccess_ws_message_duration_seconds_count{gateway="attractap",event="HEARTBEAT",status="success"} 1');
+        expect(text).toContain(
+          'attraccess_ws_message_duration_seconds_count{gateway="attractap",event="HEARTBEAT",status="success"} 1',
+        );
         done();
       },
     });
@@ -48,9 +50,7 @@ describe('WsMetricsInterceptor', () => {
     interceptor.intercept(buildWsContext(), handler).subscribe({
       error: async () => {
         const text = await registry.metrics();
-        expect(text).toContain(
-          'attraccess_ws_messages_total{gateway="attractap",event="HEARTBEAT",status="error"} 1',
-        );
+        expect(text).toContain('attraccess_ws_messages_total{gateway="attractap",event="HEARTBEAT",status="error"} 1');
         done();
       },
     });
@@ -102,9 +102,7 @@ describe('WsMetricsInterceptor', () => {
     interceptor.intercept(buildWsContext(null), handler).subscribe({
       complete: async () => {
         const text = await registry.metrics();
-        expect(text).toContain(
-          'attraccess_ws_messages_total{gateway="attractap",event="unknown",status="success"} 1',
-        );
+        expect(text).toContain('attraccess_ws_messages_total{gateway="attractap",event="unknown",status="success"} 1');
         done();
       },
     });

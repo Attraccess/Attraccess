@@ -1,5 +1,5 @@
-import { BillingTransactionItem } from '@attraccess/database-entities';
 import { formatCredits } from '@attraccess/shared';
+import type { ReceiptItem } from './email-receipt.types';
 
 /** Adds `value` decimal strings exactly; whole milliseconds and meter decimals alike. */
 function sumDecimals(values: string[]): string {
@@ -75,7 +75,7 @@ export function receiptFormatters(locale: string): {
 
 /** Receipt fields for a charge that is a share of a machine used by several people at once. */
 export function describeAllocation(
-  item: Pick<BillingTransactionItem, 'allocation' | 'meterQuantity' | 'durationMs'>,
+  item: ReceiptItem,
   secondsFormatter: Intl.NumberFormat,
   minorUnit: number,
   formatRange: SegmentRangeFormatter,

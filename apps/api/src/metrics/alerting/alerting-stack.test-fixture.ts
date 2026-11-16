@@ -2,9 +2,11 @@ import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { createServer, IncomingMessage, Server } from 'http';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { DataSource } from 'typeorm';
 import { GenericContainer, Network, StartedNetwork, StartedTestContainer, Wait } from 'testcontainers';
-import { AttractapCrashReport } from '@attraccess/database-entities';
+import {
+  openSqliteFixtureDatabase,
+  SqliteFixtureDatabase,
+} from '../../database/adapters/metrics/sqlite-fixture-database';
 import { MetricsService } from '../metrics.service';
 import { ResetReportMetricsCollector } from '../reset-report-metrics.collector';
 import { AuditMetrics, createAuditMetrics } from '../definitions/audit.metrics';
@@ -65,14 +67,14 @@ class MetricsServer {
   private constructor(
     readonly port: number,
     private readonly server: Server,
-    private readonly source: DataSource,
+    private readonly database: SqliteFixtureDatabase,
     readonly audit: AuditMetrics,
   ) {}
 
   static async start(file: string): Promise<MetricsServer> {
-    const source = await new DataSource({ type: 'sqlite', database: file, busyTimeout: 5000 }).initialize();
-    const service = new MetricsService(...(Array(7).fill({}) as ConstructorParameters<typeof MetricsService>));
-    const collector = new ResetReportMetricsCollector(service, source.getRepository(AttractapCrashReport));
+    const database = await openSqliteFixtureDatabase(file);
+    const service = new MetricsService({} as never);
+    const collector = new ResetReportMetricsCollector(service, database.resetReportReader);
     collector.onModuleInit();
     const audit = createAuditMetrics(service.registry);
     const server = createServer((req, res) => {
@@ -83,12 +85,12 @@ class MetricsServer {
     });
     await new Promise<void>((resolve) => server.listen(0, '0.0.0.0', resolve));
     const address = server.address();
-    return new MetricsServer(typeof address === 'object' && address ? address.port : 0, server, source, audit);
+    return new MetricsServer(typeof address === 'object' && address ? address.port : 0, server, database, audit);
   }
 
   async stop(): Promise<void> {
     await new Promise((resolve) => this.server.close(resolve));
-    await this.source.destroy();
+    await this.database.close();
   }
 }
 
@@ -112,7 +114,7 @@ function parseNotification(body: string): Notification {
 export class AlertingStack {
   readonly notifications: Notification[] = [];
   private dir = '';
-  private db!: DataSource;
+  private db!: SqliteFixtureDatabase;
   private servers: MetricsServer[] = [];
   private webhook!: Server;
   private network!: StartedNetwork;
@@ -134,7 +136,7 @@ export class AlertingStack {
   private async boot(rules: string): Promise<void> {
     this.dir = mkdtempSync(join(tmpdir(), 'attraccess-alerting-'));
     const file = join(this.dir, 'attraccess.sqlite');
-    this.db = await new DataSource({ type: 'sqlite', database: file, busyTimeout: 5000 }).initialize();
+    this.db = await openSqliteFixtureDatabase(file);
     await this.createSchema();
     // Push each server as it starts, so a failed second start still stops the first.
     this.servers.push(await MetricsServer.start(file));
@@ -239,10 +241,10 @@ policies:
 
   /** Replaces all stored reports in one transaction, so a scrape never sees a half-written set. */
   async setReports(reports: Array<{ reader: number; reason: string }>): Promise<void> {
-    await this.db.transaction(async (manager) => {
-      await manager.query('DELETE FROM attractap_crash_report');
+    await this.db.transaction(async (queries) => {
+      await queries.query('DELETE FROM attractap_crash_report');
       for (const { reader, reason } of reports) {
-        await manager.query(
+        await queries.query(
           `INSERT INTO attractap_crash_report (id, attractapId, resetReason, createdAt) VALUES (?, ?, ?, datetime('now'))`,
           [this.nextId++, reader, reason],
         );
@@ -307,7 +309,7 @@ policies:
       this.network?.stop(),
       ...this.servers.map((s) => s.stop()),
       this.webhook && new Promise((resolve) => this.webhook.close(resolve)),
-      this.db?.destroy(),
+      this.db?.close(),
     ]);
     if (this.dir) rmSync(this.dir, { recursive: true, force: true });
   }

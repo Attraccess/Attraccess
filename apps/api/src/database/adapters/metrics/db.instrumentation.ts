@@ -3,9 +3,9 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { DataSource, QueryRunner } from 'typeorm';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DB_METRICS } from '../../definitions/tokens';
-import { DbMetrics } from '../../definitions/db.metrics';
-import { MetricsToggleService } from '../../settings/metrics-toggle.service';
+import { DB_METRICS } from '../../../metrics/definitions/tokens';
+import { DbMetrics } from '../../../metrics/definitions/db.metrics';
+import { MetricsToggleService } from '../../../metrics/settings/metrics-toggle.service';
 
 type DbMethod = 'select' | 'insert' | 'update' | 'delete' | 'other';
 

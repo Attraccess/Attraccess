@@ -1,21 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AnalyticsService } from './analytics.service';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { BillingTransaction, Resource, ResourceUsage } from '@attraccess/database-entities';
-import { ResourceUsageAction } from '@attraccess/application-models';
-import { Between, Repository } from 'typeorm';
+import { ANALYTICS_READER } from './analytics-reader.port';
 import { DateRangeValue } from './dtos/dateRangeValue';
 import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
-  let repository: jest.Mocked<Repository<ResourceUsage>>;
 
-  const mockRepository = {
-    findAndCount: jest.fn(),
-  };
-  const mockBillingRepository = {
-    findAndCount: jest.fn(),
+  const reader = {
+    findUsagesStartedInRange: jest.fn(),
+    findBillingTransactionsInRange: jest.fn(),
+    findResourcesActiveInRange: jest.fn(),
+    countSessionsInRange: jest.fn(),
+    findFirstActivityStart: jest.fn(),
   };
   const operatingAttributionService = {
     getForResources: jest.fn(),
@@ -25,15 +22,7 @@ describe('AnalyticsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AnalyticsService,
-        {
-          provide: getRepositoryToken(ResourceUsage),
-          useValue: mockRepository,
-        },
-        {
-          provide: getRepositoryToken(BillingTransaction),
-          useValue: mockBillingRepository,
-        },
-        { provide: getRepositoryToken(Resource), useValue: {} },
+        { provide: ANALYTICS_READER, useValue: reader },
         {
           provide: ResourceOperatingAttributionService,
           useValue: operatingAttributionService,
@@ -42,9 +31,6 @@ describe('AnalyticsService', () => {
     }).compile();
 
     service = module.get<AnalyticsService>(AnalyticsService);
-    repository = module.get<Repository<ResourceUsage>>(getRepositoryToken(ResourceUsage)) as jest.Mocked<
-      Repository<ResourceUsage>
-    >;
   });
 
   afterEach(() => {
@@ -56,74 +42,40 @@ describe('AnalyticsService', () => {
   });
 
   describe('getResourceUsageHoursInDateRange', () => {
-    it('should return resource usage for a date range with default pagination', async () => {
-      const dateRange: DateRangeValue = {
-        start: new Date('2023-01-01'),
-        end: new Date('2023-01-31'),
-      };
+    const dateRange: DateRangeValue = { start: new Date('2023-01-01'), end: new Date('2023-01-31') };
 
-      const expectedResourceUsage = [
-        {
-          id: 1,
-          resourceId: 1,
-          userId: 1,
-          startTime: new Date('2023-01-15'),
-          endTime: new Date('2023-01-15T02:00:00Z'),
-          startNotes: 'Starting session',
-          endNotes: 'Ending session',
-          usageInMinutes: 120,
-          user: { id: 1, name: 'User 1' },
-          resource: { id: 1, name: 'Resource 1' },
-        },
-      ];
+    it('returns the rows and total of the reader with default pagination', async () => {
+      reader.findUsagesStartedInRange.mockResolvedValue({ rows: [{ id: 1 }], total: 1 });
 
-      mockRepository.findAndCount.mockResolvedValue([expectedResourceUsage, 1]);
-
-      const result = await service.getResourceUsageHoursInDateRange(dateRange);
-
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: {
-          startTime: Between(dateRange.start, dateRange.end),
-          usageAction: ResourceUsageAction.Usage,
-          lifecyclePending: false,
-        },
-        order: {
-          id: 'DESC',
-          userId: 'DESC',
-          startTime: 'DESC',
-        },
-        relations: ['user', 'resource', 'supervisorUser'],
-        skip: 0,
-        take: 500,
-      });
-
-      expect(result).toEqual([[{ ...expectedResourceUsage[0], userEmail: null, supervisorEmail: null }], 1]);
+      await expect(service.getResourceUsageHoursInDateRange(dateRange)).resolves.toEqual([[{ id: 1 }], 1]);
+      expect(reader.findUsagesStartedInRange).toHaveBeenCalledWith(dateRange, 1, 500);
     });
 
-    it('should apply skip/take for page 2', async () => {
-      const dateRange: DateRangeValue = {
-        start: new Date('2023-01-01'),
-        end: new Date('2023-01-31'),
-      };
-
-      mockRepository.findAndCount.mockResolvedValue([[], 1000]);
+    it('passes the requested page and limit through', async () => {
+      reader.findUsagesStartedInRange.mockResolvedValue({ rows: [], total: 1000 });
 
       await service.getResourceUsageHoursInDateRange(dateRange, 2, 100);
 
-      expect(repository.findAndCount).toHaveBeenCalledWith(expect.objectContaining({ skip: 100, take: 100 }));
+      expect(reader.findUsagesStartedInRange).toHaveBeenCalledWith(dateRange, 2, 100);
+    });
+  });
+
+  describe('getBillingTransactionsInDateRange', () => {
+    const dateRange: DateRangeValue = { start: new Date('2023-01-01'), end: new Date('2023-01-31') };
+
+    it('omits emails unless the caller may see them', async () => {
+      reader.findBillingTransactionsInRange.mockResolvedValue({ rows: [{ id: 5 }], total: 1 });
+
+      await expect(service.getBillingTransactionsInDateRange(dateRange)).resolves.toEqual([[{ id: 5 }], 1]);
+      expect(reader.findBillingTransactionsInRange).toHaveBeenCalledWith(dateRange, 1, 500, false);
     });
 
-    it('should return an empty array when no records are found', async () => {
-      const dateRange: DateRangeValue = {
-        start: new Date('2023-02-01'),
-        end: new Date('2023-02-28'),
-      };
+    it('asks for emails, page and limit when the caller may see them', async () => {
+      reader.findBillingTransactionsInRange.mockResolvedValue({ rows: [], total: 0 });
 
-      mockRepository.findAndCount.mockResolvedValue([[], 0]);
+      await service.getBillingTransactionsInDateRange(dateRange, 2, 50, true);
 
-      const result = await service.getResourceUsageHoursInDateRange(dateRange);
-
-      expect(result).toEqual([[], 0]);
+      expect(reader.findBillingTransactionsInRange).toHaveBeenCalledWith(dateRange, 2, 50, true);
     });
   });
 
@@ -165,87 +117,6 @@ describe('AnalyticsService', () => {
         new Date('2023-01-15T10:00:00Z'),
         true,
       );
-    });
-  });
-  describe('export email and metadata fields', () => {
-    const dateRange: DateRangeValue = { start: new Date('2023-01-01'), end: new Date('2023-01-31') };
-
-    it('adds flat email fields to resource usage rows and keeps resource metadata', async () => {
-      mockRepository.findAndCount.mockResolvedValue([
-        [
-          {
-            id: 1,
-            user: { id: 1, email: 'user@example.com', externalIdentifier: 'EXT-1' },
-            supervisorUser: { id: 2, email: 'mentor@example.com' },
-            resource: { id: 1, metadata: { costCenter: '4711' } },
-          },
-        ],
-        1,
-      ]);
-
-      const [rows] = await service.getResourceUsageHoursInDateRange(dateRange);
-
-      expect(rows[0]).toMatchObject({
-        userEmail: 'user@example.com',
-        supervisorEmail: 'mentor@example.com',
-        user: { externalIdentifier: 'EXT-1' },
-        resource: { metadata: { costCenter: '4711' } },
-      });
-    });
-
-    it('uses null emails when users are absent', async () => {
-      mockRepository.findAndCount.mockResolvedValue([[{ id: 1, user: null, supervisorUser: null }], 1]);
-
-      const [rows] = await service.getResourceUsageHoursInDateRange(dateRange);
-
-      expect(rows[0]).toMatchObject({ userEmail: null, supervisorEmail: null });
-    });
-  });
-
-  describe('getBillingTransactionsInDateRange', () => {
-    const dateRange: DateRangeValue = { start: new Date('2023-01-01'), end: new Date('2023-01-31') };
-    const transaction = {
-      id: 5,
-      user: { id: 1, email: 'user@example.com' },
-      initiator: { id: 3, email: 'initiator@example.com' },
-      resourceUsage: { id: 1, resource: { id: 1, metadata: { costCenter: '4711' } } },
-      items: [],
-    };
-
-    it('loads the user, initiator, resource and item relations and maps the emails', async () => {
-      mockBillingRepository.findAndCount.mockResolvedValue([[transaction], 1]);
-
-      const [rows, total] = await service.getBillingTransactionsInDateRange(dateRange, 2, 50, true);
-
-      expect(mockBillingRepository.findAndCount).toHaveBeenCalledWith({
-        where: { createdAt: Between(dateRange.start, dateRange.end) },
-        order: { createdAt: 'DESC', id: 'DESC', userId: 'DESC' },
-        relations: ['user', 'initiator', 'resourceUsage', 'resourceUsage.resource', 'items'],
-        skip: 50,
-        take: 50,
-      });
-      expect(total).toBe(1);
-      expect(rows[0]).toMatchObject({
-        userEmail: 'user@example.com',
-        initiatorEmail: 'initiator@example.com',
-        resourceUsage: { resource: { metadata: { costCenter: '4711' } } },
-      });
-    });
-
-    it('uses null emails when users are absent', async () => {
-      mockBillingRepository.findAndCount.mockResolvedValue([[{ id: 6, user: null, initiator: null }], 1]);
-
-      const [rows] = await service.getBillingTransactionsInDateRange(dateRange, 1, 500, true);
-
-      expect(rows[0]).toMatchObject({ userEmail: null, initiatorEmail: null });
-    });
-
-    it('omits the emails unless the caller may see them', async () => {
-      mockBillingRepository.findAndCount.mockResolvedValue([[transaction], 1]);
-
-      const [rows] = await service.getBillingTransactionsInDateRange(dateRange);
-
-      expect(rows[0]).toMatchObject({ userEmail: null, initiatorEmail: null });
     });
   });
 });

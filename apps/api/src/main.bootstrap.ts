@@ -2,7 +2,7 @@ import { Logger, Module, ClassSerializerInterceptor, ValidationPipe } from '@nes
 import { ConfigService, ConfigModule as NestConfigModule } from '@nestjs/config';
 import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { DataSource } from 'typeorm';
+import { DATABASE_LIFECYCLE, DatabaseLifecycle } from './database/database-lifecycle';
 import appConfiguration, { AppConfigType } from './config/app.config';
 import { StorageConfigType } from './config/storage.config';
 import { initializeProcessLogging, withLoggingLifecycle } from './logging/process-logging';
@@ -198,14 +198,14 @@ async function generateSelfSignedCertificates(storageDir: string, domain: string
 })
 class PluginBootstrapConfigModule {}
 
-type OwnedApplication = { close(): Promise<void>; get?(token: typeof DataSource): DataSource };
+type OwnedApplication = { close(): Promise<void>; get?(token: typeof DATABASE_LIFECYCLE): DatabaseLifecycle };
 
 async function closeOwnedApplication(app: OwnedApplication, logger: Logger): Promise<void> {
   // Capture ownership before closing: an earlier shutdown hook may throw before
   // TypeORM's hook runs, and the application may no longer allow provider lookup.
-  let database: DataSource | undefined;
+  let database: DatabaseLifecycle | undefined;
   try {
-    database = app.get?.(DataSource);
+    database = app.get?.(DATABASE_LIFECYCLE);
   } catch {
     // The early configuration context has no database provider.
   }
@@ -336,7 +336,7 @@ export async function bootstrap() {
       // Run migrations before the app fully starts
       try {
         bootstrapLogger.log('Running database migrations...');
-        const dataSource = app.get(DataSource);
+        const dataSource = app.get<DatabaseLifecycle>(DATABASE_LIFECYCLE);
 
         if (!dataSource.isInitialized) {
           await dataSource.initialize();

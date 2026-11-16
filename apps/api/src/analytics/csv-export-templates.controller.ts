@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthAny } from '@attraccess/plugins-backend-sdk';
-import { CsvExportTemplate } from '@attraccess/database-entities';
+import { CsvExportTemplate } from './dtos/csvExportTemplateResponse.dto';
 import { CsvExportTemplatesService } from './csv-export-templates.service';
 import {
   CreateCsvExportTemplateDto,

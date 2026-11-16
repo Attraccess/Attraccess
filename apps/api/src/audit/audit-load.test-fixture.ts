@@ -9,6 +9,7 @@ import { SettingsStoreService } from '../settings/settings-store.service';
 import { usageInternals } from '../resources/usage/sessions/fixtures/compose.test-fixture';
 import { AuditService } from './audit.service';
 import { createTestAuditMetrics } from './audit.test-fixture';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 
 /** A machine with the person who starts sessions on it and the person who takes it over. */
 export interface LoadMachine {
@@ -38,7 +39,7 @@ export function setupAuditLoadFixture(machineCount: number) {
     // No stored audit settings: the defaults record the resource and administration domains.
     audit = new AuditService(
       scope.source,
-      new SettingsStoreService(scope.source.getRepository(Setting), null),
+      new SettingsStoreService(TypeOrmSettingsRows.forRepository(scope.source.getRepository(Setting)), null),
       metrics,
     );
     await audit.onModuleInit();

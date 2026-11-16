@@ -1,7 +1,5 @@
-import { User } from '@attraccess/database-entities';
 import { EmailTemplateType } from '@attraccess/application-models';
 import { createTransport } from 'nodemailer';
-import { Repository } from 'typeorm';
 import { EmailLayoutService } from './../email-layout/email-layout.service';
 import { EmailTemplateService } from './../email-template/email-template.service';
 import { ExternalCallTimer } from './../metrics/instrumentation/external/external.helper';
@@ -9,8 +7,13 @@ import { MetricsService } from './../metrics/metrics.service';
 import { SmtpServiceType } from './../settings/dto/smtp-settings.dto';
 import { SettingsService } from './../settings/settings.service';
 import { EmailService } from './email.service';
+import { EmailRecipientDirectory } from './email-recipient-directory.port';
+import { ReceiptRecipient } from './email-receipt.types';
 
-export const makeUser = (overrides: Partial<User> = {}): User =>
+/** A recipient with the extra account fields some tests set. */
+export type TestUser = ReceiptRecipient & Record<string, unknown>;
+
+export const makeUser = (overrides: Partial<TestUser> = {}): TestUser =>
   ({
     id: 1,
     username: 'alice',
@@ -26,7 +29,7 @@ export const makeUser = (overrides: Partial<User> = {}): User =>
     nfcKeySeedToken: null,
     lastUsernameChangeAt: null,
     ...overrides,
-  }) as unknown as User;
+  }) as unknown as TestUser;
 
 export const setup = () => {
   const sendMail = jest.fn().mockResolvedValue(undefined);
@@ -143,8 +146,8 @@ export const setup = () => {
     time: <T>(_target: string, _operation: string, fn: () => Promise<T>) => fn(),
   };
 
-  const userRepository = {
-    findOne: jest.fn(),
+  const recipients = {
+    findById: jest.fn(),
   };
 
   const service = new EmailService(
@@ -153,8 +156,8 @@ export const setup = () => {
     emailLayoutService as unknown as EmailLayoutService,
     metricsService as unknown as MetricsService,
     externalCallTimer as unknown as ExternalCallTimer,
-    userRepository as unknown as Repository<User>,
+    recipients as unknown as EmailRecipientDirectory,
   );
 
-  return { service, sendMail, close, settingsService, emailTemplateService, emailLayoutService, userRepository };
+  return { service, sendMail, close, settingsService, emailTemplateService, emailLayoutService, recipients };
 };

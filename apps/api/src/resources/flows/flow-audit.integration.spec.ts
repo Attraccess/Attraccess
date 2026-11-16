@@ -25,6 +25,7 @@ import { startToHttpCanvas, testActor } from './flow-canvas-database.test-fixtur
 import { GlobalFlowsService } from './global-flows.service';
 import { ResourceFlowsService } from './resource-flows.service';
 import { ResourceFlowVariablesService } from './variables/resource-flow-variables.service';
+import { TypeOrmSettingsRows } from '../../database/adapters/settings/typeorm-settings-rows';
 
 const T = ResourceFlowNodeType;
 const tokenActor = auditActorOf({ id: 3, authenticationMethod: 'api-token', apiTokenId: 12 });
@@ -72,7 +73,7 @@ describe('flow audit rows in migrated storage', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    const store = new SettingsStoreService(source.getRepository(Setting), null);
+    const store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     await store.setPlainSetting('audit', 'domains', JSON.stringify(['resource']));
     audit = new AuditService(source, store, createTestAuditMetrics());
     await audit.onModuleInit();

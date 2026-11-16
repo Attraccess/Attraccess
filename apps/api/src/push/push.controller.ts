@@ -1,7 +1,8 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Post, Put, Query, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { PushSubscription } from '@attraccess/database-entities';
+import type { PushSubscriptionRecord } from '@attraccess/application-models';
+import { PushSubscription } from './dtos/pushSubscription.dto';
 import { PushService } from './push.service';
 import { VapidPublicKeyResponseDto } from './dtos/vapidPublicKeyResponse.dto';
 import { VapidConfigDto } from './dtos/vapidConfig.dto';
@@ -63,9 +64,7 @@ export class PushController {
     }
 
     const { keys, deletedSubscriptions } = await this.pushService.replaceVapidKeys(
-      hasPublicKey
-        ? { publicKey: dto.publicKey as string, privateKey: dto.privateKey as string }
-        : undefined,
+      hasPublicKey ? { publicKey: dto.publicKey as string, privateKey: dto.privateKey as string } : undefined,
     );
 
     return { publicKey: keys.publicKey, deletedSubscriptions };
@@ -81,7 +80,7 @@ export class PushController {
   async upsertSubscription(
     @Body() dto: CreatePushSubscriptionDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<PushSubscription> {
+  ): Promise<PushSubscriptionRecord> {
     return this.pushService.upsertSubscription(req.user.id, dto);
   }
 
