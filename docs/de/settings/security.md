@@ -91,7 +91,7 @@ Wird das Secret geändert, sind die gespeicherten Kartenschlüssel und Kopplungs
 
 ## Drosselung und Kontosperre
 
-Fehlgeschlagene Anmeldungen, Registrierungen, Passwort-Zuruecksetzungen, SSO-Kontoverknuepfungen und SSO-Provisionierungsaufrufe werden pro IP gedrosselt. Wiederholte Login-Fehlversuche und falsche Passwoerter bei der SSO-Kontoverknuepfung sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
+Fehlgeschlagene Anmeldungen, Registrierungen, Passwort-Zuruecksetzungen, erneut angeforderte Bestaetigungs-E-Mails, SSO-Kontoverknuepfungen und SSO-Provisionierungsaufrufe werden pro IP gedrosselt. Wiederholte Login-Fehlversuche und falsche Passwoerter bei der SSO-Kontoverknuepfung sperren zusaetzlich das betroffene Konto. Werte sind unter **Einstellungen -> Drosselung & Kontosperre** einstellbar.
 
 | Einstellung | Standard | Beschreibung |
 |-------------|----------|-------------|

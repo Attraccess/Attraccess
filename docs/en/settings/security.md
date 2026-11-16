@@ -91,7 +91,7 @@ Changing the secret makes the stored card keys and reader pairing keys unreadabl
 
 ## Auth Rate Limiting and Account Lockout
 
-Failed authentication attempts on login, registration, password reset, SSO account linking, and SSO provisioning endpoints are throttled per IP. Repeated login failures and wrong SSO account-link passwords additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
+Failed authentication attempts on login, registration, password reset, verification email resend, SSO account linking, and SSO provisioning endpoints are throttled per IP. Repeated login failures and wrong SSO account-link passwords additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
 
 | Setting | Default | Description |
 |---------|---------|-------------|

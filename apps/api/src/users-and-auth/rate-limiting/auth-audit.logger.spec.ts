@@ -77,9 +77,9 @@ describe('AuthAuditLogger', () => {
     );
   });
 
-  it('records verification email resends as their own identity audit action', () => {
-    logger.log({ type: 'verification_email_resend', outcome: 'success', ip: '2.2.2.2' });
-    logger.log({ type: 'verification_email_resend', outcome: 'rate_limited', ip: '2.2.2.2' });
+  it('records verification email resends as their own identity audit action', async () => {
+    await logger.log({ type: 'verification_email_resend', outcome: 'success', ip: '2.2.2.2' });
+    await logger.log({ type: 'verification_email_resend', outcome: 'rate_limited', ip: '2.2.2.2' });
 
     expect(record).toHaveBeenNthCalledWith(
       1,

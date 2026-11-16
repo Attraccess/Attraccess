@@ -41,6 +41,15 @@ class FakeController {
     return { ok: true };
   }
 
+  @Post('reset-request')
+  @AuthRateLimit('password_reset_request')
+  requestReset(@Body() body: { fail?: boolean }) {
+    if (body?.fail) {
+      throw new UnauthorizedException('boom');
+    }
+    return { ok: true };
+  }
+
   @Post('delete-confirm')
   @AuthRateLimit('delete_account_confirm', { clearFailuresOnSuccess: false })
   confirmDelete(@Body() body: { fail?: boolean }) {
@@ -94,6 +103,8 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
 
   afterEach(async () => {
     await app?.close();
+    // The audit mock is module-level; reset it so call assertions and implementations stay per test.
+    audit?.log.mockReset();
   });
 
   const hammerToLockout = async (headers: Record<string, string> = {}) => {
@@ -134,14 +145,40 @@ describe('AuthRateLimitInterceptor (HTTP integration)', () => {
       expect(blocked.status).toBe(429);
     });
 
-    it('counts verification email resends in their own scope, separate from register', async () => {
+    it.each([
+      ['/resend', '/reset-request'],
+      ['/reset-request', '/resend'],
+    ])('a lockout on %s leaves %s open (verification email resend and password reset have separate counters)', async (
+      locked,
+      open,
+    ) => {
       for (let i = 0; i < policy.maxAttempts; i += 1) {
-        await request(app.getHttpServer()).post('/resend').send({ fail: true });
+        const res = await request(app.getHttpServer()).post(locked).send({ fail: true });
+        expect(res.status).toBe(401);
       }
-      expect((await request(app.getHttpServer()).post('/resend').send({})).status).toBe(429);
-      expect((await request(app.getHttpServer()).post('/register').send({})).status).toBe(201);
-      expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ type: 'verification_email_resend' }));
-      expect(audit.log).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'password_reset_request' }));
+      expect((await request(app.getHttpServer()).post(locked).send({})).status).toBe(429);
+      expect((await request(app.getHttpServer()).post(open).send({})).status).toBe(201);
+    });
+
+    it('records resends as identity.verification_email_resent, never as a password reset request', async () => {
+      const record = jest.fn().mockResolvedValue({ status: 'recorded' });
+      const realLogger = new AuthAuditLogger({ record } as never);
+      audit.log.mockImplementation((fields) => realLogger.log(fields));
+
+      expect((await request(app.getHttpServer()).post('/resend').send({})).status).toBe(201);
+      expect((await request(app.getHttpServer()).post('/resend').send({ fail: true })).status).toBe(401);
+
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'identity.verification_email_resent', outcome: 'succeeded', details: {} }),
+      );
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'identity.verification_email_resent',
+          outcome: 'failed',
+          details: { reason: 'invalid_credentials' },
+        }),
+      );
+      expect(record).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'identity.password_reset_requested' }));
     });
 
     it('records a verification email outage as a dependency failure', async () => {
