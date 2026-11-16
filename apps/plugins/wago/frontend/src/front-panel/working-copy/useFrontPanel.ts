@@ -45,6 +45,27 @@ export interface FrontPanelWorkingCopy {
   release: () => void;
 }
 
+/** An apply this session started, or a published revision, has not reached the controller yet. */
+function isApplyPending(diagnostics: WagoDiagnostics | undefined, waitingRevision: number | null): boolean {
+  const published = diagnostics?.configuration;
+  if (published?.rejected) return false;
+  return (
+    (waitingRevision !== null && (published?.appliedRevision ?? 0) < waitingRevision) ||
+    (published?.publishedState === 'published' && published.publishedRevision !== published.appliedRevision)
+  );
+}
+
+/** The controller is online, supports the front panel and runs exactly the applied baseline revision. */
+function canUseLiveControls(diagnostics: WagoDiagnostics | undefined, baselineRevision: number | undefined): boolean {
+  return Boolean(
+    diagnostics?.capabilities.includes('front-panel-v1') &&
+    diagnostics.connectivity === 'online' &&
+    !diagnostics.incompatible &&
+    !diagnostics.configuration.revisionMismatch &&
+    diagnostics.configuration.appliedRevision === baselineRevision,
+  );
+}
+
 /**
  * Working copy of the controller configuration plus live controls, shared by the front panel page, its
  * alerts, the device cards and the apply confirmation so they all edit and apply the same copy.
@@ -214,20 +235,9 @@ export function useFrontPanel(controllerId: number): FrontPanelWorkingCopy {
     onError: () => setErrorKey('panel.discardError'),
   });
   const busy = apply.isPending || manual.isPending || release.isPending || discard.isPending;
-  const published = diagnostics.data?.configuration;
-  const pending =
-    !published?.rejected &&
-    ((waitingRevision !== null && (published?.appliedRevision ?? 0) < waitingRevision) ||
-      (published?.publishedState === 'published' && published.publishedRevision !== published.appliedRevision));
+  const pending = isApplyPending(diagnostics.data, waitingRevision);
   const enabled = Boolean(
-    !pending &&
-    applied &&
-    diagnostics.isSuccess &&
-    diagnostics.data?.capabilities.includes('front-panel-v1') &&
-    diagnostics.data.connectivity === 'online' &&
-    !diagnostics.data.incompatible &&
-    !diagnostics.data.configuration.revisionMismatch &&
-    diagnostics.data.configuration.appliedRevision === baseline.data?.revision,
+    !pending && applied && diagnostics.isSuccess && canUseLiveControls(diagnostics.data, baseline.data?.revision),
   );
   return {
     configuration,

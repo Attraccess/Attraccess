@@ -1522,7 +1522,7 @@
   "PluginController_listRegistries": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "f9109973"
+    "shape": "ff36031c"
   },
   "PluginController_addRegistry": {
     "decision": "deny",
@@ -1552,12 +1552,12 @@
   "PluginController_searchMarketplace": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "892bc1a8"
+    "shape": "5eb0691b"
   },
   "PluginController_marketplacePackage": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "928042fa"
+    "shape": "bad56e7e"
   },
   "PluginController_dependencyPlan": {
     "decision": "allow",
@@ -1592,7 +1592,7 @@
   "PluginController_installedPackages": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "290d1dbe"
+    "shape": "c2bc81ba"
   },
   "PluginController_updatePolicy": {
     "decision": "allow",
@@ -1632,7 +1632,7 @@
   "PluginController_installedPackageVersions": {
     "decision": "allow",
     "reason": "JSON request and response; the REST endpoint authorises every call.",
-    "shape": "aa04fc57"
+    "shape": "c843e8c9"
   },
   "PluginController_replaceInstalledPackage": {
     "decision": "deny",

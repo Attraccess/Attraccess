@@ -1,5 +1,4 @@
-import { Button, StatusAlert, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
-import { Description, Input, Label, ListBox, ProgressBar, Select, TextField } from '@heroui/react';
+import { Button, TableDataLoadingIndicator } from '@attraccess/plugins-frontend-ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import {
@@ -8,10 +7,29 @@ import {
   listMqttServers,
   retirePreviousMqttCredentials,
   retryControllerNetworkChange,
+  type NetworkChangeStatus,
 } from '../api/client';
 import { useWagoLiveQuery } from '../api/live-updates';
 import { useWagoTranslations } from '../i18n';
-import messages from '../network-change.en.json';
+import { NetworkChangeCredentialRetirement } from './NetworkChangeCredentialRetirement';
+import { NetworkChangeOutcome } from './NetworkChangeOutcome';
+import { NetworkChangeProgress } from './NetworkChangeProgress';
+import { NetworkChangeTargetFields } from './NetworkChangeTargetFields';
+
+/** Untouched fields follow fresh status; each deliberate edit survives refetches. */
+function networkChangeFields(
+  status: NetworkChangeStatus | undefined,
+  editedTargetHost: string | undefined,
+  editedServer: string | null | undefined,
+) {
+  const operation = status?.operation;
+  const pending = !!operation && operation.phase !== 'completed';
+  const editable = !pending || (operation?.phase === 'connecting' && !!operation.failure && !operation.running);
+  const current = pending && operation ? operation : status;
+  const targetHost = editedTargetHost ?? current?.targetHost ?? '';
+  const server = editedServer !== undefined ? editedServer : String(current?.mqttServerId ?? 'address');
+  return { pending, editable, targetHost, server };
+}
 
 export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
   const { t } = useWagoTranslations(),
@@ -28,14 +46,7 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
     [editedServer, setServer] = useState<string | null | undefined>();
   const status = statusQuery.data,
     operation = status?.operation;
-  const pending = !!operation && operation.phase !== 'completed';
-  const editable = !pending || (operation?.phase === 'connecting' && !!operation.failure && !operation.running);
-  // Untouched fields follow fresh status; each deliberate edit survives refetches.
-  const targetHost = editedTargetHost ?? (pending && operation ? operation.targetHost : (status?.targetHost ?? ''));
-  const server =
-    editedServer !== undefined
-      ? editedServer
-      : String((pending && operation ? operation.mqttServerId : status?.mqttServerId) ?? 'address');
+  const { pending, editable, targetHost, server } = networkChangeFields(status, editedTargetHost, editedServer);
   const mutation = useMutation({
     mutationFn: (kind: 'apply' | 'retry' | 'retire') =>
       kind === 'retry'
@@ -57,7 +68,6 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
     },
   });
   const busy = mutation.isPending || !!operation?.running;
-  const failure = operation?.failure;
   const validHost = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(targetHost.trim());
   const selectedServer = servers.data?.find((item) => String(item.id) === server);
 
@@ -73,72 +83,19 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
         <p role="status">{t('networkChange.managementRequired')}</p>
       ) : (
         <>
-          <TextField value={targetHost} onChange={setTargetHost} isDisabled={busy || !editable}>
-            <Label>{t('networkChange.address')}</Label>
-            <Input autoComplete="off" placeholder="192.168.1.10" />
-            <Description>{t('networkChange.addressDescription')}</Description>
-          </TextField>
-          <Select
-            value={server}
-            onChange={(value) => setServer(value === null ? null : String(value))}
+          <NetworkChangeTargetFields
+            targetHost={targetHost}
+            onTargetHostChange={setTargetHost}
+            server={server}
+            onServerChange={setServer}
+            servers={servers.data}
+            serversError={servers.isError}
             isDisabled={busy || !editable}
-          >
-            <Label>{t('networkChange.server')}</Label>
-            <Select.Trigger>
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover>
-              <ListBox>
-                <ListBox.Item id="address" textValue={t('networkChange.addressOnly')}>
-                  {t('networkChange.addressOnly')}
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-                {(servers.data ?? []).map((item) => (
-                  <ListBox.Item key={item.id} id={String(item.id)} textValue={item.name}>
-                    {item.name}
-                    <ListBox.ItemIndicator />
-                  </ListBox.Item>
-                ))}
-              </ListBox>
-            </Select.Popover>
-            <Description>{t('networkChange.refreshDescription')}</Description>
-          </Select>
-          {selectedServer && (
-            <p>
-              {selectedServer.host}:{selectedServer.port}
-            </p>
-          )}
-          {servers.isError && <p role="alert">{t('networkChange.serversUnavailable')}</p>}
+          />
           {pending && (
-            <>
-              {busy ? (
-                <ProgressBar isIndeterminate size="sm">
-                  <Label>{t(`networkChange.phases.${operation?.phase ?? 'connecting'}`)}</Label>
-                  <ProgressBar.Track>
-                    <ProgressBar.Fill />
-                  </ProgressBar.Track>
-                </ProgressBar>
-              ) : (
-                <p role="status">{t('networkChange.retryDescription')}</p>
-              )}
-              <Button variant="secondary" isDisabled={busy} onPress={() => mutation.mutate('retry')}>
-                {t('networkChange.retry')}
-              </Button>
-            </>
+            <NetworkChangeProgress phase={operation?.phase} busy={busy} onRetry={() => mutation.mutate('retry')} />
           )}
-          {failure && (
-            <StatusAlert status="danger" title={t('networkChange.failed')}>
-              {t(`networkChange.failures.${Object.hasOwn(messages.failures, failure) ? failure : 'unknown'}`)}
-            </StatusAlert>
-          )}
-          {mutation.isError && !failure && <p role="alert">{t('networkChange.actionFailed')}</p>}
-          {operation?.phase === 'completed' && (
-            <StatusAlert
-              status="success"
-              title={t(operation.mqttServerId === null ? 'networkChange.addressSuccess' : 'networkChange.success')}
-            />
-          )}
+          <NetworkChangeOutcome operation={operation ?? null} actionFailed={mutation.isError} />
           {editable && (
             <Button
               isPending={mutation.isPending}
@@ -151,13 +108,11 @@ export function NetworkChangeForm({ controllerId }: { controllerId: number }) {
         </>
       )}
       {!!status?.pendingCredentialRetirements && (
-        <>
-          <p>{t('networkChange.retirementDescription')}</p>
-          <Button variant="secondary" isDisabled={busy || pending} onPress={() => mutation.mutate('retire')}>
-            {t('networkChange.retire')}
-          </Button>
-          {!status.available && mutation.isError && <p role="alert">{t('networkChange.actionFailed')}</p>}
-        </>
+        <NetworkChangeCredentialRetirement
+          isDisabled={busy || pending}
+          onRetire={() => mutation.mutate('retire')}
+          showActionError={!status.available && mutation.isError}
+        />
       )}
     </div>
   );
