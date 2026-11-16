@@ -212,7 +212,8 @@ export class UsageSessionRecords {
     } else {
       const project = await this.projectsService.findOneById(user.id, dto.projectId);
       usage.projectId = project.id;
-      usage.project = project;
+      // Only the id is persisted; the project is reloaded with the usage below.
+      usage.project = { id: project.id } as typeof usage.project;
     }
 
     await this.resourceUsageRepository.save(usage);

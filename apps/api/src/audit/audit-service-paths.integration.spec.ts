@@ -231,9 +231,7 @@ describe('audit recorded by the owning services, without the HTTP layer', () => 
 
   it('project: creating a project through the service records the same row as the HTTP route', async () => {
     const projects = new ProjectsService(
-      { save: async (value: object) => ({ ...value, id: 3 }) } as never,
-      {} as never,
-      {} as never,
+      { create: async (value: object) => ({ ...value, id: 3 }) } as never,
       {} as never,
       {} as never,
       {} as never,

@@ -1,24 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
-import { Project, ProjectMember } from '@attraccess/database-entities';
-import { ProjectMemberRole } from '@attraccess/application-models';
-import { ProjectAccessInfoDto, ProjectWithAccessDto } from './dto/project-access.dto';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ProjectMemberRole, type ProjectMemberRecord, type ProjectRecord } from '@attraccess/application-models';
+import { ProjectAccessInfoDto } from './dto/project-access.dto';
+import { PROJECT_STORE, type ProjectStore } from './project.port';
+
+/** A project together with what the requesting user may do with it. */
+export type ProjectWithAccess = ProjectRecord & { access: ProjectAccessInfoDto };
 
 @Injectable()
 export class ProjectAccessService {
-  constructor(
-    @InjectRepository(Project)
-    private readonly projectRepository: Repository<Project>,
-    @InjectRepository(ProjectMember)
-    private readonly projectMemberRepository: Repository<ProjectMember>,
-  ) {}
+  constructor(@Inject(PROJECT_STORE) private readonly projects: ProjectStore) {}
 
-  async ensureOwner(userId: number, projectId: number): Promise<Project> {
-    const project = await this.projectRepository.findOne({
-      where: { id: projectId, owner: { id: userId } },
-      relations: { owner: true },
-    });
+  async ensureOwner(userId: number, projectId: number): Promise<ProjectRecord> {
+    const project = await this.projects.findOwned(userId, projectId);
 
     if (!project) {
       throw new NotFoundException('Project not found');
@@ -27,11 +20,8 @@ export class ProjectAccessService {
     return project;
   }
 
-  async getAccessOrThrow(userId: number, projectId: number): Promise<ProjectWithAccessDto> {
-    const project = await this.projectRepository.findOne({
-      where: { id: projectId },
-      relations: { owner: true },
-    });
+  async getAccessOrThrow(userId: number, projectId: number): Promise<ProjectWithAccess> {
+    const project = await this.projects.findWithOwner(projectId);
 
     if (!project) {
       throw new NotFoundException('Project not found');
@@ -42,12 +32,7 @@ export class ProjectAccessService {
       return this.applyAccessMetadata(project, null, true);
     }
 
-    const membership = await this.projectMemberRepository.findOne({
-      where: {
-        project: { id: projectId },
-        user: { id: userId },
-      },
-    });
+    const membership = await this.projects.findMembership(projectId, userId);
 
     if (!membership) {
       throw new NotFoundException('Project not found');
@@ -56,20 +41,17 @@ export class ProjectAccessService {
     return this.applyAccessMetadata(project, membership, false);
   }
 
-  async addAccessMetadata(userId: number, projects: Project[]): Promise<ProjectWithAccessDto[]> {
+  async addAccessMetadata(userId: number, projects: ProjectRecord[]): Promise<ProjectWithAccess[]> {
     if (!projects.length) {
       return [];
     }
 
-    const projectIds = projects.map((project) => project.id);
-    const memberships = await this.projectMemberRepository.find({
-      where: {
-        user: { id: userId },
-        project: { id: In(projectIds) },
-      },
-    });
+    const memberships = await this.projects.findMembershipsOfUser(
+      userId,
+      projects.map((project) => project.id),
+    );
 
-    const membershipByProjectId = new Map<number, ProjectMember>();
+    const membershipByProjectId = new Map<number, ProjectMemberRecord>();
     memberships.forEach((membership) => {
       membershipByProjectId.set(membership.projectId, membership);
     });
@@ -82,24 +64,20 @@ export class ProjectAccessService {
   }
 
   private applyAccessMetadata(
-    project: Project,
-    membership: ProjectMember | null,
+    project: ProjectRecord,
+    membership: ProjectMemberRecord | null,
     isOwner: boolean,
-  ): ProjectWithAccessDto {
-    const canManageProject = isOwner || this.canMemberManageProject(membership);
-
+  ): ProjectWithAccess {
     const access: ProjectAccessInfoDto = {
       isOwner,
       role: membership?.role ?? null,
-      canManageProject,
+      canManageProject: isOwner || this.canMemberManageProject(membership),
     };
 
-    const projectWithAccess = project as ProjectWithAccessDto;
-    projectWithAccess.access = access;
-    return projectWithAccess;
+    return { ...project, access };
   }
 
-  private canMemberManageProject(membership: ProjectMember | null): boolean {
+  private canMemberManageProject(membership: ProjectMemberRecord | null): boolean {
     if (!membership) {
       return false;
     }

@@ -11,6 +11,3 @@ export function buildRelease(overrides: Partial<GithubReleaseApiResponse> = {}):
     ...overrides,
   };
 }
-export function makeRepo(countValue = 0) {
-  return { count: jest.fn().mockResolvedValue(countValue) };
-}

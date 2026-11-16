@@ -169,7 +169,12 @@ describe('ProjectsController', () => {
 
       const result = await controller.create(req as AuthenticatedRequest, { ...data }, logo);
 
-      expect(projectsService.create).toHaveBeenCalledWith(6, expect.objectContaining({ ...data, logo }), 'session', undefined);
+      expect(projectsService.create).toHaveBeenCalledWith(
+        6,
+        expect.objectContaining({ ...data, logo }),
+        'session',
+        undefined,
+      );
       expect(projectAccessService.getAccessOrThrow).toHaveBeenCalledWith(6, 40);
       expect(result).toEqual(expect.objectContaining({ id: 40, logo: 'projects/40/logo.png' }));
     });
@@ -187,7 +192,12 @@ describe('ProjectsController', () => {
 
       const result = await controller.create(req as AuthenticatedRequest, { ...data });
 
-      expect(projectsService.create).toHaveBeenCalledWith(7, expect.objectContaining({ ...data }), 'session', undefined);
+      expect(projectsService.create).toHaveBeenCalledWith(
+        7,
+        expect.objectContaining({ ...data }),
+        'session',
+        undefined,
+      );
       expect(projectAccessService.getAccessOrThrow).toHaveBeenCalledWith(7, 41);
       expect(result.logo).toBeNull();
     });
@@ -210,7 +220,13 @@ describe('ProjectsController', () => {
 
       const result = await controller.update(req as AuthenticatedRequest, id, { ...data }, logo);
 
-      expect(projectsService.updateOne).toHaveBeenCalledWith(8, 55, expect.objectContaining({ ...data, logo }), 'session', undefined);
+      expect(projectsService.updateOne).toHaveBeenCalledWith(
+        8,
+        55,
+        expect.objectContaining({ ...data, logo }),
+        'session',
+        undefined,
+      );
       expect(projectAccessService.getAccessOrThrow).toHaveBeenCalledWith(8, 55);
       expect(result).toEqual(expect.objectContaining({ id: 55, logo: 'projects/55/fresh.png' }));
     });
@@ -229,7 +245,13 @@ describe('ProjectsController', () => {
 
       const result = await controller.update(req as AuthenticatedRequest, id, { ...data });
 
-      expect(projectsService.updateOne).toHaveBeenCalledWith(9, 56, expect.objectContaining({ ...data }), 'session', undefined);
+      expect(projectsService.updateOne).toHaveBeenCalledWith(
+        9,
+        56,
+        expect.objectContaining({ ...data }),
+        'session',
+        undefined,
+      );
       expect(projectAccessService.getAccessOrThrow).toHaveBeenCalledWith(9, 56);
       expect(result.logo).toBeNull();
     });
@@ -281,6 +303,32 @@ describe('ProjectsController', () => {
       expect(projectsService.listMembers).toHaveBeenCalledWith(2);
       expect(result).toEqual({ owner, members });
     });
+
+    it('never serializes private user fields of the owner or the members', async () => {
+      const req = { user: { id: 1 } };
+      const privateFields = {
+        email: 'owner@example.test',
+        passwordResetToken: 'reset-secret',
+        emailVerificationToken: 'verify-secret',
+        deleteAccountToken: 'delete-secret',
+        lockedUntil: new Date(),
+        failedLoginAttempts: 3,
+      };
+      projectAccessService.ensureOwner.mockResolvedValueOnce({
+        owner: { id: 1, username: 'owner', ...privateFields },
+      });
+      projectsService.listMembers.mockResolvedValueOnce([
+        { id: 1, projectId: 2, userId: 5, user: { id: 5, username: 'member', ...privateFields } },
+      ]);
+
+      const body = JSON.stringify(await controller.listMembers(req as AuthenticatedRequest, 2));
+
+      expect(body).toContain('"username":"owner"');
+      expect(body).toContain('"username":"member"');
+      for (const secret of ['example.test', 'reset-secret', 'verify-secret', 'delete-secret', 'failedLoginAttempts']) {
+        expect(body).not.toContain(secret);
+      }
+    });
   });
 
   describe('createInvitation', () => {
@@ -292,7 +340,7 @@ describe('ProjectsController', () => {
       const result = await controller.createInvitation(req as AuthenticatedRequest, 3, { invitedUserId: 99 });
 
       expect(projectsService.createProjectInvitation).toHaveBeenCalledWith(12, 3, 99, undefined, 'session', undefined);
-      expect(result).toBe(invitation);
+      expect(result.id).toBe(invitation.id);
     });
   });
 });
