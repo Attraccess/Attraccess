@@ -1,14 +1,11 @@
-// Upload persisted boot/crash record + coredump blob on next successful connect
+// Reader side of the crash report upload: NVS, coredump flash and heap ports for coredump-upload.cpp
 // FEATURE: api-diag
 
-#include "../api.hpp"
-#include <cstdio>
+#include "crash-report.hpp"
+#include <cstring>
 
 #ifdef ESP_PLATFORM
 #include "../../settings/kvstore.hpp"
-#include <cstring>
-#include <memory>
-#include <string>
 #include "esp_system.h"
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
@@ -16,186 +13,6 @@
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
 #include "esp_core_dump.h" // absent when coredumps are off (secure profile)
 #endif
-#include "mbedtls/base64.h"
-
-#include "crash-record.hpp"
-
-void API::sendPendingCrashReport()
-{
-    if (this->crashReportAwaitingAck)
-    {
-        return;
-    }
-
-    PendingCrashBootRecord pending = {};
-    KVStore prefs;
-    prefs.begin(BOOT_DIAG_NAMESPACE, true);
-    size_t read = prefs.getBytes(BOOT_DIAG_PENDING_KEY, &pending, sizeof(pending));
-    prefs.end();
-
-    CrashBootRecord rec = {};
-    uint8_t pendingReason = 0;
-    if (read == sizeof(pending) && pending.version == BOOT_DIAG_PENDING_VERSION &&
-        pending.record.magic == BOOT_DIAG_MAGIC)
-    {
-        rec = pending.record;
-        pendingReason = pending.resetReason;
-    }
-    else if (read == sizeof(rec))
-    {
-        memcpy(&rec, &pending, sizeof(rec));
-        if (rec.magic != BOOT_DIAG_MAGIC)
-        {
-            return;
-        }
-
-        KVStore legacyPrefs;
-        legacyPrefs.begin(BOOT_DIAG_NAMESPACE, true);
-        uint8_t legacyReason = legacyPrefs.getUChar(BOOT_DIAG_PENDING_REASON_KEY, 0);
-        legacyPrefs.end();
-
-        if (legacyReason == ESP_RST_SW)
-        {
-            // Legacy records stored the reset reason separately. An intentional
-            // software reset is not crash telemetry, so discard this old pair.
-            legacyPrefs.begin(BOOT_DIAG_NAMESPACE, false);
-            legacyPrefs.remove(BOOT_DIAG_PENDING_KEY);
-            legacyPrefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
-            legacyPrefs.end();
-            return;
-        }
-        else if (legacyReason != 0)
-        {
-            pendingReason = legacyReason;
-        }
-        else if (esp_reset_reason() == ESP_RST_SW)
-        {
-            legacyPrefs.begin(BOOT_DIAG_NAMESPACE, false);
-            legacyPrefs.remove(BOOT_DIAG_PENDING_KEY);
-            legacyPrefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
-            legacyPrefs.end();
-            return;
-        }
-        else
-        {
-            pendingReason = (uint8_t)esp_reset_reason();
-        }
-    }
-    else
-    {
-        return;
-    }
-    const char *resetStr = crashResetReasonToString(pendingReason);
-
-    // Optional deliberate-reboot reason left behind by the firmware before it
-    // rebooted itself (e.g. the websocket reconnect heap-recovery reboot). Absent
-    // for ordinary/unexpected resets, in which case the field is omitted.
-    std::string rebootReason;
-    {
-        KVStore reasonPrefs;
-        reasonPrefs.begin(BOOT_DIAG_NAMESPACE, true);
-        rebootReason = reasonPrefs.getString(BOOT_DIAG_REBOOT_REASON_KEY);
-        reasonPrefs.end();
-    }
-
-    size_t b64Len = 0;
-    std::unique_ptr<char[]> coredump = readCoredumpBase64(this->logger, b64Len);
-    this->crashReportSentCoredump = (bool)coredump;
-
-    this->logger.infof("Uploading crash report: reset=%s rebootReason=%s uptime=%ums heap=%u coredump=%s",
-                       resetStr, rebootReason.empty() ? "(none)" : rebootReason.c_str(), rec.uptimeMs,
-                       rec.freeInternalHeap, coredump ? "yes" : "no");
-
-    // Build the event manually into a single heap buffer: an oversized coredump
-    // base64 string would otherwise be copied several times through ArduinoJson.
-    const char *ws = rec.websocketConnected ? "CONNECTED" : "DISCONNECTED";
-    const char *wifi = rec.wifiConnected ? "CONNECTED" : "DISCONNECTED";
-
-    char rebootReasonField[96] = {0};
-    if (!rebootReason.empty())
-    {
-        snprintf(rebootReasonField, sizeof(rebootReasonField), ",\"rebootReason\":\"%s\"", rebootReason.c_str());
-    }
-
-    char head[416];
-    int headLen = snprintf(
-        head, sizeof(head),
-        "{\"event\":\"EVENT\",\"data\":{\"type\":\"READER_CRASH_REPORT\",\"payload\":{"
-        "\"resetReason\":\"%s\",\"heapFreeBytes\":%u,\"largestFreeBlockBytes\":%u,"
-        "\"uptimeBeforeResetMs\":%u,\"wsState\":\"%s\",\"wifiState\":\"%s\",\"firmwareVersion\":\"%s\"%s",
-        resetStr, (unsigned)rec.freeInternalHeap, (unsigned)rec.largestFreeBlock,
-        (unsigned)rec.uptimeMs, ws, wifi, FIRMWARE_VERSION, rebootReasonField);
-    if (headLen <= 0 || headLen >= (int)sizeof(head))
-    {
-        this->logger.error("Failed to format crash report header");
-        return;
-    }
-
-    const char *coredumpKey = ",\"coredumpBase64\":\"";
-    const char *tailWithCoredump = "\"}}}";
-    const char *tailPlain = "}}}";
-
-    size_t total = (size_t)headLen + 1;
-    if (coredump)
-    {
-        total += strlen(coredumpKey) + b64Len + strlen(tailWithCoredump);
-    }
-    else
-    {
-        total += strlen(tailPlain);
-    }
-
-    std::unique_ptr<char[]> buf(new (std::nothrow) char[total]);
-    if (!buf)
-    {
-        this->logger.error("Failed to allocate crash report buffer");
-        return;
-    }
-
-    size_t pos = 0;
-    memcpy(buf.get() + pos, head, headLen);
-    pos += headLen;
-    if (coredump)
-    {
-        memcpy(buf.get() + pos, coredumpKey, strlen(coredumpKey));
-        pos += strlen(coredumpKey);
-        memcpy(buf.get() + pos, coredump.get(), b64Len);
-        pos += b64Len;
-        memcpy(buf.get() + pos, tailWithCoredump, strlen(tailWithCoredump));
-        pos += strlen(tailWithCoredump);
-    }
-    else
-    {
-        memcpy(buf.get() + pos, tailPlain, strlen(tailPlain));
-        pos += strlen(tailPlain);
-    }
-    buf.get()[pos] = '\0';
-
-    this->transport.sendMessage(buf.get(), pos);
-    this->crashReportAwaitingAck = true;
-}
-#else
-void API::sendPendingCrashReport() {}
-#endif
-
-// Upload persisted boot/crash record + coredump blob on next successful connect
-// FEATURE: api-diag
-
-#ifdef ESP_PLATFORM
-#include "../../settings/kvstore.hpp"
-#include <cstring>
-#include <memory>
-#include <string>
-#include "esp_system.h"
-#include "esp_heap_caps.h"
-#include "esp_partition.h"
-#include "sdkconfig.h"
-#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
-#include "esp_core_dump.h" // absent when coredumps are off (secure profile)
-#endif
-#include "mbedtls/base64.h"
-
-#include "crash-record.hpp"
 
 const char *crashResetReasonToString(uint8_t reason)
 {
@@ -236,126 +53,261 @@ const char *crashResetReasonToString(uint8_t reason)
     }
 }
 
-// Read the stored coredump, base64-encode it into a heap buffer, and return it
-// (null when absent, too large, or the heap is too low). b64Len excludes the
-// trailing terminator written by mbedtls.
-std::unique_ptr<char[]> readCoredumpBase64(Logger &logger, size_t &b64Len)
+bool crashResetIsCrash(uint8_t reason)
 {
-    b64Len = 0;
-#if !CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
-    (void)logger;
-    return nullptr;
-#else
-    size_t addr = 0;
-    size_t size = 0;
-    if (esp_core_dump_image_get(&addr, &size) != ESP_OK || size == 0)
+    switch ((esp_reset_reason_t)reason)
     {
-        return nullptr;
+    case ESP_RST_PANIC:
+    case ESP_RST_TASK_WDT:
+    case ESP_RST_INT_WDT:
+    case ESP_RST_WDT:
+    case ESP_RST_CPU_LOCKUP:
+        return true;
+    default:
+        return false;
     }
-    if (size > CRASH_COREDUMP_MAX_BYTES)
-    {
-        logger.errorf("Coredump too large to upload (%u bytes); kept in flash", (unsigned)size);
-        return nullptr;
-    }
-
-    const esp_partition_t *part = esp_partition_find_first(
-        ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
-    if (!part)
-    {
-        logger.error("Coredump partition not found");
-        return nullptr;
-    }
-
-    size_t encodedLen = 0;
-    mbedtls_base64_encode(NULL, 0, &encodedLen, NULL, size);
-
-    // The encoded blob is held by both this buffer and the outgoing message
-    // buffer at once, so reserve generous headroom (8-bit heap covers PSRAM
-    // when enabled, which is where these large allocations land).
-    uint32_t freeHeap = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    if (freeHeap < size + 3 * encodedLen + 16384)
-    {
-        logger.errorf("Insufficient heap for coredump upload (free=%u need~%u)",
-                      (unsigned)freeHeap, (unsigned)(size + 3 * encodedLen));
-        return nullptr;
-    }
-
-    std::unique_ptr<uint8_t[]> raw(new (std::nothrow) uint8_t[size]);
-    std::unique_ptr<char[]> encoded(new (std::nothrow) char[encodedLen]);
-    if (!raw || !encoded)
-    {
-        logger.error("Coredump buffer allocation failed");
-        return nullptr;
-    }
-    if (esp_partition_read(part, 0, raw.get(), size) != ESP_OK)
-    {
-        logger.error("Coredump partition read failed");
-        return nullptr;
-    }
-
-    size_t written = 0;
-    if (mbedtls_base64_encode((unsigned char *)encoded.get(), encodedLen, &written, raw.get(), size) != 0)
-    {
-        logger.error("Coredump base64 encode failed");
-        return nullptr;
-    }
-    b64Len = written;
-    return encoded;
-#endif
 }
-#endif
 
-// Upload persisted boot/crash record + coredump blob on next successful connect
-// FEATURE: api-diag
-
-#ifdef ESP_PLATFORM
-#include "../../settings/kvstore.hpp"
-#include <cstring>
-#include <memory>
-#include <string>
-#include "esp_system.h"
-#include "esp_heap_caps.h"
-#include "esp_partition.h"
-#include "sdkconfig.h"
-#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
-#include "esp_core_dump.h" // absent when coredumps are off (secure profile)
-#endif
-#include "mbedtls/base64.h"
-
-#include "crash-record.hpp"
-
-void API::onCrashReportResponse(JsonObject data)
+namespace
 {
-    JsonObject payload = data["payload"].as<JsonObject>();
-    bool received = !payload.isNull() && payload["received"].is<bool>() && payload["received"].as<bool>();
-    if (!received)
-    {
-        this->logger.error("Crash report rejected by server; keeping record for next boot");
-        this->crashReportAwaitingAck = false;
-        return;
-    }
+// The dump in flash cannot change while the firmware runs (only a crash writes one), so its
+// fingerprint is read once per boot and forgotten when the dump is erased.
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+bool cachedFlashDumpKnown = false;
+#endif
+CrashDumpFingerprint cachedFlashDump = {};
 
-    this->logger.info("Crash report accepted; clearing stored record");
+CrashDumpFingerprint readFingerprint(const char *key)
+{
+    CrashDumpFingerprint fingerprint = {};
+    KVStore prefs;
+    prefs.begin(BOOT_DIAG_NAMESPACE, true);
+    if (prefs.getBytes(key, &fingerprint, sizeof(fingerprint)) != sizeof(fingerprint))
+    {
+        fingerprint = {};
+    }
+    prefs.end();
+    return fingerprint;
+}
+
+void writeFingerprint(const char *key, const CrashDumpFingerprint &fingerprint)
+{
     KVStore prefs;
     prefs.begin(BOOT_DIAG_NAMESPACE, false);
-    prefs.remove(BOOT_DIAG_PENDING_KEY);
-    prefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
-    prefs.remove(BOOT_DIAG_REBOOT_REASON_KEY);
+    prefs.putBytes(key, &fingerprint, sizeof(fingerprint));
     prefs.end();
+}
 
 #if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
-    if (this->crashReportSentCoredump)
-    {
-        esp_err_t err = esp_core_dump_image_erase();
-        if (err != ESP_OK)
-        {
-            this->logger.errorf("esp_core_dump_image_erase failed: %s", esp_err_to_name(err));
-        }
-    }
+const esp_partition_t *coredumpPartition()
+{
+    return esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
+}
 #endif
 
-    this->crashReportAwaitingAck = false;
+class ReaderCrashUploadPorts : public crashupload::Ports
+{
+public:
+    ReaderCrashUploadPorts(std::function<bool(const char *, size_t)> send, std::function<bool()> otaInProgress)
+        : sendMessage(std::move(send)), otaRunning(std::move(otaInProgress))
+    {
+    }
+
+    bool loadPending(PendingCrashBootRecord &out) override
+    {
+        PendingCrashBootRecord blob = {};
+        KVStore prefs;
+        prefs.begin(BOOT_DIAG_NAMESPACE, true);
+        const size_t length = prefs.getBytes(BOOT_DIAG_PENDING_KEY, &blob, sizeof(blob));
+        const uint8_t legacyReason = prefs.getUChar(BOOT_DIAG_PENDING_REASON_KEY, 0);
+        prefs.end();
+        if (length == 0)
+        {
+            return false;
+        }
+
+        switch (crashupload::decodePendingBlob(&blob, length, out))
+        {
+        case crashupload::PendingBlobKind::V2:
+            return true;
+        case crashupload::PendingBlobKind::RecordOnly:
+            // Records before version 1 stored the reset reason separately. An intentional
+            // software reset is not crash telemetry, so discard such an old pair.
+            if (legacyReason == ESP_RST_SW || (legacyReason == 0 && esp_reset_reason() == ESP_RST_SW))
+            {
+                clearPending();
+                return false;
+            }
+            out.resetReason = legacyReason != 0 ? legacyReason : (uint8_t)esp_reset_reason();
+            break;
+        case crashupload::PendingBlobKind::V1:
+            break;
+        case crashupload::PendingBlobKind::Invalid:
+            return false;
+        }
+
+        // Written by firmware before ATT-1144, which tied no dump to the record. A crash keeps the
+        // dump it would have uploaded; the conversion is stored so it happens only once.
+        const CrashDumpFingerprint dump = flashDump();
+        if (crashupload::shouldAttachDump(crashResetIsCrash(out.resetReason), dump, claimedDump()) &&
+            dump != doneDump())
+        {
+            out.dump = dump;
+            setClaimedDump(dump);
+        }
+        savePending(out);
+        return true;
+    }
+
+    void savePending(const PendingCrashBootRecord &record) override
+    {
+        KVStore prefs;
+        prefs.begin(BOOT_DIAG_NAMESPACE, false);
+        prefs.putBytes(BOOT_DIAG_PENDING_KEY, &record, sizeof(record));
+        prefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
+        prefs.end();
+    }
+
+    void clearPending() override
+    {
+        KVStore prefs;
+        prefs.begin(BOOT_DIAG_NAMESPACE, false);
+        prefs.remove(BOOT_DIAG_PENDING_KEY);
+        prefs.remove(BOOT_DIAG_PENDING_REASON_KEY);
+        prefs.remove(BOOT_DIAG_REBOOT_REASON_KEY);
+        prefs.end();
+    }
+
+    std::string rebootReason() override
+    {
+        KVStore prefs;
+        prefs.begin(BOOT_DIAG_NAMESPACE, true);
+        std::string reason = prefs.getString(BOOT_DIAG_REBOOT_REASON_KEY);
+        prefs.end();
+        return reason;
+    }
+
+    CrashDumpFingerprint claimedDump() override { return readFingerprint(BOOT_DIAG_DUMP_CLAIMED_KEY); }
+    void setClaimedDump(const CrashDumpFingerprint &fingerprint) override
+    {
+        writeFingerprint(BOOT_DIAG_DUMP_CLAIMED_KEY, fingerprint);
+    }
+    CrashDumpFingerprint doneDump() override { return readFingerprint(BOOT_DIAG_DUMP_DONE_KEY); }
+    void setDoneDump(const CrashDumpFingerprint &fingerprint) override
+    {
+        writeFingerprint(BOOT_DIAG_DUMP_DONE_KEY, fingerprint);
+    }
+
+    CrashDumpFingerprint flashDump() override { return crashFlashDumpFingerprint(); }
+
+    bool readDump(uint32_t offset, uint8_t *out, size_t length) override
+    {
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+        const esp_partition_t *part = coredumpPartition();
+        return part && esp_partition_read(part, offset, out, length) == ESP_OK;
+#else
+        (void)offset;
+        (void)out;
+        (void)length;
+        return false;
+#endif
+    }
+
+    bool eraseDump() override
+    {
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+        cachedFlashDumpKnown = true;
+        cachedFlashDump = {};
+        return esp_core_dump_image_erase() == ESP_OK;
+#else
+        return false;
+#endif
+    }
+
+    bool heapAvailable(size_t bytes) override
+    {
+        // Chunk buffers are small enough to land in internal RAM; keep headroom there for TLS and LVGL.
+        return heap_caps_get_free_size(MALLOC_CAP_INTERNAL) >= bytes + CRASH_UPLOAD_INTERNAL_HEADROOM_BYTES &&
+               heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT) >= bytes;
+    }
+
+    bool otaInProgress() override { return otaRunning(); }
+    bool send(const char *json, size_t length) override { return sendMessage(json, length); }
+    const char *resetReasonName(uint8_t reason) override { return crashResetReasonToString(reason); }
+
+private:
+    static constexpr size_t CRASH_UPLOAD_INTERNAL_HEADROOM_BYTES = 24 * 1024;
+    std::function<bool(const char *, size_t)> sendMessage;
+    std::function<bool()> otaRunning;
+};
+} // namespace
+
+CrashDumpFingerprint crashFlashDumpFingerprint()
+{
+#if CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH
+    if (cachedFlashDumpKnown)
+    {
+        return cachedFlashDump;
+    }
+    cachedFlashDumpKnown = true;
+    size_t address = 0;
+    size_t size = 0;
+    const esp_partition_t *part = coredumpPartition();
+    if (!part || esp_core_dump_image_check() != ESP_OK || esp_core_dump_image_get(&address, &size) != ESP_OK ||
+        size == 0 || size > part->size || size > CRASH_COREDUMP_PARTITION_BYTES)
+    {
+        return cachedFlashDump;
+    }
+    // Small reads keep the flash bus free for the RGB panel's PSRAM framebuffer.
+    uint8_t buffer[512];
+    uint32_t crc = 0;
+    for (size_t offset = 0; offset < size; offset += sizeof(buffer))
+    {
+        const size_t length = size - offset < sizeof(buffer) ? size - offset : sizeof(buffer);
+        if (esp_partition_read(part, offset, buffer, length) != ESP_OK)
+        {
+            return cachedFlashDump;
+        }
+        crc = crashupload::crc32Update(crc, buffer, length);
+    }
+    cachedFlashDump = {static_cast<uint32_t>(size), crc};
+#endif
+    return cachedFlashDump;
+}
+
+std::unique_ptr<crashupload::Ports> makeCrashUploadPorts(std::function<bool(const char *, size_t)> send,
+                                                         std::function<bool()> otaInProgress)
+{
+    return std::unique_ptr<crashupload::Ports>(new ReaderCrashUploadPorts(std::move(send), std::move(otaInProgress)));
 }
 #else
-void API::onCrashReportResponse(JsonObject) {}
+namespace
+{
+// The desktop simulator never crashes into a coredump: nothing is ever pending.
+class NoCrashUploadPorts : public crashupload::Ports
+{
+public:
+    bool loadPending(PendingCrashBootRecord &) override { return false; }
+    void savePending(const PendingCrashBootRecord &) override {}
+    void clearPending() override {}
+    std::string rebootReason() override { return {}; }
+    CrashDumpFingerprint claimedDump() override { return {}; }
+    void setClaimedDump(const CrashDumpFingerprint &) override {}
+    CrashDumpFingerprint doneDump() override { return {}; }
+    void setDoneDump(const CrashDumpFingerprint &) override {}
+    CrashDumpFingerprint flashDump() override { return {}; }
+    bool readDump(uint32_t, uint8_t *, size_t) override { return false; }
+    bool eraseDump() override { return false; }
+    bool heapAvailable(size_t) override { return false; }
+    bool otaInProgress() override { return false; }
+    bool send(const char *, size_t) override { return false; }
+    const char *resetReasonName(uint8_t) override { return "UNKNOWN"; }
+};
+} // namespace
+
+std::unique_ptr<crashupload::Ports> makeCrashUploadPorts(std::function<bool(const char *, size_t)>,
+                                                         std::function<bool()>)
+{
+    return std::unique_ptr<crashupload::Ports>(new NoCrashUploadPorts());
+}
 #endif

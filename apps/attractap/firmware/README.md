@@ -546,6 +546,61 @@ The lookup reads LVGL objects only: text drawn without a label (images, canvas
 content, button-matrix keys without text) cannot be matched, and keys are
 reported without separate hit-testing of overlapping keys.
 
+## Crash reports and coredump upload (ATT-474, ATT-1144)
+
+After a panic, watchdog or lockup reset (and after a long-running reader was
+power-cycled while hung), the next boot stores a pending crash record in NVS
+(`bootdiag/pending`, version 2). It holds the last heap snapshot, the reset
+reason, the firmware version that crashed and, when this crash wrote the
+coredump in the `coredump` partition (128 KiB), the dump's size and zlib CRC-32.
+A dump is attached only to the crash that wrote it: a dump an earlier record
+already claimed (`bootdiag/cdclaimed`) stays with that record. Version 1 and
+older records are still read.
+
+After each sign-in the reader uploads the record, then its dump, from the API
+loop with one message in flight. Chunks are read from flash 4 KiB at a time,
+so the upload needs about 10 KiB of heap whatever the dump size; it waits
+while the free heap is low or an OTA update runs.
+
+| Direction       | Event                      | Payload                                                                                                           |
+| --------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Reader → server | `READER_CRASH_REPORT`      | crash metadata, `firmwareVersion` (null if unknown), `coredumpSize`, `coredumpCrc32`                              |
+| Server → reader | `READER_CRASH_REPORT`      | `received`, `id`, `coredumpUpload: {reportId, chunkSize}`, or `coredumpRejected` (e.g. `COREDUMP_TOO_LARGE`)      |
+| Reader → server | `READER_COREDUMP_BEGIN`    | `reportId`, `size`, `crc32`; also after a reconnect or reboot, for the same report                                |
+| Server → reader | `READER_COREDUMP_BEGIN`    | `reportId`, `chunkSize`, `nextOffset`, or `coredumpStored: true` when an earlier upload was stored, or `error`     |
+| Reader → server | `READER_COREDUMP_CHUNK`    | `reportId`, `offset`, `data` (base64 of at most `chunkSize` bytes)                                                |
+| Server → reader | `READER_COREDUMP_CHUNK`    | `reportId`, `nextOffset`, or `error` (`COREDUMP_OUT_OF_ORDER` comes with `expectedOffset` to resync)              |
+| Reader → server | `READER_COREDUMP_COMPLETE` | `reportId`, `totalSize`, `crc32`                                                                                  |
+| Server → reader | `READER_COREDUMP_COMPLETE` | `reportId`, `coredumpStored: true` once the verified dump is stored and symbolicated, or `error`                 |
+
+The `READER_COREDUMP_*` replies are not acknowledged; the reader retries a
+step after 20 s without a reply (120 s for the completion). The record and the
+dump stay until the server confirms `coredumpStored`; only then is the dump
+erased and the record cleared. A record without a dump is cleared after the
+metadata acknowledgement. A disconnect, low heap or a reboot only delays the
+upload: it restarts for the same `reportId` after the next sign-in. After three
+failed attempts the reader waits for the next connection.
+
+A valid dump in flash that no pending record owns (for example one left by
+firmware before ATT-1144 after a metadata-only acknowledgement) is uploaded as
+a report of its own, with reset reason `UNKNOWN`, no firmware version and
+`rebootReason: COREDUMP_ORPHAN`; symbolication reads the build id from the
+dump. A dump the server refuses for good is kept in flash for a USB readout
+but never offered again (`bootdiag/cddone`). Firmware before ATT-1144 sent the
+dump inline as `coredumpBase64` (32 KiB at most); the server still accepts it.
+The secure profile has no coredumps and uploads the record only.
+
+### Crash trigger (lab builds only)
+
+Firmware built with `-DATTRACTAP_CRASH_TRIGGER=ON` accepts
+`CMND debug.crash {"stackBytes":<n>}` on the serial console (no PIN): it fills
+`n` bytes (at most 64 KiB) of task stacks (16 KiB per task) and panics, so the
+coredump grows by about that much. Without `stackBytes` it panics right away. The option is
+`OFF` by default, the secure profile refuses it, `build_firmwares.py` passes
+`-DATTRACTAP_CRASH_TRIGGER=OFF`, and `tools/check_release_build.py` fails a
+release build whose sources were compiled with a lab-only define or whose app
+image contains the `debug.crash` topic.
+
 ## Attractap Lite LED Animations
 
 The Attractap Lite variant uses a WS2812 LED ring for status feedback. For a user-facing guide to LED states and triggers, see the [Attractap Lite LED Guide](../../../docs/user/resources/iots/attractap-lite-led-guide.md) in the docs.

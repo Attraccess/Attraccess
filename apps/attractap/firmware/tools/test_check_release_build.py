@@ -1,0 +1,88 @@
+import contextlib
+import io
+import json
+import os
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+FIRMWARE_DIR = os.path.dirname(TOOLS_DIR)
+sys.path.insert(0, TOOLS_DIR)
+sys.path.insert(0, FIRMWARE_DIR)
+import check_release_build as c  # noqa: E402
+import build_firmwares as b  # noqa: E402
+
+SERIAL = "/src/serial/serialCommandHandler.cpp"
+
+
+def entry(defines, file=SERIAL):
+    return {"file": file, "command": "xtensa-gcc " + " ".join(f"-D{d}" for d in defines) + " -c " + file}
+
+
+class CompileCommands(unittest.TestCase):
+    def test_release_defines_pass(self):
+        self.assertEqual(c.check_compile_commands([entry(["FIRMWARE_VERSION=\"1\"", "LOG_LEVEL=ERROR"])]), [])
+
+    def test_each_lab_define_fails(self):
+        for define in c.LAB_ONLY_DEFINES:
+            errors = c.check_compile_commands([entry([define])])
+            self.assertEqual(len(errors), 1, define)
+            self.assertIn(define, errors[0])
+
+    def test_arguments_form_is_read(self):
+        commands = [{"file": SERIAL, "arguments": ["gcc", "-DATTRACTAP_CRASH_TRIGGER=1", SERIAL]}]
+        self.assertEqual(len(c.check_compile_commands(commands)), 1)
+
+    def test_malformed_input_is_a_gate_error(self):
+        with self.assertRaises(c.GateError):
+            c.check_compile_commands({"file": SERIAL})
+
+
+class AppImage(unittest.TestCase):
+    def test_trigger_topic_fails(self):
+        self.assertEqual(len(c.check_app_image(b"\x00prefix debug.crash suffix")), 1)
+
+    def test_clean_image_passes(self):
+        self.assertEqual(c.check_app_image(b"\x00 debug.log auth.status.get"), [])
+
+
+class BuildDirectory(unittest.TestCase):
+    def build_dir(self, defines, image):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        with open(os.path.join(tmp.name, "compile_commands.json"), "w") as f:
+            json.dump([entry(defines)], f)
+        with open(os.path.join(tmp.name, c.APP_IMAGE), "wb") as f:
+            f.write(image)
+        return tmp.name
+
+    def run_main(self, build_dir):
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return c.main([build_dir])
+
+    def test_release_build_passes(self):
+        self.assertEqual(self.run_main(self.build_dir(["LOG_LEVEL=ERROR"], b"app")), 0)
+
+    def test_crash_trigger_build_fails(self):
+        self.assertEqual(self.run_main(self.build_dir(["ATTRACTAP_CRASH_TRIGGER=1"], b"debug.crash")), 1)
+
+    def test_missing_build_fails(self):
+        self.assertEqual(self.run_main(os.path.join(tempfile.gettempdir(), "no-such-attractap-build")), 1)
+
+
+class ReleaseBuildFlags(unittest.TestCase):
+    def test_release_builds_force_the_crash_trigger_off(self):
+        # The build fails right away (run_idf), so nothing is built or cleaned.
+        with mock.patch.object(b, "run_idf", return_value=1) as run_idf, \
+                mock.patch.object(b.os.path, "exists", return_value=False), \
+                contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+            b.build_variant("attractap-touch-v2", "variants/attractap-touch-v2.cmake", "ERROR")
+        args = run_idf.call_args[0][0]
+        self.assertIn("-DATTRACTAP_CRASH_TRIGGER=OFF", args)
+        self.assertIn("-DATTRACTAP_TEST_HOOKS=OFF", args)
+
+
+if __name__ == "__main__":
+    unittest.main()

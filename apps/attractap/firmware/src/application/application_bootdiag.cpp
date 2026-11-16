@@ -5,15 +5,15 @@
 #include "../state/state.hpp"
 #include "../platform.hpp"
 #include "../api/diagnostics/reset-reason.hpp"
+#include "../api/diagnostics/crash-record.hpp"
 #ifdef ESP_PLATFORM
+#include "../api/diagnostics/crash-report.hpp"
+#include <cstdio>
+#include <cstring>
 #include "esp_heap_caps.h"
 #include "esp_system.h"
 #endif
 
-#define BOOT_DIAG_NAMESPACE "bootdiag"
-#define BOOT_DIAG_MAGIC 0x41545431
-#define BOOT_DIAG_PENDING_KEY "pending"
-#define BOOT_DIAG_PENDING_VERSION 1
 #define BOOT_DIAG_SNAPSHOT_INTERVAL_MS 60000
 #define BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS 60000
 
@@ -33,9 +33,7 @@ void Application::setupBootDiagnostics() {
     // Watchdog / panic-class resets => the firmware died -> crash-loop.
     // A clean POWERON after a long pre-freeze uptime => the device hung and
     // had to be power-cycled by hand -> silent hang.
-    bool isCrash = (reason == ESP_RST_PANIC || reason == ESP_RST_TASK_WDT ||
-                    reason == ESP_RST_INT_WDT || reason == ESP_RST_WDT ||
-                    reason == ESP_RST_CPU_LOCKUP);
+    bool isCrash = crashResetIsCrash((uint8_t)reason);
     const char *failureClass = "clean/other";
     if (isCrash) {
       failureClass = "crash-loop";
@@ -56,21 +54,46 @@ void Application::setupBootDiagnostics() {
                          prior.uptimeMs > BOOT_DIAG_SILENT_HANG_MIN_UPTIME_MS);
     this->bootDiagPreferences.begin(BOOT_DIAG_NAMESPACE, false);
     if (shouldReport) {
-      struct PendingBootDiagnostic {
-        BootDiagnostics_t record;
-        uint8_t resetReason;
-        uint8_t version;
-      } pending = {prior, (uint8_t)reason, BOOT_DIAG_PENDING_VERSION};
+      static_assert(sizeof(BootDiagnostics_t) == sizeof(CrashBootRecord),
+                    "the pending crash record embeds the boot record");
+      PendingCrashBootRecord pending = {};
+      memcpy(&pending.record, &prior, sizeof(prior));
+      pending.resetReason = (uint8_t)reason;
+      pending.version = BOOT_DIAG_PENDING_VERSION;
+      pending.phase = (uint8_t)CrashUploadPhase::MetadataPending;
+      // The image that crashed is still the one running: the report keeps its
+      // version even when an OTA update lands before the upload.
+      snprintf(pending.firmwareVersion, sizeof(pending.firmwareVersion), "%s",
+               FIRMWARE_VERSION);
+
+      // Tie the dump to this crash only when this crash wrote it (ATT-1144).
+      // A dump an earlier record already claimed stays with that one.
+      const CrashDumpFingerprint dump = crashFlashDumpFingerprint();
+      CrashDumpFingerprint claimed = {};
+      if (this->bootDiagPreferences.getBytes(BOOT_DIAG_DUMP_CLAIMED_KEY, &claimed,
+                                             sizeof(claimed)) != sizeof(claimed)) {
+        claimed = {};
+      }
+      if (crashupload::shouldAttachDump(isCrash, dump, claimed)) {
+        pending.dump = dump;
+        this->bootDiagPreferences.putBytes(BOOT_DIAG_DUMP_CLAIMED_KEY, &dump,
+                                           sizeof(dump));
+        this->logger.infof("Coredump of this crash: %u bytes", (unsigned)dump.size);
+      } else if (dump.present()) {
+        this->logger.infof("Coredump in flash (%u bytes) is not from this reset",
+                           (unsigned)dump.size);
+      }
 
       // Preserve actual failures for upload after the next successful connect
       // (ATT-474) as one blob so its reset reason cannot be paired with a
       // different snapshot after a partial NVS write.
       this->bootDiagPreferences.putBytes(BOOT_DIAG_PENDING_KEY, &pending,
                                          sizeof(pending));
+      this->bootDiagPreferences.remove(BOOT_DIAG_PENDING_REASON_KEY);
     } else if (reason == ESP_RST_SW) {
       // The reset is intentionally ignored. Keep a prior unacknowledged crash,
       // but discard this reboot's marker so it cannot relabel that crash.
-      this->bootDiagPreferences.remove("rebootreason");
+      this->bootDiagPreferences.remove(BOOT_DIAG_REBOOT_REASON_KEY);
     }
     this->bootDiagPreferences.end();
   } else {

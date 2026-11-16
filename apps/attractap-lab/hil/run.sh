@@ -34,6 +34,12 @@
 # With a prebuilt READER_IMAGE the tests skip unless READER_OTA_IMAGE (an app image),
 # READER_OTA_VERSION and READER_BASE_VERSION are set too. NO_OTA_BUILD=1 skips the
 # second build (the OTA tests then skip).
+#
+# Crash report tests (test_crash_upload.py): plain reader images are built with the
+# lab-only crash trigger (-DATTRACTAP_CRASH_TRIGGER=ON), and the reader's ELF
+# (READER_ELF, set by the builds here) is published to the API as a symbol-only
+# firmware entry so the uploaded coredump can be symbolicated. API_LOG points the
+# tests at the API's log.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -131,6 +137,7 @@ if [[ "$READER_PROFILE" == secure-lab ]]; then
     >"$WORK/reader-sign.log"
   READER_IMAGE="$WORK/reader.hex"
   [[ -z "${built_here:-}" ]] || build_ota_image "$READER_SECURE_BUILD" -DATTRACTAP_SECURE_PROFILE=ON -DATTRACTAP_SECURE_LAB=ON
+  READER_ELF="${READER_ELF:-$READER_SECURE_BUILD/attractap.elf}"
 elif [[ -z "${READER_IMAGE:-}" ]]; then
   require_idf
   firmware="$ROOT/apps/attractap/firmware"
@@ -138,10 +145,11 @@ elif [[ -z "${READER_IMAGE:-}" ]]; then
   (cd "$firmware" && python3 tools/build_individual_ca_certs.py >/dev/null &&
     idf.py -B "$build" -DSDKCONFIG="$build/sdkconfig" -DATTRACTAP_VARIANT="$VARIANT" \
       -DATTRACTAP_LOG_LEVEL=DEBUG -DATTRACTAP_TEST_HOOKS=ON -DATTRACTAP_BEEPER_DEFAULT=OFF \
-      -DATTRACTAP_VERSION_OVERRIDE= ${READER_CMAKE_ARGS:-} build >"$WORK/reader-build.log")
+      -DATTRACTAP_CRASH_TRIGGER=ON -DATTRACTAP_VERSION_OVERRIDE= ${READER_CMAKE_ARGS:-} build >"$WORK/reader-build.log")
   (cd "$build" && esptool --chip esp32s3 merge-bin -o "$WORK/reader.bin" @flash_args >/dev/null)
   READER_IMAGE="$WORK/reader.bin"
-  build_ota_image "$build"
+  READER_ELF="${READER_ELF:-$build/attractap.elf}"
+  build_ota_image "$build" -DATTRACTAP_CRASH_TRIGGER=ON
 fi
 if [[ -z "${EMULATOR_IMAGE:-}" ]]; then
   require_idf
@@ -161,7 +169,22 @@ WIRETAP_PRELOAD="$(cd "$HERE/../real-cards" && pwd)/wiretap.cjs"
 # The update tests offer lab images through this directory (see test_ota.py).
 export ATTRACTAP_FIRMWARE_ASSETS_DIR="$WORK/firmwares"
 mkdir -p "$ATTRACTAP_FIRMWARE_ASSETS_DIR"
-echo '{"firmwares":[]}' >"$ATTRACTAP_FIRMWARE_ASSETS_DIR/firmwares.json"
+if [[ -n "${READER_ELF:-}" && -f "$READER_ELF" ]]; then
+  # Symbols only: no reader runs a firmware of this name, so nothing is ever offered for it. The API
+  # indexes it at startup by its build id (the ELF's SHA-256, which every coredump of it carries).
+  cp "$READER_ELF" "$ATTRACTAP_FIRMWARE_ASSETS_DIR/hil-reader.elf"
+  python3 - "$READER_ELF" "$ATTRACTAP_FIRMWARE_ASSETS_DIR/firmwares.json" <<'PY'
+import hashlib, json, sys
+build_id = hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest()
+entry = {"name": "hil-symbols", "friendlyName": "HIL symbols", "variant": "hil-symbols",
+         "variantFriendlyName": "HIL symbols", "version": "0.0.0", "boardFamily": "ESP32-S3",
+         "filename": "none.bin", "filenameOTA": "none.bin", "elfFilename": "hil-reader.elf",
+         "buildId": build_id, "chip": "esp32s3", "flashMode": "dio", "flashFreq": "80m", "flashSize": "16MB"}
+json.dump({"firmwares": [entry]}, open(sys.argv[2], "w"))
+PY
+else
+  echo '{"firmwares":[]}' >"$ATTRACTAP_FIRMWARE_ASSETS_DIR/firmwares.json"
+fi
 # Own process group, so the trap stops pnpm and the API it spawned. NODE_OPTIONS reaches the API
 # process through pnpm serve and nx (the preload also loads, harmlessly, into those tools).
 set -m
@@ -195,7 +218,7 @@ GRPC_ENABLE_FORK_SUPPORT=0 PYTHONPATH="$HERE/../src:$HERE" LAB_PYTHON="$LAB_PYTH
   READER_IMAGE="$READER_IMAGE" READER_VARIANT="$VARIANT" READER_PROFILE="$READER_PROFILE" EMULATOR_IMAGE="$EMULATOR_IMAGE" \
   API_URL="http://127.0.0.1:$API_PORT" API_DB="$STORAGE_ROOT/attraccess.sqlite" \
   API_HOST="${API_HOST:-}" API_PORT="$API_PORT" READER_API_PORT="$READER_API_PORT" \
-  API_RELAY_SSH="${API_RELAY_SSH:-}" WIRETAP_FILE="$WIRETAP_FILE" \
+  API_RELAY_SSH="${API_RELAY_SSH:-}" WIRETAP_FILE="$WIRETAP_FILE" API_LOG="$WORK/api.log" \
   labgrid-client -x "$COORDINATOR" -p "$PLACE" session \
     --purpose "${HIL_PURPOSE:-Attractap HIL: NFC emulator tests}" --wait-timeout "${HIL_WAIT_TIMEOUT:-1800}" -- \
     bash "$HERE/run.sh" --in-session "$@"
