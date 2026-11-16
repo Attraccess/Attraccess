@@ -63,6 +63,20 @@ describe('HttpMetricsInterceptor', () => {
     });
   });
 
+  it.each([
+    [{ authenticationMethod: 'session' }, 'session'],
+    [{ authenticationMethod: 'api-token' }, 'api-token'],
+    [{ authenticationMethod: 'mcp-oauth' }, 'mcp-oauth'],
+    [{ authenticationMethod: 'something-else' }, 'anonymous'],
+    [undefined, 'anonymous'],
+  ])('labels the authentication method of %j as %s', (user, label) => {
+    const { context, next } = createHttpContext();
+    (context.switchToHttp().getRequest() as { user?: unknown }).user = user;
+    // `of(null)` completes synchronously, so the metric is recorded before subscribe returns.
+    interceptor.intercept(context, next).subscribe();
+    expect(metrics.total.inc).toHaveBeenCalledWith(expect.objectContaining({ auth_method: label }));
+  });
+
   it('records error status code on failed requests', (done) => {
     const { context } = createHttpContext('POST', '/api/create');
     const errorNext = {

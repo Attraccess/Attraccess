@@ -6,8 +6,9 @@ import { LessThan, Repository } from 'typeorm';
 import { McpOAuthClient, McpOAuthGrant, McpOAuthToken, User } from '@attraccess/database-entities';
 import type { McpOAuthTokenKind } from '@attraccess/database-entities';
 import type { AppConfigType } from '../config/app.config';
+import { TokenHashService } from '../encryption/token-hash.service';
 import { RbacService } from '../users-and-auth/rbac/rbac.service';
-import type { McpDelegation } from './mcp-delegation';
+import type { McpDelegation } from '../users-and-auth/strategies/mcp-delegation';
 import {
   ACCESS_TOKEN_PREFIX,
   ACCESS_TOKEN_TTL_MS,
@@ -17,8 +18,9 @@ import {
   AUTHORIZATION_REQUEST_TTL_MS,
   CODE_CHALLENGE_PATTERN,
   GRANT_LIFETIME_MS,
+  MAX_STATE_LENGTH,
   REFRESH_TOKEN_PREFIX,
-  hashSecret,
+  StaticOAuthClient,
   isAllowedRedirectUri,
   isLoopbackRedirectUri,
   parseScope,
@@ -85,13 +87,22 @@ export interface TokenResponse {
   scope: string;
 }
 
+export interface ConsentPermission {
+  key: string;
+  label: string;
+  description: string;
+  category: string;
+}
+
 export interface ConsentView {
   clientName: string;
+  /** Pre-registered by the operator; otherwise the client registered itself and its name is unverified. */
+  registeredByOperator: boolean;
   redirectUri: string;
   redirectHost: string;
   loopbackRedirect: boolean;
   /** Permissions the client asked for. Empty request = all of the user's current permissions. */
-  permissions: string[];
+  permissions: ConsentPermission[];
   requestedAll: boolean;
   /** Requested permissions the user does not hold, which cannot be granted. */
   unavailablePermissions: string[];
@@ -99,10 +110,28 @@ export interface ConsentView {
   expiresAt: Date;
 }
 
-type Registered = { clientId: string; clientName: string; redirectUris: string[] };
+type Registered = StaticOAuthClient & {
+  /** Pre-registered by the operator in `MCP_OAUTH_CLIENTS`, as opposed to self-registered through DCR. */
+  isStatic: boolean;
+};
+
+export interface AuthorizationRedirectError {
+  redirectUri: string;
+  state: string | null;
+  error: McpOAuthErrorCode;
+  description: string;
+  /**
+   * True when the browser may be sent to the redirect URI without the user looking at anything first: an operator
+   * registered the client, or the URI is on the user's own device. Anyone can register a client for any https URI,
+   * so for those an automatic error redirect would be an open redirector (RFC 9700, section 4.11.2).
+   */
+  trusted: boolean;
+}
 
 const MAX_REGISTERED_CLIENTS = 5000;
 const PURGE_INTERVAL_MS = 10 * 60 * 1000;
+/** Expired grants and tokens stay this long; unanswered authorization requests go as soon as they expire. */
+const PURGE_GRACE_MS = 24 * 60 * 60 * 1000;
 const LAST_USED_WRITE_INTERVAL_MS = 60 * 1000;
 
 /**
@@ -122,10 +151,11 @@ export class McpOAuthService {
     @InjectRepository(McpOAuthGrant) private readonly grants: Repository<McpOAuthGrant>,
     @InjectRepository(McpOAuthToken) private readonly tokens: Repository<McpOAuthToken>,
     @InjectRepository(User) private readonly users: Repository<User>,
+    private readonly tokenHash: TokenHashService,
   ) {
     try {
       for (const client of parseStaticClients(config.get<AppConfigType>('app')?.MCP_OAUTH_CLIENTS)) {
-        this.staticClients.set(client.clientId, client);
+        this.staticClients.set(client.clientId, { ...client, isStatic: true });
       }
     } catch (error) {
       // A typo in an optional setting must never stop the application from starting.
@@ -141,7 +171,7 @@ export class McpOAuthService {
     if (fixed) return fixed;
     const stored = await this.clients.findOneBy({ clientId });
     return stored
-      ? { clientId: stored.clientId, clientName: stored.clientName, redirectUris: stored.redirectUris }
+      ? { clientId: stored.clientId, clientName: stored.clientName, redirectUris: stored.redirectUris, isStatic: false }
       : null;
   }
 
@@ -179,12 +209,13 @@ export class McpOAuthService {
     if (rawName !== undefined && typeof rawName !== 'string') {
       throw new McpOAuthError('invalid_client_metadata', 'client_name must be a string');
     }
-    // Control characters would let a client spoof the consent screen.
+    // Control and format characters (bidi overrides, zero-width) would let a client spoof the consent screen.
     const clientName =
       ((rawName as string | undefined) ?? '')
-        .replace(/\p{Cc}/gu, ' ')
+        .replace(/[\p{Cc}\p{Cf}]/gu, ' ')
         .trim()
         .slice(0, 120) || 'MCP client';
+    void this.purgeExpired();
     if ((await this.clients.count()) >= MAX_REGISTERED_CLIENTS) {
       await this.pruneUnusedClients();
       if ((await this.clients.count()) >= MAX_REGISTERED_CLIENTS) {
@@ -230,10 +261,7 @@ export class McpOAuthService {
   async startAuthorization(
     params: AuthorizationParameters,
     resource: string,
-  ): Promise<
-    | { requestId: string }
-    | { redirectError: { redirectUri: string; state: string | null; error: McpOAuthErrorCode; description: string } }
-  > {
+  ): Promise<{ requestId: string } | { redirectError: AuthorizationRedirectError }> {
     const client = await this.findClient(params.clientId);
     if (!client) throw new McpOAuthError('invalid_client', 'Unknown client_id');
     // Exact match. From here on only the registered value is used, never the one that came with the request.
@@ -241,10 +269,14 @@ export class McpOAuthService {
     if (!redirectUri) {
       throw new McpOAuthError('invalid_request', 'redirect_uri does not match a registered redirect URI');
     }
-    const state = params.state ?? null;
+    const trusted = client.isStatic || isLoopbackRedirectUri(redirectUri);
+    const oversizedState = params.state !== undefined && params.state.length > MAX_STATE_LENGTH;
+    // An over-long state is not echoed back; it is dropped so that the error still reaches the client.
+    const state = oversizedState ? null : (params.state ?? null);
     const fail = (error: McpOAuthErrorCode, description: string) => ({
-      redirectError: { redirectUri, state, error, description },
+      redirectError: { redirectUri, state, error, description, trusted },
     });
+    if (oversizedState) return fail('invalid_request', `state must not exceed ${MAX_STATE_LENGTH} characters`);
     if (params.responseType !== 'code') return fail('unsupported_response_type', 'response_type must be "code"');
     if (!params.codeChallenge || !CODE_CHALLENGE_PATTERN.test(params.codeChallenge)) {
       return fail('invalid_request', 'A PKCE code_challenge is required');
@@ -269,6 +301,7 @@ export class McpOAuthService {
     };
     const requestId = randomSecret(AUTHORIZATION_REQUEST_PREFIX);
     await this.store('request', requestId, payload, AUTHORIZATION_REQUEST_TTL_MS);
+    void this.purgeExpired();
     return { requestId };
   }
 
@@ -278,15 +311,27 @@ export class McpOAuthService {
     if (!client) throw new McpOAuthError('invalid_client', 'Unknown client_id');
     const current = await this.rbac.getEffectivePermissions(user.id, true);
     const requestedAll = payload.permissionKeys.length === 0;
-    const permissions = requestedAll ? [...current].sort() : payload.permissionKeys;
+    const keys = requestedAll ? [...current].sort() : payload.permissionKeys;
+    // The consent page cannot read the permission catalog itself: listing it needs an administrator permission.
+    const catalog = new Map((await this.rbac.getPermissions()).map((permission) => [permission.key, permission]));
+    const permissions = keys.map((key) => {
+      const known = catalog.get(key);
+      return {
+        key,
+        label: known?.label ?? key,
+        description: known?.description ?? '',
+        category: known?.category ?? '',
+      };
+    });
     return {
       clientName: client.clientName,
+      registeredByOperator: client.isStatic,
       redirectUri: payload.redirectUri,
       redirectHost: new URL(payload.redirectUri).host,
       loopbackRedirect: isLoopbackRedirectUri(payload.redirectUri),
       permissions,
       requestedAll,
-      unavailablePermissions: permissions.filter((permission) => !current.has(permission)),
+      unavailablePermissions: keys.filter((permission) => !current.has(permission)),
       resource: payload.resource,
       expiresAt: token.expiresAt,
     };
@@ -338,22 +383,18 @@ export class McpOAuthService {
     };
   }
 
-  buildErrorRedirect(
-    error: { redirectUri: string; state: string | null; error: string; description: string },
-    issuer: string,
-  ): string {
-    const url = new URL(error.redirectUri);
-    url.searchParams.set('error', error.error);
-    url.searchParams.set('error_description', error.description);
-    if (error.state !== null) url.searchParams.set('state', error.state);
-    url.searchParams.set('iss', issuer);
-    return url.toString();
+  buildErrorRedirect(error: AuthorizationRedirectError, issuer: string): string {
+    return this.redirect(error, issuer, { error: error.error, error_description: error.description });
   }
 
-  private redirect(payload: RequestPayload, issuer: string, parameters: Record<string, string>): string {
-    const url = new URL(payload.redirectUri);
+  private redirect(
+    target: { redirectUri: string; state: string | null },
+    issuer: string,
+    parameters: Record<string, string>,
+  ): string {
+    const url = new URL(target.redirectUri);
     for (const [key, value] of Object.entries(parameters)) url.searchParams.set(key, value);
-    if (payload.state !== null) url.searchParams.set('state', payload.state);
+    if (target.state !== null) url.searchParams.set('state', target.state);
     url.searchParams.set('iss', issuer);
     return url.toString();
   }
@@ -368,7 +409,7 @@ export class McpOAuthService {
       throw new McpOAuthError('invalid_request', 'client_id, code, redirect_uri and code_verifier are required');
     }
     if (input.resource !== resource) throw new McpOAuthError('invalid_target', `resource must be ${resource}`);
-    const row = await this.tokens.findOneBy({ tokenHash: hashSecret(input.code), kind: 'code' });
+    const row = await this.tokens.findOneBy({ tokenHash: this.hash(input.code), kind: 'code' });
     if (!row?.grantId) throw new McpOAuthError('invalid_grant', 'Invalid authorization code');
     const consumed = await this.consume(row.tokenHash);
     if (!consumed) {
@@ -381,6 +422,7 @@ export class McpOAuthService {
     if (
       !payload ||
       !grant ||
+      !(await this.findClient(payload.clientId)) ||
       row.expiresAt <= new Date() ||
       payload.clientId !== input.clientId ||
       payload.redirectUri !== input.redirectUri ||
@@ -399,10 +441,9 @@ export class McpOAuthService {
     if (!input.refreshToken || !input.clientId) {
       throw new McpOAuthError('invalid_request', 'client_id and refresh_token are required');
     }
-    if (input.resource !== undefined && input.resource !== resource) {
-      throw new McpOAuthError('invalid_target', `resource must be ${resource}`);
-    }
-    const row = await this.tokens.findOneBy({ tokenHash: hashSecret(input.refreshToken), kind: 'refresh' });
+    // RFC 8707 on every token request, refreshes included, so no token is ever minted for another audience.
+    if (input.resource !== resource) throw new McpOAuthError('invalid_target', `resource must be ${resource}`);
+    const row = await this.tokens.findOneBy({ tokenHash: this.hash(input.refreshToken), kind: 'refresh' });
     if (!row?.grantId) throw new McpOAuthError('invalid_grant', 'Invalid refresh token');
     const grant = await this.grants.findOneBy({ id: row.grantId });
     if (
@@ -412,6 +453,13 @@ export class McpOAuthService {
       grant.clientId !== input.clientId ||
       grant.resource !== resource
     ) {
+      throw new McpOAuthError('invalid_grant', 'The grant is no longer valid');
+    }
+    const user = await this.users.findOneBy({ id: grant.userId });
+    // The owner was deleted or disabled, or the operator removed the client from MCP_OAUTH_CLIENTS: nothing this grant
+    // issues should be accepted any more, so end it instead of rotating.
+    if (!user || user.isDisabled || !(await this.findClient(grant.clientId))) {
+      await this.revokeGrant(grant.id);
       throw new McpOAuthError('invalid_grant', 'The grant is no longer valid');
     }
     if (!(await this.consume(row.tokenHash))) {
@@ -445,7 +493,7 @@ export class McpOAuthService {
   /** Resolves an MCP access token for the given audience, or `null`. Never throws for an unknown token. */
   async authenticateAccessToken(token: string, resource: string): Promise<McpDelegation | null> {
     if (!token.startsWith(ACCESS_TOKEN_PREFIX)) return null;
-    const row = await this.tokens.findOneBy({ tokenHash: hashSecret(token), kind: 'access' });
+    const row = await this.tokens.findOneBy({ tokenHash: this.hash(token), kind: 'access' });
     if (!row?.grantId || row.expiresAt <= new Date()) return null;
     const grant = await this.grants.findOneBy({ id: row.grantId });
     if (!grant || grant.revokedAt || grant.expiresAt <= new Date()) return null;
@@ -466,6 +514,10 @@ export class McpOAuthService {
 
   // --- storage helpers -------------------------------------------------------------------------
 
+  private hash(secret: string): string {
+    return this.tokenHash.hashMcpToken(secret);
+  }
+
   private async store(
     kind: McpOAuthTokenKind,
     secret: string,
@@ -474,7 +526,7 @@ export class McpOAuthService {
     grantId: string | null = null,
   ): Promise<void> {
     await this.tokens.insert({
-      tokenHash: hashSecret(secret),
+      tokenHash: this.hash(secret),
       kind,
       grantId,
       payload,
@@ -495,7 +547,7 @@ export class McpOAuthService {
   }
 
   private async loadRequest(requestId: string): Promise<{ payload: RequestPayload; token: McpOAuthToken }> {
-    const token = await this.tokens.findOneBy({ tokenHash: hashSecret(requestId), kind: 'request' });
+    const token = await this.tokens.findOneBy({ tokenHash: this.hash(requestId), kind: 'request' });
     if (!token?.payload || token.usedAt || token.expiresAt <= new Date()) {
       throw new McpOAuthError('not_found', 'This authorization request has expired or was already answered', 404);
     }
@@ -514,9 +566,11 @@ export class McpOAuthService {
     if (Date.now() - this.lastPurgeAt < PURGE_INTERVAL_MS) return;
     this.lastPurgeAt = Date.now();
     try {
-      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      await this.tokens.delete({ expiresAt: LessThan(cutoff) });
-      await this.grants.delete({ expiresAt: LessThan(cutoff) });
+      const now = Date.now();
+      // Anyone can open an authorization request, so unanswered ones must not pile up.
+      await this.tokens.delete({ kind: 'request', expiresAt: LessThan(new Date(now)) });
+      await this.tokens.delete({ expiresAt: LessThan(new Date(now - PURGE_GRACE_MS)) });
+      await this.grants.delete({ expiresAt: LessThan(new Date(now - PURGE_GRACE_MS)) });
     } catch (error) {
       this.logger.warn(`Could not purge expired MCP OAuth data: ${(error as Error).message}`);
     }

@@ -11,6 +11,7 @@ import type {
 } from '../policies/domains';
 import type { IdentityAuditAction } from '../policies/identity';
 import type { RESOURCE_AUDIT_ACTIONS } from '../policies/resources';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 /**
  * The persisted action strings of every core audit domain. The envelope carries the stored action exactly as it
@@ -39,7 +40,7 @@ export type CoreAuditSubjectType = (typeof CORE_SUBJECT_TYPES)[number];
  */
 export interface AuditActor {
   id: number | null;
-  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null;
+  authenticationMethod: AuthenticationMethod | null;
   apiTokenId?: number | null;
 }
 
@@ -49,7 +50,7 @@ export const SYSTEM_AUDIT_ACTOR: AuditActor = Object.freeze({ id: null, authenti
 /** The actor of an authenticated HTTP or plugin request (session or API token). */
 export function auditActorOf(user: {
   id: number;
-  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number | null;
 }): AuditActor {
   const viaToken = user.authenticationMethod === 'api-token';

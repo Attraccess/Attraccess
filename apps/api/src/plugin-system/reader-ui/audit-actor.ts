@@ -1,9 +1,10 @@
 import type { AuditActor as RecordedAuditActor } from '../../audit/recorder/audit-event';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 /** The admin behind a reader UI change, as the audit records it (session, API token or MCP OAuth). */
 export interface AuditActor {
   id: number;
-  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number;
 }
 

@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export type AuthAuditType =
   | 'login'
@@ -32,7 +33,7 @@ export interface AuthAuditFields {
   ip: string;
   userId?: number | null;
   username?: string | null;
-  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
+  authenticationMethod?: AuthenticationMethod;
   apiTokenId?: number | null;
   reason?: string;
 }

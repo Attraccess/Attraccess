@@ -19,10 +19,11 @@ import {
 import { AttractapService } from '../attractap.service';
 import { CardConversationFailure, CardConversationService } from './card-conversation.service';
 import { AuthenticatedWebSocket, CardDetection } from './websocket.types';
+import type { AuthenticationMethod } from '@attraccess/database-entities';
 
 export type AuditPrincipal = {
   userId: number;
-  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth';
+  authenticationMethod: AuthenticationMethod;
   apiTokenId?: number;
 };
 

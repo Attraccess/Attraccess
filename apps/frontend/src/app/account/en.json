@@ -20,13 +20,15 @@
     },
     "notifications": { "title": "Notifications", "description": "Choose what reaches you and where" },
     "tokens": { "title": "API tokens", "description": "Manage access for integrations" },
+    "mcp": { "title": "AI clients (MCP)", "description": "Connect an AI assistant to Attraccess" },
     "delete": { "title": "Delete account", "description": "Request permanent account removal" }
   },
   "searchTerms": {
     "email": "email",
     "username": "username",
     "authenticator": "authenticator 2FA",
-    "push": "push"
+    "push": "push",
+    "mcp": "MCP AI assistant"
   },
   "sections": {
     "profile": "Profile",

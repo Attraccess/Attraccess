@@ -6,8 +6,8 @@ import { createServer, request as httpRequest, RequestListener, Server } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { McpDelegation, setMcpDelegation } from './mcp-delegation';
-import { formatRestResponse, RestRequest } from './mcp-rest-bridge';
+import { McpDelegation, setMcpDelegation } from '../users-and-auth/strategies/mcp-delegation';
+import { formatRestResponse, MAX_RESULT_CHARS, RestRequest } from './mcp-rest-bridge';
 
 export type CallerContext = {
   /** The bearer token of an API-token caller; the only credential ever forwarded. */
@@ -21,6 +21,10 @@ export type CallerContext = {
 
 const CALL_HEADER = 'x-mcp-call';
 const REQUEST_TIMEOUT_MS = 60_000;
+/** Enough bytes for MAX_RESULT_CHARS characters of any UTF-8 text; the rest of a larger response is not read. */
+const MAX_RESPONSE_BYTES = 4 * MAX_RESULT_CHARS + 4;
+
+class RestTimeoutError extends Error {}
 
 /**
  * Runs a tool call through the real Nest pipeline (guards, pipes, interceptors, filters) as the same client.
@@ -46,6 +50,19 @@ export class McpRestGateway implements OnApplicationShutdown {
     try {
       const response = await this.send(socketPath, nonce, restRequest, caller);
       return formatRestResponse(response.status, response.contentType, response.body);
+    } catch (error) {
+      if (!(error instanceof RestTimeoutError)) throw error;
+      // The REST handler may still finish: say so, so that a client does not blindly repeat a write.
+      const seconds = REQUEST_TIMEOUT_MS / 1000;
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `HTTP 504 Gateway Timeout: no response within ${seconds} s. The operation may still complete; check its result before you retry.`,
+          },
+        ],
+      };
     } finally {
       this.pending.delete(nonce);
     }
@@ -59,7 +76,11 @@ export class McpRestGateway implements OnApplicationShutdown {
   }
 
   private start() {
-    this.starting ??= this.listen();
+    // A failed start (e.g. no writable temporary directory) is retried by the next call instead of being cached.
+    this.starting ??= this.listen().catch((error: unknown) => {
+      this.starting = undefined;
+      throw error;
+    });
     return this.starting;
   }
 
@@ -86,10 +107,15 @@ export class McpRestGateway implements OnApplicationShutdown {
       directory = mkdtempSync(join(tmpdir(), 'attraccess-mcp-'));
       socketPath = join(directory, 'rest.sock');
     }
-    await new Promise<void>((resolve, reject) => {
-      server.once('error', reject);
-      server.listen(socketPath, resolve);
-    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(socketPath, resolve);
+      });
+    } catch (error) {
+      if (directory) rmSync(directory, { recursive: true, force: true });
+      throw error;
+    }
     this.logger.log('MCP REST gateway listening on a private local socket');
     return { server, socketPath, directory };
   }
@@ -101,6 +127,9 @@ export class McpRestGateway implements OnApplicationShutdown {
     caller: CallerContext,
   ): Promise<{ status: number; contentType: string | undefined; body: string }> {
     return new Promise((resolve, reject) => {
+      let timedOut = false;
+      // After a timeout the response stream may fail with Node's own "aborted" error first: report the timeout.
+      const fail = (error: Error) => reject(timedOut ? new RestTimeoutError('The REST request timed out') : error);
       const payload = restRequest.body === undefined ? undefined : Buffer.from(JSON.stringify(restRequest.body));
       const headers: Record<string, string> = {
         accept: 'application/json',
@@ -126,19 +155,32 @@ export class McpRestGateway implements OnApplicationShutdown {
         },
         (incoming) => {
           const chunks: Buffer[] = [];
-          incoming.on('data', (chunk: Buffer) => chunks.push(chunk));
-          incoming.on('error', reject);
-          incoming.on('end', () =>
+          let size = 0;
+          const finish = () =>
             resolve({
               status: incoming.statusCode ?? 502,
               contentType: incoming.headers['content-type'],
               body: Buffer.concat(chunks).toString('utf8'),
-            }),
-          );
+            });
+          incoming.on('data', (chunk: Buffer) => {
+            chunks.push(chunk);
+            size += chunk.length;
+            // More than a tool result can carry: stop reading instead of buffering the whole response.
+            if (size >= MAX_RESPONSE_BYTES) {
+              incoming.removeAllListeners('data');
+              incoming.destroy();
+              finish();
+            }
+          });
+          incoming.on('error', fail);
+          incoming.on('end', finish);
         },
       );
-      outgoing.on('timeout', () => outgoing.destroy(new Error('The REST request timed out')));
-      outgoing.on('error', reject);
+      outgoing.on('timeout', () => {
+        timedOut = true;
+        outgoing.destroy(new RestTimeoutError('The REST request timed out'));
+      });
+      outgoing.on('error', fail);
       outgoing.end(payload);
     });
   }

@@ -1,6 +1,7 @@
 import { useOverlayState } from '@heroui/react';
 import {
   BellIcon,
+  BotIcon,
   CalendarClockIcon,
   KeyRoundIcon,
   LockKeyholeIcon,
@@ -19,6 +20,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { TwoFactorCard } from './two-factor';
 import { PasskeysCard } from './passkeys';
 import { ApiTokensCard } from './api-tokens';
+import { McpConnectionCard, useMcpConnection } from './mcp';
 import { DateTimePreferencesForm } from './date-time';
 import { NotificationPreferencesForm } from './notifications';
 import { useUsersServiceRequestDeleteAccount, ApiError } from '@attraccess/react-query-client';
@@ -36,6 +38,8 @@ export default function AccountPage() {
   const { user: me, hasPermission } = useAuth();
   const toast = useToastMessage();
   const { isOpen, open, close } = useOverlayState();
+  const canUseApiTokens = Boolean(me && hasPermission('users.api-tokens.manage'));
+  const mcpConnection = useMcpConnection(canUseApiTokens);
 
   const { mutate: requestDelete, isPending: isRequestingDelete } = useUsersServiceRequestDeleteAccount({
     onSuccess: () => {
@@ -134,7 +138,7 @@ export default function AccountPage() {
       key: 'advanced',
       label: t('groups.advanced'),
       items: [
-        ...(me && hasPermission('users.api-tokens.manage')
+        ...(me && canUseApiTokens
           ? [
               {
                 key: 'tokens',
@@ -142,6 +146,18 @@ export default function AccountPage() {
                 description: t('topics.tokens.description'),
                 icon: <KeyRoundIcon size={19} />,
                 content: <ApiTokensCard availablePermissions={me.effectivePermissions ?? []} />,
+              },
+            ]
+          : []),
+        ...(me && mcpConnection
+          ? [
+              {
+                key: 'mcp',
+                title: t('topics.mcp.title'),
+                description: t('topics.mcp.description'),
+                icon: <BotIcon size={19} />,
+                searchTerms: [t('searchTerms.mcp')],
+                content: <McpConnectionCard connection={mcpConnection} canUseApiTokens={canUseApiTokens} />,
               },
             ]
           : []),

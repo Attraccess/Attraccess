@@ -1,0 +1,15 @@
+{
+  "intro": "Attraccess is an MCP server. AI clients that support the Model Context Protocol (MCP) can use it to look up and change things in Attraccess for you, never with more permissions than you have.",
+  "urlLabel": "Server URL",
+  "copy": "Copy server URL",
+  "copied": "Server URL copied",
+  "copyFailed": "Could not copy the server URL",
+  "signIn": {
+    "title": "Signing in",
+    "oauth": "OAuth: add the server URL to your AI client. It opens Attraccess in your browser, where you sign in and choose what the client may do.",
+    "apiToken": "API token: create a token under API tokens and set your client to send it in the header Authorization: Bearer <token>. The client gets only the token's permissions.",
+    "oauthUnavailable": "OAuth sign-in is not available because Attraccess is not reached over HTTPS here. Use an API token."
+  },
+  "docs": "How to connect an AI client",
+  "docsUrl": "https://docs.attraccess.org/#/en/developer/mcp"
+}

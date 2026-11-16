@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import type { AppConfigType } from '../config/app.config';
@@ -18,6 +18,8 @@ export interface McpEndpoints {
   registrationEndpoint: string;
   /** The frontend consent page; the authorization endpoint redirects the browser here. */
   consentUrl: string;
+  /** The frontend page for an authorization request that cannot go back to the client. */
+  errorPageUrl: string;
   /** False on plain-HTTP, non-loopback deployments: API tokens keep working, OAuth does not. */
   oauthEnabled: boolean;
 }
@@ -27,7 +29,7 @@ export interface McpEndpoints {
  * (`SettingsService.getUrl()`, then `ATTRACCESS_URL`). A request only fills in when neither is configured.
  */
 @Injectable()
-export class McpPublicUrls {
+export class McpPublicUrls implements OnApplicationBootstrap {
   private readonly logger = new Logger(McpPublicUrls.name);
   private warnedAbout?: string;
 
@@ -35,6 +37,11 @@ export class McpPublicUrls {
     private readonly config: ConfigService,
     private readonly settings: SettingsService,
   ) {}
+
+  /** Resolves the URLs once at startup so that the warning about a disabled OAuth shows up in the boot log. */
+  async onApplicationBootstrap(): Promise<void> {
+    await this.resolve().catch(() => undefined);
+  }
 
   async resolve(request?: Pick<Request, 'protocol' | 'host'>): Promise<McpEndpoints> {
     const app = this.config.get<AppConfigType>('app');
@@ -66,6 +73,7 @@ export class McpPublicUrls {
       tokenEndpoint: `${origin}${prefix}/mcp/oauth/token`,
       registrationEndpoint: `${origin}${prefix}/mcp/oauth/register`,
       consentUrl: `${frontend}/oauth/authorize`,
+      errorPageUrl: `${frontend}/oauth/error`,
       oauthEnabled,
     };
   }
