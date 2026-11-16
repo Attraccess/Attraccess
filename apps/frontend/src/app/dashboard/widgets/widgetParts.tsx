@@ -39,15 +39,23 @@ export function WidgetSearch({
 
   return (
     <div className="flex items-end gap-2">
-      <SearchField fullWidth value={term} onChange={setTerm} onSubmit={submit} variant="secondary" data-cy={dataCy}>
+      <SearchField
+        fullWidth
+        className="min-w-0"
+        value={term}
+        onChange={setTerm}
+        onSubmit={submit}
+        variant="secondary"
+        data-cy={dataCy}
+      >
         <Label className="sr-only">{label}</Label>
         <SearchField.Group>
           <SearchField.SearchIcon />
-          <SearchField.Input placeholder={label} />
+          <SearchField.Input className="min-w-0" placeholder={label} />
           <SearchField.ClearButton />
         </SearchField.Group>
       </SearchField>
-      <Button isIconOnly variant="secondary" aria-label={submitLabel} onPress={submit}>
+      <Button isIconOnly className="shrink-0" variant="secondary" aria-label={submitLabel} onPress={submit}>
         <SearchIcon className="w-4 h-4" />
       </Button>
     </div>

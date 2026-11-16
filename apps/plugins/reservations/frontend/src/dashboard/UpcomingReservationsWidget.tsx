@@ -29,7 +29,10 @@ export function UpcomingReservationsWidget() {
             className="rv:flex rv:flex-wrap rv:items-center rv:gap-2"
             data-cy="reservations-widget-item"
           >
-            <Link href={`/reservations/${reservation.id}`} className="rv:flex rv:min-w-0 rv:flex-col rv:no-underline">
+            <Link
+              href={`/reservations/${reservation.id}`}
+              className="rv:flex rv:min-w-0 rv:flex-col rv:items-start rv:no-underline"
+            >
               <span className="rv:truncate rv:text-sm rv:font-medium">
                 {reservation.resourceName ?? t('dashboard.unknownResource')}
               </span>
