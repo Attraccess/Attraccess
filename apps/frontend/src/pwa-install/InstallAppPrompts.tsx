@@ -8,10 +8,9 @@ import { useInstallApp } from './useInstallApp';
 import en from './en.json';
 import de from './de.json';
 
-type Translate = ReturnType<typeof useTranslations>['t'];
-
 // A small card at the bottom instead of a full-screen overlay: it never blocks the page and "Not now" snoozes it.
-function InstallBanner({ t }: { t: Translate }) {
+function InstallBanner() {
+  const { t } = useTranslations({ en, de });
   const { mode, install } = useInstallApp();
   const isBannerDismissed = useInstallPromptStore((state) => state.isBannerDismissed);
   const dismissBanner = useInstallPromptStore((state) => state.dismissBanner);
@@ -58,7 +57,8 @@ function InstallBanner({ t }: { t: Translate }) {
   );
 }
 
-function IosInstallDialog({ t }: { t: Translate }) {
+function IosInstallDialog() {
+  const { t } = useTranslations({ en, de });
   const isOpen = useInstallPromptStore((state) => state.isIosHelpOpen);
   const setIosHelpOpen = useInstallPromptStore((state) => state.setIosHelpOpen);
 
@@ -82,11 +82,10 @@ function IosInstallDialog({ t }: { t: Translate }) {
 
 /** The install banner and the iOS how-to dialog. Not rendered in kiosk mode. */
 export function InstallAppPrompts() {
-  const { t } = useTranslations({ en, de });
   return (
     <>
-      <InstallBanner t={t} />
-      <IosInstallDialog t={t} />
+      <InstallBanner />
+      <IosInstallDialog />
     </>
   );
 }
