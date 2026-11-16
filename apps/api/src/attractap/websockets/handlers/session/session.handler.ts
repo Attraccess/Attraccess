@@ -42,8 +42,12 @@ import { ResourceFormAction } from '@attraccess/database-entities';
 
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 
+import { StartBlockedException } from '../../../../resources/usage/pre-start/start-confirmation.errors';
+import type { PluginBlockReason } from '@attraccess/plugins-backend-sdk';
 import { ResourceInUseError } from '../../../../resources/usage/errors/resource-in-use.error';
 import { ResourceFullError } from '../../../../resources/usage/errors/resource-full.error';
+import { SessionChangeInterruptedError } from '../../../../resources/usage/errors/session-change-interrupted.error';
+import { MachineBusyError } from '../../../../resources/usage/errors/machine-busy.error';
 import { AlreadyHasActiveSessionError } from '../../../../resources/usage/errors/already-has-active-session.error';
 
 @Injectable()
@@ -91,7 +95,7 @@ export class AttractapSessionHandler {
 
   public async handleResourceUsageStats(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
     const { resourceId } = data.payload ?? {};
-    const userId = socket.state.lastAuthenticatedUserId;
+    const userId = socket.state.verifiedUserId;
     if (
       !(await this.resourceActionGuard.validateResourceAction(
         socket,
@@ -115,7 +119,7 @@ export class AttractapSessionHandler {
         this.operatingAttributionService.getForResource(resourceId, asOf, usage.startTime),
         this.billingService.getConfiguration(),
       ]);
-      if (socket.state.lastAuthenticatedUserId !== userId) return;
+      if (socket.state.verifiedUserId !== userId) return;
       await this.reply(socket, data, AttractapEventType.RESOURCE_USAGE_STATS, {
         resourceId,
         usage: {
@@ -129,15 +133,20 @@ export class AttractapSessionHandler {
           isOperating: operating.operatingDataAvailable ? operating.isOperating : null,
           // Catalog entries include captured terms with unavailable values for skipped free meters.
           // Never attach a new session's meter reading to an earlier usage snapshot.
-          meters: meter.meters
-            .filter((entry) => entry.session?.usageId === usage.id)
-            .map((entry) => ({
-              id: entry.id,
-              name: entry.session.meterName,
-              creditsPerUnit: entry.session.creditsPerUnit,
-              formattedRate: this.formatMeterRate(entry.session.creditsPerUnit, billingConfiguration),
-              value: entry.session.latestValue,
-            })),
+          meters: meter.meters.flatMap((entry) => {
+            const own = (entry.sessions ?? [entry.session]).find((session) => session?.usageId === usage.id);
+            return own
+              ? [
+                  {
+                    id: entry.id,
+                    name: own.meterName,
+                    creditsPerUnit: own.creditsPerUnit,
+                    formattedRate: this.formatMeterRate(own.creditsPerUnit, billingConfiguration),
+                    value: own.latestValue,
+                  },
+                ]
+              : [];
+          }),
         },
       } satisfies ResourceUsageStatsPayload);
     } catch (error) {
@@ -161,6 +170,11 @@ export class AttractapSessionHandler {
     );
   }
 
+  /** The user a reader action was sent for, captured before the first await of the handler. */
+  protected async findActingUser(userId: number | null) {
+    return userId == null ? null : this.usersService.findOne({ id: userId });
+  }
+
   protected extractUserFacingError(error: unknown): string {
     if (error instanceof FlowExecutionError) {
       return error.message.replace(/^FLOW_EXECUTION_ERROR:\s*/, '');
@@ -176,6 +190,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleLockDoor(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId } = data.payload as { resourceId: number };
 
     if (
@@ -189,7 +205,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.LOCK_DOOR, { error: 'USER_NOT_FOUND' });
       return;
@@ -206,6 +222,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleUnlockDoor(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId } = data.payload as { resourceId: number };
 
     if (
@@ -219,7 +237,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.UNLOCK_DOOR, { error: 'USER_NOT_FOUND' });
       return;
@@ -236,6 +254,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleUnlatchDoor(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId } = data.payload as { resourceId: number };
 
     if (
@@ -249,7 +269,7 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.UNLATCH_DOOR, { error: 'USER_NOT_FOUND' });
       return;
@@ -266,6 +286,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleTriggerFlowButton(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId, buttonId } = data.payload as { resourceId: number; buttonId: string };
 
     if (
@@ -279,8 +301,13 @@ export class AttractapSessionHandler {
       return;
     }
 
+    if (userId == null) {
+      await this.reply(socket, data, AttractapEventType.TRIGGER_FLOW_BUTTON, { error: 'USER_NOT_AUTHENTICATED' });
+      return;
+    }
+
     try {
-      await this.resourceFlowsExecutorService.pressButton(resourceId, buttonId, socket.state.lastAuthenticatedUserId);
+      await this.resourceFlowsExecutorService.pressButton(resourceId, buttonId, userId);
       await this.reply(socket, data, AttractapEventType.TRIGGER_FLOW_BUTTON, { success: true });
     } catch (error) {
       this.logger.error(`Failed to trigger flow button: ${error.message}`);
@@ -290,10 +317,12 @@ export class AttractapSessionHandler {
 
   /** START/STOP carry the reader's card session id: the reader is still signed in, keep the session alive. */
   protected resumeCardSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    this.cardSessions.resume(socket, data.payload?.cardSessionId, socket.state.lastAuthenticatedUserId);
+    this.cardSessions.resume(socket, data.payload?.cardSessionId, socket.state.verifiedUserId);
   }
 
   public async handleStartResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId, projectId, forceTakeOver, stepId } = data.payload as {
       resourceId: number;
       projectId?: number;
@@ -324,17 +353,22 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' });
       return;
     }
 
     // Two-card supervision (ATT-493): if a supervisor card was validated for this socket, attribute
-    // the session to that supervisor. The requester stays as `user` (lastAuthenticatedUserId).
-    const flow = socket.state.supervisionFlow;
-    const supervisorUserId =
-      flow && flow.resourceId === resourceId ? (flow.approvedSupervisorUserId ?? undefined) : undefined;
+    // the session to that supervisor. The requester stays as `user` (verifiedUserId). Only a flow the
+    // reader started for this very user counts: a web-started flow is approved on the server, and an
+    // approval for someone else must not carry over to whoever is logged in now.
+    const current = socket.state.supervisionFlow;
+    const flow =
+      current && !current.webInitiated && current.resourceId === resourceId && current.requesterUserId === userId
+        ? current
+        : null;
+    const supervisorUserId = flow?.approvedSupervisorUserId ?? undefined;
 
     try {
       // Plugin pre-start hooks (ATT-1187): allow, ask for a confirmation step, or block. Never gates stop.
@@ -353,21 +387,29 @@ export class AttractapSessionHandler {
         await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, gate.payload);
         return;
       }
-      await this.resourceUsageService.startSession(
-        resourceId,
-        user,
-        { projectId, formSubmissions, forceTakeOver },
-        {
-          ...(supervisorUserId ? { supervisorUserId } : {}),
-          auditOrigin: { actorId: user.id, authenticationMethod: null },
-        },
-      );
+      const releaseCardSession = this.cardSessions.hold(socket);
+      try {
+        await this.resourceUsageService.startSession(
+          resourceId,
+          user,
+          { projectId, formSubmissions, forceTakeOver },
+          {
+            ...(supervisorUserId ? { supervisorUserId } : {}),
+            auditOrigin: { id: user.id, authenticationMethod: null },
+            origin: supervisorUserId ? 'supervision' : 'reader',
+            confirmedStepKeys: gate.satisfied,
+            ...(gate.language ? { language: gate.language } : {}),
+          },
+        );
+      } finally {
+        releaseCardSession();
+      }
       this.formsHandler.clearFormDraft(socket, resourceId, formAction);
       // The card channel won — settle the still-open web request so any supervisor popups close.
       if (flow?.requestId) {
         this.supervisionService.settleByCard(flow.requestId);
       }
-      socket.state.supervisionFlow = null;
+      if (flow && socket.state.supervisionFlow === flow) socket.state.supervisionFlow = null;
       await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, {
         success: true,
         ...(gate.warning ? { warning: true } : {}),
@@ -376,10 +418,22 @@ export class AttractapSessionHandler {
       if (
         error instanceof ResourceInUseError ||
         error instanceof ResourceFullError ||
+        error instanceof MachineBusyError ||
+        error instanceof SessionChangeInterruptedError ||
         error instanceof AlreadyHasActiveSessionError
       ) {
         // Resolve the pending action before refreshing an occupied row.
         await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, { error: error.message });
+        await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
+        return;
+      }
+      if (error instanceof StartBlockedException) {
+        // A plugin held back the free slot inside the start transaction: shown like the pre-start gate's block.
+        const { reason } = error.getResponse() as { reason: PluginBlockReason };
+        await this.reply(socket, data, AttractapEventType.START_RESOURCE_USAGE_SESSION, {
+          error: 'START_BLOCKED',
+          reason,
+        });
         await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
         return;
       }
@@ -397,6 +451,8 @@ export class AttractapSessionHandler {
   }
 
   public async handleStopResourceUsageSession(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
+    // The reader may end its login (READER_SESSION_ENDED) while this runs: act for the user who asked.
+    const userId = socket.state.verifiedUserId;
     const { resourceId, usageId } = data.payload as {
       resourceId: number;
       /** Force-stop of a chosen session of someone else; without it the card holder's own session ends. */
@@ -425,21 +481,24 @@ export class AttractapSessionHandler {
       return;
     }
 
-    const user = await this.usersService.findOne({ id: socket.state.lastAuthenticatedUserId });
+    const user = await this.findActingUser(userId);
     if (!user) {
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: 'USER_NOT_FOUND' });
       return;
     }
 
     try {
-      const usage = await this.resourceUsageService.endSession(
-        resourceId,
-        user,
-        { formSubmissions, ...(Number.isInteger(usageId) ? { usageId } : {}) },
-        {
-          auditOrigin: { actorId: user.id, authenticationMethod: null },
-        },
-      );
+      const releaseCardSession = this.cardSessions.hold(socket);
+      const usage = await this.resourceUsageService
+        .endSession(
+          resourceId,
+          user,
+          { formSubmissions, ...(Number.isInteger(usageId) ? { usageId } : {}) },
+          {
+            auditOrigin: { id: user.id, authenticationMethod: null },
+          },
+        )
+        .finally(releaseCardSession);
       this.formsHandler.clearFormDraft(socket, resourceId, ResourceFormAction.END);
       const start = usage?.startTime ? new Date(usage.startTime).getTime() : NaN;
       const end = usage?.endTime ? new Date(usage.endTime).getTime() : NaN;
@@ -473,6 +532,13 @@ export class AttractapSessionHandler {
         void this.startGate.afterStop(socket, { resourceId, userId: user.id, sessionId: usage.id });
       }
     } catch (error) {
+      if (error instanceof MachineBusyError || error instanceof SessionChangeInterruptedError) {
+        // Retryable: the reader shows its error, and the refreshed row shows whether the session still runs.
+        this.logger.warn(`Stopping a session on resource ${resourceId} was refused: ${error.message}`);
+        await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message });
+        await this.resourceListService.sendResourceListToSocket(socket, { resourceIds: new Set([resourceId]) });
+        return;
+      }
       this.logger.error(`Failed to stop resource usage session: ${error.message}`);
       await this.reply(socket, data, AttractapEventType.STOP_RESOURCE_USAGE_SESSION, { error: error.message });
     }

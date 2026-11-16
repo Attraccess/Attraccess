@@ -2,7 +2,7 @@
 import { SettingsService } from '../../../../../settings/settings.service';
 import { AttractapCardHandler } from '../card.handler';
 import { CardSessionService } from '../../ui/card-session.service';
-import { AttractapCardHandlerTestScope } from '../card.handler.spec';
+import type { AttractapCardHandlerTestScope } from '../card.handler.spec';
 export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   scope.handler = Object.create(AttractapCardHandler.prototype);
   (scope.handler as any).logger = {
@@ -19,8 +19,6 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
     getNFCCardByID: jest
       .fn()
       .mockResolvedValue({ id: 7, key: 'aabbccddeeff00112233445566778899', keyNo: 1, user: scope.mockUser }),
-    generateNTAG424Key: jest.fn().mockResolvedValue(new Uint8Array([1, 2, 3])),
-    uint8ArrayToHexString: jest.fn().mockReturnValue('deadbeef'),
     createNFCCard: jest.fn().mockResolvedValue({ id: 8 }),
     deleteNFCCard: jest.fn().mockResolvedValue({ affected: 1 }),
   };
@@ -33,7 +31,7 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
     findOne: jest.fn().mockResolvedValue({ id: 10, supervisionMode: 'introduction_required' }),
   };
   scope.rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set<string>()) };
-  scope.audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+  scope.audit = { record: jest.fn().mockResolvedValue(undefined) };
 
   (scope.handler as any).settingsService = Object.assign(Object.create(SettingsService.prototype), {
     getDefaultLanguage: jest.fn().mockResolvedValue('en'),
@@ -47,6 +45,31 @@ export function resetTestFixture(scope: AttractapCardHandlerTestScope) {
   (scope.handler as any).metricsService = scope.metricsService;
   (scope.handler as any).resourceRepository = scope.resourceRepository;
   (scope.handler as any).rbacService = scope.rbacService;
-  (scope.handler as any).audit = scope.audit;
+  (scope.handler as any).cardOperations = {
+    // Card verification itself is covered by card-relay.spec.ts and card-pending-records.spec.ts; here the card is
+    // verified exactly when the stored card exists and is active.
+    verifyCard: jest.fn(async (_socket: unknown, _purpose: string, detection: { uid: string }) => {
+      const card = await scope.attractapService.getNFCCardByUID(detection.uid);
+      if (!card) return { ok: false, error: 'CARD_NOT_FOUND' };
+      if (!card.isActive) return { ok: false, error: 'CARD_NOT_ACTIVE' };
+      return { ok: true, card };
+    }),
+    enroll: jest.fn().mockResolvedValue({ ok: true }),
+    reset: jest.fn().mockResolvedValue({ ok: true }),
+  };
+  (scope.handler as any).cardWriterPolicy = { assertAllowed: jest.fn().mockResolvedValue(undefined) };
+  (scope.handler as any).cardConversations = { abort: jest.fn() };
+  // Specs written for the old request/response protocol still call this shape.
+  (scope.handler as any).handleCardAuthenticationRequest = (socket: unknown, data: any) =>
+    scope.handler.handleCardTap(
+      socket as any,
+      { uid: data.payload.uid, detectionId: data.payload.detectionId ?? 1 },
+      data.payload.resourceId,
+    );
   (scope.handler as any).cardSessions = new CardSessionService();
+  (scope.handler as any).supervisionHandler = {
+    cancelForSocket: jest.fn((socket: any) => {
+      socket.state.supervisionFlow = null;
+    }),
+  };
 }

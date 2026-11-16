@@ -3,7 +3,7 @@ import { WIRE_VERSION } from './constants';
 import { capabilityReportSchema } from './capabilities';
 import { COMPATIBILITY_TABLE, supportedCombinationSchema } from './compatibility';
 import { errorEnvelopeSchema } from './errors';
-import { eventEnvelopeSchema } from './events';
+import { commandOutcomePayloadSchema, deviceStatePayloadSchema, eventEnvelopeSchema } from './events';
 import { clientMessageSchema, serverMessageSchema } from './messages';
 import { EVENTS_PATH, OPERATIONS, OperationDefinition } from './operations';
 
@@ -14,6 +14,8 @@ const NAMED_SCHEMAS: Record<string, z.ZodType> = {
   CapabilityReport: capabilityReportSchema,
   SupportedCombination: supportedCombinationSchema,
   EventEnvelope: eventEnvelopeSchema,
+  DeviceStatePayload: deviceStatePayloadSchema,
+  CommandOutcomePayload: commandOutcomePayloadSchema,
   ClientMessage: clientMessageSchema,
   ServerMessage: serverMessageSchema,
 };
@@ -59,16 +61,22 @@ export function buildSchemaDefinitions(refPrefix: string): Record<string, JsonOb
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
 const errorBody = { description: 'Error', content: { 'application/json': { schema: ref('ErrorEnvelope') } } };
 
-type ResponseShape = Pick<OperationDefinition, 'family' | 'versioned' | 'params' | 'body'> & { id: string };
+type ResponseShape = Pick<OperationDefinition, 'family' | 'versioned' | 'params' | 'body' | 'anonymous'> & {
+  id: string;
+};
 
 /** The error statuses a route can actually answer with, so generated clients do not expect impossible ones. */
 function errorStatuses(operation: ResponseShape): number[] {
   // Any route can refuse a browser origin, miss the path, get the wrong method or fail internally.
   const codes = [403, 404, 405, 500];
+  // Everything except the container probes needs the service token.
+  if (!operation.anonymous) codes.push(401);
   // Release headers are checked, and draining refused, only on versioned routes.
   if (operation.versioned) codes.push(409, 426, 503);
   if (operation.params || operation.body) codes.push(400);
   if (operation.body) codes.push(413);
+  // A snapshot that fails validation is refused with 422; any backup operation can be refused over plain HTTP.
+  if (operation.family === 'backup') codes.push(422);
   // Only feature operations can be unimplemented or run into their deadline.
   const isFeature = operation.family !== 'health' && operation.id !== 'events.stream';
   if (isFeature) codes.push(501, 504);
@@ -106,6 +114,11 @@ function buildPathItem(operation: OperationDefinition): JsonObject {
     operationId: operation.id,
     summary: operation.summary,
     tags: [operation.family],
+    ...(operation.anonymous ? { security: [] } : {}),
+    ...(operation.bodyLimitBytes ? { 'x-max-body-bytes': operation.bodyLimitBytes } : {}),
+    ...(operation.secretsOnWire
+      ? { 'x-secrets-on-wire': 'Refused over plain HTTP to a non-loopback address (insecure_transport).' }
+      : {}),
     parameters: [...(operation.versioned ? COMPAT_PARAMETERS : []), ...pathParams],
     ...(operation.body
       ? {
@@ -152,8 +165,19 @@ export function buildOpenApiDocument(): JsonObject {
     openapi: '3.1.0',
     info: { title: 'Attraccess Matter sidecar', version: String(WIRE_VERSION) },
     'x-compatibility': COMPATIBILITY_TABLE,
+    security: [{ serviceToken: [] }],
     paths,
-    components: { schemas: buildSchemaDefinitions('#/components/schemas/') },
+    components: {
+      securitySchemes: {
+        serviceToken: {
+          type: 'http',
+          scheme: 'bearer',
+          description:
+            'Shared service token (32-512 printable ASCII characters). Required on every route except /health/live and /health/ready.',
+        },
+      },
+      schemas: buildSchemaDefinitions('#/components/schemas/'),
+    },
   };
 }
 

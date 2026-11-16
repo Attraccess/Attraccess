@@ -1,5 +1,7 @@
 # Usage Tracking
 
+<!-- llms-description: How usage sessions are started, ended, shared between users, linked to projects and reviewed in the usage history. -->
+
 Attraccess tracks who uses which resource and when. Every usage session is recorded in the resource's usage history.
 
 Who can see whether a resource is in use, and by whom, depends on the [resource activity visibility](settings/overview.md#resource-activity-visibility) setting. You always see your own sessions.
@@ -43,15 +45,34 @@ A machine can allow several people to use it at the same time via **Max parallel
 Everybody ends their own session. Resource managers, introducers, maintainers and the supervisor of a session can end a chosen session of someone else by picking it from the list of active sessions on the [detail page](resources/resource-details.md) and clicking **End Session**.
 
 > [!WARNING]
-> **Flows and billing on shared machines (limit above 1).** Flows and billing do not take the number of running sessions into account. With a limit of 1, this section does not apply.
->
-> - **Flows** run for every session start and stop. A flow that switches the power off when a session ends therefore cuts the power for everybody on the machine. Flow awareness of the session count is planned.
-> - **Per-use fees** are charged per session.
-> - **Session-time billing** is charged per session.
-> - **Meters (for example energy):** the earliest-started session that is still running owns the meter and is charged its consumption. Later overlapping sessions are not metered or charged for meters already in use. When that session ends while others continue, the meter is read as usual and the sessions still running are not charged any further meter consumption. The meter is then free again: the next session that starts while it is free gets the meter and is charged its consumption.
-> - **Running (operating) time** is attributed to exactly one session at any moment, the earliest-started active one, so the total charged never exceeds the machine's operating time.
->
-> A fair split of meters and running time between simultaneous sessions is planned.
+> **Flows on shared machines (limit above 1).** [Flows](flows/overview.md) run for every session start and stop. A flow that switches the power off when a session ends therefore cuts the power for everybody on the machine unless it checks `activeSessions` (see [Active sessions on shared machines](flows/payloads-variables-templates.md#active-sessions-on-shared-machines)). The resource settings list the flows that do not check it in the **Resource type and behavior** section. With a limit of 1, this does not apply.
+
+### Billing on shared machines
+
+Everybody is billed for their own session, and every person's charges are on their own billing transaction and count toward their own [project](#linking-sessions-to-projects).
+
+- **Per-use fee and session time** stay per person and are never split. Session time is the person's own session duration, rounded up to whole minutes.
+- **Meters (for example energy) and running time** are shared fairly. Every start and stop of a session on the machine closes the current time segment and opens a new one. Each segment records its time range, the consumption measured between its two boundary readings, the operating time of the machine inside it and which sessions were active. Consumption and operating time of a segment are split equally among the sessions active in that segment, so the total charged never exceeds what the machine actually consumed or ran.
+- A session that never shared a segment with another session is billed exactly as on a single-user machine (running time rounded up to whole minutes). As soon as a session shared any segment, its running time is charged on exact shares, because rounding up per person would create credit out of nothing.
+- Each meter has an **Allocation** setting that can switch a meter to **Measured per session** instead. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines) for the details, rounding, failed readings and meters that cannot be split.
+
+For example, a machine uses 8 kWh at 30 credits per kWh. Person A is alone for 2 kWh, A and B are together for 2 kWh and B is alone for 4 kWh. A pays 2 + 1 = 3 kWh = 90 credits, B pays 1 + 4 = 5 kWh = 150 credits.
+
+On receipts and in the billing history, a shared session shows the person's share against the total (for example "0.8 — your share of 2.4") with a **Shared** marker and a breakdown of every segment the person was in. See [Billing transactions](billing/transactions.md#shared-sessions). While the session runs, the live session billing view shows the meter share so far (for example "0.8 — your share of 1.2 so far"), marked "provisional until the next reading", and the same breakdown with the open segment marked provisional; it shows no **Shared** marker.
+
+With a limit of 1, nothing changes. If a limit is lowered while sessions are running, overlapping sessions are still split fairly. If it is raised during a solo session, that session joins the segments from the moment others start.
+
+### Machine hours and person hours
+
+Reports show these figures separately, so that people using a shared machine at the same time are not counted as extra machine time:
+
+- **Person hours**: the duration of every session added up. If A uses the machine from 10:00 to 12:00 and B from 11:00 to 13:00, this is 4 hours.
+- **Machine hours with a session**: the time in which at least one session was running on the machine. Overlapping sessions count once, so the example gives 3 hours.
+- **Machine running time**: the time the machine was recorded as running (see [Flows](flows/node-types.md)), where operating data exists. It also includes time without a session.
+
+On a machine with **Max parallel sessions** of 1, person hours and machine hours with a session are equal. The project statistics call machine hours with a session simply **Machine hours**.
+
+You find the figures in the **Operating duration** card on the resource [detail page](resources/resource-details.md), on the statistics of a [project](projects/overview.md#usage-statistics), and in the [Resource hours summary export](resources/csv-export.md#resource-hours-summary). This only changes what is reported: how running time is attributed to individual sessions, and billing, stay as described above.
 
 ## Linking Sessions to Projects
 

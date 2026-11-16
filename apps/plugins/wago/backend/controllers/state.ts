@@ -171,8 +171,9 @@ export abstract class WagoServiceState {
 
   abstract commandSchema(
     config: Record<string, unknown>,
-    resourceId: number,
+    resourceId: number | null,
     previewOnly?: boolean,
+    flowId?: number | null,
   ): Promise<Record<string, unknown>>;
 
   abstract validateCommandConfig(

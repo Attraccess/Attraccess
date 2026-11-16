@@ -1,7 +1,9 @@
+import { billingTransactionAuditEvent } from './policies/billing';
 import { AuditLog, SSOProviderType } from '@attraccess/database-entities';
 import { randomUUID } from 'node:crypto';
 import { ssoAuditSnapshot } from '../users-and-auth/auth/sso/audit/provider-audit';
 import { AuditService } from './audit.service';
+import { PluginAuditHost } from './plugin-audit-host';
 export interface DomainScenario {
   domain: string;
   action: string;
@@ -23,12 +25,11 @@ const scenarios: DomainScenario[] = [
     subjectType: 'resource',
     subjectId: 101,
     emit: (audit) =>
-      audit.recordResource({
+      audit.record({
+        domain: 'resource',
         action: 'maintenance_schedule.updated',
-        actorId: 42,
-        subjectId: 101,
-        authenticationMethod: 'api-token',
-        apiTokenId: 19,
+        actor: { id: 42, authenticationMethod: 'api-token', apiTokenId: 19 },
+        subject: { type: 'resource', id: 101 },
         details: { scheduleId: 12, enabled: 1, triggerType: 'USAGE_COUNT', usageThreshold: 40 },
       }),
   },
@@ -37,8 +38,9 @@ const scenarios: DomainScenario[] = [
     action: 'demo.publication',
     subjectType: 'demo.device',
     subjectId: 102,
+    // Plugins record through the SDK's host provider, which maps the event onto the envelope.
     emit: (audit) =>
-      audit.record({
+      new PluginAuditHost(audit).record({
         pluginId: fixturePluginId,
         action: 'demo.publication',
         operationId: randomUUID(),
@@ -54,14 +56,16 @@ const scenarios: DomainScenario[] = [
     subjectType: 'billing.transaction',
     subjectId: 103,
     emit: (audit) =>
-      audit.recordBillingTransaction({
-        transactionId: 103,
-        userId: 42,
-        initiatorId: 42,
-        amount: 125,
-        status: 'completed',
-        source: 'manual',
-      }),
+      audit.record(
+        billingTransactionAuditEvent({
+          transactionId: 103,
+          userId: 42,
+          initiatorId: 42,
+          amount: 125,
+          status: 'completed',
+          source: 'manual',
+        }),
+      ),
   },
   {
     domain: 'administration',
@@ -69,12 +73,11 @@ const scenarios: DomainScenario[] = [
     subjectType: 'mqtt-server',
     subjectId: 104,
     emit: (audit) =>
-      audit.recordAdministration({
+      audit.record({
+        domain: 'administration',
         action: 'mqtt_server.created',
-        actorId: 42,
-        authenticationMethod: 'session',
-        subjectType: 'mqtt-server',
-        subjectId: 104,
+        actor: { id: 42, authenticationMethod: 'session' },
+        subject: { type: 'mqtt-server', id: 104 },
         details: { serverName: 'Workshop broker', host: 'mqtt.example.test', port: 1883, useTls: 0 },
       }),
   },
@@ -84,16 +87,15 @@ const scenarios: DomainScenario[] = [
     subjectType: 'identity.user',
     subjectId: 105,
     emit: (audit) =>
-      audit.recordIdentity({
-        action: 'user_updated',
+      audit.record({
+        domain: 'identity',
+        action: 'identity.user_updated',
         operationId: randomUUID(),
-        actorId: 42,
-        authenticationMethod: 'session',
+        actor: { id: 42, authenticationMethod: 'session' },
+        subject: { type: 'identity.user', id: 105 },
         outcome: 'succeeded',
-        subjectType: 'identity.user',
-        subjectId: 105,
-        details: { field: 'username' },
         request: { ipAddress: '2001:db8::1', userAgent: 'Audit verification' },
+        details: { field: 'username' },
       }),
   },
   {
@@ -102,11 +104,11 @@ const scenarios: DomainScenario[] = [
     subjectType: 'project',
     subjectId: 106,
     emit: (audit) =>
-      audit.recordProject({
+      audit.record({
+        domain: 'project',
         action: 'project.created',
-        actorId: 42,
-        subjectType: 'project',
-        subjectId: 106,
+        actor: { id: 42, authenticationMethod: 'session' },
+        subject: { type: 'project', id: 106 },
         details: { projectId: 106, 'after.name': 'Workshop project', 'after.hasLogo': 0 },
       }),
   },
@@ -116,11 +118,11 @@ const scenarios: DomainScenario[] = [
     subjectType: 'attractap.reader',
     subjectId: 107,
     emit: (audit) =>
-      audit.recordAttractap({
-        action: 'reader.deregistered',
-        actorId: 42,
-        authenticationMethod: 'session',
-        subjectId: 107,
+      audit.record({
+        domain: 'attractap',
+        action: 'attractap.reader.deregistered',
+        actor: { id: 42, authenticationMethod: 'session' },
+        subject: { type: 'attractap.reader', id: 107 },
         details: { source: 'admin-api' },
       }),
   },
@@ -130,11 +132,11 @@ const scenarios: DomainScenario[] = [
     subjectType: 'sso.provider',
     subjectId: 108,
     emit: (audit) =>
-      audit.recordSso({
+      audit.record({
+        domain: 'sso',
         action: 'sso.provider.created',
         operationId: randomUUID(),
-        actorId: 42,
-        authenticationMethod: 'session',
+        actor: { id: 42, authenticationMethod: 'session' },
         subject: { type: 'sso.provider', id: 108 },
         details: {
           before: 'null',

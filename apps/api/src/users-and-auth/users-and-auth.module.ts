@@ -31,6 +31,7 @@ import { UserPasswordService } from './users/user-password.service';
 import { UserPermissionsController } from './users/user-permissions.controller';
 
 import { UserPermissionsService } from './users/user-permissions.service';
+import { UserAdministrationService } from './users/user-administration.service';
 
 import { UserProfileController } from './users/user-profile.controller';
 
@@ -116,6 +117,7 @@ import { SSOSamlGuard } from './auth/sso/saml/saml.guard';
 import { SSOSamlStrategy } from './auth/sso/saml/saml.strategy';
 
 import { SSOController } from './auth/sso/sso.controller';
+import { SSO_CONTROLLER_SERVICES } from './auth/sso/sso-controller.services';
 
 import { SSOService } from './auth/sso/sso.service';
 
@@ -144,6 +146,8 @@ import { SESSION_STORE, SessionStore } from './auth/session-store/session-store'
 import { SqliteSessionStore } from './auth/session-store/sqlite.session-store';
 
 import { ValkeySessionStore } from './auth/session-store/valkey.session-store';
+import { UserAccounts } from './users/accounts/user-accounts';
+import { UserDirectory } from './users/directory/user-directory';
 
 export const sessionStoreProvider = {
   provide: SESSION_STORE,
@@ -195,11 +199,14 @@ export const sessionStoreProvider = {
   providers: [
     sessionStoreProvider,
     UsersService,
+    UserAccounts,
+    UserDirectory,
     SignupDomainService,
     UserRegistrationService,
     UserPasswordService,
     UserInvitationService,
     UserPermissionsService,
+    UserAdministrationService,
     AuthService,
     SessionService,
     TwoFactorService,
@@ -213,6 +220,7 @@ export const sessionStoreProvider = {
     LocalStrategy,
     SessionStrategy,
     SSOService,
+    ...SSO_CONTROLLER_SERVICES,
     SsoLogoutService,
     OidcTokenVerifier,
     OidcSessionResyncer,

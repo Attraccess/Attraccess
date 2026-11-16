@@ -20,13 +20,15 @@ import { Repository, EntityManager } from 'typeorm';
 
 import { EmailLayoutService } from '../email-layout/email-layout.service';
 
-import { EmailTemplateService } from '../email-template/email-template.service';
+import { EmailTemplateKey, EmailTemplateService } from '../email-template/email-template.service';
 
 import { ExternalCallTimer } from '../metrics/instrumentation/external/external.helper';
 
 import { MetricsService } from '../metrics/metrics.service';
 
 import { SettingsService } from '../settings/settings.service';
+
+import { describeAllocation, receiptFormatters } from './usage-receipt-allocation';
 
 import * as Handlebars from 'handlebars';
 
@@ -99,24 +101,17 @@ export class EmailService {
     const roundedMinutes = transaction.items?.find(
       (item) => item.name === 'PER_MINUTE' && item.meterQuantity == null && item.meterCreditsPerUnit == null,
     )?.quantity;
-    const secondsFormatOptions = { maximumFractionDigits: 3 };
-    let secondsFormatter: Intl.NumberFormat;
-    try {
-      secondsFormatter = new Intl.NumberFormat(
-        getSupportedDeviceLanguage(user.locale) ? user.locale : await this.settingsService.resolveLanguage(user.locale),
-        secondsFormatOptions,
-      );
-    } catch {
-      // Persisted locales are not restricted to valid Intl tags. Match the default email language.
-      secondsFormatter = new Intl.NumberFormat('en', secondsFormatOptions);
-    }
+    const { secondsFormatter, formatRange } = receiptFormatters(
+      getSupportedDeviceLanguage(user.locale) ? user.locale : await this.settingsService.resolveLanguage(user.locale),
+    );
 
     const items = (transaction.items ?? []).map((item) => ({
+      ...describeAllocation(item, secondsFormatter, currencyMinorUnit, formatRange),
       name: item.name,
       description: item.description,
       quantity:
         item.meterCreditsPerUnit != null && item.meterQuantity == null ? '—' : (item.meterQuantity ?? item.quantity),
-      isUnavailable: item.meterCreditsPerUnit != null && item.meterQuantity == null,
+      isUnavailable: item.meterCreditsPerUnit != null && item.meterQuantity == null && !item.allocation?.pending,
       unitPrice:
         item.meterCreditsPerUnit != null
           ? formatCredits(item.meterCreditsPerUnit, currencyMinorUnit, { useGrouping: false })
@@ -132,6 +127,7 @@ export class EmailService {
         item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
       isBillingFactor: item.meterQuantity == null && item.meterCreditsPerUnit == null && item.name === 'BILLING_FACTOR',
       isDuration:
+        item.allocation == null &&
         item.meterQuantity == null &&
         item.meterCreditsPerUnit == null &&
         (item.name === 'PER_MINUTE' || item.name === 'PER_ATTRIBUTABLE_OPERATING_MINUTE'),
@@ -516,9 +512,9 @@ export class EmailService {
     return { subject, body };
   }
 
-  protected async sendEmail(
+  async sendEmail(
     user: User,
-    templateType: EmailTemplateType,
+    templateType: EmailTemplateKey,
     context: Record<string, unknown>,
     manager?: EntityManager,
   ) {
@@ -527,30 +523,10 @@ export class EmailService {
       const dbTemplate = await this.emailTemplateService.findOne(templateType, manager);
 
       const { subject, body } = await this.convertTemplate(dbTemplate, context, locale);
-      const { transporter, from } = await this.createTransporter();
-
       this.logger.debug(
         `Sending email to: ${user.email} using ${templateType} template with subject: ${dbTemplate.subject}`,
       );
-      await this.externalCallTimer.time('smtp', 'send', () =>
-        transporter.sendMail({
-          to: user.email,
-          from,
-          subject,
-          html: body,
-          attachments: [
-            {
-              filename: 'logo.png',
-              path: EMAIL_LOGO_PATH,
-              contentType: 'image/png',
-              cid: EMAIL_LOGO_CID,
-            },
-          ],
-        }),
-      );
-      if (typeof transporter.close === 'function') {
-        transporter.close();
-      }
+      await this.deliverEmail(user, subject, body);
       this.metricsService.emailSentTotal.inc({ status: 'success' });
       this.logger.debug(`Email sent successfully to: ${user.email}`);
     } catch (error) {
@@ -560,7 +536,25 @@ export class EmailService {
     }
   }
 
-  protected async getBaseContext(user: User) {
+  /** Hands one rendered email to the SMTP transport, with the layout's inline logo attached. */
+  async deliverEmail(user: User, subject: string, html: string, text?: string): Promise<void> {
+    const { transporter, from } = await this.createTransporter();
+    await this.externalCallTimer.time('smtp', 'send', () =>
+      transporter.sendMail({
+        to: user.email,
+        from,
+        subject,
+        html,
+        ...(text ? { text } : {}),
+        attachments: [{ filename: 'logo.png', path: EMAIL_LOGO_PATH, contentType: 'image/png', cid: EMAIL_LOGO_CID }],
+      }),
+    );
+    if (typeof transporter.close === 'function') {
+      transporter.close();
+    }
+  }
+
+  async getBaseContext(user: User) {
     const url = await this.settingsService.getUrl();
     if (!url) {
       throw new Error('Application URL not configured');

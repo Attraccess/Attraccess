@@ -12,6 +12,7 @@ import '@nestjs/common';
 import { WebSocketEventService } from './websockets/websocket-event.service';
 import { ResourceListService } from './websockets/handlers/resource-list/resource-list.service';
 import { ResourceActionGuard } from './websockets/handlers/resource-action.guard';
+import { ReaderTimeZoneService } from './websockets/reader-time-zone.service';
 import { AttractapAuthHandler } from './websockets/handlers/auth/auth.handler';
 import { AttractapFirmwareHandler } from './websockets/handlers/firmware/firmware.handler';
 import { AttractapCrashReportHandler } from './websockets/handlers/crash-report/crash-report.handler';
@@ -27,8 +28,11 @@ import {
   AttractapCrashReport,
   AttractapCredentialEvent,
   AttractapInstallation,
+  AttractapSecureBootKey,
   NFCCard,
+  NFCCardPendingChange,
   Resource,
+  ResourceUsage,
   User,
 } from '@attraccess/database-entities';
 import { AttractapPairingController } from './pairing.controller';
@@ -38,6 +42,9 @@ import { InstallationIdentityService } from './security/installation-identity.se
 import { PairingService } from './security/pairing.service';
 import { ReaderSessionService } from './security/reader-session.service';
 import { SessionMetrics } from './security/session-metrics';
+import { SecureBootKeyService } from './secure-boot/secure-boot-key.service';
+import { SecureImageService } from './secure-boot/secure-image.service';
+import { AttractapSecureBootKeysController } from './secure-boot/secure-boot-keys.controller';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { ResourcesModule } from '../resources/resources.module';
 import { ResourceUsageModule } from '../resources/usage/resourceUsage.module';
@@ -60,14 +67,20 @@ import { MassIntroductionModule } from '../resources/mass-introductions/mass-int
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ResourceMeteringModule } from '../resources/metering/resource-metering.module';
 import { ResourceOperatingAttributionModule } from '../resources/operating-intervals/resource-operating-attribution.module';
-import { AuditModule } from '../audit/audit.module';
 import { DeviceEnrollmentModule } from '../device-enrollment/device-enrollment.module';
 import { SettingsModule } from '../settings/settings.module';
+import { CardConversationService } from './websockets/card-conversation.service';
+import { CardDetectedRouter } from './websockets/card-detected.router';
+import { CardOperationsService } from './websockets/card-operations.service';
+import { CardWriterPolicyService } from './websockets/card-writer-policy.service';
+import { CardWriterSettingsController } from './card-writer-settings.controller';
+import { EncryptionModule } from '../encryption/encryption.module';
 import { ReaderUiModule } from '../plugin-system/reader-ui/reader-ui.module';
 import { AttractapUiHandler } from './websockets/handlers/ui/ui.handler';
 import { CardSessionService } from './websockets/handlers/ui/card-session.service';
 import { UiAuditService } from './websockets/handlers/ui/ui-audit.service';
 import { UiSlotService } from './websockets/handlers/ui/ui-slot.service';
+import { ReaderActiveUsageService } from './websockets/reader-active-usage.service';
 import { UiStepService } from './websockets/handlers/ui/ui-step.service';
 import { ReaderStartGate } from './websockets/handlers/session/reader-start-gate.service';
 import { ReaderUiAdminController } from './reader-ui-admin.controller';
@@ -80,8 +93,11 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
       AttractapCrashReport,
       AttractapCredentialEvent,
       AttractapInstallation,
+      AttractapSecureBootKey,
       NFCCard,
+      NFCCardPendingChange,
       Resource,
+      ResourceUsage,
       User,
     ]),
     UsersAndAuthModule,
@@ -100,9 +116,9 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     SupervisionModule,
     MassIntroductionModule,
     NotificationsModule,
-    AuditModule,
     DeviceEnrollmentModule,
     SettingsModule,
+    EncryptionModule,
     ResourceMeteringModule,
     ResourceOperatingAttributionModule,
     ReaderUiModule,
@@ -113,9 +129,15 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     CredentialRegistryService,
     PairingService,
     ReaderSessionService,
+    SecureBootKeyService,
+    SecureImageService,
     SessionMetrics,
     CardAccessService,
     AttractapService,
+    CardConversationService,
+    CardDetectedRouter,
+    CardOperationsService,
+    CardWriterPolicyService,
     WebsocketService,
     AttractapGateway,
     WebSocketEventService,
@@ -124,6 +146,7 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     ResourceListService,
     ResourceActionGuard,
     AttractapAuthHandler,
+    ReaderTimeZoneService,
     AttractapFirmwareHandler,
     AttractapCrashReportHandler,
     AttractapCardHandler,
@@ -137,15 +160,18 @@ import { ReaderUiAdminController } from './reader-ui-admin.controller';
     UiAuditService,
     UiStepService,
     UiSlotService,
+    ReaderActiveUsageService,
     AttractapUiHandler,
     ReaderStartGate,
   ],
   controllers: [
     AttractapController,
     AttractapNfcCardsController,
+    CardWriterSettingsController,
     AttractapFirmwareController,
     ResourceAttractapsController,
     AttractapPairingController,
+    AttractapSecureBootKeysController,
     ReaderUiAdminController,
   ],
 })

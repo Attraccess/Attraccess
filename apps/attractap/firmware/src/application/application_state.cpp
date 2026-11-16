@@ -75,6 +75,11 @@ void Application::updateLedState() {
   if (State::consumeSessionProblemNotice()) {
     this->led.triggerError();
   }
+  // A card the server did not verify: the error flash, as for a wrong-key card on firmware 1.x.
+  if (this->cardRejectedLedPending) {
+    this->cardRejectedLedPending = false;
+    this->led.triggerError();
+  }
 }
 #endif
 
@@ -160,6 +165,10 @@ bool Application::processConnectionState()
   if (!apiState.authenticated ||
       (!networkState.ethernet_connected && !networkState.wifi_connected) ||
       !websocketState.connected) {
+    // The server's commands for an open card conversation can no longer arrive, and a late one
+    // after the reconnect belongs to a session the server already dropped: close it now instead of
+    // keeping the card (and presence probing) blocked until the relay's own timeout.
+    this->cardRelay.cancel();
 #ifdef HAS_LVGL_DISPLAY
     this->resetSessionOnDisconnect();
     // Drop any pending/active enrollment. The trigger is set asynchronously by
@@ -299,6 +308,8 @@ bool Application::processCardFlowState()
   if (this->state == APPLICATION_STATE_SUPERVISION) {
     SupervisionFlow::Outcome outcome = this->supervision.tick(millis());
     if (outcome != SupervisionFlow::Outcome::None) {
+      // Cancelled or timed out while the server may still talk to the supervisor card: free it.
+      if (outcome == SupervisionFlow::Outcome::ReturnToRouting) this->cardRelay.cancel();
       this->externalState = EXTERNAL_STATE_NONE;
       this->state = APPLICATION_STATE_INIT;
       const bool hadLogin = this->unlocked;
@@ -326,6 +337,7 @@ bool Application::processCardFlowState()
   // countdown runs out or someone presses cancel. Nobody is signed in, so routing starts fresh.
   if (this->state == APPLICATION_STATE_MASS_INTRODUCTION) {
     if (this->massIntroduction.tick(millis()) == MassIntroductionFlow::Outcome::ReturnToRouting) {
+      this->cardRelay.cancel(); // the session ended mid-card: the server's commands stop reaching it
       this->externalState = EXTERNAL_STATE_NONE;
       this->state = APPLICATION_STATE_INIT;
     }
@@ -354,11 +366,15 @@ bool Application::processAuthenticationState()
 #endif
 
 #ifdef HAS_LVGL_DISPLAY
-  // This must run before the AUTHENTICATE_CARD early return (card lifted while
-  // waiting for its key). Otherwise that wait would never expire.
+  // This must run before the AUTHENTICATE_CARD early return (no server verdict
+  // for the tapped card). Otherwise that wait would never expire.
   if (this->cardAuthenticationPending && millis() - this->cardAuthenticationStartedAt > 30000) {
+    // The server may have verified the card meanwhile and sent that user's rows: end its login like a sign-out
+    // before the lock screen may show plugin statuses again.
+    this->endReaderLogin();
     this->finishCardAuthentication(false);
-    Display::showErrorPopup(FirmwareI18n::Message::SignInFailed, FirmwareI18n::Message::PleaseTapTheNfcCardAgain);
+    this->beeper.errorBeep();
+    this->showSignInFailed(FirmwareI18n::Message::PleaseTapTheNfcCardAgain);
   }
 #endif
 
@@ -393,22 +409,12 @@ bool Application::processAuthenticationState()
 
     this->state = APPLICATION_STATE_AUTHENTICATE_CARD;
 
-#ifndef HAS_LVGL_DISPLAY
-    // For non-display mode, process authentication immediately since the card
-    // is still present and won't trigger another detection event
-    this->processCardAuthenticationData();
-#else
+#ifdef HAS_LVGL_DISPLAY
     this->nfc.enableCardDetection();
-    // The card that triggered the auth-data request is still on the reader.
-    // handleCardDetection() only emits a detection event on an absent->present
-    // transition, so it will not re-fire while the card stays put. Authenticate
-    // immediately instead of forcing the user to remove and re-present the card
-    // (the double-tap bug). If the card was already lifted, fall back to the
-    // detection callback on the next presentation.
-    if (this->nfc.isCardPresent()) {
-      this->processCardAuthenticationData();
-    }
 #endif
+    // The server already verified the card through the relay, so there is nothing left to do with
+    // the card itself: show the outcome right away.
+    this->processCardAuthenticationData();
     return true;
   }
 
@@ -423,16 +429,22 @@ void Application::renderResourceState()
   // An open plugin step is exempt from the watchdog like a pending form request: the user is deciding.
   if (!this->pendingUiAction.empty() && !this->hasPendingFormRequest && !this->uiStepOpen &&
       now - this->pendingUiStartedAt > 60000) {
+    const uint32_t resourceId = this->pendingUiResourceId;
+    const bool returnToList = this->returnToListAfterAction;
     this->finishReaderAction(false);
     this->handleFormsCancel();
-    Display::showErrorPopup(FirmwareI18n::Message::ActionNotConfirmed, FirmwareI18n::Message::ResourceStatusIsBeingRefreshedCheckItBeforeTryingAgain);
+    this->showActionFailure(resourceId, "ACTION_NOT_CONFIRMED", FirmwareI18n::Message::ActionNotConfirmed, returnToList);
   }
   // Finishing an action starts a new refresh timer; do not subtract its newer
   // timestamp from the earlier sample and wrap the unsigned elapsed duration.
   now = millis();
   if (this->waitingForResourceRefresh && now - this->pendingUiStartedAt > 30000) {
     this->logoutReader();
-    Display::showErrorPopup(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus);
+    // The message first; leaving it (or tapping a card) routes to the signed-out screen.
+    this->beeper.errorBeep();
+    StatusScreen::Config config = StatusScreen::warning(FirmwareI18n::Message::StatusUnavailable, FirmwareI18n::Message::SignInAgainToLoadTheCurrentResourceStatus);
+    config.purpose = StatusScreen::Purpose::StatusUnavailable;
+    this->showStatus(std::move(config), true);
   }
   if (this->unlocked) {
     uint32_t effectivePause = this->accumulatedPauseMs;
@@ -446,7 +458,7 @@ void Application::renderResourceState()
     this->selectedResourceChanged = false;
   }
   if (this->projectsOfUserResponseUpdated && this->unlocked) {
-    Display::resourceDetailsScreen.setProjects(this->projectsOfUserResponse);
+    Display::projectSelectScreen.setProjects(this->projectsOfUserResponse);
     Display::resourceDetailsScreen.setSelectedProject(this->selectedProjectId, this->selectedProjectName.c_str());
     this->projectsOfUserResponseUpdated = false;
   }
@@ -462,10 +474,19 @@ void Application::renderResourceState()
     }
     return;
   }
+  // A status screen the application raised holds its place until the state it was raised in
+  // changes (logout, timeout, ...). The session timeout above keeps running meanwhile.
+  if (this->statusHeld && !Display::transientActive()) this->statusHeld = false;
+  if (this->statusHeld && this->routingKey() == this->statusHoldKey) return;
+  // The top-up screen owns the reader while someone is signed in.
+  if (this->state == APPLICATION_STATE_TOP_UP && this->unlocked) return;
+  // A status screen left without a screen to return to: show what the state dictates.
+  const bool reroute = this->rerouteRequested;
+  this->rerouteRequested = false;
   if (!this->resourceIsSelected) {
     Display::resourceListScreen.setAuthenticatedUser(this->unlocked ? this->cardAuthenticationData.username : "");
     const auto target = this->unlocked ? APPLICATION_STATE_RESOURCE_LIST_AUTHENTICATED : APPLICATION_STATE_RESOURCE_LIST;
-    if (this->state != target) {
+    if (this->state != target || reroute) {
       this->state = target;
       Display::transitionToScreen(&Display::resourceListScreen);
       if (!this->unlocked && !this->cardAuthenticationPending) this->nfc.enableCardDetection();
@@ -473,7 +494,7 @@ void Application::renderResourceState()
     return;
   }
   if (!this->unlocked) {
-    if (this->state == APPLICATION_STATE_LOCKED) {
+    if (this->state == APPLICATION_STATE_LOCKED && !reroute) {
       if (!this->cardAuthenticationPending && now - this->timeOfResourceSelectionMs > this->RESOURCE_SELECTION_TIMEOUT_MS) {
         this->resourceIsSelected = false;
         this->selectedResourceId = 0;
@@ -484,11 +505,16 @@ void Application::renderResourceState()
     Display::transitionToScreen(&Display::lockscreen, [this] { this->nfc.enableCardDetection(); });
     return;
   }
-  if (this->state != APPLICATION_STATE_UNLOCKED) {
+  if (this->state != APPLICATION_STATE_UNLOCKED || reroute) {
     this->state = APPLICATION_STATE_UNLOCKED;
     Display::transitionToScreen(&Display::resourceDetailsScreen);
   }
 #else
+
+  if (this->sessionEndNotifyAtMs != 0 && static_cast<int32_t>(millis() - this->sessionEndNotifyAtMs) >= 0) {
+    this->sessionEndNotifyAtMs = 0;
+    this->api.sendReaderSessionEnded();
+  }
 
 #ifdef HAS_WS2812_LED
   // Card-confirm window over: nothing starts (fail closed).
@@ -543,6 +569,9 @@ void Application::renderResourceState()
 #endif
       }
     }
+
+    // The card action is done: the server forgets the user once the action request is behind it.
+    this->sessionEndNotifyAtMs = millis() + 1500;
 
     // Reset state back to waiting for card
     this->state = APPLICATION_STATE_WAIT_FOR_CARD;

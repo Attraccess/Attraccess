@@ -2,17 +2,23 @@ import { Description, Input, InputGroup, Label, TextArea, TextField, Tooltip, To
 import { Eye, EyeOff } from 'lucide-react';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
-import { Button, LabeledSwitch, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, LabeledSwitch, StringListField, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS, ROLE_PATH_LIST_MAX_ENTRIES, ROLE_PATH_MAX_LENGTH } from '@attraccess/shared';
 import en from '../en.json';
 import de from '../de.json';
+
+const EMAIL_ATTRIBUTE_KEYS_DEFAULT =
+  'email · mail · Email · http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress · urn:oid:1.2.840.113549.1.9.1';
 
 export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
   const { t } = useTranslations({ en, de });
   const {
     formValues,
     setSaml,
-    emailAttributeKeysInput,
-    setEmailAttributeKeysInput,
+    emailAttributeKeys,
+    setEmailAttributeKeys,
+    roleAttributeKeys,
+    setRoleAttributeKeys,
     showSamlProvisioningSecret,
     setShowSamlProvisioningSecret,
     samlRoleMappingEntries,
@@ -26,8 +32,10 @@ export function useSAMLConfigFormState({ form }: SAMLConfigFormProps) {
     t,
     formValues,
     setSaml,
-    emailAttributeKeysInput,
-    setEmailAttributeKeysInput,
+    emailAttributeKeys,
+    setEmailAttributeKeys,
+    roleAttributeKeys,
+    setRoleAttributeKeys,
     showSamlProvisioningSecret,
     setShowSamlProvisioningSecret,
     samlRoleMappingEntries,
@@ -48,8 +56,10 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
     t,
     formValues,
     setSaml,
-    emailAttributeKeysInput,
-    setEmailAttributeKeysInput,
+    emailAttributeKeys,
+    setEmailAttributeKeys,
+    roleAttributeKeys,
+    setRoleAttributeKeys,
     showSamlProvisioningSecret,
     setShowSamlProvisioningSecret,
     samlRoleMappingEntries,
@@ -120,14 +130,26 @@ export function SAMLConfigForm({ form }: SAMLConfigFormProps) {
         <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
           {t('sections.samlAttributes')}
         </h3>
-        <TextField value={emailAttributeKeysInput} onChange={setEmailAttributeKeysInput}>
-          <Label>{t('emailAttributeKeys')}</Label>
-          <Input
-            placeholder="email, mail, urn:oid:1.2.840.113549.1.9.1"
-            data-cy="sso-provider-form-saml-email-attribute-keys-input"
-          />
-          <Description>{t('emailAttributeKeysHint')}</Description>
-        </TextField>
+        <StringListField
+          label={t('emailAttributeKeys')}
+          description={t('emailAttributeKeysHint')}
+          values={emailAttributeKeys}
+          onChange={setEmailAttributeKeys}
+          placeholder="mail"
+          emptyHint={t('emailAttributeKeysEmptyHint', { defaults: EMAIL_ATTRIBUTE_KEYS_DEFAULT })}
+          data-cy="sso-provider-form-saml-email-attribute-keys-input"
+        />
+        <StringListField
+          label={t('roleAttributeKeys')}
+          description={t('roleAttributeKeysHint')}
+          values={roleAttributeKeys}
+          onChange={setRoleAttributeKeys}
+          placeholder="roles"
+          emptyHint={t('defaultsUsed', { defaults: DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS.join(' · ') })}
+          maxEntries={ROLE_PATH_LIST_MAX_ENTRIES}
+          maxLength={ROLE_PATH_MAX_LENGTH}
+          data-cy="sso-provider-form-saml-role-attribute-keys-input"
+        />
       </section>
 
       <section className="w-full flex flex-col gap-4 pt-6 border-t border-default-200 first:pt-0 first:border-t-0">

@@ -9,6 +9,7 @@ import {
   EmailTemplateType,
   Message,
   NFCCard,
+  NFCCardPendingChange,
   NotificationPreference,
   Passkey,
   PasskeyChallenge,
@@ -25,6 +26,8 @@ import {
 import { ensureEntity } from '../seed-storage.test-fixture';
 export async function migrationIdentityNotificationSeeds(dataSource: DataSource, seedTag: string, primaryUser: User) {
   const nfcCardRepo = dataSource.getRepository(NFCCard);
+
+  const nfcCardPendingChangeRepo = dataSource.getRepository(NFCCardPendingChange);
 
   const emailTemplateRepo = dataSource.getRepository(EmailTemplate);
 
@@ -63,6 +66,16 @@ export async function migrationIdentityNotificationSeeds(dataSource: DataSource,
     keyNo: 1,
     key: `seed-key-${seedTag}`,
     user: primaryUser,
+  }));
+
+  await ensureEntity(nfcCardPendingChangeRepo, () => ({
+    uid: `seed-pending-uid-${seedTag}`,
+    kind: 'enroll' as const,
+    userId: primaryUser.id,
+    cardId: null,
+    keyNo: 2,
+    key: `seed-pending-key-${seedTag}`,
+    actorId: primaryUser.id,
   }));
 
   await ensureEntity(emailTemplateRepo, () => ({

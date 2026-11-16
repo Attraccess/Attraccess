@@ -19,10 +19,14 @@
     "startNotes": "Start Notes",
     "endNotes": "End Notes",
     "supervisorId": "Supervisor ID",
-    "supervisorUsername": "Supervisor Name"
+    "supervisorUsername": "Supervisor Name",
+    "userEmail": "User Email",
+    "userExternalIdentifier": "User External ID",
+    "supervisorEmail": "Supervisor Email"
   },
   "status": {
     "provisional": "Provisional",
     "unavailable": "Unavailable"
-  }
+  },
+  "metadataField": "Resource metadata: {{key}}"
 }

@@ -26,25 +26,17 @@ import {
 import {
   ResourceFlowLog,
   ResourceFlowNodeDto,
-  useResourceFlowsServiceGetNodeSchemas,
-  useResourceFlowsServiceGetFlowLogRecordingStatus,
-  useResourceFlowsServiceGetFlowLogRecordingStatusKey,
-  useResourceFlowsServiceGetResourceFlow,
-  useResourceFlowsServiceGetResourceFlowLogs,
-  useResourceFlowsServiceStartFlowLogRecording,
-  useResourceFlowsServiceStopFlowLogRecording,
 } from '@attraccess/react-query-client';
-import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import de from './de.json';
 import en from './en.json';
 import nodeTranslationsDe from '../node/de.json';
 import nodeTranslationsEn from '../node/en.json';
 import { useFlowContext } from '../context/index';
+import { useFlowCanvasQuery, useFlowLogRecording, useFlowNodeSchemasQuery } from '../flowOwner';
 
 export interface Props {
   children: (open: () => void) => React.ReactNode;
-  resourceId: number;
   confettiEnabled: boolean;
   onConfettiEnabledChange: (enabled: boolean) => void;
 }
@@ -116,11 +108,10 @@ export function useLogViewerState(props: Props) {
 
   const [durationMinutes, setDurationMinutes] = useState(DEFAULT_DURATION_MINUTES);
 
-  const { liveLogs: sseLogs } = useFlowContext();
-  const queryClient = useQueryClient();
+  const { liveLogs: sseLogs, owner } = useFlowContext();
 
-  const { data: flowData } = useResourceFlowsServiceGetResourceFlow({ resourceId: props.resourceId });
-  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId: props.resourceId });
+  const { data: flowData } = useFlowCanvasQuery(owner);
+  const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
 
   const nodeTitle = useCallback(
     (node?: ResourceFlowNodeDto) => {
@@ -135,43 +126,17 @@ export function useLogViewerState(props: Props) {
     [nodeSchemas, t, tExists],
   );
 
-  // Recording expires on its own; poll while the drawer is open to notice. Status only —
+  // Recording expires on its own; the status is polled while the drawer is open to notice. Status only —
   // polling the logs endpoint would re-ship the whole buffer every tick.
-  const { data: recording } = useResourceFlowsServiceGetFlowLogRecordingStatus(
-    { resourceId: props.resourceId },
-    undefined,
-    { refetchInterval: isOpen ? 10_000 : false },
+  const { recording, isRecording, logs, startRecording, stopRecording, isStarting, isStopping } = useFlowLogRecording(
+    owner,
+    { isOpen },
   );
-
-  const isRecording = recording?.isRecording ?? false;
-
-  // Fetched once per recording to pick up whatever was collected before the drawer opened;
-  // everything after that arrives over SSE, so this never refetches.
-  const { data: logs } = useResourceFlowsServiceGetResourceFlowLogs(
-    { resourceId: props.resourceId },
-    // The generated key defaults to [{ resourceId }]; startedAt makes it per-recording.
-    [{ resourceId: props.resourceId }, recording?.startedAt],
-    { enabled: isOpen && isRecording, refetchInterval: false, staleTime: Infinity },
-  );
-
-  // Only the status needs invalidating: starting changes startedAt, which is part of the
-  // logs query key, and stopping disables that query altogether.
-  const invalidateStatus = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: [useResourceFlowsServiceGetFlowLogRecordingStatusKey] }),
-    [queryClient],
-  );
-
-  const { mutate: startRecording, isPending: isStarting } = useResourceFlowsServiceStartFlowLogRecording({
-    onSuccess: invalidateStatus,
-  });
-  const { mutate: stopRecording, isPending: isStopping } = useResourceFlowsServiceStopFlowLogRecording({
-    onSuccess: invalidateStatus,
-  });
 
   const countdown = useCountdown(isRecording ? recording?.expiresAt : null);
 
   const [recordedLogs, setRecordedLogs] = useState<ResourceFlowLog[]>([]);
-  const fetchedLogs = logs?.logs;
+  const fetchedLogs = logs;
   const recordingStartedAt = recording?.startedAt;
 
   // The server discards its buffer on stop. Keep downloaded entries for this page visit;
@@ -298,7 +263,7 @@ export function LogViewer(props: Props) {
                   <Button
                     variant="danger"
                     isPending={isStopping}
-                    onPress={() => stopRecording({ resourceId: props.resourceId })}
+                    onPress={() => stopRecording()}
                     data-cy="flow-log-stop-recording"
                   >
                     <CircleStopIcon className="w-4 h-4" />
@@ -318,12 +283,7 @@ export function LogViewer(props: Props) {
                   <Button
                     variant="primary"
                     isPending={isStarting}
-                    onPress={() =>
-                      startRecording({
-                        resourceId: props.resourceId,
-                        requestBody: { durationMinutes: Number(durationMinutes) },
-                      })
-                    }
+                    onPress={() => startRecording(Number(durationMinutes))}
                     data-cy="flow-log-start-recording"
                   >
                     <CircleDotIcon className="w-4 h-4" />

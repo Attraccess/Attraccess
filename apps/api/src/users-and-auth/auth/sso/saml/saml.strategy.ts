@@ -1,5 +1,6 @@
 import { SsoSessionRequest } from '../sso-session-request';
 import { SSOProviderType, User, SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
+import { DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS } from '@attraccess/shared';
 
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 
@@ -19,13 +20,9 @@ import { SSOSamlRequest, SSOSamlRequestOptions } from './saml.types';
 
 import { buildSamlSessionContext } from './saml-session-context';
 
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
-
 import { RbacService } from '../../../rbac/rbac.service';
 
 import { resolveSsoRoleAssignments } from '../permission-mapping';
-
-import { recordSsoProvisioningAudit } from '../audit/provider-audit';
 
 import { SSOService } from '../sso.service';
 
@@ -136,20 +133,15 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     return await this.syncPermissionsFromClaims(user, profile, config);
   }
 
-  protected getPermissionClaimValues(profile: SamlProfile): unknown[] {
+  protected getPermissionClaimValues(
+    profile: SamlProfile,
+    config: Pick<SSOProviderSAMLConfiguration, 'roleAttributeKeys'>,
+  ): unknown[] {
     const values: unknown[] = [];
     const profileRecord = profile as Record<string, unknown>;
-    const candidateKeys = [
-      'roles',
-      'role',
-      'groups',
-      'group',
-      'memberof',
-      // Azure AD / ADFS URI-style claim names
-      'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups',
-      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
-      'http://schemas.xmlsoap.org/claims/group',
-    ];
+    // Configured keys replace the defaults entirely.
+    const configuredKeys = config.roleAttributeKeys?.map((key) => key.toLowerCase());
+    const candidateKeys = configuredKeys?.length ? configuredKeys : DEFAULT_SAML_ROLE_ATTRIBUTE_KEYS;
 
     // Check candidateKeys inside the SAML attributes bag (not all attributes — that would
     // include email/displayName and make the empty-claims guard always true)
@@ -191,7 +183,7 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
     profile: SamlProfile,
     config: SSOProviderSAMLConfiguration,
   ): Promise<User> {
-    const claimValues = this.getPermissionClaimValues(profile);
+    const claimValues = this.getPermissionClaimValues(profile, config);
     const roleNames = this.resolveRoleNamesFromClaims(claimValues);
     const roleAssignments = resolveSsoRoleAssignments(roleNames, config.roleMappings);
     this.logger.debug(`RBAC role keys from SAML: ${JSON.stringify(roleAssignments.map((r) => r.roleKey))}`);
@@ -221,14 +213,11 @@ export class SSOSamlStrategy extends PassportStrategy(MultiSamlStrategy as unkno
   ): Promise<void> {
     try {
       const ssoService = this.moduleRef.get(SSOService, { strict: false });
-      const audit = this.moduleRef.get(SsoAuditService, { strict: false });
-      const provider = await ssoService?.getProviderByTypeAndIdWithConfiguration(SSOProviderType.SAML, providerId);
-      if (!audit || !provider) return;
-      await recordSsoProvisioningAudit(
-        audit,
-        action,
+      await ssoService?.recordSignInProvisioning(
+        SSOProviderType.SAML,
+        providerId,
         userId,
-        provider,
+        action,
         action === 'user_created' ? { userCreated: true } : changes,
       );
     } catch (error) {

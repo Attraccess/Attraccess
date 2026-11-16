@@ -2,6 +2,9 @@ import { Checkbox, Description, Form, Input, Label, Spinner, TextField, FieldErr
 import { TlsSection } from './TlsSection';
 import { Select } from '../../../components/select/index';
 import { PluginSlot } from '../../plugins/PluginSlot';
+import { MqttMessageExplorer } from '../explorer/MqttMessageExplorer';
+import { MQTT_EXPLORER_PERMISSION } from '../explorer/permission';
+import { useAuth } from '../../../hooks/useAuth';
 import { MQTT_SERVER_DETAIL_SLOT, MqttServerSlotContext } from '../mqtt.slots';
 import { Button, LabeledSwitch, PageHeader, PasswordInput, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { MqttManagementPort, parseManagementPort } from './managementPort';
@@ -228,6 +231,7 @@ export function EditMqttServerPage() {
     handleSubmit,
     handleCancel,
   } = useEditMqttServerPageState();
+  const { hasPermission } = useAuth();
 
   if (isLoadingServer) {
     return (
@@ -371,6 +375,8 @@ export function EditMqttServerPage() {
           </Button>
         </div>
       </Form>
+
+      {hasPermission(MQTT_EXPLORER_PERMISSION) && <MqttMessageExplorer mqttServerId={server.id} />}
 
       <PluginSlot<MqttServerSlotContext> slotId={MQTT_SERVER_DETAIL_SLOT} context={{ mqttServerId: server.id }} />
     </div>

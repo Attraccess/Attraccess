@@ -17,13 +17,9 @@ import { classifySsoFailureReason, markSsoFailureMetricRecorded, recordSsoLoginF
 
 import { OidcCookieStateStore, OIDCAppState } from './oidc-cookie-state-store';
 
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
-
 import { RbacService } from '../../../rbac/rbac.service';
 
 import { syncOidcRolesFromClaims } from './oidc-permission-claims';
-
-import { recordSsoProvisioningAudit } from '../audit/provider-audit';
 
 import { resolvePermissionSyncIntervalMinutes } from '../session-permission-sync';
 
@@ -276,14 +272,12 @@ export class SSOOIDCStrategy extends PassportStrategy(Strategy, 'sso-oidc', 10) 
   ): Promise<void> {
     try {
       const ssoService = this.moduleRef.get(SSOService, { strict: false });
-      const audit = this.moduleRef.get(SsoAuditService, { strict: false });
-      const provider = await ssoService?.getProviderByTypeAndIdWithConfiguration(
-        SSOProviderType.OIDC,
-        this.config.ssoProviderId,
-      );
-      if (!audit || !provider) return;
-      if (userCreated) await recordSsoProvisioningAudit(audit, 'user_created', userId, provider, { userCreated: true });
-      if (changes) await recordSsoProvisioningAudit(audit, 'permissions_synced', userId, provider, changes);
+      if (!ssoService) return;
+      const { OIDC } = SSOProviderType;
+      const providerId = this.config.ssoProviderId;
+      if (userCreated)
+        await ssoService.recordSignInProvisioning(OIDC, providerId, userId, 'user_created', { userCreated: true });
+      if (changes) await ssoService.recordSignInProvisioning(OIDC, providerId, userId, 'permissions_synced', changes);
     } catch (error) {
       this.logger.warn(
         `Failed to record committed OIDC provisioning audit: ${error instanceof Error ? error.message : String(error)}`,

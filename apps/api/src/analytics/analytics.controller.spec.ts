@@ -3,6 +3,7 @@ import { AnalyticsController } from './analytics.controller';
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsQueryDto } from './dtos/analyticsQuery.dto';
 import { ResourceOperatingDurationsDto } from './dtos/resourceOperatingDurations.dto';
+import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
 describe('AnalyticsController', () => {
   let controller: AnalyticsController;
@@ -12,6 +13,7 @@ describe('AnalyticsController', () => {
     getResourceUsageHoursInDateRange: jest.fn(),
     getBillingTransactionsInDateRange: jest.fn(),
     getResourceOperatingDurations: jest.fn(),
+    getResourceHoursSummaryInDateRange: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -93,6 +95,34 @@ describe('AnalyticsController', () => {
     });
   });
 
+  describe('getBillingTransactionsInDateRange', () => {
+    const query = Object.assign(new AnalyticsQueryDto(), {
+      start: new Date('2023-01-01'),
+      end: new Date('2023-01-31'),
+      page: 1,
+      limit: 500,
+    });
+    const requestWith = (permissions: string[]) =>
+      ({ user: { id: 1, effectivePermissions: new Set(permissions) } }) as unknown as AuthenticatedRequest;
+
+    it.each([
+      [['resources.update'], false],
+      [['resources.update', 'billing.manage'], true],
+      [['resources.update', 'resources.reports.export'], true],
+    ])('with %j passes includeEmail=%s', async (permissions, includeEmail) => {
+      mockAnalyticsService.getBillingTransactionsInDateRange.mockResolvedValue([[], 0]);
+
+      await controller.getBillingTransactionsInDateRange(query, requestWith(permissions));
+
+      expect(service.getBillingTransactionsInDateRange).toHaveBeenCalledWith(
+        { start: query.start, end: query.end },
+        1,
+        500,
+        includeEmail,
+      );
+    });
+  });
+
   it('returns exact operating durations for the requested resources and date range', async () => {
     const body = Object.assign(new ResourceOperatingDurationsDto(), {
       resourceIds: [1, 2],
@@ -106,6 +136,28 @@ describe('AnalyticsController', () => {
     expect(service.getResourceOperatingDurations).toHaveBeenCalledWith(body.resourceIds, {
       start: body.start,
       end: body.end,
+    });
+  });
+
+  describe('getResourceHoursSummaryInDateRange', () => {
+    it('returns the summary rows with pagination info', async () => {
+      const query = Object.assign(new AnalyticsQueryDto(), {
+        start: new Date('2023-01-01'),
+        end: new Date('2023-01-31'),
+        page: 1,
+        limit: 2,
+      });
+      const rows = [{ resourceId: 1 }, { resourceId: 2 }];
+      mockAnalyticsService.getResourceHoursSummaryInDateRange.mockResolvedValue([rows, 3]);
+
+      const result = await controller.getResourceHoursSummaryInDateRange(query);
+
+      expect(service.getResourceHoursSummaryInDateRange).toHaveBeenCalledWith(
+        { start: query.start, end: query.end },
+        1,
+        2,
+      );
+      expect(result).toEqual({ data: rows, total: 3, page: 1, limit: 2, nextPage: 2 });
     });
   });
 });

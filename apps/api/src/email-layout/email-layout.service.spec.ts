@@ -1,9 +1,13 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { Test } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { EmailLayoutService } from './email-layout.service';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { MjmlService } from '../email-template/mjml.service';
 import { readDefaultLayoutBody } from '../email-template/email-defaults';
+
+const ACTOR = { id: 1, authenticationMethod: 'session' as const };
+const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 
 describe('EmailLayoutService', () => {
   let service: EmailLayoutService;
@@ -13,6 +17,7 @@ describe('EmailLayoutService', () => {
     const module = await Test.createTestingModule({
       providers: [
         EmailLayoutService,
+        { provide: AUDIT_RECORDER, useValue: audit },
         {
           provide: SettingsStoreService,
           useValue: { getPlainSetting: jest.fn(), setPlainSetting: jest.fn() },
@@ -58,7 +63,7 @@ describe('EmailLayoutService', () => {
       (settingsStore.setPlainSetting as jest.Mock).mockResolvedValue(undefined);
       (settingsStore.getPlainSetting as jest.Mock).mockResolvedValue(defaultLayout);
 
-      await expect(service.resetToDefault()).resolves.toEqual({ body: defaultLayout });
+      await expect(service.resetToDefault(ACTOR)).resolves.toEqual({ body: defaultLayout });
       expect(settingsStore.setPlainSetting).toHaveBeenCalledWith('email_layout', 'body', defaultLayout);
       expect(defaultLayout).toContain('src="{{host.logoUrl}}"');
     });

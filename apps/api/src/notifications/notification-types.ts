@@ -10,6 +10,9 @@ export enum NotificationCategory {
   NFC_CARDS = 'nfc_cards',
 }
 
+/** A core category, or a plugin-declared one namespaced as `plugin.<pluginName>.<id>`. */
+export type AnyNotificationCategory = NotificationCategory | `plugin.${string}`;
+
 export enum NotificationChannel {
   EMAIL = 'email',
   PUSH = 'push',
@@ -20,6 +23,12 @@ export type NotificationChannelPreferences = Record<NotificationChannel, boolean
 export type NotificationCategoryPreferences = Record<NotificationCategory, NotificationChannelPreferences>;
 
 export const ALL_NOTIFICATION_CATEGORIES = Object.values(NotificationCategory);
+
+export const DEFAULT_PLUGIN_NOTIFICATION_CHANNELS: NotificationChannelPreferences = {
+  email: true,
+  push: true,
+  toast: true,
+};
 
 export const DEFAULT_NOTIFICATION_CHANNELS: NotificationCategoryPreferences = {
   [NotificationCategory.MESSAGES]: { email: true, push: true, toast: true },

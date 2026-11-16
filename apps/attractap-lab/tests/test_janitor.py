@@ -18,10 +18,11 @@ from types import SimpleNamespace
 import grpc
 from labgrid.binding import BindingState
 from labgrid.exceptions import NoDriverFoundError, NoResourceFoundError
+from labgrid.resource.remote import RemotePlace
 import pytest
 
 from attractap_lab import efuse, workflow
-from attractap_lab.drivers import ESPToolDriver, ReaderPowerDriver
+from attractap_lab.drivers import ESPToolDriver, ReaderPowerDriver, SwitchPowerDriver
 from attractap_lab.janitor import OWNER, Janitor
 from attractap_lab.workflow import flash_reader, park
 from test_lab_workflow import eventually, executable, free_port, running
@@ -69,6 +70,58 @@ def test_efuse_missing_field_is_a_violation():
         efuse.check(output)
 
 
+SECURE_LAB = {**efuse.SECURE_LAB_VALUES, "KEY_PURPOSE_2": "XTS_AES_128_KEY", "KEY_PURPOSE_4": "HMAC_UP",
+              **{name: " ".join(digest[i:i + 2] for i in range(0, 64, 2))
+                 for name, digest in efuse.LAB_KEY_DIGESTS.items()}}
+# BLOCK0 of the lab's secure Touch V2: SECURE_VERSION 1 in word 4, bits 14-29;
+# SPI_BOOT_CRYPT_CNT 1 in word 2, bits 18-20.
+SECURE_BLOCK0 = "0b801700 000f0c14 a984d1f5 00500804 00004102 00000000"
+
+
+def secure_output(overrides=None, block0=SECURE_BLOCK0, version=1):
+    output = espefuse_output({**SECURE_LAB, **(overrides or {})}, block0=block0)
+    layout = '"SECURE_VERSION": {"value": %d, "block": 0, "word": 4, "pos": 14, "bit_len": 16},\n    "MAC"' % version
+    return output.replace('"MAC"', layout, 1)
+
+
+def test_efuse_secure_lab_profile(tmp_path):
+    assert efuse.check(secure_output(), tmp_path, profile="secure-lab") == "7c:df:a1:00:11:22"
+    # A plain place must never take a Secure Boot reader, nor the other way round.
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_EN"):
+        efuse.check(secure_output())
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_EN"):
+        efuse.check(espefuse_output(), profile="secure-lab")
+    # Release-mode flash encryption leaves only signed OTA updates.
+    with pytest.raises(efuse.EfuseViolation, match="DIS_DOWNLOAD_MANUAL_ENCRYPT"):
+        efuse.check(secure_output({"DIS_DOWNLOAD_MANUAL_ENCRYPT": True}), profile="secure-lab")
+    # Other Secure Boot keys would reject the lab-signed parking image.
+    other_key = "00 " * 31 + "01"
+    with pytest.raises(efuse.EfuseViolation, match="BLOCK_KEY0 does not hold the lab key digest"):
+        efuse.check(secure_output({"BLOCK_KEY0": other_key}), profile="secure-lab")
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_BOOT_KEY_REVOKE2"):
+        efuse.check(secure_output({"SECURE_BOOT_KEY_REVOKE2": False}), profile="secure-lab")
+    with pytest.raises(efuse.EfuseViolation, match="DIS_USB_JTAG"):
+        efuse.check(secure_output({"DIS_USB_JTAG": False}), profile="secure-lab")
+    with pytest.raises(ValueError, match="profile"):
+        efuse.check(secure_output(), profile="release")
+
+    # Anti-rollback raises SECURE_VERSION (in BLOCK0); that alone is fine.
+    newer = secure_output(block0=SECURE_BLOCK0.replace("00004102", "00008102"), version=2)
+    assert efuse.check(newer, tmp_path, profile="secure-lab") == "7c:df:a1:00:11:22"
+    with pytest.raises(efuse.EfuseViolation, match="SECURE_VERSION went from 1 to 0"):
+        efuse.check(secure_output(block0=SECURE_BLOCK0.replace("00004102", "00000102"), version=0),
+                    tmp_path, profile="secure-lab")
+    # Any other BLOCK0 burn is not, even one the summary hides: SPI_BOOT_CRYPT_CNT
+    # 1 -> 7 still reads "Enable".
+    with pytest.raises(efuse.EfuseViolation, match="BLOCK0 \\(besides SECURE_VERSION\\)"):
+        efuse.check(secure_output(block0=SECURE_BLOCK0.replace("a984d1f5", "a99cd1f5")),
+                    tmp_path, profile="secure-lab")
+    with pytest.raises(efuse.EfuseViolation, match="blocks changed since first seen: BLOCK_KEY0"):
+        efuse.check(secure_output().replace("BLOCK4          ) [4 ] dump: 00000000",
+                                            "BLOCK4          ) [4 ] dump: 00000001"),
+                    tmp_path, profile="secure-lab")
+
+
 class FakeConsole:
     def __init__(self, chunks):
         self.chunks = list(chunks)
@@ -95,47 +148,80 @@ class FakeFlash:
     def erase_and_flash(self, image):
         self.events.append(("erase-and-flash", Path(image).name))
 
+    def erase_and_flash_encrypted(self, image):
+        self.events.append(("erase-and-flash-encrypted", Path(image).name))
+
     def flash(self, image):
         self.events.append(("flash", Path(image).name))
 
 
 class FakePower:
-    """A Touch V1 that is off until its emulator presses the power button."""
+    """A Touch V1 that is off until its emulator presses the power button.
 
-    def __init__(self, events):
+    Like ReaderPowerDriver, it presses only when the reader is not already in
+    the requested state. ``failing_ons`` presses do not turn it on.
+    """
+
+    def __init__(self, events, powered=False, failing_ons=0):
         self.events = events
         self.emulator = SimpleNamespace(state=BindingState.bound)
-        self.powered = False
+        self.powered = powered
+        self.failing_ons = failing_ons
+        self.delay = 2.0
 
     def get(self):
         return self.powered
 
     def on(self):
+        if self.powered:
+            return
         self.events.append("power-on")
+        if self.failing_ons:
+            self.failing_ons -= 1
+            raise TimeoutError("The reader did not turn on within 20s")
         self.powered = True
+
+    def off(self):
+        if self.powered:
+            self.events.append("power-off")
+            self.powered = False
+
+
+class FakeSwitch(FakePower):
+    """A Touch V2 behind the lab host's USB power switch."""
+
+    def __init__(self, events):
+        super().__init__(events, powered=True)
+        self.delay = 10.0
 
 
 class FakeTarget:
-    def __init__(self, console, flash, power=None):
+    def __init__(self, console, flash, power=None, tags=None):
         self.console = console
         self.flash = flash
         self.power = power
+        self.tags = tags
         self.events = flash.events
 
     def get_driver(self, name, activate=True):
-        drivers = {"SerialDriver": self.console, ESPToolDriver: self.flash, ReaderPowerDriver: self.power}
+        drivers = {"SerialDriver": self.console, ESPToolDriver: self.flash,
+                   (SwitchPowerDriver if isinstance(self.power, FakeSwitch) else ReaderPowerDriver): self.power}
         if drivers.get(name) is None:
             raise NoDriverFoundError(f"no {name}")
         return drivers[name]
 
     def get_resource(self, cls, name=None, wait_avail=True):
+        if cls is RemotePlace and self.tags is not None:
+            return SimpleNamespace(tags=self.tags)
         raise NoResourceFoundError(f"no {name}")
 
     def await_resources(self, resources, timeout):
         assert resources == [self.flash.device] and timeout > 0
 
     def _name(self, driver):
-        return {id(self.console): "serial", id(self.flash): "flash"}.get(id(driver), "power")
+        emulator = getattr(self.power, "emulator", None)
+        return {id(self.console): "serial", id(self.flash): "flash", id(emulator): "emulator"}.get(
+            id(driver), "power")
 
     def activate(self, driver):
         self.events.append(("activate", self._name(driver)))
@@ -161,10 +247,29 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
     assert all(event != "erase-and-flash" and event[0] != "erase-and-flash"
                for event in burned.events if isinstance(event, tuple))
 
-    failing = FakeTarget(FakeConsole([b"ATTRACTAP_PARK_FAILED hardware=x line=io-expander\n"]),
+    # The image retries every 2 s: the last failure line within the marker time is the error.
+    failing = FakeTarget(FakeConsole([b"ATTRACTAP_PARK_FAILED hardware=x line=io-expander err=ESP_ERR_TIMEOUT\n",
+                                      b"ATTRACTAP_PARK_FAILED hardware=x line=io-expander err=ESP_FAIL sda=1 scl=1",
+                                      b" expander=nack pn532=ack\n"]),
                          FakeFlash(espefuse_output(), []))
-    with pytest.raises(RuntimeError, match="io-expander"):
-        park(failing, tmp_path / "park.bin", tmp_path / "failing")
+    with pytest.raises(RuntimeError, match=r"2 attempts .*err=ESP_FAIL sda=1 scl=1 expander=nack pn532=ack$"):
+        park(failing, tmp_path / "park.bin", tmp_path / "failing", marker_seconds=0.5)
+    assert (tmp_path / "failing/serial.log").read_bytes().count(b"ATTRACTAP_PARK_FAILED") == 2
+
+    # A failure the image recovers from on its next attempt still parks.
+    recovered = FakeTarget(FakeConsole([b"ATTRACTAP_PARK_FAILED hardware=x line=io-expander err=ESP_ERR_TIMEOUT\n",
+                                        b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                           FakeFlash(espefuse_output(), []))
+    assert park(recovered, tmp_path / "park.bin", tmp_path / "recovered", marker_seconds=5)
+
+    secure = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                        FakeFlash(secure_output(), []))
+    assert park(secure, tmp_path / "park.hex", tmp_path / "secure", profile="secure-lab")
+    assert ("erase-and-flash-encrypted", "park.hex") in secure.events
+    assert not any(event[0] == "erase-and-flash" for event in secure.events if isinstance(event, tuple))
+    with pytest.raises(efuse.EfuseViolation):
+        park(FakeTarget(FakeConsole([]), FakeFlash(secure_output(), [])),
+             tmp_path / "park.bin", tmp_path / "unexpected-secure")
 
     silent = FakeTarget(FakeConsole([b"garbage\n"]), FakeFlash(espefuse_output(), []))
     with pytest.raises(TimeoutError):
@@ -177,6 +282,95 @@ def test_park_checks_efuses_before_erasing(tmp_path, monkeypatch):
     park(off, tmp_path / "park.bin", tmp_path / "off", baseline_dir=tmp_path / "base")
     assert events.index("power-on") < events.index("efuse")
 
+    # The janitor's retry for a reader behind a power switch cuts its power first.
+    events = []
+    monkeypatch.setattr(workflow.time, "sleep", lambda seconds: events.append(("sleep", seconds)))
+    switched = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                          FakeFlash(espefuse_output(), events), FakeSwitch(events), tags={"power": "switch"})
+    park(switched, tmp_path / "park.bin", tmp_path / "switch", baseline_dir=tmp_path / "base", cycle_power=True)
+    assert events.index("power-off") < events.index(("sleep", 10.0)) < events.index("power-on") < events.index("efuse")
+    assert events.count("power-on") == 1, "the reader is on after the cycle"
+    log = (tmp_path / "switch/power-cycle.log").read_text()
+    assert "off for 10s, then on" in log and "reader is on again" in log
+
+    # A reader with a power button stays off for at least 30 s, then is on again.
+    events = []
+    button = FakeTarget(FakeConsole([b"ATTRACTAP_PARKED hardware=x nfc=off\n"]),
+                        FakeFlash(espefuse_output(), events), FakePower(events, powered=True),
+                        tags={"power": "button"})
+    park(button, tmp_path / "park.bin", tmp_path / "button", baseline_dir=tmp_path / "base", cycle_power=True)
+    sleep = next(event for event in events if event[0] == "sleep")
+    assert sleep[1] >= 30
+    assert events.index("power-off") < events.index(sleep) < events.index("power-on") < events.index("efuse")
+    assert events.count("power-on") == 1 and button.power.get()
+    assert ("deactivate", "emulator") in events
+    log = (tmp_path / "button/power-cycle.log").read_text()
+    assert "FakePower: off for 30s, then on" in log and "reader is off" in log and "reader is on again" in log
+    # An always-on place has nothing to cycle with; the attempt fails before erasing.
+    events = []
+    always_on = FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(), events), FakeSwitch(events),
+                           tags={"power": "always-on"})
+    with pytest.raises(RuntimeError, match="no switchable reader power"):
+        park(always_on, tmp_path / "park.bin", tmp_path / "always-on", cycle_power=True)
+    assert "efuse" not in events
+    assert "failed: The place has no switchable reader power" in (tmp_path / "always-on/power-cycle.log").read_text()
+
+
+def test_manual_power_cycles_keep_their_off_time():
+    assert workflow.BUTTON_CYCLE_OFF_SECONDS >= 30
+    assert ReaderPowerDriver.__attrs_attrs__.delay.default == 2.0
+    assert SwitchPowerDriver.__attrs_attrs__.delay.default == 10.0
+
+
+def cycle_button(tmp_path, monkeypatch, power, name):
+    events = power.events
+    monkeypatch.setattr(workflow.time, "sleep", lambda seconds: events.append(("sleep", seconds)))
+    target = FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(), events), power, tags={"power": "button"})
+    workflow.power_cycle(target, tmp_path / name)
+    return (tmp_path / name).read_text()
+
+
+def test_power_cycle_switches_on_a_button_reader_that_was_already_off(tmp_path, monkeypatch):
+    events = []
+    power = FakePower(events, powered=False)
+    log = cycle_button(tmp_path, monkeypatch, power, "off.log")
+    assert "power-off" not in events, "pressing a reader that is off would switch it on"
+    assert events == [("activate", "power"), ("sleep", 30.0), "power-on", ("deactivate", "emulator")]
+    assert power.get() and "reader is on again" in log
+
+
+@pytest.mark.parametrize("failing_ons,final", [
+    (1, "reader is on again"),
+    (2, "reader is still off: The reader did not turn on within 20s"),
+])
+def test_power_cycle_retries_switching_on_once_and_still_fails(tmp_path, monkeypatch, failing_ons, final):
+    events = []
+    power = FakePower(events, powered=True, failing_ons=failing_ons)
+    with pytest.raises(TimeoutError, match="did not turn on"):
+        cycle_button(tmp_path, monkeypatch, power, "failed.log")
+    log = (tmp_path / "failed.log").read_text()
+    assert events.count("power-on") == 2, "one best-effort switch on after the failed one"
+    assert events[-1] == ("deactivate", "emulator"), "the emulator connection is closed"
+    assert power.get() == (failing_ons == 1)
+    lines = log.splitlines()
+    assert "failed: The reader did not turn on" in lines[-2] and lines[-1].endswith(final)
+
+
+def test_power_cycle_switches_a_reader_on_when_stopped_while_it_is_off(tmp_path, monkeypatch):
+    # The janitor's job timeout and service stop send SIGTERM, which run_park turns into SystemExit.
+    def terminated(seconds):
+        raise SystemExit(143)
+
+    events = []
+    power = FakePower(events, powered=True)
+    target = FakeTarget(FakeConsole([]), FakeFlash(espefuse_output(), events), power, tags={"power": "button"})
+    monkeypatch.setattr(workflow.time, "sleep", terminated)
+    with pytest.raises(SystemExit):
+        workflow.power_cycle(target, tmp_path / "stopped.log")
+    assert events == [("activate", "power"), "power-off", "power-on", ("deactivate", "emulator")]
+    lines = (tmp_path / "stopped.log").read_text().splitlines()
+    assert lines[-2].endswith("interrupted: SystemExit(143)") and lines[-1].endswith("reader is on again")
+
 
 FAKE_PARK = textwrap.dedent("""
     import json, os, sys, time
@@ -187,7 +381,9 @@ FAKE_PARK = textwrap.dedent("""
     root = Path(os.environ["FAKE_PARK_ROOT"])
     with (root / "events.jsonl").open("a") as events:
         events.write(json.dumps({"place": place, "host": os.environ.get("LG_HOSTNAME"),
-                                 "image": Path(value("--image")).name}) + "\\n")
+                                 "image": Path(value("--image")).name,
+                                 "profile": value("--profile"),
+                                 "cycle_power": "--cycle-power" in args}) + "\\n")
     time.sleep(float(os.environ.get("FAKE_PARK_SECONDS", "0")))
     while (root / f"hold-{place}").exists():
         time.sleep(0.05)
@@ -204,6 +400,7 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
     monkeypatch.setenv("LG_COORDINATOR", address)
     (tmp_path / "fake_park.py").write_text(FAKE_PARK)
     (tmp_path / "park.bin").write_bytes(b"park")
+    (tmp_path / "park.hex").write_bytes(b":park")
     (tmp_path / "outcome-reader-b").write_text("3")
     events = tmp_path / "events.jsonl"
     events.touch()
@@ -246,16 +443,18 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
         eventually(lambda: client("places", check=False).returncode == 0, coordinator)
         # reader-c has no exporter resources: acquiring it would leave nothing to
         # flash, and reserving it would hold off maintenance.
-        for place, variant in [("reader-a", "touch-v2"), ("reader-b", "touch-v2"),
-                               ("reader-c", "touch-v2"), ("other", None)]:
+        for place, tags in [("reader-a", ["variant=touch-v2"]),
+                            ("reader-b", ["variant=touch-v2-secure-lab", "profile=secure-lab"]),
+                            ("reader-c", ["variant=touch-v2"]), ("other", [])]:
             client("-p", place, "create")
             client("-p", place, "add-match", f"test/{place}/*")
-            if variant:
-                client("-p", place, "set-tags", f"variant={variant}")
+            if tags:
+                client("-p", place, "set-tags", *tags)
         janitor_command = [
             sys.executable, "-m", "attractap_lab.janitor", "--state-dir", str(state), "run",
             "--coordinator", address, "--config", str(tmp_path / "unused.yaml"),
-            "--image", f"touch-v2={tmp_path / 'park.bin'}", "--attempts", "2",
+            "--image", f"touch-v2={tmp_path / 'park.bin'}",
+            "--image", f"touch-v2-secure-lab={tmp_path / 'park.hex'}", "--attempts", "2",
             "--park-command", f"{sys.executable} {tmp_path / 'fake_park.py'}",
         ]
         monkeypatch.setenv("FAKE_PARK_ROOT", str(tmp_path))
@@ -271,7 +470,9 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
             assert holder("reader-b") == OWNER
             assert len(parked("reader-b")) == 1, "eFuse quarantine must not retry"
             assert parked("reader-a")[0] == {"place": "reader-a", "host": "attractap-lab-janitor",
-                                             "image": "park.bin"}
+                                             "image": "park.bin", "profile": "plain", "cycle_power": False}
+            assert parked("reader-b")[0]["image"] == "park.hex"
+            assert parked("reader-b")[0]["profile"] == "secure-lab"
             assert not parked("other") and holder("other") is None
             assert not parked("reader-c") and holder("reader-c") is None
             assert client("-p", "reader-b", "acquire", check=False).returncode != 0
@@ -318,6 +519,7 @@ def test_janitor_parks_released_readers_first(tmp_path, monkeypatch):
             client("-p", "reader-a", "release")
             eventually(lambda: (state / "quarantine/reader-a.json").exists(), janitor, 30)
             assert len(parked("reader-a")) == before + 2
+            assert not any(entry["cycle_power"] for entry in parked("reader-a")), "no power switch to cycle"
             reason = json.loads((state / "quarantine/reader-a.json").read_text())["reason"]
             assert "failed 2 times" in reason
 
@@ -377,7 +579,7 @@ def test_janitor_releases_a_claim_without_resources(tmp_path):
                       priority=1000, max_parallel=1, attempts=1, park_command=[], job_seconds=1,
                       marker_seconds=1)
 
-    async def fake_park(name, variant):
+    async def fake_park(name, variant, profile):
         parked.append(name)
 
     janitor._park = fake_park
@@ -453,7 +655,7 @@ def test_flash_reader_keeps_a_reader_with_a_power_button_on(tmp_path, monkeypatc
     flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
     assert power.powered
     assert events == [("activate", "flash"), ("deactivate", "flash"),
-                      ("activate", "power"), "power-on", ("deactivate", "power")]
+                      ("activate", "power"), "power-on", ("deactivate", "emulator")]
 
     # A flash that fails while the reader stays on is a real failure.
     events.clear()
@@ -464,3 +666,187 @@ def test_flash_reader_keeps_a_reader_with_a_power_button_on(tmp_path, monkeypatc
     flash.flash = broken
     with pytest.raises(subprocess.CalledProcessError):
         flash_reader(FakeTarget(FakeConsole([]), flash, power), tmp_path / "reader.bin")
+
+
+def test_janitor_parks_again_when_variant_or_profile_changes(tmp_path):
+    from labgrid.remote.common import Place, ResourceMatch
+
+    def place(**tags):
+        return Place(name="reader", tags=tags, matches=[ResourceMatch.fromstr("test/reader/*")])
+
+    # No exporter resources: tick() only decides what is dirty, without reserving.
+    session = SimpleNamespace(stub=None, resources={}, places={"reader": place(variant="touch-v2")})
+    janitor = Janitor(session, config=None, images={"touch-v2": "park.bin", "touch-v2-secure": "park.hex"},
+                      state_dir=tmp_path, priority=1000, max_parallel=1, attempts=1, park_command=[],
+                      job_seconds=1, marker_seconds=1)
+    asyncio.run(janitor.tick())
+    assert janitor.dirty == {"reader"}
+    janitor.dirty.clear()
+    asyncio.run(janitor.tick())
+    assert not janitor.dirty
+    session.places["reader"] = place(variant="touch-v2", profile="plain")
+    asyncio.run(janitor.tick())
+    assert not janitor.dirty, "an explicit default profile is the same reader"
+    session.places["reader"] = place(variant="touch-v2-secure", profile="secure-lab")
+    asyncio.run(janitor.tick())
+    assert janitor.dirty == {"reader"}
+
+
+@pytest.mark.parametrize("power,outcomes,runs,quarantined", [
+    case
+    for kind in ("switch", "button")
+    for case in [
+        # A reader behind a power switch or with a power button is power-cycled before each retry...
+        (kind, [1, 0], [False, True], None),
+        # ...and quarantined only once an attempt after a power cycle failed too.
+        (kind, [1, 1], [False, True], "parking failed 2 times (last exit 1), also after a power cycle"),
+        # Burned eFuses quarantine at once; a power cycle must never retry them away.
+        (kind, [3], [False], "eFuses burned"),
+        (kind, [1, 3], [False, True], "eFuses burned"),
+    ]
+] + [
+    # Readers the lab cannot switch keep the plain retry count.
+    ("always-on", [1], [False], "parking failed 1 times (last exit 1)"),
+    (None, [1], [False], "parking failed 1 times (last exit 1)"),
+])
+def test_janitor_power_cycles_a_switchable_reader_before_giving_up(tmp_path, power, outcomes, runs, quarantined):
+    janitor, calls, released = park_attempts(tmp_path, power, outcomes)
+    assert calls == runs
+    hold = tmp_path / "quarantine/reader.json"
+    if quarantined is None:
+        assert released == ["reader"] and not hold.exists()
+    else:
+        assert json.loads(hold.read_text())["reason"] == quarantined
+        assert not released
+    assert not janitor.power_cycle
+
+
+def park_attempts(tmp_path, power, outcomes, *, attempts=1, cycle_log="reader is on again", retag=None):
+    """Run one janitor attempt per outcome; ``retag`` changes the power tag after the first."""
+    from labgrid.remote.common import Place, ResourceMatch
+    released, calls = [], []
+
+    class Stub:
+        async def ReleasePlace(self, request, timeout):
+            released.append(request.placename)
+
+    async def sync_with_coordinator():
+        return True
+
+    tags = {"variant": "touch-v2", **({"power": power} if power else {})}
+    session = SimpleNamespace(stub=Stub(), sync_with_coordinator=sync_with_coordinator, places={
+        "reader": Place(name="reader", tags=tags, matches=[ResourceMatch.fromstr("test/reader/*")])})
+    janitor = Janitor(session, config=None, images={"touch-v2": "park.bin"}, state_dir=tmp_path,
+                      priority=1000, max_parallel=1, attempts=attempts, park_command=[], job_seconds=1,
+                      marker_seconds=1)
+
+    async def run_child(name, image, profile, *, cycle_power=False):
+        calls.append(cycle_power)
+        run = tmp_path / "runs" / str(len(calls))
+        run.mkdir(parents=True)
+        code = outcomes[len(calls) - 1]
+        if code == 3:
+            (run / "reason.txt").write_text("eFuses burned\n")
+        if cycle_power:
+            (run / "power-cycle.log").write_text(f"2026-11-15T10:00:00+0100 {cycle_log}\n")
+        return code, run
+
+    janitor._run_child = run_child
+
+    async def run():
+        for attempt in range(len(outcomes)):
+            if attempt == 1 and retag is not None:
+                tags.pop("power", None)
+                tags.update({"power": retag} if retag else {})
+            await janitor._park("reader", "touch-v2", efuse.PLAIN)
+
+    asyncio.run(run())
+    return janitor, calls, released
+
+
+@pytest.mark.parametrize("power", ["switch", "button"])
+def test_janitor_power_cycles_before_every_retry(tmp_path, power):
+    janitor, calls, released = park_attempts(tmp_path, power, [1, 1, 1], attempts=3)
+    assert calls == [False, True, True]
+    assert json.loads((tmp_path / "quarantine/reader.json").read_text())["reason"] == (
+        "parking failed 3 times (last exit 1), also after a power cycle")
+    assert not released and not janitor.power_cycle
+
+
+def test_janitor_names_a_power_cycle_that_failed(tmp_path):
+    # Without an NFC emulator nothing presses the button; the reason must not read like a real cycle.
+    park_attempts(tmp_path, "button", [1, 1],
+                  cycle_log="failed: The place has no switchable reader power to cycle")
+    assert json.loads((tmp_path / "quarantine/reader.json").read_text())["reason"] == (
+        "parking failed 2 times (last exit 1), also after a power cycle that failed: "
+        "The place has no switchable reader power to cycle")
+
+
+@pytest.mark.parametrize("cycle_log", [
+    "reader is on again",
+    # Only the cycle's own failure counts, not an error text quoted in a later line.
+    "interrupted: SystemExit(143)\n2026-11-15T10:00:30+0100 reader is still off: switching on failed: x",
+])
+def test_janitor_reports_other_power_cycles_plainly(tmp_path, cycle_log):
+    park_attempts(tmp_path, "switch", [1, 1], cycle_log=cycle_log)
+    assert json.loads((tmp_path / "quarantine/reader.json").read_text())["reason"] == (
+        "parking failed 2 times (last exit 1), also after a power cycle")
+
+
+@pytest.mark.parametrize("retag", ["always-on", ""])
+def test_janitor_stops_power_cycling_a_retagged_place(tmp_path, retag):
+    janitor, calls, released = park_attempts(tmp_path, "button", [1, 1, 1], attempts=3, retag=retag)
+    assert calls == [False, False, False]
+    assert json.loads((tmp_path / "quarantine/reader.json").read_text())["reason"] == (
+        "parking failed 3 times (last exit 1)")
+
+
+STOPPED_PARK = textwrap.dedent("""
+    import os, signal, subprocess, sys, time
+    from pathlib import Path
+    root = Path(os.environ["FAKE_PARK_ROOT"])
+    # Stands in for an ssh or esptool command the child started, in its process group.
+    ssh = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    (root / "ssh.pid").write_text(str(ssh.pid))
+
+    def terminate(signum, frame):
+        try:
+            ssh.wait(timeout=1)
+            (root / "ssh-at-stop").write_text("gone")
+        except subprocess.TimeoutExpired:
+            (root / "ssh-at-stop").write_text("alive")
+        sys.exit(143)
+
+    signal.signal(signal.SIGTERM, terminate)
+    (root / "started").touch()
+    time.sleep(60)
+""")
+
+
+def test_janitor_stops_a_park_child_before_its_process_group(tmp_path, monkeypatch):
+    monkeypatch.setenv("FAKE_PARK_ROOT", str(tmp_path))
+    (tmp_path / "stopped_park.py").write_text(STOPPED_PARK)
+    janitor = Janitor(SimpleNamespace(), config=tmp_path / "env.yaml", images={}, state_dir=tmp_path / "state",
+                      priority=1000, max_parallel=1, attempts=1,
+                      park_command=[sys.executable, str(tmp_path / "stopped_park.py")],
+                      job_seconds=5, marker_seconds=1)
+
+    async def stop():
+        job = asyncio.ensure_future(janitor._run_child("reader", tmp_path / "park.bin", efuse.PLAIN))
+        while not (tmp_path / "started").exists():
+            assert not job.done(), job.result()
+            await asyncio.sleep(0.05)
+        job.cancel()
+        await asyncio.gather(job, return_exceptions=True)
+
+    asyncio.run(stop())
+    assert (tmp_path / "ssh-at-stop").read_text() == "alive", "the child switches the reader on first"
+    ssh = int((tmp_path / "ssh.pid").read_text())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.kill(ssh, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.05)
+    pytest.fail("the rest of the child's process group was not stopped")

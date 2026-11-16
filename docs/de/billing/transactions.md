@@ -1,4 +1,5 @@
 # Abrechnungstransaktionen
+<!-- llms-description: Credit-Transaktionen im Abrechnungs-Dashboard ansehen, filtern und prüfen, inklusive erforderlicher Berechtigung. -->
 
 Das Abrechnungs-Dashboard zeigt alle Credit-Transaktionen im gesamten System. Verwenden Sie es, um Belastungen zu verfolgen, Nutzungskosten von Ressourcen zu ueberwachen und die Aktivitaet einzelner Benutzer zu ueberpruefen.
 
@@ -23,6 +24,10 @@ Jede Transaktion enthaelt folgende Informationen:
 Für neue Nutzungssitzungen speichern abgeschlossene zeitabhängige Abrechnungsposten die gemessene Dauer, die aufgerundeten Minuten und den beim Sitzungsstart gespeicherten Tarif. Spätere Änderungen an Preisen, Abrechnungsfaktoren oder Betriebsverläufen berechnen abgeschlossene Transaktionen nicht neu.
 
 Bei einer Gesamtsumme ungleich null zeigt der Standardbeleg per E-Mail getrennte Berechnungen für Sitzungs- und Betriebsdauer sowie den gespeicherten Abrechnungsfaktor. Bei einer Gesamtsumme von null wird keine Abrechnungs-E-Mail versendet. Angepasste E-Mail-Vorlagen bleiben beim Aktualisieren des Standardbelegs erhalten; Administratoren können die Vorlage auf den Standard zurücksetzen, um das neue Layout zu übernehmen. Historische Transaktionen werden nicht umgeschrieben.
+
+### Geteilte Sitzungen
+
+Bei einer Maschine mit parallelen Sitzungen zeigen die Zähler- und Laufzeitzeilen einer geteilten Sitzung den Anteil der Person am Gesamtwert (zum Beispiel „0,8 — dein Anteil an 2,4“) und ihre Credits mit der Markierung **Geteilt**. Eine geteilte Laufzeitzeile zeigt keinen Preis („—“). Eine Aufschlüsselung listet alle Segmente, an denen die Person beteiligt war: Zeitraum, Anzahl der Personen, Gesamtmenge und Credits des Segments sowie den Anteil der Person. Sie erscheint in den Transaktionsdetails, im Beleg per E-Mail und in der laufenden Abrechnungsansicht der Sitzung. Ist beim Beenden einer Sitzung eine Zählermessung fehlgeschlagen, steht in ihrer Zählerzeile „Ausstehend: Dein Anteil wird separat abgerechnet, sobald der Zähler wieder gelesen werden kann.“, bis das zusammengeführte Segment geschlossen ist; der Anteil wird dann ohne E-Mail als Korrekturbuchung zur ursprünglichen Abrechnung berechnet. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen).
 
 ## Transaktionen filtern
 

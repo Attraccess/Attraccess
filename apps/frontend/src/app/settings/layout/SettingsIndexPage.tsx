@@ -1,7 +1,9 @@
 import {
   ActivityIcon,
+  NfcIcon,
   FileClockIcon,
   InfoIcon,
+  KeyRoundIcon,
   LockKeyholeIcon,
   MailIcon,
   MessageSquareIcon,
@@ -14,6 +16,7 @@ import { PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useSettingsSections } from './useSettingsSections';
 import en from './en.json';
 import de from './de.json';
+import { AdminSettingsPluginSlot } from '../../plugins/PluginSettingsSlots';
 import { SettingsDirectory, type SettingsDirectoryGroup } from '../../../components/settingsDirectory';
 
 const sectionIcons = {
@@ -22,9 +25,11 @@ const sectionIcons = {
   messaging: MessageSquareIcon,
   about: InfoIcon,
   security: LockKeyholeIcon,
+  readerSecurity: KeyRoundIcon,
   roles: UsersIcon,
   sso: ShieldIcon,
   monitoring: ActivityIcon,
+  attractap: NfcIcon,
   auditLog: FileClockIcon,
   plugins: PlugIcon,
 } as const;
@@ -56,6 +61,10 @@ export function SettingsIndexPage() {
       <nav aria-label={t('navLabel')}>
         <SettingsDirectory groups={directoryGroups} searchLabel={t('search')} emptyMessage={t('noResults')} />
       </nav>
+
+      <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col gap-6 empty:hidden">
+        <AdminSettingsPluginSlot />
+      </div>
     </div>
   );
 }

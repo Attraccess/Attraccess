@@ -1,5 +1,6 @@
 import { ResourceFlowNode, Resource } from '@attraccess/database-entities';
-import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { requireRunMachineId } from './flow.utils';
 
 /**
  * Records resource activity by stamping the shared resourceActivity map. The map
@@ -9,8 +10,8 @@ import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
 export class ActivityTrackExecutor implements NodeExecutor {
   constructor(private readonly resourceActivity: Map<Resource['id'], Date>) {}
 
-  async execute(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
-    this.resourceActivity.set(node.resourceId, new Date());
+  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+    this.resourceActivity.set(await requireRunMachineId(node, ctx), new Date());
 
     return { payload: input };
   }

@@ -1,4 +1,5 @@
 # E-Mail-Vorlagen
+<!-- llms-description: E-Mail-Vorlagen von Attraccess verwalten und anpassen, inklusive verfügbarer Vorlagen, Plugin-Vorlagen und Platzhalter. -->
 
 Attraccess verwendet E-Mail-Vorlagen für automatisierte Nachrichten wie Registrierungsbestätigungen und Passwort-Zurücksetzungen. Sie können diese Vorlagen an Ihre Organisation anpassen.
 
@@ -16,6 +17,14 @@ Attraccess enthält Standardvorlagen für:
 - **Passwort zurücksetzen** – Link zum Zurücksetzen des Passworts
 - **E-Mail-Verifizierung** – Bestätigung der E-Mail-Adresse
 - **Projekteinladung** – Einladung zu einem Projekt
+
+## Plugin-Vorlagen
+
+Plugins können eigene E-Mail-Vorlagen mitbringen (das [Reservierungs-Plugin](plugins/reservations/overview.md) etwa für Buchungsbestätigungen und
+Erinnerungen). Sie stehen in derselben Liste nach den Kernvorlagen, mit einem Chip **Plugin: &lt;Name&gt;**
+gekennzeichnet, und werden genauso bearbeitet und übersetzt. Ist eine Plugin-Vorlage einmal gespeichert, gehört sie
+Ihnen: Plugin-Upgrades lassen Ihre Fassung unverändert, neue Standardtexte eines Plugin-Updates überschreiben sie also
+nicht. Mit **Standard wiederherstellen** übernehmen Sie die aktuellen Standardtexte und Übersetzungen des Plugins.
 
 ## Vorlagen bearbeiten
 

@@ -1,4 +1,5 @@
 # MQTT & IoT
+<!-- llms-description: Introduces MQTT and IoT: why use MQTT with Attraccess, how it works and how it integrates with flows. -->
 
 MQTT is a lightweight messaging protocol widely used in IoT (Internet of Things) applications. Attraccess can connect to MQTT brokers to exchange commands and status messages with machine controllers, sensors and other devices in production facilities and labs.
 

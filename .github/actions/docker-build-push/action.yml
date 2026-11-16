@@ -11,6 +11,10 @@ inputs:
   tags:
     description: 'Newline- or comma-separated Docker tags to apply'
     required: true
+  labels:
+    description: 'Newline-separated OCI labels to set on the image'
+    required: false
+    default: ''
   push:
     description: 'Push the image to the registries ("false" only builds it)'
     required: false
@@ -68,6 +72,7 @@ runs:
         context: .
         push: ${{ inputs.push }}
         tags: ${{ inputs.tags }}
+        labels: ${{ inputs.labels }}
         build-args: NODE_VERSION=${{ steps.node-version.outputs.value }}
         cache-from: type=gha
         # ignore-error: cache export is an optimization; transient GHA cache

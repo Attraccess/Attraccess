@@ -28,6 +28,7 @@ import editorEn from '../editModal/resourceEditModal.en.json';
 import editorDe from '../editModal/resourceEditModal.de.json';
 import en from './en.json';
 import de from './de.json';
+import { ResourceSettingsPluginSlot } from '../../plugins/PluginSettingsSlots';
 
 export type FormData = Omit<UpdateResourceDto, 'metadata'> & { metadata: Record<string, unknown> };
 
@@ -309,6 +310,9 @@ function ResourceSettingsEditor({ resourceId }: { resourceId: number }) {
         backTo={`/resources/${resourceId}`}
       />
       <SettingsDirectory groups={groups} searchLabel={model.t('search')} emptyMessage={model.t('noResults')} />
+      <div className="mx-auto mt-6 flex w-full max-w-3xl flex-col gap-6 empty:hidden">
+        <ResourceSettingsPluginSlot resourceId={resourceId} />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 # Überblick
+<!-- llms-description: Stellt Attraccess als Plattform mit öffentlich einsehbarem Quellcode für Maschinenzugang vor, mit Hauptfunktionen, Technologie und Lizenzierung. -->
 
 ## Was ist Attraccess?
 
@@ -24,7 +25,7 @@ Mit dem **Attractap RFID-Leser** können Sie den physischen Zugang zu Maschinen 
 
 ### Maschinenintegration & Automatisierung
 
-Verbinden Sie Maschinen über das WAGO-SPS-Plugin oder erstellen Sie visuelle Automatisierungen mit dem Flow-Editor. Verknüpfen Sie Zugangsentscheidungen und Nutzungssitzungen über MQTT oder HTTP mit Gerätesteuerungen und Statussignalen.
+Verbinden Sie Maschinen über das [WAGO-SPS-Plugin](plugins/wago/overview.md) oder erstellen Sie visuelle Automatisierungen mit dem Flow-Editor. Verknüpfen Sie Zugangsentscheidungen und Nutzungssitzungen über MQTT oder HTTP mit Gerätesteuerungen und Statussignalen.
 
 ### Projekte
 

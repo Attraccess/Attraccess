@@ -136,6 +136,21 @@ export class ResourceMaintenanceService {
     return maintenance;
   }
 
+  /**
+   * Maintenances whose window overlaps [from, to). A window is [startTime, endTime ?? infinity): open-ended
+   * maintenance (running or announced without an end) reaches until it is finished.
+   */
+  async findOverlappingMaintenances(resourceId: number, from: Date, to: Date): Promise<ResourceMaintenance[]> {
+    return this.maintenanceRepository
+      .createQueryBuilder('maintenance')
+      .where('maintenance.resourceId = :resourceId', { resourceId })
+      .andWhere('maintenance.startTime < :to', { to })
+      .andWhere('(maintenance.endTime IS NULL OR maintenance.endTime > :from)', { from })
+      .orderBy('maintenance.startTime', 'ASC')
+      .addOrderBy('maintenance.id', 'ASC')
+      .getMany();
+  }
+
   async hasActiveMaintenance(
     resourceIdOrFilter: number | { resourceId: number; scheduleId?: number },
     transactionalEntityManager?: EntityManager,
@@ -336,7 +351,7 @@ export class ResourceMaintenanceService {
     const savedMaintenance = await this.maintenanceRepository.save(maintenance);
     this.eventEmitter.emit(
       ResourceMaintenanceChangedEvent.EVENT_NAME,
-      new ResourceMaintenanceChangedEvent(resourceId, savedMaintenance.id),
+      new ResourceMaintenanceChangedEvent(resourceId, savedMaintenance.id, 'created'),
     );
     this.metricsService.resourceMaintenanceTotal.inc({ type: 'manual' });
     return savedMaintenance;
@@ -385,7 +400,7 @@ export class ResourceMaintenanceService {
   emitScheduledMaintenanceCreated(resourceId: number, maintenanceId: number): void {
     this.eventEmitter.emit(
       ResourceMaintenanceChangedEvent.EVENT_NAME,
-      new ResourceMaintenanceChangedEvent(resourceId, maintenanceId),
+      new ResourceMaintenanceChangedEvent(resourceId, maintenanceId, 'created'),
     );
     this.metricsService.resourceMaintenanceTotal.inc({ type: 'scheduled' });
   }
@@ -418,7 +433,7 @@ export class ResourceMaintenanceService {
     const savedMaintenance = await this.maintenanceRepository.save(maintenance);
     this.eventEmitter.emit(
       ResourceMaintenanceChangedEvent.EVENT_NAME,
-      new ResourceMaintenanceChangedEvent(maintenance.resourceId, savedMaintenance.id),
+      new ResourceMaintenanceChangedEvent(maintenance.resourceId, savedMaintenance.id, 'finished'),
     );
     return savedMaintenance;
   }

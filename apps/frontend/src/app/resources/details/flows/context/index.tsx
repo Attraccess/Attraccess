@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState, useRef, useContext, createContext, ReactNode } from 'react';
+import { useCallback, useMemo, useState, useRef, ReactNode } from 'react';
 import { nanoid } from 'nanoid';
 import { buildClipboardData, parseClipboardData, buildPastedElements } from '../flowClipboard';
 import {
@@ -12,17 +12,13 @@ import {
   applyEdgeChanges,
   NodeTypes,
   NodeProps,
-  OnNodesChange,
-  OnEdgesChange,
 } from '@xyflow/react';
-import {
-  ResourceFlowLog,
-  useResourceFlowsServiceGetNodeSchemas,
-  useResourcesServiceGetOneResourceById,
-} from '@attraccess/react-query-client';
+import { ResourceFlowLog, useResourcesServiceGetOneResourceById } from '@attraccess/react-query-client';
 import { useLiveLogs } from '../liveLogs';
+import { FlowOwner, useFlowNodeSchemasQuery } from '../flowOwner';
 import { AttraccessNode } from '../node/index';
 import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { FlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';
 import nodesDeTranslations from '../node/de.json';
 import nodesEnTranslations from '../node/en.json';
 
@@ -38,7 +34,7 @@ export function useFlowProviderStateOutput(model: ReturnType<typeof useFlowProvi
     updateNodeData,
     addNode,
     removeNode,
-    resourceId,
+    owner,
     resource,
     liveLogs,
     addLiveLogReceiver,
@@ -91,7 +87,8 @@ export function useFlowProviderStateOutput(model: ReturnType<typeof useFlowProvi
       removeNode: removeNode,
       setNodes: setNodes,
       setEdges: setEdges,
-      resourceId: resourceId,
+      owner,
+      resourceId: owner.kind === 'resource' ? owner.resourceId : undefined,
       resourceType: (resource?.type as 'machine' | 'door') ?? 'machine',
       resourceSeparateUnlockAndUnlatch: Boolean(resource?.separateUnlockAndUnlatch),
       resourceAllowTakeOver: Boolean(resource?.allowTakeOver),
@@ -116,7 +113,7 @@ export function useFlowProviderStateOutput(model: ReturnType<typeof useFlowProvi
       removeNode,
       setNodes,
       setEdges,
-      resourceId,
+      owner,
       resource?.type,
       resource?.separateUnlockAndUnlatch,
       resource?.allowTakeOver,
@@ -134,16 +131,20 @@ export function useFlowProviderStateOutput(model: ReturnType<typeof useFlowProvi
   return { value, children: model.children } as const;
 }
 
-export function useFlowProviderState({ children, resourceId }: FlowProviderProps) {
-  const useFlowProviderStateInputsModel = useFlowProviderStateInputs({ children, resourceId });
+export function useFlowProviderState({ children, owner }: FlowProviderProps) {
+  const useFlowProviderStateInputsModel = useFlowProviderStateInputs({ children, owner });
   return useFlowProviderStateOutput(useFlowProviderStateInputsModel);
 }
 
-export function useFlowProviderStateInputs({ children, resourceId }: FlowProviderProps) {
+export function useFlowProviderStateInputs({ children, owner }: FlowProviderProps) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [validationErrors, setValidationErrorsState] = useState<Record<string, string>>({});
-  const { data: resource } = useResourcesServiceGetOneResourceById({ id: resourceId });
+  const { data: resource } = useResourcesServiceGetOneResourceById(
+    { id: owner.kind === 'resource' ? owner.resourceId : 0 },
+    undefined,
+    { enabled: owner.kind === 'resource' },
+  );
 
   const { t: tNodeTranslations, tExists: tNodeExists } = useTranslations({
     de: nodesDeTranslations,
@@ -216,11 +217,11 @@ export function useFlowProviderStateInputs({ children, resourceId }: FlowProvide
   }, []);
 
   const { liveLogs } = useLiveLogs({
-    resourceId,
+    owner,
     onUpdate: publishLiveLog,
   });
 
-  const { data: nodeSchemas } = useResourceFlowsServiceGetNodeSchemas({ resourceId });
+  const { data: nodeSchemas } = useFlowNodeSchemasQuery(owner);
   const flowNodeTypes = useMemo(() => {
     if (!nodeSchemas) {
       return {};
@@ -266,55 +267,19 @@ export function useFlowProviderStateInputs({ children, resourceId }: FlowProvide
     nodeSchemas,
     flowNodeTypes,
     children,
-    resourceId,
+    owner,
   } as const;
-}
-
-export type LiveLogReceiver = (log: ResourceFlowLog) => void;
-
-export interface FlowContextType {
-  nodes: Node[];
-  edges: Edge[];
-  onNodesChange: OnNodesChange<Node>;
-  onEdgesChange: OnEdgesChange<Edge>;
-  onConnect: (params: Edge | Connection) => void;
-  updateNodeData: (nodeId: string, data: Record<string, unknown>) => void;
-  addNode: (node: Node) => void;
-  removeNode: (nodeId: string) => void;
-  setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
-  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
-  resourceId: number;
-  resourceType: 'machine' | 'door';
-  resourceSeparateUnlockAndUnlatch: boolean;
-  resourceAllowTakeOver: boolean;
-  liveLogs: ResourceFlowLog[];
-  addLiveLogReceiver: (receiver: LiveLogReceiver) => void;
-  removeLiveLogReceiver: (receiver: LiveLogReceiver) => void;
-  flowNodeTypes: NodeTypes;
-  copySelectedNodes: () => Promise<void>;
-  cutSelectedNodes: () => Promise<void>;
-  pasteNodes: (targetFlowPosition?: { x: number; y: number }) => Promise<void>;
-  validationErrors: Record<string, string>;
-  setValidationErrors: (errors: Array<{ nodeId: string; message: string }>) => void;
 }
 
 export interface FlowProviderProps {
   children: ReactNode;
-  resourceId: number;
+  owner: FlowOwner;
 }
 
-export const FlowContext = createContext<FlowContextType | undefined>(undefined);
-
-export function useFlowContext(): FlowContextType {
-  const context = useContext(FlowContext);
-  if (context === undefined) {
-    throw new Error('useFlowContext must be used within a FlowProvider');
-  }
-  return context;
-}
-
-export function FlowProvider({ children, resourceId }: FlowProviderProps) {
-  const { value } = useFlowProviderState({ children, resourceId });
+export function FlowProvider({ children, owner }: FlowProviderProps) {
+  const { value } = useFlowProviderState({ children, owner });
 
   return <FlowContext.Provider value={value}>{children}</FlowContext.Provider>;
 }
+
+export { FlowContext, useFlowContext, type FlowContextType, type LiveLogReceiver } from './flowContext';

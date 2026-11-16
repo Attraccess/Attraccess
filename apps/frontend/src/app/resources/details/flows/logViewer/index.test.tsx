@@ -25,8 +25,15 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: state.invalidate }) }));
-vi.mock('../context/index', () => ({ useFlowContext: () => ({ liveLogs: state.live }) }));
+vi.mock('../context/index', () => ({ useFlowContext: () => ({ liveLogs: state.live, owner: { kind: 'resource', resourceId: 7 } }) }));
 vi.mock('@attraccess/react-query-client', () => ({
+  useGlobalFlowsServiceGetGlobalFlowCanvas: () => ({ data: undefined }),
+  useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
+  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatus: () => ({ data: undefined }),
+  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatusKey: 'global-recording',
+  useGlobalFlowsServiceGetGlobalFlowLogs: () => ({ data: undefined }),
+  useGlobalFlowsServiceStartGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
+  useGlobalFlowsServiceStopGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
   useResourceFlowsServiceGetNodeSchemas: () => ({ data: undefined }),
   useResourceFlowsServiceGetFlowLogRecordingStatusKey: 'recording',
   useResourceFlowsServiceGetResourceFlow: () => ({
@@ -63,7 +70,7 @@ afterEach(() => {
 function Viewer({ version = 0 }: { version?: number }) {
   const [confettiEnabled, setConfettiEnabled] = useState(false);
   return (
-    <LogViewer resourceId={7} confettiEnabled={confettiEnabled} onConfettiEnabledChange={setConfettiEnabled}>
+    <LogViewer confettiEnabled={confettiEnabled} onConfettiEnabledChange={setConfettiEnabled}>
       {(open) => (
         <button data-version={version} onClick={open}>
           View logs

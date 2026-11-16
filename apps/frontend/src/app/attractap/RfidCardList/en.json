@@ -19,7 +19,7 @@
       "title": "Delete RFID Card",
       "description": "You are about to delete the RFID Card with the ID {{id}}. This action cannot be undone.",
       "readerLabel": "Select Attractap",
-      "readerPlaceholder": "Select a Attractap",
+      "readerPlaceholder": "Select an Attractap",
       "cancel": "Cancel",
       "delete": "Delete"
     }
@@ -29,11 +29,10 @@
     "title": "Enroll RFID Card",
     "description": "To enroll a new RFID Card, choose a connected Attractap in the list below. Then click on the button \"Enroll new RFID Card\" and follow the instructions on the Attractap.",
     "readerLabel": "Select Attractap",
-    "readerPlaceholder": "Select a Attractap",
+    "readerPlaceholder": "Select an Attractap",
     "cancel": "Cancel",
     "enroll": "Enroll"
   },
   "userCards": "RFID Cards — {{username}}",
-  "errorFetchCards": "Could not load RFID cards",
-  "errorOperation": "Could not start the card operation"
+  "errorFetchCards": "Could not load RFID cards"
 }

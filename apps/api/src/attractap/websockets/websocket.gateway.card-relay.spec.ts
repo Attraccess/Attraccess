@@ -1,0 +1,645 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- partial socket and service mocks */
+import { Logger } from '@nestjs/common';
+import { WebSocket } from 'ws';
+import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
+import { createReaderSenders, READER_SEND_LIMITS } from './reader-socket-send';
+import { securelyHashToken } from './websocket.utils';
+import { CARD_CONVERSATION_LIMITS } from './card-conversation.service';
+import { CardSessionService } from './handlers/ui/card-session.service';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
+
+/** Gateway-level rules of the card relay (ATT-1145): what the server forgets, refuses and never queues. */
+describe('AttractapGateway card relay rules', () => {
+  const fixture = registerAttractapGatewayFixture();
+
+  let supervisionService: Record<string, jest.Mock>;
+  let massIntroductionService: Record<string, jest.Mock>;
+  let abort: jest.SpyInstance;
+
+  beforeEach(() => {
+    // The fixture provides bare objects; give the teardown paths what they call.
+    supervisionService = fixture.gateway['supervisionHandler']['supervisionService'] as any;
+    supervisionService.cancelReaderRequest = jest.fn();
+    massIntroductionService = fixture.gateway['massIntroductionHandler']['massIntroductionService'] as any;
+    massIntroductionService.detachReader = jest.fn();
+    abort = jest.spyOn(fixture.gateway['cardConversations'], 'abort');
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  /** A reader connection with a verified user and every kind of armed flow. */
+  function loggedInReader(overrides: Record<string, unknown> = {}): AuthenticatedWebSocket {
+    const socket = fixture.createMockSocket({
+      id: 'reader-1',
+      readerId: 7,
+      readerName: 'Lathe',
+      readyState: WebSocket.OPEN,
+      ...overrides,
+    } as any);
+    Object.assign(socket.state, {
+      verifiedUserId: 5,
+      verifiedCardUid: '04aabbccddee80',
+      cardConversation: null,
+      enrollment: { userId: 5, auditPrincipal: { userId: 1, authenticationMethod: 'session' } },
+      resetNfcCardData: { cardId: 3, auditPrincipal: { userId: 1, authenticationMethod: 'session' } },
+      supervisionFlow: {
+        resourceId: 1,
+        requesterUserId: 5,
+        requestId: 'web-request',
+        approvedSupervisorUserId: null,
+        webInitiated: true,
+      },
+      massIntroductionFlow: { sessionId: 'mass-1' },
+      formDrafts: { '1:START': { 1: 'x' } },
+    });
+    fixture.websocketService.sockets.set(socket.id, socket);
+    return socket;
+  }
+
+  const cardSessions = () => fixture.gateway['uiHandler']['cardSessions'] as CardSessionService;
+  /** A card conversation waiting for the card's answer. */
+  const pendingConversation = (socket: AuthenticatedWebSocket) =>
+    fixture.gateway['cardConversations'].run(socket, 'tap', { uid: '04aabbccddee80', detectionId: 1 }, (channel) =>
+      channel.exchange(Buffer.from([0x90, 0x60, 0, 0, 0])),
+    );
+
+  const send = (socket: AuthenticatedWebSocket, type: AttractapEventType, payload: unknown = {}) =>
+    fixture.gateway.onClientEvent(new AttractapEvent(type, payload).data, socket);
+  const replies = (socket: AuthenticatedWebSocket) =>
+    (socket.sendMessage as jest.Mock).mock.calls.map(([message]) => message.data);
+
+  describe('legacy (pre-2.0.0) card events', () => {
+    it.each([
+      [AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED, AttractapEventType.SUPERVISION_RESOLVED],
+      [AttractapEventType.MASS_INTRODUCTION_CARD_AUTH_CONFIRMED, AttractapEventType.MASS_INTRODUCTION_RESULT],
+      [AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA, AttractapEventType.CARD_AUTHENTICATION_DATA],
+      [
+        AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA,
+        AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA,
+      ],
+      [
+        AttractapEventType.REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA,
+        AttractapEventType.MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA,
+      ],
+      [AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY, AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY],
+    ])('%s gets FIRMWARE_UPDATE_REQUIRED and approves nothing', async (type, replyType) => {
+      const socket = loggedInReader();
+      socket.state.verifiedUserId = null;
+      const flow = socket.state.supervisionFlow;
+
+      // What an old reader sends after it checked a card itself: never trusted.
+      await send(socket, type, {
+        success: true,
+        uid: '04aabbccddee80',
+        cardUID: '04aabbccddee80',
+        sessionId: 'mass-1',
+      });
+
+      expect(replies(socket)).toEqual([
+        expect.objectContaining({
+          type: replyType,
+          payload: expect.objectContaining({ error: 'FIRMWARE_UPDATE_REQUIRED' }),
+        }),
+      ]);
+      expect(replies(socket)[0].payload.success).not.toBe(true);
+      expect(flow.approvedSupervisorUserId).toBeNull();
+      expect(socket.state.supervisionFlow).toBe(flow);
+      expect(socket.state.verifiedUserId).toBeNull();
+      // Nothing beyond the reply touched the supervision or mass-introduction services.
+      expect(
+        Object.keys(massIntroductionService).filter((name) => name !== 'setReaderPort' && name !== 'detachReader'),
+      ).toEqual([]);
+      expect(supervisionService.cancelReaderRequest).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      AttractapEventType.CARD_AUTHENTICATION_DATA,
+      AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA,
+      AttractapEventType.MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA,
+      AttractapEventType.ENROLL_NEW_CARD,
+      AttractapEventType.RESET_NFC_CARD,
+    ])('%s from a reader is rejected and changes no state', async (type) => {
+      const socket = loggedInReader();
+      const before = { ...socket.state };
+
+      await expect(send(socket, type, { success: true, key: '00'.repeat(16) })).rejects.toThrow(
+        'THIS IS A SERVER SIDE ONLY EVENT',
+      );
+
+      expect(socket.state).toEqual(before);
+      expect(socket.sendMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('forgetting the verified user', () => {
+    it('READER_SESSION_ENDED forgets the user and aborts the card conversation, but keeps admin-armed flows', async () => {
+      const socket = loggedInReader();
+
+      await send(socket, AttractapEventType.READER_SESSION_ENDED);
+
+      expect(abort).toHaveBeenCalledWith(socket, 'READER_SESSION_ENDED');
+      expect(socket.state.verifiedUserId).toBeNull();
+      expect(socket.state.verifiedCardUid).toBeNull();
+      expect(socket.state.formDrafts).toBeUndefined();
+      // Web-started supervision, mass introduction, enrollment and reset do not belong to the login.
+      expect(socket.state.supervisionFlow).not.toBeNull();
+      expect(socket.state.massIntroductionFlow).not.toBeNull();
+      expect(socket.state.enrollment).not.toBeNull();
+      expect(socket.state.resetNfcCardData).not.toBeNull();
+    });
+
+    it('READER_SESSION_ENDED cancels a supervision the reader started for the logged-in user', async () => {
+      const socket = loggedInReader();
+      socket.state.supervisionFlow.webInitiated = false;
+
+      await send(socket, AttractapEventType.READER_SESSION_ENDED);
+
+      expect(socket.state.supervisionFlow).toBeNull();
+      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('web-request');
+    });
+
+    it('a disconnect forgets the user, aborts the card conversation and tears down every armed flow', async () => {
+      const socket = loggedInReader();
+
+      await fixture.gateway.handleDisconnect(socket);
+
+      expect(abort).toHaveBeenCalledWith(socket, 'READER_UNREACHABLE');
+      expectConnectionStateCleared(socket);
+      expect(massIntroductionService.detachReader).toHaveBeenCalledWith('mass-1', 7);
+    });
+
+    it('authenticating again on the same connection starts from nothing', async () => {
+      const socket = loggedInReader();
+      // Even a successful re-authentication as the same reader must not inherit the old login.
+      const token = 'reader-token-for-reauth';
+      const apiTokenHash = await securelyHashToken(token);
+      let stateWhileCheckingCredentials: unknown;
+      fixture.attractapService.findReaderById.mockImplementation(async () => {
+        stateWhileCheckingCredentials = { ...socket.state };
+        return { id: 7, name: 'Lathe', apiTokenHash, pairingState: 'unpaired', resources: [] };
+      });
+      jest.spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket').mockResolvedValue(undefined);
+
+      await send(socket, AttractapEventType.READER_AUTHENTICATE, { id: 7, token });
+
+      // Cleared before the credentials are even checked.
+      expect(stateWhileCheckingCredentials).toEqual(
+        expect.objectContaining({ verifiedUserId: null, enrollment: null }),
+      );
+
+      expect(abort).toHaveBeenCalledWith(socket, 'READER_SESSION_ENDED');
+      expect(massIntroductionService.detachReader).toHaveBeenCalledWith('mass-1', 7);
+      expect(socket.readerId).toBe(7);
+      expectConnectionStateCleared(socket);
+    });
+
+    it('READER_SESSION_ENDED ends the card session', async () => {
+      const socket = loggedInReader();
+      cardSessions().issue(socket, 5, 'en');
+
+      await send(socket, AttractapEventType.READER_SESSION_ENDED);
+
+      expect(socket.state.cardSession).toBeNull();
+    });
+
+    it('CARD_SESSION_ENDED for the verified user ends the login like READER_SESSION_ENDED', async () => {
+      const socket = loggedInReader({ sendRaw: jest.fn(() => true) });
+      socket.state.supervisionFlow.webInitiated = false;
+      const session = cardSessions().issue(socket, 5, 'en');
+      const conversation = pendingConversation(socket);
+      await new Promise(setImmediate);
+
+      await send(socket, AttractapEventType.CARD_SESSION_ENDED, { cardSessionId: session.id });
+
+      expect(await conversation).toEqual({ ok: false, reason: 'READER_SESSION_ENDED' });
+      expect(socket.state.cardSession).toBeNull();
+      expect(socket.state.verifiedUserId).toBeNull();
+      expect(socket.state.verifiedCardUid).toBeNull();
+      expect(socket.state.formDrafts).toBeUndefined();
+      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('web-request');
+    });
+
+    it('CARD_SESSION_ENDED for an older card session keeps the current login', async () => {
+      const socket = loggedInReader();
+      const old = cardSessions().issue(socket, 4, 'en');
+      cardSessions().issue(socket, 5, 'en');
+
+      await send(socket, AttractapEventType.CARD_SESSION_ENDED, { cardSessionId: old.id });
+
+      expect(abort).not.toHaveBeenCalled();
+      expect(socket.state.verifiedUserId).toBe(5);
+      expect(socket.state.formDrafts).toEqual({ '1:START': { 1: 'x' } });
+    });
+
+    it('a credential change ends the login and armed flows before the socket is gone', async () => {
+      const socket = loggedInReader({ sendRaw: jest.fn(() => true) });
+      const conversation = pendingConversation(socket);
+      await new Promise(setImmediate);
+
+      await fixture.gateway.disconnectReader(7);
+
+      expect(socket.terminate).toHaveBeenCalled();
+      expect(socket.close).not.toHaveBeenCalled();
+      // The close event has not arrived yet: nothing of the old login may still be usable.
+      expect(await conversation).toEqual({ ok: false, reason: 'READER_UNREACHABLE' });
+      expectConnectionStateCleared(socket);
+      expect(massIntroductionService.detachReader).toHaveBeenCalledWith('mass-1', 7);
+
+      await fixture.gateway.handleDisconnect(socket);
+      expect(massIntroductionService.detachReader).toHaveBeenCalledTimes(1);
+      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledTimes(1);
+    });
+
+    function expectConnectionStateCleared(socket: AuthenticatedWebSocket) {
+      expect(socket.state).toEqual(
+        expect.objectContaining({
+          verifiedUserId: null,
+          verifiedCardUid: null,
+          enrollment: null,
+          resetNfcCardData: null,
+          supervisionFlow: null,
+          massIntroductionFlow: null,
+          formDrafts: undefined,
+        }),
+      );
+      expect(supervisionService.cancelReaderRequest).toHaveBeenCalledWith('web-request');
+    }
+  });
+
+  describe('reader activity', () => {
+    it('keeps the card relay events free of the lastConnection write; heartbeats keep it fresh', async () => {
+      const socket = loggedInReader();
+      const route = jest.spyOn(fixture.gateway['cardDetectedRouter'], 'route').mockResolvedValue(undefined);
+
+      await send(socket, AttractapEventType.CARD_DETECTED, { uid: '04aabbccddee80', detectionId: 1 });
+      await send(socket, AttractapEventType.CARD_APDU_RESPONSE, { conversationId: 'c', seq: 1, response: '9100' });
+      await send(socket, AttractapEventType.CARD_REMOVED, { conversationId: 'c' });
+
+      expect(route).toHaveBeenCalled();
+      expect(fixture.attractapService.updateLastReaderConnection).not.toHaveBeenCalled();
+
+      await fixture.gateway.onHeartbeat(socket);
+      expect(fixture.attractapService.updateLastReaderConnection).toHaveBeenCalledWith(7);
+    });
+
+    it('handles a logout before a later tap even while the activity write is slow', async () => {
+      const socket = loggedInReader();
+      socket.state.verifiedUserId = 11;
+      // A write that never finishes must not hold READER_SESSION_ENDED behind the next tap.
+      fixture.attractapService.updateLastReaderConnection.mockReturnValue(new Promise(() => undefined));
+      const order: string[] = [];
+      jest.spyOn(fixture.gateway, 'onReaderSessionEnded').mockImplementation(async () => {
+        order.push('logout');
+      });
+      jest.spyOn(fixture.gateway['cardDetectedRouter'], 'route').mockImplementation(async () => {
+        order.push('tap');
+      });
+
+      void fixture.gateway.onClientEvent(new AttractapEvent(AttractapEventType.READER_SESSION_ENDED, {}).data, socket);
+      void fixture.gateway.onClientEvent(
+        new AttractapEvent(AttractapEventType.CARD_DETECTED, { uid: '04aabbccddee80', detectionId: 2 }).data,
+        socket,
+      );
+      await new Promise(setImmediate);
+
+      expect(order).toEqual(['logout', 'tap']);
+    });
+  });
+
+  describe('send limits of a paired reader (session transport)', () => {
+    /** A session socket as ReaderSessionService.attach leaves it: queued bytes live in the session. */
+    function sessionSenders(options: { queued?: () => number; refuse?: boolean } = {}) {
+      const client: any = {
+        readyState: WebSocket.OPEN,
+        bufferedAmount: 0,
+        transport: 'session',
+        readerId: 7,
+        state: { verifiedUserId: null },
+        pendingSendBytes: options.queued ?? (() => 0),
+        send: jest.fn((_data: unknown, callback?: (error?: Error) => void) =>
+          callback?.(options.refuse ? new Error('session closed or send queue full') : undefined),
+        ),
+        terminate: jest.fn(),
+      };
+      const waitForAck = jest.fn(async () => {
+        throw new Error('timeout');
+      });
+      const senders = createReaderSenders({
+        client,
+        id: 's1',
+        logger: new Logger('test'),
+        waitForAck,
+        canReceiveReaderLanguage: () => true,
+        readerLanguage: () => undefined,
+      });
+      Object.assign(client, senders);
+      return { client, socket: client as AuthenticatedWebSocket, waitForAck };
+    }
+    const apdu = () => new AttractapEvent(AttractapEventType.CARD_APDU, { apdu: '9060000000' });
+
+    it('reports a frame the session refused, so a card exchange ends with READER_UNREACHABLE', async () => {
+      const { socket } = sessionSenders({ refuse: true });
+
+      expect(socket.sendRaw(apdu())).toBe(false);
+      expect(await pendingConversation(socket)).toEqual({ ok: false, reason: 'READER_UNREACHABLE' });
+      await expect(socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_LIST, {}))).resolves.toBe(false);
+    });
+
+    it("cuts the reader off at the session's queue limit, not the WebSocket's", async () => {
+      const errors = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      const { client, socket } = sessionSenders({ queued: () => READER_SEND_LIMITS.session.maxQueuedBytes + 1 });
+
+      expect(socket.sendRaw(apdu())).toBe(false);
+
+      expect(client.send).not.toHaveBeenCalled();
+      expect(client.terminate).toHaveBeenCalledTimes(1);
+      expect(errors).toHaveBeenCalled();
+    });
+
+    it('accepts a large message while the session queue is below its limit', () => {
+      const { client, socket } = sessionSenders({ queued: () => READER_SEND_LIMITS.session.maxQueuedBytes });
+      socket.sendBinaryData(Buffer.alloc(60 * 1024));
+      expect(client.send).toHaveBeenCalledTimes(1);
+      expect(client.terminate).not.toHaveBeenCalled();
+    });
+
+    it('does not resend an unACKed message while the session queue is backed up', async () => {
+      let queued = 0;
+      const { client, socket, waitForAck } = sessionSenders({ queued: () => queued });
+      waitForAck.mockImplementation(async () => {
+        queued = READER_SEND_LIMITS.session.retryMaxQueuedBytes + 1;
+        throw new Error('timeout');
+      });
+
+      await expect(socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_LIST, {}))).resolves.toBe(false);
+
+      expect(client.send).toHaveBeenCalledTimes(1);
+      expect(waitForAck).toHaveBeenCalledTimes(READER_SEND_LIMITS.ackRetryCount);
+    });
+
+    it('refuses a new card conversation with BUSY while the session queue is backed up', () => {
+      const { socket } = sessionSenders({ queued: () => CARD_CONVERSATION_LIMITS.maxBufferedBytes + 1 });
+      expect(fixture.gateway['cardConversations'].isBusy(socket)).toBe(true);
+    });
+  });
+
+  describe('bounded send queue', () => {
+    function connect(bufferedAmount = 0) {
+      const client: any = {
+        readyState: WebSocket.OPEN,
+        bufferedAmount,
+        send: jest.fn(),
+        close: jest.fn(),
+        terminate: jest.fn(),
+        on: jest.fn(),
+      };
+      const connection = fixture.gateway.handleConnection(client);
+      return { client, socket: client as AuthenticatedWebSocket, connection };
+    }
+
+    async function settle(socket: AuthenticatedWebSocket, connection: Promise<void>) {
+      await fixture.gateway.onClientEvent({ type: 'ACK_READER_REQUEST_AUTHENTICATION' } as any, socket);
+      await connection;
+    }
+
+    it('drops a card APDU and cuts the reader off when its send queue is full', async () => {
+      const { client, socket, connection } = connect();
+      await new Promise((resolve) => setImmediate(resolve));
+      await settle(socket, connection);
+      const errors = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      client.send.mockClear();
+      client.bufferedAmount = READER_SEND_LIMITS.maxBufferedBytes;
+
+      const apdu = new AttractapEvent(AttractapEventType.CARD_APDU, { apdu: '90af000000' });
+      expect(socket.sendRaw(apdu)).toBe(false);
+
+      expect(client.send).not.toHaveBeenCalled();
+      expect(client.terminate).toHaveBeenCalledTimes(1);
+      expect(errors.mock.calls.flat().join(' ')).not.toContain('90af000000');
+    });
+
+    it('drops an ACKed message instead of queueing it behind a full send queue', async () => {
+      const { client, socket, connection } = connect();
+      await new Promise((resolve) => setImmediate(resolve));
+      await settle(socket, connection);
+      client.send.mockClear();
+      client.bufferedAmount = READER_SEND_LIMITS.maxBufferedBytes - 10;
+
+      await expect(
+        socket.sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_LIST, { resources: [] })),
+      ).resolves.toBe(false);
+
+      expect(client.send).not.toHaveBeenCalled();
+      expect(client.terminate).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not queue another copy of an unACKed message while the queue is backed up', async () => {
+      const client: any = { readyState: WebSocket.OPEN, bufferedAmount: 0, send: jest.fn(), terminate: jest.fn() };
+      client.state = {};
+      const waitForAck = jest.fn(async () => {
+        // The first copy is still queued: the reader is slow, not deaf.
+        client.bufferedAmount = READER_SEND_LIMITS.retryMaxBufferedBytes + 1;
+        throw new Error('timeout');
+      });
+      const { sendMessage } = createReaderSenders({
+        client,
+        id: 'c1',
+        logger: new Logger('test'),
+        waitForAck,
+        canReceiveReaderLanguage: () => true,
+        readerLanguage: () => undefined,
+      });
+
+      await expect(sendMessage(new AttractapEvent(AttractapEventType.RESOURCE_LIST, {}))).resolves.toBe(false);
+
+      expect(client.send).toHaveBeenCalledTimes(1);
+      expect(waitForAck).toHaveBeenCalledTimes(READER_SEND_LIMITS.ackRetryCount);
+      expect(client.terminate).not.toHaveBeenCalled();
+    });
+
+    it('does not drop OTA chunks of a reader that drains its queue', async () => {
+      const { client, socket, connection } = connect();
+      await new Promise((resolve) => setImmediate(resolve));
+      await settle(socket, connection);
+      client.bufferedAmount = 4096 * 3;
+
+      socket.sendBinaryData(Buffer.alloc(4096));
+
+      expect(client.send).toHaveBeenLastCalledWith(expect.any(Buffer), expect.any(Function));
+      expect(client.terminate).not.toHaveBeenCalled();
+    });
+  });
+
+  it('never logs the reader token or card bytes during authentication and a card exchange', async () => {
+    const token = 'tok-' + 'c0ffee'.repeat(8);
+    const cardBytes = '0123456789abcdef0123456789abcdef';
+    const logged: unknown[] = [];
+    for (const method of ['log', 'error', 'warn', 'debug', 'verbose', 'fatal'] as const) {
+      jest.spyOn(Logger.prototype, method).mockImplementation((...args: unknown[]) => void logged.push(args));
+      jest.spyOn(Logger, method).mockImplementation((...args: unknown[]) => void logged.push(args));
+    }
+    for (const method of ['log', 'error', 'warn', 'debug', 'info'] as const) {
+      jest.spyOn(console, method).mockImplementation((...args: unknown[]) => void logged.push(args));
+    }
+    fixture.attractapService.findReaderById.mockResolvedValue({
+      id: 7,
+      name: 'Lathe',
+      apiTokenHash: await securelyHashToken(token),
+      pairingState: 'unpaired',
+      resources: [],
+    });
+    jest.spyOn(fixture.gateway['resourceListService'], 'sendResourceListToSocket').mockResolvedValue(undefined);
+    const client: any = {
+      readyState: WebSocket.OPEN,
+      bufferedAmount: 0,
+      send: jest.fn(),
+      close: jest.fn(),
+      on: jest.fn(),
+    };
+    const socket = client as AuthenticatedWebSocket;
+    const connection = fixture.gateway.handleConnection(client);
+    await new Promise((resolve) => setImmediate(resolve));
+    await fixture.gateway.onClientEvent({ type: 'ACK_READER_REQUEST_AUTHENTICATION' } as any, socket);
+    await connection;
+
+    const authentication = send(socket, AttractapEventType.READER_AUTHENTICATE, { id: 7, token });
+    for (
+      let i = 0;
+      i < 20 && !client.send.mock.calls.some(([m]: [string]) => m.includes('READER_AUTHENTICATED'));
+      i++
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    await fixture.gateway.onClientEvent({ type: 'ACK_READER_AUTHENTICATED' } as any, socket);
+    await authentication;
+    expect(socket.readerId).toBe(7);
+    // A token sign-in is an unpaired reader and gets no card functions; this test logs the card
+    // traffic of a paired one, so lift the gate that the pairing flow would have lifted.
+    expect(socket.state.pairingRequired).toBe(true);
+    socket.state.pairingRequired = false;
+
+    // Card traffic both ways, including answers to a conversation that does not exist (logged as ignored).
+    socket.sendRaw(new AttractapEvent(AttractapEventType.CARD_APDU, { conversationId: 'c', seq: 1, apdu: cardBytes }));
+    await send(socket, AttractapEventType.CARD_APDU_RESPONSE, { conversationId: 'c', seq: 1, response: cardBytes });
+    await send(socket, AttractapEventType.CARD_REMOVED, { conversationId: 'c' });
+    await expect(send(socket, AttractapEventType.ENROLL_NEW_CARD, { key: cardBytes })).rejects.toThrow();
+    await send(socket, AttractapEventType.READER_SESSION_ENDED);
+    await fixture.gateway.handleDisconnect(socket);
+
+    const text = JSON.stringify(logged);
+    expect(logged.length).toBeGreaterThan(0);
+    expect(text).not.toContain(token);
+    expect(text).not.toContain(cardBytes);
+    expect(text).not.toMatch(/[0-9a-f]{32}/i);
+  });
+
+  describe('a reader that is not paired', () => {
+    // The only events it may send. Any other event, including one added later, is gated.
+    const ALLOWED = new Set<string>([
+      AttractapEventType.READER_AUTHENTICATE,
+      AttractapEventType.READER_REGISTER,
+      AttractapEventType.READER_FIRMWARE_INFO,
+      AttractapEventType.FIRMWARE_REQUEST_CHUNK,
+      AttractapEventType.READER_CRASH_REPORT,
+      AttractapEventType.READER_SESSION_ENDED,
+    ]);
+    const gatedEvents = () =>
+      (Object.keys(fixture.gateway['eventHandlers']) as AttractapEventType[]).filter((type) => !ALLOWED.has(type));
+
+    const unpairedReader = (state: Record<string, unknown> = { cardRelay: true }) => {
+      const socket = loggedInReader();
+      Object.assign(socket.state, { pairingRequired: true, ...state });
+      return socket;
+    };
+    const startPairing = (socket: AuthenticatedWebSocket) =>
+      replies(socket).filter((data) => data.type === AttractapEventType.READER_START_PAIRING);
+
+    it('gates every event but signing in, the firmware update, crash reports and the end of a login', async () => {
+      const types = gatedEvents();
+      expect(types).toEqual(
+        expect.arrayContaining([
+          AttractapEventType.CARD_DETECTED,
+          AttractapEventType.START_RESOURCE_USAGE_SESSION,
+          AttractapEventType.STOP_RESOURCE_USAGE_SESSION,
+          AttractapEventType.SUPERVISION_REQUEST,
+          AttractapEventType.REQUEST_RESOURCE_LIST,
+        ]),
+      );
+      for (const type of types) {
+        const socket = unpairedReader();
+        const handler = jest.spyOn(fixture.gateway['eventHandlers'], type).mockResolvedValue(undefined);
+
+        await send(socket, type);
+
+        expect({ type, handled: handler.mock.calls.length }).toEqual({ type, handled: 0 });
+        expect({ type, replies: replies(socket) }).toEqual({
+          type,
+          replies: [
+            expect.objectContaining({
+              type: AttractapEventType.READER_START_PAIRING,
+              payload: { ticket: 'ticket-1' },
+            }),
+          ],
+        });
+      }
+      expect(fixture.pairingService.issueBindingTicket).toHaveBeenCalledWith(7);
+    });
+
+    it('sends nothing when the pairing service says this reader was asked a moment ago', async () => {
+      fixture.pairingService.claimAutoPrompt.mockReturnValueOnce(false);
+      const socket = unpairedReader();
+
+      await send(socket, AttractapEventType.CARD_DETECTED);
+
+      expect(fixture.pairingService.claimAutoPrompt).toHaveBeenCalledWith(7);
+      expect(replies(socket)).toEqual([]);
+      expect(fixture.pairingService.issueBindingTicket).not.toHaveBeenCalled();
+    });
+
+    it('does not interrupt a firmware update running on this connection', async () => {
+      const socket = unpairedReader({ cardRelay: false, ota: { path: '/tmp/fw.bin', size: 4096 } });
+
+      await send(socket, AttractapEventType.REQUEST_RESOURCE_LIST);
+
+      expect(startPairing(socket)).toHaveLength(0);
+      expect(fixture.pairingService.claimAutoPrompt).not.toHaveBeenCalled();
+    });
+
+    it('asks again from its heartbeats, since a reader whose pairing failed sends little else', async () => {
+      const socket = unpairedReader();
+      (socket as unknown as { send: jest.Mock }).send = jest.fn();
+      await fixture.gateway.onHeartbeat(socket);
+      expect(startPairing(socket)).toHaveLength(0); // its firmware info was not handled yet
+      socket.state.updateCheckDone = true;
+
+      await fixture.gateway.onHeartbeat(socket);
+      fixture.pairingService.claimAutoPrompt.mockReturnValueOnce(false);
+      await fixture.gateway.onHeartbeat(socket);
+
+      expect(startPairing(socket)).toHaveLength(1);
+      expect(fixture.pairingService.claimAutoPrompt).toHaveBeenCalledTimes(2);
+    });
+
+    it('asks a reader on firmware before 2.0.0 to pair as well, never telling it to drop its token', async () => {
+      // Firmware 1.8.0+ pairs with the ticket; older firmware ignores it. READER_UNAUTHORIZED would
+      // make either drop its token and lose its record.
+      const socket = unpairedReader({ cardRelay: false });
+
+      await send(socket, AttractapEventType.CARD_DETECTED);
+
+      expect(replies(socket)).toEqual([
+        expect.objectContaining({ type: AttractapEventType.READER_START_PAIRING, payload: { ticket: 'ticket-1' } }),
+      ]);
+    });
+
+    it('still serves a firmware chunk request', async () => {
+      const socket = unpairedReader();
+      const handler = jest.spyOn(fixture.gateway['firmwareHandler'], 'handleFirmwareChunkRequest').mockResolvedValue();
+
+      await send(socket, AttractapEventType.FIRMWARE_REQUEST_CHUNK, { offset: 0, length: 1 });
+
+      expect(handler).toHaveBeenCalled();
+      expect(startPairing(socket)).toHaveLength(0);
+    });
+  });
+});

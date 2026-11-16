@@ -1,87 +1,71 @@
 import { AuditLog } from '@attraccess/database-entities';
 
-import { PluginAuditHostProvider, PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { PluginAuditReceipt } from '@attraccess/plugins-backend-sdk';
 
-import { randomUUID } from 'crypto';
-
-import {
-  DataSource,
-  EntitySubscriberInterface,
-  QueryRunner,
-  EntityManager,
-  TransactionCommitEvent,
-  TransactionRollbackEvent,
-} from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 
 import { SettingsStoreService } from '../settings/settings-store.service';
 
 import {
-  AttractapAuditEvent,
-  IdentityAuditEvent,
-  projectAttractapAuditEvent,
-  projectIdentityAuditEvent,
-  projectSsoAuditEvent,
-  SsoAuditEvent,
-} from './audit-policy';
+  AUDIT_SHUTDOWN_DRAIN_MS,
+  auditCutoff,
+  AuditStorage,
+  AuditStorageState,
+  hasPasswordPolicyOverflow,
+  sqliteErrorCode,
+} from './persistence/audit-storage';
 
-import { BillingTransactionAuditEvent, SQLITE_BUSY_TIMEOUT_MS } from './persistence/audit-storage';
+import { SQLITE_BUSY_TIMEOUT_MS } from '../database/sqlite-connection';
+
+import { getRegisteredPluginAuditDomains } from '../plugin-system/audit/audit-registry';
+
+import { AUDIT_DROP_REASONS, AuditMetrics } from '../metrics/definitions/audit.metrics';
+
+import { AUDIT_METRICS } from '../metrics/definitions/tokens';
 
 import { Interval } from '@nestjs/schedule';
 
 import { readAuditSettings } from './audit.config';
 
-import { AuditStorage } from './persistence/audit-storage';
+import { AuditEvent, AuditRecorder, AuditRecordOptions } from './recorder/audit-event';
 
-export { BillingTransactionAuditEvent } from './persistence/audit-storage';
-
+/** The audit storage engine and the implementation of the AuditRecorder port (bound as AUDIT_RECORDER). */
 @Injectable()
-export class AuditService
-  extends AuditStorage
-  implements PluginAuditHostProvider, EntitySubscriberInterface, OnModuleInit, OnModuleDestroy
-{
+export class AuditService implements AuditRecorder, OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(AuditService.name);
+
+  private readonly state = new AuditStorageState();
+
+  private readonly store: AuditStorage;
+
+  private shutdownDrainMs = AUDIT_SHUTDOWN_DRAIN_MS;
+
   constructor(
-    protected readonly source: DataSource,
-    protected readonly settings: SettingsStoreService,
+    private readonly source: DataSource,
+    private readonly settings: SettingsStoreService,
+    @Inject(AUDIT_METRICS) private readonly metrics: AuditMetrics,
   ) {
-    super();
+    this.store = new AuditStorage(settings, metrics, this.logger, this.state);
   }
 
-  protected readonly logger = new Logger(AuditService.name);
-
-  protected stopping = false;
-
-  protected activeReads = 0;
-
-  protected storage?: DataSource;
-
-  protected pending = 0;
-
-  protected cleaning = false;
-
-  protected writeTail: Promise<void> = Promise.resolve();
-
-  protected contended = false;
-
-  protected subscribed = false;
-
-  protected readonly billingEvents = new WeakMap<
-    QueryRunner,
-    Array<{
-      event: BillingTransactionAuditEvent;
-      transactionDepth: number;
-      resolve: (receipt: PluginAuditReceipt) => void;
-    }>
-  >();
+  /** The audit connection, once initialized. */
+  private get storage(): DataSource | undefined {
+    return this.state.storage;
+  }
 
   async onModuleInit(): Promise<void> {
-    if (this.storage?.isInitialized || this.stopping) return;
-    this.source.subscribers.push(this);
-    this.subscribed = true;
-    // A separate connection guarantees that a receipt follows autocommit, never a
-    // savepoint in the application's shared SQLite transaction. No schema sync.
-    if (this.source.options.type !== 'sqlite' || this.source.options.database === ':memory:') return;
+    // Plugin domains are registered while modules are built, before this runs. Zero series let the alert see a first drop.
+    for (const { domain } of getRegisteredPluginAuditDomains())
+      for (const reason of AUDIT_DROP_REASONS) this.metrics.recordsDropped.inc({ domain, reason }, 0);
+    if (this.storage?.isInitialized || this.state.stopping) return;
+    // A separate connection guarantees that a write without a caller transaction follows autocommit,
+    // never a savepoint in another request's shared SQLite transaction. No schema sync.
+    if (this.source.options.type !== 'sqlite' || this.source.options.database === ':memory:') {
+      this.logger.warn('Audit storage unavailable: requires a file-backed SQLite database');
+      return;
+    }
     const storage = new DataSource({
       type: 'sqlite',
       database: this.source.options.database,
@@ -89,114 +73,50 @@ export class AuditService
       synchronize: false,
       migrationsRun: false,
       logging: false,
-      busyTimeout: 10,
+      busyTimeout: SQLITE_BUSY_TIMEOUT_MS,
     });
     try {
       await storage.initialize();
       await storage.query(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
       await storage.query('PRAGMA synchronous = FULL');
-      this.storage = storage;
+      this.state.storage = storage;
       await this.cleanup();
-    } catch {
+    } catch (error) {
+      // Only the SQLite code or error name: the driver message may contain the database path.
+      this.logger.error(
+        `Audit storage initialization failed: ${
+          sqliteErrorCode(error) ?? (error instanceof Error ? error.name : 'unknown error')
+        }`,
+      );
       if (storage.isInitialized) await storage.destroy().catch(() => undefined);
     }
   }
 
   async onModuleDestroy(): Promise<void> {
-    this.stopping = true;
-    if (this.subscribed) this.source.subscribers.splice(this.source.subscribers.indexOf(this), 1);
-    while (this.pending || this.cleaning || this.activeReads) await new Promise((resolve) => setTimeout(resolve, 5));
+    // New writes are refused from here on; writes already queued are stored, within a time limit.
+    this.state.stopping = true;
+    const drainDeadline = Date.now() + this.shutdownDrainMs;
+    while (this.state.pending || this.state.cleaning || this.state.activeReads) {
+      if (!this.state.drainExpired && Date.now() >= drainDeadline) this.state.drainExpired = true;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
     const storage = this.storage;
-    this.storage = undefined;
+    this.state.storage = undefined;
     if (storage?.isInitialized) await storage.destroy().catch(() => undefined);
-  }
-
-  async recordSso(event: SsoAuditEvent): Promise<PluginAuditReceipt> {
-    try {
-      const snapshot = projectSsoAuditEvent(event);
-      if (!snapshot) return { status: 'unavailable' };
-      return await this.recordSnapshot({
-        domain: 'sso',
-        pluginId: null,
-        action: snapshot.action,
-        operationId: snapshot.operationId,
-        actorId: snapshot.actorId,
-        authenticationMethod: snapshot.authenticationMethod,
-        apiTokenId: snapshot.apiTokenId ?? null,
-        outcome: 'succeeded',
-        subjectType: snapshot.subject.type,
-        subjectId: snapshot.subject.id,
-        ipAddress: null,
-        userAgent: null,
-        details: snapshot.details,
-      });
-    } catch {
-      return { status: 'unavailable' };
-    }
-  }
-
-  async recordIdentity(event: IdentityAuditEvent): Promise<PluginAuditReceipt> {
-    try {
-      const snapshot = projectIdentityAuditEvent(event);
-      if (!snapshot) return { status: 'unavailable' };
-      return await this.recordSnapshot({
-        domain: 'identity',
-        pluginId: null,
-        action: snapshot.action,
-        operationId: snapshot.operationId,
-        actorId: snapshot.actorId,
-        authenticationMethod: snapshot.authenticationMethod,
-        apiTokenId: snapshot.apiTokenId,
-        outcome: snapshot.outcome,
-        subjectType: snapshot.subjectType,
-        subjectId: snapshot.subjectId,
-        ipAddress: snapshot.ipAddress,
-        userAgent: snapshot.userAgent,
-        details: snapshot.details,
-      });
-    } catch {
-      return { status: 'unavailable' };
-    }
-  }
-
-  async recordAttractap(event: AttractapAuditEvent): Promise<void> {
-    try {
-      const snapshot = projectAttractapAuditEvent(event);
-      if (!snapshot) return;
-      await this.recordSnapshot({
-        domain: 'attractap',
-        pluginId: 'core',
-        action: `attractap.${snapshot.action}`,
-        operationId: randomUUID(),
-        actorId: snapshot.actorId,
-        authenticationMethod: snapshot.authenticationMethod,
-        apiTokenId: snapshot.apiTokenId ?? null,
-        outcome: 'succeeded',
-        subjectType: snapshot.action.startsWith('card.')
-          ? 'attractap.card'
-          : (snapshot.subjectType ?? 'attractap.reader'),
-        subjectId: snapshot.subjectId,
-        ipAddress: null,
-        userAgent: null,
-        details: snapshot.details,
-      });
-    } catch {
-      /* Audit persistence must not affect Attractap operations. */
-    }
   }
 
   @Interval(60 * 60 * 1000)
   async cleanup(): Promise<void> {
     const storage = this.storage;
-    if (this.stopping || !storage?.isInitialized || this.cleaning) return;
-    this.cleaning = true;
+    if (this.state.stopping || !storage?.isInitialized || this.state.cleaning) return;
+    this.state.cleaning = true;
     try {
       const config = await readAuditSettings(this.settings);
-      const cutoff = this.sqliteDate(this.cutoff(config.retention_days));
-      while (!this.stopping) {
-        const hasOverflow = await this.hasPasswordPolicyOverflow();
-        const count = await this.serializeStorageWrite(async () => {
-          if (this.stopping) return 0;
+      const cutoff = this.store.sqliteDate(auditCutoff(config.retention_days));
+      while (!this.state.stopping) {
+        const hasOverflow = await hasPasswordPolicyOverflow(storage);
+        const count = await this.store.serializeStorageWrite(async () => {
+          if (this.state.stopping) return 0;
           return storage.transaction(async (manager) => {
             const rows = await manager.query<{ id: number }[]>(
               'SELECT id FROM audit_log WHERE at < ? ORDER BY at, id LIMIT 1000',
@@ -225,52 +145,17 @@ export class AuditService
     } catch {
       // Retention must not affect domain operations or expose database errors.
     } finally {
-      this.cleaning = false;
+      this.state.cleaning = false;
     }
   }
 
-  /** Defers billing audit writes until the supplied transaction has committed. */
-  recordBillingTransactionAfterCommit(
-    event: BillingTransactionAuditEvent,
-    transactionManager?: EntityManager,
-  ): Promise<PluginAuditReceipt> {
-    const queryRunner = transactionManager?.queryRunner;
-    if (!queryRunner?.isTransactionActive) return this.recordBillingTransaction(event);
-    return new Promise((resolve) => {
-      const events = this.billingEvents.get(queryRunner) ?? [];
-      events.push({ event, transactionDepth: this.transactionDepth(queryRunner), resolve });
-      this.billingEvents.set(queryRunner, events);
-    });
+  /** The AuditRecorder port; see AuditStorage.record. */
+  async record(event: AuditEvent, manager?: EntityManager, options?: AuditRecordOptions): Promise<PluginAuditReceipt> {
+    return this.store.record(event, manager, options);
   }
 
-  afterTransactionCommit({ queryRunner }: TransactionCommitEvent): void {
-    // Nested transaction commits release a savepoint; wait for the owning transaction.
-    if (queryRunner.isTransactionActive) {
-      const transactionDepth = this.transactionDepth(queryRunner);
-      for (const event of this.billingEvents.get(queryRunner) ?? []) {
-        event.transactionDepth = Math.min(event.transactionDepth, transactionDepth);
-      }
-      return;
-    }
-    const events = this.billingEvents.get(queryRunner);
-    if (!events) return;
-    this.billingEvents.delete(queryRunner);
-    for (const { event, resolve } of events) void this.recordBillingTransaction(event).then(resolve);
-  }
-
-  afterTransactionRollback({ queryRunner }: TransactionRollbackEvent): void {
-    const events = this.billingEvents.get(queryRunner);
-    if (!events) return;
-    const transactionDepth = this.transactionDepth(queryRunner);
-    const retainedEvents = events.filter((event) => event.transactionDepth <= transactionDepth);
-    for (const event of events) {
-      if (event.transactionDepth > transactionDepth) event.resolve({ status: 'unavailable' });
-    }
-    if (retainedEvents.length) this.billingEvents.set(queryRunner, retainedEvents);
-    else this.billingEvents.delete(queryRunner);
-  }
-
-  protected transactionDepth(queryRunner: QueryRunner): number {
-    return (queryRunner as QueryRunner & { transactionDepth: number }).transactionDepth;
+  /** Runs a read on the audit connection; shutdown waits for it. */
+  async read<T>(query: (storage: DataSource) => Promise<T>): Promise<T> {
+    return this.store.read(query);
   }
 }

@@ -60,6 +60,10 @@ export function registerAttractapFirmwareHandlerFixture() {
     (handler as any).attractapService = mockAttractapService;
     (handler as any).firmwareService = mockFirmwareService;
     (handler as any).metricsService = mockMetricsService;
+    (handler as any).pairingService = {
+      issueBindingTicket: jest.fn(() => 'ticket-1'),
+      claimAutoPrompt: jest.fn(() => true),
+    };
     (handler as any).uiHandler = { onFirmwareInfo: jest.fn().mockResolvedValue(undefined) };
 
     socket = makeSocket();

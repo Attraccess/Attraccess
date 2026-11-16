@@ -8,7 +8,7 @@ import {
 } from '../../api/client';
 import { outputBehavior } from '../../../../channel-behavior';
 import { type Channel } from '../model';
-import { readConfiguration } from './useFrontPanel';
+import { readConfiguration } from './workingCopy';
 import type { useFrontPanelInputs } from './useFrontPanelInputs';
 
 export function useFrontPanelApply(model: ReturnType<typeof useFrontPanelInputs>) {

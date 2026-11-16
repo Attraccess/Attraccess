@@ -1,5 +1,6 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { z } from 'zod';
+import { EntityManager } from 'typeorm';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AUDIT_DOMAIN_QUERY_PATTERN, CORE_AUDIT_DOMAINS } from './policies/domains';
 
@@ -26,11 +27,15 @@ export const auditSettingsSchema = z
   .strict();
 export type AuditSettings = z.infer<typeof auditSettingsSchema>;
 
-export async function readAuditSettings(store: SettingsStoreService): Promise<AuditSettings> {
+/** With a transaction, uncached settings are read through it instead of the main connection. */
+export async function readAuditSettings(
+  store: SettingsStoreService,
+  transaction?: EntityManager,
+): Promise<AuditSettings> {
   try {
     const [enabled, domains, pluginDomainsDisabled, retention] = await Promise.all(
       ['enabled', 'domains', 'plugin_domains_disabled', 'retention_days'].map((key) =>
-        store.getPlainSetting('audit', key),
+        store.getPlainSetting('audit', key, transaction),
       ),
     );
     const parse = (value: string | null | undefined) => (value == null ? undefined : JSON.parse(value));

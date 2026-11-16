@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AttractapGateway } from './websocket.gateway';
-import { ReaderDeletedEvent, ReaderUpdatedEvent } from '../events';
+import { ReaderDeletedEvent, ReaderTimeZoneChangedEvent, ReaderUpdatedEvent } from '../events';
 import {
   ResourceSessionStartedEvent,
   ResourceUsageSessionEndedEvent,
@@ -31,6 +31,14 @@ export class WebSocketEventService {
   public async onReaderUpdated(event: ReaderUpdatedEvent) {
     this.logger.debug('Got reader updated event');
     this.attractapGateway.sendResourceList(event.reader.id);
+  }
+
+  /** Session start times in the list carry the reader zone's offsets, so a new zone needs a new list. */
+  @OnEvent(ReaderTimeZoneChangedEvent.EVENT_NAME)
+  public async onReaderTimeZoneChanged(event: ReaderTimeZoneChangedEvent) {
+    await this.attractapGateway.sendResourceList(event.readerId).catch((error) => {
+      this.logger.error(`Could not resend the resource list of reader ${event.readerId}: ${(error as Error).message}`);
+    });
   }
 
   @OnEvent(ReaderDeletedEvent.EVENT_NAME)

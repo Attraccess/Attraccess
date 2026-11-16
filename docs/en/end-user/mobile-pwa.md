@@ -1,4 +1,5 @@
 # Mobile Usage (PWA)
+<!-- llms-description: How to install Attraccess as a Progressive Web App on iOS and Android, with updates and offline support. -->
 
 Attraccess is a Progressive Web App (PWA). This means you can install it on your phone or tablet and use it like a native app – no app store required.
 
@@ -49,6 +50,16 @@ Once installed, you can use Attraccess on your phone just like on a desktop:
 - Manage your account
 
 The interface adapts to smaller screens automatically.
+
+## App Updates
+
+When a new version of Attraccess is available, the app downloads it in the background while you keep working:
+
+1. A short notice tells you an update is downloading.
+2. A small circular progress indicator appears in the bottom-right corner. Drag it (or use the arrow keys while it is focused) to any other corner if it is in the way; Attraccess remembers your choice.
+3. When the download is done, the indicator turns into an **Update ready** card. Choose **Reload now** to switch to the new version, or **Later** to shrink it to a small button you can tap again.
+
+The update is also applied automatically when it is safe to do so: when you switch to another tab or app, after 5 minutes without any activity, or when you reload or close the page. Unsaved input on a page can be lost when this happens.
 
 ## Offline Support
 

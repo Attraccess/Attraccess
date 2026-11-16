@@ -1,4 +1,5 @@
 # Email / SMTP Configuration
+<!-- llms-description: Configure the SMTP email server Attraccess uses for verification, password resets and invitations, with provider examples and Mailpit testing. -->
 
 Attraccess needs an email server (SMTP) to send emails – for example, for account verification, password resets and invitations.
 

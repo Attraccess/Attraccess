@@ -59,31 +59,59 @@ void Application::setupApiCallbacks()
   this->api.setCardAuthenticationDetailsResponseCallback(
       [this](API::CardAuthenticationDetailsResponse response) {
 #ifdef HAS_LVGL_DISPLAY
-        if (!this->cardAuthenticationPending || this->unlocked) return;
-#endif
-        if (response.error.length() > 0) {
-          State::setUserLanguage(false);
-          this->logger.errorf("Authentication failed: %s",
-                              response.error.c_str());
-          this->beeper.errorBeep();
-          this->nfc.enableCardDetection();
-#ifdef HAS_LVGL_DISPLAY
-          Display::asyncCall([](void *data) { static_cast<Application *>(data)->finishCardAuthentication(false); }, this);
-#else
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
-#endif
+        if (!this->cardAuthenticationPending || this->unlocked) {
+          // A verified card the reader no longer waits for (its sign-in timed out or was given up): nobody is
+          // signed in, but the server opened a card session and would keep sending that user's rows. End it like a
+          // sign-out, decided on the LVGL task: a new tap sets cardAuthenticationPending before it takes the LVGL
+          // lock and sends its CARD_DETECTED only after it, so the decision either sees that tap (and leaves its
+          // verification alone) or goes out before it. Not while another card flow (enrollment, reset, supervision,
+          // mass introduction) owns the reader: ending the login would abort that flow's card conversation.
+          if (!this->unlocked && response.error.empty() && !response.cardSessionId.empty()) {
+            Display::asyncCall(
+                [](void *data) {
+                  auto *self = static_cast<Application *>(data);
+                  const bool otherCardFlow = self->state == APPLICATION_STATE_ENROLLMENT || self->state == APPLICATION_STATE_RESET ||
+                                             self->state == APPLICATION_STATE_SUPERVISION ||
+                                             self->state == APPLICATION_STATE_MASS_INTRODUCTION;
+                  if (!self->cardAuthenticationPending && !self->unlocked && !otherCardFlow) self->endReaderLogin();
+                },
+                this);
+          }
           return;
         }
-
-        if (response.keyLen != 16) {
+#endif
+        if (response.error.length() > 0) {
+          // The server did not verify the card: never unlock, say why on the display.
           State::setUserLanguage(false);
-          this->logger.error("Invalid key bytes provided");
+          // Same line as the generic error path: lab tests read the server's verdict from it.
+          this->logger.error((std::string("Reader reported error: ") + response.error).c_str());
           this->beeper.errorBeep();
+#ifdef HAS_WS2812_LED
+          this->cardRejectedLedPending = true;
+#endif
           this->nfc.enableCardDetection();
 #ifdef HAS_LVGL_DISPLAY
-          Display::asyncCall([](void *data) { static_cast<Application *>(data)->finishCardAuthentication(false); }, this);
-#else
-          this->externalState = EXTERNAL_STATE_AUTHENTICATE_CARD;
+          struct Payload {
+            Application *self;
+            FirmwareI18n::Text message;
+          };
+          // Unknown, inactive and unverifiable cards get one answer (as a wrong-key card did on
+          // firmware 1.x), so a copied UID does not reveal whether it belongs to a member. Other
+          // reasons (busy, card pulled, update needed, ...) are the reader's to fix and are named.
+          const bool rejectedCard = response.error == "CARD_AUTHENTICATION_FAILED" ||
+                                    response.error == "CARD_NOT_FOUND" || response.error == "CARD_NOT_ACTIVE";
+          auto *payload = new Payload{this, rejectedCard ? FirmwareI18n::Text(FirmwareI18n::Message::PleaseTapAValidNfcCard)
+                                                         : FirmwareI18n::readerError(response.error)};
+          Display::asyncCall(
+              [](void *data) {
+                auto *payload = static_cast<Payload *>(data);
+                if (payload->self->cardAuthenticationPending && !payload->self->unlocked) {
+                  payload->self->finishCardAuthentication(false);
+                  payload->self->showSignInFailed(payload->message);
+                }
+                delete payload;
+              },
+              payload);
 #endif
           return;
         }
@@ -96,7 +124,7 @@ void Application::setupApiCallbacks()
         this->currentProjectsUser = response.username;
         // Through the screen, so the refresh keeps the active search and stays the request it awaits.
         lv_lock();
-        Display::resourceDetailsScreen.refreshProjects();
+        Display::projectSelectScreen.refreshProjects();
         lv_unlock();
 #endif
 
@@ -141,13 +169,9 @@ void Application::setupErrorCallbacks()
           p->self->handleFormsCancel();
           Display::resourceDetailsScreen.hideActionProgress();
           if (p->enabled) {
-            Display::showInsufficientBalancePopup(
-                [self = p->self](uint32_t amountCents) {
-                  self->api.requestBillingTopup(amountCents);
-                },
-                []() {});
+            p->self->openTopUp();
           } else {
-            Display::showErrorPopup(FirmwareI18n::Message::Error, FirmwareI18n::readerError("INSUFFICIENT_BALANCE"));
+            p->self->showStatus(StatusScreen::warning(FirmwareI18n::Message::InsufficientBalance, FirmwareI18n::readerError("INSUFFICIENT_BALANCE")));
           }
           delete p;
         },
@@ -155,54 +179,30 @@ void Application::setupErrorCallbacks()
   });
 #endif
 
-  // Generic error fallback for all other errors
-  this->api.setErrorCallback([this](const char *title, const char *message) {
-    this->beeper.errorBeep();
-
+  // Errors the server reports for events that have no result callback of their own. `eventType`
+  // is the event that carried the error; only errors that belong to something on screen get UI.
+  this->api.setErrorCallback([this](const char *eventType, const char *code) {
 #ifdef HAS_LVGL_DISPLAY
-    if (this->state == APPLICATION_STATE_LOCKED)
-#else
-    if (this->state == APPLICATION_STATE_WAIT_FOR_CARD)
-#endif
-    {
-      this->nfc.enableCardDetection();
-    }
-
-#ifdef HAS_LVGL_DISPLAY
-    // Ensure UI operations on LVGL thread
+    this->logger.errorf("Reader error on %s: %s", eventType, code);
     struct ErrPayload {
       Application *self;
-      FirmwareI18n::Text t;
-      FirmwareI18n::Text m;
+      std::string eventType;
+      std::string code;
     };
-    ErrPayload *p = new ErrPayload();
-    if (!p)
-      return;
-    p->self = this;
-    p->t = FirmwareI18n::Message::Error;
-    this->logger.errorf("Reader error %s: %s", title, message);
-    p->m = FirmwareI18n::readerError(message);
+    auto *p = new ErrPayload{this, eventType, code};
     Display::asyncCall(
         [](void *u) {
-          auto *pl = (ErrPayload *)u;
-          if (!pl || !pl->self) {
-            if (pl)
-              delete pl;
-            return;
-          }
-          if (pl->self->cardAuthenticationPending) pl->self->finishCardAuthentication(false);
-          pl->self->finishReaderAction(false);
-          pl->self->handleFormsCancel();
-          Display::showErrorPopup(pl->t, pl->m);
-          if (pl && pl->self) {
-            pl->self->pendingActionType = PENDING_ACTION_NONE;
-            pl->self->hasPendingFormRequest = false;
-            pl->self->formFlowSubmitted = false;
-            Display::resourceDetailsScreen.hideFormsModal();
-          }
+          auto *pl = static_cast<ErrPayload *>(u);
+          pl->self->handleReaderError(pl->eventType, pl->code);
           delete pl;
         },
         p);
+#else
+    this->logger.errorf("Reader error on %s: %s", eventType, code);
+    this->beeper.errorBeep();
+    if (this->state == APPLICATION_STATE_WAIT_FOR_CARD) {
+      this->nfc.enableCardDetection();
+    }
 #endif
   });
 
@@ -221,7 +221,7 @@ void Application::setupErrorCallbacks()
 void Application::setupActionCallbacks()
 {
 #ifdef HAS_LVGL_DISPLAY
-  // Generic action result handling: stop overlay and show success toast
+  // Action results: the completion, billing or failure screen, or the error on the button.
   this->api.setActionResultCallback([this](const API::ActionResult &result) {
     struct Payload { Application *self; API::ActionResult result; };
     auto *payload = new Payload{this, result};
@@ -229,6 +229,14 @@ void Application::setupActionCallbacks()
       auto *payload = static_cast<Payload *>(data);
       auto *self = payload->self;
       const auto &result = payload->result;
+      // While a usage form is open the server refuses its fields or pages as a START error
+      // without a request id, also in stop flows: that is the form failing, not the action.
+      if (self->unlocked && self->hasPendingFormRequest && !result.success && self->api.isCurrentResourceAction(result.requestId) &&
+          (result.type == "START_RESOURCE_USAGE_SESSION" || result.type == "STOP_RESOURCE_USAGE_SESSION")) {
+        self->handleFormFlowError(result);
+        delete payload;
+        return;
+      }
       if (self->unlocked && self->pendingUiAction == result.type && self->api.isCurrentResourceAction(result.requestId)) {
         if (result.success && result.type == "STOP_RESOURCE_USAGE_SESSION" &&
             self->pendingActionType == PENDING_ACTION_STOP_SESSION && result.hasDuration &&
@@ -237,24 +245,24 @@ void Application::setupActionCallbacks()
           delete payload;
           return;
         }
+        const uint32_t resourceId = self->pendingUiResourceId;
+        const std::string resourceName = self->resourceNameOf(resourceId);
+        const bool returnToList = self->returnToListAfterAction;
         self->finishReaderAction(result.success);
         if (result.success) {
+          self->completedResourceName = resourceName;
           self->onActionResult(result.type);
           if (!result.billingTotal.empty()) {
             self->restartSessionTimeout();
-            Display::showBillingSummary(result.billingTotal);
+            self->billingSummaryShown = true;
+            self->showStatus(StatusScreen::billing(FirmwareI18n::Text::literal(result.billingTotal) /* i18n-data: Server-supplied formatted billing total; preserve exact amount and currency. */,
+                                                   FirmwareI18n::Text::literal(resourceName) /* i18n-data: Server-supplied resource name; preserve exact contents. */),
+                             returnToList);
           }
         }
         else {
           self->handleFormsCancel();
-          if (result.error == "INSUFFICIENT_BALANCE" && result.sumUpEnabled) {
-            Display::showInsufficientBalancePopup([self](uint32_t cents) { self->api.requestBillingTopup(cents); }, [] {});
-          } else if (result.error == "START_BLOCKED" && !result.blockTitle.empty()) {
-            // The plugin's own words, and only that: no generic error popup on top.
-            Display::showReasonPopup(result.blockTitle, result.blockBody);
-          } else {
-            Display::showErrorPopup(FirmwareI18n::Message::ActionFailed, result.error.empty() ? FirmwareI18n::Message::PleaseTryAgain : FirmwareI18n::readerError(result.error));
-          }
+          self->reportActionFailure(result, resourceId, returnToList);
         }
       }
       delete payload;
@@ -277,8 +285,11 @@ void Application::setupActionCallbacks()
     this->enrollPhase = ENROLL_PHASE_NONE;
     this->resetPhase = RESET_PHASE_NONE;
     this->cardAuthenticationPending = false;
-    this->enrollKeyMaterialReady = false;
+    this->enrollSucceeded = false;
     this->enrollErrorPending = false;
+    this->resetSucceeded = false;
+    this->resetErrorPending = false;
+    this->cardRelay.cancel();
 #endif
     this->externalState = EXTERNAL_STATE_FIRMWARE_UPDATE;
     this->availableFirmwareVersion = availableVersion;
@@ -311,19 +322,26 @@ void Application::setupDisplayCallbacks()
         this->handleResourceDetailsButtonClick(evt);
       });
 
-  Display::resourceDetailsScreen.setProjectsPageRequestCallback(
-      [this](uint32_t page, const std::string &search) { return this->requestProjectsPage(page, search); });
   Display::resourceDetailsScreen.setProjectSelectionCallback(
       [this](uint32_t projectId, const std::string &projectName) {
         this->handleProjectSelection(projectId, projectName);
       });
-  Display::resourceDetailsScreen.setFormPageNextCallback(
+  Display::resourceDetailsScreen.setOpenProjectsCallback([this]() { this->openProjects(); });
+  Display::projectSelectScreen.setProjectsPageRequestCallback(
+      [this](uint32_t page, const std::string &search) { return this->requestProjectsPage(page, search); });
+  Display::projectSelectScreen.setCallbacks(
+      [this](uint32_t projectId, const std::string &projectName) {
+        this->handleProjectSelection(projectId, projectName);
+        Display::returnFromTransient();
+      },
+      []() { Display::returnFromTransient(); });
+  Display::formsScreen.setFormPageNextCallback(
       [this](const API::FormPageSubmission &page) {
         this->handleFormPageNext(page);
       });
-  Display::resourceDetailsScreen.setFormPageBackCallback(
+  Display::formsScreen.setFormPageBackCallback(
       [this]() { this->handleFormPageBack(); });
-  Display::resourceDetailsScreen.setFormsCancelCallback(
+  Display::formsScreen.setFormsCancelCallback(
       [this]() { this->handleFormsCancel(); });
 
   Display::setPinScreen.setOnPinConfirmedCallback(

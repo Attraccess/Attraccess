@@ -1,4 +1,5 @@
 # Forms
+<!-- llms-description: Introduces forms collected from users at points of resource use, including when forms are shown, field types and submissions. -->
 
 Forms let you collect information from users when they interact with a resource. Each form is attached to a specific resource and can be required at different points during a usage session.
 

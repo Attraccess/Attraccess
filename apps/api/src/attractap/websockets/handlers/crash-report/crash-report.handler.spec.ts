@@ -13,7 +13,7 @@ describe('AttractapCrashReportHandler', () => {
   };
   let mockAttractapService: { createCrashReport: jest.Mock };
   let mockMetricsService: { attractapCrashReportsTotal: { inc: jest.Mock } };
-  let mockAudit: { recordAttractap: jest.Mock };
+  let mockAudit: { record: jest.Mock };
 
   beforeEach(() => {
     handler = Object.create(AttractapCrashReportHandler.prototype);
@@ -39,7 +39,7 @@ describe('AttractapCrashReportHandler', () => {
     mockMetricsService = {
       attractapCrashReportsTotal: { inc: jest.fn() },
     };
-    mockAudit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+    mockAudit = { record: jest.fn().mockResolvedValue(undefined) };
 
     (handler as any).attractapService = mockAttractapService;
     (handler as any).metricsService = mockMetricsService;
@@ -136,11 +136,11 @@ describe('AttractapCrashReportHandler', () => {
 
       expect(mockAttractapService.createCrashReport).toHaveBeenCalledWith(42, payload);
       expect(mockMetricsService.attractapCrashReportsTotal.inc).toHaveBeenCalled();
-      expect(mockAudit.recordAttractap).toHaveBeenCalledWith({
-        action: 'reader.crash_reported',
-        actorId: null,
-        authenticationMethod: null,
-        subjectId: 42,
+      expect(mockAudit.record).toHaveBeenCalledWith({
+        domain: 'attractap',
+        action: 'attractap.reader.crash_reported',
+        actor: { id: null, authenticationMethod: null },
+        subject: { type: 'attractap.reader', id: 42 },
         details: { source: 'reader-websocket', resetReason: 'PANIC', hasCoredump: false },
       });
       expect(mockSocket.sendMessage).toHaveBeenCalledWith(
@@ -192,8 +192,9 @@ describe('AttractapCrashReportHandler', () => {
 
       await handler.handleCrashReport(mockSocket as any, { payload } as AttractapEvent['data']);
 
-      expect(mockAudit.recordAttractap).toHaveBeenCalledWith(
+      expect(mockAudit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'attractap',
           details: { source: 'reader-websocket', resetReason: 'UNKNOWN', hasCoredump: false },
         }),
       );

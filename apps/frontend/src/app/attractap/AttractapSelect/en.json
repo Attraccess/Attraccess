@@ -1,0 +1,21 @@
+{
+  "loading": "Loading readers...",
+  "empty": {
+    "noConnectedReader": {
+      "title": "No paired reader connected",
+      "description": "No paired Attractap is connected right now. Readers must be paired before they can be used here; an administrator pairs them on the Attractap Readers page under \"Not paired\". If a paired reader is switched off, switch it on and wait until it is online."
+    },
+    "firmwareUpdateRequired": {
+      "title": "Firmware update required",
+      "description": "The connected Attractap readers need firmware 2.0.0 or later to enroll and reset RFID cards. They are offered the update automatically."
+    },
+    "noCardEnrollment": {
+      "title": "No suitable reader",
+      "description": "None of the connected Attractap readers can enroll or reset RFID cards."
+    },
+    "notAllowed": {
+      "title": "No reader allowed",
+      "description": "None of the connected Attractap readers is allowed to enroll or reset RFID cards. An administrator can allow readers under Settings → RFID card enrollment."
+    }
+  }
+}

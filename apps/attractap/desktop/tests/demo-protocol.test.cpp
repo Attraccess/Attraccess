@@ -126,7 +126,7 @@ int main(int argc, char **argv)
     // The first card response is queued while the previous default is still active.
     State::setDefaultLanguage("de");
     assert(DemoStore::addCard("11223344", DemoStore::UserRole::INTRODUCED, "Literal Müller"));
-    exchange(R"({"data":{"type":"REQUEST_CARD_AUTHENTICATION_DATA","payload":{"uid":"11223344","resourceId":1}}})");
+    exchange(R"({"data":{"type":"CARD_DETECTED","payload":{"purpose":"tap","uid":"11223344","resourceId":1}}})");
     assert(received["data"]["payload"]["language"] == "en");
     assert(resourceList["data"]["payload"]["readerName"] == "Demo Device");
     assert(resourceList["data"]["payload"]["resources"][0]["name"] == "CNC Router");
@@ -138,7 +138,7 @@ int main(int argc, char **argv)
     assert(DemoStore::addCard("C3C3C3C3", DemoStore::UserRole::INTRODUCED, "Cid"));
     assert(DemoStore::addCard("D4D4D4D4", DemoStore::UserRole::ADMIN, "Dee"));
     const auto tap = [&](const char *uid) {
-        exchange((std::string(R"({"data":{"type":"REQUEST_CARD_AUTHENTICATION_DATA","payload":{"uid":")") + uid + R"(","resourceId":2}}})").c_str());
+        exchange((std::string(R"({"data":{"type":"CARD_DETECTED","payload":{"purpose":"tap","detectionId":1,"uid":")") + uid + R"(","resourceId":2}}})").c_str());
     };
     const auto printer = [&]() { return resourceList["data"]["payload"]["resources"][1]; };
     const auto startPrinter = [&]() {

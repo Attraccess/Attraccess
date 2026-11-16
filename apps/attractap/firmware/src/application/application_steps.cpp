@@ -22,12 +22,14 @@ void Application::setupUiCallbacks()
       queued = false; // updates that land from now on queue a new refresh
       Display::resourceDetailsScreen.refreshUiSlots();
       Display::resourceListScreen.refreshUiSlots();
+      Display::lockscreen.refreshUiSlots();
     }, nullptr);
   });
 
   ui::setSlotsExpiredCallback([] {
     Display::resourceDetailsScreen.refreshUiSlots();
     Display::resourceListScreen.refreshUiSlots();
+    Display::lockscreen.refreshUiSlots();
   });
 
   this->api.setUiStepRequestCallback([this](const ui::StepRequest &step) {
@@ -98,7 +100,7 @@ void Application::rejectUiStep(const ui::StepRequest &step)
     return;
   // That START will never be answered now: end its pause and progress instead of waiting for the watchdog.
   this->clearPendingStartLocally();
-  Display::showErrorPopup(FirmwareI18n::Message::ActionFailed, FirmwareI18n::Message::PleaseTryAgain);
+  this->showStatus(StatusScreen::error(FirmwareI18n::Message::ActionFailed, FirmwareI18n::Message::PleaseTryAgain));
 }
 
 void Application::closeUiStep()

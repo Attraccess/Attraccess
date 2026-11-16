@@ -1,5 +1,8 @@
 import { Button } from '@attraccess/plugins-frontend-ui';
 import { useParams } from 'react-router-dom';
+import { useCallback, useMemo, useRef } from 'react';
+import type { FlowOwner } from './flowOwner';
+import { flowOwnerKey } from './flowOwner';
 import { Background, BackgroundVariant, Controls, ReactFlow, Panel, SelectionMode } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ButtonGroup, Spinner } from '@heroui/react';
@@ -11,6 +14,7 @@ import {
   LayoutGridIcon,
   LogsIcon,
   PlusIcon,
+  RadioTowerIcon,
   SaveIcon,
   UploadIcon,
 } from 'lucide-react';
@@ -20,18 +24,33 @@ import { LogViewer } from './logViewer';
 import { VariablesModal } from './variablesModal';
 import { FlowNodeQuerySelection } from './FlowNodeQuerySelection';
 import { useFlowEditor } from './canvas/useFlowEditor';
+import { FlowMqttExplorer } from './mqttExplorer';
+import { editorHoldsFlowNodes, useMqttNodeUses } from './mqttExplorer/mqttNodes';
+import { useRememberedOpen } from './mqttExplorer/useRememberedOpen';
+import { useAuth } from '../../../../hooks/useAuth';
+import { MQTT_EXPLORER_PERMISSION } from '../../../mqtt/explorer/permission';
+import { useMqttServiceMqttServersGetAll } from '@attraccess/react-query-client';
 
 // Efficient comparison functions to replace expensive JSON.stringify operations
 
 function FlowsPageInner() {
   const model = useFlowEditor();
+  const { hasPermission } = useAuth();
+  const canUseMqttExplorer = hasPermission(MQTT_EXPLORER_PERMISSION);
+  const { data: mqttServers } = useMqttServiceMqttServersGetAll(undefined, { enabled: canUseMqttExplorer });
+  const [mqttExplorerOpen, setMqttExplorerOpen] = useRememberedOpen();
+  const showMqttExplorer = canUseMqttExplorer && (mqttServers?.length ?? 0) > 0;
+  // Stable props, so the explorer panel does not re-render on every canvas change (e.g. each drag frame).
+  const mqttExplorerToggleRef = useRef<HTMLButtonElement>(null);
+  const closeMqttExplorer = useCallback(() => setMqttExplorerOpen(false), [setMqttExplorerOpen]);
+  const mqttNodes = useMqttNodeUses(model.nodes);
 
   return (
     <div className="h-full w-full flex flex-col">
       <div className="flex flex-row w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-border">
         <NodeCatalogPanel
           ref={model.nodeCatalogRef}
-          resourceId={Number(model.resourceId)}
+          owner={model.owner}
           onSelect={model.addStartNode}
           tNodeTranslations={model.tNodeTranslations}
         />
@@ -74,7 +93,7 @@ function FlowsPageInner() {
             edgeTypes={model.edgeTypes}
           >
             <Controls />
-            <FlowNodeQuerySelection key={model.resourceId} nodes={model.nodes} setNodes={model.setNodes} />
+            <FlowNodeQuerySelection key={flowOwnerKey(model.owner)} nodes={model.nodes} setNodes={model.setNodes} />
             <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
 
             <Panel position="top-right" className="flex flex-row flex-wrap gap-2">
@@ -123,11 +142,7 @@ function FlowsPageInner() {
               >
                 <DownloadIcon />
               </Button>
-              <LogViewer
-                resourceId={Number(model.resourceId)}
-                confettiEnabled={model.confettiEnabled}
-                onConfettiEnabledChange={model.setConfettiEnabled}
-              >
+              <LogViewer confettiEnabled={model.confettiEnabled} onConfettiEnabledChange={model.setConfettiEnabled}>
                 {(open) => (
                   <Button isIconOnly onPress={open} aria-label={model.t('actions.logs')}>
                     <LogsIcon />
@@ -135,13 +150,31 @@ function FlowsPageInner() {
                 )}
               </LogViewer>
 
-              <VariablesModal resourceId={Number(model.resourceId)}>
-                {(open) => (
-                  <Button isIconOnly onPress={open} aria-label={model.t('actions.variables')}>
-                    <BracesIcon />
-                  </Button>
-                )}
-              </VariablesModal>
+              {/* Variables are managed through a resource; a global flow has none to open them for. */}
+              {model.owner.kind === 'resource' && (
+                <VariablesModal resourceId={model.owner.resourceId}>
+                  {(open) => (
+                    <Button isIconOnly onPress={open} aria-label={model.t('actions.variables')}>
+                      <BracesIcon />
+                    </Button>
+                  )}
+                </VariablesModal>
+              )}
+
+              {showMqttExplorer && (
+                <Button
+                  ref={mqttExplorerToggleRef}
+                  isIconOnly
+                  // Closed it looks like its neighbours; open it stands out as switched on.
+                  variant={mqttExplorerOpen ? 'outline' : undefined}
+                  onPress={() => setMqttExplorerOpen(!mqttExplorerOpen)}
+                  aria-label={model.t('actions.mqttExplorer')}
+                  aria-pressed={mqttExplorerOpen}
+                  data-cy="flow-mqtt-explorer-toggle"
+                >
+                  <RadioTowerIcon />
+                </Button>
+              )}
 
               <Button isIconOnly onPress={model.layout} isDisabled={model.isFlowLoading}>
                 <LayoutGridIcon />
@@ -174,17 +207,40 @@ function FlowsPageInner() {
             </div>
           )}
         </div>
+        {showMqttExplorer && (
+          <FlowMqttExplorer
+            isOpen={mqttExplorerOpen}
+            onClose={closeMqttExplorer}
+            mqttNodes={mqttNodes}
+            returnFocusRef={mqttExplorerToggleRef}
+            nodesReady={editorHoldsFlowNodes({
+              isError: model.isFlowError,
+              loaded: model.originalFlowData,
+              editorNodeCount: model.nodes.length,
+            })}
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+/** The flow editor for any owner: a resource's own flow or a global flow. */
+export function FlowEditor({ owner }: { owner: FlowOwner }) {
+  const ownerIdentity = flowOwnerKey(owner);
+  // Memoised on the identity: children key their queries and effects on the owner object.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the identity string covers every field of the owner.
+  const stableOwner = useMemo(() => owner, [ownerIdentity]);
+
+  return (
+    <FlowProvider key={ownerIdentity} owner={stableOwner}>
+      <FlowsPageInner />
+    </FlowProvider>
   );
 }
 
 export default function FlowsPage() {
   const { id: resourceId } = useParams();
 
-  return (
-    <FlowProvider key={resourceId} resourceId={Number(resourceId)}>
-      <FlowsPageInner />
-    </FlowProvider>
-  );
+  return <FlowEditor owner={{ kind: 'resource', resourceId: Number(resourceId) }} />;
 }

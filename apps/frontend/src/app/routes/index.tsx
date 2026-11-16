@@ -14,12 +14,18 @@ import { BillingDashboardPage } from '../billing/dashboard/index';
 import ChangelogPage from '../changelog/ChangelogPage';
 import { ConfirmDeleteAccount } from '../confirm-delete-account/index';
 import { CsvExport } from '../csv-export/index';
+import {
+  BillingTransactionsExportPage,
+  ResourceHoursSummaryExportPage,
+  ResourceUsageExportPage,
+} from '../csv-export/configure-page';
 import { Dependencies } from '../dependencies/index';
 import { EmailTemplatesPage } from '../email-templates/EmailTemplatesPage';
 import FirstTimeSetupPage from '../first-time-setup/index';
 import { KioskCompanionPage } from '../kiosk/companion/KioskCompanionPage';
 import { KioskLayout } from '../kiosk/layout/KioskLayout';
 import { KioskResourcePage } from '../kiosk/resources/KioskResourcePage';
+import { mcpOAuthRoutes } from '../mcp-oauth/routes';
 import { MessagesPage } from '../messaging/index';
 import { EditMqttServerPage, MqttServersPage } from '../mqtt/index';
 import usePluginState, { PluginManifestWithPlugin } from '../plugins/plugin.state';
@@ -30,6 +36,8 @@ import { ResourceGroupEditPage } from '../resource-groups/index';
 import { ResourceOverview } from '../resourceOverview/index';
 import { ResourceDiagnosticsTab } from '../resources/details/diagnostics/ResourceDiagnosticsTab';
 import FlowsPage from '../resources/details/flows/index';
+import { GlobalFlowEditorPage } from '../global-flows/GlobalFlowEditorPage';
+import { GlobalFlowsListPage } from '../global-flows/GlobalFlowsListPage';
 import { FormEditorPage, FormListPage } from '../resources/details/forms/index';
 import { ResourceGroupsTab } from '../resources/details/groups/ResourceGroupsTab';
 import { ResourceHistoryTab } from '../resources/details/history/ResourceHistoryTab';
@@ -44,10 +52,12 @@ import { SettingsIndexPage } from '../settings/layout/SettingsIndexPage';
 import { SettingsLayout } from '../settings/layout/SettingsLayout';
 import { SETTINGS_SECTION_PERMISSIONS } from '../settings/layout/settingsSections';
 import { AboutSection } from '../settings/sections/about/index';
+import { ReaderSecuritySection } from '../settings/sections/reader-security';
 import { AuditLogSection } from '../settings/sections/audit-log/index';
 import { EmailSection } from '../settings/sections/email/index';
 import { GeneralSection } from '../settings/sections/general/index';
 import { MessagingSection } from '../settings/sections/messaging/index';
+import { AttractapSection } from '../settings/sections/attractap/index';
 import { MonitoringSection } from '../settings/sections/monitoring/index';
 import { PluginsSection } from '../settings/sections/plugins/index';
 import { RolesSection } from '../settings/sections/roles/index';
@@ -152,6 +162,8 @@ const coreRoutes: RouteConfig[] = [
     path: '/confirm-delete-account',
     element: <ConfirmDeleteAccount />,
     authRequired: false,
+    // The layout swaps its tree when a deletion signs the user out, which would reset the dialog's state.
+    noLayout: true,
   },
   {
     path: '/resources',
@@ -256,6 +268,16 @@ const coreRoutes: RouteConfig[] = [
     authRequired: true,
   },
   {
+    path: '/devices/flows',
+    element: <GlobalFlowsListPage />,
+    authRequired: 'resources.update',
+  },
+  {
+    path: '/devices/flows/:flowId',
+    element: <GlobalFlowEditorPage />,
+    authRequired: 'resources.update',
+  },
+  {
     path: '/devices/mqtt/servers',
     element: <MqttServersPage />,
     authRequired: 'resources.update',
@@ -321,6 +343,21 @@ const coreRoutes: RouteConfig[] = [
     authRequired: ['billing.manage', 'resources.reports.export'],
   },
   {
+    path: '/csv-export/resource-usage-hours',
+    element: <ResourceUsageExportPage />,
+    authRequired: ['billing.manage', 'resources.reports.export'],
+  },
+  {
+    path: '/csv-export/resource-hours-summary',
+    element: <ResourceHoursSummaryExportPage />,
+    authRequired: 'resources.reports.export',
+  },
+  {
+    path: '/csv-export/billing-transactions',
+    element: <BillingTransactionsExportPage />,
+    authRequired: ['billing.manage', 'resources.reports.export'],
+  },
+  {
     path: '/billing/administration/sumup',
     element: <SumUpPage />,
     authRequired: 'billing.manage',
@@ -344,6 +381,15 @@ const coreRoutes: RouteConfig[] = [
     element: (
       <SettingsLayout>
         <MonitoringSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/attractap',
+    element: (
+      <SettingsLayout>
+        <AttractapSection />
       </SettingsLayout>
     ),
     authRequired: 'system.settings.manage',
@@ -410,6 +456,15 @@ const coreRoutes: RouteConfig[] = [
     element: (
       <SettingsLayout>
         <AboutSection />
+      </SettingsLayout>
+    ),
+    authRequired: 'system.settings.manage',
+  },
+  {
+    path: '/settings/reader-security',
+    element: (
+      <SettingsLayout>
+        <ReaderSecuritySection />
       </SettingsLayout>
     ),
     authRequired: 'system.settings.manage',
@@ -537,10 +592,7 @@ const coreRoutes: RouteConfig[] = [
 export function useAllRoutes() {
   const { plugins: pluginManifests } = usePluginState();
 
-  const pluginRoutes = useMemo(
-    () => pluginManifests.flatMap((pluginManifest) => getRoutesOfPlugin(pluginManifest)),
-    [pluginManifests],
-  );
+  const pluginRoutes = useMemo(() => pluginManifests.flatMap(getRoutesOfPlugin), [pluginManifests]);
 
-  return useMemo(() => [...coreRoutes, ...pluginRoutes], [pluginRoutes]);
+  return useMemo(() => [...coreRoutes, ...mcpOAuthRoutes, ...pluginRoutes], [pluginRoutes]);
 }

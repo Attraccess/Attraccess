@@ -54,6 +54,16 @@ describe('StatusDialog', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
   });
 
+  it('wraps long unbroken text such as an email address instead of clipping it', () => {
+    render(
+      <StatusDialog isOpen onClose={vi.fn()} status="info" title="Long text">
+        {`Account ${'a'.repeat(200)}@example.test`}
+      </StatusDialog>,
+    );
+
+    expect(screen.getByText(/^Account a+@example\.test$/)).toHaveClass('break-words');
+  });
+
   it('renders nothing while closed', () => {
     render(<StatusDialog isOpen={false} onClose={vi.fn()} status="info" title="Hidden" />);
 

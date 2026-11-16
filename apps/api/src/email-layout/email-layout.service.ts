@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../audit/recorder/audit-event';
 import { EmailTemplate } from '@attraccess/database-entities';
 import { UpdateEmailLayoutDto } from './dto/update-email-layout.dto';
 import { EmailLayoutResponseDto } from './dto/email-layout-response.dto';
@@ -17,6 +18,7 @@ export class EmailLayoutService {
   constructor(
     private readonly settingsStore: SettingsStoreService,
     private readonly mjmlService: MjmlService,
+    @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
 
   injectContentIntoLayout(layoutMjml: string, contentMjml: string): string {
@@ -45,7 +47,7 @@ export class EmailLayoutService {
     return this.mjmlService.validateAndConvert(fullMjml);
   }
 
-  async update(dto: UpdateEmailLayoutDto): Promise<EmailLayoutResponseDto> {
+  async update(dto: UpdateEmailLayoutDto, actor: AuditActor): Promise<EmailLayoutResponseDto> {
     if (!dto.body.includes(CONTENT_PLACEHOLDER)) {
       throw new BadRequestException(`Email layout body must contain the placeholder '${CONTENT_PLACEHOLDER}'`);
     }
@@ -55,12 +57,27 @@ export class EmailLayoutService {
 
     await this.settingsStore.setPlainSetting(EMAIL_LAYOUT_PARENT, EMAIL_LAYOUT_KEY, dto.body);
 
-    return this.findGlobal();
+    const layout = await this.findGlobal();
+    await this.record(actor, 'email_layout.updated');
+    return layout;
   }
 
-  async resetToDefault(): Promise<EmailLayoutResponseDto> {
+  async resetToDefault(actor: AuditActor): Promise<EmailLayoutResponseDto> {
     const defaultBody = readDefaultLayoutBody();
     await this.settingsStore.setPlainSetting(EMAIL_LAYOUT_PARENT, EMAIL_LAYOUT_KEY, defaultBody);
-    return this.findGlobal();
+    const layout = await this.findGlobal();
+    await this.record(actor, 'email_layout.reset');
+    return layout;
+  }
+
+  /** The installation has one global layout; its audit subject id is fixed. */
+  private async record(actor: AuditActor, action: 'email_layout.updated' | 'email_layout.reset') {
+    await this.audit.record({
+      domain: 'administration',
+      action,
+      actor,
+      subject: { type: 'email-layout', id: 1 },
+      details: {},
+    });
   }
 }

@@ -17,6 +17,17 @@
       "label": "per measured value ({{currency}})",
       "description": "0 disables billing. The rate is captured when a session starts.",
       "invalid": "Enter a valid price with up to {{digits}} decimal places."
+    },
+    "meterAllocation": {
+      "label": "Allocation",
+      "options": {
+        "shared": "Shared and split",
+        "per-session": "Measured per session"
+      },
+      "description": {
+        "shared": "Every start and stop of a session closes a time segment. The consumption of that segment is split equally between the sessions active in it.",
+        "per-session": "A flow measures every session separately via its own measuring point. Nothing is split."
+      }
     }
   },
   "actions": {

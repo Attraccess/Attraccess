@@ -2,9 +2,16 @@ import { Resource } from '@attraccess/database-entities';
 import { MeteringRunContext } from '../node-executors';
 
 export interface FlowExecutionOptions {
+  /** The user whose action started this run (start, stop, takeover, button press); none for MQTT, webhooks etc. */
+  actorUserId?: number;
   lifecycleAttemptId?: string;
   lifecycleCandidateCancellation?: boolean;
   metering?: MeteringRunContext;
+  /**
+   * The resource whose event started this run. Nodes of global flows have no resource of their own; they act on
+   * this one. Resource-flow nodes always use their own resource. Unset for runs without a triggering resource.
+   */
+  triggeringResourceId?: number | null;
 }
 
 export interface UsageEventData {

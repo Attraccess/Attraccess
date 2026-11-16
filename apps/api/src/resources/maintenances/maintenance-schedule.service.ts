@@ -11,13 +11,13 @@ import {
   ResourceType,
 } from '@attraccess/database-entities';
 
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 
@@ -38,7 +38,7 @@ export class MaintenanceScheduleService {
     protected readonly timeIntervalConfigRepository: Repository<ResourceMaintenanceScheduleTimeIntervalConfig>,
     @InjectRepository(Resource)
     protected readonly resourceRepository: Repository<Resource>,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
     protected readonly evaluator: MaintenanceScheduleEvaluatorService,
   ) {}
 
@@ -137,7 +137,7 @@ export class MaintenanceScheduleService {
     resourceId: number,
     dto: CreateMaintenanceScheduleDto,
     actorId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<ResourceMaintenanceSchedule> {
     const resource = await this.ensureResourceExists(resourceId);
@@ -159,12 +159,11 @@ export class MaintenanceScheduleService {
     });
 
     const result = await this.getOne(resourceId, saved.id);
-    await this.audit.recordResource({
+    await this.audit.record({
+      domain: 'resource',
       action: 'maintenance_schedule.created',
-      actorId,
-      authenticationMethod,
-      apiTokenId,
-      subjectId: resourceId,
+      actor: { id: actorId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'resource', id: resourceId },
       details: this.scheduleDetails(result),
     });
     if (result.enabled) await this.evaluator.evaluateResource(resourceId);
@@ -176,7 +175,7 @@ export class MaintenanceScheduleService {
     scheduleId: number,
     dto: UpdateMaintenanceScheduleDto,
     actorId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<ResourceMaintenanceSchedule> {
     const schedule = await this.getOne(resourceId, scheduleId);
@@ -213,12 +212,11 @@ export class MaintenanceScheduleService {
     }
 
     const result = await this.getOne(resourceId, scheduleId);
-    await this.audit.recordResource({
+    await this.audit.record({
+      domain: 'resource',
       action: 'maintenance_schedule.updated',
-      actorId,
-      authenticationMethod,
-      apiTokenId,
-      subjectId: resourceId,
+      actor: { id: actorId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+      subject: { type: 'resource', id: resourceId },
       details: this.scheduleDetails(result),
     });
     if (result.enabled) await this.evaluator.evaluateResource(resourceId);
@@ -229,7 +227,7 @@ export class MaintenanceScheduleService {
     resourceId: number,
     scheduleId: number,
     actorId: number,
-    authenticationMethod: 'session' | 'api-token' = 'session',
+    authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' = 'session',
     apiTokenId?: number,
   ): Promise<void> {
     const schedule = await this.getOne(resourceId, scheduleId);
@@ -242,14 +240,16 @@ export class MaintenanceScheduleService {
       await manager.getRepository(ResourceMaintenanceScheduleUsageCountConfig).delete({ scheduleId });
       await manager.getRepository(ResourceMaintenanceScheduleTimeIntervalConfig).delete({ scheduleId });
       await manager.getRepository(ResourceMaintenanceSchedule).remove(schedule);
-    });
-    await this.audit.recordResource({
-      action: 'maintenance_schedule.deleted',
-      actorId,
-      authenticationMethod,
-      apiTokenId,
-      subjectId: resourceId,
-      details,
+      await this.audit.record(
+        {
+          domain: 'resource',
+          action: 'maintenance_schedule.deleted',
+          actor: { id: actorId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+          subject: { type: 'resource', id: resourceId },
+          details: details,
+        },
+        manager,
+      );
     });
   }
 

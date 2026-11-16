@@ -10,15 +10,15 @@ describe('PasswordPolicyService', () => {
     await fixture.service.updatePolicy({ minLength: 14 }, fixture.audit);
     expect(fixture.identityAudit.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'password_policy_updated',
-        actorId: 7,
-        apiTokenId: 9,
-        authenticationMethod: 'api-token',
-        subjectId: 1,
+        domain: 'identity',
+        action: 'identity.password_policy_updated',
+        actor: expect.objectContaining({ id: 7, authenticationMethod: 'api-token', apiTokenId: 9 }),
+        subject: expect.objectContaining({ id: 1 }),
         outcome: 'succeeded',
         request: { ipAddress: '192.0.2.7', userAgent: 'fixture' },
         details: { field: 'minLength', before: expect.any(String), after: expect.any(String) },
       }),
+      fixture.manager,
     );
     const details = fixture.identityAudit.record.mock.calls[0][0].details;
     expect(JSON.parse(details.before).minLength).toBe(12);
@@ -33,17 +33,21 @@ describe('PasswordPolicyService', () => {
     );
     expect(fixture.identityAudit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        action: 'password_policy_override_updated',
+        domain: 'identity',
+        action: 'identity.password_policy_override_updated',
         details: { role: PasswordPolicyRole.ADMIN, after: expect.any(String) },
       }),
+      fixture.manager,
     );
     fixture.overrideRepo.findOne.mockResolvedValue(fixture.buildOverride({ minLength: 16, requireDigit: true }));
     await fixture.service.deleteOverride(PasswordPolicyRole.ADMIN, fixture.audit);
     expect(fixture.identityAudit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        action: 'password_policy_override_deleted',
+        domain: 'identity',
+        action: 'identity.password_policy_override_deleted',
         details: { role: PasswordPolicyRole.ADMIN, before: expect.any(String) },
       }),
+      fixture.manager,
     );
     expect(JSON.parse(fixture.identityAudit.record.mock.calls[1][0].details.before)).toMatchObject({
       minLength: 16,

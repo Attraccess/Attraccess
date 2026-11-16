@@ -16,6 +16,7 @@ import { LicenseModuleType } from '../license/license.service';
 import { RequiresLicense } from '../license/require-license.decorator';
 import { ResourcesService } from '../resources/resources.service';
 import { AttractapService } from './attractap.service';
+import { isPaired } from './reader-pairing';
 import { ReaderUiAlertsService } from '../plugin-system/reader-ui/reader-ui-alerts.service';
 import { ReaderUiSettingsService } from '../plugin-system/reader-ui/reader-ui-settings.service';
 import {
@@ -25,6 +26,17 @@ import {
   ResourceReaderUiSettingsDto,
 } from './dtos/reader-ui-settings.dto';
 import { UiSlotService } from './websockets/handlers/ui/ui-slot.service';
+
+/**
+ * Who may clear an alert. Plugin alerts reset the plugin globally (plugin managers); reader alerts belong to the
+ * reader editor (resources.update). A time zone conflict is a reader's alert that shows on the plugins page too.
+ */
+const CLEAR_PERMISSIONS: Record<string, SystemPermission[]> = {
+  'breaker-open': ['system.plugins.manage'],
+  'load-failure': ['system.plugins.manage'],
+  'crash-loop': ['resources.update'],
+  'time-zone-conflict': ['resources.update', 'system.plugins.manage'],
+};
 
 /** Admin side of the reader UI: settings, contribution status and alerts (ATT-1187 phase A). */
 @ApiTags('Attractap')
@@ -45,7 +57,9 @@ export class ReaderUiAdminController {
   }
 
   private async requireReader(readerId: number): Promise<void> {
-    if (!(await this.readers.findReaderById(readerId))) throw new NotFoundException(`Reader ${readerId} not found`);
+    // A reader that is not paired yet is not visible outside the pairing session.
+    if (!isPaired(await this.readers.findReaderById(readerId)))
+      throw new NotFoundException(`Reader ${readerId} not found`);
   }
 
   @Get('resources/:resourceId/reader-ui-settings')
@@ -114,8 +128,11 @@ export class ReaderUiAdminController {
   @AuthAny('resources.update', 'system.plugins.manage')
   @ApiOperation({ summary: 'Open reader UI alerts', operationId: 'getReaderUiAlerts' })
   @ApiResponse({ status: 200, type: [ReaderUiAlertDto] })
-  getAlerts(): Promise<ReaderUiAlertDto[]> {
-    return this.alerts.listOpen();
+  async getAlerts(): Promise<ReaderUiAlertDto[]> {
+    // Alerts of a reader that is not paired yet stay hidden, like the reader itself.
+    const [open, paired] = await Promise.all([this.alerts.listOpen(), this.readers.getPairedReaders()]);
+    const pairedIds = new Set(paired.map((reader) => reader.id));
+    return open.filter((alert) => alert.readerId == null || pairedIds.has(alert.readerId));
   }
 
   @Post('reader-ui/alerts/:alertId/clear')
@@ -123,7 +140,8 @@ export class ReaderUiAdminController {
   @ApiOperation({
     summary:
       'Clear a reader UI alert. Plugin alerts (open breaker, load failure) reset the plugin globally and need ' +
-      'system.plugins.manage; a reader crash-loop alert needs resources.update.',
+      'system.plugins.manage; a reader crash-loop alert needs resources.update; a reader time-zone-conflict ' +
+      'alert needs either.',
     operationId: 'clearReaderUiAlert',
   })
   @ApiResponse({ status: 200, type: ReaderUiAlertDto })
@@ -134,8 +152,10 @@ export class ReaderUiAdminController {
   ): Promise<ReaderUiAlertDto> {
     const alert = await this.alerts.findOpen(alertId);
     if (!alert) throw new NotFoundException('Alert not found or already cleared');
-    const needed: SystemPermission = alert.kind === 'crash-loop' ? 'resources.update' : 'system.plugins.manage';
-    if (!req.user.effectivePermissions?.has(needed)) throw new ForbiddenException('Insufficient permissions');
+    const allowed = CLEAR_PERMISSIONS[alert.kind] ?? ['system.plugins.manage'];
+    if (!allowed.some((permission) => req.user.effectivePermissions?.has(permission))) {
+      throw new ForbiddenException('Insufficient permissions');
+    }
     const cleared = await this.alerts.clear(alertId, req.user);
     if (!cleared) throw new NotFoundException('Alert not found or already cleared');
     return cleared;

@@ -17,10 +17,11 @@ import { WagoCommissioningSession } from '../../backend/commissioning/sessions/s
 import { WagoCommissioningService } from '../../backend/commissioning/service';
 import { WagoController } from '../../backend/controllers/entity';
 import { WagoCredentialRotationService, WagoCredentialRotationEntity } from '../../backend/credentials/service';
-import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/service';
 import { WagoControllerApi } from '../../backend/controllers/controller';
 import { WagoService } from '../../backend/controllers/service';
 import type { WagoConfigurationSnapshot } from '../../backend/configuration/model';
+import { SessionPermissionSync } from '../../../../api/src/users-and-auth/auth/sso/session-permission-sync';
 
 export const pluginId = 'abcdefghijklmnopqrstu';
 export const principal = { userId: 42, authenticationMethod: 'api-token' as const, apiTokenId: 19 };
@@ -103,6 +104,7 @@ export class AuditFixtureState {
       controllers: [WagoControllerApi],
       providers: [
         SessionStrategy,
+        { provide: SessionPermissionSync, useValue: { syncIfDue: async () => 'skipped' } },
         { provide: WagoService, useValue: this.wago },
         { provide: WagoCommissioningService, useValue: this.commissioning },
         { provide: WagoCredentialRotationService, useFactory: () => new WagoCredentialRotationService(this.context) },

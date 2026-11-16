@@ -1,23 +1,15 @@
+import { auditActorOf } from '../../../audit/recorder/audit-event';
 import { ResourceUsage } from '@attraccess/database-entities';
 
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 
-import {
-  Controller,
-  ForbiddenException,
-  Get,
-  Param,
-  ParseIntPipe,
-  Post,
-  Query,
-  Req,
-  Body,
-  Put,
-} from '@nestjs/common';
+import { Controller, ForbiddenException, Get, Param, ParseIntPipe, Post, Query, Req, Body, Put } from '@nestjs/common';
 
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 import { CanControlResponseDto } from '../dtos/canControl.response.dto';
+
+import { StartBlockedResponseDto } from '../dtos/startBlocked.response.dto';
 
 import { GetResourceHistoryQueryDto } from '../dtos/getResourceHistoryQuery.dto';
 
@@ -198,6 +190,26 @@ export class ResourceUsageController {
     } as CanControlResponseDto;
   }
 
+  @Get('start-blocked')
+  @Auth()
+  @ApiOperation({
+    summary: 'Ask whether a plugin currently blocks the start for the current user',
+    description:
+      'Informational counterpart of the pre-start gate, for showing the reason in place of the start button. ' +
+      'A start is still checked when it is requested.',
+    operationId: 'resourceUsageStartBlocked',
+  })
+  @ApiResponse({ status: 200, description: 'The start-blocked state', type: StartBlockedResponseDto })
+  async startBlocked(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<StartBlockedResponseDto> {
+    const view = await this.preStart.queryStartBlocked(resourceId, req.user);
+    return view
+      ? { blocked: true, reason: view.reason, ...(view.until ? { until: view.until } : {}), plugin: view.plugin }
+      : { blocked: false };
+  }
+
   @Post('start')
   @Auth()
   @ApiOperation({ summary: 'Start a resource usage session', operationId: 'resourceUsageStartSession' })
@@ -223,16 +235,15 @@ export class ResourceUsageController {
     @Body() dto: StartUsageSessionDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
-    await this.preStart.gateHttp(resourceId, req.user, dto, {
-      origin: req.user.authenticationMethod === 'api-token' ? 'api' : 'web',
+    const origin = req.user.authenticationMethod === 'api-token' ? 'api' : 'web';
+    const confirmedStepKeys = await this.preStart.gateHttp(resourceId, req.user, dto, {
+      origin,
       ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
     });
     return this.resourceUsageService.startSession(resourceId, req.user, dto, {
-      auditOrigin: {
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-      },
+      auditOrigin: auditActorOf(req.user),
+      origin,
+      confirmedStepKeys,
     });
   }
 
@@ -263,11 +274,7 @@ export class ResourceUsageController {
     @Req() req: AuthenticatedRequest,
   ): Promise<ResourceUsage> {
     const ended = await this.resourceUsageService.endSession(resourceId, req.user, dto, {
-      auditOrigin: {
-        actorId: req.user.id,
-        authenticationMethod: req.user.authenticationMethod,
-        ...(req.user.apiTokenId === undefined ? {} : { apiTokenId: req.user.apiTokenId }),
-      },
+      auditOrigin: auditActorOf(req.user),
     });
     if (ended) {
       // Nobody can answer an after-stop question on web/API, also when a manager ends someone else's session.

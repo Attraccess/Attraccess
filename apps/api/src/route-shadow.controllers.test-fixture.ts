@@ -1,5 +1,5 @@
 import { dirname, resolve } from 'path';
-import { ClassDeclaration, Node, Project, SyntaxKind } from 'ts-morph';
+import { ClassDeclaration, Node, Project } from 'ts-morph';
 import {
   ControllerInfo,
   HTTP_METHODS,
@@ -38,24 +38,6 @@ export function inheritedMethods(
   return methods;
 }
 
-function registeredMethodOrder(declaration: ClassDeclaration): string[] {
-  const installed = declaration
-    .getSourceFile()
-    .getDescendantsOfKind(SyntaxKind.CallExpression)
-    .find(
-      (call) =>
-        call.getExpression().getText() === 'installInheritedMethods' &&
-        call.getArguments()[0]?.getText() === declaration.getName(),
-    );
-  const names = installed?.getArguments()[1];
-  return names && Node.isArrayLiteralExpression(names)
-    ? names
-        .getElements()
-        .filter(Node.isStringLiteral)
-        .map((name) => name.getLiteralValue())
-    : [];
-}
-
 /** Follow the same own-method and inherited-method registration order as Nest. */
 export function parseControllers(filePath: string): ControllerInfo[] {
   const source = project.addSourceFileAtPath(filePath);
@@ -65,11 +47,8 @@ export function parseControllers(filePath: string): ControllerInfo[] {
     const prefixArgument = controller.getArguments()[0];
     const prefix = prefixArgument && Node.isStringLiteral(prefixArgument) ? prefixArgument.getLiteralValue() : '';
     const methods = inheritedMethods(declaration);
-    const order = [...new Set([...registeredMethodOrder(declaration), ...methods.keys()])];
     const routes: RouteDecl[] = [];
-    for (const name of order) {
-      const method = methods.get(name);
-      if (!method) continue;
+    for (const method of methods.values()) {
       for (const decorator of method.getDecorators()) {
         if (!HTTP_METHODS.includes(decorator.getName())) continue;
         const argument = decorator.getArguments()[0];

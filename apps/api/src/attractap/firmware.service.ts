@@ -4,7 +4,7 @@ import { createReadStream, existsSync, readFileSync, statSync, copyFileSync, mkd
 
 import { join } from 'path';
 
-import { AttractapFirmware } from './dtos/firmware.dto';
+import { AttractapFirmware, AttractapSecureImage } from './dtos/firmware.dto';
 
 export interface FirmwareSymbolEntry {
   firmware: AttractapFirmware;
@@ -14,7 +14,11 @@ export interface FirmwareSymbolEntry {
 @Injectable()
 export class AttractapFirmwareService {
   public constructor() {
-    this.firmwareAssetsDirectory = join(__dirname, 'assets', 'attractap-firmwares');
+    // ATTRACTAP_FIRMWARE_ASSETS_DIR is for the hardware-in-the-loop tests (apps/attractap-lab/hil): they
+    // offer a reader a lab-built image and change it between test cases, so the directory's
+    // firmwares.json is re-read when it changes. Deployments leave it unset.
+    this.firmwareAssetsDirectory =
+      process.env.ATTRACTAP_FIRMWARE_ASSETS_DIR || join(__dirname, 'assets', 'attractap-firmwares');
     this.firmwareSymbolDirectory = join(
       process.env.STORAGE_ROOT || join(process.cwd(), 'storage'),
       'attractap-firmware-symbols',
@@ -28,6 +32,7 @@ export class AttractapFirmwareService {
       this.logger.debug(`Loading firmwares from: ${firmwaresPath}`);
       const firmwares = readFileSync(firmwaresPath, 'utf8');
       this.firmwares = JSON.parse(firmwares).firmwares;
+      this.firmwaresModifiedAt = this.firmwaresMtime(firmwaresPath);
     } else {
       this.logger.error(`Firmwares file does not exist: ${firmwaresPath}`);
     }
@@ -47,6 +52,8 @@ export class AttractapFirmwareService {
 
   protected firmwares: AttractapFirmware[] = [];
 
+  protected firmwaresModifiedAt = 0;
+
   protected symbolFirmwares: FirmwareSymbolEntry[] = [];
 
   public async getFirmwares(): Promise<AttractapFirmware[]> {
@@ -54,7 +61,35 @@ export class AttractapFirmwareService {
     return this.firmwares;
   }
 
+  protected firmwaresMtime(firmwaresPath: string): number {
+    try {
+      return statSync(firmwaresPath).mtimeMs;
+    } catch {
+      return 0;
+    }
+  }
+
+  /** Test-only hot reload, see the ATTRACTAP_FIRMWARE_ASSETS_DIR note in the constructor. */
+  protected reloadFirmwaresIfChanged(): void {
+    const firmwaresPath = join(this.firmwareAssetsDirectory, 'firmwares.json');
+    const modifiedAt = this.firmwaresMtime(firmwaresPath);
+    if (modifiedAt === this.firmwaresModifiedAt) {
+      return;
+    }
+    try {
+      this.firmwares = JSON.parse(readFileSync(firmwaresPath, 'utf8')).firmwares;
+      this.firmwaresModifiedAt = modifiedAt;
+      this.logger.log(`Reloaded ${this.firmwares.length} firmware definitions from ${firmwaresPath}`);
+    } catch (error) {
+      this.logger.warn(`Could not reload ${firmwaresPath}: ${(error as Error).message}`);
+    }
+  }
+
   public getFirmwareDefinition(firmwareName: string, variantName: string): AttractapFirmware {
+    if (process.env.ATTRACTAP_FIRMWARE_ASSETS_DIR) {
+      this.reloadFirmwaresIfChanged();
+    }
+
     const firmware = this.firmwares.find(
       (firmware) => firmware.name === firmwareName && firmware.variant === variantName,
     );
@@ -64,6 +99,22 @@ export class AttractapFirmwareService {
     }
 
     return firmware;
+  }
+
+  /** Unsigned secure-profile images of a variant, or undefined when the build did not package any. */
+  public getSecureImageSource(
+    firmwareName: string,
+    variantName: string,
+  ):
+    | { firmware: AttractapFirmware; secureImage: AttractapSecureImage; appPath: string; bootloaderPath: string }
+    | undefined {
+    const firmware = this.getFirmwareDefinition(firmwareName, variantName);
+    const image = firmware?.secureImage;
+    if (!image) return undefined;
+    const appPath = join(this.firmwareAssetsDirectory, image.appFilename);
+    const bootloaderPath = join(this.firmwareAssetsDirectory, image.bootloaderFilename);
+    if (!existsSync(appPath) || !existsSync(bootloaderPath)) return undefined;
+    return { firmware, secureImage: image, appPath, bootloaderPath };
   }
 
   public getFirmwareBinaryStream(firmwareName: string, variantName: string): NodeJS.ReadableStream {

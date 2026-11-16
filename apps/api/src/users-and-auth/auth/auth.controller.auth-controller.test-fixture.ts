@@ -1,9 +1,9 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { SsoLogoutService } from './sso/sso-logout.service';
 import { SettingsService } from '../../settings/settings.service';
 import { ConfigService } from '@nestjs/config';
 import { ApprovedOriginsService } from '../../common/security/approved-origins.service';
 import { Test, TestingModule } from '@nestjs/testing';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { CookieConfigService } from '../../common/services/cookie-config.service';
 import { AuthAuditLogger } from '../rate-limiting/auth-audit.logger';
 import { BruteForceProtectionService } from '../rate-limiting/brute-force.service';
@@ -33,10 +33,12 @@ export function registerAuthControllerFixture() {
   let cookieConfigService: CookieConfigService;
 
   let identityAudit: { record: jest.Mock };
+  let recorder: { record: jest.Mock };
 
   let ssoPermissionSync: { syncIfDue: jest.Mock };
 
   beforeEach(async () => {
+    recorder = { record: jest.fn() };
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
@@ -47,6 +49,11 @@ export function registerAuthControllerFixture() {
         {
           provide: SessionService,
           useValue: {
+            // The real logout ending: Passport's logout, then the `logout` audit through `audit`.
+            audit: recorder,
+            endLogin: jest.fn(function (this: SessionService, ...args: Parameters<SessionService['endLogin']>) {
+              return SessionService.prototype.endLogin.apply(this, args);
+            }),
             createSession: jest.fn().mockResolvedValue('test-session-token'),
             refreshSession: jest.fn().mockResolvedValue('new-session-token'),
             revokeSession: jest.fn(),
@@ -91,7 +98,7 @@ export function registerAuthControllerFixture() {
           provide: ApprovedOriginsService,
           useValue: approvedOriginsFor('https://app.example'),
         },
-        { provide: IdentityAuditService, useValue: { record: jest.fn() } },
+        { provide: AUDIT_RECORDER, useValue: recorder },
         { provide: LoginRateLimitGuard, useValue: { canActivate: jest.fn().mockResolvedValue(true) } },
         { provide: SessionPermissionSync, useValue: { syncIfDue: jest.fn().mockResolvedValue('skipped') } },
       ],
@@ -100,7 +107,7 @@ export function registerAuthControllerFixture() {
     authController = module.get<AuthController>(AuthController);
     sessionService = module.get<SessionService>(SessionService);
     cookieConfigService = module.get<CookieConfigService>(CookieConfigService);
-    identityAudit = module.get(IdentityAuditService);
+    identityAudit = module.get(AUDIT_RECORDER);
     ssoPermissionSync = module.get(SessionPermissionSync);
   });
   return {

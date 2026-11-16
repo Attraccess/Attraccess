@@ -1,4 +1,5 @@
 # Plugin Database Migrations
+<!-- llms-description: How a plugin ships TypeORM migrations for its own tables: declaring, writing and bundling the migrations entry. -->
 
 A plugin that needs its own persistent tables ships **TypeORM migrations** and
 lets the host run them. The host manages the full lifecycle:

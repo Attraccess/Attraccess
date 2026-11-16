@@ -7,6 +7,7 @@ import { AttractapList } from './index';
 
 const data = vi.hoisted(() => ({
   readers: [] as unknown[],
+  toPair: [] as unknown[],
   openDeviceSettings: undefined as undefined | ((deviceId: string, justPaired?: boolean) => void),
   onPaired: undefined as undefined | ((readerId: number) => void),
   editor: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock('@attraccess/react-query-client', () => ({
   useLicenseServiceGetLicenseInformation: vi.fn(),
   useAttractapServiceGetFirmwares: () => ({ data: [] }),
   useAttractapServiceGetReaders: () => ({ data: data.readers, error: null }),
+  useAttractapServiceGetReadersToPair: () => ({ data: data.toPair }),
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -57,9 +59,15 @@ vi.mock('../AttractapEditor/AttractapEditor', () => ({
   },
 }));
 vi.mock('../pairing/ReadersToPair', () => ({
-  ReadersToPair: ({ onPaired }: { onPaired: (readerId: number) => void }) => {
+  ReadersToPair: ({ onPaired, readers }: { onPaired: (readerId: number) => void; readers: { name: string }[] }) => {
     data.onPaired = onPaired;
-    return null;
+    return (
+      <ul data-testid="to-pair">
+        {readers.map((r) => (
+          <li key={r.name}>{r.name}</li>
+        ))}
+      </ul>
+    );
   },
 }));
 vi.mock('./delete', () => ({ AttractapDeleteModal: () => null }));
@@ -102,15 +110,19 @@ describe('AttractapList pairing', () => {
 
   it('lists only paired readers in the tables; the others wait in the Not paired card', () => {
     mockLicense(['attractap']);
-    data.readers = [
-      reader(1, 'Paired door', 'paired'),
-      reader(2, 'New lathe', 'unpaired'),
-      reader(3, 'Old', 'revoked'),
-    ];
+    data.readers = [reader(1, 'Paired door', 'paired')];
+    data.toPair = [reader(2, 'New lathe', 'unpaired'), reader(3, 'Old', 'revoked')];
     render(<AttractapList />);
     expect(screen.getByText('Paired door')).toBeInTheDocument();
-    expect(screen.queryByText('New lathe')).toBeNull();
-    expect(screen.queryByText('Old')).toBeNull();
+    // They are listed in the pairing card, and the reader tables never show them, even if a stale
+    // response still carried one.
+    expect(screen.getByTestId('to-pair')).toHaveTextContent('New lathe');
+    expect(screen.getByTestId('to-pair')).toHaveTextContent('Old');
+    expect(screen.queryAllByText('New lathe')).toHaveLength(1);
+    data.readers = [reader(1, 'Paired door', 'paired'), reader(5, 'Leaked', 'unpaired')];
+    data.toPair = [];
+    render(<AttractapList />);
+    expect(screen.queryByText('Leaked')).toBeNull();
   });
 
   it('shows a dash instead of an empty type for a reader that has not reported its firmware yet', () => {
@@ -125,6 +137,7 @@ describe('AttractapList pairing', () => {
   describe('opening the settings', () => {
     beforeEach(() => {
       mockLicense(['attractap']);
+      data.toPair = [];
       data.editor.mockClear();
       Object.values(data.toast).forEach((fn) => fn.mockClear());
     });
@@ -133,7 +146,8 @@ describe('AttractapList pairing', () => {
 
     it('opens the settings of a reader the web flasher just paired, although the list does not know it yet', () => {
       // The token reader is still listed as not paired, and the new reader is not listed at all.
-      data.readers = [reader(2, 'Token reader', 'unpaired')];
+      data.readers = [];
+      data.toPair = [reader(2, 'Token reader', 'unpaired')];
       render(<AttractapList />);
       act(() => data.openDeviceSettings?.('2', true));
       editorOpenFor(2);
@@ -143,7 +157,8 @@ describe('AttractapList pairing', () => {
     });
 
     it('asks to pair first when the settings of a reader that is not paired are opened', () => {
-      data.readers = [reader(2, 'Token reader', 'unpaired')];
+      data.readers = [];
+      data.toPair = [reader(2, 'Token reader', 'unpaired')];
       render(<AttractapList />);
       act(() => data.openDeviceSettings?.('2'));
       expect(data.toast.info).toHaveBeenCalledWith({ title: 'pairFirst' });

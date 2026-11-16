@@ -211,6 +211,22 @@ export class ValkeySessionStore implements SessionStore {
     return (await this.client.call('GETDEL', `sso_logout_state:${key}`)) as string | null;
   }
 
+  async putEphemeralState(key: string, value: string, expiresAt: number): Promise<boolean> {
+    return this.putLogoutState(key, value, expiresAt);
+  }
+
+  async getEphemeralState(key: string): Promise<string | null> {
+    return this.client.get(`sso_logout_state:${key}`);
+  }
+
+  async incrementEphemeralCounter(key: string, expiresAt: number): Promise<number> {
+    const redisKey = `sso_logout_state:${key}`;
+    const results = await this.client.multi().incr(redisKey).pexpireat(redisKey, expiresAt).exec();
+    const [error, value] = results?.[0] ?? [new Error('Valkey increment returned no result'), null];
+    if (error) throw error;
+    return Number(value);
+  }
+
   private ssoIndex(providerId: number, protocol: string, kind: string, identity: string): string {
     return `sso_sessions:${providerId}:${protocol}:${kind}:${createHash('sha256').update(identity).digest('hex')}`;
   }

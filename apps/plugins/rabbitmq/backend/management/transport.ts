@@ -64,8 +64,9 @@ export async function managementRequest(
   method: string,
   body: unknown,
   timeoutMs: number,
+  extraHeaders?: Readonly<Record<string, string>>,
 ): Promise<Response> {
-  const headers: Record<string, string> = { accept: 'application/json' };
+  const headers: Record<string, string> = { accept: 'application/json', ...extraHeaders };
   if (config.username !== null) {
     headers.authorization = `Basic ${Buffer.from(`${config.username}:${config.password ?? ''}`, 'utf8').toString('base64')}`;
   }

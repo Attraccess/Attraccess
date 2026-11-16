@@ -28,7 +28,9 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => {
 });
 vi.mock('../../../components/toastProvider', () => ({ useToastMessage: () => ({ success: vi.fn(), error: vi.fn() }) }));
 vi.mock('../../resourceOverview/toolbar/scanner', () => ({
-  ResourceScanner: ({ children }: { children: (open: () => void) => React.ReactNode }) => <>{children(() => undefined)}</>,
+  ResourceScanner: ({ children }: { children: (open: () => void) => React.ReactNode }) => (
+    <>{children(() => undefined)}</>
+  ),
 }));
 
 const waiting = {
@@ -50,6 +52,7 @@ function stubApi() {
   vi.spyOn(AttractapService, 'getPairings').mockImplementation(() => ok([waiting]));
   vi.spyOn(AttractapService, 'getPairing').mockImplementation(() => ok(waiting));
   vi.spyOn(AttractapService, 'getReaders').mockImplementation(() => ok([]));
+  vi.spyOn(AttractapService, 'getReadersToPair').mockImplementation(() => ok([]));
   vi.spyOn(AttractapService, 'cancelPairing').mockImplementation(() => ok(undefined));
   const resolve = vi.spyOn(AttractapService, 'resolvePairing').mockImplementation(() => ok(waiting));
   const approve = vi

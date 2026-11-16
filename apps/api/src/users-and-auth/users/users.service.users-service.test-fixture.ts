@@ -9,6 +9,8 @@ import { LicenseService } from '../../license/license.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { RbacService } from '../rbac/rbac.service';
 import { UsersService } from './users.service';
+import { UserAccounts } from './accounts/user-accounts';
+import { UserDirectory } from './directory/user-directory';
 
 const settingsService = {
   getDefaultLanguage: jest.fn().mockResolvedValue('en'),
@@ -37,8 +39,11 @@ export function registerUsersServiceFixture() {
 
   let dataSource: jest.Mocked<DataSource>;
 
+  let licenseService: jest.Mocked<Pick<LicenseService, 'verifyLicense'>>;
+
   let emailService: { sendUsernameChangedEmail: jest.Mock; sendVerificationEmail: jest.Mock };
 
+  let accounts: UserAccounts;
   beforeEach(async () => {
     settingsService.getDefaultLanguage.mockResolvedValue('en');
     mockRbacService.assignRoleByKey.mockClear();
@@ -49,6 +54,8 @@ export function registerUsersServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
+        UserAccounts,
+        UserDirectory,
         { provide: SettingsService, useValue: settingsService },
         {
           provide: LicenseService,
@@ -124,8 +131,10 @@ export function registerUsersServiceFixture() {
     }).compile();
 
     service = module.get<UsersService>(UsersService);
+    accounts = module.get(UserAccounts);
     userRepository = module.get(getRepositoryToken(User)) as jest.Mocked<Repository<User>>;
     dataSource = module.get(DataSource) as jest.Mocked<DataSource>;
+    licenseService = module.get(LicenseService) as jest.Mocked<Pick<LicenseService, 'verifyLicense'>>;
     emailService = module.get(EmailService) as unknown as {
       sendUsernameChangedEmail: jest.Mock;
       sendVerificationEmail: jest.Mock;
@@ -141,6 +150,9 @@ export function registerUsersServiceFixture() {
     get mockRbacService() {
       return mockRbacService;
     },
+    get accounts() {
+      return accounts;
+    },
     get service() {
       return service;
     },
@@ -149,6 +161,9 @@ export function registerUsersServiceFixture() {
     },
     get dataSource() {
       return dataSource;
+    },
+    get licenseService() {
+      return licenseService;
     },
     get emailService() {
       return emailService;

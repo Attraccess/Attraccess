@@ -1,4 +1,4 @@
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 
 import { spawn } from 'child_process';
 
@@ -7,8 +7,6 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { rm, rename } from 'fs/promises';
 
 import { join, basename, isAbsolute, relative, resolve } from 'path';
-
-import { PluginMigrationService } from './plugin-migration.service';
 
 import { randomBytes, createHash } from 'crypto';
 
@@ -30,19 +28,74 @@ function getImplementationClass(): typeof PluginService {
   return require('./plugin.service').PluginService;
 }
 
-export class PluginService extends PluginBootGuard {
+export class PluginService {
+  public static PLUGIN_PATH: string;
+
+  protected static RESTART_BY_EXIT_FLAG: boolean;
+
+  protected static plugins: LoadedPluginManifest[] | null = null;
+
+  protected static loadedPlugins: Set<string> = new Set();
+
+  protected static pluginLoadErrors: Map<string, Error> = new Map();
+
+  protected static logger = new Logger('PluginService');
+
+  protected static readonly pluginUploadLocks = new Map<string, Promise<void>>();
+
+  /** Marks active plugins only while Nest is running their lifecycle hooks. */
+  public static beginBootGuard(): void {
+    return PluginBootGuard.beginBootGuard(getImplementationClass().PLUGIN_PATH, () =>
+      getImplementationClass().getPlugins(),
+    );
+  }
+
+  /**
+   * Records the error that prevented the guarded startup from completing so the
+   * next process can show the actionable cause rather than a generic warning.
+   */
+  public static recordBootFailure(error: unknown): void {
+    return PluginBootGuard.recordBootFailure(getImplementationClass().PLUGIN_PATH, error);
+  }
+
+  public static clearBootGuard(): void {
+    return PluginBootGuard.clearBootGuard(getImplementationClass().PLUGIN_PATH);
+  }
+
+  /**
+   * Persist a failed plugin outside its package. A subsequent process must never
+   * retry code which already prevented the host from starting.
+   */
+  public static quarantinePlugin(manifest: LoadedPluginManifest, error: Error): void {
+    const key = `${manifest.name}@${manifest.version}`;
+    getImplementationClass().setPluginLoadError(key, error);
+    try {
+      PluginBootGuard.quarantinePluginDirectory(getImplementationClass().PLUGIN_PATH, manifest.pluginDirectory, error);
+    } catch (persistenceError) {
+      getImplementationClass().logger.error(`Failed to persist quarantine for ${key}`, persistenceError as Error);
+    }
+  }
+
+  public static quarantinePluginDirectory(pluginDirectory: string, error: Error): void {
+    return PluginBootGuard.quarantinePluginDirectory(getImplementationClass().PLUGIN_PATH, pluginDirectory, error);
+  }
+
+  public static pluginQuarantineError(pluginDirectory: string): string | undefined {
+    return PluginBootGuard.pluginQuarantineError(pluginDirectory);
+  }
+
+  public static clearPluginQuarantine(pluginDirectory: string): void {
+    return PluginBootGuard.clearPluginQuarantine(getImplementationClass().PLUGIN_PATH, pluginDirectory);
+  }
+
   public static configure(config: { PLUGIN_DIR: string; RESTART_BY_EXIT: boolean }): void {
-    getImplementationClass().removeBootGuardSignalHandlers();
+    PluginBootGuard.removeBootGuardSignalHandlers();
     getImplementationClass().PLUGIN_PATH = config.PLUGIN_DIR; // Assume PLUGIN_DIR from appConfig is already resolved or correct
     getImplementationClass().RESTART_BY_EXIT_FLAG = config.RESTART_BY_EXIT;
     getImplementationClass().plugins = null; // Discovery may have been cached with an unset path before configure() ran; force a re-scan.
     getImplementationClass().loadedPlugins.clear();
     getImplementationClass().pluginLoadErrors.clear();
-    getImplementationClass().pluginFailures = new Map(
-      getImplementationClass()
-        .readFailures()
-        .map((failure) => [failure.pluginDirectory, failure]),
-    );
+    PluginBootGuard.loadFailures(getImplementationClass().PLUGIN_PATH);
     getImplementationClass().logger.log(
       `PluginService configured. Path: ${getImplementationClass().PLUGIN_PATH}, RestartByExit: ${getImplementationClass().RESTART_BY_EXIT_FLAG}`,
     );
@@ -75,49 +128,6 @@ export class PluginService extends PluginBootGuard {
 
   public requestRestart(): void {
     setTimeout(() => this.restartApp(), 1000);
-  }
-
-  public async deletePlugin(pluginId: string, deferRestart = false) {
-    const plugin = PluginService.getPlugins().find((plugin) => plugin.id === pluginId);
-
-    if (!plugin) {
-      PluginService.logger.error(`Plugin with id ${pluginId} not found`);
-      throw new NotFoundException('Plugin not found');
-    }
-
-    const pluginFolder = join(PluginService.PLUGIN_PATH, plugin.pluginDirectory);
-
-    // if folder does not exist, throw error
-    if (!existsSync(pluginFolder)) {
-      PluginService.logger.error(`Plugin folder ${pluginFolder} of plugin ${plugin.name} not found`);
-      throw new NotFoundException('Plugin not found');
-    }
-
-    // Revert the plugin's database migrations (drops its tables/data) BEFORE the
-    // files are removed — the migration classes live in the plugin bundle and
-    // must still be on disk to run. A failure here is logged but never blocks the
-    // uninstall: the admin asked for the plugin to be gone.
-    if (PluginMigrationService.hasMigrations(plugin)) {
-      try {
-        await PluginMigrationService.runDownMigrations(plugin);
-      } catch (error) {
-        PluginService.logger.error(
-          `Failed to revert migrations for plugin ${plugin.name}; removing files anyway. Its tables may be orphaned.`,
-          error as Error,
-        );
-      }
-    }
-
-    // delete folder
-    await rm(pluginFolder, { recursive: true });
-    try {
-      PluginService.clearPluginQuarantine(plugin.pluginDirectory);
-    } catch (error) {
-      PluginService.logger.error(`Failed to clear quarantine for deleted plugin ${plugin.name}`, error as Error);
-    }
-
-    // restart app
-    if (!deferRestart) this.requestRestart();
   }
 
   // Returns the discovered plugins enriched with their backend load status so the
@@ -324,7 +334,7 @@ export class PluginService extends PluginBootGuard {
   }
 
   public static isPluginQuarantined(manifest: Pick<LoadedPluginManifest, 'pluginDirectory'>): boolean {
-    return getImplementationClass().pluginFailures.has(manifest.pluginDirectory);
+    return PluginBootGuard.isQuarantined(manifest.pluginDirectory);
   }
 
   protected static findPluginsInFolder(rootFolder: string): LoadedPluginManifest[] {
@@ -383,12 +393,9 @@ export class PluginService extends PluginBootGuard {
         // prevents registrations from changing every time the host restarts.
         manifest.id = createHash('sha256').update(pluginFolder).digest('base64url').slice(0, 21);
 
-        const failure = getImplementationClass().pluginFailures.get(pluginFolder);
-        if (failure) {
-          getImplementationClass().setPluginLoadError(
-            `${manifest.name}@${manifest.version}`,
-            new Error(failure.message),
-          );
+        const failure = PluginBootGuard.pluginQuarantineError(pluginFolder);
+        if (failure !== undefined) {
+          getImplementationClass().setPluginLoadError(`${manifest.name}@${manifest.version}`, new Error(failure));
         }
 
         try {

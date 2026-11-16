@@ -1,4 +1,5 @@
 # Common Issues
+<!-- llms-description: Common problems and fixes, such as SSO login failures, emails not sending, resource access, RFID cards and database issues. -->
 
 This page lists frequently encountered problems and their solutions.
 

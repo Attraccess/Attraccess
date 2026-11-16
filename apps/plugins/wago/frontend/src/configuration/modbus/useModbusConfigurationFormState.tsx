@@ -7,7 +7,7 @@ import {
   type ModbusProfile,
   validateModbus,
 } from '../../../../modbus/model';
-import { ModbusConfigurationFormProps } from './ConfigurationForm';
+import type { ModbusConfigurationFormProps } from './ConfigurationForm';
 
 export function useModbusConfigurationFormState({
   value,

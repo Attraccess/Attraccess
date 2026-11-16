@@ -1,8 +1,10 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
+import { ReaderTimeZoneService } from './reader-time-zone.service';
+import { readerTimeZoneStub } from './reader-time-zone.test-fixture';
 import { Resource } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Provider } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { AuditService } from '../../audit/audit.service';
 import { SettingsService } from '../../settings/settings.service';
 
 import { BillingService } from '../../billing/charges/billing.service';
@@ -29,6 +31,10 @@ import { AttractapService } from '../attractap.service';
 import { AttractapFirmwareService } from '../firmware.service';
 import { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import { AttractapBillingHandler } from './handlers/billing/billing.handler';
+import { CardConversationService } from './card-conversation.service';
+import { CardDetectedRouter } from './card-detected.router';
+import { CardOperationsService } from './card-operations.service';
+import { CardWriterPolicyService } from './card-writer-policy.service';
 import { AttractapCardHandler } from './handlers/card/card.handler';
 import { AttractapCrashReportHandler } from './handlers/crash-report/crash-report.handler';
 import { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
@@ -45,6 +51,7 @@ import { AttractapUiHandler } from './handlers/ui/ui.handler';
 import { CardSessionService } from './handlers/ui/card-session.service';
 import { UiAuditService } from './handlers/ui/ui-audit.service';
 import { UiSlotService } from './handlers/ui/ui-slot.service';
+import { ReaderActiveUsageService } from './reader-active-usage.service';
 import { UiStepService } from './handlers/ui/ui-step.service';
 import { ReaderStartGate } from './handlers/session/reader-start-gate.service';
 import { PreStartService } from '../../resources/usage/pre-start/pre-start.service';
@@ -81,8 +88,9 @@ function createMockSocket(overrides: Partial<AuthenticatedWebSocket> = {}): Auth
     sendBinaryData: jest.fn(),
     send: jest.fn(),
     close: jest.fn(),
+    terminate: jest.fn(),
     state: {
-      lastAuthenticatedUserId: null,
+      verifiedUserId: null,
       enrollment: null,
       enrollNewCardData: null,
       resetNfcCardData: null,
@@ -95,12 +103,20 @@ export function gatewayProviders(
   attractapService: unknown,
   licenseService: unknown,
   security: Provider[] = [
-    { provide: PairingService, useValue: { handleConnection: jest.fn() } },
+    {
+      provide: PairingService,
+      useValue: {
+        handleConnection: jest.fn(),
+        issueBindingTicket: jest.fn(() => 'ticket-1'),
+        claimAutoPrompt: jest.fn(() => true),
+      },
+    },
     { provide: ReaderSessionService, useValue: { accept: jest.fn() } },
   ],
 ): Provider[] {
   return [
     AttractapGateway,
+    { provide: ReaderTimeZoneService, useValue: readerTimeZoneStub() },
     WebsocketService,
     { provide: AttractapService, useValue: attractapService },
     { provide: UsersService, useValue: {} },
@@ -123,7 +139,11 @@ export function gatewayProviders(
     { provide: SupervisionService, useValue: {} },
     { provide: MassIntroductionService, useValue: { setReaderPort: jest.fn() } },
     { provide: RbacService, useValue: {} },
-    { provide: AuditService, useValue: { recordAttractap: jest.fn().mockResolvedValue(undefined) } },
+    { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue(undefined) } },
+    CardConversationService,
+    CardDetectedRouter,
+    { provide: CardOperationsService, useValue: { verifyCard: jest.fn(), enroll: jest.fn(), reset: jest.fn() } },
+    { provide: CardWriterPolicyService, useValue: { assertAllowed: jest.fn() } },
     { provide: SettingsService, useValue: { getDefaultLanguage: jest.fn().mockResolvedValue('de') } },
     { provide: getRepositoryToken(Resource), useValue: {} },
     ResourceListService,
@@ -152,6 +172,7 @@ export function gatewayProviders(
     UiAuditService,
     UiStepService,
     UiSlotService,
+    { provide: ReaderActiveUsageService, useValue: { activeResourceIds: jest.fn(async () => new Set<number>()) } },
     AttractapUiHandler,
     ReaderStartGate,
     ...security,

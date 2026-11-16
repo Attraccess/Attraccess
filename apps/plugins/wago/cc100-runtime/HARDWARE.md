@@ -51,11 +51,11 @@ permissions, stop PLC software, or mount hardware itself.
   daemon-only restart, the supervisor or checked hook can resume only while
   enablement remains present. Containment removes that enablement; hook `start`
   then exits `0` without starting anything, and reboot does not clear the latch.
-  Resolve the cause and use the [wizard cleanup/recommissioning route](../../../../docs/en/devices/wago-cc100-commissioning.md#recover-after-latched-containment).
+  Resolve the cause and use the [wizard cleanup/recommissioning route](../../../../docs/en/plugins/wago/cc100-commissioning.md#recover-after-latched-containment).
   Only installation recreates enablement. Do not recreate its marker manually or
   start the container directly with Docker. This corrects the earlier hook-only
   recovery instruction and supersedes the intermediate restart policy
-  recorded in the [2026-09-06 decision ledger](../../../../docs/en/devices/wago-fw31-support.md#security-follow-up-on-2026-09-06).
+  recorded in the [2026-09-06 decision ledger](../../../../docs/en/plugins/wago/fw31-support.md#security-follow-up-on-2026-09-06).
 - Require root-owned, restrictive configuration/lock paths and validated boot-hook
   publication. Before I/O, verify CODESYS processes are absent, runtime selection
   is `0`, standard and alternative enabled PLC boot entries are absent, and the

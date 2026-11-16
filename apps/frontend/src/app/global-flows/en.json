@@ -1,0 +1,41 @@
+{
+  "list": {
+    "title": "Flows",
+    "subtitle": "Global flows run for every resource and are not tied to a single machine.",
+    "create": "New flow",
+    "loadError": "The flows could not be loaded.",
+    "empty": "There are no global flows yet.",
+    "tableLabel": "Global flows",
+    "columns": {
+      "name": "Name",
+      "enabled": "Enabled",
+      "nodes": "Nodes",
+      "actions": "Actions"
+    },
+    "toggle": "{{name}} enabled",
+    "edit": "Edit {{name}}",
+    "editTooltip": "Open in editor",
+    "delete": "Delete {{name}}",
+    "deleteTooltip": "Delete",
+    "deleteTitle": "Delete flow",
+    "deleteConfirmation": "Delete the flow \"{{name}}\" and all its nodes? This cannot be undone.",
+    "deleteAction": "Delete",
+    "cancel": "Cancel",
+    "deleted": "Flow deleted",
+    "createdModalTitle": "New global flow",
+    "createName": "Name",
+    "createDescription": "Description",
+    "createSubmit": "Create flow",
+    "editDetails": "Edit details of {{name}}",
+    "editDetailsTooltip": "Edit details",
+    "editModalTitle": "Edit flow details",
+    "editSubmit": "Save"
+  },
+  "editor": {
+    "loadError": "This flow could not be loaded.",
+    "noticeTitle": "Global flow",
+    "notice": "Runs for every resource; a failing or slow global flow affects starts and stops on all machines.",
+    "enabled": "Enabled",
+    "editDetails": "Edit details"
+  }
+}

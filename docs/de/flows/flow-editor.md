@@ -1,4 +1,5 @@
 # Flow-Editor
+<!-- llms-description: So nutzen Sie den visuellen Flow-Editor, um Knoten hinzuzufügen, zu verbinden, zu konfigurieren und automatisch anzuordnen. -->
 
 Der Flow-Editor ist ein visuelles Drag-and-Drop-Werkzeug zum Erstellen von Automatisierungs-Workflows. Er ist über den Tab **Flows** auf jeder Ressourcen-Detailseite erreichbar.
 
@@ -80,6 +81,10 @@ Die Knotenfarben zeigen den aktuellen Zustand an:
 
 <!-- TODO: Screenshot der Ausführungsprotokolle mit Farbindikatoren -->
 
+## MQTT-Flows testen
+
+Für Flows mit MQTT-Knoten öffnet die Schaltfläche **MQTT-Explorer** in der Werkzeugleiste ein Panel neben der Arbeitsfläche. Es zeigt Nachrichten live und lässt Sie Testnachrichten senden, während Sie den Flow bearbeiten. Siehe [MQTT-Nachrichten-Explorer](mqtt/message-explorer.md).
+
 ## Flow speichern
 
 Klicken Sie auf **Speichern** in der Werkzeugleiste, um Ihre Änderungen zu speichern. Der Flow ist sofort aktiv und wird ausgelöst, wenn seine Eingabebedingungen erfüllt sind.
@@ -87,4 +92,5 @@ Klicken Sie auf **Speichern** in der Werkzeugleiste, um Ihre Änderungen zu spei
 ## Siehe auch
 
 - [Knotentypen](flows/node-types.md) -- Alle verfügbaren Knoten und ihre Einstellungen
+- [MQTT-Nachrichten-Explorer](mqtt/message-explorer.md) -- MQTT-Nachrichten neben dem Flow beobachten und senden
 - [Flows-Überblick](flows/overview.md) -- Was Flows sind und wie sie funktionieren

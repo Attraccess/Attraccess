@@ -13,7 +13,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { EntityManager, Repository } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder, SYSTEM_AUDIT_ACTOR } from '../../audit/recorder/audit-event';
 
 import { MetricsService } from '../../metrics/metrics.service';
 
@@ -21,7 +21,7 @@ import { NotificationDispatchService } from '../../notifications/notification-di
 
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
 
-import { ResourceAuditOrigin } from '../../audit/audit-policy';
+import { AuditActor } from '../../audit/recorder/audit-event';
 
 import { NotificationCategory } from '../../notifications/notification-types';
 
@@ -41,7 +41,7 @@ export class ResourceIntroductionsService {
     protected readonly metricsService: MetricsService,
     protected readonly notifications: NotificationDispatchService,
     protected readonly retraining: ResourceRetrainingService,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(ResourceIntroductionsService.name);
@@ -199,7 +199,7 @@ export class ResourceIntroductionsService {
     data?: UpdateResourceIntroductionDto,
     tutorUserId?: number,
     performedByUserId?: number | null,
-    authenticationMethod?: 'session' | 'api-token' | null,
+    authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null,
     apiTokenId?: number | null,
   ) {
     this.logger.debug(`Updating introduction status to ${nextStatus} for resourceId: ${resourceId}, userId: ${userId}`);
@@ -244,29 +244,29 @@ export class ResourceIntroductionsService {
       nextStatus === IntroductionHistoryAction.GRANT &&
       (await this.retraining.getIntroductionRetrainingStatus(resourceIntroduction.id))?.isDue === true;
     if (retrainingWasDue && !retrainingIsDue) {
-      const retrainingOrigin: ResourceAuditOrigin =
+      const retrainingOrigin: AuditActor =
         performedByUserId === null
-          ? { actorId: null }
+          ? SYSTEM_AUDIT_ACTOR
           : {
-              actorId: performedByUserId ?? userId,
+              id: performedByUserId ?? userId,
               authenticationMethod: authenticationMethod === undefined ? 'session' : authenticationMethod,
               ...(apiTokenId === undefined || apiTokenId === null ? {} : { apiTokenId }),
             };
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'retraining.cleared',
-        ...retrainingOrigin,
-        subjectId: resourceId,
+        actor: retrainingOrigin,
+        subject: { type: 'resource', id: resourceId },
         details: { introductionId: resourceIntroduction.id, usageUserId: userId },
       });
     }
 
     if (performedByUserId !== undefined) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: nextStatus === IntroductionHistoryAction.GRANT ? 'introduction.granted' : 'introduction.revoked',
-        actorId: performedByUserId,
-        authenticationMethod,
-        apiTokenId,
-        subjectId: resourceId,
+        actor: { id: performedByUserId, authenticationMethod: authenticationMethod, apiTokenId: apiTokenId },
+        subject: { type: 'resource', id: resourceId },
         details: { recipientUserId: userId, ...(tutorUserId === undefined ? {} : { tutorUserId }) },
       });
     }
@@ -280,7 +280,7 @@ export class ResourceIntroductionsService {
     options?: {
       tutorUserId?: number;
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | null;
+      authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null;
       apiTokenId?: number | null;
     },
   ): Promise<ResourceIntroductionHistoryItem> {
@@ -306,7 +306,7 @@ export class ResourceIntroductionsService {
     data?: UpdateResourceIntroductionDto,
     options?: {
       performedByUserId?: number | null;
-      authenticationMethod?: 'session' | 'api-token' | null;
+      authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth' | null;
       apiTokenId?: number | null;
     },
   ): Promise<ResourceIntroductionHistoryItem> {

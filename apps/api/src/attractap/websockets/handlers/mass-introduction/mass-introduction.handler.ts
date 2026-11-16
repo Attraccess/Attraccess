@@ -12,13 +12,16 @@ import { MassIntroductionService } from '../../../../resources/mass-introduction
 import { MassIntroductionEndReason } from '../../../../resources/mass-introductions/dtos/massIntroductionLiveEvent.dto';
 import { ResourceUsageService } from '../../../../resources/usage/sessions/resource-usage.service';
 import { AttractapService } from '../../../attractap.service';
+import { assertReaderPaired } from '../../../reader-pairing';
+import { CardOperationsService } from '../../card-operations.service';
+import { assertReaderRelaysCards } from '../card/card-write-errors';
 import { WebsocketService } from '../../websocket.service';
-import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../../websocket.types';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket, CardDetection } from '../../websocket.types';
 
 /**
  * Reader side of mass introductions (ATT-1151). The reader shows a scan screen; each tapped card
- * is crypto-authenticated like a supervisor card (UID lookup, key handed out, reader confirms)
- * before its owner is introduced, because a bare UID can be cloned.
+ * is authenticated by the server (EV2 with the stored key, relayed through the reader) before its
+ * owner is introduced, because a bare UID can be cloned.
  */
 @Injectable()
 export class AttractapMassIntroductionHandler implements OnModuleInit {
@@ -33,6 +36,9 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
   @Inject(ResourceUsageService)
   protected resourceUsageService: ResourceUsageService;
 
+  @Inject(CardOperationsService)
+  protected cardOperations: CardOperationsService;
+
   @Inject(MassIntroductionService)
   protected massIntroductionService: MassIntroductionService;
 
@@ -43,44 +49,12 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
     });
   }
 
-  public async handleCardAuthRequest(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { uid, sessionId } = (data.payload ?? {}) as { uid?: string; sessionId?: string };
-    const reply = (payload: Record<string, unknown>) =>
-      socket.sendMessage(
-        new AttractapEvent(AttractapEventType.MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA, { sessionId, ...payload }),
-      );
-
-    const flow = socket.state.massIntroductionFlow;
-    if (!flow || flow.sessionId !== sessionId) {
-      await reply({ error: 'NO_MASS_INTRODUCTION_IN_PROGRESS' });
-      return;
-    }
-    if (!uid || typeof uid !== 'string') {
-      await reply({ error: 'INVALID_UID' });
-      return;
-    }
-
-    const nfcCard = await this.attractapService.getNFCCardByUID(uid);
-    if (!nfcCard) {
-      await reply({ error: 'CARD_NOT_FOUND' });
-      return;
-    }
-    if (!nfcCard.isActive) {
-      await reply({ error: 'CARD_NOT_ACTIVE' });
-      return;
-    }
-
-    // The flow may have ended while the card was looked up.
-    if (socket.state.massIntroductionFlow !== flow) {
-      await reply({ error: 'NO_MASS_INTRODUCTION_IN_PROGRESS' });
-      return;
-    }
-    flow.pendingCard = { uid, userId: nfcCard.user.id };
-    await reply({ keyNo: nfcCard.keyNo, key: nfcCard.key, username: nfcCard.user.username });
-  }
-
-  public async handleCardAuthConfirmed(socket: AuthenticatedWebSocket, data: AttractapEvent['data']) {
-    const { uid, sessionId } = (data.payload ?? {}) as { uid?: string; sessionId?: string };
+  /** A card was tapped on the scan screen: the server authenticates it before its owner is introduced. */
+  public async handleCardDetected(
+    socket: AuthenticatedWebSocket,
+    detection: CardDetection,
+    sessionId: string | undefined,
+  ) {
     const reply = (payload: Record<string, unknown>) =>
       socket.sendMessage(new AttractapEvent(AttractapEventType.MASS_INTRODUCTION_RESULT, { sessionId, ...payload }));
 
@@ -89,16 +63,15 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
       await reply({ success: false, error: 'NO_MASS_INTRODUCTION_IN_PROGRESS' });
       return;
     }
-    const pendingCard = flow.pendingCard;
-    flow.pendingCard = null;
-    if (!pendingCard || pendingCard.uid !== uid) {
-      await reply({ success: false, error: 'CARD_MISMATCH' });
+
+    const verified = await this.cardOperations.verifyCard(socket, 'mass-introduction', detection);
+    if (!verified.ok) {
+      await reply({ success: false, error: verified.error });
       return;
     }
-
-    const nfcCard = await this.attractapService.getNFCCardByUID(pendingCard.uid);
-    if (!nfcCard?.isActive || nfcCard.user.id !== pendingCard.userId) {
-      await reply({ success: false, error: 'CARD_NOT_ACTIVE' });
+    // The flow may have ended while the card was checked.
+    if (socket.state.massIntroductionFlow !== flow) {
+      await reply({ success: false, error: 'NO_MASS_INTRODUCTION_IN_PROGRESS' });
       return;
     }
 
@@ -106,7 +79,7 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
       const { participant, participantCount } = await this.massIntroductionService.redeemCard(
         flow.sessionId,
         socket.readerId,
-        nfcCard.user,
+        verified.card.user,
       );
       await reply({
         success: true,
@@ -168,6 +141,7 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
     if (!reader) {
       throw new NotFoundException(`Reader not found: ${readerId}`);
     }
+    assertReaderPaired(reader);
     // Every reader that can enroll cards can run the scan flow; readers without a screen just cannot
     // show its progress.
     if (!reader.firmware?.capabilities?.cardEnrollment) {
@@ -182,6 +156,9 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
     if (sockets.length === 0) {
       throw new BadRequestException('The selected reader is offline');
     }
+
+    // Readers on firmware before 2.0.0 cannot relay card commands, so they cannot check a card.
+    assertReaderRelaysCards(sockets);
 
     // Checked before the socket state below: an await between the busy check and the claim would
     // let two concurrent arms both pass (see the supervision handler).
@@ -198,14 +175,13 @@ export class AttractapMassIntroductionHandler implements OnModuleInit {
           socket.state.massIntroductionFlow ||
           socket.state.supervisionFlow ||
           socket.state.enrollment ||
-          socket.state.enrollNewCardData ||
           socket.state.resetNfcCardData,
       )
     ) {
       throw new ConflictException('The selected reader is busy with another operation');
     }
     for (const socket of sockets) {
-      socket.state.massIntroductionFlow = { sessionId, pendingCard: null };
+      socket.state.massIntroductionFlow = { sessionId };
     }
 
     const start = new AttractapEvent(AttractapEventType.MASS_INTRODUCTION_START, {

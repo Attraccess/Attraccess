@@ -43,6 +43,12 @@ export interface SessionStore {
   revokeSsoSessions(selector: SsoSessionSelector): Promise<number>;
   putLogoutState(key: string, value: string, expiresAt: number): Promise<boolean>;
   takeLogoutState(key: string): Promise<string | null>;
+  /** Generic short-lived state; same insert-if-absent semantics as `putLogoutState`. */
+  putEphemeralState(key: string, value: string, expiresAt: number): Promise<boolean>;
+  /** Reads live state without consuming it. */
+  getEphemeralState(key: string): Promise<string | null>;
+  /** Atomically adds one to a counter that expires at `expiresAt` (epoch ms) and returns the new value. */
+  incrementEphemeralCounter(key: string, expiresAt: number): Promise<number>;
   validateSession(token: string): Promise<User | null>;
   rotateSession(token: string, newHashedToken: string, newExpiresAt: Date): Promise<boolean>;
   revokeSession(token: string): Promise<boolean>; // true = was active

@@ -100,9 +100,6 @@ void DemoSettingsScreen::init()
 void DemoSettingsScreen::onScreenLeave()
 {
     hideScanOverlay();
-#ifdef HAS_POWER_BUTTON
-    PowerOffButton::hideConfirm();
-#endif
 }
 
 void DemoSettingsScreen::loop()

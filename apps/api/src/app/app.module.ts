@@ -4,7 +4,9 @@ import { AuditModule } from '../audit/audit.module';
 import { AppService } from './app.service';
 import { UsersAndAuthModule } from '../users-and-auth/users-and-auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataSourceOptions } from 'typeorm';
 import { dataSourceConfig } from '../database/datasource';
+import { createDataSource } from '../database/sqlite-connection';
 import { ResourcesModule } from '../resources/resources.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import storageConfigObject, { StorageConfigType } from '../config/storage.config';
@@ -37,6 +39,7 @@ import { VersionModule } from '../version/version.module';
 import { MessagingModule } from '../messaging/messaging.module';
 import { PushModule } from '../push/push.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { McpModule } from '../mcp/mcp.module';
 
 const logger = new Logger('AppModule');
 
@@ -53,7 +56,11 @@ const logger = new Logger('AppModule');
     UsersAndAuthModule,
     SettingsModule,
     SecurityModule,
-    TypeOrmModule.forRoot(dataSourceConfig),
+    TypeOrmModule.forRootAsync({
+      useFactory: () => dataSourceConfig,
+      // The main connection shares the SQLite file with the resource-lifecycle and audit connections.
+      dataSourceFactory: async (options) => createDataSource(options as DataSourceOptions),
+    }),
     AuditModule,
     ResourcesModule,
     ServeStaticModule.forRootAsync({
@@ -112,7 +119,7 @@ const logger = new Logger('AppModule');
         return [
           {
             rootPath: resolvedFrontendPath,
-            exclude: ['/api/{*path}', '/docs/{*path}', '/cdn/{*path}'],
+            exclude: ['/api/{*path}', '/docs/{*path}', '/cdn/{*path}', '/.well-known/{*path}'],
           },
         ];
       },
@@ -132,6 +139,7 @@ const logger = new Logger('AppModule');
     MessagingModule,
     PushModule,
     NotificationsModule,
+    McpModule,
     LiveUpdatesModule,
   ],
   controllers: [AppController],

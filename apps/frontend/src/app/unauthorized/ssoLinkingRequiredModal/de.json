@@ -1,21 +1,21 @@
 {
-  "title": "Account verknüpfung erforderlich",
-  "subtitle": "Bitte verknüpfen Sie Ihr Konto mit Ihrem SSO-Konto",
-  "description": "Wir haben bereits ein Konto mit der E-Mail-Adresse {{email}} gefunden. Bitte geben Sie Ihr Passwort ein, um Ihr Konto mit Ihrem SSO-Konto zu verknüpfen.",
+  "title": "Kontoverknüpfung erforderlich",
+  "subtitle": "Bitte verknüpfe dein Konto mit deinem SSO-Konto",
+  "description": "Wir haben bereits ein Konto mit der E-Mail-Adresse {{email}} gefunden. Bitte gib dein Passwort ein, um es mit deinem SSO-Konto zu verknüpfen.",
   "inputs": {
     "password": {
       "label": "Passwort"
     }
   },
   "actions": {
-    "link": "Konto verknüpfen"
+    "link": "Konto verknüpfen",
+    "cancel": "Zurück zur Anmeldung",
+    "restartSso": "Erneut per SSO anmelden"
   },
   "errors": {
-    "passwordRequired": "Zum Verknüpfen wird ein Passwort benötigt. Bitte melde dich zuerst lokal an.",
+    "passwordRequired": "Dieses Konto hat noch kein Passwort. Lege über „Passwort vergessen?“ auf der Anmeldeseite eines fest und versuche es dann erneut.",
     "alreadyLinked": "Dieses Konto ist bereits mit SSO verknüpft.",
     "subjectTaken": "Diese SSO-Identität ist bereits mit einem anderen Konto verknüpft.",
-    "invalidToken": "Diese Verknüpfung ist nicht mehr gültig. Bitte starte den SSO-Login erneut.",
-    "invalidPassword": "Ungültiges Passwort. Bitte erneut versuchen.",
-    "unknown": "Verknüpfung fehlgeschlagen. Bitte erneut versuchen oder Support kontaktieren."
+    "invalidPassword": "Ungültiges Passwort. Bitte erneut versuchen."
   }
 }

@@ -49,6 +49,9 @@ export interface AttraccessFrontendPlugin extends IPlugin {
   getRoutes?(): RouteConfig[];
   // Optional. Return the sidebar navigation entries this plugin contributes.
   getSidebarItems?(): PluginSidebarItem[];
+  // Optional. Subscribe to changes of this plugin's sidebar entries (e.g. after an async permission check);
+  // the host then calls getSidebarItems() again. Returns the unsubscribe function.
+  onSidebarItemsChange?(listener: () => void): () => void;
   // Optional. Declare groups your entries need, including shared groups.
   // Each plugin can declare the same shared ID to work independently.
   // Host groups take precedence; the first plugin declaration wins duplicate IDs.

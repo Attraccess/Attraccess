@@ -42,6 +42,10 @@ const cases: Array<[ResourceFlowNodeType, Domain]> = [
   [ResourceFlowNodeType.INPUT_RESOURCE_METERING_COLLECT, 'billing'],
   [ResourceFlowNodeType.OUTPUT_RESOURCE_METERING_READY, 'billing'],
   [ResourceFlowNodeType.OUTPUT_RESOURCE_METERING_REPORT, 'billing'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_HEALTH_CHANGED, 'health-monitoring'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_MAINTENANCE_CREATED, 'operation-activity'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_MAINTENANCE_FINISHED, 'operation-activity'],
+  [ResourceFlowNodeType.INPUT_RESOURCE_MAINTENANCE_REQUEST_CREATED, 'operation-activity'],
 ];
 
 describe('nodeTypeDomain', () => {

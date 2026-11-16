@@ -1,15 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { NotificationPreference } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import {
   ALL_NOTIFICATION_CATEGORIES,
+  AnyNotificationCategory,
   DEFAULT_NOTIFICATION_CHANNELS,
+  DEFAULT_PLUGIN_NOTIFICATION_CHANNELS,
   NotificationCategory,
   NotificationCategoryPreferences,
   NotificationChannel,
   NotificationChannelPreferences,
 } from './notification-types';
+import { getPluginNotificationCategory, listPluginNotificationCategories } from './plugin-notification-categories';
 import { NotificationPreferencesDto } from './dtos/notification-preferences.dto';
 import { UpdateNotificationPreferencesDto } from './dtos/update-notification-preferences.dto';
 
@@ -30,6 +33,10 @@ export class NotificationPreferenceService {
     dto: UpdateNotificationPreferencesDto,
   ): Promise<NotificationPreferencesDto> {
     const existing = await this.preferenceRepository.findOne({ where: { userId } });
+    const isCore = ALL_NOTIFICATION_CATEGORIES.includes(dto.category as NotificationCategory);
+    if (!isCore && !getPluginNotificationCategory(dto.category)) {
+      throw new BadRequestException(`Unknown notification category "${dto.category}"`);
+    }
     const preferences = this.resolvePreferences(existing);
     preferences[dto.category] = { ...preferences[dto.category], ...dto.channels };
 
@@ -43,19 +50,35 @@ export class NotificationPreferenceService {
 
   public async isChannelEnabled(
     userId: number,
-    category: NotificationCategory,
+    category: AnyNotificationCategory,
     channel: NotificationChannel,
   ): Promise<boolean> {
     const row = await this.preferenceRepository.findOne({ where: { userId } });
-    return this.resolvePreferences(row)[category][channel];
+    return (this.resolvePreferences(row)[category] ?? DEFAULT_PLUGIN_NOTIFICATION_CHANNELS)[channel];
   }
 
-  private resolvePreferences(row: Partial<NotificationPreference> | null): NotificationCategoryPreferences {
-    const preferences = this.cloneDefaults();
-    const parsed = this.parseCategoryChannels(row?.categoryChannels);
+  private resolvePreferences(
+    row: Partial<NotificationPreference> | null,
+  ): NotificationCategoryPreferences & Record<string, NotificationChannelPreferences> {
+    const preferences: NotificationCategoryPreferences & Record<string, NotificationChannelPreferences> =
+      this.cloneDefaults();
+    const parsed = this.parseCategoryChannels(row?.categoryChannels) as Record<
+      string,
+      Partial<NotificationChannelPreferences> | undefined
+    >;
 
     for (const category of ALL_NOTIFICATION_CATEGORIES) {
       preferences[category] = { ...preferences[category], ...parsed[category] };
+    }
+    // Plugin categories exist only while their plugin is loaded; stored choices for others are ignored.
+    for (const { key } of listPluginNotificationCategories()) {
+      preferences[key] = { ...DEFAULT_PLUGIN_NOTIFICATION_CHANNELS, ...parsed[key] };
+    }
+    // Keep choices of currently unloaded plugins so a save does not discard them.
+    for (const key of Object.keys(parsed)) {
+      if (key.startsWith('plugin.') && !preferences[key]) {
+        preferences[key] = { ...DEFAULT_PLUGIN_NOTIFICATION_CHANNELS, ...parsed[key] };
+      }
     }
 
     if (!parsed[NotificationCategory.MESSAGES]) {
@@ -88,8 +111,16 @@ export class NotificationPreferenceService {
     ) as NotificationCategoryPreferences;
   }
 
-  private toDto(preferences: NotificationCategoryPreferences): NotificationPreferencesDto {
+  private toDto(
+    preferences: NotificationCategoryPreferences & Record<string, NotificationChannelPreferences>,
+  ): NotificationPreferencesDto {
     return {
+      pluginCategories: listPluginNotificationCategories().map(({ key, pluginName, label }) => ({
+        category: key,
+        pluginName,
+        label,
+        channels: preferences[key],
+      })),
       categories: ALL_NOTIFICATION_CATEGORIES.map((category) => ({
         category,
         channels: preferences[category] as NotificationChannelPreferences,

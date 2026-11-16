@@ -1,3 +1,4 @@
+import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import {
   BillingTransaction,
   BillingTransactionItem,
@@ -18,7 +19,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { EntityManager, Repository, MoreThan } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { EmailService } from '../../email/email.service';
 
@@ -33,34 +34,50 @@ import { LiveNotificationsService } from '../live-notifications/live-notificatio
 import { BillingLedger } from '../accounting/billing-ledger';
 
 import { applyBillingFactor, toExactCredits } from '@attraccess/shared';
+import { OperatingShare, operatingBreakdown } from '../../resources/operating-intervals/operating-share';
+import { PaginationOptions } from '../../types/request';
+import { BillingConfigurationDto } from '../dto/configuration.dto';
+import { RefundTransactionDto } from '../dto/refund-transaction.dto';
+import { SetBillingConfigurationDto } from '../dto/set-configuration.dto';
+import { TransactionsDto } from '../dto/transactions.dto';
+import { UpdateResourceBillingConfigurationDto } from '../dto/update-resource-billing-configuration.dto';
 
 @Injectable()
-export class BillingService extends BillingLedger {
+export class BillingService {
+  private readonly ledger: BillingLedger;
+
   constructor(
     @InjectRepository(BillingTransaction)
-    protected readonly billingTransactionRepository: Repository<BillingTransaction>,
+    private readonly billingTransactionRepository: Repository<BillingTransaction>,
     @InjectRepository(User)
-    protected readonly userRepository: Repository<User>,
+    private readonly userRepository: Repository<User>,
     @InjectRepository(ResourceBillingConfiguration)
-    protected readonly resourceBillingConfigurationRepository: Repository<ResourceBillingConfiguration>,
-    protected readonly liveNotificationsService: LiveNotificationsService,
+    private readonly resourceBillingConfigurationRepository: Repository<ResourceBillingConfiguration>,
+    private readonly liveNotificationsService: LiveNotificationsService,
     @InjectRepository(Setting)
-    protected readonly settingRepository: Repository<Setting>,
+    private readonly settingRepository: Repository<Setting>,
     @InjectRepository(BillingTransactionItem)
-    protected readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
-    protected readonly resourceFlowsService: ResourceFlowsService,
-    protected readonly emailService: EmailService,
+    private readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
+    private readonly resourceFlowsService: ResourceFlowsService,
+    private readonly emailService: EmailService,
     @Inject(EventEmitter2)
-    protected readonly eventEmitter: EventEmitter2,
-    protected readonly metricsService: MetricsService,
-    protected readonly auditService: AuditService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
+    @Inject(AUDIT_RECORDER) private readonly auditService: AuditRecorder,
   ) {
-    super();
+    this.ledger = new BillingLedger(
+      this.settingRepository,
+      this.userRepository,
+      this.billingTransactionRepository,
+      this.liveNotificationsService,
+      this.auditService,
+      this.metricsService,
+      this.resourceBillingConfigurationRepository,
+      this.eventEmitter,
+    );
   }
 
-  protected readonly logger = new Logger(BillingService.name);
-
-  protected DEFAULT_RELATIONS = ['initiator', 'resourceUsage', 'resourceUsage.resource', 'refundOf', 'items'];
+  private readonly logger = new Logger(BillingService.name);
 
   /** Validate a tentative start without creating an externally visible billing transaction. */
   public async validateResourceUsageStart(
@@ -103,14 +120,14 @@ export class BillingService extends BillingLedger {
       amount: 0,
       status: BillingTransactionStatus.Pending,
     });
-    void this.auditService.recordBillingTransactionAfterCommit(
-      {
+    await this.auditService.record(
+      billingTransactionAuditEvent({
         transactionId: transaction.id,
         userId: transaction.userId,
         amount: transaction.amount,
         status: transaction.status,
         source: 'resource-usage',
-      },
+      }),
       transactionalEntityManager,
     );
   }
@@ -145,6 +162,8 @@ export class BillingService extends BillingLedger {
   public async chargeForResourceUsage(
     usage: ResourceUsage,
     transactionManager?: EntityManager,
+    /** The running time split among the sessions that shared the machine; sessions that never did bill by the minute. */
+    operatingShare?: OperatingShare | null,
   ): Promise<BillingTransaction> {
     let existingTransaction: BillingTransaction | null;
     if (transactionManager) {
@@ -172,11 +191,15 @@ export class BillingService extends BillingLedger {
       const operatingDurationMs = Math.round((usage.attributedOperatingDurationInMinutes ?? 0) * 60_000);
       const roundedMinutes = Math.ceil(sessionDurationMs / 60_000);
       const roundedOperatingMinutes = Math.ceil(operatingDurationMs / 60_000);
+      // Rounding a shared session's time up per person would create credit, so it is charged on exact shares.
+      const sharedOperating = operatingShare?.shared ? operatingShare : null;
       // Legacy sessions have no complete snapshot; preserve their existing configuration fallback.
       const creditsForSession = usage.creditsPerUsage ?? configuration.creditsPerUsage;
       let grossCredits =
         toExactCredits(sessionDurationRate) * toExactCredits(roundedMinutes) +
-        toExactCredits(operatingDurationRate) * toExactCredits(roundedOperatingMinutes) +
+        (sharedOperating
+          ? toExactCredits(operatingDurationRate > 0 ? sharedOperating.credits : 0)
+          : toExactCredits(operatingDurationRate) * toExactCredits(roundedOperatingMinutes)) +
         toExactCredits(creditsForSession);
 
       let transaction = await manager.findOne(BillingTransaction, {
@@ -209,15 +232,15 @@ export class BillingService extends BillingLedger {
 
         transaction.amount = -totalCredits;
         transaction.status = BillingTransactionStatus.Completed;
-        void this.auditService.recordBillingTransactionAfterCommit(
-          {
+        await this.auditService.record(
+          billingTransactionAuditEvent({
             transactionId: transaction.id,
             userId: transaction.userId,
             amount: transaction.amount,
             status: transaction.status,
             previousStatus,
             source: 'resource-usage',
-          },
+          }),
           manager,
         );
       } else {
@@ -227,14 +250,14 @@ export class BillingService extends BillingLedger {
           amount: -totalCredits,
           status: BillingTransactionStatus.Completed,
         } as Partial<BillingTransaction>);
-        void this.auditService.recordBillingTransactionAfterCommit(
-          {
+        await this.auditService.record(
+          billingTransactionAuditEvent({
             transactionId: transaction.id,
             userId: transaction.userId,
             amount: transaction.amount,
             status: transaction.status,
             source: 'resource-usage',
-          },
+          }),
           manager,
         );
       }
@@ -254,7 +277,29 @@ export class BillingService extends BillingLedger {
         quantity: roundedMinutes,
       });
 
-      if (operatingDurationRate > 0) {
+      if (operatingDurationRate > 0 && sharedOperating) {
+        const breakdown = operatingBreakdown(sharedOperating);
+        await manager.save(
+          BillingTransactionItem,
+          breakdown.length
+            ? {
+                billingTransactionId: transaction.id,
+                name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+                durationMs: sharedOperating.shareMs,
+                unitPrice: sharedOperating.credits,
+                quantity: 1,
+                allocation: { kind: 'operating-time' as const, segments: breakdown },
+              }
+            : // Without any running time there is nothing to show a share of; it reads like a solo session with none.
+              {
+                billingTransactionId: transaction.id,
+                name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
+                durationMs: 0,
+                unitPrice: operatingDurationRate,
+                quantity: 0,
+              },
+        );
+      } else if (operatingDurationRate > 0) {
         await manager.save(BillingTransactionItem, {
           billingTransactionId: transaction.id,
           name: 'PER_ATTRIBUTABLE_OPERATING_MINUTE',
@@ -311,5 +356,60 @@ export class BillingService extends BillingLedger {
       // A receipt delivery failure must not change an already committed charge.
       this.logger.warn(`Failed to publish resource usage charge ${transactionId}`, error);
     }
+  }
+
+  async getBalance(userId: number, transactionalEntityManager?: EntityManager): Promise<number> {
+    return this.ledger.getBalance(userId, transactionalEntityManager);
+  }
+
+  async getTransactionIdForUsage(usageId: number, userId: number): Promise<number | null> {
+    return this.ledger.getTransactionIdForUsage(usageId, userId);
+  }
+
+  async getHistory(userId: number, options: PaginationOptions): Promise<TransactionsDto> {
+    return this.ledger.getHistory(userId, options);
+  }
+
+  async getTransaction(transactionId: number, userId?: number): Promise<BillingTransaction> {
+    return this.ledger.getTransaction(transactionId, userId);
+  }
+
+  async getResourceUsageCharge(resourceUsageId: number, userId: number): Promise<BillingTransaction | null> {
+    return this.ledger.getResourceUsageCharge(resourceUsageId, userId);
+  }
+
+  async createManualTransaction(
+    userId: number,
+    initiatorId: number,
+    amount: number,
+    failOnInsufficientBalance = true,
+  ): Promise<BillingTransaction> {
+    return this.ledger.createManualTransaction(userId, initiatorId, amount, failOnInsufficientBalance);
+  }
+
+  async refundTransaction(executingUserId: number, transactionId: number, data: RefundTransactionDto) {
+    return this.ledger.refundTransaction(executingUserId, transactionId, data);
+  }
+
+  async setConfiguration(nextConfigurationData: SetBillingConfigurationDto): Promise<BillingConfigurationDto> {
+    return this.ledger.setConfiguration(nextConfigurationData);
+  }
+
+  async getConfiguration(): Promise<BillingConfigurationDto> {
+    return this.ledger.getConfiguration();
+  }
+
+  async getResourceBillingConfiguration(
+    resourceId: number,
+    transactionManager?: EntityManager,
+  ): Promise<ResourceBillingConfiguration> {
+    return this.ledger.getResourceBillingConfiguration(resourceId, transactionManager);
+  }
+
+  async updateResourceBillingConfiguration(
+    resourceId: number,
+    data: UpdateResourceBillingConfigurationDto,
+  ): Promise<ResourceBillingConfiguration> {
+    return this.ledger.updateResourceBillingConfiguration(resourceId, data);
   }
 }

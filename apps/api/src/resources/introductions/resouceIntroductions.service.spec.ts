@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -11,15 +12,20 @@ import { MetricsService } from '../../metrics/metrics.service';
 import { NotificationDispatchService } from '../../notifications/notification-dispatch.service';
 import { NotificationCategory } from '../../notifications/notification-types';
 import { ResourceRetrainingService } from '../retraining/resourceRetraining.service';
-import { AuditService } from '../../audit/audit.service';
 
 describe('ResourceIntroductionsService notifications', () => {
   let service: ResourceIntroductionsService;
-  let introductionRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; update: jest.Mock; find: jest.Mock };
+  let introductionRepository: {
+    findOne: jest.Mock;
+    create: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+    find: jest.Mock;
+  };
   let historyRepository: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; find: jest.Mock };
   let notifications: { dispatch: jest.Mock };
   let retraining: { getIntroductionRetrainingStatus: jest.Mock };
-  let audit: { recordResource: jest.Mock };
+  let audit: { record: jest.Mock };
 
   beforeEach(async () => {
     introductionRepository = {
@@ -37,7 +43,7 @@ describe('ResourceIntroductionsService notifications', () => {
     };
     notifications = { dispatch: jest.fn().mockResolvedValue(undefined) };
     retraining = { getIntroductionRetrainingStatus: jest.fn().mockResolvedValue({ isDue: false }) };
-    audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
+    audit = { record: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -48,12 +54,12 @@ describe('ResourceIntroductionsService notifications', () => {
         { provide: MetricsService, useValue: { resourceIntroductionsTotal: { inc: jest.fn() } } },
         { provide: NotificationDispatchService, useValue: notifications },
         { provide: ResourceRetrainingService, useValue: retraining },
-        { provide: AuditService, useValue: audit },
+        { provide: AUDIT_RECORDER, useValue: audit },
       ],
     }).compile();
 
     service = module.get(ResourceIntroductionsService);
-    audit.recordResource.mockClear();
+    audit.record.mockClear();
   });
 
   it('notifies the user when a resource introduction is granted', async () => {
@@ -74,20 +80,33 @@ describe('ResourceIntroductionsService notifications', () => {
     await service.grant(7, 3, undefined, { performedByUserId: 9 });
 
     expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
-    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'introduction.granted', actorId: 9, subjectId: 7, details: { recipientUserId: 3 },
-    }));
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: 'resource',
+        action: 'introduction.granted',
+        actor: expect.objectContaining({ id: 9 }),
+        subject: expect.objectContaining({ id: 7 }),
+        details: { recipientUserId: 3 },
+      }),
+    );
   });
 
   it('records a cleared event only when the renewed resource introduction was due', async () => {
     introductionRepository.findOne.mockResolvedValue({ id: 10, receiverUser: { id: 3 } });
-    retraining.getIntroductionRetrainingStatus.mockResolvedValueOnce({ isDue: true }).mockResolvedValueOnce({ isDue: false });
+    retraining.getIntroductionRetrainingStatus
+      .mockResolvedValueOnce({ isDue: true })
+      .mockResolvedValueOnce({ isDue: false });
 
     await service.grant(7, 3);
 
-    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'retraining.cleared', subjectId: 7, details: { introductionId: 10, usageUserId: 3 },
-    }));
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: 'resource',
+        action: 'retraining.cleared',
+        subject: expect.objectContaining({ id: 7 }),
+        details: { introductionId: 10, usageUserId: 3 },
+      }),
+    );
   });
 
   it('does not clear a resource introduction when inactivity remains due after renewal', async () => {
@@ -96,7 +115,7 @@ describe('ResourceIntroductionsService notifications', () => {
 
     await service.grant(7, 3);
 
-    expect(audit.recordResource).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 
   it('records the acting user for a revoked introduction', async () => {
@@ -105,7 +124,13 @@ describe('ResourceIntroductionsService notifications', () => {
     await service.revoke(7, 3, undefined, { performedByUserId: 9 });
 
     expect(historyRepository.create).toHaveBeenCalledWith(expect.objectContaining({ performedByUser: { id: 9 } }));
-    expect(audit.recordResource).toHaveBeenCalledWith(expect.objectContaining({ action: 'introduction.revoked', actorId: 9 }));
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: 'resource',
+        action: 'introduction.revoked',
+        actor: expect.objectContaining({ id: 9 }),
+      }),
+    );
   });
 
   it('does not notify when a resource introduction is granted twice without an effective access change', async () => {

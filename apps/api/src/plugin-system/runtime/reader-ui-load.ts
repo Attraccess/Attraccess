@@ -6,18 +6,23 @@ import {
   type PreStartHook,
   type ReaderUiProvider,
   type SessionEndHook,
+  type StartBlockedQuery,
+  type StartCapacityHook,
 } from '@attraccess/plugins-backend-sdk';
 
 export interface ReaderUiContributions {
   readerUi?: ReaderUiProvider;
   preStartHook?: PreStartHook;
   sessionEndHook?: SessionEndHook;
+  startBlockedQuery?: StartBlockedQuery;
+  startCapacityHook?: StartCapacityHook;
 }
 
 /**
  * Collects the reader UI contributions of a plugin module and enforces the permissions.
  * Throws PluginPermissionError (quarantines the plugin) when `readerUi` is declared without
- * READER_UI or a hook without ACCESS_HOOKS. Returns null when the plugin contributes nothing.
+ * READER_UI, a hook without ACCESS_HOOKS, or the start capacity hook (handed the host's transaction) without
+ * DATABASE_ACCESS. Returns null when the plugin contributes nothing.
  */
 export function collectReaderUiContributions(
   pluginName: string,
@@ -38,10 +43,15 @@ export function collectReaderUiContributions(
   for (const [field, hook] of [
     ['preStartHook', exported.preStartHook],
     ['sessionEndHook', exported.sessionEndHook],
+    ['startBlockedQuery', exported.startBlockedQuery],
+    ['startCapacityHook', exported.startCapacityHook],
   ] as const) {
     if (!hook) continue;
     if (!granted.has(PluginPermission.ACCESS_HOOKS)) {
       throw new PluginPermissionError(pluginName, field, PluginPermission.ACCESS_HOOKS);
+    }
+    if (field === 'startCapacityHook' && !granted.has(PluginPermission.DATABASE_ACCESS)) {
+      throw new PluginPermissionError(pluginName, field, PluginPermission.DATABASE_ACCESS);
     }
     if (typeof hook !== 'function') throw new Error(`Plugin ${pluginName}: ${field} must be a function`);
     out[field] = hook as never;
@@ -49,5 +59,10 @@ export function collectReaderUiContributions(
   if (out.readerUi && typeof out.readerUi.getSlotContributions !== 'function') {
     throw new Error(`Plugin ${pluginName}: readerUi.getSlotContributions must be a function`);
   }
-  return out.readerUi || out.preStartHook || out.sessionEndHook ? out : null;
+  if (out.readerUi && out.readerUi.getTimeZone !== undefined && typeof out.readerUi.getTimeZone !== 'function') {
+    throw new Error(`Plugin ${pluginName}: readerUi.getTimeZone must be a function`);
+  }
+  return out.readerUi || out.preStartHook || out.sessionEndHook || out.startBlockedQuery || out.startCapacityHook
+    ? out
+    : null;
 }

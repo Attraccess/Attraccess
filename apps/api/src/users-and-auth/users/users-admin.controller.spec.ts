@@ -1,3 +1,5 @@
+import { UserAdministrationService } from './user-administration.service';
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
 import { UsersAdminController } from './users-admin.controller';
@@ -16,6 +18,8 @@ describe('UsersAdminController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UsersAdminController],
       providers: [
+        UserAdministrationService,
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         {
           provide: UsersService,
           useValue: {

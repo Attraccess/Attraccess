@@ -1,6 +1,7 @@
 import {
   HEADER_REQUEST_DEADLINE,
   MAX_REQUEST_DEADLINE_MS,
+  OPERATIONS,
   findOperation,
   type OperationId,
   type TypedOperation,
@@ -8,7 +9,9 @@ import {
   type OperationDefinition,
 } from '@attraccess/matter-contract';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { ApiError } from './api-error';
 import { versionedRefusal, type RunningReleases } from './admission';
+import { UNAUTHORIZED_MESSAGE, type TokenAuthenticator } from './auth';
 import type { SidecarConfig } from './config';
 import {
   BodyTooLargeError,
@@ -37,10 +40,16 @@ export type PipelineDeps = {
   config: SidecarConfig;
   running: RunningReleases;
   logger: Logger;
+  auth: TokenAuthenticator;
   isDraining: () => boolean;
   builtIns: Partial<Record<OperationId, (correlationId: string) => { status: number; body: unknown }>>;
   features: FeatureHandlers;
 };
+
+/** The probes container platforms call without credentials. They reveal no versions. */
+const ANONYMOUS_OPERATIONS: ReadonlySet<string> = new Set(
+  OPERATIONS.filter((operation) => operation.anonymous).map((operation) => operation.id),
+);
 
 class DeadlineError extends Error {}
 
@@ -113,7 +122,10 @@ async function runFeature(
   deps: PipelineDeps,
 ): Promise<{ status: number; body: unknown } | { error: ErrorReply }> {
   const controller = new AbortController();
-  const deadlineMs = parseDeadline(req, input.body, deps.config.requestDeadlineMs);
+  // Backup operations stop and restart the controller, and a commit cannot be cancelled halfway: the caller's deadline
+  // header governs them, up to the contract maximum, instead of the shorter default.
+  const base = operation.family === 'backup' ? MAX_REQUEST_DEADLINE_MS : deps.config.requestDeadlineMs;
+  const deadlineMs = parseDeadline(req, input.body, base);
   try {
     const value = await withDeadline(
       handler({ ...input, correlationId, signal: controller.signal }),
@@ -138,9 +150,18 @@ async function runFeature(
         },
       };
     }
+    if (error instanceof ApiError) {
+      return {
+        error: { code: error.code, message: error.message, ...(error.details ? { details: error.details } : {}) },
+      };
+    }
     deps.logger('error', 'handler failed', { operation: operation.id, correlationId });
     return { error: { code: 'internal_error', message: 'The request failed.' } };
   }
+}
+
+function operationLimit(operation: OperationDefinition, deps: PipelineDeps): number {
+  return operation.bodyLimitBytes ?? deps.config.maxMessageBytes;
 }
 
 function unsupported(family: FeatureFamily): ErrorReply {
@@ -166,7 +187,19 @@ async function respond(
     deps.logger('error', 'built-in returned an invalid response', { operation: operation.id, correlationId });
     return { error: invalidResponse };
   }
-  const input = await parseInput(req, operation, params, deps.config.maxMessageBytes);
+  if (operation.secretsOnWire && deps.config.insecureRemote) {
+    // Fabric secrets never cross an unencrypted network link, whatever the handler would have done.
+    return {
+      error: {
+        code: 'insecure_transport',
+        message:
+          'Backup and restore carry fabric secrets and are refused over plain HTTP on a non-loopback address. ' +
+          'Serve the sidecar with TLS (MATTER_SIDECAR_TLS_CERT_FILE and MATTER_SIDECAR_TLS_KEY_FILE).',
+      } as ErrorReply,
+    };
+  }
+  const limit = operation.bodyLimitBytes ?? deps.config.maxMessageBytes;
+  const input = await parseInput(req, operation, params, limit);
   if ('error' in input && input.error) return { error: input.error };
   const handler = deps.features[operation.id];
   if (!handler) return { error: unsupported(operation.family) };
@@ -182,10 +215,17 @@ async function respond(
 
 export async function handleRequest(req: IncomingMessage, res: ServerResponse, deps: PipelineDeps): Promise<void> {
   const correlationId = correlationIdFrom(req.headers);
-  const denied = checkLocalAccess(req.headers);
+  // Check order: origin/host (403), authentication (401), draining (503), release admission (426/409).
+  const denied = checkLocalAccess(req.headers, deps.config.allowedHosts);
   if (denied) return sendError(res, { code: 'forbidden_origin', message: denied }, correlationId, true);
   const path = requestPath(req.url);
   const route = path === null ? ({ kind: 'not-found' } as const) : findOperation(req.method ?? 'GET', path);
+  // Only the container probes are anonymous. Everything else, including unknown paths, needs the token first, so an
+  // unauthenticated caller learns nothing about routes or versions.
+  const anonymous = route.kind === 'match' && ANONYMOUS_OPERATIONS.has(route.match.operation.id);
+  if (!anonymous && deps.auth.check(req.headers, req.socket.remoteAddress)) {
+    return sendError(res, { code: 'unauthorized', message: UNAUTHORIZED_MESSAGE }, correlationId, true);
+  }
   if (route.kind === 'not-found') return sendError(res, { code: 'not_found', message: 'Unknown path.' }, correlationId);
   if (route.kind === 'method-not-allowed') {
     return sendError(res, { code: 'method_not_allowed', message: 'Method not allowed.' }, correlationId);
@@ -204,7 +244,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse, d
         {
           code: 'payload_too_large',
           message: 'Request body exceeds the size limit.',
-          details: { limitBytes: deps.config.maxMessageBytes },
+          details: { limitBytes: operationLimit(operation, deps) },
         },
         correlationId,
         true,

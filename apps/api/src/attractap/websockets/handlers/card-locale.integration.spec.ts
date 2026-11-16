@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import * as migrations from '../../../database/migrations';
 import { UserProfileController } from '../../../users-and-auth/users/user-profile.controller';
 import { UsersService } from '../../../users-and-auth/users/users.service';
+import { composeUsersService } from '../../../users-and-auth/users/fixtures/compose.test-fixture';
 import { getSupportedDeviceLanguage } from '@attraccess/shared';
 import { SettingsService } from '../../../settings/settings.service';
 import { AttractapService } from '../../attractap.service';
@@ -43,13 +44,22 @@ describe('persisted web UI locale at card authentication', () => {
     });
 
     // Keep production persistence and lookup methods; stub only unrelated collaborators.
-    const usersService: UsersService = Object.assign(Object.create(UsersService.prototype), {
+    const usersService: UsersService = composeUsersService(
       userRepository,
-      metricsService: {
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
         usersLocaleSyncsTotal: { inc: jest.fn() },
         usersPerLocale: { inc: jest.fn(), dec: jest.fn() },
       },
-    });
+      undefined,
+      undefined,
+    );
     const profile = new UserProfileController(usersService);
     const attractapService: AttractapService = Object.assign(Object.create(AttractapService.prototype), {
       nfcCardRepository: cardRepository,
@@ -68,15 +78,18 @@ describe('persisted web UI locale at card authentication', () => {
       resourceIntroducersService: { isIntroducer: async () => false },
       rbacService: { getEffectivePermissions: async () => new Set<string>() },
       resourceListService: { sendResourceListToSocket: async () => undefined },
+      // The card proof itself is covered by card-relay.spec.ts and card-pending-records.spec.ts.
+      cardOperations: {
+        verifyCard: async (_socket: unknown, _purpose: string, detection: { uid: string }) => ({
+          ok: true,
+          card: await attractapService.getNFCCardByUID(detection.uid),
+        }),
+      },
       cardSessions: new CardSessionService(),
     });
     const sendMessage = jest.fn().mockResolvedValue(true);
-    const socket = { readerId: 42, state: {}, sendMessage } as unknown as AuthenticatedWebSocket;
-    const tap = () =>
-      handler.handleCardAuthenticationRequest(socket, {
-        type: AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA,
-        payload: { uid: card.uid, resourceId: resource.id },
-      });
+    const socket = { readerId: 42, readyState: 1, state: {}, sendMessage } as unknown as AuthenticatedWebSocket;
+    const tap = () => handler.handleCardTap(socket, { uid: card.uid, detectionId: 1 }, resource.id);
     const expectLanguage = (language: string, languageFallback = false) =>
       expect(sendMessage).toHaveBeenLastCalledWith(
         expect.objectContaining({

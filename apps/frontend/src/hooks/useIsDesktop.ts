@@ -1,12 +1,31 @@
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 /** Tailwind's `sm` breakpoint. The settings shell switches between a rail and a list here. */
 const DESKTOP_QUERY = '(min-width: 640px)';
 
-function subscribe(onChange: () => void): () => void {
-  const mql = window.matchMedia(DESKTOP_QUERY);
-  mql.addEventListener('change', onChange);
-  return () => mql.removeEventListener('change', onChange);
+// Test environments may run without matchMedia.
+const canMatch = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function';
+
+/**
+ * Whether a media query matches, read synchronously on the first render and kept up to date.
+ * Without `matchMedia` (some test environments) it reports `fallback`.
+ */
+export function useMediaQuery(query: string, fallback = true): boolean {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!canMatch()) return () => undefined;
+      const mql = window.matchMedia(query);
+      mql.addEventListener('change', onChange);
+      return () => mql.removeEventListener('change', onChange);
+    },
+    [query],
+  );
+  return useSyncExternalStore(subscribe, () => (canMatch() ? window.matchMedia(query).matches : fallback));
+}
+
+/** Whether the viewport is at least `px` wide, e.g. 1024 for Tailwind's `lg`. */
+export function useMinWidth(px: number): boolean {
+  return useMediaQuery(`(min-width: ${px}px)`);
 }
 
 /**
@@ -17,5 +36,5 @@ function subscribe(onChange: () => void): () => void {
  * flashes the phone list for one frame before redirecting.
  */
 export function useIsDesktop(): boolean {
-  return useSyncExternalStore(subscribe, () => window.matchMedia(DESKTOP_QUERY).matches);
+  return useMediaQuery(DESKTOP_QUERY);
 }

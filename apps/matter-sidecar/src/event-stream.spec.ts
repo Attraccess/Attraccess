@@ -6,7 +6,7 @@ function stream(maxEvents = 3, maxAgeMs = 1_000) {
   return { clock, stream: new EventStream({ maxEvents, maxAgeMs, now: () => clock.now }) };
 }
 const publish = (s: EventStream, count = 1) =>
-  Array.from({ length: count }, () => s.publish('device.state', { value: 1 }));
+  Array.from({ length: count }, () => s.publish('fabric.changed', { value: 1 }));
 
 describe('EventStream', () => {
   it('assigns increasing sequence numbers, ids and timestamps once', () => {

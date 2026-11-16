@@ -1,4 +1,5 @@
 # MQTT-Beispiele
+<!-- llms-description: Praktische MQTT-Beispiele: Maschinensteuerung über Relais, Sensordaten empfangen und MQTT in Flows für Nutzungsereignisse. -->
 
 Diese Seite zeigt praktische Beispiele, wie Sie MQTT mit Attraccess verwenden können, um Maschinen zu steuern, Sensordaten zu empfangen und Geräte in Produktions- und Laborumgebungen zu automatisieren.
 

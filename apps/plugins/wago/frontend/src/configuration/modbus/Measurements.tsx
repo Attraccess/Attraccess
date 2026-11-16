@@ -1,10 +1,10 @@
 import { ENGINEERING_UNITS } from '../../../../measurement-contract';
 import { Button } from '@heroui/react';
 import { modbusDisplayName } from './modbus-labels';
-import { Field } from './ConfigurationForm';
-import { Choice } from './ConfigurationForm';
-import { FormatFields } from './ConfigurationForm';
-import { SignalDisclosure } from './ConfigurationForm';
+import { Field } from './FormFields';
+import { Choice } from './FormFields';
+import { FormatFields } from './FormFields';
+import { SignalDisclosure } from './FormFields';
 import { useModbusProfileFormState } from './useModbusProfileFormState';
 type Model = ReturnType<typeof useModbusProfileFormState>;
 type Props = Pick<

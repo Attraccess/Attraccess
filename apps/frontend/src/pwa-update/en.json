@@ -1,0 +1,17 @@
+{
+  "toast": {
+    "title": "Downloading update…",
+    "description": "You can keep using Attraccess. We'll let you know when it's ready."
+  },
+  "downloading": "Downloading update",
+  "downloadingTooltip": "Downloading update – {{percent}}%",
+  "downloadingTooltipIndeterminate": "Downloading update…",
+  "ready": {
+    "title": "Update ready",
+    "description": "Reload to use the latest version.",
+    "reload": "Reload now",
+    "later": "Later",
+    "reopen": "Update ready – show options"
+  },
+  "moveHint": "Drag or use the arrow keys to move"
+}

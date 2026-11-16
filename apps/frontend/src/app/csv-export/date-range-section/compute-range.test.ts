@@ -3,7 +3,8 @@ import { CalendarDate, getLocalTimeZone } from '@internationalized/date';
 import { computeRange, daysBetween, rangeToDateBounds, type Preset } from './compute-range';
 beforeEach(() => {
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2024-03-15T12:00:00Z'));
+  // local noon: the presets are local calendar days, so a UTC instant would be another day in far-off time zones
+  vi.setSystemTime(new Date(2024, 2, 15, 12));
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -22,7 +23,7 @@ it.each<[Preset, string, string]>([
   expect(range?.end.toString()).toBe(end);
 });
 it('handles the previous year and custom ranges', () => {
-  vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
+  vi.setSystemTime(new Date(2024, 0, 15, 12));
   expect(computeRange('lastMonth')?.start.toString()).toBe('2023-12-01');
   expect(computeRange('lastMonth')?.end.toString()).toBe('2023-12-31');
   expect(computeRange('custom')).toBeNull();
@@ -37,9 +38,9 @@ it('counts inclusive days and applies the entire final day to export bounds', ()
   });
 });
 it('does not mutate the fallback date when there is no selected range', () => {
-  const fallback = new Date('2024-03-15T12:34:00Z');
+  const fallback = new Date(2024, 2, 15, 12, 34);
   expect(rangeToDateBounds(null, fallback)).toEqual({ start: fallback, end: new Date(2024, 2, 15, 23, 59, 59, 999) });
-  expect(fallback.toISOString()).toBe('2024-03-15T12:34:00.000Z');
+  expect(fallback).toEqual(new Date(2024, 2, 15, 12, 34));
 });
 
 describe('rangeToDateBounds', () => {

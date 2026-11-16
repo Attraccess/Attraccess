@@ -1,3 +1,4 @@
+import { zoneOffsetMinutes } from '../../reader-time-zone';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { registerResourceListServiceFixture } from './service.test-fixture';
@@ -40,13 +41,27 @@ describe('ResourceListService', () => {
       expect(matchA.sendMessage.mock.calls[0][0]).not.toBe(matchB.sendMessage.mock.calls[0][0]);
       expect(matchA.sendMessage.mock.calls[0][0].data.payload).toBe(matchB.sendMessage.mock.calls[0][0].data.payload);
     });
+
+    it('sends nothing to a connection of a reader that is not paired', async () => {
+      const unpaired = fixture.createMockSocket({ id: 'u', readerId: 42, state: { pairingRequired: true } });
+      const paired = fixture.createMockSocket({ id: 'p', readerId: 42 });
+      fixture.websocketService.sockets.set('u', unpaired);
+      fixture.websocketService.sockets.set('p', paired);
+      fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
+
+      await fixture.service.sendResourceList(42);
+      await fixture.service.sendResourceListToSocket(unpaired);
+
+      expect(unpaired.sendMessage).not.toHaveBeenCalled();
+      expect(paired.sendMessage).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('per-resource card access', () => {
     it('keeps users isolated while sharing list queries and same-user permission results', async () => {
-      const a = fixture.createMockSocket({ id: 'a', state: { lastAuthenticatedUserId: 1 } });
-      const b = fixture.createMockSocket({ id: 'b', state: { lastAuthenticatedUserId: 2 } });
-      const c = fixture.createMockSocket({ id: 'c', state: { lastAuthenticatedUserId: 1 } });
+      const a = fixture.createMockSocket({ id: 'a', state: { verifiedUserId: 1 } });
+      const b = fixture.createMockSocket({ id: 'b', state: { verifiedUserId: 2 } });
+      const c = fixture.createMockSocket({ id: 'c', state: { verifiedUserId: 1 } });
       const guest = fixture.createMockSocket({ id: 'guest' });
       for (const socket of [a, b, c, guest]) fixture.websocketService.sockets.set(socket.id, socket);
       fixture.attractapService.findReaderById.mockResolvedValue(
@@ -88,10 +103,10 @@ describe('ResourceListService', () => {
     });
 
     it('discards personalized results if another card arrives during authorization', async () => {
-      const socket = fixture.createMockSocket({ state: { lastAuthenticatedUserId: 1 } });
+      const socket = fixture.createMockSocket({ state: { verifiedUserId: 1 } });
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
       fixture.resourceUsageService.canControllResource.mockImplementation(async () => {
-        socket.state.lastAuthenticatedUserId = 2;
+        socket.state.verifiedUserId = 2;
         return true;
       });
       await fixture.service.sendResourceListToSocket(socket);
@@ -99,7 +114,7 @@ describe('ResourceListService', () => {
     });
 
     it('correlates explicit refreshes and versions snapshots before asynchronous work', async () => {
-      const socket = fixture.createMockSocket({ state: { lastAuthenticatedUserId: 1 } });
+      const socket = fixture.createMockSocket({ state: { verifiedUserId: 1 } });
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
       let release: () => void;
       const held = new Promise<boolean>((resolve) => {
@@ -119,7 +134,7 @@ describe('ResourceListService', () => {
     });
 
     it('fails closed for a deleted user', async () => {
-      const socket = fixture.createMockSocket({ state: { lastAuthenticatedUserId: 1 } });
+      const socket = fixture.createMockSocket({ state: { verifiedUserId: 1 } });
       fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
       (fixture.service as any).usersService.findOne.mockResolvedValue(null);
       await fixture.service.sendResourceListToSocket(socket);
@@ -279,14 +294,14 @@ describe('ResourceListService', () => {
                     id: 99,
                     user: { username: 'active-user' },
                     startTime: startTime.toISOString(),
-                    startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset(),
+                    startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset() || 0,
                   },
                   activeUsageSessions: [
                     {
                       id: 99,
                       user: { username: 'active-user' },
                       startTime: startTime.toISOString(),
-                      startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset(),
+                      startTimeUtcOffsetMinutes: -startTime.getTimezoneOffset() || 0,
                     },
                   ],
                   flowButtons: [{ id: 'node-1', label: 'Start' }],
@@ -380,8 +395,25 @@ describe('ResourceListService', () => {
 
       const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
       const session = (sent.data.payload as any).resources[0].activeUsageSession;
-      // Offset is the inverse of getTimezoneOffset() for that exact instant (DST-correct).
-      expect(session.startTimeUtcOffsetMinutes).toBe(-summer.getTimezoneOffset());
+      // Offset is the inverse of getTimezoneOffset() for that exact instant (DST-correct); `|| 0` drops -0 at UTC.
+      expect(session.startTimeUtcOffsetMinutes).toBe(-summer.getTimezoneOffset() || 0);
+    });
+
+    it("uses the reader's time zone for the session start, whatever the API process zone is", async () => {
+      const summer = new Date('2026-07-01T10:00:00.000Z');
+      const winter = new Date('2026-01-15T10:00:00.000Z');
+      (fixture.service as any).readerTimeZone = {
+        readerUtcOffsetMinutes: (_readerId: number, at: Date) => zoneOffsetMinutes('Europe/Berlin', at),
+      };
+      fixture.attractapService.findReaderById.mockResolvedValue(fixture.createReaderFixture());
+      fixture.resourceUsageService.getActiveSessions.mockResolvedValue(
+        new Map([[10, [{ user: { username: 'u' }, startTime: summer }]]]),
+      );
+      const socket = fixture.createMockSocket();
+      await fixture.service.sendResourceListToSocket(socket);
+      const sent = (socket.sendMessage as jest.Mock).mock.calls[0][0] as AttractapEvent;
+      expect((sent.data.payload as any).resources[0].activeUsageSession.startTimeUtcOffsetMinutes).toBe(120);
+      expect(zoneOffsetMinutes('Europe/Berlin', winter)).toBe(60);
     });
 
     it('lists all sessions with count and limit for a reader without a card holder', async () => {
@@ -438,7 +470,7 @@ describe('ResourceListService', () => {
         userId === 6 ? new Set(['resources.update']) : new Set(),
       );
       const sockets = [7, 4, 9, 6].map((userId) =>
-        fixture.createMockSocket({ id: `s${userId}`, state: { lastAuthenticatedUserId: userId } }),
+        fixture.createMockSocket({ id: `s${userId}`, state: { verifiedUserId: userId } }),
       );
       for (const socket of sockets) fixture.websocketService.sockets.set(socket.id, socket);
       await fixture.service.sendResourceList(42);
@@ -475,7 +507,7 @@ describe('ResourceListService', () => {
       }));
       fixture.resourceUsageService.getActiveSessions.mockResolvedValue(new Map([[10, sessions]]));
       const guest = fixture.createMockSocket({ id: 'guest' });
-      const lastStarter = fixture.createMockSocket({ id: 'last', state: { lastAuthenticatedUserId: 119 } });
+      const lastStarter = fixture.createMockSocket({ id: 'last', state: { verifiedUserId: 119 } });
       fixture.websocketService.sockets.set(guest.id, guest);
       fixture.websocketService.sockets.set(lastStarter.id, lastStarter);
       await fixture.service.sendResourceList(42);
@@ -543,9 +575,9 @@ describe('ResourceListService', () => {
 
       await fixture.service.sendResourceListToSocket(socket);
 
+      // Only the socket and counts: the payload names the logged-in user and every resource.
       expect((fixture.service as any).logger.debug).toHaveBeenCalledWith(
-        expect.stringContaining('Sending resource list to socket sock-debug'),
-        expect.any(AttractapEvent),
+        expect.stringMatching(/^Sending resource list to socket sock-debug \(revision \d+, \d+ resources\)$/),
       );
     });
 

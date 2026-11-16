@@ -21,8 +21,8 @@ from labgrid.util.ssh import sshmanager
 import pytest
 import yaml
 
-from attractap_lab.drivers import ESPToolDriver
-from attractap_lab.workflow import claim, smoke
+from attractap_lab.drivers import ESPToolDriver, SwitchPowerDriver
+from attractap_lab.workflow import claim, place_power, reader_power, smoke
 
 
 def free_port():
@@ -219,11 +219,17 @@ def test_exported_reader_lifecycle(tmp_path, monkeypatch, fail_flash, offline_ca
                 client = [executable("labgrid-client"), "-x", address, "-p", "reader-1"]
                 real_run(client + ["create"], check=True)
                 real_run(client + ["add-match", "test/reader-1/*"], check=True)
+                real_run(client + ["set-tags", "board=attractap", "power=switch"], check=True)
                 try:
                     with claim(tmp_path / "env.yaml", "reader-1") as target:
                         # Confirm native locking rejects a second claimant.
                         busy = real_run(client + ["acquire"], capture_output=True)
                         assert busy.returncode != 0
+                        # Place tags arrive with the RemotePlace. The switch needs
+                        # no emulator; the reader is on, so smoke leaves it alone.
+                        assert place_power(target) == "switch"
+                        assert isinstance(reader_power(target), SwitchPowerDriver)
+                        monkeypatch.setattr(SwitchPowerDriver, "get", lambda self: True)
                         if fail_flash:
                             with pytest.raises(subprocess.CalledProcessError):
                                 smoke(target, firmware, tmp_path / "artifacts", log_seconds=10, max_log_bytes=1024)

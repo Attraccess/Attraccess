@@ -23,10 +23,11 @@ describe('AuthAuditLogger', () => {
 
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'login',
+        domain: 'identity',
+        action: 'identity.login',
+        actor: expect.objectContaining({ id: 42 }),
+        subject: expect.objectContaining({ id: 42 }),
         outcome: 'failed',
-        actorId: 42,
-        subjectId: 42,
         details: { reason: 'invalid_credentials' },
         request: { ipAddress: '1.2.3.4' },
       }),
@@ -42,7 +43,12 @@ describe('AuthAuditLogger', () => {
     logger.log({ type: 'register', outcome: 'success', ip: '2.2.2.2' });
 
     expect(record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'registration', outcome: 'succeeded', details: {} }),
+      expect.objectContaining({
+        domain: 'identity',
+        action: 'identity.registration',
+        outcome: 'succeeded',
+        details: {},
+      }),
     );
   });
 
@@ -54,6 +60,64 @@ describe('AuthAuditLogger', () => {
       expect(warnSpy.mock.calls[0][0]).not.toContain('Alice@Example.com');
     },
   );
+
+  it('records SSO account-link failures as identity audit and keeps them in the Fail2ban feed', () => {
+    logger.log({ type: 'sso_link_account', outcome: 'invalid_credentials', ip: '1.2.3.4', userId: 7 });
+
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: 'identity',
+        action: 'identity.sso_account_link',
+        outcome: 'failed',
+        details: { reason: 'invalid_credentials' },
+      }),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^auth\.failed type=sso_link_account outcome=invalid_credentials ip=1\.2\.3\.4 user_id=7 /),
+    );
+  });
+
+  it('records verification email resends as their own identity audit action', async () => {
+    await logger.log({ type: 'verification_email_resend', outcome: 'success', ip: '2.2.2.2' });
+    await logger.log({ type: 'verification_email_resend', outcome: 'rate_limited', ip: '2.2.2.2' });
+
+    expect(record).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        domain: 'identity',
+        action: 'identity.verification_email_resent',
+        outcome: 'succeeded',
+        details: {},
+      }),
+    );
+    expect(record).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        action: 'identity.verification_email_resent',
+        outcome: 'failed',
+        details: { reason: 'rate_limited' },
+        request: { ipAddress: '2.2.2.2' },
+      }),
+    );
+    expect(record).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'identity.password_reset_requested' }));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^auth\.failed type=verification_email_resend outcome=rate_limited ip=2\.2\.2\.2 /),
+    );
+  });
+
+  it('logs SSO provisioning failures without an identity audit entry', () => {
+    logger.log({
+      type: 'sso_provisioning',
+      outcome: 'invalid_credentials',
+      ip: '1.2.3.4',
+      username: 'provider:OIDC:1',
+    });
+
+    expect(record).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/^auth\.failed type=sso_provisioning outcome=invalid_credentials ip=1\.2\.3\.4 /),
+    );
+  });
 
   it('does not persist unsupported legacy event types', () => {
     logger.log({ type: 'api_token', outcome: 'success', ip: '2.2.2.2', userId: 42 });

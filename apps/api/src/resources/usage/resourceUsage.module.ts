@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ResourceUsageController } from './sessions/resource-usage.controller';
 import { ResourceUsageService } from './sessions/resource-usage.service';
 import { ResourceActivityVisibilityService } from './authorization/resource-activity-visibility.service';
@@ -27,6 +27,8 @@ import { ReaderUiModule } from '../../plugin-system/reader-ui/reader-ui.module';
 import { PreStartService } from './pre-start/pre-start.service';
 import { SessionEndNotifier } from './pre-start/session-end-notifier.service';
 import { WebStartStepStore } from './pre-start/web-start-step.store';
+import { RESOURCE_USAGE_COLLABORATORS } from './resource-usage.collaborators';
+import { ResourceUsageFlowsBridge } from './sessions/resource-usage-flows.bridge';
 
 @Module({
   imports: [
@@ -40,10 +42,10 @@ import { WebStartStepStore } from './pre-start/web-start-step.store';
     ResourceGroupsModule,
     ResourceRetrainingModule,
     ResourceMaintenanceModule,
-    forwardRef(() => BillingModule),
-    forwardRef(() => ResourceFlowsModule),
-    forwardRef(() => ResourceMeteringModule),
-    forwardRef(() => ProjectsModule),
+    BillingModule,
+    ResourceFlowsModule,
+    ResourceMeteringModule,
+    ProjectsModule,
     ResourceFormsModule,
     ResourceHealthModule,
     ResourceOperatingIntervalModule,
@@ -52,6 +54,7 @@ import { WebStartStepStore } from './pre-start/web-start-step.store';
   controllers: [ResourceUsageController],
   providers: [
     ResourceUsageService,
+    ...RESOURCE_USAGE_COLLABORATORS,
     ResourceUsageNoteNotificationListener,
     ResourceSessionNotificationListener,
     SupervisedUsageAutoPromotionListener,
@@ -59,6 +62,7 @@ import { WebStartStepStore } from './pre-start/web-start-step.store';
     PreStartService,
     WebStartStepStore,
     SessionEndNotifier,
+    ResourceUsageFlowsBridge,
   ],
   exports: [ResourceUsageService, ResourceActivityVisibilityService, PreStartService, SessionEndNotifier],
 })

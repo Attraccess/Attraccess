@@ -1,7 +1,7 @@
+import { withSignInProvisioning } from '../oidc/oidc.strategy.ssooidcstrategy-claim-path-resolution.test-fixture';
 import { SSOProviderSAMLConfiguration } from '@attraccess/database-entities';
 import { ModuleRef } from '@nestjs/core';
 import { DataSource } from 'typeorm';
-import { SsoAuditService } from '../../../../audit/sso-audit.service';
 import { MetricsService } from '../../../../metrics/metrics.service';
 import { RbacService } from '../../../rbac/rbac.service';
 import { UsersService } from '../../../users/users.service';
@@ -32,8 +32,7 @@ export function buildSamlModuleRef(deps: {
     [UsersService, deps.users],
     [AuthService, auth],
     [RbacService, deps.rbac ?? null],
-    [SSOService, deps.sso],
-    [SsoAuditService, deps.audit],
+    [SSOService, withSignInProvisioning(deps.sso as object | undefined, deps.audit)],
     [MetricsService, deps.metrics],
   ]);
   return { get: jest.fn((token: unknown) => byToken.get(token)) } as unknown as ModuleRef;

@@ -1,71 +1,74 @@
-import { recordAdministrationSafely, auditSubjectKeyId } from '../audit/policies/administration';
 import { Controller, Delete, Get, HttpCode, HttpStatus, Post, Body, Patch, Param, Req } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { AuditService } from '../audit/audit.service';
-import { EmailTemplate, EmailTemplateType } from '@attraccess/database-entities';
-import { EmailTemplateService, TemplateTranslations } from './email-template.service';
+import { auditActorOf } from '../audit/recorder/audit-event';
+import { EmailTemplate } from '@attraccess/database-entities';
+import {
+  EmailTemplateKey,
+  EmailTemplateService,
+  ListedEmailTemplate,
+  TemplateTranslations,
+} from './email-template.service';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { UpsertTranslationsDto } from './dto/upsert-translations.dto';
+import { ListedEmailTemplateDto } from './dto/listed-email-template.dto';
 import { GetTranslationsResponseDto } from './dto/get-translations-response.dto';
+
+/** Plugin templates are addressed by their namespaced key, so the path parameter is not limited to the core enum. */
+const TEMPLATE_TYPE_PARAM = {
+  name: 'type',
+  type: String,
+  description: 'A core email template type (e.g. `verify-email`) or a plugin template key, `plugin.<plugin>.<id>`',
+};
 
 @ApiTags('Email Templates')
 @ApiBearerAuth()
 @Controller('email-templates')
 export class EmailTemplateController {
-  constructor(
-    private readonly emailTemplateService: EmailTemplateService,
-    private readonly audit: AuditService,
-  ) {}
+  constructor(private readonly emailTemplateService: EmailTemplateService) {}
 
   @Get()
   @Auth('system.settings.manage')
-  @ApiOperation({ summary: 'List all email templates' })
-  @ApiResponse({ status: 200, description: 'List of email templates', type: [EmailTemplate] })
-  findAll(): Promise<EmailTemplate[]> {
+  @ApiOperation({ summary: 'List all email templates, including those declared by loaded plugins' })
+  @ApiResponse({ status: 200, description: 'List of email templates', type: [ListedEmailTemplateDto] })
+  findAll(): Promise<ListedEmailTemplate[]> {
     return this.emailTemplateService.findAll();
   }
 
   @Get(':type')
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Get an email template by type' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
-  @ApiResponse({ status: 200, type: EmailTemplate })
+  @ApiParam(TEMPLATE_TYPE_PARAM)
+  @ApiResponse({ status: 200, type: ListedEmailTemplateDto })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  findOne(@Param('type') type: EmailTemplateType): Promise<EmailTemplate> {
-    return this.emailTemplateService.findOne(type);
+  findOne(@Param('type') type: EmailTemplateKey): Promise<ListedEmailTemplate> {
+    return this.emailTemplateService.findOneListed(type);
   }
 
   @Patch(':type')
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Update an email template' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiParam(TEMPLATE_TYPE_PARAM)
   @ApiBody({ type: UpdateEmailTemplateDto })
   @ApiResponse({ status: 200, type: EmailTemplate })
   @ApiResponse({ status: 404, description: 'Template not found' })
   update(
-    @Param('type') type: EmailTemplateType,
+    @Param('type') type: EmailTemplateKey,
     @Body() updateEmailTemplateDto: UpdateEmailTemplateDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<EmailTemplate> {
-    return this.emailTemplateService.update(type, updateEmailTemplateDto).then(async (template) => {
-      await this.record(req, 'email_template.updated', type, { templateType: type });
-      return template;
-    });
+    return this.emailTemplateService.update(type, updateEmailTemplateDto, auditActorOf(req.user));
   }
 
   @Post(':type/reset')
   @HttpCode(HttpStatus.OK)
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Reset an email template to its bundled default' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType', description: 'Template type' })
+  @ApiParam(TEMPLATE_TYPE_PARAM)
   @ApiResponse({ status: 200, description: 'Template reset to default', type: EmailTemplate })
   @ApiResponse({ status: 404, description: 'Template not found' })
-  resetToDefault(@Param('type') type: EmailTemplateType, @Req() req: AuthenticatedRequest): Promise<EmailTemplate> {
-    return this.emailTemplateService.resetToDefault(type).then(async (template) => {
-      await this.record(req, 'email_template.reset', type, { templateType: type });
-      return template;
-    });
+  resetToDefault(@Param('type') type: EmailTemplateKey, @Req() req: AuthenticatedRequest): Promise<EmailTemplate> {
+    return this.emailTemplateService.resetToDefault(type, auditActorOf(req.user));
   }
 
   @Get(':type/translations')
@@ -73,60 +76,36 @@ export class EmailTemplateController {
   @ApiOperation({
     summary: 'Get all translations for a template — returns extracted keys with defaults and all stored locale values',
   })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiParam(TEMPLATE_TYPE_PARAM)
   @ApiResponse({ status: 200, type: GetTranslationsResponseDto })
-  getTranslations(@Param('type') type: EmailTemplateType): Promise<TemplateTranslations> {
+  getTranslations(@Param('type') type: EmailTemplateKey): Promise<TemplateTranslations> {
     return this.emailTemplateService.getTranslations(type);
   }
 
   @Post(':type/translations')
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Set translations for a locale (replaces all existing values for that locale)' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiParam(TEMPLATE_TYPE_PARAM)
   @ApiResponse({ status: 201, description: 'Translations saved' })
   async setTranslations(
-    @Param('type') type: EmailTemplateType,
+    @Param('type') type: EmailTemplateKey,
     @Body() dto: UpsertTranslationsDto,
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    await this.emailTemplateService.setTranslations(type, dto.locale, dto.translations);
-    await this.record(req, 'email_template.translations_set', type, {
-      templateType: type,
-      locale: dto.locale,
-      translationCount: Object.keys(dto.translations).length,
-    });
+    await this.emailTemplateService.setTranslations(type, dto.locale, dto.translations, auditActorOf(req.user));
   }
 
   @Delete(':type/translations/:locale')
   @Auth('system.settings.manage')
   @ApiOperation({ summary: 'Delete all translations for a locale' })
-  @ApiParam({ name: 'type', enum: EmailTemplateType, enumName: 'EmailTemplateType' })
+  @ApiParam(TEMPLATE_TYPE_PARAM)
   @ApiParam({ name: 'locale', description: 'BCP 47 locale tag' })
   @ApiResponse({ status: 200, description: 'Translations deleted' })
   deleteTranslations(
-    @Param('type') type: EmailTemplateType,
+    @Param('type') type: EmailTemplateKey,
     @Param('locale') locale: string,
     @Req() req: AuthenticatedRequest,
   ): Promise<void> {
-    return this.emailTemplateService.deleteTranslations(type, locale).then(async () => {
-      await this.record(req, 'email_template.translations_deleted', type, { templateType: type, locale });
-    });
-  }
-
-  private async record(
-    req: AuthenticatedRequest,
-    action: string,
-    type: string,
-    details: Record<string, string | number>,
-  ) {
-    await recordAdministrationSafely(this.audit, {
-      action,
-      actorId: req.user.id,
-      authenticationMethod: req.user.authenticationMethod,
-      apiTokenId: req.user.apiTokenId,
-      subjectType: 'email-template',
-      subjectId: auditSubjectKeyId(type),
-      details,
-    });
+    return this.emailTemplateService.deleteTranslations(type, locale, auditActorOf(req.user));
   }
 }

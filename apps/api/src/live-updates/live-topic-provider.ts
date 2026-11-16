@@ -5,7 +5,8 @@ import { Observable } from 'rxjs';
 export type LiveTopicDefinition =
   | { topic: Extract<LiveSubscription, { resourceId: number }>['topic']; scope: 'resource' }
   | { topic: 'billing' | 'messaging' | 'notifications' | 'supervision' | 'mass-introduction'; scope: 'user' }
-  | { topic: `plugin:${string}:${string}`; scope: 'plugin'; identifier: 'none' | 'required' | 'optional' };
+  | { topic: `plugin:${string}:${string}`; scope: 'plugin'; identifier: 'none' | 'required' | 'optional' }
+  | { topic: 'mqtt-messages'; scope: 'mqtt-explorer'; maxFilterBytes: number };
 
 /** Feature-owned adapter, registered during module initialization. */
 export interface LiveTopicProvider {

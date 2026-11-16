@@ -6,6 +6,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { StandardDrawer, TFunction, useTranslations } from '@attraccess/plugins-frontend-ui';
 import { CatalogContent } from './catalogContent';
 import { useNodeCatalog } from './useNodeCatalog';
+import type { FlowOwner } from '../flowOwner';
 import { getDomainDef, getPluginDomainLabel } from './domains';
 import de from './de.json';
 import en from './en.json';
@@ -15,18 +16,18 @@ export interface NodeCatalogHandle {
 }
 
 interface Props {
-  resourceId: number;
+  owner: FlowOwner;
   onSelect: (nodeType: string) => void;
   tNodeTranslations: TFunction;
 }
 
 export const NodeCatalogPanel = forwardRef<NodeCatalogHandle, Props>(function NodeCatalogPanel(
-  { resourceId, onSelect, tNodeTranslations },
+  { owner, onSelect, tNodeTranslations },
   ref,
 ) {
   const { t } = useTranslations({ de, en });
   const { groups, isLoading, isError, collapsed, setCollapsed, isDomainExpanded, setDomainExpanded } = useNodeCatalog({
-    resourceId,
+    owner,
   });
   const { isOpen, setOpen } = useOverlayState();
 

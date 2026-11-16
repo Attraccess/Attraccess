@@ -1,8 +1,8 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { Project, ProjectInvitation, ProjectMember, ResourceUsage, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AuditService } from '../audit/audit.service';
 import { FileStorageService } from '../common/services/file-storage.service';
 import { EmailService } from '../email/email.service';
 import { MetricsService } from '../metrics/metrics.service';
@@ -60,7 +60,7 @@ export function registerProjectsServiceFixture() {
 
   let userRepository: jest.Mocked<Repository<User>>;
 
-  let audit: { recordProject: jest.Mock };
+  let audit: { record: jest.Mock };
 
   beforeEach(async () => {
     const queryBuilder = createMockQueryBuilder();
@@ -96,7 +96,7 @@ export function registerProjectsServiceFixture() {
       save: jest.fn(),
     } as unknown as jest.Mocked<Repository<ProjectInvitation>>;
     userRepository = { findOne: jest.fn() } as unknown as jest.Mocked<Repository<User>>;
-    audit = { recordProject: jest.fn().mockResolvedValue(undefined) };
+    audit = { record: jest.fn().mockResolvedValue(undefined) };
 
     fileStorageService = {
       saveFile: jest.fn(),
@@ -122,7 +122,7 @@ export function registerProjectsServiceFixture() {
         { provide: EmailService, useValue: { sendProjectInvitationEmail: jest.fn() } },
         { provide: MetricsService, useValue: mockMetricsService },
         { provide: NotificationDispatchService, useValue: { dispatch: jest.fn() } },
-        { provide: AuditService, useValue: audit },
+        { provide: AUDIT_RECORDER, useValue: audit },
       ],
     }).compile();
 

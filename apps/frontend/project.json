@@ -54,7 +54,7 @@
           "externalDependencies": ["vitest"]
         }
       ],
-      "outputs": ["{workspaceRoot}/coverage/apps/frontend"]
+      "outputs": ["{workspaceRoot}/coverage/apps/frontend/test"]
     },
     "typecheck": {
       "dependsOn": ["react-query-client:generate", "typecheck-tests"],
@@ -82,7 +82,16 @@
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/frontend"
       },
-      "dependsOn": ["react-query-client:generate"]
+      "dependsOn": ["test", "test-scripts"]
+    },
+    "test-scripts": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default"],
+      "outputs": ["{workspaceRoot}/coverage/apps/frontend/test-scripts"],
+      "options": {
+        "command": "node scripts/crap-score/node-test.mjs apps/frontend coverage/apps/frontend/test-scripts apps/frontend/extract-dependencies.test.mjs"
+      }
     }
   },
   "targetDefaults": {

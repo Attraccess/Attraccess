@@ -2,48 +2,21 @@ import { User } from '@attraccess/database-entities';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FixedWindowCounterStore, WindowCounterEntry } from '../../common/rate-limiting/fixed-window-counter';
+import { FixedWindowCounterStore } from '../../common/rate-limiting/fixed-window-counter';
 import { SettingsService } from '../../settings/settings.service';
-import { recordFailure as recordFailureImplementation } from './brute-force-failure';
+import {
+  recordFailure as recordFailureImplementation,
+  recordIpFailure as recordIpFailureImplementation,
+} from './brute-force-failure';
 import { AccountLockedException, TooManyAuthAttemptsException } from './exceptions';
-export type RateLimitScope =
-  'login' | 'register' | 'password_reset_request' | 'password_reset_complete' | 'delete_account_confirm';
-
-export interface CounterEntry extends WindowCounterEntry {
-  lockoutUntil: number;
-  lockoutCount: number;
-}
-
-export const MAX_COUNTER_ENTRIES = 10_000;
-
-export // ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
-const COARSE_IP_MULTIPLIER = 10;
-
-export function isStale(entry: CounterEntry, now: number, windowMs: number): boolean {
-  if (entry.lockoutUntil > now) return false;
-  return now - entry.firstAt > windowMs;
-}
-
-export function ipKey(scope: RateLimitScope, ip: string, username: string | null = null): string {
-  return `${scope}:${ip}:${username ?? ''}`;
-}
-
-export function ipCoarseKey(scope: RateLimitScope, ip: string): string {
-  return `${scope}:${ip}`;
-}
-
-export function computeLockoutMs(
-  policy: { lockoutDurationSeconds: number; exponentialBackoff: boolean; backoffMultiplier: number },
-  priorLockouts: number,
-): number {
-  const baseMs = policy.lockoutDurationSeconds * 1000;
-  if (!policy.exponentialBackoff || priorLockouts <= 0) {
-    return baseMs;
-  }
-  return Math.floor(baseMs * Math.pow(policy.backoffMultiplier, priorLockouts));
-}
-
-// ponytail: coarse per-IP threshold = maxAttempts * 10; prevents username-spray bypass; tune multiplier if needed
+import {
+  type CounterEntry,
+  type RateLimitScope,
+  MAX_COUNTER_ENTRIES,
+  isStale,
+  ipKey,
+  ipCoarseKey,
+} from './brute-force-policy';
 
 @Injectable()
 export class BruteForceProtectionService {
@@ -117,23 +90,28 @@ export class BruteForceProtectionService {
     userId: number | null,
     username: string | null = null,
   ): Promise<void> {
-    const getContextOwner = () => this;
-    return recordFailureImplementation(
-      {
-        settingsService: getContextOwner().settingsService,
-        nowFn: getContextOwner().nowFn,
-        evictStale: getContextOwner().evictStale.bind(getContextOwner()),
-        upsertCounter: getContextOwner().upsertCounter.bind(getContextOwner()),
-        ipCounters: getContextOwner().ipCounters,
-        ipCoarseCounters: getContextOwner().ipCoarseCounters,
-        accountCounters: getContextOwner().accountCounters,
-        userRepository: getContextOwner().userRepository,
-      },
-      scope,
-      ip,
-      userId,
-      username,
-    );
+    return recordFailureImplementation(this.failureContext(), scope, ip, userId, username);
+  }
+
+  /**
+   * Records a failure that names no account, e.g. a forged or spent token. Only the coarse per-IP counter moves, so
+   * other accounts behind the same IP keep their own maxAttempts budget.
+   */
+  async recordIpFailure(scope: RateLimitScope, ip: string): Promise<void> {
+    return recordIpFailureImplementation(this.failureContext(), scope, ip);
+  }
+
+  private failureContext() {
+    return {
+      settingsService: this.settingsService,
+      nowFn: this.nowFn,
+      evictStale: this.evictStale.bind(this),
+      upsertCounter: this.upsertCounter.bind(this),
+      ipCounters: this.ipCounters,
+      ipCoarseCounters: this.ipCoarseCounters,
+      accountCounters: this.accountCounters,
+      userRepository: this.userRepository,
+    };
   }
 
   async recordSuccess(

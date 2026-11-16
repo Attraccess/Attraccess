@@ -1,4 +1,5 @@
 # User Management
+<!-- llms-description: Overview of user management: creating accounts, assigning permissions and configuring login methods as an administrator. -->
 
 User management allows administrators to create user accounts, assign permissions and configure login methods.
 

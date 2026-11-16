@@ -1,4 +1,5 @@
 # MQTT Server Setup
+<!-- llms-description: How to add and test an MQTT broker connection in Attraccess, including common brokers, multiple servers and connection status. -->
 
 This guide explains how to connect Attraccess to an MQTT broker so you can use MQTT in your automation flows.
 
@@ -102,6 +103,10 @@ The Servers page shows the current connection status for each broker:
 | **Connecting** | Attraccess is attempting to connect |
 | **Error** | Connection failed -- see error details for more information |
 
+## Managing RabbitMQ from Attraccess
+
+With the **RabbitMQ plugin** installed, an MQTT server that Attraccess detects as a RabbitMQ broker shows extra panels on its detail page. See [RabbitMQ](plugins/rabbitmq/overview.md) for the panels, required RabbitMQ user tags and Attraccess permissions.
+
 ## Troubleshooting
 
 | Problem | Solution |
@@ -114,6 +119,7 @@ The Servers page shows the current connection status for each broker:
 ## See Also
 
 - [Overview](devices/mqtt/overview.md) -- What is MQTT?
+- [Message Explorer](devices/mqtt/message-explorer.md) -- Watch and publish live MQTT messages
 - [Examples](devices/mqtt/examples.md) -- Practical MQTT integration examples
 - [Flows & Automation](flows/overview.md) -- Create automation workflows
 - [Environment Variables](installation/environment-variables.md) -- Server configuration

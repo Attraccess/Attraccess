@@ -1,21 +1,10 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Inject,
-  Patch,
-  Param,
-  ParseUUIDPipe,
-  ParseIntPipe,
-  Post,
-  Req,
-  forwardRef,
-} from '@nestjs/common';
+import { Body, Controller, Get, Patch, Param, ParseUUIDPipe, ParseIntPipe, Post, Req } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { ResourceMeteringSession } from '@attraccess/database-entities';
 import { ResourceMeteringService } from './resource-metering.service';
 import {
+  MeterAllocationDto,
   MeterNameDto,
   MeterRateDto,
   ResourceMeterDto,
@@ -31,7 +20,6 @@ import { ResourceActivityVisibilityService } from '../usage/authorization/resour
 export class ResourceMeteringController {
   constructor(
     private readonly metering: ResourceMeteringService,
-    @Inject(forwardRef(() => ResourceActivityVisibilityService))
     private readonly activityVisibility: ResourceActivityVisibilityService,
   ) {}
 
@@ -49,9 +37,11 @@ export class ResourceMeteringController {
     if (full) return meters;
     return meters.map((meter) => {
       const own = ownUsageId !== null && meter.session?.usageId === ownUsageId;
+      const ownSessions = meter.sessions.filter((session) => ownUsageId !== null && session.usageId === ownUsageId);
       return {
         ...meter,
-        session: own ? meter.session : null,
+        session: own ? meter.session : (ownSessions[0] ?? null),
+        sessions: ownSessions,
         counterValue: ownUsageId !== null ? meter.counterValue : null,
         latestObservedAt: ownUsageId !== null ? meter.latestObservedAt : null,
       };
@@ -99,8 +89,24 @@ export class ResourceMeteringController {
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Param('meterId', ParseIntPipe) meterId: number,
     @Body() body: MeterRateDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceMeterDto> {
-    return this.metering.setRate(resourceId, meterId, body.creditsPerUnit);
+    return this.metering.setRate(resourceId, meterId, body.creditsPerUnit, req.user.id);
+  }
+
+  @Patch('meters/:meterId/allocation')
+  @ApiOperation({
+    summary: 'Choose how the meter consumption is assigned when several sessions run at once',
+    operationId: 'setResourceMeterAllocation',
+  })
+  @ApiResponse({ status: 200, type: ResourceMeterDto })
+  setAllocation(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+    @Param('meterId', ParseIntPipe) meterId: number,
+    @Body() body: MeterAllocationDto,
+    @Req() req: AuthenticatedRequest,
+  ): Promise<ResourceMeterDto> {
+    return this.metering.setAllocation(resourceId, meterId, body.allocation, req.user.id);
   }
 
   @Get()

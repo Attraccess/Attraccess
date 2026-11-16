@@ -30,6 +30,14 @@ permissions:
   packages: write
   pull-requests: write
 
+# A push to a PR cancels that PR's previous run. A superseded run can never
+# count toward a merge, yet it holds its three macOS runners, which a few
+# busy PRs are enough to exhaust. Merge-queue runs each get their own group
+# (github.ref is the queue entry's branch) and are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   precommit-check:
     # Lint/typecheck/test/e2e already run as dedicated jobs below. This job is a
@@ -46,17 +54,18 @@ jobs:
     #
     # Everything in `needs` is gated, so adding a job here is the whole change.
     # Only `lint-and-typecheck` is a required check in its own right; the rest
-    # would otherwise be able to fail without blocking a merge. `plugins` is the
-    # sharpest of those — lint/typecheck/test all `--exclude=tag:type:plugin`,
-    # so it is the only job in this workflow that compiles the plugin apps.
+    # would otherwise be able to fail without blocking a merge. `build-all` is
+    # one of those: it is the full Nx build of every project the shared exclude
+    # list (scripts/ci-nx-exclude.mjs) does not skip, so a change can no longer
+    # break a project it does not touch. `plugins` builds and packs the plugin
+    # apps that `build-all` skips.
     #
     # Deliberately NOT gated:
     #   `commitlint`   — `if: github.event_name == 'pull_request'`, so it reports
     #                    `skipped` in the merge queue and would deadlock it. It
     #                    is a required check already.
     #   `containerize` — required already, and its Docker build would serialize
-    #                    a 3-second gate behind ~45 minutes. It covers `pnpm
-    #                    precommit`'s `build` step. Note it is
+    #                    a 3-second gate behind ~45 minutes. Note it is
     #                    deliverable/test dependencies + `if: ... && !failure()`,
     #                    so upstream failures *skip* it and it reports Success
     #                    — which is why those jobs are gated here too.
@@ -67,6 +76,7 @@ jobs:
     needs:
       [
         lint-and-typecheck,
+        build-all,
         test,
         browser-e2e,
         crap-score,
@@ -84,9 +94,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Gate on every upstream job
+        env:
+          NEEDS: ${{ toJSON(needs) }}
         run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
           results='${{ join(needs.*.result, ' ') }}'
-          echo "$results"
           for result in $results; do [[ "$result" == "success" ]] || exit 1; done
 
   commitlint:
@@ -116,20 +128,35 @@ jobs:
         run: ./scripts/attractap-firmware-version-check.spec.sh
       - name: Ensure Attractap firmware version was bumped
         run: ./scripts/check-attractap-firmware-version.sh "${{ env.NX_AFFECTED_BASE }}"
+      - name: Ensure the secure-profile secure_version never decreases
+        run: python3 -I apps/attractap/firmware/tools/check_secure_profile.py --base-ref "${{ env.NX_AFFECTED_BASE }}"
 
   wago-runtime-version:
     runs-on: ubuntu-latest
+    # The gate may install and build PR dependencies at the merge-base and at HEAD, so it gets no write token and no
+    # Nx remote cache credentials.
+    permissions:
+      contents: read
+    env:
+      NX_SELF_HOSTED_REMOTE_CACHE_SERVER: ''
+      NX_SELF_HOSTED_REMOTE_CACHE_ACCESS_TOKEN: ''
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v6
+          persist-credentials: false
+      # pnpm and Node are only used when the gate has to build the runtime at the merge-base and at HEAD; it installs
+      # each checkout itself, so no workspace install happens here. No `cache: pnpm`: without an install on the fast
+      # path the store never exists, and setup-node then fails its post step ("Path Validation Error").
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - name: Test CC100 runtime version check
         run: node --test scripts/wago-runtime-version-check.test.mjs
       - name: Ensure CC100 runtime version was increased
-        run: node scripts/check-wago-runtime-version.mjs "${{ env.NX_AFFECTED_BASE }}"
+        run: node scripts/check-wago-runtime-version.mjs "$NX_AFFECTED_BASE"
 
   lint-and-typecheck:
     runs-on: ubuntu-latest
@@ -141,12 +168,65 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           esp-idf: 'false'
-      - name: Enforce file size limits
+      # Always repo-wide: an import cycle can close through a project the change does not touch.
+      - name: Enforce file size limits and reject import cycles
         run: pnpm lint:files
+      # apps/cesentry may only hold the pointer to the private submodule (CONTRIBUTING.md, "Private submodule").
+      - name: Check the private submodule pointer
+        run: node scripts/check-private-submodule.mjs
+      # Public clones have no access to it: `update = none` must make them skip it, with this runner's git.
+      - name: Clone with submodules, without access to the private submodule
+        run: |
+          # The default `bash -e` would ignore the clone's exit status behind `tee`.
+          set -o pipefail
+          git --version
+          clone="$RUNNER_TEMP/public-clone"
+          GIT_TERMINAL_PROMPT=0 GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+            git -c protocol.file.allow=always clone --quiet --depth 1 --recurse-submodules "file://$PWD" "$clone" 2>&1 \
+            | tee "$RUNNER_TEMP/public-clone.log"
+          grep -q "Skipping submodule 'apps/cesentry'" "$RUNNER_TEMP/public-clone.log" ||
+            { echo "::error::git did not skip apps/cesentry; .gitmodules must keep update = none"; exit 1; }
+          test -d "$clone/apps/cesentry" && test -z "$(ls -A "$clone/apps/cesentry")" ||
+            { echo "::error::apps/cesentry must exist and stay empty in a clone without access"; exit 1; }
+          rm -rf "$clone"
+      # Every project, not just the affected ones: a change can break a project it
+      # does not touch (e.g. plugins-frontend-sdk re-exports plugins-frontend-ui
+      # through an edge `implicitDependencies` hides from the project graph).
+      # Runs before lint so no earlier step has generated code a missing
+      # `dependsOn` would otherwise hide (#2023).
+      - name: Typecheck all projects
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs typecheck)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many --target=typecheck --parallel=5 --exclude="$exclude"
       - name: Lint affected projects
-        run: pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
-      - name: Typecheck affected projects
-        run: pnpm nx affected --target=typecheck --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude=tag:scope:hardware,tag:type:plugin
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs lint)"
+          echo "Excluding: $exclude"
+          pnpm nx affected --target=lint --parallel=5 --base=${{ env.NX_AFFECTED_BASE }} --exclude="$exclude"
+
+  build-all:
+    # A fresh job on purpose: typecheck and build in one job would share a warm
+    # workspace and hide missing `dependsOn` edges that only fail on a clean checkout.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          esp-idf: 'false'
+      - name: Build all projects
+        env:
+          NODE_ENV: production
+        run: |
+          exclude="$(node scripts/ci-nx-exclude.mjs build)"
+          echo "Excluding: $exclude"
+          pnpm nx run-many --target=build --parallel=5 --exclude="$exclude"
 
   test:
     runs-on: ubuntu-latest
@@ -221,9 +301,7 @@ jobs:
           pnpm exec vitest run --config apps/plugins/scripts/vitest.config.mts
           node --test apps/plugins/scripts/*.test.mjs
 
-      # Lint the affected set, but test and pack every plugin on every CI run.
-      - name: Lint affected plugin apps
-        run: pnpm nx affected --target=lint --parallel=3 --base=${{ env.NX_AFFECTED_BASE }} --exclude='*,!tag:type:plugin'
+      # Plugin lint runs in `lint-and-typecheck`; test and pack every plugin on every CI run.
       - uses: ./.github/actions/setup-browser-tests
       - name: Test and pack all plugin apps
         run: node scripts/ci-test-projects.mjs --group=plugins

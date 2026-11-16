@@ -19,9 +19,9 @@ export function isActiveUsage(usage: ResourceUsage): boolean {
 }
 
 /**
- * The session that owns metering: the only active one. With parallel sessions the earliest started
- * (interim rule, see ATT-1191); on a machine limited to one session, legacy duplicates resolve to the newest.
- * Select it before resolving optional related records such as meter sessions.
+ * The machine's one active session. With parallel sessions the earliest started; on a machine limited to one
+ * session, legacy duplicates resolve to the newest. Select it before resolving optional related records such as
+ * meter sessions.
  */
 export async function findActiveUsage(manager: EntityManager, resourceId: number): Promise<ResourceUsage | null> {
   const sessions = await manager.find(ResourceUsage, {
@@ -44,7 +44,7 @@ export function activeUsageSql(alias: string): string {
     .join(' AND ')}`;
 }
 
-/** All published sessions of a machine, earliest first: the earliest session is the interim payer (ATT-1189). */
+/** All published sessions of a machine, earliest first. */
 export function findActiveUsages(manager: EntityManager, resourceId: number): Promise<ResourceUsage[]> {
   return manager.find(ResourceUsage, {
     where: { resourceId, ...activeUsageWhere() },
@@ -54,13 +54,22 @@ export function findActiveUsages(manager: EntityManager, resourceId: number): Pr
 
 /** Published sessions plus pending starts occupy a slot. Supervisors never take one. */
 export function countOccupiedSlots(manager: EntityManager, resourceId: number): Promise<number> {
+  return occupiedSlotsQuery(manager, resourceId).getCount();
+}
+
+/** The users behind {@link countOccupiedSlots}, one entry per occupied slot. */
+export async function findOccupyingUserIds(manager: EntityManager, resourceId: number): Promise<number[]> {
+  const rows = await occupiedSlotsQuery(manager, resourceId).select('usage.userId', 'userId').getRawMany();
+  return rows.map((row: { userId: number }) => Number(row.userId));
+}
+
+function occupiedSlotsQuery(manager: EntityManager, resourceId: number) {
   return manager
     .createQueryBuilder(ResourceUsage, 'usage')
     .where('usage.resourceId = :resourceId', { resourceId })
     .andWhere('usage.usageAction = :action', { action: ResourceUsageAction.Usage })
     .andWhere('usage.endTime IS NULL')
-    .andWhere('(usage.isFinalized = 1 OR usage.lifecyclePending = 1)')
-    .getCount();
+    .andWhere('(usage.isFinalized = 1 OR usage.lifecyclePending = 1)');
 }
 
 /**
@@ -86,12 +95,16 @@ export function pickSessionToEnd(
   throw new NoOwnActiveSessionError();
 }
 
+/** Effective number of parallel sessions. Doors and unknown resources behave like a limit of 1. */
+export function sessionLimitOf(resource: Pick<Resource, 'type' | 'maxParallelSessions'> | null | undefined): number {
+  return resource?.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
+}
+
 /** Slot usage for display and gating. Doors always behave like a limit of 1. */
 export function getSessionCapacity(
   resource: Pick<Resource, 'type' | 'maxParallelSessions'>,
   activeSessionCount: number,
 ): { activeSessionCount: number; maxParallelSessions: number; isFull: boolean } {
-  const maxParallelSessions =
-    resource.type === ResourceType.Machine ? Math.max(1, resource.maxParallelSessions ?? 1) : 1;
+  const maxParallelSessions = sessionLimitOf(resource);
   return { activeSessionCount, maxParallelSessions, isFull: activeSessionCount >= maxParallelSessions };
 }

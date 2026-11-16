@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DataSource, EntityManager } from 'typeorm';
 import { MaintenanceScheduleEvaluatorService } from './maintenance-schedule-evaluator.service';
 import { ResourceMaintenanceSchedule } from '@attraccess/database-entities';
+import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 describe('Scheduled maintenance commit notification', () => {
   let directory: string;
@@ -75,7 +76,7 @@ describe('Scheduled maintenance commit notification', () => {
       {} as never,
     );
     jest
-      .spyOn(service as unknown as { shouldTrigger: () => Promise<boolean> }, 'shouldTrigger')
+      .spyOn(Reflect.get(service, 'evaluation') as MaintenanceResourceEvaluation, 'shouldTrigger')
       .mockResolvedValue(true);
   });
 

@@ -5,7 +5,7 @@ import {
   SSOProviderType,
 } from '@attraccess/database-entities';
 
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -28,6 +28,8 @@ import {
 } from './dto/update-sso-provider.dto';
 
 import { SSOProviderNotFoundException } from './errors';
+import { AUDIT_RECORDER, AuditActor, AuditRecorder } from '../../../audit/recorder/audit-event';
+import { recordSsoProvisioningAudit, ssoProviderAuditEvent } from './audit/provider-audit';
 
 import { OIDC_SIGNING_ALGORITHMS, trustedEndpoint } from './logout-endpoints';
 
@@ -45,8 +47,12 @@ const SAML_UPDATE_PASSTHROUGH_FIELDS = [
   'wantAuthnResponseSigned',
   'forceAuthn',
   'emailAttributeKeys',
+  'roleAttributeKeys',
   'roleMappings',
 ] as const;
+
+/** An empty list means "use the defaults"; store it as null rather than the `simple-array` empty string. */
+const emptyListToNull = <T>(value: T[] | null | undefined) => (value?.length === 0 ? null : value);
 
 @Injectable()
 export class SSOService {
@@ -59,7 +65,23 @@ export class SSOService {
     protected samlConfigRepository: Repository<SSOProviderSAMLConfiguration>,
     protected licenseService: LicenseService,
     protected readonly encryptionService: EncryptionService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
+
+  /**
+   * Records a committed `sso.provisioning.*` change a sign-in made (account creation, role sync). The provider's
+   * configuration snapshot is loaded here, so the strategies record without touching audit themselves.
+   */
+  public async recordSignInProvisioning(
+    type: SSOProviderType,
+    providerId: number,
+    userId: number,
+    action: 'user_created' | 'permissions_synced',
+    changes: unknown,
+  ): Promise<void> {
+    const provider = await this.getProviderByTypeAndIdWithConfiguration(type, providerId);
+    if (provider) await recordSsoProvisioningAudit(this.audit, action, userId, provider, changes);
+  }
 
   public async getAllProviders(): Promise<SSOProvider[]> {
     const providers = await this.ssoProviderRepository.find({
@@ -107,7 +129,7 @@ export class SSOService {
     return provider;
   }
 
-  public async createProvider(createDto: CreateSSOProviderDto): Promise<SSOProvider> {
+  public async createProvider(createDto: CreateSSOProviderDto, actor: AuditActor): Promise<SSOProvider> {
     // verifying usage limits
     await this.licenseService.verifyLicense({
       modules: [LicenseModuleType.SSO],
@@ -143,12 +165,13 @@ export class SSOService {
       });
       if (!loaded) throw new BadRequestException('Provider not found after create');
       this.decryptProviderSecrets(loaded);
+      await this.audit.record(ssoProviderAuditEvent('created', actor, loaded), manager);
       return loaded;
     });
     return savedProvider;
   }
 
-  public async updateProvider(id: number, updateDto: UpdateSSOProviderDto): Promise<SSOProvider> {
+  public async updateProvider(id: number, updateDto: UpdateSSOProviderDto, actor: AuditActor): Promise<SSOProvider> {
     await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
     const provider = await this.getProviderById(id);
 
@@ -174,11 +197,13 @@ export class SSOService {
       });
       if (!updated) throw new BadRequestException('Provider not found after update');
       this.decryptProviderSecrets(updated);
+      const event = ssoProviderAuditEvent('updated', actor, updated, provider);
+      if (event) await this.audit.record(event, manager);
       return updated;
     });
   }
 
-  public async deleteProvider(id: number): Promise<void> {
+  public async deleteProvider(id: number, actor: AuditActor): Promise<void> {
     await this.licenseService.verifyLicense({ modules: [LicenseModuleType.SSO] });
     const provider = await this.getProviderById(id);
     await this.ssoProviderRepository.manager.transaction(async (manager) => {
@@ -187,6 +212,7 @@ export class SSOService {
       if (provider.samlConfiguration)
         await manager.getRepository(SSOProviderSAMLConfiguration).delete(provider.samlConfiguration.id);
       await manager.getRepository(SSOProvider).delete(id);
+      await this.audit.record(ssoProviderAuditEvent('deleted', actor, provider), manager);
     });
   }
 
@@ -215,6 +241,8 @@ export class SSOService {
 
     const newConfig = repository.create({
       ...persistableConfig,
+      emailAttributeKeys: emptyListToNull(persistableConfig.emailAttributeKeys),
+      roleAttributeKeys: emptyListToNull(persistableConfig.roleAttributeKeys),
       certificate: normalizedCertificate,
       provisioningSecret: encryptedProvisioningSecret,
       spSigningCertificate: normalizedSpSigningCertificate,
@@ -252,6 +280,9 @@ export class SSOService {
     const payload: Partial<SAMLConfigEntity> = {};
     for (const key of SAML_UPDATE_PASSTHROUGH_FIELDS) {
       if (config[key] !== undefined) Object.assign(payload, { [key]: config[key] });
+    }
+    for (const key of ['emailAttributeKeys', 'roleAttributeKeys'] as const) {
+      if (config[key] !== undefined) Object.assign(payload, { [key]: emptyListToNull(config[key]) });
     }
     if (typeof config.certificate !== 'undefined') {
       payload.certificate = this.normalizeCertificate(config.certificate);
@@ -373,6 +404,10 @@ export class SSOService {
     const encryptedSecret = this.encryptionService.encrypt(config.clientSecret);
     const newConfig = repository.create({
       ...config,
+      scopes: emptyListToNull(config.scopes),
+      usernameClaimPaths: emptyListToNull(config.usernameClaimPaths),
+      emailClaimPaths: emptyListToNull(config.emailClaimPaths),
+      roleClaimPaths: emptyListToNull(config.roleClaimPaths),
       clientSecret: encryptedSecret,
       ssoProviderId: providerId,
     });
@@ -414,13 +449,17 @@ export class SSOService {
       // empty string means "unchanged" — the frontend never receives the real secret back
     }
     if (typeof updateConfig.scopes !== 'undefined') {
-      payload.scopes = updateConfig.scopes;
+      payload.scopes = emptyListToNull(updateConfig.scopes);
     }
     if (typeof updateConfig.usernameClaimPaths !== 'undefined') {
-      payload.usernameClaimPaths = updateConfig.usernameClaimPaths;
+      payload.usernameClaimPaths = emptyListToNull(updateConfig.usernameClaimPaths);
     }
     if (typeof updateConfig.emailClaimPaths !== 'undefined') {
-      payload.emailClaimPaths = updateConfig.emailClaimPaths;
+      payload.emailClaimPaths = emptyListToNull(updateConfig.emailClaimPaths);
+    }
+    if (typeof updateConfig.roleClaimPaths !== 'undefined') {
+      // explicit null clears the column
+      payload.roleClaimPaths = emptyListToNull(updateConfig.roleClaimPaths);
     }
     if (typeof updateConfig.roleMappings !== 'undefined') {
       // explicit null clears the column

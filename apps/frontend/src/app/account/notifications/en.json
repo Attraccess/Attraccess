@@ -18,6 +18,9 @@
     "admins": {
       "label": "Admins",
       "description": "Notifications tied to system-level or access-management permissions."
+    },
+    "plugin": {
+      "description": "Categories declared by this plugin"
     }
   },
   "categories": {

@@ -1,4 +1,5 @@
 # End User Guide
+<!-- llms-description: Starting page of the end user guide for operators, employees, researchers and students who use machines through Attraccess. -->
 
 Welcome to Attraccess! This guide is for machine operators, employees, researchers and students who use Attraccess to access machines, tools, workstations and other resources in their organization.
 

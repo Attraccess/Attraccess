@@ -51,8 +51,21 @@ export class ResourceFlowLog {
   @ApiProperty({ description: 'When the log entry was created' })
   createdAt!: Date;
 
-  @ApiProperty({ description: 'The id of the resource that this log belongs to', example: 1 })
-  resourceId!: number;
+  @ApiProperty({
+    description: 'The id of the resource that this log belongs to; null for logs of a global flow',
+    example: 1,
+    nullable: true,
+    type: Number,
+  })
+  resourceId!: number | null;
+
+  @ApiProperty({
+    description: 'The id of the global flow that this log belongs to; null for logs of a resource flow',
+    example: 1,
+    nullable: true,
+    type: Number,
+  })
+  flowId!: number | null;
 }
 
 export class FlowLogRecordingDto {

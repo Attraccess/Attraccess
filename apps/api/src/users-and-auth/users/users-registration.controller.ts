@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Optional, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Req, UseInterceptors } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from '@attraccess/database-entities';
@@ -15,8 +15,6 @@ import { ChangePasswordDto } from './dtos/changePassword.dto';
 import { SignupDomainService } from './signup-domain.service';
 import { UserRegistrationService } from './user-registration.service';
 import { UserPasswordService } from './user-password.service';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
-import { randomUUID } from 'node:crypto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -26,7 +24,6 @@ export class UsersRegistrationController {
     private readonly signupDomainService: SignupDomainService,
     private readonly registrationService: UserRegistrationService,
     private readonly passwordService: UserPasswordService,
-    @Optional() private readonly identityAudit?: IdentityAuditService,
   ) {}
 
   @Get('local-signup-domain-whitelist')
@@ -79,16 +76,8 @@ export class UsersRegistrationController {
   async createOne(@Body() body: CreateUserDto, @Req() req: Request): Promise<User> {
     const acceptLanguage = req.headers['accept-language'];
     const locale = (acceptLanguage?.split(',')[0]?.split(';')[0] ?? '').trim() || undefined;
-    const user = await this.registrationService.createOne(body, locale);
-    await this.identityAudit?.record({
-      action: 'user_created',
-      operationId: randomUUID(),
-      outcome: 'succeeded',
-      subjectId: user.id,
-      details: {},
-      request: { ipAddress: req.ip, userAgent: req.headers['user-agent'] },
-    });
-    return user;
+    const userAgent = req.headers['user-agent'];
+    return this.registrationService.createOne(body, locale, { ipAddress: req.ip, userAgent });
   }
 
   @Get('local-signup-enabled')
@@ -124,7 +113,7 @@ export class UsersRegistrationController {
   }
 
   @Post('resend-verification-email')
-  @AuthRateLimit('password_reset_request')
+  @AuthRateLimit('verification_email_resend')
   @ApiOperation({ summary: 'Resend the email verification link', operationId: 'resendVerificationEmail' })
   @ApiResponse({
     status: 200,

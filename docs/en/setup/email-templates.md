@@ -1,4 +1,5 @@
 # Email Templates
+<!-- llms-description: Manage and customize the email templates Attraccess sends, including available templates, plugin templates and placeholders. -->
 
 Attraccess uses email templates for automated messages such as registration confirmations and password resets. You can customize these templates for your organization.
 
@@ -16,6 +17,14 @@ Attraccess includes default templates for:
 - **Password Reset** – Link to reset the password
 - **Email Verification** – Email address confirmation
 - **Project Invitation** – Invitation to a project
+
+## Plugin Templates
+
+Plugins can bring their own email templates (the [Reservations plugin](plugins/reservations/overview.md), for example, for booking confirmations and
+reminders). They appear in the same list after the core templates, marked with a **Plugin: &lt;name&gt;** chip, and
+are edited and translated the same way. Once a plugin template is stored, it is yours: plugin upgrades leave your
+version unchanged, so new default texts of a plugin update do not overwrite it. Use **Reset to Default** to switch to
+the plugin's current default texts and translations.
 
 ## Editing Templates
 

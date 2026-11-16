@@ -9,6 +9,8 @@ export * from './lib/plugin-migrations';
 export * from './lib/entity';
 export * from './lib/semver';
 export * from './lib/reader-ui';
+export * from './lib/plugin-notifications';
+export * from './lib/plugin-resource-access';
 
 export * from './lib/auth-decorator';
 export * from '@attraccess/database-entities';

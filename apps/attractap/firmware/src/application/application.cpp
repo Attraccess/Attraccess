@@ -141,10 +141,13 @@ void Application::loop() {
   // touch live on LvglTask.
   this->nfc.loop();
 
+  // Card commands from the server (tap, enrollment, reset, supervisor and mass-introduction cards).
+  this->cardRelay.loop(millis());
+
   this->api.loop();
 
 #ifdef HAS_LVGL_DISPLAY
-  // processState mutates LVGL (screen transitions, popups, screen setters);
+  // processState mutates LVGL (screen transitions, status screens, screen setters);
   // rendering runs on LvglTask, so serialize with lv_lock (recursive).
   lv_lock();
   this->processState();
@@ -171,8 +174,8 @@ void Application::finishReaderAction(bool success) {
   this->pendingUiAction.clear();
   this->waitingForResourceRefresh = true;
   this->pendingUiStartedAt = millis();
-  Display::resourceDetailsScreen.hideFormsModal();
   if (this->returnToListAfterAction) this->resourceIsSelected = false;
+  this->leaveForms();
   this->actionCompletionMessage = success
       ? FirmwareI18n::Text(type == "START_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageStarted
       : type == "STOP_RESOURCE_USAGE_SESSION" ? FirmwareI18n::Message::UsageEnded : FirmwareI18n::Message::ActionConfirmed)
@@ -185,7 +188,6 @@ void Application::finishReaderAction(bool success) {
 }
 
 void Application::beginSessionSummary(const API::ActionResult &result) {
-  Display::hidePopup();
   this->onActionResult(result.type);
   this->clearFormPageCache();
   this->pendingFormFieldsReady = false;
@@ -203,6 +205,7 @@ void Application::beginSessionSummary(const API::ActionResult &result) {
   this->waitingForResourceRefresh = false;
   this->returnToListAfterAction = false;
   this->actionCompletionMessage.clear();
+  this->billingSummaryShown = false;
   this->api.cancelResourceAction();
   this->resetPauseAccounting();
   Display::resourceListScreen.hideActionProgress();
@@ -227,17 +230,32 @@ void Application::dismissSessionSummary() {
   this->logoutReader();
 }
 
+void Application::endReaderLogin() {
+  // Row statuses received during this card session (the card holder's own booking) must not reach the lock
+  // screen or the signed-out list. The server sends the signed-out ones again as soon as it hears the session ended.
+  if (ui::slotCache().clearSlot(ui::SlotId::ListRowStatus) > 0) {
+    Display::asyncCall([](void *) {
+      Display::lockscreen.refreshUiSlots();
+      Display::resourceListScreen.refreshUiSlots();
+    }, nullptr);
+  }
+  // The server keeps the verified user for this connection until told otherwise.
+  this->api.sendReaderSessionEnded();
+  this->api.endCardSession(); // the card session is over: tell the server
+}
+
 void Application::logoutReader() {
   this->closeUiStep();
-  // The card session is over: tell the server, and drop what only the signed-in user may see.
-  this->api.endCardSession();
-  ui::slotCache().clearSlot(ui::SlotId::DetailsSession);
+  this->endReaderLogin();
+  ui::slotCache().clearSlot(ui::SlotId::DetailsSession); // only the signed-in user may see it
   State::setUserLanguage(false);
   this->sessionSummaryActive = false;
   this->sessionSummaryVisible = false;
   this->sessionSummaryDismissRequested = false;
   Display::sessionSummaryScreen.clearSummary();
-  Display::hidePopup();
+  this->billingSummaryShown = false;
+  // A top-up answer that arrives later belongs to the user who just left.
+  this->topUpPending = false;
   this->handleFormsCancel();
   this->finishCardAuthentication(false);
   this->unlocked = false;
@@ -262,9 +280,12 @@ void Application::finishCardAuthentication(bool success) {
   this->cardAuthenticationPending = false;
   Display::resourceListScreen.hideActionProgress();
   Display::lockscreen.hideActionProgress();
+  if (!success) Display::lockscreen.holdPluginStatus(false); // refused or signed out: public status again
   if (success) {
     this->restartSessionTimeout();
     this->selectedResourceChanged = true;
+    this->topUpPending = false; // nothing of an earlier user's top-up reaches this one
+
   } else {
     State::setUserLanguage(false);
     this->externalState = EXTERNAL_STATE_NONE;
@@ -300,6 +321,8 @@ void Application::pollUsageStats() {
 
 #ifdef HAS_LVGL_DISPLAY
 void Application::beginEnrollment() {
+  // Sign out whoever is signed in or checking a card: their rows leave the cache and the server ends the session.
+  if (this->unlocked || this->cardAuthenticationPending) this->logoutReader();
   this->unlocked = false;
   State::setUserLanguage(false);
   // WAIT_FOR_CARD rides the normal card-detection loop, which re-arms the
@@ -311,7 +334,7 @@ void Application::beginEnrollment() {
   this->nfc.resetCardPresence();
   this->nfc.enableCardDetection();
   this->enrollPhase = ENROLL_PHASE_WAIT_FOR_CARD;
-  this->enrollKeyMaterialReady = false;
+  this->enrollSucceeded = false;
   this->enrollCancelRequested = false;
   this->enrollErrorPending = false;
   this->enrollErrorMessage[0] = '\0';
@@ -347,6 +370,7 @@ void Application::processEnrollment() {
   if (this->enrollCancelRequested) {
     this->enrollCancelRequested = false;
     this->logger.debug("Enrollment cancelled by user");
+    this->cardRelay.cancel();
     this->api.sendEnrollNewCardCancel();
     this->exitEnrollment();
     return;
@@ -357,6 +381,7 @@ void Application::processEnrollment() {
       now - this->apiEnrollNewCardGetAvailableKeyNoStartTimeMs >
           ENROLLMENT_TIMEOUT_MS) {
     this->logger.error("Enrollment timeout reached");
+    this->cardRelay.cancel();
     this->api.sendEnrollNewCardCancel();
     this->exitEnrollment();
     return;
@@ -366,6 +391,7 @@ void Application::processEnrollment() {
   // ERROR dwell loop retries within the remaining time.
   if (this->enrollErrorPending) {
     this->enrollErrorPending = false;
+    this->cardRelay.cancel();
     this->beeper.errorBeep();
     Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
     Display::enrollmentScreen.setStatusMessage(FirmwareI18n::readerError(this->enrollErrorMessage));
@@ -387,58 +413,31 @@ void Application::processEnrollment() {
     // follow, so the detection loop doesn't probe the card underneath us.
     this->nfc.disableCardDetection();
 
-    uint8_t uid[7] = {0};
-    uint8_t uidLength = 0;
-    uint8_t keyNo = 0;
-    if (this->nfc.getAvailableKeyNo(uid, &uidLength, &keyNo)) {
-      this->api.sendEnrollNewCardAvailableKeyNo(uid, uidLength, keyNo);
-      this->enrollPhase = ENROLL_PHASE_REQUESTED_KEY;
-      this->enrollPhaseChangedMs = now;
-    } else {
-      // Card slipped away or has no writable key. Surface the failure instead
-      // of silently re-arming, otherwise DESFire setup/auth failures look like
-      // the reader ignored the card.
-      this->beeper.errorBeep();
-      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
-      Display::enrollmentScreen.setStatusMessage(
-          FirmwareI18n::Message::CouldNotPrepareCard);
-      this->enrollPhase = ENROLL_PHASE_ERROR;
-      this->enrollPhaseChangedMs = now;
-      this->nfc.resetCardPresence();
-    }
-    break;
-  }
-
-  case ENROLL_PHASE_REQUESTED_KEY: {
-    // Key material arrives asynchronously via the API callback, which only
-    // sets a flag — the actual write happens here on the main loop.
-    if (this->enrollKeyMaterialReady) {
-      this->enrollKeyMaterialReady = false;
-      Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WRITING);
-      this->enrollPhase = ENROLL_PHASE_WRITING;
-      this->enrollPhaseChangedMs = now;
-    }
+    // Hand the card to the server: it finds a free slot, writes a fresh key and proves it through
+    // the relay before it records the card. The reader only relays the commands.
+    this->api.sendCardDetected("enroll", this->enrollCardUid, this->enrollCardUidLength);
+    Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_WRITING);
+    this->enrollPhase = ENROLL_PHASE_WRITING;
+    this->enrollPhaseChangedMs = now;
     break;
   }
 
   case ENROLL_PHASE_WRITING: {
-    bool ok = this->nfc.changeKey(
-        this->apiEnrollNewCardData.keyNo, this->nfc.getFactoryKey(),
-        this->nfc.getFactoryKey(), this->apiEnrollNewCardData.keyBytes,
-        INfc::CARD_KEY_VERSION_ENROLLED);
-    this->api.sendEnrollNewCard(ok);
-    if (ok) {
+    if (this->enrollSucceeded) {
+      this->enrollSucceeded = false;
       this->beeper.successBeep();
       Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_SUCCESS);
       this->enrollPhase = ENROLL_PHASE_SUCCESS;
-    } else {
+      this->enrollPhaseChangedMs = now;
+    } else if (now - this->enrollPhaseChangedMs > CARD_WRITE_TIMEOUT_MS) {
+      // No verdict from the server: nothing is recorded, so the card must be presented again.
+      this->cardRelay.cancel();
       this->beeper.errorBeep();
       Display::enrollmentScreen.setStatus(EnrollmentScreen::STATUS_ERROR);
-      Display::enrollmentScreen.setStatusMessage(
-          FirmwareI18n::Message::CouldNotWriteCard);
+      Display::enrollmentScreen.setStatusMessage(FirmwareI18n::Message::CouldNotWriteCard);
       this->enrollPhase = ENROLL_PHASE_ERROR;
+      this->enrollPhaseChangedMs = now;
     }
-    this->enrollPhaseChangedMs = now;
     break;
   }
 
@@ -473,6 +472,7 @@ void Application::processEnrollment() {
 #ifdef HAS_LVGL_DISPLAY
 
 void Application::beginReset() {
+  if (this->unlocked || this->cardAuthenticationPending) this->logoutReader(); // as in beginEnrollment()
   this->unlocked = false;
   State::setUserLanguage(false);
   // Mirrors beginEnrollment(): WAIT_FOR_CARD rides the normal card-detection
@@ -483,6 +483,8 @@ void Application::beginReset() {
   this->nfc.enableCardDetection();
   this->resetPhase = RESET_PHASE_WAIT_FOR_CARD;
   this->resetCancelRequested = false;
+  this->resetSucceeded = false;
+  this->resetErrorPending = false;
   this->resetStartTimeMs = millis();
   this->resetPhaseChangedMs = this->resetStartTimeMs;
 
@@ -512,6 +514,7 @@ void Application::processReset() {
   if (this->resetCancelRequested) {
     this->resetCancelRequested = false;
     this->logger.debug("Reset cancelled by user");
+    this->cardRelay.cancel();
     this->api.sendResetNfcCardCancel();
     this->exitReset();
     return;
@@ -521,6 +524,7 @@ void Application::processReset() {
   if (this->resetPhase != RESET_PHASE_SUCCESS &&
       now - this->resetStartTimeMs > RESET_TIMEOUT_MS) {
     this->logger.error("Reset timeout reached");
+    this->cardRelay.cancel();
     this->api.sendResetNfcCardCancel();
     this->exitReset();
     return;
@@ -538,6 +542,8 @@ void Application::processReset() {
     // Take exclusive control of the PN532 for the authenticate + write that
     // follow, so the detection loop doesn't probe the card underneath us.
     this->nfc.disableCardDetection();
+    // The server resets the card through the relay and only then forgets it.
+    this->api.sendCardDetected("reset", this->resetCardUid, this->resetCardUidLength);
     Display::resetScreen.setStatus(ResetScreen::STATUS_WRITING);
     this->resetPhase = RESET_PHASE_WRITING;
     this->resetPhaseChangedMs = now;
@@ -545,26 +551,24 @@ void Application::processReset() {
   }
 
   case RESET_PHASE_WRITING: {
-    // Authenticate as the (still factory) application master key, then change
-    // the stored slot from the card's current key back to the factory key.
-    bool ok = this->nfc.changeKey(this->apiResetNfcCardData.keyNo,
-                                  this->nfc.getFactoryKey(),
-                                  this->apiResetNfcCardData.keyBytes,
-                                  this->nfc.getFactoryKey(),
-                                  INfc::CARD_KEY_VERSION_FREE);
-    this->api.sendResetNfcCard(ok);
-    if (ok) {
+    if (this->resetSucceeded) {
+      this->resetSucceeded = false;
       this->beeper.successBeep();
       Display::resetScreen.setStatus(ResetScreen::STATUS_SUCCESS);
       this->resetPhase = RESET_PHASE_SUCCESS;
-    } else {
+      this->resetPhaseChangedMs = now;
+    } else if (this->resetErrorPending || now - this->resetPhaseChangedMs > CARD_WRITE_TIMEOUT_MS) {
+      // The server did not confirm the factory state: the card record stays, present it again.
+      const bool serverReason = this->resetErrorPending;
+      this->resetErrorPending = false;
+      this->cardRelay.cancel();
       this->beeper.errorBeep();
       Display::resetScreen.setStatus(ResetScreen::STATUS_ERROR);
-      Display::resetScreen.setStatusMessage(
-          FirmwareI18n::Message::CouldNotResetCard);
+      Display::resetScreen.setStatusMessage(serverReason ? FirmwareI18n::readerError(this->resetErrorMessage)
+                                                         : FirmwareI18n::Text(FirmwareI18n::Message::CouldNotResetCard));
       this->resetPhase = RESET_PHASE_ERROR;
+      this->resetPhaseChangedMs = now;
     }
-    this->resetPhaseChangedMs = now;
     break;
   }
 

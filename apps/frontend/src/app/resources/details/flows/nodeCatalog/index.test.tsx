@@ -35,12 +35,14 @@ vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   }))()),
 }));
 
+const OWNER = { kind: 'resource', resourceId: 1 } as const;
 let mockIsLoading = false;
 
 vi.mock('@attraccess/react-query-client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@attraccess/react-query-client')>();
   return {
     ...actual,
+    useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined, isLoading: false, isError: false }),
     useResourceFlowsServiceGetNodeSchemas: () => ({
       isLoading: mockIsLoading,
       data: mockIsLoading
@@ -52,6 +54,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
               outputs: ['out'],
               isOutput: false,
               supportedByResource: true,
+              supportedFlowScopes: ['resource', 'global'],
               configSchema: {},
             },
             {
@@ -60,6 +63,7 @@ vi.mock('@attraccess/react-query-client', async (importOriginal) => {
               outputs: ['out'],
               isOutput: false,
               supportedByResource: true,
+              supportedFlowScopes: ['resource', 'global'],
               configSchema: {},
             },
           ],
@@ -84,7 +88,7 @@ describe('NodeCatalogPanel', () => {
   });
 
   it('renders domain headers and node rows in desktop shell', () => {
-    render(<NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+    render(<NodeCatalogPanel owner={OWNER} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
       wrapper: TestWrapper,
     });
     expect(screen.getAllByText('Flow control').length).toBeGreaterThan(0);
@@ -94,7 +98,7 @@ describe('NodeCatalogPanel', () => {
   it('renders icon rail when collapsed and expands + scrolls on icon click', async () => {
     window.localStorage.setItem('nodeCatalog.collapsed', 'true');
     const user = userEvent.setup();
-    render(<NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+    render(<NodeCatalogPanel owner={OWNER} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
       wrapper: TestWrapper,
     });
     const manualButton = screen.getAllByRole('button', { name: 'Flow control' })[0];
@@ -107,7 +111,7 @@ describe('NodeCatalogPanel', () => {
 
   it('shows spinner while loading in desktop sidebar', () => {
     mockIsLoading = true;
-    render(<NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+    render(<NodeCatalogPanel owner={OWNER} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
       wrapper: TestWrapper,
     });
     expect(screen.getByRole('status')).toBeInTheDocument();
@@ -115,7 +119,7 @@ describe('NodeCatalogPanel', () => {
   });
 
   it('shows content once loaded in desktop sidebar', () => {
-    render(<NodeCatalogPanel resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+    render(<NodeCatalogPanel owner={OWNER} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
       wrapper: TestWrapper,
     });
     expect(screen.queryByRole('status')).toBeNull();
@@ -125,7 +129,7 @@ describe('NodeCatalogPanel', () => {
   it('shows spinner in mobile drawer while loading', async () => {
     mockIsLoading = true;
     const ref = createRef<NodeCatalogHandle>();
-    render(<NodeCatalogPanel ref={ref} resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+    render(<NodeCatalogPanel ref={ref} owner={OWNER} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
       wrapper: TestWrapper,
     });
     act(() => {
@@ -138,7 +142,7 @@ describe('NodeCatalogPanel', () => {
 
   it('shows content in mobile drawer once loaded', async () => {
     const ref = createRef<NodeCatalogHandle>();
-    render(<NodeCatalogPanel ref={ref} resourceId={1} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
+    render(<NodeCatalogPanel ref={ref} owner={OWNER} onSelect={vi.fn()} tNodeTranslations={tNodeTranslations} />, {
       wrapper: TestWrapper,
     });
     act(() => {
@@ -151,7 +155,7 @@ describe('NodeCatalogPanel', () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
     const ref = createRef<NodeCatalogHandle>();
-    render(<NodeCatalogPanel ref={ref} resourceId={1} onSelect={onSelect} tNodeTranslations={tNodeTranslations} />, {
+    render(<NodeCatalogPanel ref={ref} owner={OWNER} onSelect={onSelect} tNodeTranslations={tNodeTranslations} />, {
       wrapper: TestWrapper,
     });
     act(() => {

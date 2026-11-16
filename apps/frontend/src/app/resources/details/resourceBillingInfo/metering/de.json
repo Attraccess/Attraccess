@@ -14,16 +14,22 @@
     "estimateWaiting": "Warte auf Zählerdaten der Sitzung",
     "estimate": "Voraussichtliche Kosten bisher",
     "estimateNote": "Schätzung ohne zugeordnete Betriebsminuten und zusätzliche Flow-Positionen.",
-    "billingValue": "{{credits}} {{currency}}"
+    "billingValue": "{{credits}} {{currency}}",
+    "meterShare": "{{value}} — dein Anteil",
+    "provisional": "vorläufig bis zur nächsten Messung",
+    "meterShareCost": "{{name}}: dein Kostenanteil bisher"
   },
   "setup": {
     "title": "Zähler nicht eingerichtet",
     "description": "Die Verbrauchabrechnung ist aktiv, aber es kann keine Sitzung starten, bis der Flow dieser Ressource ihren Zähler definiert.",
+    "sharingTitle": "Zähler nicht teilbar",
+    "sharingDescription": "Diesen Zähler kann immer nur eine Sitzung nutzen: Ein Start, während eine andere Sitzung läuft, wird abgelehnt. Für parallele Sitzungen stellen Sie den Zähler auf „Pro Sitzung gemessen“ um, ergänzen seinen Flow um die Zweige „Messung starten“ und „Messwert abfragen“ oder setzen seinen Preis auf 0.",
     "problems": {
       "start-trigger-missing": "Fügen Sie einen Auslöser „Messung starten“ hinzu.",
       "ready-unreachable": "Verbinden Sie „Messung starten“ mit einem Knoten „Messung bereit“.",
       "collect-trigger-missing": "Fügen Sie einen Auslöser „Messwert abfragen“ hinzu.",
-      "report-unreachable": "Verbinden Sie „Messwert abfragen“ mit einem Knoten „Verbrauch melden“."
+      "report-unreachable": "Verbinden Sie „Messwert abfragen“ mit einem Knoten „Verbrauch melden“.",
+      "shared-needs-collect": "Dieser Zähler kann nicht bei Bedarf gelesen werden und lässt sich daher nicht auf gleichzeitig laufende Sitzungen aufteilen. Stellen Sie die Zuordnung auf „Pro Sitzung gemessen“ um oder setzen Sie den Preis auf 0 (nur erfassen)."
     },
     "action": "Flows öffnen"
   },

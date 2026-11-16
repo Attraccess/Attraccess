@@ -1,4 +1,5 @@
 # Abrechnung
+<!-- llms-description: Stellt die Abrechnung vor: Credits werden bei Ressourcennutzung abgezogen; Credit-System, Zahlungsintegration und nötige Berechtigung. -->
 
 Attraccess verfuegt ueber ein Abrechnungssystem, mit dem Sie die Nutzung von Ressourcen berechnen koennen. Credits werden automatisch vom Konto der Benutzer abgezogen, wenn diese Ressourcen verwenden.
 

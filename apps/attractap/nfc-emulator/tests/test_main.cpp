@@ -4,6 +4,7 @@
 #include "nfc_emulator/persistence.hpp"
 #include "nfc_emulator/trace.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <iostream>
 

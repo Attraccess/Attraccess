@@ -1,13 +1,19 @@
 // Diagnostics over the authoritative machine operating timeline (ATT-1024).
 // All views are derived directly from `resource_operating_interval` rows; there are no persisted
 // aggregates yet, so verification recomputes derived durations from the timeline and compares.
-import { ResourceFlowNode, ResourceOperatingInterval, ResourceFlowNodeType } from '@attraccess/database-entities';
+import {
+  Resource,
+  ResourceFlowNode,
+  ResourceOperatingInterval,
+  ResourceFlowNodeType,
+  ResourceType,
+} from '@attraccess/database-entities';
 
 import { Injectable } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { In, IsNull, MoreThan, Repository } from 'typeorm';
+import { FindOptionsWhere, In, IsNull, MoreThan, Repository } from 'typeorm';
 
 import {
   OperatingDataQualityFailureKind,
@@ -38,31 +44,6 @@ export const TRACKING_NODE_TYPES = [
   ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_OPERATING,
   ResourceFlowNodeType.OUTPUT_RESOURCE_ACTIVITY_IDLE,
 ];
-
-/** Total length of the union of [start, end) ranges, ignoring empty or inverted ranges. */
-export function unionDurationMs(ranges: { start: number; end: number }[]): number {
-  const sorted = ranges.filter((range) => range.end > range.start).sort((left, right) => left.start - right.start);
-  let total = 0;
-  let cursor: number | null = null;
-  let currentEnd: number | null = null;
-
-  for (const range of sorted) {
-    if (cursor === null || currentEnd === null || range.start >= currentEnd) {
-      if (cursor !== null && currentEnd !== null) {
-        total += currentEnd - cursor;
-      }
-      cursor = range.start;
-      currentEnd = range.end;
-    } else if (range.end > currentEnd) {
-      currentEnd = range.end;
-    }
-  }
-
-  if (cursor !== null && currentEnd !== null) {
-    total += currentEnd - cursor;
-  }
-  return total;
-}
 
 @Injectable()
 export class ResourceOperatingDiagnosticsService {
@@ -131,10 +112,28 @@ export class ResourceOperatingDiagnosticsService {
     return { items, totalIntervals, page, limit };
   }
 
+  /**
+   * Tracking nodes of the resource's own flow plus, for machines, those of enabled global flows: global operating and
+   * idle nodes act on whichever machine triggered the run.
+   */
+  private async countTrackingNodes(resourceId: number): Promise<number> {
+    const own: FindOptionsWhere<ResourceFlowNode> = { resourceId, type: In(TRACKING_NODE_TYPES) };
+    const resource = await this.flowNodeRepository.manager.findOne(Resource, {
+      where: { id: resourceId },
+      select: { id: true, type: true },
+    });
+    if (resource?.type !== ResourceType.Machine) {
+      return this.flowNodeRepository.count({ where: own });
+    }
+    return this.flowNodeRepository.count({
+      where: [own, { type: In(TRACKING_NODE_TYPES), flow: { enabled: true, scope: 'global' } }],
+    });
+  }
+
   async getDataQualityReport(resourceId: number, to = new Date()): Promise<OperatingDataQualityReportDto> {
     const from = new Date(to.getTime() - STALE_SIGNAL_DAYS * DAY_MS);
     const [trackingNodes, intervals, openCount] = await Promise.all([
-      this.flowNodeRepository.count({ where: { resourceId, type: In(TRACKING_NODE_TYPES) } }),
+      this.countTrackingNodes(resourceId),
       this.intervalRepository.find({
         where: [
           { resourceId, startTime: MoreThan(from) },

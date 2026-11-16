@@ -7,7 +7,7 @@ describe('ResourceActionGuard', () => {
   let mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number | null };
+    state: { verifiedUserId: number | null };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };
@@ -33,7 +33,7 @@ describe('ResourceActionGuard', () => {
     mockSocket = {
       id: 'test-id',
       readerId: 42,
-      state: { lastAuthenticatedUserId: 1 },
+      state: { verifiedUserId: 1 },
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
     };
@@ -149,8 +149,8 @@ describe('ResourceActionGuard', () => {
   });
 
   describe('user not authenticated', () => {
-    it('sends USER_NOT_AUTHENTICATED and returns false when lastAuthenticatedUserId is null', async () => {
-      mockSocket.state.lastAuthenticatedUserId = null;
+    it('sends USER_NOT_AUTHENTICATED and returns false when verifiedUserId is null', async () => {
+      mockSocket.state.verifiedUserId = null;
 
       const result = await guard.validateResourceAction(mockSocket as any, 10, AttractapEventType.LOCK_DOOR);
 
@@ -166,8 +166,8 @@ describe('ResourceActionGuard', () => {
       expect(mockUsersService.findOne).not.toHaveBeenCalled();
     });
 
-    it('sends USER_NOT_AUTHENTICATED when lastAuthenticatedUserId is undefined', async () => {
-      mockSocket.state.lastAuthenticatedUserId = undefined as any;
+    it('sends USER_NOT_AUTHENTICATED when verifiedUserId is undefined', async () => {
+      mockSocket.state.verifiedUserId = undefined as any;
 
       const result = await guard.validateResourceAction(mockSocket as any, 10, AttractapEventType.LOCK_DOOR);
 
@@ -183,8 +183,8 @@ describe('ResourceActionGuard', () => {
     });
 
     it('does NOT treat userId 0 as unauthenticated (== null check)', async () => {
-      // lastAuthenticatedUserId == null is false for 0, so it proceeds to findOne.
-      mockSocket.state.lastAuthenticatedUserId = 0;
+      // verifiedUserId == null is false for 0, so it proceeds to findOne.
+      mockSocket.state.verifiedUserId = 0;
 
       const result = await guard.validateResourceAction(mockSocket as any, 10, AttractapEventType.LOCK_DOOR);
 

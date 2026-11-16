@@ -5,7 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@attraccess/react-query-client';
 import { StartSessionControls } from './index';
 
-const { startMutate, supervisionMode, requestForms, toastError, bothCallbacks } = vi.hoisted(() => ({
+const { startMutate, supervisionMode, resourceType, startBlocked, requestForms, toastError, bothCallbacks } = vi.hoisted(
+  () => ({
   bothCallbacks: (options: unknown, callbacks: unknown, variables: unknown) => {
     // Mirrors TanStack: the hook-level callbacks run first, then the per-call ones.
     type Callbacks = {
@@ -28,7 +29,10 @@ const { startMutate, supervisionMode, requestForms, toastError, bothCallbacks } 
   toastError: vi.fn(),
   requestForms: vi.fn().mockResolvedValue([]),
   supervisionMode: { value: 'introduction_required' },
-}));
+  resourceType: { value: 'machine' },
+  startBlocked: { value: { blocked: false } as Record<string, unknown> },
+  }),
+);
 
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -54,7 +58,7 @@ vi.mock('./MachineStartControls', () => ({
     </button>
   ),
 }));
-vi.mock('./DoorControls', () => ({ DoorControls: () => null }));
+vi.mock('./DoorControls', () => ({ DoorControls: () => <div data-testid="door-controls" /> }));
 vi.mock('../SessionNotesModal', () => ({ SessionNotesModal: () => null, SessionModalMode: { START: 'start' } }));
 vi.mock('./insufficientBalanceModal', () => ({ InsufficientBalanceModal: () => null }));
 vi.mock('../SupervisedStartModal', () => ({
@@ -70,7 +74,14 @@ vi.mock('@attraccess/react-query-client', async (original) => ({
     SUPERVISION_REQUIRED: 'supervision_required',
   },
   useResourcesServiceGetOneResourceById: () => ({
-    data: { id: 1, type: 'machine', supervisionMode: supervisionMode.value },
+    data: { id: 1, type: resourceType.value, supervisionMode: supervisionMode.value },
+  }),
+  // The real StartBlockedGate renders; only its query answer is faked.
+  useResourcesServiceResourceUsageStartBlocked: () => ({
+    data: startBlocked.value,
+    isPending: false,
+    isError: false,
+    refetch: vi.fn(),
   }),
   // The shared start hook passes onSuccess/onError at hook level and plugin handling per call.
   useResourcesServiceResourceUsageStartSession: (options: unknown) => ({
@@ -94,6 +105,8 @@ describe('StartSessionControls supervision gating', () => {
     startMutate.mockClear();
     requestForms.mockReset().mockResolvedValue([]);
     supervisionMode.value = 'introduction_required';
+    resourceType.value = 'machine';
+    startBlocked.value = { blocked: false };
   });
 
   // ATT-815: the backend rejects a solo start on supervision_required for everyone, so the picker
@@ -235,4 +248,29 @@ it('shows the plugin reason on 403 START_BLOCKED instead of a generic error', as
   await act(() => callbacks.onError(error));
   expect(toastError).toHaveBeenCalledWith({ title: 'Reserved', description: 'Booked until 14:00' });
   expect(startMutate).toHaveBeenCalledOnce();
+});
+
+describe('StartSessionControls start-blocked gate', () => {
+  const reason = { code: 'RESERVED', title: 'Reserved', body: 'Reserved by another user until 16:00.' };
+  beforeEach(() => {
+    supervisionMode.value = 'introduction_required';
+    startBlocked.value = { blocked: true, reason, until: '2026-06-01T14:00:00.000Z' };
+  });
+
+  it('replaces the machine start controls with the plugin notice', () => {
+    resourceType.value = 'machine';
+    render(<StartSessionControls resourceId={1} />);
+
+    expect(screen.getByText(reason.body)).toBeInTheDocument();
+    expect(screen.queryByText('start')).not.toBeInTheDocument();
+  });
+
+  // Door actions never pass the pre-start hook, so a booking must not hide lock/unlock from anyone.
+  it('keeps the door controls while a plugin reports a blocked start', () => {
+    resourceType.value = 'door';
+    render(<StartSessionControls resourceId={1} />);
+
+    expect(screen.getByTestId('door-controls')).toBeInTheDocument();
+    expect(screen.queryByText(reason.body)).not.toBeInTheDocument();
+  });
 });

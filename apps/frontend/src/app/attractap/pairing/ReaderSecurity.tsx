@@ -7,6 +7,7 @@ import {
   useAttractapServiceGetReaderCredentialHistory,
   useAttractapServiceRevokeReader,
   useAttractapServiceGetReadersKey,
+  useAttractapServiceGetReadersToPairKey,
   useAttractapServiceGetReaderCredentialHistoryKey,
   UseAttractapServiceGetReaderByIdKeyFn,
   useUsersServiceGetOneUserById,
@@ -79,7 +80,9 @@ export function ReaderSecurity(props: Readonly<{ reader: Attractap; onPairingRem
     onSuccess: () => {
       setRevokeOpen(false);
       toast.success({ title: t('security.revoked') });
+      // The reader moves from the paired list to the one under Not paired.
       queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersKey] });
+      queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReadersToPairKey] });
       queryClient.invalidateQueries({ queryKey: [useAttractapServiceGetReaderCredentialHistoryKey] });
       queryClient.invalidateQueries({ queryKey: UseAttractapServiceGetReaderByIdKeyFn({ readerId: reader.id }) });
       // A reader without pairing cannot be edited any more.

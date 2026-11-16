@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { User } from '@attraccess/database-entities';
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 import { UsersService } from './users.service';
@@ -20,7 +20,6 @@ export class UserPasswordService {
 
   constructor(
     private readonly usersService: UsersService,
-    @Inject(forwardRef(() => AuthService))
     private readonly authService: AuthService,
     private readonly emailService: EmailService,
     private readonly tokenHashService: TokenHashService,
@@ -71,6 +70,11 @@ export class UserPasswordService {
       throw new ForbiddenException('Invalid token');
     }
 
+    if (!user.passwordResetTokenExpiresAt || user.passwordResetTokenExpiresAt < new Date()) {
+      this.logger.debug(`Expired reset token for user ID: ${userId}`);
+      throw new ForbiddenException('Invalid token');
+    }
+
     const policyResult = await this.passwordPolicyService.validate(
       body.password,
       { username: user.username, email: user.email },
@@ -80,16 +84,22 @@ export class UserPasswordService {
       throw new PasswordPolicyViolationException(policyResult.errors);
     }
 
-    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
-    await this.authService.changePassword(user, body.password);
-
+    // Consume the token before changing the password: changePassword sends a notification email afterwards, and a
+    // failed send must not leave the link usable again.
     await this.usersService.updateOne(userId, {
       passwordResetToken: null,
       passwordResetTokenExpiresAt: null,
     });
+
+    await this.passwordPolicyService.archiveCurrentPasswordToHistory(user.id);
+    await this.authService.changePassword(user, body.password);
   }
 
-  public async setUserPassword(id: number, body: SetUserPasswordDto, requestUser: User | AuthenticatedUser): Promise<void> {
+  public async setUserPassword(
+    id: number,
+    body: SetUserPasswordDto,
+    requestUser: User | AuthenticatedUser,
+  ): Promise<void> {
     this.logger.debug(`Setting password for user ID: ${id}, by user ID: ${requestUser.id}`);
 
     // Prevent users from updating their own password through this endpoint

@@ -32,6 +32,20 @@ private:
     bool firmwareUpdateActive = false;
     Beeper beeper;
 
+    // Runs card commands for the server (the reader holds no card keys or session).
+    CardRelay cardRelay{CardRelay::Hooks{
+        [this](const uint8_t *apdu, uint8_t length, uint8_t *response, uint8_t *responseLength) {
+          return this->nfc.transceive(apdu, length, response, responseLength);
+        },
+        [this](const char *id, uint32_t seq, const uint8_t *response, uint8_t length) {
+          this->api.sendCardApduResponse(id, seq, response, length);
+        },
+        [this](const char *id) { this->api.sendCardRemoved(id); },
+        [this](bool active) { this->nfc.setConversationActive(active); }}};
+    // Non-display readers log out after each card action; the server is told shortly afterwards,
+    // unless a new tap starts first (that tap replaces the verified user anyway).
+    uint32_t sessionEndNotifyAtMs = 0;
+
 #ifdef HAS_LVGL_DISPLAY
     SupervisionFlow supervision{api, nfc, beeper, logger, Display::supervisionScreen};
     MassIntroductionFlow massIntroduction{api, nfc, beeper, logger, Display::massIntroductionScreen};
@@ -89,8 +103,37 @@ private:
     void showReaderActionProgress(const FirmwareI18n::Text &title);
     void finishReaderAction(bool success);
     void logoutReader();
+    // Ends the reader login on the server (READER_SESSION_ENDED, CARD_SESSION_ENDED) and drops the row statuses
+    // received during it. Part of every sign-out; also for a card session nobody is signed in to (a sign-in that
+    // timed out, or a verified card the reader no longer waits for).
+    void endReaderLogin();
     void beginSessionSummary(const API::ActionResult &result);
     void dismissSessionSummary();
+    // Full-screen result over the current screen. `resumeRouting`: leaving it lets the application
+    // route from its state (e.g. to the lockscreen after a logout) instead of returning to the origin.
+    void showStatus(StatusScreen::Config config, bool resumeRouting = false);
+    std::string resourceNameOf(uint32_t resourceId) const;
+    // An action failed: in place on the button that started it, or a full-screen error when that is gone.
+    void showActionFailure(uint32_t resourceId, const std::string &errorCode,
+                           const FirmwareI18n::Text &preferred = FirmwareI18n::Text(), bool returnToList = false);
+    // "Sign-in failed" with `message`; a card tapped meanwhile dismisses it (dismissSignedOutStatus).
+    void showSignInFailed(const FirmwareI18n::Text &message);
+    // A refused action: top-up, "insufficient balance" or showActionFailure.
+    void reportActionFailure(const API::ActionResult &result, uint32_t resourceId, bool returnToList);
+    // The server refused a usage form request (its fields or a page).
+    void handleFormFlowError(const API::ActionResult &result);
+    RoutingKey routingKey() const;
+    // A card tapped while "sign-in failed" or "status unavailable" is up: back to the signed-out
+    // screen the state dictates, so the tap signs in as usual.
+    bool dismissSignedOutStatus();
+    // An error the server reported for `eventType`; only errors that belong to something on screen get UI.
+    void handleReaderError(const std::string &eventType, const std::string &code);
+    // Top-up is a routed screen over the origin; the form and project screens likewise.
+    // `keepAmount`: a refused request comes back with the amount that was typed.
+    void openTopUp(bool keepAmount = false);
+    void leaveTopUp();
+    void leaveForms();
+    void openProjects();
     void finishCardAuthentication(bool success);
 
 #else

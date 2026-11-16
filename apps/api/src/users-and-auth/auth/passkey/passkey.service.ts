@@ -1,12 +1,23 @@
 import { Passkey, PasskeyChallenge, User } from '@attraccess/database-entities';
 
-import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { LessThan, Repository } from 'typeorm';
 
 import { SettingsService } from '../../../settings/settings.service';
+import { identityAuditEvent } from '../../../audit/policies/identity';
+import { AUDIT_RECORDER, AuditOrigin, AuditRecorder } from '../../../audit/recorder/audit-event';
+import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
+import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
 import {
   type AuthenticationResponseJSON,
   type PublicKeyCredentialRequestOptionsJSON,
@@ -79,7 +90,43 @@ export class PasskeyService {
     @InjectRepository(User)
     protected readonly userRepository: Repository<User>,
     protected readonly settingsService: SettingsService,
+    protected readonly bruteForce: BruteForceProtectionService,
+    protected readonly authAudit: AuthAuditLogger,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
+
+  /** Passkey sign-in is throttled per IP like password login; a throttled attempt is audited as rate limited. */
+  async assertIpAllowed(ip: string): Promise<void> {
+    try {
+      await this.bruteForce.assertIpAllowed('login', ip);
+    } catch (error) {
+      await this.authAudit.log({ type: 'login', outcome: 'rate_limited', ip, reason: 'ip_throttled' });
+      throw error;
+    }
+  }
+
+  /** Verifies a passkey sign-in, counting and auditing the attempt like a password login. */
+  async signIn(response: AuthenticationResponseJSON, requestOrigin: string | undefined, ip: string): Promise<User> {
+    let user: User;
+    try {
+      user = await this.verifyAuthentication(response, requestOrigin);
+    } catch (error) {
+      await this.bruteForce.recordFailure('login', ip, null);
+      await this.authAudit.log({ type: 'login', outcome: 'invalid_credentials', ip, reason: 'passkey_rejected' });
+      throw error;
+    }
+    await this.bruteForce.recordSuccess('login', ip, user.id, user.username);
+    await this.authAudit.log({ type: 'login', outcome: 'success', ip, userId: user.id, username: user.username });
+    return user;
+  }
+
+  private async recordPasskeyChange(
+    action: 'passkey_created' | 'passkey_renamed' | 'passkey_deleted',
+    userId: number,
+    origin: AuditOrigin,
+  ): Promise<void> {
+    await this.audit.record(identityAuditEvent(action, origin, { id: userId }));
+  }
 
   protected readonly logger = new Logger(PasskeyService.name);
 
@@ -108,20 +155,23 @@ export class PasskeyService {
     return this.passkeyRepository.find({ where: { userId }, order: { createdAt: 'DESC' } });
   }
 
-  async delete(userId: number, passkeyId: number): Promise<void> {
+  async delete(userId: number, passkeyId: number, origin: AuditOrigin): Promise<void> {
     const result = await this.passkeyRepository.delete({ id: passkeyId, userId });
     if (!result.affected) {
       throw new NotFoundException('PasskeyNotFound');
     }
+    await this.recordPasskeyChange('passkey_deleted', userId, origin);
   }
 
-  async rename(userId: number, passkeyId: number, name: string): Promise<Passkey> {
+  async rename(userId: number, passkeyId: number, name: string, origin: AuditOrigin): Promise<Passkey> {
     const passkey = await this.passkeyRepository.findOneBy({ id: passkeyId, userId });
     if (!passkey) {
       throw new NotFoundException('PasskeyNotFound');
     }
     passkey.name = name;
-    return this.passkeyRepository.save(passkey);
+    const saved = await this.passkeyRepository.save(passkey);
+    await this.recordPasskeyChange('passkey_renamed', userId, origin);
+    return saved;
   }
 
   protected async storeChallenge(challenge: string, userId: number | null): Promise<void> {
@@ -244,7 +294,8 @@ export class PasskeyService {
     user: User,
     response: RegistrationResponseJSON,
     name: string | undefined,
-    requestOrigin?: string,
+    requestOrigin: string | undefined,
+    origin: AuditOrigin,
   ): Promise<Passkey> {
     const { rpID, expectedOrigin } = await this.resolveRelyingParty(requestOrigin);
     const expectedChallenge = await this.consumeChallenge(response.response.clientDataJSON, user.id);
@@ -263,7 +314,7 @@ export class PasskeyService {
 
     const { credential, credentialBackedUp } = verification.registrationInfo;
 
-    return this.passkeyRepository.save(
+    const passkey = await this.passkeyRepository.save(
       this.passkeyRepository.create({
         userId: user.id,
         credentialId: credential.id,
@@ -274,5 +325,7 @@ export class PasskeyService {
         backedUp: credentialBackedUp,
       }),
     );
+    await this.recordPasskeyChange('passkey_created', user.id, origin);
+    return passkey;
   }
 }

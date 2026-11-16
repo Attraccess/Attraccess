@@ -22,6 +22,7 @@ import {
   GiftIcon,
   LightbulbIcon,
   PackageIcon,
+  WorkflowIcon,
 } from 'lucide-react';
 import { BalenaIcon } from '../../balena/balena-icon';
 import { getBaseUrl } from '../../../api/index';
@@ -229,6 +230,12 @@ export const SIDEBAR_ITEMS: (SidebarItem | SidebarItemGroup)[] = [
         translationKey: 'attractapReaders',
         icon: ScanLineIcon,
         licenseModule: 'attractap',
+      },
+      {
+        // Not hardware, but the automation across all of it; resources.update like the MQTT servers beside it.
+        path: '/devices/flows',
+        translationKey: 'globalFlows',
+        icon: WorkflowIcon,
       },
       {
         path: '/devices/mqtt/servers',

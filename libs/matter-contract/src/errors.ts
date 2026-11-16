@@ -4,11 +4,19 @@ import { uuidSchema } from './primitives';
 
 export const ERROR_STATUS = {
   validation_failed: 400,
+  invalid_backup: 422,
+  unauthorized: 401,
   forbidden_origin: 403,
+  insecure_transport: 403,
   not_found: 404,
   method_not_allowed: 405,
   incompatible_release: 409,
   reconciliation_required: 409,
+  fabric_exists: 409,
+  fabric_absent: 409,
+  recovery_required: 409,
+  busy: 409,
+  restore_failed: 409,
   payload_too_large: 413,
   unsupported_wire_version: 426,
   internal_error: 500,
@@ -37,6 +45,9 @@ export type ErrorEnvelope = z.infer<typeof errorEnvelopeSchema>;
 export const unsupportedCapabilityDetailsSchema = z.strictObject({
   family: z.enum(FEATURE_FAMILIES),
 });
+
+/** The sidecar's 401 hint. It names the header format, so clients pass it to the administrator unchanged. */
+export const UNAUTHORIZED_MESSAGE = 'A valid service token is required: send "Authorization: Bearer <token>".';
 
 const RETRYABLE: ReadonlySet<ErrorCode> = new Set(['sidecar_unavailable']);
 

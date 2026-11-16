@@ -9,7 +9,7 @@ describe('AttractapSessionHandler – door action error propagation', () => {
   let handler: AttractapSessionHandler;
   let mockSocket: {
     readerId: number;
-    state: { lastAuthenticatedUserId: number; readerId: number };
+    state: { verifiedUserId: number; readerId: number };
     sendMessage: jest.Mock;
   };
   let mockResourceUsageService: {
@@ -34,7 +34,7 @@ describe('AttractapSessionHandler – door action error propagation', () => {
 
     mockSocket = {
       readerId: 42,
-      state: { lastAuthenticatedUserId: 1, readerId: 42 },
+      state: { verifiedUserId: 1, readerId: 42 },
       sendMessage: jest.fn().mockResolvedValue(undefined),
     };
 

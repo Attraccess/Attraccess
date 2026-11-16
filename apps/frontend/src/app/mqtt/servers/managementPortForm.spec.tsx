@@ -6,6 +6,7 @@ import { EditMqttServerPage } from './EditMqttServerPage';
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
+  permissions: ['resources.update'] as string[],
   server: {
     id: 7,
     name: 'Broker',
@@ -41,10 +42,32 @@ vi.mock('../../../components/select', () => ({ Select: () => null }));
 
 vi.mock('./TlsSection', () => ({ TlsSection: () => null }));
 vi.mock('../../plugins/PluginSlot', () => ({ PluginSlot: () => null }));
+vi.mock('../../../hooks/useAuth', () => ({
+  useAuth: () => ({ hasPermission: (permission: string) => mocks.permissions.includes(permission) }),
+}));
+vi.mock('../explorer/MqttMessageExplorer', () => ({
+  MqttMessageExplorer: ({ mqttServerId }: { mqttServerId: number }) => (
+    <div data-testid="mqtt-explorer">{mqttServerId}</div>
+  ),
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.server.managementPort = 18083;
+  mocks.permissions = ['resources.update'];
+});
+
+describe('edit MQTT server page message explorer', () => {
+  it('shows the explorer of this server to users who can edit resources', () => {
+    render(<EditMqttServerPage />);
+    expect(screen.getByTestId('mqtt-explorer').textContent).toBe('7');
+  });
+
+  it('hides it from users who cannot', () => {
+    mocks.permissions = [];
+    render(<EditMqttServerPage />);
+    expect(screen.queryByTestId('mqtt-explorer')).toBeNull();
+  });
 });
 afterEach(cleanup);
 

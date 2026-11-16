@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { AttractapFirmwareService } from './firmware.service';
 jest.mock('fs', () => ({
   ...jest.requireActual('fs'),
@@ -8,6 +8,7 @@ jest.mock('fs', () => ({
   readFileSync: jest.fn(),
   writeFileSync: jest.fn(),
   copyFileSync: jest.fn(),
+  statSync: jest.fn(),
 }));
 const assets = join(__dirname, 'assets', 'attractap-firmwares');
 const archive = join('/fixture-storage', 'attractap-firmware-symbols');
@@ -102,4 +103,37 @@ it('tolerates a damaged archive and skips missing or unidentifiable bundled ELF 
   expect(copyFileSync).not.toHaveBeenCalled();
   expect(writeFileSync).not.toHaveBeenCalled();
   expect(service.resolveElfFile({ variant: 'missing' })).toBeNull();
+});
+describe('ATTRACTAP_FIRMWARE_ASSETS_DIR (hardware-in-the-loop tests)', () => {
+  const directory = '/hil-firmwares';
+  const hilFirmware = { ...bundled, version: '9.9', elfFilename: undefined };
+  let modifiedAt = 1;
+
+  beforeEach(() => {
+    process.env.ATTRACTAP_FIRMWARE_ASSETS_DIR = directory;
+    modifiedAt = 1;
+    files.set(join(directory, 'firmwares.json'), JSON.stringify({ firmwares: [hilFirmware] }));
+    jest.mocked(statSync).mockImplementation(() => ({ mtimeMs: modifiedAt }) as never);
+  });
+
+  afterEach(() => {
+    delete process.env.ATTRACTAP_FIRMWARE_ASSETS_DIR;
+  });
+
+  it('reads the definitions from that directory and picks up a changed firmwares.json', () => {
+    const service = new AttractapFirmwareService();
+    expect(service.getFirmwareDefinition('reader', 'standard')?.version).toBe('9.9');
+
+    files.set(join(directory, 'firmwares.json'), JSON.stringify({ firmwares: [{ ...hilFirmware, version: '9.10' }] }));
+    expect(service.getFirmwareDefinition('reader', 'standard')?.version).toBe('9.9');
+    modifiedAt = 2;
+    expect(service.getFirmwareDefinition('reader', 'standard')?.version).toBe('9.10');
+  });
+
+  it('keeps the last good definitions when firmwares.json cannot be parsed', () => {
+    const service = new AttractapFirmwareService();
+    files.set(join(directory, 'firmwares.json'), '{ not json');
+    modifiedAt = 2;
+    expect(service.getFirmwareDefinition('reader', 'standard')?.version).toBe('9.9');
+  });
 });

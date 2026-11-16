@@ -11,8 +11,15 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({ invalidateQueries: vi.fn() }) }));
-vi.mock('../context/index', () => ({ useFlowContext: () => ({ liveLogs: state.logs }) }));
+vi.mock('../context/index', () => ({ useFlowContext: () => ({ liveLogs: state.logs, owner: { kind: 'resource', resourceId: 7 } }) }));
 vi.mock('@attraccess/react-query-client', () => ({
+  useGlobalFlowsServiceGetGlobalFlowCanvas: () => ({ data: undefined }),
+  useGlobalFlowsServiceGetGlobalFlowNodeSchemas: () => ({ data: undefined }),
+  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatus: () => ({ data: undefined }),
+  useGlobalFlowsServiceGetGlobalFlowLogRecordingStatusKey: 'global-recording',
+  useGlobalFlowsServiceGetGlobalFlowLogs: () => ({ data: undefined }),
+  useGlobalFlowsServiceStartGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
+  useGlobalFlowsServiceStopGlobalFlowLogRecording: () => ({ mutate: vi.fn() }),
   useResourceFlowsServiceGetResourceFlow: () => ({ data: { nodes: state.nodes } }),
   useResourceFlowsServiceGetNodeSchemas: () => ({ data: state.schemas }),
   useResourceFlowsServiceGetFlowLogRecordingStatus: () => ({ data: { isRecording: false } }),
@@ -34,7 +41,7 @@ afterEach(() => {
 async function open() {
   render(
     <MemoryRouter>
-      <LogViewer resourceId={7} confettiEnabled={false} onConfettiEnabledChange={vi.fn()}>
+      <LogViewer confettiEnabled={false} onConfettiEnabledChange={vi.fn()}>
         {(open) => <button onClick={open}>View logs</button>}
       </LogViewer>
     </MemoryRouter>,

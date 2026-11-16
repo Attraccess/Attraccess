@@ -16,11 +16,11 @@ import { DataSource, EntityManager } from 'typeorm';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ResourceUsageService } from '../../sessions/resource-usage.service';
 import { ResourceOperatingIntervalService } from '../../../operating-intervals/resource-operating-interval.service';
 import { ResourceOperatingAttributionService } from '../../../operating-intervals/resource-operating-attribution.service';
 import { USAGE_RECOVERY_TABLE_SQL } from '../../../../database/resource-usage-integrity';
-import { UsageLifecyclePersistenceAroundExternalFlowsTestScope } from '../lifecycle.persistence.spec';
+import type { UsageLifecyclePersistenceAroundExternalFlowsTestScope } from '../lifecycle.persistence.spec';
+import { composeResourceUsageService } from '../../sessions/fixtures/compose.test-fixture';
 export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExternalFlowsTestScope) {
   jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
   jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
@@ -91,7 +91,8 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
     canMaintain: jest.fn().mockResolvedValue(false),
     isIntroducer: jest.fn().mockResolvedValue(false),
   };
-  scope.usage = new ResourceUsageService(
+  scope.pluginEvents = { emit: jest.fn() };
+  scope.usage = composeResourceUsageService(
     scope.source.getRepository(Resource),
     scope.source.getRepository(ResourceUsage),
     scope.source.getRepository(User),
@@ -130,9 +131,9 @@ export async function resetTestFixture(scope: UsageLifecyclePersistenceAroundExt
       resourceUsageDurationSeconds: { observe: jest.fn() },
     } as never,
     scope.health as never,
-    { emit: jest.fn() } as never,
-    {} as never,
-    { recordResource: jest.fn().mockResolvedValue(undefined) } as never,
+    scope.pluginEvents as never,
+    { getEffectivePermissions: jest.fn(async () => new Set<string>()) } as never,
+    { record: jest.fn().mockResolvedValue(undefined) } as never,
     null,
   );
 }

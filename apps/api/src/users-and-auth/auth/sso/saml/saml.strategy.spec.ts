@@ -256,10 +256,15 @@ describe('SSOSamlStrategy', () => {
     } as SamlProfile);
 
     expect(audit.record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 101 } }),
+      expect.objectContaining({
+        domain: 'sso',
+        action: 'sso.provisioning.user_created',
+        subject: { type: 'user', id: 101 },
+      }),
     );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
+        domain: 'sso',
         action: 'sso.provisioning.permissions_synced',
         details: expect.objectContaining({
           changes: JSON.stringify({ added: ['user-manager'], removed: [], updated: [] }),
@@ -307,7 +312,11 @@ describe('SSOSamlStrategy', () => {
 
     expect(audit.record).toHaveBeenCalledTimes(1);
     expect(audit.record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'sso.provisioning.user_created', subject: { type: 'user', id: 101 } }),
+      expect.objectContaining({
+        domain: 'sso',
+        action: 'sso.provisioning.user_created',
+        subject: { type: 'user', id: 101 },
+      }),
     );
   });
 
@@ -420,6 +429,65 @@ describe('SSOSamlStrategy', () => {
     await strategy.validate(request, profile);
 
     expect(rbacService.syncSsoRoles).toHaveBeenCalledWith(44, [], SSOProviderType.SAML, 30);
+  });
+
+  describe('configured roleAttributeKeys', () => {
+    async function syncWith(roleAttributeKeys: string[] | null, attributes: Record<string, unknown>) {
+      const rbacService = { syncSsoRoles: jest.fn().mockResolvedValue(undefined) };
+      const usersService = { findOne: jest.fn().mockResolvedValue({ id: 44 }), updateOne: jest.fn() };
+      const auth = { findUserIdBySSO: jest.fn().mockResolvedValue(44), addAuthenticationDetails: jest.fn() };
+      const moduleRef = buildSamlModuleRef({ users: usersService, auth, rbac: rbacService });
+      const strategy = new SSOSamlStrategy(moduleRef);
+      const request = fixture.buildRequest(30, 'email');
+      request.ssoSamlOptions.samlConfiguration.roleMappings = { 'user-manager': ['admins'] };
+      request.ssoSamlOptions.samlConfiguration.roleAttributeKeys = roleAttributeKeys;
+      await strategy.validate(request, { nameID: 'saml-user', email: 'user@example.com', attributes } as SamlProfile);
+      return rbacService.syncSsoRoles;
+    }
+
+    it('reads roles from a configured key, case-insensitively', async () => {
+      const sync = await syncWith(['Custom-Roles'], { 'custom-roles': ['admins'] });
+      expect(sync).toHaveBeenCalledWith(
+        44,
+        [expect.objectContaining({ roleKey: 'user-manager' })],
+        SSOProviderType.SAML,
+        30,
+      );
+    });
+
+    it('ignores the default attributes once keys are configured and revokes roles that only came from them', async () => {
+      const sync = await syncWith(['custom-roles'], { groups: ['admins'], 'custom-roles': ['other'] });
+      expect(sync).toHaveBeenCalledWith(44, [], SSOProviderType.SAML, 30);
+    });
+
+    it('keeps roles when no configured key is present, even if default attributes are', async () => {
+      const sync = await syncWith(['custom-roles'], { groups: ['admins'] });
+      expect(sync).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups',
+      'http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
+      'http://schemas.xmlsoap.org/claims/group',
+    ])('reads the default ADFS attribute %s when no keys are configured', async (key) => {
+      const sync = await syncWith(null, { [key]: ['admins'] });
+      expect(sync).toHaveBeenCalledWith(
+        44,
+        [expect.objectContaining({ roleKey: 'user-manager' })],
+        SSOProviderType.SAML,
+        30,
+      );
+    });
+
+    it.each([[null], [[]]])('falls back to the defaults when roleAttributeKeys is %j', async (keys) => {
+      const sync = await syncWith(keys as string[] | null, { groups: ['admins'] });
+      expect(sync).toHaveBeenCalledWith(
+        44,
+        [expect.objectContaining({ roleKey: 'user-manager' })],
+        SSOProviderType.SAML,
+        30,
+      );
+    });
   });
 
   it('revokes previously granted SSO roles after the mapping has been cleared', async () => {

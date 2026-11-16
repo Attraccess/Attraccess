@@ -84,6 +84,8 @@ export function createWagoServiceFixture(
   const subscriptions: Array<{ unsubscribe: jest.Mock }> = [];
   const flowQuery = {
     select: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     getMany: jest.fn().mockResolvedValue([]),

@@ -1,4 +1,5 @@
 # Security Settings
+<!-- llms-description: Security settings for session cookies and authentication, including SameSite, session configuration, card keys and rate limiting. -->
 
 Attraccess provides several security-related settings for session cookies and authentication. These settings affect how users stay logged in and how the application handles cross-site requests.
 
@@ -42,6 +43,45 @@ Session security is controlled via environment variables:
 > [!TIP]
 > If you change the `AUTH_SESSION_SECRET`, all existing user sessions are invalidated and users must log in again.
 
+## Card keys, reader pairing keys and `AUTH_SESSION_SECRET`
+
+Attractap card keys are created and checked by the server only; tapping a card never exposes its key to a reader. (Enrolling and resetting cards is the exception, see [RFID Cards](attractap/rfid-cards.md#which-readers-may-enroll-and-reset-cards).) The server stores each key encrypted with a key derived from `AUTH_SESSION_SECRET`. The same applies to the reader pairing keys: the private keys of the certificate authority for readers and of the server certificate (see [Reader Pairing](attractap/pairing.md#backup)).
+
+> [!WARNING]
+> **Back up `AUTH_SESSION_SECRET` together with your database backups.** Without it the stored card keys and reader pairing keys cannot be read. Cards that were enrolled can then neither be used nor reset by Attraccess, and have to be erased with other tools. Paired readers cannot connect any more and have to be paired again.
+
+Changing the secret makes the stored card keys and reader pairing keys unreadable until they are re-encrypted. To rotate the secret deliberately:
+
+1. Stop the API and back up the database (see [Backup & Restore](installation/backup-restore.md)). With Docker Compose: `docker compose stop attraccess`.
+2. Load both secrets into your shell. `read -rs` does not show what you type, so the secrets stay out of your shell history and out of the process list. Type each secret and press Enter:
+
+   ```bash
+   read -rs OLD_AUTH_SESSION_SECRET && export OLD_AUTH_SESSION_SECRET
+   read -rs NEW_AUTH_SESSION_SECRET && export NEW_AUTH_SESSION_SECRET
+   ```
+
+3. Check that every stored card key and reader pairing key can be read with the old secret. `--dry-run` reads every key and writes nothing. (The command is called `reencrypt-card-keys`, but it converts the reader pairing keys too.)
+
+   **Docker Compose** (the command ships in the image; `-e NAME` without a value passes the variable from your shell):
+
+   ```bash
+   docker compose run --rm --no-deps -e OLD_AUTH_SESSION_SECRET -e NEW_AUTH_SESSION_SECRET \
+     attraccess node /app/dist/apps/api/scripts/reencrypt-card-keys.mjs --dry-run
+   ```
+
+   **Source installation** (run from the repository root with the same `STORAGE_ROOT` as the API):
+
+   ```bash
+   pnpm nx run api:reencrypt-card-keys -- --dry-run
+   ```
+
+   The command uses `<STORAGE_ROOT>/attraccess.sqlite` (default `./storage/attraccess.sqlite`). Add `--db <path>` to name the database file directly.
+4. Run the same command without `--dry-run`. All keys are converted in one transaction; if one cannot be read with the old secret nothing is changed. The output lists how many card keys and reader pairing keys were converted.
+5. Set `AUTH_SESSION_SECRET` to the new value (for example in your `.env` file), clear the shell variables with `unset OLD_AUTH_SESSION_SECRET NEW_AUTH_SESSION_SECRET`, and start the API (`docker compose up -d`). Paired readers reconnect without being paired again.
+
+> [!WARNING]
+> The command converts card keys and reader pairing keys only. `AUTH_SESSION_SECRET` protects everything Attraccess stores encrypted: also the license key, SSO provider secrets, two-factor secrets, MQTT and payment credentials. After you change it these values cannot be read any more. The API may then refuse to start because the license key is unreadable, and they have to be entered again. Only rotate the secret when you must, for example after it leaked.
+
 ## Best Practices
 
 - Always use **HTTPS** in production. See [SSL Setup](installation/ssl-setup.md).
@@ -51,7 +91,7 @@ Session security is controlled via environment variables:
 
 ## Auth Rate Limiting and Account Lockout
 
-Failed authentication attempts on login, registration, and password reset endpoints are throttled per IP. Repeated login failures additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
+Failed authentication attempts on login, registration, password reset, verification email resend, SSO account linking, and SSO provisioning endpoints are throttled per IP. Repeated login failures and wrong SSO account-link passwords additionally lock the affected account. Settings are admin-tunable from **Settings -> Auth rate limiting**.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -64,9 +104,15 @@ Failed authentication attempts on login, registration, and password reset endpoi
 Rate limit triggers:
 
 - **`429 Too Many Requests`** with a `Retry-After` header is returned when an IP exceeds the threshold.
-- **`423 Locked`** with a `Retry-After` header is returned for a locked account on subsequent login attempts.
+- **`423 Locked`** with a `Retry-After` header is returned for a locked account on subsequent login and SSO account-link attempts.
 
-A successful login or admin unlock clears the lockout. Admin unlock is available via the user management UI.
+A successful login, a successful SSO account link, or an admin unlock clears the lockout. Admin unlock is available via the user management UI.
+
+### SSO account linking and provisioning
+
+- **SSO account linking** (the password prompt that appears when an SSO sign-in matches an existing local account) is throttled per IP and target account. Wrong passwords count toward the same account lockout as failed logins, so switching between the two cannot gain extra guesses. A successful link clears the counters.
+- **Link tokens are single-use.** A link token stops working after a successful link and after 3 wrong passwords; the user then has to sign in with SSO again.
+- **SSO provisioning endpoints** (IdP-initiated logout, user deletion and permission updates) are throttled per IP and provider. Only a missing or wrong provisioning secret counts as a failure. Errors such as an unknown user do not, so a normal IdP is never locked out by them. An IdP configured with a wrong secret receives `429` with a `Retry-After` header instead of `401` after `maxAttempts` failures. Cloud identity providers often send these requests from shared outbound IPs; the throttle then applies to that shared IP for this provider.
 
 ### Reverse proxies and the real client IP
 
@@ -144,7 +190,7 @@ auth.success type=login outcome=success ip=1.2.3.4 user_id=42 username=alice ts=
 | Field | Description |
 |-------|-------------|
 | `prefix` | `auth.success` for successes, `auth.failed` otherwise. |
-| `type` | One of `login`, `register`, `password_reset_request`, `password_reset_complete`. |
+| `type` | One of `login`, `register`, `password_reset_request`, `verification_email_resend`, `password_reset_complete`, `sso_link_account`, `sso_provisioning`. |
 | `outcome` | `success`, `invalid_credentials`, `account_locked`, `rate_limited`, `two_factor_required`, `two_factor_invalid`, `email_not_verified`, `invalid_token`, `invalid_input`, `unknown_user`. |
 | `ip` | Client IP. Falls back to `unknown` when not resolvable. |
 | `user_id` | Numeric user id when known, `-` otherwise. |
@@ -159,7 +205,7 @@ auth.success type=login outcome=success ip=1.2.3.4 user_id=42 username=alice ts=
 A minimal `failregex` for `/etc/fail2ban/filter.d/attraccess-auth.conf`:
 
 ```
-failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|password_reset_complete) outcome=\S+ ip=<HOST> .*$
+failregex = ^.*auth\.failed type=(?:login|register|password_reset_request|verification_email_resend|password_reset_complete|sso_link_account) outcome=\S+ ip=<HOST> .*$
 ignoreregex =
 ```
 
@@ -176,6 +222,9 @@ bantime  = 900
 ```
 
 The shipped Docker Compose stack already wires both files for you behind the `fail2ban` profile — see [Docker Compose installation](installation/docker-compose.md#brute-force-ip-banning-with-fail2ban).
+
+> [!NOTE]
+> Failed SSO provisioning requests (a wrong Bearer or `x-api-key` secret) are logged as `auth.failed type=sso_provisioning`, but the shipped filter does not match them. Banning an identity provider's IP would also block its back-channel logout, and Attraccess already throttles these requests itself (`429`). If you want firewall bans for them anyway, add `sso_provisioning` to the `failregex`.
 
 ## fail2ban Administration
 

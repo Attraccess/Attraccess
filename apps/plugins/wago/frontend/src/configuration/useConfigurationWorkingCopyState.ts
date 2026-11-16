@@ -2,7 +2,8 @@ import { useState } from 'react';
 import type { ConfigurationEditorMetadata, WagoConfigurationSnapshot } from '../api/client';
 import { emptyConfiguration, emptyMetadata } from './model';
 import type { TranslationMessage } from '@attraccess/plugins-frontend-ui';
-import type { WorkingCopy, Section } from './ConfigurationEditor';
+import type { Section } from './ConfigurationEditor';
+import type { WorkingCopy } from './configurationSession';
 export function useConfigurationWorkingCopyState(restored: WorkingCopy | undefined) {
   const [section, setSection] = useState<Section>('channels');
   const [focusChannelId, setFocusChannelId] = useState<string>();

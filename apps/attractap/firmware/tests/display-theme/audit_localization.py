@@ -65,7 +65,9 @@ def literal_inventory():
 def main() -> int:
     errors = []
     catalog = (ROOT / "messages.catalog.hpp").read_text()
-    entries = re.findall(r'\{Message::(\w+), ("(?:[^"\\]|\\.)*"), ("(?:[^"\\]|\\.)*")\}', catalog)
+    relay = ROOT / "messages.catalog.card-relay.hpp"
+    entries_source = catalog + (relay.read_text() if relay.exists() else "")
+    entries = re.findall(r'\{Message::(\w+), ("(?:[^"\\]|\\.)*"), ("(?:[^"\\]|\\.)*")\}', entries_source)
     ids = [entry[0] for entry in entries]
     enum = re.search(r"enum class Message\s*\{([^}]+)\}", catalog)[1]
     declared = re.findall(r"\b(\w+)\s*(?:,|$)", enum.strip())[:-1]

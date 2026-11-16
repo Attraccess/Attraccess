@@ -4,6 +4,8 @@ import { ResourceFormAction } from '@attraccess/database-entities';
 import { InsufficientBalanceError } from '../../../../billing/errors/insufficient-balance.error';
 import { AlreadyHasActiveSessionError } from '../../../../resources/usage/errors/already-has-active-session.error';
 import { ResourceFullError } from '../../../../resources/usage/errors/resource-full.error';
+import { SessionChangeInterruptedError } from '../../../../resources/usage/errors/session-change-interrupted.error';
+import { MachineBusyError } from '../../../../resources/usage/errors/machine-busy.error';
 import { ResourceInUseError } from '../../../../resources/usage/errors/resource-in-use.error';
 import { inheritTestScope } from '../../../../test-utils/inherit-test-scope';
 import { AttractapEvent, AttractapEventType } from '../../websocket.types';
@@ -19,7 +21,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
   let mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number; readerId: number };
+    state: { verifiedUserId: number; readerId: number };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };
@@ -179,7 +181,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         10,
         fixture.mockUser,
         { projectId: 7, formSubmissions },
-        { auditOrigin: { actorId: 1, authenticationMethod: null } },
+        { auditOrigin: { id: 1, authenticationMethod: null }, origin: 'reader', confirmedStepKeys: {} },
       );
       expect(fixture.mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(
         fixture.mockSocket,
@@ -196,13 +198,19 @@ describe('AttractapSessionHandler – session + flow button', () => {
       );
     });
 
-    it('attaches the supervisor and settles the web request for a two-card supervised start', async () => {
-      (fixture.mockSocket.state as any).supervisionFlow = {
+    it.each([
+      ['attaches the supervisor and settles the web request for a two-card supervised start', {}, true],
+      ['ignores a supervisor approval for another requester', { requesterUserId: 99 }, false],
+      ['ignores a supervisor approval of a web-started flow', { webInitiated: true }, false],
+    ])('%s', async (_label, overrides, used) => {
+      const flow = {
         resourceId: 10,
         requesterUserId: 1,
         requestId: 'req-1',
         approvedSupervisorUserId: 2,
+        ...overrides,
       };
+      (fixture.mockSocket.state as any).supervisionFlow = flow;
 
       await (fixture.handler as any).handleStartResourceUsageSession(fixture.mockSocket, fixture.eventData);
 
@@ -210,17 +218,17 @@ describe('AttractapSessionHandler – session + flow button', () => {
         10,
         fixture.mockUser,
         { projectId: 7, formSubmissions: [] },
-        { supervisorUserId: 2, auditOrigin: { actorId: 1, authenticationMethod: null } },
+        {
+          ...(used ? { supervisorUserId: 2 } : {}),
+          auditOrigin: { id: 1, authenticationMethod: null },
+          origin: used ? 'supervision' : 'reader',
+          confirmedStepKeys: {},
+        },
       );
-      expect(fixture.mockSupervisionService.settleByCard).toHaveBeenCalledWith('req-1');
-      expect((fixture.mockSocket.state as any).supervisionFlow).toBeNull();
-      expect(fixture.mockSocket.sendMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            type: AttractapEventType.START_RESOURCE_USAGE_SESSION,
-            payload: { success: true },
-          }),
-        }),
+      expect(fixture.mockSupervisionService.settleByCard.mock.calls).toEqual(used ? [['req-1']] : []);
+      expect((fixture.mockSocket.state as any).supervisionFlow).toBe(used ? null : flow);
+      expect(fixture.mockSocket.sendMessage.mock.calls.at(-1)[0].data).toEqual(
+        expect.objectContaining({ type: AttractapEventType.START_RESOURCE_USAGE_SESSION, payload: { success: true } }),
       );
     });
 
@@ -272,6 +280,8 @@ describe('AttractapSessionHandler – session + flow button', () => {
       it.each([
         ['ResourceInUseError', () => new ResourceInUseError()],
         ['ResourceFullError', () => new ResourceFullError(2, 2)],
+        ['MachineBusyError', () => new MachineBusyError()],
+        ['SessionChangeInterruptedError', () => new SessionChangeInterruptedError()],
         ['AlreadyHasActiveSessionError', () => new AlreadyHasActiveSessionError()],
       ])('reports %s immediately and refreshes the list', async (name, createError) => {
         const parentScope = resourceInUseErrorHandlingScope.parentScope;
@@ -562,9 +572,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         10,
         fixture.mockUser,
         { formSubmissions },
-        {
-          auditOrigin: { actorId: 1, authenticationMethod: null },
-        },
+        { auditOrigin: { id: 1, authenticationMethod: null } },
       );
       expect(fixture.mockFormsHandler.clearFormDraft).toHaveBeenCalledWith(
         fixture.mockSocket,
@@ -906,8 +914,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
         'rejects %s without looking up or disclosing readings',
         async (error) => {
           if (error === 'USER_NOT_AUTHENTICATED')
-            (readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket.state as any).lastAuthenticatedUserId =
-              null;
+            (readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket.state as any).verifiedUserId = null;
           else readerAccessWithTheActualResourceGuardScope.reader.resources = [];
           await readerAccessWithTheActualResourceGuardScope.parentScope.handler.handleResourceUsageStats(
             readerAccessWithTheActualResourceGuardScope.parentScope.mockSocket as any,
@@ -945,7 +952,7 @@ describe('AttractapSessionHandler – session + flow button', () => {
 
     it('discards results when the card changes during the lookup', async () => {
       liveUsageStatsScope.metering.getLive.mockImplementation(async () => {
-        liveUsageStatsScope.mockSocket.state.lastAuthenticatedUserId = 2;
+        liveUsageStatsScope.mockSocket.state.verifiedUserId = 2;
         return { meters: [] };
       });
       await liveUsageStatsScope.handler.handleResourceUsageStats(
@@ -971,7 +978,7 @@ export type AttractapSessionHandlerSessionFlowButtonTestScope = {
   mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number; readerId: number };
+    state: { verifiedUserId: number; readerId: number };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };

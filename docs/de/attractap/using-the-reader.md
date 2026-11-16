@@ -1,4 +1,5 @@
 # Den Attractap-Leser benutzen
+<!-- llms-description: So bedienen Sie den Attractap-Touchleser: mit Karte anmelden, Maschinen starten oder beenden, Türen öffnen und Formulare ausfüllen. -->
 
 Mit Ihrer RFID-Karte und dem Attractap-Touchdisplay können Sie die Nutzung einer Maschine starten oder beenden, eine Tür öffnen oder eine Aufsicht anfordern. Der Leser zeigt die ihm zugeordneten Maschinen und Türen sowie die für Sie verfügbaren Aktionen.
 
@@ -20,9 +21,9 @@ Sie können eine Ressource auch **vor der Anmeldung** auswählen. Tippen Sie auf
 
 ### Uhrzeit und Datum
 
-Solange niemand angemeldet ist, dient der Leser auch als Uhr. Die Kartenaufforderung zeigt die aktuelle Uhrzeit und das Datum in großer Schrift, darunter **RFID-Karte auflegen**. Die Ressourcenliste zeigt beides oben an. Der Leser verwendet die Zeitzone Ihres Attraccess-Servers. Nach einem Neustart erscheint die Uhr, sobald der Leser mit dem Server verbunden ist; bis dahin zeigt er den gewohnten Anmeldetext. Bricht die Verbindung später ab, läuft die Uhr intern weiter. Das Display zeigt jedoch bis zur erneuten Verbindung den Initialisierungsbildschirm.
+Solange niemand angemeldet ist, dient der Leser auch als Uhr. Die Kartenaufforderung zeigt die aktuelle Uhrzeit und das Datum in großer Schrift, darunter **RFID-Karte auflegen**. Die Ressourcenliste zeigt beides oben an. Der Leser zeigt die Zeit in seiner eigenen [Zeitzone](attractap/reader-ui.md#uhrzeit-und-zeitzone): der Zone eines Plugins wie [Reservierungen](plugins/reservations/overview.md), sofern eines sie festlegt, sonst der Ihres Attraccess-Servers. Solange Sie angemeldet sind, zeigt eine kleine Uhr in der Fußleiste die aktuelle Zeit. Nach einem Neustart erscheint die Uhr, sobald der Leser mit dem Server verbunden ist; bis dahin zeigt er den gewohnten Anmeldetext. Bricht die Verbindung später ab, läuft die Uhr intern weiter. Das Display zeigt jedoch bis zur erneuten Verbindung den Initialisierungsbildschirm.
 
-Während einer Unterbrechung läuft die UTC-Zeit mit dem zuletzt empfangenen Zeitzonenversatz des Servers weiter. Dieser Versatz bleibt unverändert: Sommerzeit- und Winterzeitwechsel oder eine Änderung der Serverzeitzone werden erst nach dem nächsten gültigen Zeitwert vom Server berücksichtigt.
+Während einer Unterbrechung läuft die UTC-Zeit mit dem zuletzt vom Server empfangenen Zeitzonenversatz weiter. Dieser Versatz bleibt unverändert: Sommerzeit- und Winterzeitwechsel oder eine Änderung der Zeitzone des Lesers werden erst nach dem nächsten gültigen Zeitwert vom Server berücksichtigt.
 
 Die Kartenaufforderung zeigt die Uhr auch dann, wenn die ausgewählte Ressource bereits verwendet wird und niemand am Leser angemeldet ist. Die Kopfzeile zeigt weiterhin den Namen der Person, die die Ressource verwendet. Nach der Anmeldung öffnen sich die gewohnten Ressourcendetails und Bedienelemente für die Sitzung.
 
@@ -35,6 +36,37 @@ Während der Leser eine Aktion verarbeitet, sind die Bedienelemente kurzzeitig n
 ### Ein Projekt auswählen
 
 Um die Maschinennutzung einem Projekt zuzuordnen, öffnen Sie über den Namen der Maschine deren Details. Tippen Sie auf **Projekt wählen**, wählen Sie Ihr Projekt aus und starten Sie die Nutzung dort. Wenn Sie direkt aus der Liste starten, wird die Nutzung ohne Projekt erfasst.
+
+### Ergebnisse, Meldungen und niedriges Guthaben
+
+Der Leser zeigt Ergebnisse auf einem eigenen Vollbild und kehrt danach zu Ihrem Bildschirm zurück:
+
+- Ein grüner Haken mit **Nutzung gestartet** oder **Nutzung beendet** und dem Ressourcennamen, oder **Aktion bestätigt** nach einer Tür- oder Ablauf-Schaltfläche. Tippen Sie irgendwo, um fortzufahren, oder warten Sie einen Moment.
+- Der Bildschirm **Gesamtkosten dieser Sitzung** mit dem Betrag, wenn ein Stopp abgerechnet wird. Tippen Sie auf **OK** oder warten Sie.
+- Ein rotes Kreuz mit **Anmeldung fehlgeschlagen**, wenn die Karte nicht akzeptiert wird. Tippen Sie auf **OK** oder halten Sie Ihre Karte erneut an den Leser.
+- Eine Warnung mit Erklärung, zum Beispiel **Status nicht verfügbar**, wenn der Leser Sie abgemeldet hat, weil der Maschinenstatus nicht geladen wurde. Tippen Sie auf **OK**, warten Sie, oder halten Sie Ihre Karte an den Leser, um sich erneut anzumelden.
+
+![Nutzung gestartet: ein grüner Haken mit dem Ressourcennamen](../../_media/attractap/usage-started.png)
+
+![Gesamtkosten der Sitzung auf einem eigenen Bildschirm](../../_media/attractap/billing-total.png)
+
+![Anmeldung fehlgeschlagen: ein rotes Kreuz, der Grund und eine OK-Schaltfläche](../../_media/attractap/sign-in-failed.png)
+
+Schlägt die Aktion einer einzelnen Schaltfläche fehl, zum Beispiel **Start**, färbt sich die Schaltfläche selbst etwa vier Sekunden rot und zeigt **⚠ Fehlgeschlagen – erneut tippen** oder den Grund, zum Beispiel **⚠ Karte ist nicht aktiv**. Sie behält Größe und Platz, sonst bewegt sich nichts auf dem Bildschirm. Tippen Sie darauf, um es erneut zu versuchen. Lädt der Leser nach dem Fehler den Maschinenstatus neu, erscheint die Meldung erst, wenn der Status da ist. Bedeutet die Schaltfläche inzwischen etwas anderes, etwa weil jemand anderes die Maschine gestartet hat, entfällt die Meldung. Ist die Schaltfläche nicht mehr da, zeigt der Leser den Bildschirm **Etwas ist schiefgelaufen** mit dem Fehlercode und einer Schaltfläche **Zurück**.
+
+Dasselbe gilt für Nutzungsformulare: Kann der Server eine Seite nicht annehmen, erscheint der Grund auf **Weiter** oder **Absenden**; lässt sich das Formular gar nicht laden, schließt es sich und der Grund erscheint auf der Schaltfläche, die es geöffnet hat.
+
+![Eine fehlgeschlagene Start-Schaltfläche, rot und an Ort und Stelle](../../_media/attractap/button-error.png)
+
+![Etwas ist schiefgelaufen, mit Fehlercode und einer Zurück-Schaltfläche](../../_media/attractap/generic-error.png)
+
+Schlägt eine Aktion wegen zu geringen Guthabens fehl und hat der Leser ein Zahlungsterminal, öffnet der Leser den Bildschirm **Unzureichendes Guthaben**. Geben Sie den Betrag in ganzen Euro auf dem Ziffernblock ein, tippen Sie auf **Aufladen** und fahren Sie am Zahlungsterminal fort, sobald **Aufladung gestartet** erscheint. Ein fehlender Betrag oder eine vom Server abgelehnte Aufladung erscheint wie bei einer fehlgeschlagenen Schaltfläche auf **Aufladen**; der eingegebene Betrag bleibt erhalten. **Abbrechen** bringt Sie zurück. Auch Nutzungsformulare und die Projektauswahl sind eigene Bildschirme. Meldet der Leser Sie währenddessen ab, wird der geöffnete Bildschirm wie jeder andere ersetzt.
+
+![Der Bildschirm zum Aufladen mit Ziffernblock](../../_media/attractap/top-up.png)
+
+Der Neustart aus dem Wartungsmenü und das Ausschalten des Lesers (bei Geräten mit Ein/Aus-Taste) fragen auf einem eigenen Vollbild nach, mit **Abbrechen** und der Aktion nebeneinander.
+
+![Neustart-Rückfrage mit Abbrechen und Neustart nebeneinander](../../_media/attractap/reboot-confirm.png)
 
 ## Live-Statistiken ansehen
 
@@ -108,13 +140,13 @@ Tippen Sie auf **Abbrechen**, wenn Sie nicht fortfahren möchten. Sie bleiben an
 
 Welche Aktion verfügbar ist, hängt von Ihren Berechtigungen und dem aktuellen Zustand der Ressource ab. Über den Ressourcennamen können Sie die Details auch dann öffnen, wenn Sie die Nutzung nicht starten können.
 
-| Anzeige        | Was Sie tun können                                                                                                                                                       |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Einweisung** | Sie benötigen eine Einweisung, bevor Sie diese Ressource nutzen können. Öffnen Sie die Details für weitere Hinweise und wenden Sie sich an einen berechtigten Einweiser. |
-| **Belegt**     | Eine andere Person nutzt die Maschine. Warten Sie, bis diese ihre Nutzung beendet hat.                                                                                   |
-| **Übernehmen** | Die Übernahme der laufenden Nutzung ist erlaubt. Tippen Sie auf die Schaltfläche, um die Details zu öffnen, und wählen Sie dort die Übernahme aus.                       |
-| **Gesperrt**   | Die Ressource ist wegen einer Wartung oder eines gemeldeten Problems für Sie nicht verfügbar. Wenden Sie sich an einen Wartenden oder Ressourcenverwalter für diese Ressource.                                      |
-| **Laden ...**  | Der Leser prüft, welche Aktionen für Sie verfügbar sind. Warten Sie, bis sich die Schaltfläche aktualisiert.                                                             |
+| Anzeige        | Was Sie tun können                                                                                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Einweisung** | Sie benötigen eine Einweisung, bevor Sie diese Ressource nutzen können. Öffnen Sie die Details für weitere Hinweise und wenden Sie sich an einen berechtigten Einweiser.       |
+| **Belegt**     | Eine andere Person nutzt die Maschine. Warten Sie, bis diese ihre Nutzung beendet hat.                                                                                         |
+| **Übernehmen** | Die Übernahme der laufenden Nutzung ist erlaubt. Tippen Sie auf die Schaltfläche, um die Details zu öffnen, und wählen Sie dort die Übernahme aus.                             |
+| **Gesperrt**   | Die Ressource ist wegen einer Wartung oder eines gemeldeten Problems für Sie nicht verfügbar. Wenden Sie sich an einen Wartenden oder Ressourcenverwalter für diese Ressource. |
+| **Laden ...**  | Der Leser prüft, welche Aktionen für Sie verfügbar sind. Warten Sie, bis sich die Schaltfläche aktualisiert.                                                                   |
 
 ## Zum Schluss abmelden
 
@@ -124,11 +156,11 @@ Nach der Abmeldung können Sie sich mit Ihrer Karte erneut anmelden. Eine laufen
 
 ## Wenn etwas nicht funktioniert
 
-| Was Sie sehen                              | Was Sie tun können                                                                                                                                                                                                |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Was Sie sehen                              | Was Sie tun können                                                                                                                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Die Anmeldung mit Ihrer Karte klappt nicht | Versuchen Sie es erneut und lassen Sie die Karte am Leser, bis die Anmeldung abgeschlossen ist. Falls es weiterhin nicht klappt, bitten Sie Ihre Administration zu prüfen, ob die Karte Ihrem Konto zugeordnet ist. |
-| Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an einen Wartenden oder Ressourcenverwalter für diese Ressource.                                               |
-| Der Leser verliert die Verbindung          | Warten Sie, bis die Verbindung wiederhergestellt ist, und melden Sie sich erneut an. Ein Verbindungsabbruch beendet keine laufende Maschinennutzung.                                                              |
+| Start, Stop oder Türöffnung schlägt fehl   | Lesen Sie die Meldung und prüfen Sie vor einem erneuten Versuch den aktuellen Status der Ressource. Wenden Sie sich bei anhaltenden Problemen an einen Wartenden oder Ressourcenverwalter für diese Ressource.      |
+| Der Leser verliert die Verbindung          | Warten Sie, bis die Verbindung wiederhergestellt ist, und melden Sie sich erneut an. Ein Verbindungsabbruch beendet keine laufende Maschinennutzung.                                                                |
 
 > [!NOTE]
 > Leser-Firmware und Server werden gemeinsam ausgeliefert. Der Server aktualisiert die Leser automatisch auf die mitgelieferte Firmware-Version (siehe [Firmware-Updates](attractap/firmware-updates.md)).

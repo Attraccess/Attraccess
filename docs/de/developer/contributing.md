@@ -1,5 +1,7 @@
 # Mitwirken
 
+<!-- llms-description: Wie Sie zu Attraccess beitragen: Fork, Branch, Code-Stil, Tests, Issue-Tracking und Fehlermeldungen. -->
+
 Attraccess ist ein Projekt mit öffentlich einsehbarem Quellcode (source-available) und begrüßt Beiträge von Anwendern, Integrationspartnern und Entwicklern. Diese Anleitung erklärt, wie Sie sich beteiligen können.
 
 Der Quellcode, Forks und weitergegebene Änderungen unterliegen der [modifizierten Prosperity Public License 3.0](https://github.com/Attraccess/Attraccess/blob/main/LICENSE.md). Kommerzielle Nutzung erfordert nach der 30-tägigen Testphase eine Lizenz; weitere Informationen finden Sie unter [Lizenzierung](getting-started/overview.md#lizenzierung).
@@ -61,6 +63,10 @@ Pushen Sie Ihren Branch und erstellen Sie einen Pull Request gegen den `main`-Br
 - Platzieren Sie Testdateien neben den Quelldateien, die sie testen (z. B. `my-service.spec.ts`)
 - Schreiben Sie Tests für neue Features und Bugfixes
 - `pnpm nx run api:test-alerting` führt den Prometheus-/Grafana-Alarmtest mit echten Containern (testcontainers) aus und benötigt Docker. Er gehört nicht zu `pnpm nx test api`; die CI führt ihn zusammen mit den anderen `test-*`-Targets aus, und er schlägt fehl, wenn Docker nicht verfügbar ist
+
+## Dokumentationsseiten
+
+Jede Seite, die in `docs/en/_sidebar.md` oder `docs/de/_sidebar.md` verlinkt ist, braucht für `llms.txt` eine einsätzige Beschreibung in der Sprache der Seite, als HTML-Kommentar direkt unter der ersten Überschrift: `<!-- llms-description: ... -->`. Nach dem Hinzufügen einer Seite oder einer Änderung an Seitenleiste oder Beschreibung führen Sie `node scripts/generate-llms-txt.mjs` aus und committen die aktualisierte `docs/llms.txt`; `lint` und `test` schlagen sonst fehl. Siehe [KI-Agenten](developer/ai-agents.md).
 
 ## Issue-Tracking
 

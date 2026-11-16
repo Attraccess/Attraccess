@@ -1,5 +1,9 @@
 module.exports = {
   displayName: 'plugin-wago',
+  // Unit coverage feeds the project's crap-score target.
+  collectCoverage: true,
+  coverageReporters: ['json'],
+  coverageDirectory: '../../../coverage/apps/plugins/wago/test',
   preset: '../../../jest.preset.js',
   testEnvironment: 'node',
   // Frontend specs run through the Vitest target which this target depends on.

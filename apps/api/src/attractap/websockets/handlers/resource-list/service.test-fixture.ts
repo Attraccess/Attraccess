@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { readerTimeZoneStub } from '../../reader-time-zone.test-fixture';
 import { ResourceListService } from './resource-list.service';
 
 export function registerResourceListServiceFixture() {
@@ -25,7 +26,7 @@ export function registerResourceListServiceFixture() {
     return {
       id: 'socket-1',
       readerId: 42,
-      state: { lastAuthenticatedUserId: null },
+      state: { verifiedUserId: null },
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
       ...overrides,
@@ -83,6 +84,7 @@ export function registerResourceListServiceFixture() {
     };
 
     (service as any).usersService = { findOne: jest.fn(async ({ id }) => ({ id, username: `user-${id}` })) };
+    (service as any).readerTimeZone = readerTimeZoneStub();
     (service as any).rbacService = { getEffectivePermissions: jest.fn().mockResolvedValue(new Set()) };
     (service as any).websocketService = websocketService;
     (service as any).attractapService = attractapService;

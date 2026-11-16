@@ -260,6 +260,8 @@ describe('Monitoring configuration consistency', () => {
       'HighHostMemoryUsage',
       'HighHostDiskUsage',
       'HighAttraccessContainerMemoryUsage',
+      // ATT-1212 audit persistence
+      'AuditRecordsDropped',
     ];
 
     it('Grafana provisioned rules define all required alerts', () => {

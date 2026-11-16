@@ -396,7 +396,7 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
         notes: 'Ended by bob',
         usageId: 'ru-1',
       },
-      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { actorId: null } },
+      { skipFormSubmissions: true, skipNoteNotification: true, auditOrigin: { id: null, authenticationMethod: null } },
     );
   });
 
@@ -485,10 +485,13 @@ describe('ResourceFlowsExecutorService.runFlow', () => {
 
     await scope.service.checkResourceActivity();
 
-    expect(startFlowSpy).toHaveBeenCalledWith(inactivityNode, { payload: {} });
-    const updatedActivity = resourceActivity.get(resourceId) as Date;
-    expect(updatedActivity).toBeInstanceOf(Date);
-    expect(updatedActivity.getTime()).toBeGreaterThan(tenMinutesAgo.getTime());
+    expect(startFlowSpy).toHaveBeenCalledWith(inactivityNode, { payload: {} }, undefined, expect.any(Map), {
+      triggeringResourceId: inactivityNode.resourceId,
+    });
+    // Firing keeps a schedule per (node, resource): it does not touch the resource's last activity.
+    expect(resourceActivity.get(resourceId)).toBe(tenMinutesAgo);
+    await scope.service.checkResourceActivity();
+    expect(startFlowSpy).toHaveBeenCalledTimes(1);
   });
 
   describe('health nodes', () => {

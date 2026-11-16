@@ -4,6 +4,8 @@ import { LicenseModuleType } from '../../license/license.service';
 import { PAIRING_SUBPROTOCOL } from '../security/session-framing';
 import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
 import { registerAttractapGatewayFixture } from './websocket.gateway.attractap-gateway.test-fixture';
+import { makeStringLVGLReady, sanitizeForLVGL } from './websocket-lvgl';
+import { ReaderTimeZoneService } from './reader-time-zone.service';
 import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from './websocket.types';
 
 describe('AttractapGateway', () => {
@@ -108,7 +110,7 @@ describe('AttractapGateway', () => {
       expect(fixture.websocketService.sockets.size).toBe(1);
       const registeredSocket = Array.from(fixture.websocketService.sockets.values())[0];
       expect(registeredSocket.readerId).toBeNull();
-      expect(registeredSocket.state.lastAuthenticatedUserId).toBeNull();
+      expect(registeredSocket.state.verifiedUserId).toBeNull();
 
       expect(mockClient.send).toHaveBeenCalled();
       const sendMock = mockClient.send as jest.Mock;
@@ -179,11 +181,40 @@ describe('AttractapGateway', () => {
       );
     });
 
+    it('forgets the reader time zone once its last socket, or one signing in as it, is gone', async () => {
+      const zones = new ReaderTimeZoneService(
+        { providers: () => [] } as never,
+        {} as never,
+        {} as never,
+        fixture.websocketService as never,
+        { emit: jest.fn() } as never,
+      );
+      (fixture.gateway as unknown as { readerTimeZone: unknown }).readerTimeZone = zones;
+      const forget = jest.spyOn(zones, 'forget');
+      const first = fixture.createMockSocket({ id: 'tz-1', readerId: 42 });
+      const second = fixture.createMockSocket({ id: 'tz-2', readerId: 42 });
+      // A reconnect: this socket is still resolving the zone before it becomes reader 42.
+      const signingIn = fixture.createMockSocket({ id: 'tz-3', readerId: null });
+      signingIn.state.signingIn = { readerId: 42, attempt: Symbol('sign-in') };
+      fixture.websocketService.sockets.set('tz-1', first);
+      fixture.websocketService.sockets.set('tz-2', second);
+      fixture.websocketService.sockets.set('tz-3', signingIn);
+
+      await fixture.gateway.handleDisconnect(first);
+      await fixture.gateway.handleDisconnect(second);
+      expect(forget).not.toHaveBeenCalled();
+      // The reconnect became reader 42; when it closes, nobody uses the reader any more.
+      delete signingIn.state.signingIn;
+      signingIn.readerId = 42;
+      await fixture.gateway.handleDisconnect(signingIn);
+      expect(forget).toHaveBeenCalledWith(42);
+    });
+
     it('closes OTA file descriptor on disconnect if present', async () => {
       const socket = fixture.createMockSocket({
         id: 'disc-ota',
         state: {
-          lastAuthenticatedUserId: null,
+          verifiedUserId: null,
           enrollNewCardData: null,
           resetNfcCardData: null,
           ota: { path: '/tmp/test', size: 1024, fd: 999 },
@@ -239,6 +270,38 @@ describe('AttractapGateway', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+
+    it('answers with the offset of the reader time zone', async () => {
+      jest.useFakeTimers({ now: new Date('2026-07-15T12:00:00Z'), doNotFake: ['nextTick', 'setImmediate'] });
+      try {
+        const zones = new ReaderTimeZoneService(
+          { providers: () => [{ plugin: 'p', provider: { getTimeZone: () => 'Asia/Tokyo' } }] } as never,
+          {} as never,
+          { findReaderById: async () => ({ id: 7, resources: [{ id: 1 }] }) } as never,
+          { sockets: new Map() } as never,
+          { emit: jest.fn() } as never,
+        );
+        await zones.resolve(7);
+        (fixture.gateway as unknown as { readerTimeZone: unknown }).readerTimeZone = zones;
+        const socket = fixture.createMockSocket({ id: 'hb-zone', readerId: 7 });
+
+        await fixture.gateway.onHeartbeat(socket);
+
+        const reply = JSON.parse((socket as unknown as { send: jest.Mock }).send.mock.calls[0][0]);
+        expect(reply).toMatchObject({ event: 'HEARTBEAT', serverTime: { utcOffsetMinutes: 540 } });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('lets the reader time zone retry a resolve that timed out', async () => {
+      const onHeartbeat = jest.spyOn(fixture.gateway['readerTimeZone'], 'onHeartbeat');
+      const socket = fixture.createMockSocket({ id: 'hb-retry', readerId: 7 });
+
+      await fixture.gateway.onHeartbeat(socket);
+
+      expect(onHeartbeat).toHaveBeenCalledWith(7);
     });
 
     it('returns public clock metadata without authenticating the reader or granting resource access', async () => {
@@ -319,16 +382,19 @@ describe('AttractapGateway', () => {
       await expect(fixture.gateway.disconnectReader(999)).resolves.toBeUndefined();
     });
 
-    it('closes all sockets for the given reader', async () => {
+    it('terminates all sockets for the given reader, token and session alike', async () => {
       const socket1 = fixture.createMockSocket({ id: 'dr-1', readerId: 5 });
-      const socket2 = fixture.createMockSocket({ id: 'dr-2', readerId: 5 });
-      fixture.websocketService.sockets.set('dr-1', socket1);
-      fixture.websocketService.sockets.set('dr-2', socket2);
+      const socket2 = fixture.createMockSocket({ id: 'dr-2', readerId: 5, transport: 'session' });
+      const other = fixture.createMockSocket({ id: 'dr-3', readerId: 6 });
+      for (const socket of [socket1, socket2, other]) fixture.websocketService.sockets.set(socket.id, socket);
 
       await fixture.gateway.disconnectReader(5);
 
-      expect(socket1.close).toHaveBeenCalled();
-      expect(socket2.close).toHaveBeenCalled();
+      // A closing handshake would leave the socket registered for this reader for up to 30 s.
+      expect(socket1.terminate).toHaveBeenCalled();
+      expect(socket2.terminate).toHaveBeenCalled();
+      expect(socket1.close).not.toHaveBeenCalled();
+      expect(other.terminate).not.toHaveBeenCalled();
     });
   });
   it('sends language updates only to open authenticated readers', async () => {

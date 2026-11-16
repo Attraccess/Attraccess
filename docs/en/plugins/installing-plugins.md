@@ -1,4 +1,5 @@
 # Installing Plugins
+<!-- llms-description: How to upload, enable, disable and remove plugins in the web interface, with troubleshooting. -->
 
 Plugins are installed by uploading them through the Attraccess web interface. This page explains how to upload, enable and manage plugins.
 
@@ -14,6 +15,23 @@ Open **Settings → Plugins → Install plugin → Browse marketplace** and sele
 Updates and downgrades cannot break the dependency graph. If a required plugin is removed, the confirmation lists its dependants: cancel to keep it, or explicitly approve removing those plugins together. Automatically installed dependencies remain normal plugins. Removing a provider does not automatically remove its dependencies; npm removal retains plugin data and secrets.
 
 If a dependency fails to load, its dependants stay inactive. Open the failure details in **Settings → Plugins**, repair or retry the failed dependency, then restart.
+
+## Release channels
+
+Official plugins are published to npm under these dist-tags:
+
+| Tag      | Moved by               | Contents                                                                                                                                    |
+| -------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `latest` | Attraccess releases    | The plugin version published with an Attraccess release. **The marketplace shows and installs this version.**                               |
+| `next`   | Nightly builds of main | Builds from green, hardware-gated main builds, versioned like `0.2.0-nightly.1180.1` (the plugin version, then `-nightly.<run>.<attempt>`). |
+| `alpha`  | Nobody (legacy)        | Frozen builds from before release channels existed.                                                                                         |
+
+To try a nightly, open **Settings → Plugins**, choose **Manage version** on the installed plugin and enter `next` (or a specific nightly version) as **Requested version or channel**. Nightly versions are prereleases, so they are never installed automatically.
+
+Once a plugin has had a release, the marketplace offers only released versions. Until then:
+
+- The WAGO, Shelly and RabbitMQ `latest` versions stay at a nightly build (`0.1.0-nightly.925.2`, for hosts `^1.9.0`) until Attraccess 1.11.0 publishes them as stable versions. Current plugin code requires Attraccess 1.11 or newer, so `0.1.0-nightly.925.2` stays the version for older hosts.
+- npm sets `latest` automatically on a package's first publish. A plugin first published by a nightly (like Matter) therefore has a nightly `latest` until its first release. The release treats a nightly `latest` as never released and publishes the plugin.
 
 ## Uploading a Plugin
 

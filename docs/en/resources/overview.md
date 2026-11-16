@@ -1,4 +1,5 @@
 # Resources
+<!-- llms-description: Introduces resources, the core of Attraccess: machines, tools and equipment whose access and usage you manage, and their types. -->
 
 Resources are the core of Attraccess. A resource is anything whose access and usage you manage at your site – production machines, lab equipment, tools, shared workstations or doors.
 
@@ -37,3 +38,4 @@ The Attraccess home page shows all available resources in an overview. You can:
 - [Groups](resources/resource-groups.md) – Organize resources
 - [Introductions](resources/introductions.md) – Manage access
 - [Maintenance](resources/maintenance.md) – Schedule maintenance
+- With the Reservations plugin installed, members can book resources in advance; see [Reservations](plugins/reservations/overview.md).

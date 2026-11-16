@@ -10,6 +10,7 @@ function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
     createdAt: new Date(),
     updatedAt: new Date(),
     resourceId: 1,
+    flowId: null,
     resource: undefined,
     ...partial,
   } as unknown as ResourceFlowNode;

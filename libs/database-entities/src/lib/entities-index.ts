@@ -1,9 +1,15 @@
 export { ApiTokenPermission } from './entities/api-token-permission.entity';
 export { ApiToken } from './entities/api-token.entity';
+export { McpOAuthClient } from './entities/mcp-oauth-client.entity';
+export { McpOAuthGrant } from './entities/mcp-oauth-grant.entity';
+export { McpOAuthToken } from './entities/mcp-oauth-token.entity';
+export type { McpOAuthTokenKind } from './entities/mcp-oauth-token.entity';
 export { Attractap, AttractapFirmwareVersion } from './entities/attractap.entity';
 export { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 export { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
 export { AttractapInstallation } from './entities/attractap-installation.entity';
+export { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
+export type { SecureBootKeyRole } from './entities/attractap-secure-boot-key.entity';
 export {
   ReaderUiAlert,
   ReaderUiPluginSettings,
@@ -13,7 +19,11 @@ export {
 export type { ReaderUiAlertKind } from './entities/reader-ui-settings.entity';
 export { AuditLog } from './entities/audit-log.entity';
 export { AuthenticationDetail } from './entities/authenticationDetail.entity';
-export { BillingTransactionItem } from './entities/billing-transaction-item.entity';
+export {
+  BillingTransactionItem,
+  BillingItemAllocation,
+  BillingItemAllocationSegment,
+} from './entities/billing-transaction-item.entity';
 export { BillingTransaction, BillingTransactionStatus } from './entities/billing-transaction.entity';
 export { CompanionDevice } from './entities/companion-device.entity';
 export { ConversationParticipant } from './entities/conversation-participant.entity';
@@ -48,13 +58,22 @@ export {
   ResourceMaintenanceScheduleDurationBasis,
   ResourceMaintenanceScheduleTriggerType,
 } from './entities/resource-maintenance-schedule.entity';
-export { ResourceMeter } from './entities/resource-meter.entity';
+export { ResourceMeter, ResourceMeterAllocation } from './entities/resource-meter.entity';
+export {
+  CsvExportTemplate,
+  CsvExportTemplateColumn,
+  CsvExportTemplateColumnType,
+  CsvExportType,
+} from './entities/csv-export-template.entity';
 export {
   ResourceMeteringOperation,
   ResourceMeteringOperationKind,
   ResourceMeteringOperationStatus,
   ResourceMeteringSession,
   ResourceMeteringSessionStatus,
+  ResourceMeteringSegment,
+  ResourceMeteringSegmentParticipant,
+  ResourceMeteringSegmentStatus,
 } from './entities/resource-metering.entity';
 export { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
 export {
@@ -66,6 +85,7 @@ export { ResourceMaintenance } from './entities/resource.maintenance';
 export { AutoIntroductionTarget, SupervisionMode } from './entities/resource.supervision';
 export { ResourceType } from './entities/resource.type';
 export { ResourceFlowEdge } from './entities/resourceFlowEdge';
+export { Flow, type FlowScope } from './entities/flow.entity';
 export {
   BillingTransactionItemCreateSchema,
   ButtonNodeDataSchema,
@@ -118,6 +138,7 @@ export {
 export { ResourceUsage } from './entities/resourceUsage.entity';
 export { ResourceUsageAction } from './entities/resourceUsage.type';
 export { NFCCard } from './entities/rfidCard.entity';
+export { NFCCardPendingChange } from './entities/nfcCardPendingChange.entity';
 export { RolePermission } from './entities/role-permission.entity';
 export { Role } from './entities/role.entity';
 export { Session } from './entities/session.entity';
@@ -130,10 +151,14 @@ export { User } from './entities/user.entity';
 export { UsageDurationUnit } from './types/usageDurationUnit.enum';
 import { ApiTokenPermission } from './entities/api-token-permission.entity';
 import { ApiToken } from './entities/api-token.entity';
+import { McpOAuthClient } from './entities/mcp-oauth-client.entity';
+import { McpOAuthGrant } from './entities/mcp-oauth-grant.entity';
+import { McpOAuthToken } from './entities/mcp-oauth-token.entity';
 import { Attractap } from './entities/attractap.entity';
 import { AttractapCrashReport } from './entities/attractapCrashReport.entity';
 import { AttractapCredentialEvent } from './entities/attractap-credential-event.entity';
 import { AttractapInstallation } from './entities/attractap-installation.entity';
+import { AttractapSecureBootKey } from './entities/attractap-secure-boot-key.entity';
 import {
   ReaderUiAlert,
   ReaderUiPluginSettings,
@@ -169,12 +194,18 @@ import { ResourceMaintenanceScheduleUsageCountConfig } from './entities/resource
 import { ResourceMaintenanceScheduleUsageHoursConfig } from './entities/resource-maintenance-schedule-usage-hours-config.entity';
 import { ResourceMaintenanceSchedule } from './entities/resource-maintenance-schedule.entity';
 import { ResourceMeter } from './entities/resource-meter.entity';
-import { ResourceMeteringOperation, ResourceMeteringSession } from './entities/resource-metering.entity';
+import { CsvExportTemplate } from './entities/csv-export-template.entity';
+import {
+  ResourceMeteringOperation,
+  ResourceMeteringSegment,
+  ResourceMeteringSession,
+} from './entities/resource-metering.entity';
 import { ResourceOperatingInterval } from './entities/resource-operating-interval.entity';
 import { ResourceUsageLifecycleAttempt } from './entities/resource-usage-lifecycle-attempt.entity';
 import { Resource } from './entities/resource.entity';
 import { ResourceMaintenance } from './entities/resource.maintenance';
 import { ResourceFlowEdge } from './entities/resourceFlowEdge';
+import { Flow } from './entities/flow.entity';
 import { ResourceFlowNode } from './entities/resourceFlowNode';
 import { ResourceFlowVariable } from './entities/resourceFlowVariable';
 import { ResourceGroup } from './entities/resourceGroup.entity';
@@ -184,6 +215,7 @@ import { ResourceIntroduction } from './entities/resourceIntroduction.entity';
 import { ResourceIntroductionHistoryItem } from './entities/resourceIntroductionHistoryItem.entity';
 import { ResourceUsage } from './entities/resourceUsage.entity';
 import { NFCCard } from './entities/rfidCard.entity';
+import { NFCCardPendingChange } from './entities/nfcCardPendingChange.entity';
 import { RolePermission } from './entities/role-permission.entity';
 import { Role } from './entities/role.entity';
 import { Session } from './entities/session.entity';
@@ -210,10 +242,12 @@ export const entities = {
   SSOProviderOIDCConfiguration,
   SSOProviderSAMLConfiguration,
   NFCCard,
+  NFCCardPendingChange,
   Attractap,
   AttractapCrashReport,
   AttractapCredentialEvent,
   AttractapInstallation,
+  AttractapSecureBootKey,
   ReaderUiAlert,
   ReaderUiPluginSettings,
   ReaderUiReaderSettings,
@@ -222,6 +256,7 @@ export const entities = {
   EmailTemplateTranslation,
   ResourceFlowNode,
   ResourceFlowEdge,
+  Flow,
   ResourceMaintenance,
   ResourceMaintenanceRequest,
   ResourceMaintenanceSchedule,
@@ -257,9 +292,14 @@ export const entities = {
   UserRole,
   ApiToken,
   ApiTokenPermission,
+  McpOAuthClient,
+  McpOAuthGrant,
+  McpOAuthToken,
   ResourceOperatingInterval,
   ResourceUsageLifecycleAttempt,
   ResourceMeteringSession,
   ResourceMeteringOperation,
+  ResourceMeteringSegment,
   ResourceMeter,
+  CsvExportTemplate,
 };

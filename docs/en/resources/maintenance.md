@@ -1,4 +1,5 @@
 # Maintenance
+<!-- llms-description: Track resource maintenance with manual records and automated maintenance schedules, including the required permissions. -->
 
 Attraccess helps you keep track of maintenance for your resources. You can create manual maintenance records and set up automated maintenance schedules that trigger based on usage or time.
 

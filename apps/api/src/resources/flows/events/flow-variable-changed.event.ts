@@ -11,5 +11,7 @@ export class ResourceFlowVariableChangedEvent {
     public readonly newValue: unknown,
     public readonly changedAt: Date,
     public readonly sourceResourceId: number | null,
+    /** The global flow whose node made the change, if any. */
+    public readonly sourceFlowId: number | null = null,
   ) {}
 }

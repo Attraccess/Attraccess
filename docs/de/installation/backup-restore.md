@@ -1,17 +1,19 @@
 # Backup & Wiederherstellung
 
+<!-- llms-description: Erklärt, welche Attraccess-Daten gesichert werden, wie Sie ein Backup erstellen und wiederherstellen. -->
+
 Attraccess speichert alle Daten in einem einzigen Verzeichnis, was Backups einfach macht.
 
 ## Was wird gesichert?
 
 Alle Daten liegen im **Storage-Verzeichnis** (Standard: `/app/storage` im Container):
 
-| Datei/Ordner | Inhalt |
-|-------------|--------|
+| Datei/Ordner        | Inhalt                                                   |
+| ------------------- | -------------------------------------------------------- |
 | `attraccess.sqlite` | Datenbank mit allen Einstellungen, Benutzern, Ressourcen |
-| `cache/` | Zwischengespeicherte Bilder (kann regeneriert werden) |
-| `cdn/` | Hochgeladene Dateien (Bilder, Dokumente) |
-| `plugins/` | Installierte Plugins |
+| `cache/`            | Zwischengespeicherte Bilder (kann regeneriert werden)    |
+| `cdn/`              | Hochgeladene Dateien (Bilder, Dokumente)                 |
+| `plugins/`          | Installierte Plugins                                     |
 
 > [!NOTE]
 > Die Datenbank (`attraccess.sqlite`) ist die wichtigste Datei. Ohne sie sind alle Konfigurationen und Daten verloren.
@@ -71,6 +73,10 @@ docker compose start attraccess
 > [!WARNING]
 > Die Wiederherstellung überschreibt alle aktuellen Daten. Erstellen Sie vorher ein Backup des aktuellen Zustands.
 
+## Speicher des Matter-Sidecars
+
+Ist das Matter-Plugin installiert, liegt die Matter-Fabric im **eigenen Speicher-Volume des Sidecars** (`MATTER_SIDECAR_STORAGE_DIR`), das **nicht** zum Attraccess-Volume gehört. Sichern Sie sie über die verschlüsselten Backups des Matter-Plugins und bewahren Sie den Wiederherstellungsschlüssel außerhalb des Servers auf. Siehe [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md).
+
 ## Tipps
 
 - Sichern Sie Backups auf einem separaten Server oder Cloud-Speicher
@@ -79,5 +85,6 @@ docker compose start attraccess
 
 ## Siehe auch
 
+- [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md)
 - [Aktualisierung](installation/updating.md)
 - [Docker Compose Installation](installation/docker-compose.md)

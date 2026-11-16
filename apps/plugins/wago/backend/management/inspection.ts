@@ -11,7 +11,7 @@ import { wagoFw31IdentityCheck } from '../host/firmware-identity';
  * https://man.openbsd.org/sshd_config.5 documents OpenSSH controls, NOT WAGO reload/persistence.
  * https://github.com/mkj/dropbear/blob/master/src/runopts.h distinguishes Dropbear controls.
  * https://www.kernel.org/doc/html/latest/networking/proc_net_tcp.html documents socket observations.
- * Repository: docs/en/devices/wago-cc100-commissioning.md, especially Current release limitations.
+ * Repository: docs/en/plugins/wago/cc100-commissioning.md, especially Current release limitations.
  * No config_sshd/config_dropbear invocation, service reload, useradd/sudo profile, WBM mutation,
  * password/default-account disable or reboot-safe watchdog is claimed qualified here.
  */

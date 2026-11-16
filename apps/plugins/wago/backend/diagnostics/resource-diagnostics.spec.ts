@@ -10,6 +10,8 @@ describe('resource diagnostics', () => {
   function setup(ids: unknown[]) {
     const nodesQuery = {
       select: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
@@ -96,6 +98,48 @@ describe('resource diagnostics', () => {
       ['relay-on', [{ id: 7, name: 'Workbench outlet' }]],
       ['relay-off', [{ id: 7, name: 'Workbench outlet' }]],
     ]);
+  });
+  it('flags channels shared with global flows but never lists global nodes as own references', async () => {
+    const { nodesQuery, service } = setup([1]);
+    const own = [
+      {
+        id: 'relay-on',
+        resourceId: 42,
+        flowId: null,
+        type: 'plugin.wago.command',
+        data: { controllerId: 1, channelId: 'do1' },
+      },
+    ];
+    nodesQuery.getMany.mockResolvedValueOnce(own).mockResolvedValueOnce([
+      ...own,
+      {
+        id: 'global-on',
+        resourceId: null,
+        flowId: 8,
+        flow: { id: 8, name: 'Power off all' },
+        type: 'plugin.wago.command',
+        data: { controllerId: 1, channelId: 'do1' },
+      },
+      {
+        id: 'unnamed-on',
+        resourceId: null,
+        flowId: 9,
+        flow: null,
+        type: 'plugin.wago.command',
+        data: { controllerId: 1, channelId: 'do1' },
+      },
+    ]);
+    const [controller] = (await service.getResource(42)).controllers;
+    expect(controller.references.map((reference) => reference.nodeId)).toEqual(['relay-on']);
+    expect(controller.references[0]).toMatchObject({
+      conflict: true,
+      conflictResources: [],
+      conflictFlows: [
+        { id: 8, name: 'Power off all' },
+        { id: 9, name: null },
+      ],
+    });
+    expect(nodesQuery.leftJoin).toHaveBeenCalledWith('node.flow', 'flow');
   });
   it('keeps both endpoints behind resources.update', () => {
     const guard = new EffectivePermissionsGuard(new Reflector());

@@ -1,9 +1,9 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Resource, ResourceHealthState } from '@attraccess/database-entities';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AuditService } from '../../audit/audit.service';
 import { ResourceHealthService } from './resource-health.service';
 
 type MockRepository<T = unknown> = Partial<Record<keyof Repository<T>, jest.Mock>>;
@@ -18,13 +18,13 @@ export function registerResourceHealthServiceFixture() {
 
   let eventEmitter: EventEmitter2;
 
-  const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
 
   const records: ResourceHealthState[] = [];
 
   beforeEach(async () => {
     records.length = 0;
-    audit.recordResource.mockClear();
+    audit.record.mockClear();
 
     healthRepo = {
       findOne: jest.fn(
@@ -79,7 +79,7 @@ export function registerResourceHealthServiceFixture() {
         { provide: getRepositoryToken(ResourceHealthState), useValue: healthRepo },
         { provide: getRepositoryToken(Resource), useValue: resourceRepo },
         EventEmitter2,
-        { provide: AuditService, useValue: audit },
+        { provide: AUDIT_RECORDER, useValue: audit },
       ],
     }).compile();
 

@@ -10,7 +10,22 @@ import { DurableAudit1783700000000 } from '../database/migrations/1783700000000-
 import { IdentityAudit1783800000000 } from '../database/migrations/1783800000000-identity-audit';
 import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
+import { Registry } from 'prom-client';
+import { AuditMetrics, createAuditMetrics } from '../metrics/definitions/audit.metrics';
 import { AuditService } from './audit.service';
+import { AuditQueryService } from './audit-query.service';
+import { PluginAuditHost } from './plugin-audit-host';
+
+/** Fresh registry per call so drop counters never leak between tests. */
+export const createTestAuditMetrics = (): AuditMetrics => createAuditMetrics(new Registry());
+
+/** Non-zero drop counters as `domain:reason` → count. */
+export async function droppedRecords(metrics: AuditMetrics): Promise<Record<string, number>> {
+  const { values } = await metrics.recordsDropped.get();
+  return Object.fromEntries(
+    values.filter(({ value }) => value > 0).map(({ labels, value }) => [`${labels.domain}:${labels.reason}`, value]),
+  );
+}
 
 export const fixturePluginId = 'abcdefghijklmnopqrstu';
 
@@ -88,6 +103,8 @@ export function setupAuditDatabase() {
 
   let store: SettingsStoreService;
 
+  let metrics: AuditMetrics;
+
   const migration = new DurableAudit1783700000000();
 
   const identityMigration = new IdentityAudit1783800000000();
@@ -113,7 +130,8 @@ export function setupAuditDatabase() {
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
     store = new SettingsStoreService(source.getRepository(Setting), null);
-    service = new AuditService(source, store);
+    metrics = createTestAuditMetrics();
+    service = new AuditService(source, store, metrics);
     await service.onModuleInit();
   });
 
@@ -145,8 +163,18 @@ export function setupAuditDatabase() {
     get service() {
       return service;
     },
+    /** The plugin SDK's host provider, writing through the service's recorder port. */
+    get plugins() {
+      return new PluginAuditHost(service);
+    },
+    get query() {
+      return new AuditQueryService(service, source, store);
+    },
     get store() {
       return store;
+    },
+    get metrics() {
+      return metrics;
     },
     get migration() {
       return migration;

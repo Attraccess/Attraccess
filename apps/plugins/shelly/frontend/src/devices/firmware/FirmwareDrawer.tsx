@@ -98,10 +98,6 @@ export function VersionRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export // A Shelly OTA takes ~30-90s including the reboot; past this we stop claiming
-// progress and let the operator re-check manually.
-const UPDATE_TIMEOUT_MS = 5 * 60 * 1000;
-
 export function FirmwareDetails({ status }: { status: FirmwareStatus | null }) {
   const { t } = useShellyTranslations();
   const formatDateTime = useDateTimeFormatter({ showSeconds: true });

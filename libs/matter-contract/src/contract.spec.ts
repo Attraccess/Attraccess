@@ -2,9 +2,15 @@ import {
   COMPATIBILITY_TABLE,
   ERROR_STATUS,
   FEATURE_FAMILIES,
+  MAX_BACKUP_BODY_BYTES,
+  MAX_MESSAGE_BYTES,
   OPERATIONS,
+  SERVICE_TOKEN_PATTERN,
   WIRE_VERSION,
   buildError,
+  buildRequestHeaders,
+  expectedSidecarVersion,
+  isHostSupported,
   capabilityReportSchema,
   clientMessageSchema,
   commandRequestSchema,
@@ -61,6 +67,7 @@ describe('errors', () => {
   it('maps every code to a documented status', () => {
     expect(ERROR_STATUS).toMatchObject({
       validation_failed: 400,
+      unauthorized: 401,
       payload_too_large: 413,
       incompatible_release: 409,
       unsupported_wire_version: 426,
@@ -79,8 +86,8 @@ describe('errors', () => {
 });
 
 describe('capabilities and operations', () => {
-  it('covers all eight families', () => {
-    expect(FEATURE_FAMILIES).toHaveLength(8);
+  it('covers all nine families', () => {
+    expect(FEATURE_FAMILIES).toHaveLength(9);
     for (const family of FEATURE_FAMILIES) {
       expect(OPERATIONS.some((operation) => operation.family === family)).toBe(true);
     }
@@ -123,14 +130,84 @@ describe('families', () => {
   });
 
   it('caps device type IDs at uint32', () => {
-    expect(families.endpointSchema.safeParse({ endpointId: 1, deviceTypes: [0xffff_ffff] }).success).toBe(true);
-    expect(families.endpointSchema.safeParse({ endpointId: 1, deviceTypes: [0x1_0000_0000] }).success).toBe(false);
+    const base = { endpointId: 1, parentEndpointId: null, clusters: [], bridged: null };
+    expect(
+      families.endpointSchema.safeParse({ ...base, deviceTypes: [{ deviceTypeId: 0xffff_ffff, revision: 1 }] }).success,
+    ).toBe(true);
+    expect(
+      families.endpointSchema.safeParse({ ...base, deviceTypes: [{ deviceTypeId: 0x1_0000_0000, revision: 1 }] })
+        .success,
+    ).toBe(false);
+    expect(families.endpointSchema.safeParse({ ...base, deviceTypes: [0xffff_ffff] }).success).toBe(false);
+  });
+
+  it('describes the inventory with identity, bounded clusters and bridged data', () => {
+    const node = {
+      nodeId: '5',
+      reachable: true,
+      vendorId: 4_874,
+      productId: 1,
+      vendorName: 'Acme',
+      productName: 'Plug',
+      serialNumber: 'SN1',
+      uniqueId: 'U1',
+      hardwareVersion: 1,
+      softwareVersion: 3,
+      softwareVersionString: '1.0.3',
+      attestation: { status: 'verified', checkedAt: '2026-10-29T10:00:00.000Z' },
+      observedAt: null,
+      endpoints: [
+        {
+          endpointId: 1,
+          parentEndpointId: 0,
+          deviceTypes: [{ deviceTypeId: 266, revision: 1 }],
+          clusters: [
+            { clusterId: 6, role: 'server', revision: 5, featureMap: 1, attributeIds: [0], acceptedCommandIds: [0, 1] },
+          ],
+          bridged: {
+            uniqueId: 'B1',
+            nodeLabel: null,
+            vendorName: null,
+            productName: null,
+            serialNumber: null,
+            reachable: true,
+          },
+        },
+      ],
+    };
+    expect(families.nodeListSchema.safeParse({ authoritative: true, fabricId: '1', nodes: [node] }).success).toBe(true);
+    expect(families.nodeListSchema.safeParse({ authoritative: true, fabricId: null, nodes: [] }).success).toBe(true);
+    expect(families.nodeListSchema.safeParse({ authoritative: true, nodes: [] }).success).toBe(false);
+    expect(families.nodeSchema.safeParse({ ...node, attestation: { status: 'bogus', checkedAt: null } }).success).toBe(
+      false,
+    );
+    const cluster = node.endpoints[0].clusters[0];
+    const oversized = { ...node.endpoints[0], clusters: [{ ...cluster, attributeIds: new Array(513).fill(1) }] };
+    expect(families.endpointSchema.safeParse(oversized).success).toBe(false);
   });
 
   it('keeps the subscription interval invariant in the shared schema', () => {
     const base = { nodeId: '1', minIntervalSec: 1, maxIntervalSec: 5 };
     expect(subscriptionRequestSchema.safeParse(base).success).toBe(true);
     expect(subscriptionRequestSchema.safeParse({ ...base, minIntervalSec: 6 }).success).toBe(false);
+  });
+
+  it('adds the backup family with its own body limit and secrets-on-wire marking', () => {
+    const backupOperations = OPERATIONS.filter((operation) => operation.family === 'backup');
+    expect(backupOperations.map((operation) => operation.id)).toEqual([
+      'backup.snapshot',
+      'backup.restore.stage',
+      'backup.restore.commit',
+      'backup.restore.rollback',
+      'backup.restore.finalize',
+      'backup.restore.abort',
+    ]);
+    for (const operation of backupOperations) expect(operation.secretsOnWire).toBe(true);
+    expect(MAX_BACKUP_BODY_BYTES).toBeGreaterThan(MAX_MESSAGE_BYTES);
+    expect(OPERATIONS.find((operation) => operation.id === 'backup.snapshot')?.bodyLimitBytes).toBe(
+      MAX_BACKUP_BODY_BYTES,
+    );
+    expect(MAX_MESSAGE_BYTES).toBe(1024 * 1024);
   });
 
   it('keeps requested, accepted and reported outcomes distinct', () => {
@@ -145,8 +222,20 @@ describe('families', () => {
   });
 
   it.each([
-    ['fabric', families.fabricStatusSchema, { state: 'uninitialized', fabricId: null }],
-    ['inventory', families.nodeListSchema, { authoritative: false, nodes: [] }],
+    [
+      'fabric',
+      families.fabricStatusSchema,
+      {
+        state: 'uninitialized',
+        reason: null,
+        fabricId: null,
+        fabricGeneration: 0,
+        rootCertFingerprint: null,
+        storageInstanceId: null,
+        storageSchemaVersion: 1,
+      },
+    ],
+    ['inventory', families.nodeListSchema, { authoritative: false, fabricId: null, nodes: [] }],
     ['subscription', families.subscriptionSchema, { subscriptionId: id, nodeId: '1', state: 'active' }],
     ['ota', families.otaUpdateSchema, { updateId: id, nodeId: '1', state: 'queued', outcome: 'requested' }],
     [
@@ -176,6 +265,62 @@ describe('events and messages', () => {
     }
     expect(eventEnvelopeSchema.safeParse({ ...event, timestamp: 'yesterday' }).success).toBe(false);
     expect(eventEnvelopeSchema.safeParse({ ...event, sequence: 0 }).success).toBe(false);
+  });
+
+  it('validates device.state and command.outcome payloads by type', () => {
+    const state = {
+      nodeId: '5',
+      endpointId: 1,
+      clusterId: 6,
+      attributeId: 0,
+      value: true,
+      observedAt: '2026-10-29T10:00:00.000Z',
+      source: 'subscription_report',
+    };
+    expect(eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: state }).success).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({
+        ...event,
+        type: 'device.state',
+        payload: { ...state, fault: { code: 'x', message: 'y' } },
+      }).success,
+    ).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { ...state, fabricId: '1' } }).success,
+    ).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { ...state, fabricId: 'x' } }).success,
+    ).toBe(false);
+    expect(eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { nodeId: '5' } }).success).toBe(
+      false,
+    );
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'device.state', payload: { phase: 'started' } }).success,
+    ).toBe(false);
+    const outcome = {
+      requestId: id,
+      outcome: 'accepted',
+      acceptedAt: null,
+      reportedAt: null,
+      nodeId: '5',
+      endpointId: 1,
+    };
+    expect(eventEnvelopeSchema.safeParse({ ...event, type: 'command.outcome', payload: outcome }).success).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({
+        ...event,
+        type: 'command.outcome',
+        payload: { ...outcome, fabricId: '1', failureCode: 'timeout' },
+      }).success,
+    ).toBe(true);
+    expect(
+      eventEnvelopeSchema.safeParse({ ...event, type: 'command.outcome', payload: { ...outcome, outcome: 'done' } })
+        .success,
+    ).toBe(false);
+    // Types without an implementation keep the opaque slot.
+    expect(eventEnvelopeSchema.safeParse({ ...event, type: 'fabric.changed', payload: { anything: 1 } }).success).toBe(
+      true,
+    );
   });
 
   it('round-trips cursors and rejects malformed ones', () => {
@@ -210,7 +355,7 @@ describe('compatibility table', () => {
   it('lists exactly one combination for wire version 1', () => {
     expect(COMPATIBILITY_TABLE).toHaveLength(1);
     expect(COMPATIBILITY_TABLE[0].wireVersion).toBe(WIRE_VERSION);
-    expect(minimumAttraccessVersion()).toBe('1.11.0');
+    expect(minimumAttraccessVersion()).toBe('1.11.0-0');
     expect(minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '>=1.12.0 <2' })).toBe('1.12.0');
     expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: 'not a range' })).toThrow();
     expect(() => minimumAttraccessVersion({ ...COMPATIBILITY_TABLE[0], attraccess: '<0.0.0' })).toThrow();
@@ -223,5 +368,45 @@ describe('compatibility table', () => {
     expect(isWellFormedVersion('1.11.0\nX: y')).toBe(false);
     expect(isWellFormedVersion(undefined)).toBe(false);
     expect(isWellFormedVersion(`1.0.0-${'a'.repeat(80)}`)).toBe(false);
+  });
+});
+
+describe('client helpers', () => {
+  it('pairs a plugin release with its sidecar release and checks the host range', () => {
+    const entry = COMPATIBILITY_TABLE[0];
+    expect(expectedSidecarVersion(entry.plugin)).toBe(entry.sidecar);
+    expect(expectedSidecarVersion('9.9.9')).toBeUndefined();
+    expect(isHostSupported(entry.plugin, '1.11.0')).toBe(true);
+    expect(isHostSupported(entry.plugin, '1.11.0-beta.0')).toBe(true);
+    expect(isHostSupported(entry.plugin, '1.10.0')).toBe(false);
+    expect(isHostSupported('9.9.9', '1.11.0')).toBe(false);
+  });
+
+  it('builds the full header set with a bearer token only when given', () => {
+    const base = {
+      attraccessVersion: '1.11.0',
+      pluginVersion: '0.4.0-alpha.0',
+      sidecarVersion: '0.4.0-alpha.0',
+      correlationId: id,
+    };
+    expect(buildRequestHeaders({ ...base, deadlineMs: 1500.2, token: 'x'.repeat(32) })).toEqual({
+      'x-matter-wire-version': '1',
+      'x-attraccess-version': '1.11.0',
+      'x-matter-plugin-version': '0.4.0-alpha.0',
+      'x-matter-sidecar-version': '0.4.0-alpha.0',
+      'x-correlation-id': id,
+      'x-request-deadline-ms': '1501',
+      authorization: `Bearer ${'x'.repeat(32)}`,
+    });
+    expect(buildRequestHeaders(base).authorization).toBeUndefined();
+  });
+
+  it('accepts only 32-512 printable ASCII characters as a service token', () => {
+    expect(SERVICE_TOKEN_PATTERN.test('a'.repeat(32))).toBe(true);
+    expect(SERVICE_TOKEN_PATTERN.test('a'.repeat(512))).toBe(true);
+    expect(SERVICE_TOKEN_PATTERN.test('a'.repeat(31))).toBe(false);
+    expect(SERVICE_TOKEN_PATTERN.test('a'.repeat(513))).toBe(false);
+    expect(SERVICE_TOKEN_PATTERN.test(`${'a'.repeat(31)} `)).toBe(false);
+    expect(SERVICE_TOKEN_PATTERN.test(`${'a'.repeat(31)}é`)).toBe(false);
   });
 });

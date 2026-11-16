@@ -5,10 +5,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import * as migrations from '../database/migrations';
+import { createTestAuditMetrics } from './audit.test-fixture';
 import { registerPluginAuditDomains, resetPluginAuditRegistry } from '../plugin-system/audit/audit-registry';
 import { SettingsStoreService } from '../settings/settings-store.service';
 import { AuditController } from './audit.controller';
+import { AuditQueryService } from './audit-query.service';
+import { PluginAuditHost } from './plugin-audit-host';
 import { AuditService } from './audit.service';
+import { canvasDetails, canvasSaveDetails, diffCanvas } from '../resources/flows/flow-audit';
 
 const fixturePluginId = 'abcdefghijklmnopqrstu';
 
@@ -39,9 +43,10 @@ describe('persisted audit names', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    service = new AuditService(source, new SettingsStoreService(source.getRepository(Setting), null));
+    const store = new SettingsStoreService(source.getRepository(Setting), null);
+    service = new AuditService(source, store, createTestAuditMetrics());
     await service.onModuleInit();
-    controller = new AuditController(service);
+    controller = new AuditController(new AuditQueryService(service, source, store));
     await source.getRepository(User).insert({
       id: 7,
       username: 'Current admin',
@@ -63,10 +68,11 @@ describe('persisted audit names', () => {
   });
 
   it('returns readable current names from persisted events without selecting private entity fields', async () => {
-    await service.recordResource({
+    await service.record({
+      domain: 'resource',
       action: 'maintenance_schedule.updated',
-      actorId: 7,
-      subjectId: 7,
+      actor: { id: 7, authenticationMethod: 'session' },
+      subject: { type: 'resource', id: 7 },
       details: { scheduleId: 3, name: 'Monthly oiling' },
     });
     const queries: string[] = [];
@@ -94,6 +100,83 @@ describe('persisted audit names', () => {
     expect(JSON.stringify(items)).not.toContain('private');
   });
 
+  it('persists flow events, including a degraded large snapshot, and labels them', async () => {
+    const actor = { id: 7, authenticationMethod: 'api-token' as const, apiTokenId: 4 };
+    const large = {
+      nodes: Array.from({ length: 200 }, (_, i) => ({
+        id: `node-${i}`,
+        type: 'output.http',
+        data: { body: 'x'.repeat(4000) },
+      })),
+      edges: Array.from({ length: 199 }, (_, i) => ({ id: `edge-${i}`, source: `node-${i}`, target: `node-${i + 1}` })),
+    };
+    const emptied = { nodes: [], edges: [] };
+    const changeOf = (before: typeof large, after: typeof emptied) => {
+      const diff = diffCanvas(before, after);
+      if (!diff) throw new Error('expected a change');
+      return diff;
+    };
+    const events = [
+      {
+        action: 'resource_flow.updated' as const,
+        subject: { type: 'resource' as const, id: 7 },
+        details: canvasSaveDetails(large, emptied, changeOf(large, emptied)),
+      },
+      {
+        action: 'flow.canvas_updated' as const,
+        subject: { type: 'flow' as const, id: 3 },
+        details: canvasSaveDetails(large, emptied, changeOf(large, emptied), 'Door bell'),
+      },
+      {
+        action: 'flow.deleted' as const,
+        subject: { type: 'flow' as const, id: 3 },
+        details: canvasDetails({ 'before.name': 'Door bell', 'before.enabled': 1 }, large),
+      },
+      {
+        action: 'flow.created' as const,
+        subject: { type: 'flow' as const, id: 4 },
+        details: { 'after.name': 'Alarm', 'after.enabled': 1 },
+      },
+      {
+        action: 'flow.updated' as const,
+        subject: { type: 'flow' as const, id: 3 },
+        details: { flowName: 'Door bell', changedFields: '["enabled"]', 'before.enabled': 1, 'after.enabled': 0 },
+      },
+      {
+        action: 'flow_variable.set' as const,
+        subject: { type: 'resource' as const, id: 7 },
+        details: { scope: 'global', key: 'mode', valueType: 'string', 'after.value': '"on"' },
+      },
+    ];
+    for (const event of events)
+      expect(await service.record({ domain: 'resource', actor, ...event })).toEqual({ status: 'recorded' });
+
+    const { items } = await controller.list({ limit: 50 });
+    expect(items).toHaveLength(6);
+    const byAction = (action: string) => items.filter((entry) => entry.action === action);
+    expect(byAction('resource_flow.updated')[0]).toMatchObject({
+      subjectType: 'resource',
+      subjectLabel: 'Current lathe',
+      authenticationMethod: 'api-token',
+      apiTokenId: 4,
+      details: { snapshotDetail: 'omitted', 'before.nodeCount': 200 },
+    });
+    expect(byAction('flow.canvas_updated')[0]).toMatchObject({
+      subjectType: 'flow',
+      subjectLabel: 'Door bell',
+      subjectLabelSource: 'recorded',
+    });
+    expect(byAction('flow.deleted')[0]).toMatchObject({
+      subjectLabel: 'Door bell',
+      details: { snapshotDetail: 'omitted' },
+    });
+    expect(byAction('flow.updated')[0]).toMatchObject({ subjectLabel: 'Door bell', subjectLabelSource: 'recorded' });
+    expect(byAction('flow.created')[0]).toMatchObject({ subjectType: 'flow', subjectLabel: 'Alarm' });
+    expect(byAction('flow_variable.set')[0]).toMatchObject({ subjectType: 'resource', subjectLabel: 'Current lathe' });
+    const filtered = await controller.list({ limit: 50, subjectType: 'flow', eventPrefix: 'flow.' });
+    expect(filtered.items).toHaveLength(4);
+  });
+
   it('retains recorded names after deletion and never joins plugin target IDs to core resources', async () => {
     await source.getRepository(AuditLog).insert([
       {
@@ -112,7 +195,7 @@ describe('persisted audit names', () => {
       },
     ]);
     expect(
-      await service.record({
+      await new PluginAuditHost(service).record({
         pluginId: fixturePluginId,
         action: 'demo.publication',
         operationId: randomUUID(),
@@ -141,11 +224,11 @@ describe('persisted audit names', () => {
   });
 
   it('uses recorded MQTT names without joining coincident resource IDs', async () => {
-    await service.recordAdministration({
+    await service.record({
+      domain: 'administration',
       action: 'mqtt_server.deleted',
-      actorId: 7,
-      subjectType: 'mqtt-server',
-      subjectId: 7,
+      actor: { id: 7, authenticationMethod: 'session' },
+      subject: { type: 'mqtt-server', id: 7 },
       details: { serverName: 'Former workshop broker', host: 'mqtt.example.test', port: 1883, useTls: 0 },
     });
     const { items } = await controller.list({ domain: 'administration' });

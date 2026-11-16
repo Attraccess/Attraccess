@@ -6,8 +6,8 @@ import {
   ResourceHealthStatus,
 } from '@attraccess/database-entities';
 import { ResourceHealthService } from '../../health/resource-health.service';
-import { NodeExecutor, NodeProcessingResult } from './node-executor.interface';
-import { heartbeatKey } from './flow.utils';
+import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { globalHeartbeatKey, heartbeatKey, requireRunResourceId } from './flow.utils';
 
 /**
  * Records a heartbeat from an output node: stamps the shared last-seen map and
@@ -22,19 +22,25 @@ export class HealthHeartbeatExecutor implements NodeExecutor {
     private readonly heartbeatLastSeen: Map<string, Date>,
   ) {}
 
-  async execute(node: ResourceFlowNode, input: object): Promise<NodeProcessingResult> {
+  async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
     const parsed = ResourceHealthHeartbeatNodeDataSchema.safeParse(node.data ?? {});
     if (!parsed.success) {
       this.logger.warn(`Heartbeat node ${node.id} has invalid data: ${parsed.error.message}`);
       return { payload: input };
     }
     const normalizedIdentifier = (parsed.data.identifier ?? '').trim();
+    const resourceId = requireRunResourceId(node, ctx);
     const now = new Date();
 
-    this.heartbeatLastSeen.set(heartbeatKey(node.resourceId, normalizedIdentifier), now);
+    // Global-flow beats are kept per node, apart from the resource's own heartbeat nodes.
+    const key =
+      node.flowId != null
+        ? globalHeartbeatKey(node.id, resourceId, normalizedIdentifier)
+        : heartbeatKey(resourceId, normalizedIdentifier);
+    this.heartbeatLastSeen.set(key, now);
 
     await this.resourceHealthService.reportHealth({
-      resourceId: node.resourceId,
+      resourceId: resourceId,
       identifier: normalizedIdentifier,
       status: ResourceHealthStatus.HEALTHY,
       reason: null,

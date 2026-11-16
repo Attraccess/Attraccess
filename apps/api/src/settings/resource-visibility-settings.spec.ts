@@ -1,9 +1,10 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { CanActivate, ExecutionContext, INestApplication, Injectable, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import supertest from 'supertest';
 import { DualAuthGuard } from '@attraccess/plugins-backend-sdk';
-import { AuditService } from '../audit/audit.service';
 import { SettingsController } from './settings.controller';
+import { SettingsAdministrationService } from './settings-administration.service';
 import { SettingsService } from './settings.service';
 import { RESOURCES_KEYS, RESOURCES_PARENT } from './constants';
 
@@ -43,7 +44,7 @@ describe('resource activity visibility setting (ATT-1149)', () => {
       getResourceVisibilitySettings: jest.fn(async () => ({ activityVisibility: 'all' })),
       updateResourceVisibilitySettings: jest.fn(async () => ({ activityVisibility: 'introduced' })),
     };
-    const audit = { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+    const audit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 
     beforeEach(async () => {
       jest.clearAllMocks();
@@ -51,7 +52,8 @@ describe('resource activity visibility setting (ATT-1149)', () => {
         controllers: [SettingsController],
         providers: [
           { provide: SettingsService, useValue: settingsService },
-          { provide: AuditService, useValue: audit },
+          SettingsAdministrationService,
+          { provide: AUDIT_RECORDER, useValue: audit },
         ],
       })
         .overrideGuard(DualAuthGuard)
@@ -77,7 +79,7 @@ describe('resource activity visibility setting (ATT-1149)', () => {
         expect((await call('get', permissions)).status).toBe(403);
         expect((await call('patch', permissions).send({ activityVisibility: 'introduced' })).status).toBe(403);
         expect(settingsService.updateResourceVisibilitySettings).not.toHaveBeenCalled();
-        expect(audit.recordAdministration).not.toHaveBeenCalled();
+        expect(audit.record).not.toHaveBeenCalled();
       },
     );
 
@@ -88,7 +90,7 @@ describe('resource activity visibility setting (ATT-1149)', () => {
       const saved = await call('patch', permissions).send({ activityVisibility: 'introduced' });
       expect(saved.status).toBe(200);
       expect(saved.body).toEqual({ activityVisibility: 'introduced' });
-      expect(audit.recordAdministration).toHaveBeenCalled();
+      expect(audit.record).toHaveBeenCalled();
     });
   });
 });

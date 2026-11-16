@@ -1,6 +1,6 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { ResourceUsage, User } from '@attraccess/database-entities';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuditService } from '../../audit/audit.service';
 import { ResourceIntroducersService } from '../introducers/resourceIntroducers.service';
 import { PreStartService } from '../usage/pre-start/pre-start.service';
 import { ResourceUsageService } from '../usage/sessions/resource-usage.service';
@@ -24,7 +24,7 @@ export function registerSupervisionServiceFixture() {
 
   let live: { emitToSupervisor: jest.Mock; getSupervisorSubject: jest.Mock };
 
-  let audit: { recordResource: jest.Mock };
+  let audit: { record: jest.Mock };
 
   const requester: User = { id: 1, username: 'requester' } as User;
 
@@ -51,7 +51,7 @@ export function registerSupervisionServiceFixture() {
       emitToSupervisor: jest.fn(),
       getSupervisorSubject: jest.fn(),
     };
-    audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
+    audit = { record: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -59,7 +59,7 @@ export function registerSupervisionServiceFixture() {
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: ResourceIntroducersService, useValue: introducers },
         { provide: SupervisionLiveService, useValue: live },
-        { provide: AuditService, useValue: audit },
+        { provide: AUDIT_RECORDER, useValue: audit },
         { provide: PreStartService, useValue: { gateSupervision: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();

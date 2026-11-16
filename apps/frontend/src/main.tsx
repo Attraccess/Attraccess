@@ -8,7 +8,7 @@ import '@attraccess/plugins-frontend-ui';
 import { queryClient } from './api/queryClient';
 import { PluginProvider } from './app/plugins/plugin-provider';
 import { PWAInstall } from './components/pwaInstall';
-import { registerSW } from 'virtual:pwa-register';
+import { registerPwaUpdates } from './pwa-update/register';
 import { detectAndSetLanguage } from '@attraccess/plugins-frontend-ui';
 import { trackVisualViewportHeight } from './viewport-height';
 import { Providers } from '@attraccess/ui';
@@ -16,24 +16,7 @@ import { Providers } from '@attraccess/ui';
 detectAndSetLanguage();
 trackVisualViewportHeight();
 
-const oneMinute = 60 * 1000;
-const serviceWorkerUpdateIntervalMs = 15 * oneMinute;
-
-const updateSW = registerSW({
-  immediate: true,
-  onRegistered(registration) {
-    if (import.meta.env.PROD && registration) {
-      setInterval(() => {
-        registration.update();
-      }, serviceWorkerUpdateIntervalMs);
-    }
-  },
-  onNeedRefresh() {
-    if (import.meta.env.PROD) {
-      updateSW(true);
-    }
-  },
-});
+registerPwaUpdates();
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 

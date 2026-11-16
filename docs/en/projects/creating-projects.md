@@ -1,4 +1,5 @@
 # Creating Projects
+<!-- llms-description: How any logged-in user can create, edit and delete a project. -->
 
 Any logged-in user can create projects.
 

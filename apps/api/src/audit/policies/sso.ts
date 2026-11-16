@@ -1,5 +1,15 @@
-import { SsoAuditEvent } from './domain-events';
 import { dataFields, positive, uuid } from './projection';
+
+/** Projection input of an sso-domain event. */
+export type SsoAuditInput = {
+  action: string;
+  operationId: string;
+  actorId: number | null;
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null;
+  apiTokenId?: number;
+  subject: { type: 'sso.provider' | 'user'; id: number };
+  details: Record<string, string>;
+};
 
 export function stringArray(value: unknown, max = 100): boolean {
   return (
@@ -129,19 +139,21 @@ export function oidcProviderConfiguration(value: unknown): boolean {
     'scopes',
     'usernameClaimPaths',
     'emailClaimPaths',
+    'roleClaimPaths',
     'roleMappings',
     'omitted',
   ]);
   return (
     !!config &&
-    Reflect.ownKeys(config).length === 11 &&
+    // roleClaimPaths is absent from snapshots recorded before it existed
+    Reflect.ownKeys(config).length === ('roleClaimPaths' in config ? 12 : 11) &&
     ['issuer', 'authorizationURL', 'tokenURL', 'userInfoURL'].every(
       (key) => safeUrl(config[key]) || (config[key] === '' && omittedField(config.omitted, key)),
     ) &&
     typeof config.clientId === 'string' &&
     config.clientId.length <= 96 &&
     typeof config.clientSecretConfigured === 'boolean' &&
-    [config.scopes, config.usernameClaimPaths, config.emailClaimPaths].every(
+    [config.scopes, config.usernameClaimPaths, config.emailClaimPaths, config.roleClaimPaths ?? null].every(
       (field) => field === null || stringArray(field),
     ) &&
     (config.roleMappings === null || roleMappings(config.roleMappings)) &&
@@ -155,6 +167,7 @@ export function oidcProviderConfiguration(value: unknown): boolean {
       'scopes',
       'usernameClaimPaths',
       'emailClaimPaths',
+      'roleClaimPaths',
     ])
   );
 }
@@ -169,6 +182,7 @@ export function samlProviderConfiguration(value: unknown): boolean {
     'wantAuthnResponseSigned',
     'forceAuthn',
     'emailAttributeKeys',
+    'roleAttributeKeys',
     'roleMappings',
     'signingMaterial',
     'omitted',
@@ -183,7 +197,7 @@ export function samlProviderConfiguration(value: unknown): boolean {
     ]);
   return (
     !!config &&
-    Reflect.ownKeys(config).length === 11 &&
+    Reflect.ownKeys(config).length === ('roleAttributeKeys' in config ? 12 : 11) &&
     !!material &&
     Reflect.ownKeys(material).length === 4 &&
     (safeUrl(config.entryPoint) || (config.entryPoint === '' && omittedField(config.omitted, 'entryPoint'))) &&
@@ -194,9 +208,19 @@ export function samlProviderConfiguration(value: unknown): boolean {
     ['signRequest', 'wantAssertionsSigned', 'wantAuthnResponseSigned', 'forceAuthn'].every(
       (key) => typeof config[key] === 'boolean',
     ) &&
-    (config.emailAttributeKeys === null || stringArray(config.emailAttributeKeys)) &&
+    // roleAttributeKeys is absent from snapshots recorded before it existed
+    [config.emailAttributeKeys, config.roleAttributeKeys ?? null].every(
+      (field) => field === null || stringArray(field),
+    ) &&
     (config.roleMappings === null || roleMappings(config.roleMappings)) &&
-    omissionMetadata(config.omitted, ['name', 'entryPoint', 'issuer', 'audience', 'emailAttributeKeys']) &&
+    omissionMetadata(config.omitted, [
+      'name',
+      'entryPoint',
+      'issuer',
+      'audience',
+      'emailAttributeKeys',
+      'roleAttributeKeys',
+    ]) &&
     [
       'identityProviderCertificateConfigured',
       'provisioningSecretConfigured',
@@ -316,7 +340,7 @@ export function validSsoDetails(
   return true;
 }
 
-export function projectSsoAuditEvent(input: unknown): SsoAuditEvent | null {
+export function projectSsoAuditEvent(input: unknown): SsoAuditInput | null {
   const event = dataFields(input, [
     'action',
     'operationId',
@@ -331,7 +355,9 @@ export function projectSsoAuditEvent(input: unknown): SsoAuditEvent | null {
     if (event.authenticationMethod !== null || event.apiTokenId !== undefined) return null;
   } else if (
     !positive(event.actorId) ||
-    (event.authenticationMethod !== 'session' && event.authenticationMethod !== 'api-token')
+    (event.authenticationMethod !== 'session' &&
+      event.authenticationMethod !== 'api-token' &&
+      event.authenticationMethod !== 'mcp-oauth')
   ) {
     return null;
   }
@@ -353,7 +379,7 @@ export function projectSsoAuditEvent(input: unknown): SsoAuditEvent | null {
     action: event.action as string,
     operationId: event.operationId as string,
     actorId: event.actorId as number | null,
-    authenticationMethod: event.authenticationMethod as SsoAuditEvent['authenticationMethod'],
+    authenticationMethod: event.authenticationMethod as SsoAuditInput['authenticationMethod'],
     ...(event.apiTokenId === undefined ? {} : { apiTokenId: event.apiTokenId as number }),
     subject: { type: subject.type as 'sso.provider' | 'user', id: subject.id as number },
     details: details as Record<string, string>,

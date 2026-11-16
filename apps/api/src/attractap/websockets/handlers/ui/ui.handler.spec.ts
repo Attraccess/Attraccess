@@ -5,7 +5,12 @@ import { makeSocket } from './ui-test-helpers.test-fixture';
 
 function setup() {
   const handler = new AttractapUiHandler() as any;
-  const slots = { onFirmwareInfo: jest.fn().mockResolvedValue(undefined), cleanup: jest.fn(), renderReport: jest.fn() };
+  const slots = {
+    onFirmwareInfo: jest.fn().mockResolvedValue(undefined),
+    cleanup: jest.fn(),
+    renderReport: jest.fn(),
+    readerSignedOut: jest.fn(),
+  };
   const steps = { discardAll: jest.fn(), handleResult: jest.fn() };
   const alerts = { touchCrash: jest.fn(), raise: jest.fn().mockResolvedValue({}) };
   const cardSessions = new CardSessionService();
@@ -52,6 +57,59 @@ describe('AttractapUiHandler crash-loop protection', () => {
       payload: { cardSessionId: session.id },
     } as any);
     expect(cardSessions.current(socket)).toBeNull();
+  });
+
+  it("reports the login as ended when the reader ends the verified user's card session", () => {
+    const { handler, cardSessions } = setup();
+    const socket = makeSocket();
+    const session = cardSessions.issue(socket, 7, 'en');
+    Object.assign(socket.state, { verifiedUserId: 7, verifiedCardUid: '04aabbccddee80' });
+    const ended = (cardSessionId: unknown) =>
+      handler.handleCardSessionEnded(socket, { type: 'CARD_SESSION_ENDED', payload: { cardSessionId } } as any);
+    expect(ended(5)).toBe(false);
+    expect(ended(session.id)).toBe(true);
+    // Already over: a repeated message ends nothing.
+    expect(ended(session.id)).toBe(false);
+  });
+
+  it('keeps a different verified user when an older card session ends', () => {
+    const { handler, cardSessions } = setup();
+    const socket = makeSocket();
+    const session = cardSessions.issue(socket, 7, 'en');
+    // Someone else tapped since: the verified user is not the one of this card session.
+    Object.assign(socket.state, { verifiedUserId: 9, verifiedCardUid: '04112233445566' });
+    expect(
+      handler.handleCardSessionEnded(socket, {
+        type: 'CARD_SESSION_ENDED',
+        payload: { cardSessionId: session.id },
+      } as any),
+    ).toBe(false);
+    expect(socket.state.verifiedUserId).toBe(9);
+  });
+
+  it('ends the card session together with the reader login', () => {
+    const { handler, cardSessions } = setup();
+    const socket = makeSocket();
+    cardSessions.issue(socket, 7, 'en');
+    handler.endCardSession(socket);
+    expect(cardSessions.current(socket)).toBeNull();
+  });
+
+  it('resends the cleared rows when the reader signs out after the server timer expired its card session', () => {
+    jest.useFakeTimers();
+    try {
+      const { handler, slots, cardSessions } = setup();
+      const socket = makeSocket();
+      const session = cardSessions.issue(socket, 7, 'en');
+      jest.advanceTimersByTime(36_000);
+      expect(cardSessions.current(socket)).toBeNull();
+      handler.endCardSession(socket);
+      expect(slots.readerSignedOut).toHaveBeenCalledWith(socket);
+      // The reader ended it: the expired session cannot come back.
+      expect(cardSessions.resume(socket, session.id, 7)).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('discards steps and the card session on close', () => {

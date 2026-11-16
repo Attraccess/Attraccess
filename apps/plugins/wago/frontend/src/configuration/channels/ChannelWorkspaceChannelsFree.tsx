@@ -3,7 +3,7 @@ import { Button, Input, TextField } from '@heroui/react';
 import { ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { availableDigitalTerminals, DIGITAL_TERMINALS } from '../../../../backend/configuration/digital';
 import { PhysicalAssignments } from './DigitalChannelEditor';
-import { channelAssignment } from './ChannelWorkspace';
+import { channelAssignment } from './channelWorkspaceModel';
 import { useChannelWorkspaceState } from './useChannelWorkspaceState';
 type Props = Pick<
   ReturnType<typeof useChannelWorkspaceState>,

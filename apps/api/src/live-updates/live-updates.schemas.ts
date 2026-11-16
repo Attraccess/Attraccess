@@ -31,6 +31,15 @@ export function liveSubscriptionSchema(definition: LiveTopicDefinition): z.ZodTy
                 : pluginIdentifier.optional(),
         })
         .transform(({ topic, identifier }) => ({ topic, ...(identifier !== undefined ? { identifier } : {}) }));
+    case 'mqtt-explorer':
+      return z.strictObject({
+        topic: z.literal(definition.topic),
+        mqttServerId: z.int().positive(),
+        filter: z
+          .string()
+          .min(1)
+          .refine((filter) => Buffer.byteLength(filter) <= definition.maxFilterBytes),
+      });
     case 'user':
       return z
         .strictObject({ topic: z.literal(definition.topic), resourceId: z.undefined().optional() })

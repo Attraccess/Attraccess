@@ -43,18 +43,21 @@ describe('ResourceFlowVariablesController', () => {
     expect(result[0]).toMatchObject({ scope: ResourceFlowVariableScope.RESOURCE, key: 'a', value: 'x' });
   });
 
+  const req = { user: { id: 9, authenticationMethod: 'api-token', apiTokenId: 3 } } as never;
+  const actor = { id: 9, authenticationMethod: 'api-token', apiTokenId: 3 };
+
   it('upserts via PUT', async () => {
-    await controller.upsert(5, ResourceFlowVariableScope.GLOBAL, 'k', { value: { foo: 1 } });
-    expect(service.set).toHaveBeenCalledWith(ResourceFlowVariableScope.GLOBAL, 5, 'k', { foo: 1 }, 5);
+    await controller.upsert(5, ResourceFlowVariableScope.GLOBAL, 'k', { value: { foo: 1 } }, req);
+    expect(service.set).toHaveBeenCalledWith(ResourceFlowVariableScope.GLOBAL, 5, 'k', { foo: 1 }, 5, null, actor);
   });
 
   it('upsert resolves resource scope to its resource id', async () => {
-    await controller.upsert(7, ResourceFlowVariableScope.RESOURCE, 'k', { value: 'v' });
-    expect(service.set).toHaveBeenCalledWith(ResourceFlowVariableScope.RESOURCE, 7, 'k', 'v', 7);
+    await controller.upsert(7, ResourceFlowVariableScope.RESOURCE, 'k', { value: 'v' }, req);
+    expect(service.set).toHaveBeenCalledWith(ResourceFlowVariableScope.RESOURCE, 7, 'k', 'v', 7, null, actor);
   });
 
   it('deletes via DELETE', async () => {
-    await controller.remove(5, ResourceFlowVariableScope.GLOBAL, 'k');
-    expect(service.delete).toHaveBeenCalledWith(ResourceFlowVariableScope.GLOBAL, 5, 'k');
+    await controller.remove(5, ResourceFlowVariableScope.GLOBAL, 'k', req);
+    expect(service.delete).toHaveBeenCalledWith(ResourceFlowVariableScope.GLOBAL, 5, 'k', actor);
   });
 });

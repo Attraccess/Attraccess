@@ -161,6 +161,8 @@ describe(`WAGO reliability harness (${mode} mode) - simulator measurement, NOT h
     };
     const flowQuery = {
       select: () => flowQuery,
+      leftJoin: () => flowQuery,
+      addSelect: () => flowQuery,
       where: () => flowQuery,
       andWhere: () => flowQuery,
       getMany: async () => [],

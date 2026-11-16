@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import {
   AuthenticationDetail,
   PasswordHistory,
@@ -8,7 +9,6 @@ import {
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
 import { RbacService } from '../rbac/rbac.service';
 import { HibpClient } from './hibp.client';
 import { PasswordPolicyService, type AuditContext } from './password-policy.service';
@@ -94,6 +94,8 @@ export function registerPasswordPolicyServiceFixture() {
 
   let dataSource: { transaction: jest.Mock };
 
+  let manager: { getRepository: (entity: unknown) => unknown };
+
   let rbacService: { getEffectivePermissions: jest.Mock };
 
   beforeEach(async () => {
@@ -137,6 +139,7 @@ export function registerPasswordPolicyServiceFixture() {
     const fakeManager = {
       getRepository: (entity: unknown) => repoByEntity.get(entity) ?? {},
     };
+    manager = fakeManager;
     dataSource = {
       transaction: jest.fn(async (cb: (mgr: typeof fakeManager) => Promise<unknown>) => cb(fakeManager)),
     };
@@ -145,7 +148,7 @@ export function registerPasswordPolicyServiceFixture() {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PasswordPolicyService,
-        { provide: IdentityAuditService, useValue: identityAudit },
+        { provide: AUDIT_RECORDER, useValue: identityAudit },
         { provide: getRepositoryToken(PasswordPolicy), useValue: repo },
         { provide: getRepositoryToken(PasswordPolicyOverride), useValue: overrideRepo },
         { provide: getRepositoryToken(PasswordHistory), useValue: historyRepo },
@@ -170,6 +173,10 @@ export function registerPasswordPolicyServiceFixture() {
     },
     get identityAudit() {
       return identityAudit;
+    },
+    /** The manager the transaction mock hands its callback. */
+    get manager() {
+      return manager;
     },
     get audit() {
       return audit;

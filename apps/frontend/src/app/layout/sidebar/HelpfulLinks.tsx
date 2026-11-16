@@ -17,9 +17,9 @@ import {
 import { ExternalLink, PuzzleIcon } from 'lucide-react';
 import { buttonVariants } from '@heroui/styles';
 import { useNavigate, NavLink as RouterNavLink } from 'react-router-dom';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
-import { useTranslations } from '@attraccess/plugins-frontend-ui';
+import { useTranslations, useTranslationState } from '@attraccess/plugins-frontend-ui';
 import { useAllRoutes } from '../../routes/index';
 import { hasRequiredPermissions } from '../../routes/routeAccess';
 import de from '../sidebar.de.json';
@@ -31,6 +31,17 @@ import type { PluginSidebarGroup, PluginSidebarItem } from '@attraccess/plugins-
 
 export function usePluginSidebarContributions() {
   const model = usePluginState();
+  const { user } = useAuth();
+  const language = useTranslationState((state) => state.language);
+  // Plugins build their entries from the account (permissions, language), so re-read them when either changes or a
+  // plugin reports a change of its own (e.g. after an async check).
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    const unsubscribe = model.plugins.map((manifest) =>
+      manifest.plugin.onSidebarItemsChange?.(() => setRevision((current) => current + 1)),
+    );
+    return () => unsubscribe.forEach((stop) => stop?.());
+  }, [model.plugins]);
   // Sidebar entries contributed by installed frontend plugins. Each plugin's
   // getSidebarItems() is optional and isolated so a throwing plugin can't break
   // the shell. Visibility is still gated by the target route's auth below.
@@ -47,7 +58,7 @@ export function usePluginSidebarContributions() {
         return [];
       }
     });
-  }, [model.plugins]);
+  }, [model.plugins, user, language, revision]);
 
   const pluginNavGroups: PluginSidebarGroup[] = useMemo(() => {
     return model.plugins.flatMap((manifest) => {

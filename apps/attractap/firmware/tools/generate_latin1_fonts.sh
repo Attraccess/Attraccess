@@ -23,12 +23,13 @@ if [[ "${actual_sha256%% *}" != "$font_sha256" ]]; then
     exit 1
 fi
 
+# Text fonts: ASCII, Latin-1, the en dash (U+2013) and the euro sign (U+20AC).
 # Resolve the pinned converter once for the whole set, reusing npm's cache across
 # firmware variants. Resolving it separately for every size adds network waits.
 npx --yes --prefer-offline --package=lv_font_conv@1.5.3 -- bash -euo pipefail -c '
 for size in "$@"; do
     lv_font_conv --size "$size" --bpp 4 --no-compress --format lvgl --lv-include lvgl.h \
-        --font Montserrat-Medium.ttf -r 0x20-0x7E -r 0xA0-0xFF \
+        --font Montserrat-Medium.ttf -r 0x20-0x7E -r 0xA0-0xFF -r 0x2013 -r 0x20AC \
         --lv-font-name "attractap_font_montserrat_latin1_$size" \
         --output "attractap_font_montserrat_latin1_$size.c"
 done

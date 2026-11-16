@@ -1,4 +1,5 @@
 # OIDC einrichten
+<!-- llms-description: So legen Sie einen OpenID-Connect-SSO-Anbieter an und konfigurieren ihn, inklusive Callback-URL und Test der Anmeldung. -->
 
 OpenID Connect (OIDC) ist das empfohlene SSO-Protokoll für die meisten Anwendungsfälle.
 
@@ -27,6 +28,13 @@ Für Authentik, Keycloak oder andere OpenID-kompatible Anbieter können Sie die 
 
 Alle URL-Felder werden automatisch ausgefüllt.
 
+**Wenn die Erkennung fehlschlägt**, zeigt Attraccess den Grund in der Meldung „Automatische Erkennung fehlgeschlagen“ an:
+
+- Eine Meldung mit einem Status zeigt, was der Anbieter geantwortet hat. `answered with status 404` bedeutet meist, dass Host, Realm oder Anwendungsname falsch sind. Ein 5xx-Status weist auf ein Problem beim Anbieter hin.
+- `TLS certificate of the discovery URL could not be verified` bedeutet, dass der Attraccess-API-Server das Zertifikat des Anbieters nicht prüfen konnte. Der Code in Klammern nennt den Grund, zum Beispiel `CERT_HAS_EXPIRED` oder `ERR_TLS_CERT_ALTNAME_INVALID`. Wenn der Anbieter ein Zertifikat einer privaten CA verwendet, fügen Sie diese CA dem Truststore des Servers hinzu, zum Beispiel über die Node.js-Umgebungsvariable `NODE_EXTRA_CA_CERTS`, und starten Sie den API-Server neu.
+
+Hinter einem Reverse Proxy (nginx, Traefik, Cloudflare, …) kann der Proxy die Fehlerantwort der API durch eine eigene „Bad Gateway“-Seite ersetzen; die Meldung zeigt dann statt des Grundes einen allgemeinen Hinweis. Scheitert die Erkennung am Identitätsanbieter (nicht erreichbar, Antwort mit Fehlerstatus oder unlesbare Antwort), steht die genaue Ursache, zum Beispiel DNS-Fehler, abgelehnte Verbindung, Zeitüberschreitung, TLS-Fehler oder der Statuscode, als Warnung im API-Log. Damit der Grund in der Meldung erscheint, lassen Sie den Proxy die Fehlerantworten der API durchreichen: Lassen Sie bei nginx `proxy_intercept_errors` für die API-Location ausgeschaltet (Standard), damit keine `error_page` sie ersetzt.
+
 ### Manuelle Konfiguration
 
 | Feld | Beschreibung | Beispiel |
@@ -44,7 +52,7 @@ Sendet der Identity Provider `email_verified=false` (Boolean oder String), wird 
 
 ### Scopes
 
-Optional können Sie zusätzliche OIDC-Scopes angeben (kommagetrennt). Standard-Scopes werden automatisch angefordert.
+Optional können Sie die anzufordernden OIDC-Scopes angeben, jeweils einzeln. Ist die Liste leer, werden `openid`, `email` und `profile` angefordert. Konfigurierte Scopes ersetzen diese Standardwerte; nehmen Sie `email` und `profile` also mit auf, wenn Sie sie weiterhin benötigen (z. B. `openid`, `email`, `profile`, `offline_access`). `openid` wird immer gesendet.
 
 ### Claim-Pfade
 
@@ -56,6 +64,12 @@ Attraccess muss wissen, welche Felder im OIDC-Token den Benutzernamen und die E-
 | **E-Mail-Claim-Pfade** | `email, emails[0].value, upn` | Geordnete Liste von Token-Feldern für die E-Mail |
 
 Attraccess prüft die Pfade in der angegebenen Reihenfolge und verwendet den ersten Treffer.
+
+### Rollen-Claim-Pfade
+
+Standardmäßig liest Attraccess Rollen aus `permissions`, `roles`, `groups`, `realm_access.roles` und `resource_access.<clientId>.roles`. Legt Ihr Anbieter die Rollen an anderer Stelle ab, fügen Sie unter **Rollen-Claim-Pfade** die Claim-Pfade einzeln hinzu (höchstens 20, je bis zu 256 Zeichen, ohne Kommas). Das Ändern dieser Einstellung erfordert die Berechtigung `users.roles.manage`. Die Pfade werden beim Login in den Claims des ID-Tokens gesucht; ein Claim, den nur die UserInfo-Antwort enthält, wird beim Login nicht gesehen, sondern erst vom Berechtigungsabgleich während der Sitzung (siehe unten).
+
+> **Eigene Pfade ersetzen die Standardwerte.** Sobald Pfade gesetzt sind, werden nur diese gelesen. Ist einer davon im Token vorhanden, werden Rollen, die nur aus einem Standardpfad stammten (z. B. `groups`), beim nächsten Login entfernt. Ist keiner der konfigurierten Pfade vorhanden, bleiben vorhandene Rollen erhalten; ist einer vorhanden, aber leer, werden die SSO-Rollen dieses Anbieters entfernt. Leeren Sie das Feld, um zu den Standardwerten zurückzukehren.
 
 ### Berechtigungszuordnung
 

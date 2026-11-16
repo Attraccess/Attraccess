@@ -1,7 +1,8 @@
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import { AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
 import { Test } from '@nestjs/testing';
 import { SettingsController } from './settings.controller';
+import { SettingsAdministrationService } from './settings-administration.service';
 import { SettingsService } from './settings.service';
 import { METRICS_SLOW_QUERY_THRESHOLD_DEFAULT_SECONDS, METRICS_TOGGLE_DEFAULTS } from './constants';
 
@@ -37,9 +38,10 @@ describe('SettingsController (metrics endpoints)', () => {
       controllers: [SettingsController],
       providers: [
         { provide: SettingsService, useValue: settingsService },
+        SettingsAdministrationService,
         {
-          provide: AuditService,
-          useValue: { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) },
+          provide: AUDIT_RECORDER,
+          useValue: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) },
         },
       ],
     }).compile();

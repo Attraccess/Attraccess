@@ -1,4 +1,5 @@
 # SSL einrichten
+<!-- llms-description: Wie Attraccess per HTTPS bereitgestellt wird: Reverse Proxy, selbst-signierte oder eigene Zertifikate und Anforderungen für SSO. -->
 
 HTTPS ist für den produktiven Betrieb von Attraccess dringend empfohlen, insbesondere wenn Sie SSO (Single Sign-On) nutzen möchten.
 

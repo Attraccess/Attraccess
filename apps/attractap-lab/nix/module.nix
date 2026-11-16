@@ -19,6 +19,19 @@ let
   readerWifiCommand = pkgs.writeShellScriptBin "attractap-lab-reader-wifi" ''
     exec /run/wrappers/bin/sudo -n ${readerWifiRoot} "$@"
   '';
+  readerSwitch = cfg.readerSwitch;
+  readerSwitches = pkgs.writeText "attractap-reader-switches.json" (builtins.toJSON readerSwitch.switches);
+  # Runs as root through sudo, so the switches' password can stay root-only.
+  readerSwitchRoot = pkgs.writeShellScript "attractap-lab-reader-switch-root" ''
+    exec ${cfg.package}/bin/attractap-lab-reader-switch \
+      --switches ${readerSwitches} \
+      --password-file ${lib.escapeShellArg readerSwitch.passwordFile} \
+      --coordinator ${lib.escapeShellArg cfg.coordinator.syncAddress} \
+      --labgrid-client ${labgrid}/bin/labgrid-client "$@"
+  '';
+  readerSwitchCommand = pkgs.writeShellScriptBin "attractap-lab-reader-switch" ''
+    exec /run/wrappers/bin/sudo -n ${readerSwitchRoot} "$@"
+  '';
   waitForCoordinator = pkgs.writeShellScript "labgrid-wait-for-coordinator" ''
     until ${labgrid}/bin/labgrid-client -x ${lib.escapeShellArg cfg.coordinator.syncAddress} places >/dev/null; do
       ${pkgs.coreutils}/bin/sleep 1
@@ -117,7 +130,7 @@ in {
       enable = mkEnableOption "letting lab users relay a test API to the readers' LAN with an SSH reverse tunnel (CI runners are not on that LAN)";
       ports = mkOption {
         type = types.nonEmptyListOf types.port;
-        default = [ 20480 20481 ];
+        default = [ 20480 20481 20482 ];
         description = "The only ports the labgrid account may forward, one per test run at a time. The CI hardware tests run every reader type at once, counting up from the first port. Open them to the readers' LAN in the host firewall; the module opens no ports.";
       };
     };
@@ -129,13 +142,26 @@ in {
         description = ''Root-only JSON file {"ssid": "...", "password": "..."}. Provision it on the host, outside the Nix store.'';
       };
     };
+    readerSwitch = {
+      switches = mkOption {
+        type = types.attrsOf types.str;
+        default = { };
+        example = { attractap-touch-v2-1 = "attractap-touch-v2-1-power.fritz.box"; };
+        description = "Tasmota USB power switches in readers' cables, keyed by place, with each switch's host name or address. Tag those places `power=switch`. The host generates the switches' web password and sets it on a switch that has none; only root can read it.";
+      };
+      passwordFile = mkOption {
+        type = types.str;
+        default = "/var/lib/attractap-lab/reader-switch-password";
+        description = "Root-only file with the switches' web password, created on first use. Keep it outside the Nix store.";
+      };
+    };
     janitor = {
       enable = mkEnableOption "erasing and parking every reader as soon as it is released";
       images = mkOption {
         type = types.attrsOf types.path;
         default = { };
         example = lib.literalExpression ''{ "attractap-touch-v2" = ./attractap_touch_v2_park.bin; }'';
-        description = "Parking images keyed by place `variant` tag, built with `pnpm nx run attractap-firmware:build-lab`. Places whose variant has no image are not managed.";
+        description = "Parking images keyed by place `variant` tag, built with `pnpm nx run attractap-firmware:build-lab`. Places whose variant has no image are not managed. Places tagged `profile=secure-lab` (Secure Boot lab readers) need the lab-signed `.hex` image of a secure-lab park variant; the janitor writes it encrypted.";
       };
       priority = mkOption {
         type = types.ints.positive;
@@ -143,7 +169,7 @@ in {
         description = "Reservation priority; must exceed every client's (labgrid sessions use 0) so released readers are parked before anyone else gets them.";
       };
       maxParallel = mkOption { type = types.ints.positive; default = 2; description = "Readers parked at the same time."; };
-      attempts = mkOption { type = types.ints.positive; default = 3; description = "Failed parking attempts before a reader is quarantined."; };
+      attempts = mkOption { type = types.ints.positive; default = 3; description = "Failed parking attempts before a reader is quarantined. A reader on a place tagged power=switch or power=button is power-cycled before each retry (a button reader stays off for at least 30 s) and quarantined only after an attempt following a power cycle failed too."; };
       markerSeconds = mkOption { type = types.ints.positive; default = 30; description = "Time for the parking image to report ATTRACTAP_PARKED after flashing."; };
     };
     cameras = mkOption {
@@ -270,13 +296,44 @@ in {
       message = "services.attractap-lab.readerWifi needs the exporter on the same host.";
     } ];
     # Lab users run the command but cannot read the credentials it sends.
-    environment.systemPackages = [ readerWifiCommand ];
-    users.users.labgrid.packages = [ readerWifiCommand ];
+    # hiPrio: the package's unwrapped script of the same name must not win,
+    # as it did in root's PATH (it needs the root-only arguments).
+    environment.systemPackages = [ (lib.hiPrio readerWifiCommand) ];
+    users.users.labgrid.packages = [ (lib.hiPrio readerWifiCommand) ];
     security.sudo.extraRules = [ {
       users = [ "labgrid" ];
       commands = [ { command = "${readerWifiRoot}"; options = [ "NOPASSWD" ]; } ];
     } ];
     systemd.tmpfiles.rules = [ "d ${dirOf readerWifi.credentialsFile} 0700 root root -" ];
+  })
+  (mkIf (readerSwitch.switches != { }) {
+    assertions = [ {
+      assertion = cfg.coordinator.enable;
+      message = "services.attractap-lab.readerSwitch needs the coordinator on the same host (it checks who holds a place).";
+    } ];
+    # Lab users and the janitor switch readers but cannot read the password.
+    # hiPrio, as for readerWifi.
+    environment.systemPackages = [ (lib.hiPrio readerSwitchCommand) ];
+    users.users.labgrid.packages = [ (lib.hiPrio readerSwitchCommand) ];
+    security.sudo.extraRules = [ {
+      users = [ "labgrid" ];
+      commands = [ { command = "${readerSwitchRoot}"; options = [ "NOPASSWD" ]; } ];
+    } ];
+    systemd.tmpfiles.rules = [ "d ${dirOf readerSwitch.passwordFile} 0700 root root -" ];
+    # Locks a new or reset switch right away instead of at its first use. An
+    # unreachable switch must not fail the deployment; switching reports it.
+    systemd.services.attractap-lab-reader-switch-secure = {
+      description = "Set the lab's web password on reader power switches that have none";
+      wantedBy = [ "multi-user.target" ];
+      wants = [ "network-online.target" ];
+      after = [ "network-online.target" ];
+      restartTriggers = [ readerSwitches ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "-${readerSwitchRoot} secure";
+      };
+    };
   })
   (mkIf janitor.enable {
     systemd.services.attractap-lab-janitor = {
@@ -307,6 +364,10 @@ in {
         ] ++ lib.concatMap (variant: [ "--image" "${variant}=${janitor.images.${variant}}" ]) (lib.attrNames janitor.images));
         Restart = "always";
         RestartSec = 5;
+        # Stopping signals the janitor only: it stops each park child first, so
+        # a power-cycled reader is switched on again while labgrid's SSH
+        # connections (outside the child's process group) still work.
+        KillMode = "mixed";
       };
     };
   })

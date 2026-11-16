@@ -1,6 +1,8 @@
 import type { AttractapService } from '../attractap.service';
 import type { AttractapAuthHandler } from './handlers/auth/auth.handler';
 import type { AttractapBillingHandler } from './handlers/billing/billing.handler';
+import type { CardConversationFailure, CardConversationService } from './card-conversation.service';
+import type { CardDetectedRouter } from './card-detected.router';
 import type { AttractapCardHandler } from './handlers/card/card.handler';
 import type { AttractapCrashReportHandler } from './handlers/crash-report/crash-report.handler';
 import type { AttractapFirmwareHandler } from './handlers/firmware/firmware.handler';
@@ -30,6 +32,20 @@ export interface EventHandlerDeps {
   massIntroductionHandler: AttractapMassIntroductionHandler;
   resourceListService: ResourceListService;
   uiHandler: AttractapUiHandler;
+  cardConversations: CardConversationService;
+  cardDetectedRouter: CardDetectedRouter;
+  /** Tells a reader on firmware before 2.0.0 that the server offers it no card functions. */
+  requireFirmwareUpdate(
+    socket: AuthenticatedWebSocket,
+    replyType: AttractapEventType,
+    extra?: Record<string, unknown>,
+  ): Promise<void>;
+  onReaderSessionEnded(socket: AuthenticatedWebSocket, reason?: CardConversationFailure): void;
+  resetReaderConnectionState(
+    socket: AuthenticatedWebSocket,
+    readerId: number | null,
+    reason: CardConversationFailure,
+  ): void;
   rejectServerEvent(socket: AuthenticatedWebSocket, eventData: AttractapEvent['data']): never;
 }
 
@@ -37,25 +53,39 @@ export interface EventHandlerDeps {
 export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventType, AttractapEventHandler> {
   return {
     [AttractapEventType.READER_REGISTER]: (socket, eventData) => d.authHandler.handleReaderRegister(socket, eventData),
-    [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) =>
-      d.authHandler.handleAuthentication(socket, eventData),
+    [AttractapEventType.READER_AUTHENTICATE]: (socket, eventData) => {
+      // A new identity on this connection starts from nothing: no verified card, no armed flow.
+      d.resetReaderConnectionState(socket, socket.readerId, 'READER_SESSION_ENDED');
+      return d.authHandler.handleAuthentication(socket, eventData);
+    },
     [AttractapEventType.READER_FIRMWARE_INFO]: (socket, eventData) =>
       d.firmwareHandler.handleFirmwareInfo(socket, eventData),
     [AttractapEventType.READER_CRASH_REPORT]: (socket, eventData) =>
       d.crashReportHandler.handleCrashReport(socket, eventData),
-    [AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
-      d.cardHandler.handleCardAuthenticationRequest(socket, eventData),
+    // Card relay (ATT-1145): the reader announces a card and relays APDUs; the server runs the card crypto.
+    [AttractapEventType.CARD_DETECTED]: (socket, eventData) => d.cardDetectedRouter.route(socket, eventData),
+    [AttractapEventType.CARD_APDU_RESPONSE]: (socket, eventData) =>
+      d.cardConversations.handleResponse(socket, eventData.payload),
+    [AttractapEventType.CARD_REMOVED]: (socket, eventData) =>
+      d.cardConversations.handleRemoved(socket, eventData.payload),
+    [AttractapEventType.READER_SESSION_ENDED]: (socket) => d.onReaderSessionEnded(socket),
+    [AttractapEventType.CARD_APDU]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    [AttractapEventType.CARD_CONVERSATION_END]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
+    // Firmware < 2.0.0 asked the server for card keys and reported its own card checks. Neither is
+    // possible any more: tell the reader to update instead of failing the connection.
+    [AttractapEventType.REQUEST_CARD_AUTHENTICATION_DATA]: (socket) =>
+      d.requireFirmwareUpdate(socket, AttractapEventType.CARD_AUTHENTICATION_DATA),
     [AttractapEventType.SUPERVISION_REQUEST]: (socket, eventData) =>
       d.supervisionHandler.handleSupervisionRequest(socket, eventData),
-    [AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
-      d.supervisionHandler.handleSupervisorCardAuthRequest(socket, eventData),
-    [AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED]: (socket, eventData) =>
-      d.supervisionHandler.handleSupervisorCardAuthConfirmed(socket, eventData),
+    [AttractapEventType.REQUEST_SUPERVISOR_CARD_AUTHENTICATION_DATA]: (socket) =>
+      d.requireFirmwareUpdate(socket, AttractapEventType.SUPERVISOR_CARD_AUTHENTICATION_DATA),
+    [AttractapEventType.SUPERVISOR_CARD_AUTH_CONFIRMED]: (socket) =>
+      d.requireFirmwareUpdate(socket, AttractapEventType.SUPERVISION_RESOLVED, { success: false }),
     [AttractapEventType.SUPERVISION_CANCEL]: (socket) => d.supervisionHandler.handleSupervisionCancel(socket),
-    [AttractapEventType.REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA]: (socket, eventData) =>
-      d.massIntroductionHandler.handleCardAuthRequest(socket, eventData),
-    [AttractapEventType.MASS_INTRODUCTION_CARD_AUTH_CONFIRMED]: (socket, eventData) =>
-      d.massIntroductionHandler.handleCardAuthConfirmed(socket, eventData),
+    [AttractapEventType.REQUEST_MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA]: (socket) =>
+      d.requireFirmwareUpdate(socket, AttractapEventType.MASS_INTRODUCTION_CARD_AUTHENTICATION_DATA),
+    [AttractapEventType.MASS_INTRODUCTION_CARD_AUTH_CONFIRMED]: (socket) =>
+      d.requireFirmwareUpdate(socket, AttractapEventType.MASS_INTRODUCTION_RESULT, { success: false }),
     [AttractapEventType.MASS_INTRODUCTION_CANCEL]: (socket, eventData) =>
       d.massIntroductionHandler.handleCancel(socket, eventData),
     [AttractapEventType.START_RESOURCE_USAGE_SESSION]: (socket, eventData) =>
@@ -73,11 +103,11 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
       d.billingHandler.handleBillingRequestTopup(socket, eventData),
     [AttractapEventType.FIRMWARE_REQUEST_CHUNK]: (socket, eventData) =>
       d.firmwareHandler.handleFirmwareChunkRequest(socket, eventData),
-    [AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY]: (socket, eventData) =>
-      d.cardHandler.onEnrollNewCardRequestNFCKey(socket, eventData),
-    [AttractapEventType.ENROLL_NEW_CARD]: (socket, eventData) => d.cardHandler.onEnrollNewCard(socket, eventData),
+    [AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY]: (socket) =>
+      d.requireFirmwareUpdate(socket, AttractapEventType.ENROLL_NEW_CARD_REQUEST_NFC_KEY),
+    [AttractapEventType.ENROLL_NEW_CARD]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.ENROLL_NEW_CARD_CANCEL]: (socket) => d.cardHandler.onEnrollNewCardCancel(socket),
-    [AttractapEventType.RESET_NFC_CARD]: (socket, eventData) => d.cardHandler.onResetNfcCard(socket, eventData),
+    [AttractapEventType.RESET_NFC_CARD]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.RESET_NFC_CARD_CANCEL]: (socket) => d.cardHandler.onResetNfcCardCancel(socket),
     [AttractapEventType.PROJECTS_OF_USER]: (socket, eventData) =>
       d.projectsHandler.handleProjectsOfUserRequest(socket, eventData),
@@ -118,8 +148,10 @@ export function buildEventHandlers(d: EventHandlerDeps): Record<AttractapEventTy
     [AttractapEventType.UI_STEP_CANCEL]: (socket, eventData) => d.rejectServerEvent(socket, eventData),
     [AttractapEventType.UI_STEP_RESULT]: (socket, eventData) => d.uiHandler.handleStepResult(socket, eventData),
     [AttractapEventType.UI_RENDER_REPORT]: (socket, eventData) => d.uiHandler.handleRenderReport(socket, eventData),
-    [AttractapEventType.CARD_SESSION_ENDED]: (socket, eventData) =>
-      d.uiHandler.handleCardSessionEnded(socket, eventData),
+    [AttractapEventType.CARD_SESSION_ENDED]: (socket, eventData) => {
+      // The reader signed the verified user out itself: the same as READER_SESSION_ENDED.
+      if (d.uiHandler.handleCardSessionEnded(socket, eventData)) d.onReaderSessionEnded(socket);
+    },
     // Phase 7 (custom screens) is not implemented: messages of these types are dropped.
     [AttractapEventType.UI_SCREEN_OPEN]: () => undefined,
     [AttractapEventType.UI_SCREEN_CLOSE]: () => undefined,

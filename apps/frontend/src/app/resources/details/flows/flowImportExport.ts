@@ -18,12 +18,26 @@ export type FlowImportExportProps = {
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
   setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   resourceId?: number;
+  /** Set for global flows; names the export file after the flow. */
+  flowId?: number;
+  /**
+   * Returns the display names of imported nodes the flow cannot hold (for example a node that does not
+   * support global flows). An import with any of them is rejected as a whole, so nothing unsupported ever
+   * reaches the canvas or gets saved.
+   */
+  findUnsupportedNodes?: (nodes: ResourceFlowNodeDto[]) => string[];
   t: TranslationFn;
 };
 
 export const FLOW_EXPORT_VERSION = 1;
 
 export const INVALID_STRUCTURE_ERROR = 'invalidStructure';
+
+export class UnsupportedNodesError extends Error {
+  constructor(public readonly nodeNames: string[]) {
+    super('unsupportedNodes');
+  }
+}
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -136,15 +150,27 @@ export function parseFlowImport(raw: unknown): { nodes: ResourceFlowNodeDto[]; e
   return { nodes, edges };
 }
 
-export function useFlowImportExport({ nodes, edges, setNodes, setEdges, resourceId, t }: FlowImportExportProps) {
+export function useFlowImportExport({
+  nodes,
+  edges,
+  setNodes,
+  setEdges,
+  resourceId,
+  flowId,
+  findUnsupportedNodes,
+  t,
+}: FlowImportExportProps) {
   const toast = useToastMessage();
 
   const exportFileName = useMemo(() => {
+    if (flowId) {
+      return `global-flow-${flowId}.json`;
+    }
     if (resourceId) {
       return `resource-${resourceId}-flow.json`;
     }
     return 'resource-flow.json';
-  }, [resourceId]);
+  }, [resourceId, flowId]);
 
   const handleExport = useCallback(() => {
     try {
@@ -201,6 +227,11 @@ export function useFlowImportExport({ nodes, edges, setNodes, setEdges, resource
         const parsed = JSON.parse(text);
         const importedFlow = parseFlowImport(parsed);
 
+        const unsupported = findUnsupportedNodes?.(importedFlow.nodes) ?? [];
+        if (unsupported.length > 0) {
+          throw new UnsupportedNodesError(unsupported);
+        }
+
         setNodes(importedFlow.nodes as Node[]);
         setEdges(importedFlow.edges as Edge[]);
 
@@ -219,7 +250,10 @@ export function useFlowImportExport({ nodes, edges, setNodes, setEdges, resource
 
         toast.error({
           title: t('import.error.title'),
-          description: t(`import.errors.${errorKey}`),
+          description:
+            error instanceof UnsupportedNodesError
+              ? t('import.errors.unsupportedNodes', { nodes: [...new Set(error.nodeNames)].join(', ') })
+              : t(`import.errors.${errorKey}`),
         });
       } finally {
         cleanup();
@@ -239,7 +273,7 @@ export function useFlowImportExport({ nodes, edges, setNodes, setEdges, resource
 
     host.appendChild(input);
     input.click();
-  }, [setNodes, setEdges, t, toast]);
+  }, [setNodes, setEdges, findUnsupportedNodes, t, toast]);
 
   return {
     handleExport,

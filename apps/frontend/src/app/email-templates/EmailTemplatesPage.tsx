@@ -9,6 +9,7 @@ import {
   TableRow,
   TableCell,
   Button,
+  Chip,
 } from '@heroui/react';
 import { Edit3, Mail } from 'lucide-react';
 import { EmptyState, PageHeader, useTranslations } from '@attraccess/plugins-frontend-ui';
@@ -19,7 +20,7 @@ import de from './de.json';
 import { useCallback, useMemo } from 'react';
 
 export function EmailTemplatesPage() {
-  const { t } = useTranslations({ en, de });
+  const { t, language } = useTranslations({ en, de });
   const navigate = useNavigate();
   // The Email settings section — these editors are sub-routes of it and navigate to its siblings.
   const basePath = '/settings/email';
@@ -34,17 +35,27 @@ export function EmailTemplatesPage() {
   );
 
   const tableItems = useMemo(() => {
-    return (emailTemplates ?? []).map((item) => ({
+    const items = (emailTemplates ?? []).map((item) => ({
       key: item.type,
-      type: t(`templateTypes.${item.type}`),
+      pluginName: item.plugin?.name,
+      // Core templates are named by the app's own translations, plugin templates by the plugin's label.
+      type: item.plugin ? item.plugin.label[language === 'de' ? 'de' : 'en'] : t(`templateTypes.${item.type}`),
       subject: item.subject,
+    }));
+    // Core templates first, then each plugin's templates together under the plugin's name.
+    const core = items.filter((item) => !item.pluginName);
+    const fromPlugins = items
+      .filter((item) => item.pluginName)
+      .sort((a, b) => (a.pluginName as string).localeCompare(b.pluginName as string) || a.type.localeCompare(b.type));
+    return [...core, ...fromPlugins].map((item) => ({
+      ...item,
       actions: (
-        <Button variant="ghost" isIconOnly aria-label={t('editButton')} onPress={() => openEditor(item.type)}>
+        <Button variant="ghost" isIconOnly aria-label={t('editButton')} onPress={() => openEditor(item.key)}>
           <Edit3 size={18} />
         </Button>
       ),
     }));
-  }, [emailTemplates, t, openEditor]);
+  }, [emailTemplates, t, language, openEditor]);
 
   return (
     <>
@@ -66,7 +77,14 @@ export function EmailTemplatesPage() {
                   className="cursor-pointer hover:bg-primary-50 transition-colors duration-300"
                   onAction={() => openEditor(item.key)}
                 >
-                  <TableCell>{item.type}</TableCell>
+                  <TableCell>
+                    {item.type}
+                    {item.pluginName && (
+                      <Chip size="sm" variant="soft" className="ml-2" data-cy="email-template-plugin-chip">
+                        {t('pluginChip', { plugin: item.pluginName })}
+                      </Chip>
+                    )}
+                  </TableCell>
                   <TableCell>{item.subject}</TableCell>
                   <TableCell>{item.actions}</TableCell>
                 </TableRow>

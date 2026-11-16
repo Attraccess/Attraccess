@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import {
   AuthenticationDetail,
   AuthenticationType,
@@ -57,7 +58,13 @@ interface BuildOpts {
   currentPasswordHash?: string | null;
   history?: Array<{ id: number; passwordHash: string; userId: number; createdAt: Date }>;
   userId?: number;
-  user?: { id: number; username: string; email: string; passwordResetToken?: string | null };
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+    passwordResetToken?: string | null;
+    passwordResetTokenExpiresAt?: Date | null;
+  };
   isSSOUser?: boolean;
 }
 
@@ -68,6 +75,7 @@ async function buildController(opts: BuildOpts = {}) {
     username: 'jane',
     email: 'jane@example.com',
     passwordResetToken: 'hashed:reset-token-123',
+    passwordResetTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
   };
 
   const usersFindOne = jest.fn(async () => user);
@@ -104,6 +112,7 @@ async function buildController(opts: BuildOpts = {}) {
 
   const module: TestingModule = await Test.createTestingModule({
     providers: [
+      { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
       UserPasswordService,
       UserRegistrationService,
       SignupDomainService,

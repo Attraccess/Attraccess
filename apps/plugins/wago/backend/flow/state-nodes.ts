@@ -12,6 +12,7 @@ export function createWagoStateNodes(service: () => WagoFlowService): PluginFlow
       description: 'Start a flow when a channel reports state, a measurement, or a fault. Data is available in wago.',
       configSchema: WAGO_FLOW_PREVIEW_SCHEMA,
       isInput: true,
+      flowScopes: ['resource', 'global'],
       inputs: [],
       outputs: ['output'],
       resolveConfigSchema: (config, context) =>
@@ -24,6 +25,7 @@ export function createWagoStateNodes(service: () => WagoFlowService): PluginFlow
       description:
         'Read the latest channel state or measurement into wago. Unavailable data uses the unavailable output.',
       configSchema: WAGO_FLOW_PREVIEW_SCHEMA,
+      flowScopes: ['resource', 'global'],
       inputs: ['input'],
       outputs: ['output', 'unavailable'],
       resolveConfigSchema: (config, context) =>
@@ -40,6 +42,7 @@ export function createWagoStateNodes(service: () => WagoFlowService): PluginFlow
       label: 'WAGO wait for state',
       description: 'Wait for an available channel value to match, then continue with the value in wago.',
       configSchema: WAGO_FLOW_PREVIEW_SCHEMA,
+      flowScopes: ['resource', 'global'],
       inputs: ['input'],
       outputs: ['output', 'timeout'],
       resolveConfigSchema: (config, context) =>

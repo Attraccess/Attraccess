@@ -1,4 +1,5 @@
 # Aktualisierung
+<!-- llms-description: So prüfen Sie auf neue Attraccess-Versionen und aktualisieren mit Docker Compose, Docker oder Portainer oder legen eine feste Version fest. -->
 
 So aktualisieren Sie Attraccess auf die neueste Version.
 

@@ -273,12 +273,16 @@ int main()
         State::setWebsocketState(true, "reader.test", 80, false);
         const auto pump = [&](uint32_t duration = 60) {
             const auto end = millis() + duration;
+            unsigned iterations = 0;
             do
             {
                 application.loop();
                 lv_timer_handler();
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            } while (static_cast<int32_t>(end - millis()) > 0);
+                ++iterations;
+                // Always tick a few times: a loaded runner can otherwise swallow the whole window in
+                // one slow loop and leave a queued session event unprocessed.
+            } while (iterations < 4 || static_cast<int32_t>(end - millis()) > 0);
         };
         pump(2200); // boot screen
 

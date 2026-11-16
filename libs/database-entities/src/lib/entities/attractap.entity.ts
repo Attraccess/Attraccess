@@ -53,6 +53,18 @@ class AttractapCapabilities {
   })
   hasLeds!: boolean;
 
+  @Column({
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  @ApiProperty({
+    description:
+      'Whether the reader relays card APDUs to the server and holds no card keys (firmware 2.0.0 and later). Readers without it get no card functions.',
+    example: true,
+    default: false,
+  })
+  cardRelay!: boolean;
   @Column({ type: 'simple-json', nullable: true })
   @ApiProperty({
     description:
@@ -130,6 +142,21 @@ export class Attractap {
   @Column({ type: 'text', nullable: true })
   @ApiProperty({ description: 'SHA-256 fingerprint of the current reader public key', nullable: true })
   credentialFingerprint!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Secure Boot digest burned to KEY0 (signing key), hex', nullable: true })
+  secureBootDigest0!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({ description: 'Secure Boot digest burned to KEY1 (recovery key), hex', nullable: true })
+  secureBootDigest1!: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  @ApiProperty({
+    description: "Secure Boot digest of the key the server signs this reader's images with, hex",
+    nullable: true,
+  })
+  secureBootSignerDigest!: string | null;
 
   @Column({ type: 'datetime', nullable: true })
   @ApiProperty({ description: 'When the reader was paired', nullable: true })

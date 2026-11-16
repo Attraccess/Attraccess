@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Smoke test for the Attraccess fail2ban jail. Runs the upstream fail2ban
 # image against a synthetic log file containing N failed-login lines that match
-# the slice-D audit format, then asserts that the offending IP is banned via
+# the slice-D audit format, plus N failed verification-email resends from a
+# second IP, then asserts that both offending IPs are banned via
 # `fail2ban-client status attraccess-auth`.
 #
 # Designed to run on CI (GitHub Actions, ubuntu-latest). The jail action is
@@ -16,6 +17,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="crazymax/fail2ban:1.1.0"
 CONTAINER="attraccess-fail2ban-smoke"
 TEST_IP="10.99.0.42"
+RESEND_IP="10.99.0.43"
 MAXRETRY=5
 FAILURES=6
 TIMEOUT_S=60
@@ -40,9 +42,11 @@ TS="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
 for i in $(seq 1 "$FAILURES"); do
   printf 'auth.failed type=login outcome=invalid_credentials ip=%s user_id=- username=mallory ts=%s reason=bad_password\n' \
     "$TEST_IP" "$TS" >> "$LOG"
+  printf 'auth.failed type=verification_email_resend outcome=invalid_input ip=%s user_id=- username=- ts=%s reason=BadRequestException\n' \
+    "$RESEND_IP" "$TS" >> "$LOG"
 done
 
-echo "smoke: prepared ${FAILURES} failed-login lines for ${TEST_IP}"
+echo "smoke: prepared ${FAILURES} failed-login lines for ${TEST_IP} and ${FAILURES} failed-resend lines for ${RESEND_IP}"
 
 docker run -d --name "$CONTAINER" \
   --cap-add NET_ADMIN \
@@ -58,20 +62,20 @@ docker run -d --name "$CONTAINER" \
   --entrypoint /usr/local/bin/attraccess-fail2ban-entrypoint.sh \
   "$IMAGE" >/dev/null
 
-echo "smoke: container started, polling for ban (timeout ${TIMEOUT_S}s)"
+echo "smoke: container started, polling for bans (timeout ${TIMEOUT_S}s)"
 
 deadline=$(( $(date +%s) + TIMEOUT_S ))
 while [[ $(date +%s) -lt $deadline ]]; do
-  if docker exec "$CONTAINER" fail2ban-client status attraccess-auth 2>/dev/null \
-    | grep -q "$TEST_IP"; then
-    echo "smoke: PASS — ${TEST_IP} is banned"
+  status="$(docker exec "$CONTAINER" fail2ban-client status attraccess-auth 2>/dev/null || true)"
+  if grep -qF "$TEST_IP" <<<"$status" && grep -qF "$RESEND_IP" <<<"$status"; then
+    echo "smoke: PASS — ${TEST_IP} and ${RESEND_IP} are banned"
     docker exec "$CONTAINER" fail2ban-client status attraccess-auth
     exit 0
   fi
   sleep 1
 done
 
-echo "smoke: FAIL — ${TEST_IP} was not banned within ${TIMEOUT_S}s" >&2
+echo "smoke: FAIL — ${TEST_IP} and ${RESEND_IP} were not both banned within ${TIMEOUT_S}s" >&2
 echo "--- container state ---" >&2
 docker ps -a --filter "name=$CONTAINER" >&2 || true
 docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}' \

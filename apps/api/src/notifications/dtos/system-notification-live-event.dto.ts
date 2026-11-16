@@ -1,9 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { NotificationCategory } from '../notification-types';
+import { AnyNotificationCategory, NotificationCategory } from '../notification-types';
 
 export class SystemNotificationLiveEventDto {
-  @ApiProperty({ enum: NotificationCategory, enumName: 'NotificationCategory' })
-  category!: NotificationCategory;
+  @ApiProperty({
+    enum: NotificationCategory,
+    enumName: 'NotificationCategory',
+    description: 'Core category, or `plugin.<pluginName>.<id>` for plugin-declared categories',
+  })
+  category!: AnyNotificationCategory;
 
   @ApiProperty()
   title!: string;

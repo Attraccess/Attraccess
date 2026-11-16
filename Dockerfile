@@ -104,6 +104,10 @@ COPY --from=builder /app/dist dist
 COPY --from=builder /app/docs docs
 COPY --from=builder /app/deploy/api /app/dist/apps/api
 
+# Operator command to move stored card keys to a new AUTH_SESSION_SECRET (docs/en/settings/security.md).
+# Plain Node script; placed inside the API package so it resolves sqlite3 from the API's node_modules.
+COPY --from=builder /app/apps/api/scripts/reencrypt-card-keys.mjs /app/dist/apps/api/scripts/reencrypt-card-keys.mjs
+
 # Large controller assets are server-owned, never embedded in the 50 MiB npm
 # plugin package. Missing/mismatched assets fail the server image build.
 COPY --from=builder --chown=appuser:appuser /app/apps/plugins/wago/runtime-assets/cc100-build /app/share/cc100-runtime

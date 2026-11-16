@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
@@ -64,6 +65,7 @@ describe('Register flow + password policy (integration)', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         UserRegistrationService,
         SignupDomainService,
         PasswordPolicyService,
@@ -80,10 +82,52 @@ describe('Register flow + password policy (integration)', () => {
             }),
           },
         },
-        { provide: getRepositoryToken(PasswordPolicy), useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn((row) => row), save: jest.fn() } },
-        { provide: getRepositoryToken(PasswordHistory), useValue: { find: jest.fn(async () => []), save: jest.fn(), create: jest.fn((row) => row), createQueryBuilder: jest.fn(() => ({ delete: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), execute: jest.fn(async () => ({ affected: 0 })) })) } },
-        { provide: getRepositoryToken(PasswordPolicyOverride), useValue: { find: jest.fn(async () => []), findOne: jest.fn(async () => null), save: jest.fn(), create: jest.fn((row) => row), merge: jest.fn((a, b) => Object.assign(a, b)), delete: jest.fn(), remove: jest.fn() } },
-        { provide: DataSource, useValue: { transaction: jest.fn(async (cb: never) => (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({ getRepository: () => ({ findOne: jest.fn(), find: jest.fn(async () => []), save: jest.fn(), create: jest.fn(), remove: jest.fn() }) })) } },
+        {
+          provide: getRepositoryToken(PasswordPolicy),
+          useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn((row) => row), save: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(PasswordHistory),
+          useValue: {
+            find: jest.fn(async () => []),
+            save: jest.fn(),
+            create: jest.fn((row) => row),
+            createQueryBuilder: jest.fn(() => ({
+              delete: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              execute: jest.fn(async () => ({ affected: 0 })),
+            })),
+          },
+        },
+        {
+          provide: getRepositoryToken(PasswordPolicyOverride),
+          useValue: {
+            find: jest.fn(async () => []),
+            findOne: jest.fn(async () => null),
+            save: jest.fn(),
+            create: jest.fn((row) => row),
+            merge: jest.fn((a, b) => Object.assign(a, b)),
+            delete: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
+        {
+          provide: DataSource,
+          useValue: {
+            transaction: jest.fn(async (cb: never) =>
+              (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({
+                getRepository: () => ({
+                  findOne: jest.fn(),
+                  find: jest.fn(async () => []),
+                  save: jest.fn(),
+                  create: jest.fn(),
+                  remove: jest.fn(),
+                }),
+              }),
+            ),
+          },
+        },
         { provide: getRepositoryToken(AuthenticationDetail), useValue: { findOne: jest.fn(async () => null) } },
         {
           provide: UsersService,
@@ -173,6 +217,7 @@ describe('Register flow + password policy (integration)', () => {
     hibpCheck = jest.fn(async () => ({ pwned: true, count: 7, available: true }));
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         UserRegistrationService,
         SignupDomainService,
         PasswordPolicyService,
@@ -183,10 +228,52 @@ describe('Register flow + password policy (integration)', () => {
             evaluate: () => ({ score: 4, guessesLog10: 12, crackTimesSeconds: {}, warning: '', suggestions: [] }),
           },
         },
-        { provide: getRepositoryToken(PasswordPolicy), useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn(), save: jest.fn() } },
-        { provide: getRepositoryToken(PasswordHistory), useValue: { find: jest.fn(async () => []), save: jest.fn(), create: jest.fn((row) => row), createQueryBuilder: jest.fn(() => ({ delete: jest.fn().mockReturnThis(), where: jest.fn().mockReturnThis(), andWhere: jest.fn().mockReturnThis(), execute: jest.fn(async () => ({ affected: 0 })) })) } },
-        { provide: getRepositoryToken(PasswordPolicyOverride), useValue: { find: jest.fn(async () => []), findOne: jest.fn(async () => null), save: jest.fn(), create: jest.fn((row) => row), merge: jest.fn((a, b) => Object.assign(a, b)), delete: jest.fn(), remove: jest.fn() } },
-        { provide: DataSource, useValue: { transaction: jest.fn(async (cb: never) => (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({ getRepository: () => ({ findOne: jest.fn(), find: jest.fn(async () => []), save: jest.fn(), create: jest.fn(), remove: jest.fn() }) })) } },
+        {
+          provide: getRepositoryToken(PasswordPolicy),
+          useValue: { findOne: jest.fn(async () => policyRow()), create: jest.fn(), save: jest.fn() },
+        },
+        {
+          provide: getRepositoryToken(PasswordHistory),
+          useValue: {
+            find: jest.fn(async () => []),
+            save: jest.fn(),
+            create: jest.fn((row) => row),
+            createQueryBuilder: jest.fn(() => ({
+              delete: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              execute: jest.fn(async () => ({ affected: 0 })),
+            })),
+          },
+        },
+        {
+          provide: getRepositoryToken(PasswordPolicyOverride),
+          useValue: {
+            find: jest.fn(async () => []),
+            findOne: jest.fn(async () => null),
+            save: jest.fn(),
+            create: jest.fn((row) => row),
+            merge: jest.fn((a, b) => Object.assign(a, b)),
+            delete: jest.fn(),
+            remove: jest.fn(),
+          },
+        },
+        {
+          provide: DataSource,
+          useValue: {
+            transaction: jest.fn(async (cb: never) =>
+              (cb as unknown as (m: { getRepository: () => unknown }) => Promise<unknown>)({
+                getRepository: () => ({
+                  findOne: jest.fn(),
+                  find: jest.fn(async () => []),
+                  save: jest.fn(),
+                  create: jest.fn(),
+                  remove: jest.fn(),
+                }),
+              }),
+            ),
+          },
+        },
         { provide: getRepositoryToken(AuthenticationDetail), useValue: { findOne: jest.fn(async () => null) } },
         {
           provide: UsersService,
@@ -201,7 +288,14 @@ describe('Register flow + password policy (integration)', () => {
             validateUsernameOrThrow: jest.fn(),
           },
         },
-        { provide: AuthService, useValue: { addAuthenticationDetails: jest.fn(), generateEmailVerificationToken: jest.fn(), removeAuthenticationDetails: jest.fn() } },
+        {
+          provide: AuthService,
+          useValue: {
+            addAuthenticationDetails: jest.fn(),
+            generateEmailVerificationToken: jest.fn(),
+            removeAuthenticationDetails: jest.fn(),
+          },
+        },
         { provide: EmailService, useValue: { sendVerificationEmail: jest.fn() } },
         { provide: SSOService, useValue: { getProviderByTypeAndIdWithConfiguration: jest.fn() } },
         { provide: TokenHashService, useValue: { hashToken: (t: string) => `hashed:${t}` } },

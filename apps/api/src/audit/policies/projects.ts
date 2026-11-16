@@ -1,18 +1,18 @@
-import { ProjectAuditEvent } from './domain-events';
+import { PROJECT_AUDIT_ACTIONS } from './domains';
 import { dataFields, oneOf, positive, uuid } from './projection';
-export const projectActions = new Set<ProjectAuditEvent['action']>([
-  'project.created',
-  'project.updated',
-  'project.deleted',
-  'project.archived',
-  'project.unarchived',
-  'project.member.added',
-  'project.member.removed',
-  'project.invitation.sent',
-  'project.invitation.accepted',
-  'project.invitation.rejected',
-  'project.invitation.revoked',
-]);
+/** Projection input of a project-domain event. */
+export interface ProjectAuditInput {
+  action: (typeof PROJECT_AUDIT_ACTIONS)[number];
+  operationId: string;
+  actorId: number;
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
+  apiTokenId?: number;
+  subjectType: 'project' | 'project.member' | 'project.invitation';
+  subjectId: number;
+  details: Record<string, string | number>;
+}
+
+export const projectActions = new Set<ProjectAuditInput['action']>(PROJECT_AUDIT_ACTIONS);
 export const projectDetailFields = new Set([
   'projectId',
   'memberId',
@@ -62,7 +62,7 @@ export const projectDetailValidators: Record<string, (value: string | number) =>
 };
 
 /** Project administration snapshots intentionally exclude descriptions, email addresses, and invitation credentials. */
-export function projectProjectAuditEvent(input: ProjectAuditEvent): ProjectAuditEvent | null {
+export function projectProjectAuditEvent(input: ProjectAuditInput): ProjectAuditInput | null {
   if (
     !projectActions.has(input.action) ||
     !uuid(input.operationId) ||
@@ -76,9 +76,10 @@ export function projectProjectAuditEvent(input: ProjectAuditEvent): ProjectAudit
   if (
     (input.authenticationMethod !== undefined &&
       input.authenticationMethod !== 'session' &&
-      input.authenticationMethod !== 'api-token') ||
+      input.authenticationMethod !== 'api-token' &&
+      input.authenticationMethod !== 'mcp-oauth') ||
     (authenticationMethod === 'api-token' && !positive(input.apiTokenId)) ||
-    (authenticationMethod === 'session' && input.apiTokenId !== undefined)
+    (authenticationMethod !== 'api-token' && input.apiTokenId !== undefined)
   ) {
     return null;
   }

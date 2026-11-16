@@ -35,7 +35,7 @@ describe('ResourceHealthController', () => {
       user: { id: 4, authenticationMethod: 'api-token', apiTokenId: 8 },
     } as never);
     expect(service.clearEntry).toHaveBeenCalledWith(7, 42, {
-      actorId: 4,
+      id: 4,
       authenticationMethod: 'api-token',
       apiTokenId: 8,
     });

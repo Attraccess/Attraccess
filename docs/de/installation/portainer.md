@@ -1,4 +1,5 @@
 # Installation mit Portainer
+<!-- llms-description: Installation von Attraccess als Stack in Portainer, inklusive Umgebungsvariablen, Deployment, Ersteinrichtung und Stack-Update. -->
 
 Portainer ist eine grafische Verwaltungsoberfläche für Docker. Wenn Sie Portainer bereits nutzen, können Sie Attraccess bequem darüber installieren.
 

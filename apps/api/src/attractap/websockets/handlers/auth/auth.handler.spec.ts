@@ -1,3 +1,4 @@
+import { readerTimeZoneStub } from '../../reader-time-zone.test-fixture';
 import { AttractapGateway } from '../../websocket.gateway';
 import { WebsocketService } from '../../websocket.service';
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -26,7 +27,7 @@ describe('AttractapAuthHandler', () => {
   let mockAttractapService: { createNewReader: jest.Mock; findReaderById: jest.Mock };
   let mockResourceListService: { sendResourceListToSocket: jest.Mock };
   let mockMetricsService: { attractapReaderConnected: { set: jest.Mock } };
-  let mockAudit: { recordAttractap: jest.Mock };
+  let mockAudit: { record: jest.Mock };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -61,12 +62,13 @@ describe('AttractapAuthHandler', () => {
     mockMetricsService = {
       attractapReaderConnected: { set: jest.fn() },
     };
-    mockAudit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+    mockAudit = { record: jest.fn().mockResolvedValue(undefined) };
 
     (handler as any).attractapService = mockAttractapService;
     (handler as any).resourceListService = mockResourceListService;
     (handler as any).metricsService = mockMetricsService;
     (handler as any).audit = mockAudit;
+    (handler as any).readerTimeZone = readerTimeZoneStub();
     (handler as any).settingsService = { getDefaultLanguage: jest.fn().mockResolvedValue('de') };
     (handler as any).websocketService = new WebsocketService();
   });
@@ -75,10 +77,12 @@ describe('AttractapAuthHandler', () => {
     it.each([{ payload: { firmware: { name: 'attractap' } } }, { payload: {} }])(
       'creates nothing and sends no reply: readers join through pairing',
       async (data) => {
-        await expect(handler.handleReaderRegister(mockSocket as any, data as AttractapEvent['data'])).resolves.toBeUndefined();
+        await expect(
+          handler.handleReaderRegister(mockSocket as any, data as AttractapEvent['data']),
+        ).resolves.toBeUndefined();
 
         expect(mockAttractapService.createNewReader).not.toHaveBeenCalled();
-        expect(mockAudit.recordAttractap).not.toHaveBeenCalled();
+        expect(mockAudit.record).not.toHaveBeenCalled();
         expect(mockSocket.sendMessage).not.toHaveBeenCalled();
       },
     );
@@ -172,6 +176,15 @@ describe('AttractapAuthHandler', () => {
       );
     });
 
+    it('drops the previous reader zone state when reauthentication revokes the identity', async () => {
+      const forgetUnlessInUse = jest.fn();
+      (handler as any).readerTimeZone = { ...readerTimeZoneStub(), forgetUnlessInUse };
+      mockSocket.readerId = 99;
+      mockAttractapService.findReaderById.mockResolvedValueOnce(null);
+      await handler.handleAuthentication(mockSocket as any, data);
+      expect(forgetUnlessInUse).toHaveBeenCalledWith(99, mockSocket.id);
+    });
+
     it('keeps another authenticated connection marked online when revoking the old identity', async () => {
       mockSocket.readerId = 99;
       (handler as any).websocketService.sockets.set('other', { id: 'other', readerId: 99 });
@@ -244,11 +257,12 @@ describe('AttractapAuthHandler', () => {
             }),
           }),
         );
-        expect(mockAudit.recordAttractap).toHaveBeenCalledTimes(1);
-        expect(mockAudit.recordAttractap).toHaveBeenCalledWith(
+        expect(mockAudit.record).toHaveBeenCalledTimes(1);
+        expect(mockAudit.record).toHaveBeenCalledWith(
           expect.objectContaining({
-            action: 'reader.token_rejected',
-            subjectId: 42,
+            domain: 'attractap',
+            action: 'attractap.reader.token_rejected',
+            subject: expect.objectContaining({ id: 42 }),
             details: { reason: pairingState },
           }),
         );
@@ -279,7 +293,7 @@ describe('AttractapAuthHandler', () => {
       expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
     });
 
-    it('sets readerId, sends READER_AUTHENTICATED, and pushes the resource list on a valid token', async () => {
+    it('sets readerId and sends READER_AUTHENTICATED on a valid token, marking the reader as not paired', async () => {
       mockAttractapService.findReaderById.mockResolvedValue({
         id: 42,
         name: 'Reader A',
@@ -309,29 +323,168 @@ describe('AttractapAuthHandler', () => {
           }),
         }),
       );
+      // Signed in by token means not paired: no functions, and no resources to show.
+      expect(mockSocket.state.pairingRequired).toBe(true);
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+    });
+
+    it('signs a paired reader in by its certificate without the pairing gate and pushes the resource list', async () => {
+      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader A', pairingState: 'paired' });
+      mockSocket.state.pairingRequired = true;
+
+      await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(true);
+
+      expect(mockSocket.state.pairingRequired).toBe(false);
       expect(mockResourceListService.sendResourceListToSocket).toHaveBeenCalledWith(mockSocket);
     });
 
-    it('sends READER_AUTHENTICATED before pushing the resource list', async () => {
-      mockAttractapService.findReaderById.mockResolvedValue({
-        id: 42,
-        name: 'Reader A',
-        apiTokenHash: 'hashed',
-        pairingState: 'unpaired',
-      });
-      mockVerifyToken.mockResolvedValue(true);
+    it('does not sign a reader in by certificate that is no longer paired', async () => {
+      mockAttractapService.findReaderById.mockResolvedValue({ id: 42, name: 'Reader A', pairingState: 'revoked' });
 
-      const callOrder: string[] = [];
-      mockSocket.sendMessage.mockImplementation(async () => {
-        callOrder.push('sendMessage');
-      });
-      mockResourceListService.sendResourceListToSocket.mockImplementation(async () => {
-        callOrder.push('sendResourceList');
+      await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(false);
+
+      expect(mockSocket.readerId).toBeNull();
+      expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+    });
+
+    describe('reader time zone', () => {
+      const serverTime = { epochMs: Date.parse('2026-07-15T12:00:00Z'), utcOffsetMinutes: 540 };
+      let zones: {
+        resolve: jest.Mock;
+        serverTimeFor: jest.Mock;
+        resourceGeneration: jest.Mock;
+        forgetUnlessInUse: jest.Mock;
+      };
+
+      beforeEach(() => {
+        zones = {
+          resolve: jest.fn().mockResolvedValue('Asia/Tokyo'),
+          serverTimeFor: jest.fn(() => serverTime),
+          resourceGeneration: jest.fn(() => 3),
+          forgetUnlessInUse: jest.fn(),
+        };
+        (handler as any).readerTimeZone = { ...readerTimeZoneStub(), ...zones };
+        mockVerifyToken.mockResolvedValue(true);
       });
 
-      await handler.handleAuthentication(mockSocket as any, data);
+      const authenticated = () =>
+        mockSocket.sendMessage.mock.calls
+          .map(([message]) => message.data)
+          .filter((event) => event.type === AttractapEventType.READER_AUTHENTICATED);
 
-      expect(callOrder).toEqual(['sendMessage', 'sendResourceList']);
+      it('sends the offset of the reader zone on a token sign-in, resolved with the reader resources', async () => {
+        mockAttractapService.findReaderById.mockResolvedValue({
+          id: 42,
+          name: 'Reader A',
+          apiTokenHash: 'hashed',
+          pairingState: 'unpaired',
+          resources: [{ id: 3 }, { id: 1 }],
+        });
+
+        await handler.handleAuthentication(mockSocket as any, data);
+
+        // The generation is read before the lookup, so a reader update after it wins over the lookup's ids.
+        expect(zones.resourceGeneration.mock.invocationCallOrder[0]).toBeLessThan(
+          mockAttractapService.findReaderById.mock.invocationCallOrder[0],
+        );
+        expect(zones.resolve).toHaveBeenCalledWith(42, [3, 1], 3);
+        expect(zones.serverTimeFor).toHaveBeenCalledWith(42);
+        expect(authenticated()).toEqual([
+          expect.objectContaining({ payload: expect.objectContaining({ serverTime }) }),
+        ]);
+        // The sign-in lookup is the only one.
+        expect(mockAttractapService.findReaderById).toHaveBeenCalledTimes(1);
+        expect(mockSocket.state.signingIn).toBeUndefined();
+      });
+
+      it('sends the offset of the reader zone on a certificate sign-in, resolved with the reader resources', async () => {
+        mockAttractapService.findReaderById.mockResolvedValue({
+          id: 42,
+          name: 'Reader A',
+          pairingState: 'paired',
+          resources: [{ id: 5 }],
+        });
+
+        await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(true);
+
+        expect(zones.resolve).toHaveBeenCalledWith(42, [5], 3);
+        expect(authenticated()).toEqual([
+          expect.objectContaining({ payload: expect.objectContaining({ serverTime }) }),
+        ]);
+      });
+
+      it.each(['token', 'certificate'])(
+        'counts as signing in as the reader while the zone resolves (%s)',
+        async (path) => {
+          mockAttractapService.findReaderById.mockResolvedValue({
+            id: 42,
+            name: 'Reader A',
+            apiTokenHash: 'hashed',
+            pairingState: path === 'token' ? 'unpaired' : 'paired',
+            resources: [],
+          });
+          let during: unknown;
+          zones.resolve.mockImplementationOnce(async () => {
+            during = mockSocket.state.signingIn;
+            return null;
+          });
+
+          if (path === 'token') await handler.handleAuthentication(mockSocket as any, data);
+          else await handler.authenticateSessionReader(mockSocket as any, 42);
+
+          expect(during).toEqual({ readerId: 42, attempt: expect.any(Symbol) });
+          expect(mockSocket.state.signingIn).toBeUndefined();
+          expect(mockSocket.readerId).toBe(42);
+        },
+      );
+
+      it.each(['token', 'certificate'])(
+        'does not sign in by %s when the socket closes while the zone resolves, and lets go of the reader',
+        async (path) => {
+          mockAttractapService.findReaderById.mockResolvedValue({
+            id: 42,
+            name: 'Reader A',
+            apiTokenHash: 'hashed',
+            pairingState: path === 'token' ? 'unpaired' : 'paired',
+            resources: [],
+          });
+          zones.resolve.mockImplementationOnce(async () => {
+            mockSocket.readyState = WebSocket.CLOSED;
+            return 'Asia/Tokyo';
+          });
+
+          if (path === 'token') await handler.handleAuthentication(mockSocket as any, data);
+          else await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(false);
+
+          expect(mockSocket.readerId).toBeNull();
+          expect(mockSocket.state.signingIn).toBeUndefined();
+          expect(zones.forgetUnlessInUse).toHaveBeenCalledWith(42);
+          expect(zones.serverTimeFor).not.toHaveBeenCalled();
+          expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+          expect(mockMetricsService.attractapReaderConnected.set).not.toHaveBeenCalled();
+          expect(mockResourceListService.sendResourceListToSocket).not.toHaveBeenCalled();
+        },
+      );
+
+      it('lets a newer attempt win over one still resolving the zone', async () => {
+        mockAttractapService.findReaderById.mockResolvedValue({
+          id: 42,
+          name: 'Reader A',
+          pairingState: 'paired',
+          resources: [],
+        });
+        let finishResolve: (value: string) => void = () => undefined;
+        zones.resolve.mockImplementationOnce(() => new Promise((resolve) => (finishResolve = resolve)));
+        const older = handler.authenticateSessionReader(mockSocket as any, 42);
+        await new Promise((resolve) => setImmediate(resolve));
+        mockAttractapService.findReaderById.mockResolvedValue(null);
+        await expect(handler.authenticateSessionReader(mockSocket as any, 42)).resolves.toBe(false);
+        finishResolve('Asia/Tokyo');
+
+        await expect(older).resolves.toBe(false);
+        expect(mockSocket.readerId).toBeNull();
+        expect(mockSocket.sendMessage).not.toHaveBeenCalled();
+      });
     });
 
     it('does not send the unauthorized response on the happy path', async () => {

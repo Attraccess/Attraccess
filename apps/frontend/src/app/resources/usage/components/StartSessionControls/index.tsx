@@ -3,6 +3,7 @@ import { InsufficientBalanceModal } from './insufficientBalanceModal/index';
 import { DoorControls } from './DoorControls';
 import { MachineStartControls } from './MachineStartControls';
 import { SupervisedStartModal } from '../SupervisedStartModal/index';
+import { StartBlockedGate } from '../StartBlockedGate';
 import { useCallback, useState } from 'react';
 import {
   StartUsageSessionDto,
@@ -420,15 +421,19 @@ export function StartSessionControls(
             separateUnlockAndUnlatch={resource.separateUnlockAndUnlatch}
           />
         )}
+        {/* Plugins block session starts only (pre-start hook); door actions never pass that hook, so the door
+            controls stay outside the gate. Gating here means every call site gets it, the maintenance view too. */}
         {resource?.type === 'machine' && (
-          <MachineStartControls
-            t={t}
-            selectedProjectId={selectedProjectId}
-            onProjectChange={setSelectedProjectId}
-            onStart={() => void handleStartSession()}
-            onStartWithNotes={handleOpenStartSessionModal}
-            isStarting={startUsageSessionIsPending}
-          />
+          <StartBlockedGate resourceId={resourceId}>
+            <MachineStartControls
+              t={t}
+              selectedProjectId={selectedProjectId}
+              onProjectChange={setSelectedProjectId}
+              onStart={() => void handleStartSession()}
+              onStartWithNotes={handleOpenStartSessionModal}
+              isStarting={startUsageSessionIsPending}
+            />
+          </StartBlockedGate>
         )}
       </div>
 

@@ -1,4 +1,5 @@
 # Documentation
+<!-- llms-description: How to attach documentation to a resource so users can operate it safely, including documentation types and viewing them. -->
 
 Each resource in Attraccess can have documentation attached to help users understand how to operate it safely and correctly.
 

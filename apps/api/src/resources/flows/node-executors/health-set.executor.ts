@@ -9,6 +9,7 @@ import { get } from 'lodash-es';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { FlowExecutionError } from '../errors/flow-execution.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { requireRunResourceId } from './flow.utils';
 
 export class HealthSetExecutor implements NodeExecutor {
   constructor(private readonly resourceHealthService: ResourceHealthService) {}
@@ -42,7 +43,7 @@ export class HealthSetExecutor implements NodeExecutor {
     const reasonCandidate = reasonOverride ?? ctx.compileTemplate(parsed.data.reason ?? '', input);
 
     await this.resourceHealthService.reportHealth({
-      resourceId: node.resourceId,
+      resourceId: requireRunResourceId(node, ctx),
       identifier,
       status,
       reason: status === ResourceHealthStatus.UNHEALTHY ? reasonCandidate : null,

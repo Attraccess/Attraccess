@@ -1,4 +1,5 @@
 # Wartung
+<!-- llms-description: Wartung von Ressourcen mit manuellen Einträgen und automatisierten Wartungsplänen nachverfolgen, inklusive nötiger Berechtigungen. -->
 
 Attraccess hilft Ihnen, die Wartung Ihrer Ressourcen im Blick zu behalten. Sie können manuelle Wartungseinträge erstellen und automatisierte Wartungspläne einrichten, die auf Nutzung oder Zeit basieren.
 

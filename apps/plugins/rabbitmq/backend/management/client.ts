@@ -20,6 +20,12 @@ interface RabbitmqErrorBody {
   reason?: string;
 }
 
+// RabbitMQ answers a user that authenticated but lacks a tag or object access
+// with HTTP 401 and `{"error":"not_authorised","reason":"Not administrator user"}`
+// (or "User not authorised to access object"). A wrong password answers the same
+// status with the American spelling: `{"error":"not_authorized","reason":"Not_Authorized"}`.
+const MISSING_PRIVILEGE_ERROR = 'not_authorised';
+
 @Injectable()
 export class RabbitmqManagementClient {
   // Builds the management API base URL from the generic MQTT config (same
@@ -36,11 +42,12 @@ export class RabbitmqManagementClient {
     method: 'GET' | 'PUT' | 'DELETE',
     path: string,
     body?: unknown,
+    headers?: Readonly<Record<string, string>>,
   ): Promise<T> {
     const base = this.managementApiBase(config);
     let response: Response;
     try {
-      response = await managementRequest(config, `${base}/api${path}`, method, body, REQUEST_TIMEOUT_MS);
+      response = await managementRequest(config, `${base}/api${path}`, method, body, REQUEST_TIMEOUT_MS, headers);
     } catch (error) {
       throw new HttpException(
         `Cannot reach the RabbitMQ management API at ${base}: ${describeManagementError(error, REQUEST_TIMEOUT_MS)}`,
@@ -62,7 +69,9 @@ export class RabbitmqManagementClient {
     const upstream = await this.parseErrorBody(response);
     const reason = upstream?.reason || upstream?.error || '';
 
-    if (response.status === 401) {
+    const missingPrivilege = upstream?.error === MISSING_PRIVILEGE_ERROR;
+
+    if (response.status === 401 && !missingPrivilege) {
       return new HttpException(
         'The RabbitMQ management API rejected the configured MQTT server credentials (401). ' +
           'Check the username/password configured for this MQTT server.',
@@ -70,9 +79,9 @@ export class RabbitmqManagementClient {
       );
     }
 
-    if (response.status === 403 || /not.?authori[sz]ed/i.test(reason)) {
+    if (response.status === 403 || missingPrivilege || /not.?authori[sz]ed/i.test(reason)) {
       return new HttpException(
-        'The configured MQTT server user lacks management privileges on RabbitMQ. User management requires a user with the "administrator" tag.',
+        'The configured MQTT server user lacks management privileges on RabbitMQ. Viewing requires the "monitoring" tag; managing users and closing connections requires "administrator".',
         HttpStatus.BAD_GATEWAY,
       );
     }

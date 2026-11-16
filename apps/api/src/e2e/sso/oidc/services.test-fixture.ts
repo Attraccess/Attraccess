@@ -23,6 +23,7 @@ import { AuthService } from '../../../users-and-auth/auth/auth.service';
 import { SsoAccountResolver } from '../../../users-and-auth/auth/sso/account-resolution/sso-account-resolver.service';
 import { RbacService } from '../../../users-and-auth/rbac/rbac.service';
 import { UsersService } from '../../../users-and-auth/users/users.service';
+import { composeUsersService } from '../../../users-and-auth/users/fixtures/compose.test-fixture';
 export function createOidcTestServices(dataSource: DataSource) {
   // ── 3. Build real services backed by SQLite ───────────────────────────────
   const userRepo = dataSource.getRepository(User);
@@ -66,7 +67,7 @@ export function createOidcTestServices(dataSource: DataSource) {
 
   const tokenHashService = new TokenHashService(mockConfigService);
   const rbacService = new RbacService(userRoleRepo, roleRepo, permissionRepo);
-  const usersService = new UsersService(
+  const usersService = composeUsersService(
     userRepo,
     authDetailRepo,
     sessionRepo,

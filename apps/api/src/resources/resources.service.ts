@@ -1,4 +1,4 @@
-import { Resource, SupervisionMode } from '@attraccess/database-entities';
+import { Resource, ResourceFlowEdge, ResourceFlowNode, SupervisionMode } from '@attraccess/database-entities';
 
 import { Inject, Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 
@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { In, Repository, Brackets } from 'typeorm';
 
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../audit/recorder/audit-event';
 
 import { ResourceNotFoundException } from '../exceptions/resource.notFound.exception';
 
@@ -28,32 +28,17 @@ import { CreateResourceDto } from './dtos/createResource.dto';
 
 import { UpdateResourceDto } from './dtos/updateResource.dto';
 
+import { ResourceSessionLimitChangedEvent } from './events/resource-session-limit-changed.event';
+import { sessionLimitOf } from './usage/sessions/active-usage';
 import { ResourceChangedEvent } from './events/resource-changed.event';
 
-export const MAX_AUDIT_DETAILS_BYTES = 4096;
+import { AUDIT_DETAILS_BYTE_LIMIT, fitAuditText, fitAuditTexts } from '../audit/policies/projection';
 
-export function auditResourceName(name: string, maxJsonBytes: number): string {
-  if (Buffer.byteLength(JSON.stringify(name), 'utf8') <= maxJsonBytes) return name;
+export const MAX_AUDIT_DETAILS_BYTES = AUDIT_DETAILS_BYTE_LIMIT;
 
-  const suffix = '...';
-  let result = '';
-  for (const character of name) {
-    if (Buffer.byteLength(JSON.stringify(result + character + suffix), 'utf8') > maxJsonBytes) break;
-    result += character;
-  }
-  return result + suffix;
-}
+export const auditResourceName = fitAuditText;
 
-export function auditResourceNames(
-  names: Record<string, string>,
-  details: Record<string, string>,
-): Record<string, string> {
-  const emptyNames = Object.fromEntries(Object.keys(names).map((key) => [key, '']));
-  const availableBytes =
-    MAX_AUDIT_DETAILS_BYTES - Buffer.byteLength(JSON.stringify({ ...details, ...emptyNames }), 'utf8');
-  const maxJsonBytes = Math.floor(availableBytes / Object.keys(names).length);
-  return Object.fromEntries(Object.entries(names).map(([key, name]) => [key, auditResourceName(name, maxJsonBytes)]));
-}
+export const auditResourceNames = fitAuditTexts;
 
 export function resourceAuditSnapshot(resource: Resource) {
   return {
@@ -164,7 +149,7 @@ export class ResourcesService {
     @Inject(EventEmitter2)
     protected readonly eventEmitter: EventEmitter2,
     protected readonly metricsService: MetricsService,
-    protected readonly audit: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly audit: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(ResourcesService.name);
@@ -355,7 +340,7 @@ export class ResourcesService {
   async createResource(
     dto: CreateResourceDto,
     image?: FileUpload,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
   ): Promise<Resource> {
     // verifying usage limits
     const currentAmountOfResources = await this.resourceRepository.count();
@@ -408,12 +393,11 @@ export class ResourcesService {
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(resource.id));
     this.metricsService.resourcesTotal.inc();
     if (actor) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'resource.created',
-        actorId: actor.id,
-        authenticationMethod: actor.authenticationMethod,
-        apiTokenId: actor.apiTokenId,
-        subjectId: resource.id,
+        actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+        subject: { type: 'resource', id: resource.id },
         details: {
           ...auditResourceNames({ 'after.name': resource.name }, { 'after.type': resource.type }),
           'after.type': resource.type,
@@ -428,7 +412,7 @@ export class ResourcesService {
     id: number,
     dto: UpdateResourceDto,
     image?: FileUpload,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
   ): Promise<Resource> {
     const resource = await this.getResourceById(id);
     const before = resourceAuditSnapshot(resource);
@@ -454,16 +438,23 @@ export class ResourcesService {
 
     const updatedResource = await this.resourceRepository.save(resource);
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(updatedResource.id));
+    const previousLimit = sessionLimitOf(before);
+    const newLimit = sessionLimitOf(updatedResource);
+    if (previousLimit !== newLimit) {
+      this.eventEmitter.emit(
+        ResourceSessionLimitChangedEvent.EVENT_NAME,
+        new ResourceSessionLimitChangedEvent(updatedResource.id, previousLimit, newLimit, actor?.id ?? null),
+      );
+    }
     if (actor) {
       const details = resourceUpdateAuditDetails(before, updatedResource);
       if (Object.keys(details).length) {
-        await this.audit.recordResource({
+        await this.audit.record({
+          domain: 'resource',
           action: 'resource.updated',
-          actorId: actor.id,
-          authenticationMethod: actor.authenticationMethod,
-          apiTokenId: actor.apiTokenId,
-          subjectId: updatedResource.id,
-          details,
+          actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+          subject: { type: 'resource', id: updatedResource.id },
+          details: details,
         });
       }
     }
@@ -472,9 +463,16 @@ export class ResourcesService {
 
   async deleteResource(
     id: number,
-    actor?: { id: number; authenticationMethod?: 'session' | 'api-token'; apiTokenId?: number },
+    actor?: { id: number; authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth'; apiTokenId?: number },
   ): Promise<void> {
     const resource = actor ? await this.getResourceById(id) : undefined;
+    // A soft delete keeps the flow rows; the counts say what flow the resource had when it was deleted.
+    const [flowNodeCount, flowEdgeCount] = actor
+      ? await Promise.all([
+          this.resourceRepository.manager.count(ResourceFlowNode, { where: { resourceId: id } }),
+          this.resourceRepository.manager.count(ResourceFlowEdge, { where: { resourceId: id } }),
+        ])
+      : [0, 0];
     const result = await this.resourceRepository.softDelete(id);
     if (result.affected === 0) {
       throw new ResourceNotFoundException(id);
@@ -483,15 +481,23 @@ export class ResourcesService {
     this.eventEmitter.emit(ResourceChangedEvent.EVENT_NAME, new ResourceChangedEvent(id));
     this.metricsService.resourcesTotal.dec();
     if (actor && resource) {
-      await this.audit.recordResource({
+      await this.audit.record({
+        domain: 'resource',
         action: 'resource.deleted',
-        actorId: actor.id,
-        authenticationMethod: actor.authenticationMethod,
-        apiTokenId: actor.apiTokenId,
-        subjectId: id,
+        actor: { id: actor.id, authenticationMethod: actor.authenticationMethod, apiTokenId: actor.apiTokenId },
+        subject: { type: 'resource', id: id },
         details: {
-          ...auditResourceNames({ 'before.name': resource.name }, { 'before.type': resource.type }),
+          ...auditResourceNames(
+            { 'before.name': resource.name },
+            {
+              'before.type': resource.type,
+              flowNodeCount: String(flowNodeCount),
+              flowEdgeCount: String(flowEdgeCount),
+            },
+          ),
           'before.type': resource.type,
+          flowNodeCount,
+          flowEdgeCount,
         },
       });
     }

@@ -1,4 +1,5 @@
 # MQTT & IoT
+<!-- llms-description: Stellt MQTT und IoT vor: Nutzen mit Attraccess, Funktionsweise und Integration in Flows. -->
 
 MQTT ist ein leichtgewichtiges Nachrichtenprotokoll, das häufig in IoT-Anwendungen (Internet of Things) eingesetzt wird. Attraccess kann sich mit MQTT-Brokern verbinden, um Befehle und Statusmeldungen mit Maschinensteuerungen, Sensoren und anderen Geräten in Produktionsbetrieben und Laboren auszutauschen.
 

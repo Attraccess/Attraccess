@@ -27,17 +27,27 @@ export function MeterSetupNotice({ resourceId }: { resourceId: number }) {
   const { t } = useTranslations({ en, de });
   const { hasPermission } = useAuth();
   const { data: status } = useMeteringStatus(resourceId, true);
-  const incomplete = status?.meters.filter((meter) => meter.creditsPerUnit > 0 && !meter.configured) ?? [];
+  // A shared-needs-collect problem only matters for a meter that is split between sessions.
+  const problemsOf = (meter: NonNullable<typeof status>['meters'][number]) =>
+    meter.problems.filter((problem) => problem !== 'shared-needs-collect' || meter.allocation === 'shared');
+  const incomplete =
+    status?.meters.filter(
+      (meter) =>
+        (meter.creditsPerUnit > 0 && !meter.configured) ||
+        (meter.allocation === 'shared' && meter.problems.includes('shared-needs-collect')),
+    ) ?? [];
   if (!hasPermission('billing.manage') || !incomplete.length) return null;
+  // Sessions can still start when the only problem is a meter that cannot be split between them.
+  const sharingOnly = incomplete.every((meter) => problemsOf(meter).every((problem) => problem === 'shared-needs-collect'));
 
   return (
     <Alert status="warning" data-cy="meter-setup-notice">
       <AlertContent>
-        <AlertTitle>{t('setup.title')}</AlertTitle>
-        <AlertDescription>{t('setup.description')}</AlertDescription>
+        <AlertTitle>{t(sharingOnly ? 'setup.sharingTitle' : 'setup.title')}</AlertTitle>
+        <AlertDescription>{t(sharingOnly ? 'setup.sharingDescription' : 'setup.description')}</AlertDescription>
         <ul className="list-disc pl-4 text-sm">
           {incomplete.flatMap((meter) =>
-            meter.problems.map((problem) => (
+            problemsOf(meter).map((problem) => (
               <li key={`${meter.meterId}:${problem}`}>
                 {meter.name}: {t(`setup.problems.${problem}`)}
               </li>

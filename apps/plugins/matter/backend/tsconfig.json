@@ -8,8 +8,11 @@
     "emitDecoratorMetadata": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "strict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true
   },
   "include": ["**/*.ts"],
-  "exclude": ["**/*.spec.ts"]
+  "exclude": ["**/*.spec.ts", "**/*.test-utils.ts"]
 }

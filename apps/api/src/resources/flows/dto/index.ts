@@ -14,3 +14,5 @@ export {
   DEFAULT_RECORDING_MINUTES,
   MAX_RECORDING_MINUTES,
 } from './flow-log.dto';
+export { SharedMachineFlowWarningDto, SharedMachineFlowEffectNodeDto } from './shared-machine-flow-warning.dto';
+export { CreateGlobalFlowDto, UpdateGlobalFlowDto, GlobalFlowDto, GlobalFlowSummaryDto } from './global-flow.dto';

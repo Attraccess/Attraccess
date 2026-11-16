@@ -8,6 +8,8 @@ import { Observable } from 'rxjs';
 
 import { finalize } from 'rxjs/operators';
 
+import { auditActorOf } from '../../audit/recorder/audit-event';
+
 import { SseInstrumentation } from '../../metrics/instrumentation/sse/sse.helper';
 
 import {
@@ -17,6 +19,7 @@ import {
   ResolveResourceFlowNodeSchemaDto,
   ResourceFlowResponseDto,
   ResourceFlowSaveDto,
+  SharedMachineFlowWarningDto,
 } from './dto/index';
 
 import { FlowLogRecorderService, ResourceFlowLogEvent } from './logs/flow-log-recorder.service';
@@ -197,6 +200,25 @@ export class ResourceFlowsController {
     return await this.resourceFlowsService.getNodes(resourceId, ResourceFlowNodeType.INPUT_BUTTON);
   }
 
+  @Get('shared-machine-warnings')
+  @ApiOperation({
+    summary: 'Get flows that ignore the number of active sessions',
+    description:
+      'Lists the session start, stop and takeover triggers that lead to an external effect (HTTP, MQTT, PC lock/unlock, plugin outputs) without an IF node checking activeSessions. Relevant when several people may use the machine at the same time.',
+    operationId: 'getSharedMachineFlowWarnings',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Affected triggers retrieved successfully',
+    type: SharedMachineFlowWarningDto,
+    isArray: true,
+  })
+  async getSharedMachineFlowWarnings(
+    @Param('resourceId', ParseIntPipe) resourceId: number,
+  ): Promise<SharedMachineFlowWarningDto[]> {
+    return await this.resourceFlowsService.getSharedMachineFlowWarnings(resourceId);
+  }
+
   @Get('node-schemas')
   @ApiOperation({
     summary: 'Get node schemas',
@@ -330,7 +352,8 @@ export class ResourceFlowsController {
   async saveResourceFlow(
     @Param('resourceId', ParseIntPipe) resourceId: number,
     @Body() flowData: ResourceFlowSaveDto,
+    @Req() req: AuthenticatedRequest,
   ): Promise<ResourceFlowResponseDto> {
-    return await this.resourceFlowsService.saveResourceFlow(resourceId, flowData);
+    return await this.resourceFlowsService.saveResourceFlow(resourceId, flowData, auditActorOf(req.user));
   }
 }

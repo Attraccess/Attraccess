@@ -1,7 +1,7 @@
 import { Card } from '@heroui/react';
 import { emptyConfiguration, readMetadata } from './model';
 import { ConfigurationRevisions } from './ConfigurationRevisions';
-import { draftIdentity } from './ConfigurationEditor';
+import { draftIdentity } from './configurationSession';
 import { useConfigurationSessionState } from './useConfigurationSessionState';
 type Props = Pick<
   ReturnType<typeof useConfigurationSessionState>,

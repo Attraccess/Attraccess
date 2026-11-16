@@ -1,4 +1,4 @@
-import { AuditService } from '../audit/audit.service';
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 import 'reflect-metadata';
 import { Global, INestApplication, Module } from '@nestjs/common';
 import { EventEmitter2, EventEmitterModule } from '@nestjs/event-emitter';
@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import request from 'supertest';
 import { PluginService } from './plugin.service';
+import { PluginUninstallService } from './plugin-uninstall.service';
 import { PluginModule } from './plugin.module';
 import { LoadedPluginManifest } from './plugin.manifest';
 import { zipFileUpload } from './__test__/make-zip';
@@ -21,11 +22,11 @@ let hostDataSource: DataSource;
 @Global()
 @Module({
   providers: [
-    { provide: AuditService, useValue: { recordAdministration: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
+    { provide: AUDIT_RECORDER, useValue: { record: jest.fn().mockResolvedValue({ status: 'recorded' }) } },
     { provide: DataSource, useFactory: () => hostDataSource },
     { provide: 'POC_HOST_GREETER', useValue: { greet: () => 'hello from host' } },
   ],
-  exports: [AuditService, DataSource, 'POC_HOST_GREETER'],
+  exports: [AUDIT_RECORDER, DataSource, 'POC_HOST_GREETER'],
 })
 class HostModule {}
 
@@ -214,7 +215,7 @@ describe('Plugin system end-to-end (upload, load, endpoints, event round-trip, p
     const plugin = PluginService.getPlugins().find((p) => p.name === PLUGIN_NAME);
     expect(plugin).toBeDefined();
 
-    await new PluginService().deletePlugin((plugin as LoadedPluginManifest).id);
+    await new PluginUninstallService(new PluginService()).deletePlugin((plugin as LoadedPluginManifest).id);
 
     expect(existsSync(join(PLUGIN_PATH, PLUGIN_NAME))).toBe(false);
     expect(restartSpy).toHaveBeenCalledTimes(0);

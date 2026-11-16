@@ -1,6 +1,15 @@
 import { User, AuthenticationDetail, AuthenticationType, UserRole } from '@attraccess/database-entities';
 
-import { Brackets, FindOptionsWhere, ILike, In, Raw, SelectQueryBuilder, EntityManager } from 'typeorm';
+import {
+  Brackets,
+  DataSource,
+  FindOptionsWhere,
+  ILike,
+  In,
+  Repository,
+  SelectQueryBuilder,
+  EntityManager,
+} from 'typeorm';
 
 import { PaginationOptionsSchema } from '../../../types/request';
 
@@ -10,7 +19,9 @@ import { UserListOptions, UpdateUserData, FindOneOptionsSchema } from '../accoun
 
 import { AuthenticatedUser } from '@attraccess/plugins-backend-sdk';
 
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+
+import { InjectRepository } from '@nestjs/typeorm';
 
 import { isEmail } from 'class-validator';
 
@@ -23,8 +34,23 @@ import { UserNotFoundException } from '../../../exceptions/user.notFound.excepti
 import { SSOUsernameChangeForbiddenException } from '../errors/ssoUsernameChangeForbidden.exception';
 
 import { UserAccounts } from '../accounts/user-accounts';
+import { normalizeEmail } from '../accounts/normalize-email';
 
-export abstract class UserDirectory extends UserAccounts {
+import { EmailService } from '../../../email/email.service';
+
+/** Listing and searching users, and changes to an existing account's identity. */
+@Injectable()
+export class UserDirectory {
+  private readonly logger = new Logger('UsersService');
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly accounts: UserAccounts,
+    private readonly emailService: EmailService,
+    private readonly dataSource: DataSource,
+  ) {}
+
   /** Resolve the identifier accepted by local login without ambiguous username/email queries. */
   async findByLoginIdentifier(identifier: string): Promise<User | null> {
     const value = identifier.trim();
@@ -34,22 +60,7 @@ export abstract class UserDirectory extends UserAccounts {
     const parsed = FindOneOptionsSchema.safeParse(options);
     if (!parsed.success) return null;
 
-    if (parsed.data.email !== undefined) {
-      // Preserve distinct existing accounts whose addresses differ only by case.
-      const exactMatch = await this.userRepository.findOne({ where: { email: parsed.data.email } });
-      if (exactMatch) return exactMatch;
-
-      // Fall back only when case-insensitive matching identifies one account.
-      // Equality keeps underscores literal, unlike a LIKE query.
-      const matches = await this.userRepository.find({
-        where: {
-          email: Raw((alias) => `LOWER(${alias}) = :loginEmail`, { loginEmail: parsed.data.email.toLowerCase() }),
-        },
-        take: 2,
-      });
-      return matches.length === 1 ? matches[0] : null;
-    }
-    return this.findOne(parsed.data);
+    return this.accounts.findOne(parsed.data);
   }
 
   async findMany(options: UserListOptions): Promise<PaginatedResponse<User>> {
@@ -101,9 +112,12 @@ export abstract class UserDirectory extends UserAccounts {
         this.logger.debug(`Searching for users with query: ${search}`);
         query.andWhere(
           new Brackets((where) =>
-            where.where('LOWER(user.username) LIKE LOWER(:search)').orWhere('LOWER(user.email) LIKE LOWER(:search)'),
+            where
+              .where('LOWER(user.username) LIKE LOWER(:search)')
+              .orWhere('LOWER(user.email) LIKE :emailSearch'),
           ),
-          { search: `%${search}%` },
+          // SQLite LOWER() only folds ASCII, so fold the email term in JS like the stored value.
+          { search: `%${search}%`, emailSearch: `%${normalizeEmail(search)}%` },
         );
       }
 
@@ -125,7 +139,7 @@ export abstract class UserDirectory extends UserAccounts {
       this.logger.debug(`Searching for users with query: ${search}`);
       whereCondition = [
         { ...whereCondition, username: ILike(`%${search}%`) },
-        { ...whereCondition, email: ILike(`%${search}%`) },
+        { ...whereCondition, email: ILike(`%${normalizeEmail(search)}%`) },
       ];
     }
 
@@ -149,7 +163,7 @@ export abstract class UserDirectory extends UserAccounts {
     };
   }
 
-  protected applyRoleFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
+  private applyRoleFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
     const requestedRoleIds = options.roleIds ?? (options.roleId === undefined ? undefined : [options.roleId]);
     const roleIds = requestedRoleIds ? [...new Set(requestedRoleIds)] : undefined;
     if (roleIds?.length) {
@@ -179,7 +193,7 @@ export abstract class UserDirectory extends UserAccounts {
     }
   }
 
-  protected applySsoFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
+  private applySsoFilters(query: SelectQueryBuilder<User>, options: UserListOptions): void {
     const ssoProviderIds = options.ssoProviderIds ? [...new Set(options.ssoProviderIds)] : undefined;
     if (ssoProviderIds?.length || options.ssoProviderNone) {
       const noSsoProvider = query
@@ -255,13 +269,17 @@ export abstract class UserDirectory extends UserAccounts {
   }
 
   async updateOne(id: number, updateData: UpdateUserData, manager?: EntityManager): Promise<User> {
+    // An explicit null clears the column; undefined leaves it unchanged.
+    const trimOrNull = (value: string | null | undefined) => (value === null ? null : value?.trim());
     const updates: UpdateUserData = {
-      externalIdentifier: updateData.externalIdentifier?.trim() ?? undefined,
-      emailVerificationToken: updateData.emailVerificationToken?.trim() ?? undefined,
-      emailVerificationTokenExpiresAt: updateData.emailVerificationTokenExpiresAt ?? undefined,
+      externalIdentifier: trimOrNull(updateData.externalIdentifier),
+      emailVerificationToken: trimOrNull(updateData.emailVerificationToken),
+      emailVerificationTokenExpiresAt:
+        'emailVerificationTokenExpiresAt' in updateData ? updateData.emailVerificationTokenExpiresAt : undefined,
       isEmailVerified: updateData.isEmailVerified ?? undefined,
-      passwordResetToken: updateData.passwordResetToken?.trim() ?? undefined,
-      passwordResetTokenExpiresAt: updateData.passwordResetTokenExpiresAt ?? undefined,
+      passwordResetToken: trimOrNull(updateData.passwordResetToken),
+      passwordResetTokenExpiresAt:
+        'passwordResetTokenExpiresAt' in updateData ? updateData.passwordResetTokenExpiresAt : undefined,
       lockedUntil: 'lockedUntil' in updateData ? updateData.lockedUntil : undefined,
       failedLoginAttempts: updateData.failedLoginAttempts ?? undefined,
       firstFailedLoginAt: 'firstFailedLoginAt' in updateData ? updateData.firstFailedLoginAt : undefined,
@@ -275,7 +293,7 @@ export abstract class UserDirectory extends UserAccounts {
     await userRepo.update(id, updates);
 
     this.logger.debug(`Fetching updated user from database, ID: ${id}`);
-    const updatedUser = await this.findOne({ id }, undefined, manager);
+    const updatedUser = await this.accounts.findOne({ id }, undefined, manager);
     if (!updatedUser) {
       this.logger.error(`User not found after update, ID: ${id}`);
       throw new UserNotFoundException(id);
@@ -286,22 +304,22 @@ export abstract class UserDirectory extends UserAccounts {
   }
 
   async changeUsername(targetUserId: number, newUsername: string, executingUser: User): Promise<User> {
-    const isSSOUser = await this.isSSOUser(targetUserId);
+    const isSSOUser = await this.accounts.isSSOUser(targetUserId);
     if (isSSOUser) {
       throw new SSOUsernameChangeForbiddenException();
     }
 
-    newUsername = this.cleanupUsername(newUsername);
+    newUsername = this.accounts.cleanupUsername(newUsername);
     if (newUsername.length === 0) {
       throw new BadRequestException('Username cannot be empty');
     }
 
-    const targetUser = await this.findOne({ id: targetUserId });
+    const targetUser = await this.accounts.findOne({ id: targetUserId });
     if (!targetUser) {
       throw new UserNotFoundException(targetUserId);
     }
 
-    this.validateUsernameOrThrow(newUsername);
+    this.accounts.validateUsernameOrThrow(newUsername);
 
     const isSelf = executingUser.id === targetUserId;
     const canUpdateUsers = !!(executingUser as AuthenticatedUser).effectivePermissions?.has('users.update');
@@ -331,7 +349,7 @@ export abstract class UserDirectory extends UserAccounts {
       ...(lastUsernameChangeAt ? { lastUsernameChangeAt } : {}),
     });
 
-    const updated = await this.findOne({ id: targetUserId });
+    const updated = await this.accounts.findOne({ id: targetUserId });
     if (!updated) {
       throw new UserNotFoundException(targetUserId);
     }
@@ -345,15 +363,15 @@ export abstract class UserDirectory extends UserAccounts {
   }
 
   async changeEmail(targetUserId: number, newEmail: string, executingUser: User): Promise<User> {
-    const trimmedEmail = (newEmail ?? '').trim();
-    if (!trimmedEmail) {
+    const normalizedEmail = normalizeEmail(newEmail ?? '');
+    if (!normalizedEmail) {
       throw new BadRequestException('Email cannot be empty');
     }
-    if (!isEmail(trimmedEmail)) {
+    if (!isEmail(normalizedEmail)) {
       throw new BadRequestException('Invalid email');
     }
 
-    const targetUser = await this.findOne({ id: targetUserId });
+    const targetUser = await this.accounts.findOne({ id: targetUserId });
     if (!targetUser) {
       throw new UserNotFoundException(targetUserId);
     }
@@ -365,11 +383,11 @@ export abstract class UserDirectory extends UserAccounts {
       throw new ForbiddenException("You do not have permission to change this user's email");
     }
 
-    if (targetUser.email.trim() === trimmedEmail) {
+    if (normalizeEmail(targetUser.email) === normalizedEmail) {
       return targetUser;
     }
 
-    const existingEmail = await this.findOne({ email: trimmedEmail });
+    const existingEmail = await this.accounts.findOne({ email: normalizedEmail });
     if (existingEmail && existingEmail.id !== targetUserId) {
       throw new BadRequestException('Email already exists');
     }
@@ -382,13 +400,13 @@ export abstract class UserDirectory extends UserAccounts {
         const userRepo = manager.getRepository(User);
 
         await userRepo.update(targetUserId, {
-          email: trimmedEmail,
+          email: normalizedEmail,
           isEmailVerified: false,
           emailVerificationToken: token,
           emailVerificationTokenExpiresAt: expiresAt,
         });
 
-        const updated = await this.findOne({ id: targetUserId }, undefined, manager);
+        const updated = await this.accounts.findOne({ id: targetUserId }, undefined, manager);
         if (!updated) {
           throw new UserNotFoundException(targetUserId);
         }
@@ -397,7 +415,7 @@ export abstract class UserDirectory extends UserAccounts {
         return updated;
       });
     } catch (error) {
-      if (this.isEmailUniqueConstraintViolation(error)) {
+      if (this.accounts.isEmailUniqueConstraintViolation(error)) {
         throw new BadRequestException('Email already exists');
       }
       throw error;
@@ -405,7 +423,7 @@ export abstract class UserDirectory extends UserAccounts {
   }
 
   async changeBillingFactor(targetUserId: number, newBillingFactor: number): Promise<User> {
-    const targetUser = await this.findOne({ id: targetUserId });
+    const targetUser = await this.accounts.findOne({ id: targetUserId });
     if (!targetUser) {
       throw new UserNotFoundException(targetUserId);
     }
@@ -416,7 +434,7 @@ export abstract class UserDirectory extends UserAccounts {
 
     await this.userRepository.update(targetUserId, { billingFactor: newBillingFactor });
 
-    const updatedUser = await this.findOne({ id: targetUserId });
+    const updatedUser = await this.accounts.findOne({ id: targetUserId });
     if (!updatedUser) {
       throw new UserNotFoundException(targetUserId);
     }

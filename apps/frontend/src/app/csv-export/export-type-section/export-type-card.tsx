@@ -77,13 +77,7 @@ export function ExportTypeCard(props: Props) {
         )}
       </Card.Content>
       <Card.Footer>
-        <Button
-          variant="primary"
-          fullWidth
-          isDisabled={isDisabled}
-          onPress={onPress}
-          data-cy={dataCy + '-button'}
-        >
+        <Button variant="primary" fullWidth isDisabled={isDisabled} onPress={onPress} data-cy={dataCy + '-button'}>
           {ctaLabel}
           <ArrowRightIcon className="size-4" />
         </Button>

@@ -99,15 +99,15 @@ export function VerifyEmail() {
       return () => {
         cancelled = true;
       };
-    } else if (token !== null && email !== null) {
-      setError(t('apiErrors.invalidLink'));
-      didSendRequest.current = true;
+    } else {
+      // This effect reruns on every render; keep a resend error that is already showing.
+      setError((current) => current ?? t('apiErrors.invalidLink'));
     }
   }, [activateEmail, token, email, t]);
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center px-4 py-8">
         <Card className="max-w-md w-full" data-cy="verify-email-success-card">
           <Card.Header className="text-center">
             <h2 className="text-3xl font-bold">{t('success.title')}</h2>
@@ -177,19 +177,21 @@ export function VerifyEmail() {
           )}
 
           <div className="flex flex-col gap-2">
-            <Button
-              variant="primary"
-              className="w-full"
-              onPress={() => {
-                didSendRequest.current = false;
-                activateEmail();
-              }}
-              isPending={verifyEmail.isPending}
-              isDisabled={verifyEmail.isPending}
-              data-cy="verify-email-error-try-again-button"
-            >
-              {t('error.tryAgain')}
-            </Button>
+            {token && email && (
+              <Button
+                variant="primary"
+                className="w-full"
+                onPress={() => {
+                  didSendRequest.current = false;
+                  activateEmail();
+                }}
+                isPending={verifyEmail.isPending}
+                isDisabled={verifyEmail.isPending}
+                data-cy="verify-email-error-try-again-button"
+              >
+                {t('error.tryAgain')}
+              </Button>
+            )}
             <Button
               variant="outline"
               className="w-full"

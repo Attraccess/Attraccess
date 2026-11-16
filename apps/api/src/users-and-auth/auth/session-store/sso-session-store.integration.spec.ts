@@ -1,3 +1,4 @@
+import { AuditRecorder } from '../../../audit/recorder/audit-event';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -27,6 +28,7 @@ import { SqliteSessionStore } from './sqlite.session-store';
 import { ValkeySessionStore } from './valkey.session-store';
 import { TokenHashService } from '../../../encryption/token-hash.service';
 import { SSOService } from '../sso/sso.service';
+import { SessionPermissionSync } from '../sso/session-permission-sync';
 
 jest.setTimeout(90000);
 const hash = { hashToken: (token: string) => `hashed:${token}` } as TokenHashService;
@@ -191,6 +193,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
           hash,
           { authActiveSessions: { dec } } as unknown as MetricsService,
           {} as CronTimer,
+          { record: jest.fn() } as unknown as AuditRecorder,
         );
         let started: () => void;
         const preparing = new Promise<void>((resolve) => {
@@ -206,7 +209,6 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
             getCookieName: () => 'auth-session',
             clearAuthCookie: async () => undefined,
           } as unknown as CookieConfigService,
-          undefined,
           {
             returnURL: async () => 'https://app.example/',
             prepare: async () => {
@@ -216,7 +218,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
               return { kind: 'redirect', redirectUrl: 'https://idp.example/logout' };
             },
           } as unknown as SsoLogoutService,
-          undefined,
+          { syncIfDue: async () => 'skipped' } as SessionPermissionSync,
           approvedOrigins,
         );
         const request = {
@@ -258,6 +260,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
           hash,
           { authActiveSessions: { dec } } as unknown as MetricsService,
           {} as CronTimer,
+          { record: jest.fn() } as unknown as AuditRecorder,
         );
         let authenticated: () => void;
         const captured = new Promise<void>((resolve) => {
@@ -279,6 +282,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
           } as unknown as RbacService,
           { authenticate: async () => null } as unknown as ApiTokenService,
           {} as AuthAuditLogger,
+          { syncIfDue: async () => 'skipped' } as SessionPermissionSync,
         );
         const request = {
           headers: { authorization: 'Bearer original', origin: 'https://app.example' },
@@ -301,12 +305,11 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
             getCookieName: () => 'auth-session',
             clearAuthCookie: async () => undefined,
           } as unknown as CookieConfigService,
-          undefined,
           {
             returnURL: async () => 'https://app.example/',
             prepare: async () => ({ kind: 'local_only' }),
           } as unknown as SsoLogoutService,
-          undefined,
+          { syncIfDue: async () => 'skipped' } as SessionPermissionSync,
           approvedOrigins,
         );
         if (kind === 'local') await controller.endSession(request, {} as Response);
@@ -346,6 +349,7 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
         hash,
         { authActiveSessions: { dec } } as unknown as MetricsService,
         {} as CronTimer,
+        { record: jest.fn() } as unknown as AuditRecorder,
       );
       const getSession = store.getLogoutSession.bind(store);
       const capture = jest.spyOn(store, 'getLogoutSession').mockImplementationOnce(async (token) => {
@@ -427,6 +431,28 @@ for (const backend of ['SQLite', 'Valkey'] as const) {
       expect(results.filter((value) => value === 'target')).toHaveLength(1);
       expect(await store.putLogoutState('expired', 'target', Date.now() - 1000)).toBe(false);
       expect(await store.takeLogoutState('expired')).toBeNull();
+    });
+
+    it('keeps ephemeral state: insert-if-absent, readable without consuming, counters that expire', async () => {
+      const expiresAt = Date.now() + 60000;
+      expect(await store.getEphemeralState('eph')).toBeNull();
+      const puts = await Promise.all([
+        store.putEphemeralState('eph', 'x', expiresAt),
+        store.putEphemeralState('eph', 'y', expiresAt),
+      ]);
+      expect(puts.filter(Boolean)).toHaveLength(1);
+      expect(['x', 'y']).toContain(await store.getEphemeralState('eph'));
+      expect(await store.getEphemeralState('eph')).not.toBeNull();
+
+      const counts = await Promise.all([1, 2, 3].map(() => store.incrementEphemeralCounter('count', expiresAt)));
+      expect([...counts].sort()).toEqual([1, 2, 3]);
+      expect(await store.getEphemeralState('count')).toBe('3');
+
+      await store.incrementEphemeralCounter('short', Date.now() + 1000);
+      expect(await store.getEphemeralState('short')).toBe('1');
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      expect(await store.getEphemeralState('short')).toBeNull();
+      expect(await store.incrementEphemeralCounter('short', Date.now() + 60000)).toBe(1);
     });
 
     it('atomically records a logout receipt with revocation and protects new sessions from replay', async () => {

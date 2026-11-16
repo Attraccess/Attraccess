@@ -2,6 +2,7 @@ import {
   BillingTransaction,
   BillingTransactionItem,
   BillingTransactionStatus,
+  Flow,
   Project,
   Resource,
   ResourceFlowEdge,
@@ -10,6 +11,7 @@ import {
   ResourceFlowVariable,
   ResourceFlowVariableScope,
   ResourceMeteringOperation,
+  ResourceMeteringSegment,
   ResourceMeteringSession,
   ResourceMeter,
   ResourceMeteringSessionStatus,
@@ -58,6 +60,38 @@ export async function migrationFlowUsageSeeds(
     targetHandle: null,
     resourceId: flowNode.resourceId,
   }));
+
+  // A global flow with its own node and edge (flowId set, resourceId NULL).
+  const globalFlow = await ensureEntity(dataSource.getRepository(Flow), () => ({
+    name: `seed-flow-${seedTag}`,
+    description: null,
+    enabled: true,
+    scope: 'global' as const,
+  }));
+  const globalNodeId = `seed-global-node-${seedTag}`;
+  if (!(await flowNodeRepo.findOne({ where: { id: globalNodeId } }))) {
+    await flowNodeRepo.save(
+      flowNodeRepo.create({
+        id: globalNodeId,
+        type: ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STARTED,
+        position: { x: 20, y: 20 },
+        data: {},
+        flowId: globalFlow.id,
+        resourceId: null,
+      }),
+    );
+    await flowEdgeRepo.save(
+      flowEdgeRepo.create({
+        id: `seed-global-edge-${seedTag}`,
+        source: globalNodeId,
+        target: globalNodeId,
+        sourceHandle: null,
+        targetHandle: null,
+        flowId: globalFlow.id,
+        resourceId: null,
+      }),
+    );
+  }
 
   await ensureEntity(flowVariableRepo, () => ({
     scope: ResourceFlowVariableScope.RESOURCE,
@@ -139,6 +173,18 @@ export async function migrationFlowUsageSeeds(
     completedAt: new Date(),
     totalValue: '500000000',
     observedAt: new Date(),
+  }));
+
+  await ensureEntity(dataSource.getRepository(ResourceMeteringSegment), () => ({
+    id: `seed-metering-segment-${seedTag}`,
+    resourceId: resource.id,
+    meterId: meter.id,
+    status: 'closed' as const,
+    startedAt: new Date(Date.now() - 60_000),
+    endedAt: new Date(),
+    startValue: '1000000000',
+    endValue: '1500000000',
+    participants: [{ usageId: usage.id, creditsPerUnit: 30 }],
   }));
 
   const billingTransaction = await ensureEntity(billingTransactionRepo, () => ({

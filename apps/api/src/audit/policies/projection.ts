@@ -37,3 +37,28 @@ export const AUDIT_DETAILS_BYTE_LIMIT = 4096;
 
 export const withinDetailsLimit = (details: Record<string, unknown>): boolean =>
   Buffer.byteLength(JSON.stringify(details), 'utf8') <= AUDIT_DETAILS_BYTE_LIMIT;
+
+/** Shortens `text` with a "..." suffix so that its JSON form takes at most `maxJsonBytes` UTF-8 bytes. */
+export function fitAuditText(text: string, maxJsonBytes: number): string {
+  if (Buffer.byteLength(JSON.stringify(text), 'utf8') <= maxJsonBytes) return text;
+
+  const suffix = '...';
+  let result = '';
+  for (const character of text) {
+    if (Buffer.byteLength(JSON.stringify(result + character + suffix), 'utf8') > maxJsonBytes) break;
+    result += character;
+  }
+  return result + suffix;
+}
+
+/** Shortens free texts evenly so that they fit the details limit next to the `fixed` details. */
+export function fitAuditTexts(
+  texts: Record<string, string>,
+  fixed: Record<string, string | number>,
+): Record<string, string> {
+  const emptyTexts = Object.fromEntries(Object.keys(texts).map((key) => [key, '']));
+  const availableBytes =
+    AUDIT_DETAILS_BYTE_LIMIT - Buffer.byteLength(JSON.stringify({ ...fixed, ...emptyTexts }), 'utf8');
+  const maxJsonBytes = Math.floor(availableBytes / Object.keys(texts).length);
+  return Object.fromEntries(Object.entries(texts).map(([key, text]) => [key, fitAuditText(text, maxJsonBytes)]));
+}

@@ -2,6 +2,8 @@
 #include "supervisionScreen.hpp"
 #include "../../theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
+#include "../../shared/resultLayout.hpp"
+#include "../../shared/screenChrome.hpp"
 #include <string>
 #include <functional>
 
@@ -19,11 +21,9 @@ void SupervisionScreen::init()
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
    DisplayTheme::applyScreen(this->screen);
-   lv_obj_set_style_pad_left(this->screen, 24, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_right(this->screen, 24, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_top(this->screen, 18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(this->screen, 18, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_row(this->screen, 14, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // Clear of the chrome; long names and messages end in dots after their lines.
+   ScreenChrome::applyInsets(this->screen);
+   lv_obj_set_style_pad_row(this->screen, 12, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Countdown bar — full width.
    this->timeoutBar = lv_bar_create(this->screen);
@@ -49,33 +49,15 @@ void SupervisionScreen::init()
    lv_obj_set_style_text_font(title, &attractap_font_montserrat_latin1_28, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    // Requester — the person who wants to use the resource. Most prominent line.
-   this->requesterNameLabel = lv_label_create(this->screen);
-   lv_obj_set_width(this->requesterNameLabel, lv_pct(100));
-   lv_obj_set_height(this->requesterNameLabel, LV_SIZE_CONTENT);
-   lv_label_set_long_mode(this->requesterNameLabel, LV_LABEL_LONG_WRAP);
    const char *initialName = this->view.requesterName.length() > 0 ? this->view.requesterName.c_str() : "...";
-   FirmwareI18n::setDynamicLabel(this->requesterNameLabel, initialName) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */;
-   lv_obj_set_style_text_align(this->requesterNameLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_color(this->requesterNameLabel, DisplayTheme::text(), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(this->requesterNameLabel, &attractap_font_montserrat_latin1_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->requesterNameLabel = ResultLayout::createText(this->screen, FirmwareI18n::Text::literal(initialName) /* i18n-data: Supplied cardholder or resource name (including the neutral empty-name display); preserve exact contents. */,
+                                                       &attractap_font_montserrat_latin1_36, DisplayTheme::text(), 2);
 
    // Status line — colour + text reflect the current supervision phase.
-   this->statusLabel = lv_label_create(this->screen);
-   lv_obj_set_width(this->statusLabel, lv_pct(100));
-   lv_obj_set_height(this->statusLabel, LV_SIZE_CONTENT);
-   lv_label_set_long_mode(this->statusLabel, LV_LABEL_LONG_WRAP);
-   lv_obj_set_style_text_align(this->statusLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->statusLabel, &attractap_font_montserrat_latin1_28, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->statusLabel = ResultLayout::createText(this->screen, FirmwareI18n::Text(), &attractap_font_montserrat_latin1_28, DisplayTheme::text(), 2);
 
    // Secondary hint — who may approve + the web fallback note.
-   this->hintLabel = lv_label_create(this->screen);
-   lv_obj_set_width(this->hintLabel, lv_pct(100));
-   lv_obj_set_height(this->hintLabel, LV_SIZE_CONTENT);
-   lv_label_set_long_mode(this->hintLabel, LV_LABEL_LONG_WRAP);
-   FirmwareI18n::setLabel(this->hintLabel, this->view.supervisorHint);
-   lv_obj_set_style_text_align(this->hintLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_color(this->hintLabel, DisplayTheme::muted(), LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_text_font(this->hintLabel, &attractap_font_montserrat_latin1_18, LV_PART_MAIN | LV_STATE_DEFAULT);
+   this->hintLabel = ResultLayout::createText(this->screen, this->view.supervisorHint, &attractap_font_montserrat_latin1_18, DisplayTheme::muted(), 3);
 
    // Cancel button — lets the user abort the supervised start.
    this->cancelButton = lv_button_create(this->screen);
@@ -98,6 +80,8 @@ void SupervisionScreen::init()
 
    this->updateTimeoutBar();
    this->applyStatus();
+   // Size the texts now: their dot truncation needs the laid-out height.
+   if (this->screen) lv_obj_update_layout(this->screen);
 }
 
 lv_obj_t *SupervisionScreen::getScreen()
@@ -119,6 +103,8 @@ void SupervisionScreen::render(const View &view)
    }
    this->updateTimeoutBar();
    this->applyStatus();
+   // Size the texts now: their dot truncation needs the laid-out height.
+   if (this->screen) lv_obj_update_layout(this->screen);
 }
 
 void SupervisionScreen::setOnCancelCallback(std::function<void()> callback)

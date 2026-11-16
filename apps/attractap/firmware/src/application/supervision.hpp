@@ -49,11 +49,8 @@ private:
     struct Event {
         EventType type;
         bool success;
-        uint8_t keyNo;
-        uint8_t keyLen;
         uint8_t cardUid[7];
         uint8_t cardUidLength;
-        uint8_t keyBytes[16];
         uint8_t supervisorCount;
         char error[64];
         char requesterName[64];
@@ -79,15 +76,14 @@ private:
     bool webInitiated = false;
     bool pendingWebStart = false;
     bool cardDetected = false;
-    bool keyReady = false;
+    // The server authenticated the supervisor card through the relay.
+    bool cardVerified = false;
     bool cardRejected = false;
     TerminalEvent terminalEvent = TerminalEvent::None;
     bool errorIsTerminal = false;
     bool hintReady = false;
     uint8_t cardUid[7] = {0};
     uint8_t cardUidLength = 0;
-    uint8_t keyNo = 0;
-    uint8_t keyBytes[16] = {0};
     FirmwareI18n::Text errorMessage;
     FirmwareI18n::Text hintMessage;
     char requesterName[64] = {0};

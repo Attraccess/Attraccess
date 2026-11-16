@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FeatureFamily } from './constants';
+import { FeatureFamily, MAX_BACKUP_BODY_BYTES } from './constants';
 import { capabilityReportSchema } from './capabilities';
 import * as f from './families';
 
@@ -17,6 +17,14 @@ export type OperationDefinition = {
   response: z.ZodType;
   /** Physical effects: a timeout is reported as `uncertain` and is never retried automatically. */
   physical?: boolean;
+  /** Own request body limit in bytes; the sidecar's general message limit applies when absent. */
+  bodyLimitBytes?: number;
+  /** Carries fabric secrets: the sidecar refuses it on plain HTTP to a non-loopback address. */
+  secretsOnWire?: true;
+  /** Changes the fabric: refused while a snapshot or restore is in progress. */
+  fabricMutating?: true;
+  /** Served without the service token: the container probes, which reveal no versions. */
+  anonymous?: true;
 };
 
 /** `const T` keeps each `id` a string literal so `OperationId` is a union of the real operation IDs. */
@@ -29,6 +37,7 @@ const DEFINITIONS = [
     method: 'GET',
     path: '/health/live',
     versioned: false,
+    anonymous: true,
     summary: 'Liveness',
     response: f.liveResponseSchema,
   }),
@@ -38,6 +47,7 @@ const DEFINITIONS = [
     method: 'GET',
     path: '/health/ready',
     versioned: false,
+    anonymous: true,
     summary: 'Readiness',
     response: f.readyResponseSchema,
   }),
@@ -78,6 +88,7 @@ const DEFINITIONS = [
     body: f.fabricCreateRequestSchema,
     response: f.fabricStatusSchema,
     physical: true,
+    fabricMutating: true,
   }),
   op({
     id: 'commissioning.start',
@@ -192,9 +203,91 @@ const DEFINITIONS = [
     params: f.otaParamsSchema,
     response: f.otaUpdateSchema,
   }),
+  op({
+    id: 'backup.snapshot',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/snapshot',
+    versioned: true,
+    summary: 'Take a consistent snapshot of the sidecar storage',
+    body: f.backupSnapshotRequestSchema,
+    response: f.backupSnapshotSchema,
+    bodyLimitBytes: MAX_BACKUP_BODY_BYTES,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.stage',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/stage',
+    versioned: true,
+    summary: 'Stage and validate a snapshot without touching live storage',
+    body: f.backupStageRequestSchema,
+    response: f.backupStageSchema,
+    bodyLimitBytes: MAX_BACKUP_BODY_BYTES,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.commit',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/commit',
+    versioned: true,
+    summary: 'Swap the staged storage in, keep the previous one as a rollback copy, then verify',
+    body: f.backupStageIdSchema,
+    response: f.backupRestoreResultSchema,
+    physical: true,
+    fabricMutating: true,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.rollback',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/rollback',
+    versioned: true,
+    summary: 'Swap the rollback copy of the previous storage back in',
+    body: f.backupStageIdSchema,
+    response: f.backupRestoreResultSchema,
+    physical: true,
+    fabricMutating: true,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.finalize',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/finalize',
+    versioned: true,
+    summary: 'Delete the rollback copy once the plugin has committed too',
+    body: f.backupStageIdSchema,
+    response: f.backupRestoreResultSchema,
+    secretsOnWire: true,
+  }),
+  op({
+    id: 'backup.restore.abort',
+    family: 'backup',
+    method: 'POST',
+    path: '/v1/backup/restore/abort',
+    versioned: true,
+    summary: 'Discard staged data',
+    body: f.backupStageIdSchema,
+    response: f.backupRestoreResultSchema,
+    secretsOnWire: true,
+  }),
 ];
 
 export type OperationId = (typeof DEFINITIONS)[number]['id'];
+/** The definition of one operation, with its exact schemas. */
+export type OperationById<Id extends OperationId> = Extract<(typeof DEFINITIONS)[number], { id: Id }>;
+/** What a successful call returns, after validation. */
+export type OperationResponse<Id extends OperationId> = z.infer<OperationById<Id>['response']>;
+/** The path parameters, or `undefined` for an operation without any. */
+export type OperationParams<Id extends OperationId> =
+  OperationById<Id> extends { params: infer Schema extends z.ZodType } ? z.input<Schema> : undefined;
+/** The request body before validation, or `undefined` for an operation without one. */
+export type OperationBody<Id extends OperationId> =
+  OperationById<Id> extends { body: infer Schema extends z.ZodType } ? z.input<Schema> : undefined;
 export type TypedOperation = OperationDefinition & { id: OperationId };
 export const OPERATIONS: readonly TypedOperation[] = DEFINITIONS;
 

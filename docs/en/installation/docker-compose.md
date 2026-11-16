@@ -1,4 +1,5 @@
 # Installation with Docker Compose
+<!-- llms-description: Recommended production installation of Attraccess with Docker Compose, including project directory, environment variables and first start. -->
 
 This guide describes the recommended installation of Attraccess for production use.
 

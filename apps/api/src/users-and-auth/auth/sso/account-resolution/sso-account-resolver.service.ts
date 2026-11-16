@@ -60,6 +60,7 @@ export class SsoAccountResolver {
     private readonly usersService: UsersService,
     private readonly authService: AuthService,
     private readonly dataSource: DataSource,
+    // optional: extension point; without a hook, defaultSsoProvisioningHook keeps the standard create-on-first-login rule
     @Optional()
     @Inject(SSO_PROVISIONING_HOOK)
     private readonly provisioningHook: SsoProvisioningHook = defaultSsoProvisioningHook,

@@ -40,6 +40,15 @@ public:
 
     bool found() const { return dev != nullptr; }
 
+    // Register reads since boot (all instances), for the lab test hooks: a
+    // controller that answers keeps `ok` growing while LVGL polls it.
+    struct Stats
+    {
+        uint32_t ok;
+        uint32_t failed;
+    };
+    static Stats stats();
+
 private:
     static constexpr uint16_t REG_PRODUCT_ID = 0x8140;
     static constexpr uint16_t REG_STATUS = 0x814E;

@@ -5,13 +5,16 @@ import {
   type CapabilityReport,
   type FeatureFamily,
 } from '@attraccess/matter-contract';
-import { createServer, type Server } from 'node:http';
+import { createServer, type RequestListener, type Server } from 'node:http';
+import { createServer as createSecureServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
+import { TokenAuthenticator } from './auth';
 import type { SidecarConfig } from './config';
 import { EventStream } from './event-stream';
 import { correlationIdFrom, sendError } from './http-utils';
 import { createLogger, type Logger } from './logger';
-import { loadMatterPlatform, type MatterPlatform } from './matter-platform';
+import { fabricHandlers } from './fabric/handlers';
+import { loadMatterPlatform, type MatterPlatform, type PlatformContext } from './matter-platform';
 import { handleRequest, type FeatureHandlers, type PipelineDeps } from './request-pipeline';
 import { SIDECAR_VERSION, versionInfo } from './version';
 import { WebSocketHub } from './websocket-hub';
@@ -21,7 +24,7 @@ export type SidecarOptions = {
   logger?: Logger;
   /** Simulated or real feature handlers, keyed by operation ID. Families without a handler are unavailable. */
   features?: FeatureHandlers;
-  loadPlatform?: () => Promise<MatterPlatform>;
+  loadPlatform?: (context: PlatformContext) => Promise<MatterPlatform>;
   now?: () => number;
   commit?: string;
 };
@@ -65,6 +68,7 @@ export function createSidecar(options: SidecarOptions): Sidecar {
   /** The startup in progress, if any. A stop() that overlaps it waits for it, so the platform is closed before stop resolves. */
   let starting: Promise<unknown> | null = null;
   const running = { sidecar: SIDECAR_VERSION, matterJs: '' };
+  const auth = new TokenAuthenticator(config.authTokens, logger);
 
   const readiness = () => {
     const status = state.draining ? 'draining' : state.ready ? 'ready' : 'starting';
@@ -78,7 +82,7 @@ export function createSidecar(options: SidecarOptions): Sidecar {
           transport: state.transport,
           shuttingDown: state.draining,
         },
-        fabric: { state: 'uninitialized' as const },
+        fabric: { state: platform?.fabric?.status().state ?? ('uninitialized' as const) },
       },
     };
   };
@@ -87,6 +91,7 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     config,
     running,
     logger,
+    auth,
     isDraining: () => state.draining,
     features,
     builtIns: {
@@ -121,17 +126,27 @@ export function createSidecar(options: SidecarOptions): Sidecar {
   }
 
   async function startUnsafe() {
-    const loaded = await (options.loadPlatform ?? loadMatterPlatform)();
+    const loaded = await (options.loadPlatform ?? loadMatterPlatform)({
+      config,
+      logger,
+      onFabricChanged: (payload) => stream.publish('fabric.changed', payload),
+    });
     if (state.draining) {
       // stop() ran while this platform was loading and never saw it; it waits for this start, so close it here.
       await loaded.close();
       assertNotStopping();
     }
     platform = loaded;
+    // Explicit handlers win, so tests can still simulate features. Families without a handler stay unavailable.
+    if (loaded.fabric) {
+      for (const [id, handler] of Object.entries(fabricHandlers(loaded.fabric))) {
+        (features as Record<string, unknown>)[id] ??= handler;
+      }
+    }
     running.matterJs = loaded.version;
     state.matterPlatform = true;
-    hub = new WebSocketHub(config, stream, running, () => state.draining, logger);
-    server = createServer((req, res) => {
+    hub = new WebSocketHub(config, stream, running, () => state.draining, logger, auth);
+    const onRequest: RequestListener = (req, res) => {
       req.on('error', () => undefined);
       res.on('error', () => undefined);
       handleRequest(req, res, deps).catch(() => {
@@ -139,7 +154,10 @@ export function createSidecar(options: SidecarOptions): Sidecar {
         logger('error', 'request failed', { correlationId });
         sendError(res, { code: 'internal_error', message: 'The request failed.' }, correlationId);
       });
-    });
+    };
+    server = config.tls
+      ? createSecureServer({ cert: config.tls.cert, key: config.tls.key }, onRequest)
+      : createServer(onRequest);
     // Bounds the whole request including a slow body, so the configured deadline also covers reading it.
     server.requestTimeout = config.requestDeadlineMs;
     server.headersTimeout = Math.min(config.requestDeadlineMs, 30_000);
@@ -156,7 +174,12 @@ export function createSidecar(options: SidecarOptions): Sidecar {
     pruneTimer.unref();
     stream.publish('sidecar.lifecycle', { phase: 'started' });
     stream.publish('sidecar.capabilities', capabilityReport(features));
-    logger('info', 'listening', { host: config.host, port });
+    logger('info', 'listening', { host: config.host, port, tls: config.tls !== null });
+    if (config.insecureRemote) {
+      logger('warn', 'serving plain HTTP on a non-loopback address (MATTER_SIDECAR_ALLOW_INSECURE_REMOTE=true)', {
+        host: config.host,
+      });
+    }
     return { port };
   }
 

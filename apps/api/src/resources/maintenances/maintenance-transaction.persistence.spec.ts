@@ -12,6 +12,7 @@ import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
 } from '../../database/run-serialized-transaction';
+import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 const deferred = () => {
   let resolve!: () => void;
@@ -102,8 +103,12 @@ describe('Maintenance transaction coordination (file-backed SQLite)', () => {
       { maintenanceUsageQueryWindowDays: { observe: jest.fn() } } as never,
       { getDurationsForWindows: async () => new Map() } as never,
     );
-    jest.spyOn(evaluator, 'shouldTrigger').mockResolvedValue(true);
-    jest.spyOn(evaluator, 'getBaselineDate').mockResolvedValue(new Date('2020-01-01'));
+    jest
+      .spyOn(Reflect.get(evaluator, 'evaluation') as MaintenanceResourceEvaluation, 'shouldTrigger')
+      .mockResolvedValue(true);
+    jest
+      .spyOn(Reflect.get(evaluator, 'evaluation') as MaintenanceResourceEvaluation, 'getBaselineDate')
+      .mockResolvedValue(new Date('2020-01-01'));
   });
 
   afterEach(async () => {

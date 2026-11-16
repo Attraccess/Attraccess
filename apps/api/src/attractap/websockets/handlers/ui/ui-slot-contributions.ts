@@ -25,6 +25,8 @@ export interface CollectInput {
   resourceIds: number[];
   providers: { plugin: string; provider: ReaderUiProvider }[];
   userId?: number;
+  /** Whether the resource has an active usage (the reader shows its session slot only then). */
+  sessionActive: (resourceId: number) => boolean;
   language: 'en' | 'de';
   /** Widgets toggled on for the resource and plugin (the reader toggle is applied by the caller). */
   enabled: (resourceId: number, plugin: string) => boolean;
@@ -107,6 +109,7 @@ async function callProvider(
       readerId: input.readerId,
       resourceId,
       userId: input.userId,
+      sessionActive: input.sessionActive(resourceId),
       capabilities: input.caps,
       language: input.language,
     }),

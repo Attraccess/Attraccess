@@ -1,13 +1,14 @@
+import { AUDIT_RECORDER } from '../../../audit/recorder/audit-event';
 import { SSOProvider, SSOProviderType } from '@attraccess/database-entities';
 import { ModuleRef } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
-import { IdentityAuditService } from '../../../audit/identity-audit.service';
-import { SsoAuditService } from '../../../audit/sso-audit.service';
 import { CookieConfigService } from '../../../common/services/cookie-config.service';
 import { LicenseService } from '../../../license/license.service';
 import { MetricsService } from '../../../metrics/metrics.service';
 import { SettingsService } from '../../../settings/settings.service';
 import { RbacService } from '../../rbac/rbac.service';
+import { AuthAuditLogger } from '../../rate-limiting/auth-audit.logger';
+import { BruteForceProtectionService } from '../../rate-limiting/brute-force.service';
 import { UsersService } from '../../users/users.service';
 import { AuthService } from '../auth.service';
 import { SessionService } from '../session.service';
@@ -16,6 +17,7 @@ import { OidcCookieStateStore } from './oidc/oidc-cookie-state-store';
 import { SSOOIDCGuard } from './oidc/oidc.guard';
 import { SSOController } from './sso.controller';
 import { SSOService } from './sso.service';
+import { SSO_CONTROLLER_SERVICES } from './sso-controller.services';
 
 const mockMetricsService = {
   authSsoLoginTotal: { inc: jest.fn() },
@@ -32,9 +34,21 @@ export function registerSsoControllerFixture() {
 
   let linkTokenService: SSOLinkTokenService;
 
-  const identityAudit = { record: jest.fn() };
+  /** One recorder port: identity (SSO login) and sso (provisioning) events go through it. */
+  const identityAudit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
 
-  const ssoAudit = { record: jest.fn().mockResolvedValue({ status: 'recorded' }) };
+  const bruteForce = {
+    assertIpAllowed: jest.fn(),
+    assertAccountAllowed: jest.fn(),
+    runAccountAttempt: jest.fn((_userId: number | null, attempt: () => Promise<unknown>) => attempt()),
+    recordFailure: jest.fn(),
+    recordIpFailure: jest.fn(),
+    recordSuccess: jest.fn(),
+  };
+
+  const authAudit = { log: jest.fn() };
+
+  const ssoAudit = identityAudit;
 
   const mockSSOProvider: SSOProvider = {
     id: 1,
@@ -105,6 +119,14 @@ export function registerSsoControllerFixture() {
           provide: SessionService,
           useValue: {
             createSession: jest.fn().mockResolvedValue('mock-session-token'),
+            // The real SSO-session start: the session, then the `sso_login` audit through `audit`.
+            createSsoSession: jest.fn(function (
+              this: SessionService,
+              ...args: Parameters<SessionService['createSsoSession']>
+            ) {
+              return SessionService.prototype.createSsoSession.apply(this, args);
+            }),
+            audit: identityAudit,
             revokeAllUserSessions: jest.fn().mockResolvedValue(undefined),
           },
         },
@@ -176,6 +198,9 @@ export function registerSsoControllerFixture() {
           useValue: {
             verify: jest.fn(),
             issue: jest.fn(),
+            assertUsable: jest.fn(),
+            reservePasswordAttempt: jest.fn(),
+            consume: jest.fn(),
           },
         },
         {
@@ -186,9 +211,11 @@ export function registerSsoControllerFixture() {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
-        { provide: IdentityAuditService, useValue: identityAudit },
-        { provide: SsoAuditService, useValue: ssoAudit },
+        { provide: AUDIT_RECORDER, useValue: identityAudit },
+        { provide: BruteForceProtectionService, useValue: bruteForce },
+        { provide: AuthAuditLogger, useValue: authAudit },
         SSOOIDCGuard,
+        ...SSO_CONTROLLER_SERVICES,
       ],
       controllers: [SSOController],
     }).compile();
@@ -197,8 +224,9 @@ export function registerSsoControllerFixture() {
     ssoService = module.get<SSOService>(SSOService);
     cookieConfigService = module.get<CookieConfigService>(CookieConfigService);
     linkTokenService = module.get<SSOLinkTokenService>(SSOLinkTokenService);
-    identityAudit.record.mockReset();
-    ssoAudit.record.mockReset().mockResolvedValue({ status: 'recorded' });
+    identityAudit.record.mockReset().mockResolvedValue({ status: 'recorded' });
+    for (const mock of [...Object.values(bruteForce), authAudit.log]) mock.mockClear();
+    bruteForce.runAccountAttempt.mockImplementation((_userId, attempt) => attempt());
   });
   return {
     get controller() {
@@ -218,6 +246,12 @@ export function registerSsoControllerFixture() {
     },
     get identityAudit() {
       return identityAudit;
+    },
+    get bruteForce() {
+      return bruteForce;
+    },
+    get authAudit() {
+      return authAudit;
     },
     get ssoAudit() {
       return ssoAudit;

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Preserve the original handler test policy for partial protocol mocks. */
 import { AttractapSessionHandler } from '../session.handler';
-import { AttractapSessionHandlerSessionFlowButtonTestScope } from '../session.handler.spec';
+import type { AttractapSessionHandlerSessionFlowButtonTestScope } from '../session.handler.spec';
 export function resetTestFixture(scope: AttractapSessionHandlerSessionFlowButtonTestScope) {
   scope.handler = Object.create(AttractapSessionHandler.prototype);
   (scope.handler as any).logger = {
@@ -13,7 +13,7 @@ export function resetTestFixture(scope: AttractapSessionHandlerSessionFlowButton
   scope.mockSocket = {
     id: 'sock-1',
     readerId: 42,
-    state: { lastAuthenticatedUserId: 1, readerId: 42 },
+    state: { verifiedUserId: 1, readerId: 42 },
     sendMessage: jest.fn().mockResolvedValue(undefined),
     sendBinaryData: jest.fn(),
   };
@@ -65,9 +65,12 @@ export function resetTestFixture(scope: AttractapSessionHandlerSessionFlowButton
   (scope.handler as any).resourceListService = scope.mockResourceListService;
   (scope.handler as any).formsHandler = scope.mockFormsHandler;
   (scope.handler as any).supervisionService = scope.mockSupervisionService;
-  (scope.handler as any).cardSessions = { resume: jest.fn().mockReturnValue(false) };
+  (scope.handler as any).cardSessions = {
+    resume: jest.fn().mockReturnValue(false),
+    hold: jest.fn().mockReturnValue(() => undefined),
+  };
   (scope.handler as any).startGate = {
-    run: jest.fn().mockResolvedValue({ kind: 'proceed' }),
+    run: jest.fn().mockResolvedValue({ kind: 'proceed', satisfied: {} }),
     afterStop: jest.fn().mockResolvedValue(undefined),
   };
   scope.mockBillingService = {

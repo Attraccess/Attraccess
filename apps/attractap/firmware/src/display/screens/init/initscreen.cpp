@@ -23,7 +23,7 @@ void InitScreen::init()
    lv_obj_set_width(logo, LV_SIZE_CONTENT);
    lv_obj_set_height(logo, LV_SIZE_CONTENT);
    lv_obj_set_x(logo, 0);
-   lv_obj_set_y(logo, -160);
+   lv_obj_set_y(logo, -148); // The logo stays clear of the network badge.
    lv_obj_set_align(logo, LV_ALIGN_CENTER);
    lv_obj_add_flag(logo, LV_OBJ_FLAG_CLICKABLE);
    lv_obj_remove_flag(logo, LV_OBJ_FLAG_SCROLLABLE);
@@ -33,7 +33,7 @@ void InitScreen::init()
    lv_obj_set_width(statesContainer, lv_pct(100));
    lv_obj_set_height(statesContainer, LV_SIZE_CONTENT);
    lv_obj_set_x(statesContainer, 0);
-   lv_obj_set_y(statesContainer, 53);
+   lv_obj_set_y(statesContainer, 56);
    lv_obj_set_align(statesContainer, LV_ALIGN_CENTER);
    lv_obj_set_flex_flow(statesContainer, LV_FLEX_FLOW_COLUMN);
    lv_obj_set_flex_align(statesContainer, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -41,9 +41,10 @@ void InitScreen::init()
    lv_obj_remove_flag(statesContainer, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_style_pad_left(statesContainer, 40, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(statesContainer, 40, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_top(statesContainer, 40, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(statesContainer, 40, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_row(statesContainer, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   // Tight enough that the settings button clears the device footer while the details block is up.
+   lv_obj_set_style_pad_top(statesContainer, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_bottom(statesContainer, 16, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_row(statesContainer, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_column(statesContainer, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    this->createNetworkRows(statesContainer);

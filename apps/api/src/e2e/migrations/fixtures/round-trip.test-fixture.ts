@@ -3,11 +3,14 @@ import { promises as fs } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { DataSource } from 'typeorm';
+import { migrationCsvExportSeeds } from './seeds/csv-export.test-fixture';
 import { migrationFlowUsageSeeds } from './seeds/flow-usage.test-fixture';
 import { migrationIdentityNotificationSeeds } from './seeds/identity-notification.test-fixture';
+import { migrationMcpOAuthSeeds } from './seeds/mcp-oauth.test-fixture';
 import { migrationMaintenanceSeeds } from './seeds/maintenance.test-fixture';
 import { migrationMembershipFormSeeds } from './seeds/membership-form.test-fixture';
 import { migrationReaderSeeds } from './seeds/reader.test-fixture';
+import { migrationSecureBootSeeds } from './seeds/secure-boot.test-fixture';
 import { migrationResourceSeeds } from './seeds/resource.test-fixture';
 import { ensureUsers } from './seed-storage.test-fixture';
 import { migrationSsoSeeds } from './seeds/sso.test-fixture';
@@ -41,6 +44,9 @@ const seedDatabase = async (dataSource: DataSource) => {
     usage,
   );
   await migrationIdentityNotificationSeeds(dataSource, seedTag, primaryUser);
+  await migrationCsvExportSeeds(dataSource, seedTag);
+  await migrationSecureBootSeeds(dataSource, seedTag);
+  await migrationMcpOAuthSeeds(dataSource, seedTag, primaryUser);
 };
 
 const assertAllEntitiesHaveRows = async (dataSource: DataSource) => {

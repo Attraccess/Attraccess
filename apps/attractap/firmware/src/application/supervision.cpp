@@ -20,7 +20,7 @@ void SupervisionFlow::setup() {
 void SupervisionFlow::resetActiveTransaction() {
     phase = Phase::Idle;
     webInitiated = false;
-    cardDetected = keyReady = cardRejected = false;
+    cardDetected = cardVerified = cardRejected = false;
     terminalEvent = TerminalEvent::None;
     errorIsTerminal = hintReady = false;
     cardUidLength = 0;
@@ -36,7 +36,7 @@ void SupervisionFlow::clearPendingWebStart() {
 
 void SupervisionFlow::enter(const char *requester, const FirmwareI18n::Text &hint, uint32_t now, uint32_t deadlineMs) {
     phase = Phase::WaitingForCard;
-    cardDetected = keyReady = cardRejected = false;
+    cardDetected = cardVerified = cardRejected = false;
     terminalEvent = TerminalEvent::None;
     errorIsTerminal = hintReady = false;
     errorMessage.clear();
@@ -151,9 +151,6 @@ void SupervisionFlow::onRequestResult(const API::SupervisionRequestResult &resul
 void SupervisionFlow::onCardAuthentication(const API::SupervisorCardAuthenticationResponse &response) {
     Event event = {};
     event.type = EventType::CardAuthentication;
-    event.keyNo = response.keyNo;
-    event.keyLen = response.keyLen;
-    memcpy(event.keyBytes, response.keyBytes, sizeof(event.keyBytes));
     strlcpy(event.error, response.error.c_str(), sizeof(event.error));
     enqueueEvent(event);
 }
@@ -294,16 +291,14 @@ void SupervisionFlow::processEvent(const Event &event) {
     }
     case EventType::CardAuthentication:
         if (phase != Phase::RequestedAuth) break;
-        if (event.error[0] != '\0' || event.keyLen != 16) {
+        if (event.error[0] != '\0') {
             errorMessage = strcmp(event.error, "SUPERVISOR_NOT_AUTHORIZED") == 0
                                         ? FirmwareI18n::Message::CardIsNotAuthorizedAsASupervisor
                                         : FirmwareI18n::readerError(event.error);
             cardRejected = true;
             break;
         }
-        keyNo = event.keyNo;
-        memcpy(keyBytes, event.keyBytes, sizeof(keyBytes));
-        keyReady = true;
+        cardVerified = true;
         break;
     case EventType::Resolved:
         if (phase == Phase::Idle || phase == Phase::Success ||
@@ -378,13 +373,13 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
         // The server resolution settles the transaction. Discard card-path
         // events that raced it so a subsequent tick cannot replace success.
         terminalEvent = TerminalEvent::None;
-        cardRejected = keyReady = cardDetected = false;
+        cardRejected = cardVerified = cardDetected = false;
         beeper.successBeep(); nfc.disableCardDetection();
         phase = Phase::Success; phaseChangedAtMs = now; renderScreen(SupervisionScreen::STATUS_SUCCESS); return Outcome::None;
     }
     if (event == TerminalEvent::Failed) {
         terminalEvent = TerminalEvent::None;
-        cardRejected = keyReady = cardDetected = false;
+        cardRejected = cardVerified = cardDetected = false;
         showError(true, now);
         return Outcome::None;
     }
@@ -395,16 +390,16 @@ SupervisionFlow::Outcome SupervisionFlow::tick(uint32_t now) {
     }
     switch (phase) {
     case Phase::WaitingForCard:
-        if (cardDetected) { cardDetected = false; nfc.disableCardDetection(); api.requestSupervisorCardAuthenticationData(cardUid, cardUidLength, resourceId); phase = Phase::RequestedAuth; phaseChangedAtMs = now; }
+        if (cardDetected) { cardDetected = false; nfc.disableCardDetection(); api.sendCardDetected("supervisor", cardUid, cardUidLength, resourceId); phase = Phase::RequestedAuth; phaseChangedAtMs = now; }
         break;
     case Phase::RequestedAuth:
-        if (keyReady) {
-            keyReady = false; renderScreen(SupervisionScreen::STATUS_VERIFYING);
-            if (nfc.authenticate(keyNo, keyBytes)) {
-                beeper.successBeep();
-                if (webInitiated) { api.confirmSupervisorCardAuth(resourceId); phase = Phase::Starting; phaseChangedAtMs = now; }
-                else { resetActiveTransaction(); return Outcome::UnlockAndStartSession; }
-            } else { errorMessage = FirmwareI18n::Message::CouldNotReadCard; showError(false, now); }
+        if (cardVerified) {
+            cardVerified = false;
+            beeper.successBeep();
+            // The server checked the card and the supervisor's rights; a web-started flow is
+            // approved by the server itself, a reader-started one now starts its session.
+            if (webInitiated) { phase = Phase::Starting; phaseChangedAtMs = now; }
+            else { resetActiveTransaction(); return Outcome::UnlockAndStartSession; }
         }
         break;
     case Phase::Success:

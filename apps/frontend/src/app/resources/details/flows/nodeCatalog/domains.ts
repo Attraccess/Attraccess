@@ -136,7 +136,8 @@ export function nodeTypeDomain(nodeType: string): string {
     return parts.length >= 2 ? `plugin.${parts[1]}` : 'plugin';
   }
   if (nodeType.includes('.usage.')) return 'usage-sessions';
-  if (nodeType.includes('.activity.')) return 'operation-activity';
+  if (nodeType.includes('.activity.') || nodeType.includes('.maintenance.') || nodeType.includes('.maintenance-request.'))
+    return 'operation-activity';
   if (nodeType.includes('.billing.') || nodeType.includes('.metering.')) return 'billing';
   if (nodeType.includes('.door.')) return 'access-doors';
   if (nodeType.includes('.health.')) return 'health-monitoring';

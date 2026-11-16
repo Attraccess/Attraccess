@@ -281,11 +281,10 @@ struct ResourceUsageFormPageResult
 
 struct ApiCards : public ApiForms
 {
+// The server verified the card before it sends this: it ran the card crypto through the relay.
+// There is no key material on the reader.
 struct CardAuthenticationDetailsResponse
     {
-        uint8_t keyNo;
-        uint8_t keyBytes[16];
-        uint8_t keyLen;
         std::string error;
         std::string username;
         std::string language;
@@ -312,9 +311,6 @@ struct SupervisionRequestResult
 
 struct SupervisorCardAuthenticationResponse
     {
-        uint8_t keyNo = 0;
-        uint8_t keyBytes[16] = {0};
-        uint8_t keyLen = 0;
         std::string error;
         std::string username;
     };

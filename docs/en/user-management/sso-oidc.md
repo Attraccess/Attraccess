@@ -1,4 +1,5 @@
 # OIDC Setup
+<!-- llms-description: How to create and configure an OpenID Connect SSO provider, including the callback URL and testing the login. -->
 
 OpenID Connect (OIDC) is the recommended SSO protocol for most use cases.
 
@@ -27,6 +28,13 @@ For Authentik, Keycloak or other OpenID-compatible providers, you can use auto-d
 
 All URL fields are filled in automatically.
 
+**If discovery fails**, Attraccess shows the reason in an "Auto-discovery failed" message:
+
+- A message with a status shows what the provider answered. `answered with status 404` usually means the host, realm or application name is wrong. A 5xx status points to a problem on the provider.
+- `TLS certificate of the discovery URL could not be verified` means the Attraccess API server could not verify the provider's certificate. The code in brackets names the reason, for example `CERT_HAS_EXPIRED` or `ERR_TLS_CERT_ALTNAME_INVALID`. If the provider uses a certificate from a private CA, add that CA to the server's trust store, for example with Node.js's `NODE_EXTRA_CA_CERTS` environment variable, and restart the API server.
+
+Behind a reverse proxy (nginx, Traefik, Cloudflare, …) the proxy may replace the API's error response with its own "Bad Gateway" page, and the message then shows a general hint instead of the reason. Whenever discovery fails at the identity provider (it cannot be reached, answers with an error status, or sends an unreadable answer), the API log records the exact cause, for example a DNS failure, a refused connection, a timeout, a TLS error or the status code, as a warning. To see the reason in the message, let the proxy pass the API's error responses through: for nginx, leave `proxy_intercept_errors` off (the default) for the API location, so that an `error_page` does not replace them.
+
 ### Manual Configuration
 
 | Field | Description | Example |
@@ -44,7 +52,7 @@ If the identity provider sends `email_verified=false` (boolean or string), the e
 
 ### Scopes
 
-Optionally specify additional OIDC scopes (comma-separated). Default scopes are requested automatically.
+Optionally specify the OIDC scopes to request, one entry at a time. When the list is empty, `openid`, `email` and `profile` are requested. Configured scopes replace these defaults, so include `email` and `profile` if you still need them (e.g. `openid`, `email`, `profile`, `offline_access`); `openid` is always sent.
 
 ### Claim Paths
 
@@ -56,6 +64,12 @@ Attraccess needs to know which fields in the OIDC token contain the username and
 | **Email Claim Paths** | `email, emails[0].value, upn` | Ordered list of token fields for email |
 
 Attraccess checks the paths in the specified order and uses the first match.
+
+### Role Claim Paths
+
+By default Attraccess reads roles from `permissions`, `roles`, `groups`, `realm_access.roles` and `resource_access.<clientId>.roles`. If your provider puts roles elsewhere, add the claim paths one by one (at most 20, up to 256 characters each, no commas) in **Role Claim Paths**. Changing this setting requires the `users.roles.manage` permission. Paths are looked up in the ID token claims at login; a claim that only the UserInfo response carries is not seen at login, only by the permission re-sync during sessions (see below).
+
+> **Custom paths replace the defaults.** Once set, only the configured paths are read. If one of them is present in the token, roles that came only from a default location (for example `groups`) are removed at the next login. If none of the configured paths is present, existing roles are kept; if one is present but empty, this provider's SSO roles are removed. Clear the field to return to the defaults.
 
 ### Permission Mapping
 

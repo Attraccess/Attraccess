@@ -6,7 +6,7 @@ export function createAttractapSessionHandlerSessionFlowButtonFixture() {
   let mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number; readerId: number };
+    state: { verifiedUserId: number; readerId: number };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };

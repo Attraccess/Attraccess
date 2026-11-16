@@ -1,6 +1,9 @@
 # Knotentypen
+<!-- llms-description: Referenz aller eingebauten Flow-Knoten, gegliedert in Eingabe-Trigger, Verarbeitungs-Knoten und Ausgabe-Aktionen. -->
 
 Diese Referenz beschreibt alle eingebauten Flow-Knoten. Der Editor gruppiert sie nach Zweck, etwa Abrechnung, Nachrichten und Flow-Steuerung, und zeigt die vom Ressourcentyp unterstützten Knoten. Nutzungs-, Aktivitäts- und Abrechnungsknoten sind für **Maschinen**; Tür-Trigger für **Türen**. Plugins können weitere Knoten mit eigenen Einstellungen ergänzen.
+
+Knoten können in **Ressourcen-Flows**, in [globalen Flows](flows/global-flows.md) oder in beiden verwendet werden. Knoten mit dem Hinweis **Nur Ressourcen-Flows** sind in globalen Flows ausgeblendet, und ein globaler Flow, der einen solchen Knoten enthält, lässt sich weder speichern noch importieren. Alle anderen Knoten funktionieren in beiden. Knoten, die auf eine Ressource wirken (z. B. **Aktive Sitzung beenden** oder **Aktivität aufzeichnen**), benötigen in einem globalen Flow eine auslösende Ressource; siehe [Die auslösende Ressource](flows/global-flows.md#die-auslösende-ressource).
 
 Lesen Sie zuerst [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md) für Pfade, Datentypen und Beispiele. **Vorlage** bezeichnet hier eine Handlebars-Vorlage, die den aktuellen Eingang verwendet. Andere Einstellungen sind wörtliche Werte, sofern nicht anders beschrieben. Objekt-Payloads erhalten Ressourcenkontext; Vorlagen können gespeicherte Variablen lesen.
 
@@ -12,7 +15,7 @@ Trigger starten einen Durchlauf und geben ihre Ereignisdaten über **Ausgang** w
 
 ### Button
 
-Typ: `input.button` · Maschinen · Editor: **Taste**
+Typ: `input.button` · Maschinen · Editor: **Taste** · Nur Ressourcen-Flows
 
 Ergänzt einen manuellen Button auf der Ressourcen-Detailseite. **Beschriftung** ist erforderlicher, wörtlicher Text. Die Payload beginnt mit Ressourcenkontext; sie enthält nicht den Benutzer, der den Button gedrückt hat. Der Button kann nur vom Besitzer einer aktiven Nutzungssitzung gedrückt werden.
 
@@ -22,19 +25,19 @@ Beispiel: Button `Relais testen` mit **MQTT-Nachricht senden** verbinden.
 
 Typ: `input.resource.usage.started` · Maschinen
 
-Läuft während eines Nutzungsstarts. Keine Einstellungen. Die Payload enthält Felder der neuen Sitzung an der Wurzel (`id`, `startTime`, `user`, `formSubmissions` usw.). `{{user.username}}` liest den Sitzungsbesitzer. Ein Flow-Fehler kann den Start verhindern; wählen Sie das Fehlerverhalten externer Aktionen entsprechend.
+Läuft während eines Nutzungsstarts. Keine Einstellungen. Die Payload enthält Felder der neuen Sitzung an der Wurzel (`id`, `startTime`, `user`, `formSubmissions` usw.) und [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). `{{user.username}}` liest den Sitzungsbesitzer. Ein Flow-Fehler kann den Start verhindern; wählen Sie das Fehlerverhalten externer Aktionen entsprechend.
 
 ### Nutzung beendet
 
 Typ: `input.resource.usage.stopped` · Maschinen
 
-Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes`. Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen.
+Läuft während eines Nutzungsendes. Keine Einstellungen. Die Payload enthält die bisherige Sitzung, eingereichte Formulare und Endfelder wie `endTime`, `endNotes` sowie [`activeSessions`](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen). Beispiel: Relais ausschalten oder vor der Abrechnung einen Posten ergänzen.
 
 ### Nutzung übernommen
 
 Typ: `input.resource.usage.takeover` · Maschinen
 
-Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime`. `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**.
+Läuft bei Übernahme einer aktiven Sitzung. Keine Einstellungen. Die Payload enthält die bisherige Sitzung sowie `newUser`, `oldUser`, `takeOverTime` und `activeSessions` (immer 1 zu 1). `{{newUser.username}}` liest den neuen Besitzer. Eine Übernahme verwendet diesen Trigger anstelle von **Nutzung gestartet**.
 
 ### Tür entriegelt
 
@@ -54,6 +57,40 @@ Typ: `input.resource.door.unlatched` · Türen
 
 Läuft beim kurzen Öffnen der Türfalle. Keine Einstellungen. Verwendet dieselbe Payload-Struktur wie **Tür entriegelt**. Beispiel: Impuls an einen elektrischen Türöffner senden.
 
+### Gesundheitsstatus geändert
+
+Typ: `input.resource.health.changed` · Alle Ressourcen · Ressourcen- und globale Flows
+
+Läuft, wenn sich der Gesundheitsstatus einer Ressource tatsächlich ändert; eine Meldung mit unverändertem Status löst nicht aus. Keine Einstellungen. Die Payload enthält den Ressourcenkontext und `health: { identifier, status, previousStatus, reason }`. Beispiel: In einem globalen Flow eine MQTT- oder HTTP-Benachrichtigung senden, sobald eine beliebige Ressource nicht mehr gesund ist.
+
+| Feld                    | Beschreibung                                       |
+| ----------------------- | -------------------------------------------------- |
+| `health.identifier`     | Kennung der Gesundheitsquelle                      |
+| `health.status`         | Neuer Status                                       |
+| `health.previousStatus` | Status vor der Änderung                            |
+| `health.reason`         | Mit der Änderung gemeldeter Grund, falls vorhanden |
+
+### Wartung erstellt
+
+Typ: `input.resource.maintenance.created` · Alle Ressourcen · Ressourcen- und globale Flows
+
+Läuft, wenn ein Wartungszeitraum erstellt wird, manuell oder durch einen Wartungsplan. Keine Einstellungen. Die Payload enthält den Ressourcenkontext und `maintenance: { id, reason, startTime, endTime }`.
+
+### Wartung beendet
+
+Typ: `input.resource.maintenance.finished` · Alle Ressourcen · Ressourcen- und globale Flows
+
+Läuft, wenn ein Wartungszeitraum endet. Keine Einstellungen. Verwendet dieselbe Payload-Form wie **Wartung erstellt**, mit gesetztem `endTime`.
+
+### Wartungsanfrage erstellt
+
+Typ: `input.resource.maintenance-request.created` · Alle Ressourcen · Ressourcen- und globale Flows
+
+Läuft, wenn eine Wartungsanfrage für eine Ressource gestellt wird. Keine Einstellungen. Die Payload enthält den Ressourcenkontext und `maintenanceRequest: { id, reason, status, createdAt, createdByUser }`; `createdByUser` ist `{ id, username }` oder `null`. Es sind nur für Benutzer sichtbare Felder enthalten.
+
+> [!WARNING]
+> Jeder angemeldete Benutzer kann für eine Ressource eine Wartungsanfrage stellen. Dieser Trigger kann also von jedem angemeldeten Benutzer ausgelöst werden. Verbinden Sie ihn nicht mit Aktionen, die nicht jeder Benutzer auslösen dürfte.
+
 ### MQTT-Nachricht empfangen
 
 Typ: `input.mqtt.message.received`
@@ -71,7 +108,7 @@ Typ: `input.resource.activity.no-activity` · Maschinen · Editor: **Inaktivitä
 
 **Minimale Inaktivität (Minuten)** (`minInactivityMinutes`) ist eine positive ganze Zahl. Läuft nur bei einer aktiven, finalisierten Nutzungssitzung. Die Prüfung erfolgt einmal pro Minute und ist kein präziser Timer. Die Payload beginnt nur mit Ressourcenkontext.
 
-**Aktivität verfolgen** setzt den Timer zurück. Nach dem Auslösen wird er ebenfalls zurückgesetzt und kann bei weiterhin aktiver Sitzung erneut auslösen. Aktivitätszeiten liegen im Arbeitsspeicher und werden nach Serverneustart neu initialisiert. Beispiel: mit **Nutzungssitzung beenden** für automatische Abschaltung verbinden.
+**Aktivität verfolgen** setzt den Timer aller Keine-Aktivität-Knoten der Maschine zurück. Jeder Keine-Aktivität-Knoten hat pro Maschine seinen eigenen Zeitplan und löst erneut aus, solange die Sitzung inaktiv bleibt: Bei einem Knoten mit 5 und einem mit 10 Minuten löst der erste nach 5, 10, 15 … Minuten aus, der zweite nach 10, 20 … Minuten. Das Auslösen eines Knotens setzt die anderen nicht zurück, und Knoten in [globalen Flows](flows/global-flows.md) und im Flow der Ressource beeinflussen sich nicht gegenseitig. Frühere Versionen setzten den Timer der Maschine für alle Keine-Aktivität-Knoten zurück, sobald einer davon auslöste; im Beispiel löste der 10-Minuten-Knoten deshalb nie aus. Aktivitätszeiten liegen im Arbeitsspeicher und werden nach Serverneustart neu initialisiert. Beispiel: mit **Nutzungssitzung beenden** für automatische Abschaltung verbinden.
 
 ### Variable geändert
 
@@ -123,25 +160,25 @@ Wählen Sie ein **Companion-Gerät** und optionale dezimale **Hersteller-ID / Pr
 
 ### Messung starten
 
-Typ: `input.resource.metering.start` · Maschinen
+Typ: `input.resource.metering.start` · Maschinen · Nur Ressourcen-Flows
 
 Einen vordefinierten **Zähler** auswählen oder einen mit einem Namen erstellen. Bereitet diesen Zähler vor, bevor eine erfasste Sitzung startet oder übernommen wird. **Zeitlimit (Sekunden)**: 1–600, Standard **30**. Der Zweig muss **Messung bereit** erreichen. Kann ein kostenpflichtiger Zähler nicht initialisiert werden, startet die Sitzung nicht.
 
-Die Payload enthält `metering: { sessionId, meterId, operationId, resourceId, usageId, kind, requestedAt }` mit `kind: "start"`. Beispiel: Lifetime-Zähler per HTTP lesen und dessen Basiswert melden. Siehe [Zähler](flows/energy-metering.md).
+Die Payload enthält `metering: { sessionId, meterId, operationId, resourceId, usageId, userId, kind, requestedAt }` mit `kind: "start"`. `userId` ist die Person der Sitzung. Beispiel: Lifetime-Zähler per HTTP lesen und dessen Basiswert melden. Siehe [Zähler](flows/energy-metering.md).
 
 ### Messwert abfragen
 
-Typ: `input.resource.metering.collect` · Maschinen
+Typ: `input.resource.metering.collect` · Maschinen · Nur Ressourcen-Flows
 
-| Einstellung | Bereich / Standard |
-| --- | --- |
-| **Zähler** | Vordefinierten Zähler auswählen oder einen erstellen |
-| **Zeitlimit (Sekunden)** | 1–600 / **30** |
-| **Zwischenintervall (Minuten)** | 0–1440 / **1**; `0` deaktiviert regelmäßige Abfragen |
-| **Versuche für den Endwert** | 1–10 / **3** |
-| **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5** |
+| Einstellung                                     | Bereich / Standard                                   |
+| ----------------------------------------------- | ---------------------------------------------------- |
+| **Zähler**                                      | Vordefinierten Zähler auswählen oder einen erstellen |
+| **Zeitlimit (Sekunden)**                        | 1–600 / **30**                                       |
+| **Zwischenintervall (Minuten)**                 | 0–1440 / **1**; `0` deaktiviert regelmäßige Abfragen |
+| **Versuche für den Endwert**                    | 1–10 / **3**                                         |
+| **Pause zwischen Endwert-Versuchen (Sekunden)** | 0–120 / **5**                                        |
 
-Läuft regelmäßig, auch außerhalb von Sitzungen, und für Endwerte beim Sitzungsende. Die Payload enthält dieselben Messfelder wie **Messung starten**, mit `kind: "interim"` oder `"final"`. Ohne Sitzung sind `sessionId` und `usageId` null. Mit **Zähler melden** für denselben Zähler verbinden. Regelmäßige Messungen aktualisieren Gesamtverbrauch und laufende Sitzung; nur Sitzungsverbrauch wird abgerechnet. Siehe [Zähler](flows/energy-metering.md) für Aktualität und ausstehende Gebühren.
+Läuft regelmäßig, auch außerhalb von Sitzungen, und für Endwerte beim Sitzungsende. Die Payload enthält dieselben Messfelder wie **Messung starten**, mit `kind: "interim"`, `"final"` oder `"boundary"` (eine Messung eines geteilten Zählers beim Start oder Ende einer Sitzung auf einer gemeinsam genutzten Maschine). Ohne Sitzung sind `sessionId` und `usageId` null. Mit **Zähler melden** für denselben Zähler verbinden. Regelmäßige Messungen aktualisieren Gesamtverbrauch und laufende Sitzung; nur Sitzungsverbrauch wird abgerechnet. Siehe [Zähler](flows/energy-metering.md) für Aktualität und ausstehende Gebühren.
 
 ## Verarbeitungs-Knoten
 
@@ -287,7 +324,13 @@ Beispiel: Formularantwort mit **Payload setzen** nach `quantity` übertragen, da
 
 Typ: `output.resource.usage.end-session` · Maschinen · Editor: **Aktive Sitzung beenden**
 
-**Notizen** ist eine optionale Vorlage. **Bei Fehler** folgt dem gemeinsamen Verhalten. Beendet die aktuelle Sitzung dieser Ressource mit deren Besitzer; eine fehlende aktive Sitzung führt zum Fehler. Gibt bei Erfolg die unveränderte Payload weiter. Während eines ausstehenden Starts/einer Übernahme kann er die Kandidatensitzung dieser Lebenszyklusaktion beenden.
+**Notizen** ist eine optionale Vorlage. **Bei Fehler** folgt dem gemeinsamen Verhalten. **Welche Sitzung** legt fest, was beendet wird:
+
+- **Die auslösende Sitzung** (Standard, so verhalten sich auch ältere Knoten): die Sitzung, die diesen Lauf ausgelöst hat; eine fehlende aktive Sitzung führt zum Fehler.
+- **Die Sitzung eines Benutzers**: die Sitzung des Benutzers, dessen ID bei **Benutzer-ID** steht (Vorlage, z. B. `{{user.id}}`). Ein Benutzer ohne Sitzung führt zum Fehler.
+- **Alle Sitzungen**: jede laufende Sitzung der Maschine. Ohne Sitzungen passiert nichts.
+
+Sitzungen, die bereits beendet werden, werden übersprungen. Jede beendete Sitzung führt ihren eigenen Flow [Nutzung beendet](flows/node-types.md#nutzung-beendet) aus, daher meldet nur die letzte `activeSessions.after` = 0. In einem Start- oder Ende-Flow wählen **Die Sitzung eines Benutzers** und **Alle Sitzungen** die Sitzungen aus, wenn der Knoten läuft, und beenden sie direkt nach Abschluss dieses Starts oder Endes, vor dem nächsten Start oder Ende an der Maschine; die gerade startende Sitzung ist nie darunter. Schlägt der Start oder das Ende fehl, entfallen diese Beendigungen; beendet der Start-Flow seine eigene neue Sitzung mit **Die auslösende Sitzung**, laufen sie trotzdem (siehe [Aktive Sitzungen auf gemeinsam genutzten Maschinen](flows/payloads-variables-templates.md#aktive-sitzungen-auf-gemeinsam-genutzten-maschinen)). Die Sitzung wird mit ihrem Besitzer beendet. Der Audit-Eintrag jeder beendeten Sitzung hält fest, wer den Flow-Lauf verursacht hat (**Auslösende Benutzer-ID**: wer eine Sitzung gestartet, beendet oder übernommen oder den Button gedrückt hat; bei Sitzungen, die eine Kette von Flow-Beendigungen beendet, wer die Kette ausgelöst hat). Flows, die ohne Benutzer starten (z. B. MQTT-Nachrichten, Inaktivität oder Companion-Ereignisse), halten keinen fest. Gibt bei Erfolg die unveränderte Payload weiter. Während eines ausstehenden Starts/einer Übernahme kann er die Kandidatensitzung dieser Lebenszyklusaktion beenden.
 
 Beispielnotiz: `Wegen Inaktivität an {{resource.name}} automatisch beendet`. Die Aktion überspringt erforderliche Endformulare und Notizbenachrichtigungen.
 
@@ -355,13 +398,13 @@ Wählen Sie ein festes **Companion-Gerät**. Sendet einen Entsperrbefehl und spe
 
 ### Messung bereit
 
-Typ: `output.resource.metering.ready` · Maschinen
+Typ: `output.resource.metering.ready` · Maschinen · Nur Ressourcen-Flows
 
-| Einstellung | Beschreibung |
-| --- | --- |
-| **Zähler** | Den Zähler der Start-Anfrage auswählen |
+| Einstellung   | Beschreibung                                                              |
+| ------------- | ------------------------------------------------------------------------- |
+| **Zähler**    | Den Zähler der Start-Anfrage auswählen                                    |
 | **Basiswert** | Optionale Vorlage für den aktuellen Gesamtstand eines kumulierten Zählers |
-| **Quelle** | Optionale Vorlage mit dem Namen des physischen Zählers |
+| **Quelle**    | Optionale Vorlage mit dem Namen des physischen Zählers                    |
 
 Schließt eine **Messung starten**-Operation ab. Schlägt außerhalb eines Startzweigs fehl. Nach einem Reset auf null den Basiswert leer lassen; ein konfigurierter Basiswert, der leer gerendert wird, führt zum Fehler. Der Katalog bietet keinen ausgehenden Anschluss.
 
@@ -369,17 +412,20 @@ Beispiel nach HTTP-Antwort `{"counter":1500}`: Basiswert `{{counter}}`. Eine Ein
 
 ### Zähler melden
 
-Typ: `output.resource.metering.report`
+Typ: `output.resource.metering.report` · Nur Ressourcen-Flows
 
-| Einstellung | Beschreibung |
-| --- | --- |
-| **Zähler** | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen |
-| **Modus** | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
-| **Wert** | Erforderlicher nichtnegativer Zahlenwert oder Vorlage |
-| **Messzeit** | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt |
-| **Quelle** | Optionale Vorlage mit dem Namen des Zählers |
+| Einstellung     | Beschreibung                                                           |
+| --------------- | ---------------------------------------------------------------------- |
+| **Zähler**      | Vordefinierten Zähler auswählen oder einen mit einem Namen erstellen   |
+| **Modus**       | **total** für kumulierten Zählerstand; **increment** für einen Zuwachs |
+| **Wert**        | Erforderlicher nichtnegativer Zahlenwert oder Vorlage                  |
+| **Messzeit**    | Optionale ISO-Zeitstempel-Vorlage; Standard ist der Meldezeitpunkt     |
+| **Quelle**      | Optionale Vorlage mit dem Namen des Zählers                            |
+| **Nutzungs-ID** | Optionale Vorlage mit der Nutzungs-ID, zu der die Messung gehört       |
 
 Meldet Werte in Abfragezweigen und gewöhnlichen Flows, auch ohne Sitzung. Eine Antwort im Abfragezweig muss zum angefragten Zähler passen. Eine Einheit ist nicht erforderlich. Der erste unaufgeforderte Gesamtstand legt einen Basiswert fest; spätere Zuwächse erhöhen den Gesamtverbrauch. Inkremente erhöhen den Verbrauch direkt. Während einer laufenden Sitzung aktualisieren akzeptierte Zuwächse auch deren Verbrauch. Eine konfigurierte Messzeit-Vorlage, die leer gerendert wird, führt zum Fehler; Endwerte müssen aktuell sein. Der Katalog bietet keinen ausgehenden Anschluss.
+
+Eine außerhalb eines Messlaufs gesendete Messung an einen Zähler mit **Pro Sitzung gemessen** muss die Nutzung benennen, zu der sie gehört: In einem Flow des Sitzungsablaufs (Start, Ende, Übernahme) wird die Nutzung des Ablaufs verwendet, andernfalls setzen Sie **Nutzungs-ID** auf eine Vorlage, die eine Nutzungs-ID ergibt, etwa `{{ id }}` in einem Flow, den **Nutzung gestartet** oder **Nutzung beendet** auslöst, oder `{{ metering.usageId }}` in einem Mess-Flow. Eine **Nutzungs-ID**, die eine andere Nutzung als die des laufenden Sitzungsablaufs benennt, wird abgelehnt. Bei mehr als einer laufenden Sitzung wird eine Messung ohne Nutzung mit einem Flow-Fehler abgelehnt und nie geraten. Messungen eines Zählers mit **Geteilt und aufgeteilt** gehören zum Zähler und benötigen keine Nutzungs-ID. Siehe [Zähler bei gemeinsam genutzten Maschinen](flows/energy-metering.md#zähler-bei-gemeinsam-genutzten-maschinen).
 
 Beispiel nach **Auf MQTT-Nachricht warten** mit Inhalt `{"heartbeats":1500}`: **Heartbeats** auswählen, Modus **total**, Wert `{{payload.heartbeats}}`. Siehe [Zähler](flows/energy-metering.md) für Basiswerte und Wiederholungsversuche.
 

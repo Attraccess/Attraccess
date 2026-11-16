@@ -4,6 +4,7 @@
   "targets": {
     "lint": {
       "executor": "@nx/eslint:lint",
+      "dependsOn": ["check-llms-txt"],
       "options": {
         "lintFilePatterns": ["*.{js,ts}", "docs/**/*.md"]
       }
@@ -21,7 +22,8 @@
       "options": {
         "command": "node scripts/crap-score/run.mjs ."
       },
-      "outputs": ["{workspaceRoot}/coverage/crap/@attraccess__source"]
+      "outputs": ["{workspaceRoot}/coverage/crap/@attraccess__source"],
+      "dependsOn": ["test"]
     },
     "test": {
       "executor": "nx:run-commands",
@@ -35,20 +37,42 @@
           "runtime": "node -p \"process.platform + '-' + process.arch + '-' + process.version\""
         }
       ],
-      "outputs": [],
+      "outputs": ["{workspaceRoot}/coverage/root/test"],
       "options": {
         "commands": [
-          "node --test scripts/*.test.mjs scripts/crap-score/*.test.mjs tools/eslint-rules/*.test.mjs",
+          "node scripts/crap-score/node-test.mjs . coverage/root/test/node scripts/*.test.mjs scripts/crap-score/*.test.mjs tools/eslint-rules/*.test.mjs apps/plugins/scripts/*.test.mjs tools/hetzner-dns-updater/*.test.mjs",
           "vitest run --config scripts/vitest.config.mts"
         ],
         "parallel": false
+      }
+    },
+    "check-llms-txt": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": [
+        "{workspaceRoot}/docs/**/*.md",
+        "{workspaceRoot}/docs/llms.txt",
+        "{workspaceRoot}/docs/CNAME",
+        "{workspaceRoot}/scripts/generate-llms-txt.mjs",
+        "{workspaceRoot}/docs/assets/webmcp.js"
+      ],
+      "options": {
+        "command": "node scripts/generate-llms-txt.mjs --check"
+      }
+    },
+    "generate-llms-txt": {
+      "executor": "nx:run-commands",
+      "cache": false,
+      "options": {
+        "command": "node scripts/generate-llms-txt.mjs"
       }
     },
     "lint-files": {
       "executor": "nx:run-commands",
       "cache": false,
       "options": {
-        "command": "node scripts/check-file-size.mjs"
+        "commands": ["node scripts/check-file-size.mjs", "node scripts/check-import-cycles.mjs"],
+        "parallel": false
       }
     },
     "check-balena-compose": {

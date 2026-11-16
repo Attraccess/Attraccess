@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../../audit/recorder/audit-event';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserRegistrationService } from './user-registration.service';
 import { UsersService } from './users.service';
@@ -28,6 +29,7 @@ describe('UserRegistrationService – resendVerificationEmail', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
+        { provide: AUDIT_RECORDER, useValue: { record: jest.fn() } },
         UserRegistrationService,
         { provide: UsersService, useValue: usersService },
         { provide: AuthService, useValue: authService },

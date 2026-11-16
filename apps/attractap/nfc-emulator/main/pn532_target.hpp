@@ -10,13 +10,15 @@ namespace nfc_emulator {
 class Pn532Target {
  public:
   enum class Activation { Activated, Pending, Failed };
+  enum class Receive { Command, Pending, Ended };
 
   bool begin(gpio_num_t sda = GPIO_NUM_8, gpio_num_t scl = GPIO_NUM_9,
              gpio_num_t reset = GPIO_NUM_7);
   bool arm(const std::array<uint8_t, 4> &uid);
   // Pending: still waiting for a reader; TgInitAsTarget stays armed.
   Activation poll_activation(uint32_t timeout_ms);
-  bool receive(Bytes &apdu, uint32_t timeout_ms);
+  // Pending: no command within timeout_ms; TgGetData stays issued for the next poll.
+  Receive poll_command(Bytes &apdu, uint32_t timeout_ms);
   bool respond(const Bytes &response);
   void deactivate();
   bool active() const { return active_; }
@@ -32,6 +34,7 @@ class Pn532Target {
   Bytes first_command_;
   bool active_ = false;
   bool armed_ = false;
+  bool receiving_ = false;
   gpio_num_t reset_pin_ = GPIO_NUM_NC;
   i2c_master_bus_handle_t bus_ = nullptr;
   i2c_master_dev_handle_t device_ = nullptr;

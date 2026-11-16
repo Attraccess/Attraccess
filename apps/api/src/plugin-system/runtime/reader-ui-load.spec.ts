@@ -14,21 +14,62 @@ describe('collectReaderUiContributions', () => {
     expect(() => collectReaderUiContributions('p', [], { readerUi: provider }, ctx)).toThrow(PluginPermissionError);
   });
 
-  it.each(['preStartHook', 'sessionEndHook'] as const)('rejects %s without ACCESS_HOOKS', (field) => {
-    expect(() =>
-      collectReaderUiContributions('p', [PluginPermission.READER_UI], { [field]: hook }, ctx),
-    ).toThrow(PluginPermissionError);
+  it.each(['preStartHook', 'sessionEndHook', 'startBlockedQuery', 'startCapacityHook'] as const)(
+    'rejects %s without ACCESS_HOOKS',
+    (field) => {
+      expect(() => collectReaderUiContributions('p', [PluginPermission.READER_UI], { [field]: hook }, ctx)).toThrow(
+        PluginPermissionError,
+      );
+    },
+  );
+
+  it('rejects startCapacityHook without DATABASE_ACCESS: it is handed the host transaction', () => {
+    const load = () =>
+      collectReaderUiContributions(
+        'p',
+        [PluginPermission.ACCESS_HOOKS],
+        { startCapacityHook: () => ({ heldSlots: 0 }) },
+        ctx,
+      );
+    expect(load).toThrow(PluginPermissionError);
+    expect(load).toThrow(/"startCapacityHook", which requires the "DATABASE_ACCESS" permission/);
   });
 
   it('collects provider factories and hooks when permitted', () => {
     const out = collectReaderUiContributions(
       'p',
       [PluginPermission.READER_UI, PluginPermission.ACCESS_HOOKS],
-      { readerUi: () => provider, preStartHook: hook, sessionEndHook: () => ({ decision: 'none' }) },
+      {
+        readerUi: () => provider,
+        preStartHook: hook,
+        sessionEndHook: () => ({ decision: 'none' }),
+        startBlockedQuery: () => null,
+      },
       ctx,
     );
     expect(out?.readerUi).toBe(provider);
     expect(out?.preStartHook).toBe(hook);
     expect(out?.sessionEndHook).toBeDefined();
+    expect(out?.startBlockedQuery).toBeDefined();
+  });
+
+  it('counts a start-blocked query alone as a contribution', () => {
+    const out = collectReaderUiContributions(
+      'p',
+      [PluginPermission.ACCESS_HOOKS],
+      { startBlockedQuery: () => null },
+      ctx,
+    );
+    expect(out?.startBlockedQuery).toBeDefined();
+  });
+
+  it('counts a start capacity hook alone as a contribution', () => {
+    const out = collectReaderUiContributions(
+      'p',
+      [PluginPermission.ACCESS_HOOKS, PluginPermission.DATABASE_ACCESS],
+      { startCapacityHook: () => ({ heldSlots: 0 }) },
+      ctx,
+    );
+    expect(out?.startCapacityHook).toBeDefined();
   });
 });

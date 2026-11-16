@@ -67,6 +67,9 @@ const EXTERNALS = [
   'eventemitter2',
   'typeorm',
   'reflect-metadata',
+  '@nestjs/swagger',
+  'class-validator',
+  'class-transformer',
   SDK_SPECIFIER,
 ];
 

@@ -13,6 +13,7 @@
 
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
+#include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -33,6 +34,8 @@ constexpr int kI2cTimeoutMs = 50;
 constexpr int kMarkerIntervalMs = 2000;
 
 i2c_master_bus_handle_t i2cBus = nullptr;
+// The last I2C call that failed while parking, for the failure marker.
+esp_err_t lastI2cError = ESP_OK;
 
 void delayMs(uint32_t ms)
 {
@@ -63,17 +66,22 @@ i2c_master_dev_handle_t addI2cDevice(uint8_t address)
         busConfig.clk_source = I2C_CLK_SRC_DEFAULT;
         busConfig.glitch_ignore_cnt = 7;
         busConfig.flags.enable_internal_pullup = true;
-        if (i2c_new_master_bus(&busConfig, &i2cBus) != ESP_OK)
+        lastI2cError = i2c_new_master_bus(&busConfig, &i2cBus);
+        if (lastI2cError != ESP_OK)
         {
             return nullptr;
         }
+        // The driver clears the bus only after a transfer timed out. A reset of
+        // the ESP32 mid-transfer can leave a slave holding SDA, so clear it first.
+        i2c_master_bus_reset(i2cBus);
     }
     i2c_device_config_t deviceConfig = {};
     deviceConfig.dev_addr_length = I2C_ADDR_BIT_LEN_7;
     deviceConfig.device_address = address;
     deviceConfig.scl_speed_hz = 100000;
     i2c_master_dev_handle_t device = nullptr;
-    if (i2c_master_bus_add_device(i2cBus, &deviceConfig, &device) != ESP_OK)
+    lastI2cError = i2c_master_bus_add_device(i2cBus, &deviceConfig, &device);
+    if (lastI2cError != ESP_OK)
     {
         return nullptr;
     }
@@ -86,7 +94,8 @@ i2c_master_dev_handle_t expander = nullptr;
 bool writeExpander(uint8_t reg, uint8_t value)
 {
     uint8_t buffer[2] = {reg, value};
-    return i2c_master_transmit(expander, buffer, sizeof(buffer), kI2cTimeoutMs) == ESP_OK;
+    lastI2cError = i2c_master_transmit(expander, buffer, sizeof(buffer), kI2cTimeoutMs);
+    return lastI2cError == ESP_OK;
 }
 
 #if defined(IO_EXPANDER_16BIT)
@@ -199,9 +208,37 @@ bool clearLedRing()
 }
 #endif
 
+// "ack" if a device answers at address, else "nack", or the driver error when
+// the bus itself does not work (a slave holding SCL low times out).
+const char *probe(uint8_t address)
+{
+    if (!i2cBus)
+    {
+        return "no-bus";
+    }
+    const esp_err_t err = i2c_master_probe(i2cBus, address, kI2cTimeoutMs);
+    return err == ESP_OK ? "ack" : err == ESP_ERR_NOT_FOUND ? "nack" : esp_err_to_name(err);
+}
+
+// Why parking failed: the I2C error, the idle line levels (an idle bus reads
+// high on both; a low line is a slave stuck mid-transfer, which only a power
+// cycle releases once a bus clear did not) and which shared-bus devices answer.
+void reportFailure(const char *line)
+{
+    const int sda = gpio_get_level(static_cast<gpio_num_t>(PIN_NFC_I2C_SDA));
+    const int scl = gpio_get_level(static_cast<gpio_num_t>(PIN_NFC_I2C_SCL));
+    printf("ATTRACTAP_PARK_FAILED hardware=%s line=%s err=%s sda=%d scl=%d",
+           ATTRACTAP_PARK_HARDWARE, line, esp_err_to_name(lastI2cError), sda, scl);
+#if defined(HAS_IO_EXPANDER)
+    printf(" expander=%s", probe(IOEXPANDER_I2C_ADDR));
+#endif
+    printf(" pn532=%s\n", probe(PN532_I2C_ADDRESS));
+}
+
 // Returns the first hardware line that could not be parked, or nullptr.
 const char *park()
 {
+    lastI2cError = ESP_OK;
 #if defined(BEEPER_PIN) && !defined(HAS_IO_EXPANDER)
     driveLow(BEEPER_PIN);
 #endif
@@ -232,7 +269,11 @@ extern "C" void app_main(void)
     {
         if (failed)
         {
-            printf("ATTRACTAP_PARK_FAILED hardware=%s line=%s\n", ATTRACTAP_PARK_HARDWARE, failed);
+            reportFailure(failed);
+            if (i2cBus)
+            {
+                i2c_master_bus_reset(i2cBus);
+            }
             failed = park();
         }
         else

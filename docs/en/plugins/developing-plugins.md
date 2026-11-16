@@ -1,5 +1,7 @@
 # Developing Plugins
 
+<!-- llms-description: Developer guide to building Attraccess plugins: anatomy, SDKs, backend plugins, dependencies and reader UI integration. -->
+
 Attraccess plugins extend the platform with new API endpoints, background
 behaviour, and UI pages — without forking the core. A plugin can ship a
 **backend** half, a **frontend** half, or both, published as an npm package and
@@ -7,9 +9,9 @@ installed through the admin [Plugins](plugins/installing-plugins.md) page.
 
 ## Official plugin classification
 
-Plugin packages are Community by default. Attraccess marks a package Official only when its exact npm package name and registry source are listed in the core-owned allowlist at `apps/api/src/plugin-system/plugin-classification.service.ts`. Package metadata cannot grant this label.
+Plugin packages are Community by default. Attraccess marks a package Official only when it is installed from the public npm registry (`https://registry.npmjs.org`) and its name starts with `@attraccess/plugin-`. npm only lets members of the `attraccess` npm organization publish to the `@attraccess` scope, so the scope is what proves the package comes from Attraccess. Package metadata (such as an `official` flag) cannot grant this label, and the same name served by any other registry or mirror stays Community. The rule lives in `apps/api/src/plugin-system/plugin-classification.service.ts`.
 
-To add or remove an Official package, update that allowlist in a normal pull request. The review must confirm the exact registry host, package identity, and expected registry publisher when that metadata is available. Include tests for the approved source and for the same name from another registry. Official means maintained or approved by Attraccess; it does not imply a security sandbox or guarantee of safety. Installers must still review the source and requested permissions.
+Official packages are published from this repository's GitHub Actions workflows through npm trusted publishing, so each version carries a provenance attestation that links it to the commit and workflow that built it. Official means maintained by Attraccess; it does not imply a security sandbox or guarantee of safety. Installers must still review the source and requested permissions.
 
 This guide is a complete walkthrough. It follows a working example —
 **`plugin-hello-world`** — that exercises every core capability: a backend
@@ -87,9 +89,7 @@ Declare plugin dependencies in `package.json` under `attraccess.dependencies`:
 ```json
 {
   "attraccess": {
-    "dependencies": [
-      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
-    ]
+    "dependencies": [{ "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }]
   }
 }
 ```
@@ -179,19 +179,24 @@ export default plugin;
 
 `register(context)` receives a `PluginContext` — your gateway to the host:
 
-| Member                                                    | Purpose                                                                        | Permission               |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
-| `context.manifest`                                        | Your plugin's name, version, id, directory.                                    | none                     |
-| `context.logger`                                          | Logger prefixed with your plugin name.                                         | none                     |
-| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                 | per-entity (see below)   |
-| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                           | `DATABASE_ACCESS`        |
-| `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                            | `LISTEN_EVENTS`          |
-| `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                    | `EMIT_EVENTS`            |
-| `context.events`                                          | The raw shared event bus (restricted surface).                                 | per-method               |
-| `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                   | `RESOLVE_HOST_PROVIDERS` |
-| `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials. | `ACCESS_MQTT_SERVERS`    |
-| `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement. | `ACCESS_MQTT_SERVERS`    |
-| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                             | `ACCESS_MQTT_SERVERS`    |
+| Member                                                    | Purpose                                                                                                                                                           | Permission               |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| `context.manifest`                                        | Your plugin's name, version, id, directory.                                                                                                                       | none                     |
+| `context.hostVersion`                                     | Version of the running Attraccess host (the one plugin compatibility is checked against). Optional: hosts older than 1.11.0 do not set it, so handle `undefined`. | none                     |
+| `context.logger`                                          | Logger prefixed with your plugin name.                                                                                                                            | none                     |
+| `context.getRepository(entity)`                           | TypeORM repository over the shared connection.                                                                                                                    | per-entity (see below)   |
+| `context.dataSource`                                      | The raw shared TypeORM `DataSource`.                                                                                                                              | `DATABASE_ACCESS`        |
+| `context.onEvent(event, handler)`                         | Subscribe to a typed `SystemEvent`.                                                                                                                               | `LISTEN_EVENTS`          |
+| `context.emitEvent(event, payload)`                       | Emit a typed `SystemEvent`.                                                                                                                                       | `EMIT_EVENTS`            |
+| `context.events`                                          | The raw shared event bus (restricted surface).                                                                                                                    | per-method               |
+| `context.get(token)`                                      | Resolve an arbitrary host provider by token.                                                                                                                      | `RESOLVE_HOST_PROVIDERS` |
+| `context.getMqttServerConfig(serverId)`                   | Resolve an MQTT server's connection config + resolved (decrypted) credentials.                                                                                    | `ACCESS_MQTT_SERVERS`    |
+| `context.mqtt.subscribe(serverId, topicFilter, handler)`  | Subscribe through the host's shared MQTT connection; resolves after broker acknowledgement.                                                                       | `ACCESS_MQTT_SERVERS`    |
+| `context.mqtt.publish(serverId, topic, payload, options)` | Publish through the host's shared MQTT connection.                                                                                                                | `ACCESS_MQTT_SERVERS`    |
+| `context.notifications.dispatch(request)`                 | Notify users under a category your plugin declared. See [Notifications](#notifications).                                                                          | `SEND_NOTIFICATIONS`     |
+| `context.startBlocked.invalidate({ resourceId })`         | Tell open resource pages that your `startBlockedQuery` answer changed. See [Start-blocked state](#start-blocked-state).                                           | `ACCESS_HOOKS`           |
+| `context.resourceAccess`                                  | Read-only authorization, maintenance and session queries. See [Resource access](#resource-access-queries).                                                        | `ACCESS_RESOURCES`       |
+| `context.runSerialized(fn)`                               | Run database work in one serialized transaction. See [Serialized transactions](#serialized-transactions).                                                         | `DATABASE_ACCESS`        |
 
 > [!IMPORTANT]
 > Resolve services and repositories through `context`, never by re-initialising
@@ -206,18 +211,19 @@ array. At runtime the host hands your plugin a **guarded** `PluginContext`:
 accessing a capability whose permission you did not declare throws a clear error
 naming the missing permission.
 
-| Permission               | Grants access to                                                                                                                                                      |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                 |
-| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources.                                                                                                       |
-| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                       |
-| `DATABASE_ACCESS`        | `context.dataSource` and `context.getRepository(...)` for any other entity.                                                                                           |
-| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                           |
-| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                               |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                      |
-| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection. |
-| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                |
-| `ACCESS_HOOKS`           | The `preStartHook` and `sessionEndHook` — ask for a confirmation or block a session start. See [Reader UI](#reader-ui-and-start-hooks).                                |
+| Permission               | Grants access to                                                                                                                                                                                                                                                        |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.getRepository('User')` — read user accounts.                                                                                                                                                                                                                   |
+| `ACCESS_RESOURCES`       | `context.getRepository('Resource')` — read and write resources — and the read-only `context.resourceAccess` queries. See [Resource access](#resource-access-queries).                                                                                                   |
+| `READ_SETTINGS`          | `context.getRepository('Setting')` — read application settings.                                                                                                                                                                                                         |
+| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` for any other entity and `context.runSerialized(...)`.                                                                                                                                                               |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` and `context.events.emit(...)` / `emitAsync(...)`.                                                                                                                                                                                             |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` and `context.events.on(...)` / `once(...)` / ...                                                                                                                                                                                                 |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` — resolve arbitrary host services by token.                                                                                                                                                                                                        |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)`, `context.mqtt.subscribe(...)`, and `context.mqtt.publish(...)` — access an MQTT server through the host's pooled connection.                                                                                                   |
+| `READER_UI`              | `context.readerUi.invalidate(...)` and the `readerUi` provider — show widgets on Attractap reader screens. See [Reader UI](#reader-ui-and-start-hooks).                                                                                                                 |
+| `ACCESS_HOOKS`           | The `preStartHook`, `sessionEndHook`, `startBlockedQuery` and `startCapacityHook` — ask for a confirmation or block a session start, and show a blocked start in the UI. `startCapacityHook` also needs `DATABASE_ACCESS`. See [Reader UI](#reader-ui-and-start-hooks). |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` — send in-app, push and email notifications under categories the plugin declares, and declare editable email templates. See [Notifications](#notifications).                                                                      |
 
 ### MQTT subscriptions
 
@@ -285,6 +291,227 @@ The host emits at least `SystemEvent.RESOURCE_USAGE_STARTED` and
 that throws is **isolated** by the host — its error is logged and never breaks
 the core flow that emitted the event.
 
+Further events for plugins that follow maintenance, health and live sessions
+(all require `LISTEN_EVENTS`, payloads are `Date`-typed as in the SDK):
+
+| Event                                           | Payload                                                                                           | Fires                                                                                                                                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SystemEvent.MAINTENANCE_CHANGED`               | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | After a maintenance window was created or finished. Core currently emits `created` and `finished` only; `updated` is reserved for a future edit path. `endTime` is `null` while open-ended. |
+| `SystemEvent.RESOURCE_HEALTH_CHANGED`           | `{ resourceId, status, previousStatus, reason, identifier }`                                      | Only on a real status transition of a health entry.                                                                                                                                         |
+| `SystemEvent.RESOURCE_USAGE_SESSION_STARTED`    | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                                    | A user started a session on an idle resource (not a takeover). `supervisorUserId` is set for supervised starts.                                                                             |
+| `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`                     | A user took over a running session. Fires for the **new** user.                                                                                                                             |
+| `SystemEvent.RESOURCE_USAGE_SESSION_ENDED`      | `{ resourceId, usageId, userId, startTime, endTime, reason: 'ended' \| 'taken_over' }`            | A session ended, explicitly or because it was taken over.                                                                                                                                   |
+
+`SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED` carries a `ResourceSessionLimitChangedPayload`:
+
+| Event                                        | Payload                                                | Fires                                                                                                                                                                                                                                              |
+| -------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED` | `{ resourceId, previousLimit, newLimit, actorUserId }` | After commit, when the effective session limit of a resource changed (`maxParallelSessions`, or a type change that changes the limit). The limit is 1 for doors and other non-machine types. `actorUserId` is `null` when no user made the change. |
+
+### Notifications
+
+With `SEND_NOTIFICATIONS` a plugin notifies users in the app, by push and by
+email, respecting each user's notification preferences. Declare the categories
+on the backend module and dispatch under their short ids:
+
+```ts
+const plugin: PluginBackendModule = {
+  notificationCategories: [{ id: 'reminders', label: { en: 'Reminders', de: 'Erinnerungen' } }],
+  register(context) {
+    // keep `context` and call notify(context, ...) from your handlers
+    return { module: MyPluginModule };
+  },
+};
+
+async function notify(context: PluginContext, userId: number) {
+  await context.notifications.dispatch({
+    category: 'reminders',
+    recipients: [userId],
+    title: 'Your booking starts soon',
+    body: 'Booking #12 starts at 14:00.',
+    url: '/reservations/12', // relative to the application URL
+    severity: 'info', // or 'warning'
+    dedupeKey: 'reservations:reminder:12', // collapses repeated push messages
+    // an email template your plugin declared, see Email templates below
+    email: { template: 'reminder', variables: { booking: { id: 12, start: '14:00' } } },
+  });
+}
+```
+
+- A category id is short and unique within the plugin (lowercase letters, digits, `-`, `_`). The host namespaces it as
+  `plugin.<pluginName>.<id>` and lists it, with your `label`, in every user's notification preferences under the
+  plugin's name. Dispatching an undeclared category is rejected. Declaring categories without `SEND_NOTIFICATIONS`
+  quarantines the plugin at load time.
+- Unknown user ids are skipped and duplicates are collapsed. An email is only sent when `email` is set and the
+  recipient's preferences allow email for the category. The host renders it inside the global email layout.
+  Prefer an [email template](#email-templates): admins can edit it. Raw content (`email: { subject, text, html? }`)
+  remains possible for mails that must not be edited; `html` is a trusted fragment, `text` is used (escaped) when
+  `html` is omitted.
+- Dispatching is not transactional: if it fails, the plugin decides whether to retry. The reservations plugin claims
+  a "sent" flag first and never retries, so its notices are at most once.
+
+### Email templates
+
+Mails a plugin sends should be editable like the system's own mails. A plugin declares its templates on the backend
+module, and the host stores, lists and renders them with the same mechanism as the core templates: the global layout,
+per-locale translations, the editor under **Settings → Email → Templates**, and the `{{t "key" "default"}}` helper.
+Declaring templates requires `SEND_NOTIFICATIONS`; without it the plugin is quarantined at load time.
+
+```ts
+const plugin: PluginBackendModule = {
+  notificationCategories: [{ id: 'reminders', label: { en: 'Reminders', de: 'Erinnerungen' } }],
+  emailTemplates: [
+    {
+      id: 'reminder', // short id; the stored key is plugin.<pluginName>.reminder
+      label: { en: 'Booking reminder', de: 'Buchungserinnerung' }, // name in the template list
+      variables: ['booking.id', 'booking.start'], // offered in the editor ("Variables")
+      subject: '{{t "subject" "Reminder: booking {id}" id=booking.id}}',
+      body: `<mj-section><mj-column>
+  <mj-text>{{t "greeting" "Hello {name}," name=user.username}}</mj-text>
+  <mj-text>{{t "body" "Your booking starts at {start}." start=booking.start}}</mj-text>
+  <mj-button href="{{host.frontend}}/reservations/{{booking.id}}">{{t "open" "Open booking"}}</mj-button>
+</mj-column></mj-section>`,
+      translations: {
+        de: {
+          subject: 'Erinnerung: Buchung {id}',
+          greeting: 'Hallo {name},',
+          body: 'Ihre Buchung beginnt um {start}.',
+          open: 'Buchung öffnen',
+        },
+      },
+    },
+  ],
+  register: (context) => ({ module: MyPluginModule }),
+};
+
+await context.notifications.dispatch({
+  category: 'reminders',
+  recipients: [userId],
+  title: 'Your booking starts soon',
+  body: 'Booking #12 starts at 14:00.',
+  email: { template: 'reminder', variables: { booking: { id: 12, start: '14:00' } } },
+});
+```
+
+- **Declaration.** `subject` is a Handlebars string (usually one `t` call), `body` an MJML **fragment** without an
+  `<mjml>` root, which the host places in the global layout. English texts are the inline defaults of the `t` calls;
+  `translations.de` is required and must contain every `t` key (the plugin is quarantined otherwise). More locales may
+  be added next to `de`. Ids use lowercase letters, digits, `-` and `_`, and are unique within the plugin. Subject and
+  body must be valid Handlebars using only `t` and the built-in helpers (`if`, `unless`, `each`, `with`); partials and
+  decorators are not supported. Any declaration error, including a Handlebars syntax error, quarantines the plugin at
+  load time, so none of its hooks, categories or templates are registered.
+- **Variables.** `user.*`, `host.*` and `url` are always available; your `variables` object is merged next to them and
+  can never replace them. Values are HTML-escaped by the `t` helper and by `{{ }}`. List every variable the editor
+  should offer in `variables`. The locale of the recipient decides the language; a plugin never picks it.
+- **Storing and upgrades.** The host stores a declared template at startup, the first time its plugin is loaded with
+  it, together with the shipped translations. From then on the stored template belongs to the admins: subject, body
+  and translations are **never overwritten**, so their edits (including deleted translations) survive restarts and
+  plugin upgrades, and new defaults a plugin update ships do not replace the stored ones. Only the variable list
+  follows the declaration. **Reset to default** in the editor restores the currently declared version with its shipped
+  translations. Templates of a plugin that is disabled or uninstalled stay stored but are neither listed nor sendable.
+- **Admin UI.** Plugin templates appear in the same template list as core templates, after them, grouped by plugin
+  and marked with the plugin's name; the editor, the translations dialog and the reset action work the same way.
+- **Sending.** `email: { template, variables }` goes through `notifications.dispatch`, so each recipient's
+  preferences for the category apply. Sending a template the plugin did not declare is rejected. An invalid MJML body is
+  logged and the template is not registered, while the plugin's other templates still work. The application URL must
+  be configured (as for every core mail).
+
+### Resource access queries
+
+`context.resourceAccess` (permission `ACCESS_RESOURCES`) answers read-only
+authorization and state questions with the same logic the core uses to authorise
+a session start, so plugin decisions never drift from it.
+
+Methods marked with `principal` take either a user id or the request's user
+(`PluginAccessPrincipal = number | { id, effectivePermissions? }`). **Pass
+`request.user` for request-driven checks** so API-token scopes apply: an API
+token only carries the permissions it was created with, and permission-based
+grants are limited to that set (intersected with the user's current
+permissions), exactly as on core routes. Introducer/maintainer roles and
+introductions still count. A plain user id resolves the user's full RBAC
+permissions; use it for background work such as schedulers. Unknown users and
+resources yield negative answers (`false`, all-false, `[]`) rather than errors.
+
+| Method                                          | Returns                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `canStart(principal, resourceId)`               | `{ allowed, requiresSupervision, supervisionAllowed }`. Covers introductions, retraining blocks, introducers/maintainers, `resources.update` and the supervision mode. It does **not** consider live maintenance or health.                                                                                                                                                                                                                                                      |
+| `canMaintain(principal, resourceId)`            | Whether the user can manage maintenance of the resource (`resources.maintenance.manage`, introducer/maintainer of the resource or one of its groups). Same check as core's maintenance API.                                                                                                                                                                                                                                                                                      |
+| `canSeeUsageAttribution(principal, resourceId)` | Whether the user may see **who** is using the resource: core's rule for the current user's name in the resource UI and API (`resources.update`/`resources.access.manage`, people introduced to the machine, everybody when the instance shows activity to all). `false` where the user sees only free/in use (supervised-use machines in "introduced" mode), when the activity is hidden from the user and for unknown resources. Does not check hidden groups or account state. |
+| `hasPermission(principal, permission)`          | Whether the user holds an RBAC permission such as `resources.update`, limited to the request's scope.                                                                                                                                                                                                                                                                                                                                                                            |
+| `listResourceIdsIntroduced(principal)`          | Resources the user is introduced to in the sense of `canStart` (valid introduction, introducer/maintainer, `resources.update`).                                                                                                                                                                                                                                                                                                                                                  |
+| `listResourceIdsMaintained(principal)`          | Resources whose maintenance the user can manage.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `getMaintenanceWindows(resourceId, from, to)`   | Windows overlapping `[from, to)` as `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Open-ended maintenance counts until it is finished.                                                                                                                                                                                                                                                                                                             |
+| `getActiveSessions(resourceId)`                 | Running sessions `{ usageId, userId, startTime }`, earliest first.                                                                                                                                                                                                                                                                                                                                                                                                               |
+
+### Serialized transactions
+
+`context.runSerialized(fn)` (permission `DATABASE_ACCESS`) runs `fn(manager)` in
+a transaction that the host executes one at a time on SQLite. The transaction
+commits when `fn` resolves and rolls back when it throws, which makes
+check-then-write sequences such as overlap checks race-free:
+
+```ts
+await context.runSerialized(async (manager) => {
+  const clash = await manager.getRepository(Booking).count({ where: {/* overlapping window */} });
+  if (clash > 0) throw new ConflictException('OVERLAP');
+  await manager.getRepository(Booking).save(newBooking);
+});
+```
+
+The queue is shared with every core session start and end, so:
+
+- keep `fn` short and limited to database work through the given `manager`; do
+  no HTTP, MQTT, email or other non-database I/O inside it;
+- do not nest calls. A `runSerialized` started inside `fn` would wait for `fn`
+  itself, so the host rejects it with an error instead of hanging. Pass the
+  `manager` down to helpers instead, and do not await core operations that write
+  through the same queue (such as starting or ending a session) inside `fn`;
+- read and write only through `manager` inside `fn`, not through
+  `context.getRepository(...)` or `context.dataSource`. Their connection waits
+  for the lock `fn` holds: a write there fails with `SQLITE_BUSY` after about
+  5 seconds, and it stalls other queries on that connection meanwhile.
+
+Serialization is per host process. Plugins that need exclusion across several API
+instances need a cross-instance lock of their own; the reservations plugin runs
+on a single instance for that reason (see
+[Reservations](plugins/reservations/administration.md#single-instance-operation)).
+
+### Flow nodes
+
+A backend plugin can add nodes to the flow editor by returning `flowNodes` from its module (see `PluginFlowNodeDefinition` in the SDK). Trigger nodes (`isInput: true`) start flows when the plugin calls `context.flows.trigger(...)`, which needs the `TRIGGER_FLOWS` permission. The call matches the plugin's trigger nodes in resource flows **and** in enabled [global flows](flows/global-flows.md), using the same `matches` callback.
+
+#### Flow scopes
+
+Every node declares where it can be used with `flowScopes`:
+
+```ts
+const myNode: PluginFlowNodeDefinition = {
+  type: 'plugin.demo.send-on',
+  label: 'Send on',
+  flowScopes: ['resource', 'global'], // default: ['resource']
+  // ...
+};
+```
+
+- `flowScopes` is `readonly ('resource' | 'global')[]` and **defaults to `['resource']`**. A node only shows up in global flows after it opts in. Saving a global flow that contains a node without the `global` scope fails with a validation error naming the node.
+- `supportedByAllResources` filters resource flows only.
+- In a global flow there is no fixed resource. A run has a triggering resource only when a resource event started it, so opt in only when your node copes with that.
+
+#### The `resolveConfigSchema` context
+
+`resolveConfigSchema(currentConfig, context)` receives:
+
+```ts
+{
+  flowScope: 'resource' | 'global';
+  resourceId: number | null; // set only in resource flows
+  flowId: number | null; // set only in global flows
+  purpose?: 'editor' | 'preview';
+}
+```
+
+Plugins that do not opt in to global flows never see `null` in `resourceId`. Nodes that do opt in must handle both cases, and use `flowId` to identify a global flow, for example as the owner of a channel.
+
 ### Packaging the backend
 
 A backend plugin shares the host's NestJS runtime, event bus and database
@@ -292,10 +519,10 @@ connection. For dependency-injection identities to line up, your build must use
 the _same_ copies of those packages the host already loaded — it must **not**
 bundle its own. Split dependencies into two groups:
 
-| Dependency                                                                                                | How to declare it                                  | Why                                                                                                                                                  |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, **externalized** at build time | They carry the DI identities, the shared event bus and the single DB connection. A bundled copy is a _different_ type and silently fails to connect. |
-| `@attraccess/plugins-backend-sdk` and your own code                                                       | bundle normally                                    | Safe — the SDK's runtime surface is `Symbol.for()`, identity-safe across copies.                                                                     |
+| Dependency                                                                                                                                                           | How to declare it                                  | Why                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, **externalized** at build time | They carry the DI identities, the shared event bus and the single DB connection. A bundled copy is a _different_ type and silently fails to connect. |
+| `@attraccess/plugins-backend-sdk` and your own code                                                                                                                  | bundle normally                                    | Safe — the SDK's runtime surface is `Symbol.for()`, identity-safe across copies.                                                                     |
 
 Ship a **CommonJS** entry point (`index.js`), not an ES module. A minimal
 [esbuild](https://esbuild.github.io/) build that follows the rule:
@@ -306,6 +533,7 @@ esbuild backend/plugin.ts \
   --external:@nestjs/common --external:@nestjs/core \
   --external:@nestjs/event-emitter --external:eventemitter2 \
   --external:typeorm --external:reflect-metadata \
+  --external:@nestjs/swagger --external:class-validator --external:class-transformer \
   --external:@attraccess/plugins-backend-sdk
 ```
 
@@ -321,24 +549,33 @@ A plugin only describes **data** (a "Reader UI schema v1" node tree). No plugin 
 host validates, sanitizes and renders it. Admins configure this under **Reader display**, see
 [Reader display](attractap/reader-ui.md).
 
-| What                | Declared as                                               | Permission     |
-| ------------------- | --------------------------------------------------------- | -------------- |
-| Slot widgets        | `readerUi` (provider or `(context) => provider`)          | `READER_UI`    |
-| Pre-start hook      | `preStartHook`                                            | `ACCESS_HOOKS` |
-| Advisory after-stop | `sessionEndHook`                                          | `ACCESS_HOOKS` |
-| Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })` | `READER_UI`    |
+| What                | Declared as                                                               | Permission                           |
+| ------------------- | ------------------------------------------------------------------------- | ------------------------------------ |
+| Slot widgets        | `readerUi` (provider or `(context) => provider`)                          | `READER_UI`                          |
+| Pre-start hook      | `preStartHook`                                                            | `ACCESS_HOOKS`                       |
+| Advisory after-stop | `sessionEndHook`                                                          | `ACCESS_HOOKS`                       |
+| Start-blocked state | `startBlockedQuery` and `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS`                       |
+| Start capacity      | `startCapacityHook`                                                       | `ACCESS_HOOKS` and `DATABASE_ACCESS` |
+| Re-render on change | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`                          |
 
 A plugin that declares `readerUi` or a hook without the matching permission **fails to load** and is quarantined.
+The first-party [Reservations](plugins/reservations/overview.md) plugin is a real-world user of both hooks: its pre-start hook blocks or confirms starts around bookings, and its session-end hook asks the holder to keep or free the rest of a booking.
 See `examples/plugin-reader-ui` for a working example.
 
 ### Slots
 
-| Slot id                    | Where                                     | Node budget                                                                                                                                   |
-| -------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `resourceList.row.status`  | status line of a resource list row        | 1 `text` or `badge`, at most 24 characters. Shown only when no core status (in use, maintenance, unavailable, introduction required) applies. |
-| `resource.details.header`  | below the description on resource details | 6 nodes                                                                                                                                       |
-| `resource.details.body`    | resource details body                     | 8 nodes                                                                                                                                       |
-| `resource.details.session` | while the active-session block is shown   | 6 nodes                                                                                                                                       |
+| Slot id                    | Where                                                                 | Node budget                                                                                                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resourceList.row.status`  | status line of a resource list row and of the lock screen             | 1 `text` or `badge`, at most 24 characters. Shown only when no core status (in use, maintenance, unavailable, introduction required) applies. The lock screen shows while nobody is signed in, so only what you contributed without a card session ever appears there. |
+| `resource.details.header`  | below the description on resource details                             | 6 nodes                                                                                                                                                                                                                                                                |
+| `resource.details.body`    | resource details body                                                 | 8 nodes                                                                                                                                                                                                                                                                |
+| `resource.details.session` | only while a usage is active (`ctx.sessionActive`); card session only | 6 nodes                                                                                                                                                                                                                                                                |
+
+`ctx.sessionActive` (optional boolean) tells you whether the resource has an active usage visible on this reader.
+The reader shows `resource.details.session` only while that is `true`, so put a fact in that slot when it is `true`
+and in `resource.details.body` otherwise, and never in both: a booking or free window should appear in one block per
+screen. The host calls your provider again when a usage starts, ends or is taken over; the update limit of once per
+2 s per reader and slot still applies. A host that does not send the field leaves it unset; treat that as `false`.
 
 Components: `col`, `row`, `text`, `badge`, `icon` (`ok`, `warning`, `bell`, `lock`, `clock`), `progress`,
 `countdown`, `spacer`. Slot trees must not contain `button`. Tones are `primary`, `success`, `warning`, `danger`;
@@ -366,6 +603,35 @@ const readerUi: ReaderUiProvider = {
 };
 ```
 
+### Time zone on readers
+
+Readers show one clock, and your texts must agree with it. If your plugin writes times on reader screens (for
+example "Free until 14:00"), implement `getTimeZone` on the provider and return the IANA zone your texts use:
+
+```ts
+const readerUi: ReaderUiProvider = {
+  getSlotContributions(ctx) {
+    /* ... */
+  },
+  getTimeZone({ resourceId }) {
+    return resourceHasMyFeature(resourceId) ? 'Europe/Berlin' : undefined; // undefined = no opinion
+  },
+};
+```
+
+The host asks the plugins of a reader's resources (with the same 1.5 s timeout as slots; an error counts as no opinion)
+and uses the **first valid zone in host order**: the reader's resources by id, and for each resource the plugins in host
+order (alphabetically by plugin name); a slower plugin that answers within the time limit still wins over a faster one
+ranked lower. It sends the zone's UTC offset to the reader, daylight saving included. An invalid name is ignored, and
+names are compared canonically (`europe/berlin` is `Europe/Berlin`). If the answers differ for one reader, the first
+wins and admins get an alert. Without any answer the reader follows the server's `TZ`. If a plugin that could decide the
+zone times out, the host keeps the reader's current zone; without one yet it uses the next valid answer for now. Either
+way it asks again on a later heartbeat of the reader, after 5 s and then less often, up to every 5 minutes. Call
+`context.readerUi.invalidate(...)` when your zone changes; the host then re-resolves it and pushes the new offset, and
+the session start times of the resource list, to the affected readers at once. Do not write the current time into your
+texts: the reader's footer shows it on every screen except the lock screen, the signed-out list and the session summary
+(which has no footer unless a plugin question is open over it), so "check in by 14:15" can be related to now.
+
 ### Limits
 
 | Limit                       | Value                                                                    |
@@ -390,11 +656,25 @@ become `'` and `"`, dashes U+2010-2015 become `-`, `…` becomes `...`, thin and
 anything else becomes `?`). Dates from `Intl.DateTimeFormat` are covered. Preview your texts with the same rules
 so they fit the limits after transliteration.
 
+### Line breaks
+
+The reader wraps text at spaces and punctuation such as `,`, `-`, `.` and `_`, but never after `:` or `)`, so a
+time ("14:25") is never split and a closing parenthesis never starts a line. A hyphen is a break, so a long
+hyphenated name wraps there instead of mid-word, and so can a time range ("13:55-" / "14:25") that does not fit its
+line. A word longer than the line is still cut. The reader does not balance lines, and a newline in a text is
+replaced by a space.
+
+Write each clause as its own `text` node in a `col`, for example "Free until 13:55," and "then reserved by bea
+until 14:25", so no single time or note is left alone on a line. About 42 characters fit one line of the details
+body (18 px) and of a small (14 px) text beside a countdown. Split a longer clause yourself, for example between a
+name and its times: "Reserved by Wolfgang Mohrman" above "13:55-14:25".
+
 ### Privacy and language
 
-Public slots (signed-out reader) must not show names of other people. User-specific content belongs in
-user-scoped slots (`resource.details.session`) and steps; the host clears them when the card session ends. Prefer
-"Reserved" over names, and first name plus initial when a name is needed.
+Public slots (signed-out reader) must not show names of other people. Everything a provider returns during a card
+session is user-scoped, in every slot, and so are steps: the host removes it when the card session ends. Which slot
+holds a fact follows `ctx.sessionActive`, not privacy. Prefer "Reserved" over names, and first name plus initial
+when a name is needed.
 
 Every context carries `ctx.language` (`'en'` or `'de'`). For slot providers it is the reader language, or the card
 user's language while a card session is live. For `PreStartContext` and `SessionEndContext` it is the card user's
@@ -430,6 +710,9 @@ or `block`; the `choose` and `info` start steps of the schema are reserved for a
 - With several plugins any `block` wins; otherwise the confirmations are asked one after the other in host order.
   Each retry sends only the newest step id; the host remembers the earlier confirmations of the same attempt.
 - The hook runs after the host's read-only can-start check, so users who would be refused anyway never see a step.
+- `ctx.principal` is the starter as a `resourceAccess` principal. For web and API starts it carries the request's
+  permissions, so an API token's scope applies; for reader and supervision starts it is the plain user id. Pass it,
+  not `ctx.userId`, to `context.resourceAccess` for permission checks inside the hook.
 - A takeover is a start for the new user (`action: 'takeover'`). **Stop and emergency stop never go through hooks.**
 - **Supervision approval:** a `confirm` there blocks with your reason by default, because the supervisor cannot
   confirm on the requester's behalf.
@@ -438,6 +721,88 @@ or `block`; the `choose` and `info` start steps of the schema are reserved for a
   repeated crashes) follow the resource's no-screen policy: `block` (default), `card-confirm` (Lite: a second tap
   by the same user) or `allow-with-warning` (starts without a confirmation). `PluginConfirmation.noScreenPolicy`
   sets your default, admins can override it per resource.
+
+### Start-blocked state
+
+`preStartHook` only answers when somebody presses Start. To let the resource page show the reason **instead of the
+Start button**, a plugin also declares the query-side counterpart `startBlockedQuery`:
+
+```ts
+const startBlockedQuery: StartBlockedQuery = async (ctx) => {
+  const until = await endOfRunningBooking(ctx.resourceId, ctx.userId); // your own lookup
+  if (!until) return null; // nothing blocks
+  const de = ctx.language === 'de';
+  return {
+    reason: {
+      code: 'RESERVED',
+      title: de ? 'Reserviert' : 'Reserved',
+      body: de ? 'Von einer anderen Person reserviert.' : 'Reserved by another user.',
+    },
+    until, // optional Date: the UI shows it and refreshes itself then
+  };
+};
+```
+
+- **Same shape as a block.** `reason` is the `{ code, title, body }` of a `preStartHook` block, with the same limits and
+  reserved codes; `until` is optional. Return `null` for "not blocked".
+- **Informational only.** The server still runs `preStartHook` for every start, so the hook must keep blocking; a start
+  that slips through, or a stale page, ends in the usual error toast. Readers keep using the hook alone.
+- **Privacy is yours.** The query runs for the user who looks at the page (`ctx.userId`, with the request's scope in
+  `ctx.principal`). The reason is shown to that user as written, so apply your own visibility rules and never name
+  somebody the user may not see. When the reason names a person, ask
+  `context.resourceAccess.canSeeUsageAttribution(ctx.principal, ctx.resourceId)` instead of keeping your own rule: it is
+  the rule core applies to the current user of a machine. The reservations plugin names the holder exactly then, and
+  returns nothing for managers, who start through an override confirmation.
+- **Keep it cheap.** It runs whenever a resource page with a start button is open (about every 30 seconds per page, plus
+  when you invalidate). It has the hook timeout; a timeout, an error or an invalid answer count as "not blocked" and
+  never open the pre-start circuit breaker.
+- **Live.** Call `context.startBlocked.invalidate({ resourceId })` whenever something that decides the answer changed
+  (a booking was created, cancelled, started or ended). The host sends a `resource.start_blocked_changed` live event and
+  open pages ask again at once. Viewers who may not follow the resource live still refresh by polling and at `until`.
+- The HTTP side is `GET /api/resources/:resourceId/usage/start-blocked`, answering `{ blocked, reason?, until?, plugin? }`
+  for the signed-in user.
+
+### Start capacity on shared machines
+
+On a machine with `maxParallelSessions` above 1, a plugin that holds slots back for others (the reservations plugin
+does this for running confirmed bookings whose holder has no session yet) declares `startCapacityHook`. `preStartHook` alone cannot do this safely: two
+simultaneous starts could both pass and take the same slot.
+
+```ts
+const startCapacityHook: StartCapacityHook = async (ctx) => {
+  // ctx.manager is the host's start transaction: only read through it
+  const held = await countSlotsHeldForOthers(ctx.manager, ctx.resourceId, ctx.userId, ctx.now); // your own query
+  if (!held) return { heldSlots: 0 };
+  return {
+    heldSlots: held,
+    reason: {
+      code: 'RESERVED',
+      title: ctx.language === 'de' ? 'Reserviert' : 'Reserved',
+      body: ctx.language === 'de' ? 'Alle freien Plätze sind reserviert.' : 'All free slots are reserved.',
+    },
+  };
+};
+```
+
+- **When it runs.** Only on shared machines (limit above 1), inside core's serialized start transaction and after
+  core's own capacity check. The context carries `sessionLimit`, `occupiedSlots` (sessions and starts in progress, read
+  in the same transaction), `usersInSession`, `userId`, `principal`, `action`, `origin`, `confirmedStepKeys`,
+  `language` and `now`.
+- **`usersInSession`** (`number[]`) lists the users behind `occupiedSlots` (sessions and starts in progress), read in
+  the same transaction. Use it to tell whether a holder is already in a session; the hook does not need to query
+  core's session table.
+- **`action` is always `start`.** Shared machines have no takeover: a start there always adds a session.
+- **Core decides.** Return `{ heldSlots, reason? }`. Core refuses the start with your `reason` when
+  `occupiedSlots + heldSlots >= sessionLimit`, so simultaneous starts can never take a held slot.
+- **Always return a `reason` when your held slots can fill the machine.** Without one core refuses with its generic
+  "unavailable" text and audits an invalid result.
+- **Only read through `ctx.manager`, never nest `runSerialized`.** `ctx.manager` is core's transactional
+  `EntityManager`: never write through it. The start transaction is already serialized; starting another one inside
+  the hook makes it wait for itself. Keep the hook to one indexed query.
+- **Failures.** A failure, a timeout and an open circuit breaker follow the per-resource, per-plugin failure policy
+  (fail open or fail closed, see [Failures and trust](#failures-and-trust)) and are audited.
+- Requires `ACCESS_HOOKS` and `DATABASE_ACCESS` (the hook is handed core's transaction). A plugin that declares it
+  without both fails to load. Without a registered hook nothing changes.
 
 ### After-stop question
 
@@ -622,7 +987,7 @@ route props (`path`, `element`, ...) with an `authRequired` field:
 | `"resources.update"`                       | A single required RBAC permission key.   |
 | `["resources.update", "resources.create"]` | Any one of several RBAC permission keys. |
 
-See [Permissions](../user-management/permissions.md) for the full list of available permission keys.
+See [Permissions](user-management/permissions.md) for the full list of available permission keys.
 
 The host wraps each plugin route in an error boundary and merges it with the
 core routes, so a route that throws cannot take down the rest of the app.
@@ -732,10 +1097,25 @@ getSlotContributions(): PluginSlotContribution[] {
 The slot contract is intentionally generic — the SDK carries no domain
 knowledge. Host slot ids available today:
 
-| Slot id                | Where it renders                                  | Context            |
-| ---------------------- | ------------------------------------------------- | ------------------ |
-| `mqtt.server.detail`   | MQTT server detail/edit view (extensions section) | `{ mqttServerId }` |
-| `mqtt.server.list.row` | MQTT server list, per-row action area             | `{ mqttServerId }` |
+| Slot id                   | Where it renders                                                                        | Context                   |
+| ------------------------- | --------------------------------------------------------------------------------------- | ------------------------- |
+| `mqtt.server.detail`      | MQTT server detail/edit view (extensions section)                                       | `{ mqttServerId }`        |
+| `mqtt.server.list.row`    | MQTT server list, per-row action area                                                   | `{ mqttServerId }`        |
+| `resource.overview`       | Resource detail overview body (resource-level status or controls)                       | `{ resourceId }`          |
+| `resource.active-session` | Active-usage panel, directly after the host flow controls                               | `{ resourceId, usageId }` |
+| `resource.list.row`       | Resource list row, compact status area                                                  | `{ resourceId }`          |
+| `resource.settings`       | Resource settings page, shown to users who may manage the resource (`resources.update`) | `{ resourceId }`          |
+| `user.account`            | The signed-in user's own account page                                                   | `{ userId }`              |
+| `admin.settings`          | System settings index, only for users with the `system.settings.manage` permission      | `{}`                      |
+
+The slots `resource.settings`, `user.account` and `admin.settings` are rendered as
+**titled sections**: set `title` on the contribution (falls back to a generic
+plugin title). The constants `RESOURCE_OVERVIEW_SLOT`, `RESOURCE_SETTINGS_SLOT`,
+`USER_ACCOUNT_SLOT`, `ADMIN_SETTINGS_SLOT` and the context types
+(`ResourceSlotContext`, `UserSlotContext`, `AdminSettingsSlotContext`) are exported
+by `@attraccess/plugins-frontend-sdk`. The host only decides **where** a
+contribution is shown; your plugin's backend must still enforce permissions on its
+own API.
 
 ### Translations and language switching
 
@@ -965,10 +1345,10 @@ so they share the workspace toolchain, caching and CI.
   same anatomy as any plugin (`package.json`, `backend/plugin.ts`,
   `frontend/src/plugin.tsx`, …).
 - **nx tag:** every plugin app is tagged **`type:plugin`** in its `project.json`.
-  CI targets the set with `--projects=tag:type:plugin` (test + pack the plugins)
-  and the generic lint/typecheck/test/build jobs exclude it with
-  `--exclude=...,tag:type:plugin`, exactly mirroring how `scope:hardware` is
-  handled. List the plugin apps any time with:
+  CI's `plugins` job tests and packs every plugin app (selected by that tag), so
+  the generic full build skips them. Lint and typecheck no longer exclude plugin
+  apps. The exclusions for lint, typecheck and build live in one place,
+  `scripts/ci-nx-exclude.mjs`. List the plugin apps any time with:
 
   ```bash
   pnpm nx show projects --projects=tag:type:plugin
@@ -995,15 +1375,15 @@ so they share the workspace toolchain, caching and CI.
   plugin. Plugin source changes require running `install-dev` again; this target
   does not watch plugin sources.
 
-  | Target           | Produces                                                                |
-  | ---------------- | ----------------------------------------------------------------------- |
-  | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized) |
-  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)              |
+  | Target           | Produces                                                                       |
+  | ---------------- | ------------------------------------------------------------------------------ |
+  | `build-backend`  | `package/dist/index.js` (esbuild, CommonJS, host packages externalized)        |
+  | `build-frontend` | `package/frontend/remoteEntry.js` (Vite federation remote)                     |
   | `build`          | stages `package.json` and `plugin.json` in `package/` (depends on both builds) |
-  | `zip`            | `dist/plugin-<name>.zip` — uploadable in the Plugins UI                 |
-  | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)            |
-  | `pack-test`      | validates the packed tarball and loads its backend                      |
-  | `publish`        | publishes a new package version to npm                                  |
+  | `zip`            | `dist/plugin-<name>.zip` — uploadable in the Plugins UI                        |
+  | `pack`           | `dist/*.tgz` — the npm package artifact (depends on `build`)                   |
+  | `pack-test`      | validates the packed tarball and loads its backend                             |
+  | `publish`        | publishes a new package version to npm                                         |
 
   ```bash
    # Build and pack a single plugin app:
@@ -1016,10 +1396,26 @@ so they share the workspace toolchain, caching and CI.
    pnpm nx run-many --target=zip --projects=tag:type:plugin
   ```
 
-- **CI:** pull requests test and pack affected plugin apps. Every main-branch
-  build publishes every plugin app tagged `type:plugin` as a unique
-  `-nightly.<run>` version under npm's `next` tag. Release CI publishes changed
-  tagged plugin apps with a new version under `latest`.
+- **CI:** pull requests test and pack every plugin app. Publishing is decided from what npm has, not
+  from the pushed commits (`apps/plugins/scripts/plugin-publish-plan.mjs`). Every published manifest records the
+  commit it was built from in `gitHead` (plus `attraccess.publishedCommit` as a fallback). For each plugin the plan
+  reads the commit on the channel's dist-tag and publishes only if the plugin's inputs (its own files, the plugin
+  SDK libraries, other Nx inputs) changed since then. A plugin that was never published, or has no recorded commit,
+  is always published. Changes merged in a failed run are therefore picked up by the next green one, and an older
+  run finishing late never moves a tag backwards.
+  - **Nightly** (main, after all build, test and hardware gates pass) publishes the `package.json` version
+    without its prerelease suffix plus `-nightly.<run>.<attempt>` (e.g. `0.2.0-nightly.1180.1`) under `next`, in
+    the same gated outcome as the `nightly-<sha>` image.
+  - **Release** publishes the `package.json` version without its prerelease suffix (`0.2.0-alpha.0` becomes
+    `0.2.0`) under `latest`. The release checks every planned version before publishing any; if one already
+    exists, raise that plugin's major, minor or patch number (changing only the prerelease suffix is not
+    enough). After a release, bump the plugin to the next prerelease (e.g. `0.2.1-alpha.0`) so nightlies sort
+    above the released version.
+  - Nothing publishes to `alpha` any more; existing `alpha` tags are frozen. See
+    [Release channels](plugins/installing-plugins.md#release-channels).
+  - Preview the plan locally against the real registry with
+    `node apps/plugins/scripts/plugin-publish-plan.mjs --channel=next --dry-run` (or `--channel=latest`); add
+    `--out=plan.json` for the machine-readable plan.
 
 ## See Also
 
@@ -1045,7 +1441,7 @@ even after final unsubscribe; recreated consumers receive fresh samples.
 The host recovers valid same-user credential rotation without clearing queries
 and retains the stream across same-batch cleanup/setup. Plugin event payloads
 have no local replay.
-See [Plugin live updates](../../development/live-updates.md#plugin-live-updates)
+See [Plugin live updates](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#plugin-live-updates)
 for the contract and examples, including reconnection and cleanup.
-The [WAGO sampling schedule](../../development/live-updates.md#wago-sampling-schedule)
+The [WAGO sampling schedule](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#wago-sampling-schedule)
 lists the shared backend intervals for all nine WAGO topics.

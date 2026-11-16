@@ -1,4 +1,5 @@
 # Prometheus & Grafana einrichten
+<!-- llms-description: Prometheus und Grafana mit den gebündelten Attraccess-Dashboards per Coolify oder Docker Compose einrichten, inklusive Bearer-Token. -->
 
 Diese Anleitung behandelt die Einrichtung von Prometheus und Grafana zur Erfassung und Visualisierung von Attraccess-Metriken. Attraccess bündelt vorkonfigurierte Dashboards, Datenquellen-Provisioning und eine Prometheus-Scrape-Konfiguration im `attraccess`-Image unter `/app/share/monitoring/` — ein Klon des Repositorys ist für das Deployment des Stacks nicht nötig.
 
@@ -257,6 +258,19 @@ Hinweise:
 - **Eine Installation:** Replikate müssen sich eine Datenbank teilen. Mehrere unabhängige Installationen in einer Grafana-Instanz zu kombinieren wird nicht unterstützt.
 - **Lange Lesegeräte-Listen** werden auf etwa 200 Zeichen begrenzt (`; +N more`), damit die Pushover-Nachricht unter der Pushover-Grenze von 1.024 Zeichen bleibt und ihre Links zum Stummschalten und Ansehen behält. Namen von Lesegeräten werden auf 40 Zeichen gekürzt und `<` sowie `>` entfernt, weil Pushover die Nachricht als HTML darstellt.
 - **Upgrades:** Die frühere einzelne Regel `AttractapReaderCrashes` behält ihre UID und wird an Ort und Stelle ersetzt, der alte Wortlaut bleibt also nicht erhalten. Eine bestehende Grafana-Stummschaltung auf `AttractapReaderCrashes` unterdrückt daher auch die neue Crash-Warnung, bis sie abläuft.
+
+## Audit-Alarm
+
+`AuditRecordsDropped` ist ein kritischer Grafana-Alarm. Er löst aus, sobald `attraccess_audit_records_dropped_total` in den letzten 5 Minuten gestiegen ist, also mindestens ein Audit-Eintrag nicht gespeichert werden konnte, und wird etwa 5 Minuten nach dem letzten Verlust wieder aufgehoben. Die beschriebene Änderung selbst wurde trotzdem durchgeführt. Das API-Log enthält pro Verlust eine Zeile `Audit record dropped` mit Aktivitätsbereich (`domain`), Aktion, Grund und SQLite-Fehlercode (nie Ereignisdetails). Das Label `reason` nennt den Grund:
+
+- `storage_error`: Das Einfügen ist fehlgeschlagen; der SQLite-Code nennt die Ursache (z. B. `SQLITE_BUSY`, wenn die Datenbank 5 Sekunden lang gesperrt blieb).
+- `queue_full`: Mehr als 1.000 Audit-Schreibvorgänge warteten.
+- `storage_unavailable`: Audit-Speicher nicht verfügbar (Start fehlgeschlagen oder In-Memory-Datenbank).
+- `shutting_down`: Der Eintrag kam an, während die API herunterfuhr; bei einem Neustart zu erwarten.
+- `settings_unavailable`: Die Audit-Einstellungen konnten nicht gelesen werden.
+- `invalid_event`: Das Ereignis wurde als ungültig abgelehnt; das deutet auf einen Programmfehler hin.
+
+Wenn viele Zugriffe gleichzeitig auf die Datenbank warten, kann ein Audit-Schreibvorgang ohne Transaktion des Aufrufers bis zu 5 Sekunden warten, statt den Eintrag zu verlieren. Anmeldungen, die Authentifizierung von Lesegeräten und das Verknüpfen von Karten können dadurch kurz langsamer werden.
 
 ## Prometheus extern verfügbar machen (optional)
 

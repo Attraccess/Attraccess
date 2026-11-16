@@ -57,6 +57,12 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     permission: 'system.settings.manage',
   },
   {
+    key: 'readerSecurity',
+    path: '/settings/reader-security',
+    group: 'access',
+    permission: 'system.settings.manage',
+  },
+  {
     key: 'roles',
     path: '/settings/roles',
     group: 'access',
@@ -75,6 +81,12 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
   {
     key: 'monitoring',
     path: '/settings/monitoring',
+    group: 'operations',
+    permission: 'system.settings.manage',
+  },
+  {
+    key: 'attractap',
+    path: '/settings/attractap',
     group: 'operations',
     permission: 'system.settings.manage',
   },

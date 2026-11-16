@@ -15,6 +15,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { RabbitmqManagementClient } from '../management/client';
+import { requireMqttServerConfig } from '../management/config';
+import { RABBITMQ_MANAGE_PERMISSION, RABBITMQ_VIEW_PERMISSION } from '../permissions';
 
 export const PLUGIN_CONTEXT = Symbol.for('attraccess.plugin.context');
 
@@ -121,7 +123,7 @@ export class RabbitmqUsersService {
   // Lists all users with their per-vhost permissions, plus the vhost list for
   // the UI's vhost choices. Three management calls, joined here.
   async listUsers(mqttServerId: number): Promise<RabbitmqUserList> {
-    const config = await this.requireConfig(mqttServerId);
+    const config = await requireMqttServerConfig(this.context, mqttServerId);
 
     const [rawUsers, rawPermissions, rawVhosts] = await Promise.all([
       this.client.request<RawUser[]>(config, 'GET', '/users'),
@@ -159,7 +161,7 @@ export class RabbitmqUsersService {
   // the same operation (used by the create form's "default MQTT permissions").
   async upsertUser(mqttServerId: number, username: string, dto: UpsertRabbitmqUserDto): Promise<void> {
     this.assertValidName(username, 'Username');
-    const config = await this.requireConfig(mqttServerId);
+    const config = await requireMqttServerConfig(this.context, mqttServerId);
 
     const existing = await this.findUser(config, username);
     const password = dto.password?.length ? dto.password : undefined;
@@ -188,7 +190,7 @@ export class RabbitmqUsersService {
 
   async deleteUser(mqttServerId: number, username: string): Promise<void> {
     this.assertValidName(username, 'Username');
-    const config = await this.requireConfig(mqttServerId);
+    const config = await requireMqttServerConfig(this.context, mqttServerId);
 
     if (config.username !== null && config.username === username) {
       // Deleting the account the management calls run as would lock the plugin
@@ -206,14 +208,14 @@ export class RabbitmqUsersService {
   async setPermissions(mqttServerId: number, username: string, dto: SetRabbitmqPermissionDto): Promise<void> {
     this.assertValidName(username, 'Username');
     this.assertValidName(dto.vhost, 'Vhost');
-    const config = await this.requireConfig(mqttServerId);
+    const config = await requireMqttServerConfig(this.context, mqttServerId);
     await this.putPermission(config, username, dto);
   }
 
   async clearPermissions(mqttServerId: number, username: string, vhost: string): Promise<void> {
     this.assertValidName(username, 'Username');
     this.assertValidName(vhost, 'Vhost');
-    const config = await this.requireConfig(mqttServerId);
+    const config = await requireMqttServerConfig(this.context, mqttServerId);
     await this.client.request(
       config,
       'DELETE',
@@ -250,16 +252,6 @@ export class RabbitmqUsersService {
     }
   }
 
-  private async requireConfig(mqttServerId: number): Promise<MqttServerConnectionConfig> {
-    // ACCESS_MQTT_SERVERS gates this call; the core resolves + decrypts the
-    // credentials and hands us a broker-agnostic config.
-    const config = await this.context.getMqttServerConfig(mqttServerId);
-    if (!config) {
-      throw new HttpException('MQTT server not found.', HttpStatus.NOT_FOUND);
-    }
-    return config;
-  }
-
   private normalizeTags(tags: RawUser['tags']): string[] {
     if (Array.isArray(tags)) {
       return tags.filter((tag) => tag.length > 0);
@@ -283,18 +275,19 @@ export class RabbitmqUsersService {
   }
 }
 
-@Auth('resources.update')
 @Controller('rabbitmq')
 export class RabbitmqUsersController {
   // esbuild does not emit decorator metadata, so Nest cannot infer constructor
   // types for injection — always inject by an explicit token.
   constructor(@Inject(RabbitmqUsersService) private readonly users: RabbitmqUsersService) {}
 
+  @Auth(RABBITMQ_VIEW_PERMISSION)
   @Get('users/:mqttServerId')
   list(@Param('mqttServerId', ParseIntPipe) mqttServerId: number): Promise<RabbitmqUserList> {
     return this.users.listUsers(mqttServerId);
   }
 
+  @Auth(RABBITMQ_MANAGE_PERMISSION)
   @Put('users/:mqttServerId/:username')
   upsert(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
@@ -304,6 +297,7 @@ export class RabbitmqUsersController {
     return this.users.upsertUser(mqttServerId, username, dto ?? {});
   }
 
+  @Auth(RABBITMQ_MANAGE_PERMISSION)
   @Delete('users/:mqttServerId/:username')
   remove(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
@@ -312,6 +306,7 @@ export class RabbitmqUsersController {
     return this.users.deleteUser(mqttServerId, username);
   }
 
+  @Auth(RABBITMQ_MANAGE_PERMISSION)
   @Put('users/:mqttServerId/:username/permissions')
   setPermissions(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,
@@ -324,6 +319,7 @@ export class RabbitmqUsersController {
     return this.users.setPermissions(mqttServerId, username, dto);
   }
 
+  @Auth(RABBITMQ_MANAGE_PERMISSION)
   @Delete('users/:mqttServerId/:username/permissions')
   clearPermissions(
     @Param('mqttServerId', ParseIntPipe) mqttServerId: number,

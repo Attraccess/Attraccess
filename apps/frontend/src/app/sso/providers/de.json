@@ -66,7 +66,9 @@
   "copyFailedDesc": "Die URL konnte nicht in die Zwischenablage kopiert werden.",
   "copyUnsupported": "Clipboard-Zugriff ist in diesem Browser nicht verfügbar.",
   "emailAttributeKeys": "E-Mail-Attributschlüssel",
-  "emailAttributeKeysHint": "Kommagetrennte Attributnamen oder URNs, die zur Ermittlung der Benutzer-E-Mail geprüft werden (erste Übereinstimmung gewinnt).",
+  "emailAttributeKeysHint": "Attributnamen oder URNs, die zur Ermittlung der Benutzer-E-Mail in dieser Reihenfolge geprüft werden (erste Übereinstimmung gewinnt). Die integrierten Namen werden immer nach Ihren geprüft.",
+  "roleAttributeKeys": "Rollen-Attributschlüssel",
+  "roleAttributeKeysHint": "Attributnamen, aus denen Rollen oder Gruppen gelesen werden (Groß-/Kleinschreibung wird ignoriert). Die Liste leer lassen, um die angezeigten Standardwerte zu verwenden. Sobald gesetzt, werden NUR diese Schlüssel gelesen und die Standardwerte ignoriert: Ist einer vorhanden, werden Rollen, die nur aus einem Standardattribut stammten (z. B. groups), bei der nächsten Anmeldung entfernt. Erfordert die Berechtigung zum Verwalten von Benutzerrollen.",
   "signRequest": "AuthnRequests signieren",
   "wantAssertionsSigned": "Signierte Assertions erforderlich",
   "wantAuthnResponseSigned": "Signierte Antworten erforderlich",
@@ -74,9 +76,9 @@
   "copy": "Kopieren",
   "showClientSecret": "Client-Secret anzeigen",
   "hideClientSecret": "Client-Secret verbergen",
-  "scopes": "Scopes (durch Komma getrennt)",
-  "usernameClaimPaths": "Benutzername-Claim-Pfade (durch Komma getrennt)",
-  "emailClaimPaths": "E-Mail-Claim-Pfade (durch Komma getrennt)",
+  "scopes": "Scopes",
+  "usernameClaimPaths": "Benutzername-Claim-Pfade",
+  "emailClaimPaths": "E-Mail-Claim-Pfade",
   "permissionSyncTtlMinutes": "Abgleichsintervall (Minuten)",
   "permissionSyncTtlMinutesHint": "Die Rollen werden erneut geprüft, sobald seit der letzten Prüfung so viele Minuten vergangen sind, und beim Erneuern der Sitzung (höchstens einmal pro Minute). Höchstwert 525600 (365 Tage).",
   "permissionSync": {
@@ -90,6 +92,8 @@
       "existingSessions": "Nur Sitzungen, die mit dieser Attraccess-Version oder später begonnen wurden, können abgeglichen werden. Benutzer, die sich vor dem Update angemeldet haben, müssen sich noch einmal anmelden."
     }
   },
+  "roleClaimPaths": "Rollen-Claim-Pfade",
+  "roleClaimPathsHint": "Claim-Pfade, aus denen Rollen, Gruppen oder Berechtigungen gelesen werden. Die Liste leer lassen, um die angezeigten Standardwerte zu verwenden. Sobald gesetzt, werden NUR diese Pfade gelesen und die Standardwerte ignoriert: Ist der Claim vorhanden, werden Rollen, die nur aus einem Standardpfad stammten (z. B. groups), bei der nächsten Anmeldung entfernt. Erfordert die Berechtigung zum Verwalten von Benutzerrollen.",
   "samlProvisioningSecret": "SAML-Provisioning-Secret",
   "samlProvisioningSecretHint": "Wird für SAML-Provisioning-Aufrufe (Logout, Löschen, Berechtigungen) verwendet. Leer lassen, um das vorhandene Secret beizubehalten.",
   "showSamlProvisioningSecret": "Provisioning-Secret anzeigen",
@@ -137,5 +141,9 @@
   "frontchannelLogoutUrl": "Front-Channel-Abmelde-URI",
   "samlSloUrl": "Single-Logout-Service-URL",
   "logoutRegistrationHint": "Registrieren Sie diese exakten URLs beim Anbieter. Aktivieren Sie signierte Back-Channel-Nachrichten für zuverlässige Zustellung. Front-Channel-Nachrichten mit Sitzungs-ID werden unterstützt; Browser-Datenschutzeinstellungen können reine Cookie-Nachrichten blockieren.",
-  "samlLogoutRegistrationHint": "Registrieren Sie diese URL für HTTP-Redirect und HTTP-POST Single Logout. Attraccess sendet signierte Redirect-Nachrichten. Hinterlegen Sie das Signaturzertifikat des Anbieters und vertrauen Sie dem Attraccess-Signaturzertifikat."
+  "samlLogoutRegistrationHint": "Registrieren Sie diese URL für HTTP-Redirect und HTTP-POST Single Logout. Attraccess sendet signierte Redirect-Nachrichten. Hinterlegen Sie das Signaturzertifikat des Anbieters und vertrauen Sie dem Attraccess-Signaturzertifikat.",
+  "defaultsUsed": "Standardwerte: {{{defaults}}}",
+  "scopesEmptyHint": "Standardwerte: openid · email · profile",
+  "signingAlgorithmsEmptyHint": "Eine leere Liste wird als RS256 gespeichert",
+  "emailAttributeKeysEmptyHint": "Integrierte Namen: {{{defaults}}}"
 }

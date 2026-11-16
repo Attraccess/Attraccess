@@ -11,5 +11,8 @@ export default {
   moduleNameMapper: {
     '^@attraccess/(.*)$': '<rootDir>/../../../libs/$1/src/index.ts',
   },
-  coverageDirectory: '../../../coverage/apps/plugins/matter',
+  // Unit coverage feeds the project's crap-score target.
+  collectCoverage: true,
+  coverageReporters: ['json'],
+  coverageDirectory: '../../../coverage/apps/plugins/matter/test',
 };

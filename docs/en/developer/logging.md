@@ -1,4 +1,5 @@
 # API log destinations
+<!-- llms-description: How the API routes logs to destinations with RoutedLogger, including registering a driver and startup ownership. -->
 
 Services and plugins keep using `Logger` from `@nestjs/common`. `RoutedLogger` extends Nest's `ConsoleLogger` to reuse the installed Nest 11.1.28 argument parsing and effective level filter, then passes intact messages, context, level, ISO timestamp and supplied stacks to Winston's object-mode logger. There is no separate producer API. See [operator configuration](installation/environment-variables.md#api-application-logs).
 

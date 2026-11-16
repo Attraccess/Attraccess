@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { READER_UI_TIMING } from '@attraccess/plugins-backend-sdk';
-import { AuditService } from '../../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../../audit/recorder/audit-event';
 
 export interface WebStepBinding {
   userId: number;
@@ -44,7 +44,7 @@ const sameBinding = (a: WebStepBinding, b: WebStepBinding) =>
 export class WebStartStepStore {
   private readonly steps = new Map<string, WebStep>();
 
-  constructor(private readonly audit: AuditService) {}
+  constructor(@Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder) {}
 
   get size(): number {
     return this.steps.size;
@@ -122,23 +122,23 @@ export class WebStartStepStore {
     reasonCode: string,
   ): void {
     const viaToken = step.apiTokenId !== undefined;
-    void this.audit
-      .recordAttractap({
-        action,
-        subjectType: 'resource',
-        actorId: step.userId,
+    void this.audit.record({
+      domain: 'attractap',
+      action: `attractap.${action}` as const,
+      actor: {
+        id: step.userId,
         authenticationMethod: viaToken ? 'api-token' : 'session',
         ...(viaToken ? { apiTokenId: step.apiTokenId } : {}),
-        subjectId: step.resourceId,
-        details: {
-          plugin: step.plugin,
-          userId: step.userId,
-          resourceId: step.resourceId,
-          decision,
-          reasonCode,
-          origin: step.origin,
-        },
-      })
-      .catch(() => undefined);
+      },
+      subject: { type: 'resource', id: step.resourceId },
+      details: {
+        plugin: step.plugin,
+        userId: step.userId,
+        resourceId: step.resourceId,
+        decision,
+        reasonCode,
+        origin: step.origin,
+      },
+    });
   }
 }

@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
+import { useMemo, useRef, useState } from 'react';
+import { StatusDialog, TranslationMessage, useTranslations, useUrlQuery } from '@attraccess/plugins-frontend-ui';
 import { useNavigate } from 'react-router-dom';
-import { Loading } from '../loading';
-import { Alert, AlertContent, AlertDescription, AlertTitle, Card } from '@heroui/react';
 import en from './en.json';
 import de from './de.json';
 import {
@@ -15,25 +13,41 @@ import { getTranslationKeyForApiError } from '../../utils/apiError';
 import API_ERROR_TRANSLATIONS_EN from '../../global-translations/api-errors.en.json';
 import API_ERROR_TRANSLATIONS_DE from '../../global-translations/api-errors.de.json';
 
+const NON_RETRYABLE_ERRORS = [
+  'DeleteAccountTokenInvalidException',
+  'DeleteAccountTokenExpiredException',
+  'Cannot delete the last administrator',
+];
+
+// Rejects free text in the link's email parameter, which the confirm dialog displays.
+const isPlausibleEmail = (value: string) => value.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(value);
+
 export function ConfirmDeleteAccount() {
   const query = useUrlQuery();
   const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
-  const [allowRetry, setAllowRetry] = useState(false);
+  const [error, setError] = useState<{ message: TranslationMessage; retryable: boolean } | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
-  const { t, tExists } = useTranslations({
-    en: { ...en, apiErrors: { ...API_ERROR_TRANSLATIONS_EN, ...en.apiErrors } },
-    de: { ...de, apiErrors: { ...API_ERROR_TRANSLATIONS_DE, ...de.apiErrors } },
-  });
+  // Values only end up as React text, which escapes them already.
+  const { t, tMessage, tExists } = useTranslations(
+    {
+      en: { ...en, apiErrors: { ...API_ERROR_TRANSLATIONS_EN, ...en.apiErrors } },
+      de: { ...de, apiErrors: { ...API_ERROR_TRANSLATIONS_DE, ...de.apiErrors } },
+    },
+    { escapeValues: false },
+  );
 
   const token = useMemo(() => query.get('token'), [query]);
   const email = useMemo(() => query.get('email'), [query]);
 
   const queryClient = useQueryClient();
-  const didSendRequest = useRef(false);
+  // `isPending` reaches the render only after react-query notifies, so a fast double press needs this guard.
+  const isSending = useRef(false);
 
   const confirmDelete = useUsersServiceConfirmDeleteAccount({
     retry: false,
+    onSettled: () => {
+      isSending.current = false;
+    },
     onSuccess: () => {
       setIsSuccess(true);
       setError(null);
@@ -41,132 +55,114 @@ export function ConfirmDeleteAccount() {
         queryKey: [useUsersServiceGetCurrentKey],
       });
     },
-    onError: (error) => {
+    onError: (apiError) => {
       const { key, errorMessage } = getTranslationKeyForApiError({
-        error: error as ApiError,
+        error: apiError as ApiError,
         t,
         tExists,
         baseTranslationKey: 'apiErrors',
         fallbackKey: 'unexpectedError',
       });
-      const translation = t(key, { error: errorMessage });
-      setError(translation);
-      setAllowRetry(true);
+      // Some API errors translate to `{ title, description }`; the dialog has its own title.
+      const messageKey = tExists(key) ? key : `${key}.description`;
+      const { retryAfterSeconds } = ((apiError as ApiError).body ?? {}) as { retryAfterSeconds?: number };
+      setError({
+        message: { key: messageKey, data: { error: errorMessage, retryAfterSeconds } },
+        retryable: !NON_RETRYABLE_ERRORS.includes(errorMessage),
+      });
     },
   });
 
-  const confirm = useCallback(
-    (force = false) => {
-      if (didSendRequest.current && !force) {
-        return;
-      }
+  const goToLogin = () => navigate('/');
 
-      if (!token || !email) {
-        setError(t('apiErrors.invalidLink'));
-        didSendRequest.current = true;
-        return;
-      }
-
-      didSendRequest.current = true;
-      setAllowRetry(false);
-      confirmDelete.mutate({ requestBody: { token, email } });
-    },
-    [confirmDelete, email, token, t],
-  );
-
-  useEffect(() => {
-    if (token && email) {
-      confirm();
-    } else if (token !== null && email !== null) {
-      setError(t('apiErrors.invalidLink'));
-      didSendRequest.current = true;
+  const leaveDeletedAccount = () => {
+    // A failed refetch keeps the deleted user cached; reset it unless another signed-in user was confirmed.
+    const currentUser = queryClient.getQueryState([useUsersServiceGetCurrentKey]);
+    if (currentUser?.status !== 'success' || currentUser.fetchStatus !== 'idle') {
+      queryClient.resetQueries({ queryKey: [useUsersServiceGetCurrentKey] });
     }
-  }, [confirm, email, token, t]);
+    goToLogin();
+  };
 
-  useEffect(() => {
-    if (!didSendRequest.current || confirmDelete.isPending || isSuccess || error) {
+  const confirm = () => {
+    if (!token || !email || confirmDelete.isPending || isSending.current) {
       return;
     }
+    isSending.current = true;
+    confirmDelete.mutate({ requestBody: { token, email } });
+  };
 
-    const timeout = setTimeout(() => {
-      if (!confirmDelete.isPending && !isSuccess && !error && didSendRequest.current) {
-        setError(t('apiErrors.unexpectedError'));
-        didSendRequest.current = false;
-      }
-    }, 3000);
-
-    return () => clearTimeout(timeout);
-  }, [confirmDelete.isPending, isSuccess, error, t]);
+  if (!token || !email || !isPlausibleEmail(email)) {
+    return (
+      <StatusDialog
+        isOpen
+        status="error"
+        title={t('error.title')}
+        closeLabel={t('error.backToLogin')}
+        onClose={goToLogin}
+        data-cy="confirm-delete-account-invalid-dialog"
+      >
+        {t('apiErrors.invalidLink')}
+      </StatusDialog>
+    );
+  }
 
   if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full" data-cy="confirm-delete-success-card">
-          <Card.Header className="text-center">
-            <h2 className="text-3xl font-bold">{t('success.title')}</h2>
-          </Card.Header>
-          <Card.Content>
-            <p className="text-sm text-gray-600 dark:text-gray-400 text-center">{t('success.message')}</p>
-          </Card.Content>
-          <Card.Footer>
-            <Button
-              variant="primary"
-              className="w-full"
-              onPress={() => navigate('/')}
-              data-cy="confirm-delete-success-button"
-            >
-              {t('success.backToLogin')}
-            </Button>
-          </Card.Footer>
-        </Card>
-      </div>
+      <StatusDialog
+        isOpen
+        status="success"
+        title={t('success.title')}
+        closeLabel={t('success.backToLogin')}
+        onClose={leaveDeletedAccount}
+        data-cy="confirm-delete-account-success-dialog"
+      >
+        {t('success.message')}
+      </StatusDialog>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md w-full" data-cy="confirm-delete-error-card">
-          <Card.Header className="text-center">
-            <h2 className="text-3xl font-bold">{t('error.title')}</h2>
-          </Card.Header>
-          <Card.Content>
-            <Alert status="danger" data-cy="confirm-delete-error-alert">
-              <AlertContent>
-                <AlertTitle>{t('error.errorTitle')}</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </AlertContent>
-            </Alert>
-          </Card.Content>
-          <Card.Footer className="flex flex-col gap-2">
-            {allowRetry && (
-              <Button
-                variant="primary"
-                className="w-full"
-                onPress={() => confirm(true)}
-                isDisabled={confirmDelete.isPending}
-                data-cy="confirm-delete-error-try-again-button"
-              >
-                {t('error.tryAgain')}
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              className="w-full"
-              onPress={() => navigate('/')}
-              data-cy="confirm-delete-error-back-button"
-            >
-              {t('error.backToLogin')}
-            </Button>
-          </Card.Footer>
-        </Card>
-      </div>
+      <StatusDialog
+        isOpen
+        status="error"
+        title={t('error.title')}
+        closeLabel={t('error.backToLogin')}
+        onClose={goToLogin}
+        action={
+          error.retryable
+            ? {
+                label: t('error.tryAgain'),
+                onPress: confirm,
+                isPending: confirmDelete.isPending,
+                'data-cy': 'confirm-delete-account-retry-button',
+              }
+            : undefined
+        }
+        data-cy="confirm-delete-account-error-dialog"
+      >
+        {tMessage(error.message)}
+      </StatusDialog>
     );
   }
 
-  if (confirmDelete.isPending) {
-    return <Loading />;
-  }
-
-  return <Loading />;
+  return (
+    <StatusDialog
+      isOpen
+      status="error"
+      title={t('confirm.title')}
+      closeLabel={t('confirm.cancel')}
+      onClose={goToLogin}
+      action={{
+        label: t('confirm.action'),
+        onPress: confirm,
+        isPending: confirmDelete.isPending,
+        'data-cy': 'confirm-delete-account-confirm-button',
+      }}
+      data-cy="confirm-delete-account-dialog"
+    >
+      {t('confirm.description', { email })}
+    </StatusDialog>
+  );
 }

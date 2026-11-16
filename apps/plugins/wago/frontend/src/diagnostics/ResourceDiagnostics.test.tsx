@@ -30,6 +30,7 @@ const fixture: WagoResourceDiagnostics = {
         {
           nodeId: 'node-1',
           resourceId: 4,
+          flowId: null,
           channelId: 'output',
           control: true,
           href: '/resources/4/flows',
@@ -37,6 +38,8 @@ const fixture: WagoResourceDiagnostics = {
           conflict: true,
           conflictResourceIds: [9],
           conflictResources: [{ id: 9, name: 'Workbench outlet' }],
+          conflictFlowIds: [],
+          conflictFlows: [],
         },
       ],
     },
@@ -79,6 +82,31 @@ it('groups problems per node, dedupes repeated references, and unmounts on permi
     listeners.forEach((listener) => listener());
   });
   expect(screen.queryByText('WAGO setup needs attention')).toBeNull();
+});
+it('names global flows that also switch the channel and links their editor', async () => {
+  const [reference] = fixture.controllers[0].references;
+  respond({
+    ...fixture,
+    controllers: [
+      {
+        ...fixture.controllers[0],
+        references: [
+          {
+            ...reference,
+            conflictFlowIds: [3, 5],
+            conflictFlows: [
+              { id: 3, name: 'Power off all' },
+              { id: 5, name: null },
+            ],
+          },
+        ],
+      },
+    ],
+  });
+  mount();
+  const named = await screen.findByRole('link', { name: 'Power off all (global flow)' });
+  expect(named.getAttribute('href')).toBe('/devices/flows/3');
+  expect(screen.getByRole('link', { name: '#5 (global flow)' }).getAttribute('href')).toBe('/devices/flows/5');
 });
 it('does not fetch diagnostics without permission', () => {
   allowed = false;

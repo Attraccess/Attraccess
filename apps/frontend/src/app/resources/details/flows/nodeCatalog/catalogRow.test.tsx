@@ -14,7 +14,7 @@ const tStub: TFunction = ((key: string) => {
 }) as unknown as TFunction;
 
 const node: CatalogNode = {
-  schema: { type: ResourceFlowNodeType.INPUT_BUTTON, inputs: [], outputs: ['out'], isInput: true, isOutput: false, supportedByResource: true, configSchema: {} },
+  schema: { type: ResourceFlowNodeType.INPUT_BUTTON, inputs: [], outputs: ['out'], isInput: true, isOutput: false, supportedByResource: true, supportedFlowScopes: ['resource'], configSchema: {} },
   direction: 'down',
 };
 

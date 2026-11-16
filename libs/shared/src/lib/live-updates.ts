@@ -1,8 +1,13 @@
 /** One logical subscription on the tab's bundled live-update stream. */
 export type LiveSubscription =
   | { topic: 'resource' | 'flow-logs'; resourceId: number }
-  | { topic: 'billing' | 'messaging' | 'notifications' | 'supervision' | 'mass-introduction'; resourceId?: never; identifier?: never }
-  | { topic: `plugin:${string}:${string}`; identifier?: string; resourceId?: never };
+  | {
+      topic: 'billing' | 'messaging' | 'notifications' | 'supervision' | 'mass-introduction';
+      resourceId?: never;
+      identifier?: never;
+    }
+  | { topic: `plugin:${string}:${string}`; identifier?: string; resourceId?: never }
+  | { topic: 'mqtt-messages'; mqttServerId: number; filter: string; resourceId?: never; identifier?: never };
 
 export type LiveTopic = LiveSubscription['topic'];
 /** A valid same-user credential can recover by opening a new connection. */
@@ -16,6 +21,9 @@ export type LivePacket =
 export function liveSubscriptionKey(subscription: LiveSubscription): string {
   if (subscription.topic.startsWith('plugin:')) {
     return JSON.stringify([subscription.topic, 'identifier' in subscription ? (subscription.identifier ?? '') : '']);
+  }
+  if (subscription.topic === 'mqtt-messages') {
+    return JSON.stringify([subscription.topic, subscription.mqttServerId, subscription.filter]);
   }
   return `${subscription.topic}:${subscription.resourceId ?? ''}`;
 }

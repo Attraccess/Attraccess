@@ -4,11 +4,11 @@ import { PushService } from '../push/push.service';
 import { EmailService } from '../email/email.service';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationLiveService } from './notification-live.service';
-import { NotificationCategory, NotificationChannel } from './notification-types';
+import { AnyNotificationCategory, NotificationCategory, NotificationChannel } from './notification-types';
 import { SettingsService } from '../settings/settings.service';
 
 export interface NotificationDispatchRequest {
-  category: NotificationCategory;
+  category: AnyNotificationCategory;
   recipients: User[];
   channels?: NotificationChannel[];
   /** Static string, or a per-recipient resolver for locale-specific strings. */

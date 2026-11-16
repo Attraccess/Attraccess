@@ -24,7 +24,7 @@ function setup() {
       return x;
     }),
   };
-  const audit = { recordAttractap: jest.fn().mockResolvedValue(undefined) };
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
   const gauge = { set: jest.fn() };
   const service = new ReaderUiAlertsService(
     repository as never,
@@ -44,13 +44,14 @@ describe('ReaderUiAlertsService', () => {
     const b = await service.raise('breaker-open', 'down again', { plugin: 'p' });
     expect(b.id).toBe(a.id);
     expect(rows).toHaveLength(1);
-    expect(audit.recordAttractap).toHaveBeenCalledWith(
+    expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'ui.alert_changed',
+        domain: 'attractap',
+        action: 'attractap.ui.alert_changed',
         details: { kind: 'breaker-open', state: 'created', plugin: 'p' },
       }),
     );
-    expect(gauge.set).toHaveBeenLastCalledWith({ kind: 'crash-loop' }, 0);
+    expect(gauge.set).toHaveBeenCalledWith({ kind: 'time-zone-conflict' }, 0);
     expect(gauge.set).toHaveBeenCalledWith({ kind: 'breaker-open' }, 1);
   });
 

@@ -1,6 +1,9 @@
 # Node Types
+<!-- llms-description: Reference of all built-in flow nodes, grouped into input triggers, processing nodes and output actions. -->
 
 This reference covers all built-in flow nodes. The editor groups them by purpose, such as Billing, Messaging and Flow Control, and shows nodes supported by the resource type. Usage, activity and billing nodes are for **machines**; door triggers are for **doors**. Plugins can add further nodes with their own settings.
+
+Nodes can be used in **resource flows**, in [global flows](flows/global-flows.md), or in both. Nodes marked **Resource flows only** are hidden in global flows, and a global flow that contains one cannot be saved or imported. All other nodes work in both. Nodes that act on a resource (for example **End Usage Session** or **Record activity**) need a triggering resource in a global flow; see [The triggering resource](flows/global-flows.md#the-triggering-resource).
 
 Read [Payloads, Variables & Templates](flows/payloads-variables-templates.md) first for paths, typed values and examples. **Template** below means a Handlebars template evaluated against the current input. Other settings are literal unless stated otherwise. Object payloads also receive resource context, and templates can read stored variables.
 
@@ -12,7 +15,7 @@ Triggers start a run and pass their event data through **Output**.
 
 ### Button
 
-Type: `input.button` · Machines
+Type: `input.button` · Machines · Resource flows only
 
 Adds a manual button to the resource detail page. **Label** is required, literal button text. The payload starts with resource context; it does not include the user who pressed the button.
 
@@ -24,19 +27,19 @@ Example: connect a button labeled `Test relay` to **MQTT Send Message**.
 
 Type: `input.resource.usage.started` · Machines
 
-Runs during a usage start. No settings. Payload contains the new usage session's root fields (`id`, `startTime`, `user`, `formSubmissions`, etc.). Use `{{user.username}}` for the session owner. A flow failure can prevent the start; configure external actions' failure behavior accordingly.
+Runs during a usage start. No settings. Payload contains the new usage session's root fields (`id`, `startTime`, `user`, `formSubmissions`, etc.) and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Use `{{user.username}}` for the session owner. A flow failure can prevent the start; configure external actions' failure behavior accordingly.
 
 ### Resource Usage Stopped
 
 Type: `input.resource.usage.stopped` · Machines
 
-Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms and stop fields such as `endTime` and `endNotes`. Example: switch off a relay or add a billing item before settlement.
+Runs during a usage stop. No settings. Payload contains the outgoing session, submitted forms, stop fields such as `endTime` and `endNotes`, and [`activeSessions`](flows/payloads-variables-templates.md#active-sessions-on-shared-machines). Example: switch off a relay or add a billing item before settlement.
 
 ### Resource Usage Takeover
 
 Type: `input.resource.usage.takeover` · Machines
 
-Runs when an active session is taken over. No settings. Payload contains the outgoing usage session plus `newUser`, `oldUser` and `takeOverTime`. Use `{{newUser.username}}` for the incoming owner. A takeover uses this trigger instead of the ordinary Usage Started trigger.
+Runs when an active session is taken over. No settings. Payload contains the outgoing usage session plus `newUser`, `oldUser`, `takeOverTime` and `activeSessions` (always 1 to 1). Use `{{newUser.username}}` for the incoming owner. A takeover uses this trigger instead of the ordinary Usage Started trigger.
 
 ### Door Unlocked
 
@@ -56,6 +59,40 @@ Type: `input.resource.door.unlatched` · Doors
 
 Runs for a brief door-unlatch action. No settings. Uses the same payload shape as **Door Unlocked**. Example: send a pulse command to an electric strike.
 
+### Health Changed
+
+Type: `input.resource.health.changed` · All resources · Resource and global flows
+
+Runs when a resource's health status really changes; a report with the same status does not fire. No settings. Payload contains the resource context and `health: { identifier, status, previousStatus, reason }`. Example: in a global flow, send an MQTT or HTTP notification when any resource becomes unhealthy.
+
+| Field                   | Description                             |
+| ----------------------- | --------------------------------------- |
+| `health.identifier`     | Identifier of the health source         |
+| `health.status`         | New status                              |
+| `health.previousStatus` | Status before the change                |
+| `health.reason`         | Reason reported with the change, if any |
+
+### Maintenance Created
+
+Type: `input.resource.maintenance.created` · All resources · Resource and global flows
+
+Runs when a maintenance window is created, either manually or from a maintenance schedule. No settings. Payload contains the resource context and `maintenance: { id, reason, startTime, endTime }`.
+
+### Maintenance Finished
+
+Type: `input.resource.maintenance.finished` · All resources · Resource and global flows
+
+Runs when a maintenance window ends. No settings. Uses the same payload shape as **Maintenance Created**, with `endTime` set.
+
+### Maintenance Request Created
+
+Type: `input.resource.maintenance-request.created` · All resources · Resource and global flows
+
+Runs when a maintenance request is submitted for a resource. No settings. Payload contains the resource context and `maintenanceRequest: { id, reason, status, createdAt, createdByUser }`, where `createdByUser` is `{ id, username }` or `null`. Only user-visible fields are included.
+
+> [!WARNING]
+> Any signed-in user can create a maintenance request for a resource, so any authenticated user can fire this trigger. Do not connect it to actions you would not let any user cause.
+
 ### MQTT Message Received
 
 Type: `input.mqtt.message.received`
@@ -73,7 +110,7 @@ Type: `input.resource.activity.no-activity` · Machines · Editor: **Inactivity 
 
 **Minimum inactivity (minutes)** (`minInactivityMinutes`) is a positive integer. Runs only while a finalized usage session is active. Checks happen once per minute, so this is not a precise timer. Payload starts with resource context only.
 
-**Track Activity** resets the timer. After firing, the timer resets and can fire again if the session remains active. Activity timestamps are kept in memory and initialized again after a server restart. Example: connect to **End Usage Session** for automatic shutdown.
+**Track Activity** resets the timer of every no-activity node on the machine. Each no-activity node keeps its own schedule per machine and fires again while the session stays inactive: with a 5-minute and a 10-minute node, the first fires at 5, 10, 15 … minutes and the second at 10, 20 … minutes. Firing one node does not reset the others, and nodes in [global flows](flows/global-flows.md) and in the resource's own flow do not affect each other. Earlier versions reset the machine's timer for all its no-activity nodes whenever any of them fired, so in this example the 10-minute node never fired. Activity timestamps are kept in memory and initialized again after a server restart. Example: connect to **End Usage Session** for automatic shutdown.
 
 ### Variable Changed
 
@@ -125,25 +162,25 @@ Select a **Companion device** and optional decimal **Vendor ID / Product ID** fi
 
 ### Metering Start
 
-Type: `input.resource.metering.start` · Machines
+Type: `input.resource.metering.start` · Machines · Resource flows only
 
 Select a predefined **Meter**, or create one with a name. Prepares that meter before a tracked session starts or is taken over. **Timeout (seconds)** is 1–600, default **30**. The branch must reach **Metering Ready**. A priced meter that cannot initialize prevents the session from starting.
 
-Payload contains `metering: { sessionId, meterId, operationId, resourceId, usageId, kind, requestedAt }`, with `kind: "start"`. Example: read a lifetime counter with HTTP, then submit its baseline. See [Meters](flows/energy-metering.md).
+Payload contains `metering: { sessionId, meterId, operationId, resourceId, usageId, userId, kind, requestedAt }`, with `kind: "start"`. `userId` is the person of the session. Example: read a lifetime counter with HTTP, then submit its baseline. See [Meters](flows/energy-metering.md).
 
 ### Metering Collection
 
-Type: `input.resource.metering.collect` · Machines
+Type: `input.resource.metering.collect` · Machines · Resource flows only
 
-| Setting | Range / default |
-| --- | --- |
-| **Meter** | Select a predefined meter, or create one |
-| **Timeout (seconds)** | 1–600 / **30** |
-| **Interim interval (minutes)** | 0–1440 / **1**; `0` disables periodic readings |
-| **Final attempts** | 1–10 / **3** |
-| **Final retry delay (seconds)** | 0–120 / **5** |
+| Setting                         | Range / default                                |
+| ------------------------------- | ---------------------------------------------- |
+| **Meter**                       | Select a predefined meter, or create one       |
+| **Timeout (seconds)**           | 1–600 / **30**                                 |
+| **Interim interval (minutes)**  | 0–1440 / **1**; `0` disables periodic readings |
+| **Final attempts**              | 1–10 / **3**                                   |
+| **Final retry delay (seconds)** | 0–120 / **5**                                  |
 
-Runs for periodic readings, including while idle, and final readings at session end. Payload has the same metering fields as **Metering Start**, with `kind: "interim"` or `"final"`. While idle, `sessionId` and `usageId` are null. Connect the branch to **Report Meter** for the same meter. Periodic readings update lifetime and active-session totals; only session consumption is billed. See [Meters](flows/energy-metering.md) for freshness and pending charges.
+Runs for periodic readings, including while idle, and final readings at session end. Payload has the same metering fields as **Metering Start**, with `kind: "interim"`, `"final"` or `"boundary"` (a shared-meter reading at a session start or stop on a shared machine). While idle, `sessionId` and `usageId` are null. Connect the branch to **Report Meter** for the same meter. Periodic readings update lifetime and active-session totals; only session consumption is billed. See [Meters](flows/energy-metering.md) for freshness and pending charges.
 
 ## Processing Nodes
 
@@ -289,7 +326,13 @@ Example: use **Set Payload** to map a form answer to `quantity`, then add a cons
 
 Type: `output.resource.usage.end-session` · Machines · Editor: **End active session**
 
-**Notes** is an optional template. **On failure** follows the shared policy. Ends this resource's current session using its owner; a missing active session fails. Forwards unchanged payload on success. During a pending usage start/takeover, it can end that lifecycle's candidate session.
+**Notes** is an optional template. **On failure** follows the shared policy. **Which session** chooses what is ended:
+
+- **The triggering session** (default, and what older nodes do): the session that started this run; a missing active session fails.
+- **The session of a user**: the session of the user whose id is in **User id** (template, e.g. `{{user.id}}`). A user without a session fails.
+- **All sessions**: every running session of the machine. Without sessions nothing happens.
+
+Sessions that are already being ended are skipped. Each ended session runs its own [Usage Stopped](flows/node-types.md#resource-usage-stopped) flow, so only the last one reports `activeSessions.after` = 0. Inside a usage start or stop flow, **The session of a user** and **All sessions** pick the sessions when the node runs and end them right after that start or stop has finished, before the next start or stop on the machine; the session being started is never among them. If the start or stop fails, these ends are dropped; if the start flow ends its own new session with **The triggering session**, they still run (see [Active sessions on shared machines](flows/payloads-variables-templates.md#active-sessions-on-shared-machines)). Ends the session using its owner. The audit entry of each session it ends records the user who caused the flow run (**Triggering user ID**: who started, stopped or took over a session, or pressed the button; for sessions ended by a chain of flow ends, the user who started the chain). Flows started without a user (e.g. MQTT messages, inactivity or companion events) record none. Forwards unchanged payload on success. During a pending usage start/takeover, it can end that lifecycle's candidate session.
 
 Example notes: `Automatically ended after inactivity on {{resource.name}}`. This action skips required end-form submissions and note notifications.
 
@@ -359,13 +402,13 @@ Select a literal **Companion device**. Sends an unlock-screen command and saves 
 
 ### Metering Ready
 
-Type: `output.resource.metering.ready` · Machines
+Type: `output.resource.metering.ready` · Machines · Resource flows only
 
-| Setting | Description |
-| --- | --- |
-| **Meter** | Select the meter matching the start request |
+| Setting            | Description                                                |
+| ------------------ | ---------------------------------------------------------- |
+| **Meter**          | Select the meter matching the start request                |
 | **Baseline value** | Optional template for a cumulative counter's current total |
-| **Source** | Optional template naming the physical meter |
+| **Source**         | Optional template naming the physical meter                |
 
 Completes a **Metering Start** operation. Fails outside a start branch. Leave the baseline empty after resetting the source to zero; a configured baseline that renders empty fails. The catalog exposes no outgoing connection.
 
@@ -373,17 +416,20 @@ Example after HTTP returning `{"counter":1500}`: baseline `{{counter}}`. No unit
 
 ### Report Meter
 
-Type: `output.resource.metering.report`
+Type: `output.resource.metering.report` · Resource flows only
 
-| Setting | Description |
-| --- | --- |
-| **Meter** | Select a predefined meter, or create one with a name |
-| **Mode** | **total** for a cumulative counter; **increment** for an increase |
-| **Value** | Required non-negative numeric value or template |
-| **Observed at** | Optional ISO timestamp template; defaults to reporting time |
-| **Source** | Optional template naming the meter |
+| Setting         | Description                                                       |
+| --------------- | ----------------------------------------------------------------- |
+| **Meter**       | Select a predefined meter, or create one with a name              |
+| **Mode**        | **total** for a cumulative counter; **increment** for an increase |
+| **Value**       | Required non-negative numeric value or template                   |
+| **Observed at** | Optional ISO timestamp template; defaults to reporting time       |
+| **Source**      | Optional template naming the meter                                |
+| **Usage ID**    | Optional template rendering the usage ID the reading belongs to   |
 
 Reports values in collection branches and ordinary flows, including outside sessions. A reply in a collection branch must match the requested meter. No unit is required. The first unsolicited cumulative reading establishes a baseline; subsequent increases update lifetime consumption. Increments directly increase consumption. During an active session, accepted increases also update that session's total. A configured observed-at template that renders empty fails; final readings must be fresh. The catalog exposes no outgoing connection.
+
+A reading pushed outside a metering run to a meter set to **Measured per session** must name the usage it belongs to: in a session lifecycle flow (start, stop, takeover) the lifecycle's usage is used, otherwise set **Usage ID** to a template that renders a usage ID, such as `{{ id }}` in a flow started by **Usage started** or **Usage stopped**, or `{{ metering.usageId }}` in a metering flow. A **Usage ID** that names a different usage than the lifecycle the flow runs in is rejected. With more than one running session, a reading that names no usage is rejected with a flow error and never guessed. Readings of a **Shared and split** meter belong to the meter and need no usage ID. See [Meters on shared machines](flows/energy-metering.md#meters-on-shared-machines).
 
 Example after **Wait for MQTT Message** returning `{"heartbeats":1500}` in its content: choose **Heartbeats**, mode **total**, value `{{payload.heartbeats}}`. See [Meters](flows/energy-metering.md) for baselines and retries.
 

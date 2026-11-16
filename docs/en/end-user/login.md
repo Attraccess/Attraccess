@@ -1,4 +1,5 @@
 # Logging In
+<!-- llms-description: The ways to log in to Attraccess: password, SSO, two-factor authentication, registration and password reset. -->
 
 This page explains the different ways to log in to Attraccess.
 

@@ -1,6 +1,9 @@
 import { AuditLog, Setting, entities } from '@attraccess/database-entities';
 import httpRequest from 'supertest';
 import { AuditService } from '../../../../api/src/audit/audit.service';
+import { AuditQueryService } from '../../../../api/src/audit/audit-query.service';
+import { PluginAuditHost } from '../../../../api/src/audit/plugin-audit-host';
+import { createTestAuditMetrics } from '../../../../api/src/audit/audit.test-fixture';
 import { SettingsStoreService } from '../../../../api/src/settings/settings-store.service';
 import { WagoCommissioningSession } from '../../backend/commissioning/sessions/session.entity';
 import { WagoCommissioningService } from '../../backend/commissioning/service';
@@ -28,7 +31,8 @@ import { createPluginAuditContext } from '../../../../api/src/plugin-system/runt
 import { fw31IdentityOutput } from '../../backend/fixtures/fw31-identity';
 import { CLOCK_INSPECTION_SCRIPT } from '../../backend/commissioning/delivery/clock';
 import { WAGO_HARDWARE_PROFILE } from '../../backend/host/hardware-deployment';
-import { type RuntimeArtifactManifest, WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/catalog';
+import { type RuntimeArtifactManifest } from '../../backend/runtime/artifacts/catalog';
+import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/service';
 
 describe('composed WAGO hooks through the host bridge and durable SQLite provider', () => {
   const state = new AuditFixtureState();
@@ -68,7 +72,11 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       entities: [...Object.values(entities), ...plugin.entities],
       synchronize: false,
     }).initialize();
-    state.audit = new AuditService(state.db, new SettingsStoreService(state.db.getRepository(Setting), null));
+    state.audit = new AuditService(
+      state.db,
+      new SettingsStoreService(state.db.getRepository(Setting), null),
+      createTestAuditMetrics(),
+    );
     await state.audit.onModuleInit();
     state.mqtt = new FixtureMqtt();
     state.revoke.mockReset().mockResolvedValue(undefined);
@@ -84,7 +92,8 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       manifest: { id: pluginId, name: 'wago-fixture', version: '1.0.0', pluginDirectory: state.directory },
       dataSource: state.db,
       getRepository: (entity) => state.db.getRepository(entity),
-      audit: createPluginAuditContext(pluginId, () => state.audit),
+      // The SDK host provider, mapping onto the current audit service's recorder port.
+      audit: createPluginAuditContext(pluginId, () => new PluginAuditHost(state.audit)),
       mqtt: state.mqtt,
       events: new EventEmitter2(),
       logger: { log: jest.fn(), error: jest.fn(), warn: jest.fn() },
@@ -94,6 +103,18 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
       onEvent: () => ({ off: () => undefined }),
       emitEvent: () => undefined,
       flows: { trigger: async () => undefined },
+      notifications: {
+        dispatch: async () => {
+          throw new Error('Unexpected fixture notification');
+        },
+      },
+      startBlocked: { invalidate: () => undefined },
+      resourceAccess: new Proxy({} as PluginContext['resourceAccess'], {
+        get: () => () => {
+          throw new Error('Unexpected fixture resource access query');
+        },
+      }),
+      runSerialized: (fn) => state.db.transaction((manager) => fn(manager)),
       secrets: {
         encrypt: (value) => encryption.encryptForPlugin(pluginId, value),
         decrypt: (value) => encryption.decryptForPlugin(pluginId, value),
@@ -318,7 +339,11 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.audit.onModuleDestroy();
     await state.db.destroy();
     await state.db.initialize();
-    state.audit = new AuditService(state.db, new SettingsStoreService(state.db.getRepository(Setting), null));
+    state.audit = new AuditService(
+      state.db,
+      new SettingsStoreService(state.db.getRepository(Setting), null),
+      createTestAuditMetrics(),
+    );
     await state.audit.onModuleInit();
     state.wago = new WagoService(state.context);
     state.commissioning = new WagoCommissioningService(state.context, state.wago, state.artifacts);
@@ -393,10 +418,19 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.audit.onModuleDestroy();
     await state.db.destroy();
     await state.db.initialize();
-    state.audit = new AuditService(state.db, new SettingsStoreService(state.db.getRepository(Setting), null));
+    state.audit = new AuditService(
+      state.db,
+      new SettingsStoreService(state.db.getRepository(Setting), null),
+      createTestAuditMetrics(),
+    );
     await state.audit.onModuleInit();
     expect(await state.db.getRepository(AuditLog).find({ order: { id: 'ASC' } })).toEqual(before);
-    expect((await state.audit.list({ limit: 100 })).items).toHaveLength(4);
+    const query = new AuditQueryService(
+      state.audit,
+      state.db,
+      new SettingsStoreService(state.db.getRepository(Setting), null),
+    );
+    expect((await query.list({ limit: 100 })).items).toHaveLength(4);
   });
 
   it('persists publication, forced publication, rollback and idempotent rejection acknowledgement revisions', async () => {

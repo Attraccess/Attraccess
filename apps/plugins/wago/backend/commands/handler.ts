@@ -190,17 +190,37 @@ export class WagoCommandHandler {
     };
   }
 
-  protected async references(controllerId: number, channelId: string, resourceId: number): Promise<string[]> {
-    const nodes = await this.dependencies.context.dataSource
+  /**
+   * Lists command nodes of other owners that control the same channel. A resource flow is owned by its
+   * resource, a global flow by itself. NULL owner columns must be matched explicitly: `<>` skips them.
+   */
+  protected async references(
+    controllerId: number,
+    channelId: string,
+    resourceId: number | null,
+    flowId: number | null = null,
+  ): Promise<string[]> {
+    const query = this.dependencies.context.dataSource
       .getRepository(ResourceFlowNode)
       .createQueryBuilder('node')
-      .select(['node.id', 'node.resourceId'])
+      .select(['node.id', 'node.resourceId', 'node.flowId'])
+      .leftJoin('node.flow', 'flow')
+      .addSelect(['flow.id', 'flow.name'])
       .where('node.type = :type', { type: 'plugin.wago.command' })
-      .andWhere('node.resourceId <> :resourceId', { resourceId })
       .andWhere("node.data ->> 'controllerId' = :controllerId", { controllerId })
-      .andWhere("node.data ->> 'channelId' = :channelId", { channelId })
-      .getMany();
-    return nodes.map((node) => `resource ${node.resourceId} / node ${node.id}`);
+      .andWhere("node.data ->> 'channelId' = :channelId", { channelId });
+    if (flowId !== null) {
+      query.andWhere('(node.flowId IS NULL OR node.flowId <> :flowId)', { flowId });
+    } else if (resourceId !== null) {
+      query.andWhere('(node.resourceId IS NULL OR node.resourceId <> :resourceId)', { resourceId });
+    }
+    const nodes = await query.getMany();
+    // A global flow is named for the reader; the id is only the fallback.
+    return nodes.map((node) =>
+      node.flowId !== null && node.flowId !== undefined
+        ? `global flow ${node.flow?.name ? JSON.stringify(node.flow.name) : node.flowId} / node ${node.id}`
+        : `resource ${node.resourceId} / node ${node.id}`,
+    );
   }
 
   destroy(): void {
@@ -359,8 +379,9 @@ export class WagoCommandHandler {
 
   async schema(
     config: Record<string, unknown>,
-    resourceId: number,
+    resourceId: number | null,
     previewOnly = false,
+    flowId: number | null = null,
   ): Promise<Record<string, unknown>> {
     const controllerId = positiveInteger(config.controllerId);
     const controllers =
@@ -389,7 +410,8 @@ export class WagoCommandHandler {
         ),
       };
     const channel = outputChannels.find((item) => item.id === channelId);
-    const references = channelId && controllerId ? await this.references(controllerId, channelId, resourceId) : [];
+    const references =
+      channelId && controllerId ? await this.references(controllerId, channelId, resourceId, flowId) : [];
     const properties: Record<string, unknown> = {
       controllerId: {
         type: 'number',
@@ -416,7 +438,7 @@ export class WagoCommandHandler {
         })),
         refreshesSchema: true,
         description: references.length
-          ? `Also controlled by resource flow node${references.length === 1 ? '' : 's'}: ${references.join(', ')}. Reuse is allowed.`
+          ? `Also controlled by flow node${references.length === 1 ? '' : 's'}: ${references.join(', ')}. Reuse is allowed.`
           : outputChannels.length
             ? undefined
             : 'This applied configuration has no output channels. Add an output and publish it first.',

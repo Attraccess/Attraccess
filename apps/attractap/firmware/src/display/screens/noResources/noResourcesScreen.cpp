@@ -1,5 +1,6 @@
 #include "display/i18n.hpp"
 #include "noResourcesScreen.hpp"
+#include "../../shared/screenChrome.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include "../../theme.hpp"
 #include "../../images/lockscreen_background_image.hpp"
@@ -19,8 +20,8 @@ void NoResourcesScreen::init()
    lv_obj_set_style_bg_image_src(this->screen, &lockscreen_background_image, LV_PART_MAIN);
    lv_obj_set_style_pad_left(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
    lv_obj_set_style_pad_right(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_top(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
-   lv_obj_set_style_pad_bottom(this->screen, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_top(this->screen, ScreenChrome::Top, LV_PART_MAIN | LV_STATE_DEFAULT);
+   lv_obj_set_style_pad_bottom(this->screen, ScreenChrome::Bottom, LV_PART_MAIN | LV_STATE_DEFAULT);
 
    lv_obj_t *noResourcesMessage = lv_label_create(this->screen);
    lv_obj_set_width(noResourcesMessage, lv_pct(100));

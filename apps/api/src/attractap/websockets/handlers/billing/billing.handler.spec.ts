@@ -7,7 +7,7 @@ describe('AttractapBillingHandler', () => {
   let mockSocket: {
     id: string;
     readerId: number;
-    state: { lastAuthenticatedUserId: number | null };
+    state: { verifiedUserId: number | null };
     sendMessage: jest.Mock;
     sendBinaryData: jest.Mock;
   };
@@ -48,7 +48,7 @@ describe('AttractapBillingHandler', () => {
     mockSocket = {
       id: 'test-id',
       readerId: 42,
-      state: { lastAuthenticatedUserId: 7 },
+      state: { verifiedUserId: 7 },
       sendMessage: jest.fn().mockResolvedValue(undefined),
       sendBinaryData: jest.fn(),
     };
@@ -71,8 +71,8 @@ describe('AttractapBillingHandler', () => {
   });
 
   describe('user not authenticated', () => {
-    it('sends USER_NOT_AUTHENTICATED when lastAuthenticatedUserId is null', async () => {
-      mockSocket.state.lastAuthenticatedUserId = null;
+    it('sends USER_NOT_AUTHENTICATED when verifiedUserId is null', async () => {
+      mockSocket.state.verifiedUserId = null;
 
       await callHandler({ amountCents: 1000 });
 
@@ -82,8 +82,8 @@ describe('AttractapBillingHandler', () => {
       expect(mockSumUpService.topUpWithReader).not.toHaveBeenCalled();
     });
 
-    it('sends USER_NOT_AUTHENTICATED when lastAuthenticatedUserId is 0 (falsy)', async () => {
-      mockSocket.state.lastAuthenticatedUserId = 0;
+    it('sends USER_NOT_AUTHENTICATED when verifiedUserId is 0 (falsy)', async () => {
+      mockSocket.state.verifiedUserId = 0;
 
       await callHandler({ amountCents: 1000 });
 

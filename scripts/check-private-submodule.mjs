@@ -1,0 +1,82 @@
+#!/usr/bin/env node
+/* eslint-disable no-console -- CLI diagnostics are intentional. */
+// apps/cesentry is a private repository mounted as a git submodule (CONTRIBUTING.md, "Private submodule"). This
+// repository may hold only the pointer to it: one gitlink entry, never files under the path. `update = none` keeps
+// `git clone --recurse-submodules` and `git submodule update` from trying to fetch it for people without access.
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const SUBMODULE_PATH = 'apps/cesentry';
+export const SUBMODULE_URL = 'https://github.com/Attraccess/cesentry.git';
+const HINT = 'See CONTRIBUTING.md, "Private submodule".';
+
+const git = (args, cwd) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+
+function gitmodules(args, cwd) {
+  try {
+    return git(['config', '--file', '.gitmodules', ...args], cwd)
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    // `git config` exits 1 when the key (or the file) is missing.
+    return [];
+  }
+}
+
+const gitmodulesValue = (key, cwd) => gitmodules(['--get-all', `submodule.${SUBMODULE_PATH}.${key}`], cwd);
+
+/** Returns the problems found in the index and in .gitmodules (empty when the pointer is intact). */
+export function checkPrivateSubmodule(start = process.cwd()) {
+  const cwd = git(['rev-parse', '--show-toplevel'], start).trim();
+  const problems = [];
+  const entries = git(['ls-files', '--stage', '-z', '--', SUBMODULE_PATH], cwd).split('\0').filter(Boolean);
+  const gitlinks = entries.filter((entry) => entry.startsWith('160000 ') && entry.endsWith(`\t${SUBMODULE_PATH}`));
+  if (entries.length === 0) {
+    problems.push(`The submodule pointer ${SUBMODULE_PATH} (mode 160000) is missing from the index. ${HINT}`);
+  } else if (entries.length !== 1 || gitlinks.length !== 1) {
+    problems.push(
+      `${SUBMODULE_PATH} must be exactly one submodule pointer (mode 160000); the index has ${entries.length} ` +
+        `entr${entries.length === 1 ? 'y' : 'ies'} there:\n${entries.map((entry) => `  ${entry}`).join('\n')}\n` +
+        `Remove the others with \`git rm -r --cached <path>\`. ${HINT}`,
+    );
+  }
+  // CI clones this repository with --recurse-submodules, which would fetch any other submodule a PR declares.
+  const otherGitlinks = git(['ls-files', '--stage', '-z'], cwd)
+    .split('\0')
+    .filter((entry) => entry.startsWith('160000 '))
+    .map((entry) => entry.slice(entry.indexOf('\t') + 1))
+    .filter((file) => file !== SUBMODULE_PATH && !file.startsWith(`${SUBMODULE_PATH}/`));
+  if (otherGitlinks.length)
+    problems.push(
+      `${SUBMODULE_PATH} must be the only submodule; the index also has:\n` +
+        `${otherGitlinks.map((file) => `  ${file}`).join('\n')}\nRemove them with \`git rm --cached <path>\`. ${HINT}`,
+    );
+  const otherKeys = gitmodules(['--name-only', '--list'], cwd).filter(
+    (key) => !key.startsWith(`submodule.${SUBMODULE_PATH}.`),
+  );
+  if (otherKeys.length)
+    problems.push(
+      `.gitmodules may only declare [submodule "${SUBMODULE_PATH}"]; remove ${otherKeys.join(', ')}. ${HINT}`,
+    );
+  const paths = gitmodulesValue('path', cwd);
+  if (paths.length !== 1 || paths[0] !== SUBMODULE_PATH)
+    problems.push(`.gitmodules must declare [submodule "${SUBMODULE_PATH}"] with path = ${SUBMODULE_PATH}. ${HINT}`);
+  const updates = gitmodulesValue('update', cwd);
+  if (updates.length !== 1 || updates[0] !== 'none')
+    problems.push(
+      `.gitmodules must keep update = none for ${SUBMODULE_PATH}, so clones without access skip it. ${HINT}`,
+    );
+  const urls = gitmodulesValue('url', cwd);
+  // Exact match: a different url would make maintainers fetch and run someone else's code.
+  if (urls.length !== 1 || urls[0] !== SUBMODULE_URL)
+    problems.push(`.gitmodules must give ${SUBMODULE_PATH} exactly url = ${SUBMODULE_URL}. ${HINT}`);
+  return problems;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const problems = checkPrivateSubmodule();
+  for (const problem of problems) console.error(problem);
+  if (problems.length) process.exitCode = 1;
+  else console.log(`${SUBMODULE_PATH} is a submodule pointer with update = none.`);
+}

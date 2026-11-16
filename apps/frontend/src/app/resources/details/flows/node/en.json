@@ -15,6 +15,7 @@
       "title": "Flow"
     },
     "unsupportedForResourceType": "not supported by this resource",
+    "unsupportedInGlobalFlow": "not available in global flows",
     "genericConfig": {
       "overridableByInput": "Overridable by input: {{fieldName}}",
       "createMqttServer": "Create MQTT server"
@@ -36,6 +37,40 @@
         }
       },
       "resource": {
+        "health": {
+          "changed": {
+            "title": "Health changed",
+            "description": "Triggers when the health status of a resource changes. Payload: health.identifier, health.status, health.previousStatus, health.reason.",
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        },
+        "maintenance": {
+          "created": {
+            "title": "Maintenance created",
+            "description": "Triggers when a maintenance is created for a resource. Payload: maintenance.id, maintenance.reason, maintenance.startTime, maintenance.endTime.",
+            "outputs": {
+              "output": "Output"
+            }
+          },
+          "finished": {
+            "title": "Maintenance finished",
+            "description": "Triggers when a maintenance of a resource is finished. Payload: maintenance.id, maintenance.reason, maintenance.startTime, maintenance.endTime.",
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        },
+        "maintenance-request": {
+          "created": {
+            "title": "Maintenance request created",
+            "description": "Triggers when a maintenance request is created for a resource. Payload: maintenanceRequest.id, maintenanceRequest.reason, maintenanceRequest.status, maintenanceRequest.createdAt, maintenanceRequest.createdByUser.",
+            "outputs": {
+              "output": "Output"
+            }
+          }
+        },
         "usage": {
           "started": {
             "title": "Usage started",
@@ -663,10 +698,23 @@
         "usage": {
           "end-session": {
             "title": "End active session",
-            "description": "Ends the current usage session, optionally with a note.",
+            "description": "Ends the triggering session, one user's session or all sessions of this machine, optionally with a note.",
             "inputs": { "input": "Input" },
             "outputs": { "output": "Output", "failure": "Failure" },
             "config": {
+              "target": {
+                "label": "Which session",
+                "helpText": "\"The triggering session\" ends the session whose start, stop or takeover ran this flow. \"The session of a user\" ends that user's session. \"All sessions\" ends every running session on this machine. Sessions that are already ending are skipped.",
+                "enum": {
+                  "triggering": "The triggering session",
+                  "user": "The session of a user",
+                  "all": "All sessions"
+                }
+              },
+              "userId": {
+                "label": "User id (templates allowed)",
+                "helpText": "Only for \"The session of a user\". A user id, or a template that resolves to one, such as \\{{user.id}}."
+              },
               "notes": { "label": "Notes (templates allowed)" },
               "failureBehavior": {
                 "label": "On failure",
@@ -679,6 +727,7 @@
               }
             },
             "preview": {
+              "target": "Which session",
               "notes": "Notes"
             }
           }
@@ -755,6 +804,10 @@
               "observedAt": {
                 "label": "Observed at",
                 "helpText": "Optional ISO time the source took the reading. Readings from before the session ended are rejected as stale. Defaults to now."
+              },
+              "usageId": {
+                "label": "Usage ID",
+                "helpText": "Session the reading belongs to (template). Only needed for a meter measured per session when the flow does not run in a session lifecycle. Leave empty otherwise."
               },
               "source": {
                 "label": "Source",

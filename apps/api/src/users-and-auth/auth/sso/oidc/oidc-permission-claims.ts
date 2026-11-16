@@ -1,24 +1,48 @@
 import { Logger } from '@nestjs/common';
 import { SSOProviderOIDCConfiguration, SSOProviderType } from '@attraccess/database-entities';
-import { get } from 'lodash-es';
+import { toPath } from 'lodash-es';
+import { DEFAULT_OIDC_ROLE_CLAIM_PATHS } from '@attraccess/shared';
 import type { RbacService } from '../../../rbac/rbac.service';
 import { resolveSsoRoleAssignments } from '../permission-mapping';
 import type { RoleDelta } from '../session-permission-sync';
 
 const logger = new Logger('OidcPermissionClaims');
 
-/** Claim values that may carry IdP roles/groups; shared by login and session-time re-sync. */
-export function getOidcPermissionClaimValues(claimSources: unknown[], clientId?: string | null): unknown[] {
-  const paths = ['permissions', 'roles', 'groups', 'realm_access.roles'];
-  if (clientId) {
-    paths.push(`resource_access.${clientId}.roles`);
+const hasOwn = (value: unknown, key: string): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && Object.prototype.hasOwnProperty.call(value, key);
+
+/**
+ * Like lodash `get`, but only follows the claims' own properties. An inherited name such as `toString`
+ * would otherwise resolve to a function, count as a present claim and revoke this provider's SSO roles.
+ * A key that exists as-is (e.g. a flat `"a.b"` claim) wins over the nested path, as with `get`.
+ */
+function getOwnClaim(source: unknown, path: string): unknown {
+  if (hasOwn(source, path)) return source[path];
+  let current = source;
+  for (const segment of toPath(path)) {
+    if (!hasOwn(current, segment)) return undefined;
+    current = current[segment];
   }
+  return current;
+}
+
+/** Claim values that may carry IdP roles/groups; shared by login and session-time re-sync. */
+export function getOidcPermissionClaimValues(
+  claimSources: unknown[],
+  clientId?: string | null,
+  roleClaimPaths?: string[] | null,
+): unknown[] {
+  // Configured paths replace the defaults entirely.
+  const paths = roleClaimPaths?.length
+    ? roleClaimPaths
+    : [...DEFAULT_OIDC_ROLE_CLAIM_PATHS, ...(clientId ? [`resource_access.${clientId}.roles`] : [])];
 
   const values: unknown[] = [];
   for (const path of paths) {
     for (const source of claimSources) {
-      const value = get(source, path);
-      if (value !== undefined && value !== null) {
+      const value = getOwnClaim(source, path);
+      // Only strings, lists and objects can carry role names; e.g. `groups.length` must not count as present.
+      if (typeof value === 'string' || (typeof value === 'object' && value !== null)) {
         values.push(value);
       }
     }
@@ -69,10 +93,10 @@ export function resolveOidcRoleNames(claimValues: unknown[]): string[] {
 export async function syncOidcRolesFromClaims(
   rbacService: Pick<RbacService, 'syncSsoRoles'>,
   userId: number,
-  config: Pick<SSOProviderOIDCConfiguration, 'ssoProviderId' | 'clientId' | 'roleMappings'>,
+  config: Pick<SSOProviderOIDCConfiguration, 'ssoProviderId' | 'clientId' | 'roleMappings' | 'roleClaimPaths'>,
   claimSources: unknown[],
 ): Promise<RoleDelta | undefined> {
-  const claimValues = getOidcPermissionClaimValues(claimSources, config.clientId);
+  const claimValues = getOidcPermissionClaimValues(claimSources, config.clientId, config.roleClaimPaths);
   logger.debug(`Permission claim values: ${JSON.stringify(claimValues)}`);
   if (claimValues.length === 0) {
     logger.debug(`No role/group claims for user ${userId}; roles kept`);

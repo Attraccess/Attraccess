@@ -5,7 +5,7 @@ import { CalendarDate } from '@internationalized/date';
 import { CalendarRangeIcon } from 'lucide-react';
 import { PresetChips } from './preset-chips';
 import { SelectedRangePill } from './selected-range-pill';
-import { computeRange, Preset } from './compute-range';
+import { Preset } from './compute-range';
 
 interface Props {
   preset: Preset;
@@ -21,14 +21,6 @@ const renderDayCell = (date: CalendarDate) => <RangeCalendar.Cell date={date} />
 export function DateRangeSection(props: Props) {
   const { preset, range, onPresetChange, onRangeChange, t } = props;
 
-  const handlePreset = (next: Preset) => {
-    onPresetChange(next);
-    if (next !== 'custom') {
-      const computed = computeRange(next);
-      if (computed) onRangeChange(computed);
-    }
-  };
-
   return (
     <Card>
       <Card.Header className="flex flex-col gap-1">
@@ -43,11 +35,11 @@ export function DateRangeSection(props: Props) {
       </Card.Header>
       <Card.Content className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <PresetChips value={preset} onChange={handlePreset} t={t} />
+          <PresetChips value={preset} onChange={onPresetChange} t={t} />
           <SelectedRangePill
             range={range}
             emptyLabel={t('range.empty')}
-            summaryLabel={({ start, end, days }) => t('range.summary', { start, end, days })}
+            summaryLabel={({ start, end, days }) => t('range.summary', { start, end, count: days })}
           />
         </div>
 

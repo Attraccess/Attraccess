@@ -1,4 +1,5 @@
 # Dokumentation
+<!-- llms-description: Wie Sie einer Ressource Dokumentation für die sichere Bedienung hinzufügen, inklusive Dokumentationstypen und Anzeige. -->
 
 Jede Ressource in Attraccess kann mit einer Dokumentation versehen werden, um Benutzern die sichere und korrekte Bedienung zu erleichtern.
 

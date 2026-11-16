@@ -1,0 +1,67 @@
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Source rules shared by the crap-score analysis and the Node test runner.
+export const workspace = fileURLToPath(new URL('../../', import.meta.url));
+
+export function isSource(file) {
+  return (
+    /\.[cm]?[jt]sx?$/.test(file) &&
+    // Upstream OpenSCAD WebAssembly runtime, distributed unchanged with the app.
+    file !== 'apps/frontend/public/openscad/openscad.wasm.js' &&
+    !/(^|\/)(__tests__|__mocks__|test|tests|test-utils|fixtures|generated|node_modules|dist|package|\.nx-cache|\.nx-workspace-data|\.electron-cache|\.npm-cache)(\/|$)/.test(
+      file,
+    ) &&
+    !/\.(spec|test|test-utils|test-fixture|d)\.[cm]?[jt]sx?$/.test(file) &&
+    !/(^|\/)(test-setup|jest\.setup)\.[jt]s$/.test(file) &&
+    !/^libs\/(react-query-client|companion-ws-client)\/src\/lib\//.test(file)
+  );
+}
+
+const gitFiles = (args, cwd, env) =>
+  execFileSync('git', args, { cwd, env, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024 })
+    .split('\0')
+    .filter(Boolean);
+
+// A submodule is its own repository: variables such as GIT_INDEX_FILE (set inside Git hooks) name the outer one.
+function submoduleEnv(inherited) {
+  const env = { ...inherited };
+  for (const name of execFileSync('git', ['rev-parse', '--local-env-vars'], { encoding: 'utf8' }).split('\n'))
+    delete env[name];
+  return env;
+}
+
+// Existing tracked and untracked (not ignored) files below `cwd`. A gitlink (mode 160000) is a directory, not a
+// file: a checked-out submodule contributes its own files under its path, one that is not checked out contributes
+// nothing. `submodules` lists every gitlink path, checked out or not. Like the root's files, a submodule is read as
+// checked out, even when its HEAD is not the commit the gitlink names: the tests that supply coverage run on those
+// files, and a submodule's own CI may check it out at another commit than the one this repository pins.
+export function workspaceFiles(cwd = workspace, env = process.env) {
+  const submodules = gitFiles(['ls-files', '--stage', '-z'], cwd, env)
+    .filter((entry) => entry.startsWith('160000 '))
+    .map((entry) => entry.slice(entry.indexOf('\t') + 1));
+  const files = gitFiles(['ls-files', '--cached', '--others', '--exclude-standard', '-z'], cwd, env).filter(
+    (file) => !submodules.includes(file) && existsSync(path.resolve(cwd, file)),
+  );
+  for (const submodule of [...submodules]) {
+    if (!existsSync(path.join(cwd, submodule, '.git'))) continue;
+    const nested = workspaceFiles(path.join(cwd, submodule), submoduleEnv(env));
+    files.push(...nested.files.map((file) => `${submodule}/${file}`));
+    submodules.push(...nested.submodules.map((file) => `${submodule}/${file}`));
+  }
+  return { files, submodules };
+}
+
+// A submodule is a separate repository, so it bounds ownership like a project does: the workspace root never owns
+// its files.
+export function ownedFiles(root, tracked, submodules = []) {
+  const projects = tracked
+    .filter((file) => /(^|\/)project\.json$/.test(file))
+    .map((file) => path.dirname(file))
+    .filter((directory) => directory !== '.')
+    .concat(submodules)
+    .sort((a, b) => b.length - a.length);
+  return tracked.filter((file) => (projects.find((directory) => file.startsWith(`${directory}/`)) ?? '.') === root);
+}

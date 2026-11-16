@@ -31,5 +31,6 @@
     "resource-takeover": "Resource Takeover",
     "access-change": "Access Change",
     "resource-session-ended": "Resource Session Ended"
-  }
+  },
+  "pluginChip": "Plugin: {{plugin}}"
 }

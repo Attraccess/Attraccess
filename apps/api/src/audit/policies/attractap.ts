@@ -1,6 +1,18 @@
-import { AttractapAuditEvent } from './domain-events';
 import { dataFields, oneOf, positive } from './projection';
-export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet<string>> = {
+
+/** Projection input: the attractap action without its `attractap.` prefix. */
+export interface AttractapAuditInput {
+  action: AttractapAuditAction;
+  /** Defaults to attractap.reader. `ui.*` events may use the resource or an alert as subject. */
+  subjectType?: 'attractap.reader' | 'attractap.installation' | 'resource' | 'attractap.ui-alert';
+  actorId: number | null;
+  authenticationMethod: 'session' | 'api-token' | 'mcp-oauth' | null;
+  apiTokenId?: number;
+  subjectId: number;
+  details: Record<string, string | number | boolean>;
+}
+
+export const attractapDetails = {
   'reader.registered': new Set(['source']),
   'reader.deregistered': new Set(['source']),
   'card.linked': new Set(['readerId', 'source']),
@@ -14,6 +26,11 @@ export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet
   'reader.replaced': new Set(['mode']),
   'reader.token_rejected': new Set(['reason']),
   'reader.handshake_rejected': new Set(['reason', 'count']),
+  'reader.secure_keys_created': new Set(['signingFingerprint', 'recoveryFingerprint']),
+  'reader.recovery_key_downloaded': new Set(['recoveryFingerprint']),
+  'reader.recovery_key_verified': new Set(['recoveryFingerprint']),
+  'reader.signing_key_backup_downloaded': new Set(['signingFingerprint']),
+  'reader.secure_keys_restored': new Set(['signingFingerprint', 'recoveryFingerprint', 'source']),
   'ui.hook_decision': new Set([
     'plugin',
     'readerId',
@@ -99,7 +116,9 @@ export const attractapDetails: Record<AttractapAuditEvent['action'], ReadonlySet
   'ui.breaker_changed': new Set(['plugin', 'state', 'reasonCode']),
   'ui.alert_changed': new Set(['plugin', 'kind', 'state', 'readerId']),
   'ui.setting_changed': new Set(['setting', 'resourceId', 'readerId', 'plugin', 'value']),
-};
+} satisfies Record<string, ReadonlySet<string>>;
+
+export type AttractapAuditAction = keyof typeof attractapDetails;
 export const attractapResetReasons = new Set([
   'POWERON',
   'EXT',
@@ -115,8 +134,21 @@ export const attractapResetReasons = new Set([
 ]);
 type DetailValue = string | number | boolean;
 
+function isSha256Hex(value: DetailValue): boolean {
+  return typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+}
+
 const detailValidators: Record<string, (value: DetailValue) => boolean> = {
-  source: oneOf('reader-websocket', 'admin-api', 'reader-enrollment', 'reader-reset'),
+  source: oneOf(
+    'reader-websocket',
+    'admin-api',
+    'reader-enrollment',
+    'reader-reset',
+    'signing-backup',
+    'recovery-file',
+  ),
+  signingFingerprint: isSha256Hex,
+  recoveryFingerprint: isSha256Hex,
   resetReason: (value) => attractapResetReasons.has(value as string),
   hasCoredump: (value) => typeof value === 'boolean',
   readerId: positive,
@@ -138,29 +170,31 @@ const detailValidators: Record<string, (value: DetailValue) => boolean> = {
   origin: oneOf('web', 'api', 'reader', 'supervision'),
   policy: oneOf('block', 'card-confirm', 'allow-with-warning'),
   state: oneOf('open', 'closed', 'reset', 'probe', 'created', 'cleared', 'half-open'),
-  kind: oneOf('breaker-open', 'load-failure', 'crash-loop'),
+  kind: oneOf('breaker-open', 'load-failure', 'crash-loop', 'time-zone-conflict'),
   setting: oneOf('noScreenPolicy', 'widgetsEnabled', 'hookFailurePolicy', 'readerWidgetsEnabled'),
   value: (value) => typeof value === 'string' || typeof value === 'boolean',
   reason: (value) => typeof value === 'string' && /^[a-z0-9-]{1,40}$/.test(value),
 };
 
-export function validAttractapDetails(
-  action: AttractapAuditEvent['action'],
-  details: Record<string, unknown>,
-): boolean {
+export function validAttractapDetails(action: AttractapAuditAction, details: Record<string, unknown>): boolean {
   return Object.entries(details).every(
     ([key, value]) =>
-      attractapDetails[action].has(key) &&
+      (attractapDetails[action] as ReadonlySet<string>).has(key) &&
       (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') &&
       (detailValidators[key]?.(value) ?? true),
   );
 }
 
-export function projectAttractapAuditEvent(input: AttractapAuditEvent): AttractapAuditEvent | null {
+export function projectAttractapAuditEvent(input: AttractapAuditInput): AttractapAuditInput | null {
   if (!positive(input.subjectId) || !attractapDetails[input.action]) return null;
   const deviceActor = input.authenticationMethod === null;
   if (deviceActor ? input.actorId !== null || input.apiTokenId !== undefined : !positive(input.actorId)) return null;
-  if (!deviceActor && input.authenticationMethod !== 'session' && input.authenticationMethod !== 'api-token')
+  if (
+    !deviceActor &&
+    input.authenticationMethod !== 'session' &&
+    input.authenticationMethod !== 'api-token' &&
+    input.authenticationMethod !== 'mcp-oauth'
+  )
     return null;
   if (input.authenticationMethod === 'api-token' ? !positive(input.apiTokenId) : input.apiTokenId !== undefined)
     return null;
@@ -170,7 +204,7 @@ export function projectAttractapAuditEvent(input: AttractapAuditEvent): Attracta
   if (Buffer.byteLength(JSON.stringify(details), 'utf8') > 4096) return null;
   if (
     input.subjectType !== undefined &&
-    !oneOf('attractap.reader', 'resource', 'attractap.ui-alert')(input.subjectType)
+    !oneOf('attractap.reader', 'attractap.installation', 'resource', 'attractap.ui-alert')(input.subjectType)
   )
     return null;
   return { ...input, details: details as Record<string, string | number | boolean> };
@@ -190,6 +224,11 @@ export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.reader.replaced',
   'attractap.reader.token_rejected',
   'attractap.reader.handshake_rejected',
+  'attractap.reader.secure_keys_created',
+  'attractap.reader.recovery_key_downloaded',
+  'attractap.reader.recovery_key_verified',
+  'attractap.reader.signing_key_backup_downloaded',
+  'attractap.reader.secure_keys_restored',
   'attractap.ui.hook_decision',
   'attractap.ui.step_issued',
   'attractap.ui.step_answered',
@@ -201,4 +240,4 @@ export const ATTRACTAP_AUDIT_ACTIONS = [
   'attractap.ui.breaker_changed',
   'attractap.ui.alert_changed',
   'attractap.ui.setting_changed',
-];
+] as const satisfies readonly `attractap.${AttractapAuditAction}`[];

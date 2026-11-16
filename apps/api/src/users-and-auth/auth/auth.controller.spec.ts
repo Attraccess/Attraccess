@@ -1,6 +1,6 @@
 import { approvedOriginsFor, registerAuthControllerFixture } from './auth.controller.auth-controller.test-fixture';
 import { SsoLogoutService } from './sso/sso-logout.service';
-import { IdentityAuditService } from '../../audit/identity-audit.service';
+import { SessionPermissionSync } from './sso/session-permission-sync';
 import { AuthController } from './auth.controller';
 import { Response } from 'express';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
@@ -135,7 +135,12 @@ describe('AuthController', () => {
     expect(fixture.sessionService.revokeLogoutSession).toHaveBeenCalledWith('stable-session');
     expect(fixture.cookieConfigService.clearAuthCookie).toHaveBeenCalledWith(mockResponse);
     expect(fixture.identityAudit.record).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'logout', actorId: 1, subjectId: 1 }),
+      expect.objectContaining({
+        domain: 'identity',
+        action: 'identity.logout',
+        actor: expect.objectContaining({ id: 1 }),
+        subject: expect.objectContaining({ id: 1 }),
+      }),
     );
     if (!resolveAudit) throw new Error('audit receipt was not requested');
     resolveAudit();
@@ -298,14 +303,13 @@ describe('AuthController', () => {
     const controller = new AuthController(
       fixture.sessionService,
       fixture.cookieConfigService,
-      fixture.identityAudit as unknown as IdentityAuditService,
       {
         prepare: async () => {
           throw new Error('Provider unavailable');
         },
         returnURL: async () => 'https://app.example/',
       } as unknown as SsoLogoutService,
-      undefined,
+      fixture.ssoPermissionSync as unknown as SessionPermissionSync,
       approvedOriginsFor('https://app.example'),
     );
     const request = {
@@ -405,9 +409,16 @@ describe('AuthController', () => {
     it('rejects revoked sessions without rotating them', async () => {
       syncIfDue.mockResolvedValue('revoked');
 
-      await expect(fixture.authController.refreshSession(refreshRequest(), noStore())).rejects.toThrow(
-        UnauthorizedException,
-      );
+      const refresh = fixture.authController.refreshSession(refreshRequest(), noStore());
+      await expect(refresh).rejects.toThrow(UnauthorizedException);
+      await expect(refresh).rejects.toThrow('Session was ended by the identity provider');
+      expect(fixture.sessionService.refreshSession).not.toHaveBeenCalled();
+    });
+
+    it('does not rotate the session when the sync breaks its contract and throws', async () => {
+      syncIfDue.mockRejectedValue(new Error('sync exploded'));
+
+      await expect(fixture.authController.refreshSession(refreshRequest(), noStore())).rejects.toThrow('sync exploded');
       expect(fixture.sessionService.refreshSession).not.toHaveBeenCalled();
     });
 

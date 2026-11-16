@@ -38,6 +38,8 @@ import { createSupervisedStartFixture } from './fixtures/supervised-start.test-f
 
 import { mockRbacService } from './fixtures/rbac.test-fixture';
 
+import { captureTransactions } from './fixtures/transaction-capture.test-fixture';
+
 export type ResourceUsageServiceTestScope = ReturnType<typeof createResourceUsageServiceFixture>;
 
 export type EndSessionTestScope = ReturnType<typeof createEndSessionFixture>;
@@ -132,6 +134,12 @@ describe('ResourceUsageService', () => {
         mockUpdateQueryBuilder as unknown as SelectQueryBuilder<ResourceUsage>,
       );
 
+      const transactions = captureTransactions(
+        endSessionScope.resourceUsageRepository.manager as unknown as { transaction: jest.Mock },
+        endSessionScope.transactionalEntityManager,
+        endSessionScope.mockAuditService.record,
+      );
+
       const result = await endSessionScope.service.endSession(1, endSessionScope.mockUser, dto);
 
       expect(result).toBe(mockUpdatedSession);
@@ -153,13 +161,23 @@ describe('ResourceUsageService', () => {
         id: endSessionScope.mockUser.id,
         username: endSessionScope.mockUser.username,
       });
-      expect(endSessionScope.mockAuditService.recordResource).toHaveBeenCalledWith({
-        action: 'usage_session.ended',
-        actorId: 1,
-        authenticationMethod: 'session',
-        subjectId: 1,
-        details: { usageId: 1, usageUserId: 1 },
-      });
+      // Written with the manager of the transaction that ends the session, so it commits or rolls back with it.
+      const auditing = transactions.filter((transaction) => transaction.auditCalls.length > 0);
+      expect(auditing).toHaveLength(1);
+      expect(endSessionScope.mockAuditService.record).toHaveBeenCalledTimes(1);
+      expect(auditing[0].auditCalls).toEqual([
+        [
+          {
+            domain: 'resource',
+            action: 'usage_session.ended',
+            actor: { id: 1, authenticationMethod: 'session' },
+            subject: { type: 'resource', id: 1 },
+            details: { usageId: 1, usageUserId: 1 },
+          },
+          expect.anything(),
+        ],
+      ]);
+      expect(auditing[0].auditCalls[0][1]).toBe(auditing[0].manager);
     });
 
     it('runs the stopped-session flow after reservation but before usage finalization', async () => {
@@ -208,7 +226,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: 'Auto-ended' }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 1 },
       );
     });
 
@@ -270,14 +288,14 @@ describe('ResourceUsageService', () => {
       expect(sessionEnded).toBe(false);
       expect(endSessionScope.transactionalEntityManager.update).not.toHaveBeenCalled();
       expect(endSessionScope.billingService.chargeForResourceUsage).not.toHaveBeenCalled();
-      expect(endSessionScope.mockAuditService.recordResource).not.toHaveBeenCalled();
+      expect(endSessionScope.mockAuditService.record).not.toHaveBeenCalled();
       expect(endSessionScope.lifecycleAttempts.size).toBe(0);
       expect(endSessionScope.flowExecutorService.runFlow).toHaveBeenCalledWith(
         1,
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.any(Object),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 1 },
       );
     });
 
@@ -556,7 +574,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 88 },
       );
     });
 
@@ -602,7 +620,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 44 },
       );
     });
 
@@ -653,7 +671,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 91 },
       );
     });
 
@@ -692,7 +710,7 @@ describe('ResourceUsageService', () => {
         ResourceFlowNodeType.INPUT_RESOURCE_USAGE_STOPPED,
         expect.objectContaining({ endNotes: prefixedNotes }),
         undefined,
-        { lifecycleAttemptId: expect.any(String) },
+        { lifecycleAttemptId: expect.any(String), actorUserId: 61 },
       );
     });
 

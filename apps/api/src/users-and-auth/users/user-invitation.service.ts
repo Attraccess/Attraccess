@@ -1,10 +1,12 @@
 import { User } from '@attraccess/database-entities';
 
-import { Inject, Injectable, Logger, forwardRef, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 
 import { EntityManager } from 'typeorm';
 
 import { EmailService } from '../../email/email.service';
+
+import { LicenseError } from '../../license/license.service';
 
 import { AuthService } from '../auth/auth.service';
 
@@ -13,6 +15,7 @@ import { InviteUserDto } from './dtos/inviteUser.dto';
 import { mapEmailSendError } from './email-send-error.util';
 
 import { UsersService } from './users.service';
+import { normalizeEmail } from './accounts/normalize-email';
 
 import { plainToInstance } from 'class-transformer';
 
@@ -30,7 +33,6 @@ import { Readable } from 'stream';
 export class UserInvitationService {
   constructor(
     protected readonly usersService: UsersService,
-    @Inject(forwardRef(() => AuthService))
     protected readonly authService: AuthService,
     protected readonly emailService: EmailService,
   ) {}
@@ -41,7 +43,15 @@ export class UserInvitationService {
     candidates: Array<{ username: string; email: string; locale?: string; roleKey?: string }>,
     options?: { grantAllPermissionsToFirst?: boolean; actorId?: number },
   ): Promise<User[]> {
-    await this.usersService.ensureLicenseForNewUsers(candidates.length);
+    try {
+      await this.usersService.ensureLicenseForNewUsers(candidates.length);
+    } catch (error) {
+      if (error instanceof LicenseError) {
+        this.logger.warn(`Blocking user invitation due to license: ${error.reason}`);
+        throw new ForbiddenException(error.reason);
+      }
+      throw error;
+    }
 
     return this.usersService
       .withTransaction(async (manager: EntityManager) => {
@@ -62,6 +72,17 @@ export class UserInvitationService {
   }
 
   public async inviteUser(body: InviteUserDto, adminLocale?: string): Promise<User> {
+    // createMany does not check for taken identities and the unique constraints would surface as a 500
+    const email = normalizeEmail(body.email);
+    const username = this.usersService.cleanupUsername(body.username);
+    const existingUsers = await this.usersService.findByEmailsOrUsernames([email], [username]);
+    if (existingUsers.some((user) => user.email === email)) {
+      throw new BadRequestException('Email already exists');
+    }
+    if (existingUsers.some((user) => user.username === username)) {
+      throw new BadRequestException('Username already exists');
+    }
+
     try {
       const [invited] = await this.inviteUsersTransactional(
         [{ username: body.username, email: body.email, locale: adminLocale }],
@@ -76,15 +97,22 @@ export class UserInvitationService {
 
   public async inviteUsersFromCsv(
     file: FileUpload | undefined,
-    rawConfig: string | CsvInviteConfigDto,
+    rawConfig: string | CsvInviteConfigDto | undefined,
     adminLocale?: string,
     actorId?: number,
   ): Promise<User[]> {
-    let configPayload: CsvInviteConfigDto | string;
+    let configPayload: unknown;
     try {
       configPayload = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
     } catch {
       throw new BadRequestException('Invalid config payload');
+    }
+    // class-validator throws a TypeError for null/undefined, so reject anything that is not an object first
+    if (configPayload === undefined || configPayload === null) {
+      throw new BadRequestException('config is required');
+    }
+    if (typeof configPayload !== 'object' || Array.isArray(configPayload)) {
+      throw new BadRequestException('config must be a JSON object');
     }
     const config = plainToInstance(CsvInviteConfigDto, configPayload);
     const validationErrors = await validate(config, { whitelist: true, forbidNonWhitelisted: true });
@@ -114,7 +142,7 @@ export class UserInvitationService {
 
     const duplicateErrors: CsvInviteRowErrorDto[] = [];
     existingUsers.forEach((user) => {
-      const emailRows = emailRowMap.get(user.email.trim().toLowerCase());
+      const emailRows = emailRowMap.get(normalizeEmail(user.email));
       if (emailRows?.length) {
         emailRows.forEach((row) =>
           duplicateErrors.push({ row, field: 'email', message: 'DUPLICATE_IN_DB', value: user.email }),
@@ -216,7 +244,7 @@ export class UserInvitationService {
 
         const { email, normalizedUsername } = this.validateCsvIdentity(rowData, config, rowNumber, rowErrors);
 
-        const emailKey = email.toLowerCase();
+        const emailKey = normalizeEmail(email);
         if (email && seenEmails.has(emailKey)) {
           rowErrors.push({ row: rowNumber, field: 'email', message: 'DUPLICATE_IN_CSV', value: email });
         } else if (email) {

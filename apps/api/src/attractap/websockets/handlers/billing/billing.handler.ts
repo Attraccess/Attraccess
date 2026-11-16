@@ -20,7 +20,7 @@ export class AttractapBillingHandler {
         return;
       }
 
-      const userId = socket.state.lastAuthenticatedUserId;
+      const userId = socket.state.verifiedUserId;
       if (!userId) {
         this.logger.warn('BILLING_REQUEST_TOPUP received but no authenticated user is set on socket');
         await socket.sendMessage(
@@ -31,7 +31,7 @@ export class AttractapBillingHandler {
 
       const { amountCents } = data.payload as { amountCents: number };
       if (typeof amountCents !== 'number' || !Number.isInteger(amountCents) || amountCents <= 0) {
-        this.logger.warn(`BILLING_REQUEST_TOPUP invalid amount (${typeof amountCents})`);
+        this.logger.warn(`BILLING_REQUEST_TOPUP invalid amount (${typeof amountCents}) from client ${socket.id}`);
         await socket.sendMessage(
           new AttractapEvent(AttractapEventType.BILLING_REQUEST_TOPUP, { error: 'INVALID_AMOUNT' }),
         );

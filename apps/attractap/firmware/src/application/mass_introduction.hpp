@@ -15,8 +15,8 @@
 
 // Owns the reader side of one mass introduction session (ATT-1151). Websocket, NFC and touch
 // callbacks only enqueue events here; NFC and UI work is performed on the main loop by
-// takePendingStart() and tick(). Cards are handled one at a time: request the key, authenticate
-// the NTAG424 locally, confirm, show the server's result briefly, wait for the next card.
+// takePendingStart() and tick(). Cards are handled one at a time: announce the card, let the
+// server verify it through the card relay, show the server's result briefly, wait for the next card.
 class MassIntroductionFlow {
 public:
     enum class Outcome { None, ReturnToRouting };
@@ -25,7 +25,6 @@ public:
                          MassIntroductionScreen &screen);
 
     void onStart(const API::MassIntroductionStartCommand &command);
-    void onCardAuthentication(const API::MassIntroductionCardAuthenticationResponse &response);
     void onResult(const API::MassIntroductionResult &result);
     void onEnd(const API::MassIntroductionEnd &end);
     void onCardDetected(const uint8_t *uid, uint8_t uidLength);
@@ -42,8 +41,8 @@ public:
     bool active() const { return phase != Phase::Idle; }
 
 private:
-    enum class Phase { Idle, WaitingForCard, RequestedAuth, AwaitingResult, ShowingResult };
-    enum class EventType : uint8_t { Start, CardDetected, CardAuthentication, Result, End, Cancel };
+    enum class Phase { Idle, WaitingForCard, AwaitingResult, ShowingResult };
+    enum class EventType : uint8_t { Start, CardDetected, Result, End, Cancel };
     // Session ids are UUIDs (36 characters).
     static constexpr size_t SESSION_ID_LEN = 48;
     static constexpr size_t NAME_LEN = 96;
@@ -52,9 +51,6 @@ private:
         EventType type;
         bool success;
         bool alreadyIntroduced;
-        uint8_t keyNo;
-        uint8_t keyLen;
-        uint8_t keyBytes[16];
         uint8_t uid[7];
         uint8_t uidLength;
         uint32_t remainingMs;
@@ -115,7 +111,6 @@ private:
     void processEvents(uint32_t now);
     void processEvent(const Event &event, uint32_t now);
     void handleStart(const Event &event);
-    void handleCardAuthentication(const Event &event, uint32_t now);
     void handleResult(const Event &event, uint32_t now);
     bool isActiveSession(const char *id) const;
     void refuse(const char *id, const char *reason);

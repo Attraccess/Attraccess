@@ -4,6 +4,9 @@ import {
   PluginSlotContribution,
 } from '@attraccess/plugins-frontend-sdk';
 import { Component, ErrorInfo, PropsWithChildren, ReactNode, useMemo } from 'react';
+import { PlugIcon } from 'lucide-react';
+import { FlatSection } from '../../components/flatSection';
+import { useTranslationState } from '@attraccess/plugins-frontend-ui';
 import usePluginState from './plugin.state';
 
 // Isolates a single plugin slot contribution so a throwing contribution cannot
@@ -65,6 +68,10 @@ export interface PluginSlotProps<Context extends PluginSlotContext = PluginSlotC
   // types this per slot (e.g. `{ mqttServerId: number }`); it stays a plain
   // object so the SDK keeps no domain knowledge.
   context?: Context;
+  // When set, each contribution renders inside a titled section (the contribution's
+  // own `title` wins). The section sits inside the error boundary, so a crashing
+  // contribution leaves no empty section behind.
+  sectionTitle?: string;
 }
 
 // Generic extension point: renders every plugin contribution registered for
@@ -74,8 +81,11 @@ export interface PluginSlotProps<Context extends PluginSlotContext = PluginSlotC
 export function PluginSlot<Context extends PluginSlotContext = PluginSlotContext>({
   slotId,
   context,
+  sectionTitle,
 }: PluginSlotProps<Context>) {
   const { plugins } = usePluginState();
+  // Contribution titles follow the UI language, so they are read again when it changes.
+  const language = useTranslationState((state) => state.language);
 
   const contributions = useMemo(() => {
     return plugins.flatMap((manifest) => {
@@ -97,7 +107,7 @@ export function PluginSlot<Context extends PluginSlotContext = PluginSlotContext
           manifestName: manifest.name,
         }));
     });
-  }, [plugins, slotId]);
+  }, [plugins, slotId, language]);
 
   if (contributions.length === 0) {
     return null;
@@ -115,7 +125,13 @@ export function PluginSlot<Context extends PluginSlotContext = PluginSlotContext
           contributionKey={contribution.key}
         >
           <PluginLiveUpdatesIdentityProvider name={manifestName}>
-            <SlotContribution contribution={contribution} context={slotContext} />
+            {sectionTitle ? (
+              <FlatSection icon={<PlugIcon className="size-4" />} title={contribution.title ?? sectionTitle}>
+                <SlotContribution contribution={contribution} context={slotContext} />
+              </FlatSection>
+            ) : (
+              <SlotContribution contribution={contribution} context={slotContext} />
+            )}
           </PluginLiveUpdatesIdentityProvider>
         </PluginSlotBoundary>
       ))}

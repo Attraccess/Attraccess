@@ -15,6 +15,14 @@
     "title": "Maschine ist voll",
     "description": "An dieser Maschine arbeiten bereits so viele Personen, wie erlaubt sind. Bitte versuchen Sie es erneut, sobald jemand fertig ist."
   },
+  "MachineBusyError": {
+    "title": "Maschine ist beschäftigt",
+    "description": "An dieser Maschine wird gerade eine andere Sitzung gestartet oder beendet. Bitte versuchen Sie es gleich noch einmal."
+  },
+  "SessionChangeInterruptedError": {
+    "title": "Start oder Ende unterbrochen",
+    "description": "Der Server wurde neu gestartet, während Ihre Anfrage bearbeitet wurde. Ihr Start bzw. Ende wurde daher nicht gespeichert. Bitte prüfen Sie die Maschine und versuchen Sie es erneut."
+  },
   "AlreadyHasActiveSessionError": {
     "title": "Sitzung bereits aktiv",
     "description": "Sie haben an dieser Maschine bereits eine aktive Sitzung. Beenden Sie diese zuerst, wenn Sie neu starten möchten."
@@ -34,6 +42,10 @@
   "METER_INITIALIZATION_FAILED": {
     "title": "Zähler nicht gestartet",
     "description": "Die Sitzung wurde nicht gestartet, weil ein kostenpflichtiger Zähler nicht initialisiert werden konnte: {{error}}"
+  },
+  "METER_SHARING_UNSUPPORTED": {
+    "title": "Zähler nicht teilbar",
+    "description": "Die Sitzung wurde nicht gestartet: Der Zähler „{{error}}“ kann nicht bei Bedarf gelesen werden und lässt sich daher nicht teilen, solange eine andere Sitzung läuft."
   },
   "METER_SETTLEMENT_FAILED": {
     "title": "Zählerstand weiterhin nicht verfügbar",
@@ -154,5 +166,81 @@
   "This website is not approved to make changes": {
     "title": "Website nicht freigegeben",
     "description": "Änderungen von dieser Website werden abgelehnt. Öffne Attraccess über die übliche Adresse. Falls du das schon tust, bitte eine Administratorin oder einen Administrator, die freigegebenen Websites in der Serverkonfiguration zu prüfen (siehe Sicherheitsdokumentation)."
+  },
+  "READER_OFFLINE": {
+    "title": "Reader nicht verbunden",
+    "description": "Der gewählte Attractap ist nicht mit dem Server verbunden. Prüfen Sie, ob er eingeschaltet und online ist, und versuchen Sie es erneut."
+  },
+  "READER_BUSY": {
+    "title": "Reader beschäftigt",
+    "description": "Der gewählte Attractap bearbeitet gerade eine Karte. Warten Sie, bis er fertig ist, und versuchen Sie es erneut."
+  },
+  "READER_FIRMWARE_UPDATE_REQUIRED": {
+    "title": "Firmware-Update erforderlich",
+    "description": "Der gewählte Attractap braucht für Kartenfunktionen Firmware 2.0.0 oder neuer. Das Update wird ihm automatisch angeboten; versuchen Sie es erneut, sobald er es installiert hat."
+  },
+  "READER_NOT_PAIRED": {
+    "title": "Reader nicht gekoppelt",
+    "description": "Dieser Attractap ist noch nicht gekoppelt. Koppeln Sie ihn zuerst auf der Seite „Attractap-Lesegeräte“ unter „Nicht gekoppelt“."
+  },
+  "READER_NOT_ALLOWED_TO_WRITE_CARDS": {
+    "title": "Reader nicht erlaubt",
+    "description": "Dieser Attractap darf keine RFID-Karten registrieren oder zurücksetzen. Wählen Sie einen anderen Reader oder bitten Sie eine Administratorin oder einen Administrator, ihn unter Einstellungen → RFID-Kartenregistrierung zu erlauben."
+  },
+  "READER_NOT_FOUND": {
+    "title": "Reader nicht gefunden",
+    "description": "Der gewählte Attractap existiert nicht mehr. Laden Sie die Seite neu und wählen Sie einen anderen Reader."
+  },
+  "READER_CARD_ENROLLMENT_NOT_SUPPORTED": {
+    "title": "Reader kann keine Karten registrieren",
+    "description": "Dieses Attractap-Modell kann keine Karten registrieren oder zurücksetzen. Wählen Sie einen Reader mit Display."
+  },
+  "USER_NOT_FOUND": {
+    "title": "Benutzer nicht gefunden",
+    "description": "Der Benutzer existiert nicht mehr."
+  },
+  "CARD_NOT_FOUND": {
+    "title": "Karte nicht gefunden",
+    "description": "Die Karte existiert nicht mehr. Laden Sie die Seite neu."
+  },
+  "AccountLocked": {
+    "title": "Konto vorübergehend gesperrt",
+    "description": "Zu viele fehlgeschlagene Versuche. Bitte warte {{retryAfterSeconds}} Sekunden, bevor du es erneut versuchst."
+  },
+  "LINK_TOKEN_USED": {
+    "title": "Link nicht mehr gültig",
+    "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
+  },
+  "LINK_TOKEN_EXHAUSTED": {
+    "title": "Link nicht mehr gültig",
+    "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
+  },
+  "LINK_TOKEN_EXPIRED": {
+    "title": "Link nicht mehr gültig",
+    "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
+  },
+  "INVALID_LINK_TOKEN": {
+    "title": "Link nicht mehr gültig",
+    "description": "Dieser Link ist nicht mehr gültig. Bitte melde dich erneut mit deinem Firmenkonto an."
+  },
+  "Email already exists": {
+    "title": "E-Mail-Adresse bereits vergeben",
+    "description": "Es existiert bereits ein Konto mit dieser E-Mail-Adresse. Verwende eine andere E-Mail-Adresse."
+  },
+  "Username already exists": {
+    "title": "Benutzername bereits vergeben",
+    "description": "Es existiert bereits ein Konto mit diesem Benutzernamen. Wähle einen anderen Benutzernamen."
+  },
+  "DUPLICATE_IN_DB": {
+    "title": "E-Mail-Adresse oder Benutzername bereits vergeben",
+    "description": "Bei einigen Zeilen ist die E-Mail-Adresse oder der Benutzername bereits vergeben. Prüfe die Zeilen unter „Import-Fehler“ und korrigiere die Datei oder nutze „Fehlgeschlagene Zeilen überspringen und einladen“."
+  },
+  "NO_CANDIDATES_IN_CSV": {
+    "title": "Keine Benutzer zum Einladen",
+    "description": "Es sind keine Zeilen zum Einladen übrig, weil alle Zeilen übersprungen wurden. Prüfe die Datei und die Spaltenzuordnung."
+  },
+  "MISSING_HEADER_ROW": {
+    "title": "CSV-Datei ohne Daten",
+    "description": "Die CSV-Datei hat keine Kopfzeile oder keine Zeilen darunter. Die erste Zeile muss die Spaltennamen enthalten, danach folgt eine Zeile pro Benutzer."
   }
 }

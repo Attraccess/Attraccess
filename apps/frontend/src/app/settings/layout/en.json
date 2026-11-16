@@ -31,6 +31,10 @@
       "label": "Security",
       "description": "Sign-in throttling, password policy, 2FA and signup domains"
     },
+    "readerSecurity": {
+      "label": "Reader security",
+      "description": "Secure Boot keys and backups for secured readers"
+    },
     "roles": {
       "label": "Roles",
       "description": "Roles and their permission sets"
@@ -42,6 +46,10 @@
     "monitoring": {
       "label": "Monitoring",
       "description": "Metrics endpoint and instrumentation"
+    },
+    "attractap": {
+      "label": "RFID card enrollment",
+      "description": "Which Attractap readers may enroll and reset RFID cards"
     },
     "auditLog": {
       "label": "Audit log",

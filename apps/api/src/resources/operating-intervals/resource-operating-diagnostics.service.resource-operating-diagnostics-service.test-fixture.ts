@@ -1,4 +1,4 @@
-import { ResourceFlowNode, ResourceOperatingInterval } from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceOperatingInterval, ResourceType } from '@attraccess/database-entities';
 import { Repository } from 'typeorm';
 import { OperatingMetricsRecorder } from '../../metrics/instrumentation/operating/operating.helper';
 import {
@@ -17,6 +17,7 @@ function summary(overrides: Partial<ResourceOperatingAttributionSummary> = {}): 
     asOf: at(20, '12:00:00'),
     windowStart: at(1, '00:00:00'),
     sessionDurationMs: 0,
+    personDurationMs: 0,
     operatingDataAvailable: true,
     operatingDurationMs: 0,
     attributedOperatingDurationMs: 0,
@@ -32,7 +33,9 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
     Pick<Repository<ResourceOperatingInterval>, 'findOne' | 'find' | 'findAndCount' | 'count'>
   >;
 
-  let flowNodeRepository: jest.Mocked<Pick<Repository<ResourceFlowNode>, 'count'>>;
+  let flowNodeRepository: jest.Mocked<Pick<Repository<ResourceFlowNode>, 'count'>> & {
+    manager: { findOne: jest.Mock };
+  };
 
   let attributionService: jest.Mocked<Pick<ResourceOperatingAttributionService, 'getForResource'>>;
 
@@ -47,7 +50,10 @@ export function registerResourceOperatingDiagnosticsServiceFixture() {
       findAndCount: jest.fn().mockResolvedValue([[], 0]),
       count: jest.fn().mockResolvedValue(0),
     };
-    flowNodeRepository = { count: jest.fn().mockResolvedValue(0) };
+    flowNodeRepository = {
+      count: jest.fn().mockResolvedValue(0),
+      manager: { findOne: jest.fn().mockResolvedValue({ id: 1, type: ResourceType.Machine }) },
+    };
     attributionService = { getForResource: jest.fn().mockResolvedValue(summary()) };
     operatingMetrics = {
       recordTransition: jest.fn(),

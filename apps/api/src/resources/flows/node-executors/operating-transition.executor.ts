@@ -5,6 +5,7 @@ import {
 } from '../../operating-intervals/resource-operating-interval.service';
 import { ExternalEffectFailureError } from '../errors/external-effect-failure.error';
 import { NodeExecutionContext, NodeExecutor, NodeProcessingResult } from './node-executor.interface';
+import { requireRunMachineId } from './flow.utils';
 
 export class OperatingTransitionExecutor implements NodeExecutor {
   constructor(
@@ -13,8 +14,9 @@ export class OperatingTransitionExecutor implements NodeExecutor {
   ) {}
 
   async execute(node: ResourceFlowNode, input: object, ctx: NodeExecutionContext): Promise<NodeProcessingResult> {
+    const resourceId = await requireRunMachineId(node, ctx);
     try {
-      await this.operatingIntervals.transition(node.resourceId, this.state, {
+      await this.operatingIntervals.transition(resourceId, this.state, {
         flowNodeId: node.id,
         flowRunId: ctx.flowRunId,
       });

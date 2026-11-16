@@ -17,6 +17,7 @@ import { AttraccessUserActionsBridge } from '../components/attraccessUserActions
 import { SupervisorApprovalListener } from '../components/supervisorApproval/SupervisorApprovalListener';
 import { EnrollLinkDialog } from './attractap/pairing/EnrollLinkDialog';
 import { MassIntroductionRedeemModal } from './mass-introduction/MassIntroductionRedeemModal';
+import { PwaUpdateIndicator } from '../pwa-update/PwaUpdateIndicator';
 import { ThemeToggle } from '../components/themeToggle';
 import { SessionBillingSummary } from './billing/sessionSummary/index';
 import { Layout } from './layout/layout';
@@ -173,6 +174,7 @@ export function AppLayout(props: PropsWithChildren) {
               <ThemeToggle />
             </div>
           )}
+          <PwaUpdateIndicator />
           <ReactFlowProvider>
             <AttraccessUserActionsBridge>
               {props.children}

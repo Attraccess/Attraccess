@@ -12,7 +12,10 @@ function setup() {
   const alerts = { listOpen: jest.fn().mockResolvedValue([{ id: 1 }]), clear: jest.fn(), findOpen: jest.fn() };
   const slots = { syncReader: jest.fn(), contributionsOf: jest.fn().mockReturnValue([{ plugin: 'p' }]) };
   const resources = { getResourceById: jest.fn().mockResolvedValue({ id: 3 }) };
-  const readers = { findReaderById: jest.fn().mockResolvedValue({ id: 8 }) };
+  const readers = {
+    findReaderById: jest.fn().mockResolvedValue({ id: 8, pairingState: 'paired' }),
+    getPairedReaders: jest.fn().mockResolvedValue([{ id: 8, pairingState: 'paired' }]),
+  };
   const controller = new ReaderUiAdminController(
     settings as never,
     alerts as never,
@@ -58,10 +61,31 @@ describe('ReaderUiAdminController', () => {
     expect(settings.setReader).not.toHaveBeenCalled();
   });
 
+  // Readers that are not paired yet exist for the pairing session only: no settings, no resync.
+  it.each(['unpaired', 'revoked'])('answers 404 for the settings of a %s reader', async (pairingState) => {
+    const { controller, settings, slots, readers, req } = setup();
+    readers.findReaderById.mockResolvedValue({ id: 5, pairingState });
+    await expect(controller.getReaderSettings(5)).rejects.toThrow(NotFoundException);
+    await expect(controller.getContributions(5)).rejects.toThrow(NotFoundException);
+    await expect(controller.updateReaderSettings(5, { widgetsEnabled: false }, req)).rejects.toThrow(NotFoundException);
+    expect(settings.setReader).not.toHaveBeenCalled();
+    expect(slots.syncReader).not.toHaveBeenCalled();
+  });
+
   it('lists contributions and open alerts', async () => {
     const { controller } = setup();
     expect(await controller.getContributions(8)).toEqual([{ plugin: 'p' }]);
     expect(await controller.getAlerts()).toEqual([{ id: 1 }]);
+  });
+
+  it('hides the alerts of a reader that is not paired', async () => {
+    const { controller, alerts } = setup();
+    alerts.listOpen.mockResolvedValueOnce([
+      { id: 1, kind: 'breaker', plugin: 'p', readerId: null },
+      { id: 2, kind: 'crash-loop', readerId: 8 },
+      { id: 3, kind: 'crash-loop', readerId: 9 },
+    ]);
+    expect((await controller.getAlerts()).map((alert) => alert.id)).toEqual([1, 2]);
   });
 
   it('clears a reader crash-loop alert with resources.update and answers 404 when it is gone', async () => {
@@ -84,6 +108,18 @@ describe('ReaderUiAdminController', () => {
       const admin = { user: { ...req.user, effectivePermissions: new Set(['system.plugins.manage']) } } as any;
       alerts.clear.mockResolvedValueOnce({ id: 7 });
       await expect(controller.clearAlert(7, admin)).resolves.toEqual({ id: 7 });
+    },
+  );
+
+  it.each([['resources.update'], ['system.plugins.manage']])(
+    'clears a reader time zone conflict with %s: it shows in the reader editor and on the plugins page',
+    async (permission) => {
+      const { controller, alerts, req } = setup();
+      alerts.findOpen.mockResolvedValue({ id: 9, kind: 'time-zone-conflict', plugin: 'p', readerId: 8 });
+      alerts.clear.mockResolvedValueOnce({ id: 9 });
+      const user = { user: { ...req.user, effectivePermissions: new Set([permission]) } } as any;
+      await expect(controller.clearAlert(9, user)).resolves.toEqual({ id: 9 });
+      expect(alerts.clear).toHaveBeenCalledWith(9, user.user);
     },
   );
 

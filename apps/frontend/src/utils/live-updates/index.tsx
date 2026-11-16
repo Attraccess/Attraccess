@@ -73,8 +73,10 @@ export function LiveUpdatesProvider({ userId, children }: { userId?: number; chi
 
 type CoreLiveTopic = keyof LivePayloads;
 type TopicSubscription<T extends CoreLiveTopic> = T extends 'resource' | 'flow-logs'
-  ? { topic: T; resourceId: number }
-  : { topic: T; resourceId?: never };
+  ? { topic: T; resourceId: number; mqttServerId?: never; filter?: never }
+  : T extends 'mqtt-messages'
+    ? { topic: T; mqttServerId: number; filter: string; resourceId?: never }
+    : { topic: T; resourceId?: never; mqttServerId?: never; filter?: never };
 
 export function useLiveUpdates<T extends CoreLiveTopic>(
   props: { topic: T } & TopicSubscription<T> & {
@@ -86,7 +88,7 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
 ) {
   const client = useContext(Context);
   const queryClient = useQueryClient();
-  const { topic, resourceId, enabled = true } = props;
+  const { topic, resourceId, mqttServerId, filter, enabled = true } = props;
   const latest = useRef({ props, client });
   latest.current = { props, client };
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -98,8 +100,14 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
       latest.current.client === client &&
       latest.current.props.enabled !== false &&
       latest.current.props.topic === topic &&
-      latest.current.props.resourceId === resourceId;
-    const subscription = { topic, ...(resourceId !== undefined ? { resourceId } : {}) } as LiveSubscription;
+      latest.current.props.resourceId === resourceId &&
+      latest.current.props.mqttServerId === mqttServerId &&
+      latest.current.props.filter === filter;
+    const subscription = {
+      topic,
+      ...(resourceId !== undefined ? { resourceId } : {}),
+      ...(mqttServerId !== undefined ? { mqttServerId, filter } : {}),
+    } as LiveSubscription;
     const unsubscribe = client.subscribe(
       subscription,
       (payload) => {
@@ -122,7 +130,7 @@ export function useLiveUpdates<T extends CoreLiveTopic>(
       cleanup();
       if (unsubscribeRef.current === cleanup) unsubscribeRef.current = null;
     };
-  }, [client, topic, resourceId, enabled, queryClient]);
+  }, [client, topic, resourceId, mqttServerId, filter, enabled, queryClient]);
   // Feature state can use this identity to reset on authentication-context changes.
   return { abort: useCallback(() => unsubscribeRef.current?.(), []), owner: client };
 }

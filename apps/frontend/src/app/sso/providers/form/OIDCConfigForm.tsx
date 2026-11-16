@@ -1,4 +1,5 @@
 import {
+  Description,
   Dropdown,
   DropdownItem,
   DropdownMenu,
@@ -18,23 +19,28 @@ import { KeycloakDiscoveryDialog } from '../discovery/keycloak/index';
 import { RoleMappingsSection } from './RoleMappingsSection';
 import { PermissionSyncSection } from './PermissionSyncSection';
 import { SSOProviderFormApi } from '../useSSOProviderForm';
-import { Button, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { Button, StringListField, useTranslations } from '@attraccess/plugins-frontend-ui';
+import { DEFAULT_OIDC_ROLE_CLAIM_PATHS, ROLE_PATH_LIST_MAX_ENTRIES, ROLE_PATH_MAX_LENGTH } from '@attraccess/shared';
 import en from '../en.json';
 import de from '../de.json';
+
+const USERNAME_CLAIM_PATHS_DEFAULT = 'preferred_username · email · sub';
+const EMAIL_CLAIM_PATHS_DEFAULT = 'email · emails[0].value · upn';
+const ROLE_CLAIM_PATHS_DEFAULT = [...DEFAULT_OIDC_ROLE_CLAIM_PATHS, 'resource_access.<clientId>.roles'].join(' · ');
 
 export function useOIDCConfigFormState({ form }: OIDCConfigFormProps) {
   const { t } = useTranslations({ en, de });
   const {
     formValues,
     setOidc,
-    scopesInput,
-    setScopesInput,
-    signingAlgorithmsInput,
-    setSigningAlgorithmsInput,
-    usernameClaimPathsInput,
-    setUsernameClaimPathsInput,
-    emailClaimPathsInput,
-    setEmailClaimPathsInput,
+    scopes,
+    setScopes,
+    usernameClaimPaths,
+    setUsernameClaimPaths,
+    emailClaimPaths,
+    setEmailClaimPaths,
+    roleClaimPaths,
+    setRoleClaimPaths,
     showClientSecret,
     setShowClientSecret,
     onAutoDiscovery,
@@ -47,14 +53,14 @@ export function useOIDCConfigFormState({ form }: OIDCConfigFormProps) {
     t,
     formValues,
     setOidc,
-    scopesInput,
-    setScopesInput,
-    signingAlgorithmsInput,
-    setSigningAlgorithmsInput,
-    usernameClaimPathsInput,
-    setUsernameClaimPathsInput,
-    emailClaimPathsInput,
-    setEmailClaimPathsInput,
+    scopes,
+    setScopes,
+    usernameClaimPaths,
+    setUsernameClaimPaths,
+    emailClaimPaths,
+    setEmailClaimPaths,
+    roleClaimPaths,
+    setRoleClaimPaths,
     showClientSecret,
     setShowClientSecret,
     onAutoDiscovery,
@@ -130,10 +136,14 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
           <Label>{model.t('jwksURL')}</Label>
           <Input placeholder="https://sso.example.com/jwks" />
         </TextField>
-        <TextField value={model.signingAlgorithmsInput} onChange={model.setSigningAlgorithmsInput}>
-          <Label>{model.t('signingAlgorithms')}</Label>
-          <Input placeholder="RS256" />
-        </TextField>
+        <StringListField
+          label={model.t('signingAlgorithms')}
+          values={model.formValues.oidcConfiguration?.signingAlgorithms ?? []}
+          onChange={(values) => model.setOidc('signingAlgorithms', values)}
+          placeholder="RS256"
+          emptyHint={model.t('signingAlgorithmsEmptyHint')}
+          data-cy="sso-provider-form-oidc-signing-algorithms-input"
+        />
         <p className="text-sm text-muted">{model.t('oidcLogoutHint')}</p>
 
         <TextField
@@ -233,18 +243,41 @@ export function OIDCConfigForm({ form }: OIDCConfigFormProps) {
         <h3 className="text-sm uppercase tracking-wide font-semibold text-default-700">
           {model.t('sections.oidcClaims')}
         </h3>
-        <TextField value={model.scopesInput} onChange={model.setScopesInput}>
-          <Label>{model.t('scopes')}</Label>
-          <Input placeholder="openid, email, profile" data-cy="sso-provider-form-oidc-scopes-input" />
-        </TextField>
-        <TextField value={model.usernameClaimPathsInput} onChange={model.setUsernameClaimPathsInput}>
-          <Label>{model.t('usernameClaimPaths')}</Label>
-          <Input placeholder="preferred_username, email, sub" data-cy="sso-provider-form-oidc-username-claims-input" />
-        </TextField>
-        <TextField value={model.emailClaimPathsInput} onChange={model.setEmailClaimPathsInput}>
-          <Label>{model.t('emailClaimPaths')}</Label>
-          <Input placeholder="email, emails[0].value, upn" data-cy="sso-provider-form-oidc-email-claims-input" />
-        </TextField>
+        <StringListField
+          label={model.t('scopes')}
+          values={model.scopes}
+          onChange={model.setScopes}
+          placeholder="email"
+          emptyHint={model.t('scopesEmptyHint')}
+          data-cy="sso-provider-form-oidc-scopes-input"
+        />
+        <StringListField
+          label={model.t('usernameClaimPaths')}
+          values={model.usernameClaimPaths}
+          onChange={model.setUsernameClaimPaths}
+          placeholder="preferred_username"
+          emptyHint={model.t('defaultsUsed', { defaults: USERNAME_CLAIM_PATHS_DEFAULT })}
+          data-cy="sso-provider-form-oidc-username-claims-input"
+        />
+        <StringListField
+          label={model.t('emailClaimPaths')}
+          values={model.emailClaimPaths}
+          onChange={model.setEmailClaimPaths}
+          placeholder="email"
+          emptyHint={model.t('defaultsUsed', { defaults: EMAIL_CLAIM_PATHS_DEFAULT })}
+          data-cy="sso-provider-form-oidc-email-claims-input"
+        />
+        <StringListField
+          label={model.t('roleClaimPaths')}
+          description={model.t('roleClaimPathsHint')}
+          values={model.roleClaimPaths}
+          onChange={model.setRoleClaimPaths}
+          placeholder="realm_access.roles"
+          emptyHint={model.t('defaultsUsed', { defaults: ROLE_CLAIM_PATHS_DEFAULT })}
+          maxEntries={ROLE_PATH_LIST_MAX_ENTRIES}
+          maxLength={ROLE_PATH_MAX_LENGTH}
+          data-cy="sso-provider-form-oidc-role-claims-input"
+        />
       </section>
 
       <RoleMappingsSection

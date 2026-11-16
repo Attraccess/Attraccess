@@ -63,43 +63,6 @@
 
 #define PN532_MIFARE_ISO14443A (0x00) ///< MiFare
 
-// NTAG242 Commands
-#define NTAG424_COMM_MODE_PLAIN (0x00)        ///< Commmode plain
-#define NTAG424_COMM_MODE_MAC (0x01)          ///< Commmode mac
-#define NTAG424_COMM_MODE_FULL (0x02)         ///< Commmode full
-#define NTAG424_COM_CLA (0x90)                ///< CLA prefix
-#define NTAG424_COM_CHANGEKEY (0xC4)          ///< changekey
-#define NTAG424_CMD_READSIG (0x3C)            ///< Read_Sig
-#define NTAG424_CMD_GETTTSTATUS (0xF7)        ///< getttstatus
-#define NTAG424_CMD_GETFILESETTINGS (0xF5)    ///< getfilesettings
-#define NTAG424_CMD_CHANGEFILESETTINGS (0x5F) ///< changefilesettings
-#define NTAG424_CMD_GETCARDUUID (0x51)        ///< getfilesettings
-#define NTAG424_CMD_READDATA (0xAD)           ///< Readdata
-#define NTAG424_CMD_WRITEDATA (0x8D)          ///< Writedata
-#define NTAG424_CMD_GETVERSION (0x60)         ///< GetVersion
-#define NTAG424_CMD_NEXTFRAME (0xAF)          ///< Nextframe
-
-#define NTAG424_RESPONE_GETVERSION_HWTYPE_NTAG424 \
-  (0x04) ///< Response value HWType NTAG 424
-#define NTAG424_RESPONE_GETVERSION_HWTYPE_DESFIRE \
-  (0x01) ///< Response value HWType MIFARE DESFire
-
-// MIFARE DESFire native commands (ISO7816-wrapped, CLA 0x90).
-// DESFire EV2/EV3 share the NTAG424 EV2 secure messaging (AuthenticateEV2First
-// 0x71, SV1/SV2 session keys, ChangeKey 0xC4), so the ntag424_* helpers are
-// reused; only application selection/creation is DESFire specific.
-#define DESFIRE_CMD_SELECT_APPLICATION (0x5A) ///< SelectApplication
-#define DESFIRE_CMD_CREATE_APPLICATION (0xCA) ///< CreateApplication
-#define DESFIRE_CMD_GET_KEY_VERSION (0x64)    ///< GetKeyVersion
-
-// DESFire GetVersion HWMajorVersion values (EV1 lacks AuthenticateEV2First).
-#define DESFIRE_HWMAJOR_EV2 (0x12) ///< HWMajorVersion of DESFire EV2
-
-#define NTAG424_COM_ISOCLA (0x00)          ///< ISO prefix
-#define NTAG424_CMD_ISOSELECTFILE (0xA4)   ///< ISOSelectFile
-#define NTAG424_CMD_ISOREADBINARY (0xB0)   ///< ISOReadBinary
-#define NTAG424_CMD_ISOUPDATEBINARY (0xD6) ///< ISOUpdateBinary
-
 // Mifare Commands
 #define MIFARE_CMD_AUTH_A (0x60)           ///< Auth A
 #define MIFARE_CMD_AUTH_B (0x61)           ///< Auth B

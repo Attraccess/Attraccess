@@ -2,12 +2,17 @@ name: Attractap lab hardware tests
 
 # Runs the hardware-in-the-loop tests (apps/attractap-lab/hil) against real
 # reader firmware and the NFC card emulator in the Attractap lab, on every
-# reader type at once: one job per firmware variant, in place <variant>-1.
+# reader type at once: one job per firmware variant, in place <variant>-1, plus
+# (ATTRACTAP_LAB_HIL_SECURE_ENABLED) one on the Secure Boot lab reader.
 # Called from the release and main-branch (nightly) workflows; skipped unless
 # the ATTRACTAP_LAB_HIL_ENABLED variable is "true".
 #
-# Repository variable (the job's `if:` cannot read environment variables):
+# Repository variables (the job's `if:` cannot read environment variables):
 #   ATTRACTAP_LAB_HIL_ENABLED       "true" to run at all
+#   ATTRACTAP_LAB_HIL_SECURE_ENABLED  "true" to also run the secure-lab profile on the Secure
+#                                   Boot lab reader (place attractap-touch-v2-secure-1). Needs
+#                                   a third lab host relay port (services.attractap-lab.
+#                                   readerApiRelay.ports: 20480-20482) before it is enabled.
 # Variables (repository or `attractap-lab` environment):
 #   LAB_HOST                        Lab host on the tailnet (SSH + coordinator)
 #   ATTRACTAP_LAB_COORDINATOR_PORT  Labgrid coordinator port (default 20408)
@@ -47,31 +52,27 @@ permissions:
 jobs:
   hil:
     if: vars.ATTRACTAP_LAB_HIL_ENABLED == 'true'
-    name: hil (${{ matrix.variant }})
+    name: hil (${{ matrix.variant }}, ${{ matrix.profile }})
     strategy:
-      # Each reader runs in its own place; a failure on one must not cancel the other.
+      # Each reader runs in its own place; a failure on one must not cancel the others.
       fail-fast: false
-      matrix:
-        include:
-          - variant: attractap-touch-v2
-            relay-offset: 0
-          # The Touch V1 is off while idle; its NFC emulator presses the power button.
-          - variant: attractap-touch
-            relay-offset: 1
+      matrix: ${{ fromJSON(vars.ATTRACTAP_LAB_HIL_SECURE_ENABLED == 'true' && '{"include":[{"variant":"attractap-touch-v2","profile":"plain","place":"attractap-touch-v2-1","relay-offset":0},{"variant":"attractap-touch","profile":"plain","place":"attractap-touch-1","relay-offset":1},{"variant":"attractap-touch-v2","profile":"secure-lab","place":"attractap-touch-v2-secure-1","relay-offset":2}]}' || '{"include":[{"variant":"attractap-touch-v2","profile":"plain","place":"attractap-touch-v2-1","relay-offset":0},{"variant":"attractap-touch","profile":"plain","place":"attractap-touch-1","relay-offset":1}]}') }}
+      # The Touch V1 is off while idle; its NFC emulator presses the power button.
     runs-on: ubuntu-latest
     environment: attractap-lab
     timeout-minutes: 90
     env:
       LAB_HOST: ${{ vars.LAB_HOST }}
       LG_COORDINATOR: ${{ vars.LAB_HOST }}:${{ vars.ATTRACTAP_LAB_COORDINATOR_PORT || '20408' }}
-      LG_PLACE_NAME: ${{ matrix.variant }}-1
+      LG_PLACE_NAME: ${{ matrix.place }}
       READER_VARIANT: ${{ matrix.variant }}
+      READER_PROFILE: ${{ matrix.profile }}
       API_RELAY_SSH: labgrid@${{ vars.LAB_HOST }}
       API_RELAY_HOST: ${{ vars.ATTRACTAP_LAB_API_RELAY_HOST }}
       API_RELAY_FIRST_PORT: ${{ vars.ATTRACTAP_LAB_API_RELAY_PORT || '20480' }}
       API_RELAY_OFFSET: ${{ matrix.relay-offset }}
       HIL_WAIT_MINUTES: ${{ vars.ATTRACTAP_LAB_WAIT_MINUTES || '30' }}
-      HIL_PURPOSE: CI ${{ github.workflow }} ${{ github.ref_name }} run ${{ github.run_id }} ${{ matrix.variant }}
+      HIL_PURPOSE: CI ${{ github.workflow }} ${{ github.ref_name }} run ${{ github.run_id }} ${{ matrix.place }}
     steps:
       - name: Check configuration
         run: |
@@ -131,7 +132,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: attractap-lab-hil-${{ matrix.variant }}-${{ github.run_id }}
+          name: attractap-lab-hil-${{ matrix.variant }}-${{ matrix.profile }}-${{ github.run_id }}
           path: apps/attractap-lab/hil-artifacts/
           if-no-files-found: ignore
           retention-days: 14

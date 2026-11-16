@@ -43,6 +43,7 @@
   - [Überblick](flows/overview.md)
   - [Flow-Editor](flows/flow-editor.md)
   - [Payloads, Variablen & Vorlagen](flows/payloads-variables-templates.md)
+  - [Globale Flows](flows/global-flows.md)
   - [Knotentypen](flows/node-types.md)
   - [Zähler](flows/energy-metering.md)
 
@@ -63,16 +64,14 @@
   - [Reader koppeln](attractap/pairing.md)
   - [RFID-Karten](attractap/rfid-cards.md)
   - [Firmware-Updates](attractap/firmware-updates.md)
+  - [Reader-Sicherheit](attractap/reader-security.md)
   - [Reader-Anzeige](attractap/reader-ui.md)
 
 - **MQTT & IoT**
   - [Überblick](mqtt/overview.md)
   - [Server einrichten](mqtt/server-setup.md)
+  - [Nachrichten-Explorer](mqtt/message-explorer.md)
   - [Beispiele](mqtt/examples.md)
-
-- **Geräte**
-  - [Matter: Architektur](devices/matter/architecture.md)
-  - [Matter: Betriebsanleitung](devices/matter/operator.md)
 
 - **Abrechnung**
   - [Überblick](billing/overview.md)
@@ -83,6 +82,29 @@
   - [Überblick](plugins/overview.md)
   - [Plugins installieren](plugins/installing-plugins.md)
   - [Plugins entwickeln](plugins/developing-plugins.md)
+  - **Reservierungen**
+    - [Überblick](plugins/reservations/overview.md)
+    - [Reservierungen nutzen](plugins/reservations/using-reservations.md)
+    - [Reservierungen administrieren](plugins/reservations/administration.md)
+    - [Reservierungs-API](plugins/reservations/api.md)
+  - **WAGO**
+    - [Überblick](plugins/wago/overview.md)
+    - [Geführte WAGO-CC100-Inbetriebnahme](plugins/wago/cc100-commissioning.md)
+    - [WAGO-CC100-Docker-Laufzeit](plugins/wago/cc100-runtime.md)
+    - [WAGO-Produktivbetrieb und Kompatibilität](plugins/wago/production-support.md)
+    - [WAGO-Wiederherstellungs-Runbooks](plugins/wago/recovery-runbooks.md)
+    - [WAGO-Bedrohungsmodell und Pen-Test-Briefing](plugins/wago/threat-model.md)
+    - [WAGO-Sicherheitsgrenze](plugins/wago/safety-boundary.md)
+  - **Matter**
+    - [Überblick](plugins/matter/overview.md)
+    - [Matter: Architektur](plugins/matter/architecture.md)
+    - [Matter: Betriebsanleitung](plugins/matter/operator.md)
+    - [Matter: Datenmodell und Lebenszyklus](plugins/matter/data-model.md)
+    - [Matter: Backup und Wiederherstellung](plugins/matter/backup-restore.md)
+  - **RabbitMQ**
+    - [Überblick](plugins/rabbitmq/overview.md)
+  - **Shelly**
+    - [Überblick](plugins/shelly/overview.md)
 
 - **Monitoring & Metriken**
   - [Überblick](monitoring/overview.md)
@@ -100,6 +122,8 @@
   - [Architektur](developer/architecture.md)
   - [API-Log-Ziele](developer/logging.md)
   - [API-Referenz](developer/api-reference.md)
+  - [MCP-Server (KI-Clients)](developer/mcp.md)
+  - [KI-Agenten (llms.txt & WebMCP)](developer/ai-agents.md)
   - [Mitwirken](developer/contributing.md)
 
 - **Für Endbenutzer**

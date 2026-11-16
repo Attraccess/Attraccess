@@ -1,4 +1,5 @@
 # API-Referenz
+<!-- llms-description: Beschreibt die REST-API mit OpenAPI-Dokumentation, generiertem API-Client und React-Query-Hooks, Authentifizierung und wichtigen Modulen. -->
 
 Attraccess stellt eine REST-API für alle Operationen bereit. Die API ist vollständig mit der OpenAPI-(Swagger-)Spezifikation dokumentiert.
 

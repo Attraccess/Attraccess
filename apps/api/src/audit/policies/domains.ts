@@ -1,5 +1,7 @@
 import { ADMINISTRATION_AUDIT_ACTIONS } from './administration';
-import { ATTRACTAP_AUDIT_ACTIONS, IDENTITY_AUDIT_ACTIONS, RESOURCE_AUDIT_ACTIONS } from '../audit-policy';
+import { ATTRACTAP_AUDIT_ACTIONS } from './attractap';
+import { IDENTITY_AUDIT_ACTIONS } from './identity';
+import { RESOURCE_AUDIT_ACTIONS } from './resources';
 
 /**
  * Audit domains owned by the core application. Plugins contribute additional
@@ -20,6 +22,7 @@ export type CoreAuditDomain = (typeof CORE_AUDIT_DOMAINS)[number];
 /** Subject types recorded by core domains. Plugin subject types come from the plugin audit registry. */
 export const CORE_SUBJECT_TYPES = [
   'attractap.reader',
+  'attractap.installation',
   'attractap.card',
   'attractap.ui-alert',
   'setting',
@@ -36,6 +39,7 @@ export const CORE_SUBJECT_TYPES = [
   'identity.password_policy',
   'identity.role',
   'identity.user',
+  'flow',
   'resource',
   'resource_group',
   'sso.provider',

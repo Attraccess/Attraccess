@@ -1,4 +1,5 @@
 # Ziele für API-Logs
+<!-- llms-description: Wie die API Logs mit RoutedLogger an Ziele leitet, inklusive Treiber-Registrierung und Start-Lebenszyklus. -->
 
 Services und Plugins verwenden weiterhin `Logger` aus `@nestjs/common`. `RoutedLogger` erweitert Nests `ConsoleLogger`, um Argumentauswertung und effektiven Ebenenfilter der installierten Version 11.1.28 wiederzuverwenden. Nachrichtenobjekte, Kontext, Ebene, ISO-Zeitstempel und übergebene Stacks gelangen unverändert an Winstons Logger im Object-Modus. Eine eigene API für Log-Aufrufe ist nicht nötig. Siehe [Betriebskonfiguration](installation/environment-variables.md#api-anwendungslogs).
 

@@ -1,4 +1,5 @@
 # Benutzerverwaltung
+<!-- llms-description: Überblick über die Benutzerverwaltung: Konten anlegen, Berechtigungen vergeben und Anmeldemethoden als Administrator konfigurieren. -->
 
 Die Benutzerverwaltung ermöglicht es Administratoren, Benutzerkonten zu erstellen, Berechtigungen zu vergeben und Anmeldemethoden zu konfigurieren.
 

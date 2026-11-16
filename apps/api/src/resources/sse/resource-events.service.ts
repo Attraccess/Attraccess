@@ -10,6 +10,11 @@ import {
   ResourceUsageSessionTakenOverEvent,
 } from '../usage/events/resource-usage.events';
 import { ResourceHealthChangedEvent } from '../health/events/resource-health-changed.event';
+import {
+  PLUGIN_START_BLOCKED_CHANGED_EVENT,
+  START_BLOCKED_LIVE_EVENT_TYPE,
+  type PluginStartBlockedChanged,
+} from '../../plugin-system/start-blocked/start-blocked.events';
 import { activeUsageWhere, getSessionCapacity } from '../usage/sessions/active-usage';
 
 interface MessageEvent {
@@ -186,6 +191,15 @@ export class ResourceEventsService implements OnModuleInit, OnModuleDestroy {
       status: event.status,
       reason: event.reason,
       previousStatus: event.previousStatus,
+    });
+  }
+
+  /** A plugin says its start-blocked answer may have changed: open resource pages ask again. */
+  @OnEvent(PLUGIN_START_BLOCKED_CHANGED_EVENT)
+  handleStartBlockedChanged(event: PluginStartBlockedChanged) {
+    this.emitWithSessionStatus(event.resourceId, {
+      eventType: START_BLOCKED_LIVE_EVENT_TYPE,
+      resourceId: event.resourceId,
     });
   }
 }

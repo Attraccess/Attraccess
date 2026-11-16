@@ -1,5 +1,6 @@
 #include "display/i18n.hpp"
 #include "connectionConfigurationScreen.hpp"
+#include "../../shared/screenChrome.hpp"
 #include "../../theme.hpp"
 #include "../../fonts/attractap_fonts.hpp"
 #include <string>
@@ -24,6 +25,8 @@ void ConnectionConfigurationScreen::init()
 
    this->screen = lv_obj_create(NULL);
    DisplayTheme::applyScreen(this->screen);
+   // The tab bar starts below the drawer grabber and the network badge on the top layer.
+   lv_obj_set_style_pad_top(this->screen, ScreenChrome::Top, LV_PART_MAIN);
    lv_obj_remove_flag(this->screen, LV_OBJ_FLAG_SCROLLABLE);
    lv_obj_set_flex_flow(this->screen, LV_FLEX_FLOW_COLUMN_WRAP);
    lv_obj_set_flex_align(this->screen, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
@@ -70,9 +73,6 @@ std::string ConnectionConfigurationScreen::getName()
 
 void ConnectionConfigurationScreen::onScreenLeave()
 {
-#ifdef HAS_POWER_BUTTON
-   PowerOffButton::hideConfirm();
-#endif
 }
 
 void ConnectionConfigurationScreen::destroy()

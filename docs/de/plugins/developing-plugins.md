@@ -1,13 +1,15 @@
 # Plugins entwickeln
 
+<!-- llms-description: Entwicklerleitfaden für Attraccess-Plugins: SDKs, Frontend- und Backend-Plugins, Abhängigkeiten, Reader-UI und Start-Hooks. -->
+
 Attraccess stellt SDKs für die Entwicklung eigener Plugins bereit. Sie können Frontend-Erweiterungen, Backend-Erweiterungen oder beides erstellen.
 
 ## Plugin-SDKs
 
-| SDK | Installationsbefehl | Verwendung |
-|-----|---------------------|-----------|
+| SDK                                | Installationsbefehl                            | Verwendung                       |
+| ---------------------------------- | ---------------------------------------------- | -------------------------------- |
 | `@attraccess/plugins-frontend-sdk` | `npm install @attraccess/plugins-frontend-sdk` | Frontend-Seiten und -Komponenten |
-| `@attraccess/plugins-backend-sdk` | `npm install @attraccess/plugins-backend-sdk` | Backend-API-Endpunkte |
+| `@attraccess/plugins-backend-sdk`  | `npm install @attraccess/plugins-backend-sdk`  | Backend-API-Endpunkte            |
 
 ## Frontend-Plugins
 
@@ -28,6 +30,30 @@ Ein Frontend-Plugin kann:
 > [!TIP]
 > Lesen Sie die SDK-Dokumentation, die mit `@attraccess/plugins-frontend-sdk` mitgeliefert wird, für eine detaillierte API-Referenz, Beispiele und Typdefinitionen.
 
+### Slots (eingebettete Erweiterungspunkte)
+
+Neben eigenen Routen kann ein Frontend-Plugin über `getSlotContributions()` UI **in** Host-Seiten einbetten. Jeder
+Beitrag nennt eine `slotId`, eine `render(context)`-Funktion und optional `key` und `title`. Unbekannte Slot-IDs werden
+ignoriert, und jeder Beitrag läuft in einer Error Boundary. Verfügbare Slots:
+
+| Slot-ID                   | Ort                                                                                               | Kontext                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------- |
+| `mqtt.server.detail`      | Detail-/Bearbeitungsansicht eines MQTT-Servers                                                    | `{ mqttServerId }`        |
+| `mqtt.server.list.row`    | MQTT-Serverliste, Aktionsbereich pro Zeile                                                        | `{ mqttServerId }`        |
+| `resource.overview`       | Hauptbereich der Ressourcen-Detailseite                                                           | `{ resourceId }`          |
+| `resource.active-session` | Panel der aktiven Nutzung, direkt nach den Flow-Bedienelementen                                   | `{ resourceId, usageId }` |
+| `resource.list.row`       | Kompakter Statusbereich einer Ressourcenzeile                                                     | `{ resourceId }`          |
+| `resource.settings`       | Einstellungsseite der Ressource, für Nutzende, die sie verwalten dürfen (`resources.update`)      | `{ resourceId }`          |
+| `user.account`            | Kontoseite der angemeldeten Person                                                                | `{ userId }`              |
+| `admin.settings`          | Übersicht der Systemeinstellungen, nur für Nutzende mit der Berechtigung `system.settings.manage` | `{}`                      |
+
+`resource.settings`, `user.account` und `admin.settings` werden als **Abschnitte mit Titel** dargestellt: Setzen Sie
+`title` am Beitrag (sonst gilt ein allgemeiner Plugin-Titel). Die Konstanten `RESOURCE_OVERVIEW_SLOT`,
+`RESOURCE_SETTINGS_SLOT`, `USER_ACCOUNT_SLOT`, `ADMIN_SETTINGS_SLOT` und die Kontexttypen (`ResourceSlotContext`,
+`UserSlotContext`, `AdminSettingsSlotContext`) exportiert `@attraccess/plugins-frontend-sdk`. Der Host entscheidet nur,
+**wo** ein Beitrag angezeigt wird; das Backend Ihres Plugins muss Berechtigungen an der eigenen API weiterhin selbst
+durchsetzen.
+
 ## Abhängigkeiten von anderen Attraccess-Plugins
 
 Deklariere Plugin-Abhängigkeiten in `package.json` unter `attraccess.dependencies`:
@@ -35,9 +61,7 @@ Deklariere Plugin-Abhängigkeiten in `package.json` unter `attraccess.dependenci
 ```json
 {
   "attraccess": {
-    "dependencies": [
-      { "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }
-    ]
+    "dependencies": [{ "name": "@example/3d-printer-core", "version": "^1.0.0", "required": true }]
   }
 }
 ```
@@ -68,14 +92,14 @@ Ein Backend-Plugin kann:
 
 ### Backend-Plugins verpacken
 
-Ein Backend-Plugin läuft **innerhalb** des Attraccess-Serverprozesses und teilt sich die NestJS-Laufzeit, den Event-Bus und die Datenbankverbindung des Hosts. Damit das funktioniert, muss Ihr Build *dieselben* Kopien dieser Pakete verwenden, die der Host bereits geladen hat -- er darf keine eigenen mitbündeln.
+Ein Backend-Plugin läuft **innerhalb** des Attraccess-Serverprozesses und teilt sich die NestJS-Laufzeit, den Event-Bus und die Datenbankverbindung des Hosts. Damit das funktioniert, muss Ihr Build _dieselben_ Kopien dieser Pakete verwenden, die der Host bereits geladen hat -- er darf keine eigenen mitbündeln.
 
 Teilen Sie Ihre Abhängigkeiten in zwei Gruppen auf:
 
-| Abhängigkeit | Deklaration | Grund |
-|---------------|-------------|-------|
-| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebündelte Kopie gilt als *anderer* Typ und verbindet sich stillschweigend nicht. |
-| `@attraccess/plugins-backend-sdk` und Ihr eigener Code | Normal bündeln | Kann sicher in Ihr Artefakt aufgenommen werden. |
+| Abhängigkeit                                                                                                                                                         | Deklaration                                                       | Grund                                                                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@nestjs/common`, `@nestjs/core`, `@nestjs/event-emitter`, `eventemitter2`, `typeorm`, `reflect-metadata`, `@nestjs/swagger`, `class-validator`, `class-transformer` | `peerDependencies`, beim Build **externalisiert** (nie gebündelt) | Sie tragen die Dependency-Injection-Identitäten, den gemeinsamen Event-Bus und die einzelne Datenbankverbindung. Eine gebündelte Kopie gilt als _anderer_ Typ und verbindet sich stillschweigend nicht. |
+| `@attraccess/plugins-backend-sdk` und Ihr eigener Code                                                                                                               | Normal bündeln                                                    | Kann sicher in Ihr Artefakt aufgenommen werden.                                                                                                                                                         |
 
 Liefern Sie einen **CommonJS**-Einstiegspunkt (`index.js`) aus, kein ES-Modul (`index.mjs`). Verweisen Sie im `plugin.json`-Manifest darauf:
 
@@ -95,7 +119,8 @@ esbuild src/index.ts \
   --bundle --platform=node --format=cjs --outfile=dist/index.js \
   --external:@nestjs/common --external:@nestjs/core \
   --external:@nestjs/event-emitter --external:eventemitter2 \
-  --external:typeorm --external:reflect-metadata
+  --external:typeorm --external:reflect-metadata \
+  --external:@nestjs/swagger --external:class-validator --external:class-transformer
 ```
 
 > [!WARNING]
@@ -121,21 +146,25 @@ nennt.
 }
 ```
 
-| Berechtigung | Gewährt Zugriff auf |
-|-----------|------------------|
-| `READ_USERS` | `context.getRepository(User)` -- Benutzerkonten lesen. |
-| `ACCESS_RESOURCES` | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben. |
-| `READ_SETTINGS` | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen. |
-| `DATABASE_ACCESS` | `context.dataSource` und `context.getRepository(...)` für jede andere Entität. |
-| `EMIT_EVENTS` | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden. |
-| `LISTEN_EVENTS` | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren. |
-| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen. |
-| `ACCESS_MQTT_SERVERS` | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen. |
-| `READER_UI` | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
-| `ACCESS_HOOKS` | `preStartHook` und `sessionEndHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
+| Berechtigung             | Gewährt Zugriff auf                                                                                                                                                                                                                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `READ_USERS`             | `context.getRepository(User)` -- Benutzerkonten lesen.                                                                                                                                                                                                                                                            |
+| `ACCESS_RESOURCES`       | `context.getRepository(Resource)` -- Ressourcen lesen und schreiben -- sowie die lesenden `context.resourceAccess`-Abfragen. Siehe [Ressourcen-Zugriff](#ressourcen-zugriff-abfragen).                                                                                                                            |
+| `READ_SETTINGS`          | `context.getRepository(Setting)` -- Anwendungseinstellungen lesen.                                                                                                                                                                                                                                                |
+| `DATABASE_ACCESS`        | `context.dataSource`, `context.getRepository(...)` für jede andere Entität und `context.runSerialized(...)`.                                                                                                                                                                                                      |
+| `EMIT_EVENTS`            | `context.emitEvent(...)` und `context.events.emit(...)` / `emitAsync(...)` -- auf dem geteilten Event-Bus senden.                                                                                                                                                                                                 |
+| `LISTEN_EVENTS`          | `context.onEvent(...)` und `context.events.on(...)` / `once(...)` / ... -- den geteilten Event-Bus abonnieren.                                                                                                                                                                                                    |
+| `RESOLVE_HOST_PROVIDERS` | `context.get(token)` -- beliebige Host-Dienste per Injection-Token auflösen.                                                                                                                                                                                                                                      |
+| `ACCESS_MQTT_SERVERS`    | `context.getMqttServerConfig(serverId)` -- Verbindungskonfiguration und aufgelöste (entschlüsselte) Zugangsdaten eines MQTT-Servers lesen.                                                                                                                                                                        |
+| `READER_UI`              | `context.readerUi.invalidate(...)` und der `readerUi`-Provider -- Widgets auf Attractap-Reader-Bildschirmen anzeigen. Siehe [Reader-UI](#reader-ui-und-start-hooks).                                                                                                                                              |
+| `ACCESS_HOOKS`           | `preStartHook`, `sessionEndHook`, `startBlockedQuery` und `startCapacityHook` -- eine Bestätigung verlangen oder einen Sitzungsstart blockieren und einen blockierten Start in der Oberfläche anzeigen. `startCapacityHook` benötigt zusätzlich `DATABASE_ACCESS`. Siehe [Reader-UI](#reader-ui-und-start-hooks). |
+| `SEND_NOTIFICATIONS`     | `context.notifications.dispatch(...)` -- Benachrichtigungen in der App, per Push und per E-Mail unter vom Plugin deklarierten Kategorien senden und bearbeitbare E-Mail-Vorlagen deklarieren. Siehe [Benachrichtigungen](#benachrichtigungen).                                                                    |
 
 `context.manifest` und `context.logger` sind immer verfügbar und benötigen
-keine Berechtigung. Eine unbekannte Berechtigung führt dazu, dass das Plugin
+keine Berechtigung. Dasselbe gilt für `context.hostVersion`: die Version des
+laufenden Attraccess-Hosts, gegen die auch die Plugin-Kompatibilität geprüft
+wird. Das Feld ist optional – Hosts vor Version 1.11.0 setzen es nicht, ein
+Plugin, das es braucht, muss `undefined` behandeln. Eine unbekannte Berechtigung führt dazu, dass das Plugin
 nicht geladen wird.
 
 Einige Hinweise zur Grenze:
@@ -164,24 +193,33 @@ einfügen. Ein Plugin beschreibt nur **Daten** (einen Knotenbaum nach „Reader 
 kein Plugin-Code; der Host prüft, bereinigt und rendert alles. Admins stellen das unter **Reader-Anzeige** ein,
 siehe [Reader-Anzeige](attractap/reader-ui.md).
 
-| Was                            | Deklaration                                               | Berechtigung   |
-| ------------------------------ | --------------------------------------------------------- | -------------- |
-| Slot-Widgets                   | `readerUi` (Provider oder `(context) => provider`)        | `READER_UI`    |
-| Pre-Start-Hook                 | `preStartHook`                                            | `ACCESS_HOOKS` |
-| Beratende Frage nach dem Stopp | `sessionEndHook`                                          | `ACCESS_HOOKS` |
-| Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })` | `READER_UI`    |
+| Was                            | Deklaration                                                               | Berechtigung                         |
+| ------------------------------ | ------------------------------------------------------------------------- | ------------------------------------ |
+| Slot-Widgets                   | `readerUi` (Provider oder `(context) => provider`)                        | `READER_UI`                          |
+| Pre-Start-Hook                 | `preStartHook`                                                            | `ACCESS_HOOKS`                       |
+| Beratende Frage nach dem Stopp | `sessionEndHook`                                                          | `ACCESS_HOOKS`                       |
+| Start-blockiert-Zustand        | `startBlockedQuery` und `context.startBlocked.invalidate({ resourceId })` | `ACCESS_HOOKS`                       |
+| Start-Kapazität                | `startCapacityHook`                                                       | `ACCESS_HOOKS` und `DATABASE_ACCESS` |
+| Neu rendern                    | `context.readerUi.invalidate({ resourceId?, readerId? })`                 | `READER_UI`                          |
 
 Ein Plugin, das `readerUi` oder einen Hook ohne die passende Berechtigung deklariert, **wird nicht geladen** und
-unter Quarantäne gestellt. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
+unter Quarantäne gestellt. Das Erstanbieter-Plugin [Reservierungen](plugins/reservations/overview.md) nutzt beide Hooks in der Praxis: Sein Pre-Start-Hook blockiert oder bestätigt Starts rund um Buchungen, sein Session-End-Hook fragt die buchende Person, ob sie den Rest einer Buchung behalten oder freigeben möchte. Ein lauffähiges Beispiel liegt in `examples/plugin-reader-ui`.
 
 ### Slots
 
-| Slot-ID                    | Ort                                                | Knotenbudget                                                                                                                                            |
-| -------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `resourceList.row.status`  | Statuszeile einer Ressourcenzeile                  | 1 `text` oder `badge`, höchstens 24 Zeichen. Nur sichtbar, wenn kein Kernstatus (in Benutzung, Wartung, nicht verfügbar, Einweisung erforderlich) gilt. |
-| `resource.details.header`  | unter der Beschreibung in den Ressourcendetails    | 6 Knoten                                                                                                                                                |
-| `resource.details.body`    | Hauptbereich der Ressourcendetails                 | 8 Knoten                                                                                                                                                |
-| `resource.details.session` | solange der Block der aktiven Sitzung sichtbar ist | 6 Knoten                                                                                                                                                |
+| Slot-ID                    | Ort                                                                         | Knotenbudget                                                                                                                                                                                                                                                                                   |
+| -------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resourceList.row.status`  | Statuszeile einer Ressourcenzeile und des Sperrbildschirms                  | 1 `text` oder `badge`, höchstens 24 Zeichen. Nur sichtbar, wenn kein Kernstatus (in Benutzung, Wartung, nicht verfügbar, Einweisung erforderlich) gilt. Der Sperrbildschirm erscheint, solange niemand angemeldet ist; dort erscheint daher nur, was Sie ohne Kartensitzung beigetragen haben. |
+| `resource.details.header`  | unter der Beschreibung in den Ressourcendetails                             | 6 Knoten                                                                                                                                                                                                                                                                                       |
+| `resource.details.body`    | Hauptbereich der Ressourcendetails                                          | 8 Knoten                                                                                                                                                                                                                                                                                       |
+| `resource.details.session` | nur solange eine Nutzung aktiv ist (`ctx.sessionActive`); nur Kartensitzung | 6 Knoten                                                                                                                                                                                                                                                                                       |
+
+`ctx.sessionActive` (optionaler Boolean) sagt Ihnen, ob die Ressource eine aktive Nutzung hat, die auf diesem Reader
+sichtbar ist. Der Reader zeigt `resource.details.session` nur, solange das `true` ist. Legen Sie einen Sachverhalt
+daher in diesem Slot ab, wenn es `true` ist, und sonst in `resource.details.body`, nie in beiden: Eine Buchung oder
+ein freies Zeitfenster soll pro Bildschirm in einem Block stehen. Der Host ruft Ihren Provider erneut auf, wenn eine
+Nutzung beginnt, endet oder übernommen wird; das Update-Limit von einmal pro 2 s je Reader und Slot gilt weiterhin.
+Sendet ein Host das Feld nicht, bleibt es ungesetzt; behandeln Sie das als `false`.
 
 Komponenten: `col`, `row`, `text`, `badge`, `icon` (`ok`, `warning`, `bell`, `lock`, `clock`), `progress`,
 `countdown`, `spacer`. Slot-Bäume dürfen kein `button` enthalten. Töne: `primary`, `success`, `warning`, `danger`;
@@ -226,6 +264,38 @@ Ungültige Beiträge lehnt der Host ab und protokolliert sie mit dem Plugin-Name
 Reader-Editor zeigt sie als **Übersprungen** mit „ungültiger Inhalt“. Texte, die einem Kernstatus entsprechen
 („Wartung“, „Zugriff gewährt“, ...), werden abgelehnt, damit Plugins keine Host-Meldungen nachahmen.
 
+### Zeitzone auf Readern
+
+Reader zeigen eine Uhr, und Ihre Texte müssen dazu passen. Schreibt Ihr Plugin Zeiten auf Reader-Bildschirme (zum
+Beispiel „Frei bis 14:00“), implementieren Sie `getTimeZone` am Provider und geben Sie die IANA-Zone zurück, in der
+Ihre Texte stehen:
+
+```ts
+const readerUi: ReaderUiProvider = {
+  getSlotContributions(ctx) {
+    /* ... */
+  },
+  getTimeZone({ resourceId }) {
+    return resourceHasMyFeature(resourceId) ? 'Europe/Berlin' : undefined; // undefined = keine Meinung
+  },
+};
+```
+
+Der Host fragt die Plugins der Ressourcen eines Readers (mit demselben Timeout von 1,5 s wie bei Slots; ein Fehler zählt
+als keine Meinung) und nimmt die **erste gültige Zone in Host-Reihenfolge**: die Ressourcen des Readers nach ID und je
+Ressource die Plugins in Host-Reihenfolge (alphabetisch nach Plugin-Namen); ein langsameres Plugin, das innerhalb der
+Zeitgrenze antwortet, gewinnt trotzdem gegen ein schnelleres, das nach ihm kommt. Er sendet dem Reader den UTC-Offset
+der Zone, Sommerzeit eingeschlossen. Ein ungültiger Name wird ignoriert, Namen werden kanonisch verglichen
+(`europe/berlin` ist `Europe/Berlin`). Weichen die Antworten für einen Reader voneinander ab, gewinnt die erste, und
+Admins erhalten einen Alarm. Ohne Antwort folgt der Reader dem `TZ` des Servers. Läuft ein Plugin in den Timeout, das
+die Zone entscheiden könnte, behält der Host die aktuelle Zone des Readers; hat er noch keine, nutzt er vorerst die
+nächste gültige Antwort. In beiden Fällen fragt er bei einem späteren Heartbeat des Readers erneut, zuerst nach 5 s,
+dann seltener, höchstens alle 5 Minuten. Rufen Sie `context.readerUi.invalidate(...)` auf, wenn sich Ihre Zone ändert;
+der Host löst sie dann neu auf und schickt den neuen Offset und die Startzeiten der Sitzungen in der Ressourcenliste
+sofort an die betroffenen Reader. Schreiben Sie nicht die aktuelle Uhrzeit in Ihre Texte: Die Fußleiste des Readers
+zeigt sie auf jedem Bildschirm außer Sperrbildschirm, Liste ohne Anmeldung und Sitzungszusammenfassung (diese hat keine
+Fußleiste, solange keine Plugin-Frage darüber offen ist), so lässt sich „Check-in bis 14:15“ auf jetzt beziehen.
+
 ### Nur Latin-1
 
 Die Reader-Schriften decken Latin-1 ab. Der Host transliteriert **vor** dem Zählen der Bytes (`ł` wird `l`,
@@ -233,11 +303,26 @@ typografische Anführungszeichen werden `'` und `"`, Striche U+2010-2015 werden 
 Leerzeichen werden ein Leerzeichen, alles andere wird `?`). Ausgaben von `Intl.DateTimeFormat` sind abgedeckt.
 Prüfen Sie Ihre Texte vorab mit denselben Regeln, damit sie auch nach der Transliteration in die Grenzen passen.
 
+### Zeilenumbrüche
+
+Der Reader bricht Text an Leerzeichen und Satzzeichen wie `,`, `-`, `.` und `_` um, aber nie nach `:` oder `)`. Eine
+Uhrzeit („14:25“) wird also nie getrennt, und eine schließende Klammer beginnt keine Zeile. Ein Bindestrich ist eine
+Umbruchstelle: Ein langer Name mit Bindestrich bricht dort statt mitten im Wort um, ebenso ein Zeitraum
+(„13:55-“ / „14:25“), der nicht in seine Zeile passt. Ein Wort, das länger als die Zeile ist, wird weiterhin
+getrennt. Der Reader gleicht Zeilen nicht aus, und ein Zeilenumbruch im Text wird durch ein Leerzeichen ersetzt.
+
+Schreiben Sie jede Teilaussage als eigenen `text`-Knoten in einer `col`, zum Beispiel „Frei bis 13:55,“ und „dann
+reserviert von bea bis 14:25“, damit keine einzelne Uhrzeit oder Notiz allein in einer Zeile steht. Etwa 42 Zeichen
+passen in eine Zeile des Detailbereichs (18 px) und eines kleinen Texts (14 px) neben einem Countdown. Teilen Sie
+eine längere Teilaussage selbst, zum Beispiel zwischen einem Namen und seinen Zeiten: „Reserviert von Wolfgang
+Mohrman“ über „13:55-14:25“.
+
 ### Datenschutz und Sprache
 
-Öffentliche Slots (Reader ohne angemeldete Person) zeigen keine Namen anderer Personen. Personenbezogene Inhalte
-gehören in benutzerbezogene Slots (`resource.details.session`) und Schritte; der Host entfernt sie, wenn die
-Kartensitzung endet. Bevorzugen Sie „Reserviert“ statt Namen, sonst Vorname und Initial.
+Öffentliche Slots (Reader ohne angemeldete Person) zeigen keine Namen anderer Personen. Alles, was ein Provider
+während einer Kartensitzung liefert, ist benutzerbezogen, in jedem Slot, ebenso Schritte: Der Host entfernt es, wenn
+die Kartensitzung endet. In welchen Slot eine Angabe gehört, richtet sich nach `ctx.sessionActive`, nicht nach dem
+Datenschutz. Bevorzugen Sie „Reserviert“ statt Namen, sonst Vorname und Initial.
 
 Jeder Kontext enthält `ctx.language` (`'en'` oder `'de'`). Für Slot-Provider ist das die Reader-Sprache oder,
 solange eine Kartensitzung läuft, die Sprache der Kartenperson. In `PreStartContext` und `SessionEndContext` ist es
@@ -274,6 +359,10 @@ Ein Vertrag für Reader, Web-UI, API-Clients und die Supervision-Freigabe. Ein H
 - Bei mehreren Plugins gewinnt jedes `block`; sonst werden die Bestätigungen nacheinander in Host-Reihenfolge
   gefragt. Jede Wiederholung sendet nur die neueste Schritt-ID; der Host merkt sich die früheren Bestätigungen
   desselben Startversuchs.
+- `ctx.principal` ist die startende Person als `resourceAccess`-Prinzipal. Bei Starts über Web und API trägt es die
+  Berechtigungen der Anfrage, sodass der Umfang eines API-Tokens gilt; bei Starts am Reader und über die
+  Supervision-Freigabe ist es die reine Nutzer-ID. Übergeben Sie es statt `ctx.userId` an `context.resourceAccess`,
+  wenn der Hook Berechtigungen prüft.
 - Der Hook läuft nach der schreibgeschützten Start-Prüfung des Hosts; wer ohnehin abgelehnt würde, sieht keinen
   Schritt.
 - Eine Übernahme ist ein Start für die neue Person (`action: 'takeover'`). **Stopp und Notaus laufen nie durch
@@ -286,6 +375,96 @@ Ein Vertrag für Reader, Web-UI, API-Clients und die Supervision-Freigabe. Ein H
   Ressource: `block` (Standard), `card-confirm` (Lite: zweites Auflegen durch dieselbe Person) oder
   `allow-with-warning` (startet ohne Bestätigung). `PluginConfirmation.noScreenPolicy` setzt Ihren Standard;
   Admins können ihn pro Ressource überschreiben.
+
+### Start-blockiert-Zustand
+
+`preStartHook` antwortet nur, wenn jemand auf Start drückt. Damit die Ressourcenseite den Grund **anstelle des
+Start-Knopfs** anzeigen kann, deklariert ein Plugin zusätzlich das abfrageseitige Gegenstück `startBlockedQuery`:
+
+```ts
+const startBlockedQuery: StartBlockedQuery = async (ctx) => {
+  const until = await endOfRunningBooking(ctx.resourceId, ctx.userId); // eigene Abfrage
+  if (!until) return null; // nichts blockiert
+  const de = ctx.language === 'de';
+  return {
+    reason: {
+      code: 'RESERVED',
+      title: de ? 'Reserviert' : 'Reserved',
+      body: de ? 'Von einer anderen Person reserviert.' : 'Reserved by another user.',
+    },
+    until, // optionales Date: die Oberfläche zeigt es an und aktualisiert sich dann selbst
+  };
+};
+```
+
+- **Gleiche Form wie ein Block.** `reason` ist das `{ code, title, body }` eines `preStartHook`-Blocks mit denselben
+  Grenzen und reservierten Codes; `until` ist optional. `null` bedeutet „nicht blockiert“.
+- **Nur zur Information.** Der Server führt für jeden Start weiterhin `preStartHook` aus, der Hook muss also weiter
+  blockieren; ein Start, der doch durchkommt, oder eine veraltete Seite endet im üblichen Fehler-Hinweis. Reader
+  nutzen weiterhin nur den Hook.
+- **Datenschutz liegt bei Ihnen.** Die Abfrage läuft für die Person, die die Seite ansieht (`ctx.userId`, mit dem
+  Umfang der Anfrage in `ctx.principal`). Der Grund
+  wird ihr wörtlich angezeigt; wenden Sie also Ihre eigenen Sichtbarkeitsregeln an und nennen Sie niemanden, den die
+  Person nicht sehen darf. Nennt der Grund eine Person, fragen Sie
+  `context.resourceAccess.canSeeUsageAttribution(ctx.principal, ctx.resourceId)`, statt eine eigene Regel zu pflegen:
+  Es ist die Regel, die der Kern auf den aktuellen Nutzer einer Maschine anwendet. Das Reservierungs-Plugin nennt die
+  buchende Person genau dann und liefert für Verwaltende nichts, die über eine Override-Bestätigung starten.
+- **Günstig halten.** Sie läuft, solange eine Ressourcenseite mit Start-Knopf offen ist (etwa alle 30 Sekunden pro
+  Seite, dazu bei jedem Invalidieren). Es gilt das Hook-Timeout; Timeout, Fehler oder eine ungültige Antwort zählen als
+  „nicht blockiert“ und öffnen nie den Circuit Breaker des Pre-Start-Hooks.
+- **Live.** Rufen Sie `context.startBlocked.invalidate({ resourceId })` auf, wenn sich etwas ändert, das die Antwort
+  bestimmt (Buchung angelegt, storniert, begonnen oder beendet). Der Host sendet ein Live-Ereignis
+  `resource.start_blocked_changed`, und offene Seiten fragen sofort neu. Wer die Ressource nicht live verfolgen darf,
+  aktualisiert weiterhin per Polling und zum Zeitpunkt `until`.
+- Die HTTP-Seite ist `GET /api/resources/:resourceId/usage/start-blocked` und antwortet für die angemeldete Person mit
+  `{ blocked, reason?, until?, plugin? }`.
+
+### Start-Kapazität auf geteilten Maschinen
+
+Bei einer Maschine mit `maxParallelSessions` über 1 deklariert ein Plugin, das Plätze für andere zurückhält (das
+Reservierungs-Plugin tut das für laufende bestätigte Buchungen, deren Inhaber noch keine Sitzung hat), den
+`startCapacityHook`. Der `preStartHook` allein kann das
+nicht sicher leisten: Zwei gleichzeitige Starts könnten beide durchkommen und denselben Platz belegen.
+
+```ts
+const startCapacityHook: StartCapacityHook = async (ctx) => {
+  // ctx.manager ist die Start-Transaktion des Hosts: Lesen Sie ausschließlich darüber
+  const held = await countSlotsHeldForOthers(ctx.manager, ctx.resourceId, ctx.userId, ctx.now); // Ihre eigene Abfrage
+  if (!held) return { heldSlots: 0 };
+  return {
+    heldSlots: held,
+    reason: {
+      code: 'RESERVED',
+      title: ctx.language === 'de' ? 'Reserviert' : 'Reserved',
+      body: ctx.language === 'de' ? 'Alle freien Plätze sind reserviert.' : 'All free slots are reserved.',
+    },
+  };
+};
+```
+
+- **Wann er läuft.** Nur auf geteilten Maschinen (Limit über 1), innerhalb der serialisierten Start-Transaktion des
+  Kerns und nach dessen eigener Kapazitätsprüfung. Der Kontext enthält `sessionLimit`, `occupiedSlots` (Sitzungen und
+  laufende Starts, in derselben Transaktion gelesen), `usersInSession`, `userId`, `principal`, `action`, `origin`,
+  `confirmedStepKeys`, `language` und `now`.
+- **`usersInSession`** (`number[]`) nennt die Personen hinter `occupiedSlots` (Sitzungen und laufende Starts), in
+  derselben Transaktion gelesen. Damit erkennen Sie, ob ein Inhaber schon in einer Sitzung ist; der Hook muss die
+  Sitzungstabelle des Kerns nicht abfragen.
+- **`action` ist immer `start`.** Geteilte Maschinen kennen keine Übernahme: Ein Start fügt dort immer eine Sitzung
+  hinzu.
+- **Der Kern entscheidet.** Geben Sie `{ heldSlots, reason? }` zurück. Der Kern lehnt den Start mit Ihrem `reason` ab,
+  wenn `occupiedSlots + heldSlots >= sessionLimit`; gleichzeitige Starts können so nie einen zurückgehaltenen Platz
+  belegen.
+- **Geben Sie immer einen `reason` zurück, wenn Ihre zurückgehaltenen Plätze die Maschine füllen können.** Ohne ihn
+  lehnt der Kern mit seinem allgemeinen „nicht verfügbar“-Text ab und protokolliert ein ungültiges Ergebnis.
+- **Lesen Sie nur über `ctx.manager`, verschachteln Sie nie `runSerialized`.** `ctx.manager` ist der
+  transaktionale `EntityManager` des Kerns: Schreiben Sie nie darüber. Die Start-Transaktion ist bereits
+  serialisiert; eine weitere im Hook zu starten, lässt sie auf sich selbst warten. Beschränken Sie den Hook auf eine
+  indizierte Abfrage.
+- **Ausfälle.** Fehler, Timeout und ein offener Circuit Breaker folgen der Ausfallrichtlinie pro Ressource und
+  Plugin (fail open oder fail closed, siehe [Ausfälle und Vertrauen](#ausfälle-und-vertrauen)) und werden
+  protokolliert.
+- Benötigt `ACCESS_HOOKS` und `DATABASE_ACCESS` (der Hook erhält die Transaktion des Kerns). Ein Plugin, das ihn ohne
+  beide deklariert, wird nicht geladen. Ist kein Hook registriert, ändert sich nichts.
 
 ### Frage nach dem Stopp
 
@@ -367,6 +546,225 @@ Ein Handler, der eine Ausnahme wirft, wird vom Host **isoliert** — sein Fehler
 wird protokolliert und unterbricht niemals den Kernablauf, der das Event
 gesendet hat.
 
+Weitere Events für Plugins, die Wartung, Gesundheit und laufende Sitzungen verfolgen (alle benötigen
+`LISTEN_EVENTS`, Zeitangaben sind `Date`):
+
+| Event                                           | Payload                                                                                           | Wird gesendet                                                                                                                                                                                                                  |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SystemEvent.MAINTENANCE_CHANGED`               | `{ resourceId, maintenanceId, action: 'created' \| 'updated' \| 'finished', startTime, endTime }` | Nachdem ein Wartungsfenster angelegt oder beendet wurde. Core sendet derzeit nur `created` und `finished`; `updated` ist für einen künftigen Bearbeitungspfad reserviert. `endTime` ist `null`, solange kein Ende gesetzt ist. |
+| `SystemEvent.RESOURCE_HEALTH_CHANGED`           | `{ resourceId, status, previousStatus, reason, identifier }`                                      | Nur bei einem echten Statuswechsel eines Gesundheitseintrags.                                                                                                                                                                  |
+| `SystemEvent.RESOURCE_USAGE_SESSION_STARTED`    | `{ resourceId, usageId, userId, startTime, supervisorUserId }`                                    | Eine Person startet eine Sitzung auf einer freien Ressource (keine Übernahme). `supervisorUserId` ist bei beaufsichtigten Starts gesetzt.                                                                                      |
+| `SystemEvent.RESOURCE_USAGE_SESSION_TAKEN_OVER` | `{ resourceId, usageId, userId, startTime, previousUsageId, previousUserId }`                     | Eine Person übernimmt eine laufende Sitzung. Gilt für die **neue** Person.                                                                                                                                                     |
+| `SystemEvent.RESOURCE_USAGE_SESSION_ENDED`      | `{ resourceId, usageId, userId, startTime, endTime, reason: 'ended' \| 'taken_over' }`            | Eine Sitzung endet, ausdrücklich oder durch Übernahme.                                                                                                                                                                         |
+
+`SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED` trägt eine `ResourceSessionLimitChangedPayload`:
+
+| Event                                        | Payload                                                | Wird gesendet                                                                                                                                                                                                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SystemEvent.RESOURCE_SESSION_LIMIT_CHANGED` | `{ resourceId, previousLimit, newLimit, actorUserId }` | Nach dem Commit, wenn sich das effektive Sitzungslimit einer Ressource ändert (`maxParallelSessions` oder ein Typwechsel, der das Limit ändert). Für Türen und andere Nicht-Maschinen-Typen ist das Limit 1. `actorUserId` ist `null`, wenn keine Person die Änderung vorgenommen hat. |
+
+### Benachrichtigungen
+
+Mit `SEND_NOTIFICATIONS` benachrichtigt ein Plugin Nutzende in der App, per Push und per E-Mail und beachtet dabei die
+Benachrichtigungseinstellungen jeder Person. Deklarieren Sie die Kategorien am Backend-Modul und senden Sie unter
+ihren kurzen IDs:
+
+```ts
+const plugin: PluginBackendModule = {
+  notificationCategories: [{ id: 'reminders', label: { en: 'Reminders', de: 'Erinnerungen' } }],
+  register(context) {
+    // `context` merken und notify(context, ...) aus Ihren Handlern aufrufen
+    return { module: MyPluginModule };
+  },
+};
+
+async function notify(context: PluginContext, userId: number) {
+  await context.notifications.dispatch({
+    category: 'reminders',
+    recipients: [userId],
+    title: 'Ihre Buchung beginnt bald',
+    body: 'Buchung #12 beginnt um 14:00.',
+    url: '/reservations/12', // relativ zur Anwendungs-URL
+    severity: 'info', // oder 'warning'
+    dedupeKey: 'reservations:reminder:12', // fasst wiederholte Push-Nachrichten zusammen
+    // eine vom Plugin deklarierte E-Mail-Vorlage, siehe E-Mail-Vorlagen unten
+    email: { template: 'reminder', variables: { booking: { id: 12, start: '14:00' } } },
+  });
+}
+```
+
+- Eine Kategorie-ID ist kurz und im Plugin eindeutig (Kleinbuchstaben, Ziffern, `-`, `_`). Der Host stellt ihr
+  `plugin.<Pluginname>.<id>` voran und listet sie mit Ihrem `label` in den Benachrichtigungseinstellungen jeder Person
+  unter dem Namen des Plugins. Das Senden unter einer nicht deklarierten Kategorie wird abgelehnt. Deklariert ein
+  Plugin Kategorien ohne `SEND_NOTIFICATIONS`, wird es beim Laden unter Quarantäne gestellt.
+- Unbekannte Benutzer-IDs werden übersprungen, Duplikate zusammengefasst. Eine E-Mail wird nur gesendet, wenn `email`
+  gesetzt ist und die Einstellungen der Person E-Mail für die Kategorie erlauben. Der Host rendert sie im globalen
+  E-Mail-Layout. Bevorzugen Sie eine [E-Mail-Vorlage](#e-mail-vorlagen): Admins können sie bearbeiten. Rohinhalt
+  (`email: { subject, text, html? }`) bleibt für Mails möglich, die nicht bearbeitbar sein sollen; `html` ist ein
+  vertrauenswürdiges Fragment, ohne `html` wird `text` (maskiert) verwendet.
+- Das Senden ist nicht transaktional: Schlägt es fehl, entscheidet das Plugin, ob es wiederholt. Das
+  Reservierungs-Plugin beansprucht zuerst ein „gesendet“-Flag und wiederholt nie, seine Mitteilungen gehen also
+  höchstens einmal raus.
+
+### E-Mail-Vorlagen
+
+Mails eines Plugins sollen wie die Mails des Systems bearbeitbar sein. Ein Plugin deklariert seine Vorlagen am
+Backend-Modul, und der Host speichert, listet und rendert sie mit demselben Mechanismus wie die Kernvorlagen: globales
+Layout, Übersetzungen pro Sprache, der Editor unter **Einstellungen → E-Mail → Vorlagen** und der Helfer
+`{{t "key" "default"}}`. Das Deklarieren von Vorlagen erfordert `SEND_NOTIFICATIONS`; ohne diese Berechtigung wird das
+Plugin beim Laden unter Quarantäne gestellt.
+
+```ts
+const plugin: PluginBackendModule = {
+  notificationCategories: [{ id: 'reminders', label: { en: 'Reminders', de: 'Erinnerungen' } }],
+  emailTemplates: [
+    {
+      id: 'reminder', // kurze ID; der gespeicherte Schlüssel ist plugin.<Pluginname>.reminder
+      label: { en: 'Booking reminder', de: 'Buchungserinnerung' }, // Name in der Vorlagenliste
+      variables: ['booking.id', 'booking.start'], // im Editor unter „Variablen“ angeboten
+      subject: '{{t "subject" "Reminder: booking {id}" id=booking.id}}',
+      body: `<mj-section><mj-column>
+  <mj-text>{{t "greeting" "Hello {name}," name=user.username}}</mj-text>
+  <mj-text>{{t "body" "Your booking starts at {start}." start=booking.start}}</mj-text>
+  <mj-button href="{{host.frontend}}/reservations/{{booking.id}}">{{t "open" "Open booking"}}</mj-button>
+</mj-column></mj-section>`,
+      translations: {
+        de: {
+          subject: 'Erinnerung: Buchung {id}',
+          greeting: 'Hallo {name},',
+          body: 'Ihre Buchung beginnt um {start}.',
+          open: 'Buchung öffnen',
+        },
+      },
+    },
+  ],
+  register: (context) => ({ module: MyPluginModule }),
+};
+
+await context.notifications.dispatch({
+  category: 'reminders',
+  recipients: [userId],
+  title: 'Ihre Buchung beginnt bald',
+  body: 'Buchung #12 beginnt um 14:00.',
+  email: { template: 'reminder', variables: { booking: { id: 12, start: '14:00' } } },
+});
+```
+
+- **Deklaration.** `subject` ist ein Handlebars-String (meist ein `t`-Aufruf), `body` ein MJML-**Fragment** ohne
+  `<mjml>`-Wurzel, das der Host in das globale Layout setzt. Die englischen Texte sind die Standardwerte der
+  `t`-Aufrufe; `translations.de` ist Pflicht und muss jeden `t`-Schlüssel enthalten (sonst wird das Plugin unter
+  Quarantäne gestellt). Weitere Sprachen können neben `de` stehen. IDs bestehen aus Kleinbuchstaben, Ziffern, `-` und
+  `_` und sind im Plugin eindeutig. Betreff und Text müssen gültiges Handlebars sein und dürfen nur `t` und die
+  eingebauten Helfer (`if`, `unless`, `each`, `with`) verwenden; Partials und Decorators werden nicht unterstützt. Jeder
+  Fehler in der Deklaration, auch ein Handlebars-Syntaxfehler, stellt das Plugin beim Laden unter Quarantäne; dann wird
+  keiner seiner Hooks, keine Kategorie und keine Vorlage registriert.
+- **Variablen.** `user.*`, `host.*` und `url` sind immer vorhanden; Ihr `variables`-Objekt wird daneben gelegt und kann
+  sie nie ersetzen. Werte werden vom `t`-Helfer und von `{{ }}` HTML-maskiert. Listen Sie unter `variables` alle
+  Variablen auf, die der Editor anbieten soll. Die Sprache bestimmt das Profil der empfangenden Person, nie das Plugin.
+- **Speichern und Upgrades.** Der Host speichert eine deklarierte Vorlage beim Start, wenn ihr Plugin zum ersten Mal
+  mit ihr geladen wird, zusammen mit den mitgelieferten Übersetzungen. Danach gehört die gespeicherte Vorlage den
+  Admins: Betreff, Text und Übersetzungen werden **nie überschrieben**, ihre Änderungen (auch gelöschte Übersetzungen)
+  überstehen also Neustarts und Plugin-Upgrades, und neue Standardtexte eines Plugin-Updates ersetzen die gespeicherten
+  nicht. Nur die Variablenliste folgt der Deklaration. **Standard wiederherstellen** im Editor stellt die aktuell
+  deklarierte Fassung mit ihren mitgelieferten Übersetzungen wieder her. Vorlagen eines deaktivierten oder
+  deinstallierten Plugins bleiben gespeichert, werden aber weder gelistet noch gesendet.
+- **Admin-Oberfläche.** Plugin-Vorlagen stehen in derselben Vorlagenliste wie die Kernvorlagen, danach, nach Plugin
+  gruppiert und mit dem Namen des Plugins gekennzeichnet; Editor, Übersetzungsdialog und Zurücksetzen funktionieren
+  gleich.
+- **Senden.** `email: { template, variables }` läuft über `notifications.dispatch`, die Einstellungen jeder Person für
+  die Kategorie gelten also. Eine nicht deklarierte Vorlage zu senden wird abgelehnt. Ein ungültiger MJML-Text wird
+  protokolliert und die Vorlage nicht registriert, die übrigen Vorlagen des Plugins funktionieren weiter. Die
+  Anwendungs-URL muss konfiguriert sein (wie bei jeder Kern-Mail).
+
+### Ressourcen-Zugriff (Abfragen)
+
+`context.resourceAccess` (Berechtigung `ACCESS_RESOURCES`) beantwortet lesende Berechtigungs- und Zustandsfragen mit
+derselben Logik, mit der der Kern einen Sitzungsstart autorisiert, sodass Plugin-Entscheidungen nicht davon abweichen.
+
+Methoden mit `principal` nehmen eine Benutzer-ID oder den Benutzer der Anfrage entgegen
+(`PluginAccessPrincipal = number | { id, effectivePermissions? }`). **Übergeben Sie bei anfragebezogenen Prüfungen
+`request.user`**, damit die Bereiche von API-Tokens gelten: Ein API-Token trägt nur die Berechtigungen, mit denen es
+erstellt wurde, und berechtigungsbasierte Freigaben werden auf diese Menge beschränkt (geschnitten mit den aktuellen
+Berechtigungen der Person), genau wie bei Kern-Routen. Rollen als Einweisende/Wartende und Einweisungen zählen
+weiterhin. Eine reine Benutzer-ID löst die vollen RBAC-Berechtigungen auf; nutzen Sie sie für Hintergrundarbeit wie
+Scheduler. Unbekannte Personen und Ressourcen ergeben negative Antworten (`false`, alles `false`, `[]`) statt Fehlern.
+
+| Methode                                         | Liefert                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `canStart(principal, resourceId)`               | `{ allowed, requiresSupervision, supervisionAllowed }`. Berücksichtigt Einweisungen, Nachschulungssperren, Einweisende/Wartende, `resources.update` und den Aufsichtsmodus. Aktuelle Wartung oder Gesundheit werden **nicht** berücksichtigt.                                                                                                                                                                                                                                                                                                                    |
+| `canMaintain(principal, resourceId)`            | Ob die Person die Wartung der Ressource verwalten darf (`resources.maintenance.manage`, Einweisende/Wartende der Ressource oder einer ihrer Gruppen). Dieselbe Prüfung wie die Wartungs-API des Kerns.                                                                                                                                                                                                                                                                                                                                                           |
+| `canSeeUsageAttribution(principal, resourceId)` | Ob die Person sehen darf, **wer** die Ressource nutzt: die Regel des Kerns für den Namen der aktuellen Nutzerin oder des aktuellen Nutzers in Ressourcen-UI und -API (`resources.update`/`resources.access.manage`, in die Maschine eingewiesene Personen, alle, wenn die Instanz die Aktivität für alle zeigt). `false`, wo die Person nur frei/in Benutzung sieht (Maschinen mit beaufsichtigter Nutzung im Modus „eingewiesen“), wenn die Aktivität für sie verborgen ist und für unbekannte Ressourcen. Prüft weder verborgene Gruppen noch den Kontostatus. |
+| `hasPermission(principal, permission)`          | Ob die Person eine RBAC-Berechtigung wie `resources.update` besitzt, beschränkt auf den Bereich der Anfrage.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `listResourceIdsIntroduced(principal)`          | Ressourcen, in die die Person im Sinne von `canStart` eingewiesen ist (gültige Einweisung, Einweisende/Wartende, `resources.update`).                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `listResourceIdsMaintained(principal)`          | Ressourcen, deren Wartung die Person verwalten darf.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `getMaintenanceWindows(resourceId, from, to)`   | Fenster, die `[from, to)` überschneiden, als `{ maintenanceId, resourceId, startTime, endTime \| null, reason \| null }`. Offene Wartung zählt bis zu ihrem Abschluss.                                                                                                                                                                                                                                                                                                                                                                                           |
+| `getActiveSessions(resourceId)`                 | Laufende Sitzungen `{ usageId, userId, startTime }`, die früheste zuerst.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+### Serialisierte Transaktionen
+
+`context.runSerialized(fn)` (Berechtigung `DATABASE_ACCESS`) führt `fn(manager)` in einer Transaktion aus, die der Host
+unter SQLite nacheinander ausführt. Die Transaktion wird committet, wenn `fn` abschließt, und zurückgerollt, wenn `fn`
+wirft. Damit sind Prüfen-dann-Schreiben-Abläufe wie Überschneidungsprüfungen frei von Race Conditions:
+
+```ts
+await context.runSerialized(async (manager) => {
+  const clash = await manager.getRepository(Booking).count({ where: {/* überschneidendes Fenster */} });
+  if (clash > 0) throw new ConflictException('OVERLAP');
+  await manager.getRepository(Booking).save(newBooking);
+});
+```
+
+Die Warteschlange teilt sich `runSerialized` mit jedem Sitzungsstart und -ende des Kerns. Deshalb:
+
+- `fn` kurz halten und auf Datenbankarbeit über den übergebenen `manager` beschränken; keine HTTP-, MQTT-, E-Mail-
+  oder andere Nicht-Datenbank-Ein-/Ausgabe darin;
+- Aufrufe nicht verschachteln. Ein in `fn` gestartetes `runSerialized` würde auf `fn` selbst warten; der Host weist
+  es deshalb mit einem Fehler ab, statt zu hängen. Geben Sie stattdessen den `manager` an Hilfsfunktionen weiter und
+  warten Sie in `fn` nicht auf Kern-Vorgänge, die über dieselbe Warteschlange schreiben (etwa Sitzungsstart oder -ende);
+- in `fn` nur über `manager` lesen und schreiben, nicht über `context.getRepository(...)` oder `context.dataSource`.
+  Deren Verbindung wartet auf die Sperre, die `fn` hält: Ein Schreibvorgang dort scheitert nach etwa 5 Sekunden mit
+  `SQLITE_BUSY` und hält währenddessen andere Abfragen auf dieser Verbindung auf.
+
+Die Serialisierung gilt pro Host-Prozess. Plugins, die Ausschluss über mehrere API-Instanzen brauchen, benötigen eine
+eigene instanzübergreifende Sperre; das Reservierungs-Plugin läuft deshalb mit einer Instanz (siehe
+[Reservierungen](plugins/reservations/administration.md#betrieb-mit-einer-instanz)).
+
+### Flow-Knoten
+
+Ein Backend-Plugin kann dem Flow-Editor Knoten hinzufügen, indem sein Modul `flowNodes` liefert (siehe `PluginFlowNodeDefinition` im SDK). Trigger-Knoten (`isInput: true`) starten Flows, wenn das Plugin `context.flows.trigger(...)` aufruft; dafür ist die Berechtigung `TRIGGER_FLOWS` nötig. Der Aufruf trifft die Trigger-Knoten des Plugins in Ressourcen-Flows **und** in aktivierten [globalen Flows](flows/global-flows.md), mit demselben `matches`-Callback.
+
+#### Flow-Bereiche
+
+Jeder Knoten legt mit `flowScopes` fest, wo er verwendet werden kann:
+
+```ts
+const myNode: PluginFlowNodeDefinition = {
+  type: 'plugin.demo.send-on',
+  label: 'Einschalten',
+  flowScopes: ['resource', 'global'], // Standard: ['resource']
+  // ...
+};
+```
+
+- `flowScopes` ist `readonly ('resource' | 'global')[]` und hat den **Standardwert `['resource']`**. Ein Knoten erscheint erst in globalen Flows, wenn er sich dafür freigibt. Das Speichern eines globalen Flows mit einem Knoten ohne den Bereich `global` schlägt mit einem Validierungsfehler fehl, der den Knoten nennt.
+- `supportedByAllResources` filtert nur Ressourcen-Flows.
+- In einem globalen Flow gibt es keine feste Ressource. Ein Durchlauf hat nur dann eine auslösende Ressource, wenn ein Ressourcen-Ereignis ihn gestartet hat. Geben Sie einen Knoten daher nur frei, wenn er damit umgehen kann.
+
+#### Der Kontext von `resolveConfigSchema`
+
+`resolveConfigSchema(currentConfig, context)` erhält:
+
+```ts
+{
+  flowScope: 'resource' | 'global';
+  resourceId: number | null; // nur in Ressourcen-Flows gesetzt
+  flowId: number | null; // nur in globalen Flows gesetzt
+  purpose?: 'editor' | 'preview';
+}
+```
+
+Plugins, die sich nicht für globale Flows freigeben, sehen in `resourceId` nie `null`. Knoten, die sich freigeben, müssen beide Fälle behandeln und können `flowId` nutzen, um einen globalen Flow zu identifizieren, etwa als Eigentümer eines Kanals.
+
 ## Kombinierte Plugins
 
 Sie können ein Plugin erstellen, das sowohl Frontend- als auch Backend-Funktionalität umfasst. Dies ist nützlich, wenn Ihre Erweiterung benutzerdefinierte API-Endpunkte zusammen mit einer Benutzeroberfläche benötigt.
@@ -383,9 +781,10 @@ Plugins, die **innerhalb dieses Monorepos** gepflegt werden, sind vollwertige
 
 - **Ablageort:** ein Verzeichnis pro Plugin unter `apps/plugins/<name>/`.
 - **nx-Tag:** jede Plugin-App ist in ihrer `project.json` mit **`type:plugin`**
-  getaggt. CI baut und zippt die Menge mit `--projects=tag:type:plugin`; die
-  generischen Lint/Typecheck/Test/Build-Jobs schließen sie über
-  `--exclude=...,tag:type:plugin` aus — analog zu `scope:hardware`.
+  getaggt. Der `plugins`-Job der CI testet und packt alle Plugin-Apps (Auswahl
+  über diesen Tag); der allgemeine Build aller Projekte überspringt sie deshalb.
+  Lint und Typecheck schließen Plugin-Apps nicht mehr aus. Die Ausschlüsse für
+  Lint, Typecheck und Build stehen zentral in `scripts/ci-nx-exclude.mjs`.
 - **Build-Rezept:** die esbuild/Vite/zip-Schritte sind über
   `apps/plugins/scripts/` geteilt und in nx-Targets verdrahtet
   (`build-backend`, `build-frontend`, `build`, `zip`, `pack`).
@@ -422,6 +821,7 @@ die Plugin-Quellen nicht.
 - [Plugins installieren](plugins/installing-plugins.md) -- Plugins hochladen und verwalten
 - [Entwicklerhandbuch](developer/overview.md) -- Attraccess-Architektur und -Entwicklung
 - [API-Referenz](developer/api-reference.md) -- Attraccess-REST-API
+
 ## Übersetzungen und Sprachwechsel
 
 Verwende `useTranslations` aus `@attraccess/plugins-frontend-ui` mit eigenen
@@ -506,7 +906,7 @@ erhalten frische Werte. Der Host stellt die Verbindung bei gültigem
 Sitzungswechsel desselben Benutzers ohne Löschen des Abfragecaches wieder her und
 behält sie bei Abmelden/Anmelden im selben React-Batch. Plugin-Ereignisse werden
 lokal nicht erneut zugestellt.
-Der [Vertrag mit Beispielen](../../development/live-updates.md#plugin-live-updates)
+Der [Vertrag mit Beispielen](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#plugin-live-updates)
 beschreibt auch Wiederverbindung und Freigabe von Abonnements.
-Die [WAGO-Abfrageintervalle](../../development/live-updates.md#wago-sampling-schedule)
+Die [WAGO-Abfrageintervalle](https://github.com/Attraccess/Attraccess/blob/main/docs/development/live-updates.md#wago-sampling-schedule)
 listen die gemeinsamen Backend-Intervalle für alle neun WAGO-Themen auf.

@@ -17,7 +17,8 @@ public:
             lv_obj_add_flag(root, LV_OBJ_FLAG_FLOATING);
             lv_obj_set_size(root, lv_display_get_horizontal_resolution(lv_obj_get_display(screen)),
                             lv_display_get_vertical_resolution(lv_obj_get_display(screen)));
-            lv_obj_align(root, LV_ALIGN_CENTER, 0, 0);
+            // The display's top-left corner, whatever padding the screen has.
+            lv_obj_set_pos(root, -lv_obj_get_style_pad_left(screen, LV_PART_MAIN), -lv_obj_get_style_pad_top(screen, LV_PART_MAIN));
             lv_obj_set_style_bg_color(root, lv_color_black(), 0);
             lv_obj_set_style_bg_opa(root, LV_OPA_70, 0);
             lv_obj_add_flag(root, LV_OBJ_FLAG_CLICKABLE);

@@ -70,7 +70,7 @@
           "externalDependencies": ["jest"]
         }
       ],
-      "outputs": ["{workspaceRoot}/coverage/apps/matter-sidecar"],
+      "outputs": ["{workspaceRoot}/coverage/apps/matter-sidecar/test"],
       "options": {
         "jestConfig": "apps/matter-sidecar/jest.config.ts"
       }
@@ -85,7 +85,7 @@
           "externalDependencies": ["jest", "ws"]
         }
       ],
-      "outputs": [],
+      "outputs": ["{workspaceRoot}/coverage/apps/matter-sidecar/test-integration"],
       "options": {
         "jestConfig": "apps/matter-sidecar/jest.integration.config.ts"
       }
@@ -105,14 +105,14 @@
           "runtime": "git rev-parse HEAD"
         }
       ],
-      "outputs": [],
+      "outputs": ["{workspaceRoot}/coverage/apps/matter-sidecar/test-built"],
       "options": {
         "jestConfig": "apps/matter-sidecar/jest.built.config.ts"
       }
     },
     "crap-score": {
+      "dependsOn": ["test", "test-integration", "test-built"],
       "executor": "nx:run-commands",
-      "dependsOn": ["build"],
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/matter-sidecar"
       }

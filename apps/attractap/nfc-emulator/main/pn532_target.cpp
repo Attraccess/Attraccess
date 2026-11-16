@@ -171,22 +171,34 @@ Pn532Target::Activation Pn532Target::poll_activation(uint32_t timeout_ms) {
   return Activation::Activated;
 }
 
-bool Pn532Target::receive(Bytes &apdu, uint32_t timeout_ms) {
-  if (!active_) return false;
+Pn532Target::Receive Pn532Target::poll_command(Bytes &apdu, uint32_t timeout_ms) {
+  if (!active_) return Receive::Ended;
   if (!first_command_.empty()) {
     apdu = std::move(first_command_);
     first_command_.clear();
-    return true;
+    return Receive::Command;
   }
+  // Like a real card, the target waits for the reader's next command as long as the
+  // caller wants: TgGetData stays issued across polls instead of being re-sent.
+  if (!receiving_) {
+    if (!begin_command(0x86, {})) {
+      ESP_LOGI(tag, "TgGetData was not acknowledged");
+      deactivate();
+      return Receive::Ended;
+    }
+    receiving_ = true;
+  }
+  if (!ready(timeout_ms)) return Receive::Pending;
+  receiving_ = false;
   Bytes response;
-  if (!command(0x86, {}, response, timeout_ms) || response.size() < 2 || response[1] != 0) {
+  if (!read_frame(response, 100) || response.size() < 2 || response[0] != 0x87 || response[1] != 0) {
     // Status 0x29 means the reader released the target; anything else is an error.
     ESP_LOGI(tag, "TgGetData ended, status %02x", response.size() > 1 ? response[1] : 0xff);
     deactivate();
-    return false;
+    return Receive::Ended;
   }
   apdu.assign(response.begin() + 2, response.end());
-  return true;
+  return Receive::Command;
 }
 
 bool Pn532Target::respond(const Bytes &data) {
@@ -200,6 +212,7 @@ bool Pn532Target::respond(const Bytes &data) {
 void Pn532Target::deactivate() {
   active_ = false;
   armed_ = false;
+  receiving_ = false;
   first_command_.clear();
   if (reset_pin_ != GPIO_NUM_NC) {
     gpio_set_level(reset_pin_, 0);

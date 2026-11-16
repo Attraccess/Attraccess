@@ -11,8 +11,11 @@ import {
   useAccessControlServiceMassIntroductionCancel,
   useAccessControlServiceMassIntroductionStart,
 } from '@attraccess/react-query-client';
+import { useTranslations } from '@attraccess/plugins-frontend-ui';
 import { useLiveUpdates } from '../../../../utils/live-updates';
-import { getApiErrorMessage } from '../../../../utils/apiError';
+import { useToastMessage } from '../../../../components/toastProvider';
+import API_ERROR_TRANSLATIONS_DE from '../../../../global-translations/api-errors.de.json';
+import API_ERROR_TRANSLATIONS_EN from '../../../../global-translations/api-errors.en.json';
 import { useInvalidatePeopleIntroductions } from '../usePeopleMutations';
 import { PeopleTarget } from '../types';
 
@@ -28,9 +31,13 @@ export type MassIntroductionSessionState = ReturnType<typeof useMassIntroduction
 
 export function useMassIntroductionSession(target: PeopleTarget) {
   const invalidateIntroductions = useInvalidatePeopleIntroductions(target);
+  const toast = useToastMessage();
+  const { t, tExists } = useTranslations({
+    en: { api: API_ERROR_TRANSLATIONS_EN },
+    de: { api: API_ERROR_TRANSLATIONS_DE },
+  });
   const [session, setSession] = useState<MassIntroductionSessionDto | null>(null);
   const [endReason, setEndReason] = useState<MassIntroductionEndState | null>(null);
-  const [startError, setStartError] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   // Bumped when fetching the next join code failed, to schedule another attempt.
   const [refreshRetry, setRefreshRetry] = useState(0);
@@ -76,7 +83,8 @@ export function useMassIntroductionSession(target: PeopleTarget) {
       setSecondsLeft(secondsUntil(started.expiresAt));
       applySession(started);
     },
-    onError: (error) => setStartError(getApiErrorMessage(error as ApiError)),
+    // E.g. READER_FIRMWARE_UPDATE_REQUIRED or READER_BUSY: say why in the user's language.
+    onError: (error) => toast.apiError({ error: error as ApiError, t, tExists, baseTranslationKey: 'api' }),
   });
   const { mutate: cancelMutate } = useAccessControlServiceMassIntroductionCancel();
   // The unmount cleanup below must not re-run (and cancel early) if the mutate identity ever changes.
@@ -85,7 +93,6 @@ export function useMassIntroductionSession(target: PeopleTarget) {
 
   const start = useCallback(
     (readerId?: number) => {
-      setStartError(null);
       startMutation.mutate({
         requestBody: {
           ...(target.type === 'resource' ? { resourceId: target.id } : { resourceGroupId: target.id }),
@@ -111,7 +118,6 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     sessionRef.current = null;
     setSession(null);
     setEndReason(null);
-    setStartError(null);
   }, [cancel]);
 
   // Closing the drawer or navigating away must not leave a QR code (and reader) running.
@@ -190,7 +196,6 @@ export function useMassIntroductionSession(target: PeopleTarget) {
     session,
     endReason,
     secondsLeft,
-    startError,
     isStarting: startMutation.isPending,
     start,
     cancel,

@@ -1,3 +1,4 @@
+import { AUDIT_RECORDER } from '../audit/recorder/audit-event';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { DocumentationType, Resource, ResourceType, SupervisionMode } from '@attraccess/database-entities';
@@ -8,13 +9,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { getRepositoryToken } from '@nestjs/typeorm';
 
-import { randomUUID } from 'node:crypto';
-
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 
-import { projectResourceAuditEvent } from './../audit/audit-policy';
-
-import { AuditService } from './../audit/audit.service';
+import { projectAuditRow } from './../audit/recorder/audit-row';
 
 import { ResourceNotFoundException } from './../exceptions/resource.notFound.exception';
 
@@ -40,7 +37,7 @@ export type ResourcesServiceTestScope = {
   resourceRepository: jest.Mocked<Repository<Resource>>;
   mockResourceImageService: { saveImage: any; deleteImage: any; getPublicPath: any };
   service: ResourcesService;
-  audit: { recordResource: any };
+  audit: { record: any };
   mockResourceRepository: () => {
     find: any;
     findOne: any;
@@ -59,7 +56,7 @@ describe('ResourcesService', () => {
 
   let resourceRepository: jest.Mocked<Repository<Resource>>;
 
-  const audit = { recordResource: jest.fn().mockResolvedValue(undefined) };
+  const audit = { record: jest.fn().mockResolvedValue(undefined) };
 
   // ResourceImageService is injected but not directly used in these tests
 
@@ -143,13 +140,13 @@ describe('ResourcesService', () => {
           provide: MetricsService,
           useValue: mockMetricsService,
         },
-        { provide: AuditService, useValue: audit },
+        { provide: AUDIT_RECORDER, useValue: audit },
       ],
     }).compile();
 
     service = module.get<ResourcesService>(ResourcesService);
     resourceRepository = module.get(getRepositoryToken(Resource)) as jest.Mocked<Repository<Resource>>;
-    audit.recordResource.mockClear();
+    audit.record.mockClear();
     // ResourceImageService is available but not directly used in tests
   });
 
@@ -168,8 +165,13 @@ describe('ResourcesService', () => {
     expect(result.imageFilename).toBe('image.webp');
     expect(scope.mockResourceImageService.saveImage).toHaveBeenCalledWith(8, file);
     expect(scope.resourceRepository.save).toHaveBeenCalledTimes(2);
-    expect(scope.audit.recordResource).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'resource.created', actorId: 7, apiTokenId: 9, subjectId: 8 }),
+    expect(scope.audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        domain: 'resource',
+        action: 'resource.created',
+        actor: expect.objectContaining({ id: 7, apiTokenId: 9 }),
+        subject: expect.objectContaining({ id: 8 }),
+      }),
     );
   });
 
@@ -188,7 +190,7 @@ describe('ResourcesService', () => {
       ),
     ).rejects.toThrow('image metadata write failed');
     expect(scope.resourceRepository.delete).toHaveBeenCalledWith(8);
-    expect(scope.audit.recordResource).not.toHaveBeenCalled();
+    expect(scope.audit.record).not.toHaveBeenCalled();
   });
 
   it('should be defined', () => {
@@ -943,11 +945,12 @@ describe('ResourcesService', () => {
         id: 9,
       });
 
-      expect(createResourceScope.audit.recordResource).toHaveBeenCalledWith(
+      expect(createResourceScope.audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
+          domain: 'resource',
           action: 'resource.created',
-          actorId: 9,
-          subjectId: 1,
+          actor: expect.objectContaining({ id: 9 }),
+          subject: expect.objectContaining({ id: 1 }),
           details: { 'after.name': 'Lathe', 'after.type': ResourceType.Machine },
         }),
       );
@@ -962,15 +965,10 @@ describe('ResourcesService', () => {
         id: 9,
       });
 
-      const details = createResourceScope.audit.recordResource.mock.calls[0][0].details;
+      const details = createResourceScope.audit.record.mock.calls[0][0].details;
       expect(details['after.name']).toMatch(/\.\.\.$/);
       expect(Buffer.byteLength(JSON.stringify(details), 'utf8')).toBeLessThanOrEqual(4096);
-      expect(
-        projectResourceAuditEvent({
-          ...createResourceScope.audit.recordResource.mock.calls[0][0],
-          operationId: randomUUID(),
-        }),
-      ).not.toBeNull();
+      expect(projectAuditRow(createResourceScope.audit.record.mock.calls[0][0])).not.toBeNull();
     });
   });
 });

@@ -5,6 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuditEntryDto, AuditMetaDto, AuditSettingsDto } from '@attraccess/react-query-client';
 import { AuditLogSection } from './index';
+import { auditLabel } from './components/AuditLogPanels';
+import { humanize } from './audit-log-model';
+import de from './de.json';
+import en from './en.json';
 
 // Allow query notifications to settle when the shared CI/dev host is busy.
 configure({ asyncUtilTimeout: 10000 });
@@ -285,6 +289,34 @@ describe('audit admin workflows', () => {
     expect(within(dialog).getByText('Workshop admin')).toBeInTheDocument();
   });
 
+  it('shows a meter allocation change with its labels and allocation names', async () => {
+    list.mockResolvedValue({
+      items: [
+        {
+          ...entry,
+          action: 'meter.updated',
+          details: {
+            meterId: 4,
+            meterName: 'Energy',
+            'before.allocation': 'shared',
+            'after.allocation': 'per-session',
+          },
+        },
+      ],
+      nextCursor: null,
+    });
+    mount();
+    await userEvent.click(await screen.findByRole('button', { name: 'View event #52' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Meter updated')).toBeInTheDocument();
+    expect(within(dialog).getByText('Allocation')).toBeInTheDocument();
+    expect(within(dialog).getByText('Meter name')).toBeInTheDocument();
+    expect(within(dialog).getByText('Allocation before')).toBeInTheDocument();
+    expect(within(dialog).getAllByText('Shared and split')).toHaveLength(2);
+    expect(within(dialog).getAllByText('Measured per session')).toHaveLength(2);
+    expect(within(dialog).queryByText('per-session')).not.toBeInTheDocument();
+  });
+
   it('returns from the older page without sending the invalid zero cursor', async () => {
     list.mockImplementation(async ({ beforeId }) => ({
       items: [{ ...entry, id: beforeId ? 50 : 52 }],
@@ -425,4 +457,133 @@ it('reports an export failure and allows retry without downloading partial data'
   await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
   expect(await screen.findByText('Export failed. Please try again.')).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Export CSV' })).not.toBeDisabled();
+});
+
+it('labels the recorded details of MQTT explorer events in both languages', () => {
+  const translate = (strings: typeof en) => (key: string) =>
+    strings.fields[JSON.parse(key.slice('fields['.length, -1)) as keyof typeof strings.fields];
+  expect(['topic', 'size', 'qos', 'retain'].map((field) => auditLabel('fields', field, translate(en)))).toEqual([
+    'Topic',
+    'Size (bytes)',
+    'QoS',
+    'Retain',
+  ]);
+  expect(['topic', 'size', 'qos', 'retain'].map((field) => auditLabel('fields', field, translate(de)))).toEqual([
+    'Thema',
+    'Größe (Bytes)',
+    'QoS',
+    'Nachricht behalten (retain)',
+  ]);
+});
+
+it('labels the verification email resend apart from the password reset request in both languages', () => {
+  const translate = (strings: typeof en) => (key: string) => {
+    const [, section, value] = /^(\w+)\[(.*)\]$/.exec(key) ?? [];
+    return (strings as unknown as Record<string, Record<string, string>>)[section][JSON.parse(value)];
+  };
+  expect(auditLabel('events', 'identity.verification_email_resent', translate(en))).toBe('Verification email resent');
+  expect(auditLabel('events', 'identity.verification_email_resent', translate(de))).toBe(
+    'Bestätigungs-E-Mail erneut gesendet',
+  );
+  expect(auditLabel('events', 'identity.password_reset_requested', translate(en))).toBe('Password reset requested');
+});
+
+it('labels every flow audit event, target and detail field in both languages', () => {
+  const translate = (strings: typeof en) => (key: string) => {
+    const [, section, value] = /^(\w+)\[(.*)\]$/.exec(key) ?? [];
+    return (strings as unknown as Record<string, Record<string, string>>)[section][JSON.parse(value)];
+  };
+  const events = {
+    'resource_flow.updated': ['Resource flow updated', 'Ressourcen-Flow geändert'],
+    'flow.created': ['Global flow created', 'Globaler Flow erstellt'],
+    'flow.updated': ['Global flow updated', 'Globaler Flow geändert'],
+    'flow.deleted': ['Global flow deleted', 'Globaler Flow gelöscht'],
+    'flow.canvas_updated': ['Global flow canvas updated', 'Canvas eines globalen Flows geändert'],
+    'flow_variable.set': ['Flow variable set', 'Flow-Variable gesetzt'],
+    'flow_variable.deleted': ['Flow variable deleted', 'Flow-Variable gelöscht'],
+  };
+  for (const [action, [english, german]] of Object.entries(events)) {
+    expect(auditLabel('events', action, translate(en))).toBe(english);
+    expect(auditLabel('events', action, translate(de))).toBe(german);
+  }
+  expect(auditLabel('targets', 'flow', translate(en))).toBe('Global flow');
+  expect(auditLabel('targets', 'flow', translate(de))).toBe('Globaler Flow');
+  // Detail fields added for flow events; each needs its own label rather than the humanized key.
+  const fields = [
+    'flowName',
+    'nodeCount',
+    'edgeCount',
+    'snapshot',
+    'snapshotDetail',
+    'addedNodes',
+    'removedNodes',
+    'changedNodes',
+    'addedEdges',
+    'removedEdges',
+    'addedNodeCount',
+    'removedNodeCount',
+    'changedNodeCount',
+    'addedEdgeCount',
+    'removedEdgeCount',
+    'flowNodeCount',
+    'flowEdgeCount',
+    'scope',
+    'key',
+    'valueType',
+    'before.nodeCount',
+    'after.nodeCount',
+    'before.edgeCount',
+    'after.edgeCount',
+    'before.snapshot',
+    'before.value',
+    'after.value',
+    'before.name',
+    'after.name',
+    'before.enabled',
+    'after.enabled',
+    'before.description',
+    'after.description',
+  ];
+  // English labels that are already the humanized key.
+  const humanizedInEnglish = ['scope', 'key'];
+  for (const field of fields) {
+    for (const strings of [en, de]) {
+      expect(strings.fields).toHaveProperty([field]);
+      const label = auditLabel('fields', field, translate(strings));
+      expect(label.trim()).not.toBe('');
+      if (strings === de || !humanizedInEnglish.includes(field)) expect(label).not.toBe(humanize(field));
+    }
+  }
+  expect(auditLabel('fields', 'snapshot', translate(en))).toBe('Flow (JSON)');
+  expect(auditLabel('fields', 'before.snapshot', translate(de))).toBe('Vorheriger Flow (JSON)');
+});
+
+it('shows a global flow audit entry with its recorded flow name and a readable previous-flow snapshot', async () => {
+  list.mockResolvedValue({
+    items: [
+      {
+        ...entry,
+        id: 31,
+        action: 'flow.deleted',
+        subjectType: 'flow',
+        subjectId: 3,
+        subjectLabel: 'Door bell',
+        subjectLabelSource: 'recorded',
+        details: {
+          'before.name': 'Door bell',
+          'before.nodeCount': 2,
+          'before.snapshot': '{"nodes":[{"id":"a","type":"output.http"}],"edges":[]}',
+          snapshotDetail: 'no_data',
+        },
+      },
+    ],
+    nextCursor: null,
+  });
+  mount();
+  await userEvent.click(await screen.findByRole('button', { name: 'View event #31' }));
+  const dialog = await screen.findByRole('dialog');
+  expect(within(dialog).getAllByText('Global flow deleted').length).toBeGreaterThan(0);
+  expect(within(dialog).getAllByText('Door bell').length).toBeGreaterThan(0);
+  expect(within(dialog).getAllByText(/"type": "output.http"/).length).toBeGreaterThan(0);
+  expect(within(dialog).getByText('Previous flow detail level')).toBeInTheDocument();
 });

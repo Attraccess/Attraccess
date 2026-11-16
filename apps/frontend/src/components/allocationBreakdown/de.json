@@ -1,0 +1,13 @@
+{
+  "shared": "Geteilt",
+  "shareLine": "{{share}} — dein Anteil an {{total}}",
+  "shareLineSoFar": "{{share}} — dein Anteil an {{total}} bisher",
+  "breakdown": "Aufschlüsselung: {{name}}",
+  "now": "jetzt",
+  "provisional": "vorläufig",
+  "people": {
+    "one": "{{count}} Person",
+    "many": "{{count}} Personen"
+  },
+  "segment": "{{people}} · gesamt {{total}} ({{totalCredits}}) · dein Anteil {{share}} ({{shareCredits}})"
+}

@@ -1,4 +1,5 @@
 # Updating
+<!-- llms-description: How to check for new Attraccess versions and update with Docker Compose, plain Docker or Portainer, or pin a specific version. -->
 
 How to update Attraccess to the latest version.
 

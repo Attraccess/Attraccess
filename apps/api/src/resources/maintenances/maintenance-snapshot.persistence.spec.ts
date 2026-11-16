@@ -20,6 +20,7 @@ import {
   closeResourceTransactionConnection,
   runSerializedTransaction,
 } from '../../database/run-serialized-transaction';
+import { MaintenanceResourceEvaluation } from './evaluation/resource-evaluation';
 
 const UsageSchema = new EntitySchema<ResourceUsage>({
   name: 'ResourceUsage',
@@ -166,7 +167,9 @@ describe('Maintenance snapshots (file-backed SQLite)', () => {
       { maintenanceUsageQueryWindowDays: { observe: jest.fn() } } as never,
       { getDurationsForWindows: durationScan } as never,
     );
-    jest.spyOn(evaluator, 'getBaselineDate').mockImplementation(async () => new Date(baseline.getTime()));
+    jest
+      .spyOn(Reflect.get(evaluator, 'evaluation') as MaintenanceResourceEvaluation, 'getBaselineDate')
+      .mockImplementation(async () => new Date(baseline.getTime()));
   });
 
   afterEach(async () => {

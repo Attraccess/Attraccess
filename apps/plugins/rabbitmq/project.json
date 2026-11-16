@@ -34,7 +34,7 @@
           "externalDependencies": ["jest"]
         }
       ],
-      "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq"],
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq/test"],
       "options": {
         "jestConfig": "apps/plugins/rabbitmq/jest.config.ts",
         "passWithNoTests": true
@@ -126,7 +126,9 @@
       "options": {
         "cwd": "apps/plugins/rabbitmq",
         "command": "node ../scripts/verify-packed-plugin.mjs package package.json dist/index.js frontend/remoteEntry.js frontend/style.css",
-        "env": { "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0" }
+        "env": {
+          "ATTRACCESS_PLUGIN_TEST_HOST_VERSION": "1.11.0"
+        }
       }
     },
     "publish": {
@@ -142,7 +144,8 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node scripts/crap-score/run.mjs apps/plugins/rabbitmq"
-      }
+      },
+      "dependsOn": ["test", "test-frontend"]
     },
     "test-frontend": {
       "executor": "nx:run-commands",
@@ -150,7 +153,8 @@
       "inputs": ["default", "{workspaceRoot}/libs/plugins-frontend-ui/src/**/*"],
       "options": {
         "command": "vitest run --config apps/plugins/rabbitmq/frontend/vitest.config.ts"
-      }
+      },
+      "outputs": ["{workspaceRoot}/coverage/apps/plugins/rabbitmq/test-frontend"]
     }
   }
 }

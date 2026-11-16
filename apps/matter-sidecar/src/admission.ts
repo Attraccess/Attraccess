@@ -98,5 +98,7 @@ export function versionedRefusal(
 ): ErrorReply | null {
   if (isDraining()) return { code: 'sidecar_unavailable', message: 'The Matter sidecar is shutting down.' };
   const admission = checkAdmission(headers, running);
-  return admission.ok ? null : { code: admission.code, message: admission.message, details: admission.details };
+  // `=== false` rather than truthiness: this file is also type-checked, without strictNullChecks, by the plugin acceptance project.
+  if (admission.ok === false) return { code: admission.code, message: admission.message, details: admission.details };
+  return null;
 }

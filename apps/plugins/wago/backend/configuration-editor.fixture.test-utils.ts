@@ -51,6 +51,8 @@ export function fixture({ capabilities = FIXTURE_CAPABILITIES }: { capabilities?
   };
   const flowQuery = {
     select: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
     andWhere: jest.fn().mockReturnThis(),
     getMany: jest.fn().mockResolvedValue([]),

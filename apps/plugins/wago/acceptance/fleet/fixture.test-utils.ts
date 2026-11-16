@@ -104,7 +104,9 @@ export class FleetFixtureState {
         Object.assign(new ResourceFlowNode(), {
           id: `${id}-${index}`,
           type: `plugin.wago.${type}`,
+          // Resource-flow rows; a global-flow row would set flowId and leave resourceId null.
           resourceId: 1,
+          flowId: null,
           data,
           position: { x: index * 100, y: 0 },
           createdAt: new Date(),

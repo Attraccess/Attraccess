@@ -43,6 +43,22 @@ describe('flow node previews', () => {
     for (const type of Object.values(Type)) getNodePreviewRows(type, translate, { data });
   });
 
+  it('translates the end-session target and shows the user id only for one user', () => {
+    const translate = (key: string) => String(get(en, key));
+    const rows = (data: Record<string, unknown>) =>
+      getNodePreviewRows(Type.OUTPUT_RESOURCE_USAGE_END_SESSION, translate, { data });
+    expect(rows({})).toEqual([
+      { label: 'Which session', value: 'The triggering session' },
+      { label: 'Notes', value: undefined },
+    ]);
+    expect(rows({ target: 'user', userId: '{{user.id}}' })).toEqual([
+      { label: 'Which session', value: 'The session of a user' },
+      { label: 'User id (templates allowed)', value: '{{user.id}}' },
+      { label: 'Notes', value: undefined },
+    ]);
+    expect(rows({ target: 'all' })[0]).toEqual({ label: 'Which session', value: 'All sessions' });
+  });
+
   it('limits payload summaries to three entries and retains blank entry fallbacks', () => {
     const rows = getNodePreviewRows(Type.PROCESSING_SET_PAYLOAD, keyTranslation, {
       data: {

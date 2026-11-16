@@ -1,5 +1,5 @@
 import { EntityManager } from 'typeorm';
-import { ResourceFlowNode } from '@attraccess/database-entities';
+import { ResourceFlowNode, ResourceType } from '@attraccess/database-entities';
 
 export interface NodeProcessingResult {
   payload: object;
@@ -23,7 +23,7 @@ export type MeteringReport =
 export interface MeteringRunContext {
   meterId: number;
   operationId: string;
-  kind: 'start' | 'interim' | 'final';
+  kind: 'start' | 'interim' | 'final' | 'boundary';
   complete(report: MeteringReport): Promise<void>;
 }
 
@@ -39,9 +39,15 @@ export interface TemplateVariables {
  */
 export interface NodeExecutionContext {
   flowRunId?: string;
+  /** The user whose action started this run; never taken from the payload, which nodes can replace. */
+  actorUserId?: number;
   lifecycleAttemptId?: string;
   lifecycleCandidateCancellation?: boolean;
   metering?: MeteringRunContext;
+  /** The resource the run acts on: the node's own resource, or the triggering resource in a global flow. */
+  resourceId?: number | null;
+  /** The type of `resourceId`'s resource; undefined when there is none. */
+  getResourceType?(): Promise<ResourceType | undefined>;
   transactionManager?: EntityManager;
   compileTemplate(template: string, data: object): string;
   getTemplateVariables(data: object): TemplateVariables | undefined;

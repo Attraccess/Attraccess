@@ -1,4 +1,4 @@
-import { minVersion, validRange } from 'semver';
+import { minVersion, satisfies, validRange } from 'semver';
 import { z } from 'zod';
 import { WIRE_VERSION } from './constants';
 import { SEMVER_PATTERN } from './headers';
@@ -25,16 +25,32 @@ export type SupportedCombination = z.infer<typeof supportedCombinationSchema>;
 export const COMPATIBILITY_TABLE: readonly SupportedCombination[] = [
   {
     wireVersion: WIRE_VERSION,
-    attraccess: '^1.11.0',
-    plugin: '0.1.0-alpha.0',
-    sidecar: '0.1.0-alpha.0',
+    attraccess: '^1.11.0-0',
+    plugin: '0.4.0-alpha.0',
+    sidecar: '0.4.0-alpha.0',
     matterJs: '0.18.0',
   },
 ];
 
-/** Minimum Attraccess version implied by the table's range (`^1.11.0` -> `1.11.0`). */
+/** Minimum Attraccess version implied by the table's range (`^1.11.0-0` -> `1.11.0-0`). */
 export function minimumAttraccessVersion(combination: SupportedCombination = COMPATIBILITY_TABLE[0]): string {
   const minimum = validRange(combination.attraccess) ? minVersion(combination.attraccess) : null;
   if (!minimum) throw new Error(`Unsupported Attraccess range in compatibility table: ${combination.attraccess}`);
   return minimum.version;
+}
+
+/** The combination the client side (the plugin) is released with, or undefined when its own release is not listed. */
+export function combinationForPlugin(pluginVersion: string): SupportedCombination | undefined {
+  return COMPATIBILITY_TABLE.find((entry) => entry.plugin === pluginVersion);
+}
+
+/** The sidecar release that `COMPATIBILITY_TABLE` pairs with a plugin release. */
+export function expectedSidecarVersion(pluginVersion: string): string | undefined {
+  return combinationForPlugin(pluginVersion)?.sidecar;
+}
+
+/** True when the table lists the host release for this plugin release. */
+export function isHostSupported(pluginVersion: string, hostVersion: string): boolean {
+  const entry = combinationForPlugin(pluginVersion);
+  return entry !== undefined && satisfies(hostVersion, entry.attraccess, { includePrerelease: true });
 }

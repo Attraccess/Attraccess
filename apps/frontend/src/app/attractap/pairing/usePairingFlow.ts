@@ -1,4 +1,5 @@
 import {
+  Attractap,
   PairingDto,
   useAttractapServiceApprovePairing,
   useAttractapServiceCancelPairing,
@@ -8,6 +9,8 @@ import {
   useAttractapServiceGetReaderByIdKey,
   useAttractapServiceGetReaderCredentialHistoryKey,
   useAttractapServiceGetReaders,
+  useAttractapServiceGetReadersToPair,
+  useAttractapServiceGetReadersToPairKey,
   useAttractapServiceGetReadersKey,
   useAttractapServiceResolvePairing,
 } from '@attraccess/react-query-client';
@@ -43,6 +46,16 @@ const ENDED_ERRORS: ReadonlySet<string> = new Set(['notWaiting', 'failed', 'read
 
 export const isFinished = (pairing: PairingDto | null) =>
   pairing !== null && TERMINAL_PAIRING_STATES.includes(pairing.state);
+
+/**
+ * Paired and not paired records in one list. A reader that was just paired can briefly be in both
+ * lists; it is listed once, as the paired entry.
+ */
+export function mergeReaderLists(paired?: Attractap[], unpaired?: Attractap[]): Attractap[] | undefined {
+  if (!paired && !unpaired) return undefined;
+  const pairedIds = new Set((paired ?? []).map((reader) => reader.id));
+  return [...(paired ?? []), ...(unpaired ?? []).filter((reader) => !pairedIds.has(reader.id))];
+}
 
 /** What the reader is: its own record (token), a takeover of a chosen record, or a new record. */
 export function modeOf(bound: boolean, hasPresetTarget: boolean, choice: Choice): Mode {
@@ -227,12 +240,16 @@ export function usePairingFlow(props: PairingFlowProps) {
 
   const active = useActivePairing(props, resolved, pickedId);
   const { current, resolvedByCode, refetch } = active;
-  const { data: readers } = useAttractapServiceGetReaders();
+  // The pairing session sees every reader record: paired ones and the ones that are not paired yet.
+  const { data: pairedReaders } = useAttractapServiceGetReaders();
+  const { data: unpairedReaders } = useAttractapServiceGetReadersToPair();
+  const readers = useMemo(() => mergeReaderLists(pairedReaders, unpairedReaders), [pairedReaders, unpairedReaders]);
 
   const refreshLists = () =>
     Promise.all(
       [
         useAttractapServiceGetReadersKey,
+        useAttractapServiceGetReadersToPairKey,
         useAttractapServiceGetReaderByIdKey,
         useAttractapServiceGetReaderCredentialHistoryKey,
         useAttractapServiceGetPairingsKey,
@@ -280,7 +297,12 @@ export function usePairingFlow(props: PairingFlowProps) {
   });
 
   const idle = !resolving && !approve.isPending;
-  const cancelAndClose = useCancelAndClose(current, () => approve.isPending || submitting.current, onClose, refreshLists);
+  const cancelAndClose = useCancelAndClose(
+    current,
+    () => approve.isPending || submitting.current,
+    onClose,
+    refreshLists,
+  );
   const blocked = countdown.secondsLeft > 0;
   const normalizedCode = normalizeEnrollmentCode(codeInput);
   const bound = current?.boundReaderId != null;

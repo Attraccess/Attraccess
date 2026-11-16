@@ -1,3 +1,4 @@
+import { pairedReadersOnly } from '../cardWriting';
 import {
   Button,
   Card,
@@ -30,6 +31,7 @@ import {
   Attractap,
   useAttractapServiceGetFirmwares,
   useAttractapServiceGetReaders,
+  useAttractapServiceGetReadersToPair,
   useLicenseServiceGetLicenseInformation,
 } from '@attraccess/react-query-client';
 import { useToastMessage } from '../../../components/toastProvider';
@@ -50,6 +52,9 @@ export function useAttractapListState() {
   const { data: allReaders, error: readersError } = useAttractapServiceGetReaders(undefined, {
     refetchInterval: 5000,
   });
+
+  // Readers that are not paired yet come from their own list and are shown in the pairing card only.
+  const { data: readersToPair } = useAttractapServiceGetReadersToPair(undefined, { refetchInterval: 5000 });
 
   const toast = useToastMessage();
   const navigate = useNavigate();
@@ -90,7 +95,7 @@ export function useAttractapListState() {
     const stale = [];
     const active = [];
     // Readers that are not paired are only listed in the Not paired card until they are paired.
-    for (const reader of (allReaders ?? []).filter((r) => r.pairingState === 'paired')) {
+    for (const reader of pairedReadersOnly(allReaders)) {
       const lastConnection = new Date(reader.lastConnection);
       const isStale = lastConnection.getTime() < now.getTime() - 24 * 60 * 60 * 1000;
       if (isStale) {
@@ -143,6 +148,7 @@ export function useAttractapListState() {
     activeReaders,
     firmwareUpdateChip,
     allReaders,
+    readersToPair,
     toast,
   } as const;
 }
@@ -159,6 +165,7 @@ export function AttractapList() {
     activeReaders,
     firmwareUpdateChip,
     allReaders,
+    readersToPair,
     toast,
   } = useAttractapListState();
 
@@ -213,7 +220,7 @@ export function AttractapList() {
       />
 
       <div className="flex flex-col gap-4">
-        <ReadersToPair readers={allReaders ?? []} onPaired={setOpenedReaderEditor} />
+        <ReadersToPair readers={readersToPair ?? []} onPaired={setOpenedReaderEditor} />
         {[activeReaders, staleReaders].map((readers, tableIndex) => (
           <Card key={tableIndex}>
             <Card.Header>

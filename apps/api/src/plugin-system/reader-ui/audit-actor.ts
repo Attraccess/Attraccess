@@ -1,15 +1,18 @@
-/** The admin behind a reader UI change, as the audit records it (session or API token). */
+import type { AuditActor as RecordedAuditActor } from '../../audit/recorder/audit-event';
+
+/** The admin behind a reader UI change, as the audit records it (session, API token or MCP OAuth). */
 export interface AuditActor {
   id: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
 }
 
-export function auditActorFields(actor: AuditActor) {
+export function auditActorFields(actor: AuditActor): RecordedAuditActor {
   const viaToken = actor.authenticationMethod === 'api-token' && actor.apiTokenId !== undefined;
+  const viaMcp = actor.authenticationMethod === 'mcp-oauth';
   return {
-    actorId: actor.id,
-    authenticationMethod: viaToken ? ('api-token' as const) : ('session' as const),
+    id: actor.id,
+    authenticationMethod: viaToken ? 'api-token' : viaMcp ? 'mcp-oauth' : 'session',
     ...(viaToken ? { apiTokenId: actor.apiTokenId } : {}),
   };
 }

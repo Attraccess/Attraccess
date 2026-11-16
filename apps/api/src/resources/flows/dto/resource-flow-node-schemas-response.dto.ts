@@ -2,14 +2,16 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class ResourceFlowNodeSchemaDto {
   @ApiProperty({
-    description: 'The node type identifier. Core types match the ResourceFlowNodeType enum; plugin types use "plugin.<pluginName>.<nodeName>".',
+    description:
+      'The node type identifier. Core types match the ResourceFlowNodeType enum; plugin types use "plugin.<pluginName>.<nodeName>".',
     type: 'string',
     example: 'output.mqtt.sendMessage',
   })
   type: string;
 
   @ApiProperty({
-    description: 'Human-readable label for the node. Used by the frontend as a display name fallback when no i18n translation exists for the type.',
+    description:
+      'Human-readable label for the node. Used by the frontend as a display name fallback when no i18n translation exists for the type.',
     type: 'string',
     required: false,
   })
@@ -44,10 +46,20 @@ export class ResourceFlowNodeSchemaDto {
   outputs: string[];
 
   @ApiProperty({
-    description: 'Whether the node type is supported by this resource',
+    description:
+      'Whether the node type is supported by this resource. Applies to resource flows only (global flows have no resource)',
     type: 'boolean',
   })
   supportedByResource: boolean;
+
+  @ApiProperty({
+    description:
+      'The kinds of flow the node type can be used in: "resource" (flows of one resource) and/or "global" (global flows). Plugin nodes support only resource flows unless they opt in.',
+    type: 'string',
+    enum: ['resource', 'global'],
+    isArray: true,
+  })
+  supportedFlowScopes: ('resource' | 'global')[];
 
   @ApiProperty({
     description: 'Whether the node type is an output node',

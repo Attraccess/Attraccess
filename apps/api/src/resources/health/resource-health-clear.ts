@@ -3,7 +3,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { ResourceHealthStatus } from '@attraccess/database-entities';
 import { ResourceHealthChangedEvent } from './events/resource-health-changed.event';
-import { ResourceAuditOrigin } from '../../audit/audit-policy';
+import { AuditActor, SYSTEM_AUDIT_ACTOR } from '../../audit/recorder/audit-event';
 import type { ResourceHealthService } from './resource-health.service';
 
 interface ResourceHealthServiceResourceHealthClearContext {
@@ -16,9 +16,7 @@ export async function clearEntry(
   context: ResourceHealthServiceResourceHealthClearContext,
   resourceId: number,
   entryId: number,
-  auditOrigin: ResourceAuditOrigin = {
-    actorId: null,
-  },
+  auditOrigin: AuditActor = SYSTEM_AUDIT_ACTOR,
 ): Promise<void> {
   const entry = await context.healthRepository.findOne({
     where: { id: entryId, resourceId },
@@ -30,18 +28,17 @@ export async function clearEntry(
   await context.healthRepository.remove(entry);
 
   if (entry.status === ResourceHealthStatus.UNHEALTHY) {
-    await context.audit
-      .recordResource({
-        action: 'health.transition',
-        ...auditOrigin,
-        subjectId: resourceId,
-        details: {
-          previousStatus: entry.status,
-          status: ResourceHealthStatus.HEALTHY,
-          healthSource: entry.source,
-        },
-      })
-      .catch(() => undefined);
+    await context.audit.record({
+      domain: 'resource',
+      action: 'health.transition',
+      actor: auditOrigin,
+      subject: { type: 'resource', id: resourceId },
+      details: {
+        previousStatus: entry.status,
+        status: ResourceHealthStatus.HEALTHY,
+        healthSource: entry.source,
+      },
+    });
     context.logger.log(
       `Resource ${resourceId} health entry cleared (identifier="${entry.identifier}"): ${entry.status} -> cleared`,
     );

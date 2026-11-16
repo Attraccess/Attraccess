@@ -102,7 +102,7 @@ describe('ResourceHealthService', () => {
         source: ResourceHealthSource.MANUAL,
       });
       expect(emitSpy).not.toHaveBeenCalled();
-      expect(fixture.audit.recordResource).toHaveBeenCalledTimes(1);
+      expect(fixture.audit.record).toHaveBeenCalledTimes(1);
 
       await fixture.service.reportHealth({
         resourceId: 1,
@@ -120,11 +120,12 @@ describe('ResourceHealthService', () => {
           reason: 'ka-pow',
         }),
       );
-      expect(fixture.audit.recordResource).toHaveBeenLastCalledWith(
+      expect(fixture.audit.record).toHaveBeenLastCalledWith(
         expect.objectContaining({
+          domain: 'resource',
           action: 'health.transition',
-          actorId: null,
-          subjectId: 1,
+          actor: expect.objectContaining({ id: null }),
+          subject: expect.objectContaining({ id: 1 }),
           details: expect.objectContaining({
             previousStatus: ResourceHealthStatus.HEALTHY,
             status: ResourceHealthStatus.UNHEALTHY,
@@ -202,6 +203,14 @@ describe('ResourceHealthService', () => {
       });
       expect(await fixture.service.isResourceUnhealthy(1)).toBe(false);
     });
+
+    it('counts through the given transaction manager', async () => {
+      const count = jest.fn().mockResolvedValue(1);
+      const manager = { getRepository: jest.fn().mockReturnValue({ count }) };
+      expect(await fixture.service.isResourceUnhealthy(1, manager as never)).toBe(true);
+      expect(manager.getRepository).toHaveBeenCalledWith(ResourceHealthState);
+      expect(count).toHaveBeenCalledWith({ where: { resourceId: 1, status: ResourceHealthStatus.UNHEALTHY } });
+    });
   });
 
   describe('clearEntry', () => {
@@ -233,8 +242,12 @@ describe('ResourceHealthService', () => {
           previousStatus: ResourceHealthStatus.UNHEALTHY,
         }),
       );
-      expect(fixture.audit.recordResource).toHaveBeenLastCalledWith(
-        expect.objectContaining({ action: 'health.transition', subjectId: 1 }),
+      expect(fixture.audit.record).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          domain: 'resource',
+          action: 'health.transition',
+          subject: expect.objectContaining({ id: 1 }),
+        }),
       );
     });
 

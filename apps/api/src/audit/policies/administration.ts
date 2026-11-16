@@ -33,11 +33,12 @@ export function safeAuditSender(value: string): string {
       : '';
 }
 
-export interface AdministrationAuditEvent {
+/** Projection input of an administration-domain event. */
+export interface AdministrationAuditInput {
   action: string;
   operationId?: string;
   actorId: number;
-  authenticationMethod?: 'session' | 'api-token';
+  authenticationMethod?: 'session' | 'api-token' | 'mcp-oauth';
   apiTokenId?: number;
   subjectType: string;
   subjectId: number;
@@ -107,6 +108,9 @@ export const SETTING_KEYS = [
   'audit.plugin_domains_disabled',
   'audit.retention_days',
   'resources.activityVisibility',
+  'attractap.cardWriterMode',
+  'attractap.cardWriterReaders',
+  'attractap.cardWriterReaderCount',
   'metrics.apiKeyConfigured',
   'metrics.slowQueryThresholdSeconds',
   ...['http', 'ws', 'cron', 'db', 'external', 'sse', 'flow'].map((key) => `metrics.toggles.${key}`),
@@ -120,7 +124,14 @@ export const SETTING_KEYS = [
 
 export const settings = { settingKey: enumeration(...SETTING_KEYS), before: text, after: text };
 
-export const template = { templateType: enumeration(...Object.values(EmailTemplateType)) };
+const coreTemplateType = enumeration(...Object.values(EmailTemplateType));
+
+/** A core template type or a plugin template key, `plugin.<plugin name>.<template id>`. */
+export const templateType: Check = (v) =>
+  coreTemplateType(v) ||
+  (typeof v === 'string' && v.length <= 256 && /^plugin\.[a-zA-Z0-9_.@/-]+\.[a-z0-9][a-z0-9_-]*$/.test(v));
+
+export const template = { templateType };
 
 export const mqtt = {
   serverName: text,
@@ -193,6 +204,18 @@ rules['email_template.translations_set'] = {
 rules['email_template.translations_deleted'] = { subject: 'email-template', fields: { ...template, locale } };
 for (const action of ['created', 'updated', 'deleted'])
   rules[`mqtt_server.${action}`] = { subject: 'mqtt-server', fields: mqtt };
+// The payload is never recorded, only the topic and its size.
+rules['mqtt_server.message_subscribe'] = { subject: 'mqtt-server', fields: { serverName: text, topic: text } };
+rules['mqtt_server.message_publish'] = {
+  subject: 'mqtt-server',
+  fields: {
+    serverName: text,
+    topic: text,
+    size: count,
+    qos: (v: unknown) => v === 0 || v === 1 || v === 2,
+    retain: flag,
+  },
+};
 for (const action of ['added', 'removed', 'tested'])
   rules[`plugin.registry_${action}`] = { subject: 'plugin-registry', fields: registry };
 for (const action of [
@@ -217,7 +240,29 @@ rules['plugin.retry_requested'] = {
   fields: { pluginId: identifier, restartRequested: flag },
 };
 
-export const ADMINISTRATION_AUDIT_ACTIONS = Object.keys(rules);
+export const ADMINISTRATION_AUDIT_ACTIONS = Object.keys(rules) as AdministrationAuditAction[];
+
+export type AdministrationAuditAction =
+  | 'settings.updated'
+  | 'settings.api_key.generated'
+  | 'settings.api_key.deleted'
+  | `email_template.${'updated' | 'reset' | 'translations_set' | 'translations_deleted'}`
+  | `email_layout.${'updated' | 'reset'}`
+  | `mqtt_server.${'created' | 'updated' | 'deleted' | 'message_subscribe' | 'message_publish'}`
+  | `plugin.registry_${'added' | 'removed' | 'tested'}`
+  | `plugin.${
+      | 'installed'
+      | 'removed'
+      | 'replaced'
+      | 'spec_updated'
+      | 'update_override_updated'
+      | 'checked'
+      | 'activation_completed'
+      | 'update_policy_updated'
+      | 'package_policy_updated'
+      | 'zip_uploaded'
+      | 'zip_deleted'
+      | 'retry_requested'}`;
 
 /** Numeric grouping key for public string-keyed subjects; retain the original key in event details.
  * This persisted identifier hash is never a password hash; changing it would split audit history. */
@@ -225,7 +270,7 @@ export function auditSubjectKeyId(value: string): number {
   return Number.parseInt(createHash('sha256').update(value).digest('hex').slice(0, 13), 16) || 1;
 }
 
-function administrationEventFields(input: AdministrationAuditEvent): AdministrationAuditEvent | null {
+function administrationEventFields(input: AdministrationAuditInput): AdministrationAuditInput | null {
   if (!input || ![Object.prototype, null].includes(Object.getPrototypeOf(input))) return null;
   const source: Record<string, unknown> = {};
   const allowed = [
@@ -245,11 +290,11 @@ function administrationEventFields(input: AdministrationAuditEvent): Administrat
     if (!descriptor || !('value' in descriptor)) return null;
     source[key] = descriptor.value;
   }
-  return source as unknown as AdministrationAuditEvent;
+  return source as unknown as AdministrationAuditInput;
 }
 
 function administrationDetails(
-  input: AdministrationAuditEvent,
+  input: AdministrationAuditInput,
   rule: (typeof rules)[string],
 ): Record<string, string | number> | null {
   if (!input.details || ![Object.prototype, null].includes(Object.getPrototypeOf(input.details))) return null;
@@ -263,7 +308,7 @@ function administrationDetails(
   return details;
 }
 
-export function projectAdministrationAuditEvent(input: AdministrationAuditEvent): AdministrationAuditEvent | null {
+export function projectAdministrationAuditEvent(input: AdministrationAuditInput): AdministrationAuditInput | null {
   try {
     const source = administrationEventFields(input);
     if (!source) return null;
@@ -278,9 +323,9 @@ export function projectAdministrationAuditEvent(input: AdministrationAuditEvent)
       return null;
     const method = input.authenticationMethod ?? 'session';
     if (
-      !['session', 'api-token'].includes(method) ||
+      !['session', 'api-token', 'mcp-oauth'].includes(method) ||
       (method === 'api-token' && !positive(input.apiTokenId)) ||
-      (method === 'session' && input.apiTokenId !== undefined) ||
+      (method !== 'api-token' && input.apiTokenId !== undefined) ||
       (input.outcome !== undefined && !['succeeded', 'failed'].includes(input.outcome))
     )
       return null;
@@ -307,6 +352,8 @@ function safeSettingValue(key: string, value: unknown): boolean {
   if (typeof value !== 'string') return false;
   if (key === 'app.defaultLanguage') return value === 'en' || value === 'de';
   if (key === 'resources.activityVisibility') return value === 'all' || value === 'introduced';
+  if (key === 'attractap.cardWriterMode') return value === 'all' || value === 'selected';
+  if (key === 'attractap.cardWriterReaders') return /^(?:\d+(?:,\d+)*)?$/.test(value);
   if (value === '') return true;
   if (['app.url', 'app.publicInternetUrl'].includes(key)) return value === safeAuditOrigin(value);
   if (key === 'smtp.host') return value === safeAuditHost(value);
@@ -316,22 +363,4 @@ function safeSettingValue(key: string, value: unknown): boolean {
   if (/Configured$|Changed$|\.enabled$|\.secure$|\.exponentialBackoff$|^metrics\.toggles\./.test(key))
     return ['true', 'false', 'null'].includes(value);
   return /^\d+(?:\.\d+)?$/.test(value) && Number.isFinite(Number(value));
-}
-
-/** Await recording while preserving the successful primary operation even if a provider rejects. */
-export async function recordAdministrationSafely(
-  recorder: {
-    recordAdministration(
-      event: AdministrationAuditEvent,
-      previousAuditSettings?: PreviousAuditSettings,
-    ): Promise<unknown>;
-  },
-  event: AdministrationAuditEvent,
-  previousAuditSettings?: PreviousAuditSettings,
-): Promise<void> {
-  try {
-    await recorder.recordAdministration(event, previousAuditSettings);
-  } catch {
-    /* Never log exception payloads or request data. */
-  }
 }

@@ -1,0 +1,17 @@
+{
+  "toast": {
+    "title": "Update wird heruntergeladen…",
+    "description": "Du kannst Attraccess weiter nutzen. Wir sagen dir Bescheid, sobald es bereit ist."
+  },
+  "downloading": "Update wird heruntergeladen",
+  "downloadingTooltip": "Update wird heruntergeladen – {{percent}} %",
+  "downloadingTooltipIndeterminate": "Update wird heruntergeladen…",
+  "ready": {
+    "title": "Update bereit",
+    "description": "Lade neu, um die neueste Version zu nutzen.",
+    "reload": "Jetzt neu laden",
+    "later": "Später",
+    "reopen": "Update bereit – Optionen anzeigen"
+  },
+  "moveHint": "Ziehen oder mit den Pfeiltasten verschieben"
+}

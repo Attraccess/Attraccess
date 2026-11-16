@@ -19,7 +19,7 @@ import { WagoService } from '../controllers/service';
 
 jest.mock('@attraccess/plugins-backend-sdk', () => jest.requireActual('typeorm'));
 jest.mock('../controllers/service', () => ({ WagoService: class {} }));
-jest.mock('../runtime/artifacts/catalog', () => ({ WagoRuntimeArtifactsService: class {} }));
+jest.mock('../runtime/artifacts/service', () => ({ WagoRuntimeArtifactsService: class {} }));
 jest.mock('../commissioning/readiness/readiness', () => ({ WagoCommissioningReadiness: class {} }));
 jest.mock('../runtime/managed/transport/ssh', () => ({ managedSsh: jest.fn() }));
 jest.mock('node:dns/promises', () => ({ lookup: jest.fn() }));

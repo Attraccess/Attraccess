@@ -19,6 +19,7 @@ const schema: ResourceFlowNodeSchemaDto = {
   isInput: false,
   isOutput: true,
   supportedByResource: true,
+  supportedFlowScopes: ['resource', 'global'],
   configSchema: { dynamic: true, properties: {}, preview: [] },
 };
 let client: QueryClient;
@@ -45,7 +46,7 @@ afterEach(() => {
 });
 function mount(currentSchema = schema) {
   return renderHook(
-    () => useNodePreviewRows({ schema: currentSchema, tNodeTranslations: (key) => key, resourceId: 6 }),
+    () => useNodePreviewRows({ schema: currentSchema, tNodeTranslations: (key) => key, resourceId: 6, owner: { kind: 'resource', resourceId: 6 } }),
     {
       wrapper: ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={client}>{children}</QueryClientProvider>

@@ -1,12 +1,4 @@
-import {
-  forwardRef,
-  Inject,
-  Injectable,
-  OnModuleInit,
-  ForbiddenException,
-  NotFoundException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, OnModuleInit, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -32,7 +24,7 @@ import { FlowLogRecorderService } from '../logs/flow-log-recorder.service';
 
 import { MqttClientService } from '../../../mqtt/mqtt-client.service';
 
-import { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
+import type { ResourceUsageService } from '../../usage/sessions/resource-usage.service';
 
 import { ResourceHealthService } from '../../health/resource-health.service';
 
@@ -44,13 +36,13 @@ import { ResourceOperatingIntervalService } from '../../operating-intervals/reso
 
 import { CompanionGatewayService } from '../../../companion/companion-gateway.service';
 
-import { ResourceMeteringService } from '../../metering/resource-metering.service';
+import type { ResourceMeteringService } from '../../metering/resource-metering.service';
 
 import { CompanionUsbDeviceDto } from '../../../companion/companion.types';
 
-import { heartbeatKey, NodeProcessingResult } from '../node-executors';
+import { heartbeatKey, NodeExecutor, NodeProcessingResult } from '../node-executors';
 
-import { FlowExecutionOptions, UsageEventData, FlowResourceContext } from './flow-execution.types';
+import type { FlowExecutionOptions, UsageEventData, FlowResourceContext } from './flow-execution.types';
 
 import { getFlowRepository, FlowExecutionContext } from './flow-execution-context';
 
@@ -66,7 +58,9 @@ import { FlowTriggerDispatcher } from './trigger-dispatcher';
 
 import { FlowResourceMonitor } from './resource-monitor';
 
-import { buildNodeExecutorRegistry } from './node-executor-registry';
+import { buildNodeExecutorRegistry, meteringNodeExecutors, usageNodeExecutors } from './node-executor-registry';
+
+import { isGlobalFlowNode, resourceOwnAndGlobalNodesWhere, triggerAppliesToResourceType } from './flow-node-queries';
 
 @Injectable()
 export class ResourceFlowsExecutorService implements OnModuleInit {
@@ -76,13 +70,11 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     @InjectRepository(ResourceFlowEdge)
     flowEdgeRepository: Repository<ResourceFlowEdge>,
     @InjectRepository(Resource)
-    resourceRepository: Repository<Resource>,
+    protected readonly resourceRepository: Repository<Resource>,
     flowLogs: FlowLogRecorderService,
     mqttClientService: MqttClientService,
-    @Inject(forwardRef(() => ResourceUsageService))
-    protected readonly resourceUsageService: ResourceUsageService,
     @InjectRepository(BillingTransactionItem)
-    billingTransactionItemRepository: Repository<BillingTransactionItem>,
+    protected readonly billingTransactionItemRepository: Repository<BillingTransactionItem>,
     eventEmitter: EventEmitter2,
     resourceHealthService: ResourceHealthService,
     variablesService: ResourceFlowVariablesService,
@@ -90,27 +82,23 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     flowTimer: FlowTimer,
     companionGatewayService: CompanionGatewayService,
     operatingIntervals: ResourceOperatingIntervalService,
-    @Inject(forwardRef(() => ResourceMeteringService)) metering: ResourceMeteringService,
   ) {
-    const nodeExecutors = buildNodeExecutorRegistry({
+    this.nodeExecutors = buildNodeExecutorRegistry({
       resourceActivity: this.resourceActivity,
       heartbeatLastSeen: this.heartbeatLastSeen,
       resourceHealthService,
-      resourceUsageService,
-      billingTransactionItemRepository,
       mqttClientService,
       operatingIntervals,
       eventEmitter,
       variablesService,
       companionGatewayService,
-      metering,
     });
     this.engine = new FlowExecutionEngine(
       flowNodeRepository,
       flowEdgeRepository,
       flowLogs,
       flowTimer,
-      nodeExecutors,
+      this.nodeExecutors,
       new FlowExecutionContext(resourceRepository, variablesService),
       this.logger,
     );
@@ -126,7 +114,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
       this.heartbeatLastSeen,
       resourceHealthService,
       cronTimer,
-      (node, data) => this.startFlow(node, data),
+      (node, data, options) => this.startFlow(node, data, undefined, new Map(), options),
       this.logger,
     );
   }
@@ -139,13 +127,37 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
 
   protected readonly engine: FlowExecutionEngine;
 
+  /** Shared with the engine by reference, so executors attached later reach it. Never copy it. */
+  protected readonly nodeExecutors: Partial<Record<ResourceFlowNodeType, NodeExecutor>>;
+
+  protected resourceUsageService?: ResourceUsageService;
+
+  /**
+   * Usage and metering depend on flows (they start flow runs) while some flow nodes call back into them, so
+   * `ResourceUsageFlowsBridge` and `ResourceMeteringFlowsBridge` attach them here at startup instead of flows
+   * injecting them, which would make the modules import each other.
+   */
+  public attachUsage(resourceUsageService: ResourceUsageService): void {
+    this.resourceUsageService = resourceUsageService;
+    Object.assign(this.nodeExecutors, usageNodeExecutors(resourceUsageService, this.billingTransactionItemRepository));
+  }
+
+  public attachMetering(metering: ResourceMeteringService): void {
+    Object.assign(this.nodeExecutors, meteringNodeExecutors(metering));
+  }
+
+  protected get usage(): ResourceUsageService {
+    if (!this.resourceUsageService) throw new Error('Resource usage is not attached to flows');
+    return this.resourceUsageService;
+  }
+
   protected readonly triggers: FlowTriggerDispatcher;
 
   protected readonly monitor: FlowResourceMonitor;
 
   public async pressButton(resourceId: number, buttonId: string, executingUserId: number) {
     // With parallel sessions any active session owner may press the machine's buttons.
-    const activeSessions = await this.resourceUsageService.getActiveSessionsForResource(resourceId);
+    const activeSessions = await this.usage.getActiveSessionsForResource(resourceId);
     const pressingSession = activeSessions.find((session) => session.userId === executingUserId);
 
     if (!executingUserId || !pressingSession) {
@@ -165,7 +177,9 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     }
 
     // The pressing owner's session is the triggering session for end-session and billing nodes.
-    await this.startFlow(button, { payload: { usageId: pressingSession.id } });
+    await this.startFlow(button, { payload: { usageId: pressingSession.id } }, undefined, new Map(), {
+      actorUserId: executingUserId,
+    });
   }
 
   @OnEvent('companion.usb_disconnected')
@@ -224,6 +238,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     this.resourceActivity.set(resourceId, new Date());
   }
 
+  /**
+   * Runs the trigger nodes of the resource's own flow together with the matching nodes of enabled global flows,
+   * with the same transaction and options. A failing global flow therefore fails the run like the resource's own.
+   */
   public async runFlow(
     resourceId: number,
     triggerNodeType: ResourceFlowNodeType,
@@ -233,16 +251,23 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
   ): Promise<object[]> {
     const repository = getFlowRepository(ResourceFlowNode, this.flowNodeRepository, transactionManager);
 
-    const allNodes = await repository.find({
-      where: {
-        resourceId,
-        type: triggerNodeType,
-      },
-    });
+    const allNodes = await repository.find({ where: resourceOwnAndGlobalNodesWhere(resourceId, triggerNodeType) });
 
-    const nodes = options.metering
-      ? allNodes.filter((node) => node.data?.meterId === options.metering?.meterId)
+    // Metering runs belong to one meter of one resource; global flows never take part.
+    let nodes = options.metering
+      ? allNodes.filter((node) => !isGlobalFlowNode(node) && node.data?.meterId === options.metering?.meterId)
       : allNodes;
+
+    if (nodes.some(isGlobalFlowNode)) {
+      const resource = await getFlowRepository(Resource, this.resourceRepository, transactionManager).findOne({
+        where: { id: resourceId },
+        select: { id: true, type: true },
+      });
+      nodes = nodes.filter(
+        (node) => !isGlobalFlowNode(node) || triggerAppliesToResourceType(node.type, resource?.type),
+      );
+    }
+
     if (nodes.length === 0) {
       this.logger.debug(
         `No flow nodes found for trigger node type '${triggerNodeType}' and resource ID: ${resourceId}`,
@@ -251,7 +276,10 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     }
 
     // TODO: propagate errors so when calling runFlow you can react to them and they dont get ignored
-    const results = await this.startFlow(nodes, { payload: initialData }, transactionManager, new Map(), options);
+    const results = await this.startFlow(nodes, { payload: initialData }, transactionManager, new Map(), {
+      ...options,
+      triggeringResourceId: resourceId,
+    });
     return results.map((r) => r.payload);
   }
 
@@ -261,24 +289,7 @@ export class ResourceFlowsExecutorService implements OnModuleInit {
     eventData: UsageEventData,
   ) {
     this.logger.debug(`Looking for flow nodes of type '${eventType}' for resource ID: ${resourceId}`);
-
-    const eventNodes = await this.flowNodeRepository.find({
-      where: {
-        resourceId,
-        type: eventType,
-      },
-    });
-
-    if (eventNodes.length === 0) {
-      this.logger.debug(`No flow nodes found for event type '${eventType}' and resource ID: ${resourceId}`);
-      return;
-    }
-
-    this.logger.log(
-      `Found ${eventNodes.length} flow node(s) for event type '${eventType}' and resource ID: ${resourceId}`,
-    );
-
-    await this.startFlow(eventNodes, { payload: eventData });
+    await this.runFlow(resourceId, eventType, eventData);
   }
 
   protected async handleResourceUsage(usage: ResourceUsage, inputType: ResourceFlowNodeType) {

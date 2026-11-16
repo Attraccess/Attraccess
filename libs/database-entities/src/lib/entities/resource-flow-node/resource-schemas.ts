@@ -31,6 +31,13 @@ export const InputResourceActivityNoActivityNodeDataSchema = z.object({
 
 export const ResourceUsageEndSessionNodeDataSchema = z
   .object({
+    target: z.enum(['triggering', 'user', 'all']).default('triggering').meta({
+      helpText:
+        'Triggering ends the session that started this flow. User ends the session of one person, all ends every running session on the machine.',
+    }),
+    userId: z.string().optional().meta({
+      helpText: 'Only for target "user": the user id (template), for example {{user.id}}.',
+    }),
     notes: z.string().optional().meta({
       stringVariant: 'multiline',
     }),

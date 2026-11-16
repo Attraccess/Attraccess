@@ -2,6 +2,7 @@
 
 #include "profile_store.hpp"
 #include "rfid/rfid_contract.hpp"
+#include "virtual_card_chip.hpp"
 
 #include <array>
 #include <cstdint>
@@ -33,6 +34,9 @@ public:
         bool failWrite = false;
         std::array<Key, KeySlotCount> keys{};
         std::array<uint8_t, KeySlotCount> keyVersions{};
+        // A DESFire card gets its Attraccess application when the server creates it during enrollment.
+        // Not persisted: it follows from the key versions after a restart.
+        bool applicationExists = false;
     };
 
     explicit VirtualNfc(ProfileStore &profile);
@@ -51,12 +55,10 @@ public:
     void setRemoveOnWrite(bool enabled) { removeOnWrite = enabled; didRemoveOnWrite = false; }
     bool removedOnWrite() const { return didRemoveOnWrite; }
 
-    bool authenticate(uint8_t keyNumber, uint8_t *key) override;
-    bool changeKey(uint8_t keyNumber, uint8_t *masterKey, uint8_t *oldKey,
-                   uint8_t *newKey, uint8_t keyVersion = 1) override;
-    bool getAvailableKeyNo(uint8_t *uid, uint8_t *uidLength, uint8_t *keyNumber) override;
+    // The simulated card answers complete APDUs like the chip does; all card crypto runs on the server.
+    bool transceive(const uint8_t *apdu, uint8_t apduLength, uint8_t *response, uint8_t *responseLength) override;
+    void setConversationActive(bool active) override { conversationActive = active; }
     bool isCardPresent() override { return !suspended && presentedCard < CardCount; }
-    uint8_t *getFactoryKey() override { return const_cast<uint8_t *>(factoryKey().data()); }
 
     void enableCardDetection() override { if (!suspended) cardDetectionEnabled = true; }
     void disableCardDetection() override { cardDetectionEnabled = false; }
@@ -89,6 +91,8 @@ private:
     bool cardDetectionEnabled = false;
     bool suspended = false;
     bool cardPresenceReported = false;
+    bool conversationActive = false;
+    VirtualCardChip chip;
     std::function<void(uint8_t *, uint8_t)> cardDetectedCallback;
     std::function<void(uint32_t)> cardRemovedCallback;
 };

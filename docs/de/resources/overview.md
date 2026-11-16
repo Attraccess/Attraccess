@@ -1,4 +1,5 @@
 # Ressourcen
+<!-- llms-description: Stellt Ressourcen als Kern von Attraccess vor: Maschinen, Geräte und Werkzeuge, deren Zugang und Nutzung Sie verwalten, und ihre Typen. -->
 
 Ressourcen sind das Herzstück von Attraccess. Eine Ressource ist alles, dessen Zugang und Nutzung Sie an Ihrem Standort verwalten – Produktionsmaschinen, Laborgeräte, Werkzeuge, gemeinsam genutzte Arbeitsplätze oder Türen.
 
@@ -37,3 +38,4 @@ Die Startseite von Attraccess zeigt alle verfügbaren Ressourcen in einer Übers
 - [Gruppen](resources/resource-groups.md) – Ressourcen organisieren
 - [Einweisungen](resources/introductions.md) – Zugang verwalten
 - [Wartung](resources/maintenance.md) – Wartungen planen
+- Mit installiertem Plugin Reservierungen können Mitglieder Ressourcen im Voraus buchen; siehe [Reservierungen](plugins/reservations/overview.md).

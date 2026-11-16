@@ -1,12 +1,10 @@
 /* eslint-disable no-console -- CLI diagnostics are intentional. */
-import { execFileSync } from 'node:child_process';
 import { lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { excludedDirectory, generatedClients, git, readBlobs } from './lib/repo-files.mjs';
 
 const codeExtension =
   /\.(?:[cm]?[jt]sx?|c|cc|cpp|cxx|h|hh|hpp|hxx|m|mm|py|sh|bash|zsh|sql|scad|css|scss|sass|less|html|mjml)$/i;
-const excludedDirectory = /(^|\/)(node_modules|dist|build|coverage|managed_components|generated|\.tools|\.nx)(\/|$)/;
-const generatedClients = /^libs\/(react-query-client|companion-ws-client)\/src\/lib\//;
 
 function limitFor(file) {
   if (
@@ -26,10 +24,6 @@ function lineCount(content) {
   return content.split(/\r\n|\r|\n/).length - Number(/[\r\n]$/.test(content));
 }
 
-function git(args, options = {}) {
-  return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 128 * 1024 * 1024, ...options });
-}
-
 function entries(output, staged = false) {
   return output
     .split('\0')
@@ -43,22 +37,8 @@ function entries(output, staged = false) {
     .filter(({ file, mode }) => /^100/.test(mode) && limitFor(file) !== null);
 }
 
-// Batch by object ID so filenames containing whitespace or newlines remain safe.
 function blobLines(files) {
-  const result = new Map();
-  if (files.length === 0) return result;
-  const output = git(['cat-file', '--batch'], { input: files.map(({ oid }) => oid).join('\n') + '\n', encoding: null });
-  let offset = 0;
-  for (const { file } of files) {
-    const end = output.indexOf(10, offset);
-    const [, type, size] = output.subarray(offset, end).toString().split(' ');
-    if (type !== 'blob') throw new Error(`Could not read Git blob for ${file}.`);
-    const start = end + 1;
-    offset = start + Number(size);
-    result.set(file, lineCount(output.subarray(start, offset).toString('utf8')));
-    offset += 1;
-  }
-  return result;
+  return new Map([...readBlobs(files)].map(([file, content]) => [file, lineCount(content)]));
 }
 
 function check() {

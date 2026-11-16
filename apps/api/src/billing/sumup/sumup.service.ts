@@ -1,6 +1,7 @@
+import { billingTransactionAuditEvent } from '../../audit/policies/billing';
 import { BillingTransaction, Setting, BillingTransactionStatus } from '@attraccess/database-entities';
 
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Inject } from '@nestjs/common';
 
 import { InjectRepository } from '@nestjs/typeorm';
 
@@ -8,7 +9,7 @@ import { SumUp } from '@sumup/sdk';
 
 import { Repository, DeepPartial } from 'typeorm';
 
-import { AuditService } from '../../audit/audit.service';
+import { AUDIT_RECORDER, AuditRecorder } from '../../audit/recorder/audit-event';
 
 import { EncryptionService } from '../../encryption/encryption.service';
 
@@ -45,7 +46,7 @@ export class SumUpService {
     protected readonly billingService: BillingService,
     protected readonly cronTimer: CronTimer,
     protected readonly externalCallTimer: ExternalCallTimer,
-    protected readonly auditService: AuditService,
+    @Inject(AUDIT_RECORDER) protected readonly auditService: AuditRecorder,
   ) {}
 
   protected readonly logger = new Logger(SumUpService.name);
@@ -212,14 +213,16 @@ export class SumUpService {
     const updatedTransaction = await this.billingTransactionRepository.save(transaction);
     this.hasPendingTransactions = true;
     this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
-    void this.auditService.recordBillingTransaction({
-      transactionId: updatedTransaction.id,
-      userId: updatedTransaction.userId,
-      amount: updatedTransaction.amount,
-      status: updatedTransaction.status,
-      previousStatus,
-      source: 'sumup-topup',
-    });
+    void this.auditService.record(
+      billingTransactionAuditEvent({
+        transactionId: updatedTransaction.id,
+        userId: updatedTransaction.userId,
+        amount: updatedTransaction.amount,
+        status: updatedTransaction.status,
+        previousStatus,
+        source: 'sumup-topup',
+      }),
+    );
 
     this.logger.debug(
       `updateTransactionStatusBySumupServer: Transaction status updated of ${sumupTransactionId} to ${transaction.status}`,
@@ -254,14 +257,16 @@ export class SumUpService {
           transaction.status = BillingTransactionStatus.Failed;
           const updatedTransaction = await this.billingTransactionRepository.save(transaction);
           this.liveNotificationsService.notifyTransactionUpdate(updatedTransaction);
-          void this.auditService.recordBillingTransaction({
-            transactionId: updatedTransaction.id,
-            userId: updatedTransaction.userId,
-            amount: updatedTransaction.amount,
-            status: updatedTransaction.status,
-            previousStatus: BillingTransactionStatus.Pending,
-            source: 'sumup-topup',
-          });
+          void this.auditService.record(
+            billingTransactionAuditEvent({
+              transactionId: updatedTransaction.id,
+              userId: updatedTransaction.userId,
+              amount: updatedTransaction.amount,
+              status: updatedTransaction.status,
+              previousStatus: BillingTransactionStatus.Pending,
+              source: 'sumup-topup',
+            }),
+          );
           continue;
         }
 
@@ -311,13 +316,15 @@ export class SumUpService {
       this.hasPendingTransactions = true;
 
       this.liveNotificationsService.notifyTransactionUpdate(transaction);
-      void this.auditService.recordBillingTransaction({
-        transactionId: transaction.id,
-        userId: transaction.userId,
-        amount: transaction.amount,
-        status: transaction.status,
-        source: 'sumup-topup',
-      });
+      void this.auditService.record(
+        billingTransactionAuditEvent({
+          transactionId: transaction.id,
+          userId: transaction.userId,
+          amount: transaction.amount,
+          status: transaction.status,
+          source: 'sumup-topup',
+        }),
+      );
 
       return transaction;
     } catch (error) {

@@ -9,8 +9,12 @@ import { WebSocket } from 'ws';
 import { LicenseService } from '../../license/license.service';
 import { AttractapService } from '../attractap.service';
 import { AttractapAuthHandler } from '../websockets/handlers/auth/auth.handler';
+import { CARD_CONVERSATION_LIMITS } from '../websockets/card-conversation.service';
+import { ResourceListService } from '../websockets/handlers/resource-list/resource-list.service';
 import { AttractapGateway } from '../websockets/websocket.gateway';
 import { gatewayProviders } from '../websockets/websocket.gateway.attractap-gateway.test-fixture';
+import { WebsocketService } from '../websockets/websocket.service';
+import { AttractapEvent, AttractapEventType, AuthenticatedWebSocket } from '../websockets/websocket.types';
 import { CredentialRegistryService } from './credential-registry.service';
 import { HandshakeLimiter } from './handshake-limiter';
 import { InstallationIdentityService } from './installation-identity.service';
@@ -130,6 +134,18 @@ describe('reader session through the real gateway', () => {
 
   const json = (frame: { payload: Buffer }) => JSON.parse(frame.payload.toString());
 
+  /** A paired reader that is signed in, and the server's socket for it. */
+  async function signedIn(readerId: number) {
+    // The fixture's resource services are bare; an empty list keeps the sign-in from failing.
+    jest.spyOn(app.get(ResourceListService), 'sendResourceListToSocket').mockResolvedValueOnce(undefined);
+    const { reader } = await connectPaired(readerId);
+    await reader.nextFrame((f) => f.type === FrameType.JSON && json(f).data?.type === 'READER_AUTHENTICATED');
+    reader.send(FrameType.JSON, JSON.stringify({ event: 'EVENT', data: { type: 'ACK_READER_AUTHENTICATED' } }));
+    const socket = [...app.get(WebsocketService).sockets.values()].find((s) => s.readerId === readerId);
+    if (!socket) throw new Error(`reader ${readerId} is not registered`);
+    return { reader, socket: socket as AuthenticatedWebSocket };
+  }
+
   it('signs a paired reader in from its certificate and routes messages through the normal handlers', async () => {
     const { reader } = await connectPaired(5);
 
@@ -200,6 +216,46 @@ describe('reader session through the real gateway', () => {
     await again.connect().catch(() => undefined);
     await again.closed;
     expect(again.frames.filter((f) => f.type === FrameType.JSON)).toHaveLength(0);
+  });
+
+  it('ends a card conversation and the verified user as soon as the credential changes', async () => {
+    const { reader, socket } = await signedIn(20);
+    socket.state.verifiedUserId = 3;
+    socket.state.verifiedCardUid = '04aabbccddee80';
+    const conversations = gateway['cardConversations'];
+    const conversation = conversations.run(socket, 'tap', { uid: '04aabbccddee80', detectionId: 1 }, (channel) =>
+      channel.exchange(Buffer.from([0x90, 0x60, 0, 0, 0])),
+    );
+    // The APDU went out through the session; the card's answer is still pending.
+    await reader.nextFrame((f) => f.type === FrameType.JSON && json(f).data?.type === 'CARD_APDU');
+
+    active.clear();
+    app.get(EventEmitter2).emit(CREDENTIAL_CHANGED_EVENT, 20);
+
+    // Before the socket's close event: nothing of the old login is left.
+    expect(socket.state.verifiedUserId).toBeNull();
+    expect(socket.state.verifiedCardUid).toBeNull();
+    expect(await conversation).toEqual({ ok: false, reason: 'READER_UNREACHABLE' });
+    expect(conversations.activeConversations).toBe(0);
+    await reader.closed;
+  });
+
+  it("applies the send limits to the session's own queue, which the WebSocket does not see", async () => {
+    const { reader, socket } = await signedIn(21);
+    const big = () => new AttractapEvent(AttractapEventType.CARD_APDU, { apdu: 'aa'.repeat(4000) });
+    const conversations = gateway['cardConversations'];
+    let busyWhileAccepted = false;
+    let refused = false;
+    // Synchronous: nothing can drain meanwhile, so everything stays queued inside TLS.
+    for (let i = 0; i < 32 && !refused; i++) {
+      refused = !socket.sendRaw(big());
+      if (!refused && conversations.isBusy(socket)) busyWhileAccepted = true;
+    }
+    expect(socket.bufferedAmount).toBeLessThan(CARD_CONVERSATION_LIMITS.maxBufferedBytes);
+    // BUSY comes first, then the full queue refuses the frame (the sender sees it) and cuts the reader off.
+    expect(busyWhileAccepted).toBe(true);
+    expect(refused).toBe(true);
+    await reader.closed;
   });
 
   it.each([

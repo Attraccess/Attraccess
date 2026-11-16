@@ -7,7 +7,7 @@ import {
 } from '@attraccess/database-entities';
 import { ResourceHealthService } from '../../health/resource-health.service';
 import { HealthHeartbeatExecutor } from './health-heartbeat.executor';
-import { heartbeatKey } from './flow.utils';
+import { globalHeartbeatKey, heartbeatKey } from './flow.utils';
 
 function createNode(partial: Partial<ResourceFlowNode>): ResourceFlowNode {
   return {
@@ -125,9 +125,7 @@ describe('HealthHeartbeatExecutor', () => {
       await executor.execute(node, {});
 
       expect(heartbeatLastSeen.has(heartbeatKey(3, ''))).toBe(true);
-      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
-        expect.objectContaining({ identifier: '' }),
-      );
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(expect.objectContaining({ identifier: '' }));
     });
 
     it('handles node.data being null/undefined by falling back to {} (then schema fails on missing timeoutSeconds)', async () => {
@@ -149,6 +147,25 @@ describe('HealthHeartbeatExecutor', () => {
       const stamped = heartbeatLastSeen.get(heartbeatKey(1, 'x')) as Date;
       const reportedAt = resourceHealthService.reportHealth.mock.calls[0][0].reportedAt;
       expect(reportedAt).toBe(stamped);
+    });
+  });
+
+  describe('global flows', () => {
+    it("stamps a per-node key for the run's resource, apart from resource-flow beats", async () => {
+      const node = createNode({
+        id: 'g-hb',
+        resourceId: null,
+        flowId: 4,
+        data: { identifier: 'x', timeoutSeconds: 5 },
+      });
+
+      await executor.execute(node, {}, { resourceId: 9 } as never);
+
+      expect([...heartbeatLastSeen.keys()]).toEqual([globalHeartbeatKey('g-hb', 9, 'x')]);
+      expect(heartbeatLastSeen.has(heartbeatKey(9, 'x'))).toBe(false);
+      expect(resourceHealthService.reportHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ resourceId: 9, identifier: 'x', status: ResourceHealthStatus.HEALTHY }),
+      );
     });
   });
 });

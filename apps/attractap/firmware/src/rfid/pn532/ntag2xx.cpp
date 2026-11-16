@@ -54,7 +54,6 @@ uint8_t Adafruit_PN532::ntag2xx_ReadPage(uint8_t page, uint8_t *buffer)
   readdata(pn532_packetbuffer, 26);
 #ifdef MIFAREDEBUG
   PN532DEBUGPRINT.println(F("Received: "));
-  Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 26);
 #endif
 
   /* If byte 8 isn't 0x00 we probably have an error */
@@ -71,7 +70,6 @@ uint8_t Adafruit_PN532::ntag2xx_ReadPage(uint8_t page, uint8_t *buffer)
   {
 #ifdef MIFAREDEBUG
     PN532DEBUGPRINT.println(F("Unexpected response reading block: "));
-    Adafruit_PN532::PrintHexChar(pn532_packetbuffer, 26);
 #endif
     return 0;
   }
@@ -81,7 +79,6 @@ uint8_t Adafruit_PN532::ntag2xx_ReadPage(uint8_t page, uint8_t *buffer)
   PN532DEBUGPRINT.print(F("Page "));
   PN532DEBUGPRINT.print(page);
   PN532DEBUGPRINT.println(F(":"));
-  Adafruit_PN532::PrintHexChar(buffer, 4);
 #endif
 
   // Return OK signal

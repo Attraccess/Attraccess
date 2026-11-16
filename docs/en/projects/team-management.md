@@ -1,4 +1,5 @@
 # Team Management
+<!-- llms-description: Invite members to a project, accept invitations, manage team roles and remove members. -->
 
 Projects support team-based collaboration. You can invite members, manage roles, and coordinate who works on your project.
 

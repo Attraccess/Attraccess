@@ -154,3 +154,44 @@ it("runs the session-end default for the ended session's owner when a manager en
   await moduleRef.get(ResourceUsageController).endSession(5, {} as never, request);
   expect(applyDefault).toHaveBeenCalledWith({ resourceId: 5, userId: 2, sessionId: 9 }, 'web', 'en');
 });
+
+describe('start-blocked query', () => {
+  const request = { user: { id: 7 } } as AuthenticatedRequest;
+  const build = async (queryStartBlocked: jest.Mock) => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [ResourceUsageController],
+      providers: [
+        { provide: PreStartService, useValue: { gateHttp: jest.fn(), queryStartBlocked } },
+        { provide: SessionEndNotifier, useValue: { applyDefault: jest.fn() } },
+        { provide: ResourceUsageService, useValue: {} },
+        { provide: ResourceActivityVisibilityService, useValue: {} },
+      ],
+    }).compile();
+    return moduleRef.get(ResourceUsageController);
+  };
+
+  it('answers "not blocked" when no plugin reports a block', async () => {
+    const queryStartBlocked = jest.fn().mockResolvedValue(null);
+    expect(await (await build(queryStartBlocked)).startBlocked(5, request)).toEqual({ blocked: false });
+    expect(queryStartBlocked).toHaveBeenCalledWith(5, request.user);
+  });
+
+  it('returns the reason, the end time and the reporting plugin', async () => {
+    const reason = { code: 'RESERVED', title: 'Reserved', body: 'Reserved until 16:00.' };
+    const controller = await build(
+      jest.fn().mockResolvedValue({ plugin: 'reservations', reason, until: '2026-06-01T14:00:00.000Z' }),
+    );
+    expect(await controller.startBlocked(5, request)).toEqual({
+      blocked: true,
+      reason,
+      until: '2026-06-01T14:00:00.000Z',
+      plugin: 'reservations',
+    });
+  });
+
+  it('leaves out the end time when the plugin gives none', async () => {
+    const reason = { code: 'RESERVED', title: 'Reserved', body: 'Not now' };
+    const controller = await build(jest.fn().mockResolvedValue({ plugin: 'p', reason }));
+    expect(await controller.startBlocked(5, request)).toEqual({ blocked: true, reason, plugin: 'p' });
+  });
+});

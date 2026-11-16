@@ -1,4 +1,5 @@
 # Benutzer anlegen
+<!-- llms-description: Die Wege zu einem Benutzerkonto: Selbstregistrierung, SSO-Registrierung, Projekteinladungen und Anlegen durch einen Administrator. -->
 
 Es gibt mehrere Wege, neue Benutzer in Attraccess anzulegen.
 

@@ -555,7 +555,7 @@ groups:
           severity: warning
         annotations:
           summary: "Reader display alerts open"
-          description: "{{ $values.A }} reader display alerts are open. Open plugin circuit breaker: starts follow the plugin's hook failure policy (fail closed by default); after 60 s the next start probes the hook and the breaker closes by itself when it answers. ACCESS_HOOKS plugin that failed to load: its start hooks are not enforced until it loads again. Reader crash-loop suspension: plugin widgets are suspended on that reader and return after 30 min without another panic. Admins can clear an alert early in the plugin settings or the reader editor."
+          description: "{{ $values.A }} reader display alerts are open. Open plugin circuit breaker: starts follow the plugin's hook failure policy (fail closed by default); after 60 s the next start probes the hook and the breaker closes by itself when it answers. ACCESS_HOOKS plugin that failed to load: its start hooks are not enforced until it loads again. Reader crash-loop suspension: plugin widgets are suspended on that reader and return after 30 min without another panic. Reader time zone conflict: plugins return different time zones for one reader, which shows the first valid zone in host order; it stays open until an admin clears it. Admins can clear an alert early in the plugin settings or the reader editor."
         data:
           - refId: A
             relativeTimeRange:
@@ -887,6 +887,56 @@ groups:
                   evaluator:
                     type: gt
                     params: [0.1]
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    type: last
+                    params: []
+
+      - uid: audit-records-dropped
+        title: AuditRecordsDropped
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Audit records dropped"
+          description: "About {{ humanize $values.A.Value }} audit records could not be stored in the last 5 minutes; the changes they describe were applied. Check the API log for 'Audit record dropped' lines (domain, action, reason, code). storage_error: the insert failed, see the SQLite code (SQLITE_BUSY means the database stayed locked for 5 s). queue_full: more than 1,000 audit writes were waiting. storage_unavailable: audit storage is not available (startup failed or in-memory database). shutting_down: expected while the API restarts. settings_unavailable: the audit settings could not be read. invalid_event: an event was rejected, which points to a bug. The alert clears about 5 minutes after the last drop."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: attraccess-prometheus
+            model:
+              refId: A
+              expr: 'sum(increase(attraccess_audit_records_dropped_total{job="attraccess"}[5m]))'
+              instant: true
+              range: false
+              datasource:
+                type: prometheus
+                uid: attraccess-prometheus
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: A
+              datasource:
+                type: __expr__
+                uid: __expr__
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
                   operator:
                     type: and
                   query:
