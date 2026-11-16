@@ -1,7 +1,8 @@
 import { type ArgumentsHost, Logger } from '@nestjs/common';
 import { BaseExceptionFilter, type HttpAdapterHost } from '@nestjs/core';
-import { QueryFailedError } from 'typeorm';
+import { resolveDatabaseBackend } from '../database/backend';
 import { SqliteReadonlyFilter } from './sqlite-readonly.filter';
+resolveDatabaseBackend({ DATABASE_TYPE: 'sqlite' });
 afterEach(() => jest.restoreAllMocks());
 it.each([
   { code: 'SQLITE_READONLY', message: 'write failed' },
@@ -11,11 +12,9 @@ it.each([
   const log = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
   const filter = new SqliteReadonlyFilter({ httpAdapter: {} } as HttpAdapterHost),
     host = {} as ArgumentsHost;
-  const error = new QueryFailedError(
-    'UPDATE fixture',
-    [],
-    Object.assign(new Error(driver.message), { code: driver.code }),
-  );
+  // The shape of a failed statement: the driver's error with its code sits in driverError.
+  const driverError = Object.assign(new Error(driver.message), { code: driver.code });
+  const error = Object.assign(new Error(`${driver.code}: ${driver.message}`), { driverError, query: 'UPDATE fixture' });
   filter.catch(error, host);
   expect(log).toHaveBeenCalledWith(expect.stringContaining('chown -R appuser:appuser /app/storage'));
   expect(base).toHaveBeenCalledWith(error, host);

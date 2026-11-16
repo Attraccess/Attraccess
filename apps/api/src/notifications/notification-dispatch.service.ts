@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
-import { ResourceHealthStatus } from '@attraccess/application-models';
+import { NotificationRecipient, ResourceHealthStatus } from '@attraccess/application-models';
 import { PushService } from '../push/push.service';
 import { EmailService } from '../email/email.service';
 import { NotificationPreferenceService } from './notification-preference.service';
@@ -10,17 +9,17 @@ import { SettingsService } from '../settings/settings.service';
 
 export interface NotificationDispatchRequest {
   category: AnyNotificationCategory;
-  recipients: User[];
+  recipients: NotificationRecipient[];
   channels?: NotificationChannel[];
   /** Static string, or a per-recipient resolver for locale-specific strings. */
-  title: string | ((recipient: User) => string);
-  body: string | ((recipient: User) => string);
+  title: string | ((recipient: NotificationRecipient) => string);
+  body: string | ((recipient: NotificationRecipient) => string);
   url?: string;
   actorId?: number;
   severity?: 'info' | 'warning';
   dedupeKey?: string;
   /** Keep the original recipient locale for custom catalogs; use language for code-defined translations. */
-  sendEmail?: (recipient: User, language: 'en' | 'de') => Promise<void>;
+  sendEmail?: (recipient: NotificationRecipient, language: 'en' | 'de') => Promise<void>;
 }
 
 @Injectable()
@@ -43,11 +42,18 @@ export class NotificationDispatchService {
     );
   }
 
-  private async dispatchToRecipient(request: NotificationDispatchRequest, recipient: User): Promise<void> {
+  private async dispatchToRecipient(
+    request: NotificationDispatchRequest,
+    recipient: NotificationRecipient,
+  ): Promise<void> {
     const language = await this.settingsService.resolveLanguage(recipient.locale);
-    const textRecipient: User = Object.assign(Object.create(Object.getPrototypeOf(recipient)), recipient, {
-      locale: language,
-    });
+    const textRecipient: NotificationRecipient = Object.assign(
+      Object.create(Object.getPrototypeOf(recipient)),
+      recipient,
+      {
+        locale: language,
+      },
+    );
     const channels = request.channels ?? [
       NotificationChannel.EMAIL,
       NotificationChannel.PUSH,
@@ -75,7 +81,11 @@ export class NotificationDispatchService {
     ]);
   }
 
-  private async tryEmail(request: NotificationDispatchRequest, recipient: User, language: 'en' | 'de'): Promise<void> {
+  private async tryEmail(
+    request: NotificationDispatchRequest,
+    recipient: NotificationRecipient,
+    language: 'en' | 'de',
+  ): Promise<void> {
     try {
       await request.sendEmail?.(recipient, language);
     } catch (error) {
@@ -88,7 +98,7 @@ export class NotificationDispatchService {
 
   private async tryPush(
     request: NotificationDispatchRequest,
-    recipient: User,
+    recipient: NotificationRecipient,
     title: string,
     body: string,
   ): Promise<void> {
@@ -102,7 +112,7 @@ export class NotificationDispatchService {
 
   private async tryToast(
     request: NotificationDispatchRequest,
-    recipient: User,
+    recipient: NotificationRecipient,
     title: string,
     body: string,
   ): Promise<void> {
@@ -119,7 +129,7 @@ export class NotificationDispatchService {
   }
 
   public async sendEmailTemplate(
-    recipient: User,
+    recipient: NotificationRecipient,
     category: NotificationCategory,
     context: Record<string, unknown>,
   ): Promise<void> {

@@ -6,10 +6,8 @@ import {
   NotFoundException,
   OnApplicationBootstrap,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { EmailTemplate, EmailTemplateTranslation } from '@attraccess/database-entities';
-import { EmailTemplateType } from '@attraccess/application-models';
-import { EntityManager, Repository } from 'typeorm';
+import { EmailTemplateRecord, EmailTemplateTranslationRecord, EmailTemplateType } from '@attraccess/application-models';
+import { EMAIL_TEMPLATE_STORE, EmailTemplateReadContext, EmailTemplateStore } from './email-template-store.port';
 import { UpdateEmailTemplateDto } from './dto/update-email-template.dto';
 import { MjmlService } from './mjml.service';
 import { auditSubjectKeyId } from '../audit/policies/administration';
@@ -30,7 +28,7 @@ import {
 export type EmailTemplateKey = EmailTemplateType | PluginEmailTemplateKey;
 
 /** A stored template with where it comes from: core, or the plugin that declared it. */
-export type ListedEmailTemplate = EmailTemplate & {
+export type ListedEmailTemplate = EmailTemplateRecord & {
   plugin?: { name: string; label: { en: string; de: string } };
 };
 
@@ -46,10 +44,7 @@ export class EmailTemplateService implements OnApplicationBootstrap {
   private syncing: Promise<number> | null = null;
 
   constructor(
-    @InjectRepository(EmailTemplate)
-    private readonly emailTemplateRepository: Repository<EmailTemplate>,
-    @InjectRepository(EmailTemplateTranslation)
-    private readonly translationRepository: Repository<EmailTemplateTranslation>,
+    @Inject(EMAIL_TEMPLATE_STORE) private readonly store: EmailTemplateStore,
     private readonly mjmlService: MjmlService,
     @Inject(AUDIT_RECORDER) private readonly audit: AuditRecorder,
   ) {}
@@ -63,7 +58,7 @@ export class EmailTemplateService implements OnApplicationBootstrap {
   /** Core templates plus the templates of the plugins that are loaded now, each tagged with its origin. */
   async findAll(): Promise<ListedEmailTemplate[]> {
     await this.syncPluginTemplates();
-    const rows = await this.emailTemplateRepository.find();
+    const rows = await this.store.listTemplates();
     // Rows of plugins that are not loaded (disabled, uninstalled) stay stored but are not offered.
     return rows
       .filter((row) => !isPluginEmailTemplateKey(row.type) || getPluginEmailTemplate(row.type))
@@ -75,13 +70,12 @@ export class EmailTemplateService implements OnApplicationBootstrap {
     return withOrigin(await this.findOne(type));
   }
 
-  async findOne(type: EmailTemplateKey, manager?: EntityManager): Promise<EmailTemplate> {
+  async findOne(type: EmailTemplateKey, transaction?: EmailTemplateReadContext): Promise<EmailTemplateRecord> {
     if (isPluginEmailTemplateKey(type)) await this.syncPluginTemplates();
-    const repo = manager ? manager.getRepository(EmailTemplate) : this.emailTemplateRepository;
     const template =
       isPluginEmailTemplateKey(type) && !getPluginEmailTemplate(type)
         ? null
-        : await repo.findOneBy({ type: type as EmailTemplateType });
+        : await this.store.findTemplate(type, transaction);
     if (!template) {
       throw new NotFoundException(`Email template "${type}" not found`);
     }
@@ -92,7 +86,7 @@ export class EmailTemplateService implements OnApplicationBootstrap {
     type: EmailTemplateKey,
     updateEmailTemplateDto: UpdateEmailTemplateDto,
     actor: AuditActor,
-  ): Promise<EmailTemplate> {
+  ): Promise<EmailTemplateRecord> {
     await this.findOne(type);
     assertRenderableTemplate(updateEmailTemplateDto);
 
@@ -105,42 +99,31 @@ export class EmailTemplateService implements OnApplicationBootstrap {
       await this.mjmlService.validateAndConvert(`<mjml><mj-body>${updateEmailTemplateDto.body}</mj-body></mjml>`);
     }
 
-    await this.emailTemplateRepository.update(
-      { type: type as EmailTemplateType },
-      {
-        body: updateEmailTemplateDto.body,
-        subject: updateEmailTemplateDto.subject,
-      },
-    );
+    await this.store.updateContent(type, {
+      body: updateEmailTemplateDto.body,
+      subject: updateEmailTemplateDto.subject,
+    });
 
     const template = await this.findOne(type);
     await this.record(actor, 'email_template.updated', type, { templateType: type });
     return template;
   }
 
-  async resetToDefault(type: EmailTemplateKey, actor: AuditActor): Promise<EmailTemplate> {
+  async resetToDefault(type: EmailTemplateKey, actor: AuditActor): Promise<EmailTemplateRecord> {
     await this.findOne(type);
 
     const { subject, body, variables, translations } = this.defaultsFor(type);
 
-    await this.emailTemplateRepository.update({ type: type as EmailTemplateType }, { subject, body, variables });
-
-    await this.translationRepository.manager.transaction(async (manager) => {
-      await manager.delete(EmailTemplateTranslation, { templateType: type as EmailTemplateType });
-      if (translations.length > 0) {
-        await manager.insert(
-          EmailTemplateTranslation,
-          translations.map((t) =>
-            manager.create(EmailTemplateTranslation, {
-              templateType: type as EmailTemplateType,
-              locale: t.locale,
-              key: t.key,
-              value: t.value,
-            }),
-          ),
-        );
-      }
-    });
+    await this.store.restoreDefaults(
+      type,
+      { subject, body, variables },
+      translations.map((t) => ({
+        templateType: type as EmailTemplateType,
+        locale: t.locale,
+        key: t.key,
+        value: t.value,
+      })),
+    );
 
     const template = await this.findOne(type);
     await this.record(actor, 'email_template.reset', type, { templateType: type });
@@ -215,39 +198,19 @@ export class EmailTemplateService implements OnApplicationBootstrap {
   }
 
   private async syncPluginTemplate(declared: RegisteredPluginEmailTemplate): Promise<void> {
-    await this.emailTemplateRepository.manager.transaction(async (manager) => {
-      const templates = manager.getRepository(EmailTemplate);
-      const type = declared.key as unknown as EmailTemplateType;
-      const existing = await templates.findOneBy({ type });
-      if (existing) {
-        if (existing.variables.join(',') !== declared.variables.join(',')) {
-          await templates.update({ type }, { variables: declared.variables });
-        }
-        return;
-      }
-      // orIgnore: a second instance seeding at the same time is a no-op instead of a conflict.
-      await templates
-        .createQueryBuilder()
-        .insert()
-        .values({ type, subject: declared.subject, body: declared.body, variables: declared.variables })
-        .orIgnore()
-        .execute();
-      // Translations are seeded with the row only, so ones an admin deleted later stay deleted.
-      const shipped = shippedPluginTranslations(declared);
-      if (shipped.length > 0) {
-        await manager
-          .getRepository(EmailTemplateTranslation)
-          .createQueryBuilder()
-          .insert()
-          .values(shipped.map((t) => ({ templateType: t.templateType, locale: t.locale, key: t.key, value: t.value })))
-          .orIgnore()
-          .execute();
-      }
-    });
+    await this.store.registerPluginTemplate(
+      {
+        type: declared.key,
+        subject: declared.subject,
+        body: declared.body,
+        variables: declared.variables,
+      },
+      shippedPluginTranslations(declared),
+    );
   }
 
   async getExactTranslationsMap(type: EmailTemplateKey, locale: string): Promise<Record<string, string>> {
-    const rows = await this.translationRepository.findBy({ templateType: type as EmailTemplateType, locale });
+    const rows = await this.store.findTranslations(type, locale);
     return Object.fromEntries(rows.map((r) => [r.key, r.value]));
   }
 
@@ -262,8 +225,8 @@ export class EmailTemplateService implements OnApplicationBootstrap {
     // BCP-47 merge: base translations first, then regional overrides per key.
     // Skip empty regional values so they fall through to the base translation.
     const [baseRows, regionalRows] = await Promise.all([
-      this.translationRepository.findBy({ templateType: type as EmailTemplateType, locale: baseLocale }),
-      this.translationRepository.findBy({ templateType: type as EmailTemplateType, locale }),
+      this.store.findTranslations(type, baseLocale),
+      this.store.findTranslations(type, locale),
     ]);
     const base = Object.fromEntries(baseRows.map((r) => [r.key, r.value]));
     for (const r of regionalRows) {
@@ -275,7 +238,7 @@ export class EmailTemplateService implements OnApplicationBootstrap {
   async getTranslations(type: EmailTemplateKey): Promise<TemplateTranslations> {
     const template = await this.findOne(type);
     const keys = extractTranslationKeys(template.subject + '\n' + template.body);
-    const rows = await this.translationRepository.findBy({ templateType: type as EmailTemplateType });
+    const rows = await this.store.findTranslations(type);
 
     const translations: Record<string, Record<string, string>> = {};
     for (const row of rows) {
@@ -293,22 +256,16 @@ export class EmailTemplateService implements OnApplicationBootstrap {
     actor: AuditActor,
   ): Promise<void> {
     await this.findOne(type);
-    const entities = Object.entries(data).map(([key, value]) =>
-      this.translationRepository.create({ templateType: type as EmailTemplateType, key, locale, value }),
-    );
-    await this.translationRepository.manager.transaction(async (manager) => {
-      await manager.delete(EmailTemplateTranslation, { templateType: type as EmailTemplateType, locale });
-      if (entities.length > 0) {
-        await manager.insert(EmailTemplateTranslation, entities);
-      }
+    const entries = Object.entries(data).map(([key, value]) => ({ key, value }));
+    await this.store.replaceTranslations(type, locale, entries, async (transaction) => {
       const details = { templateType: type, locale, translationCount: Object.keys(data).length };
-      await this.record(actor, 'email_template.translations_set', type, details, manager);
+      await this.record(actor, 'email_template.translations_set', type, details, transaction);
     });
   }
 
   async deleteTranslations(type: EmailTemplateKey, locale: string, actor: AuditActor): Promise<void> {
     await this.findOne(type);
-    await this.translationRepository.delete({ templateType: type as EmailTemplateType, locale });
+    await this.store.deleteTranslations(type, locale);
     await this.record(actor, 'email_template.translations_deleted', type, { templateType: type, locale });
   }
 
@@ -317,7 +274,7 @@ export class EmailTemplateService implements OnApplicationBootstrap {
     action: `email_template.${'updated' | 'reset' | 'translations_set' | 'translations_deleted'}`,
     type: string,
     details: AuditDetails,
-    manager?: EntityManager,
+    transaction?: EmailTemplateReadContext,
   ) {
     await this.audit.record(
       {
@@ -327,13 +284,14 @@ export class EmailTemplateService implements OnApplicationBootstrap {
         subject: { type: 'email-template', id: auditSubjectKeyId(type) },
         details,
       },
-      manager,
+      // The audit row joins the caller's transaction, whatever handle type the recorder takes.
+      transaction as Parameters<AuditRecorder['record']>[1],
     );
   }
 }
 
 /** The translation rows a plugin template ships: its `de` texts and any other locale it declares. */
-function shippedPluginTranslations(declared: RegisteredPluginEmailTemplate) {
+function shippedPluginTranslations(declared: RegisteredPluginEmailTemplate): EmailTemplateTranslationRecord[] {
   return Object.entries(declared.translations).flatMap(([locale, texts]) =>
     Object.entries(texts).map(([key, value]) => ({
       templateType: declared.key as unknown as EmailTemplateType,
@@ -344,7 +302,7 @@ function shippedPluginTranslations(declared: RegisteredPluginEmailTemplate) {
   );
 }
 
-function withOrigin(row: EmailTemplate): ListedEmailTemplate {
+function withOrigin(row: EmailTemplateRecord): ListedEmailTemplate {
   const registered = isPluginEmailTemplateKey(row.type) ? getPluginEmailTemplate(row.type) : undefined;
   return registered ? { ...row, plugin: { name: registered.pluginName, label: registered.label } } : row;
 }

@@ -1,7 +1,10 @@
 import { billingTransactionAuditEvent } from './policies/billing';
 import { Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { closeResourceTransactionConnection, runSerializedTransaction } from '../database/sqlite/run-serialized-transaction';
+import {
+  closeResourceTransactionConnection,
+  runSerializedTransaction,
+} from '../database/sqlite/run-serialized-transaction';
 import { AuditTransactionAbortedError } from './persistence/audit-storage';
 import { droppedRecords, setupAuditDatabase } from './audit.test-fixture';
 
@@ -174,7 +177,7 @@ describe('durable audit SQLite', () => {
 
       it('reads uncached audit settings through the caller transaction, not another connection', async () => {
         const store = fixture.store as unknown as { cache: Map<string, unknown> };
-        const mainRead = jest.spyOn(fixture.store['settingRepository'], 'findOneBy');
+        const mainRead = jest.spyOn(fixture.store['rows']['settings'], 'findOneBy');
         try {
           await run(async (manager) => {
             store.cache.clear();

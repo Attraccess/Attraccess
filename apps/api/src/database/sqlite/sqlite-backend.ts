@@ -6,6 +6,7 @@ import type { DatabaseBackend } from '../backend/database-backend';
 import { closeResourceTransactionConnection } from './run-serialized-transaction';
 import { createDataSource } from './sqlite-connection';
 import { sqliteErrorClassifier } from './sqlite-errors';
+import { createSqliteUnitOfWork } from './sqlite-unit-of-work';
 
 const entityList: unknown[] = Object.values(entities);
 
@@ -30,6 +31,7 @@ export const sqliteBackend: DatabaseBackend = {
     } as DataSourceOptions;
   },
   createDataSource,
+  createUnitOfWork: createSqliteUnitOfWork,
   errors: sqliteErrorClassifier,
   async shutdown(source: DataSource): Promise<void> {
     await closeResourceTransactionConnection(source);

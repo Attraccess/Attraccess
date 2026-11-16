@@ -14,6 +14,7 @@ import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
 import { AuditService } from './audit.service';
 import { canvasDetails, canvasSaveDetails, diffCanvas } from '../resources/flows/flow-audit';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 
 const fixturePluginId = 'abcdefghijklmnopqrstu';
 
@@ -44,7 +45,7 @@ describe('persisted audit names', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    const store = new SettingsStoreService(source.getRepository(Setting), null);
+    const store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     service = new AuditService(source, store, createTestAuditMetrics());
     await service.onModuleInit();
     controller = new AuditController(new AuditQueryService(service, source, store));

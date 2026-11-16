@@ -140,9 +140,7 @@ describe('HttpMetricsInterceptor', () => {
 
     interceptor.intercept(context, next).subscribe({
       complete: () => {
-        expect(metrics.total.inc).toHaveBeenCalledWith(
-          expect.objectContaining({ route: 'unmatched' }),
-        );
+        expect(metrics.total.inc).toHaveBeenCalledWith(expect.objectContaining({ route: 'unmatched' }));
         done();
       },
     });

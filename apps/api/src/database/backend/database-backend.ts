@@ -1,4 +1,5 @@
-import type { DataSource, DataSourceOptions } from 'typeorm';
+import type { DataSource, DataSourceOptions, EntityManager } from 'typeorm';
+import type { ScopedUnitOfWork } from '../unit-of-work';
 import type { PersistenceErrorClassifier } from '../persistence-errors';
 
 /** Backends the application can run on. A new backend is added here, in resolveDatabaseBackend and in its adapter. */
@@ -32,6 +33,8 @@ export interface DatabaseBackend {
   readonly migrationTrack: MigrationTrack;
   /** Opens a connection with the engine's connection rules (busy handling, flow ownership, PRAGMAs). */
   createDataSource(options: DataSourceOptions): DataSource;
+  /** The unit of work (transactions with post-commit effects) of one application DataSource. */
+  createUnitOfWork(source: DataSource): ScopedUnitOfWork<EntityManager>;
   readonly errors: PersistenceErrorClassifier;
   /** Releases connections the backend opened beside the given application DataSource. */
   shutdown(source: DataSource): Promise<void>;

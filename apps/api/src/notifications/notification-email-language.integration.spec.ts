@@ -7,6 +7,7 @@ import { Repository } from 'typeorm';
 import { createTransport } from 'nodemailer';
 import { EmailService } from '../email/email.service';
 import { EmailTemplateService } from '../email-template/email-template.service';
+import { EMAIL_RECIPIENT_DIRECTORY } from '../email/email-recipient-directory.port';
 import {
   EMAIL_TEMPLATE_DEFAULTS,
   readDefaultTemplateBody,
@@ -95,6 +96,7 @@ describe('Notification email language fallback', () => {
         { provide: NotificationPreferenceService, useValue: preferences },
         { provide: NotificationLiveService, useValue: createMock<NotificationLiveService>() },
         { provide: PushService, useValue: push },
+        { provide: EMAIL_RECIPIENT_DIRECTORY, useValue: { findById: jest.fn() } },
         { provide: getRepositoryToken(User), useValue: users },
         { provide: getRepositoryToken(Resource), useValue: resources },
         { provide: getRepositoryToken(ResourceIntroducer), useValue: introducers },

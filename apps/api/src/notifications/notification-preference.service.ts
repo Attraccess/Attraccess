@@ -1,7 +1,6 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { NotificationPreference } from '@attraccess/database-entities';
-import { Repository } from 'typeorm';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import type { NotificationPreferenceRecord } from '@attraccess/application-models';
+import { NOTIFICATION_PREFERENCE_STORE, NotificationPreferenceStore } from './notification-preference-store.port';
 import {
   ALL_NOTIFICATION_CATEGORIES,
   AnyNotificationCategory,
@@ -19,12 +18,12 @@ import { UpdateNotificationPreferencesDto } from './dtos/update-notification-pre
 @Injectable()
 export class NotificationPreferenceService {
   constructor(
-    @InjectRepository(NotificationPreference)
-    private readonly preferenceRepository: Repository<NotificationPreference>,
+    @Inject(NOTIFICATION_PREFERENCE_STORE)
+    private readonly store: NotificationPreferenceStore,
   ) {}
 
   public async getPreferences(userId: number): Promise<NotificationPreferencesDto> {
-    const row = await this.preferenceRepository.findOne({ where: { userId } });
+    const row = await this.store.findForUser(userId);
     return this.toDto(this.resolvePreferences(row));
   }
 
@@ -32,7 +31,7 @@ export class NotificationPreferenceService {
     userId: number,
     dto: UpdateNotificationPreferencesDto,
   ): Promise<NotificationPreferencesDto> {
-    const existing = await this.preferenceRepository.findOne({ where: { userId } });
+    const existing = await this.store.findForUser(userId);
     const isCore = ALL_NOTIFICATION_CATEGORIES.includes(dto.category as NotificationCategory);
     if (!isCore && !getPluginNotificationCategory(dto.category)) {
       throw new BadRequestException(`Unknown notification category "${dto.category}"`);
@@ -40,11 +39,7 @@ export class NotificationPreferenceService {
     const preferences = this.resolvePreferences(existing);
     preferences[dto.category] = { ...preferences[dto.category], ...dto.channels };
 
-    const serialized = JSON.stringify(preferences);
-    const row = existing ?? this.preferenceRepository.create({ userId, categoryChannels: serialized });
-    row.categoryChannels = serialized;
-
-    const saved = await this.preferenceRepository.save(row);
+    const saved = await this.store.saveCategoryChannels(userId, JSON.stringify(preferences));
     return this.toDto(this.resolvePreferences(saved));
   }
 
@@ -53,12 +48,12 @@ export class NotificationPreferenceService {
     category: AnyNotificationCategory,
     channel: NotificationChannel,
   ): Promise<boolean> {
-    const row = await this.preferenceRepository.findOne({ where: { userId } });
+    const row = await this.store.findForUser(userId);
     return (this.resolvePreferences(row)[category] ?? DEFAULT_PLUGIN_NOTIFICATION_CHANNELS)[channel];
   }
 
   private resolvePreferences(
-    row: Partial<NotificationPreference> | null,
+    row: Partial<NotificationPreferenceRecord> | null,
   ): NotificationCategoryPreferences & Record<string, NotificationChannelPreferences> {
     const preferences: NotificationCategoryPreferences & Record<string, NotificationChannelPreferences> =
       this.cloneDefaults();

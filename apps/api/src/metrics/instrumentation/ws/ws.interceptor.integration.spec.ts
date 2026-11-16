@@ -122,9 +122,7 @@ describe('WsMetricsInterceptor (integration)', () => {
       expect(count).toBeGreaterThan(0);
 
       const exposition = await fixedRegistry.metrics();
-      expect(exposition).toMatch(
-        /attraccess_ws_message_duration_seconds_count\{[^}]*event="PING"[^}]*\}\s+[1-9]/,
-      );
+      expect(exposition).toMatch(/attraccess_ws_message_duration_seconds_count\{[^}]*event="PING"[^}]*\}\s+[1-9]/);
     }, 20000);
   });
 

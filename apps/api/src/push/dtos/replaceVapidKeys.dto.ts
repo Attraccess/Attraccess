@@ -3,8 +3,7 @@ import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class ReplaceVapidKeysDto {
   @ApiPropertyOptional({
-    description:
-      'Custom base64url-encoded VAPID public key. Omit both keys to auto-generate a fresh pair instead.',
+    description: 'Custom base64url-encoded VAPID public key. Omit both keys to auto-generate a fresh pair instead.',
     example: 'BNc9oTcAcLWab5C8DUk...',
   })
   @IsOptional()

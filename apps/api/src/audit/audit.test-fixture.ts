@@ -15,6 +15,7 @@ import { AuditMetrics, createAuditMetrics } from '../metrics/definitions/audit.m
 import { AuditService } from './audit.service';
 import { AuditQueryService } from './audit-query.service';
 import { PluginAuditHost } from './plugin-audit-host';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 
 /** Fresh registry per call so drop counters never leak between tests. */
 export const createTestAuditMetrics = (): AuditMetrics => createAuditMetrics(new Registry());
@@ -129,7 +130,7 @@ export function setupAuditDatabase() {
     await source.query(
       'CREATE TABLE IF NOT EXISTS setting (id integer PRIMARY KEY AUTOINCREMENT, parent varchar NOT NULL, key varchar NOT NULL, value varchar NOT NULL, createdAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updatedAt datetime NOT NULL DEFAULT CURRENT_TIMESTAMP)',
     );
-    store = new SettingsStoreService(source.getRepository(Setting), null);
+    store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     metrics = createTestAuditMetrics();
     service = new AuditService(source, store, metrics);
     await service.onModuleInit();

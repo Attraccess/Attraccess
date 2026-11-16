@@ -1,17 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import {
-  BillingTransaction,
-  BillingTransactionItem,
-  Resource,
-  ResourceUsage,
-  User,
-} from '@attraccess/database-entities';
+import { ReceiptItem, ReceiptTransaction, ReceiptUsage } from './email-receipt.types';
+import { NotificationRecipient } from '@attraccess/application-models';
 import { EmailTemplateType } from '@attraccess/application-models';
 import { EmailTemplateService } from './../email-template/email-template.service';
 import { EmailService } from './email.service';
 import { inheritTestScope } from './../test-utils/inherit-test-scope';
-import { makeUser, setup } from './email.service.test-fixture';
+import { makeUser, setup, TestUser } from './email.service.test-fixture';
 
 jest.mock('nodemailer', () => ({
   createTransport: jest.fn(),
@@ -97,7 +92,7 @@ describe('EmailService', () => {
     const { service, sendMail } = scope.setup();
     const user = scope.makeUser({ id: 7, username: 'dana', email: 'dana@example.com', creditBalance: 1234 });
 
-    const transaction: Partial<BillingTransaction> = {
+    const transaction: Partial<ReceiptTransaction> = {
       id: 99,
       userId: 7,
       amount: -345, // charged 345 credits
@@ -105,21 +100,21 @@ describe('EmailService', () => {
         { name: 'PER_SESSION', unitPrice: 100, quantity: 1 },
         { name: 'PER_MINUTE', unitPrice: 5, quantity: 70 },
         { name: 'BILLING_FACTOR', unitPrice: -55, quantity: 1 },
-      ] as unknown as BillingTransactionItem[],
+      ] as unknown as ReceiptItem[],
     };
 
-    const usage: Partial<ResourceUsage> = {
+    const usage: Partial<ReceiptUsage> = {
       startTime: new Date('2024-01-01T10:00:00Z'),
       endTime: new Date('2024-01-01T11:10:00Z'),
       usageInMinutes: 999, // The settled item quantity, not a recalculation, is authoritative.
-      resource: { id: 3, name: 'Laser Cutter' } as Resource,
+      resource: { id: 3, name: 'Laser Cutter' },
       user,
     };
 
     await service.sendResourceUsageBillingSummaryEmail(
       user,
-      transaction as BillingTransaction,
-      usage as ResourceUsage,
+      transaction as ReceiptTransaction,
+      usage as ReceiptUsage,
       2,
     );
 
@@ -171,16 +166,16 @@ describe('EmailService', () => {
   });
 
   it('loads a full recipient before sending access-change email for id-only notification recipients', async () => {
-    const { service, sendMail, userRepository } = scope.setup();
-    userRepository.findOne.mockResolvedValue(scope.makeUser({ id: 7, username: 'riley', email: 'riley@example.com' }));
+    const { service, sendMail, recipients } = scope.setup();
+    recipients.findById.mockResolvedValue(scope.makeUser({ id: 7, username: 'riley', email: 'riley@example.com' }));
 
-    await service.sendAccessChangeEmail({ id: 7 } as User, {
+    await service.sendAccessChangeEmail({ id: 7 } as NotificationRecipient, {
       title: 'Your group access changed',
       body: 'You received an introduction for group #5.',
       url: '/resource-groups/5',
     });
 
-    expect(userRepository.findOne).toHaveBeenCalledWith({ where: { id: 7 } });
+    expect(recipients.findById).toHaveBeenCalledWith(7);
     const callArg = (sendMail as jest.Mock).mock.calls[0][0];
     expect(callArg.to).toBe('riley@example.com');
     expect(callArg.html).toContain('Hello riley');
@@ -191,11 +186,15 @@ describe('EmailService', () => {
     const { service, sendMail } = scope.setup();
     const user = scope.makeUser({ id: 7, username: 'dana', email: 'dana@example.com' });
 
-    await service.sendResourceSessionEndedEmail(user, { id: 3, name: 'Laser Cutter' } as Resource, {
-      id: 99,
-      endedAt: new Date('2026-01-01T12:00:00.000Z'),
-      endedBy: 'alice',
-    });
+    await service.sendResourceSessionEndedEmail(
+      user,
+      { id: 3, name: 'Laser Cutter' },
+      {
+        id: 99,
+        endedAt: new Date('2026-01-01T12:00:00.000Z'),
+        endedBy: 'alice',
+      },
+    );
 
     expect(sendMail).toHaveBeenCalledTimes(1);
     const callArg = (sendMail as jest.Mock).mock.calls[0][0];
@@ -500,8 +499,12 @@ describe('EmailService', () => {
           ...(exactGreeting === undefined ? [] : [{ locale: 'de-ch', key: 'greeting', value: exactGreeting }]),
         ];
         const translations = new EmailTemplateService(
+          {
+            findTranslations: jest.fn(async (_type: string, locale: string) =>
+              rows.filter((row) => row.locale === locale),
+            ),
+          } as never,
           {} as never,
-          { findBy: jest.fn(async ({ locale }) => rows.filter((row) => row.locale === locale)) } as never,
           {} as never,
         );
         emailTemplateService.getTranslationsMap.mockImplementation(translations.getTranslationsMap.bind(translations));
@@ -582,7 +585,7 @@ export type EmailServiceTestScope = {
     settingsService: { getUrl: any; getSmtpConfiguration: any; buildSmtpTransportOptions: any };
     emailTemplateService: { findOne: any; getTranslationsMap: any; getExactTranslationsMap: any };
     emailLayoutService: { renderWithTemplate: any };
-    userRepository: { findOne: any };
+    recipients: { findOne: any };
   };
-  makeUser: (overrides?: Partial<User>) => User;
+  makeUser: (overrides?: Partial<TestUser>) => TestUser;
 };

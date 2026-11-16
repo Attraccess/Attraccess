@@ -1,22 +1,11 @@
-import { activeUsageWhere } from '../resources/usage/sessions/active-usage';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
-import {
-  User,
-  Resource,
-  Project,
-  ResourceGroup,
-  MqttServer,
-  ResourceUsage,
-  Session,
-} from '@attraccess/database-entities';
+import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Registry, collectDefaultMetrics, Counter, Gauge, Histogram } from 'prom-client';
 import { PluginService } from '../plugin-system/plugin.service';
 import { createIdentityMetrics } from './definitions/identity.metrics';
 import { createResourcesMetrics } from './definitions/resources.metrics';
 import { createDevicesMetrics } from './definitions/devices.metrics';
 import { createOperationsMetrics } from './definitions/operations.metrics';
+import { GAUGE_COUNT_READER, GaugeCountReader } from './metrics-readers.port';
 
 @Injectable()
 export class MetricsService implements OnModuleInit {
@@ -73,22 +62,7 @@ export class MetricsService implements OnModuleInit {
   public readonly authorizationCacheSize: Gauge;
   public readonly maintenanceUsageQueryWindowDays: Histogram;
 
-  constructor(
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    @InjectRepository(Resource)
-    private readonly resourceRepository: Repository<Resource>,
-    @InjectRepository(Project)
-    private readonly projectRepository: Repository<Project>,
-    @InjectRepository(ResourceGroup)
-    private readonly resourceGroupRepository: Repository<ResourceGroup>,
-    @InjectRepository(MqttServer)
-    private readonly mqttServerRepository: Repository<MqttServer>,
-    @InjectRepository(ResourceUsage)
-    private readonly resourceUsageRepository: Repository<ResourceUsage>,
-    @InjectRepository(Session)
-    private readonly sessionRepository: Repository<Session>,
-  ) {
+  constructor(@Inject(GAUGE_COUNT_READER) private readonly gaugeCounts: GaugeCountReader) {
     this.registry = new Registry();
     collectDefaultMetrics({ register: this.registry });
     const identity = createIdentityMetrics(this.registry);
@@ -137,22 +111,16 @@ export class MetricsService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     this.logger.log('Initializing gauge metrics from database...');
-    const [users, resources, projects, groups, mqttServers, activeUsageSessions, activeAuthSessions, localeCounts] =
-      await Promise.all([
-        this.userRepository.count(),
-        this.resourceRepository.count(),
-        this.projectRepository.count(),
-        this.resourceGroupRepository.count(),
-        this.mqttServerRepository.count(),
-        this.resourceUsageRepository.count({ where: activeUsageWhere() }),
-        this.sessionRepository.count({ where: { expiresAt: MoreThan(new Date()) } }),
-        this.userRepository
-          .createQueryBuilder('user')
-          .select('user.locale', 'locale')
-          .addSelect('COUNT(*)', 'count')
-          .groupBy('user.locale')
-          .getRawMany<{ locale: string; count: string }>(),
-      ]);
+    const {
+      users,
+      resources,
+      projects,
+      resourceGroups: groups,
+      mqttServers,
+      activeUsageSessions,
+      activeAuthSessions,
+      usersPerLocale,
+    } = await this.gaugeCounts.readInitialGaugeCounts();
 
     this.usersTotal.set(users);
     this.resourcesTotal.set(resources);
@@ -161,8 +129,8 @@ export class MetricsService implements OnModuleInit {
     this.mqttServersTotal.set(mqttServers);
     this.resourceUsageSessionsActive.set(activeUsageSessions);
     this.authActiveSessions.set(activeAuthSessions);
-    for (const row of localeCounts) {
-      this.usersPerLocale.set({ locale: row.locale ?? 'en' }, parseInt(row.count, 10));
+    for (const row of usersPerLocale) {
+      this.usersPerLocale.set({ locale: row.locale ?? 'en' }, row.count);
     }
 
     try {

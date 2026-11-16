@@ -1,7 +1,11 @@
-import { EmailTemplate, EmailTemplateTranslation, User } from '@attraccess/database-entities';
+import { EmailTemplate, EmailTemplateTranslation } from '@attraccess/database-entities';
+import type { NotificationRecipient } from '@attraccess/application-models';
 import type { PluginEmailTemplate } from '@attraccess/plugins-backend-sdk';
 import { createTransport } from 'nodemailer';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
+import { TypeOrmEmailTemplateStore } from '../database/adapters/email/typeorm-email-template-store';
+import { TransactionHandles } from '../database/adapters/common/transaction-handles';
+import { EmailRecipientDirectory } from './email-recipient-directory.port';
 import { EmailLayoutService } from '../email-layout/email-layout.service';
 import { EmailTemplateService } from '../email-template/email-template.service';
 import { MjmlService } from '../email-template/mjml.service';
@@ -39,8 +43,8 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
   let dataSource: DataSource;
   let service: PluginEmailService;
   let sendMail: jest.Mock;
-  const alice = { id: 1, username: 'alice', email: 'alice@example.com', locale: 'en' } as User;
-  const bob = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'de' } as User;
+  const alice = { id: 1, username: 'alice', email: 'alice@example.com', locale: 'en' } as NotificationRecipient;
+  const bob = { id: 2, username: 'bob', email: 'bob@example.com', locale: 'de' } as NotificationRecipient;
 
   beforeEach(async () => {
     dataSource = await new DataSource({
@@ -50,8 +54,11 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
       entities: [EmailTemplate, EmailTemplateTranslation],
     }).initialize();
     const templates = new EmailTemplateService(
-      dataSource.getRepository(EmailTemplate),
-      dataSource.getRepository(EmailTemplateTranslation),
+      new TypeOrmEmailTemplateStore(
+        dataSource.getRepository(EmailTemplate),
+        dataSource.getRepository(EmailTemplateTranslation),
+        new TransactionHandles(undefined as never),
+      ),
       new MjmlService(),
       audit as never,
     );
@@ -69,7 +76,7 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
       audit as never,
     );
     const metrics = { emailSentTotal: { inc: jest.fn() } } as unknown as MetricsService;
-    const users = { findOne: jest.fn() } as unknown as Repository<User>;
+    const users = { findById: jest.fn() } as unknown as EmailRecipientDirectory;
     service = new PluginEmailService(
       new EmailService(
         settings as unknown as SettingsService,
@@ -167,7 +174,7 @@ describe('PluginEmailService.sendPluginTemplate (real template store)', () => {
   });
 
   it('sends nothing to a recipient without an email address', async () => {
-    await service.sendPluginTemplate('demo', { ...alice, email: '' } as User, 'confirmed', variables);
+    await service.sendPluginTemplate('demo', { ...alice, email: '' } as NotificationRecipient, 'confirmed', variables);
     expect(sendMail).not.toHaveBeenCalled();
   });
 });

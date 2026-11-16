@@ -13,12 +13,12 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Auth, AuthenticatedRequest } from '@attraccess/plugins-backend-sdk';
-import { Message } from '@attraccess/database-entities';
-import { MessageReferenceType } from '@attraccess/application-models';
+import { MessageRecord, MessageReferenceType } from '@attraccess/application-models';
 import { Observable } from 'rxjs';
 import { MessagingService } from './messaging.service';
 import { MessagingLiveService } from './messaging-live.service';
 import { SseInstrumentation } from '../metrics/instrumentation/sse/sse.helper';
+import { Message } from './dtos/message.dto';
 import { ContactResponseDto } from './dtos/contactResponse.dto';
 import { SendMessageDto } from './dtos/sendMessage.dto';
 import { ListMessagesQueryDto } from './dtos/listMessagesQuery.dto';
@@ -40,7 +40,7 @@ export class MessagingController {
   @Sse('live')
   @Auth()
   @ApiOperation({ summary: 'Subscribe to live new messages for the authenticated user', operationId: 'messagingLive' })
-  streamMessages(@Req() req: AuthenticatedRequest): Observable<{ data: Message }> {
+  streamMessages(@Req() req: AuthenticatedRequest): Observable<{ data: MessageRecord }> {
     const subject = this.messagingLiveService.getUserMessageSubject(req.user.id);
     return this.messagingLiveService.trackPresence(req.user.id, this.sse.wrap('messaging', subject.asObservable()));
   }
@@ -164,7 +164,7 @@ export class MessagingController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: SendMessageDto,
     @Req() req: AuthenticatedRequest,
-  ): Promise<Message> {
+  ): Promise<MessageRecord> {
     return this.messagingService.sendMessage(
       id,
       req.user.id,

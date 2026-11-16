@@ -1,67 +1,61 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { DataSource } from 'typeorm';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { Conversation, ConversationParticipant, Message, Resource, User } from '@attraccess/database-entities';
-import { MessageReferenceType } from '@attraccess/application-models';
+import { ConversationRecord, MessageRecord, MessageReferenceType } from '@attraccess/application-models';
 import { MessagingService } from './messaging.service';
 import { MessagingLiveService } from './messaging-live.service';
 import { MessageCreatedEvent } from './events/message-created.event';
+import { CONVERSATION_STORE } from './conversation-store.port';
 import { ResourceUsageService } from '../resources/usage/sessions/resource-usage.service';
 import { MessageRateLimitService } from './rate-limiting/message-rate-limit.service';
 import { MessageRateLimitExceededException } from './rate-limiting/message-rate-limit.exception';
 
 describe('MessagingService', () => {
   let service: MessagingService;
-  let conversationRepository: { findOne: jest.Mock; update: jest.Mock };
-  let participantRepository: { findOne: jest.Mock; find: jest.Mock; update: jest.Mock; createQueryBuilder: jest.Mock };
-  let messageRepository: {
-    findOne: jest.Mock;
-    create: jest.Mock;
-    save: jest.Mock;
-    findAndCount: jest.Mock;
-    count: jest.Mock;
+  let store: {
+    isParticipant: jest.Mock;
+    markRead: jest.Mock;
+    listParticipations: jest.Mock;
+    countUnread: jest.Mock;
+    userExists: jest.Mock;
+    findOneToOneConversation: jest.Mock;
+    createOneToOneConversation: jest.Mock;
+    findResourceName: jest.Mock;
+    appendMessage: jest.Mock;
+    findLastMessage: jest.Mock;
+    findOtherParticipant: jest.Mock;
+    pageMessages: jest.Mock;
   };
-  let userRepository: { findOne: jest.Mock };
-  let resourceRepository: { findOne: jest.Mock };
-  let dataSource: { transaction: jest.Mock };
   let resourceUsageService: { getActiveSessionsForResource: jest.Mock };
   let eventEmitter: { emit: jest.Mock };
   let messagingLiveService: { isOnline: jest.Mock };
   let messageRateLimitService: { assertWithinLimit: jest.Mock };
 
-  const pairQuery = {
-    select: jest.fn().mockReturnThis(),
-    groupBy: jest.fn().mockReturnThis(),
-    having: jest.fn().mockReturnThis(),
-    andHaving: jest.fn().mockReturnThis(),
-    orderBy: jest.fn().mockReturnThis(),
-    leftJoinAndSelect: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    getRawOne: jest.fn().mockResolvedValue(undefined),
-    getOne: jest.fn().mockResolvedValue(null),
-  };
+  const participation = (overrides: Record<string, unknown> = {}) => ({
+    participantId: 1,
+    conversationId: 1,
+    userId: 7,
+    lastReadAt: null,
+    lastNotifiedAt: null,
+    conversationUpdatedAt: new Date(1000),
+    ...overrides,
+  });
 
   beforeEach(async () => {
-    conversationRepository = { findOne: jest.fn(), update: jest.fn() };
-    participantRepository = {
-      findOne: jest.fn(),
-      find: jest.fn(),
-      update: jest.fn(),
-      createQueryBuilder: jest.fn().mockReturnValue(pairQuery),
+    store = {
+      isParticipant: jest.fn(),
+      markRead: jest.fn(),
+      listParticipations: jest.fn(),
+      countUnread: jest.fn(),
+      userExists: jest.fn(),
+      findOneToOneConversation: jest.fn().mockResolvedValue(null),
+      createOneToOneConversation: jest.fn(),
+      findResourceName: jest.fn(),
+      appendMessage: jest.fn(),
+      findLastMessage: jest.fn(),
+      findOtherParticipant: jest.fn(),
+      pageMessages: jest.fn(),
     };
-    messageRepository = {
-      findOne: jest.fn(),
-      create: jest.fn(),
-      save: jest.fn(),
-      findAndCount: jest.fn(),
-      count: jest.fn(),
-    };
-    userRepository = { findOne: jest.fn() };
-    resourceRepository = { findOne: jest.fn() };
-    dataSource = { transaction: jest.fn() };
     resourceUsageService = { getActiveSessionsForResource: jest.fn() };
     eventEmitter = { emit: jest.fn() };
     messagingLiveService = { isOnline: jest.fn().mockReturnValue(false) };
@@ -70,12 +64,7 @@ describe('MessagingService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MessagingService,
-        { provide: getRepositoryToken(Conversation), useValue: conversationRepository },
-        { provide: getRepositoryToken(ConversationParticipant), useValue: participantRepository },
-        { provide: getRepositoryToken(Message), useValue: messageRepository },
-        { provide: getRepositoryToken(User), useValue: userRepository },
-        { provide: getRepositoryToken(Resource), useValue: resourceRepository },
-        { provide: DataSource, useValue: dataSource },
+        { provide: CONVERSATION_STORE, useValue: store },
         { provide: ResourceUsageService, useValue: resourceUsageService },
         { provide: EventEmitter2, useValue: eventEmitter },
         { provide: MessagingLiveService, useValue: messagingLiveService },
@@ -84,7 +73,6 @@ describe('MessagingService', () => {
     }).compile();
 
     service = module.get(MessagingService);
-    pairQuery.getRawOne.mockResolvedValue(undefined);
   });
 
   describe('getOrCreateConversation', () => {
@@ -93,47 +81,41 @@ describe('MessagingService', () => {
     });
 
     it('throws when the target user does not exist', async () => {
-      userRepository.findOne.mockResolvedValue(null);
+      store.userExists.mockResolvedValue(false);
       await expect(service.getOrCreateConversation(1, 2)).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('returns an existing 1:1 conversation when the participant pair matches', async () => {
-      userRepository.findOne.mockResolvedValue({ id: 2 } as User);
-      pairQuery.getRawOne.mockResolvedValue({ conversationId: 7 });
-      conversationRepository.findOne.mockResolvedValue({ id: 7 } as Conversation);
+      store.userExists.mockResolvedValue(true);
+      store.findOneToOneConversation.mockResolvedValue({ id: 7 } as ConversationRecord);
 
       const result = await service.getOrCreateConversation(1, 2);
 
       expect(result.id).toBe(7);
-      expect(dataSource.transaction).not.toHaveBeenCalled();
+      expect(store.findOneToOneConversation).toHaveBeenCalledWith(1, 2);
+      expect(store.createOneToOneConversation).not.toHaveBeenCalled();
     });
 
-    it('creates a conversation with two participant rows when none exists', async () => {
-      userRepository.findOne.mockResolvedValue({ id: 2 } as User);
-      pairQuery.getRawOne.mockResolvedValue(undefined);
-      const manager = {
-        create: jest.fn().mockImplementation((_entity, data) => data),
-        save: jest.fn().mockImplementation(async (data) => (Array.isArray(data) ? data : { id: 9, ...data })),
-      };
-      dataSource.transaction.mockImplementation(async (cb) => cb(manager));
+    it('creates the conversation with both participants when none exists', async () => {
+      store.userExists.mockResolvedValue(true);
+      store.createOneToOneConversation.mockResolvedValue({ id: 9 } as ConversationRecord);
 
       const result = await service.getOrCreateConversation(1, 2);
 
       expect(result.id).toBe(9);
-      expect(manager.save).toHaveBeenCalledTimes(2);
+      expect(store.createOneToOneConversation).toHaveBeenCalledWith(1, 2);
     });
   });
 
   describe('sendMessage', () => {
     it('throws when the sender is not a participant', async () => {
-      participantRepository.findOne.mockResolvedValue(null);
+      store.isParticipant.mockResolvedValue(false);
       await expect(service.sendMessage(1, 5, 'hi')).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('persists the message and emits MessageCreatedEvent', async () => {
-      participantRepository.findOne.mockResolvedValue({ id: 1 } as ConversationParticipant);
-      messageRepository.create.mockImplementation((data) => data);
-      messageRepository.save.mockImplementation(async (data) => ({ id: 3, ...data }));
+      store.isParticipant.mockResolvedValue(true);
+      store.appendMessage.mockImplementation(async (data) => ({ id: 3, ...data }));
 
       const result = await service.sendMessage(1, 5, 'hello', {
         referenceType: MessageReferenceType.RESOURCE,
@@ -148,8 +130,8 @@ describe('MessagingService', () => {
 
   describe('rate limiting', () => {
     it('checks the send_message limit before sending', async () => {
-      participantRepository.findOne.mockResolvedValue({ id: 1 } as ConversationParticipant);
-      messageRepository.save.mockImplementation(async (data) => ({ id: 3, ...data }));
+      store.isParticipant.mockResolvedValue(true);
+      store.appendMessage.mockImplementation(async (data) => ({ id: 3, ...data }));
 
       await service.sendMessage(1, 5, 'hello');
 
@@ -163,8 +145,8 @@ describe('MessagingService', () => {
       });
 
       await expect(service.sendMessage(1, 5, 'hello')).rejects.toBe(error);
-      expect(participantRepository.findOne).not.toHaveBeenCalled();
-      expect(messageRepository.save).not.toHaveBeenCalled();
+      expect(store.isParticipant).not.toHaveBeenCalled();
+      expect(store.appendMessage).not.toHaveBeenCalled();
     });
 
     it('checks the contact limit when opening a conversation', async () => {
@@ -174,19 +156,19 @@ describe('MessagingService', () => {
 
       await expect(service.getOrCreateConversation(1, 2)).rejects.toBeInstanceOf(MessageRateLimitExceededException);
       expect(messageRateLimitService.assertWithinLimit).toHaveBeenCalledWith('contact', 1);
-      expect(userRepository.findOne).not.toHaveBeenCalled();
+      expect(store.userExists).not.toHaveBeenCalled();
     });
   });
 
   describe('listMessages', () => {
     it('throws for non-participants', async () => {
-      participantRepository.findOne.mockResolvedValue(null);
+      store.isParticipant.mockResolvedValue(false);
       await expect(service.listMessages(1, 5)).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('returns paginated messages for a participant', async () => {
-      participantRepository.findOne.mockResolvedValue({ id: 1 } as ConversationParticipant);
-      messageRepository.findAndCount.mockResolvedValue([[{ id: 1 } as Message], 1]);
+      store.isParticipant.mockResolvedValue(true);
+      store.pageMessages.mockResolvedValue({ data: [{ id: 1 } as MessageRecord], total: 1 });
 
       const result = await service.listMessages(1, 5, 2, 10);
 
@@ -218,12 +200,10 @@ describe('MessagingService', () => {
 
   describe('listConversations', () => {
     it('includes the unread count per conversation', async () => {
-      participantRepository.find.mockResolvedValue([
-        { conversationId: 1, lastReadAt: null, conversation: { updatedAt: new Date(1000) } },
-      ]);
-      messageRepository.findOne.mockResolvedValue({ id: 5, createdAt: new Date(2000) } as Message);
-      pairQuery.getOne = jest.fn().mockResolvedValue({ user: { id: 2 } });
-      messageRepository.count.mockResolvedValue(4);
+      store.listParticipations.mockResolvedValue([participation()]);
+      store.findLastMessage.mockResolvedValue({ id: 5, createdAt: new Date(2000) } as MessageRecord);
+      store.findOtherParticipant.mockResolvedValue({ id: 2 });
+      store.countUnread.mockResolvedValue(4);
 
       const result = await service.listConversations(7);
 
@@ -231,12 +211,10 @@ describe('MessagingService', () => {
     });
 
     it('reflects the other participant online state from MessagingLiveService', async () => {
-      participantRepository.find.mockResolvedValue([
-        { conversationId: 1, lastReadAt: null, conversation: { updatedAt: new Date(1000) } },
-      ]);
-      messageRepository.findOne.mockResolvedValue({ id: 5, createdAt: new Date(2000) } as Message);
-      pairQuery.getOne = jest.fn().mockResolvedValue({ user: { id: 2 } });
-      messageRepository.count.mockResolvedValue(0);
+      store.listParticipations.mockResolvedValue([participation()]);
+      store.findLastMessage.mockResolvedValue({ id: 5, createdAt: new Date(2000) } as MessageRecord);
+      store.findOtherParticipant.mockResolvedValue({ id: 2 });
+      store.countUnread.mockResolvedValue(0);
       messagingLiveService.isOnline.mockReturnValue(true);
 
       const result = await service.listConversations(7);
@@ -248,32 +226,29 @@ describe('MessagingService', () => {
 
   describe('markConversationRead', () => {
     it('throws for non-participants', async () => {
-      participantRepository.findOne.mockResolvedValue(null);
+      store.isParticipant.mockResolvedValue(false);
       await expect(service.markConversationRead(1, 5)).rejects.toBeInstanceOf(ForbiddenException);
     });
 
     it('updates lastReadAt and returns the new total unread count', async () => {
-      participantRepository.findOne.mockResolvedValue({ id: 1 } as ConversationParticipant);
-      participantRepository.find.mockResolvedValue([{ conversationId: 1, lastReadAt: new Date() }]);
-      messageRepository.count.mockResolvedValue(0);
+      store.isParticipant.mockResolvedValue(true);
+      store.listParticipations.mockResolvedValue([participation({ lastReadAt: new Date() })]);
+      store.countUnread.mockResolvedValue(0);
 
       const total = await service.markConversationRead(1, 5);
 
-      expect(participantRepository.update).toHaveBeenCalledWith(
-        { conversationId: 1, userId: 5 },
-        expect.objectContaining({ lastReadAt: expect.any(Date) }),
-      );
+      expect(store.markRead).toHaveBeenCalledWith(1, 5, expect.any(Date));
       expect(total).toBe(0);
     });
   });
 
   describe('getTotalUnreadCount', () => {
     it('sums unread counts across all participations', async () => {
-      participantRepository.find.mockResolvedValue([
-        { conversationId: 1, lastReadAt: null },
-        { conversationId: 2, lastReadAt: new Date() },
+      store.listParticipations.mockResolvedValue([
+        participation({ conversationId: 1 }),
+        participation({ conversationId: 2, lastReadAt: new Date() }),
       ]);
-      messageRepository.count.mockResolvedValueOnce(2).mockResolvedValueOnce(3);
+      store.countUnread.mockResolvedValueOnce(2).mockResolvedValueOnce(3);
 
       await expect(service.getTotalUnreadCount(5)).resolves.toBe(5);
     });

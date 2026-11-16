@@ -2,6 +2,8 @@ import { EmailTemplate, EmailTemplateTranslation } from '@attraccess/database-en
 import { EmailTemplateType } from '@attraccess/application-models';
 import type { PluginEmailTemplate } from '@attraccess/plugins-backend-sdk';
 import { DataSource } from 'typeorm';
+import { TypeOrmEmailTemplateStore } from '../database/adapters/email/typeorm-email-template-store';
+import { TransactionHandles } from '../database/adapters/common/transaction-handles';
 import { EmailTemplateService } from './email-template.service';
 import { MjmlService } from './mjml.service';
 import { registerPluginEmailTemplates, unregisterPluginEmailTemplates } from './plugin-email-templates';
@@ -42,8 +44,11 @@ describe('EmailTemplateService with plugin templates (real SQLite)', () => {
       entities: [EmailTemplate, EmailTemplateTranslation],
     }).initialize();
     service = new EmailTemplateService(
-      dataSource.getRepository(EmailTemplate),
-      dataSource.getRepository(EmailTemplateTranslation),
+      new TypeOrmEmailTemplateStore(
+        dataSource.getRepository(EmailTemplate),
+        dataSource.getRepository(EmailTemplateTranslation),
+        new TransactionHandles(undefined as never),
+      ),
       new MjmlService(),
       audit as never,
     );

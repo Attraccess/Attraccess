@@ -33,6 +33,7 @@ import { CLOCK_INSPECTION_SCRIPT } from '../../backend/commissioning/delivery/cl
 import { WAGO_HARDWARE_PROFILE } from '../../backend/host/hardware-deployment';
 import { type RuntimeArtifactManifest } from '../../backend/runtime/artifacts/catalog';
 import { WagoRuntimeArtifactsService } from '../../backend/runtime/artifacts/service';
+import { TypeOrmSettingsRows } from '../../../../api/src/database/adapters/settings/typeorm-settings-rows';
 
 describe('composed WAGO hooks through the host bridge and durable SQLite provider', () => {
   const state = new AuditFixtureState();
@@ -74,7 +75,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     }).initialize();
     state.audit = new AuditService(
       state.db,
-      new SettingsStoreService(state.db.getRepository(Setting), null),
+      new SettingsStoreService(TypeOrmSettingsRows.forRepository(state.db.getRepository(Setting)), null),
       createTestAuditMetrics(),
     );
     await state.audit.onModuleInit();
@@ -341,7 +342,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.db.initialize();
     state.audit = new AuditService(
       state.db,
-      new SettingsStoreService(state.db.getRepository(Setting), null),
+      new SettingsStoreService(TypeOrmSettingsRows.forRepository(state.db.getRepository(Setting)), null),
       createTestAuditMetrics(),
     );
     await state.audit.onModuleInit();
@@ -420,7 +421,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     await state.db.initialize();
     state.audit = new AuditService(
       state.db,
-      new SettingsStoreService(state.db.getRepository(Setting), null),
+      new SettingsStoreService(TypeOrmSettingsRows.forRepository(state.db.getRepository(Setting)), null),
       createTestAuditMetrics(),
     );
     await state.audit.onModuleInit();
@@ -428,7 +429,7 @@ describe('composed WAGO hooks through the host bridge and durable SQLite provide
     const query = new AuditQueryService(
       state.audit,
       state.db,
-      new SettingsStoreService(state.db.getRepository(Setting), null),
+      new SettingsStoreService(TypeOrmSettingsRows.forRepository(state.db.getRepository(Setting)), null),
     );
     expect((await query.list({ limit: 100 })).items).toHaveLength(4);
   });

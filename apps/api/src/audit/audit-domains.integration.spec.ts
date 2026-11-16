@@ -41,6 +41,7 @@ import { AuditController } from './audit.controller';
 import { AuditService } from './audit.service';
 import { createTestAuditMetrics } from './audit.test-fixture';
 import { SessionPermissionSync } from '../users-and-auth/auth/sso/session-permission-sync';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 
 describe('audit domains through migrated storage and the admin HTTP API', () => {
   let directory: string;
@@ -85,7 +86,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    store = new SettingsStoreService(source.getRepository(Setting), null);
+    store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     audit = new AuditService(source, store, createTestAuditMetrics());
     settings = new SettingsService(null, store, { getSettings: async () => ({}) } as never, null, events);
     const module = await Test.createTestingModule({
@@ -202,7 +203,7 @@ describe('audit domains through migrated storage and the admin HTTP API', () => 
     const repository = source.getRepository(Setting);
     await repository.delete({ parent: 'app', key: 'default_language' });
     if (value !== null) await repository.save(repository.create({ parent: 'app', key: 'default_language', value }));
-    const persistedStore = new SettingsStoreService(repository, null);
+    const persistedStore = new SettingsStoreService(TypeOrmSettingsRows.forRepository(repository), null);
     const settings = new SettingsService(null, persistedStore, null);
     expect((await settings.getAppSettings()).defaultLanguage).toBe(expected);
     expect(await settings.getDefaultLanguage()).toBe(expected);

@@ -1,10 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { DateRangeValue } from './dtos/dateRangeValue';
-import { toBillingTransactionExportRow, toResourceUsageExportRow } from './dtos/analyticsExportRows.dto';
-import { BillingTransaction, Resource, ResourceOperatingInterval, ResourceUsage } from '@attraccess/database-entities';
 import { ResourceUsageAction } from '@attraccess/application-models';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Brackets, FindManyOptions, In, IsNull, LessThan, MoreThan, Repository } from 'typeorm';
+import { ANALYTICS_READER, AnalyticsReader, ResourceHoursRangeParams } from './analytics-reader.port';
 import { ResourceHoursSummaryRowDto } from './dtos/resourceHoursSummary.dto';
 import { MAX_REPORT_DURATION_MS, MAX_RESOURCE_IDS_PER_REPORT } from './dtos/resourceOperatingDurations.dto';
 import {
@@ -12,7 +9,6 @@ import {
   ResourceOperatingAttributionSummary,
 } from '../resources/operating-intervals/resource-operating-attribution.service';
 
-type ResourceHoursRangeParams = { start: Date; asOf: Date; action: ResourceUsageAction; pending: boolean };
 type ResourceHours = Pick<
   ResourceHoursSummaryRowDto,
   | 'personDurationMs'
@@ -33,34 +29,13 @@ const NO_HOURS: ResourceHours = {
 @Injectable()
 export class AnalyticsService {
   public constructor(
-    @InjectRepository(ResourceUsage)
-    private resourceUsageRepository: Repository<ResourceUsage>,
-    @InjectRepository(BillingTransaction)
-    private billingTransactionRepository: Repository<BillingTransaction>,
-    @InjectRepository(Resource)
-    private resourceRepository: Repository<Resource>,
+    @Inject(ANALYTICS_READER) private readonly reader: AnalyticsReader,
     private readonly operatingAttributionService: ResourceOperatingAttributionService,
   ) {}
 
   public async getResourceUsageHoursInDateRange(dateRange: DateRangeValue, page = 1, limit = 500) {
-    const findOptions: FindManyOptions<ResourceUsage> = {
-      where: {
-        startTime: Between(dateRange.start, dateRange.end),
-        usageAction: ResourceUsageAction.Usage,
-        lifecyclePending: false,
-      },
-      order: {
-        startTime: 'DESC',
-        id: 'DESC',
-        userId: 'DESC',
-      },
-      relations: ['user', 'resource', 'supervisorUser'],
-      skip: (page - 1) * limit,
-      take: limit,
-    };
-
-    const [usages, total] = await this.resourceUsageRepository.findAndCount(findOptions);
-    return [usages.map(toResourceUsageExportRow), total] as const;
+    const { rows, total } = await this.reader.findUsagesStartedInRange(dateRange, page, limit);
+    return [rows, total] as const;
   }
 
   public async getBillingTransactionsInDateRange(
@@ -69,25 +44,8 @@ export class AnalyticsService {
     limit = 500,
     includeEmail = false,
   ) {
-    const findOptions: FindManyOptions<BillingTransaction> = {
-      where: {
-        createdAt: Between(dateRange.start, dateRange.end),
-      },
-      order: {
-        createdAt: 'DESC',
-        id: 'DESC',
-        userId: 'DESC',
-      },
-      relations: ['user', 'initiator', 'resourceUsage', 'resourceUsage.resource', 'items'],
-      skip: (page - 1) * limit,
-      take: limit,
-    };
-
-    const [transactions, total] = await this.billingTransactionRepository.findAndCount(findOptions);
-    return [
-      transactions.map((transaction) => toBillingTransactionExportRow(transaction, includeEmail)),
-      total,
-    ] as const;
+    const { rows, total } = await this.reader.findBillingTransactionsInRange(dateRange, page, limit, includeEmail);
+    return [rows, total] as const;
   }
 
   public async getResourceOperatingDurations(
@@ -118,14 +76,19 @@ export class AnalyticsService {
       return [[], 0] as const;
     }
 
-    const params = { start: dateRange.start, asOf, action: ResourceUsageAction.Usage, pending: false };
-    const [resources, total] = await this.findResourcesActiveInRange(params, page, limit);
+    const params: ResourceHoursRangeParams = {
+      start: dateRange.start,
+      asOf,
+      action: ResourceUsageAction.Usage,
+      pending: false,
+    };
+    const { resources, total } = await this.reader.findResourcesActiveInRange(params, page, limit);
     const resourceIds = resources.map(({ id }) => id);
     if (resourceIds.length === 0) {
       return [[], total] as const;
     }
 
-    const sessionsByResourceId = await this.countSessionsInRange(resourceIds, params);
+    const sessionsByResourceId = await this.reader.countSessionsInRange(resourceIds, params);
     const hoursByResourceId = await this.sumHoursInRange(resourceIds, dateRange.start, asOf);
     // a range that has not ended yet can still gain sessions, even if none is open right now
     const isProvisional = dateRange.end.getTime() >= now.getTime();
@@ -133,61 +96,12 @@ export class AnalyticsService {
     const rows = resources.map((resource): ResourceHoursSummaryRowDto => ({
       resourceId: resource.id,
       resourceName: resource.name,
-      metadata: resource.metadata ?? null,
+      metadata: resource.metadata,
       sessionCount: sessionsByResourceId.get(resource.id) ?? 0,
       ...(hoursByResourceId.get(resource.id) ?? NO_HOURS),
       isProvisional,
     }));
     return [rows, total] as const;
-  }
-
-  private findResourcesActiveInRange(params: ResourceHoursRangeParams, page: number, limit: number) {
-    // deleted resources keep their history, so a past range reports the same hours after a deletion
-    const query = this.resourceRepository
-      .createQueryBuilder('resource')
-      .withDeleted()
-      .select(['resource.id', 'resource.name', 'resource.metadata']);
-    const sources = [
-      {
-        entity: ResourceUsage,
-        alias: 'usage',
-        condition: 'usage.usageAction = :action AND usage.lifecyclePending = :pending AND usage.startTime < :asOf',
-      },
-      { entity: ResourceOperatingInterval, alias: 'interval', condition: 'interval.startTime < :asOf' },
-    ];
-    // Open and closed records are checked apart so SQLite can search the (resourceId, endTime) indexes.
-    const exists = sources.flatMap(({ entity, alias, condition }) =>
-      [`${alias}.endTime IS NULL`, `${alias}.endTime > :start`].map(
-        (end) =>
-          `EXISTS ${query
-            .subQuery()
-            .select('1')
-            .from(entity, alias)
-            .where(`${alias}.resourceId = resource.id AND ${condition} AND ${end}`)
-            .getQuery()}`,
-      ),
-    );
-
-    return query
-      .where(new Brackets((qb) => exists.forEach((condition) => qb.orWhere(condition))))
-      .setParameters(params)
-      .orderBy('resource.id', 'ASC')
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
-  }
-
-  private async countSessionsInRange(resourceIds: number[], params: ResourceHoursRangeParams) {
-    const sessionCounts = await this.resourceUsageRepository
-      .createQueryBuilder('usage')
-      .select('usage.resourceId', 'resourceId')
-      .addSelect('COUNT(*)', 'sessions')
-      .where('usage.resourceId IN (:...resourceIds)', { resourceIds })
-      .andWhere('usage.usageAction = :action AND usage.lifecyclePending = :pending', params)
-      .andWhere('usage.startTime < :asOf AND (usage.endTime IS NULL OR usage.endTime > :start)', params)
-      .groupBy('usage.resourceId')
-      .getRawMany<{ resourceId: number; sessions: string }>();
-    return new Map(sessionCounts.map((row) => [Number(row.resourceId), Number(row.sessions)]));
   }
 
   /**
@@ -222,27 +136,8 @@ export class AnalyticsService {
 
   /** Where the batch's first session or interval overlapping the range starts: the windows before it are empty. */
   private async firstActivityInRange(resourceIds: number[], start: Date, asOf: Date): Promise<Date> {
-    const overlapping = { resourceId: In(resourceIds), startTime: LessThan(asOf) };
-    const usage = { ...overlapping, usageAction: ResourceUsageAction.Usage, lifecyclePending: false };
-    const [firstUsage, firstInterval] = await Promise.all([
-      this.resourceUsageRepository.findOne({
-        where: [
-          { ...usage, endTime: IsNull() },
-          { ...usage, endTime: MoreThan(start) },
-        ],
-        order: { startTime: 'ASC' },
-        select: ['id', 'startTime'],
-      }),
-      this.resourceRepository.manager.getRepository(ResourceOperatingInterval).findOne({
-        where: [
-          { ...overlapping, endTime: IsNull() },
-          { ...overlapping, endTime: MoreThan(start) },
-        ],
-        order: { startTime: 'ASC' },
-        select: ['id', 'startTime'],
-      }),
-    ]);
-    const firstStarts = [firstUsage, firstInterval].flatMap((record) => (record ? [record.startTime.getTime()] : []));
+    const first = await this.reader.findFirstActivityStart(resourceIds, start, asOf);
+    const firstStarts = first ? [first.getTime()] : [];
     return new Date(Math.max(start.getTime(), Math.min(asOf.getTime(), ...firstStarts)));
   }
 }

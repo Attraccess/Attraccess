@@ -2,7 +2,7 @@ import { createTranslator } from '../i18n/translate';
 import { SettingsService } from '../settings/settings.service';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Logger } from '@nestjs/common';
-import { User } from '@attraccess/database-entities';
+import { NotificationRecipient } from '@attraccess/application-models';
 import { NotificationDispatchService } from './notification-dispatch.service';
 import { NotificationPreferenceService } from './notification-preference.service';
 import { NotificationLiveService } from './notification-live.service';
@@ -23,7 +23,7 @@ describe('NotificationDispatchService', () => {
     sendResourceSessionEndedEmail: jest.Mock;
   };
 
-  const recipient = { locale: 'en', id: 2, email: 'recipient@example.com' } as User;
+  const recipient = { locale: 'en', id: 2, email: 'recipient@example.com' } as NotificationRecipient;
 
   beforeEach(async () => {
     settings.resolveLanguage.mockImplementation(async (locale) => locale?.trim() || 'en');
@@ -104,7 +104,7 @@ describe('NotificationDispatchService', () => {
 
   it('uses the system default for notification text without changing recipient preferences', async () => {
     settings.resolveLanguage.mockImplementation(async (locale) => locale?.trim() || 'de');
-    const guest = { id: 3, email: 'guest@example.com' } as User;
+    const guest = { id: 3, email: 'guest@example.com' } as NotificationRecipient;
     const t = createTranslator({ en: { title: 'Session ended' }, de: { title: 'Sitzung beendet' } });
     await service.dispatch({
       category: NotificationCategory.RESOURCE_SESSION_ENDED,
@@ -122,7 +122,7 @@ describe('NotificationDispatchService', () => {
       getDefaultLanguage: async () => 'de',
     });
     settings.resolveLanguage.mockImplementation((locale) => fallback.resolveLanguage(locale));
-    const unsupported = { id: 3, locale: 'fr', email: 'guest@example.com' } as User;
+    const unsupported = { id: 3, locale: 'fr', email: 'guest@example.com' } as NotificationRecipient;
     const sendEmail = jest.fn().mockResolvedValue(undefined);
     const t = createTranslator({ en: { title: 'Session ended' }, de: { title: 'Sitzung beendet' } });
     await service.dispatch({

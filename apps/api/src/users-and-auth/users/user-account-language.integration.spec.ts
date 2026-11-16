@@ -11,6 +11,7 @@ import { SettingsService } from '../../settings/settings.service';
 import { RbacService } from '../rbac/rbac.service';
 import { UsersService } from './users.service';
 import { composeUsersService } from './fixtures/compose.test-fixture';
+import { TypeOrmSettingsRows } from '../../database/adapters/settings/typeorm-settings-rows';
 
 describe('new account language persistence', () => {
   let source: DataSource;
@@ -26,7 +27,7 @@ describe('new account language persistence', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    store = new SettingsStoreService(source.getRepository(Setting), createMock<EncryptionService>());
+    store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), createMock<EncryptionService>());
     settings = Object.assign(Object.create(SettingsService.prototype), { settingsStore: store });
     // Execute production creation, transactions, persistence and language resolution.
     // Licensing, roles and metrics are unrelated collaborators for this regression.

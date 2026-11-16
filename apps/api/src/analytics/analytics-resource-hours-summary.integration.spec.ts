@@ -10,6 +10,7 @@ import { ResourceUsageAction } from '@attraccess/application-models';
 import { DataSource } from 'typeorm';
 import { ResourceOperatingAttributionService } from '../resources/operating-intervals/resource-operating-attribution.service';
 import { AnalyticsService } from './analytics.service';
+import { TypeOrmAnalyticsReader } from '../database/adapters/analytics/typeorm-analytics-reader';
 
 const HOUR = 3_600_000;
 const FEBRUARY = { start: new Date('2024-02-01T00:00:00Z'), end: new Date('2024-03-01T00:00:00Z') };
@@ -57,9 +58,11 @@ describe('AnalyticsService resource hours summary (SQLite)', () => {
       source.getRepository(ResourceUsageLifecycleAttempt),
     );
     service = new AnalyticsService(
-      source.getRepository(ResourceUsage),
-      source.getRepository(BillingTransaction),
-      source.getRepository(Resource),
+      new TypeOrmAnalyticsReader(
+        source.getRepository(ResourceUsage),
+        source.getRepository(BillingTransaction),
+        source.getRepository(Resource),
+      ),
       attribution,
     );
   }, 30_000);

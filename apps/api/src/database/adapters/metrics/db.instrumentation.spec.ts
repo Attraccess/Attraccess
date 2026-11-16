@@ -2,8 +2,8 @@
 // FEATURE: Metrics — database query timing instrumentation
 import { Registry } from 'prom-client';
 import { DataSource, QueryRunner } from 'typeorm';
-import { createDbMetrics } from '../../definitions/db.metrics';
-import { MetricsToggleService } from '../../settings/metrics-toggle.service';
+import { createDbMetrics } from '../../../metrics/definitions/db.metrics';
+import { MetricsToggleService } from '../../../metrics/settings/metrics-toggle.service';
 import { DbMetricsInstrumentation, parseSql } from './db.instrumentation';
 
 interface FakeRunner {
@@ -16,7 +16,11 @@ interface FakeDriver {
 }
 
 describe('DbMetricsInstrumentation', () => {
-  function setup(opts?: { enabled?: boolean; threshold?: number; queryImpl?: (sql: string, params?: unknown[]) => Promise<unknown> }) {
+  function setup(opts?: {
+    enabled?: boolean;
+    threshold?: number;
+    queryImpl?: (sql: string, params?: unknown[]) => Promise<unknown>;
+  }) {
     const enabled = opts?.enabled ?? true;
     const threshold = opts?.threshold ?? 0.5;
     const queryImpl = opts?.queryImpl ?? (async () => []);
@@ -68,7 +72,7 @@ describe('DbMetricsInstrumentation', () => {
     instrumentation.install(dataSource);
 
     for (let i = 0; i < 200; i += 1) {
-      (driver.createQueryRunner('master') as unknown as QueryRunner);
+      driver.createQueryRunner('master') as unknown as QueryRunner;
     }
     await (cachedRunner.query as (sql: string) => Promise<unknown>)('SELECT * FROM "user"');
 
@@ -165,7 +169,9 @@ describe('DbMetricsInstrumentation', () => {
     await expect(makeRunner(driver).query('SELECT * FROM "user"')).rejects.toThrow('boom');
 
     const text = await registry.metrics();
-    expect(text).toContain('attraccess_db_query_errors_total{entity="user",method="select",error_type="SQLITE_BUSY"} 1');
+    expect(text).toContain(
+      'attraccess_db_query_errors_total{entity="user",method="select",error_type="SQLITE_BUSY"} 1',
+    );
     expect(text).toContain('attraccess_db_query_duration_seconds_count{entity="user",method="select"} 1');
   });
 

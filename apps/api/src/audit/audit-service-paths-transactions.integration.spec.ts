@@ -25,6 +25,7 @@ import { SSOService } from '../users-and-auth/auth/sso/sso.service';
 import { AuditService } from './audit.service';
 import { createTestAuditMetrics, droppedRecords } from './audit.test-fixture';
 import { AuditMetrics } from '../metrics/definitions/audit.metrics';
+import { TypeOrmSettingsRows } from '../database/adapters/settings/typeorm-settings-rows';
 
 /**
  * A service that owns a transactional change records its audit row with the same EntityManager, so the row commits
@@ -47,7 +48,7 @@ describe('audit recorded by an owning service inside its transaction', () => {
       migrations: Object.values(migrations),
     }).initialize();
     await source.runMigrations();
-    store = new SettingsStoreService(source.getRepository(Setting), null);
+    store = new SettingsStoreService(TypeOrmSettingsRows.forRepository(source.getRepository(Setting)), null);
     await store.setPlainSetting('audit', 'domains', JSON.stringify(['billing', 'sso']));
   }, 120_000);
 
