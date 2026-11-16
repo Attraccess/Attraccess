@@ -188,82 +188,6 @@ test('crap-score reads the coverage its test targets wrote and fails when one wr
   }
 });
 
-test('commit validation accepts staged source, rejects partial edits and ignores generated caches', () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'crap-staged-'));
-  // Git hooks export their repository paths and alternate index. These fixture
-  // repositories must use their own metadata and index, never the caller's.
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-  const git = (...args) => execFileSync('git', args, { cwd: dir, env, stdio: 'ignore' });
-  const check = () =>
-    spawnSync(process.execPath, [path.join(workspace, 'scripts/crap-score/check-staged.mjs')], {
-      cwd: dir,
-      encoding: 'utf8',
-      env,
-    });
-  try {
-    git('init', '-q');
-    git('config', 'user.email', 'test@example.com');
-    git('config', 'user.name', 'Test');
-    writeFileSync(path.join(dir, 'source.ts'), 'export const value = 1;\n');
-    git('add', 'source.ts');
-    git('commit', '-qm', 'baseline');
-
-    writeFileSync(path.join(dir, 'source.ts'), 'export const value = 2;\n');
-    git('add', 'source.ts');
-    assert.equal(check().status, 0, 'fully staged JS/TS must validate');
-
-    writeFileSync(path.join(dir, 'source.ts'), 'export const value = 3;\n');
-    const indexBefore = execFileSync('git', ['show', ':source.ts'], { cwd: dir, encoding: 'utf8', env });
-    const worktreeBefore = readFileSync(path.join(dir, 'source.ts'), 'utf8');
-    const status = check();
-    assert.equal(status.status, 1);
-    assert.match(status.stderr, /Unstaged relevant paths: source\.ts/);
-    assert.equal(execFileSync('git', ['show', ':source.ts'], { cwd: dir, encoding: 'utf8', env }), indexBefore);
-    assert.equal(readFileSync(path.join(dir, 'source.ts'), 'utf8'), worktreeBefore);
-
-    git('checkout', '--', 'source.ts');
-    writeFileSync(path.join(dir, '.swcrc'), '{"jsc":{}}\n');
-    git('add', '.swcrc');
-    writeFileSync(path.join(dir, '.swcrc'), '{"jsc":{"target":"es2022"}}\n');
-    const configIndexBefore = execFileSync('git', ['show', ':.swcrc'], { cwd: dir, encoding: 'utf8', env });
-    const configWorktreeBefore = readFileSync(path.join(dir, '.swcrc'), 'utf8');
-    const configStatus = check();
-    assert.equal(configStatus.status, 1);
-    assert.match(configStatus.stderr, /Unstaged relevant paths: \.swcrc/);
-    assert.equal(execFileSync('git', ['show', ':.swcrc'], { cwd: dir, encoding: 'utf8', env }), configIndexBefore);
-    assert.equal(readFileSync(path.join(dir, '.swcrc'), 'utf8'), configWorktreeBefore);
-
-    git('checkout', '--', '.swcrc');
-    mkdirSync(path.join(dir, 'patches'), { recursive: true });
-    writeFileSync(path.join(dir, 'patches/crap-score.patch'), 'first patch\n');
-    git('add', 'patches/crap-score.patch');
-    writeFileSync(path.join(dir, 'source.ts'), 'export const guarded = true;\n');
-    git('add', 'source.ts');
-    writeFileSync(path.join(dir, 'patches/crap-score.patch'), 'worktree-only scorer fix\n');
-    const patchIndexBefore = execFileSync('git', ['show', ':patches/crap-score.patch'], {
-      cwd: dir,
-      encoding: 'utf8',
-      env,
-    });
-    const patchWorktreeBefore = readFileSync(path.join(dir, 'patches/crap-score.patch'), 'utf8');
-    const patchStatus = check();
-    assert.equal(patchStatus.status, 1);
-    assert.match(patchStatus.stderr, /Unstaged relevant paths: patches\/crap-score\.patch/);
-    assert.equal(
-      execFileSync('git', ['show', ':patches/crap-score.patch'], { cwd: dir, encoding: 'utf8', env }),
-      patchIndexBefore,
-    );
-    assert.equal(readFileSync(path.join(dir, 'patches/crap-score.patch'), 'utf8'), patchWorktreeBefore);
-
-    git('checkout', '--', 'patches/crap-score.patch', 'source.ts');
-    mkdirSync(path.join(dir, '.nx-cache/hash/project/src'), { recursive: true });
-    writeFileSync(path.join(dir, '.nx-cache/hash/project/src/generated.ts'), 'export const cached = true;\n');
-    assert.equal(check().status, 0, 'generated Nx cache data is not a proposed source change');
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
 test('the inclusive maximum passes 30 and fails above 30 without rounding', () => {
   assert.deepEqual(summarizeScores([29.99, 30, 30.01].map((crap) => ({ statements: { crap } }))), {
     functions: 3,
@@ -337,107 +261,93 @@ test('a controlled above-limit project fails with retained reports and passes af
   }
 });
 
-test(
-  'the pre-commit hook and the CI affected command reject and then accept a controlled function',
-  { timeout: 300000 },
-  () => {
-    const directory = mkdtempSync(path.join(os.tmpdir(), 'attraccess-crap-entrypoints-'));
-    const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
-    const git = (...args) => execFileSync('git', args, { cwd: directory, env: gitEnv, stdio: 'ignore' });
-    const invoke = (command, args) =>
-      spawnSync(command, args, {
-        cwd: directory,
-        encoding: 'utf8',
-        env: { ...gitEnv, NX_DAEMON: 'false', NX_SKIP_NX_CACHE: 'true' },
-      });
-    try {
-      cpSync(path.join(workspace, 'scripts/crap-score'), path.join(directory, 'scripts/crap-score'), {
-        recursive: true,
-      });
-      cpSync(path.join(workspace, 'scripts/precommit.sh'), path.join(directory, 'scripts/precommit.sh'));
-      cpSync(path.join(workspace, '.husky/pre-commit'), path.join(directory, '.husky/pre-commit'));
-      symlinkSync(path.join(workspace, 'node_modules'), path.join(directory, 'node_modules'), 'dir');
-      writeFileSync(path.join(directory, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/*'\n");
-      const rootPackage = JSON.parse(readFileSync(path.join(workspace, 'package.json'), 'utf8'));
-      writeFileSync(
-        path.join(directory, 'package.json'),
-        JSON.stringify(
-          {
-            name: 'crap-entrypoint-fixture',
-            private: true,
-            packageManager: rootPackage.packageManager,
-            scripts: {
-              // File-size limits are a separate gate with their own tests; this fixture checks CRAP enforcement.
-              'lint:files': 'true',
-              precommit: rootPackage.scripts.precommit,
-              'crap-score:affected': rootPackage.scripts['crap-score:affected'],
-            },
-          },
-          null,
-          2,
-        ),
-      );
-      writeFileSync(
-        path.join(directory, 'nx.json'),
-        JSON.stringify({ targetDefaults: { 'crap-score': { cache: false } } }),
-      );
-      mkdirSync(path.join(directory, 'apps/fixture'), { recursive: true });
-      const command = (value) => ({ executor: 'nx:run-commands', options: { command: value } });
-      writeFileSync(
-        path.join(directory, 'apps/fixture/project.json'),
-        JSON.stringify({
+test('the CI affected command rejects and then accepts a controlled function', { timeout: 300000 }, () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'attraccess-crap-entrypoints-'));
+  const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  const git = (...args) => execFileSync('git', args, { cwd: directory, env: gitEnv, stdio: 'ignore' });
+  const invoke = (command, args) =>
+    spawnSync(command, args, {
+      cwd: directory,
+      encoding: 'utf8',
+      env: { ...gitEnv, NX_DAEMON: 'false', NX_SKIP_NX_CACHE: 'true' },
+    });
+  try {
+    cpSync(path.join(workspace, 'scripts/crap-score'), path.join(directory, 'scripts/crap-score'), {
+      recursive: true,
+    });
+    symlinkSync(path.join(workspace, 'node_modules'), path.join(directory, 'node_modules'), 'dir');
+    writeFileSync(path.join(directory, 'pnpm-workspace.yaml'), "packages:\n  - 'apps/*'\n");
+    const rootPackage = JSON.parse(readFileSync(path.join(workspace, 'package.json'), 'utf8'));
+    writeFileSync(
+      path.join(directory, 'package.json'),
+      JSON.stringify(
+        {
           name: 'crap-entrypoint-fixture',
-          root: 'apps/fixture',
-          targets: {
-            test: command(
-              'node scripts/crap-score/node-test.mjs apps/fixture coverage/apps/fixture/test apps/fixture/source.test.mjs',
-            ),
-            'crap-score': { ...command('node scripts/crap-score/run.mjs apps/fixture'), dependsOn: ['test'] },
+          private: true,
+          packageManager: rootPackage.packageManager,
+          scripts: {
+            'crap-score:affected': rootPackage.scripts['crap-score:affected'],
           },
-        }),
-      );
-      const source = path.join(directory, 'apps/fixture/source.mjs');
-      const setComplex = (branches) =>
-        writeFileSync(
-          source,
-          [
-            'export function controlled(value) {',
-            ...Array.from({ length: branches }, (_, index) => `  if (value === ${index}) return ${index};`),
-            '  return -1;',
-            '}\n',
-          ].join('\n'),
-        );
+        },
+        null,
+        2,
+      ),
+    );
+    writeFileSync(
+      path.join(directory, 'nx.json'),
+      JSON.stringify({ targetDefaults: { 'crap-score': { cache: false } } }),
+    );
+    mkdirSync(path.join(directory, 'apps/fixture'), { recursive: true });
+    const command = (value) => ({ executor: 'nx:run-commands', options: { command: value } });
+    writeFileSync(
+      path.join(directory, 'apps/fixture/project.json'),
+      JSON.stringify({
+        name: 'crap-entrypoint-fixture',
+        root: 'apps/fixture',
+        targets: {
+          test: command(
+            'node scripts/crap-score/node-test.mjs apps/fixture coverage/apps/fixture/test apps/fixture/source.test.mjs',
+          ),
+          'crap-score': { ...command('node scripts/crap-score/run.mjs apps/fixture'), dependsOn: ['test'] },
+        },
+      }),
+    );
+    const source = path.join(directory, 'apps/fixture/source.mjs');
+    const setComplex = (branches) =>
       writeFileSync(
-        path.join(directory, 'apps/fixture/source.test.mjs'),
-        "import test from 'node:test';\nimport './source.mjs';\ntest('controlled source loads', () => {});\n",
+        source,
+        [
+          'export function controlled(value) {',
+          ...Array.from({ length: branches }, (_, index) => `  if (value === ${index}) return ${index};`),
+          '  return -1;',
+          '}\n',
+        ].join('\n'),
       );
-      setComplex(1);
-      git('init', '-q');
-      git('config', 'user.email', 'test@example.com');
-      git('config', 'user.name', 'Test');
-      git('add', '.');
-      git('commit', '-qm', 'fixture baseline');
+    writeFileSync(
+      path.join(directory, 'apps/fixture/source.test.mjs'),
+      "import test from 'node:test';\nimport './source.mjs';\ntest('controlled source loads', () => {});\n",
+    );
+    setComplex(1);
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    git('add', '.');
+    git('commit', '-qm', 'fixture baseline');
 
-      setComplex(8);
-      git('add', 'apps/fixture/source.mjs');
-      const hookFail = invoke('sh', ['.husky/pre-commit']);
-      assert.notEqual(hookFail.status, 0, hookFail.stdout);
-      assert.match(hookFail.stdout + hookFail.stderr, /CRAP score limit 30 exceeded/);
-      git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'over-limit function');
+    setComplex(8);
+    git('add', 'apps/fixture/source.mjs');
+    git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'over-limit function');
 
-      const ciFail = invoke('pnpm', ['crap-score:affected', '--base=HEAD~1']);
-      assert.notEqual(ciFail.status, 0, ciFail.stdout);
-      assert.match(ciFail.stdout + ciFail.stderr, /CRAP score limit 30 exceeded/);
+    const ciFail = invoke('pnpm', ['crap-score:affected', '--base=HEAD~1']);
+    assert.notEqual(ciFail.status, 0, ciFail.stdout);
+    assert.match(ciFail.stdout + ciFail.stderr, /CRAP score limit 30 exceeded/);
 
-      setComplex(1);
-      git('add', 'apps/fixture/source.mjs');
-      const hookPass = invoke('sh', ['.husky/pre-commit']);
-      assert.equal(hookPass.status, 0, hookPass.stdout + hookPass.stderr);
-      git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'reduce complexity');
-      const ciPass = invoke('pnpm', ['crap-score:affected', '--base=HEAD~1']);
-      assert.equal(ciPass.status, 0, ciPass.stdout + ciPass.stderr);
-    } finally {
-      rmSync(directory, { recursive: true, force: true });
-    }
-  },
-);
+    setComplex(1);
+    git('add', 'apps/fixture/source.mjs');
+    git('-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'reduce complexity');
+    const ciPass = invoke('pnpm', ['crap-score:affected', '--base=HEAD~1']);
+    assert.equal(ciPass.status, 0, ciPass.stdout + ciPass.stderr);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

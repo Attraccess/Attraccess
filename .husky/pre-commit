@@ -19,8 +19,4 @@ if [ -f .nvmrc ]; then
     fi
 fi
 
-# A long-lived Nx daemon goes stale across Node switches and parallel worktrees; the
-# hook's few graph computations cost about a second each without it.
-export NX_DAEMON=false
-
 pnpm precommit

@@ -8,8 +8,8 @@ lines and comments; a final newline does not add an extra line. CRLF and LF coun
 
 Run `pnpm lint:files` to check tracked files and unignored new files in your working
 tree. `pnpm lint:files --staged` checks the Git index, including partially staged
-files. Both run before the existing `pnpm precommit` and `pnpm precommit:all`
-checks. The PR and merge-queue workflow runs the check in the required
+files. The pre-commit hook (`pnpm precommit`) runs the staged check, and
+`pnpm precommit:all` runs both. The PR and merge-queue workflow runs the check in the required
 `lint-and-typecheck` job, independently of Nx's affected-project selection.
 
 The limits apply to every covered file, including unchanged files and renames.
