@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplateType } from '@attraccess/database-entities';
 import { readDefaultTemplateBody } from '../../email-template/email-defaults';
 import { RefreshMeterReceiptTotals1791300000000 } from './1791300000000-refresh-meter-receipt-totals';
 

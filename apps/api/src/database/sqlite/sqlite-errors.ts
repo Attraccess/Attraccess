@@ -19,6 +19,22 @@ export function isSqliteBusyError(error: unknown): boolean {
 
 const UNIQUE_CODES = new Set(['SQLITE_CONSTRAINT_UNIQUE', 'SQLITE_CONSTRAINT_PRIMARYKEY']);
 
+/**
+ * The node sqlite3 driver reports constraint failures with the generic code SQLITE_CONSTRAINT and names the kind
+ * only in its message. The message is read for classification and never logged (it can contain column values).
+ */
+function constraintKind(error: unknown): PersistenceErrorKind | undefined {
+  const messages = [
+    (error as { message?: unknown })?.message,
+    (error as { driverError?: { message?: unknown } })?.driverError?.message,
+  ].filter((message): message is string => typeof message === 'string');
+  if (messages.some((message) => /UNIQUE constraint failed|PRIMARY KEY constraint failed/i.test(message))) {
+    return 'unique-violation';
+  }
+  if (messages.some((message) => /FOREIGN KEY constraint failed/i.test(message))) return 'foreign-key-violation';
+  return undefined;
+}
+
 /** Interprets SQLite driver errors as neutral persistence error categories. */
 export const sqliteErrorClassifier: PersistenceErrorClassifier = {
   classify(error: unknown): PersistenceErrorKind | undefined {
@@ -28,6 +44,7 @@ export const sqliteErrorClassifier: PersistenceErrorClassifier = {
     if (UNIQUE_CODES.has(code)) return 'unique-violation';
     if (code === 'SQLITE_CONSTRAINT_FOREIGNKEY') return 'foreign-key-violation';
     if (code === 'SQLITE_BUSY_SNAPSHOT') return 'conflict';
+    if (code === 'SQLITE_CONSTRAINT') return constraintKind(error);
     return undefined;
   },
   diagnosticCode: sqliteErrorCode,

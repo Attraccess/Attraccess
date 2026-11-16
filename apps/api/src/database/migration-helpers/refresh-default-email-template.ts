@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { QueryRunner } from 'typeorm';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplateType } from '@attraccess/database-entities';
 import { readDefaultTemplateBody } from '../../email-template/email-defaults';
 
 /** Refresh recognized shipped bodies only. Returns false when the template is absent. */

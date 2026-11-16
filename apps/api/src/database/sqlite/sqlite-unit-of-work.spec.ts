@@ -24,7 +24,8 @@ describe('createSqliteUnitOfWork on a real file database', () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  const balance = async (id: number) => (await source.query('SELECT balance FROM account WHERE id = ?', [id]))[0].balance;
+  const balance = async (id: number) =>
+    (await source.query('SELECT balance FROM account WHERE id = ?', [id]))[0].balance;
 
   it('commits all writes of a unit together and runs the post-commit effect once, after the commit', async () => {
     const seen: number[] = [];

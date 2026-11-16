@@ -199,6 +199,14 @@
         "passWithNoTests": false
       }
     },
+    "test-conformance": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "inputs": ["default", "^production", "{workspaceRoot}/jest.preset.js"],
+      "options": {
+        "command": "jest -c apps/api/jest.config.ts --coverage=false --testPathPatterns=src/database/conformance"
+      }
+    },
     "e2e": {
       "executor": "@nx/jest:jest",
       "cache": true,

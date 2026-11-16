@@ -1,7 +1,7 @@
 import { DataSource, QueryRunner } from 'typeorm';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplateType } from '@attraccess/database-entities';
 import { readDefaultTemplateBody } from '../../email-template/email-defaults';
 import { GenericMeters1790100000000 } from './1790100000000-generic-meters';
 import { ReplaceEnergyBilling1790200000000 } from './1790200000000-replace-energy-billing';

@@ -1,8 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DataSource, QueryRunner } from 'typeorm';
-import { EmailTemplate, EmailTemplateTranslation } from '@attraccess/database-entities';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplate, EmailTemplateTranslation, EmailTemplateType } from '@attraccess/database-entities';
 import { readDefaultTemplateBody } from '../../email-template/email-defaults';
 import { EmailTemplateService } from '../../email-template/email-template.service';
 import { MjmlService } from '../../email-template/mjml.service';

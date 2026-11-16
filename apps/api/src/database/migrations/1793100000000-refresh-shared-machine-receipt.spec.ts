@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DataSource } from 'typeorm';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplateType } from '@attraccess/database-entities';
 import { readDefaultTemplateBody, SHIPPED_TRANSLATIONS } from '../../email-template/email-defaults';
 import { EmailTemplateTranslations1782500000000 } from './1782500000000-email-templates-locale';
 import { RefreshSharedMachineReceipt1793100000000 } from './1793100000000-refresh-shared-machine-receipt';

@@ -13,8 +13,7 @@ export const getDefaultOidcConfiguration = () => ({
   permissionSyncTtlMinutes: null as number | null,
 });
 
-/** Mirrors MAX_PERMISSION_SYNC_TTL_MINUTES in database-entities; importing it would pull the entity barrel into the browser bundle. */
-export const MAX_PERMISSION_SYNC_TTL_MINUTES = 365 * 24 * 60;
+export { MAX_PERMISSION_SYNC_TTL_MINUTES } from '@attraccess/application-models';
 
 export const getDefaultSamlConfiguration = () => ({
   entryPoint: '',

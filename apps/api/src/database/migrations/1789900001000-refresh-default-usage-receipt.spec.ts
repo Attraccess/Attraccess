@@ -1,5 +1,5 @@
 import { DataSource, QueryRunner } from 'typeorm';
-import { EmailTemplateType } from '@attraccess/application-models';
+import { EmailTemplateType } from '@attraccess/database-entities';
 import {
   EMAIL_TEMPLATE_DEFAULTS,
   readDefaultTemplateBody,

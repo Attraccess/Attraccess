@@ -17,6 +17,14 @@ describe('persistence error categories', () => {
     expect(classifyPersistenceError({ code: 'SQLITE_CONSTRAINT_PRIMARYKEY' })).toBe('unique-violation');
     expect(classifyPersistenceError({ code: 'SQLITE_CONSTRAINT_FOREIGNKEY' })).toBe('foreign-key-violation');
     expect(classifyPersistenceError({ code: 'SQLITE_BUSY_SNAPSHOT' })).toBe('conflict');
+    const generic = (message: string) => ({ code: 'SQLITE_CONSTRAINT', message });
+    expect(classifyPersistenceError(generic('SQLITE_CONSTRAINT: UNIQUE constraint failed: t.k'))).toBe(
+      'unique-violation',
+    );
+    expect(classifyPersistenceError(generic('SQLITE_CONSTRAINT: FOREIGN KEY constraint failed'))).toBe(
+      'foreign-key-violation',
+    );
+    expect(classifyPersistenceError(generic('SQLITE_CONSTRAINT: NOT NULL constraint failed: t.k'))).toBeUndefined();
   });
 
   it('does not treat unrelated errors as database errors and exposes only a safe code', () => {

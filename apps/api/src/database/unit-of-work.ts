@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Logger } from '@nestjs/common';
+import { isDatabaseBusyError, isWriteConflict } from './persistence-errors';
 
 /**
  * The explicit scope of one atomic unit of work: every persistence write made through it commits or rolls back
@@ -116,5 +117,34 @@ export class ScopedUnitOfWork<THandle> implements UnitOfWork {
     }
     if (!scope.isOpen) throw new TransactionScopeError('The transaction scope is closed');
     return scope.handle;
+  }
+}
+
+export interface RetryOptions {
+  /** Total attempts including the first. Defaults to 3; never unbounded. */
+  readonly attempts?: number;
+  /** Which failures are worth another attempt. Defaults to busy and write-conflict categories. */
+  readonly isTransient?: (error: unknown) => boolean;
+}
+
+/**
+ * Runs a unit of work again when the database reports a transient failure (busy, write conflict), a bounded number of
+ * times. The work must be free of external effects: a retry runs it again from the start. Effects belong in
+ * `scope.afterCommit`, which only runs for the attempt that committed, so retries never replay device commands,
+ * payments, MQTT publishes or emails.
+ */
+export async function runWithRetry<T>(
+  uow: UnitOfWork,
+  work: (scope: TransactionScope) => Promise<T>,
+  options: RetryOptions = {},
+): Promise<T> {
+  const attempts = Math.max(1, Math.min(options.attempts ?? 3, 10));
+  const isTransient = options.isTransient ?? ((error) => isDatabaseBusyError(error) || isWriteConflict(error));
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await uow.run(work);
+    } catch (error) {
+      if (attempt >= attempts || !isTransient(error)) throw error;
+    }
   }
 }
