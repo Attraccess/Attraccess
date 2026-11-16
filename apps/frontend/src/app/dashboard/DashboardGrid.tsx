@@ -99,14 +99,12 @@ export function DashboardGrid({ pins, isEditing }: Readonly<{ pins: DashboardPin
   const reorder = usePinReorder(pins);
   const { pages, titleOf, isReady } = usePinnablePages();
   const widgets = useDashboardWidgets();
-  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 6 } });
-  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } });
-  const keyboardSensor = useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates });
-  // Always three entries: useSensors memoizes on them, and a changing count would keep the first answer.
+  // The sensors stay the same in both modes: DndContext uses them as effect dependencies, so their number must not
+  // change. Outside edit mode the cards are disabled sortables without a handle, so no sensor can pick one up.
   const sensors = useSensors(
-    isEditing ? pointerSensor : null,
-    isEditing ? touchSensor : null,
-    isEditing ? keyboardSensor : null,
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   const remove = (pin: DashboardPin) =>

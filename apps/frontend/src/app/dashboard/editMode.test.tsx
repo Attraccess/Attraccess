@@ -150,6 +150,17 @@ describe('dashboard edit mode', () => {
     expect(container.querySelector('[data-cy="dashboard-edit-hint"]')).toBeNull();
   });
 
+  it('switches modes without React errors', async () => {
+    const consoleError = vi.spyOn(console, 'error');
+    renderDashboard([page('/projects'), widget('messages')]);
+
+    await userEvent.click(await editToggle('Edit dashboard'));
+    await userEvent.click(await editToggle('Done'));
+    await userEvent.click(await editToggle('Edit dashboard'));
+
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
   it('opens the picker from the empty state, already in edit mode', async () => {
     renderDashboard([]);
 
