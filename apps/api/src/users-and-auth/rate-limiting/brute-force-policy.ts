@@ -4,6 +4,7 @@ export type RateLimitScope =
   | 'login'
   | 'register'
   | 'password_reset_request'
+  | 'verification_email_resend'
   | 'password_reset_complete'
   | 'delete_account_confirm'
   | 'sso_link_account'

@@ -476,6 +476,18 @@ it('labels the recorded details of MQTT explorer events in both languages', () =
   ]);
 });
 
+it('labels the verification email resend apart from the password reset request in both languages', () => {
+  const translate = (strings: typeof en) => (key: string) => {
+    const [, section, value] = /^(\w+)\[(.*)\]$/.exec(key) ?? [];
+    return (strings as unknown as Record<string, Record<string, string>>)[section][JSON.parse(value)];
+  };
+  expect(auditLabel('events', 'identity.verification_email_resent', translate(en))).toBe('Verification email resent');
+  expect(auditLabel('events', 'identity.verification_email_resent', translate(de))).toBe(
+    'Bestätigungs-E-Mail erneut gesendet',
+  );
+  expect(auditLabel('events', 'identity.password_reset_requested', translate(en))).toBe('Password reset requested');
+});
+
 it('labels every flow audit event, target and detail field in both languages', () => {
   const translate = (strings: typeof en) => (key: string) => {
     const [, section, value] = /^(\w+)\[(.*)\]$/.exec(key) ?? [];

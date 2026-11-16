@@ -62,6 +62,24 @@ describe('BruteForceProtectionService', () => {
       await expect(service.assertIpAllowed('register', '5.5.5.5')).resolves.toBeUndefined();
     });
 
+    it('keeps verification email resend and password reset counters isolated in both directions', async () => {
+      for (let i = 0; i < 3; i += 1) {
+        await service.recordFailure('verification_email_resend', '6.6.6.6', null);
+      }
+      await expect(service.assertIpAllowed('verification_email_resend', '6.6.6.6')).rejects.toBeInstanceOf(
+        TooManyAuthAttemptsException,
+      );
+      await expect(service.assertIpAllowed('password_reset_request', '6.6.6.6')).resolves.toBeUndefined();
+
+      for (let i = 0; i < 3; i += 1) {
+        await service.recordFailure('password_reset_request', '7.7.7.7', null);
+      }
+      await expect(service.assertIpAllowed('password_reset_request', '7.7.7.7')).rejects.toBeInstanceOf(
+        TooManyAuthAttemptsException,
+      );
+      await expect(service.assertIpAllowed('verification_email_resend', '7.7.7.7')).resolves.toBeUndefined();
+    });
+
     it('uses separate counters per username — shared NAT IP does not lock out other users', async () => {
       for (let i = 0; i < 3; i += 1) {
         await service.recordFailure('login', '10.0.0.1', null, 'attacker');
