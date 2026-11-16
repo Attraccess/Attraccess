@@ -63,7 +63,7 @@ und `import('x')`-Typen.
 Bestehende Nutzer stehen je Datei in `scripts/persistence-boundaries.baseline.json`. Die Baseline kann nur schrumpfen:
 ein neuer Verstoß schlägt fehl, ebenso eine Datei, die ihren Eintrag nicht mehr braucht, bis er mit
 `node scripts/check-persistence-boundaries.mjs --update` gesenkt wird. Frontend und neutrale Bibliotheken dürfen nie
-eingetragen werden. Erlaubte Orte: `libs/database-entities`, `apps/api/src/database` und Migrationsordner.
+eingetragen werden. Erlaubte Orte: `libs/database-entities`, `apps/api/src/database` (Adapter liegen in `database/adapters/<Bereich>`), Migrationsordner und Echt-Engine-Tests (`*.persistence.spec.ts`, `*.integration.spec.ts`, `*.e2e.spec.ts`, `apps/api/src/{e2e,test,__test__,test-utils}`, Plugin-`acceptance/`). Unit-Specs mit gefälschten Repositories bleiben geprüft.
 
 ## Zuständigkeit je Funktionsbereich
 

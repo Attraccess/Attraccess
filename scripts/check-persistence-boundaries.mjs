@@ -22,7 +22,16 @@ export const forbiddenPackage =
 const adapterInternals = /(?:^|\/)database\/sqlite(?:\/|$)|(?:^|\/)libs\/database-entities(?:\/|$)/;
 
 // Persistence implementation code that may use the ORM and the drivers.
-const allowedPaths = [/^libs\/database-entities\//, /^apps\/api\/src\/database\//, /(^|\/)migrations\//];
+const allowedPaths = [
+  /^libs\/database-entities\//,
+  /^apps\/api\/src\/database\//,
+  /(^|\/)migrations\//,
+  // Real-engine tests: they open actual databases to prove migrations, constraints, transactions and concurrency.
+  // Unit specs that only fake repositories stay checked.
+  /\.(?:persistence|integration|e2e)\.spec\.ts$/,
+  /^apps\/api\/src\/(?:e2e|test|__test__|test-utils)\//,
+  /^apps\/plugins\/[^/]+\/acceptance\//,
+];
 // Code that may never carry a baseline entry.
 const zeroTolerance = [/^libs\/application-models\//, /^apps\/frontend\//, /^libs\/(?:ui|shared|env|api-client)\//];
 

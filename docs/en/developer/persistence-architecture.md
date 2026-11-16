@@ -58,7 +58,7 @@ re-exports, dynamic `import()`, `require()`, `import x = require()` and `import(
 Existing users are recorded per file in `scripts/persistence-boundaries.baseline.json`. The baseline can only shrink:
 a new violation fails, and so does a file that no longer needs its entry until the entry is lowered with
 `node scripts/check-persistence-boundaries.mjs --update`. The frontend and the neutral libraries can never be listed.
-Allowed locations: `libs/database-entities`, `apps/api/src/database` and migration folders.
+Allowed locations: `libs/database-entities`, `apps/api/src/database` (adapters live in `database/adapters/<area>`), migration folders and real-engine tests (`*.persistence.spec.ts`, `*.integration.spec.ts`, `*.e2e.spec.ts`, `apps/api/src/{e2e,test,__test__,test-utils}`, plugin `acceptance/`). Unit specs that fake repositories stay checked.
 
 ## Ownership by feature area
 

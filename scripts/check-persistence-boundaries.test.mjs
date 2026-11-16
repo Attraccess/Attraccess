@@ -49,6 +49,11 @@ test('persistence implementation code is allowed, application code is checked', 
   assert.equal(isChecked('apps/api/src/database/migrations/1-x.ts'), false);
   assert.equal(isChecked('libs/database-entities/src/lib/entities/user.entity.ts'), false);
   assert.equal(isChecked('apps/plugins/wago/backend/migrations/1-x.ts'), false);
+  assert.equal(isChecked('apps/api/src/billing/billing.integration.spec.ts'), false);
+  assert.equal(isChecked('apps/api/src/resources/usage/x.persistence.spec.ts'), false);
+  assert.equal(isChecked('apps/api/src/e2e/a.e2e.spec.ts'), false);
+  assert.equal(isChecked('apps/plugins/wago/acceptance/a.spec.ts'), false);
+  assert.equal(isChecked('apps/api/src/billing/billing.service.spec.ts'), true);
   assert.equal(isChecked('apps/api/src/billing/billing.service.ts'), true);
   assert.equal(isChecked('libs/plugins-backend-sdk/src/lib/plugin-context.ts'), true);
 });
