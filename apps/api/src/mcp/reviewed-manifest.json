@@ -1963,5 +1963,10 @@
     "decision": "deny",
     "reason": "MCP OAuth endpoint: the consent decision belongs to the signed-in user in a browser, never to an MCP client.",
     "shape": "013d9cf4"
+  },
+  "getMcpConnectionInfo": {
+    "decision": "allow",
+    "reason": "JSON request and response; the REST endpoint authorises every call.",
+    "shape": "f86a3b4b"
   }
 }

@@ -52,3 +52,13 @@ export class McpOAuthRedirectDto {
   @ApiProperty({ description: 'Where to send the browser next: the client, with a code or an error.' })
   redirectUrl!: string;
 }
+
+export class McpConnectionInfoDto {
+  @ApiProperty({ description: 'The MCP endpoint to add to an AI client.' })
+  url!: string;
+
+  @ApiProperty({
+    description: 'True when clients can sign in with OAuth on this URL (https or loopback); API tokens always work.',
+  })
+  oauthEnabled!: boolean;
+}

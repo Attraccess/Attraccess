@@ -4,7 +4,7 @@
 
 Attraccess stellt seine REST-API als [Model-Context-Protocol](https://modelcontextprotocol.io/)-Server (MCP) bereit. KI-Clients wie Claude Code, MCP Inspector oder eigene Agenten können damit nach denselben Regeln wie jeder andere Zugriff Daten lesen und ändern.
 
-- **Endpunkt:** `https://<deine-attraccess-adresse>/api/mcp` (Streamable HTTP, nur Tools).
+- **Endpunkt:** `https://<deine-attraccess-adresse>/api/mcp` (Streamable HTTP, nur Tools). Angemeldete Nutzer finden die genaue URL mit Kopier-Button und den dort möglichen Anmeldewegen unter Konto → Erweitert → KI-Clients (MCP).
 - **Tools:** ein Tool pro REST-Operation. Der Tool-Name ist die Operation-ID aus dem OpenAPI-Dokument (zum Beispiel `getAllResources`). Die Tools werden aus der laufenden API erzeugt und passen deshalb immer zu ihr.
 - **Jeder Aufruf ist ein REST-Aufruf.** Validierung, Berechtigungsprüfung, Audit-Log-Einträge und Fehlermeldungen entsprechen genau dem REST-Endpunkt. Ein REST-Fehler (400, 403, 404, ...) kommt als Tool-Fehler mit HTTP-Status und Meldung zurück.
 

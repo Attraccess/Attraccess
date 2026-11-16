@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   success: vi.fn(),
   apiError: vi.fn(),
   options: {} as { onSuccess: () => void; onError: (error: unknown) => void },
+  mcp: undefined as undefined | { url: string; oauthEnabled: boolean },
 }));
 vi.mock('@attraccess/plugins-frontend-ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@attraccess/plugins-frontend-ui')>()),
@@ -26,6 +27,7 @@ vi.mock('../../components/toastProvider', () => ({
   useToastMessage: () => ({ success: state.success, apiError: state.apiError }),
 }));
 vi.mock('@attraccess/react-query-client', () => ({
+  useMcpServiceGetMcpConnectionInfo: () => ({ data: state.mcp }),
   useUsersServiceRequestDeleteAccount: (options: typeof state.options) => {
     state.options = options;
     return { mutate: state.request };
@@ -41,6 +43,14 @@ vi.mock('./api-tokens', () => ({
     <div>Token permissions: {availablePermissions.join(',')}</div>
   ),
 }));
+vi.mock('./mcp', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./mcp')>()),
+  McpConnectionCard: ({ connection, canUseApiTokens }: { connection: { url: string }; canUseApiTokens: boolean }) => (
+    <div>
+      MCP {connection.url} tokens:{String(canUseApiTokens)}
+    </div>
+  ),
+}));
 vi.mock('../user-management/details/components/setPasswordForm', () => ({
   SetPasswordForm: ({ userId, username }: { userId: number; username: string }) => (
     <div>
@@ -52,6 +62,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.user = undefined;
   state.permission = false;
+  state.mcp = undefined;
 });
 afterEach(cleanup);
 function open() {
@@ -113,4 +124,23 @@ it('retains deletion confirmation and reports an unsuccessful request', async ()
   );
   expect(screen.getByRole('button', { name: 'deleteAccount.actions.confirm' })).toBeTruthy();
   expect(state.success).not.toHaveBeenCalled();
+});
+it('offers the MCP topic only when the user can sign in to it with OAuth or an API token', () => {
+  state.user = { id: 7, username: 'member', effectivePermissions: [] };
+  state.mcp = { url: 'http://192.168.1.50:3000/api/mcp', oauthEnabled: false };
+  const lanView = open();
+  expect(screen.queryByRole('button', { name: /topics.mcp.title/ })).toBeNull();
+  lanView.unmount();
+
+  state.permission = true;
+  const tokenView = open();
+  fireEvent.click(screen.getByRole('button', { name: /topics.mcp.title/ }));
+  expect(screen.getByText('MCP http://192.168.1.50:3000/api/mcp tokens:true')).toBeTruthy();
+  tokenView.unmount();
+
+  state.permission = false;
+  state.mcp = { url: 'https://attraccess.example/api/mcp', oauthEnabled: true };
+  open();
+  fireEvent.click(screen.getByRole('button', { name: /topics.mcp.title/ }));
+  expect(screen.getByText('MCP https://attraccess.example/api/mcp tokens:false')).toBeTruthy();
 });

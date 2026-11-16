@@ -49,6 +49,12 @@ describe('MCP on a plain-HTTP, non-loopback deployment (real application)', () =
     await t.http.post('/api/mcp/oauth/token').type('form').send({ grant_type: 'refresh_token' }).expect(404);
   });
 
+  it('tells the account page that only API tokens work here', async () => {
+    const session = await t.createSessionToken(await t.createUser([]));
+    const response = await t.http.get('/api/mcp/connection').set('Cookie', `auth-session=${session}`).expect(200);
+    expect(response.body).toEqual({ url: `${PUBLIC_URL}/api/mcp`, oauthEnabled: false });
+  });
+
   it('answers 401 without pointing clients at metadata that does not exist', async () => {
     const response = await t.rpc(undefined, 'tools/list');
     expect(response.status).toBe(401);

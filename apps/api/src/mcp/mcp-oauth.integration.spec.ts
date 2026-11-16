@@ -116,6 +116,13 @@ describe('MCP OAuth (real application)', () => {
         expect(response.body.scopes_supported).toContain('resources.read');
       }
     });
+
+    it('tells a signed-in user the MCP URL and that OAuth sign-in works', async () => {
+      const session = await t.createSessionToken(await t.createUser([]));
+      const response = await t.http.get('/api/mcp/connection').set('Cookie', `auth-session=${session}`).expect(200);
+      expect(response.body).toEqual({ url: RESOURCE, oauthEnabled: true });
+      await t.http.get('/api/mcp/connection').expect(401);
+    });
   });
 
   describe('dynamic client registration', () => {

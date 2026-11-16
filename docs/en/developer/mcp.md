@@ -4,7 +4,7 @@
 
 Attraccess exposes its REST API as a [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server, so AI clients such as Claude Code, MCP Inspector or your own agents can read and change data with the same rules as everyone else.
 
-- **Endpoint:** `https://<your-attraccess>/api/mcp` (Streamable HTTP, tools only).
+- **Endpoint:** `https://<your-attraccess>/api/mcp` (Streamable HTTP, tools only). Signed-in users find the exact URL, with a copy button and the sign-in options that work on it, under Account → Advanced → AI clients (MCP).
 - **Tools:** one tool per REST operation. The tool name is the operation ID from the OpenAPI document (for example `getAllResources`). The tools are generated from the running API, so they always match it.
 - **Every call is a REST call.** Validation, permission checks, audit log entries and error messages are exactly those of the REST endpoint. A REST error (400, 403, 404, ...) comes back as a tool error that contains the HTTP status and message.
 
